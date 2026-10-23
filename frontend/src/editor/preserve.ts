@@ -7,11 +7,22 @@
  * - Tables and lists: line alignment (LCS over normalised line keys). Every
  *   original line whose content still appears is kept verbatim; changed lines
  *   take the regenerated text restyled to the original's bullet character,
- *   indent width and table cell padding.
+ *   ordered-list delimiter, indent width and table cell padding. A loose list
+ *   keeps the blank lines between its items.
+ * - Other multi-line blocks (paragraphs, quotes, code): line alignment against
+ *   the block's baseline, i.e. what the serializer emitted for the unedited
+ *   block. A regenerated line equal to its baseline line was not edited, so the
+ *   original line is kept (with its own emphasis style and escaping).
  * - The original's line ending (LF/CRLF) and trailing newlines are kept.
  */
 
-export type EditorBlock = { raw?: string; markdown: string; kind: string }
+export type EditorBlock = {
+  raw?: string
+  markdown: string
+  kind: string
+  /** The serializer's output for the unedited `raw` (see `preserveBlock`). */
+  baseline?: string
+}
 
 // ---------------------------------------------------------------- helpers
 
@@ -151,8 +162,15 @@ function preserveList(origLines: string[], regenLines: string[]): string[] {
   const origParsed = parseList(origLines)
   const regenParsed = parseList(regenLines)
 
-  // Original style: bullet char, gap after the marker, indent per depth.
+  // Original style: bullet char, gap after the marker, indent per depth,
+  // ordered delimiter ('.' or ')') and a repeated number ('1.' on every item).
   const firstBullet = origParsed.find((p) => p && !/\d/.test(p.marker))
+  const origOrdered = origParsed.filter((p): p is ListLine => !!p && /\d/.test(p.marker))
+  const delimiter = origOrdered[0]?.marker.slice(-1)
+  const repeated =
+    origOrdered.length > 1 && origOrdered.every((p) => p.marker === origOrdered[0].marker)
+      ? origOrdered[0].marker.slice(0, -1)
+      : null
   const indentByDepth = new Map<number, string>()
   for (const p of origParsed) if (p && !indentByDepth.has(p.depth)) indentByDepth.set(p.depth, p.indent)
   const unit =
@@ -165,18 +183,65 @@ function preserveList(origLines: string[], regenLines: string[]): string[] {
     if (!p) return line
     const indent = indentByDepth.get(p.depth) ?? unit.repeat(p.depth)
     const ordered = /\d/.test(p.marker)
-    const marker = ordered || !firstBullet ? p.marker : firstBullet.marker
+    let marker = p.marker
+    if (ordered && delimiter) marker = (repeated ?? p.marker.slice(0, -1)) + delimiter
+    else if (!ordered && firstBullet) marker = firstBullet.marker
     const gap = p.content === '' ? '' : firstBullet && !ordered ? firstBullet.gap || ' ' : p.gap || ' '
     return indent + marker + gap + p.content
   }
 
-  return alignLines(
-    origLines,
-    regenLines,
+  const match = alignMatch(
     origLines.map((l, i) => listKey(l, origParsed[i])),
     regenLines.map((l, i) => listKey(l, regenParsed[i])),
-    restyle,
   )
+  return weaveBlankLines(origLines, regenLines, match, restyle)
+}
+
+const isBlank = (line: string) => line.trim() === ''
+
+/**
+ * Emit the aligned lines, putting back the original's blank lines that the
+ * regenerated (tight) list dropped. Between two kept original lines, the
+ * original lines in between are replayed in order: blank ones as they were,
+ * the others replaced one-for-one by the unmatched regenerated lines there
+ * (extra regenerated lines follow; extra original lines were deleted).
+ */
+function weaveBlankLines(
+  origLines: string[],
+  regenLines: string[],
+  match: Int32Array,
+  restyle: (line: string, index: number) => string,
+): string[] {
+  const out: string[] = []
+  const last = () => out[out.length - 1]
+  const pushBlank = (line: string) => {
+    // No blank first line, and no stacked blanks where an item was removed.
+    if (out.length > 0 && !isBlank(last())) out.push(line)
+  }
+  let prevOrig = -1
+  let j = 0
+  for (;;) {
+    // The run of unmatched regenerated lines up to the next match (or the end).
+    let k = j
+    while (k < regenLines.length && match[k] < 0) k++
+    const nextOrig = k < regenLines.length ? match[k] : origLines.length
+    const pending = regenLines.slice(j, k).map((line, n) => restyle(line, j + n))
+    let p = 0
+    for (let i = prevOrig + 1; i < nextOrig; i++) {
+      if (isBlank(origLines[i])) pushBlank(origLines[i])
+      else if (p < pending.length) out.push(pending[p++])
+    }
+    while (p < pending.length) out.push(pending[p++])
+    if (k >= regenLines.length) break
+    const kept = origLines[match[k]]
+    if (isBlank(kept)) pushBlank(kept)
+    else out.push(kept)
+    prevOrig = match[k]
+    j = k + 1
+  }
+  // A blank line only goes back between two lines, never at the end.
+  while (out.length > 0 && isBlank(last())) out.pop()
+  return out
 }
 
 // ---------------------------------------------------------------- alignment
@@ -192,6 +257,12 @@ function alignLines(
   regenKeys: string[],
   restyle: (line: string, index: number) => string,
 ): string[] {
+  const match = alignMatch(origKeys, regenKeys)
+  return regenLines.map((line, j) => (match[j] >= 0 ? origLines[match[j]] : restyle(line, j)))
+}
+
+/** LCS over line keys: for each regenerated line, the original line it matches, or -1. */
+function alignMatch(origKeys: string[], regenKeys: string[]): Int32Array {
   const n = origKeys.length
   const m = regenKeys.length
   // Trim a common prefix and suffix first: a one-line edit in a big table is O(n).
@@ -232,8 +303,7 @@ function alignLines(
       else j++
     }
   }
-
-  return regenLines.map((line, j) => (match[j] >= 0 ? origLines[match[j]] : restyle(line, j)))
+  return match
 }
 
 // ---------------------------------------------------------------- public API
@@ -268,6 +338,7 @@ export function preserveBlock(
   regenerated: string,
   kind: string,
   fallbackEol?: string,
+  baseline?: string,
 ): string {
   if (blockKeysEqual(original, regenerated, kind)) return original
 
@@ -277,13 +348,35 @@ export function preserveBlock(
   const regenLines = regenBody.split('\n')
 
   let lines: string[]
+  const origLines = origBody.split(/\r\n|\n|\r/)
   if ((kind === 'table' || kind === 'list') && origBody !== '') {
-    const origLines = origBody.split(/\r\n|\n|\r/)
     lines = kind === 'table' ? preserveTable(origLines, regenLines) : preserveList(origLines, regenLines)
+  } else if (origBody !== '' && (origLines.length > 1 || regenLines.length > 1)) {
+    lines = preserveLines(origLines, regenLines, baseline)
   } else {
     lines = regenLines
   }
   return lines.join(eol) + tail
+}
+
+/**
+ * Any other multi-line block: keep each original line whose regenerated line
+ * is unchanged. With a `baseline` that has one line per original line, a
+ * regenerated line equal to baseline line i stands for original line i (so an
+ * untouched line keeps its own `_em_` style and escaping); otherwise only
+ * lines that come back identical are kept. The key is the exact serialized
+ * line, so an edit that only adds or removes markup still counts as an edit.
+ */
+function preserveLines(origLines: string[], regenLines: string[], baseline?: string): string[] {
+  const baseLines = baseline === undefined ? null : splitTail(toLF(baseline))[0].split('\n')
+  const origKeys = baseLines && baseLines.length === origLines.length ? baseLines : origLines
+  return alignLines(
+    origLines,
+    regenLines,
+    origKeys.map((l) => l.trimEnd()),
+    regenLines.map((l) => l.trimEnd()),
+    (line) => line,
+  )
 }
 
 /**
@@ -301,7 +394,7 @@ export function serializeWithPreservation(blocks: EditorBlock[]): string {
   let prev: EditorBlock | null = null
   for (const block of blocks) {
     let text: string
-    if (block.raw !== undefined) text = preserveBlock(block.raw, block.markdown, block.kind, eol)
+    if (block.raw !== undefined) text = preserveBlock(block.raw, block.markdown, block.kind, eol, block.baseline)
     else text = eol === '\n' ? block.markdown : toLF(block.markdown).replace(/\n/g, eol)
     if (text === '') continue
 

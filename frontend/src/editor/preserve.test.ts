@@ -167,6 +167,38 @@ describe('preserveBlock', () => {
     expect(lineDiffCount(original, out)).toBe(1)
   })
 
+  test('editing one item of a loose list keeps the blank lines between items', () => {
+    expect(preserveBlock('- a\n\n- b\n\n- c', '- a\n- bZ\n- c', 'list')).toBe('- a\n\n- bZ\n\n- c')
+    expect(preserveBlock('- a\n\n- b\n\n- c', '- a\n- c', 'list')).toBe('- a\n\n- c')
+  })
+
+  test('a loose item with a paragraph keeps the blank line before the next item', () => {
+    const original = '* one\n\n  para in item\n\n* two'
+    const out = preserveBlock(original, '- one\n\n  para in item\n- twoZ', 'list')
+    expect(out).toBe('* one\n\n  para in item\n\n* twoZ')
+  })
+
+  test('an edited ordered item keeps the original delimiter and numbering style', () => {
+    expect(preserveBlock('1) a\n2) b', '1. a\n2. bZ', 'list')).toBe('1) a\n2) bZ')
+    expect(preserveBlock('1. a\n1. b\n1. c', '1. a\n2. bZ\n3. c', 'list')).toBe('1. a\n1. bZ\n1. c')
+    expect(preserveBlock('1. a\n2. b', '1. a\n2. b\n3. new', 'list')).toBe('1. a\n2. b\n3. new')
+  })
+
+  test('editing line 2 of a paragraph keeps line 1 byte-identical', () => {
+    expect(preserveBlock('_it_ first\nsecond', '*it* first\nsecondZ', 'paragraph', undefined, '*it* first\nsecond')).toBe(
+      '_it_ first\nsecondZ',
+    )
+    expect(preserveBlock('a * not em\nb', 'a \\* not em\nbZ', 'paragraph', undefined, 'a \\* not em\nb')).toBe(
+      'a * not em\nbZ',
+    )
+  })
+
+  test('a markup-only edit to one line of a paragraph is kept', () => {
+    expect(preserveBlock('word rest\nb', '**word** rest\nb', 'paragraph', undefined, 'word rest\nb')).toBe(
+      '**word** rest\nb',
+    )
+  })
+
   test('list item added at a deeper level uses the original indent unit', () => {
     const original = '* a\n    * b\n* c'
     const out = preserveBlock(original, '- a\n  - b\n    - b1\n- c', 'list')
