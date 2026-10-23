@@ -166,6 +166,33 @@ describe('document model', () => {
     editor.destroy()
   })
 
+  test('editing line 2 of a paragraph leaves line 1 untouched', () => {
+    for (const body of ['_it_ first\nsecond\n', 'a * not em\nb\n']) {
+      const editor = headless(body)
+      editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), 'Z')
+      const out = serializeBody(editor)
+      expect(out).toBe(body.replace(/\n$/, 'Z\n'))
+      editor.destroy()
+    }
+  })
+
+  test('editing an item of a loose list keeps its blank lines', () => {
+    const cases: [string, string, string][] = [
+      ['- a\n\n- b\n\n- c\n', 'b', '- a\n\n- bZ\n\n- c\n'],
+      ['* one\n\n  para in item\n\n* two\n', 'two', '* one\n\n  para in item\n\n* twoZ\n'],
+    ]
+    for (const [body, text, expected] of cases) {
+      const editor = headless(body)
+      let pos = -1
+      editor.state.doc.descendants((n, p) => {
+        if (pos < 0 && n.isText && n.text === text) pos = p + n.nodeSize
+      })
+      editor.commands.insertContentAt(pos, 'Z')
+      expect(serializeBody(editor)).toBe(expected)
+      editor.destroy()
+    }
+  })
+
   test('wikilinks parse as inline atoms and round-trip', () => {
     const editor = headless('See [[Ada Lovelace]] and [[Alpha|the server]].\n')
     const links: { target: string; label: string | null }[] = []

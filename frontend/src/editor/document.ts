@@ -119,6 +119,22 @@ export function loadBody(editor: Editor, body: string): void {
   edges.set(editor, { leading, trailing })
 }
 
+/**
+ * What the serializer emits for `raw` unedited: the baseline `preserveBlock`
+ * compares an edited block's lines against, so only edited lines change.
+ */
+function baselineOf(editor: Editor, raw: string, kind: string): string | undefined {
+  const md = editor.markdown
+  if (!md || kind === 'raw') return undefined
+  try {
+    const nodes = md.parse(raw.replace(/\r\n?/g, '\n')).content ?? []
+    if (nodes.length !== 1) return undefined
+    return trimBreaks(md.serialize({ type: 'doc', content: [nodes[0]] }))
+  } catch {
+    return undefined
+  }
+}
+
 function nodeMarkdown(editor: Editor, node: PMNode): string {
   if (node.type.name === 'rawBlock') return node.textContent
   const json = node.toJSON() as JSONContent
@@ -138,7 +154,7 @@ export function serializeBody(editor: Editor): string {
       blocks.push({ raw: source, markdown: source, kind })
     } else {
       const markdown = nodeMarkdown(editor, node)
-      if (origin != null) blocks.push({ raw: origin, markdown, kind })
+      if (origin != null) blocks.push({ raw: origin, markdown, kind, baseline: baselineOf(editor, origin, kind) })
       else if (markdown !== '') blocks.push({ markdown, kind })
     }
     const after = node.attrs.blockTrailing as string | null | undefined
