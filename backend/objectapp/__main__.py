@@ -28,7 +28,11 @@ def build_server_config(
 ) -> uvicorn.Config:
     """The uvicorn config for `space`. Always bound to localhost."""
     app = create_app(space, static_dir)
-    return uvicorn.Config(app, host=HOST, port=port, log_level="warning")
+    # uvicorn runs off the main thread here, so it installs no signal handlers;
+    # a short graceful timeout keeps a lingering connection from stalling exit.
+    return uvicorn.Config(
+        app, host=HOST, port=port, log_level="warning", timeout_graceful_shutdown=1
+    )
 
 
 def _wait_until_up(url: str, timeout: float = 10.0) -> None:
@@ -70,6 +74,9 @@ def main(argv: list[str] | None = None) -> None:
     except KeyboardInterrupt:
         pass
     finally:
+        # End the open /api/events streams first: sse_starlette only watches for
+        # signals, which never reach a server running on a worker thread.
+        server.config.app.state.hub.close()
         server.should_exit = True
         thread.join(timeout=5)
 
