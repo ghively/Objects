@@ -1,0 +1,38 @@
+[project]
+name = "objectapp"
+version = "0.1.0"
+description = "A local, file-based object workspace with a Object-style UI"
+authors = [
+    { name = "Gene Hively", email = "ghively@cpicardgroup.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.162.0",
+    "pywebview>=6.2.1",
+    "ruamel-yaml>=0.19.1",
+    "sse-starlette>=3.5.0",
+    "uvicorn>=0.54.0",
+    "watchdog>=6.0.0",
+]
+
+[project.scripts]
+objectapp = "objectapp.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = true
+
+[tool.uv.build-backend]
+module-root = "backend"
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]
