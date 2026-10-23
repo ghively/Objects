@@ -1,0 +1,19 @@
+# Source material kept local, never committed
+*.exe
+Capacities*.zip
+docs/ui-reference/03-settings-account.png
+
+# Local tooling state
+.remember/
+.claude/settings.local.json
+
+# Build and runtime
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.vault-copy/
+
+# Capacities reference material (recovered from the installer); never commit
+.reference/
