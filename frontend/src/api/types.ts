@@ -39,6 +39,8 @@ export interface ObjectSummary {
   lastUpdated: string | null
   tags: string[]
   readOnly: boolean
+  /** Why the object opens read-only (absent or null when it can be saved). */
+  readOnlyReason?: string | null
 }
 
 /** GET /api/space */
@@ -66,4 +68,6 @@ export interface ChangeEvent {
   kind: 'created' | 'changed' | 'deleted'
   path: string
   version: string | null
+  /** For a save made through the API: the saving window's `CLIENT_ID`. */
+  origin?: string | null
 }

@@ -102,6 +102,7 @@ export function RawMode({ path, text, version, onSaved, onConflict, readOnly = f
     getBody: () => (viewRef.current ? viewRef.current.state.sliceDoc() : null),
     savedBody: () => autosave.savedBody(),
     isDirty: () => autosave.isDirty(),
+    flush: () => autosave.settle(),
     hold: () => autosave.hold(),
     resume: (v: string, saveNow?: boolean) => autosave.resume(v, saveNow),
     reload: (body: string, v: string) => {

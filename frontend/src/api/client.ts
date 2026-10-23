@@ -71,13 +71,33 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const d = detailOf(data)
   if (res.status === 409) throw new ConflictError(String(d.currentVersion ?? ''))
   if (res.status === 423) throw new ReadOnlyError(String(d.reason ?? 'read-only'))
-  throw new ApiError(res.status, typeof data === 'string' ? data : res.statusText)
+  const detail = data && typeof data === 'object' ? (data as Record<string, unknown>).detail : undefined
+  // 400/404 carry the server's message as {detail: "..."}.
+  const message = typeof detail === 'string' ? detail : typeof data === 'string' ? data : res.statusText
+  throw new ApiError(res.status, message)
 }
 
 type ChangeListener = (e: ChangeEvent) => void
 
 const listeners = new Set<ChangeListener>()
 let source: EventSource | null = null
+
+function newClientId(): string {
+  const c = globalThis.crypto as Crypto | undefined
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID()
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+}
+
+/**
+ * This window's id. Saves send it, and the server tags the change event it
+ * announces for the save with it (`origin`), so this window can tell the
+ * echo of its own save from another window's.
+ */
+export const CLIENT_ID = newClientId()
+
+function emit(e: ChangeEvent) {
+  for (const cb of [...listeners]) cb(e)
+}
 
 function ensureSource() {
   if (source || typeof EventSource === 'undefined') return
@@ -89,7 +109,9 @@ function ensureSource() {
     } catch {
       return
     }
-    for (const cb of [...listeners]) cb(e)
+    // Our own saves were already announced locally (see `saveBody`).
+    if (e.origin && e.origin === CLIENT_ID) return
+    emit(e)
   })
 }
 
@@ -109,13 +131,24 @@ export const api = {
   /**
    * Save an object's body. Resolves with the new version (unchanged if the body was identical).
    * Rejects with `ConflictError` (409) or `ReadOnlyError` (423); neither writes the file.
+   *
+   * A save that wrote is announced to this window's `onChange` listeners as a
+   * `changed` event, after the caller has handled the result: the server doesn't
+   * echo the app's own writes back to the window that made them, and other views
+   * of the same object (a peek over its page) must not go stale.
    */
-  saveBody(path: string, body: string, baseVersion: string): Promise<SaveResult> {
-    return request<SaveResult>('/object/body', {
+  async saveBody(path: string, body: string, baseVersion: string): Promise<SaveResult> {
+    const res = await request<SaveResult>('/object/body', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path, body, baseVersion }),
+      body: JSON.stringify({ path, body, baseVersion, clientId: CLIENT_ID }),
     })
+    if (res && res.version && res.version !== baseVersion) {
+      const event: ChangeEvent = { kind: 'changed', path, version: res.version, origin: CLIENT_ID }
+      // Next task: the saving view adopts the new version first, so it ignores this.
+      setTimeout(() => emit(event), 0)
+    }
+    return res
   },
 
   /** Resolve a `[[link]]` to a path, or `null` when nothing matches (404). */

@@ -5,6 +5,9 @@ import { ObjectIcon } from '@/object/ObjectHeader'
 import { usePeek } from '@/nav/tabs'
 import { TypeChip } from '@/shell/Sidebar'
 
+/** Change events arrive in bursts (a git checkout, a sync tool): reload once per burst. */
+const RELOAD_DELAY_MS = 150
+
 /** M1 type page: header (icon tile + plural name) and a plain list of titles; click to peek. */
 export function TypePage({ type }: { type: TypeDef }) {
   const [objects, setObjects] = useState<ObjectSummary[] | null>(null)
@@ -12,21 +15,32 @@ export function TypePage({ type }: { type: TypeDef }) {
 
   useEffect(() => {
     let alive = true
-    const load = () =>
-      api
+    let seq = 0
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const load = () => {
+      const mine = ++seq // only the latest request may update the list
+      return api
         .objects(type.id)
         .then((os) => {
-          if (!alive) return
+          if (!alive || mine !== seq) return
           setObjects([...os].sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })))
           setError(null)
         })
-        .catch((e: unknown) => alive && setError(e instanceof Error ? e.message : String(e)))
+        .catch((e: unknown) => alive && mine === seq && setError(e instanceof Error ? e.message : String(e)))
+    }
     setObjects(null)
     void load()
     // Keep the list current as files appear, change or disappear on disk.
-    const off = api.onChange(() => void load())
+    const off = api.onChange(() => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        timer = null
+        void load()
+      }, RELOAD_DELAY_MS)
+    })
     return () => {
       alive = false
+      if (timer) clearTimeout(timer)
       off()
     }
   }, [type.id])
@@ -34,9 +48,9 @@ export function TypePage({ type }: { type: TypeDef }) {
   const paths = objects?.map((o) => o.path) ?? []
 
   return (
-    <div className="mx-auto w-full max-w-[1100px] px-10 pt-10 pb-16">
-      <header className="mb-6 flex items-center gap-3">
-        <TypeChip type={type} size={36} />
+    <div className="w-full">
+      <header className="flex items-center gap-2.5 border-b border-line px-4 pt-5 pb-4">
+        <TypeChip type={type} size={34} />
         <h1 className="text-[24px] font-bold">{type.pluralName}</h1>
         {objects && (
           <span className="ml-1 rounded-md border border-line px-1.5 text-[13px] text-fg-muted tabular-nums">
@@ -44,6 +58,7 @@ export function TypePage({ type }: { type: TypeDef }) {
           </span>
         )}
       </header>
+      <div className="mx-auto w-full max-w-[1100px] px-10 pt-6 pb-16">
       {error && <p className="text-fg-muted">{error}</p>}
       {objects && objects.length === 0 && (
         <div className="py-16 text-center">
@@ -68,6 +83,7 @@ export function TypePage({ type }: { type: TypeDef }) {
           ))}
         </ul>
       )}
+      </div>
     </div>
   )
 }

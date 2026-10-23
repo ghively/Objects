@@ -71,6 +71,7 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict, con
       getBody: () => (editor && !editor.isDestroyed ? serializeBody(editor) : null),
       savedBody: () => autosave.savedBody(),
       isDirty: () => autosave.isDirty(),
+      flush: () => autosave.settle(),
       hold: () => autosave.hold(),
       resume: (v: string, saveNow?: boolean) => autosave.resume(v, saveNow),
       reload: (text: string, v: string) => {

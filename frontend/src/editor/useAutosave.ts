@@ -1,7 +1,8 @@
 /**
  * Debounced, conflict-safe autosave shared by the formatted editor and raw mode.
  *
- * - `schedule()` saves 1000 ms after the last call; `flush()` saves now (on blur).
+ * - `schedule()` saves 1000 ms after the last call; `flush()` saves now (on blur);
+ *   `settle()` saves now and waits until no save is in flight or queued.
  * - Nothing is sent when the body equals the last loaded or saved body.
  * - One save in flight at a time; edits made meanwhile are saved right after.
  * - A 409 calls `onConflict` and pauses saving until a new version arrives.
@@ -34,6 +35,8 @@ export function useAutosave(opts: AutosaveOptions) {
   const inFlightRef = useRef(false)
   const againRef = useRef(false)
   const pausedRef = useRef(false)
+  /** The save running now (including any save queued behind it), if any. */
+  const runningRef = useRef<Promise<void> | null>(null)
   const flushRef = useRef<(pathOverride?: string) => Promise<void>>(async () => {})
 
   // A new version from the parent (a reload, or a conflict resolved) resumes saving.
@@ -65,29 +68,46 @@ export function useAutosave(opts: AutosaveOptions) {
 
     const path = pathOverride ?? o.path
     inFlightRef.current = true
-    try {
-      const res = await api.saveBody(path, body, versionRef.current)
-      if (optsRef.current.path !== path) return
-      versionRef.current = res.version
-      savedBodyRef.current = body
-      optsRef.current.onSaved(res.version)
-    } catch (err) {
-      if (err instanceof ConflictError) {
-        pausedRef.current = true
-        optsRef.current.onConflict?.(err.currentVersion)
-      } else if (err instanceof ReadOnlyError) {
-        pausedRef.current = true
-      } else {
-        console.error('autosave failed', err)
+    const run = (async () => {
+      try {
+        const res = await api.saveBody(path, body, versionRef.current)
+        if (optsRef.current.path !== path) return
+        versionRef.current = res.version
+        savedBodyRef.current = body
+        optsRef.current.onSaved(res.version)
+      } catch (err) {
+        if (err instanceof ConflictError) {
+          pausedRef.current = true
+          optsRef.current.onConflict?.(err.currentVersion)
+        } else if (err instanceof ReadOnlyError) {
+          pausedRef.current = true
+        } else {
+          console.error('autosave failed', err)
+        }
+      } finally {
+        inFlightRef.current = false
       }
+      if (againRef.current) {
+        againRef.current = false
+        await flushRef.current()
+      }
+    })()
+    runningRef.current = run
+    try {
+      await run
     } finally {
-      inFlightRef.current = false
-    }
-    if (againRef.current) {
-      againRef.current = false
-      await flushRef.current()
+      if (runningRef.current === run) runningRef.current = null
     }
   }, [cancel])
+
+  /**
+   * Save now and resolve only once nothing is left to save: any save already in
+   * flight, and any save queued behind it, has finished.
+   */
+  const settle = useCallback(async (): Promise<void> => {
+    await flush()
+    while (runningRef.current) await runningRef.current
+  }, [flush])
   useLayoutEffect(() => {
     flushRef.current = flush
   }, [flush])
@@ -146,6 +166,7 @@ export function useAutosave(opts: AutosaveOptions) {
   return {
     schedule,
     flush,
+    settle,
     markLoaded,
     cancel,
     hold,
@@ -167,6 +188,11 @@ export interface BodyEditorHandle {
   savedBody(): string | null
   /** True when there are edits not yet saved. */
   isDirty(): boolean
+  /**
+   * Save pending edits now; resolves once every save (in flight, or queued
+   * behind one) has finished, so what is on disk is what the editor shows.
+   */
+  flush(): Promise<void>
   /** Stop autosaving until `resume()` or `reload()`. */
   hold(): void
   /** Adopt `version` and resume autosave; `saveNow` saves pending edits against it at once. */
