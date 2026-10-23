@@ -10,10 +10,14 @@ from __future__ import annotations
 import hashlib
 import re
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
-from .objfile import ObjectFile
+from .frontmatter import set_keys
+from .ids import new_ulid
+from .objfile import ObjectFile, join_object
+from .textfile import TextFile, atomic_write, decode, encode
 from .typedefs import (
     RawObject,
     TypeDef,
@@ -25,9 +29,31 @@ from .typedefs import (
     slug,
 )
 
-__all__ = ["ObjectSummary", "Space", "version_of"]
+__all__ = ["Conflict", "ObjectSummary", "ReadOnly", "Space", "now_stamp", "version_of"]
 
 _HEADING_RE = re.compile(r"^#[ \t]+(.+?)[ \t#]*$", re.MULTILINE)
+
+
+class Conflict(Exception):
+    """The file changed on disk since the version the caller edited."""
+
+    def __init__(self, current_version: str) -> None:
+        super().__init__(f"Object changed on disk (current version {current_version})")
+        self.current_version = current_version
+
+
+class ReadOnly(Exception):
+    """The object cannot be saved (e.g. its frontmatter is malformed)."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+def now_stamp() -> str:
+    """The current UTC time as ``YYYY-MM-DDTHH:MM:SS.sssZ``."""
+    now = datetime.now(UTC)
+    return now.strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
 
 
 @dataclass
@@ -96,6 +122,8 @@ class Space:
         self._lock = threading.RLock()
         self._raw: dict[str, RawObject] = {}
         self._summaries: dict[str, ObjectSummary] = {}
+        self.own_writes: dict[str, str] = {}
+        """Path -> version of the last write `save_body` made (for self-write suppression)."""
         for rel in iter_object_paths(self.root):
             try:
                 self._raw[rel] = read_raw(self.root, rel)
@@ -177,6 +205,45 @@ class Space:
             raise KeyError(rel)
         raw = read_raw(self.root, rel)
         return raw.of, dict(raw.fm), version_of(raw.data)
+
+    def save_body(self, path: str, body: str, base_version: str) -> str:
+        """Replace an object's body, touching nothing else; return the new version.
+
+        Raises `Conflict` when the file on disk no longer matches ``base_version``
+        and `ReadOnly` when its frontmatter is malformed. An unchanged body
+        writes nothing. Otherwise ``lastUpdated`` is set (in place, or appended)
+        and an ``id`` is inserted first if absent; line endings, BOM and the
+        trailing newline are kept.
+        """
+        rel = self._rel(path)
+        full = self.root / rel
+        body = body.replace("\r\n", "\n")
+        with self._lock:
+            if not full.is_file():
+                raise KeyError(rel)
+            raw = read_raw(self.root, rel)
+            current = version_of(raw.data)
+            if current != base_version:
+                raise Conflict(current)
+            if raw.readOnly:
+                raise ReadOnly(raw.of.fm_error or "Frontmatter is not valid YAML")
+            if raw.of.body == body:
+                return current
+
+            insert_first = None if _str_or_none(raw.fm.get("id")) else {"id": new_ulid()}
+            fm_src = set_keys(
+                raw.of.frontmatter_src or "",
+                {"lastUpdated": now_stamp()},
+                insert_first=insert_first,
+            )
+            of = replace(raw.of, frontmatter_src=fm_src, body=body)
+            tf = decode(raw.data)
+            data = encode(TextFile(text=join_object(of), eol=tf.eol, bom=tf.bom))
+            new_version = version_of(data)
+            self.own_writes[rel] = new_version
+            atomic_write(full, data)
+            self.rescan_file(rel)
+            return new_version
 
     def rescan_file(self, path: str) -> None:
         """Refresh one object's summary from disk (or drop it if the file is gone)."""
