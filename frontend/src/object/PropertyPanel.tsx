@@ -61,7 +61,7 @@ export function PropertyPanel({ type, frontmatter }: PropertyPanelProps) {
   return (
     <aside
       aria-label="Properties"
-      className="w-[370px] shrink-0 overflow-auto border-r border-line bg-panel px-6 pt-8 pb-6 text-fg"
+      className="group/panel w-[370px] shrink-0 overflow-auto border-r border-line bg-panel px-6 pt-8 pb-6 text-fg"
     >
       {rows.map((p, i) => {
         const v = frontmatter[p.key]
@@ -70,13 +70,13 @@ export function PropertyPanel({ type, frontmatter }: PropertyPanelProps) {
             {i > 0 && <hr className="my-3 border-line" />}
             <div className="px-1">
               <div className="flex items-center gap-2 text-[15px] font-medium">
-                <Icon name={KIND_ICON[p.type] ?? 'ph-text-t'} size={15} className="text-fg-muted" />
+                <Icon name={KIND_ICON[p.type] ?? 'ph-text-t'} size={15} />
                 <span>{p.name}</span>
               </div>
               {isEmpty(v) ? (
-                <p className="mt-2 text-[15px] text-fg-muted">Empty</p>
+                <p className="mt-3 text-[15px] text-fg-muted">Empty</p>
               ) : (
-                <p className="mt-2 text-[15px] break-words whitespace-pre-wrap">{formatValue(v)}</p>
+                <p className="mt-3 text-[15px] break-words whitespace-pre-wrap">{formatValue(v)}</p>
               )}
             </div>
           </Fragment>
@@ -86,7 +86,7 @@ export function PropertyPanel({ type, frontmatter }: PropertyPanelProps) {
         type="button"
         disabled
         title="Editing properties arrives in M2"
-        className="mt-5 flex items-center gap-2 px-1 text-[15px] text-fg-muted opacity-40"
+        className="mt-5 flex items-center gap-2 px-1 text-[15px] text-fg-muted opacity-15 transition-opacity group-hover/panel:opacity-100"
       >
         <Icon name="ph-plus" size={14} />
         Add Property

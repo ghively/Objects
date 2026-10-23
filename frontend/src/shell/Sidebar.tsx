@@ -25,7 +25,7 @@ export function TypeChip({ type, size = 22 }: { type: Pick<TypeDef, 'icon' | 'co
       data-color={type.color}
       data-icon={type.icon}
       style={{ ...chipStyle(type.color), width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-md bg-[var(--chip-bg)] text-[var(--chip-fg)]"
+      className="inline-flex shrink-0 items-center justify-center rounded-md border border-[color-mix(in_srgb,var(--chip-bg)_85%,white)] bg-[var(--chip-bg)] text-[var(--chip-fg)]"
     >
       <Icon name={type.icon} size={Math.round(size * 0.68)} />
     </span>
@@ -36,7 +36,7 @@ function SectionHeader({ id, icon, children }: { id: string; icon?: string; chil
   return (
     <h2
       id={id}
-      className="flex items-center gap-1.5 px-2 pt-5 pb-2 text-[13px] font-semibold text-fg-muted"
+      className="flex items-center gap-1.5 px-2 pt-5 pb-2 text-[14px] font-semibold text-[#a7a2a1]"
     >
       {icon && <Icon name={icon} size={14} />}
       {children}
@@ -69,13 +69,13 @@ function NavItem({ icon, label, hint }: { icon: string; label: string; hint: str
 export function Sidebar({ types, activeTypeId, onOpenType, counts }: SidebarProps) {
   const sorted = [...types].sort(byPluralName)
   return (
-    <aside className="flex h-full w-[330px] shrink-0 flex-col bg-app pr-2 pl-1.5 text-fg" aria-label="Sidebar">
+    <aside className="flex h-full w-[358px] shrink-0 flex-col bg-app pr-3.5 pl-2.5 text-fg" aria-label="Sidebar">
       <div className="flex items-center gap-2 pt-3 pb-3">
         <button
           type="button"
           disabled
           title="Creating objects arrives in M2"
-          className="flex h-[42px] flex-1 items-center gap-2 rounded-xl bg-raised px-3 text-[15px] font-medium disabled:cursor-default disabled:opacity-60"
+          className="flex h-[42px] flex-1 items-center gap-2 rounded-xl border border-[#2a292d] bg-raised px-3 text-[15px] font-medium disabled:cursor-default disabled:opacity-60"
         >
           <Icon name="ph-plus" size={16} />
           New
@@ -84,7 +84,7 @@ export function Sidebar({ types, activeTypeId, onOpenType, counts }: SidebarProp
           type="button"
           aria-label="Search"
           title="Search (M5)"
-          className="flex size-[42px] items-center justify-center rounded-xl bg-raised hover:bg-hover"
+          className="flex size-[42px] items-center justify-center rounded-xl border border-[#2a292d] bg-raised hover:bg-hover"
         >
           <Icon name="ph-magnifying-glass" size={18} />
         </button>
@@ -139,6 +139,9 @@ export function Sidebar({ types, activeTypeId, onOpenType, counts }: SidebarProp
         </button>
         <button type="button" disabled aria-label="Theme" className="flex size-8 items-center justify-center rounded-md disabled:opacity-60">
           <Icon name="ph-sun" size={17} />
+        </button>
+        <button type="button" disabled aria-label="Share" className="ml-auto flex size-8 items-center justify-center rounded-md disabled:opacity-60">
+          <Icon name="ph-share-fat" size={17} />
         </button>
       </footer>
     </aside>

@@ -19,25 +19,29 @@
   --accent-today: #ff0000;
   --primary-btn: #e8e7e6;
 
-  /* Type colours: icon foreground + chip tint. */
-  --type-blue-fg: #6e9bff;
-  --type-blue-bg: #1d2a4a;
-  --type-green-fg: #4fc489;
-  --type-green-bg: #18352a;
-  --type-orange-fg: #f0925a;
+  /* Card edge: color-mix(border-front 80%, bg-back), as Object's .app-window-chrome. */
+  --border-chrome: #27262b;
+
+  /* Type colours: pastel ink on a mid-tone fill (sampled from Object's sidebar chips;
+     teal and yellow derived the same way: fill ~25% lightness, ink ~88%). */
+  --type-blue-fg: #c0d8ff;
+  --type-blue-bg: #323458;
+  --type-green-fg: #b1ffd2;
+  --type-green-bg: #1f4430;
+  --type-orange-fg: #fed8a5;
   --type-orange-bg: #553025;
-  --type-purple-fg: #a98bff;
-  --type-purple-bg: #2e2550;
-  --type-pink-fg: #f07ab4;
-  --type-pink-bg: #4a2139;
-  --type-teal-fg: #45c3c9;
-  --type-teal-bg: #163a3d;
-  --type-yellow-fg: #e8c547;
-  --type-yellow-bg: #43391a;
-  --type-red-fg: #f2667e;
-  --type-red-bg: #4d1d27;
-  --type-gray-fg: #b4b4ba;
-  --type-gray-bg: #2a292e;
+  --type-purple-fg: #eecaff;
+  --type-purple-bg: #491f57;
+  --type-pink-fg: #ffc5d0;
+  --type-pink-bg: #5d1e37;
+  --type-teal-fg: #b1f6ff;
+  --type-teal-bg: #1f4346;
+  --type-yellow-fg: #fff0a8;
+  --type-yellow-bg: #4f4420;
+  --type-red-fg: #ffc2c7;
+  --type-red-bg: #59282d;
+  --type-gray-fg: #e4e3e2;
+  --type-gray-bg: #3c3b3e;
 
   --radius-xs-v: 2px;
   --radius-sm-v: 4px;
@@ -58,6 +62,7 @@
   --color-hover: var(--bg-hover);
   --color-hover-2: var(--bg-hover-2);
   --color-line: var(--border-subtle);
+  --color-chrome: var(--border-chrome);
   --color-danger: var(--danger);
   --color-fg: var(--text);
   --color-fg-muted: var(--text-muted);

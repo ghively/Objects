@@ -1,18 +1,26 @@
 /* Formatted editor surface. Colours come from the theme tokens. */
+/* Spacing and heading scale follow Object's .editor-prose: a block stack of
+   .44em plus 9px, larger gaps before headings (in the body's em; each heading's
+   value is divided by its own font-size) and .42em after one. */
 .object-editor {
   outline: none;
-  line-height: 1.6;
+  line-height: 1.647; /* 28px at 17px */
   min-height: 4rem;
   white-space: pre-wrap;
   word-wrap: break-word;
 }
 .object-editor > * + * {
-  margin-top: 0.5em;
+  margin-top: calc(0.44em + 9px);
 }
-.object-editor h1 { font-size: 1.75em; font-weight: 700; }
-.object-editor h2 { font-size: 1.4em; font-weight: 700; }
-.object-editor h3 { font-size: 1.2em; font-weight: 600; }
-.object-editor h4 { font-size: 1.05em; font-weight: 600; }
+.object-editor h1 { font-size: 1.5em; line-height: 1.333; font-weight: 700; }
+.object-editor h2 { font-size: 1.3125em; line-height: 1.333; font-weight: 700; }
+.object-editor h3 { font-size: 1.1875em; font-weight: 650; }
+.object-editor h4 { font-size: 1.0625em; font-weight: 600; }
+.object-editor > h1:not(:first-child) { margin-top: calc(2.9em / 1.5 + 8px); }
+.object-editor > h2:not(:first-child) { margin-top: calc(2.4em / 1.3125 + 6px); }
+.object-editor > h3:not(:first-child) { margin-top: calc(1.85em / 1.1875 + 4px); }
+.object-editor > h4:not(:first-child) { margin-top: calc(1.35em / 1.0625 + 4px); }
+.object-editor > :is(h1, h2, h3, h4) + * { margin-top: 0.42em; }
 .object-editor ul { list-style: disc; padding-left: 1.5em; }
 .object-editor ol { list-style: decimal; padding-left: 1.5em; }
 .object-editor ul[data-type='taskList'] { list-style: none; padding-left: 0.25em; }
@@ -20,10 +28,12 @@
 .object-editor ul[data-type='taskList'] li > label { margin-top: 0.2em; }
 .object-editor ul[data-type='taskList'] li > div { flex: 1; }
 .object-editor blockquote {
-  border-left: 3px solid var(--border-subtle);
-  padding-left: 0.9em;
-  color: var(--text-muted);
+  border-left: 3px solid #4e4b4c;
+  padding-left: 1.125rem;
+  color: inherit;
 }
+.object-editor li::marker { color: #e4e3e2; }
+.object-editor li li::marker { color: #7c7c7d; }
 .object-editor code {
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
   font-size: 0.9em;
