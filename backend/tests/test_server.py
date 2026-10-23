@@ -225,3 +225,18 @@ def test_binds_localhost_only(space_dir: Path):
     config = launcher.build_server_config(Space(space_dir), port=8790, static_dir=None)
     assert config.host == "127.0.0.1"
     assert config.port == 8790
+
+
+def test_reveal_opens_file_manager(client: TestClient, space_dir: Path, monkeypatch):
+    from objectapp import server
+
+    calls: list[Path] = []
+    monkeypatch.setattr(server, "reveal_in_file_manager", lambda p: calls.append(p))
+
+    r = client.post("/api/reveal", json={"path": "Tasks/Write docs.md"})
+    assert r.status_code == 200, r.text
+    assert calls == [space_dir / "Tasks" / "Write docs.md"]
+
+    assert client.post("/api/reveal", json={"path": "../outside.md"}).status_code == 400
+    assert client.post("/api/reveal", json={"path": "Tasks/Nope.md"}).status_code == 404
+    assert len(calls) == 1

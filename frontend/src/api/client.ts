@@ -129,6 +129,15 @@ export const api = {
     }
   },
 
+  /** Show the object's file in the OS file manager (Explorer on Windows). */
+  async reveal(path: string): Promise<void> {
+    await request<unknown>('/reveal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    })
+  },
+
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */
   onChange(cb: ChangeListener): () => void {
     listeners.add(cb)

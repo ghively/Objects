@@ -1,18 +1,87 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/api/client'
-import type { SpaceInfo, TypeDef } from '@/api/types'
+import type { SpaceInfo } from '@/api/types'
+import { Icon } from '@/components/Icon'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { LinkPicker } from '@/links/LinkPicker'
+import { stemOf, useLinkIndex } from '@/links/linkIndex'
+import { canGoBack, canGoForward, currentTarget, tabTarget, useTabs, type Tab } from '@/nav/tabs'
+import { ObjectPage } from '@/object/ObjectPage'
+import { ObjectIcon } from '@/object/ObjectHeader'
+import { ObjectPeek } from '@/object/ObjectPeek'
 import { MainPanel } from '@/shell/MainPanel'
 import { RightPanel } from '@/shell/RightPanel'
-import { Sidebar } from '@/shell/Sidebar'
+import { Sidebar, TypeChip } from '@/shell/Sidebar'
 import { TopBar } from '@/shell/TopBar'
+import { cn } from '@/lib/utils'
+import { TypePage } from '@/types/TypePage'
+
+function TabLabel({ tab, space }: { tab: Tab; space: SpaceInfo | null }) {
+  const target = tabTarget(tab)
+  const objects = useLinkIndex((s) => s.objects)
+  if (!target) return <span className="truncate">New tab</span>
+  if (target.kind === 'type') {
+    const type = space?.types.find((t) => t.id === target.typeId)
+    return (
+      <>
+        {type && <TypeChip type={type} size={18} />}
+        <span className="truncate">{type?.pluralName ?? target.typeId}</span>
+      </>
+    )
+  }
+  const summary = objects.find((o) => o.path === target.path)
+  const type = space?.types.find((t) => t.id === summary?.type)
+  return (
+    <>
+      {summary?.icon ? <ObjectIcon icon={summary.icon} size={15} /> : type && <TypeChip type={type} size={18} />}
+      <span className="truncate">{summary?.title ?? stemOf(target.path)}</span>
+    </>
+  )
+}
+
+function TabStrip({ space }: { space: SpaceInfo | null }) {
+  const { tabs, activeId, activate, close } = useTabs()
+  return (
+    <div role="tablist" aria-label="Tabs" className="flex min-w-0 items-center gap-1 overflow-hidden">
+      {tabs.map((tab) => (
+        <div
+          key={tab.id}
+          role="tab"
+          aria-selected={tab.id === activeId}
+          tabIndex={0}
+          onClick={() => activate(tab.id)}
+          onAuxClick={(e) => e.button === 1 && close(tab.id)}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && activate(tab.id)}
+          className={cn(
+            'group flex h-8 max-w-[220px] min-w-0 cursor-default items-center gap-1.5 rounded-lg pr-1 pl-2 text-[14px] font-medium',
+            tab.id === activeId ? 'bg-raised' : 'text-fg-muted hover:bg-hover',
+          )}
+        >
+          <TabLabel tab={tab} space={space} />
+          <button
+            type="button"
+            aria-label="Close tab"
+            onClick={(e) => {
+              e.stopPropagation()
+              close(tab.id)
+            }}
+            className="flex size-5 shrink-0 items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-hover-2"
+          >
+            <Icon name="ph-x" size={12} />
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function App() {
   const [space, setSpace] = useState<SpaceInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [rightOpen, setRightOpen] = useState(false)
-  const [activeType, setActiveType] = useState<TypeDef | null>(null)
+  const tabs = useTabs()
+  const target = currentTarget(tabs)
 
   useEffect(() => {
     api
@@ -22,7 +91,25 @@ export default function App() {
         document.title = `${s.name} · Object`
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+    void useLinkIndex.getState().load()
   }, [])
+
+  const activeType = target?.kind === 'type' ? space?.types.find((t) => t.id === target.typeId) : undefined
+
+  let content
+  if (error) {
+    content = (
+      <Centered title="Can't reach the Object back end." subtitle={error} />
+    )
+  } else if (target?.kind === 'object') {
+    content = <ObjectPage path={target.path} />
+  } else if (target?.kind === 'type' && activeType) {
+    content = <TypePage type={activeType} />
+  } else if (target?.kind === 'type' && space) {
+    content = <Centered title="Unknown object type" subtitle={target.typeId} />
+  } else {
+    content = <Centered title="Pick an object type" subtitle="Choose a type in the sidebar to see its objects." />
+  }
 
   return (
     <TooltipProvider delayDuration={400}>
@@ -32,38 +119,38 @@ export default function App() {
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
           onToggleRightPanel={() => setRightOpen((v) => !v)}
           rightPanelOpen={rightOpen}
+          onBack={tabs.back}
+          onForward={tabs.forward}
+          canGoBack={canGoBack(tabs)}
+          canGoForward={canGoForward(tabs)}
+          onNewTab={tabs.newTab}
+          tabs={<TabStrip space={space} />}
         />
         <div className="flex min-h-0 flex-1">
           {sidebarOpen && (
             <Sidebar
               types={space?.types ?? []}
               activeTypeId={activeType?.id}
-              onOpenType={setActiveType}
+              onOpenType={(t) => tabs.open({ kind: 'type', typeId: t.id })}
             />
           )}
-          <MainPanel>
-            <div className="flex h-full items-center justify-center p-8 text-center">
-              {error ? (
-                <div>
-                  <p className="font-semibold">Can't reach the Object back end.</p>
-                  <p className="mt-1 text-fg-muted">{error}</p>
-                </div>
-              ) : activeType ? (
-                <div>
-                  <p className="font-semibold">{activeType.pluralName}</p>
-                  <p className="mt-1 text-fg-muted">The type list arrives with tabs and pages.</p>
-                </div>
-              ) : (
-                <div>
-                  <p className="font-semibold">Pick an object type</p>
-                  <p className="mt-1 text-fg-muted">Choose a type in the sidebar to see its objects.</p>
-                </div>
-              )}
-            </div>
-          </MainPanel>
+          <MainPanel>{content}</MainPanel>
           <RightPanel open={rightOpen} />
         </div>
+        <ObjectPeek />
+        <LinkPicker />
       </div>
     </TooltipProvider>
+  )
+}
+
+function Centered({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="flex h-full items-center justify-center p-8 text-center">
+      <div>
+        <p className="font-semibold">{title}</p>
+        <p className="mt-1 text-fg-muted">{subtitle}</p>
+      </div>
+    </div>
   )
 }
