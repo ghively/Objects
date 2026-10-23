@@ -7,7 +7,8 @@ loop). Nothing is emitted for:
 
 - dot-folders (``.capacities``, ``.capacities-cache``, ``.git``…), dot-files and
   non-``.md`` files;
-- writes made by `Space.save_body` (its ``own_writes`` versions);
+- writes made by `Space.save_body` (its ``own_writes`` versions): the server
+  announces those itself, tagged with the saving client's id;
 - events that leave the file bytes as the space already knows them.
 """
 
@@ -38,6 +39,8 @@ class ChangeEvent:
     """Space-relative POSIX path of the object file."""
     version: str | None
     """The new file version (sha256 of its bytes); ``None`` when deleted."""
+    origin: str | None = None
+    """For a save made through the API: the saving client's id (see ``PUT /api/object/body``)."""
 
 
 class _Handler(FileSystemEventHandler):

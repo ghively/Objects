@@ -17,7 +17,7 @@ from pathlib import Path, PurePosixPath
 from .frontmatter import set_keys
 from .ids import new_ulid
 from .objfile import ObjectFile, join_object
-from .textfile import TextFile, atomic_write, decode, encode
+from .textfile import atomic_write, encode_like
 from .typedefs import (
     RawObject,
     TypeDef,
@@ -68,6 +68,8 @@ class ObjectSummary:
     lastUpdated: str | None
     tags: list[str] = field(default_factory=list)
     readOnly: bool = False
+    readOnlyReason: str | None = None
+    """Why the object opens read-only (None when it can be saved)."""
 
 
 def version_of(data: bytes) -> str:
@@ -184,6 +186,7 @@ class Space:
             lastUpdated=_str_or_none(fm.get("lastUpdated")),
             tags=_str_list(fm.get("tags")),
             readOnly=raw.readOnly,
+            readOnlyReason=raw.readOnlyReason,
         )
 
     def list(self, type_id: str | None = None) -> list[ObjectSummary]:
@@ -226,7 +229,7 @@ class Space:
             if current != base_version:
                 raise Conflict(current)
             if raw.readOnly:
-                raise ReadOnly(raw.of.fm_error or "Frontmatter is not valid YAML")
+                raise ReadOnly(raw.readOnlyReason or "Object is read-only")
             if raw.of.body == body:
                 return current
 
@@ -237,11 +240,27 @@ class Space:
                 insert_first=insert_first,
             )
             of = replace(raw.of, frontmatter_src=fm_src, body=body)
-            tf = decode(raw.data)
-            data = encode(TextFile(text=join_object(of), eol=tf.eol, bom=tf.bom))
+            # Untouched lines keep their own bytes (and line endings) from the original.
+            data = encode_like(raw.data, join_object(of))
             new_version = version_of(data)
+
+            def unchanged_on_disk() -> None:
+                # Re-check right before the replace: an external write since the
+                # read above must surface as a conflict, never be overwritten.
+                try:
+                    now = version_of(full.read_bytes())
+                except OSError as exc:
+                    raise KeyError(rel) from exc
+                if now != current:
+                    raise Conflict(now)
+
             self.own_writes[rel] = new_version
-            atomic_write(full, data)
+            try:
+                atomic_write(full, data, check=unchanged_on_disk)
+            except BaseException:
+                if self.own_writes.get(rel) == new_version:
+                    del self.own_writes[rel]
+                raise
             self.rescan_file(rel)
             return new_version
 

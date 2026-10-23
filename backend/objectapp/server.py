@@ -5,12 +5,13 @@ Routes (all JSON):
 - ``GET /api/space`` -> ``{name, root, types}``
 - ``GET /api/objects?type=`` -> ``ObjectSummary[]``
 - ``GET /api/object?path=`` -> ``{summary, frontmatter, body, version}``
-- ``PUT /api/object/body`` ``{path, body, baseVersion}`` -> ``200 {version}``,
-  ``409 {currentVersion}`` or ``423 {reason}``
+- ``PUT /api/object/body`` ``{path, body, baseVersion, clientId?}`` -> ``200 {version}``,
+  ``409 {currentVersion}`` or ``423 {reason}``. A save that writes announces a
+  ``changed`` event with ``origin: clientId``.
 - ``GET /api/resolve?link=&from=`` -> ``{path}`` or ``404``
 - ``POST /api/reveal`` ``{path}`` -> ``200 {ok}``: show the file in the OS file manager
 - ``GET /api/events`` -> Server-Sent Events; event ``change`` with a
-  `ChangeEvent` as JSON data (``{kind, path, version}``)
+  `ChangeEvent` as JSON data (``{kind, path, version, origin}``)
 
 Errors: a path outside the space or not an object is ``400``; a missing object is ``404``.
 """
@@ -26,7 +27,7 @@ import sys
 import threading
 from collections.abc import AsyncIterator
 from dataclasses import asdict
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from fastapi import APIRouter, FastAPI, Query
 from fastapi.responses import JSONResponse
@@ -35,6 +36,7 @@ from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from .space import Conflict, ReadOnly, Space
+from .typedefs import has_undecodable
 from .watcher import ChangeEvent, SpaceWatcher
 
 __all__ = ["EventHub", "create_app"]
@@ -87,6 +89,21 @@ class SaveBodyRequest(BaseModel):
     path: str
     body: str
     baseVersion: str
+    clientId: str | None = None
+    """The saving window's id, echoed as ``origin`` on the change event the save announces."""
+
+
+def _display_safe(value):
+    """`value` with undecodable bytes (surrogate escapes) shown as U+FFFD, so it can be JSON."""
+    if isinstance(value, str):
+        if has_undecodable(value):
+            return value.encode("utf-8", errors="surrogateescape").decode("utf-8", errors="replace")
+        return value
+    if isinstance(value, dict):
+        return {_display_safe(k): _display_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_display_safe(v) for v in value]
+    return value
 
 
 class RevealRequest(BaseModel):
@@ -153,7 +170,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
 
     @api.get("/objects")
     def list_objects(type: str | None = Query(default=None)):
-        return [asdict(s) for s in space.list(type or None)]
+        return _display_safe([asdict(s) for s in space.list(type or None)])
 
     @api.get("/object")
     def get_object(path: str):
@@ -168,17 +185,32 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
             return _error(404, f"No object at {path!r}")
-        return {
-            "summary": asdict(summary),
-            "frontmatter": fm,
-            "body": of.body,
-            "version": version,
-        }
+        # A file that isn't valid UTF-8 opens read-only (see `read_raw`), so this
+        # lossy display copy can never be saved back over the original bytes.
+        return _display_safe(
+            {
+                "summary": asdict(summary),
+                "frontmatter": fm,
+                "body": of.body,
+                "version": version,
+            }
+        )
+
+    def announce(event: ChangeEvent) -> None:
+        """Publish `event` to the SSE clients from a worker thread."""
+        loop = hub.loop
+        if loop is not None and loop.is_running() and not hub.closed:
+            loop.call_soon_threadsafe(hub.publish, event)
 
     @api.put("/object/body")
     def put_body(req: SaveBodyRequest):
         try:
             version = space.save_body(req.path, req.body, req.baseVersion)
+            if version != req.baseVersion:
+                # The watcher suppresses the app's own writes; tell every other
+                # window (and view) about the new version here instead.
+                rel = PurePosixPath(req.path.replace("\\", "/")).as_posix()
+                announce(ChangeEvent("changed", rel, version, origin=req.clientId))
         except Conflict as exc:
             return JSONResponse({"currentVersion": exc.current_version}, status_code=409)
         except ReadOnly as exc:

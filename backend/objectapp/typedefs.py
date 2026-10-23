@@ -114,6 +114,16 @@ class RawObject:
     fm: dict
     readOnly: bool
     typeName: str
+    readOnlyReason: str | None = None
+    """Why the object can't be saved (None when it can)."""
+
+
+_UNDECODABLE_RE = re.compile("[\udc80-\udcff]")
+
+
+def has_undecodable(text: str) -> bool:
+    """True when `text` holds bytes that weren't valid UTF-8 (kept as surrogate escapes)."""
+    return _UNDECODABLE_RE.search(text) is not None
 
 
 def slug(name: str) -> str:
@@ -143,21 +153,40 @@ def read_raw(root: Path, rel: str) -> RawObject:
     data = path.read_bytes()
 
     tf = decode(data)
-    of = split_object(tf.text)
+    undecodable = has_undecodable(tf.text)
+    text = tf.text
+    if undecodable:
+        # Read-only (below): show the bad bytes as U+FFFD; this text is never written.
+        text = text.encode("utf-8", errors="surrogateescape").decode("utf-8", errors="replace")
+    of = split_object(text)
     fm: dict = {}
     read_only = not of.fm_ok
+    reason = of.fm_error if read_only else None
     if of.fm_ok and of.frontmatter_src is not None:
         try:
             fm = parse_fm(of.frontmatter_src)
-        except FrontmatterError:
+        except FrontmatterError as exc:
             fm = {}
             read_only = True
+            reason = f"Frontmatter is not valid YAML: {exc}"
     type_name = DEFAULT_TYPE
     if not read_only:
         t = fm.get("type")
         if isinstance(t, str) and t.strip():
             type_name = t.strip()
-    return RawObject(path=rel, data=data, of=of, fm=fm, readOnly=read_only, typeName=type_name)
+    if not read_only and undecodable:
+        # Saving would have to re-encode bytes the editor never saw correctly.
+        read_only = True
+        reason = "The file is not valid UTF-8 text"
+    return RawObject(
+        path=rel,
+        data=data,
+        of=of,
+        fm=fm,
+        readOnly=read_only,
+        typeName=type_name,
+        readOnlyReason=reason or ("Object is read-only" if read_only else None),
+    )
 
 
 def _kind_of(key: str, values: list[Any]) -> tuple[PropertyKind, bool]:
