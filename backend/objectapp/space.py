@@ -245,6 +245,13 @@ class Space:
             self.rescan_file(rel)
             return new_version
 
+    def cached_version(self, path: str) -> str | None:
+        """The version of the object as last scanned, or None if the space doesn't know it."""
+        rel = self._rel(path)
+        with self._lock:
+            raw = self._raw.get(rel)
+            return version_of(raw.data) if raw is not None else None
+
     def rescan_file(self, path: str) -> None:
         """Refresh one object's summary from disk (or drop it if the file is gone)."""
         rel = self._rel(path)
