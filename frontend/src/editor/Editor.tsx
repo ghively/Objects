@@ -1,7 +1,7 @@
 import { EditorContent, useEditor } from '@tiptap/react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useImperativeHandle, useRef, type Ref } from 'react'
 import { editorExtensions, loadBody, serializeBody } from './document'
-import { useAutosave } from './useAutosave'
+import { useAutosave, type BodyEditorHandle } from './useAutosave'
 import './editor.css'
 
 export type EditorProps = {
@@ -11,13 +11,15 @@ export type EditorProps = {
   readOnly: boolean
   onSaved: (version: string) => void
   onConflict: (currentVersion: string) => void
+  /** Optional control handle for external-change and conflict handling (Task 10). */
+  controlRef?: Ref<BodyEditorHandle | null>
 }
 
 /**
  * Formatted block editor for an object's body. Unedited blocks are saved
  * byte-for-byte; saves happen 1000 ms after the last change and on blur.
  */
-export function Editor({ path, body, version, readOnly, onSaved, onConflict }: EditorProps) {
+export function Editor({ path, body, version, readOnly, onSaved, onConflict, controlRef }: EditorProps) {
   const autosaveRef = useRef<ReturnType<typeof useAutosave> | null>(null)
 
   const editor = useEditor({
@@ -62,6 +64,24 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict }: E
     // `version` is read at load time only; later versions come from our own saves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, path, body])
+
+  useImperativeHandle(
+    controlRef,
+    () => ({
+      getBody: () => (editor && !editor.isDestroyed ? serializeBody(editor) : null),
+      savedBody: () => autosave.savedBody(),
+      isDirty: () => autosave.isDirty(),
+      hold: () => autosave.hold(),
+      resume: (v: string, saveNow?: boolean) => autosave.resume(v, saveNow),
+      reload: (text: string, v: string) => {
+        if (!editor || editor.isDestroyed) return
+        loadBody(editor, text)
+        autosave.markLoaded(text, v)
+        loadedRef.current = { path, body: text }
+      },
+    }),
+    [editor, autosave, path],
+  )
 
   // Leaving an object (or unmounting) with a pending save: save it under its own path.
   useEffect(() => {
