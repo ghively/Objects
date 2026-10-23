@@ -58,8 +58,8 @@ export function TopBar({
   tabs,
 }: TopBarProps) {
   return (
-    <header className="flex h-[44px] shrink-0 items-center gap-1 bg-app pr-2 pl-1.5 text-fg">
-      <div className="flex w-[324px] shrink-0 items-center justify-between">
+    <header className="flex h-[42px] shrink-0 items-center gap-1 bg-app pr-2 pl-2.5 text-fg">
+      <div className="flex w-[348px] shrink-0 items-center justify-between">
         <button
           type="button"
           className="flex h-8 items-center gap-1.5 rounded-md px-1.5 text-[15px] font-semibold hover:bg-hover"

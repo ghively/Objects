@@ -19,9 +19,10 @@ Colours below are sampled from the screenshot pixels. Sizes are read off the scr
 | Token | Value | Used for |
 |---|---|---|
 | `--bg-app` | `#0d0c10` | Window background, sidebar, top bar |
-| `--bg-panel` | `#151418` | Main content panel, right panel, peek-modal side panel |
+| `--bg-panel` | `#151418` | Main content panel, right panel, peek modal (body and side panel; a 1px `--border` rule between them, 16px corner radius) |
 | `--bg-raised` | `#1a1a1d` | Cards, menus, buttons, inputs |
-| `--bg-raised-2` | `#212024` | Peek modal body |
+| `--bg-raised-2` | `#212024` | Inline code, pager pill (not the peek body: sampled #151418 in 05) |
+| Card edge | `#27262b` | Main card border (`color-mix(border-front 80%, bg-back)`) |
 | `--bg-hover` | `#232326` | Sidebar active row, chips, hover |
 | `--bg-hover-2` | `#28272b` | Menu row hover |
 | `--border` | `#2d2c31` | Dividers, panel separators, count pill |

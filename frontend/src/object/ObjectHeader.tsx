@@ -22,13 +22,13 @@ export interface ObjectHeaderProps {
 export function ObjectHeader({ summary, type }: ObjectHeaderProps) {
   const color = type?.color ?? 'gray'
   return (
-    <header className="mb-6">
+    <header className="mb-9">
       <div className="flex items-center gap-2">
         <span
           data-type-chip=""
           data-color={color}
           style={chipStyle(color)}
-          className="inline-flex h-7 items-center gap-1.5 rounded-md bg-[var(--chip-bg)] px-2 text-[15px] font-medium text-[var(--chip-fg)]"
+          className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[color-mix(in_srgb,var(--chip-bg)_85%,white)] bg-[var(--chip-bg)] px-2 text-[15px] font-medium text-[var(--chip-fg)]"
         >
           <Icon name={type?.icon ?? 'ph-file-text'} size={15} />
           {type?.name ?? summary.type}

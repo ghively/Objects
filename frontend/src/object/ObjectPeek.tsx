@@ -43,7 +43,7 @@ export function ObjectPeek() {
     <Dialog open={path !== null} onOpenChange={(open) => !open && close()}>
       <DialogContent
         showCloseButton={false}
-        className="flex h-[min(850px,calc(100vh-48px))] w-[min(1240px,calc(100vw-48px))] max-w-none gap-0 overflow-hidden rounded-xl border-line bg-raised-2 p-0 sm:max-w-none"
+        className="flex h-[min(850px,calc(100vh-48px))] w-[min(1240px,calc(100vw-48px))] max-w-none gap-0 overflow-hidden rounded-2xl border-line bg-panel p-0 sm:max-w-none"
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogDescription className="sr-only">Object preview</DialogDescription>
