@@ -258,10 +258,20 @@ function blockKeysEqual(original: string, regenerated: string, kind: string): bo
   return false
 }
 
-export function preserveBlock(original: string, regenerated: string, kind: string): string {
+/**
+ * `fallbackEol` is the document's line ending, used when `original` has no
+ * line break of its own (a one-line block's `raw` usually has none), so an
+ * edit that adds lines keeps the document's CRLF.
+ */
+export function preserveBlock(
+  original: string,
+  regenerated: string,
+  kind: string,
+  fallbackEol?: string,
+): string {
   if (blockKeysEqual(original, regenerated, kind)) return original
 
-  const eol = eolOf(original)
+  const eol = /[\r\n]/.test(original) ? eolOf(original) : (fallbackEol ?? '\n')
   const [origBody, tail] = splitTail(original)
   const [regenBody] = splitTail(toLF(regenerated))
   const regenLines = regenBody.split('\n')
@@ -291,7 +301,7 @@ export function serializeWithPreservation(blocks: EditorBlock[]): string {
   let prev: EditorBlock | null = null
   for (const block of blocks) {
     let text: string
-    if (block.raw !== undefined) text = preserveBlock(block.raw, block.markdown, block.kind)
+    if (block.raw !== undefined) text = preserveBlock(block.raw, block.markdown, block.kind, eol)
     else text = eol === '\n' ? block.markdown : toLF(block.markdown).replace(/\n/g, eol)
     if (text === '') continue
 
