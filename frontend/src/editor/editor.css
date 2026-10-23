@@ -60,4 +60,14 @@
   background: var(--bg-hover);
   cursor: pointer;
 }
+.object-editor .wikilink[data-color] {
+  color: var(--chip-fg);
+  background: var(--chip-bg);
+}
+.object-editor .wikilink-unresolved {
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
 .object-editor-root[data-readonly] .object-editor { cursor: default; }

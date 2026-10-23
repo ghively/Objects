@@ -8,6 +8,7 @@ Routes (all JSON):
 - ``PUT /api/object/body`` ``{path, body, baseVersion}`` -> ``200 {version}``,
   ``409 {currentVersion}`` or ``423 {reason}``
 - ``GET /api/resolve?link=&from=`` -> ``{path}`` or ``404``
+- ``POST /api/reveal`` ``{path}`` -> ``200 {ok}``: show the file in the OS file manager
 - ``GET /api/events`` -> Server-Sent Events; event ``change`` with a
   `ChangeEvent` as JSON data (``{kind, path, version}``)
 
@@ -19,6 +20,9 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import os
+import subprocess
+import sys
 import threading
 from collections.abc import AsyncIterator
 from dataclasses import asdict
@@ -83,6 +87,20 @@ class SaveBodyRequest(BaseModel):
     path: str
     body: str
     baseVersion: str
+
+
+class RevealRequest(BaseModel):
+    path: str
+
+
+def reveal_in_file_manager(path: Path) -> None:
+    """Show `path` in Explorer (selected), Finder, or the desktop's file manager."""
+    if sys.platform == "win32":
+        subprocess.Popen(["explorer", f"/select,{os.path.normpath(path)}"])  # noqa: S603, S607
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", "-R", str(path)])  # noqa: S603, S607
+    else:
+        subprocess.Popen(["xdg-open", str(path.parent)])  # noqa: S603, S607
 
 
 def _error(status: int, message: str) -> JSONResponse:
@@ -177,6 +195,17 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         if path is None:
             return _error(404, f"No object matches {link!r}")
         return {"path": path}
+
+    @api.post("/reveal")
+    def reveal(req: RevealRequest):
+        try:
+            full = space.abspath(req.path)
+        except ValueError as exc:
+            return _error(400, str(exc))
+        if not full.is_file():
+            return _error(404, f"No object at {req.path!r}")
+        reveal_in_file_manager(full)
+        return {"ok": True}
 
     @api.get("/events")
     async def events():
