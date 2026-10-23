@@ -20,6 +20,7 @@ import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { installLinkPicker } from '@/links/LinkPicker'
 import { typeOf, useLinkIndex, ensureLinkIndex } from '@/links/linkIndex'
 import { installWikilinkPresenter } from '@/links/wikilinkPresenter'
+import { cn } from '@/lib/utils'
 import { useTabs } from '@/nav/tabs'
 import { ConflictDialog } from './ConflictDialog'
 import { ObjectHeader } from './ObjectHeader'
@@ -60,6 +61,12 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
   const [raw, setRaw] = useState(false)
   const [panelOpen, setPanelOpen] = useState(true)
   const [deleted, setDeleted] = useState(false)
+  /** Mirrors `deleted` for the change listener (which must not wait for a render). */
+  const deletedRef = useRef(false)
+  const markDeleted = useCallback((v: boolean) => {
+    deletedRef.current = v
+    setDeleted(v)
+  }, [])
   /** An external change that collided with unsaved edits, awaiting keep-mine / take-theirs. */
   const [pending, setPending] = useState<{ mine: string; theirs: ObjectDetail } | null>(null)
   // Subscribe so the type chip and properties pick up types once the index loads.
@@ -95,7 +102,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
       } catch {
         return // gone or unreadable: a `deleted` event follows if it was removed
       }
-      setDeleted(false)
+      markDeleted(false)
       if (!fromConflict && theirs.version === versionRef.current) {
         if (h) void h.resume(theirs.version) // nothing new on disk: carry on saving
         return
@@ -118,7 +125,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
       setDetail((d) => (d ? { ...theirs, body: d.body } : theirs))
       setPending({ mine, theirs })
     },
-    [path, adoptVersion],
+    [path, adoptVersion, markDeleted],
   )
 
   // Change events arrive one at a time; handle them in order.
@@ -135,13 +142,20 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
       if (e.path !== path) return
       if (e.kind === 'deleted') {
         editorRef.current?.hold()
-        setDeleted(true)
+        markDeleted(true)
+        return
+      }
+      // The file is back (stash pop, branch switch, undo elsewhere), perhaps with
+      // the very bytes we last knew: reconcile anyway, which clears the banner and
+      // resumes autosave even when the version is unchanged.
+      if (e.kind === 'created' || deletedRef.current) {
+        enqueue(false)
         return
       }
       if (e.version && e.version === versionRef.current) return // our own write, or already loaded
       enqueue(false)
     })
-  }, [path, enqueue])
+  }, [path, enqueue, markDeleted])
 
   const keepMine = () => {
     const h = editorRef.current
@@ -166,6 +180,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
     let alive = true
     setDetail(null)
     setError(null)
+    markDeleted(false)
     void ensureLinkIndex()
     api
       .object(path)
@@ -178,10 +193,19 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
     return () => {
       alive = false
     }
-  }, [path, adoptVersion])
+  }, [path, adoptVersion, markDeleted])
 
   const toggleRaw = async () => {
-    // Re-read so the other mode starts from the saved text (the menu click already blurred and flushed).
+    // Save everything first (and wait for saves already in flight or queued),
+    // then stop this mode saving, so the re-read below is what's on disk and no
+    // late save from this mode can land after the other mode has loaded.
+    const h = editorRef.current
+    try {
+      await h?.flush()
+    } catch {
+      /* the save reported its own error */
+    }
+    h?.hold()
     try {
       await load()
     } catch {
@@ -198,13 +222,25 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
     <div className="flex h-full min-h-0 w-full" data-object-view={mode}>
       {detail && panelOpen && <PropertyPanel type={type} frontmatter={detail.frontmatter} />}
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between px-3 pt-3">
-          <ToolButton
-            label={panelOpen ? 'Hide properties' : 'Show properties'}
-            icon="ph-sidebar-simple"
+        <div className="flex items-center justify-between px-3.5 pt-3.5">
+          <button
+            type="button"
+            aria-label={panelOpen ? 'Hide properties' : 'Show properties'}
+            title={panelOpen ? 'Hide properties' : 'Show properties'}
+            aria-pressed={panelOpen}
             onClick={() => setPanelOpen((v) => !v)}
-          />
-          <div className="flex items-center gap-0.5 rounded-xl border border-line px-1 py-0.5">
+            className="flex size-10 items-center justify-center rounded-[11px] border border-[#29282d] bg-[#18181b] p-[3px] text-fg"
+          >
+            <span
+              className={cn(
+                'flex size-full items-center justify-center rounded-lg hover:bg-hover',
+                panelOpen && 'bg-line hover:bg-line',
+              )}
+            >
+              <Icon name="ph-sidebar-simple" size={17} />
+            </span>
+          </button>
+          <div className="flex h-10 items-center gap-0.5 rounded-xl border border-[#232226] bg-[#18181b] px-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -216,18 +252,18 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
                   <Icon name="ph-dots-three" size={18} />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-60 border-line bg-raised">
+              <DropdownMenuContent align="end" className="w-[272px] border-line bg-raised">
                 <DropdownMenuItem
                   onSelect={() => {
                     useTabs.getState().open({ kind: 'object', path }, { newTab: true })
                     onDismiss?.()
                   }}
                 >
-                  <Icon name="ph-arrow-square-out" size={16} />
+                  <Icon name="ph-arrow-square-out" size={14} />
                   Open in new tab
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => void api.reveal(path).catch(() => undefined)}>
-                  <Icon name="ph-folder-open" size={16} />
+                  <Icon name="ph-folder-open" size={14} />
                   Reveal in Explorer
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -241,7 +277,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-[820px] px-12 pt-6 pb-24" data-object-path={path}>
+          <div className="mx-auto w-full max-w-[820px] px-12 pt-10 pb-24" data-object-path={path}>
             {error && (
               <div className="rounded-lg border border-line bg-raised p-4">
                 <p className="font-semibold">Couldn't open this object.</p>
@@ -254,7 +290,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
                 <ObjectHeader summary={summary} type={type} />
                 {readOnly && (
                   <div role="status" className="mb-4 rounded-lg border border-line bg-raised px-3 py-2 text-[14px] text-fg-muted">
-                    This object's frontmatter couldn't be read, so it opens read-only. Fix the file to edit it.
+                    {summary.readOnlyReason
+                      ? `This object opens read-only: ${summary.readOnlyReason}. Fix the file to edit it.`
+                      : "This object's frontmatter couldn't be read, so it opens read-only. Fix the file to edit it."}
                   </div>
                 )}
                 {deleted && (

@@ -5,6 +5,7 @@ import { ConflictError } from '@/api/client'
 import { Editor } from './Editor'
 import { editorExtensions, loadBody, serializeBody } from './document'
 import { RawMode } from './RawMode'
+import type { BodyEditorHandle } from './useAutosave'
 
 vi.mock('@/api/client', async (importOriginal) => {
   const mod = await importOriginal<typeof import('@/api/client')>()
@@ -297,6 +298,43 @@ describe('<Editor> autosave', () => {
     })
     await act(async () => vi.advanceTimersByTimeAsync(3000))
     expect(saveBody).not.toHaveBeenCalled()
+  })
+
+  test('flush() resolves only after the save in flight and the one queued behind it', async () => {
+    const resolvers: ((v: { version: string }) => void)[] = []
+    saveBody.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)))
+    const ref = { current: null as BodyEditorHandle | null }
+    const { editor, onSaved } = mount({ controlRef: ref })
+    act(() => {
+      editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), ' a')
+    })
+    void ref.current!.flush() // first save goes out
+    await act(async () => vi.advanceTimersByTimeAsync(0))
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    act(() => {
+      editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), 'b')
+    })
+    let settled = false
+    void ref.current!.flush().then(() => {
+      settled = true
+    })
+    await act(async () => vi.advanceTimersByTimeAsync(0))
+    expect(settled).toBe(false)
+
+    await act(async () => {
+      resolvers[0]({ version: 'v2' })
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(saveBody).toHaveBeenCalledTimes(2) // the queued save, against the new version
+    expect(saveBody.mock.calls[1][2]).toBe('v2')
+    expect(settled).toBe(false)
+
+    await act(async () => {
+      resolvers[1]({ version: 'v3' })
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(settled).toBe(true)
+    expect(onSaved).toHaveBeenLastCalledWith('v3')
   })
 
   test('conflict calls onConflict', async () => {

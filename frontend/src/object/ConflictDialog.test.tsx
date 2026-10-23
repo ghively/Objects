@@ -131,6 +131,19 @@ describe('external changes', () => {
     expect(mocked.object).not.toHaveBeenCalled()
   })
 
+  test('a file deleted and restored with the same bytes clears the banner and saves again', async () => {
+    const { editor } = await openPage()
+    emit({ kind: 'deleted', path: PATH, version: null })
+    expect(await screen.findByRole('alert')).toHaveTextContent(/deleted or moved/)
+
+    // git stash / stash pop: the same bytes come back, so the same version.
+    emit({ kind: 'created', path: PATH, version: 'v1' })
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+
+    const mine = typeMine(editor)
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(PATH, mine, 'v1'), { timeout: 3000 })
+  })
+
   test('dirty editor shows dialog with Keep mine / Take theirs', async () => {
     const { editor } = await openPage()
     const mine = typeMine(editor)
