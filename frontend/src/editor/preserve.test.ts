@@ -201,4 +201,22 @@ describe('preserveBlock', () => {
     keptCrlf.splice(1, 0, { raw: undefined as unknown as string, markdown: 'mid', kind: 'paragraph' })
     expect(serializeWithPreservation(keptCrlf)).toBe('one\r\n\r\nmid\r\n\r\ntwo\r\n')
   })
+
+  test('one-line blocks in a CRLF body edited to two lines keep CRLF on every line', () => {
+    const blocks = asEditorBlocks(splitBlocks('x\r\n\r\n* a\r\n\r\nend\r\n'))
+    const list = blocks.find((b) => b.kind === 'list')!
+    list.markdown = '- a\n- b'
+    const para = blocks.find((b) => b.kind === 'paragraph' && b.raw.startsWith('end'))!
+    para.markdown = 'end\nmore'
+    const out = serializeWithPreservation(blocks)
+    expect(out).toBe('x\r\n\r\n* a\r\n* b\r\n\r\nend\r\nmore\r\n')
+    expect(out.replace(/\r\n/g, '')).not.toMatch(/[\r\n]/)
+  })
+
+  test('preserveBlock uses a caller-supplied ending for a one-line original', () => {
+    expect(preserveBlock('hello', 'hello\nworld', 'paragraph')).toBe('hello\nworld')
+    expect(preserveBlock('hello', 'hello\nworld', 'paragraph', '\r\n')).toBe('hello\r\nworld')
+    // An original with its own line break keeps its own ending.
+    expect(preserveBlock('a\nb', 'a\nc\nd', 'paragraph', '\r\n')).toBe('a\nc\nd')
+  })
 })
