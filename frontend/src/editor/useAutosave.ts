@@ -5,6 +5,7 @@
  * - Nothing is sent when the body equals the last loaded or saved body.
  * - One save in flight at a time; edits made meanwhile are saved right after.
  * - A 409 calls `onConflict` and pauses saving until a new version arrives.
+ * - `hold()` / `resume()` let the owner pause saving while it resolves an external change.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { api, ConflictError, ReadOnlyError } from '@/api/client'
@@ -111,9 +112,65 @@ export function useAutosave(opts: AutosaveOptions) {
     [cancel],
   )
 
+  /** Stop saving (drop any pending save) until `resume()` or a reload. Used while a conflict is resolved. */
+  const hold = useCallback(() => {
+    cancel()
+    pausedRef.current = true
+  }, [cancel])
+
+  /**
+   * Adopt `version` as the base for the next save and resume saving. With
+   * `saveNow`, unsaved edits are saved against it immediately ("keep mine").
+   */
+  const resume = useCallback(
+    (version: string, saveNow = false): Promise<void> => {
+      versionRef.current = version
+      pausedRef.current = false
+      if (saveNow) return flush()
+      if (optsRef.current.getBody() !== savedBodyRef.current) schedule()
+      return Promise.resolve()
+    },
+    [flush, schedule],
+  )
+
+  /** True when the current body differs from the last loaded or saved body. */
+  const isDirty = useCallback(() => {
+    const body = optsRef.current.getBody()
+    return body !== null && savedBodyRef.current !== null && body !== savedBodyRef.current
+  }, [])
+
   const isPending = useCallback(() => timerRef.current !== null, [])
 
   useEffect(() => cancel, [cancel])
 
-  return { schedule, flush, markLoaded, cancel, isPending, savedBody: () => savedBodyRef.current }
+  return {
+    schedule,
+    flush,
+    markLoaded,
+    cancel,
+    hold,
+    resume,
+    isDirty,
+    isPending,
+    savedBody: () => savedBodyRef.current,
+  }
+}
+
+/**
+ * What the object view needs from a body editor (formatted or raw) to handle
+ * external changes and conflicts.
+ */
+export interface BodyEditorHandle {
+  /** The current body text, or null before the editor is ready. */
+  getBody(): string | null
+  /** The body last loaded or saved (what is on disk as far as the editor knows). */
+  savedBody(): string | null
+  /** True when there are edits not yet saved. */
+  isDirty(): boolean
+  /** Stop autosaving until `resume()` or `reload()`. */
+  hold(): void
+  /** Adopt `version` and resume autosave; `saveNow` saves pending edits against it at once. */
+  resume(version: string, saveNow?: boolean): Promise<void>
+  /** Replace the content with `body` (discarding local edits) and mark it saved at `version`. */
+  reload(body: string, version: string): void
 }

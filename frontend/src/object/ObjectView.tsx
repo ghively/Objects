@@ -2,7 +2,7 @@
  * An object's full view, shared by the page and the peek: property panel,
  * header and body editor (formatted or raw), with the `…` menu.
  */
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { ObjectDetail } from '@/api/types'
 import { Icon } from '@/components/Icon'
@@ -16,10 +16,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Editor } from '@/editor/Editor'
 import { RawMode } from '@/editor/RawMode'
+import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { installLinkPicker } from '@/links/LinkPicker'
 import { typeOf, useLinkIndex, ensureLinkIndex } from '@/links/linkIndex'
 import { installWikilinkPresenter } from '@/links/wikilinkPresenter'
 import { useTabs } from '@/nav/tabs'
+import { ConflictDialog } from './ConflictDialog'
 import { ObjectHeader } from './ObjectHeader'
 import { PropertyPanel } from './PropertyPanel'
 
@@ -57,17 +59,108 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
   const [error, setError] = useState<string | null>(null)
   const [raw, setRaw] = useState(false)
   const [panelOpen, setPanelOpen] = useState(true)
-  const [conflict, setConflict] = useState(false)
+  const [deleted, setDeleted] = useState(false)
+  /** An external change that collided with unsaved edits, awaiting keep-mine / take-theirs. */
+  const [pending, setPending] = useState<{ mine: string; theirs: ObjectDetail } | null>(null)
   // Subscribe so the type chip and properties pick up types once the index loads.
   useLinkIndex((s) => s.revision)
+
+  const editorRef = useRef<BodyEditorHandle | null>(null)
+  /** The version the editor's next save is based on (mirrors `version` without waiting for a render). */
+  const versionRef = useRef('')
+  const adoptVersion = useCallback((v: string) => {
+    versionRef.current = v
+    setVersion(v)
+  }, [])
 
   const load = useCallback(async () => {
     const d = await api.object(path)
     setDetail(d)
-    setVersion(d.version)
-    setConflict(false)
+    adoptVersion(d.version)
     return d
-  }, [path])
+  }, [path, adoptVersion])
+
+  /**
+   * The file changed on disk (`fromConflict`: a save was just rejected with 409).
+   * A clean editor reloads; a dirty one keeps its edits and asks what to do.
+   */
+  const reconcile = useCallback(
+    async (fromConflict: boolean) => {
+      const h = editorRef.current
+      // Stop autosave from racing the decision (it would only hit a 409 anyway).
+      if (h && (fromConflict || h.isDirty())) h.hold()
+      let theirs: ObjectDetail
+      try {
+        theirs = await api.object(path)
+      } catch {
+        return // gone or unreadable: a `deleted` event follows if it was removed
+      }
+      setDeleted(false)
+      if (!fromConflict && theirs.version === versionRef.current) {
+        if (h) void h.resume(theirs.version) // nothing new on disk: carry on saving
+        return
+      }
+      const mine = h?.getBody() ?? null
+      if (!h || mine === null || !h.isDirty()) {
+        h?.reload(theirs.body, theirs.version)
+        setDetail(theirs)
+        adoptVersion(theirs.version)
+        return
+      }
+      if (theirs.body === h.savedBody() || theirs.body === mine) {
+        // Only the frontmatter changed (or both sides wrote the same text): no
+        // conflict in the body. Keep the edits and save them on the new version.
+        setDetail((d) => (d ? { ...theirs, body: d.body } : theirs))
+        adoptVersion(theirs.version)
+        void h.resume(theirs.version, fromConflict)
+        return
+      }
+      setDetail((d) => (d ? { ...theirs, body: d.body } : theirs))
+      setPending({ mine, theirs })
+    },
+    [path, adoptVersion],
+  )
+
+  // Change events arrive one at a time; handle them in order.
+  const queueRef = useRef<Promise<void>>(Promise.resolve())
+  const enqueue = useCallback(
+    (fromConflict: boolean) => {
+      queueRef.current = queueRef.current.then(() => reconcile(fromConflict)).catch(() => undefined)
+    },
+    [reconcile],
+  )
+
+  useEffect(() => {
+    return api.onChange((e) => {
+      if (e.path !== path) return
+      if (e.kind === 'deleted') {
+        editorRef.current?.hold()
+        setDeleted(true)
+        return
+      }
+      if (e.version && e.version === versionRef.current) return // our own write, or already loaded
+      enqueue(false)
+    })
+  }, [path, enqueue])
+
+  const keepMine = () => {
+    const h = editorRef.current
+    const p = pending
+    setPending(null)
+    if (!h || !p) return
+    // Save my text against the version now on disk; a further conflict asks again.
+    void h.resume(p.theirs.version, true)
+  }
+
+  const takeTheirs = () => {
+    const h = editorRef.current
+    const p = pending
+    setPending(null)
+    if (!p) return
+    h?.reload(p.theirs.body, p.theirs.version)
+    setDetail(p.theirs)
+    adoptVersion(p.theirs.version)
+  }
 
   useEffect(() => {
     let alive = true
@@ -79,14 +172,13 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
       .then((d) => {
         if (!alive) return
         setDetail(d)
-        setVersion(d.version)
-        setConflict(false)
+        adoptVersion(d.version)
       })
       .catch((e: unknown) => alive && setError(e instanceof Error ? e.message : String(e)))
     return () => {
       alive = false
     }
-  }, [path])
+  }, [path, adoptVersion])
 
   const toggleRaw = async () => {
     // Re-read so the other mode starts from the saved text (the menu click already blurred and flushed).
@@ -165,12 +257,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
                     This object's frontmatter couldn't be read, so it opens read-only. Fix the file to edit it.
                   </div>
                 )}
-                {conflict && (
+                {deleted && (
                   <div role="alert" className="mb-4 rounded-lg border border-danger/60 bg-raised px-3 py-2 text-[14px]">
-                    This file changed on disk, so your last edit wasn't saved.{' '}
-                    <button type="button" className="underline" onClick={() => void load()}>
-                      Reload
-                    </button>
+                    This object's file was deleted or moved on disk. Edits here aren't saved.
                   </div>
                 )}
                 <div className="text-[17px]">
@@ -180,8 +269,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
                       text={detail.body}
                       version={version}
                       readOnly={readOnly}
-                      onSaved={setVersion}
-                      onConflict={() => setConflict(true)}
+                      onSaved={adoptVersion}
+                      onConflict={() => enqueue(true)}
+                      controlRef={editorRef}
                     />
                   ) : (
                     <Editor
@@ -189,8 +279,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
                       body={detail.body}
                       version={version}
                       readOnly={readOnly}
-                      onSaved={setVersion}
-                      onConflict={() => setConflict(true)}
+                      onSaved={adoptVersion}
+                      onConflict={() => enqueue(true)}
+                      controlRef={editorRef}
                     />
                   )}
                 </div>
@@ -199,6 +290,14 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
           </div>
         </div>
         {footer && <div className="absolute right-4 bottom-4">{footer}</div>}
+        <ConflictDialog
+          open={pending !== null}
+          path={path}
+          mine={pending?.mine ?? ''}
+          theirs={pending?.theirs.body ?? ''}
+          onKeepMine={keepMine}
+          onTakeTheirs={takeTheirs}
+        />
       </div>
     </div>
   )

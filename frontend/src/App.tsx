@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/api/client'
 import type { SpaceInfo } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { LinkPicker } from '@/links/LinkPicker'
-import { stemOf, useLinkIndex } from '@/links/linkIndex'
+import { invalidateLinkIndex, stemOf, useLinkIndex } from '@/links/linkIndex'
 import { canGoBack, canGoForward, currentTarget, tabTarget, useTabs, type Tab } from '@/nav/tabs'
 import { ObjectPage } from '@/object/ObjectPage'
 import { ObjectIcon } from '@/object/ObjectHeader'
@@ -15,6 +15,8 @@ import { Sidebar, TypeChip } from '@/shell/Sidebar'
 import { TopBar } from '@/shell/TopBar'
 import { cn } from '@/lib/utils'
 import { TypePage } from '@/types/TypePage'
+
+const REFRESH_DELAY_MS = 150
 
 function TabLabel({ tab, space }: { tab: Tab; space: SpaceInfo | null }) {
   const target = tabTarget(tab)
@@ -94,6 +96,33 @@ export default function App() {
     void useLinkIndex.getState().load()
   }, [])
 
+  // Objects created or deleted on disk: refresh the summaries (sidebar counts,
+  // tab labels, link colours). Bursts of events coalesce into one reload.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const off = api.onChange((e) => {
+      if (e.kind === 'changed') return
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        timer = null
+        void invalidateLinkIndex()
+      }, REFRESH_DELAY_MS)
+    })
+    return () => {
+      if (timer) clearTimeout(timer)
+      off()
+    }
+  }, [])
+
+  const objects = useLinkIndex((s) => s.objects)
+  const indexLoaded = useLinkIndex((s) => s.loaded)
+  const counts = useMemo(() => {
+    if (!space || (!indexLoaded && objects.length === 0)) return undefined
+    const c: Record<string, number> = Object.fromEntries(space.types.map((t) => [t.id, 0]))
+    for (const o of objects) c[o.type] = (c[o.type] ?? 0) + 1
+    return c
+  }, [space, objects, indexLoaded])
+
   const activeType = target?.kind === 'type' ? space?.types.find((t) => t.id === target.typeId) : undefined
 
   let content
@@ -132,6 +161,7 @@ export default function App() {
               types={space?.types ?? []}
               activeTypeId={activeType?.id}
               onOpenType={(t) => tabs.open({ kind: 'type', typeId: t.id })}
+              counts={counts}
             />
           )}
           <MainPanel>{content}</MainPanel>

@@ -2,8 +2,8 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
-import { useEffect, useRef } from 'react'
-import { useAutosave } from './useAutosave'
+import { useEffect, useImperativeHandle, useRef, type Ref } from 'react'
+import { useAutosave, type BodyEditorHandle } from './useAutosave'
 
 export type RawModeProps = {
   path: string
@@ -13,6 +13,8 @@ export type RawModeProps = {
   onSaved: (version: string) => void
   onConflict?: (currentVersion: string) => void
   readOnly?: boolean
+  /** Optional control handle for external-change and conflict handling (Task 10). */
+  controlRef?: Ref<BodyEditorHandle | null>
 }
 
 const rawTheme = EditorView.theme(
@@ -30,7 +32,7 @@ const rawTheme = EditorView.theme(
  * Raw Markdown mode: CodeMirror 6 over the body text, saved through the same
  * debounced, conflict-safe `saveBody` as the formatted editor.
  */
-export function RawMode({ path, text, version, onSaved, onConflict, readOnly = false }: RawModeProps) {
+export function RawMode({ path, text, version, onSaved, onConflict, readOnly = false, controlRef }: RawModeProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const loadedRef = useRef<{ path: string; text: string } | null>(null)
@@ -61,15 +63,11 @@ export function RawMode({ path, text, version, onSaved, onConflict, readOnly = f
     }
   }, [])
 
-  useEffect(() => {
-    const view = viewRef.current
-    if (!view) return
-    const loaded = loadedRef.current
-    if (loaded?.path === path && (loaded.text === text || autosave.savedBody() === text)) return
-    const eol = text.includes('\r\n') ? '\r\n' : '\n'
+  const load = (view: EditorView, body: string, v: string) => {
+    const eol = body.includes('\r\n') ? '\r\n' : '\n'
     view.setState(
       EditorState.create({
-        doc: text,
+        doc: body,
         extensions: [
           EditorState.lineSeparator.of(eol),
           lineNumbers(),
@@ -87,10 +85,29 @@ export function RawMode({ path, text, version, onSaved, onConflict, readOnly = f
         ],
       }),
     )
-    autosave.markLoaded(text, version)
-    loadedRef.current = { path, text }
+    autosave.markLoaded(body, v)
+    loadedRef.current = { path, text: body }
+  }
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    const loaded = loadedRef.current
+    if (loaded?.path === path && (loaded.text === text || autosave.savedBody() === text)) return
+    load(view, text, version)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, text, readOnly])
+
+  useImperativeHandle(controlRef, () => ({
+    getBody: () => (viewRef.current ? viewRef.current.state.sliceDoc() : null),
+    savedBody: () => autosave.savedBody(),
+    isDirty: () => autosave.isDirty(),
+    hold: () => autosave.hold(),
+    resume: (v: string, saveNow?: boolean) => autosave.resume(v, saveNow),
+    reload: (body: string, v: string) => {
+      if (viewRef.current) load(viewRef.current, body, v)
+    },
+  }))
 
   return <div ref={hostRef} className="raw-mode h-full" data-path={path} />
 }
