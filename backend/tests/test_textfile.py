@@ -2,7 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from objectapp.textfile import TextFile, atomic_write, encode, read_text
+from objectapp.textfile import TextFile, atomic_write, decode, encode, encode_like, read_text
+
+read_text_bytes = decode
 
 
 def _write(tmp_path: Path, data: bytes) -> Path:
@@ -74,3 +76,28 @@ def test_atomic_write_failure_leaves_original(tmp_path, monkeypatch):
         atomic_write(p, b"new")
     assert p.read_bytes() == b"original"
     assert sorted(x.name for x in tmp_path.iterdir()) == ["obj.md"]
+
+
+def test_encode_like_keeps_untouched_line_endings():
+    original = b"\xef\xbb\xbfa\r\nb\nc\r\nd"
+    out = encode_like(original, "a\nb\nC\nd\ne")
+    assert out == b"\xef\xbb\xbfa\r\nb\nC\r\nd\r\ne"
+
+
+def test_encode_like_matches_encode_for_uniform_files():
+    for data in (b"x\ny\n", b"x\r\ny\r\n", b"x\r\ny", b""):
+        tf = read_text_bytes(data)
+        new = tf.text + "added\n"
+        assert encode_like(data, new) == encode(TextFile(new, tf.eol, tf.bom))
+
+
+def test_atomic_write_check_failure_leaves_original(tmp_path):
+    p = _write(tmp_path, b"original\n")
+
+    def refuse() -> None:
+        raise RuntimeError("changed")
+
+    with pytest.raises(RuntimeError):
+        atomic_write(p, b"new\n", check=refuse)
+    assert p.read_bytes() == b"original\n"
+    assert [x.name for x in tmp_path.iterdir()] == ["obj.md"]

@@ -3,7 +3,10 @@
 Operates on text already normalised to ``\n`` line endings (see `textfile`).
 Frontmatter exists only when the text starts with a ``---`` line and a later
 line is exactly ``---``. A file that opens a fence but never closes it is
-reported with ``fm_ok=False`` and its whole text as the body.
+reported with ``fm_ok=False`` and its whole text as the body, as is a file whose
+first line is ``---`` followed by trailing whitespace (a common editor artifact):
+such a file probably has frontmatter, so it must open read-only rather than get
+a second frontmatter block put in front of it on save.
 """
 
 from __future__ import annotations
@@ -26,6 +29,14 @@ class ObjectFile:
 
 
 def split_object(text: str) -> ObjectFile:
+    first_line = text.split("\n", 1)[0]
+    if first_line != FENCE and first_line.rstrip() == FENCE and "\n" in text:
+        return ObjectFile(
+            frontmatter_src=None,
+            body=text,
+            fm_ok=False,
+            fm_error="Frontmatter fence has trailing whitespace",
+        )
     if not text.startswith(FENCE + "\n"):
         return ObjectFile(frontmatter_src=None, body=text, fm_ok=True, fm_error=None)
 

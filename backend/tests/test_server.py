@@ -240,3 +240,120 @@ def test_reveal_opens_file_manager(client: TestClient, space_dir: Path, monkeypa
     assert client.post("/api/reveal", json={"path": "../outside.md"}).status_code == 400
     assert client.post("/api/reveal", json={"path": "Tasks/Nope.md"}).status_code == 404
     assert len(calls) == 1
+
+
+def test_save_keeps_each_untouched_lines_own_ending(space: Space, space_dir: Path):
+    target = space_dir / "Pages" / "Mixed.md"
+    original = b"---\r\ntype: Page\r\ntitle: M\r\n---\r\nline a\r\nline b\nline c\r\n"
+    target.write_bytes(original)
+    space.rescan_file("Pages/Mixed.md")
+    of, _fm, version = space.read("Pages/Mixed.md")
+
+    space.save_body("Pages/Mixed.md", of.body + "line d\n", version)
+
+    old_lines = original.decode().splitlines(keepends=True)
+    new_lines = target.read_bytes().decode().splitlines(keepends=True)
+    diff = [
+        line
+        for line in difflib.ndiff(old_lines, new_lines)
+        if line.startswith(("+ ", "- "))
+    ]
+    added = sorted(line[2:] for line in diff if line.startswith("+ "))
+    removed = [line for line in diff if line.startswith("- ")]
+    assert removed == []
+    assert added[0].startswith("id: ") and added[0].endswith("\r\n")
+    assert added[1].startswith("lastUpdated: ") and added[1].endswith("\r\n")
+    assert added[2] == "line d\r\n"
+    assert len(added) == 3
+    assert b"line b\nline c\r\n" in target.read_bytes()
+
+
+def test_fence_with_trailing_whitespace_opens_read_only(client: TestClient, space_dir: Path):
+    target = space_dir / "Pages" / "Spaced fence.md"
+    original = b"--- \ntype: Page\n---\nbody\n"
+    target.write_bytes(original)
+    obj = _get(client, "Pages/Spaced fence.md")
+    assert obj["summary"]["readOnly"] is True
+    assert "trailing whitespace" in obj["summary"]["readOnlyReason"]
+
+    r = _put(client, "Pages/Spaced fence.md", obj["body"] + "X\n", obj["version"])
+
+    assert r.status_code == 423
+    assert target.read_bytes() == original
+
+
+def test_external_write_during_save_is_a_conflict(space: Space, space_dir: Path, monkeypatch):
+    from objectapp import space as space_mod
+
+    target = space_dir / "Tasks" / "Write docs.md"
+    of, _fm, version = space.read("Tasks/Write docs.md")
+    external = target.read_bytes() + b"written elsewhere mid-save\n"
+    real_stamp = space_mod.now_stamp
+
+    def stamp_after_external_write() -> str:
+        # Runs after save_body has checked the version but before it writes.
+        target.write_bytes(external)
+        return real_stamp()
+
+    monkeypatch.setattr(space_mod, "now_stamp", stamp_after_external_write)
+
+    with pytest.raises(Conflict) as exc:
+        space.save_body("Tasks/Write docs.md", of.body + "mine\n", version)
+
+    assert target.read_bytes() == external
+    assert exc.value.current_version == space_mod.version_of(external)
+    assert not [p for p in target.parent.iterdir() if p.name.endswith(".tmp")]
+    assert "Tasks/Write docs.md" not in space.own_writes
+
+
+def test_non_utf8_file_opens_read_only_and_is_never_written(client: TestClient, space_dir: Path):
+    target = space_dir / "Pages" / "Latin1.md"
+    original = b"---\ntype: Page\ntitle: Caf\xe9\n---\nna\xefve body\n"
+    target.write_bytes(original)
+
+    obj = _get(client, "Pages/Latin1.md")
+
+    assert obj["summary"]["readOnly"] is True
+    assert "UTF-8" in obj["summary"]["readOnlyReason"]
+    assert obj["body"] == "na�ve body\n"
+    assert obj["summary"]["title"] == "Caf�"
+    assert client.get("/api/objects").status_code == 200
+    r = _put(client, "Pages/Latin1.md", obj["body"] + "x\n", obj["version"])
+    assert r.status_code == 423
+    assert target.read_bytes() == original
+
+
+def test_save_announces_change_with_client_origin(space: Space):
+    import time
+
+    app = create_app(space, None, watch=False)
+    published = []
+    app.state.hub.publish = published.append
+    with TestClient(app) as c:
+        obj = _get(c, "Tasks/Write docs.md")
+        r = c.put(
+            "/api/object/body",
+            json={
+                "path": "Tasks/Write docs.md",
+                "body": obj["body"] + "more\n",
+                "baseVersion": obj["version"],
+                "clientId": "window-1",
+            },
+        )
+        assert r.status_code == 200, r.text
+        deadline = time.monotonic() + 2
+        while not published and time.monotonic() < deadline:
+            time.sleep(0.01)
+        # An unchanged body writes nothing and announces nothing.
+        same = _put(c, "Tasks/Write docs.md", obj["body"] + "more\n", r.json()["version"])
+        assert same.status_code == 200
+        time.sleep(0.05)
+
+    assert len(published) == 1
+    ev = published[0]
+    assert (ev.kind, ev.path, ev.version, ev.origin) == (
+        "changed",
+        "Tasks/Write docs.md",
+        r.json()["version"],
+        "window-1",
+    )

@@ -82,12 +82,21 @@ def test_unterminated_frontmatter(text):
     assert join_object(of) == text
 
 
-@pytest.mark.parametrize("text", ["--- \ntitle: x\n---\n", "----\nx\n---\n", "\n---\nx\n---\n"])
+@pytest.mark.parametrize("text", ["----\nx\n---\n", "\n---\nx\n---\n"])
 def test_not_frontmatter_unless_starts_with_fence_line(text):
     of = split_object(text)
     assert of.frontmatter_src is None
     assert of.fm_ok is True
     assert of.body == text
+
+
+@pytest.mark.parametrize("text", ["--- \ntype: Page\n---\nbody\n", "---\t\ntitle: x\n---\n"])
+def test_fence_with_trailing_whitespace_is_read_only(text):
+    of = split_object(text)
+    assert of.fm_ok is False
+    assert of.fm_error == "Frontmatter fence has trailing whitespace"
+    assert of.frontmatter_src is None
+    assert join_object(of) == text
 
 
 CROCKFORD = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
