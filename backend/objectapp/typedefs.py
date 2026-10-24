@@ -1,48 +1,60 @@
-"""Object types: inference from a space's files, and their JSON definitions.
+"""Scanning a space's object files, and inferring object types from them.
 
-A space without ``.object/types/`` gets its types inferred from the
-objects' ``type`` frontmatter field (objects without valid frontmatter count as
-``Page``). `load_types` writes the inferred definitions once, to
-``.object/types/<id>.json``, and from then on reads them back.
+`infer_types_from` turns the objects' ``type`` frontmatter field (objects
+without valid frontmatter count as ``Page``) into `TypeDefinition`s. They go
+through the same `TypeDefinition.from_json` migration as stored M1 types, and
+are kept in memory until the user saves them (see `typemodel.load_types`).
 """
 
 from __future__ import annotations
 
-import json
 import re
 from collections import Counter
 from collections.abc import Iterable, Iterator
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from .frontmatter import FrontmatterError, parse_fm
 from .objfile import ObjectFile, split_object
-from .textfile import atomic_write, decode, read_text
+from .textfile import decode
+
+if TYPE_CHECKING:
+    from .typemodel import TypeDefinition
 
 __all__ = [
     "DEFAULT_TYPE",
-    "PropertyDef",
-    "PropertyKind",
-    "RawObject",
     "SYSTEM_KEYS",
-    "TypeDef",
-    "infer_types",
+    "RawObject",
+    "has_undecodable",
     "infer_types_from",
     "is_ignored",
     "iter_object_paths",
-    "load_types",
     "read_raw",
     "slug",
 ]
 
-PropertyKind = Literal["text", "number", "boolean", "url", "datetime", "label", "entity", "blocks"]
-
 DEFAULT_TYPE = "Page"
 
-# Frontmatter keys the app manages itself; never property definitions.
+# Reserved keys: never the key of a new property (see the plan's "Keys").
 SYSTEM_KEYS = frozenset(
-    {"id", "type", "title", "icon", "createdAt", "lastUpdated", "aliases", "description"}
+    {
+        "id", "type", "template", "title", "icon", "iconColor", "description", "aliases",
+        "tags", "collections", "createdAt", "lastUpdated", "coverImage", "color",
+        # basic media fields
+        "url", "domain", "iframeUrl", "previewImage", "mimeType", "fileSize", "width",
+        "height", "source",
+        # DailyNote
+        "date", "reviewed",
+    }
+)
+
+# Keys the app manages itself: never inferred as properties. (Reserved keys that
+# are system or basic properties - tags, coverImage, media fields... - are
+# inferred, and the migration turns them into system definitions.)
+_UNINFERRED_KEYS = frozenset(
+    {"id", "type", "template", "title", "icon", "iconColor", "description", "aliases",
+     "createdAt", "lastUpdated"}
 )
 
 _ICONS = {
@@ -54,6 +66,7 @@ _ICONS = {
 }
 _DEFAULT_ICON = "ph-cube"
 _COLORS = ["blue", "green", "orange", "purple", "pink", "teal", "yellow", "red"]
+_DAY_RE = re.compile(r"\d{4}-\d{2}-\d{2}(?:T00:00:00(?:\.0+)?Z)?")
 
 # String-valued keys that are labels (option sets) by convention.
 _LABEL_KEYS = frozenset({"status", "priority", "category", "stage", "state", "kind", "level"})
@@ -65,42 +78,6 @@ _DATE_RE = re.compile(
 )
 _URL_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9+.-]*://\S+")
 _WIKILINK_RE = re.compile(r"\[\[[^\[\]]+\]\]")
-
-
-@dataclass
-class PropertyDef:
-    id: str
-    key: str
-    name: str
-    type: PropertyKind
-    isArray: bool = False
-
-
-@dataclass
-class TypeDef:
-    id: str
-    name: str
-    pluralName: str
-    folder: str
-    icon: str
-    color: str
-    propertyDefinitions: list[PropertyDef] = field(default_factory=list)
-
-    def to_json(self) -> dict[str, Any]:
-        return asdict(self)
-
-    @classmethod
-    def from_json(cls, data: dict[str, Any]) -> TypeDef:
-        props = [PropertyDef(**p) for p in data.get("propertyDefinitions", [])]
-        return cls(
-            id=data["id"],
-            name=data["name"],
-            pluralName=data.get("pluralName", data["name"]),
-            folder=data.get("folder", ""),
-            icon=data.get("icon", _DEFAULT_ICON),
-            color=data.get("color", _COLORS[0]),
-            propertyDefinitions=props,
-        )
 
 
 @dataclass(frozen=True)
@@ -189,7 +166,7 @@ def read_raw(root: Path, rel: str) -> RawObject:
     )
 
 
-def _kind_of(key: str, values: list[Any]) -> tuple[PropertyKind, bool]:
+def _kind_of(key: str, values: list[Any]) -> tuple[str, bool]:
     values = [v for v in values if v is not None]
     if not values:
         return "text", False
@@ -223,8 +200,42 @@ def _humanize(key: str) -> str:
     return words[:1].upper() + words[1:]
 
 
-def infer_types_from(objects: Iterable[RawObject]) -> list[TypeDef]:
-    """Infer type definitions from already-read objects. Ordered by name."""
+def _label_texts(values: list[Any]) -> list[str]:
+    seen: list[str] = []
+    for v in values:
+        for i in v if isinstance(v, list) else [v]:
+            if i is None or isinstance(i, (dict, list)):
+                continue
+            text = str(i).strip()
+            if text and text not in seen:
+                seen.append(text)
+    return seen
+
+
+def _inferred_options(type_name: str, key: str, kind: str, values: list[Any]) -> dict[str, Any]:
+    from .typemodel import label_options
+
+    if kind == "label":
+        status = type_name == "Task" and key == "status"
+        options: dict[str, Any] = {"set": label_options(_label_texts(values), status=status)}
+        if status:
+            options["isStatus"] = True
+        return options
+    if kind == "datetime":
+        strs = [str(v).strip() for v in values if v is not None]
+        if strs and all(_DAY_RE.fullmatch(s) for s in strs):
+            return {"constraints": {"resolutionPreference": "day"}}
+    return {}
+
+
+def infer_types_from(objects: Iterable[RawObject]) -> list[TypeDefinition]:
+    """Infer type definitions from already-read objects. Ordered by name.
+
+    Each type is built in M1's (v1) shape, plus inferred label options and date
+    preferences, and read through `TypeDefinition.from_json`.
+    """
+    from .typemodel import TypeDefinition
+
     folders: dict[str, Counter[str]] = {}
     keys: dict[str, dict[str, list[Any]]] = {}
     for obj in objects:
@@ -233,10 +244,10 @@ def infer_types_from(objects: Iterable[RawObject]) -> list[TypeDef]:
         if obj.readOnly:
             continue
         for k, v in obj.fm.items():
-            if isinstance(k, str) and k not in SYSTEM_KEYS:
+            if isinstance(k, str) and k not in _UNINFERRED_KEYS:
                 per_key.setdefault(k, []).append(v)
 
-    types: list[TypeDef] = []
+    types: list[TypeDefinition] = []
     for i, name in enumerate(sorted(folders, key=lambda n: (n.lower(), n))):
         counts = folders[name]
         folder = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
@@ -244,48 +255,28 @@ def infer_types_from(objects: Iterable[RawObject]) -> list[TypeDef]:
         props = []
         for key, values in keys[name].items():
             kind, is_array = _kind_of(key, values)
-            props.append(PropertyDef(id=key, key=key, name=_humanize(key), type=kind, isArray=is_array))
+            prop: dict[str, Any] = {
+                "id": key,
+                "key": key,
+                "name": _humanize(key),
+                "type": kind,
+                "isArray": is_array,
+            }
+            options = _inferred_options(name, key, kind, values)
+            if options:
+                prop["options"] = options
+            props.append(prop)
         types.append(
-            TypeDef(
-                id=slug(name),
-                name=name,
-                pluralName=PurePosixPath(folder).name if folder else f"{name}s",
-                folder=folder,
-                icon=_ICONS.get(name, _DEFAULT_ICON),
-                color=_COLORS[i % len(_COLORS)],
-                propertyDefinitions=props,
+            TypeDefinition.from_json(
+                {
+                    "id": slug(name),
+                    "name": name,
+                    "pluralName": PurePosixPath(folder).name if folder else f"{name}s",
+                    "folder": folder,
+                    "icon": _ICONS.get(name, _DEFAULT_ICON),
+                    "color": _COLORS[i % len(_COLORS)],
+                    "propertyDefinitions": props,
+                }
             )
         )
-    return types
-
-
-def infer_types(root: Path) -> list[TypeDef]:
-    return infer_types_from(read_raw(root, rel) for rel in iter_object_paths(root))
-
-
-def _types_dir(root: Path) -> Path:
-    return Path(root) / ".object" / "types"
-
-
-def load_types(root: Path, inferred: list[TypeDef] | None = None) -> list[TypeDef]:
-    """Read ``.object/types/*.json``; if that folder is missing, infer and write it.
-
-    `inferred` lets a caller that has already scanned the space skip a second scan.
-    Existing type files are never rewritten.
-    """
-    types_dir = _types_dir(root)
-    if types_dir.is_dir():
-        loaded = []
-        for f in sorted(types_dir.glob("*.json")):
-            try:
-                loaded.append(TypeDef.from_json(json.loads(read_text(f).text)))
-            except (ValueError, KeyError, TypeError):
-                continue
-        return sorted(loaded, key=lambda t: (t.name.lower(), t.name))
-
-    types = inferred if inferred is not None else infer_types(root)
-    types_dir.mkdir(parents=True, exist_ok=True)
-    for t in types:
-        data = (json.dumps(t.to_json(), indent=2, ensure_ascii=False) + "\n").encode("utf-8")
-        atomic_write(types_dir / f"{t.id}.json", data)
     return types
