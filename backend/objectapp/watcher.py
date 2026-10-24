@@ -7,8 +7,9 @@ loop). Nothing is emitted for:
 
 - dot-folders (``.capacities``, ``.capacities-cache``, ``.git``…), dot-files and
   non-``.md`` files;
-- writes the app makes itself (`Space._write` records them in ``own_writes``):
-  the server announces those itself, tagged with the saving client's id;
+- writes the app makes itself (`Space._write` records them in ``own_writes``)
+  and files it moves to the trash (``own_deletes``): the server announces those
+  itself, tagged with the saving client's id;
 - events that leave the file bytes as the space already knows them.
 """
 
@@ -168,6 +169,11 @@ class SpaceWatcher:
             data = None
 
         if data is None:
+            if space.own_deletes.pop(rel, None) is not None:
+                # The app moved it away itself (to the trash) and announced it.
+                space.rescan_file(rel)
+                space.own_writes.pop(rel, None)
+                return None
             if known is None:
                 return None
             space.rescan_file(rel)
@@ -175,6 +181,8 @@ class SpaceWatcher:
             return ChangeEvent(kind="deleted", path=rel, version=None)
 
         version = version_of(data)
+        # The file is back (restored or re-created): a pending own delete is stale.
+        space.own_deletes.pop(rel, None)
         own = space.own_writes.get(rel)
         if own is not None and own != version:
             space.own_writes.pop(rel, None)
