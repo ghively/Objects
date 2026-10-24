@@ -7,8 +7,8 @@ loop). Nothing is emitted for:
 
 - dot-folders (``.object``, ``.object-cache``, ``.git``…), dot-files and
   non-``.md`` files;
-- writes made by `Space.save_body` (its ``own_writes`` versions): the server
-  announces those itself, tagged with the saving client's id;
+- writes the app makes itself (`Space._write` records them in ``own_writes``):
+  the server announces those itself, tagged with the saving client's id;
 - events that leave the file bytes as the space already knows them.
 """
 
@@ -34,13 +34,15 @@ DEBOUNCE_SECONDS = 0.150
 
 @dataclass(frozen=True)
 class ChangeEvent:
-    kind: Literal["created", "changed", "deleted"]
+    kind: Literal["created", "changed", "deleted", "renamed", "types"]
     path: str
-    """Space-relative POSIX path of the object file."""
+    """Space-relative POSIX path of the object file (for ``types``: the type id)."""
     version: str | None
     """The new file version (sha256 of its bytes); ``None`` when deleted."""
     origin: str | None = None
-    """For a save made through the API: the saving client's id (see ``PUT /api/object/body``)."""
+    """For a write made through the API: the writing client's id (its ``clientId``)."""
+    oldPath: str | None = None
+    """For ``renamed``: the object's path before the move."""
 
 
 class _Handler(FileSystemEventHandler):

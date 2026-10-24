@@ -4,10 +4,16 @@ Routes (all JSON):
 
 - ``GET /api/space`` -> ``{name, root, types}``
 - ``GET /api/objects?type=`` -> ``ObjectSummary[]``
-- ``GET /api/object?path=`` -> ``{summary, frontmatter, body, version}``
+- ``GET /api/object?path=`` -> ``{summary, frontmatter, body, version, links}``
+  (``links``: each entity value resolved from this file, ``null`` when dangling)
 - ``PUT /api/object/body`` ``{path, body, baseVersion, clientId?}`` -> ``200 {version}``,
   ``409 {currentVersion}`` or ``423 {reason}``. A save that writes announces a
   ``changed`` event with ``origin: clientId``.
+- ``PUT /api/object/properties`` ``{path, updates, remove?, baseVersion, clientId?}`` ->
+  ``{version, frontmatter, links, synced, skipped}``; ``409 {currentVersion}``,
+  ``423 {reason}``, ``422 {detail}``, ``404``. Announces ``changed`` for the
+  object (when written) and for each synced object.
+- ``POST /api/object/ensure-id`` ``{path, clientId?}`` -> ``{id, version}``; ``423``, ``404``.
 - ``GET /api/resolve?link=&from=`` -> ``{path}`` or ``404``
 - ``POST /api/reveal`` ``{path}`` -> ``200 {ok}``: show the file in the OS file manager
 - ``GET /api/events`` -> Server-Sent Events; event ``change`` with a
@@ -28,6 +34,7 @@ import threading
 from collections.abc import AsyncIterator
 from dataclasses import asdict
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 from fastapi import APIRouter, FastAPI, Query
 from fastapi.responses import JSONResponse
@@ -35,6 +42,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
+from .propvalues import InvalidValue
 from .space import Conflict, ReadOnly, Space
 from .typedefs import has_undecodable
 from .typemodel import type_revision
@@ -92,6 +100,19 @@ class SaveBodyRequest(BaseModel):
     baseVersion: str
     clientId: str | None = None
     """The saving window's id, echoed as ``origin`` on the change event the save announces."""
+
+
+class UpdatePropertiesRequest(BaseModel):
+    path: str
+    updates: dict[str, Any] = {}
+    remove: list[str] = []
+    baseVersion: str
+    clientId: str | None = None
+
+
+class EnsureIdRequest(BaseModel):
+    path: str
+    clientId: str | None = None
 
 
 def _display_safe(value):
@@ -194,6 +215,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
                 "frontmatter": fm,
                 "body": of.body,
                 "version": version,
+                "links": space.links_of(path, fm),
             }
         )
 
@@ -221,6 +243,57 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         except (KeyError, FileNotFoundError):
             return _error(404, f"No object at {req.path!r}")
         return {"version": version}
+
+    def _norm(path: str) -> str:
+        return PurePosixPath(path.replace("\\", "/")).as_posix()
+
+    @api.put("/object/properties")
+    def put_properties(req: UpdatePropertiesRequest):
+        try:
+            result = space.update_properties(
+                req.path, req.updates, req.baseVersion, remove=req.remove
+            )
+        except Conflict as exc:
+            return JSONResponse({"currentVersion": exc.current_version}, status_code=409)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {req.path!r}")
+        rel = _norm(req.path)
+        if result.version != req.baseVersion:
+            announce(ChangeEvent("changed", rel, result.version, origin=req.clientId))
+        for path in result.synced:
+            announce(
+                ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId)
+            )
+        return _display_safe(
+            {
+                "version": result.version,
+                "frontmatter": result.frontmatter,
+                "links": result.links,
+                "synced": result.synced,
+                "skipped": [asdict(s) for s in result.skipped],
+            }
+        )
+
+    @api.post("/object/ensure-id")
+    def ensure_id(req: EnsureIdRequest):
+        try:
+            before = space.cached_version(req.path)
+            object_id, version = space.ensure_id(req.path)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {req.path!r}")
+        if version != before:
+            announce(ChangeEvent("changed", _norm(req.path), version, origin=req.clientId))
+        return {"id": object_id, "version": version}
 
     @api.get("/resolve")
     def resolve(link: str, from_: str | None = Query(default=None, alias="from")):
