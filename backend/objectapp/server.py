@@ -37,6 +37,7 @@ from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from .space import Conflict, ReadOnly, Space
 from .typedefs import has_undecodable
+from .typemodel import type_revision
 from .watcher import ChangeEvent, SpaceWatcher
 
 __all__ = ["EventHub", "create_app"]
@@ -165,7 +166,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         return {
             "name": space.name,
             "root": str(space.root),
-            "types": [asdict(t) for t in space.types],
+            "types": [t.to_api(type_revision(space.root, t.id)) for t in space.types],
         }
 
     @api.get("/objects")

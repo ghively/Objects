@@ -1,12 +1,14 @@
 """A space: a folder of object files, scanned into summaries, types and a link index.
 
 Reading, listing, resolving and opening objects never write an object file.
-The only write `Space` makes on its own is the one-time creation of
-``.capacities/types/`` (see `typedefs.load_types`).
+The only writes `Space` makes on its own are inside ``.capacities/`` (see
+`typemodel.load_types`): the first-open type JSON, the one-time v1 type
+migration, and the built-in Page and Tag types when missing.
 """
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import re
 import threading
@@ -20,14 +22,13 @@ from .objfile import ObjectFile, join_object
 from .textfile import atomic_write, encode_like
 from .typedefs import (
     RawObject,
-    TypeDef,
     infer_types_from,
     is_ignored,
     iter_object_paths,
-    load_types,
     read_raw,
     slug,
 )
+from .typemodel import TypeDefinition, UnreadableType, load_types
 
 __all__ = ["Conflict", "ObjectSummary", "ReadOnly", "Space", "now_stamp", "version_of"]
 
@@ -61,7 +62,7 @@ class ObjectSummary:
     path: str
     id: str | None
     type: str
-    """The object's type id (see `TypeDef.id`)."""
+    """The object's type id (see `TypeDefinition.id`)."""
     title: str
     icon: str | None
     createdAt: str | None
@@ -70,6 +71,10 @@ class ObjectSummary:
     readOnly: bool = False
     readOnlyReason: str | None = None
     """Why the object opens read-only (None when it can be saved)."""
+    description: str | None = None
+    aliases: list[str] = field(default_factory=list)
+    coverImage: str | None = None
+    iconColor: str | None = None
 
 
 def version_of(data: bytes) -> str:
@@ -132,27 +137,56 @@ class Space:
             except OSError:
                 continue
         inferred = infer_types_from(self._raw.values())
-        loaded = load_types(self.root, inferred=inferred)
-        self.types: list[TypeDef] = list(loaded)
+        loaded, unreadable = load_types(self.root, inferred=inferred)
+        self.types: list[TypeDefinition] = list(loaded)
+        self.unreadable_types: list[UnreadableType] = list(unreadable)
+        self._add_placeholders(inferred)
         self._merge_types(inferred)
         for rel, raw in self._raw.items():
             self._summaries[rel] = self._summarize(raw)
 
     # -- types --------------------------------------------------------------
 
-    def _merge_types(self, inferred: list[TypeDef]) -> None:
-        """Add (in memory only) inferred types that the stored definitions lack."""
+    def _add_placeholders(self, inferred: list[TypeDefinition]) -> None:
+        """An in-memory, read-only type for each type file that couldn't be read."""
+        by_id = {t.id: t for t in inferred}
+        for u in self.unreadable_types:
+            if any(t.id == u.id for t in self.types):
+                continue
+            base = by_id.get(u.id)
+            t = copy.deepcopy(base) if base is not None else TypeDefinition.from_json(
+                {"id": u.id, "name": u.id, "schemaVersion": 2}
+            )
+            t.readOnlyReason = f"The type file {u.path} could not be read: {u.error}"
+            self.types.append(t)
+
+    def _merge_types(self, inferred: list[TypeDefinition]) -> None:
+        """Add (in memory only) inferred types that the stored definitions lack.
+
+        An inferred type is written only when the user first saves it.
+        """
         known = {t.name.lower() for t in self.types} | {t.id for t in self.types}
+        for t in self.types:
+            known |= {f.lower() for f in t.formerNames}
         for t in inferred:
             if t.name.lower() not in known and t.id not in known:
                 self.types.append(t)
                 known |= {t.name.lower(), t.id}
 
+    def type_by_id(self, type_id: str) -> TypeDefinition | None:
+        return next((t for t in self.types if t.id == type_id), None)
+
     def _type_id(self, type_name: str) -> str:
+        """The id of the type `type_name` names: by name, then id, then former names."""
         lowered = type_name.lower()
-        for t in self.types:
-            if t.name.lower() == lowered or t.id == lowered:
-                return t.id
+        for match in (
+            lambda t: t.name.lower() == lowered,
+            lambda t: t.id.lower() == lowered,
+            lambda t: lowered in (f.lower() for f in t.formerNames),
+        ):
+            for t in self.types:
+                if match(t):
+                    return t.id
         return slug(type_name)
 
     # -- paths --------------------------------------------------------------
@@ -187,6 +221,10 @@ class Space:
             tags=_str_list(fm.get("tags")),
             readOnly=raw.readOnly,
             readOnlyReason=raw.readOnlyReason,
+            description=_str_or_none(fm.get("description")),
+            aliases=_str_list(fm.get("aliases")),
+            coverImage=_str_or_none(fm.get("coverImage")),
+            iconColor=_str_or_none(fm.get("iconColor")),
         )
 
     def list(self, type_id: str | None = None) -> list[ObjectSummary]:

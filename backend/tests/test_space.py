@@ -4,7 +4,12 @@ from pathlib import Path
 import pytest
 
 from objectapp.space import ObjectSummary, Space
-from objectapp.typedefs import infer_types, load_types
+from objectapp.typedefs import infer_types_from, iter_object_paths, read_raw
+from objectapp.typemodel import load_types
+
+
+def infer_types(root: Path):
+    return infer_types_from(read_raw(root, rel) for rel in iter_object_paths(root))
 
 
 def _by_name(types):
@@ -31,11 +36,11 @@ def test_infers_types_from_type_field(space_dir):
     assert types["DailyNote"].pluralName == "DailyNotes"
     assert types["Page"].pluralName == "Pages"
     assert types["Task"].id == "task"
-    assert types["Task"].icon == "ph-check-circle"
-    assert types["Person"].icon == "ph-user"
-    assert types["Server"].icon == "ph-hard-drives"
-    assert types["DailyNote"].icon == "ph-calendar-blank"
-    assert types["Page"].icon == "ph-file-text"
+    assert types["Task"].icon.val == "ph-check-circle"
+    assert types["Person"].icon.val == "ph-user"
+    assert types["Server"].icon.val == "ph-hard-drives"
+    assert types["DailyNote"].icon.val == "ph-calendar-blank"
+    assert types["Page"].icon.val == "ph-file-text"
     colors = [t.color for t in types.values()]
     assert len(set(colors)) == len(colors)
     # ignored folders contribute no types
@@ -51,28 +56,41 @@ def test_property_kinds_inferred(space_dir):
     assert prop("DailyNote", "reviewed").type == "boolean"
     assert prop("DailyNote", "date").type == "datetime"
     tags = prop("Task", "tags")
-    assert tags.type == "label" and tags.isArray is True
+    assert tags.type == "entity_tags" and tags.id == "tags" and tags.options["isArray"] is True
     assert prop("Task", "status").type == "label"
     assert prop("Server", "cores").type == "number"
     assert prop("Server", "owner").type == "entity"
     assert prop("Person", "website").type == "url"
-    # system keys are not property definitions
-    keys = {p.key for p in types["Task"].propertyDefinitions}
-    assert not keys & {"id", "type", "title", "icon", "createdAt", "lastUpdated"}
+    # system keys are system definitions (id == key, an entity_* kind), never plain properties
+    for p in types["Task"].propertyDefinitions:
+        if p.key in {"title", "icon", "createdAt", "lastUpdated", "description", "aliases"}:
+            assert p.type.startswith("entity_") and p.id == p.key
+    assert not {p.key for p in types["Task"].propertyDefinitions} & {"id", "type"}
 
 
 def test_type_files_written_once(space_dir):
     types_dir = space_dir / ".capacities" / "types"
     assert not types_dir.exists()
-    first = load_types(space_dir)
+    first, unreadable = load_types(space_dir)
+    assert unreadable == []
     files = sorted(types_dir.glob("*.json"))
     assert {f.stem for f in files} == {t.id for t in first}
+    assert {"page", "tag"} <= {t.id for t in first}
     before = {f.name: f.stat().st_mtime_ns for f in files}
-    second = load_types(space_dir)
+    second, _ = load_types(space_dir)
     after = {f.name: f.stat().st_mtime_ns for f in sorted(types_dir.glob("*.json"))}
     assert before == after
     assert [t.id for t in second] == [t.id for t in first]
     assert second == first
+
+
+def test_tag_present_and_tags_system_def(space_dir):
+    s = Space(space_dir)
+    tag = next(t for t in s.types if t.id == "tag")
+    assert tag.name == "Tag" and tag.folder == "Tags" and tag.basic is True
+    task = next(t for t in s.types if t.id == "task")
+    tags = task.prop("tags")
+    assert tags is not None and tags.type == "entity_tags" and tags.id == "tags"
 
 
 def test_no_frontmatter_is_page_readonly_false(space_dir):
