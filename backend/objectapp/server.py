@@ -14,6 +14,14 @@ Routes (all JSON):
   ``423 {reason}``, ``422 {detail}``, ``404``. Announces ``changed`` for the
   object (when written) and for each synced object.
 - ``POST /api/object/ensure-id`` ``{path, clientId?}`` -> ``{id, version}``; ``423``, ``404``.
+- ``POST /api/objects`` ``{typeId, title?, templateId?, clientId?}`` -> ``201 {path, version}``;
+  ``404`` for an unknown type. Announces ``created`` (and ``types`` when an
+  inferred type was saved for the first time).
+- ``DELETE /api/object?path=&baseVersion=&clientId=`` -> ``{trashId}``; ``404``,
+  ``409 {currentVersion}``. Moves the file to the trash; announces ``deleted``.
+- ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
+  ``{paths, typeIds}`` (announces ``created`` per path and ``types`` per type);
+  ``DELETE /api/trash/{id}`` and ``DELETE /api/trash`` -> ``{purged}``; ``404``.
 - ``GET /api/resolve?link=&from=`` -> ``{path}`` or ``404``
 - ``POST /api/reveal`` ``{path}`` -> ``200 {ok}``: show the file in the OS file manager
 - ``GET /api/events`` -> Server-Sent Events; event ``change`` with a
@@ -112,6 +120,13 @@ class UpdatePropertiesRequest(BaseModel):
 
 class EnsureIdRequest(BaseModel):
     path: str
+    clientId: str | None = None
+
+
+class CreateObjectRequest(BaseModel):
+    typeId: str
+    title: str | None = None
+    templateId: str | None = None
     clientId: str | None = None
 
 
@@ -294,6 +309,67 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         if version != before:
             announce(ChangeEvent("changed", _norm(req.path), version, origin=req.clientId))
         return {"id": object_id, "version": version}
+
+    @api.post("/objects", status_code=201)
+    def create_object(req: CreateObjectRequest):
+        t = space.type_by_id(req.typeId)
+        had_file = bool(type_revision(space.root, req.typeId)) if t is not None else False
+        try:
+            path, version = space.create_object(req.typeId, req.title or "", req.templateId)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except KeyError:
+            return _error(404, f"No object type {req.typeId!r}")
+        if t is not None and not had_file and type_revision(space.root, req.typeId):
+            announce(ChangeEvent("types", req.typeId, None, origin=req.clientId))
+        announce(ChangeEvent("created", path, version, origin=req.clientId))
+        return JSONResponse({"path": path, "version": version}, status_code=201)
+
+    @api.delete("/object")
+    def delete_object(
+        path: str,
+        baseVersion: str | None = Query(default=None),
+        clientId: str | None = Query(default=None),
+    ):
+        try:
+            item = space.delete_object(path, base_version=baseVersion or None)
+        except Conflict as exc:
+            return JSONResponse({"currentVersion": exc.current_version}, status_code=409)
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {path!r}")
+        announce(ChangeEvent("deleted", item.originalPath, None, origin=clientId))
+        return {"trashId": item.id}
+
+    @api.get("/trash")
+    def list_trash():
+        return _display_safe([i.to_api() for i in space.list_trash()])
+
+    @api.post("/trash/{trash_id}/restore")
+    def restore_trash(trash_id: str, clientId: str | None = Query(default=None)):
+        try:
+            result = space.restore(trash_id)
+        except KeyError:
+            return _error(404, f"No trash entry {trash_id!r}")
+        for type_id in result["typeIds"]:
+            announce(ChangeEvent("types", type_id, None, origin=clientId))
+        for path in result["paths"]:
+            announce(ChangeEvent("created", path, space.cached_version(path), origin=clientId))
+        return result
+
+    @api.delete("/trash/{trash_id}")
+    def purge_trash(trash_id: str, clientId: str | None = Query(default=None)):
+        del clientId  # purging touches no visible file
+        try:
+            return {"purged": space.purge(trash_id)}
+        except KeyError:
+            return _error(404, f"No trash entry {trash_id!r}")
+
+    @api.delete("/trash")
+    def empty_trash(clientId: str | None = Query(default=None)):
+        del clientId
+        return {"purged": space.empty_trash()}
 
     @api.get("/resolve")
     def resolve(link: str, from_: str | None = Query(default=None, alias="from")):

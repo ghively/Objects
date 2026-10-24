@@ -156,3 +156,26 @@ def test_change_event_has_old_path_and_new_kinds():
     ev = ChangeEvent(kind="renamed", path="People/Ada King.md", version="v", oldPath="People/Ada.md")
     assert ev.oldPath == "People/Ada.md"
     assert ChangeEvent(kind="types", path="task", version=None).oldPath is None
+
+
+def test_own_delete_emits_no_event(space_dir: Path):
+    async def scenario(space: Space, watcher: SpaceWatcher):
+        item = await asyncio.to_thread(space.delete_object, "Pages/Alpha.md")
+        assert await _drain(watcher, QUIET) == []
+        await asyncio.to_thread(space.restore, item.id)
+        assert await _drain(watcher, QUIET) == []
+        # External deletes are still reported.
+        (space_dir / "Pages" / "Alpha.md").unlink()
+        ev = await _next_event(watcher)
+        assert ev == ChangeEvent(kind="deleted", path="Pages/Alpha.md", version=None)
+
+    _run(space_dir, scenario)
+
+
+def test_create_emits_no_watcher_event(space_dir: Path):
+    async def scenario(space: Space, watcher: SpaceWatcher):
+        path, _version = await asyncio.to_thread(space.create_object, "task", "Plan sprint")
+        assert path == "Tasks/Plan sprint.md"
+        assert await _drain(watcher, QUIET) == []
+
+    _run(space_dir, scenario)

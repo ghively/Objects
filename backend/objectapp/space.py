@@ -10,12 +10,19 @@ read-only checks, edit, optional stamp, `encode_like`, ``own_writes``,
 `atomic_write` with a re-check, `rescan_file`). Rewrites of *other* files on the
 user's behalf use `Space._rewrite_other`, which retries once on a conflict and
 otherwise reports a `Skip` instead of overwriting.
+
+Objects are created with `Space.create_object` and deleted to the app's own
+trash (`trash.Trash`, in ``.object/trash/``) with `Space.delete_object`;
+types go there with `Space.trash_type`. Opening the space purges trash entries
+older than 30 days.
 """
 
 from __future__ import annotations
 
 import copy
 import hashlib
+import json
+import os
 import re
 import threading
 from collections.abc import Callable, Iterable
@@ -29,6 +36,7 @@ from .ids import new_ulid
 from .objfile import ObjectFile, join_object
 from .propvalues import InvalidValue, decode_value, encode_updates
 from .textfile import atomic_write, encode_like
+from .trash import Trash, TrashItem
 from .typedefs import (
     RawObject,
     infer_types_from,
@@ -39,10 +47,14 @@ from .typedefs import (
 )
 from .typemodel import (
     PropertyDefinition,
+    RevisionConflict,
     TypeDefinition,
+    TypeReadOnly,
     UnreadableType,
     load_types,
     system_property_defs,
+    type_revision,
+    write_type_json,
 )
 
 __all__ = [
@@ -51,8 +63,11 @@ __all__ = [
     "ReadOnly",
     "Skip",
     "Space",
+    "TrashItem",
     "UpdateResult",
     "now_stamp",
+    "safe_filename",
+    "unique_path",
     "version_of",
 ]
 
@@ -69,6 +84,69 @@ _EXTRA_SYSTEM_DEFS = (
 )
 
 _HEADING_RE = re.compile(r"^#[ \t]+(.+?)[ \t#]*$", re.MULTILINE)
+_UNTITLED_STEM_RE = re.compile(r"^Untitled(?: \(\d+\))?$")
+
+# Characters Windows doesn't allow in a file name (and control characters).
+_ILLEGAL_FILENAME_RE = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+_MAX_FILENAME = 120
+# Device names Windows reserves (a file `CON.md` can't be created there).
+_RESERVED_STEMS = frozenset(
+    {
+        "CON", "PRN", "AUX", "NUL",
+        *(f"COM{i}" for i in range(1, 10)),
+        *(f"LPT{i}" for i in range(1, 10)),
+    }
+)
+
+
+def safe_filename(title: str) -> str:
+    """The file stem for a title, as Object's export names files.
+
+    The title up to its first character that is illegal in a Windows file name,
+    with whitespace collapsed and trailing dots and spaces stripped, capped at
+    120 characters. If that is empty, the illegal characters are dropped
+    instead; if still empty, ``Untitled``. (A Windows device name such as
+    ``CON`` gets a trailing ``_``.)
+    """
+
+    def clean(text: str) -> str:
+        text = " ".join(text.split()).rstrip(". ")
+        return text[:_MAX_FILENAME].rstrip(". ")
+
+    title = str(title or "")
+    m = _ILLEGAL_FILENAME_RE.search(title)
+    stem = clean(title[: m.start()] if m else title)
+    if not stem:
+        stem = clean(_ILLEGAL_FILENAME_RE.sub("", title))
+    if stem.split(".", 1)[0].upper() in _RESERVED_STEMS:
+        stem += "_"
+    return stem or "Untitled"
+
+
+def unique_path(root: Path, folder: str, stem: str, same_as: str | None = None) -> str:
+    """A free space path ``<folder>/<stem>.md``, appending `` (2)``, `` (3)``... on a collision.
+
+    Names compare case-insensitively (as on Windows). `same_as` is the path of
+    the file being renamed: finding only itself is not a collision.
+    """
+    folder = folder.strip("/")
+    base = Path(root) / folder if folder else Path(root)
+    try:
+        taken = {p.name.lower() for p in base.iterdir()} if base.is_dir() else set()
+    except OSError:
+        taken = set()
+    own = None
+    if same_as:
+        same = PurePosixPath(same_as.replace("\\", "/"))
+        same_folder = same.parent.as_posix()
+        if (same_folder if same_folder != "." else "").lower() == folder.lower():
+            own = same.name.lower()
+    n = 1
+    while True:
+        name = f"{stem}.md" if n == 1 else f"{stem} ({n}).md"
+        if name.lower() not in taken or name.lower() == own:
+            return f"{folder}/{name}" if folder else name
+        n += 1
 
 
 class Conflict(Exception):
@@ -169,7 +247,12 @@ def _title_of(raw: RawObject) -> str:
         m = _HEADING_RE.search(raw.of.body)
         if m:
             return m.group(1).strip()
-    return PurePosixPath(raw.path).stem
+    stem = PurePosixPath(raw.path).stem
+    return "Untitled" if _UNTITLED_STEM_RE.match(stem) else stem
+
+
+def _yaml_single_quoted(text: str) -> str:
+    return "'" + text.replace("'", "''") + "'"
 
 
 def _link_candidates(link: str) -> list[str]:
@@ -196,6 +279,9 @@ class Space:
         self._summaries: dict[str, ObjectSummary] = {}
         self.own_writes: dict[str, str] = {}
         """Path -> version of the last write `save_body` made (for self-write suppression)."""
+        self.own_deletes: dict[str, str] = {}
+        """Path -> version of a file the app moved away (to the trash); the watcher stays silent."""
+        self.trash = Trash(self.root)
         for rel in iter_object_paths(self.root):
             try:
                 self._raw[rel] = read_raw(self.root, rel)
@@ -209,6 +295,7 @@ class Space:
         self._merge_types(inferred)
         for rel, raw in self._raw.items():
             self._summaries[rel] = self._summarize(raw)
+        self.purge_expired(datetime.now(UTC))
 
     # -- types --------------------------------------------------------------
 
@@ -654,6 +741,364 @@ class Space:
 
         version = self._write(path, None, self._fm_edit(apply), stamp=False)
         return found[-1], version
+
+    # -- create ---------------------------------------------------------------
+
+    def _persist_type(self, t: TypeDefinition) -> bool:
+        """Write an inferred-only type's JSON (the first time it is used); True if written."""
+        if t.readOnlyReason or type_revision(self.root, t.id):
+            return False
+        try:
+            write_type_json(self.root, t, "")
+        except (RevisionConflict, TypeReadOnly):
+            return False
+        return True
+
+    def create_object(
+        self, type_id: str, title: str = "", template_id: str | None = None
+    ) -> tuple[str, str]:
+        """Create an object of the type in its folder; return (path, version).
+
+        The frontmatter is ``id``, ``type: '<Name>'``, ``title`` (only when
+        non-empty), ``createdAt`` and ``lastUpdated``; the body is ``# <title>``
+        or empty. The file name is `safe_filename` of the title, made unique.
+        Raises `KeyError` for an unknown type. (``template_id`` is used from Task 9.)
+        """
+        del template_id  # templates arrive in Task 9
+        t = self.type_by_id(type_id)
+        if t is None:
+            raise KeyError(type_id)
+        title = " ".join(str(title or "").split("\n")).strip()
+        stamp = now_stamp()
+        fm_src = set_keys(
+            f"type: {_yaml_single_quoted(t.name)}\n",
+            {**({"title": title} if title else {}), "createdAt": stamp, "lastUpdated": stamp},
+            insert_first={"id": new_ulid()},
+        )
+        body = f"# {title}\n" if title else ""
+        data = join_object(ObjectFile(fm_src, body, True, None)).encode("utf-8")
+        version = version_of(data)
+        stem = safe_filename(title) if title else "Untitled"
+        with self._lock:
+            self._persist_type(t)
+            folder = t.folder.strip("/")
+            (self.root / folder).mkdir(parents=True, exist_ok=True)
+            for _attempt in range(100):
+                rel = unique_path(self.root, folder, stem)
+                if self._place(rel, data):
+                    return rel, version
+        raise OSError(f"Could not find a free file name for {stem!r}")
+
+    def _place(self, rel: str, data: bytes) -> bool:
+        """Write a new file at ``rel`` unless something is there by then; True if written."""
+        full = self.root / self._rel(rel)
+
+        def absent() -> None:
+            if full.exists():
+                raise FileExistsError(rel)
+
+        self.own_writes[rel] = version_of(data)
+        try:
+            full.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write(full, data, check=absent)
+        except FileExistsError:
+            self.own_writes.pop(rel, None)
+            return False
+        except BaseException:
+            self.own_writes.pop(rel, None)
+            raise
+        self.rescan_file(rel)
+        return True
+
+    # -- delete and trash -------------------------------------------------------
+
+    def _move_out(self, rel: str, dest: Path) -> None:
+        """Move an object file out of the space (into the trash), quietly for the watcher."""
+        full = self.root / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.own_deletes[rel] = version_of(full.read_bytes())
+        except OSError:
+            self.own_deletes[rel] = ""
+        try:
+            os.replace(full, dest)
+        except BaseException:
+            self.own_deletes.pop(rel, None)
+            raise
+        self.own_writes.pop(rel, None)
+        self.rescan_file(rel)
+
+    def delete_object(
+        self, path: str, base_version: str | None = None, type_trash_id: str | None = None
+    ) -> TrashItem:
+        """Move an object to the trash (bytes unchanged); links to it are left dangling.
+
+        A stale ``base_version`` raises `Conflict`; a missing file `KeyError`.
+        Read-only objects can be deleted (the file is moved, not rewritten).
+        """
+        rel = self._rel(path)
+        full = self.root / rel
+        with self._lock:
+            if not full.is_file():
+                raise KeyError(rel)
+            current = version_of(full.read_bytes())
+            if base_version is not None and current != base_version:
+                raise Conflict(current)
+            summary = self._summaries.get(rel)
+            if summary is None:
+                self.rescan_file(rel)
+                summary = self._summaries.get(rel)
+            item = TrashItem(
+                id=new_ulid(),
+                kind="object",
+                originalPath=rel,
+                title=summary.title if summary else PurePosixPath(rel).stem,
+                type=summary.type if summary else "",
+                deletedAt=now_stamp(),
+                typeTrashId=type_trash_id,
+            )
+            meta = {k: v for k, v in item.to_api().items() if k != "objectCount"}
+            if type_trash_id is None:
+                meta.pop("typeTrashId")
+            meta_file = self.trash.object_meta_file(item.id)
+            self.trash.write_json(meta_file, meta)
+            try:
+                self._move_out(rel, self.trash.object_file(item.id))
+            except BaseException:
+                meta_file.unlink(missing_ok=True)
+                raise
+            return item
+
+    def _templates_of(self, type_id: str) -> list[str]:
+        """Paths of the template files (``template:`` key) whose type is ``type_id``."""
+        with self._lock:
+            raws = list(self._raw.values())
+        return sorted(
+            r.path
+            for r in raws
+            if not r.readOnly
+            and r.fm.get("template") not in (None, "")
+            and self._type_id(r.typeName) == type_id
+        )
+
+    def _save_type(self, t: TypeDefinition) -> bool:
+        try:
+            write_type_json(self.root, t, type_revision(self.root, t.id))
+        except (RevisionConflict, TypeReadOnly):
+            return False
+        return True
+
+    def trash_type(self, type_def: TypeDefinition, object_paths: Iterable[str]) -> TrashItem:
+        """Move a type, its template files and the given objects to the trash.
+
+        The type JSON and templates go to ``trash/types/<ulid>/``; each object
+        becomes an object entry with ``typeTrashId``. Other types' relation
+        properties that allowed this type stop allowing it; ``allowedTypesRefs``
+        records them so a restore puts them back.
+        """
+        with self._lock:
+            trash_id = new_ulid()
+            folder = self.trash.type_dir(trash_id)
+            folder.mkdir(parents=True, exist_ok=True)
+            type_file = self.root / ".object" / "types" / f"{type_def.id}.json"
+            if type_file.is_file():
+                os.replace(type_file, folder / "type.json")
+            else:
+                (folder / "type.json").write_bytes(
+                    (json.dumps(type_def.to_json(), indent=2, ensure_ascii=False) + "\n").encode()
+                )
+            objects = [self._rel(p) for p in object_paths]
+            templates = [p for p in self._templates_of(type_def.id) if p not in objects]
+            for rel in templates:
+                self._move_out(rel, folder / "templates" / rel)
+            object_ids = [
+                self.delete_object(rel, type_trash_id=trash_id).id
+                for rel in objects
+                if (self.root / rel).is_file()
+            ]
+            refs: list[dict[str, str]] = []
+            for other in self.types:
+                if other.id == type_def.id or other.readOnlyReason:
+                    continue
+                touched = [
+                    p
+                    for p in other.propertyDefinitions
+                    if p.type == "entity" and type_def.id in (p.options.get("allowedTypes") or [])
+                ]
+                if not touched:
+                    continue
+                changed = copy.deepcopy(other)
+                for p in changed.propertyDefinitions:
+                    if p.id in {q.id for q in touched}:
+                        p.options["allowedTypes"] = [
+                            a for a in p.options["allowedTypes"] if a != type_def.id
+                        ]
+                if self._save_type(changed):
+                    other.propertyDefinitions = changed.propertyDefinitions
+                    refs.extend({"typeId": other.id, "propertyId": p.id} for p in touched)
+            deleted_at = now_stamp()
+            self.trash.write_json(
+                folder / "manifest.json",
+                {
+                    "id": trash_id,
+                    "kind": "type",
+                    "typeId": type_def.id,
+                    "name": type_def.name,
+                    "deletedAt": deleted_at,
+                    "objectTrashIds": object_ids,
+                    "allowedTypesRefs": refs,
+                    "templates": templates,
+                },
+            )
+            self.types = [t for t in self.types if t.id != type_def.id]
+            return TrashItem(
+                id=trash_id,
+                kind="type",
+                originalPath=f".object/types/{type_def.id}.json",
+                title=type_def.name,
+                type=type_def.id,
+                deletedAt=deleted_at,
+                objectCount=len(object_ids),
+            )
+
+    def list_trash(self) -> list[TrashItem]:
+        """Every trash entry, newest first."""
+        with self._lock:
+            return self.trash.items()
+
+    def _restore_file(self, original: str, data: bytes) -> str:
+        """Put bytes back at ``original`` (`` (2)``... on a collision); return the path used."""
+        rel = self._rel(original)
+        parent = PurePosixPath(rel).parent.as_posix()
+        folder = "" if parent == "." else parent
+        stem = PurePosixPath(rel).stem
+        for _attempt in range(100):
+            target = unique_path(self.root, folder, stem)
+            if self._place(target, data):
+                return target
+        raise OSError(f"Could not find a free file name for {stem!r}")
+
+    def _restore_type_entry(self, trash_id: str, manifest: dict) -> tuple[list[str], list[str]]:
+        """Restore a trashed type's definition, templates and relation refs; (paths, typeIds)."""
+        folder = self.trash.type_dir(trash_id)
+        type_id = str(manifest.get("typeId", ""))
+        type_ids = [type_id]
+        type_file = self.root / ".object" / "types" / f"{type_id}.json"
+        stored = folder / "type.json"
+        if stored.is_file() and not type_file.exists():
+            type_file.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(stored, type_file)
+        try:
+            data = json.loads(type_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = None
+        if isinstance(data, dict):
+            restored = TypeDefinition.from_json(data, fallback_id=type_id)
+            name = restored.name.lower()
+            self.types = [
+                t for t in self.types if t.id != restored.id and t.name.lower() != name
+            ]
+            self.types.append(restored)
+            self.types.sort(key=lambda t: (t.name.lower(), t.name))
+        paths: list[str] = []
+        for original in manifest.get("templates") or []:
+            src = folder / "templates" / original
+            if src.is_file():
+                paths.append(self._restore_file(original, src.read_bytes()))
+        for ref in manifest.get("allowedTypesRefs") or []:
+            other = self.type_by_id(str(ref.get("typeId")))
+            if other is None or other.readOnlyReason:
+                continue
+            changed = copy.deepcopy(other)
+            p = next((q for q in changed.propertyDefinitions if q.id == ref.get("propertyId")), None)
+            if p is None or type_id in (p.options.get("allowedTypes") or []):
+                continue
+            p.options["allowedTypes"] = [*(p.options.get("allowedTypes") or []), type_id]
+            if self._save_type(changed):
+                other.propertyDefinitions = changed.propertyDefinitions
+                if other.id not in type_ids:
+                    type_ids.append(other.id)
+        self.trash.remove_type(trash_id)
+        # Objects whose type was unknown while it was in the trash resolve again.
+        for rel in list(self._raw):
+            self.rescan_file(rel)
+        return paths, type_ids
+
+    def _restore_object_entry(self, trash_id: str, meta: dict) -> str:
+        data = self.trash.object_file(trash_id).read_bytes()
+        path = self._restore_file(str(meta.get("originalPath", "")), data)
+        self.trash.remove_object(trash_id)
+        return path
+
+    def restore(self, trash_id: str) -> dict[str, list[str]]:
+        """Restore a trash entry; return ``{paths, typeIds}`` of what came back.
+
+        An object returns to its original path (`` (2)`` on a collision); if its
+        type is in the trash, the type definition and templates come back with
+        it (not the type's other objects). A type entry restores the type, its
+        templates, its remaining objects and its ``allowedTypesRefs``.
+        Raises `KeyError` for an unknown id.
+        """
+        with self._lock:
+            meta = self.trash.object_meta(trash_id)
+            if meta is not None:
+                paths: list[str] = []
+                type_ids: list[str] = []
+                type_trash = meta.get("typeTrashId")
+                manifest = self.trash.manifest(type_trash) if type_trash else None
+                obj_path = self._restore_object_entry(trash_id, meta)
+                if manifest is not None:
+                    paths, type_ids = self._restore_type_entry(type_trash, manifest)
+                return {"paths": [obj_path, *paths], "typeIds": type_ids}
+            manifest = self.trash.manifest(trash_id)
+            if manifest is None:
+                raise KeyError(trash_id)
+            objects: list[str] = []
+            for oid in manifest.get("objectTrashIds") or []:
+                ometa = self.trash.object_meta(oid)
+                if ometa is not None:
+                    objects.append(self._restore_object_entry(oid, ometa))
+            paths, type_ids = self._restore_type_entry(trash_id, manifest)
+            return {"paths": [*objects, *paths], "typeIds": type_ids}
+
+    def purge(self, trash_id: str) -> int:
+        """Delete a trash entry for good (a type with its objects); return how many entries went."""
+        with self._lock:
+            if self.trash.object_meta(trash_id) is not None:
+                self.trash.remove_object(trash_id)
+                return 1
+            manifest = self.trash.manifest(trash_id)
+            if manifest is None:
+                raise KeyError(trash_id)
+            count = 1
+            for oid in manifest.get("objectTrashIds") or []:
+                if self.trash.object_meta(oid) is not None:
+                    self.trash.remove_object(oid)
+                    count += 1
+            self.trash.remove_type(trash_id)
+            return count
+
+    def empty_trash(self) -> int:
+        """Delete every trash entry for good; return how many there were."""
+        with self._lock:
+            count = 0
+            for item in self.trash.items():
+                try:
+                    count += self.purge(item.id)
+                except KeyError:
+                    continue  # already purged with its type
+            return count
+
+    def purge_expired(self, now: datetime) -> int:
+        """Purge the entries deleted more than 30 days before ``now``; return how many went."""
+        with self._lock:
+            count = 0
+            for trash_id in self.trash.expired(now):
+                try:
+                    count += self.purge(trash_id)
+                except KeyError:
+                    continue
+            return count
 
     def cached_version(self, path: str) -> str | None:
         """The version of the object as last scanned, or None if the space doesn't know it."""
