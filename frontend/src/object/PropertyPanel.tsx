@@ -1,36 +1,14 @@
 import { Fragment } from 'react'
 import type { PropertyDef, PropertyType, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
+import { KIND_META } from '@/properties/kinds'
 
 /** Frontmatter keys shown elsewhere (header, metadata), not as properties. */
 const CORE_KEYS = new Set(['id', 'type', 'title', 'icon', 'createdAt', 'lastUpdated', 'tags'])
 
-// Temporary: Task 12's kind metadata replaces this map.
-const KIND_ICON: Record<PropertyType, string> = {
-  text: 'ph-text-t',
-  textBlock: 'ph-text-align-left',
-  simpleTableBlock: 'ph-table',
-  number: 'ph-hash',
-  boolean: 'ph-check-square',
-  url: 'ph-link',
-  datetime: 'ph-calendar-blank',
-  datetimeSimple: 'ph-calendar-blank',
-  label: 'ph-list',
-  entity: 'ph-at',
-  blocks: 'ph-text-align-left',
-  coverImage: 'ph-image',
-  color: 'ph-palette',
-  entity_title: 'ph-text-t',
-  entity_icon: 'ph-smiley',
-  entity_description: 'ph-text-align-left',
-  entity_aliases: 'ph-at',
-  entity_tags: 'ph-hash',
-  entity_type: 'ph-cube',
-  entity_collections: 'ph-stack',
-  entity_createdAt: 'ph-calendar-plus',
-  entity_lastUpdated: 'ph-clock-clockwise',
-  entity_backlinks: 'ph-arrow-bend-up-left',
-}
+const KIND_ICON: Record<PropertyType, string> = Object.fromEntries(
+  Object.entries(KIND_META).map(([k, m]) => [k, m.icon]),
+) as Record<PropertyType, string>
 
 function isEmpty(v: unknown): boolean {
   return (
