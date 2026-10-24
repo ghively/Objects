@@ -1,16 +1,11 @@
 import type { ObjectSummary, TypeDef } from '@/api/types'
-import { Icon } from '@/components/Icon'
-import { chipStyle } from '@/shell/typeColor'
+import type { Icon as IconValue } from '@/api/types'
+import { IconOrEmoji } from '@/components/Icon'
+import { chipStyle } from '@/theme/palette'
 
-/** An object's icon: a Phosphor name (`ph-…`) renders as an icon; anything else (emoji) as text. */
-export function ObjectIcon({ icon, size }: { icon: string | null; size: number }) {
-  if (!icon) return null
-  if (/^ph[-:]/.test(icon)) return <Icon name={icon} size={size} />
-  return (
-    <span aria-hidden style={{ fontSize: size, lineHeight: 1 }}>
-      {icon}
-    </span>
-  )
+/** An object's icon: an Iconify id (`ph-…`, `vscode-icons-…`) renders as an icon; anything else (emoji) as text. */
+export function ObjectIcon({ icon, size }: { icon: IconValue | string | null; size: number }) {
+  return <IconOrEmoji icon={icon} size={size} />
 }
 
 export interface ObjectHeaderProps {
@@ -30,7 +25,7 @@ export function ObjectHeader({ summary, type }: ObjectHeaderProps) {
           style={chipStyle(color)}
           className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[color-mix(in_srgb,var(--chip-bg)_85%,white)] bg-[var(--chip-bg)] px-2 text-[15px] font-medium text-[var(--chip-fg)]"
         >
-          <Icon name={type?.icon ?? 'ph-file-text'} size={15} />
+          <IconOrEmoji icon={type?.icon ?? null} fallback="ph-file-text" size={15} />
           {type?.name ?? summary.type}
         </span>
       </div>

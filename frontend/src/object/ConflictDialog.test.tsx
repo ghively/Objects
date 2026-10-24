@@ -2,23 +2,12 @@ import type { Editor as TiptapEditor } from '@tiptap/core'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ChangeEvent, ObjectDetail, ObjectSummary, SpaceInfo, TypeDef } from '@/api/types'
+import { objectDetail, objectSummary, typeDef } from '@/test/mockApi'
 
-vi.mock('@/api/client', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('@/api/client')>()
-  return {
-    ...mod,
-    api: {
-      ...mod.api,
-      space: vi.fn(),
-      objects: vi.fn(),
-      object: vi.fn(),
-      resolve: vi.fn(),
-      saveBody: vi.fn(),
-      reveal: vi.fn(),
-      onChange: vi.fn(),
-    },
-  }
-})
+vi.mock('@/api/client', async (orig) => ({
+  ...(await orig<typeof import('@/api/client')>()),
+  api: (await import('@/test/mockApi')).mockApi(),
+}))
 
 import { api } from '@/api/client'
 import App from '@/App'
@@ -27,15 +16,15 @@ import { resetLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPage } from './ObjectPage'
 
-const mocked = api as unknown as Record<string, ReturnType<typeof vi.fn>>
+const mocked = vi.mocked(api)
 
 const TYPES: TypeDef[] = [
-  { id: 'page', name: 'Page', pluralName: 'Pages', folder: 'Pages', icon: 'ph-file-text', color: 'pink', propertyDefinitions: [] },
-  { id: 'person', name: 'Person', pluralName: 'People', folder: 'People', icon: 'ph-user', color: 'orange', propertyDefinitions: [] },
+  typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', folder: 'Pages', icon: { type: 'iconify', val: 'ph-file-text' }, color: 'pink' }),
+  typeDef({ id: 'person', name: 'Person', pluralName: 'People', folder: 'People', icon: { type: 'iconify', val: 'ph-user' }, color: 'orange' }),
 ]
 
 function summary(path: string, title: string, type = 'page'): ObjectSummary {
-  return { path, id: null, type, title, icon: null, createdAt: null, lastUpdated: null, tags: [], readOnly: false }
+  return objectSummary({ path, type, title })
 }
 
 const PATH = 'Pages/Notes.md'
@@ -43,12 +32,12 @@ const ORIGINAL = 'First paragraph.\n\nSecond paragraph.\n'
 const THEIRS = 'First paragraph.\n\nSecond paragraph, edited in VS Code.\n'
 
 function detail(body: string, version: string): ObjectDetail {
-  return {
+  return objectDetail({
     summary: summary(PATH, 'Notes'),
     frontmatter: { type: 'page', title: 'Notes' },
     body,
     version,
-  }
+  })
 }
 
 let listeners: ((e: ChangeEvent) => void)[] = []
@@ -66,7 +55,7 @@ beforeEach(() => {
   usePeek.getState().close()
   resetLinkIndex()
   listeners = []
-  for (const fn of Object.values(mocked)) fn.mockReset?.()
+  for (const fn of Object.values(mocked)) vi.mocked(fn).mockReset()
   onDisk = detail(ORIGINAL, 'v1')
   mocked.space.mockResolvedValue({ name: 's', root: '/s', types: TYPES } satisfies SpaceInfo)
   mocked.objects.mockResolvedValue([summary(PATH, 'Notes')])

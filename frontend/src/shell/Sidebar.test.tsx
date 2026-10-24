@@ -1,11 +1,12 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { TypeDef } from '@/api/types'
+import { typeDef as makeType } from '@/test/mockApi'
 import { Sidebar } from './Sidebar'
 
 function typeDef(name: string, pluralName: string, icon: string, color: string): TypeDef {
   const id = name.toLowerCase()
-  return { id, name, pluralName, folder: pluralName, icon, color, propertyDefinitions: [] }
+  return makeType({ id, name, pluralName, folder: pluralName, icon: { type: 'iconify', val: icon }, color })
 }
 
 const TYPES: TypeDef[] = [

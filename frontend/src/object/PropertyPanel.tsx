@@ -1,19 +1,35 @@
 import { Fragment } from 'react'
-import type { PropertyDef, PropertyKind, TypeDef } from '@/api/types'
+import type { PropertyDef, PropertyType, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
 
 /** Frontmatter keys shown elsewhere (header, metadata), not as properties. */
 const CORE_KEYS = new Set(['id', 'type', 'title', 'icon', 'createdAt', 'lastUpdated', 'tags'])
 
-const KIND_ICON: Record<PropertyKind, string> = {
+// Temporary: Task 12's kind metadata replaces this map.
+const KIND_ICON: Record<PropertyType, string> = {
   text: 'ph-text-t',
+  textBlock: 'ph-text-align-left',
+  simpleTableBlock: 'ph-table',
   number: 'ph-hash',
   boolean: 'ph-check-square',
   url: 'ph-link',
   datetime: 'ph-calendar-blank',
+  datetimeSimple: 'ph-calendar-blank',
   label: 'ph-list',
   entity: 'ph-at',
   blocks: 'ph-text-align-left',
+  coverImage: 'ph-image',
+  color: 'ph-palette',
+  entity_title: 'ph-text-t',
+  entity_icon: 'ph-smiley',
+  entity_description: 'ph-text-align-left',
+  entity_aliases: 'ph-at',
+  entity_tags: 'ph-hash',
+  entity_type: 'ph-cube',
+  entity_collections: 'ph-stack',
+  entity_createdAt: 'ph-calendar-plus',
+  entity_lastUpdated: 'ph-clock-clockwise',
+  entity_backlinks: 'ph-arrow-bend-up-left',
 }
 
 function isEmpty(v: unknown): boolean {
@@ -33,7 +49,7 @@ export function formatValue(v: unknown): string {
   return String(v)
 }
 
-function guessKind(v: unknown): PropertyKind {
+function guessKind(v: unknown): PropertyType {
   if (typeof v === 'number') return 'number'
   if (typeof v === 'boolean') return 'boolean'
   if (typeof v === 'string' && /^https?:\/\//.test(v)) return 'url'
@@ -47,7 +63,18 @@ export function propertyRows(type: TypeDef | undefined, frontmatter: Record<stri
   if (defs.length) return defs
   return Object.keys(frontmatter)
     .filter((k) => !CORE_KEYS.has(k))
-    .map((k) => ({ id: k, key: k, name: k, type: guessKind(frontmatter[k]), isArray: Array.isArray(frontmatter[k]) }))
+    .map(
+      (k): PropertyDef => ({
+        id: k,
+        key: k,
+        name: k,
+        type: guessKind(frontmatter[k]),
+        description: '',
+        icon: null,
+        visibility: 'alwaysShow',
+        options: { isArray: Array.isArray(frontmatter[k]) },
+      }),
+    )
 }
 
 export interface PropertyPanelProps {
