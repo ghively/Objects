@@ -2,7 +2,14 @@ import difflib
 
 import pytest
 
-from objectapp.frontmatter import FrontmatterError, parse_fm, set_keys
+from objectapp.frontmatter import (
+    FrontmatterError,
+    delete_keys,
+    parse_fm,
+    rename_key,
+    replace_in_value,
+    set_keys,
+)
 
 # Mirrors the shapes found in a Capacities Markdown export (synthetic values).
 SRC = (
@@ -153,3 +160,94 @@ def test_duplicate_keys_are_invalid():
         parse_fm("a: 1\na: 2\n")
     with pytest.raises(FrontmatterError):
         set_keys("a: 1\na: 2\n", {"b": 1})
+
+
+# -- M2: key removal, rename, null, in-place value edits ---------------------------
+# These functions work on the frontmatter source between the `---` fences.
+
+FOLDED = "title: X\nurl: >-\n  https://example.org/a\n  /b\ntags: [A]\n"
+
+
+def test_delete_key_removes_only_its_lines():
+    assert delete_keys(FOLDED, ["url"]) == "title: X\ntags: [A]\n"
+
+
+def test_delete_key_keeps_trailing_comment_and_blank_lines():
+    src = "a: 1\nb: 2\n\n# note\nc: 3\n"
+    assert delete_keys(src, ["b"]) == "a: 1\n\n# note\nc: 3\n"
+
+
+def test_delete_several_keys_and_last_key():
+    expected = SRC.replace("type: 'Task'\n", "").replace("date: 2026-10-23\n", "")
+    assert delete_keys(SRC, ["date", "type"]) == expected
+
+
+def test_delete_absent_key_noop():
+    assert delete_keys(FOLDED, ["nope"]) == FOLDED
+    assert delete_keys(FOLDED, []) == FOLDED
+
+
+def test_rename_key_keeps_value_bytes():
+    out = rename_key(SRC, "url", "link")
+    assert _changed(SRC, out) == ["- url: >-", "+ link: >-"]
+    out = rename_key(SRC, "type", "kind")
+    assert out.startswith("kind: 'Task'\n")
+
+
+def test_rename_key_absent_noop_and_existing_target_raises():
+    assert rename_key(SRC, "nope", "other") == SRC
+    with pytest.raises(ValueError):
+        rename_key(SRC, "url", "title")
+
+
+def test_set_none_renders_null():
+    assert set_keys("title: X\n", {"k": None}) == "title: X\nk: null\n"
+    assert set_keys("k: 5\ntitle: X\n", {"k": None}) == "k: null\ntitle: X\n"
+
+
+def _a_to_z(text: str) -> str:
+    return text.replace("[[A]]", "[[Z]]")
+
+
+def test_replace_in_value_flow_list_keeps_other_items():
+    src = "title: X\nm: ['[[A]]', \"[[B]]\", C]\nn: 1\n"
+    assert replace_in_value(src, "m", _a_to_z) == "title: X\nm: ['[[Z]]', \"[[B]]\", C]\nn: 1\n"
+
+
+def test_replace_in_value_block_list_and_scalar():
+    src = "m:\n  - '[[A]]'\n  - '[[B]]'\no: '[[A]]'\n"
+    out = replace_in_value(src, "m", _a_to_z)
+    assert out == "m:\n  - '[[Z]]'\n  - '[[B]]'\no: '[[A]]'\n"
+    assert replace_in_value(out, "o", _a_to_z) == "m:\n  - '[[Z]]'\n  - '[[B]]'\no: '[[Z]]'\n"
+
+
+def test_replace_in_value_literal_block():
+    src = "b: |-\n  see [[A]]\n  and [[B]]\nc: 1\n"
+    assert replace_in_value(src, "b", _a_to_z) == "b: |-\n  see [[Z]]\n  and [[B]]\nc: 1\n"
+
+
+def test_replace_in_value_escapes_quote_and_quotes_plain():
+    src = "o: '[[A]]'\nm: [x, C]\n"
+    out = replace_in_value(src, "o", lambda t: t.replace("A", "Ada's"))
+    assert out == "o: '[[Ada''s]]'\nm: [x, C]\n"
+    assert parse_fm(out)["o"] == "[[Ada's]]"
+    out = replace_in_value(src, "m", lambda t: "a, b" if t == "C" else t)
+    assert out == "o: '[[A]]'\nm: [x, 'a, b']\n"
+    assert parse_fm(out)["m"] == ["x", "a, b"]
+
+
+def test_replace_in_value_double_quotes_escaped():
+    src = 'o: "[[A]]"\n'
+    out = replace_in_value(src, "o", lambda t: t.replace("A", 'say "hi"'))
+    assert out.startswith('o: "')
+    assert parse_fm(out)["o"] == '[[say "hi"]]'
+
+
+def test_replace_in_value_unchanged_and_absent():
+    assert replace_in_value(SRC, "tags", lambda t: t) == SRC
+    assert replace_in_value(SRC, "nope", _a_to_z) == SRC
+
+
+def test_replace_in_value_changes_one_item_only():
+    out = replace_in_value(SRC, "tags", lambda t: "ML" if t == "LLM" else t)
+    assert _changed(SRC, out) == ["- tags: [AI, LLM]", "+ tags: [AI, ML]"]

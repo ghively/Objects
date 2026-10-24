@@ -5,18 +5,22 @@
 stay strings exactly as written, so ``2026-03-26T00:00:00.000Z`` reads back as
 that string rather than a ``datetime``.
 
-`set_keys` changes only the lines of the keys it is given. It uses ruamel.yaml
-(round-trip mode) to locate each top-level key and to render the new value,
-then splices lines; every other line of the source is kept byte-for-byte,
-including quotes, ``null``, folded scalars, flow lists and comments.
+`set_keys` changes only the lines of the keys it is given; `delete_keys`,
+`rename_key` and `replace_in_value` likewise touch only their key's lines.
+They use ruamel.yaml (round-trip mode) to locate each top-level key and to
+render new values, then splice lines; every other line of the source is kept
+byte-for-byte, including quotes, ``null``, folded scalars, flow lists and
+comments.
 
-Both work on text normalised to ``\\n`` line endings (see `textfile`).
+All of them work on text normalised to ``\\n`` line endings (see `textfile`).
 """
 
 from __future__ import annotations
 
 import io
+import json
 import re
+from collections.abc import Callable, Iterable
 from typing import Any
 
 from ruamel.yaml import YAML
@@ -25,10 +29,19 @@ from ruamel.yaml.constructor import SafeConstructor
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.scalarstring import (
     DoubleQuotedScalarString,
+    ScalarString,
     SingleQuotedScalarString,
 )
 
-__all__ = ["FrontmatterError", "parse_fm", "set_keys"]
+__all__ = [
+    "FlowList",
+    "FrontmatterError",
+    "delete_keys",
+    "parse_fm",
+    "rename_key",
+    "replace_in_value",
+    "set_keys",
+]
 
 # Strings that a YAML 1.1/1.2 resolver would read as a timestamp. The export
 # writes them unquoted, so we do too.
@@ -40,6 +53,13 @@ _TIMESTAMP_RE = re.compile(
 
 class FrontmatterError(ValueError):
     """The frontmatter source is not valid YAML or is not a mapping."""
+
+
+class FlowList(list):
+    """A list value for `set_keys` that is written as a flow list (``[a, b]``).
+
+    A key that already holds a block list keeps the block form.
+    """
 
 
 class _PlainConstructor(SafeConstructor):
@@ -113,17 +133,23 @@ def _load_rt(src: str) -> CommentedMap | None:
 
 
 def _styled_like(old: Any, new: Any) -> Any:
-    """Carry the old value's quote or flow style over to a new value."""
-    if isinstance(new, str) and not isinstance(
-        new, (SingleQuotedScalarString, DoubleQuotedScalarString)
-    ):
+    """Carry the old value's quote or flow style over to a new value.
+
+    A new value that already has an explicit style (any ruamel `ScalarString`,
+    such as a literal block) keeps it.
+    """
+    if isinstance(new, str) and not isinstance(new, ScalarString):
         if isinstance(old, SingleQuotedScalarString):
             return SingleQuotedScalarString(new)
         if isinstance(old, DoubleQuotedScalarString):
             return DoubleQuotedScalarString(new)
     if isinstance(new, (list, tuple)) and not isinstance(new, CommentedSeq):
         seq = CommentedSeq(new)
-        if isinstance(old, CommentedSeq) and old.fa.flow_style():
+        old_is_seq = isinstance(old, CommentedSeq)
+        if isinstance(new, FlowList):
+            if not (old_is_seq and not old.fa.flow_style()):
+                seq.fa.set_flow_style()
+        elif old_is_seq and old.fa.flow_style():
             seq.fa.set_flow_style()
         return seq
     return new
@@ -134,11 +160,15 @@ def _render(key: Any, value: Any) -> list[str]:
     if isinstance(key, str) and isinstance(value, str) and type(value) is str:
         if _TIMESTAMP_RE.fullmatch(value) and _rt_yaml_key_plain(key):
             return [f"{key}: {value}\n"]
+    if isinstance(value, FlowList):
+        value = _styled_like(None, value)
     buf = io.StringIO()
     _rt_yaml().dump(CommentedMap([(key, value)]), buf)
     text = buf.getvalue()
     if text.endswith("...\n"):  # document end marker after a bare scalar
         text = text[: -len("...\n")]
+    if value is None and text.endswith(":\n"):
+        text = text[:-1] + " null\n"  # ruamel leaves the value empty; we write `null`
     return text.splitlines(keepends=True)
 
 
@@ -151,6 +181,33 @@ def _is_filler(line: str) -> bool:
     return stripped == "" or (line.startswith("#"))
 
 
+def _lines(src: str) -> list[str]:
+    lines = src.splitlines(keepends=True)
+    if lines and not lines[-1].endswith("\n"):
+        lines[-1] += "\n"
+    return lines
+
+
+def _key_spans(data: CommentedMap | None, lines: list[str]) -> dict[Any, tuple[int, int]]:
+    """Line range ``[start, end)`` of each top-level key, trailing blank/comment lines excluded."""
+    if data is None:
+        return {}
+    starts = sorted((data.lc.key(k)[0], k) for k in data.keys())
+    spans: dict[Any, tuple[int, int]] = {}
+    for i, (start, k) in enumerate(starts):
+        end = starts[i + 1][0] if i + 1 < len(starts) else len(lines)
+        while end > start + 1 and _is_filler(lines[end - 1]):
+            end -= 1
+        spans[k] = (start, end)
+    return spans
+
+
+def _dump(data: CommentedMap) -> str:
+    buf = io.StringIO()
+    _rt_yaml().dump(data, buf)
+    return buf.getvalue()
+
+
 def set_keys(
     src: str,
     updates: dict[str, Any],
@@ -160,7 +217,8 @@ def set_keys(
 
     Keys already in ``src`` are replaced in place (only their own lines).
     Keys from ``updates`` that are absent are appended at the end; absent keys
-    from ``insert_first`` go at the very top, in the order given.
+    from ``insert_first`` go at the very top, in the order given. ``None``
+    renders as ``null``; a `FlowList` as a flow list.
     Raises `FrontmatterError` when ``src`` is not a valid YAML mapping.
     """
     insert_first = insert_first or {}
@@ -168,28 +226,15 @@ def set_keys(
         return src
 
     data = _load_rt(src)
-    lines = src.splitlines(keepends=True)
-    if lines and not lines[-1].endswith("\n"):
-        lines[-1] += "\n"
+    lines = _lines(src)
 
     if data is not None and data.fa.flow_style():
         # A whole-mapping flow style (`{a: 1}`) has no per-key lines to splice.
         for k, v in {**updates, **insert_first}.items():
             data[k] = _styled_like(data.get(k), v)
-        buf = io.StringIO()
-        _rt_yaml().dump(data, buf)
-        return buf.getvalue()
+        return _dump(data)
 
-    existing = list(data.keys()) if data is not None else []
-    starts = sorted((data.lc.key(k)[0], k) for k in existing) if data is not None else []
-
-    # Line range [start, end) of each existing key, trailing blank/comment lines excluded.
-    spans: dict[Any, tuple[int, int]] = {}
-    for i, (start, k) in enumerate(starts):
-        end = starts[i + 1][0] if i + 1 < len(starts) else len(lines)
-        while end > start + 1 and _is_filler(lines[end - 1]):
-            end -= 1
-        spans[k] = (start, end)
+    spans = _key_spans(data, lines)
 
     replacements: dict[int, tuple[int, list[str]]] = {}
     appended: list[str] = []
@@ -215,3 +260,287 @@ def set_keys(
             i += 1
     out.extend(appended)
     return "".join(out)
+
+
+def delete_keys(src: str, keys: Iterable[str]) -> str:
+    """Remove top-level keys (each key's full line span), changing nothing else.
+
+    Absent keys are ignored; with nothing to remove, ``src`` comes back as is.
+    Raises `FrontmatterError` when ``src`` is not a valid YAML mapping.
+    """
+    keys = list(keys)
+    if not keys:
+        return src
+    data = _load_rt(src)
+    if data is None or not any(k in data for k in keys):
+        return src
+    if data.fa.flow_style():
+        for k in keys:
+            data.pop(k, None)
+        return _dump(data) if data else ""
+    lines = _lines(src)
+    spans = _key_spans(data, lines)
+    drop: set[int] = set()
+    for k in keys:
+        if k in spans:
+            drop.update(range(*spans[k]))
+    return "".join(line for i, line in enumerate(lines) if i not in drop)
+
+
+def _key_token_end(line: str, col: int) -> int:
+    """Index just past the key token that starts at ``col`` (before its ``:``)."""
+    if col < len(line) and line[col] in "'\"":
+        q = line[col]
+        j = col + 1
+        while j < len(line):
+            if line[j] == "\\" and q == '"':
+                j += 2
+                continue
+            if line[j] == q:
+                if q == "'" and line[j + 1 : j + 2] == "'":
+                    j += 2
+                    continue
+                return j + 1
+            j += 1
+        return len(line)
+    m = re.compile(r":(?=[ \t\r\n]|$)").search(line, col)
+    return m.start() if m else len(line)
+
+
+def _render_key(key: str) -> str:
+    if _rt_yaml_key_plain(key):
+        return key
+    return "'" + key.replace("'", "''") + "'"
+
+
+def rename_key(src: str, old: str, new: str) -> str:
+    """Rename a top-level key in place, keeping its position and its value's bytes.
+
+    An absent ``old`` (or ``old == new``) returns ``src`` unchanged. Raises
+    `ValueError` when ``new`` already exists, `FrontmatterError` on invalid YAML.
+    """
+    if old == new:
+        return src
+    data = _load_rt(src)
+    if data is None or old not in data:
+        return src
+    if new in data:
+        raise ValueError(f"Key {new!r} already exists")
+    if data.fa.flow_style():
+        out = CommentedMap([(new if k == old else k, v) for k, v in data.items()])
+        out.fa.set_flow_style()
+        return _dump(out)
+    lines = _lines(src)
+    row, col = data.lc.key(old)
+    line = lines[row]
+    lines[row] = line[:col] + _render_key(new) + line[_key_token_end(line, col) :]
+    return "".join(lines)
+
+
+# -- in-place value edits --------------------------------------------------------
+
+# (start, end, style) of one scalar inside a value. style: "'" / '"' / "plain" /
+# "flow" (a plain item inside [...]) / "line" (one line of a block scalar).
+_ItemSpan = tuple[int, int, str]
+
+
+def _value_start(lines: list[str], row: int, col: int) -> int:
+    """Offset (within ``lines[row]``) just past the ``:`` that follows the key."""
+    end = _key_token_end(lines[row], col)
+    colon = lines[row].find(":", end)
+    return (colon + 1) if colon >= 0 else len(lines[row])
+
+
+def _scan_block_scalar(text: str, i: int) -> list[_ItemSpan]:
+    items: list[_ItemSpan] = []
+    n = len(text)
+    i = text.find("\n", i)
+    if i < 0:
+        return items
+    i += 1
+    while i < n:
+        nl = text.find("\n", i)
+        nl = n if nl < 0 else nl
+        s = i
+        while s < nl and text[s] in " \t":
+            s += 1
+        e = nl
+        if e > s and text[e - 1] == "\r":
+            e -= 1
+        if e > s:
+            items.append((s, e, "line"))
+        i = nl + 1
+    return items
+
+
+def _quoted_end(text: str, i: int) -> int:
+    """Index just past the quoted scalar that opens at ``text[i]``."""
+    n, q = len(text), text[i]
+    j = i + 1
+    while j < n:
+        if q == '"' and text[j] == "\\":
+            j += 2
+            continue
+        if text[j] == q:
+            if q == "'" and text[j + 1 : j + 2] == "'":
+                j += 2
+                continue
+            return j + 1
+        j += 1
+    return n
+
+
+def _scan_items(text: str, i: int) -> list[_ItemSpan]:
+    """The scalar items of a value that starts at ``text[i]`` and runs to the end of ``text``."""
+    n = len(text)
+    while i < n and text[i] in " \t":
+        i += 1
+    if i < n and text[i] in "|>":
+        return _scan_block_scalar(text, i)
+
+    items: list[_ItemSpan] = []
+    depth = 0
+    while i < n:
+        c = text[i]
+        if c in " \t\r\n":
+            i += 1
+        elif c == "#" and (i == 0 or text[i - 1] in " \t\n"):
+            nl = text.find("\n", i)
+            i = n if nl < 0 else nl
+        elif c == "-" and depth == 0 and (i + 1 == n or text[i + 1] in " \t\r\n"):
+            i += 1
+        elif c == "[":
+            depth += 1
+            i += 1
+        elif c == "]":
+            depth -= 1
+            i += 1
+        elif c == "," and depth > 0:
+            i += 1
+        elif c == "{":  # a nested mapping: left alone
+            level, j = 0, i
+            while j < n:
+                if text[j] == "{":
+                    level += 1
+                elif text[j] == "}":
+                    level -= 1
+                    if level == 0:
+                        break
+                j += 1
+            i = j + 1
+        elif c in "&*!":  # anchors, aliases and tags: left alone
+            while i < n and text[i] not in " \t\r\n,]":
+                i += 1
+        elif c in "'\"":
+            j = _quoted_end(text, i)
+            items.append((i, j, c))
+            i = j
+        else:
+            j = i
+            while j < n and text[j] != "\n":
+                if depth > 0 and text[j] in ",]}":
+                    break
+                if text[j] == "#" and text[j - 1] in " \t":
+                    break
+                j += 1
+            e = j
+            while e > i and text[e - 1] in " \t\r":
+                e -= 1
+            items.append((i, e, "flow" if depth > 0 else "plain"))
+            i = j
+    return items
+
+
+def _decode_item(raw: str, style: str) -> str | None:
+    if style == "'":
+        return raw[1:-1].replace("''", "'")
+    if style == '"':
+        try:
+            value = parse_fm(f"x: {raw}\n").get("x")
+        except FrontmatterError:
+            return None
+        return value if isinstance(value, str) else None
+    return raw
+
+
+def _plain_ok(text: str, flow: bool) -> bool:
+    """Whether ``text`` reads back as the same string when written as a plain scalar."""
+    if not text or "\n" in text or text != text.strip():
+        return False
+    probe = f"x: [{text}]\n" if flow else f"x: {text}\n"
+    try:
+        value = parse_fm(probe).get("x")
+    except FrontmatterError:
+        return False
+    if flow:
+        return isinstance(value, list) and len(value) == 1 and value[0] == text
+    return isinstance(value, str) and value == text
+
+
+def _encode_item(new: str, style: str, indent: str) -> str:
+    if style == "line":
+        return new.replace("\n", "\n" + indent)
+    if style == "'" and "\n" not in new:
+        return "'" + new.replace("'", "''") + "'"
+    if style in ("'", '"') or "\n" in new:
+        return json.dumps(new, ensure_ascii=False)  # JSON escapes are valid YAML ones
+    if _plain_ok(new, flow=(style == "flow")):
+        return new
+    return "'" + new.replace("'", "''") + "'"
+
+
+def replace_in_value(src: str, key: str, fn: Callable[[str], str]) -> str:
+    """Apply ``fn`` to each scalar of one key's value, replacing only what changed.
+
+    Works on a scalar, a flow list, a block list or a block scalar (each of its
+    lines). An item that ``fn`` changes is written in its own quote style,
+    escaped for it; a plain item that would now need quoting is single-quoted.
+    Every other character of ``src`` is kept. An absent key, or no change,
+    returns ``src`` itself. Raises `FrontmatterError` when ``src`` or the result
+    is not valid YAML.
+    """
+    data = _load_rt(src)
+    if data is None or key not in data:
+        return src
+    if data.fa.flow_style():
+        old = data[key]
+        changed = False
+        if isinstance(old, str):
+            new = fn(str(old))
+            if new != old:
+                data[key] = _styled_like(old, new)
+                changed = True
+        elif isinstance(old, list):
+            for idx, item in enumerate(old):
+                if isinstance(item, str):
+                    new = fn(str(item))
+                    if new != item:
+                        old[idx] = _styled_like(item, new)
+                        changed = True
+        return _dump(data) if changed else src
+
+    lines = _lines(src)
+    start, end = _key_spans(data, lines)[key]
+    row, col = data.lc.key(key)
+    head = "".join(lines[:start])
+    text = "".join(lines[start:end])
+    tail = "".join(lines[end:])
+
+    changed = False
+    for s, e, style in reversed(_scan_items(text, _value_start(lines, row, col))):
+        old = _decode_item(text[s:e], style)
+        if old is None:
+            continue
+        new = fn(old)
+        if new == old:
+            continue
+        line_start = text.rfind("\n", 0, s) + 1
+        indent = re.match(r"[ \t]*", text[line_start:]).group(0)
+        text = text[:s] + _encode_item(new, style, indent) + text[e:]
+        changed = True
+    if not changed:
+        return src
+    out = head + text + tail
+    if key not in parse_fm(out):
+        raise FrontmatterError(f"Rewriting {key!r} broke its value")
+    return out
