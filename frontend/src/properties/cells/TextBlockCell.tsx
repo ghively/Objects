@@ -1,17 +1,58 @@
-import { marked } from 'marked'
+import { Marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { placeholderFor } from '../format'
 import { CELL_TEXT, type CellProps } from './types'
 
-/** Escapes raw HTML so only Markdown formatting renders. */
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
-/** Inline Markdown as HTML (`marked.parseInline`), with raw HTML shown as text. */
-export function renderInline(md: string): string {
-  return marked.parseInline(escapeHtml(md), { async: false }) as string
+/**
+ * The href to render, or null when it is unsafe. Allows http, https and mailto, and relative
+ * references (no scheme before the first `/`, `?` or `#`). Control characters and whitespace are
+ * removed first, as browsers do, and a `&` before the path is refused so an entity-encoded `:`
+ * cannot hide a scheme.
+ */
+export function safeHref(href: string): string | null {
+  // eslint-disable-next-line no-control-regex
+  const h = href.replace(/[\u0000- \u007f]/g, '')
+  if (/^(https?|mailto):/i.test(h)) return h
+  const head = h.split(/[/?#]/, 1)[0]
+  return /[:&\\]/.test(head) ? null : h
 }
+
+// A private instance so the overrides do not leak into other users of the global `marked`.
+const md = new Marked({
+  async: false,
+  renderer: {
+    // Raw HTML shows as text; marked's own escaping still covers everything else (code spans too).
+    html({ text }) {
+      return escapeHtml(text)
+    },
+    link({ href, title, tokens }) {
+      const inner = this.parser.parseInline(tokens)
+      const safe = safeHref(href)
+      if (safe === null) return inner
+      const t = title ? ` title="${escapeHtml(title)}"` : ''
+      return `<a href="${escapeHtml(safe)}"${t} target="_blank" rel="noopener noreferrer">${inner}</a>`
+    },
+    image({ text }) {
+      return escapeHtml(text)
+    },
+  },
+})
+
+/** Inline Markdown as HTML (`marked.parseInline`): raw HTML shown as text, unsafe links dropped. */
+export function renderInline(source: string): string {
+  return md.parseInline(source, { async: false }) as string
+}
+
+const onLink = (e: { target: EventTarget }) => e.target instanceof Element && e.target.closest('a') !== null
 
 /**
  * A single paragraph of inline Markdown (`textBlock`). Shows the rendered text; a click edits the
@@ -36,9 +77,12 @@ export function TextBlockCell({ def, value, readOnly, onChange }: CellProps<stri
         role={readOnly ? undefined : 'button'}
         tabIndex={readOnly ? undefined : 0}
         aria-label={readOnly ? undefined : `Edit ${def.name}`}
-        onClick={() => !readOnly && setEditing(true)}
+        onClick={(e) => {
+          // Following a link must not also open the editor.
+          if (!readOnly && !onLink(e)) setEditing(true)
+        }}
         onKeyDown={(e) => {
-          if (!readOnly && e.key === 'Enter') setEditing(true)
+          if (!readOnly && e.key === 'Enter' && !onLink(e)) setEditing(true)
         }}
         className="min-h-[1.5em] text-[15px] break-words text-fg"
       >

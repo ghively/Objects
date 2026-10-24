@@ -9,7 +9,7 @@ import { TextCell } from './TextCell'
 import { UrlCell } from './UrlCell'
 import { DateCell } from './DateCell'
 import { ReadOnlyDateCell } from './ReadOnlyDateCell'
-import { TextBlockCell } from './TextBlockCell'
+import { renderInline, TextBlockCell } from './TextBlockCell'
 
 function def(type: PropertyType, extra: Partial<PropertyDef> = {}): PropertyDef {
   return {
@@ -155,6 +155,47 @@ describe('TextBlockCell', () => {
   it('renders inline markdown', () => {
     render(<TextBlockCell def={def('textBlock')} value="some **bold** text" onChange={() => {}} />)
     expect(screen.getByText('bold').tagName).toBe('STRONG')
+  })
+
+  it('drops javascript: link hrefs', () => {
+    const html = renderInline('[x](javascript:alert(1)) [y](JaVaScRiPt&#58;alert(1)) [z](data:text/html,hi)')
+    expect(html).not.toMatch(/href/i)
+    expect(html).toContain('x')
+  })
+
+  it('keeps safe links and opens them in a new tab', () => {
+    const html = renderInline('[a](https://example.com) [b](mailto:a@b.c) [c](/notes/1)')
+    const host = document.createElement('div')
+    host.innerHTML = html
+    const links = [...host.querySelectorAll('a')]
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['https://example.com', 'mailto:a@b.c', '/notes/1'])
+    for (const a of links) {
+      expect(a.getAttribute('target')).toBe('_blank')
+      expect(a.getAttribute('rel')).toBe('noopener noreferrer')
+    }
+  })
+
+  it('shows code spans with <, > and & exactly once escaped', () => {
+    render(<TextBlockCell def={def('textBlock')} value={'`a<b` and `a && b`'} onChange={() => {}} />)
+    expect(screen.getByText('a<b').tagName).toBe('CODE')
+    expect(screen.getByText('a && b').tagName).toBe('CODE')
+  })
+
+  it('shows raw HTML as text', () => {
+    const { container } = render(
+      <TextBlockCell def={def('textBlock')} value="x <b>hi</b> <img src=x onerror=alert(1)>" onChange={() => {}} />,
+    )
+    expect(container.querySelector('b')).toBeNull()
+    expect(container.querySelector('img')).toBeNull()
+    expect(container).toHaveTextContent('x <b>hi</b> <img src=x onerror=alert(1)>')
+  })
+
+  it('clicking a link does not open the editor', () => {
+    render(<TextBlockCell def={def('textBlock')} value="see [a](https://example.com)" onChange={() => {}} />)
+    const link = screen.getByRole('link', { name: 'a' })
+    link.addEventListener('click', (e) => e.preventDefault())
+    fireEvent.click(link)
+    expect(screen.queryByRole('textbox')).toBeNull()
   })
 })
 
