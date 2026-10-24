@@ -1,46 +1,36 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ObjectDetail, ObjectSummary, SpaceInfo, TypeDef } from '@/api/types'
+import { objectDetail, objectSummary, propertyDef, typeDef as makeType } from '@/test/mockApi'
 
-vi.mock('@/api/client', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('@/api/client')>()
-  return {
-    ...mod,
-    api: {
-      ...mod.api,
-      space: vi.fn(),
-      objects: vi.fn(),
-      object: vi.fn(),
-      resolve: vi.fn(),
-      saveBody: vi.fn(),
-      reveal: vi.fn(),
-    },
-  }
-})
+vi.mock('@/api/client', async (orig) => ({
+  ...(await orig<typeof import('@/api/client')>()),
+  api: (await import('@/test/mockApi')).mockApi(),
+}))
 
 import { api } from '@/api/client'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPeek } from './ObjectPeek'
 
-const mocked = api as unknown as Record<string, ReturnType<typeof vi.fn>>
+const mocked = vi.mocked(api)
 
 function typeDef(id: string, name: string, pluralName: string, color: string): TypeDef {
-  return {
+  return makeType({
     id,
     name,
     pluralName,
     folder: pluralName,
-    icon: 'ph-file-text',
+    icon: { type: 'iconify', val: 'ph-file-text' },
     color,
-    propertyDefinitions: [{ id: 'p1', key: 'email', name: 'Email', type: 'text', isArray: false }],
-  }
+    propertyDefinitions: [propertyDef({ id: 'p1', key: 'email', name: 'Email', type: 'text' })],
+  })
 }
 
 const TYPES = [typeDef('person', 'Person', 'People', 'orange'), typeDef('page', 'Page', 'Pages', 'pink')]
 
 function summary(path: string, title: string, type = 'page'): ObjectSummary {
-  return { path, id: null, type, title, icon: null, createdAt: null, lastUpdated: null, tags: [], readOnly: false }
+  return objectSummary({ path, type, title })
 }
 
 const OBJECTS = [
@@ -55,12 +45,12 @@ const LIST = OBJECTS.slice(0, 5).map((o) => o.path)
 
 function detail(path: string): ObjectDetail {
   const s = OBJECTS.find((o) => o.path === path)!
-  return {
+  return objectDetail({
     summary: { ...s, tags: ['infra'] },
     frontmatter: { type: s.type, title: s.title, tags: ['infra'] },
     body: `\nSee [[Ada Lovelace]] and [[Nobody Here]].\n`,
     version: `v-${path}`,
-  }
+  })
 }
 
 beforeEach(() => {
@@ -68,7 +58,7 @@ beforeEach(() => {
   useTabs.getState().reset()
   usePeek.getState().close()
   resetLinkIndex()
-  for (const fn of Object.values(mocked)) fn.mockReset?.()
+  for (const fn of Object.values(mocked)) vi.mocked(fn).mockReset()
   mocked.space.mockResolvedValue({ name: 's', root: '/s', types: TYPES } satisfies SpaceInfo)
   mocked.objects.mockResolvedValue(OBJECTS)
   mocked.object.mockImplementation(async (path: string) => detail(path))

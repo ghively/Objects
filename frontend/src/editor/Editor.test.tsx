@@ -7,13 +7,13 @@ import { editorExtensions, loadBody, serializeBody } from './document'
 import { RawMode } from './RawMode'
 import type { BodyEditorHandle } from './useAutosave'
 
-vi.mock('@/api/client', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('@/api/client')>()
-  return { ...mod, api: { ...mod.api, saveBody: vi.fn() } }
-})
+vi.mock('@/api/client', async (orig) => ({
+  ...(await orig<typeof import('@/api/client')>()),
+  api: (await import('@/test/mockApi')).mockApi(),
+}))
 
 import { api } from '@/api/client'
-const saveBody = api.saveBody as unknown as ReturnType<typeof vi.fn>
+const saveBody = vi.mocked(api).saveBody
 
 const fixtures = import.meta.glob('./__fixtures__/*.md', {
   query: '?raw',

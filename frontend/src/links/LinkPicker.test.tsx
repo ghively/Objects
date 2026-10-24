@@ -2,21 +2,22 @@ import { Editor as TiptapEditor } from '@tiptap/core'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ObjectSummary } from '@/api/types'
+import { objectSummary } from '@/test/mockApi'
 
-vi.mock('@/api/client', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('@/api/client')>()
-  return { ...mod, api: { ...mod.api, space: vi.fn(), objects: vi.fn(), resolve: vi.fn() } }
-})
+vi.mock('@/api/client', async (orig) => ({
+  ...(await orig<typeof import('@/api/client')>()),
+  api: (await import('@/test/mockApi')).mockApi(),
+}))
 
 import { api } from '@/api/client'
 import { editorExtensions, loadBody, serializeBody } from '@/editor/document'
 import { fuzzyMatch, installLinkPicker, LinkPicker, useLinkPicker } from './LinkPicker'
 import { resetLinkIndex } from './linkIndex'
 
-const mocked = api as unknown as Record<string, ReturnType<typeof vi.fn>>
+const mocked = vi.mocked(api)
 
 function s(title: string, path = `Pages/${title}.md`): ObjectSummary {
-  return { path, id: null, type: 'page', title, icon: null, createdAt: null, lastUpdated: null, tags: [], readOnly: false }
+  return objectSummary({ path, type: 'page', title })
 }
 
 const OBJECTS = [s('Ada Lovelace', 'People/Ada Lovelace.md'), s('Alpha'), s('Fix printer'), s('Database backups')]

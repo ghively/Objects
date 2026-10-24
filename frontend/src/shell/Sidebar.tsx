@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Icon } from '@/components/Icon'
+import { Icon, IconOrEmoji, iconName } from '@/components/Icon'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { TypeDef } from '@/api/types'
@@ -23,11 +23,11 @@ export function TypeChip({ type, size = 22 }: { type: Pick<TypeDef, 'icon' | 'co
     <span
       data-type-chip=""
       data-color={type.color}
-      data-icon={type.icon}
+      data-icon={iconName(type.icon, 'ph-cube')}
       style={{ ...chipStyle(type.color), width: size, height: size }}
       className="inline-flex shrink-0 items-center justify-center rounded-md border border-[color-mix(in_srgb,var(--chip-bg)_85%,white)] bg-[var(--chip-bg)] text-[var(--chip-fg)]"
     >
-      <Icon name={type.icon} size={Math.round(size * 0.68)} />
+      <IconOrEmoji icon={type.icon} fallback="ph-cube" size={Math.round(size * 0.68)} />
     </span>
   )
 }
