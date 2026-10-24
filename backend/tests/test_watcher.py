@@ -134,3 +134,25 @@ def test_sse_streams_change_events(space_dir: Path):
                 if time.monotonic() > deadline:
                     pytest.fail("no change event on the SSE stream")
             app.state.hub.close()
+
+
+def test_watcher_silent_for_property_update_and_sync(space_dir: Path):
+    from test_properties import _synced_space
+
+    _synced_space(space_dir)
+
+    async def scenario(space: Space, watcher: SpaceWatcher):
+        _of, _fm, version = space.read("A/A1.md")
+        result = await asyncio.to_thread(
+            space.update_properties, "A/A1.md", {"rel": ["B1"]}, version
+        )
+        assert result.synced == ["B/B1.md"]
+        assert await _drain(watcher, QUIET) == []
+
+    _run(space_dir, scenario)
+
+
+def test_change_event_has_old_path_and_new_kinds():
+    ev = ChangeEvent(kind="renamed", path="People/Ada King.md", version="v", oldPath="People/Ada.md")
+    assert ev.oldPath == "People/Ada.md"
+    assert ChangeEvent(kind="types", path="task", version=None).oldPath is None
