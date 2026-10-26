@@ -261,3 +261,157 @@ describe('placeholders', () => {
     expect(screen.getByText(/2026/)).toBeInTheDocument()
   })
 })
+
+// M4 Task 9: the Task `date` picker edits date, repeat and remind in one write.
+describe('DateCell: the Task date', () => {
+  const TASK_DATE = def('datetimeSimple', {
+    id: 'date',
+    key: 'date',
+    name: 'Date',
+    options: { constraints: { resolutionPreference: 'day', endTimeSettings: 'notAllowed', supportsReminders: true } },
+  })
+
+  beforeEach(() => {
+    try {
+      localStorage.clear()
+    } catch {
+      /* no storage */
+    }
+  })
+
+  async function setStart(text: string) {
+    const input = screen.getByRole('textbox', { name: 'Starts' })
+    await userEvent.clear(input)
+    await userEvent.type(input, `${text}{Enter}`)
+  }
+
+  async function choose(row: 'Repeat' | 'Reminder', item: string) {
+    await userEvent.click(screen.getByRole('button', { name: new RegExp(`^${row}:`) }))
+    await userEvent.click(screen.getByRole('menuitemradio', { name: item }))
+  }
+
+  it('test picker writes date repeat remind in one call', async () => {
+    const onChangeMany = vi.fn()
+    const onChange = vi.fn()
+    render(<DateCell def={TASK_DATE} value={null} typeId="task" frontmatter={{}} onChange={onChange} onChangeMany={onChangeMany} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Date' }))
+    await setStart('2026-10-30')
+    await choose('Repeat', 'Weekly on Friday')
+    await choose('Reminder', '1 day before')
+    expect(onChangeMany).not.toHaveBeenCalled()
+    await userEvent.keyboard('{Escape}')
+    expect(onChangeMany).toHaveBeenCalledTimes(1)
+    expect(onChangeMany).toHaveBeenCalledWith(
+      { date: { start: '2026-10-30', resolution: 'day' }, repeat: 'every week', remind: '1 day before at 09:00' },
+      undefined,
+    )
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('test no repeat and no reminder remove the keys', async () => {
+    const onChangeMany = vi.fn()
+    const value = { start: '2026-10-30', resolution: 'day' as const }
+    render(
+      <DateCell
+        def={TASK_DATE}
+        value={value}
+        typeId="task"
+        frontmatter={{ date: '2026-10-30', repeat: 'every week', remind: 'on the day at 09:00' }}
+        onChange={() => {}}
+        onChangeMany={onChangeMany}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Date' }))
+    await choose('Repeat', 'No repeat')
+    await choose('Reminder', 'No reminder')
+    await userEvent.keyboard('{Escape}')
+    expect(onChangeMany).toHaveBeenCalledTimes(1)
+    expect(onChangeMany).toHaveBeenCalledWith({}, ['repeat', 'remind'])
+  })
+
+  it('test removing the date removes repeat and remind', async () => {
+    const onChangeMany = vi.fn()
+    render(
+      <DateCell
+        def={TASK_DATE}
+        value={{ start: '2026-10-30', resolution: 'day' }}
+        typeId="task"
+        frontmatter={{ date: '2026-10-30', repeat: 'every day', remind: 'on the day at 09:00' }}
+        onChange={() => {}}
+        onChangeMany={onChangeMany}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Date' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove date' }))
+    expect(onChangeMany).toHaveBeenCalledTimes(1)
+    expect(onChangeMany).toHaveBeenCalledWith({ date: null }, ['repeat', 'remind'])
+    expect(screen.queryByTestId('date-picker')).toBeNull()
+  })
+
+  it('test non-task date properties show no Repeat or Reminder rows', async () => {
+    // Another type's date, a Task date without supportsReminders, and a table cell (no onChangeMany).
+    const cases = [
+      <DateCell key="a" def={TASK_DATE} value={null} typeId="event" frontmatter={{}} onChange={() => {}} onChangeMany={() => {}} />,
+      <DateCell key="b" def={{ ...TASK_DATE, options: {} }} value={null} typeId="task" frontmatter={{}} onChange={() => {}} onChangeMany={() => {}} />,
+      <DateCell key="c" def={def('datetime', { key: 'deadline', id: 'deadline', name: 'Date' })} value={null} typeId="task" frontmatter={{}} onChange={() => {}} onChangeMany={() => {}} />,
+      <DateCell key="d" def={TASK_DATE} value={null} typeId="task" onChange={() => {}} />,
+    ]
+    for (const c of cases) {
+      const { unmount } = render(c)
+      await userEvent.click(screen.getByRole('button', { name: 'Edit Date' }))
+      expect(screen.getByTestId('date-picker')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^Repeat:/ })).toBeNull()
+      expect(screen.queryByRole('button', { name: /^Reminder:/ })).toBeNull()
+      unmount()
+    }
+  })
+
+  it('a table cell writes the Task date alone', async () => {
+    const onChange = vi.fn()
+    render(<DateCell def={TASK_DATE} value={{ start: '2026-10-30', resolution: 'day' }} typeId="task" onChange={onChange} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Date' }))
+    await setStart('2026-11-02')
+    expect(onChange).toHaveBeenCalledWith({ start: '2026-11-02', resolution: 'day' })
+  })
+
+  it('an unchanged open and close writes nothing; a date change writes only the date', async () => {
+    const onChangeMany = vi.fn()
+    const fm = { date: '2026-10-30', repeat: 'Every  2 Weeks', remind: 'on the day at 09:00' }
+    render(
+      <DateCell def={TASK_DATE} value={{ start: '2026-10-30', resolution: 'day' }} typeId="task" frontmatter={fm} onChange={() => {}} onChangeMany={onChangeMany} />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Date' }))
+    await userEvent.keyboard('{Escape}')
+    expect(onChangeMany).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Date' }))
+    await setStart('2026-11-06')
+    await userEvent.keyboard('{Escape}')
+    expect(onChangeMany).toHaveBeenCalledTimes(1)
+    expect(onChangeMany).toHaveBeenCalledWith({ date: { start: '2026-11-06', resolution: 'day' } }, undefined)
+  })
+
+  it('test changing resolution drops a mismatched reminder with a hint', async () => {
+    const onChangeMany = vi.fn()
+    render(
+      <DateCell
+        def={TASK_DATE}
+        value={{ start: '2026-10-30', resolution: 'day' }}
+        typeId="task"
+        frontmatter={{ date: '2026-10-30', remind: '1 day before at 18:30' }}
+        onChange={() => {}}
+        onChangeMany={onChangeMany}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Date' }))
+    expect(screen.getByRole('button', { name: 'Reminder: 1 day before' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('switch', { name: 'Include Time' }))
+    expect(screen.getByRole('button', { name: 'Reminder: No reminder' })).toBeInTheDocument()
+    expect(screen.getByText("Doesn't fit this date.")).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(onChangeMany).toHaveBeenCalledTimes(1)
+    const [updates, remove] = onChangeMany.mock.calls[0]
+    expect(updates.date.resolution).toBe('time')
+    expect(updates).not.toHaveProperty('remind')
+    expect(remove).toEqual(['remind'])
+  })
+})
