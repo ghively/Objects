@@ -139,6 +139,35 @@ describe('api client v2 writes', () => {
     ])
   })
 
+  test('deleteType announces each trashed object and each touched type locally', async () => {
+    const fetchMock = respond(200, {
+      trashId: 't1',
+      paths: ['Servers/Alpha.md', 'Templates/Servers/Base.md'],
+      typeIds: ['server', 'project'],
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    let result: unknown
+    const seen = await collect(async () => {
+      result = await api.deleteType('server', { confirm: true })
+    })
+    expect(result).toEqual({ trashId: 't1' })
+    expect(seen).toEqual([
+      { kind: 'types', path: 'server', version: null, origin: CLIENT_ID },
+      { kind: 'types', path: 'project', version: null, origin: CLIENT_ID },
+      { kind: 'deleted', path: 'Servers/Alpha.md', version: null, origin: CLIENT_ID },
+      { kind: 'deleted', path: 'Templates/Servers/Base.md', version: null, origin: CLIENT_ID },
+    ])
+  })
+
+  test('deleting a template announces its type; creating an object announces a first-saved type', async () => {
+    vi.stubGlobal('fetch', respond(200, { trashId: 't2', typeIds: ['project'] }))
+    const deleted = await collect(() => api.deleteObject('Templates/Projects/Kickoff.md'))
+    expect(deleted).toContainEqual({ kind: 'types', path: 'project', version: null, origin: CLIENT_ID })
+    vi.stubGlobal('fetch', respond(201, { path: 'Gadgets/A.md', version: 'v1', typeIds: ['gadget'] }))
+    const made = await collect(() => api.createObject('gadget'))
+    expect(made).toContainEqual({ kind: 'types', path: 'gadget', version: null, origin: CLIENT_ID })
+  })
+
   test('test 409 on saveType maps to RevisionConflictError with currentRevision', async () => {
     vi.stubGlobal('fetch', respond(409, { detail: { currentRevision: 'r9' } }))
     const type = { id: 'server', revision: 'r1' } as unknown as TypeDef

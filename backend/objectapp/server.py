@@ -24,10 +24,10 @@ Routes (all JSON):
   ``{path, version, relinked, skipped}``; ``409 {currentVersion}``, ``423``, ``422 {detail}``,
   ``404``. Announces ``renamed`` (with ``oldPath``) when the file moved, ``changed`` for each
   relinked object, and ``types`` when the target type's JSON was written.
-- ``POST /api/objects`` ``{typeId, title?, templateId?, clientId?}`` -> ``201 {path, version}``;
+- ``POST /api/objects`` ``{typeId, title?, templateId?, clientId?}`` -> ``201 {path, version, typeIds}``;
   ``404`` for an unknown type. Announces ``created`` (and ``types`` when an
   inferred type was saved for the first time).
-- ``DELETE /api/object?path=&baseVersion=&clientId=`` -> ``{trashId}``; ``404``,
+- ``DELETE /api/object?path=&baseVersion=&clientId=`` -> ``{trashId, typeIds}``; ``404``,
   ``409 {currentVersion}``. Moves the file to the trash; announces ``deleted``.
 - ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
   ``{paths, typeIds}`` (announces ``created`` per path and ``types`` per type);
@@ -45,7 +45,7 @@ Routes (all JSON):
   ``{targetPropertyId, createName?, baseRevision, clientId?}`` -> ``{types, rewritten, skipped}``;
   ``409 {currentRevision}``, ``422 {detail}``, ``423``, ``404``. Announces ``types`` per
   changed type and ``changed`` per backfilled object.
-- ``DELETE /api/types/{id}?confirm=true&clientId=`` -> ``{trashId}``; ``422``,
+- ``DELETE /api/types/{id}?confirm=true&clientId=`` -> ``{trashId, paths, typeIds}``; ``422``,
   ``428 {detail, affected}``, ``404``. Announces ``types`` (this type and each type
   whose relations stopped allowing it) and ``deleted`` per object and template.
 - ``GET /api/types/{id}/templates`` -> ``ObjectSummary[]`` (``templates.ids`` order, then
@@ -516,11 +516,15 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             return _error(422, str(exc))
         except KeyError:
             return _error(404, f"No object type {req.typeId!r}")
+        type_ids = []
         if t is not None and not had_file and type_revision(space.root, req.typeId):
             announce(ChangeEvent("types", req.typeId, None, origin=req.clientId))
+            type_ids.append(req.typeId)
         announce_template_ids(templates_before, req.clientId)
         announce(ChangeEvent("created", path, version, origin=req.clientId))
-        return JSONResponse({"path": path, "version": version}, status_code=201)
+        return JSONResponse(
+            {"path": path, "version": version, "typeIds": type_ids}, status_code=201
+        )
 
     @api.delete("/object")
     def delete_object(
@@ -541,10 +545,12 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
             return _error(404, f"No object at {path!r}")
+        type_ids = []
         if before is not None and space.type_by_id(before.id) is not before:
             announce(ChangeEvent("types", before.id, None, origin=clientId))
+            type_ids.append(before.id)
         announce(ChangeEvent("deleted", item.originalPath, None, origin=clientId))
-        return {"trashId": item.id}
+        return {"trashId": item.id, "typeIds": type_ids}
 
     @api.get("/types/{type_id}/templates")
     def list_templates(type_id: str):
@@ -722,7 +728,8 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
                 paths.append(str(meta.get("originalPath", "")))
         for path in paths:
             announce(ChangeEvent("deleted", path, None, origin=clientId))
-        return {"trashId": item.id}
+        # The window that deleted can't list these itself: tell it what changed.
+        return {"trashId": item.id, "paths": paths, "typeIds": type_ids}
 
     @api.post("/tags/ensure")
     def ensure_tag(req: EnsureTagRequest):

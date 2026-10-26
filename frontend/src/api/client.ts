@@ -298,19 +298,24 @@ export const api = {
     if (opts.title !== undefined) body.title = opts.title
     if (opts.templateId !== undefined) body.templateId = opts.templateId
     body.clientId = CLIENT_ID
-    const res = await request<CreatedFile>('/objects', json('POST', body))
-    emitLocal([created(res.path, res.version)])
-    return res
+    const res = await request<CreatedFile & { typeIds?: string[] }>('/objects', json('POST', body))
+    // An inferred type saved for the first time: the server's `types` event is our own echo.
+    emitLocal([created(res.path, res.version), ...(res.typeIds ?? []).map((t) => typesEvent(t))])
+    return { path: res.path, version: res.version }
   },
 
   /** Move an object to the Trash. */
   async deleteObject(path: string, opts: { baseVersion?: string } = {}): Promise<{ trashId: string }> {
-    const res = await request<{ trashId: string }>(
+    const res = await request<{ trashId: string; typeIds?: string[] }>(
       `/object${qs({ path, baseVersion: opts.baseVersion, clientId: CLIENT_ID })}`,
       { method: 'DELETE' },
     )
-    emitLocal([{ kind: 'deleted', path, version: null, origin: CLIENT_ID }])
-    return res
+    // Deleting a template also drops it from its type (`typeIds`).
+    emitLocal([
+      { kind: 'deleted', path, version: null, origin: CLIENT_ID },
+      ...(res.typeIds ?? []).map((t) => typesEvent(t)),
+    ])
+    return { trashId: res.trashId }
   },
 
   trash(): Promise<TrashItem[]> {
@@ -395,12 +400,18 @@ export const api = {
 
   /** Move a type, its objects and its templates to the Trash. Rejects with 428 unless `confirm`. */
   async deleteType(id: string, opts: { confirm?: boolean } = {}): Promise<{ trashId: string }> {
-    const res = await request<{ trashId: string }>(
+    const res = await request<{ trashId: string; paths?: string[]; typeIds?: string[] }>(
       `/types/${seg(id)}${qs({ confirm: opts.confirm ? 'true' : undefined, clientId: CLIENT_ID })}`,
       { method: 'DELETE' },
     )
-    emitLocal([typesEvent(id)])
-    return res
+    // The type's objects and templates went to the Trash, and other types may have dropped it
+    // from their relations: announce each, since the server's events for them are our echoes.
+    const typeIds = res.typeIds?.length ? res.typeIds : [id]
+    emitLocal([
+      ...typeIds.map((t) => typesEvent(t)),
+      ...(res.paths ?? []).map((p): ChangeEvent => ({ kind: 'deleted', path: p, version: null, origin: CLIENT_ID })),
+    ])
+    return { trashId: res.trashId }
   },
 
   templates(typeId: string): Promise<ObjectSummary[]> {

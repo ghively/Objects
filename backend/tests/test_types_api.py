@@ -694,6 +694,8 @@ def test_types_event_announced(space_dir: Path):
         r = c.delete("/api/types/server", params={"confirm": "true", "clientId": "w3"})
         assert r.status_code == 200, r.text
         assert r.json()["trashId"]
+        assert r.json()["typeIds"] == ["server"]
+        assert sorted(r.json()["paths"]) == ["Servers/Alpha.md", "Servers/Beta.md"]
         _wait(published, 3)
         assert {(e.kind, e.path, e.origin) for e in published} == {
             ("types", "server", "w3"),
