@@ -1,0 +1,24 @@
+{
+  "id": "dailynote",
+  "name": "DailyNote",
+  "pluralName": "DailyNotes",
+  "folder": "DailyNotes",
+  "icon": "ph-calendar-blank",
+  "color": "blue",
+  "propertyDefinitions": [
+    {
+      "id": "date",
+      "key": "date",
+      "name": "Date",
+      "type": "datetime",
+      "isArray": false
+    },
+    {
+      "id": "reviewed",
+      "key": "reviewed",
+      "name": "Reviewed",
+      "type": "boolean",
+      "isArray": false
+    }
+  ]
+}

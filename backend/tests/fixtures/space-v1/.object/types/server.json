@@ -1,0 +1,31 @@
+{
+  "id": "server",
+  "name": "Server",
+  "pluralName": "Servers",
+  "folder": "Servers",
+  "icon": "ph-hard-drives",
+  "color": "purple",
+  "propertyDefinitions": [
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "label",
+      "isArray": true
+    },
+    {
+      "id": "cores",
+      "key": "cores",
+      "name": "Cores",
+      "type": "number",
+      "isArray": false
+    },
+    {
+      "id": "owner",
+      "key": "owner",
+      "name": "Owner",
+      "type": "entity",
+      "isArray": false
+    }
+  ]
+}

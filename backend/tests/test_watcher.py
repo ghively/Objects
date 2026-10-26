@@ -226,3 +226,23 @@ def test_watcher_silent_for_rename_and_relinked_referrer(space_dir: Path):
         assert (ev.kind, ev.path) == ("changed", "People/Ada king.md")
 
     _run(space_dir, scenario)
+
+
+def test_relpath_survives_vanished_parent(space_dir: Path, monkeypatch):
+    """Emptying the Trash removes a type's folder while watchdog still reports files in it.
+
+    On Windows `Path.resolve()` then raises OSError (WinError 1168), which used to kill
+    the watcher thread, so no external change was reported after "Empty Trash".
+    """
+    space = Space(space_dir)
+    watcher = SpaceWatcher(space, asyncio.new_event_loop())
+
+    def boom(self, strict=False):
+        raise OSError(1168, "Element not found")
+
+    monkeypatch.setattr(Path, "resolve", boom)
+    gone = space.root / ".object" / "trash" / "types" / "X" / "manifest.json"
+    assert watcher._relpath(str(gone)) is None
+    assert watcher._relpath(str(space.root / "Pages" / "Gone.md")) == "Pages/Gone.md"
+    watcher._touch_folder(str(space.root / "Pages"))  # must not raise
+    watcher.stop()

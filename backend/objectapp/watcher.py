@@ -110,11 +110,27 @@ class SpaceWatcher:
 
     # -- event intake (watchdog thread) ---------------------------------------
 
+    def _space_rel(self, path: str) -> PurePosixPath | None:
+        """`path` relative to the space root, or None when it lies outside it.
+
+        A path whose folder was just removed (emptying the Trash deletes a type's
+        folder while watchdog still reports the files in it) can make
+        ``resolve()`` raise OSError on Windows; fall back to the plain absolute
+        path rather than let the watcher thread die.
+        """
+        try:
+            full = Path(path).resolve()
+        except OSError:
+            full = Path(os.path.abspath(path))
+        try:
+            return PurePosixPath(full.relative_to(self.space.root).as_posix())
+        except ValueError:
+            return None
+
     def _relpath(self, path: str) -> str | None:
         """The space-relative object path for `path`, or None if it isn't one."""
-        try:
-            rel = PurePosixPath(Path(path).resolve().relative_to(self.space.root).as_posix())
-        except ValueError:
+        rel = self._space_rel(path)
+        if rel is None:
             return None
         if not rel.parts or is_ignored(rel) or rel.name.startswith("."):
             return None
@@ -129,10 +145,10 @@ class SpaceWatcher:
 
     def _touch_folder(self, path: str) -> None:
         """A folder moved or vanished: re-check every known object beneath it."""
-        try:
-            prefix = Path(path).resolve().relative_to(self.space.root).as_posix() + "/"
-        except ValueError:
+        rel = self._space_rel(path)
+        if rel is None:
             return
+        prefix = rel.as_posix() + "/"
         for s in self.space.list():
             if s.path.startswith(prefix):
                 self._schedule(s.path)

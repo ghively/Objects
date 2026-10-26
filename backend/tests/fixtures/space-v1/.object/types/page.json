@@ -1,0 +1,9 @@
+{
+  "id": "page",
+  "name": "Page",
+  "pluralName": "Pages",
+  "folder": "Pages",
+  "icon": "ph-file-text",
+  "color": "green",
+  "propertyDefinitions": []
+}
