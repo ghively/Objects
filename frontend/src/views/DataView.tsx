@@ -331,7 +331,7 @@ export function DataView(props: DataViewProps) {
       className={cn('mx-auto flex w-full flex-col gap-2', props.embedded ? 'max-w-[50rem]' : 'max-w-5xl', props.compact && 'gap-1')}
     >
       {(props.heading || !toolbarSlot) && (
-        <div className="flex items-center justify-between gap-2">
+        <div data-toolbar-row="" className="flex items-center justify-between gap-2">
           {props.heading ? <div className="min-w-0 flex-1">{props.heading}</div> : <span className="flex-1" />}
           {!toolbarSlot && toolbar}
         </div>
