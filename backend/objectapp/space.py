@@ -60,8 +60,9 @@ from .frontmatter import (
 )
 from .ids import new_ulid
 from .collections import CollectionDef, SaveCollectionResult
+from .dailynotes import FILE_NAME_TAKEN, DailyNoteExists, build_index, day_of, parse_day
 from .jsonstore import DefinitionUnreadable, JsonStore
-from .localtime import SystemTz, to_local
+from .localtime import SystemTz, from_local, to_local
 from .queries import DEFAULT_NAME as DEFAULT_QUERY_NAME
 from .queries import LIMIT_SIZES, MAX_SEARCH_TERMS, QueryDef, query_type_ids
 from .objfile import ObjectFile, join_object
@@ -2371,6 +2372,120 @@ class Space:
         self.rescan_file(rel)
         return True
 
+    # -- daily notes (M4) -------------------------------------------------------
+
+    def daily_note_type(self) -> TypeDefinition | None:
+        """The basic DailyNote type, when the space has one (stored or inferred)."""
+        return next((t for t in self.types if t.basic and t.name.lower() == "dailynote"), None)
+
+    @staticmethod
+    def daily_note_day(raw: RawObject) -> str | None:
+        """The day a daily note stands for: its ``date``, else its ``title``, else its file stem."""
+        return day_of(raw.fm, raw.path)
+
+    def daily_notes(self) -> tuple[dict[str, str], list[tuple[str, list[str]]]]:
+        """``{day: path}`` of the daily notes (first by path wins) and the duplicates.
+
+        Templates and notes with no usable day are left out. Reads only memory.
+        """
+        t = self.daily_note_type()
+        if t is None:
+            return {}, []
+        with self._lock:
+            pairs = [
+                (rel, self.daily_note_day(raw))
+                for rel, raw in self._raw.items()
+                if self._type_id(raw.typeName) == t.id
+                and not (rel in self._summaries and self._summaries[rel].template)
+            ]
+        return build_index(pairs)
+
+    def _ensure_daily_note_type(self) -> TypeDefinition:
+        """The DailyNote type; a space that has none gets the basic one in memory."""
+        t = self.daily_note_type()
+        if t is not None:
+            return t
+        t = TypeDefinition.from_json(
+            {
+                "id": "dailynote",
+                "name": "DailyNote",
+                "pluralName": "DailyNotes",
+                "folder": "DailyNotes",
+                "icon": "ph-calendar-blank",
+                "color": "blue",
+                "propertyDefinitions": [
+                    {"id": "date", "key": "date", "name": "Date", "type": "datetime",
+                     "isArray": False},
+                    {"id": "reviewed", "key": "reviewed", "name": "Reviewed",
+                     "type": "boolean", "isArray": False},
+                ],
+            }
+        )  # fmt: skip
+        self.types.append(t)
+        return t
+
+    def create_daily_note(self, day: str, template_id: str | None = None) -> tuple[str, str]:
+        """Create the daily note for ``day`` as ``DailyNotes/<day>.md``; return (path, version).
+
+        Frontmatter ``id``, ``type: 'DailyNote'``, ``title`` and ``date`` (the day),
+        ``createdAt``, ``lastUpdated`` and ``reviewed: false``; the body is empty.
+        ``template_id`` None applies the type's default template, ``"none"``
+        none; a template adds its body and values, never ``title`` or ``date``,
+        and its reference instant is local midnight of ``day``.
+
+        Raises `InvalidValue` (malformed day), `TemplateError`, and
+        `DailyNoteExists` when the day has a note or the file name is taken by
+        another file (never a ``2026-10-23 2.md``: one note per day).
+        """
+        parsed = parse_day(day) if isinstance(day, str) else None
+        if parsed is None or parsed != day.strip():
+            raise InvalidValue(f"Not a day (YYYY-MM-DD): {day!r}")
+        day = parsed
+        with self._lock:
+            t = self._ensure_daily_note_type()
+            existing = self.daily_notes()[0].get(day)
+            if existing is not None:
+                raise DailyNoteExists(existing)
+            tmpl: RawObject | None = None
+            if template_id is None:
+                default = t.templates.get("defaultTemplateId")
+                if default:
+                    try:
+                        tmpl = self._find_template(t, str(default))
+                    except TemplateError:
+                        tmpl = None  # a default that no longer exists is ignored
+            elif template_id != "none":
+                tmpl = self._find_template(t, template_id)
+            stamp = now_stamp(self.clock())
+            fm_src = set_keys(
+                f"type: {_yaml_single_quoted(t.name)}\n",
+                {"title": day, "createdAt": stamp, "lastUpdated": stamp, "date": day,
+                 "reviewed": False},
+                insert_first={"id": new_ulid()},
+            )  # fmt: skip
+            of = ObjectFile(fm_src, "", True, None)
+            if tmpl is not None:
+                y, m, d = (int(x) for x in day.split("-"))
+                midnight = datetime(y, m, d)  # noqa: DTZ001 (a local wall clock)
+                created = to_local(from_local(midnight, self.tz), self.tz)
+                of = self._template_edit(t, tmpl, created)(of, parse_fm(fm_src)) or of
+                src = of.frontmatter_src or ""
+                if parse_fm(src).get("date") != day:
+                    of = replace(of, frontmatter_src=set_keys(src, {"date": day}))
+            data = join_object(of).encode("utf-8")
+            folder = t.folder.strip("/") or "DailyNotes"
+            rel = f"{folder}/{day}.md"
+            self._persist_type(t)
+            if self._place(rel, data):
+                return rel, version_of(data)
+            # The name is taken: a racing client, a file the watcher hasn't
+            # reported yet, or a file that is not this day's note.
+            self.rescan_file(rel)
+            existing = self.daily_notes()[0].get(day)
+            if existing is not None:
+                raise DailyNoteExists(existing)
+            raise DailyNoteExists(rel, FILE_NAME_TAKEN)
+
     # -- delete and trash -------------------------------------------------------
 
     def _move_out(self, rel: str, dest: Path) -> None:
@@ -2459,8 +2574,8 @@ class Space:
 
     @staticmethod
     def _templates_allowed(t: TypeDefinition) -> bool:
-        """Page, Task and custom types have templates (DailyNote's come in M4; Tag has none)."""
-        return not t.basic or t.name.lower() in ("page", "task")
+        """Page, Task, DailyNote and custom types have templates (Tag has none)."""
+        return not t.basic or t.name.lower() in ("page", "task", "dailynote")
 
     def template_versions(self) -> dict[str, str]:
         """Path -> version of every template file (to see which ones a call wrote)."""

@@ -115,7 +115,7 @@ from .jsonstore import DefinitionUnreadable, default_views, json_revision, norma
 from .media import NotAnImage, image_media_type, image_path, import_image, list_images
 from .propvalues import InvalidValue
 from .queries import QueryDef
-from .space import ConfirmRequired, Conflict, ReadOnly, RestoreConflict, Space
+from .space import ConfirmRequired, Conflict, DailyNoteExists, ReadOnly, RestoreConflict, Space
 from .typedefs import has_undecodable
 from .typemodel import (
     RevisionConflict,
@@ -214,6 +214,12 @@ class CreateObjectRequest(BaseModel):
     title: str | None = None
     templateId: str | None = None
     values: dict[str, Any] | None = None
+    clientId: str | None = None
+
+
+class CreateDailyNoteRequest(BaseModel):
+    date: str
+    templateId: str | None = None
     clientId: str | None = None
 
 
@@ -642,6 +648,30 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         if t is not None and not had_file and type_revision(space.root, req.typeId):
             announce(ChangeEvent("types", req.typeId, None, origin=req.clientId))
             type_ids.append(req.typeId)
+        announce_template_ids(templates_before, req.clientId)
+        announce(ChangeEvent("created", path, version, origin=req.clientId))
+        return JSONResponse(
+            {"path": path, "version": version, "typeIds": type_ids}, status_code=201
+        )
+
+    @api.post("/daily-notes", status_code=201)
+    def create_daily_note(req: CreateDailyNoteRequest):
+        before = space.daily_note_type()
+        type_id = before.id if before is not None else "dailynote"
+        had_file = bool(type_revision(space.root, type_id))
+        templates_before = space.template_versions()
+        try:
+            path, version = space.create_daily_note(req.date, req.templateId)
+        except DailyNoteExists as exc:
+            announce_template_ids(templates_before, req.clientId)
+            return JSONResponse({"detail": exc.detail, "path": exc.path}, status_code=409)
+        except InvalidValue as exc:
+            announce_template_ids(templates_before, req.clientId)
+            return _error(422, str(exc))
+        type_ids = []
+        if not had_file and type_revision(space.root, type_id):
+            announce(ChangeEvent("types", type_id, None, origin=req.clientId))
+            type_ids.append(type_id)
         announce_template_ids(templates_before, req.clientId)
         announce(ChangeEvent("created", path, version, origin=req.clientId))
         return JSONResponse(
