@@ -155,6 +155,30 @@ describe('change type', () => {
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Change type' })).toBeEnabled())
     expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
   })
+
+  test('a failed change releases what prepare paused', async () => {
+    mocked.suggestMapping.mockResolvedValue([{ fromKey: 'stage', toKey: 'notes', lossy: false }])
+    const failure = new Error("Status can't become Cores")
+    mocked.changeType.mockRejectedValue(failure)
+    const onAbort = vi.fn()
+    render(
+      <ChangeTypeDialog
+        open
+        onOpenChange={() => undefined}
+        path={PATH}
+        toType={TASK}
+        prepare={async () => 'v9'}
+        onAbort={onAbort}
+        onChanged={() => undefined}
+      />,
+    )
+    const dialog = await screen.findByRole('dialog')
+    const go = within(dialog).getByRole('button', { name: 'Change type' })
+    await waitFor(() => expect(go).toBeEnabled())
+    fireEvent.click(go)
+    await waitFor(() => expect(onAbort).toHaveBeenCalledWith(failure))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent("Status can't become Cores")
+  })
 })
 
 describe('templates', () => {
