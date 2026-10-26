@@ -101,4 +101,27 @@ describe('useTypeEditor', () => {
     expect(res).toBeNull()
     expect(mocked.saveType).toHaveBeenCalledTimes(1)
   })
+
+  test('two quick edits built from the same stale copy do not undo each other', async () => {
+    render(createElement(Harness))
+    let n = 1
+    mocked.saveType.mockImplementation(async (t: TypeDef) => ({
+      type: { ...t, revision: `r${++n}` },
+      rewritten: [],
+      skipped: [],
+    }))
+    const stale = useLinkIndex.getState().types[0]
+    await act(async () => {
+      const a = editor.save({ ...stale, name: 'Venture' })
+      const b = editor.save({ ...stale, color: 'blue' })
+      const c = editor.save((latest) => ({ ...latest, description: 'd' }))
+      await Promise.all([a, b, c])
+    })
+    expect(mocked.saveType).toHaveBeenCalledTimes(3)
+    const [, second] = mocked.saveType.mock.calls[1]
+    expect(mocked.saveType.mock.calls[1][0]).toMatchObject({ name: 'Venture', color: 'blue' })
+    expect(second).toEqual({ baseRevision: 'r2' })
+    expect(mocked.saveType.mock.calls[2][0]).toMatchObject({ name: 'Venture', color: 'blue', description: 'd' })
+    expect(useLinkIndex.getState().types[0]).toMatchObject({ name: 'Venture', color: 'blue', description: 'd', revision: 'r4' })
+  })
 })

@@ -211,14 +211,12 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  /** Save `patch` onto the newest copy of the type (an earlier save may have changed it). */
+  /** Save `patch` onto the newest copy of the type when it is sent (after any earlier save). */
   const patch = useCallback(
     (p: Partial<TypeDef>) => {
-      const latest = useLinkIndex.getState().types.find((t) => t.id === typeId)
-      if (!latest) return
-      void editor.save({ ...latest, ...p })
+      void editor.save((latest) => ({ ...latest, ...p }))
     },
-    [editor, typeId],
+    [editor],
   )
 
   const name = useDraft(

@@ -12,11 +12,19 @@ import { api, ConfirmRequiredError, RevisionConflictError } from '@/api/client'
 import type { ChangeKindResult, PropertyType, SaveTypeResult, SyncResult, TypeDef } from '@/api/types'
 import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { ConfirmChangesDialog } from './ConfirmChangesDialog'
+import { rebase } from './rebaseType'
+
+export type TypeUpdater = (latest: TypeDef) => TypeDef
 
 export interface TypeEditor {
   type: TypeDef | undefined
-  /** Save `next`; resolves null when it was cancelled or failed (see `error`). */
-  save(next: TypeDef, opts?: { confirm?: boolean }): Promise<SaveTypeResult | null>
+  /**
+   * Save an edit; resolves null when it was cancelled or failed (see `error`). Pass an updater
+   * to build the edit from the newest copy of the type right before it is sent; a `TypeDef` is
+   * taken as an edit of the copy in the index now, and replayed onto the copy current when it
+   * is sent (after earlier saves), so quick edits never undo each other.
+   */
+  save(next: TypeDef | TypeUpdater, opts?: { confirm?: boolean }): Promise<SaveTypeResult | null>
   /** "Change property type": a new property of `toType` with converted values. */
   changeKind(propertyId: string, toType: PropertyType): Promise<ChangeKindResult | null>
   /** Two-way link an entity property (`null` unlinks; `createName` creates the target property). */
@@ -93,16 +101,29 @@ export function useTypeEditor(typeId: string | undefined | null): TypeEditor {
   )
 
   const save = useCallback(
-    (next: TypeDef, opts?: { confirm?: boolean }) =>
-      run(async (confirmed) => {
-        const res = await api.saveType(next, {
-          baseRevision: revision(next.id) || next.revision,
+    (next: TypeDef | TypeUpdater, opts?: { confirm?: boolean }) => {
+      const current = (id: string | null | undefined) => useLinkIndex.getState().types.find((t) => t.id === id)
+      // The copy an edit was made from: the index as it is when the edit is made.
+      const base = typeof next === 'function' ? undefined : (current(next.id) ?? next)
+      return run(async (confirmed) => {
+        const id = typeof next === 'function' ? typeId : next.id
+        const latest = current(id)
+        let body: TypeDef
+        if (typeof next === 'function') {
+          if (!latest) throw new Error('Unknown object type')
+          body = next(latest)
+        } else {
+          body = latest && base ? { ...rebase(base, next, latest), revision: latest.revision } : next
+        }
+        const res = await api.saveType(body, {
+          baseRevision: latest?.revision || body.revision || '',
           ...(confirmed ? { confirm: true } : {}),
         })
         if (res?.type) adoptType(res.type)
         return res
-      }, opts?.confirm ?? false),
-    [run, revision],
+      }, opts?.confirm ?? false)
+    },
+    [run, typeId],
   )
 
   const changeKind = useCallback(
