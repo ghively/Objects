@@ -142,6 +142,28 @@ describe('PropertySettings', () => {
     open('p-b')
     expect(screen.getByText(/This property type cannot be changed/)).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Type "delete-all-content" to confirm' })).toBeInTheDocument()
+    expect(screen.getByRole('note')).toHaveTextContent('This is the only content property present in this object type.')
+    expect(screen.getByText(/This action cannot be reverted\./)).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveAttribute(
+      'placeholder',
+      'Give others an idea of what this property means',
+    )
+  })
+
+  test('a content property among several gets the general warning', () => {
+    useLinkIndex.setState({
+      types: [
+        {
+          ...PROJECT,
+          propertyDefinitions: [
+            propertyDef({ id: 'p-b', key: 'notes', type: 'blocks' }),
+            propertyDef({ id: 'p-c', key: 'more', type: 'blocks' }),
+          ],
+        },
+      ],
+    })
+    open('p-b')
+    expect(screen.getByRole('note')).toHaveTextContent('A content property generally is the main body of an object.')
   })
 
   test('test date Default Custom writes startTimeDefault', async () => {
