@@ -100,7 +100,13 @@ from .media import NotAnImage, image_media_type, image_path, import_image, list_
 from .propvalues import InvalidValue
 from .space import ConfirmRequired, Conflict, ReadOnly, Space
 from .typedefs import has_undecodable
-from .typemodel import RevisionConflict, TypeDefinition, TypeReadOnly, type_revision
+from .typemodel import (
+    RevisionConflict,
+    TypeDefinition,
+    TypeReadOnly,
+    option_shape_problems,
+    type_revision,
+)
 from .watcher import ChangeEvent, SpaceWatcher
 
 __all__ = ["EventHub", "create_app"]
@@ -643,6 +649,12 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             # `from_json` would fill these in; an edit that clears them is refused.
             if not isinstance(data.get(field), str) or not data[field].strip():
                 return _error(422, "An object type needs a name and a plural name")
+        for entry in data.get("propertyDefinitions") or []:
+            if isinstance(entry, dict) and "options" in entry:
+                bad = option_shape_problems(entry["options"])
+                if bad:
+                    name = entry.get("name") or entry.get("key") or "a property"
+                    return _error(422, f"Invalid options for {name}: {', '.join(bad)}")
         try:
             t = TypeDefinition.from_json(data, fallback_id=type_id)
             result = space.save_type(t, req.baseRevision, confirm=req.confirm)

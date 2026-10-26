@@ -757,3 +757,40 @@ def test_deleted_label_option_keeps_the_rest_of_the_list_bytes(space_dir: Path):
     t.prop("topics").options["set"] = [o for o in t.prop("topics").options["set"] if o["text"] != "C"]
     _save(space, t, confirm=True)
     assert team.read_text(encoding="utf-8") == "---\ntype: 'Group'\ntopics: ['A', \"B\"]  # note\n---\n"
+
+
+def test_badly_shaped_property_options_are_422_not_500(space_dir: Path):
+    _group_type(space_dir)
+    space = Space(space_dir)
+    client = TestClient(create_app(space, None, watch=False))
+    served = next(x for x in client.get("/api/space").json()["types"] if x["id"] == "group")
+    for bad in (
+        {"allowedTypes": "server", "fixedSet": 5},
+        {"numberFormat": "x"},
+        {"set": ["A"]},
+        {"propertySyncing": {"propertyIds": "x"}},
+    ):
+        props = [
+            {**p, "options": {**p["options"], **bad}} if p["key"] == "members" else p
+            for p in served["propertyDefinitions"]
+        ]
+        r = client.put(
+            "/api/types/group",
+            json={"type": {**served, "propertyDefinitions": props}, "baseRevision": served["revision"]},
+        )
+        assert r.status_code == 422, (bad, r.text)
+        assert "Invalid options for Members" in r.json()["detail"]
+
+
+def test_badly_shaped_options_in_a_type_file_are_normalised_on_load(space_dir: Path):
+    _group_type(space_dir)
+    path = space_dir / ".object" / "types" / "group.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    for p in data["propertyDefinitions"]:
+        if p["key"] == "members":
+            p["options"].update(allowedTypes="server", fixedSet=5, numberFormat="x")
+    path.write_text(json.dumps(data), encoding="utf-8")
+    members = Space(space_dir).type_by_id("group").prop("members")
+    assert members.options["allowedTypes"] == []
+    assert members.options["fixedSet"] == []
+    assert "numberFormat" not in members.options

@@ -331,6 +331,60 @@ def label_options(texts: Iterable[str], status: bool = False) -> list[dict[str, 
 # -- property definitions --------------------------------------------------------
 
 
+NUMBER_FORMAT_TYPES = frozenset({"number", "currency", "percentage", "progress"})
+
+
+def _str_list(v: Any) -> bool:
+    return isinstance(v, list) and all(isinstance(x, str) for x in v)
+
+
+def option_shape_problems(options: Any) -> list[str]:
+    """The option keys whose value has the wrong shape (see `normalize_options`)."""
+    if not isinstance(options, dict):
+        return ["options"]
+    bad: list[str] = []
+    for key in ("allowedTypes", "fixedSet"):
+        if key in options and not _str_list(options[key]):
+            bad.append(key)
+    for key in ("isArray", "hasFixedSet"):
+        if key in options and not isinstance(options[key], bool):
+            bad.append(key)
+    if "set" in options and not (
+        isinstance(options["set"], list) and all(isinstance(x, dict) for x in options["set"])
+    ):
+        bad.append("set")
+    if "numberFormat" in options:
+        fmt = options["numberFormat"]
+        if not (
+            isinstance(fmt, dict)
+            and fmt.get("type") in NUMBER_FORMAT_TYPES
+            and isinstance(fmt.get("options", {}), dict)
+        ):
+            bad.append("numberFormat")
+    if "propertySyncing" in options:
+        sync = options["propertySyncing"]
+        if not (isinstance(sync, dict) and _str_list(sync.get("propertyIds", []))):
+            bad.append("propertySyncing")
+    return bad
+
+
+def normalize_options(kind: str, options: dict[str, Any]) -> dict[str, Any]:
+    """`options` with each badly shaped value dropped (or reset to the kind's default).
+
+    A hand-edited type file can hold ``allowedTypes: "server"`` or
+    ``numberFormat: "x"``; passing those on would break the code reading them.
+    """
+    bad = option_shape_problems(options)
+    if not bad:
+        return options
+    defaults = _default_options(kind, None)
+    out = {k: v for k, v in options.items() if k not in bad}
+    for k in bad:
+        if k in defaults:
+            out[k] = copy.deepcopy(defaults[k])
+    return out
+
+
 def _default_options(kind: str, is_array: bool | None) -> dict[str, Any]:
     if kind == "entity":
         return {
@@ -375,6 +429,7 @@ class PropertyDefinition:
         pid = pid if isinstance(pid, str) and pid else key
         options = data.get("options")
         options = copy.deepcopy(options) if isinstance(options, dict) else {}
+        options = normalize_options(kind, options)
         is_array = data.get("isArray")
         is_array = is_array if isinstance(is_array, bool) else None
         for k, v in _default_options(kind, is_array).items():
