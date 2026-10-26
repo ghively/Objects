@@ -120,6 +120,8 @@ export interface DateConstraints {
   /** ISO timestamp. */
   endTimeDefault?: string | null
   hideDeleteOption?: boolean
+  /** The Task `date`: reminders may be set on it (M4). */
+  supportsReminders?: boolean
 }
 
 export type StatusCategory = 'not-started' | 'in-progress' | 'blocked' | 'done'
@@ -196,6 +198,12 @@ export interface TypeDef {
   structureViews?: Record<string, unknown>
   defaultViewType?: 'inline' | 'smallCard' | 'wideCard' | 'embed'
   smallCardViewConfig?: SmallCardViewConfig
+  /** M4: absent = offered in the calendar's quick-create chips; `createOnce` = once per day. */
+  createInCalendarOption?: 'disabled' | 'createOnce'
+  /** M4: this type's objects stay out of the calendar's "objects with this date". */
+  hideFromCalendarSidebar?: boolean
+  /** M4, our key on the DailyNote type: hide the Reviewed flag. */
+  hideReviewing?: boolean
   /** API only: set when the type file can't be read. */
   readOnlyReason: string | null
   /** API only: sha256 of the type file, `''` if unsaved. */
@@ -276,6 +284,8 @@ export interface UpdateResult {
   links: Record<string, (string | null)[]>
   synced: string[]
   skipped: SkippedFile[]
+  /** M4: present only when a Task's status changed category (the status hook ran). */
+  task?: TaskResult | null
 }
 
 /** POST /api/object/rename and POST /api/object/change-type */
@@ -502,6 +512,7 @@ export type DashboardSectionKey =
   | 'notTagged'
   | 'noBacklinks'
   | 'pinned'
+  | 'unreviewed'
   | `query:${string}`
   | `collection:${string}`
 
@@ -588,6 +599,12 @@ export interface UiState {
   pinned: PinRef[]
   sections: SidebarSection[]
   allNotesLayout: 'list' | 'grid' | 'wall' | 'embed'
+  /** M4: Calendar preferences. */
+  calendar?: CalendarUi
+  /** M4: the Tasks page's tab and views. */
+  tasks?: TasksUi
+  /** M4: the reminder scheduler switch (default on). */
+  reminders?: { enabled: boolean }
   [extra: string]: unknown
 }
 
@@ -611,4 +628,115 @@ export interface SaveCollectionResult {
   collection: Collection
   rewritten: string[]
   skipped: SkippedFile[]
+}
+
+// ---------------------------------------------------------------------------------------------
+// M4: calendar, daily notes, tasks (docs/superpowers/plans/2026-10-26-m4-calendar-daily-tasks.md,
+// "API contract (M4)").
+
+/** The parsed `repeat` text form. */
+export interface RepeatRule {
+  every: number
+  unit: 'day' | 'week' | 'weekday' | 'month' | 'year'
+  mode: 'dueDate' | 'completionDate'
+  /** YYYY-MM-DD */
+  until?: string
+}
+
+/** The parsed `remind` text form. */
+export interface ReminderRule {
+  minutesBefore: number
+  daysBefore: number
+  /** HH:mm */
+  timeOfDay?: string
+}
+
+/** One task on a calendar day. `day` is the date this entry stands for. */
+export interface TaskEntry {
+  path: string
+  kind: 'date' | 'deadline' | 'occurrence' | 'overdue'
+  /** YYYY-MM-DD */
+  day: string
+  done: boolean
+}
+
+/** An object whose date property covers a calendar day. */
+export interface DatedEntry {
+  path: string
+  /** The date property's key. */
+  key: string
+  start: string
+  end?: string | null
+  resolution: Resolution
+}
+
+export interface CalendarDay {
+  dailyNote: { path: string; reviewed: boolean } | null
+  tasks: TaskEntry[]
+  dated: DatedEntry[]
+  created: string[]
+  updated: string[]
+}
+
+/** GET /api/calendar?from=&to= (at most 100 days). */
+export interface CalendarRange {
+  /** YYYY-MM-DD, inclusive. */
+  from: string
+  /** YYYY-MM-DD, inclusive. */
+  to: string
+  /** The server's local day. */
+  today: string
+  days: Record<string, CalendarDay>
+  summaries: Record<string, ObjectSummary>
+  /** Days claimed by more than one daily note: the first by path wins, the others are listed. */
+  warnings: { day: string; paths: string[] }[]
+}
+
+/** On `UpdateResult`, only when a Task's status changed category. */
+export interface TaskResult {
+  completed: boolean
+  advanced: boolean
+  /** The new date after a recurring advance. */
+  date?: DateValue
+}
+
+export interface CalendarUi {
+  weekStart: 'sunday' | 'monday'
+  daily: {
+    hideDailyNote?: boolean
+    hideTasks?: boolean
+    hideDated?: boolean
+    hideCreatedOnDay?: boolean
+    hideUpdated?: boolean
+    hideCreateObjects?: boolean
+    tasksView?: ViewState
+    createdView?: ViewState
+    updatedView?: ViewState
+    datedView?: ViewState
+  }
+}
+
+export type TaskSectionKey =
+  | 'status'
+  | 'today'
+  | 'inbox'
+  | 'open'
+  | 'deadline'
+  | 'scheduled'
+  | 'recurring'
+  | 'reminders'
+  | 'tags'
+  | 'completed'
+
+export interface TasksUi {
+  activeTab: TaskSectionKey
+  views: Partial<Record<TaskSectionKey, ViewState>>
+}
+
+/** POST /api/daily-notes → 201 */
+export interface CreatedDailyNote {
+  path: string
+  version: string
+  /** The inferred DailyNote type when this write saved its JSON first. */
+  typeIds: string[]
 }

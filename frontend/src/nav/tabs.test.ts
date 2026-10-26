@@ -165,6 +165,28 @@ describe('collection, query, queries and allNotes targets', () => {
   })
 })
 
+describe('calendar and tasks targets', () => {
+  test('test calendar and tasks targets open, go back, same target dedupes', () => {
+    const s = useTabs.getState
+    s().open({ kind: 'allNotes' })
+    s().open({ kind: 'calendar' })
+    expect(currentTarget(s())).toEqual({ kind: 'calendar' })
+    s().open({ kind: 'calendar' })
+    expect(activeTab(s())?.history).toHaveLength(2)
+    s().open({ kind: 'tasks' })
+    s().open({ kind: 'tasks' })
+    expect(activeTab(s())?.history).toHaveLength(3)
+    expect(currentTarget(s())).toEqual({ kind: 'tasks' })
+    s().back()
+    expect(currentTarget(s())).toEqual({ kind: 'calendar' })
+    s().back()
+    expect(currentTarget(s())).toEqual({ kind: 'allNotes' })
+    expect(sameTarget({ kind: 'calendar' }, { kind: 'calendar' })).toBe(true)
+    expect(sameTarget({ kind: 'tasks' }, { kind: 'tasks' })).toBe(true)
+    expect(sameTarget({ kind: 'calendar' }, { kind: 'tasks' })).toBe(false)
+  })
+})
+
 describe('useRecent', () => {
   test('objects opened in a tab or the peek are recorded, newest first, without duplicates', () => {
     useTabs.getState().open(objT('Tasks/A.md'))

@@ -7,6 +7,8 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { createAndOpen } from '@/create/createAndOpen'
 import { NewObjectMenu } from '@/create/NewObjectMenu'
 import { AllNotesView } from '@/allnotes/AllNotesView'
+import { CalendarPage } from '@/calendar/CalendarPage'
+import { CalendarSidePanel } from '@/calendar/CalendarSidePanel'
 import { CollectionPage } from '@/collections/CollectionPage'
 import { QueriesPage } from '@/queries/QueriesPage'
 import { QueryPage, useTitleCtx } from '@/queries/QueryPage'
@@ -22,6 +24,7 @@ import { RightPanel } from '@/shell/RightPanel'
 import { Sidebar, TypeChip } from '@/shell/Sidebar'
 import { TopBar } from '@/shell/TopBar'
 import { cn } from '@/lib/utils'
+import { TasksPage } from '@/tasks/TasksPage'
 import { TrashView } from '@/trash/TrashView'
 import { CreateTypeDialog } from '@/types/CreateTypeDialog'
 import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
@@ -96,6 +99,22 @@ function TabLabel({ tab, space }: { tab: Tab; space: SpaceInfo | null }) {
       <>
         <Icon name="ph-note" size={15} />
         <span className="truncate">All notes</span>
+      </>
+    )
+  }
+  if (target.kind === 'calendar') {
+    return (
+      <>
+        <Icon name="ph-calendar-blank" size={15} />
+        <span className="truncate">Calendar</span>
+      </>
+    )
+  }
+  if (target.kind === 'tasks') {
+    return (
+      <>
+        <Icon name="ph-check-circle" size={15} />
+        <span className="truncate">Tasks</span>
       </>
     )
   }
@@ -282,6 +301,16 @@ export default function App() {
     content = <QueriesPage />
   } else if (target?.kind === 'allNotes') {
     content = <AllNotesView />
+  } else if (target?.kind === 'calendar') {
+    content = (
+      <CalendarPage
+        rightPanelOpen={rightOpen}
+        onToggleRightPanel={() => setRightOpen((v) => !v)}
+        onOpenTarget={(t) => tabs.open(t)}
+      />
+    )
+  } else if (target?.kind === 'tasks') {
+    content = <TasksPage />
   } else {
     content = <Centered title="Pick an object type" subtitle="Choose a type in the sidebar to see its objects." />
   }
@@ -318,10 +347,14 @@ export default function App() {
                 onOpenTarget={(t, o) => tabs.open(t, o)}
                 queriesActive={target?.kind === 'queries'}
                 allNotesActive={target?.kind === 'allNotes'}
+                calendarActive={target?.kind === 'calendar'}
+                tasksActive={target?.kind === 'tasks'}
               />
             </ErrorBoundary>
           )}
-          <MainPanel aside={<RightPanel open={rightOpen} />}>
+          <MainPanel
+            aside={<RightPanel open={rightOpen}>{target?.kind === 'calendar' && <CalendarSidePanel />}</RightPanel>}
+          >
             <ErrorBoundary what="This page" resetKey={target ? JSON.stringify(target) : ''}>
               {content}
             </ErrorBoundary>
