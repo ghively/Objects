@@ -31,3 +31,11 @@ def full_space_dir(tmp_path: Path) -> Path:
     dest = tmp_path / "space-sample"
     shutil.copytree(FIXTURES / "space-sample", dest)
     return dest
+
+
+@pytest.fixture
+def calendar_space_dir(tmp_path: Path) -> Path:
+    """A fresh copy of the synthetic M4 `space-calendar` space (tasks, daily notes, dates)."""
+    dest = tmp_path / "space-calendar"
+    shutil.copytree(FIXTURES / "space-calendar", dest)
+    return dest

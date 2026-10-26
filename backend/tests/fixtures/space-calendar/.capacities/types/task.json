@@ -1,0 +1,307 @@
+{
+  "schemaVersion": 2,
+  "id": "task",
+  "name": "Task",
+  "pluralName": "Tasks",
+  "folder": "Tasks",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-check-circle"
+  },
+  "color": "yellow",
+  "description": "",
+  "basic": true,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The title serves as the main identifier for any entry",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "Collections this content is included in",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "Additional information to further describe an item",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "Date and time of creation",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "Date and time of last edit",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "General tags of this content",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "A quick visual identifier",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Additional names for this content",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    },
+    {
+      "id": "status",
+      "key": "status",
+      "name": "Status",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-trend-up"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "isStatus": true,
+        "set": [
+          {
+            "id": "not-started",
+            "text": "Not Started",
+            "color": "red",
+            "icon": null,
+            "statusCategory": "not-started"
+          },
+          {
+            "id": "next-up",
+            "text": "Next Up",
+            "color": "yellow",
+            "icon": null,
+            "statusCategory": "not-started"
+          },
+          {
+            "id": "in-progress",
+            "text": "In Progress",
+            "color": "blue",
+            "icon": null,
+            "statusCategory": "in-progress"
+          },
+          {
+            "id": "on-hold",
+            "text": "On Hold",
+            "color": "pink",
+            "icon": null,
+            "statusCategory": "blocked"
+          },
+          {
+            "id": "done",
+            "text": "Done",
+            "color": "green",
+            "icon": null,
+            "statusCategory": "done"
+          }
+        ]
+      }
+    },
+    {
+      "id": "priority",
+      "key": "priority",
+      "name": "Priority",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-flag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "low",
+            "text": "Low",
+            "color": "amber",
+            "icon": null
+          },
+          {
+            "id": "medium",
+            "text": "Medium",
+            "color": "orange",
+            "icon": null
+          },
+          {
+            "id": "high",
+            "text": "High",
+            "color": "red",
+            "icon": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "date",
+      "key": "date",
+      "name": "Date",
+      "type": "datetimeSimple",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "day",
+          "endTimeSettings": "notAllowed",
+          "supportsReminders": true
+        }
+      }
+    },
+    {
+      "id": "deadline",
+      "key": "deadline",
+      "name": "Deadline",
+      "type": "datetimeSimple",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-hourglass-medium"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "day",
+          "endTimeSettings": "notAllowed"
+        }
+      }
+    },
+    {
+      "id": "completed",
+      "key": "completed",
+      "name": "Completed",
+      "type": "datetimeSimple",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-check"
+      },
+      "visibility": "hidden",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "time",
+          "endTimeSettings": "notAllowed"
+        }
+      }
+    },
+    {
+      "id": "repeat",
+      "key": "repeat",
+      "name": "Repeat",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "hidden",
+      "options": {}
+    },
+    {
+      "id": "remind",
+      "key": "remind",
+      "name": "Remind",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "hidden",
+      "options": {}
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [],
+    "defaultTemplateId": null
+  }
+}
