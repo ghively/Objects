@@ -11,7 +11,7 @@ export interface TagsCellProps extends CellProps<string[] | null> {
 }
 
 /** Tags: chips coloured from their Tag objects; "+" opens the TagPicker. */
-export function TagsCell({ def, value, readOnly, density, onChange, onOpenTag }: TagsCellProps) {
+export function TagsCell({ def, value, readOnly, density, inTable, onChange, onOpenTag }: TagsCellProps) {
   const [open, setOpen] = useState(false)
   const tags = useTagObjects()
   const names = value ?? []
@@ -39,7 +39,7 @@ export function TagsCell({ def, value, readOnly, density, onChange, onOpenTag }:
           )}
         </span>
       ))}
-      {names.length === 0 && readOnly && <span className="text-[15px] text-fg-muted">{placeholderFor(def, density)}</span>}
+      {names.length === 0 && readOnly && <span className="text-[15px] text-fg-muted">{placeholderFor(def, inTable ? 'table' : density)}</span>}
       {!readOnly && (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
@@ -48,7 +48,7 @@ export function TagsCell({ def, value, readOnly, density, onChange, onOpenTag }:
               aria-label={`Edit ${def.name}`}
               className="flex items-center gap-1 rounded px-1 text-[15px] text-fg-muted hover:bg-hover hover:text-fg"
             >
-              {names.length === 0 ? placeholderFor(def, density) : <Icon name="ph-plus" size={14} />}
+              {names.length === 0 ? placeholderFor(def, inTable ? 'table' : density) : <Icon name="ph-plus" size={14} />}
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-auto border-line bg-raised p-0 text-fg">

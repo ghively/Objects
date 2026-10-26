@@ -6,7 +6,7 @@ import { placeholderFor } from '../format'
 import type { CellProps } from './types'
 
 /** A Tag object's colour, stored as `bg-<c>`; a click opens the ColorPicker. */
-export function ColorCell({ def, value, readOnly, density, onChange }: CellProps<string | null>) {
+export function ColorCell({ def, value, readOnly, density, inTable, onChange }: CellProps<string | null>) {
   const [open, setOpen] = useState(false)
   const shown = value ? (
     <span className="flex items-center gap-2 text-[15px] text-fg">
@@ -14,7 +14,7 @@ export function ColorCell({ def, value, readOnly, density, onChange }: CellProps
       {colorName(value)}
     </span>
   ) : (
-    <span className="text-[15px] text-fg-muted">{placeholderFor(def, density)}</span>
+    <span className="text-[15px] text-fg-muted">{placeholderFor(def, inTable ? 'table' : density)}</span>
   )
   if (readOnly) return <div className="py-0.5">{shown}</div>
   return (

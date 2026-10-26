@@ -13,7 +13,7 @@ export interface LabelCellProps extends CellProps<string[] | null> {
 }
 
 /** A label (single or multi-select): pills; a click opens the LabelMenu. */
-export function LabelCell({ def, value, readOnly, density, onChange, onDefChange, onOpenSettings }: LabelCellProps) {
+export function LabelCell({ def, value, readOnly, density, inTable, onChange, onDefChange, onOpenSettings }: LabelCellProps) {
   const [open, setOpen] = useState(false)
   const selected = value ?? []
   const set = def.options.set ?? []
@@ -26,7 +26,7 @@ export function LabelCell({ def, value, readOnly, density, onChange, onDefChange
     pills.length > 0 ? (
       <span className={table ? 'flex flex-nowrap gap-1' : 'flex flex-wrap gap-1'}>{pills}</span>
     ) : (
-      <span className="text-[15px] text-fg-muted">{placeholderFor(def, density)}</span>
+      <span className="text-[15px] text-fg-muted">{placeholderFor(def, inTable ? 'table' : density)}</span>
     )
   if (readOnly) return <div className="py-0.5">{shown}</div>
   return (

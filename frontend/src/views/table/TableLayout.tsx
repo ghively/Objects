@@ -324,6 +324,7 @@ export function TableLayout(props: TableLayoutProps) {
                   value={valueFor(def, row)}
                   readOnly={row.summary.readOnly}
                   density={wrapped ? 'panel' : 'table'}
+                  inTable
                   onChange={(next: unknown) => void commit(row, def, next)}
                   onDefChange={onDefChange}
                   typeId={row.summary.type}

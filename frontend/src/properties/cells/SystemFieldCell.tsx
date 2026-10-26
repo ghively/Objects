@@ -24,11 +24,12 @@ export interface CollectionsCellProps extends CellProps<string[] | null> {
 }
 
 /** Collections: chips (a click opens the collection) and the picker; writes the `collections:` names. */
-export function CollectionsCell({ value, readOnly, density, typeId, onChange }: CollectionsCellProps) {
+export function CollectionsCell({ value, readOnly, density, inTable, typeId, onChange }: CollectionsCellProps) {
   const [open, setOpen] = useState(false)
   const { byName } = useCollections()
   const names = Array.isArray(value) ? value : []
   const table = density === 'table'
+  const blank = table || !!inTable
   const editable = !readOnly && !!typeId
   return (
     <div className={`group/collections flex items-center gap-1 py-0.5 ${table ? 'flex-nowrap' : 'flex-wrap'}`}>
@@ -60,16 +61,16 @@ export function CollectionsCell({ value, readOnly, density, typeId, onChange }: 
           </span>
         )
       })}
-      {names.length === 0 && !editable && !table && <span className="text-[15px] text-fg-muted">—</span>}
+      {names.length === 0 && !editable && !blank && <span className="text-[15px] text-fg-muted">—</span>}
       {editable && (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <button
               type="button"
               aria-label="Edit Collections"
-              className={`flex items-center gap-1 rounded px-1 text-[15px] text-fg-muted hover:bg-hover hover:text-fg ${table && names.length === 0 ? 'min-w-0 flex-1 self-stretch' : ''}`}
+              className={`flex items-center gap-1 rounded px-1 text-[15px] text-fg-muted hover:bg-hover hover:text-fg ${blank && names.length === 0 ? 'min-w-0 flex-1 self-stretch' : ''}`}
             >
-              {names.length === 0 ? (table ? null : 'Add to a collection') : <Icon name="ph-plus" size={14} />}
+              {names.length === 0 ? (blank ? null : 'Add to a collection') : <Icon name="ph-plus" size={14} />}
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-auto border-line bg-raised p-0 text-fg">

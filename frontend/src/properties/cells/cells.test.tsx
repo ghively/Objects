@@ -236,6 +236,18 @@ describe('placeholders', () => {
     expect(screen.getByPlaceholderText('Empty')).toBeInTheDocument()
   })
 
+  it('test empty table cells show no placeholder, wrapped or not', () => {
+    const d = def('text', { description: 'Additional information to further describe an item' })
+    const { unmount } = render(<TextCell def={d} value={null} density="table" inTable onChange={() => {}} />)
+    expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', '')
+    unmount()
+    const wrapped = render(<TextCell def={d} value={null} density="panel" inTable onChange={() => {}} />)
+    expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', '')
+    wrapped.unmount()
+    render(<DateCell def={def('datetime')} value={null} inTable onChange={() => {}} />)
+    expect(screen.queryByText('Empty')).toBeNull()
+  })
+
   it('DateCell shows its placeholder and value', () => {
     const { unmount } = render(<DateCell def={def('datetime')} value={null} onChange={() => {}} />)
     expect(screen.getByText('Empty')).toBeInTheDocument()

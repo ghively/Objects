@@ -59,7 +59,7 @@ const onLink = (e: { target: EventTarget }) => e.target instanceof Element && e.
  * source in a textarea, which commits on blur (Esc blurs). Line breaks are not part of a
  * paragraph, so Enter commits too.
  */
-export function TextBlockCell({ def, value, readOnly, density, onChange }: CellProps<string | null>) {
+export function TextBlockCell({ def, value, readOnly, density, inTable, onChange }: CellProps<string | null>) {
   const [editing, setEditing] = useState(false)
   const [text, setText] = useState(value ?? '')
   const ref = useRef<HTMLTextAreaElement>(null)
@@ -92,7 +92,7 @@ export function TextBlockCell({ def, value, readOnly, density, onChange }: CellP
             dangerouslySetInnerHTML={{ __html: html }}
           />
         ) : (
-          <span className="text-fg-muted">{placeholderFor(def, density)}</span>
+          <span className="text-fg-muted">{placeholderFor(def, inTable ? 'table' : density)}</span>
         )}
       </div>
     )
@@ -111,7 +111,7 @@ export function TextBlockCell({ def, value, readOnly, density, onChange }: CellP
       aria-label={def.name}
       value={text}
       rows={Math.max(1, Math.ceil(text.length / 40))}
-      placeholder={placeholderFor(def, density)}
+      placeholder={placeholderFor(def, inTable ? 'table' : density)}
       onChange={(e) => setText(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
