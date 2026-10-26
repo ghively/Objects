@@ -230,6 +230,29 @@ describe('serialized writes', () => {
     expect(mocked.renameObject).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Projects/Plans.md' }))
   })
+
+  test('a rename that keeps the path updates the title, so renaming back is still sent', async () => {
+    const user = userEvent.setup()
+    // safe_filename cuts at the first illegal character: both titles stay at the same path.
+    mocked.renameObject.mockImplementation(async (_p: string, _title: string, base: string) => ({
+      path: PATH,
+      version: `${base}+r`,
+      relinked: [],
+      skipped: [],
+    }))
+    await openPage()
+    const title = screen.getByRole('textbox', { name: 'Title' })
+
+    await user.clear(title)
+    await user.type(title, 'Notes: two{Enter}')
+    await waitFor(() => expect(mocked.renameObject).toHaveBeenCalledWith(PATH, 'Notes: two', 'v1'))
+
+    await user.clear(title)
+    await user.type(title, 'Notes{Enter}')
+    await waitFor(() => expect(mocked.renameObject).toHaveBeenCalledTimes(2))
+    expect(mocked.renameObject).toHaveBeenLastCalledWith(PATH, 'Notes', 'v1+r')
+    expect(title).toHaveValue('Notes')
+  })
 })
 
 describe('App events', () => {
