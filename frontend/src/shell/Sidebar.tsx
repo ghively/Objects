@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react'
 import { Icon, IconOrEmoji, iconName } from '@/components/Icon'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { TypeDef } from '@/api/types'
@@ -12,6 +18,18 @@ export interface SidebarProps {
   onOpenType?: (type: TypeDef) => void
   /** Optional object counts per type id, shown muted at the row's end. */
   counts?: Record<string, number>
+  /** "+ New": create an object. */
+  onNew?: () => void
+  /** The `+` beside "Object Types": create a type. */
+  onCreateType?: () => void
+  /** A type row's context menu › "Object Type Settings". */
+  onOpenTypeSettings?: (type: TypeDef) => void
+  /** A type row's context menu › "Delete object type" (non-basic types only). */
+  onDeleteType?: (type: TypeDef) => void
+  /** "Trash": the app's own trash. */
+  onOpenTrash?: () => void
+  /** Highlights the Trash item. */
+  trashActive?: boolean
 }
 
 export function byPluralName(a: TypeDef, b: TypeDef): number {
@@ -32,15 +50,28 @@ export function TypeChip({ type, size = 22 }: { type: Pick<TypeDef, 'icon' | 'co
   )
 }
 
-function SectionHeader({ id, icon, children }: { id: string; icon?: string; children: ReactNode }) {
+function SectionHeader({
+  id,
+  icon,
+  children,
+  action,
+}: {
+  id: string
+  icon?: string
+  children: ReactNode
+  action?: ReactNode
+}) {
   return (
-    <h2
-      id={id}
-      className="flex items-center gap-1.5 px-2 pt-5 pb-2 text-[14px] font-semibold text-[#a7a2a1]"
-    >
-      {icon && <Icon name={icon} size={14} />}
-      {children}
-    </h2>
+    <div className="group/sh flex items-center pr-1">
+      <h2
+        id={id}
+        className="flex flex-1 items-center gap-1.5 px-2 pt-5 pb-2 text-[14px] font-semibold text-[#a7a2a1]"
+      >
+        {icon && <Icon name={icon} size={14} />}
+        {children}
+      </h2>
+      {action && <div className="pt-3">{action}</div>}
+    </div>
   )
 }
 
@@ -66,16 +97,26 @@ function NavItem({ icon, label, hint }: { icon: string; label: string; hint: str
   )
 }
 
-export function Sidebar({ types, activeTypeId, onOpenType, counts }: SidebarProps) {
+export function Sidebar({
+  types,
+  activeTypeId,
+  onOpenType,
+  counts,
+  onNew,
+  onCreateType,
+  onOpenTypeSettings,
+  onDeleteType,
+  onOpenTrash,
+  trashActive,
+}: SidebarProps) {
   const sorted = [...types].sort(byPluralName)
   return (
     <aside className="flex h-full w-[358px] shrink-0 flex-col bg-app pr-3.5 pl-2.5 text-fg" aria-label="Sidebar">
       <div className="flex items-center gap-2 pt-3 pb-3">
         <button
           type="button"
-          disabled
-          title="Creating objects arrives in M2"
-          className="flex h-[42px] flex-1 items-center gap-2 rounded-xl border border-[#2a292d] bg-raised px-3 text-[15px] font-medium disabled:cursor-default disabled:opacity-60"
+          onClick={() => onNew?.()}
+          className="flex h-[42px] flex-1 items-center gap-2 rounded-xl border border-[#2a292d] bg-raised px-3 text-[15px] font-medium hover:bg-hover"
         >
           <Icon name="ph-plus" size={16} />
           New
@@ -105,29 +146,75 @@ export function Sidebar({ types, activeTypeId, onOpenType, counts }: SidebarProp
         </section>
 
         <section aria-labelledby="sb-types">
-          <SectionHeader id="sb-types">Object Types</SectionHeader>
+          <SectionHeader
+            id="sb-types"
+            action={
+              <button
+                type="button"
+                aria-label="Create object type"
+                title="Create object type"
+                onClick={() => onCreateType?.()}
+                className="flex size-6 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"
+              >
+                <Icon name="ph-plus" size={14} />
+              </button>
+            }
+          >
+            Object Types
+          </SectionHeader>
           <ul className="flex flex-col gap-0.5 pb-2">
             {sorted.map((t) => (
               <li key={t.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpenType?.(t)}
-                  aria-current={activeTypeId === t.id ? 'page' : undefined}
-                  className={cn(
-                    'flex h-[36px] w-full items-center gap-2 rounded-lg px-1.5 text-left text-[15px] font-medium hover:bg-hover',
-                    activeTypeId === t.id && 'bg-hover',
-                  )}
-                >
-                  <TypeChip type={t} />
-                  <span className="min-w-0 flex-1 truncate">{t.pluralName}</span>
-                  {counts && counts[t.id] !== undefined && (
-                    <span className="text-[13px] text-fg-muted tabular-nums">{counts[t.id]}</span>
-                  )}
-                </button>
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => onOpenType?.(t)}
+                      aria-current={activeTypeId === t.id ? 'page' : undefined}
+                      className={cn(
+                        'flex h-[36px] w-full items-center gap-2 rounded-lg px-1.5 text-left text-[15px] font-medium hover:bg-hover',
+                        activeTypeId === t.id && 'bg-hover',
+                      )}
+                    >
+                      <TypeChip type={t} />
+                      <span className="min-w-0 flex-1 truncate">{t.pluralName}</span>
+                      {counts && counts[t.id] !== undefined && (
+                        <span className="text-[13px] text-fg-muted tabular-nums">{counts[t.id]}</span>
+                      )}
+                    </button>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="border-line bg-raised text-fg">
+                    <ContextMenuItem onSelect={() => onOpenTypeSettings?.(t)}>
+                      <Icon name="ph-gear" size={14} />
+                      Object Type Settings
+                    </ContextMenuItem>
+                    {!t.basic && (
+                      <ContextMenuItem variant="destructive" onSelect={() => onDeleteType?.(t)}>
+                        <Icon name="ph-trash" size={14} />
+                        Delete object type
+                      </ContextMenuItem>
+                    )}
+                  </ContextMenuContent>
+                </ContextMenu>
               </li>
             ))}
           </ul>
         </section>
+
+        <div className="pb-3">
+          <button
+            type="button"
+            onClick={() => onOpenTrash?.()}
+            aria-current={trashActive ? 'page' : undefined}
+            className={cn(
+              'flex h-[36px] w-full items-center gap-2 rounded-lg px-2 text-left text-[15px] font-medium text-fg-muted hover:bg-hover hover:text-fg',
+              trashActive && 'bg-hover text-fg',
+            )}
+          >
+            <Icon name="ph-trash" size={16} />
+            Trash
+          </button>
+        </div>
       </ScrollArea>
 
       <footer className="flex items-center gap-1 py-2 text-fg-muted">

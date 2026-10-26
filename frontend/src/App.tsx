@@ -14,7 +14,10 @@ import { RightPanel } from '@/shell/RightPanel'
 import { Sidebar, TypeChip } from '@/shell/Sidebar'
 import { TopBar } from '@/shell/TopBar'
 import { cn } from '@/lib/utils'
+import { CreateTypeDialog } from '@/types/CreateTypeDialog'
+import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
 import { TypePage } from '@/types/TypePage'
+import { TypeSettings } from '@/types/TypeSettings'
 
 const REFRESH_DELAY_MS = 150
 
@@ -29,12 +32,21 @@ function TabLabel({ tab, space }: { tab: Tab; space: SpaceInfo | null }) {
   const objects = useLinkIndex((s) => s.objects)
   const types = useSpaceTypes(space)
   if (!target) return <span className="truncate">New tab</span>
-  if (target.kind === 'type') {
+  if (target.kind === 'trash') {
+    return (
+      <>
+        <Icon name="ph-trash" size={15} />
+        <span className="truncate">Trash</span>
+      </>
+    )
+  }
+  if (target.kind === 'type' || target.kind === 'typeSettings') {
     const type = types.find((t) => t.id === target.typeId)
+    const label = type ? (target.kind === 'type' ? type.pluralName : `${type.name} settings`) : target.typeId
     return (
       <>
         {type && <TypeChip type={type} size={22} />}
-        <span className="truncate">{type?.pluralName ?? target.typeId}</span>
+        <span className="truncate">{label}</span>
       </>
     )
   }
@@ -89,6 +101,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [rightOpen, setRightOpen] = useState(false)
+  const [createTypeOpen, setCreateTypeOpen] = useState(false)
+  const [deleting, setDeleting] = useState<TypeDef | null>(null)
   const tabs = useTabs()
   const target = currentTarget(tabs)
 
@@ -147,6 +161,19 @@ export default function App() {
     content = <TypePage type={activeType} />
   } else if (target?.kind === 'type' && space) {
     content = <Centered title="Unknown object type" subtitle={target.typeId} />
+  } else if (target?.kind === 'typeSettings') {
+    content = (
+      <TypeSettings
+        key={target.typeId}
+        typeId={target.typeId}
+        onOpenType={(typeId) => tabs.open({ kind: 'type', typeId })}
+        onOpenTemplate={(path) => tabs.open({ kind: 'object', path })}
+        onDeleted={() => tabs.open({ kind: 'trash' })}
+      />
+    )
+  } else if (target?.kind === 'trash') {
+    // The Trash view comes with the object lifecycle UI (Task 19).
+    content = <Centered title="Trash" subtitle="Deleted objects and types stay here for 30 days." />
   } else {
     content = <Centered title="Pick an object type" subtitle="Choose a type in the sidebar to see its objects." />
   }
@@ -173,12 +200,38 @@ export default function App() {
               activeTypeId={activeType?.id}
               onOpenType={(t) => tabs.open({ kind: 'type', typeId: t.id })}
               counts={counts}
+              onNew={() => {
+                // A new object of the open type (else a Page); the full "+ New" menu comes in Task 19.
+                const typeId = activeType?.id ?? types.find((t) => t.name.toLowerCase() === 'page')?.id ?? 'page'
+                void api
+                  .createObject(typeId)
+                  .then((res) => tabs.open({ kind: 'object', path: res.path }))
+                  .catch((e: unknown) => console.warn('Could not create an object:', e))
+              }}
+              onCreateType={() => setCreateTypeOpen(true)}
+              onOpenTypeSettings={(t) => tabs.open({ kind: 'typeSettings', typeId: t.id })}
+              onDeleteType={setDeleting}
+              onOpenTrash={() => tabs.open({ kind: 'trash' })}
+              trashActive={target?.kind === 'trash'}
             />
           )}
           <MainPanel aside={<RightPanel open={rightOpen} />}>{content}</MainPanel>
         </div>
         <ObjectPeek />
         <LinkPicker />
+        <CreateTypeDialog
+          open={createTypeOpen}
+          onOpenChange={setCreateTypeOpen}
+          onCreated={(t) => tabs.open({ kind: 'typeSettings', typeId: t.id })}
+        />
+        {deleting && (
+          <DeleteTypeDialog
+            type={deleting}
+            open
+            onOpenChange={(o) => !o && setDeleting(null)}
+            onDeleted={() => setDeleting(null)}
+          />
+        )}
       </div>
     </TooltipProvider>
   )
