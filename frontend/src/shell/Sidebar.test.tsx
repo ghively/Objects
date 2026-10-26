@@ -1,5 +1,6 @@
-import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import type { TypeDef } from '@/api/types'
 import { typeDef as makeType } from '@/test/mockApi'
 import { Sidebar } from './Sidebar'
@@ -14,15 +15,55 @@ const TYPES: TypeDef[] = [
   typeDef('Server', 'Servers', 'ph-hard-drives', 'purple'),
   typeDef('Person', 'People', 'ph-user', 'orange'),
   typeDef('DailyNote', 'DailyNotes', 'ph-calendar-blank', 'green'),
-  typeDef('Page', 'Pages', 'ph-file-text', 'pink'),
+  { ...typeDef('Page', 'Pages', 'ph-file-text', 'pink'), basic: true },
 ]
 
 describe('Sidebar', () => {
-  it('renders the + New button, disabled until M2', () => {
-    render(<Sidebar types={TYPES} />)
-    const btn = screen.getByRole('button', { name: /new/i })
-    expect(btn).toBeDisabled()
+  it('test sidebar "+ New" enabled and type context menu items', async () => {
+    const user = userEvent.setup()
+    const onNew = vi.fn()
+    const onCreateType = vi.fn()
+    const onOpenTypeSettings = vi.fn()
+    const onDeleteType = vi.fn()
+    const onOpenTrash = vi.fn()
+    render(
+      <Sidebar
+        types={TYPES}
+        onNew={onNew}
+        onCreateType={onCreateType}
+        onOpenTypeSettings={onOpenTypeSettings}
+        onDeleteType={onDeleteType}
+        onOpenTrash={onOpenTrash}
+      />,
+    )
+    const btn = screen.getByRole('button', { name: 'New' })
+    expect(btn).toBeEnabled()
+    await user.click(btn)
+    expect(onNew).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('button', { name: /search/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Create object type' }))
+    expect(onCreateType).toHaveBeenCalledTimes(1)
+
+    await user.click(screen.getByRole('button', { name: 'Trash' }))
+    expect(onOpenTrash).toHaveBeenCalledTimes(1)
+
+    // A custom type: settings and delete.
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Servers' }))
+    let menu = await screen.findByRole('menu')
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
+      'Object Type Settings',
+      'Delete object type',
+    ])
+    await user.click(within(menu).getByRole('menuitem', { name: 'Delete object type' }))
+    expect(onDeleteType).toHaveBeenCalledWith(expect.objectContaining({ id: 'server' }))
+
+    // A basic type: settings only.
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Pages' }))
+    menu = await screen.findByRole('menu')
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Object Type Settings'])
+    await user.click(within(menu).getByRole('menuitem', { name: 'Object Type Settings' }))
+    expect(onOpenTypeSettings).toHaveBeenCalledWith(expect.objectContaining({ id: 'page' }))
   })
 
   it('renders disabled Calendar, Tasks and Graph placeholders', () => {
@@ -43,7 +84,9 @@ describe('Sidebar', () => {
   it('lists object types alphabetically with coloured icon chips', () => {
     render(<Sidebar types={TYPES} />)
     const section = screen.getByRole('region', { name: 'Object Types' })
-    const items = within(section).getAllByRole('button')
+    const items = within(section)
+      .getAllByRole('button')
+      .filter((b) => b.getAttribute('aria-label') !== 'Create object type')
     expect(items.map((b) => b.textContent?.trim())).toEqual([
       'DailyNotes',
       'Pages',

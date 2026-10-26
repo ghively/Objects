@@ -5,7 +5,13 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
-export type Target = { kind: 'type'; typeId: string } | { kind: 'object'; path: string }
+export type Target =
+  | { kind: 'type'; typeId: string }
+  | { kind: 'object'; path: string }
+  /** Object Type Settings for one type. */
+  | { kind: 'typeSettings'; typeId: string }
+  /** The app's own Trash (not the Windows Recycle Bin). */
+  | { kind: 'trash' }
 
 export interface Tab {
   id: string
@@ -44,7 +50,15 @@ function newId(): string {
 
 export function sameTarget(a: Target | null | undefined, b: Target | null | undefined): boolean {
   if (!a || !b || a.kind !== b.kind) return false
-  return a.kind === 'type' ? a.typeId === (b as typeof a).typeId : a.path === (b as typeof a).path
+  switch (a.kind) {
+    case 'type':
+    case 'typeSettings':
+      return a.typeId === (b as typeof a).typeId
+    case 'object':
+      return a.path === (b as typeof a).path
+    case 'trash':
+      return true
+  }
 }
 
 export function activeTab(s: Pick<TabsState, 'tabs' | 'activeId'>): Tab | null {
