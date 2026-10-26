@@ -46,7 +46,15 @@ from .changetype import (
     suggest_mapping,
     type_category,
 )
-from .frontmatter import FlowList, delete_keys, parse_fm, rename_key, replace_in_value, set_keys
+from .frontmatter import (
+    FlowList,
+    delete_keys,
+    parse_fm,
+    remove_items,
+    rename_key,
+    replace_in_value,
+    set_keys,
+)
 from .ids import new_ulid
 from .objfile import ObjectFile, join_object
 from .propvalues import (
@@ -1030,6 +1038,11 @@ class Space:
                 value = kept[0]
             else:
                 value = FlowList(kept)
+                if not add and isinstance(raw, list):
+                    # Drop only the removed links' bytes: comments and quotes stay.
+                    out = remove_items(src, cdef.key, lambda v: v in pointing)
+                    if out is not None:
+                        return out
             return set_keys(src, {cdef.key: value})
 
         return self._fm_edit(apply)
@@ -2491,6 +2504,9 @@ class Space:
                     value = None
                 elif isinstance(raw, list):
                     value = FlowList(kept)
+                    out = remove_items(src, key, lambda v: _fold(v) in deleted)
+                    if out is not None:
+                        return out
                 else:
                     value = kept[0]
                 return set_keys(src, {key: value})
@@ -2549,6 +2565,9 @@ class Space:
                 value = kept[0]
             else:
                 value = FlowList(kept)
+                out = remove_items(src, key, lambda v: breaks_rules(v, rel))
+                if out is not None:
+                    return out
             return set_keys(src, {key: value})
 
         return _TypeOp(fn, confirm=True)

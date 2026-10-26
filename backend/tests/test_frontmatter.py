@@ -6,10 +6,50 @@ from objectapp.frontmatter import (
     FrontmatterError,
     delete_keys,
     parse_fm,
+    remove_items,
     rename_key,
     replace_in_value,
     set_keys,
 )
+
+
+def test_remove_items_flow_list_keeps_quotes_and_comment():
+    src = "type: Task\nphase: ['Alpha', \"Beta\", Gamma]  # note\nx: 1\n"
+    drop = lambda gone: (lambda v: v == gone)  # noqa: E731
+    assert remove_items(src, "phase", drop("Gamma")) == (
+        "type: Task\nphase: ['Alpha', \"Beta\"]  # note\nx: 1\n"
+    )
+    assert remove_items(src, "phase", drop("Alpha")) == (
+        "type: Task\nphase: [\"Beta\", Gamma]  # note\nx: 1\n"
+    )
+    assert remove_items(src, "phase", drop("Beta")) == (
+        "type: Task\nphase: ['Alpha', Gamma]  # note\nx: 1\n"
+    )
+
+
+def test_remove_items_block_list_keeps_other_lines():
+    src = (
+        "members:\n"
+        "  - '[[Ada Lovelace]]'   # lead dev\n"
+        '  - "[[Alpha]]"\n'
+        "  - Plain\n"
+        "# trailing comment\n"
+        "x: 1\n"
+    )
+    assert remove_items(src, "members", lambda v: v == "[[Alpha]]") == (
+        "members:\n"
+        "  - '[[Ada Lovelace]]'   # lead dev\n"
+        "  - Plain\n"
+        "# trailing comment\n"
+        "x: 1\n"
+    )
+
+
+def test_remove_items_falls_back_when_it_cannot_splice():
+    assert remove_items("a: [x, y]\n", "a", lambda v: True) is None  # everything goes
+    assert remove_items("a: x\n", "a", lambda v: True) is None  # not a list
+    assert remove_items("{a: [x, y]}\n", "a", lambda v: v == "x") is None  # flow mapping
+    assert remove_items("a: [x, y]\n", "a", lambda v: False) == "a: [x, y]\n"
 
 # Mirrors the shapes found in a Object Markdown export (synthetic values).
 SRC = (

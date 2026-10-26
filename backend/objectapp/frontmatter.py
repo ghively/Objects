@@ -6,7 +6,8 @@ stay strings exactly as written, so ``2026-03-26T00:00:00.000Z`` reads back as
 that string rather than a ``datetime``.
 
 `set_keys` changes only the lines of the keys it is given; `delete_keys`,
-`rename_key` and `replace_in_value` likewise touch only their key's lines.
+`rename_key`, `replace_in_value` and `remove_items` likewise touch only their
+key's lines (the last two only the items they change or drop).
 They use ruamel.yaml (round-trip mode) to locate each top-level key and to
 render new values, then splice lines; every other line of the source is kept
 byte-for-byte, including quotes, ``null``, folded scalars, flow lists and
@@ -38,6 +39,7 @@ __all__ = [
     "FrontmatterError",
     "delete_keys",
     "parse_fm",
+    "remove_items",
     "rename_key",
     "replace_in_value",
     "set_keys",
@@ -543,4 +545,76 @@ def replace_in_value(src: str, key: str, fn: Callable[[str], str]) -> str:
     out = head + text + tail
     if key not in parse_fm(out):
         raise FrontmatterError(f"Rewriting {key!r} broke its value")
+    return out
+
+
+def remove_items(src: str, key: str, drop: Callable[[str], bool]) -> str | None:
+    """Remove the items of one key's list for which ``drop(item)`` is true, in place.
+
+    Only the dropped items' bytes go: in a flow list the item and one adjacent
+    comma, in a block list the item's line(s). Every other byte (quotes,
+    comments, spacing) is kept. Returns ``src`` itself when nothing is dropped,
+    and ``None`` when the edit can't be made in place: the value isn't a list
+    of scalars, every item would go, the frontmatter is a flow mapping, or the
+    result wouldn't read back as the kept items. Callers then fall back to
+    `set_keys`.
+    """
+    data = _load_rt(src)
+    if data is None or key not in data or data.fa.flow_style():
+        return None
+    value = data[key]
+    if not isinstance(value, CommentedSeq):
+        return None
+    flow = bool(value.fa.flow_style())
+    lines = _lines(src)
+    start, end = _key_spans(data, lines)[key]
+    row, col = data.lc.key(key)
+    head = "".join(lines[:start])
+    text = "".join(lines[start:end])
+    tail = "".join(lines[end:])
+
+    spans = _scan_items(text, _value_start(lines, row, col))
+    if len(spans) != len(value):
+        return None  # nested mappings, aliases…: not a plain list of scalars
+    decoded = [_decode_item(text[s:e], style) for s, e, style in spans]
+    if any(d is None for d in decoded):
+        return None
+    dropped = [i for i, d in enumerate(decoded) if drop(d)]
+    if not dropped:
+        return src
+    if len(dropped) == len(spans):
+        return None
+    expected = [_plain(v) for i, v in enumerate(value) if i not in set(dropped)]
+
+    for i in reversed(dropped):
+        s, e, _style = spans[i]
+        if flow:
+            j = e
+            while j < len(text) and text[j] in " \t\r\n":
+                j += 1
+            if j < len(text) and text[j] == ",":
+                j += 1
+                while j < len(text) and text[j] in " \t":
+                    j += 1
+                text = text[:s] + text[j:]
+            else:
+                k = s
+                while k > 0 and text[k - 1] in " \t\r\n":
+                    k -= 1
+                if k > 0 and text[k - 1] == ",":
+                    k -= 1
+                text = text[:k] + text[e:]
+        else:
+            line_start = text.rfind("\n", 0, s) + 1
+            if not re.fullmatch(r"[ \t]*-[ \t]+", text[line_start:s]):
+                return None
+            nl = text.find("\n", e)
+            line_end = len(text) if nl < 0 else nl + 1
+            text = text[:line_start] + text[line_end:]
+    out = head + text + tail
+    try:
+        if parse_fm(out).get(key) != expected:
+            return None
+    except FrontmatterError:
+        return None
     return out
