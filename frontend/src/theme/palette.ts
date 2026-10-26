@@ -55,9 +55,9 @@ export function tagStyle(color: string | null | undefined): CSSProperties {
 export function labelStyle(color: string | null | undefined): CSSProperties {
   const c = themeColor(color)
   return {
-    backgroundColor: `var(--type-${c}-bg)`,
+    backgroundColor: `var(--label-bg-${c})`,
     borderColor: `var(--label-border-${c})`,
-    color: `var(--type-${c}-fg)`,
+    color: `var(--label-text-${c})`,
   }
 }
 
