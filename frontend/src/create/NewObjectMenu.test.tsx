@@ -12,6 +12,7 @@ import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { TypePage } from '@/types/TypePage'
+import { createAndOpen } from './createAndOpen'
 import { NewObjectMenu } from './NewObjectMenu'
 
 const mocked = vi.mocked(api)
@@ -105,5 +106,15 @@ describe('TypePage', () => {
 
     await user.click(screen.getByRole('button', { name: 'New Project' }))
     await waitFor(() => expect(mocked.createObject).toHaveBeenLastCalledWith('project', {}))
+  })
+})
+
+describe('createAndOpen', () => {
+  test('test createAndOpen passes values through to createObject and omits empty ones', async () => {
+    await createAndOpen('project', { title: 'Foo', values: { done: true } })
+    expect(mocked.createObject).toHaveBeenLastCalledWith('project', { title: 'Foo', values: { done: true } })
+    await createAndOpen('project', { values: {} })
+    expect(mocked.createObject).toHaveBeenLastCalledWith('project', {})
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'project/Untitled.md' })
   })
 })

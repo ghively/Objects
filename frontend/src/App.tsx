@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import type { SpaceInfo, TypeDef } from '@/api/types'
-import { Icon } from '@/components/Icon'
+import { Icon, IconOrEmoji } from '@/components/Icon'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { createAndOpen } from '@/create/createAndOpen'
 import { NewObjectMenu } from '@/create/NewObjectMenu'
@@ -22,6 +22,7 @@ import { CreateTypeDialog } from '@/types/CreateTypeDialog'
 import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
 import { TypePage } from '@/types/TypePage'
 import { TypeSettings } from '@/types/TypeSettings'
+import { useDefinitions } from '@/types/useDefinitions'
 
 const REFRESH_DELAY_MS = 150
 
@@ -54,7 +55,42 @@ function TabLabel({ tab, space }: { tab: Tab; space: SpaceInfo | null }) {
   const target = tabTarget(tab)
   const objects = useLinkIndex((s) => s.objects)
   const types = useSpaceTypes(space)
+  const { collections, queries } = useDefinitions()
   if (!target) return <span className="truncate">New tab</span>
+  if (target.kind === 'collection') {
+    const c = collections.find((x) => x.id === target.id)
+    return (
+      <>
+        <IconOrEmoji icon={c?.icon} size={15} fallback="ph-stack" />
+        <span className="truncate">{c?.name ?? target.id}</span>
+      </>
+    )
+  }
+  if (target.kind === 'query') {
+    const q = queries.find((x) => x.id === target.id)
+    return (
+      <>
+        <IconOrEmoji icon={q?.icon} size={15} fallback="ph-magnifying-glass" />
+        <span className="truncate">{q?.name || 'Query'}</span>
+      </>
+    )
+  }
+  if (target.kind === 'queries') {
+    return (
+      <>
+        <Icon name="ph-magnifying-glass" size={15} />
+        <span className="truncate">Queries</span>
+      </>
+    )
+  }
+  if (target.kind === 'allNotes') {
+    return (
+      <>
+        <Icon name="ph-notepad" size={15} />
+        <span className="truncate">All notes</span>
+      </>
+    )
+  }
   if (target.kind === 'trash') {
     return (
       <>
@@ -215,7 +251,7 @@ export default function App() {
   } else if (target?.kind === 'object') {
     content = <ObjectPage path={target.path} />
   } else if (target?.kind === 'type' && activeType) {
-    content = <TypePage type={activeType} />
+    content = <TypePage key={activeType.id} type={activeType} />
   } else if (target?.kind === 'type' && space) {
     content = <Centered title="Unknown object type" subtitle={target.typeId} />
   } else if (target?.kind === 'typeSettings') {
@@ -230,6 +266,14 @@ export default function App() {
     )
   } else if (target?.kind === 'trash') {
     content = <TrashView />
+  } else if (
+    target?.kind === 'collection' ||
+    target?.kind === 'query' ||
+    target?.kind === 'queries' ||
+    target?.kind === 'allNotes'
+  ) {
+    // Replaced by the collection, query, query list and All notes pages (Tasks 13 to 15).
+    content = <p className="p-8 text-center text-[14px] text-fg-muted">Loading results…</p>
   } else {
     content = <Centered title="Pick an object type" subtitle="Choose a type in the sidebar to see its objects." />
   }

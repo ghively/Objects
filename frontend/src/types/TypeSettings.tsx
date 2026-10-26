@@ -1,10 +1,10 @@
 /**
  * Object Type Settings, in Object's order: breadcrumb; icon, name, plural, colour and
- * description; Properties; Templates; Configuration › Page; Delete Object Type.
+ * description; Properties; Templates; Configuration › Page, Card view and linking; Delete Object Type.
  *
  * Every edit saves at once through `useTypeEditor` (text fields 400 ms after the last keystroke,
  * and on blur). A type whose file can't be read shows why and disables every control. The
- * "Card view and linking" and "Calendar" groups are store-only in M2 and not shown.
+ * "Calendar" group is store-only until M4 and not shown.
  */
 import {
   closestCenter,
@@ -35,6 +35,7 @@ import { KIND_META, kindIcon } from '@/properties/kinds'
 import { PropertySettings } from '@/properties/PropertySettings'
 import { moveProperty } from '@/properties/typeEdits'
 import { TypeChip } from '@/shell/Sidebar'
+import { CardViewSettings } from './CardViewSettings'
 import { DeleteTypeDialog } from './DeleteTypeDialog'
 import { PageLayoutCards } from './PageLayoutCards'
 import { TemplateManager, TEMPLATE_TEXT } from './TemplateManager'
@@ -447,6 +448,9 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
                 />
               </Field>
             </section>
+            <div className="mt-6">
+              <CardViewSettings typeId={type.id} editor={editor} disabled={readOnly} />
+            </div>
           </Section>
 
           {!basic && (

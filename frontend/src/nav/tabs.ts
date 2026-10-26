@@ -4,6 +4,7 @@
  */
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { useRecent } from './recent'
 
 export type Target =
   | { kind: 'type'; typeId: string }
@@ -12,6 +13,14 @@ export type Target =
   | { kind: 'typeSettings'; typeId: string }
   /** The app's own Trash (not the Windows Recycle Bin). */
   | { kind: 'trash' }
+  /** A collection's page. */
+  | { kind: 'collection'; id: string }
+  /** A query's page. */
+  | { kind: 'query'; id: string }
+  /** The page listing every query. */
+  | { kind: 'queries' }
+  /** The All notes view. */
+  | { kind: 'allNotes' }
 
 export interface Tab {
   id: string
@@ -56,7 +65,12 @@ export function sameTarget(a: Target | null | undefined, b: Target | null | unde
       return a.typeId === (b as typeof a).typeId
     case 'object':
       return a.path === (b as typeof a).path
+    case 'collection':
+    case 'query':
+      return a.id === (b as typeof a).id
     case 'trash':
+    case 'queries':
+    case 'allNotes':
       return true
   }
 }
@@ -95,6 +109,7 @@ export const useTabs = create<TabsState>()(
       activeId: null,
 
       open(target, opts) {
+        if (target.kind === 'object') useRecent.getState().add(target.path)
         const s = get()
         const tab = activeTab(s)
         if (opts?.newTab || !tab) {
@@ -156,6 +171,7 @@ export const useTabs = create<TabsState>()(
             set({ tabs: s.tabs.map((t) => ({ ...t, history: t.history.map(moved) })) })
           }
         }
+        useRecent.getState().retarget(oldPath, newPath)
         usePeek.getState().retarget(oldPath, newPath)
       },
     }),
@@ -197,6 +213,7 @@ export const usePeek = create<PeekState>()((set, get) => ({
   index: 0,
 
   peek(path, list) {
+    useRecent.getState().add(path)
     const l = list && list.includes(path) ? [...list] : [path]
     set({ path, list: l, index: l.indexOf(path) })
   },
