@@ -81,3 +81,14 @@
   text-underline-offset: 2px;
 }
 .object-editor-root[data-readonly] .object-editor { cursor: default; }
+
+/* A save failed for a reason other than a conflict: say so while it retries. */
+.autosave-error {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--bg-hover);
+  border: 1px solid var(--border, transparent);
+}

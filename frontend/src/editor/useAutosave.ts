@@ -7,11 +7,17 @@
  * - One save in flight at a time; edits made meanwhile are saved right after.
  * - A 409 calls `onConflict` and pauses saving until a new version arrives.
  * - `hold()` / `resume()` let the owner pause saving while it resolves an external change.
+ * - Any other failure (a file locked by another program, the server gone) sets
+ *   `saveError` and retries with a growing delay until a save succeeds.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api, ConflictError, ReadOnlyError } from '@/api/client'
 
 export const AUTOSAVE_DELAY_MS = 1000
+/** First retry delay after a failed save; it doubles up to `AUTOSAVE_RETRY_MAX_MS`. */
+export const AUTOSAVE_RETRY_MS = 2000
+export const AUTOSAVE_RETRY_MAX_MS = 30000
+export const AUTOSAVE_ERROR_TEXT = 'Changes not saved. Retrying…'
 
 export type AutosaveOptions = {
   path: string
@@ -38,6 +44,16 @@ export function useAutosave(opts: AutosaveOptions) {
   /** The save running now (including any save queued behind it), if any. */
   const runningRef = useRef<Promise<void> | null>(null)
   const flushRef = useRef<(pathOverride?: string) => Promise<void>>(async () => {})
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const retryDelayRef = useRef(AUTOSAVE_RETRY_MS)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const clearRetry = useCallback(() => {
+    if (retryTimerRef.current !== null) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+  }, [])
 
   // A new version from the parent (a reload, or a conflict resolved) resumes saving.
   useEffect(() => {
@@ -74,15 +90,27 @@ export function useAutosave(opts: AutosaveOptions) {
         if (optsRef.current.path !== path) return
         versionRef.current = res.version
         savedBodyRef.current = body
+        retryDelayRef.current = AUTOSAVE_RETRY_MS
+        setSaveError(null)
         optsRef.current.onSaved(res.version)
       } catch (err) {
         if (err instanceof ConflictError) {
           pausedRef.current = true
+          setSaveError(null)
           optsRef.current.onConflict?.(err.currentVersion)
         } else if (err instanceof ReadOnlyError) {
           pausedRef.current = true
+          setSaveError(null)
         } else {
           console.error('autosave failed', err)
+          setSaveError(AUTOSAVE_ERROR_TEXT)
+          clearRetry()
+          const delay = retryDelayRef.current
+          retryDelayRef.current = Math.min(delay * 2, AUTOSAVE_RETRY_MAX_MS)
+          retryTimerRef.current = setTimeout(() => {
+            retryTimerRef.current = null
+            if (optsRef.current.path === path) void flushRef.current()
+          }, delay)
         }
       } finally {
         inFlightRef.current = false
@@ -98,7 +126,7 @@ export function useAutosave(opts: AutosaveOptions) {
     } finally {
       if (runningRef.current === run) runningRef.current = null
     }
-  }, [cancel])
+  }, [cancel, clearRetry])
 
   /**
    * Save now and resolve only once nothing is left to save: any save already in
@@ -125,18 +153,21 @@ export function useAutosave(opts: AutosaveOptions) {
   const markLoaded = useCallback(
     (body: string, version?: string) => {
       cancel()
+      clearRetry()
+      setSaveError(null)
       savedBodyRef.current = body
       if (version !== undefined) versionRef.current = version
       pausedRef.current = false
     },
-    [cancel],
+    [cancel, clearRetry],
   )
 
   /** Stop saving (drop any pending save) until `resume()` or a reload. Used while a conflict is resolved. */
   const hold = useCallback(() => {
     cancel()
+    clearRetry()
     pausedRef.current = true
-  }, [cancel])
+  }, [cancel, clearRetry])
 
   /**
    * Adopt `version` as the base for the next save and resume saving. With
@@ -161,7 +192,13 @@ export function useAutosave(opts: AutosaveOptions) {
 
   const isPending = useCallback(() => timerRef.current !== null, [])
 
-  useEffect(() => cancel, [cancel])
+  useEffect(
+    () => () => {
+      cancel()
+      clearRetry()
+    },
+    [cancel, clearRetry],
+  )
 
   return {
     schedule,
@@ -174,6 +211,8 @@ export function useAutosave(opts: AutosaveOptions) {
     isDirty,
     isPending,
     savedBody: () => savedBodyRef.current,
+    /** Set while the last save failed for a reason other than a conflict or read-only file. */
+    saveError,
   }
 }
 
