@@ -13,8 +13,10 @@ Layout:
   ``manifest.json`` ``{id, kind: 'collection', collectionId, name, deletedAt,
   objectTrashIds, removedFrom, skipped}``. Its sole members are ordinary object
   entries carrying ``collectionTrashId``;
-- a query: ``queries/<ulid>.json``, the query file's bytes unchanged (its ``id`` is the
-  original id; the deletion time is the ulid's).
+- a query: ``queries/<ulid>.json``, the query file's bytes unchanged, plus
+  ``queries/<ulid>.meta.json`` ``{id, deletedAt}`` recording the original id (the
+  file's stem, which need not match an ``id`` inside it). Entries without the
+  sidecar fall back to the JSON's ``id`` and the ulid's time.
 
 This module only knows the folder layout and the metadata; `Space` moves the
 files (so it can keep the watcher quiet and its index current).
@@ -126,6 +128,9 @@ class Trash:
     def query_file(self, trash_id: str) -> Path:
         return self.queries_dir / f"{trash_id}.json"
 
+    def query_meta_file(self, trash_id: str) -> Path:
+        return self.queries_dir / f"{trash_id}.meta.json"
+
     @staticmethod
     def _safe_id(trash_id: str) -> bool:
         return bool(trash_id) and all(c.isalnum() for c in trash_id)
@@ -168,7 +173,23 @@ class Trash:
             return None
         return _load(self.query_file(trash_id))
 
+    def _query_meta(self, trash_id: str) -> dict[str, Any]:
+        if not self._safe_id(trash_id):
+            return {}
+        return _load(self.query_meta_file(trash_id)) or {}
+
+    def query_id(self, trash_id: str) -> str:
+        """The deleted query's original id: the sidecar's, else the JSON's ``id``."""
+        recorded = self._query_meta(trash_id).get("id")
+        if isinstance(recorded, str) and recorded:
+            return recorded
+        data = self.query_data(trash_id) or {}
+        return str(data.get("id") or "")
+
     def query_deleted_at(self, trash_id: str) -> str:
+        recorded = self._query_meta(trash_id).get("deletedAt")
+        if isinstance(recorded, str) and recorded:
+            return recorded
         when = ulid_time(trash_id)
         if when is None:
             try:
@@ -250,7 +271,7 @@ class Trash:
             data = self.query_data(qid)
             if data is None:
                 continue
-            query_id = str(data.get("id") or "")
+            query_id = self.query_id(qid)
             name = str(data.get("name") or "") or query_id
             out.append(
                 TrashItem(
@@ -283,10 +304,10 @@ class Trash:
                 if data and isinstance(data.get("collectionId"), str):
                     found.add(data["collectionId"])
         elif folder == "queries":
-            for entry in base.glob("*.json"):
-                data = _load(entry)
-                if data and isinstance(data.get("id"), str):
-                    found.add(data["id"])
+            for trash_id in self.query_trash_ids():
+                query_id = self.query_id(trash_id)
+                if query_id:
+                    found.add(query_id)
         return found
 
     def remove_type(self, trash_id: str) -> None:
@@ -301,6 +322,7 @@ class Trash:
     def remove_query(self, trash_id: str) -> None:
         if self._safe_id(trash_id):
             self.query_file(trash_id).unlink(missing_ok=True)
+            self.query_meta_file(trash_id).unlink(missing_ok=True)
 
     def expired(self, now: datetime) -> list[str]:
         """Ids of the entries deleted more than `RETENTION` before `now`."""

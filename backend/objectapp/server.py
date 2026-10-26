@@ -31,7 +31,8 @@ Routes (all JSON):
   inferred type was saved for the first time).
 - ``DELETE /api/object?path=&baseVersion=&clientId=`` -> ``{trashId, typeIds}``; ``404``,
   ``409 {currentVersion}``. Moves the file to the trash; announces ``deleted``.
-- ``DELETE /api/collections/{id}?confirm=true&clientId=`` -> ``{trashId, removedFrom, skipped}``;
+- ``DELETE /api/collections/{id}?confirm=true&clientId=`` -> ``{trashId, removedFrom, skipped, deleted}``
+  (``deleted``: the sole members moved to the trash);
   ``404``, ``428 {detail, affected}``, ``423``. ``POST /api/trash/{id}/restore`` of a collection
   entry also answers ``409`` (name taken, or its id is used by another definition).
 - ``GET /api/queries`` -> ``Query[]``; ``POST /api/queries`` ``{name?, definition?, view?, clientId?}``
@@ -41,7 +42,9 @@ Routes (all JSON):
   Announces ``queries``. Restoring one re-creates its file under the original id
   (``409`` when that file exists).
 - ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
-  ``{paths, typeIds}`` (announces ``created`` per path and ``types`` per type); ``422`` when a
+  ``{paths, typeIds, rewritten}`` (plus ``collectionIds``, ``queryIds``, ``skipped`` for a
+  collection or query entry; ``rewritten``: other files written back, announced ``changed``;
+  announces ``created`` per path and ``types`` per type); ``422`` when a
   saved type now has the trashed type's id or name;
   ``DELETE /api/trash/{id}`` and ``DELETE /api/trash`` -> ``{purged}``; ``404``.
 - ``POST /api/types`` ``{name, pluralName, icon?, color?, clientId?}`` -> ``201 TypeDef``;
@@ -108,7 +111,7 @@ from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from .collections import CollectionDef
-from .jsonstore import DefinitionUnreadable, default_views, json_revision
+from .jsonstore import DefinitionUnreadable, default_views, json_revision, normalize_views
 from .media import NotAnImage, image_media_type, image_path, import_image, list_images
 from .propvalues import InvalidValue
 from .queries import QueryDef
@@ -341,6 +344,46 @@ def reveal_in_file_manager(path: Path) -> None:
 
 def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse({"detail": message}, status_code=status)
+
+
+def _views_problem(views: dict[str, Any]) -> str | None:
+    """Why a PUT /api/views body is not a Views object, else None."""
+    if "activeTab" in views and not isinstance(views["activeTab"], str):
+        return "activeTab must be a string."
+    if "all" in views and not isinstance(views["all"], dict):
+        return "all must be an object."
+    if "dashboard" in views:
+        dash = views["dashboard"]
+        if not isinstance(dash, dict):
+            return "dashboard must be an object."
+        sections = dash.get("sections", [])
+        if not isinstance(sections, list) or not all(
+            isinstance(x, dict) and isinstance(x.get("key"), str) for x in sections
+        ):
+            return "dashboard.sections must be a list of sections with a key."
+        if not isinstance(dash.get("removedSections", []), list):
+            return "dashboard.removedSections must be a list."
+    return None
+
+
+def _ui_problem(patch: dict[str, Any]) -> str | None:
+    """Why a PUT /api/ui patch has the wrong shape, else None."""
+    if "pinned" in patch:
+        pinned = patch["pinned"]
+        if not isinstance(pinned, list) or not all(
+            isinstance(p, dict) and isinstance(p.get("kind"), str) and isinstance(p.get("id"), str)
+            for p in pinned
+        ):
+            return "pinned must be a list of {kind, id}."
+    if "sections" in patch:
+        sections = patch["sections"]
+        if not isinstance(sections, list) or not all(
+            isinstance(x, dict) and isinstance(x.get("items", []), list) for x in sections
+        ):
+            return "sections must be a list of sections with a list of items."
+    if "allNotesLayout" in patch and not isinstance(patch["allNotesLayout"], str):
+        return "allNotesLayout must be a string."
+    return None
 
 
 def create_app(space: Space, static_dir: Path | None = None, watch: bool = True) -> FastAPI:
@@ -686,7 +729,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             return _error(409, exc.detail)
         except KeyError:
             return _error(404, f"No trash entry {trash_id!r}")
-        rewritten = result.pop("rewritten", [])
+        rewritten = result.setdefault("rewritten", [])
         for type_id in result["typeIds"]:
             announce(ChangeEvent("types", type_id, None, origin=clientId))
         for collection_id in result.get("collectionIds", []):
@@ -726,23 +769,36 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         t = space.type_by_id(type_id)
         if t is None:
             return _error(404, f"No object type {type_id!r}")
+        store = space.store("views")
         try:
-            data, revision = space.store("views").read(type_id)
+            data, revision = store.read(type_id)
         except DefinitionUnreadable as exc:
-            revision = json_revision(space.store("views").path(type_id))
+            revision = json_revision(store.path(type_id))
             return {"views": default_views(t), "revision": revision, "readOnlyReason": exc.error}
-        return {"views": data if data is not None else default_views(t), "revision": revision}
+        except ValueError:
+            # An id no file name can hold (e.g. with a space): its views can't be stored.
+            return {
+                "views": default_views(t),
+                "revision": "",
+                "readOnlyReason": "This type's id can't be used as a file name, so its views can't be saved.",
+            }
+        return {"views": normalize_views(data, default_views(t)), "revision": revision}
 
     @api.put("/views/{type_id}")
     def put_views(type_id: str, req: SaveViewsRequest):
         if space.type_by_id(type_id) is None:
             return _error(404, f"No object type {type_id!r}")
+        problem = _views_problem(req.views)
+        if problem:
+            return _error(422, problem)
         try:
             revision = space.store("views").write(type_id, req.views, req.baseRevision)
         except RevisionConflict as exc:
             return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except ValueError:
+            return _error(422, "This type's id can't be used as a file name, so its views can't be saved.")
         announce(ChangeEvent("views", type_id, revision, origin=req.clientId))
         return {"revision": revision}
 
@@ -760,6 +816,9 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         unknown = sorted(set(req.patch) - _UI_PATCH_KEYS)
         if unknown:
             return _error(422, f"Cannot patch: {', '.join(unknown)}")
+        problem = _ui_problem(req.patch)
+        if problem:
+            return _error(422, problem)
         try:
             data, revision = patch_ui(space, req.patch, req.baseRevision)
         except RevisionConflict as exc:

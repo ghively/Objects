@@ -10,6 +10,7 @@ import copy
 from dataclasses import dataclass, field
 from typing import Any
 
+from .jsonstore import normalize_views
 from .typemodel import Icon
 
 __all__ = ["CollectionDef", "SaveCollectionResult", "default_collection_views"]
@@ -76,7 +77,7 @@ class CollectionDef:
             color=color if isinstance(color, str) and color else None,
             description=data.get("description") if isinstance(data.get("description"), str) else "",
             typeIds=_strings(data.get("typeIds")),
-            views=copy.deepcopy(views) if isinstance(views, dict) else default_collection_views(),
+            views=normalize_views(views, default_collection_views()),
             pinned={
                 **pinned,
                 "ids": _strings(pinned.get("ids")),

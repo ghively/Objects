@@ -194,6 +194,7 @@ def test_delete_query_restorable(space_dir: Path):
             "collectionIds": [],
             "queryIds": ["open-tasks"],
             "skipped": [],
+            "rewritten": [],
         }
         assert c.get("/api/trash").json() == []
         again = c.get("/api/queries").json()
