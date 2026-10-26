@@ -9,6 +9,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { TypeDef } from '@/api/types'
+import type { Target } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
 import { chipStyle } from './typeColor'
 
@@ -30,7 +31,14 @@ export interface SidebarProps {
   onOpenTrash?: () => void
   /** Highlights the Trash item. */
   trashActive?: boolean
+  /** Opens any navigation target (the "Queries" entry; pins reuse it). */
+  onOpenTarget?: (target: Target, opts: { newTab?: boolean }) => void
+  /** Highlights the "Queries" entry. */
+  queriesActive?: boolean
 }
+
+/** The sidebar entry for the query list (the reference's `RootQuery.pluralName`). */
+export const QUERIES_LABEL = 'Queries'
 
 export function byPluralName(a: TypeDef, b: TypeDef): number {
   return a.pluralName.localeCompare(b.pluralName, undefined, { sensitivity: 'base' })
@@ -108,8 +116,18 @@ export function Sidebar({
   onDeleteType,
   onOpenTrash,
   trashActive,
+  onOpenTarget,
+  queriesActive,
 }: SidebarProps) {
-  const sorted = [...types].sort(byPluralName)
+  // "Queries" sits among the types where a type of that name would be, in the by-name order.
+  type Entry = { kind: 'type'; type: TypeDef } | { kind: 'queries' }
+  const entries: Entry[] = [
+    ...types.map((type): Entry => ({ kind: 'type', type })),
+    { kind: 'queries' as const },
+  ].sort((a, b) => {
+    const name = (e: Entry) => (e.kind === 'type' ? e.type.pluralName : QUERIES_LABEL)
+    return name(a).localeCompare(name(b), undefined, { sensitivity: 'base' })
+  })
   return (
     <aside className="flex h-full w-[358px] shrink-0 flex-col bg-app pr-3.5 pl-2.5 text-fg" aria-label="Sidebar">
       <div className="flex items-center gap-2 pt-3 pb-3">
@@ -163,7 +181,29 @@ export function Sidebar({
             Object Types
           </SectionHeader>
           <ul className="flex flex-col gap-0.5 pb-2">
-            {sorted.map((t) => (
+            {entries.map((entry) => {
+              if (entry.kind === 'queries') {
+                return (
+                  <li key="queries">
+                    <button
+                      type="button"
+                      onClick={(e) => onOpenTarget?.({ kind: 'queries' }, { newTab: e.ctrlKey || e.metaKey })}
+                      aria-current={queriesActive ? 'page' : undefined}
+                      className={cn(
+                        'flex h-[36px] w-full items-center gap-2 rounded-lg px-1.5 text-left text-[15px] font-medium hover:bg-hover',
+                        queriesActive && 'bg-hover',
+                      )}
+                    >
+                      <span className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-line bg-raised text-fg-muted">
+                        <Icon name="ph-magnifying-glass" size={15} />
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">{QUERIES_LABEL}</span>
+                    </button>
+                  </li>
+                )
+              }
+              const t = entry.type
+              return (
               <li key={t.id}>
                 <ContextMenu>
                   <ContextMenuTrigger asChild>
@@ -197,7 +237,8 @@ export function Sidebar({
                   </ContextMenuContent>
                 </ContextMenu>
               </li>
-            ))}
+              )
+            })}
           </ul>
         </section>
 

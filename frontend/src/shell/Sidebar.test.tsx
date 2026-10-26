@@ -91,10 +91,11 @@ describe('Sidebar', () => {
       'DailyNotes',
       'Pages',
       'People',
+      'Queries',
       'Servers',
       'Tasks',
     ])
-    const tasks = items[4]
+    const tasks = items[5]
     const chip = tasks.querySelector('[data-type-chip]') as HTMLElement
     expect(chip).not.toBeNull()
     expect(chip.dataset.color).toBe('blue')

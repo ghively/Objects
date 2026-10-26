@@ -1,0 +1,43 @@
+import { describe, expect, test } from 'vitest'
+import type { QueryDefinition } from '@/api/types'
+import { emptyFilterGroup } from '@/views/model'
+import { autoTitle, queryTitle, titleIsCustom } from './autoTitle'
+
+const ctx = {
+  types: [
+    { id: 'server', pluralName: 'Servers' },
+    { id: 'page', pluralName: 'Pages' },
+  ],
+  tagIdsToTitles: { t1: 'urgent', t2: 'old' },
+}
+const def = (over: Partial<QueryDefinition> = {}): QueryDefinition => ({
+  structures: [],
+  filterGroup: emptyFilterGroup(),
+  sorts: [],
+  groupBy: null,
+  ...over,
+})
+
+describe('autoTitle', () => {
+  test('test autoTitle types and tags, All notes without types; custom title sticks; absent titleIsCustom with a name counts as custom', () => {
+    expect(autoTitle(def(), ctx)).toBe('All notes')
+    expect(autoTitle(def({ structures: [{ id: 'server' }, { id: 'page' }] }), ctx)).toBe('Servers, Pages')
+    expect(
+      autoTitle(
+        def({
+          structures: [{ id: 'page' }],
+          tags: { ids: ['t1'], operator: 'or' },
+          excludeTags: { ids: ['t2'] },
+          search: { searchTerms: [{ text: 'plan' }], searchMode: 'auto' },
+        }),
+        ctx,
+      ),
+    ).toBe('Pages tagged urgent not tagged old "plan"')
+
+    const d = def({ structures: [{ id: 'page' }] })
+    expect(queryTitle({ name: 'Mine', titleIsCustom: true, definition: d }, ctx)).toBe('Mine')
+    expect(queryTitle({ name: 'Stale', titleIsCustom: false, definition: d }, ctx)).toBe('Pages')
+    expect(titleIsCustom({ name: 'Named' } as { name: string; titleIsCustom: boolean })).toBe(true)
+    expect(titleIsCustom({ name: '' } as { name: string; titleIsCustom: boolean })).toBe(false)
+  })
+})
