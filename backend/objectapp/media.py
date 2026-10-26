@@ -11,7 +11,7 @@ import re
 from pathlib import Path, PurePosixPath
 
 from .space import safe_filename
-from .textfile import atomic_write
+from .textfile import create_new
 
 __all__ = [
     "ATTACHMENTS",
@@ -113,13 +113,9 @@ def import_image(root: Path, name: str, data: bytes) -> str:
         full = folder / file_name
         taken = {p.name.lower() for p in folder.iterdir()}
 
-        def absent(full: Path = full) -> None:
-            if full.exists():
-                raise FileExistsError(full)
-
         if file_name.lower() not in taken:
             try:
-                atomic_write(full, data, check=absent)
+                create_new(full, data)
             except FileExistsError:
                 pass
             else:

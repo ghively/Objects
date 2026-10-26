@@ -71,7 +71,8 @@ Routes (all JSON):
 - ``GET /api/events`` -> Server-Sent Events; event ``change`` with a
   `ChangeEvent` as JSON data (``{kind, path, version, origin}``)
 
-Errors: a path outside the space or not an object is ``400``; a missing object is ``404``.
+Errors: a path outside the space or not an object is ``400``; a missing object is ``404``;
+a file the OS refused to write (locked by another program, say) is ``503 {detail}``.
 """
 
 from __future__ import annotations
@@ -300,6 +301,17 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
     )
     app.state.space = space
     app.state.hub = hub
+
+    @app.exception_handler(OSError)
+    async def os_error(_request: Request, exc: OSError) -> JSONResponse:
+        # A file locked by another program (Windows sharing violations) or a
+        # transient file-system failure: report it as JSON the client can show
+        # and retry, never as a bare 500.
+        if isinstance(exc, PermissionError):
+            detail = "A file is in use by another program. Try again in a moment."
+        else:
+            detail = f"The file system refused the change: {exc.strerror or exc}"
+        return JSONResponse({"detail": detail, "reason": detail}, status_code=503)
     api = APIRouter(prefix="/api")
 
     @api.get("/space")
