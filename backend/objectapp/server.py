@@ -96,6 +96,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
+from .jsonstore import DefinitionUnreadable, default_views, json_revision
 from .media import NotAnImage, image_media_type, image_path, import_image, list_images
 from .propvalues import InvalidValue
 from .space import ConfirmRequired, Conflict, ReadOnly, Space
@@ -107,6 +108,7 @@ from .typemodel import (
     option_shape_problems,
     type_revision,
 )
+from .uistate import patch_ui, read_ui, ui_read_only_reason, ui_with_defaults
 from .watcher import ChangeEvent, SpaceWatcher
 
 __all__ = ["EventHub", "create_app"]
@@ -229,6 +231,21 @@ class ChangeKindRequest(BaseModel):
     toType: str
     baseRevision: str = ""
     clientId: str | None = None
+
+
+class SaveViewsRequest(BaseModel):
+    views: dict[str, Any]
+    baseRevision: str = ""
+    clientId: str | None = None
+
+
+class PatchUiRequest(BaseModel):
+    patch: dict[str, Any]
+    baseRevision: str = ""
+    clientId: str | None = None
+
+
+_UI_PATCH_KEYS = frozenset({"pinned", "sections", "allNotesLayout"})
 
 
 class EnsureTagRequest(BaseModel):
@@ -631,6 +648,54 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
     def empty_trash(clientId: str | None = Query(default=None)):
         del clientId
         return {"purged": space.empty_trash()}
+
+    @api.get("/views/{type_id}")
+    def get_views(type_id: str):
+        t = space.type_by_id(type_id)
+        if t is None:
+            return _error(404, f"No object type {type_id!r}")
+        try:
+            data, revision = space.store("views").read(type_id)
+        except DefinitionUnreadable as exc:
+            revision = json_revision(space.store("views").path(type_id))
+            return {"views": default_views(t), "revision": revision, "readOnlyReason": exc.error}
+        return {"views": data if data is not None else default_views(t), "revision": revision}
+
+    @api.put("/views/{type_id}")
+    def put_views(type_id: str, req: SaveViewsRequest):
+        if space.type_by_id(type_id) is None:
+            return _error(404, f"No object type {type_id!r}")
+        try:
+            revision = space.store("views").write(type_id, req.views, req.baseRevision)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        announce(ChangeEvent("views", type_id, revision, origin=req.clientId))
+        return {"revision": revision}
+
+    @api.get("/ui")
+    def get_ui():
+        data, revision = read_ui(space.root)
+        out: dict[str, Any] = {"ui": ui_with_defaults(data), "revision": revision}
+        reason = ui_read_only_reason(space.root)
+        if reason:
+            out["readOnlyReason"] = reason
+        return out
+
+    @api.put("/ui")
+    def put_ui(req: PatchUiRequest):
+        unknown = sorted(set(req.patch) - _UI_PATCH_KEYS)
+        if unknown:
+            return _error(422, f"Cannot patch: {', '.join(unknown)}")
+        try:
+            data, revision = patch_ui(space, req.patch, req.baseRevision)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        announce(ChangeEvent("ui", "ui.json", revision, origin=req.clientId))
+        return {"ui": ui_with_defaults(data), "revision": revision}
 
     @api.post("/types", status_code=201)
     def create_type(req: CreateTypeRequest):

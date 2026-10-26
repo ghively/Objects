@@ -56,6 +56,7 @@ from .frontmatter import (
     set_keys,
 )
 from .ids import new_ulid
+from .jsonstore import JsonStore
 from .objfile import ObjectFile, join_object
 from .propvalues import (
     KIND_TRANSFORMS,
@@ -640,6 +641,20 @@ class Space:
                 if t is not None:
                     out.append((t, rev))
             return out
+
+    def store(self, folder: str) -> JsonStore:
+        """The definition store of ``.object/<folder>/`` (``collections``, ``queries``, ``views``).
+
+        Bound to this space's lock and ``own_writes`` so the watcher stays silent
+        about the app's own writes.
+        """
+        return JsonStore(
+            self.root,
+            folder,
+            self.own_writes,
+            trash_ids=lambda: self.trash.definition_ids(folder),
+            lock=self._lock,
+        )
 
     def type_by_id(self, type_id: str) -> TypeDefinition | None:
         return next((t for t in self.types if t.id == type_id), None)
@@ -1489,7 +1504,11 @@ class Space:
 
         try:
             save_change_type_preference(
-                self.root, src.id, dst.id, [MappingRow(f, t, False) for f, t in clean.items()]
+                self.root,
+                src.id,
+                dst.id,
+                [MappingRow(f, t, False) for f, t in clean.items()],
+                self.own_writes,
             )
         except OSError:
             pass  # a preference that can't be saved is only not remembered
@@ -1913,6 +1932,10 @@ class Space:
                 (folder / "type.json").write_bytes(
                     (json.dumps(type_def.to_json(), indent=2, ensure_ascii=False) + "\n").encode()
                 )
+            views_file = self.root / ".object" / "views" / f"{type_def.id}.json"
+            if views_file.is_file():
+                self.own_writes[f".object/views/{type_def.id}.json"] = ""
+                os.replace(views_file, folder / "views.json")
             objects = [self._rel(p) for p in object_paths]
             templates = [p for p in self._templates_of(type_def.id) if p not in objects]
             for rel in templates:
@@ -2032,6 +2055,15 @@ class Space:
             ]
             self.types.append(restored)
             self.types.sort(key=lambda t: (t.name.lower(), t.name))
+        stored_views = folder / "views.json"
+        if stored_views.is_file():
+            views_file = self.root / ".object" / "views" / f"{type_id}.json"
+            if not views_file.exists():
+                views_file.parent.mkdir(parents=True, exist_ok=True)
+                self.own_writes[f".object/views/{type_id}.json"] = version_of(
+                    stored_views.read_bytes()
+                )
+                move_no_overwrite(stored_views, views_file)
         paths: list[str] = []
         for original in manifest.get("templates") or []:
             src = folder / "templates" / original

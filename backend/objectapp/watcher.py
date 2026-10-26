@@ -7,10 +7,15 @@ loop). Nothing is emitted for:
 
 - dot-folders (``.object``, ``.object-cache``, ``.git``…), dot-files and
   non-``.md`` files;
-- writes the app makes itself (`Space._write` records them in ``own_writes``)
+- writes the app makes itself (`Space._write` and the definition stores record them in
+  ``own_writes``)
   and files it moves to the trash (``own_deletes``): the server announces those
   itself, tagged with the saving client's id;
 - events that leave the file bytes as the space already knows them.
+
+The JSON definitions ``.object/{collections,queries,views}/<id>.json`` and
+``.object/ui.json`` are watched too (kinds ``collections``, ``queries``, ``views``,
+``ui``); every other file under a dot-folder stays ignored.
 
 Files are only opened (read, or resolved) while holding the space's lock, so a
 read never overlaps one of the app's own replaces (Windows refuses to replace a
@@ -35,13 +40,17 @@ from .typedefs import is_ignored
 __all__ = ["DEBOUNCE_SECONDS", "ChangeEvent", "SpaceWatcher"]
 
 DEBOUNCE_SECONDS = 0.150
+_DEFINITION_FOLDERS = ("collections", "queries", "views")
 
 
 @dataclass(frozen=True)
 class ChangeEvent:
-    kind: Literal["created", "changed", "deleted", "renamed", "types"]
+    kind: Literal[
+        "created", "changed", "deleted", "renamed", "types", "collections", "queries", "views", "ui"
+    ]
     path: str
-    """Space-relative POSIX path of the object file (for ``types``: the type id)."""
+    """Space-relative POSIX path of the object file (for ``types``: the type id; for
+    ``collections``, ``queries`` and ``views``: the definition id; for ``ui``: ``ui.json``)."""
     version: str | None
     """The new file version (sha256 of its bytes); ``None`` when deleted."""
     origin: str | None = None
@@ -142,11 +151,27 @@ class SpaceWatcher:
             return None
         return rel.as_posix()
 
+    def _definition_rel(self, path: str) -> str | None:
+        """The space-relative path when `path` is a watched ``.object`` JSON definition."""
+        rel = self._space_rel(path)
+        if rel is None:
+            return None
+        parts = rel.parts
+        if rel.suffix != ".json" or parts[0] != ".object":
+            return None
+        if len(parts) == 2 and parts[1] == "ui.json":
+            return rel.as_posix()
+        if len(parts) == 3 and parts[1] in _DEFINITION_FOLDERS and not parts[2].startswith("."):
+            return rel.as_posix()
+        return None
+
     def _touch(self, path: str) -> None:
         # `resolve()` opens the file on Windows; doing that while the app
         # replaces it would make the replace fail, so wait for the space's lock.
         with self.space._lock:
             rel = self._relpath(path)
+            if rel is None:
+                rel = self._definition_rel(path)
         if rel is not None:
             self._schedule(rel)
 
@@ -194,7 +219,29 @@ class SpaceWatcher:
             except RuntimeError:  # loop closed
                 pass
 
+    def _refresh_definition(self, rel: str) -> ChangeEvent | None:
+        """A JSON definition changed: an event unless it is the app's own write."""
+        space = self.space
+        try:
+            data = (space.root / rel).read_bytes()
+        except (FileNotFoundError, NotADirectoryError, OSError):
+            data = None
+        version = None if data is None else version_of(data)
+        own = space.own_writes.get(rel)
+        if own is not None:
+            if own == (version or ""):
+                if version is None:
+                    space.own_writes.pop(rel, None)
+                return None
+            space.own_writes.pop(rel, None)
+        parts = PurePosixPath(rel).parts
+        if len(parts) == 2:
+            return ChangeEvent(kind="ui", path="ui.json", version=version)
+        return ChangeEvent(kind=parts[1], path=PurePosixPath(rel).stem, version=version)
+
     def _refresh(self, rel: str) -> ChangeEvent | None:
+        if rel.startswith(".object/"):
+            return self._refresh_definition(rel)
         space = self.space
         full = space.root / rel
         known = space.cached_version(rel)

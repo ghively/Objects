@@ -26,7 +26,6 @@ The write itself is `Space.change_type`.
 from __future__ import annotations
 
 import copy
-import json
 import re
 import unicodedata
 from collections.abc import Iterable
@@ -35,9 +34,10 @@ from pathlib import Path
 from typing import Any
 
 from .propvalues import KIND_TRANSFORMS, InvalidValue, convert_value
-from .textfile import atomic_write
 from .typedefs import SYSTEM_KEYS
 from .typemodel import BASIC_MEDIA_TYPES, PropertyDefinition, TypeDefinition
+from .uistate import _read as _read_ui
+from .uistate import load_ui, write_ui_patch
 
 __all__ = [
     "CARRIED_KEYS",
@@ -227,20 +227,7 @@ def suggest_mapping(
     return rows
 
 
-# -- ui.json -------------------------------------------------------------------------
-
-
-def _ui_file(root: Path) -> Path:
-    return Path(root) / ".object" / "ui.json"
-
-
-def load_ui(root: Path) -> dict[str, Any]:
-    """``.object/ui.json`` as a dict (empty when missing or unreadable)."""
-    try:
-        data = json.loads(_ui_file(root).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
+# -- ui.json (the file itself is `uistate`'s) -----------------------------------------
 
 
 def remembered_mapping(root: Path, from_id: str, to_id: str) -> dict[str, str | None]:
@@ -253,19 +240,18 @@ def remembered_mapping(root: Path, from_id: str, to_id: str) -> dict[str, str | 
 
 
 def save_change_type_preference(
-    root: Path, from_id: str, to_id: str, rows: Iterable[MappingRow]
+    root: Path,
+    from_id: str,
+    to_id: str,
+    rows: Iterable[MappingRow],
+    own_writes: dict[str, str] | None = None,
 ) -> bool:
     """Remember a mapping in ``ui.json`` (other keys kept); False when the file can't be read."""
-    path = _ui_file(root)
-    data: dict[str, Any] = {}
-    if path.exists():
-        try:
-            loaded = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return False  # never replace a file we can't read
-        if not isinstance(loaded, dict):
-            return False
-        data = loaded
+    from .space import ReadOnly
+
+    data, _revision, error = _read_ui(root)
+    if error is not None:
+        return False  # never replace a file we can't read
     prefs = data.get(_PREFS_KEY)
     if not isinstance(prefs, dict):
         prefs = {}
@@ -274,8 +260,8 @@ def save_change_type_preference(
         per_from = {}
     per_from[to_id] = {r.fromKey: r.toKey for r in rows}
     prefs[from_id] = per_from
-    data[_PREFS_KEY] = prefs
-    path.parent.mkdir(parents=True, exist_ok=True)
-    text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
-    atomic_write(path, text.encode("utf-8"))
+    try:
+        write_ui_patch(root, {_PREFS_KEY: prefs}, None, own_writes)
+    except ReadOnly:
+        return False
     return True
