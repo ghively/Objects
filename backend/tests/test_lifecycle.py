@@ -427,7 +427,7 @@ def test_trash_routes(space_dir: Path):
 
     resp = client.post(f"/api/trash/{trash_id}/restore", params={"clientId": "c1"})
     assert resp.status_code == 200
-    assert resp.json() == {"paths": ["Tasks/Write docs.md"], "typeIds": []}
+    assert resp.json() == {"paths": ["Tasks/Write docs.md"], "typeIds": [], "rewritten": []}
 
     client.delete("/api/object", params={"path": "Tasks/Write docs.md"})
     client.delete("/api/object", params={"path": "Pages/Alpha.md"})

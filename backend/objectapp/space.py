@@ -324,6 +324,7 @@ class DeleteCollectionResult:
             "trashId": self.trash_id,
             "removedFrom": list(self.removed_from),
             "skipped": list(self.skipped),
+            "deleted": list(self.deleted),
         }
 
 
@@ -710,7 +711,9 @@ class Space:
             c = CollectionDef(id=cid, name=cid)
             c.readOnlyReason = error or "The collection file could not be read."
             return c
-        return CollectionDef.from_json(data, fallback_id=cid)
+        c = CollectionDef.from_json(data, fallback_id=cid)
+        c.id = cid  # the file name is the id, whatever "id" the JSON holds
+        return c
 
     def reload_collection(self, collection_id: str) -> None:
         """Re-read one collection file into `self.collections` (drop it when the file is gone)."""
@@ -985,7 +988,15 @@ class Space:
                     continue
                 ids = member_of(s.collections, by_name, by_former)
                 if collection_id in ids:
-                    (sole if ids == {collection_id} else shared).append(s.path)
+                    # Sole only when every non-empty item names this collection: an item
+                    # that resolves elsewhere, or to nothing (an unreadable or unknown
+                    # collection), keeps the object, which only loses this item.
+                    only_ours = all(
+                        member_of([n], by_name, by_former) == {collection_id}
+                        for n in s.collections
+                        if n.strip()
+                    )
+                    (sole if only_ours else shared).append(s.path)
             if not confirm:
                 raise ConfirmRequired(len(sole) + len(shared), COLLECTION_DELETE_DETAIL)
 
@@ -1141,7 +1152,9 @@ class Space:
             q = QueryDef(id=qid, name=qid)
             q.readOnlyReason = error or "The query file could not be read."
             return q
-        return QueryDef.from_json(data, fallback_id=qid)
+        q = QueryDef.from_json(data, fallback_id=qid)
+        q.id = qid  # the file name is the id, whatever "id" the JSON holds
+        return q
 
     def list_queries(self) -> list[QueryDef]:
         """Every query, by name (case-insensitive). An unreadable file lists with ``readOnlyReason``."""
@@ -1244,11 +1257,17 @@ class Space:
                 else:
                     self.own_writes[rel] = previous
                 raise
+            # The query's id is its file name, which the JSON need not repeat: record it
+            # beside the unchanged bytes so the entry can always be restored.
+            self.trash.write_json(
+                self.trash.query_meta_file(trash_id), {"id": query_id, "deletedAt": now_stamp()}
+            )
             return trash_id
 
     def _restore_query_entry(self, trash_id: str, data: dict) -> dict[str, Any]:
         """Bring a deleted query back under its original id (`RestoreConflict` if that file exists)."""
-        qid = str(data.get("id") or "")
+        del data  # the id comes from the trash entry's record (or, failing that, the JSON)
+        qid = self.trash.query_id(trash_id)
         store = self.store("queries")
         try:
             live = store.path(qid)
@@ -1268,6 +1287,7 @@ class Space:
         except BaseException:
             self.own_writes.pop(rel, None)
             raise
+        self.trash.query_meta_file(trash_id).unlink(missing_ok=True)
         return {
             "paths": [],
             "typeIds": [],
@@ -2164,6 +2184,7 @@ class Space:
                 dst.id,
                 [MappingRow(f, t, False) for f, t in clean.items()],
                 self.own_writes,
+                lock=self._lock,
             )
         except OSError:
             pass  # a preference that can't be saved is only not remembered
