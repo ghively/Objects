@@ -92,5 +92,14 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict, con
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path])
 
-  return <EditorContent editor={editor} className="object-editor-root" data-readonly={readOnly || undefined} />
+  return (
+    <>
+      {autosave.saveError && (
+        <div role="status" className="autosave-error">
+          {autosave.saveError}
+        </div>
+      )}
+      <EditorContent editor={editor} className="object-editor-root" data-readonly={readOnly || undefined} />
+    </>
+  )
 }

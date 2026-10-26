@@ -110,5 +110,14 @@ export function RawMode({ path, text, version, onSaved, onConflict, readOnly = f
     },
   }))
 
-  return <div ref={hostRef} className="raw-mode h-full" data-path={path} />
+  return (
+    <>
+      {autosave.saveError && (
+        <div role="status" className="autosave-error">
+          {autosave.saveError}
+        </div>
+      )}
+      <div ref={hostRef} className="raw-mode h-full" data-path={path} />
+    </>
+  )
 }

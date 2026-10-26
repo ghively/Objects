@@ -5,7 +5,7 @@ import { ConflictError } from '@/api/client'
 import { Editor } from './Editor'
 import { editorExtensions, loadBody, serializeBody } from './document'
 import { RawMode } from './RawMode'
-import type { BodyEditorHandle } from './useAutosave'
+import { AUTOSAVE_RETRY_MS, type BodyEditorHandle } from './useAutosave'
 
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig<typeof import('@/api/client')>()),
@@ -352,6 +352,23 @@ describe('<Editor> autosave', () => {
     })
     await act(async () => vi.advanceTimersByTimeAsync(2000))
     expect(saveBody).toHaveBeenCalledTimes(1)
+  })
+
+  test('another failure shows an unsaved state and retries until it saves', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    saveBody.mockRejectedValueOnce(new Error('503')).mockResolvedValueOnce({ version: 'v2' })
+    const { editor, onSaved, queryByRole } = mount()
+    act(() => {
+      editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), ' x')
+    })
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    expect(queryByRole('status')?.textContent).toMatch(/not saved/i)
+    await act(async () => vi.advanceTimersByTimeAsync(AUTOSAVE_RETRY_MS))
+    expect(saveBody).toHaveBeenCalledTimes(2)
+    expect(saveBody.mock.calls[1][2]).toBe('v1')
+    expect(onSaved).toHaveBeenCalledWith('v2')
+    expect(queryByRole('status')).toBeNull()
   })
 })
 
