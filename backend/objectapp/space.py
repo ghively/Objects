@@ -162,6 +162,11 @@ _RESERVED_STEMS = frozenset(
 )
 
 
+_LINK_UNSAFE_RE = re.compile(r"[\[\]#]")
+# A title that can't be a wikilink target as it is (it would end the target early).
+_LINK_BREAKING_RE = re.compile(r"[\[\]|#\n]")
+
+
 def safe_filename(title: str) -> str:
     """The file stem for a title, as Capacities' export names files.
 
@@ -169,14 +174,16 @@ def safe_filename(title: str) -> str:
     with whitespace collapsed and trailing dots and spaces stripped, capped at
     120 characters. If that is empty, the illegal characters are dropped
     instead; if still empty, ``Untitled``. (A Windows device name such as
-    ``CON`` gets a trailing ``_``.)
+    ``CON`` gets a trailing ``_``.) ``[``, ``]`` and ``#`` are dropped first.
     """
 
     def clean(text: str) -> str:
         text = " ".join(text.split()).rstrip(". ")
         return text[:_MAX_FILENAME].rstrip(". ")
 
-    title = str(title or "")
+    # `[`, `]` and `#` are legal in file names but end a wikilink's target, so
+    # the path form of a link (see `Space._link_text`) must never contain them.
+    title = _LINK_UNSAFE_RE.sub("", str(title or ""))
     m = _ILLEGAL_FILENAME_RE.search(title)
     stem = clean(title[: m.start()] if m else title)
     if not stem:
@@ -865,10 +872,18 @@ class Space:
         return self.resolve(target, from_rel) if isinstance(target, str) else None
 
     def _link_text(self, path: str, from_rel: str) -> str:
-        """Link text for ``path`` from ``from_rel``: its title, or the path form for duplicates."""
+        """Link text for ``path`` from ``from_rel``: its title, or the path form.
+
+        The path form is used for duplicate titles and for titles a wikilink
+        can't hold (``[``, ``]``, ``|``, ``#`` or a line break end the target).
+        """
         with self._lock:
             summary = self._summaries.get(path)
-        if summary is not None and self.resolve(summary.title, from_rel) == path:
+        if (
+            summary is not None
+            and not _LINK_BREAKING_RE.search(summary.title)
+            and self.resolve(summary.title, from_rel) == path
+        ):
             return summary.title
         return path[:-3] if path.lower().endswith(".md") else path
 
