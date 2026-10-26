@@ -57,6 +57,7 @@ from .propvalues import (
     encode_value,
 )
 from .relink import relink_frontmatter, replace_wikilinks, wikilink_targets
+from .templates import TemplateError, creation_variable, expand_title, resolve_date_variable
 from .textfile import atomic_write, encode_like
 from .trash import Trash, TrashItem
 from .typedefs import (
@@ -109,6 +110,27 @@ Edit = Callable[[ObjectFile, dict], "ObjectFile | None"]
 # Keys that `update_properties` refuses: they change through their own routes
 # (rename, change type) or are managed by the app.
 _LOCKED_KEYS = frozenset({"title", "type", "id", "template"})
+
+# Keys a template never copies into an object, and kinds the app maintains itself.
+_NOT_COPIED = frozenset({"template", "id", "type", "title", "createdAt", "lastUpdated", "iconColor"})
+_NOT_COPIED_KINDS = frozenset(
+    {"entity_title", "entity_type", "entity_createdAt", "entity_lastUpdated",
+     "entity_collections", "entity_backlinks"}
+)  # fmt: skip
+# A body that is empty or only a `# Title` heading (a template's body replaces it).
+_TITLE_ONLY_RE = re.compile(r"\s*(?:#[ \t][^\n]*)?\s*")
+
+
+def _parse_created(value: Any) -> datetime:
+    """An object's ``createdAt`` as a local datetime (now when missing or unreadable)."""
+    if isinstance(value, datetime):
+        return value.astimezone() if value.tzinfo else value
+    text = str(value or "").strip()
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.now().astimezone()
+    return dt.astimezone() if dt.tzinfo else dt
 
 _EXTRA_SYSTEM_DEFS = (
     PropertyDefinition(id="coverImage", key="coverImage", name="Cover image", type="coverImage"),
@@ -221,6 +243,8 @@ class ObjectSummary:
     aliases: list[str] = field(default_factory=list)
     coverImage: str | None = None
     iconColor: str | None = None
+    template: str | None = None
+    """The template's name when the file is a template (``template:`` key), else None."""
 
 
 @dataclass(frozen=True)
@@ -615,11 +639,15 @@ class Space:
             aliases=_str_list(fm.get("aliases")),
             coverImage=_str_or_none(fm.get("coverImage")),
             iconColor=_str_or_none(fm.get("iconColor")),
+            template=None if raw.readOnly else _str_or_none(fm.get("template")),
         )
 
     def list(self, type_id: str | None = None) -> list[ObjectSummary]:
+        """The space's objects (templates excluded), optionally of one type."""
         with self._lock:
-            items = sorted(self._summaries.values(), key=lambda s: s.path)
+            items = sorted(
+                (s for s in self._summaries.values() if s.template is None), key=lambda s: s.path
+            )
         if type_id is None:
             return items
         return [s for s in items if s.type == type_id]
@@ -1367,13 +1395,36 @@ class Space:
         The frontmatter is ``id``, ``type: '<Name>'``, ``title`` (only when
         non-empty), ``createdAt`` and ``lastUpdated``; the body is ``# <title>``
         or empty. The file name is `safe_filename` of the title, made unique.
-        Raises `KeyError` for an unknown type. (``template_id`` is used from Task 9.)
+
+        ``template_id`` None applies the type's default template (if it still
+        exists), ``"none"`` applies none, anything else that template (see
+        `apply_template`). Without a title, a template's ``title`` (with its
+        ``{date:FMT}`` placeholders expanded) is used.
+
+        Raises `KeyError` for an unknown type and `TemplateError` when the
+        template can't be found or applied (nothing is written then).
         """
-        del template_id  # templates arrive in Task 9
         t = self.type_by_id(type_id)
         if t is None:
             raise KeyError(type_id)
+        tmpl: RawObject | None = None
+        if template_id is None:
+            default = t.templates.get("defaultTemplateId")
+            if default and self._templates_allowed(t):
+                try:
+                    tmpl = self._find_template(t, str(default))
+                except TemplateError:
+                    tmpl = None  # a default that no longer exists is ignored
+        elif template_id != "none":
+            if not self._templates_allowed(t):
+                raise TemplateError(f"{t.name} objects have no templates")
+            tmpl = self._find_template(t, template_id)
+        created = datetime.now().astimezone()
         title = " ".join(str(title or "").split("\n")).strip()
+        if not title and tmpl is not None:
+            pattern = _str_or_none(tmpl.fm.get("title"))
+            if pattern:
+                title = " ".join(expand_title(pattern, created).split("\n")).strip()
         stamp = now_stamp()
         fm_src = set_keys(
             f"type: {_yaml_single_quoted(t.name)}\n",
@@ -1381,7 +1432,10 @@ class Space:
             insert_first={"id": new_ulid()},
         )
         body = f"# {title}\n" if title else ""
-        data = join_object(ObjectFile(fm_src, body, True, None)).encode("utf-8")
+        of = ObjectFile(fm_src, body, True, None)
+        if tmpl is not None:
+            of = self._template_edit(t, tmpl, created)(of, parse_fm(fm_src)) or of
+        data = join_object(of).encode("utf-8")
         version = version_of(data)
         stem = safe_filename(title) if title else "Untitled"
         with self._lock:
@@ -1472,6 +1526,8 @@ class Space:
             except BaseException:
                 meta_file.unlink(missing_ok=True)
                 raise
+            if summary is not None and summary.template and summary.id and type_trash_id is None:
+                self.unregister_template(summary.type, summary.id)
             return item
 
     def _templates_of(self, type_id: str) -> list[str]:
@@ -1485,6 +1541,211 @@ class Space:
             and r.fm.get("template") not in (None, "")
             and self._type_id(r.typeName) == type_id
         )
+
+    # -- templates ------------------------------------------------------------
+
+    @staticmethod
+    def _templates_allowed(t: TypeDefinition) -> bool:
+        """Page, Task and custom types have templates (DailyNote's come in M4; Tag has none)."""
+        return not t.basic or t.name.lower() in ("page", "task")
+
+    def template_versions(self) -> dict[str, str]:
+        """Path -> version of every template file (to see which ones a call wrote)."""
+        with self._lock:
+            return {
+                r.path: version_of(r.data)
+                for r in self._raw.values()
+                if not r.readOnly and r.fm.get("template") not in (None, "")
+            }
+
+    def list_templates(self, type_id: str) -> list[ObjectSummary]:
+        """The type's templates: its ``templates.ids`` order, then the other discovered ones.
+
+        Discovery is by the template's ``type:`` key, not its folder. Nothing is
+        written (a template without an ``id`` is listed as it is).
+        """
+        t = self.type_by_id(type_id)
+        if t is None:
+            raise KeyError(type_id)
+        with self._lock:
+            found = [self._summaries[p] for p in self._templates_of(t.id) if p in self._summaries]
+        order = {tid: i for i, tid in enumerate(t.templates.get("ids") or [])}
+        registered = sorted((s for s in found if s.id in order), key=lambda s: order[s.id])
+        return [*registered, *(s for s in found if s.id not in order)]
+
+    def _find_template(self, t: TypeDefinition, template_id: str) -> RawObject:
+        """The template of ``t`` with this id (or path); one found by path gets an ``id``."""
+        for path in self._templates_of(t.id):
+            with self._lock:
+                raw = self._raw.get(path)
+            if raw is None:
+                continue
+            tid = _str_or_none(raw.fm.get("id"))
+            if tid == template_id:
+                return raw
+            if path == template_id:
+                if tid is None:
+                    self.ensure_id(path)
+                    with self._lock:
+                        raw = self._raw[path]
+                return raw
+        raise TemplateError(f"No template {template_id!r} for {t.name}")
+
+    def _save_templates_field(self, t: TypeDefinition, templates: dict[str, Any]) -> bool:
+        """Write the type with a new ``templates`` value; False when it can't be saved."""
+        if t.readOnlyReason:
+            return False
+        new = copy.deepcopy(t)
+        new.templates = templates
+        try:
+            write_type_json(self.root, new, type_revision(self.root, t.id))
+        except (RevisionConflict, TypeReadOnly):
+            return False
+        self.types = [new if x.id == t.id else x for x in self.types]
+        return True
+
+    def unregister_template(self, type_id: str, template_id: str) -> bool:
+        """Drop a template's id from its type's ``templates``; True when the type was written."""
+        with self._lock:
+            t = self.type_by_id(type_id)
+            if t is None:
+                return False
+            ids = list(t.templates.get("ids") or [])
+            default = t.templates.get("defaultTemplateId")
+            if template_id not in ids and default != template_id:
+                return False
+            templates = {
+                **t.templates,
+                "ids": [i for i in ids if i != template_id],
+                "defaultTemplateId": None if default == template_id else default,
+            }
+            return self._save_templates_field(t, templates)
+
+    def create_template(self, type_id: str, name: str = "New template") -> tuple[str, str]:
+        """Create an empty template of the type and register it; return (path, version).
+
+        The file is ``Templates/<last segment of the type's folder>/<name>.md``
+        with ``id``, ``type: '<Name>'`` and ``template: <name>``; its id is
+        appended to ``templates.ids``. Raises `KeyError` (unknown type),
+        `TypeReadOnly` and `InvalidValue` (a type without templates).
+        """
+        t = self.type_by_id(type_id)
+        if t is None:
+            raise KeyError(type_id)
+        if not self._templates_allowed(t):
+            raise InvalidValue(f"{t.name} objects have no templates")
+        if t.readOnlyReason:
+            raise TypeReadOnly(t.readOnlyReason)
+        name = " ".join(str(name or "").split()) or "New template"
+        segment = PurePosixPath(t.folder.strip("/")).name or safe_filename(t.pluralName)
+        folder = f"Templates/{segment}"
+        template_id = new_ulid()
+        fm_src = set_keys(
+            f"type: {_yaml_single_quoted(t.name)}\n",
+            {"template": name},
+            insert_first={"id": template_id},
+        )
+        data = join_object(ObjectFile(fm_src, "", True, None)).encode("utf-8")
+        version = version_of(data)
+        stem = safe_filename(name)
+        with self._lock:
+            (self.root / folder).mkdir(parents=True, exist_ok=True)
+            for _attempt in range(100):
+                rel = unique_path(self.root, folder, stem)
+                if self._place(rel, data):
+                    break
+            else:
+                raise OSError(f"Could not find a free file name for {stem!r}")
+            t = self.type_by_id(type_id) or t
+            ids = [*(t.templates.get("ids") or []), template_id]
+            self._save_templates_field(t, {**t.templates, "ids": ids})
+            return rel, version
+
+    def _template_edit(
+        self, t: TypeDefinition, tmpl: RawObject, created: datetime | None = None
+    ) -> Edit:
+        """An `Edit` that applies template ``tmpl`` to an object of ``t``.
+
+        Each non-empty template value overwrites the object's (``template``,
+        ``id``, ``type``, ``title``, ``createdAt`` and ``lastUpdated`` are never
+        copied); ``{creation:<var>}`` on a ``datetime`` property becomes a date
+        from ``created`` (default: the object's ``createdAt``, else now). The
+        template's body is appended, or replaces a body that is only ``# Title``.
+        Raises `TemplateError`.
+        """
+
+        def edit(of: ObjectFile, fm: dict) -> ObjectFile | None:
+            when = created or _parse_created(fm.get("createdAt"))
+            sets: dict[str, Any] = {}
+            removals: list[str] = []
+            for key, raw in tmpl.fm.items():
+                if not isinstance(key, str) or key in _NOT_COPIED:
+                    continue
+                pdef = self._pdef(t, key)
+                var = creation_variable(raw)
+                if var is not None:
+                    if pdef is None or pdef.type != "datetime":
+                        raise TemplateError(f"{{creation:{var}}} needs a date property")
+                    start, _, end = resolve_date_variable(var, when).partition(" -> ")
+                    value: Any = {"start": start, "resolution": "day"}
+                    if end:
+                        value["end"] = end
+                elif pdef is None:
+                    if raw is None or raw == []:
+                        continue
+                    try:
+                        sets[key] = _json_scalar(key, raw)
+                    except InvalidValue as exc:
+                        raise TemplateError(str(exc)) from exc
+                    continue
+                elif pdef.type in _NOT_COPIED_KINDS:
+                    continue
+                else:
+                    value = decode_value(pdef, raw, tmpl.fm)
+                    if value is None or value == []:
+                        continue
+                try:
+                    u, r = encode_updates(pdef, value, fm)
+                except InvalidValue as exc:
+                    raise TemplateError(str(exc)) from exc
+                sets.update(u)
+                removals.extend(r)
+            src = of.frontmatter_src or ""
+            new_src = set_keys(src, sets) if sets else src
+            new_src = delete_keys(new_src, [k for k in removals if k not in sets])
+            body = of.body
+            addition = tmpl.of.body.lstrip("\n")
+            if addition.strip():
+                if _TITLE_ONLY_RE.fullmatch(body):
+                    body = addition
+                else:
+                    body = body.rstrip("\n") + "\n\n" + addition
+            if new_src == src and body == of.body:
+                return None
+            fm_src = new_src if new_src != src else of.frontmatter_src
+            return replace(of, frontmatter_src=fm_src, body=body)
+
+        return edit
+
+    def apply_template(self, path: str, template_id: str, base_version: str) -> str:
+        """Apply a template of the object's type to it (one stamped write); return the version.
+
+        Raises `Conflict`, `ReadOnly`, `KeyError` and `TemplateError` (a type
+        without templates, an unknown template, a template applied to a
+        template, or a value the template can't give).
+        """
+        rel = self._rel(path)
+        t = self._type_of(rel)
+        if t is None:
+            raise KeyError(rel)
+        if not self._templates_allowed(t):
+            raise TemplateError(f"{t.name} objects have no templates")
+        with self._lock:
+            summary = self._summaries.get(rel)
+        if summary is not None and summary.template:
+            raise TemplateError("A template can't be applied to a template")
+        tmpl = self._find_template(t, template_id)
+        return self._write(rel, base_version, self._template_edit(t, tmpl))
 
     def _save_type(self, t: TypeDefinition) -> bool:
         try:
@@ -2495,13 +2756,14 @@ class Space:
         candidates = _link_candidates(link)
         with self._lock:
             for text in candidates:
-                if "/" in text and f"{text}.md" in self._summaries:
-                    return f"{text}.md"
+                found = self._summaries.get(f"{text}.md") if "/" in text else None
+                if found is not None and found.template is None:
+                    return found.path
         from_folder = None
         if from_path:
             from_folder = PurePosixPath(str(from_path).replace("\\", "/")).parent.as_posix()
         with self._lock:
-            summaries = list(self._summaries.values())
+            summaries = [s for s in self._summaries.values() if s.template is None]
             aliases = {
                 rel: [a.lower() for a in _str_list(raw.fm.get("aliases"))]
                 for rel, raw in self._raw.items()
