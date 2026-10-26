@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { Views } from '@/api/types'
-import { collection, defaultViews, propertyDef, query, typeDef } from '@/test/mockApi'
+import { collection, defaultViews, objectSummary, propertyDef, query, row, typeDef } from '@/test/mockApi'
 import {
   addableSections,
   appendSection,
@@ -11,6 +11,7 @@ import {
   sectionInFullView,
   showSection,
   tabSections,
+  unreviewedRows,
   visibleSections,
 } from './dashboardSections'
 
@@ -145,5 +146,63 @@ describe('section edits', () => {
     const built = buildSections(NOTE, v, c2)
     // the collection is already a visible section (auto-appended), the query is not
     expect(addableSections(NOTE, built, c2).map((s) => s.key)).toEqual(['collections', 'query:q1'])
+  })
+})
+
+describe('DailyNote Unreviewed section', () => {
+  const DAILY = typeDef({
+    id: 'dailynote',
+    name: 'DailyNote',
+    basic: true,
+    propertyDefinitions: [propertyDef({ id: 'reviewed', key: 'reviewed', name: 'Reviewed', type: 'boolean' })],
+  })
+
+  test('test DailyNote Overview gets Unreviewed section appended, removable and re-addable', () => {
+    const v = views(['recentlyAccessed', 'collections', 'queries', 'inNoCollection'])
+    const all = buildSections(DAILY, v, ctx())
+    expect(all.map((s) => s.key)).toEqual(['recentlyAccessed', 'collections', 'queries', 'inNoCollection', 'unreviewed'])
+    const u = all.find((s) => s.key === 'unreviewed')
+    expect([u?.label, u?.inFullView, u?.hidden]).toEqual(['Unreviewed', false, false])
+    // Dashboard only: no header tab.
+    expect(tabSections(all).map((s) => s.key)).toEqual(['inNoCollection'])
+    // Other types never get it, even when it is saved.
+    expect(buildSections(NOTE, views(['unreviewed']), ctx()).map((s) => s.key)).toEqual([])
+    expect(buildSections(typeDef({ id: 'dailynote', name: 'DailyNote' }), views([]), ctx())).toEqual([])
+
+    const removed = removeSection(v, all, 'unreviewed')
+    expect(removed.dashboard.removedSections).toEqual(['unreviewed'])
+    const after = buildSections(DAILY, removed, ctx())
+    expect(visibleSections(after).map((s) => s.key)).not.toContain('unreviewed')
+    expect(hiddenSections(after).map((s) => s.key)).toEqual(['unreviewed'])
+    expect(addableSections(DAILY, after, ctx()).map((s) => s.key)).toEqual(['unreviewed'])
+
+    const back = showSection(removed, after, addableSections(DAILY, after, ctx())[0])
+    expect(back.dashboard.removedSections).toEqual([])
+    expect(back.dashboard.sections.at(-1)).toEqual({ key: 'unreviewed', collapsed: false })
+    expect(visibleSections(buildSections(DAILY, back, ctx())).map((s) => s.key).at(-1)).toBe('unreviewed')
+
+    // Hidden reviewing: no section, nothing to add.
+    const hiding = { ...DAILY, hideReviewing: true }
+    expect(buildSections(hiding, v, ctx()).map((s) => s.key)).not.toContain('unreviewed')
+    expect(addableSections(hiding, buildSections(hiding, removed, ctx()), ctx())).toEqual([])
+  })
+
+  test('test unreviewed lists notes with reviewed not true, newest first', () => {
+    const note = (path: string, values: Record<string, unknown>, title?: string) =>
+      row({ summary: objectSummary({ path, type: 'dailynote', title: title ?? path }), values })
+    const rows = [
+      note('DailyNotes/2026-10-20.md', { reviewed: false, date: { start: '2026-10-20', resolution: 'day' } }),
+      note('DailyNotes/2026-10-22.md', { reviewed: true, date: { start: '2026-10-22', resolution: 'day' } }),
+      note('DailyNotes/2026-10-24.md', { reviewed: null, date: { start: '2026-10-24', resolution: 'day' } }),
+      // No date: the title, else the file stem, gives the day.
+      note('DailyNotes/x.md', {}, '2026-10-23'),
+      note('DailyNotes/2026-10-21.md', { reviewed: false, date: null }, 'Untitled'),
+    ]
+    expect(unreviewedRows(rows).map((r) => r.summary.path)).toEqual([
+      'DailyNotes/2026-10-24.md',
+      'DailyNotes/x.md',
+      'DailyNotes/2026-10-21.md',
+      'DailyNotes/2026-10-20.md',
+    ])
   })
 })
