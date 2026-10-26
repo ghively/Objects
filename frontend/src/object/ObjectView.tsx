@@ -3,7 +3,7 @@
  * header and body editor (formatted or raw), with the `…` menu.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { api } from '@/api/client'
+import { api, ConflictError } from '@/api/client'
 import type { ObjectDetail, ObjectSummary, RenameResult, TypeDef, UpdateResult } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import {
@@ -12,17 +12,27 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Editor } from '@/editor/Editor'
 import { RawMode } from '@/editor/RawMode'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { installLinkPicker } from '@/links/LinkPicker'
-import { typeOf, useLinkIndex, ensureLinkIndex } from '@/links/linkIndex'
+import { invalidateLinkIndex, typeOf, useLinkIndex, ensureLinkIndex } from '@/links/linkIndex'
 import { installWikilinkPresenter } from '@/links/wikilinkPresenter'
 import { cn } from '@/lib/utils'
-import { useTabs } from '@/nav/tabs'
+import { canGoBack, useTabs, type Target } from '@/nav/tabs'
+import { byPluralName, TypeChip } from '@/shell/Sidebar'
+import { templatesAllowed } from '@/types/TemplateManager'
+import { ChangeTypeDialog } from './ChangeTypeDialog'
 import { ConflictDialog } from './ConflictDialog'
+import { DeleteObjectDialog, DELETE_OBJECT_TEXT, useDeleteRequest } from './DeleteObjectDialog'
+import { DeletedBanner } from './DeletedBanner'
+import { TemplateMarker } from './TemplateMarker'
+import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
 import { ensureNewTags, ObjectHeader, openTag } from './ObjectHeader'
 import { PageLayout, pageDesign, panelVariant } from './PageLayout'
 import { PropertyPanel } from './PropertyPanel'
@@ -80,6 +90,11 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
   const [raw, setRaw] = useState(false)
   const [panelOpen, setPanelOpen] = useState(true)
   const [deleted, setDeleted] = useState(false)
+  /** The Trash entry of this window's own delete ("Undo Delete"). */
+  const [trashId, setTrashId] = useState<string | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [undoError, setUndoError] = useState<string | null>(null)
+  const [changeTo, setChangeTo] = useState<TypeDef | null>(null)
   /** Mirrors `deleted` for the change listener (which must not wait for a render). */
   const deletedRef = useRef(false)
   const markDeleted = useCallback((v: boolean) => {
@@ -256,6 +271,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
       // the very bytes we last knew: reconcile anyway, which clears the banner and
       // resumes autosave even when the version is unchanged.
       if (e.kind === 'created' || deletedRef.current) {
+        if (e.kind === 'created') setTrashId(null)
         enqueue(false)
         return
       }
@@ -310,6 +326,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
     }
     setDetail(null)
     setError(null)
+    setTrashId(null)
     markDeleted(false)
     void ensureLinkIndex()
     api
@@ -344,6 +361,85 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
     setRaw((r) => !r)
   }
 
+  /** Save pending body edits; resolves with the version to send, or rejects while a conflict is open. */
+  const settle = async (): Promise<string> => {
+    const { ok } = await bodyControl.flush()
+    if (!ok) throw new Error('Resolve the conflict first.')
+    return versionRef.current
+  }
+
+  const deleteObject = async () => {
+    const baseVersion = await settle()
+    editorRef.current?.hold()
+    try {
+      const res = await api.deleteObject(path, { baseVersion })
+      setTrashId(res.trashId)
+      setUndoError(null)
+      markDeleted(true)
+      void invalidateLinkIndex()
+    } catch (err) {
+      void editorRef.current?.resume(versionRef.current)
+      if (err instanceof ConflictError) {
+        enqueueRef.current(false)
+        throw new Error('The object changed on disk. It has been reloaded; try again.', { cause: err })
+      }
+      throw err
+    }
+  }
+
+  const undoDelete = async () => {
+    if (!trashId) return
+    try {
+      const res = await api.restore(trashId)
+      setTrashId(null)
+      const restored = res.paths?.[0]
+      if (restored && restored !== path) useTabs.getState().retarget(path, restored)
+      else enqueueRef.current(false)
+      void invalidateLinkIndex()
+    } catch (err) {
+      setUndoError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const goBack = () => {
+    if (mode === 'peek') {
+      onDismiss?.()
+      return
+    }
+    const tabs = useTabs.getState()
+    if (canGoBack(tabs)) tabs.back()
+  }
+
+  const applyTemplate = async (templateId: string) => {
+    try {
+      const baseVersion = await settle()
+      editorRef.current?.hold()
+      await api.applyTemplate(path, templateId, baseVersion)
+      const d = await api.object(path)
+      editorRef.current?.reload(d.body, d.version)
+      setDetail(d)
+      adoptVersion(d.version)
+    } catch (err) {
+      if (err instanceof ConflictError) onConflict()
+      else void editorRef.current?.resume(versionRef.current)
+      console.warn('Could not apply the template:', err)
+    }
+  }
+
+  const openTarget = (target: Target) => {
+    useTabs.getState().open(target)
+    onDismiss?.()
+  }
+
+  // Ctrl+Backspace (handled by the app) asks the view showing this object to confirm a delete.
+  const deleteRequest = useDeleteRequest((s) => s.request)
+  useEffect(() => {
+    if (deleteRequest && deleteRequest.path === path && deleteRequest.where === mode) {
+      useDeleteRequest.getState().clear()
+      if (!deletedRef.current) setDeleteOpen(true)
+    }
+  }, [deleteRequest, path, mode])
+
   const summary = detail?.summary
   const typeEditor = useTypeEditor(summary?.type)
   const type = typeEditor.type ?? typeOf(summary?.type)
@@ -360,6 +456,11 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
   const onTypeChange = (next: TypeDef) => typeEditor.save(next)
   const onOpenTag = (name: string) => void openTag(name).catch(() => undefined)
   const onOpenObject = (p: string) => useTabs.getState().open({ kind: 'object', path: p })
+
+  const allTypes = useLinkIndex((s) => s.types)
+  const otherTypes = allTypes.filter((t) => t.id !== summary?.type).sort(byPluralName)
+  const isTemplate = summary?.template != null
+  const canTemplate = !!type && !isTemplate && templatesAllowed(type)
 
   const design = pageDesign(type)
   const properties =
@@ -424,9 +525,56 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
               Reveal in Explorer
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={propsReadOnly || !summary || isTemplate}>
+                <Icon name="ph-swap" size={14} />
+                Change type
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="max-h-[360px] overflow-auto border-line bg-raised">
+                {otherTypes.map((t) => (
+                  <DropdownMenuItem key={t.id} onSelect={() => setChangeTo(t)}>
+                    <TypeChip type={t} size={18} />
+                    {t.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            {canTemplate && type && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger disabled={propsReadOnly}>
+                  <Icon name="ph-file-dashed" size={14} />
+                  {USE_TEMPLATE_TEXT.menu}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="border-line bg-raised">
+                  <UseTemplateMenu
+                    type={type}
+                    editor={typeEditor}
+                    onApply={(id) => void applyTemplate(id)}
+                    onEdit={(p) => openTarget({ kind: 'object', path: p })}
+                    onCreated={(p) => openTarget({ kind: 'object', path: p })}
+                  />
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
+            {type && (
+              <DropdownMenuItem onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>
+                <Icon name="ph-gear-six" size={14} />
+                Object Type Settings
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
             <DropdownMenuCheckboxItem checked={raw} onCheckedChange={() => void toggleRaw()}>
               Raw Markdown
             </DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={propsReadOnly || !summary}
+              onSelect={() => setDeleteOpen(true)}
+            >
+              <Icon name="ph-trash" size={14} />
+              {DELETE_OBJECT_TEXT.action}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         {onExpand && <ToolButton label="Open as page" icon="ph-arrows-out-simple" onClick={onExpand} />}
@@ -446,6 +594,29 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
         onTakeTheirs={takeTheirs}
       />
       {typeEditor.dialog}
+      <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} />
+      {changeTo && (
+        <ChangeTypeDialog
+          open
+          onOpenChange={(o) => !o && setChangeTo(null)}
+          path={path}
+          toType={changeTo}
+          prepare={async () => {
+            const v = await settle()
+            editorRef.current?.hold()
+            return v
+          }}
+          onChanged={(res) => {
+            void invalidateLinkIndex()
+            if (res.path !== path) {
+              renamedToRef.current = res.path
+              useTabs.getState().retarget(path, res.path)
+            } else {
+              void load().then((d) => editorRef.current?.reload(d.body, d.version))
+            }
+          }}
+        />
+      )}
     </>
   )
 
@@ -500,7 +671,20 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
                   : "This object's frontmatter couldn't be read, so it opens read-only. Fix the file to edit it."}
               </div>
             )}
-            {deleted && (
+            {isTemplate && (
+              <TemplateMarker
+                summary={summary}
+                type={type}
+                editor={typeEditor}
+                readOnly={propsReadOnly}
+                onRename={(name) => writeProperties({ template: name })}
+                onManage={() => type && openTarget({ kind: 'typeSettings', typeId: type.id })}
+              />
+            )}
+            {deleted && trashId && (
+              <DeletedBanner onBack={goBack} onUndo={() => void undoDelete()} error={undoError} />
+            )}
+            {deleted && !trashId && (
               <div role="alert" className="mb-4 rounded-lg border border-danger/60 bg-raised px-3 py-2 text-[14px]">
                 This object's file was deleted or moved on disk. Edits here aren't saved.
               </div>

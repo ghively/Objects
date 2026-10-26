@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import type { SpaceInfo, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { createAndOpen } from '@/create/createAndOpen'
+import { NewObjectMenu } from '@/create/NewObjectMenu'
 import { LinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, stemOf, useLinkIndex } from '@/links/linkIndex'
-import { canGoBack, canGoForward, currentTarget, tabTarget, useTabs, type Tab } from '@/nav/tabs'
+import { canGoBack, canGoForward, currentTarget, tabTarget, usePeek, useTabs, type Tab } from '@/nav/tabs'
+import { useDeleteRequest } from '@/object/DeleteObjectDialog'
 import { ObjectPage } from '@/object/ObjectPage'
 import { ObjectIcon } from '@/object/ObjectHeader'
 import { ObjectPeek } from '@/object/ObjectPeek'
@@ -14,12 +17,32 @@ import { RightPanel } from '@/shell/RightPanel'
 import { Sidebar, TypeChip } from '@/shell/Sidebar'
 import { TopBar } from '@/shell/TopBar'
 import { cn } from '@/lib/utils'
+import { TrashView } from '@/trash/TrashView'
 import { CreateTypeDialog } from '@/types/CreateTypeDialog'
 import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
 import { TypePage } from '@/types/TypePage'
 import { TypeSettings } from '@/types/TypeSettings'
 
 const REFRESH_DELAY_MS = 150
+
+/** Inputs, text areas, selects, contenteditable (the body editor) and CodeMirror (raw mode). */
+export function isEditableTarget(el: EventTarget | null): boolean {
+  if (!(el instanceof Element)) return false
+  if (el.closest('input, textarea, select, .cm-editor')) return true
+  const ce = el.closest('[contenteditable]')
+  return !!ce && ce.getAttribute('contenteditable') !== 'false'
+}
+
+/** The type Ctrl+N creates: the open type, else the open object's type, else Page. */
+function currentTypeId(types: TypeDef[]): string {
+  const target = currentTarget(useTabs.getState())
+  if (target?.kind === 'type' || target?.kind === 'typeSettings') return target.typeId
+  if (target?.kind === 'object') {
+    const t = useLinkIndex.getState().objects.find((o) => o.path === target.path)?.type
+    if (t && types.some((x) => x.id === t)) return t
+  }
+  return types.find((t) => t.name.toLowerCase() === 'page')?.id ?? 'page'
+}
 
 /** The space's types: the link index's (reloaded as files bring new types), else the initial fetch's. */
 function useSpaceTypes(space: SpaceInfo | null): TypeDef[] {
@@ -103,6 +126,7 @@ export default function App() {
   const [rightOpen, setRightOpen] = useState(false)
   const [createTypeOpen, setCreateTypeOpen] = useState(false)
   const [deleting, setDeleting] = useState<TypeDef | null>(null)
+  const [newMenuOpen, setNewMenuOpen] = useState(false)
   const tabs = useTabs()
   const target = currentTarget(tabs)
 
@@ -139,8 +163,41 @@ export default function App() {
   }, [])
 
   const objects = useLinkIndex((s) => s.objects)
-  const indexLoaded = useLinkIndex((s) => s.loaded)
   const types = useSpaceTypes(space)
+
+  // Shortcuts, only when focus is not in an editable element (there Ctrl+Backspace deletes a word):
+  // Ctrl+U "+ New" menu, Ctrl+N a new object of the current type, Ctrl+Backspace "Delete this object?".
+  const typesRef = useRef(types)
+  useLayoutEffect(() => {
+    typesRef.current = types
+  }, [types])
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
+      if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return
+      const key = e.key.toLowerCase()
+      if (key === 'u') {
+        e.preventDefault()
+        setNewMenuOpen(true)
+      } else if (key === 'n') {
+        e.preventDefault()
+        void createAndOpen(currentTypeId(typesRef.current)).catch((err: unknown) =>
+          console.warn('Could not create an object:', err),
+        )
+      } else if (key === 'backspace') {
+        const peekPath = usePeek.getState().path
+        const target = currentTarget(useTabs.getState())
+        const path = peekPath ?? (target?.kind === 'object' ? target.path : null)
+        if (!path) return
+        e.preventDefault()
+        useDeleteRequest.getState().requestDelete(path, peekPath ? 'peek' : 'page')
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  const indexLoaded = useLinkIndex((s) => s.loaded)
   const counts = useMemo(() => {
     if (!space || (!indexLoaded && objects.length === 0)) return undefined
     const c: Record<string, number> = Object.fromEntries(types.map((t) => [t.id, 0]))
@@ -172,8 +229,7 @@ export default function App() {
       />
     )
   } else if (target?.kind === 'trash') {
-    // The Trash view comes with the object lifecycle UI (Task 19).
-    content = <Centered title="Trash" subtitle="Deleted objects and types stay here for 30 days." />
+    content = <TrashView />
   } else {
     content = <Centered title="Pick an object type" subtitle="Choose a type in the sidebar to see its objects." />
   }
@@ -200,14 +256,7 @@ export default function App() {
               activeTypeId={activeType?.id}
               onOpenType={(t) => tabs.open({ kind: 'type', typeId: t.id })}
               counts={counts}
-              onNew={() => {
-                // A new object of the open type (else a Page); the full "+ New" menu comes in Task 19.
-                const typeId = activeType?.id ?? types.find((t) => t.name.toLowerCase() === 'page')?.id ?? 'page'
-                void api
-                  .createObject(typeId)
-                  .then((res) => tabs.open({ kind: 'object', path: res.path }))
-                  .catch((e: unknown) => console.warn('Could not create an object:', e))
-              }}
+              onNew={() => setNewMenuOpen(true)}
               onCreateType={() => setCreateTypeOpen(true)}
               onOpenTypeSettings={(t) => tabs.open({ kind: 'typeSettings', typeId: t.id })}
               onDeleteType={setDeleting}
@@ -219,6 +268,7 @@ export default function App() {
         </div>
         <ObjectPeek />
         <LinkPicker />
+        <NewObjectMenu open={newMenuOpen} onOpenChange={setNewMenuOpen} />
         <CreateTypeDialog
           open={createTypeOpen}
           onOpenChange={setCreateTypeOpen}
