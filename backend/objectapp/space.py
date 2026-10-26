@@ -61,6 +61,8 @@ from .frontmatter import (
 from .ids import new_ulid
 from .collections import CollectionDef, SaveCollectionResult
 from .jsonstore import DefinitionUnreadable, JsonStore
+from .queries import DEFAULT_NAME as DEFAULT_QUERY_NAME
+from .queries import LIMIT_SIZES, MAX_SEARCH_TERMS, QueryDef, query_type_ids
 from .objfile import ObjectFile, join_object
 from .rows import member_of
 from .propvalues import (
@@ -1129,6 +1131,149 @@ class Space:
             "queryIds": [],
             "skipped": _skips_api(skipped),
             "rewritten": rewritten,
+        }
+
+    # -- queries ---------------------------------------------------------------
+
+    @staticmethod
+    def _load_query(qid: str, data: dict | None, error: str | None) -> QueryDef:
+        if data is None:
+            q = QueryDef(id=qid, name=qid)
+            q.readOnlyReason = error or "The query file could not be read."
+            return q
+        return QueryDef.from_json(data, fallback_id=qid)
+
+    def list_queries(self) -> list[QueryDef]:
+        """Every query, by name (case-insensitive). An unreadable file lists with ``readOnlyReason``."""
+        with self._lock:
+            found = [
+                self._load_query(qid, data, err)
+                for qid, data, _rev, err in self.store("queries").list()
+            ]
+        return sorted(found, key=lambda q: (q.name.casefold(), q.id))
+
+    def query_revision(self, query_id: str) -> str:
+        return self.store("queries").revision(query_id)
+
+    def _check_query_definition(self, definition: dict[str, Any], stored_type_ids: set[str]) -> None:
+        """Raise `InvalidValue` for an unknown new type id, a bad result limit or too many search terms."""
+        if not isinstance(definition.get("structures"), list):
+            raise InvalidValue("A query's structures must be a list.")
+        known = {t.id for t in self.types} | stored_type_ids
+        for tid in sorted(query_type_ids(definition)):
+            if tid not in known:
+                raise InvalidValue(f"Unknown object type {tid!r}.")
+        limit = definition.get("limit")
+        if limit is not None:
+            size = limit.get("size") if isinstance(limit, dict) else None
+            if isinstance(size, bool) or not isinstance(size, int | float) or size not in LIMIT_SIZES:
+                raise InvalidValue("A query's limit must be one of 1, 3, 5, 10, 25 or 50.")
+        search = definition.get("search")
+        if search is not None:
+            terms = search.get("searchTerms") if isinstance(search, dict) else None
+            if not isinstance(terms, list):
+                raise InvalidValue("A query's search needs a list of search terms.")
+            if len(terms) > MAX_SEARCH_TERMS:
+                raise InvalidValue(f"A query has at most {MAX_SEARCH_TERMS} search terms.")
+
+    def create_query(
+        self,
+        name: str | None = None,
+        definition: dict[str, Any] | None = None,
+        view: dict[str, Any] | None = None,
+    ) -> QueryDef:
+        """Create ``.object/queries/<id>.json``. No name: "New Query", ``titleIsCustom`` false."""
+        name = (name or "").strip()
+        data: dict[str, Any] = {"name": name or DEFAULT_QUERY_NAME, "titleIsCustom": bool(name)}
+        if definition is not None:
+            data["definition"] = definition
+        if view is not None:
+            data["view"] = view
+        with self._lock:
+            q = QueryDef.from_json(data, fallback_id="")
+            self._check_query_definition(q.definition, set())
+            store = self.store("queries")
+            q.id = store.new_id(q.name)
+            store.write(q.id, q.to_json(), "")
+            return q
+
+    def save_query(self, q: QueryDef, base_revision: str) -> tuple[QueryDef, str]:
+        """Save `q` over its file if still at `base_revision`; return it with the new revision.
+
+        Raises `RevisionConflict`, `ReadOnly` (the file holds invalid JSON), `KeyError`
+        (no such query) and `InvalidValue`.
+        """
+        with self._lock:
+            store = self.store("queries")
+            try:
+                stored, _rev = store.read(q.id)
+            except DefinitionUnreadable as exc:
+                raise ReadOnly(exc.error) from exc
+            if stored is None:
+                raise KeyError(q.id)
+            before = QueryDef.from_json(stored, fallback_id=q.id)
+            self._check_query_definition(q.definition, query_type_ids(before.definition))
+            q.readOnlyReason = None
+            revision = store.write(q.id, q.to_json(), base_revision)
+            return q, revision
+
+    def delete_query(self, query_id: str) -> str:
+        """Move a query's file to ``trash/queries/<ulid>.json`` unchanged; return the trash id.
+
+        No confirmation: it is restorable and touches no object. Raises `KeyError`, `ReadOnly`.
+        """
+        with self._lock:
+            store = self.store("queries")
+            try:
+                data, _rev = store.read(query_id)
+            except DefinitionUnreadable as exc:
+                raise ReadOnly(exc.error) from exc
+            if data is None:
+                raise KeyError(query_id)
+            trash_id = new_ulid()
+            dest = self.trash.query_file(trash_id)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            rel = store.rel(query_id)
+            previous = self.own_writes.get(rel)
+            self.own_writes[rel] = ""
+            try:
+                move_no_overwrite(store.path(query_id), dest)
+            except BaseException:
+                if previous is None:
+                    self.own_writes.pop(rel, None)
+                else:
+                    self.own_writes[rel] = previous
+                raise
+            return trash_id
+
+    def _restore_query_entry(self, trash_id: str, data: dict) -> dict[str, Any]:
+        """Bring a deleted query back under its original id (`RestoreConflict` if that file exists)."""
+        qid = str(data.get("id") or "")
+        store = self.store("queries")
+        try:
+            live = store.path(qid)
+        except ValueError as exc:
+            raise InvalidValue("The deleted query's id is not valid.") from exc
+        if live.exists():
+            raise RestoreConflict("Its id is used by another definition.")
+        src = self.trash.query_file(trash_id)
+        live.parent.mkdir(parents=True, exist_ok=True)
+        rel = store.rel(qid)
+        self.own_writes[rel] = version_of(src.read_bytes())
+        try:
+            move_no_overwrite(src, live)
+        except FileExistsError as exc:
+            self.own_writes.pop(rel, None)
+            raise RestoreConflict("Its id is used by another definition.") from exc
+        except BaseException:
+            self.own_writes.pop(rel, None)
+            raise
+        return {
+            "paths": [],
+            "typeIds": [],
+            "collectionIds": [],
+            "queryIds": [qid],
+            "skipped": [],
         }
 
     def rows(
@@ -2667,7 +2812,10 @@ class Space:
             if manifest is None:
                 collection = self.trash.collection_manifest(trash_id)
                 if collection is None:
-                    raise KeyError(trash_id)
+                    query = self.trash.query_data(trash_id)
+                    if query is None:
+                        raise KeyError(trash_id)
+                    return self._restore_query_entry(trash_id, query)
                 return self._restore_collection_entry(trash_id, collection)
             self._check_type_restorable(trash_id, manifest)
             objects: list[str] = []
@@ -2688,6 +2836,9 @@ class Space:
             if manifest is None:
                 collection = self.trash.collection_manifest(trash_id)
                 if collection is None:
+                    if self.trash.has_query(trash_id):
+                        self.trash.remove_query(trash_id)
+                        return 1
                     raise KeyError(trash_id)
                 count = 1
                 for oid in collection.get("objectTrashIds") or []:
