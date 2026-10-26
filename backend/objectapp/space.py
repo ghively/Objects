@@ -2400,6 +2400,17 @@ class Space:
             ]
         return build_index(pairs)
 
+    # -- calendar (M4) -----------------------------------------------------------
+
+    def calendar(self, from_day: str, to_day: str) -> dict[str, Any]:
+        """The ``CalendarRange`` for local days ``from_day`` through ``to_day`` (memory only).
+
+        Raises `InvalidValue` for a malformed day, ``from_day > to_day`` or more than 100 days.
+        """
+        from .calendarquery import calendar_range
+
+        return calendar_range(self, from_day, to_day)
+
     def _ensure_daily_note_type(self) -> TypeDefinition:
         """The DailyNote type; a space that has none gets the basic one in memory."""
         t = self.daily_note_type()
