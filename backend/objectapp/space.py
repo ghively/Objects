@@ -23,6 +23,7 @@ import copy
 import hashlib
 import json
 import os
+import random
 import re
 import threading
 from collections.abc import Callable, Iterable
@@ -56,7 +57,7 @@ from .propvalues import (
     encode_updates,
     encode_value,
 )
-from .relink import relink_frontmatter, replace_wikilinks, wikilink_targets
+from .relink import relink_frontmatter, replace_wikilinks, rewrite_tag_lists, wikilink_targets
 from .templates import TemplateError, creation_variable, expand_title, resolve_date_variable
 from .textfile import atomic_write, encode_like
 from .trash import Trash, TrashItem
@@ -245,6 +246,8 @@ class ObjectSummary:
     iconColor: str | None = None
     template: str | None = None
     """The template's name when the file is a template (``template:`` key), else None."""
+    color: str | None = None
+    """A Tag's colour (``bg-<c>``), else None."""
 
 
 @dataclass(frozen=True)
@@ -640,6 +643,7 @@ class Space:
             coverImage=_str_or_none(fm.get("coverImage")),
             iconColor=_str_or_none(fm.get("iconColor")),
             template=None if raw.readOnly else _str_or_none(fm.get("template")),
+            color=_str_or_none(fm.get("color")),
         )
 
     def list(self, type_id: str | None = None) -> list[ObjectSummary]:
@@ -1181,7 +1185,79 @@ class Space:
                 skipped.append(result)
             elif wrote and wrote[-1]:
                 relinked.append(ref)
+        if summary.type == "tag":
+            self._rename_tag_lists(old_title, new_title, new_rel, relinked, skipped)
         return RenameResult(new_rel, version, relinked, skipped)
+
+    def _rename_tag_lists(
+        self, old: str, new: str, tag_rel: str, relinked: list[str], skipped: list[Skip]
+    ) -> None:
+        """Rename the tag ``old`` to ``new`` in every ``tags:`` list (unstamped, one item each)."""
+        folded = _fold(old)
+        with self._lock:
+            holders = sorted(
+                rel
+                for rel, raw in self._raw.items()
+                if rel != tag_rel
+                and not raw.readOnly
+                and any(_fold(t) == folded for t in _str_list(raw.fm.get("tags")))
+            )
+        for rel in holders:
+            wrote: list[bool] = []
+            edit = self._fm_edit(lambda src, fm: rewrite_tag_lists(src, fm, old, new))
+
+            def tracked(of: ObjectFile, fm: dict, e=edit, w=wrote) -> ObjectFile | None:
+                out = e(of, fm)
+                w.append(out is not None)
+                return out
+
+            result = self._rewrite_other(rel, tracked)
+            if isinstance(result, Skip):
+                skipped.append(result)
+            elif wrote and wrote[-1] and rel not in relinked:
+                relinked.append(rel)
+
+    # -- tags -----------------------------------------------------------------
+
+    def ensure_tag(self, name: str) -> tuple[str, bool]:
+        """The Tag object named ``name`` (case-insensitively): (path, created).
+
+        When none exists, creates ``Tags/<safe name>.md`` (the type's folder)
+        with ``id``, ``type: 'Tag'``, ``title``, a random ``color: bg-<c>``,
+        ``createdAt`` and ``lastUpdated``, and an empty body. Raises
+        `InvalidValue` for an empty name.
+        """
+        title = " ".join(str(name or "").split())
+        if not title:
+            raise InvalidValue("A tag needs a name")
+        t = self.type_by_id("tag")
+        if t is None:
+            raise KeyError("tag")
+        folded = _fold(title)
+        with self._lock:
+            for s in sorted(self._summaries.values(), key=lambda s: s.path):
+                if s.type == "tag" and s.template is None and _fold(s.title) == folded:
+                    return s.path, False
+            stamp = now_stamp()
+            fm_src = set_keys(
+                f"type: {_yaml_single_quoted(t.name)}\n",
+                {
+                    "title": title,
+                    "color": f"bg-{random.choice(THEME_COLORS)}",
+                    "createdAt": stamp,
+                    "lastUpdated": stamp,
+                },
+                insert_first={"id": new_ulid()},
+            )
+            data = join_object(ObjectFile(fm_src, "", True, None)).encode("utf-8")
+            self._persist_type(t)
+            folder = t.folder.strip("/") or "Tags"
+            stem = safe_filename(title)
+            for _attempt in range(100):
+                rel = unique_path(self.root, folder, stem)
+                if self._place(rel, data):
+                    return rel, True
+        raise OSError(f"Could not find a free file name for {stem!r}")
 
     # -- change type ----------------------------------------------------------
 

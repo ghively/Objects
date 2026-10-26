@@ -5,7 +5,8 @@ keeping any ``#heading`` and ``|alias`` suffix and leaving fenced code blocks
 and inline code spans alone. `relink_frontmatter` does the same inside
 frontmatter values through `frontmatter.replace_in_value`, so only the affected
 scalar (a list item, or one line of a literal block) changes and every other
-byte, quote style included, is kept. `wikilink_targets` lists the link targets
+byte, quote style included, is kept. `rewrite_tag_lists` renames one item of
+a ``tags:`` list the same way. `wikilink_targets` lists the link targets
 a text holds (outside code), to decide which files a rename must touch.
 """
 
@@ -17,7 +18,7 @@ from typing import Any
 
 from .frontmatter import replace_in_value
 
-__all__ = ["relink_frontmatter", "replace_wikilinks", "wikilink_targets"]
+__all__ = ["relink_frontmatter", "replace_wikilinks", "rewrite_tag_lists", "wikilink_targets"]
 
 # [[target]], [[target#heading]], [[target|alias]], [[target#heading|alias]]
 _LINK_RE = re.compile(r"\[\[([^\[\]|#\n]+)((?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?)\]\]")
@@ -135,3 +136,22 @@ def relink_frontmatter(
             continue
         out = replace_in_value(out, key, lambda s: replace_wikilinks(s, should_rewrite, new_target))
     return out
+
+
+def _fold(text: str) -> str:
+    return " ".join(text.split()).casefold()
+
+
+def rewrite_tag_lists(src: str, fm: dict, old: str, new: str) -> str:
+    """Frontmatter source with the ``tags:`` item ``old`` (case-insensitively) renamed to ``new``.
+
+    Works on a flow or block list (or a single scalar) through `replace_in_value`:
+    other items, quote styles and lines keep their bytes. Returns ``src`` itself
+    when the object has no such tag.
+    """
+    tags = fm.get("tags")
+    items = tags if isinstance(tags, list) else [tags]
+    target = _fold(old)
+    if not any(isinstance(i, str) and _fold(i) == target for i in items):
+        return src
+    return replace_in_value(src, "tags", lambda s: new if _fold(s) == target else s)

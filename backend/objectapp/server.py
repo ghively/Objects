@@ -57,6 +57,15 @@ Routes (all JSON):
   ``423``, ``404``. Announces ``changed``. ``POST /api/objects`` applies the type's default
   template unless ``templateId`` is ``"none"``; ``DELETE /api/object`` on a template also
   drops it from its type's ``templates`` (announcing ``types``).
+- ``POST /api/tags/ensure`` ``{name, clientId?}`` -> ``{path, created}`` (the Tag object
+  named so, case-insensitively, created in ``Tags/`` when missing); ``422`` for an empty
+  name. Announces ``created`` when it created one. Renaming a Tag (``/api/object/rename``)
+  also renames it in every ``tags:`` list; those files are in ``relinked``.
+- ``GET /api/images`` -> ``{path}[]`` (image files outside dot-folders);
+  ``POST /api/images?name=`` (raw bytes) -> ``201 {path}`` (``Attachments/<safe name>``),
+  ``415`` for a name without an image extension. ``GET /api/file?path=`` -> the image's
+  bytes; ``415`` for a non-image extension, ``404`` when missing, in a dot-folder or
+  outside the space.
 - ``GET /api/resolve?link=&from=`` -> ``{path}`` or ``404``
 - ``POST /api/reveal`` ``{path}`` -> ``200 {ok}``: show the file in the OS file manager
 - ``GET /api/events`` -> Server-Sent Events; event ``change`` with a
@@ -79,12 +88,13 @@ from dataclasses import asdict
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from fastapi import APIRouter, FastAPI, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, FastAPI, Query, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
+from .media import NotAnImage, image_media_type, image_path, import_image, list_images
 from .propvalues import InvalidValue
 from .space import ConfirmRequired, Conflict, ReadOnly, Space
 from .typedefs import has_undecodable
@@ -210,6 +220,11 @@ class SaveTypeRequest(BaseModel):
 class ChangeKindRequest(BaseModel):
     toType: str
     baseRevision: str = ""
+    clientId: str | None = None
+
+
+class EnsureTagRequest(BaseModel):
+    name: str = ""
     clientId: str | None = None
 
 
@@ -696,6 +711,44 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         for path in paths:
             announce(ChangeEvent("deleted", path, None, origin=clientId))
         return {"trashId": item.id}
+
+    @api.post("/tags/ensure")
+    def ensure_tag(req: EnsureTagRequest):
+        try:
+            path, created = space.ensure_tag(req.name)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        if created:
+            announce(ChangeEvent("created", path, space.cached_version(path), origin=req.clientId))
+        return {"path": path, "created": created}
+
+    @api.get("/images")
+    def get_images():
+        return _display_safe(list_images(space.root))
+
+    @api.post("/images", status_code=201)
+    async def post_image(request: Request, name: str = Query(default="")):
+        data = await request.body()
+        try:
+            path = await asyncio.to_thread(import_image, space.root, name, data)
+        except NotAnImage:
+            return _error(415, "Only png, jpg, jpeg, gif, webp and svg images can be added")
+        return JSONResponse({"path": path}, status_code=201)
+
+    @api.get("/file")
+    def get_file(path: str):
+        try:
+            full = image_path(space.root, path)
+        except NotAnImage:
+            return _error(415, "Only image files can be served")
+        except (FileNotFoundError, OSError):
+            return _error(404, f"No image at {path!r}")
+        # An SVG can carry script: never let a served image run anything.
+        headers = {
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+            "X-Content-Type-Options": "nosniff",
+        }
+        return FileResponse(full, media_type=image_media_type(full.name), headers=headers)
 
     @api.get("/resolve")
     def resolve(link: str, from_: str | None = Query(default=None, alias="from")):
