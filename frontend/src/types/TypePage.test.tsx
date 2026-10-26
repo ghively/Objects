@@ -218,6 +218,20 @@ describe('TypePage', () => {
     expect(screen.getByText('Objects you recently accessed will appear here.')).toBeInTheDocument()
   })
 
+  test('an uncustomised query shows its automatic title in the Queries section and as a tab', async () => {
+    const q = query({
+      id: 'q1',
+      name: 'New Query',
+      titleIsCustom: false,
+      definition: { ...query({ id: 'x' }).definition, structures: [{ id: 'task' }] },
+    })
+    mocked.queries.mockResolvedValue([q])
+    load(views({ activeTab: 'overview' }, ['queries', 'query:q1']))
+    render(<TypePage type={TASK} />)
+    await waitFor(() => expect(tabNames()).toEqual(['Overview', 'All', 'Tasks']))
+    expect(screen.queryByText('New Query')).toBeNull()
+  })
+
   test('empty collections and queries sections show their empty states', async () => {
     load(views({ activeTab: 'overview' }, ['collections', 'queries']))
     render(<TypePage type={TASK} />)

@@ -434,7 +434,7 @@ export function TypePage({ type }: { type: TypeDef }) {
         </DropdownMenu>
         <NewSplitButton type={type} values={newValues} />
       </header>
-      <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+      <div data-toolbar-row="" className="flex flex-wrap items-center gap-2 px-4 py-3">
         <nav role="tablist" aria-label="Views" className="flex flex-wrap items-center gap-1">
           <TabPill active={tab === 'overview'} onClick={() => select('overview')} icon="ph-layout">
             {SECTION_TEXT.overview}

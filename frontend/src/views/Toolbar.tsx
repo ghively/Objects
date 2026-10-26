@@ -72,7 +72,7 @@ export function Toolbar(p: ToolbarProps) {
   useEffect(() => {
     // The toolbar only takes the width it needs (so a heading beside it keeps its room); how
     // narrow the view is shows in the row it sits in.
-    const el = ref.current?.parentElement ?? ref.current
+    const el = ref.current?.closest<HTMLElement>('[data-toolbar-row]') ?? ref.current?.parentElement ?? ref.current
     if (!el || typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver((entries) => {
       // An unmeasured (zero-width) row counts as wide.

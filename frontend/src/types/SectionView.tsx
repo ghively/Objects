@@ -18,6 +18,8 @@ import { createAndOpen } from '@/create/createAndOpen'
 import { SECTION_TEXT, keyId, type RenderedSection } from './dashboardSections'
 import { useDefinitions } from './useDefinitions'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
+import { queryTitle } from '@/queries/autoTitle'
+import { useTitleCtx } from '@/queries/QueryPage'
 
 /** How many recent objects the "Recently Opened" strip shows. */
 export const RECENT_SHOWN = 10
@@ -169,6 +171,7 @@ export function SectionView({ type, section, search, heading, onCreateCollection
   const { collections, queries } = useDefinitions()
   const recent = useRecent((s) => s.paths)
   const objects = useLinkIndex((s) => s.objects)
+  const titleCtx = useTitleCtx(useLinkIndex((s) => s.types))
   const open = (target: Parameters<ReturnType<typeof useTabs.getState>['open']>[0]) => useTabs.getState().open(target)
 
   const recentPaths = useMemo(() => {
@@ -276,7 +279,7 @@ export function SectionView({ type, section, search, heading, onCreateCollection
                   key={q.id}
                   icon={q.icon}
                   fallback={QUERY_ICON}
-                  name={q.name || 'Query'}
+                  name={queryTitle(q, titleCtx) || 'Query'}
                   description={q.description}
                   onClick={() => open({ kind: 'query', id: q.id })}
                 />
