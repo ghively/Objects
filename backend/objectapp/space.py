@@ -31,13 +31,14 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .frontmatter import FlowList, delete_keys, set_keys
+from .frontmatter import FlowList, delete_keys, parse_fm, replace_in_value, set_keys
 from .ids import new_ulid
 from .objfile import ObjectFile, join_object
 from .propvalues import InvalidValue, decode_value, encode_updates
 from .textfile import atomic_write, encode_like
 from .trash import Trash, TrashItem
 from .typedefs import (
+    SYSTEM_KEYS,
     RawObject,
     infer_types_from,
     is_ignored,
@@ -46,6 +47,9 @@ from .typedefs import (
     slug,
 )
 from .typemodel import (
+    PROPERTY_ICONS,
+    THEME_COLORS,
+    Icon,
     PropertyDefinition,
     RevisionConflict,
     TypeDefinition,
@@ -58,9 +62,11 @@ from .typemodel import (
 )
 
 __all__ = [
+    "ConfirmRequired",
     "Conflict",
     "ObjectSummary",
     "ReadOnly",
+    "SaveTypeResult",
     "Skip",
     "Space",
     "TrashItem",
@@ -208,6 +214,94 @@ class UpdateResult:
     """Other objects written by relation syncing."""
     skipped: list[Skip]
     """Other objects relation syncing could not write."""
+
+
+class ConfirmRequired(Exception):
+    """A type edit that removes values (or deletes a type) needs ``confirm`` (the API answers 428)."""
+
+    def __init__(self, affected: int, detail: str = "This change needs to be confirmed") -> None:
+        super().__init__(detail)
+        self.affected = affected
+        """How many files would change (for a type deletion: how many objects go to the trash)."""
+        self.detail = detail
+
+
+@dataclass
+class SaveTypeResult:
+    type: TypeDefinition
+    rewritten: list[str]
+    """Other files rewritten (unstamped) to follow the type change."""
+    skipped: list[Skip]
+    """Files the change could not rewrite (their bytes are unchanged)."""
+    revision: str = ""
+    """The type file's new revision (``type.revision`` in the API)."""
+
+    def to_api(self) -> dict[str, Any]:
+        """The route's response: ``{type, rewritten, skipped}``."""
+        return {
+            "type": self.type.to_api(self.revision),
+            "rewritten": list(self.rewritten),
+            "skipped": [{"path": s.path, "reason": s.reason} for s in self.skipped],
+        }
+
+
+# Capacities' en-US texts.
+BASIC_LOCKED = "Properties of basic object types cannot be edited."
+SYNC_MULTI_ONLY = (
+    "Synced properties are only available for multi-select properties without a fixed set. "
+    "You need to change your settings above or in your linked object type to enable "
+    "synchronization."
+)
+SYNC_NOT_ALLOWED = (
+    "Property syncing is not available for basic object types. "
+    "You need to link to your own custom object types above."
+)
+_DEFAULT_TYPE_ICON = "ph-note-pencil"
+# System properties every type keeps (the optional ones, e.g. `coverImage`, may be removed).
+_CORE_SYSTEM_KEYS = frozenset(
+    {"title", "collections", "description", "createdAt", "lastUpdated", "tags", "icon", "aliases"}
+)
+
+
+def _is_system_def(p: PropertyDefinition) -> bool:
+    """A system definition: its id is its key, and the key is reserved (or ``backlinks``)."""
+    return p.id == p.key and (p.key in SYSTEM_KEYS or p.key == "backlinks") and (
+        p.type.startswith("entity_") or p.type in ("coverImage", "color")
+    )
+
+
+def _is_multi(p: PropertyDefinition) -> bool:
+    default = p.type == "entity"
+    value = p.options.get("isArray", default)
+    return value if isinstance(value, bool) else default
+
+
+def _sync_ids(p: PropertyDefinition) -> list[str]:
+    sync = p.options.get("propertySyncing")
+    ids = sync.get("propertyIds") if isinstance(sync, dict) else None
+    return [i for i in ids if isinstance(i, str)] if isinstance(ids, list) else []
+
+
+def _option_texts(p: PropertyDefinition) -> dict[str, str]:
+    """Label option id -> text."""
+    return {
+        str(o.get("id")): str(o.get("text", ""))
+        for o in p.options.get("set") or []
+        if isinstance(o, dict)
+    }
+
+
+def _fold(value: Any) -> str:
+    return str(value).strip().casefold()
+
+
+@dataclass
+class _TypeOp:
+    """One rewrite every file of a type gets: ``fn(src, rel) -> src``."""
+
+    fn: Callable[[str, str], str]
+    confirm: bool
+    """True when it removes values (the save then needs ``confirm``)."""
 
 
 def version_of(data: bytes) -> str:
@@ -475,6 +569,8 @@ class Space:
                 return Skip(rel, exc.reason)
             except (KeyError, FileNotFoundError):
                 return Skip(rel, "The file no longer exists")
+            except PermissionError as exc:  # e.g. locked by another program
+                return Skip(rel, f"The file could not be written: {exc.strerror or exc}")
         raise AssertionError("unreachable")
 
     @staticmethod
@@ -1099,6 +1195,475 @@ class Space:
                 except KeyError:
                     continue
             return count
+
+    # -- type definitions -------------------------------------------------------
+
+    def _sort_types(self) -> None:
+        self.types.sort(key=lambda t: (t.name.lower(), t.name))
+
+    def _name_taken(self, name: str, except_id: str | None = None) -> bool:
+        low = name.lower()
+        return any(t.id != except_id and t.name.lower() == low for t in self.types)
+
+    def _type_members(self, type_id: str, templates: bool = True) -> list[str]:
+        """Paths of the (readable) objects of a type, with its templates unless told otherwise."""
+        with self._lock:
+            raws = list(self._raw.values())
+        return sorted(
+            r.path
+            for r in raws
+            if not r.readOnly
+            and self._type_id(r.typeName) == type_id
+            and (templates or r.fm.get("template") in (None, ""))
+        )
+
+    def _stored_type(self, type_id: str) -> TypeDefinition | None:
+        """The type as its file holds it (None when there is no readable file)."""
+        try:
+            data = json.loads(
+                (self.root / ".capacities" / "types" / f"{type_id}.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+        except (OSError, ValueError):
+            return None
+        return TypeDefinition.from_json(data, fallback_id=type_id) if isinstance(data, dict) else None
+
+    def create_type(
+        self, name: str, plural_name: str, icon: Any = None, color: str | None = None
+    ) -> TypeDefinition:
+        """Create and save a new object type.
+
+        It gets the system properties (Tags among them) and a ``blocks``
+        property named "Content". The id is `slug` of the name, made unique;
+        the folder comes from the plural name. Neither changes afterwards. The
+        folder is created with the type's first object. Raises `InvalidValue`
+        for a missing name or plural, a name in use, or a bad icon or colour.
+        """
+        name = " ".join(str(name or "").split())
+        plural = " ".join(str(plural_name or "").split())
+        if not name or not plural:
+            raise InvalidValue("An object type needs a name and a plural name")
+        color = color or "gray"
+        if color not in THEME_COLORS:
+            raise InvalidValue(f"Unknown colour {color!r}")
+        parsed = Icon("iconify", _DEFAULT_TYPE_ICON) if icon is None else Icon.parse(icon)
+        if parsed is None:
+            raise InvalidValue("Unknown icon")
+        with self._lock:
+            if self._name_taken(name):
+                raise InvalidValue(f"An object type named {name!r} already exists")
+            types_dir = self.root / ".capacities" / "types"
+            taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
+            if types_dir.is_dir():
+                taken |= {f.stem for f in types_dir.glob("*.json")}
+            base = slug(name)
+            type_id, n = base, 2
+            while type_id in taken:
+                type_id, n = f"{base}-{n}", n + 1
+            content = PropertyDefinition(
+                id=new_ulid(),
+                key="content",
+                name="Content",
+                type="blocks",
+                icon=Icon("iconify", PROPERTY_ICONS["blocks"]),
+            )
+            t = TypeDefinition(
+                id=type_id,
+                name=name,
+                pluralName=plural,
+                folder=safe_filename(plural),
+                icon=parsed,
+                color=color,
+                propertyDefinitions=[*system_property_defs(), content],
+            )
+            write_type_json(self.root, t, "")
+            self.types.append(t)
+            self._sort_types()
+            return t
+
+    def sync_problem(
+        self,
+        t: TypeDefinition,
+        p: PropertyDefinition,
+        types: dict[str, TypeDefinition] | None = None,
+    ) -> str | None:
+        """Why ``p`` of ``t`` can't sync with its ``propertySyncing`` targets (Capacities' text).
+
+        Syncing needs an entity property that is multi-select without a fixed
+        set, on a non-basic type, whose ``allowedTypes`` is exactly the
+        counterpart's (non-basic) type, and a counterpart of the same kind.
+        """
+        lookup = types if types is not None else {x.id: x for x in self.types}
+        if t.basic:
+            return SYNC_NOT_ALLOWED
+        if p.type != "entity" or not _is_multi(p) or p.options.get("hasFixedSet"):
+            return SYNC_MULTI_ONLY
+        allowed = p.options.get("allowedTypes") or []
+        target = lookup.get(allowed[0]) if len(allowed) == 1 else None
+        if target is None or target.basic:
+            return SYNC_NOT_ALLOWED
+        for pid in _sync_ids(p):
+            q = next((x for x in target.propertyDefinitions if x.id == pid), None)
+            if q is None or q.type != "entity" or not _is_multi(q) or q.options.get("hasFixedSet"):
+                return SYNC_MULTI_ONLY
+        return None
+
+    def save_type(
+        self, t: TypeDefinition, base_revision: str, confirm: bool = False
+    ) -> SaveTypeResult:
+        """Save an edited type, rewriting other files (unstamped) to follow it.
+
+        Diffs ``t`` against the stored type. A renamed type rewrites the
+        ``type:`` lines naming the old name (quotes kept) and keeps the old name
+        in ``formerNames``; a deleted property strips its key; renamed label
+        options are rewritten, deleted ones removed; multi→single keeps the
+        first value; relation rule changes drop links that break them (dangling
+        links stay). ``id``, ``folder``, ``basic`` and ``formerNames`` are the
+        server's. Every rewrite is planned first: a change that removes values
+        (or deletes a property) raises `ConfirmRequired` before anything is
+        written unless ``confirm``. Files that can't be rewritten are reported
+        in ``skipped``; the type JSON is written last.
+
+        Raises `KeyError` (unknown type), `TypeReadOnly` (unreadable type file),
+        `RevisionConflict` (stale ``base_revision``) and `InvalidValue` (422).
+        """
+        with self._lock:
+            mem = self.type_by_id(t.id)
+            if mem is None:
+                raise KeyError(t.id)
+            if mem.readOnlyReason:
+                raise TypeReadOnly(mem.readOnlyReason)
+            current = type_revision(self.root, mem.id)
+            if current != (base_revision or ""):
+                raise RevisionConflict(current)
+            old = self._stored_type(mem.id) or mem
+            new = copy.deepcopy(t)
+            new.id, new.folder, new.basic = old.id, old.folder, old.basic
+            new.formerNames = list(old.formerNames)
+            new.readOnlyReason = None
+            new.name = " ".join(str(new.name or "").split())
+            new.pluralName = " ".join(str(new.pluralName or "").split())
+
+            ops, deletes_property = self._plan_type_ops(old, new)
+
+            members = self._type_members(old.id) if ops else []
+            raws = {rel: self._raw[rel] for rel in members if rel in self._raw}
+
+            def run(src: str, rel: str, only_confirm: bool = False) -> str:
+                for op in ops:
+                    if op.confirm or not only_confirm:
+                        src = op.fn(src, rel)
+                return src
+
+            to_write: list[str] = []
+            affected = 0
+            for rel, raw in raws.items():
+                src = raw.of.frontmatter_src or ""
+                if run(src, rel, only_confirm=True) != src:
+                    affected += 1
+                if run(src, rel) != src:
+                    to_write.append(rel)
+            if (deletes_property or affected) and not confirm:
+                raise ConfirmRequired(
+                    affected,
+                    f"This change removes values from {affected} "
+                    f"object{'s' if affected != 1 else ''}.",
+                )
+
+            # The rewritten files are rescanned as they are written, so they must
+            # already resolve to the edited type (a renamed type by its new name).
+            self.types = [new if x.id == new.id else x for x in self.types]
+            try:
+                rewritten, skipped = self._apply_type_ops(to_write, run)
+                revision = write_type_json(self.root, new, current)
+            except BaseException:
+                self.types = [mem if x.id == new.id else x for x in self.types]
+                for rel in members:
+                    self.rescan_file(rel)
+                raise
+            self._sort_types()
+            return SaveTypeResult(new, rewritten, skipped, revision)
+
+    def _apply_type_ops(
+        self, to_write: list[str], run: Callable[[str, str], str]
+    ) -> tuple[list[str], list[Skip]]:
+        """Rewrite each file with ``run(src, rel)`` (unstamped); (rewritten, skipped)."""
+        rewritten: list[str] = []
+        skipped: list[Skip] = []
+        for rel in to_write:
+            wrote: list[bool] = []
+
+            def edit(of: ObjectFile, _fm: dict, rel=rel, wrote=wrote) -> ObjectFile | None:
+                src = of.frontmatter_src or ""
+                out = run(src, rel)
+                wrote.append(out != src)
+                return replace(of, frontmatter_src=out) if out != src else None
+
+            result = self._rewrite_other(rel, edit)
+            if isinstance(result, Skip):
+                skipped.append(result)
+            elif wrote and wrote[-1]:
+                rewritten.append(rel)
+        return rewritten, skipped
+
+    def _plan_type_ops(
+        self, old: TypeDefinition, new: TypeDefinition
+    ) -> tuple[list[_TypeOp], bool]:
+        """Validate a type edit (`InvalidValue`) and list the rewrites it needs.
+
+        Returns (ops, whether a property is deleted).
+        """
+        if not new.name or not new.pluralName:
+            raise InvalidValue("An object type needs a name and a plural name")
+        if new.color != old.color and new.color not in THEME_COLORS:
+            raise InvalidValue(f"Unknown colour {new.color!r}")
+        ops: list[_TypeOp] = []
+
+        renamed = new.name != old.name
+        if renamed:
+            if old.basic:
+                raise InvalidValue(BASIC_LOCKED)
+            if self._name_taken(new.name, except_id=old.id):
+                raise InvalidValue(f"An object type named {new.name!r} already exists")
+            former = [f for f in old.formerNames if f.lower() != new.name.lower()]
+            if old.name.lower() != new.name.lower() and old.name.lower() not in (
+                f.lower() for f in former
+            ):
+                former.append(old.name)
+            new.formerNames = former
+            ops.append(_TypeOp(self._type_line_op(old.name, new.name), confirm=False))
+
+        ids = [p.id for p in new.propertyDefinitions]
+        keys = [p.key for p in new.propertyDefinitions]
+        if len(set(ids)) != len(ids):
+            raise InvalidValue("Two properties have the same id")
+        if len(set(keys)) != len(keys):
+            raise InvalidValue("Two properties have the same key")
+        old_by_id = {p.id: p for p in old.propertyDefinitions}
+        new_by_id = {p.id: p for p in new.propertyDefinitions}
+        lookup = {x.id: x for x in self.types}
+        lookup[new.id] = new
+
+        deletes_property = False
+        for p in old.propertyDefinitions:
+            if p.id in new_by_id:
+                continue
+            if _is_system_def(p):
+                if p.key in _CORE_SYSTEM_KEYS:
+                    raise InvalidValue(f"{p.name} can't be removed")
+                continue  # an optional system property: display only, nothing to strip
+            if old.basic:
+                raise InvalidValue(BASIC_LOCKED)
+            deletes_property = True
+            ops.append(_TypeOp(self._delete_key_op(p.key), confirm=True))
+
+        for p in new.propertyDefinitions:
+            before = old_by_id.get(p.id)
+            if before is None:
+                self._check_new_property(old, new, p)
+            else:
+                if p.key != before.key:
+                    raise InvalidValue("The key of a property never changes")
+                if p.type != before.type:
+                    raise InvalidValue("Change the kind of a property with change-kind")
+                if old.basic and _is_multi(p) != _is_multi(before):
+                    raise InvalidValue(BASIC_LOCKED)
+            if p.type == "label":
+                self._check_label(p, before)
+                if before is not None:
+                    ops.extend(self._label_ops(before, p))
+            elif p.type == "entity":
+                self._check_fixed_set_ids(p, before)
+                if _sync_ids(p) and (before is None or p.options != before.options):
+                    problem = self.sync_problem(new, p, lookup)
+                    if problem:
+                        raise InvalidValue(problem)
+                if before is not None:
+                    op = self._entity_op(before, p)
+                    if op is not None:
+                        ops.append(op)
+        return ops, deletes_property
+
+    def _check_new_property(
+        self, old: TypeDefinition, new: TypeDefinition, p: PropertyDefinition
+    ) -> None:
+        if _is_system_def(p):
+            return  # e.g. adding the optional `coverImage` or `type` property
+        if old.basic:
+            raise InvalidValue(BASIC_LOCKED)
+        if not isinstance(p.key, str) or not p.key.strip():
+            raise InvalidValue("A property needs a key")
+        if p.key in SYSTEM_KEYS:
+            raise InvalidValue(f"{p.key!r} is a reserved key")
+        if p.type.startswith("entity_") or p.type in ("coverImage", "color"):
+            raise InvalidValue(f"{p.type!r} is a system property kind")
+
+    @staticmethod
+    def _check_label(p: PropertyDefinition, before: PropertyDefinition | None) -> None:
+        seen: set[str] = set()
+        for o in p.options.get("set") or []:
+            if not isinstance(o, dict) or not isinstance(o.get("id"), str) or not o["id"]:
+                raise InvalidValue("A label option needs an id")
+            text = o.get("text")
+            if not isinstance(text, str) or not text.strip() or len(text) > 100:
+                raise InvalidValue("A label option's text is 1 to 100 characters")
+            if o["id"] in seen:
+                raise InvalidValue("Two label options have the same id")
+            seen.add(o["id"])
+        was_status = before is not None and before.options.get("isStatus")
+        if p.options.get("isStatus") and not was_status:
+            raise InvalidValue("Only the basic Task status is a status label")
+
+    def _check_fixed_set_ids(self, p: PropertyDefinition, before: PropertyDefinition | None) -> None:
+        old_ids = set(before.options.get("fixedSet") or []) if before is not None else set()
+        fresh = [i for i in p.options.get("fixedSet") or [] if i not in old_ids]
+        if not fresh:
+            return
+        with self._lock:
+            known = {s.id for s in self._summaries.values() if s.id}
+        for object_id in fresh:
+            if object_id not in known:
+                raise InvalidValue(f"No object has the id {object_id!r}")
+
+    @staticmethod
+    def _type_line_op(old_name: str, new_name: str) -> Callable[[str, str], str]:
+        folded = old_name.lower()
+
+        def fn(src: str, _rel: str) -> str:
+            value = parse_fm(src).get("type") if src else None
+            if not isinstance(value, str) or value.strip().lower() != folded:
+                return src
+            return replace_in_value(
+                src, "type", lambda v: new_name if v.strip().lower() == folded else v
+            )
+
+        return fn
+
+    @staticmethod
+    def _delete_key_op(key: str) -> Callable[[str, str], str]:
+        def fn(src: str, _rel: str) -> str:
+            return delete_keys(src, [key]) if src else src
+
+        return fn
+
+    @staticmethod
+    def _label_ops(before: PropertyDefinition, p: PropertyDefinition) -> list[_TypeOp]:
+        """Removal (deleted options, multi→single) and rename ops for a label property."""
+        key = p.key
+        old_texts, new_texts = _option_texts(before), _option_texts(p)
+        renamed = {
+            _fold(text): new_texts[oid]
+            for oid, text in old_texts.items()
+            if oid in new_texts and new_texts[oid] != text
+        }
+        deleted = {_fold(text) for oid, text in old_texts.items() if oid not in new_texts}
+        # A deleted option's text that another option still has is not removed.
+        deleted -= {_fold(t) for t in new_texts.values()}
+        collapse = _is_multi(before) and not _is_multi(p)
+        ops: list[_TypeOp] = []
+
+        if deleted or collapse:
+
+            def remove(src: str, _rel: str) -> str:
+                raw = parse_fm(src).get(key) if src else None
+                if raw is None:
+                    return src
+                items = [i for i in (raw if isinstance(raw, list) else [raw]) if i is not None]
+                kept = [i for i in items if _fold(i) not in deleted]
+                squash = collapse and isinstance(raw, list) and len(kept) >= 2
+                if not squash and len(kept) == len(items):
+                    return src
+                if squash:
+                    value: Any = kept[0]
+                elif not kept:
+                    value = None
+                elif isinstance(raw, list):
+                    value = FlowList(kept)
+                else:
+                    value = kept[0]
+                return set_keys(src, {key: value})
+
+            ops.append(_TypeOp(remove, confirm=True))
+
+        if renamed:
+
+            def rename(src: str, _rel: str) -> str:
+                if not src or key not in parse_fm(src):
+                    return src
+                return replace_in_value(src, key, lambda v: renamed.get(_fold(v), v))
+
+            ops.append(_TypeOp(rename, confirm=False))
+        return ops
+
+    def _entity_op(self, before: PropertyDefinition, p: PropertyDefinition) -> _TypeOp | None:
+        """The op that drops links breaking a relation's new rules, or None if they didn't tighten."""
+        o, n = before.options, p.options
+        collapse = _is_multi(before) and not _is_multi(p)
+        allowed = [a for a in n.get("allowedTypes") or [] if isinstance(a, str)]
+        types_changed = set(allowed) != set(o.get("allowedTypes") or [])
+        fixed = set(n.get("fixedSet") or []) if n.get("hasFixedSet") else None
+        fixed_changed = fixed is not None and (
+            not o.get("hasFixedSet") or fixed != set(o.get("fixedSet") or [])
+        )
+        if not (collapse or (types_changed and allowed) or fixed_changed):
+            return None
+        key = p.key
+
+        def breaks_rules(item: Any, rel: str) -> bool:
+            refs = decode_value(p, item)
+            if not refs:
+                return False
+            path = self.resolve(refs[0]["target"], rel)
+            with self._lock:
+                summary = self._summaries.get(path) if path else None
+            if summary is None:
+                return False  # dangling links stay
+            if allowed and summary.type not in allowed:
+                return True
+            return fixed is not None and summary.id not in fixed
+
+        def fn(src: str, rel: str) -> str:
+            raw = parse_fm(src).get(key) if src else None
+            if raw is None:
+                return src
+            items = [i for i in (raw if isinstance(raw, list) else [raw]) if i is not None]
+            kept = [i for i in items if not breaks_rules(i, rel)]
+            squash = collapse and isinstance(raw, list) and len(kept) >= 2
+            if not squash and len(kept) == len(items):
+                return src
+            if not kept:
+                value: Any = None
+            elif squash or not isinstance(raw, list):
+                value = kept[0]
+            else:
+                value = FlowList(kept)
+            return set_keys(src, {key: value})
+
+        return _TypeOp(fn, confirm=True)
+
+    def delete_type(self, type_id: str, confirm: bool = False) -> TrashItem:
+        """Move a type, its objects and templates to the trash.
+
+        Raises `KeyError` for an unknown type, `InvalidValue` for a basic type
+        and `ConfirmRequired` (``affected`` = its objects) without ``confirm``.
+        Other types' relations stop allowing it (restored with it).
+        """
+        with self._lock:
+            t = self.type_by_id(type_id)
+            if t is None:
+                raise KeyError(type_id)
+            if t.basic:
+                raise InvalidValue("Basic object types cannot be deleted.")
+            objects = self._type_members(type_id, templates=False)
+            if not confirm:
+                n = len(objects)
+                raise ConfirmRequired(
+                    n,
+                    f"Delete the object type {t.name}? Its {n} object{'s' if n != 1 else ''} "
+                    "and templates move to the Trash.",
+                )
+            return self.trash_type(t, objects)
 
     def cached_version(self, path: str) -> str | None:
         """The version of the object as last scanned, or None if the space doesn't know it."""
