@@ -264,6 +264,8 @@ class ObjectSummary:
     """The template's name when the file is a template (``template:`` key), else None."""
     color: str | None = None
     """A Tag's colour (``bg-<c>``), else None."""
+    collections: list[str] = field(default_factory=list)
+    """The raw names of the ``collections:`` key (``[]`` when absent)."""
 
 
 @dataclass(frozen=True)
@@ -656,6 +658,31 @@ class Space:
             lock=self._lock,
         )
 
+    def _collection_names(self) -> dict[str, list[str]]:
+        """Collection id -> [its name, *formerNames], from the readable collection files."""
+        out: dict[str, list[str]] = {}
+        for cid, data, _rev, _err in self.store("collections").list():
+            if not isinstance(data, dict):
+                continue
+            names = [str(data.get("name") or "")]
+            former = data.get("formerNames")
+            if isinstance(former, list):
+                names += [str(f) for f in former if isinstance(f, str)]
+            out[cid] = names
+        return out
+
+    def rows(
+        self,
+        type_ids: list[str] | None = None,
+        collection_ids: list[str] | None = None,
+        paths: list[str] | None = None,
+        search: tuple[list[str], str] | None = None,
+    ):
+        """The objects in scope as `rows.Row`s (decoded values, links, preview), sorted by path."""
+        from .rows import build_rows
+
+        return build_rows(self, type_ids, collection_ids, paths, search)
+
     def type_by_id(self, type_id: str) -> TypeDefinition | None:
         return next((t for t in self.types if t.id == type_id), None)
 
@@ -710,6 +737,7 @@ class Space:
             iconColor=_str_or_none(fm.get("iconColor")),
             template=None if raw.readOnly else _str_or_none(fm.get("template")),
             color=_str_or_none(fm.get("color")),
+            collections=_str_list(fm.get("collections")),
         )
 
     def list(self, type_id: str | None = None) -> list[ObjectSummary]:
