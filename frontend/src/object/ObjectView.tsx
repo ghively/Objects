@@ -477,6 +477,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
         summary={detail.summary}
         readOnly={propsReadOnly}
         onChange={(key, value) => writeProperties({ [key]: value })}
+        onChangeMany={(u, r) => void writes.updateProperties(u, r)}
         onTypeChange={onTypeChange}
         onOpenTag={onOpenTag}
         onOpenObject={onOpenObject}
