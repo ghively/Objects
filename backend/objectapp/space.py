@@ -558,6 +558,10 @@ class Space:
         self.unreadable_types: list[UnreadableType] = list(unreadable)
         self._add_placeholders(inferred)
         self._merge_types(inferred)
+        self._loaded_revisions: dict[str, str] = {
+            t.id: type_revision(self.root, t.id) for t in self.types if not t.readOnlyReason
+        }
+        """Type id -> the revision of its file when the in-memory copy was loaded or written."""
         for rel, raw in self._raw.items():
             self._summaries[rel] = self._summarize(raw)
         self.purge_expired(datetime.now(UTC))
@@ -589,6 +593,38 @@ class Space:
             if t.name.lower() not in known and t.id not in known:
                 self.types.append(t)
                 known |= {t.name.lower(), t.id}
+
+    def refresh_type(self, type_id: str) -> tuple[TypeDefinition | None, str]:
+        """The type and its file's revision, reloading it when the file changed outside the app.
+
+        A type file edited by hand, a sync or a pull keeps its id; the in-memory copy
+        is replaced whenever the file's revision differs from the one it was loaded
+        with, so content and revision always match.
+        """
+        with self._lock:
+            mem = self.type_by_id(type_id)
+            if mem is None or mem.readOnlyReason:
+                return mem, type_revision(self.root, type_id) if mem is not None else ""
+            current = type_revision(self.root, type_id)
+            if current and current != self._loaded_revisions.get(type_id):
+                stored = self._stored_type(type_id)
+                if stored is not None and stored.id == type_id:
+                    self.types = [stored if x.id == type_id else x for x in self.types]
+                    self._sort_types()
+                    mem = stored
+                self._loaded_revisions[type_id] = current
+            return mem, current
+
+    def types_with_revisions(self) -> list[tuple[TypeDefinition, str]]:
+        """Every type with its file's revision, each reloaded first if its file changed."""
+        with self._lock:
+            ids = [t.id for t in self.types]
+            out = []
+            for tid in ids:
+                t, rev = self.refresh_type(tid)
+                if t is not None:
+                    out.append((t, rev))
+            return out
 
     def type_by_id(self, type_id: str) -> TypeDefinition | None:
         return next((t for t in self.types if t.id == type_id), None)
@@ -2175,12 +2211,11 @@ class Space:
         `RevisionConflict` (stale ``base_revision``) and `InvalidValue` (422).
         """
         with self._lock:
-            mem = self.type_by_id(t.id)
+            mem, current = self.refresh_type(t.id)
             if mem is None:
                 raise KeyError(t.id)
             if mem.readOnlyReason:
                 raise TypeReadOnly(mem.readOnlyReason)
-            current = type_revision(self.root, mem.id)
             if current != (base_revision or ""):
                 raise RevisionConflict(current)
             old = self._stored_type(mem.id) or mem
@@ -2518,12 +2553,11 @@ class Space:
 
         Raises `KeyError` (unknown type) and `TypeReadOnly` (unreadable file).
         """
-        mem = self.type_by_id(type_id)
+        mem, current = self.refresh_type(type_id)
         if mem is None:
             raise KeyError(type_id)
         if mem.readOnlyReason:
             raise TypeReadOnly(mem.readOnlyReason)
-        current = type_revision(self.root, mem.id)
         t = copy.deepcopy(self._stored_type(mem.id) or mem)
         t.readOnlyReason = None
         return t, current
@@ -2531,6 +2565,7 @@ class Space:
     def _commit_type(self, t: TypeDefinition, base_revision: str) -> str:
         """Write a type's JSON and put it in memory; return the new revision."""
         revision = write_type_json(self.root, t, base_revision)
+        self._loaded_revisions[t.id] = revision
         if any(x.id == t.id for x in self.types):
             self.types = [t if x.id == t.id else x for x in self.types]
         else:

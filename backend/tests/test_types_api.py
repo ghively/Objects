@@ -702,3 +702,26 @@ def test_types_event_announced(space_dir: Path):
         }
         ids = [t["id"] for t in c.get("/api/space").json()["types"]]
         assert "server" not in ids and "project" in ids
+
+
+def test_external_type_edit_is_served_and_kept_by_the_next_save(space_dir: Path):
+    space = Space(space_dir)
+    client = TestClient(create_app(space, None, watch=False))
+    t = space.create_type("Gadget", "Gadgets")
+    path = space_dir / ".capacities" / "types" / f"{t.id}.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["description"] = "Edited outside the app"
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    served = next(x for x in client.get("/api/space").json()["types"] if x["id"] == t.id)
+    assert served["description"] == "Edited outside the app"
+    assert served["revision"] == type_revision(space_dir, t.id)
+
+    r = client.put(
+        f"/api/types/{t.id}",
+        json={"type": {**served, "color": "blue"}, "baseRevision": served["revision"]},
+    )
+    assert r.status_code == 200, r.text
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert saved["description"] == "Edited outside the app"
+    assert saved["color"] == "blue"
