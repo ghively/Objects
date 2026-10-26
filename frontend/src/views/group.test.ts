@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { Row, TypeDef } from '@/api/types'
 import { collection, objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
-import { GROUP_OPTIONS, GROUP_SORT_OPTIONS, groupRows, valueForGroup, type GroupCtx } from './group'
+import { GROUP_OPTIONS, GROUP_SORT_OPTIONS, groupRows, isGroupable, valueForGroup, type GroupCtx } from './group'
 
 const now = new Date(2026, 9, 23, 12, 0) // Friday
 
@@ -39,6 +39,10 @@ describe('group options', () => {
     expect(GROUP_OPTIONS('number').map((o) => o.label)).toEqual(['By Exact Value', 'By Range'])
     expect(GROUP_OPTIONS('datetime').map((o) => o.label)).toEqual(['By Hour', 'By Day', 'By Week', 'By Month', 'By Year', 'Relative'])
     expect(GROUP_OPTIONS('label').map((o) => o.key)).toEqual(['default'])
+    // "Created at" groups like "Last updated" (All notes itself groups by it, Relative).
+    expect(isGroupable('entity_createdAt')).toBe(true)
+    expect(GROUP_OPTIONS('entity_createdAt')).toEqual(GROUP_OPTIONS('entity_lastUpdated'))
+    expect(GROUP_OPTIONS('entity_createdAt').map((o) => o.label)).toContain('Relative')
     expect(GROUP_SORT_OPTIONS('label').slice(0, 2).map((o) => o.label)).toEqual(['Order', 'Order inverse'])
     expect(GROUP_SORT_OPTIONS('entity').map((o) => o.label)).toContain('Created newest first')
     expect(GROUP_SORT_OPTIONS('text').at(-1)?.label).toBe('Manual')

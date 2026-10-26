@@ -23,8 +23,8 @@ export interface GroupOption {
 
 const o = (key: string, label: string): GroupOption => ({ key, label })
 
-const DATE_KINDS = new Set<PropertyType>(['datetime', 'datetimeSimple', 'entity_lastUpdated'])
-const NOT_GROUPABLE = new Set<PropertyType>(['blocks', 'simpleTableBlock', 'entity_createdAt'])
+const DATE_KINDS = new Set<PropertyType>(['datetime', 'datetimeSimple', 'entity_lastUpdated', 'entity_createdAt'])
+const NOT_GROUPABLE = new Set<PropertyType>(['blocks', 'simpleTableBlock'])
 
 /** The "group by" options a kind offers; the first is the default. ("Scheduled" comes in M4.) */
 export function GROUP_OPTIONS(kind: PropertyType): GroupOption[] {
