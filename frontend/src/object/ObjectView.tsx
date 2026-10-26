@@ -606,6 +606,10 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
             editorRef.current?.hold()
             return v
           }}
+          onAbort={(err) => {
+            void editorRef.current?.resume(versionRef.current)
+            if (err instanceof ConflictError) enqueueRef.current(false)
+          }}
           onChanged={(res) => {
             void invalidateLinkIndex()
             if (res.path !== path) {

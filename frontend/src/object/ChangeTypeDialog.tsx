@@ -34,10 +34,12 @@ export interface ChangeTypeDialogProps {
   toType: TypeDef
   /** Flush pending edits; resolves with the `baseVersion` to send. */
   prepare(): Promise<string>
+  /** The change failed after `prepare` (rejected, conflict, read-only): release what it paused. */
+  onAbort?(err: unknown): void
   onChanged(res: RenameResult): void
 }
 
-export function ChangeTypeDialog({ open, onOpenChange, path, toType, prepare, onChanged }: ChangeTypeDialogProps) {
+export function ChangeTypeDialog({ open, onOpenChange, path, toType, prepare, onAbort, onChanged }: ChangeTypeDialogProps) {
   const [rows, setRows] = useState<MappingRow[] | null>(null)
   const [mapping, setMapping] = useState<Record<string, string | null>>({})
   const [accepted, setAccepted] = useState(false)
@@ -87,12 +89,15 @@ export function ChangeTypeDialog({ open, onOpenChange, path, toType, prepare, on
   const submit = async () => {
     setBusy(true)
     setError(null)
+    let prepared = false
     try {
       const baseVersion = await prepare()
+      prepared = true
       const res = await api.changeType(path, toType.id, mapping, baseVersion)
       onOpenChange(false)
       onChanged(res)
     } catch (err) {
+      if (prepared) onAbort?.(err)
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
