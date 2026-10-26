@@ -55,10 +55,11 @@ A **space** is a folder; the app can hold several spaces and switch between them
 My Space/
   .capacities/                 app data, readable JSON/YAML, safe to version
     space.json                 space name, icon, settings
-    types/<type>.json          one object-type definition each (properties, views, templates…)
-    collections/<name>.json    collection definitions and their views
-    queries/<name>.json        saved queries
-    ui.json                    sidebar order, pinned items, open tabs
+    types/<type>.json          one object-type definition each (properties, card/link view settings, templates…)
+    views/<typeId>.json        a type page's saved views (Overview, All, section tabs)   [amended M3]
+    collections/<id>.json      collection definitions and their views                   [amended M3]
+    queries/<id>.json          saved queries                                            [amended M3]
+    ui.json                    sidebar order, pinned items, custom sidebar sections, open tabs
   .capacities-cache/           search index (derived, rebuildable)
   Tasks/Standalone GUI.md      one object = one Markdown file in its type's folder
   DailyNotes/2026-10-23.md
@@ -66,6 +67,8 @@ My Space/
   Whiteboards/Network map.md   + Network map.whiteboard.json (+ ink SVGs)
   Attachments/…                images, PDFs and files
 ```
+
+*Amended for M3 (2026-10-26):* collections and queries are stored by a stable `<id>` (the slug of the name at creation, never changed on rename), not by name, so renames don't move files or break references. A type page's views live in `views/<typeId>.json`, beside the type file rather than inside it, so a view change never bumps the type's revision. See `docs/superpowers/plans/2026-10-26-m3-views-collections-queries.md`.
 
 **An object file** follows the export's shape, plus the fields the export loses:
 
