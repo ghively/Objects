@@ -48,6 +48,15 @@ Routes (all JSON):
 - ``DELETE /api/types/{id}?confirm=true&clientId=`` -> ``{trashId}``; ``422``,
   ``428 {detail, affected}``, ``404``. Announces ``types`` (this type and each type
   whose relations stopped allowing it) and ``deleted`` per object and template.
+- ``GET /api/types/{id}/templates`` -> ``ObjectSummary[]`` (``templates.ids`` order, then
+  discovered ones); ``404``. ``POST /api/types/{id}/templates`` ``{name?, clientId?}`` ->
+  ``201 {path, version}``; ``422`` (a type without templates), ``423``, ``404``. Announces
+  ``created`` and ``types``.
+- ``POST /api/object/apply-template`` ``{path, templateId, baseVersion, clientId?}`` ->
+  ``{version}``; ``409 {currentVersion}``, ``422 {detail}`` ("Could not apply the template"),
+  ``423``, ``404``. Announces ``changed``. ``POST /api/objects`` applies the type's default
+  template unless ``templateId`` is ``"none"``; ``DELETE /api/object`` on a template also
+  drops it from its type's ``templates`` (announcing ``types``).
 - ``GET /api/resolve?link=&from=`` -> ``{path}`` or ``404``
 - ``POST /api/reveal`` ``{path}`` -> ``200 {ok}``: show the file in the OS file manager
 - ``GET /api/events`` -> Server-Sent Events; event ``change`` with a
@@ -168,6 +177,18 @@ class CreateObjectRequest(BaseModel):
     typeId: str
     title: str | None = None
     templateId: str | None = None
+    clientId: str | None = None
+
+
+class CreateTemplateRequest(BaseModel):
+    name: str | None = None
+    clientId: str | None = None
+
+
+class ApplyTemplateRequest(BaseModel):
+    path: str
+    templateId: str
+    baseVersion: str
     clientId: str | None = None
 
 
@@ -450,18 +471,27 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             )
         return _display_safe(result.to_api())
 
+    def announce_template_ids(before: dict[str, str], client_id: str | None) -> None:
+        """Announce ``changed`` for each template that got an ``id`` since ``before``."""
+        for path, version in space.template_versions().items():
+            if path in before and before[path] != version:
+                announce(ChangeEvent("changed", path, version, origin=client_id))
+
     @api.post("/objects", status_code=201)
     def create_object(req: CreateObjectRequest):
         t = space.type_by_id(req.typeId)
         had_file = bool(type_revision(space.root, req.typeId)) if t is not None else False
+        templates_before = space.template_versions()
         try:
             path, version = space.create_object(req.typeId, req.title or "", req.templateId)
         except InvalidValue as exc:
+            announce_template_ids(templates_before, req.clientId)
             return _error(422, str(exc))
         except KeyError:
             return _error(404, f"No object type {req.typeId!r}")
         if t is not None and not had_file and type_revision(space.root, req.typeId):
             announce(ChangeEvent("types", req.typeId, None, origin=req.clientId))
+        announce_template_ids(templates_before, req.clientId)
         announce(ChangeEvent("created", path, version, origin=req.clientId))
         return JSONResponse({"path": path, "version": version}, status_code=201)
 
@@ -472,6 +502,11 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         clientId: str | None = Query(default=None),
     ):
         try:
+            summary = space.get(path)
+        except (KeyError, ValueError):
+            summary = None
+        before = space.type_by_id(summary.type) if summary and summary.template else None
+        try:
             item = space.delete_object(path, base_version=baseVersion or None)
         except Conflict as exc:
             return JSONResponse({"currentVersion": exc.current_version}, status_code=409)
@@ -479,8 +514,52 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
             return _error(404, f"No object at {path!r}")
+        if before is not None and space.type_by_id(before.id) is not before:
+            announce(ChangeEvent("types", before.id, None, origin=clientId))
         announce(ChangeEvent("deleted", item.originalPath, None, origin=clientId))
         return {"trashId": item.id}
+
+    @api.get("/types/{type_id}/templates")
+    def list_templates(type_id: str):
+        try:
+            return _display_safe([asdict(s) for s in space.list_templates(type_id)])
+        except KeyError:
+            return _error(404, f"No object type {type_id!r}")
+
+    @api.post("/types/{type_id}/templates", status_code=201)
+    def create_template(type_id: str, req: CreateTemplateRequest):
+        try:
+            path, version = space.create_template(type_id, req.name or "New template")
+        except TypeReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except KeyError:
+            return _error(404, f"No object type {type_id!r}")
+        announce(ChangeEvent("types", type_id, None, origin=req.clientId))
+        announce(ChangeEvent("created", path, version, origin=req.clientId))
+        return JSONResponse({"path": path, "version": version}, status_code=201)
+
+    @api.post("/object/apply-template")
+    def apply_template(req: ApplyTemplateRequest):
+        templates_before = space.template_versions()
+        try:
+            version = space.apply_template(req.path, req.templateId, req.baseVersion)
+        except Conflict as exc:
+            return JSONResponse({"currentVersion": exc.current_version}, status_code=409)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {req.path!r}")
+        finally:
+            announce_template_ids(templates_before, req.clientId)
+        if version != req.baseVersion:
+            announce(ChangeEvent("changed", _norm(req.path), version, origin=req.clientId))
+        return {"version": version}
 
     @api.get("/trash")
     def list_trash():

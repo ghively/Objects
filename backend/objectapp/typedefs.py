@@ -239,6 +239,8 @@ def infer_types_from(objects: Iterable[RawObject]) -> list[TypeDefinition]:
     folders: dict[str, Counter[str]] = {}
     keys: dict[str, dict[str, list[Any]]] = {}
     for obj in objects:
+        if not obj.readOnly and obj.fm.get("template") not in (None, ""):
+            continue  # templates neither make a type nor add its properties
         folders.setdefault(obj.typeName, Counter())[PurePosixPath(obj.path).parent.as_posix()] += 1
         per_key = keys.setdefault(obj.typeName, {})
         if obj.readOnly:
