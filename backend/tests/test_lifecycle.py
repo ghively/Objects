@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from objectapp.propvalues import InvalidValue
 from objectapp.server import create_app
 from objectapp.space import Conflict, Space, safe_filename, unique_path, version_of
 
@@ -434,3 +435,25 @@ def test_trash_routes(space_dir: Path):
     assert client.delete(f"/api/trash/{one}").json() == {"purged": 1}
     assert client.delete("/api/trash").json() == {"purged": 1}
     assert client.get("/api/trash").json() == []
+
+
+def test_restore_type_refuses_when_a_type_now_has_its_id(space_dir: Path):
+    files = _gizmo_space(space_dir)
+    type_json = (space_dir / ".object" / "types" / "gizmo.json").read_bytes()
+    space = Space(space_dir)
+    item = _trash_gizmo(space)
+    fresh = space.create_type("Gizmo", "Gizmos")
+    assert fresh.id == "gizmo"
+    fresh_json = (space_dir / ".object" / "types" / "gizmo.json").read_bytes()
+    g1 = next(i for i in space.list_trash() if i.originalPath == "Gizmos/G1.md")
+
+    for trash_id in (item.id, g1.id):
+        with pytest.raises(InvalidValue, match="already exists"):
+            space.restore(trash_id)
+
+    # Nothing moved: the new type is intact and the old definition is still in the trash.
+    assert (space_dir / ".object" / "types" / "gizmo.json").read_bytes() == fresh_json
+    assert (_trash_dir(space_dir) / "types" / item.id / "type.json").read_bytes() == type_json
+    assert not (space_dir / "Gizmos" / "G1.md").exists()
+    assert len(space.list_trash()) == 3
+    assert files

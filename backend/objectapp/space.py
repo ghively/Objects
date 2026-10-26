@@ -1956,6 +1956,30 @@ class Space:
                 return target
         raise OSError(f"Could not find a free file name for {stem!r}")
 
+    def _check_type_restorable(self, trash_id: str, manifest: dict) -> None:
+        """Raise `InvalidValue` when a saved type now has the trashed type's id or name.
+
+        Restoring over it would lose one of the two definitions; nothing is
+        restored and the trash entry stays as it is.
+        """
+        type_id = str(manifest.get("typeId", ""))
+        stored = self.trash.type_dir(trash_id) / "type.json"
+        try:
+            data = json.loads(stored.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        if not isinstance(data, dict):
+            return
+        name = TypeDefinition.from_json(data, fallback_id=type_id).name
+        for t in self.types:
+            if not type_revision(self.root, t.id) and not t.readOnlyReason:
+                continue  # inferred, never saved: the restored definition supersedes it
+            if t.id == type_id or t.name.lower() == name.lower():
+                raise InvalidValue(
+                    f"An object type named {t.name} already exists. "
+                    "Rename or delete it first, then restore."
+                )
+
     def _restore_type_entry(self, trash_id: str, manifest: dict) -> tuple[list[str], list[str]]:
         """Restore a trashed type's definition, templates and relation refs; (paths, typeIds)."""
         folder = self.trash.type_dir(trash_id)
@@ -1963,9 +1987,11 @@ class Space:
         type_ids = [type_id]
         type_file = self.root / ".object" / "types" / f"{type_id}.json"
         stored = folder / "type.json"
-        if stored.is_file() and not type_file.exists():
+        if stored.is_file():
+            if type_file.exists():
+                raise InvalidValue(f"An object type with the id {type_id} already exists.")
             type_file.parent.mkdir(parents=True, exist_ok=True)
-            os.replace(stored, type_file)
+            move_no_overwrite(stored, type_file)
         try:
             data = json.loads(type_file.read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -2015,7 +2041,8 @@ class Space:
         type is in the trash, the type definition and templates come back with
         it (not the type's other objects). A type entry restores the type, its
         templates, its remaining objects and its ``allowedTypesRefs``.
-        Raises `KeyError` for an unknown id.
+        Raises `KeyError` for an unknown id and `InvalidValue` when a saved type
+        now has the trashed type's id or name (nothing is restored then).
         """
         with self._lock:
             meta = self.trash.object_meta(trash_id)
@@ -2024,6 +2051,8 @@ class Space:
                 type_ids: list[str] = []
                 type_trash = meta.get("typeTrashId")
                 manifest = self.trash.manifest(type_trash) if type_trash else None
+                if manifest is not None:
+                    self._check_type_restorable(type_trash, manifest)
                 obj_path = self._restore_object_entry(trash_id, meta)
                 if manifest is not None:
                     paths, type_ids = self._restore_type_entry(type_trash, manifest)
@@ -2031,6 +2060,7 @@ class Space:
             manifest = self.trash.manifest(trash_id)
             if manifest is None:
                 raise KeyError(trash_id)
+            self._check_type_restorable(trash_id, manifest)
             objects: list[str] = []
             for oid in manifest.get("objectTrashIds") or []:
                 ometa = self.trash.object_meta(oid)
