@@ -37,11 +37,11 @@ Found and fixed during acceptance: the file watcher thread died when "Empty Tras
 
 ### M3 status
 
-The plan is written (`2026-10-26-m3-views-collections-queries.md`); its build starts once M2's review and fix pass land.
+**Built** (`2026-10-26-m3-views-collections-queries.md`, Tasks 1-16). Automated results and Gene's unchecked hand-run list are in `m3-acceptance.md`. The whole-milestone review and fix pass are tracked separately from this task.
 
 ## To do
 
-### M3: views, collections, queries
+### M3: views, collections, queries (built; hand checks pending in `m3-acceptance.md`)
 
 - **View layouts:** list, grid, wall (cards), table, embed, kanban, gallery, on type pages, collections and query results.
 - **Table:** resizable columns, wrap content, pinned column, hide/show columns, column calculations, inline cell editing (reuses the M2 cells).
