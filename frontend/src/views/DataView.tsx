@@ -9,7 +9,13 @@ import { cn } from '@/lib/utils'
 import type { CustomizePage } from './CustomizeMenu'
 import { applyFilters } from './filter'
 import { groupRows, type Group, type GroupCtx } from './group'
+import { CardCustomizePage } from './cards/CardCustomize'
+import { EmbedLayout } from './layouts/EmbedLayout'
+import { GalleryLayout } from './layouts/GalleryLayout'
+import { GridLayout } from './layouts/GridLayout'
+import { KanbanLayout } from './layouts/KanbanLayout'
 import { ListLayout } from './layouts/ListLayout'
+import { WallLayout } from './layouts/WallLayout'
 import { TableLayout } from './table/TableLayout'
 import { TableCustomizePage } from './table/TableCustomize'
 import { LOAD_PAGE } from './model'
@@ -191,15 +197,36 @@ export function DataView(props: DataViewProps) {
     patchRow: props.patchRow,
     groupCount: (g) => result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length,
   }
-  const custom =
-    props.renderLayout?.(layout, layoutProps) ?? (layout === 'table' ? <TableLayout {...layoutProps} /> : null)
+  const builtin = (): ReactNode => {
+    switch (layout) {
+      case 'table':
+        return <TableLayout {...layoutProps} />
+      case 'grid':
+        return <GridLayout {...layoutProps} />
+      case 'wall':
+        return <WallLayout {...layoutProps} />
+      case 'gallery':
+        return <GalleryLayout {...layoutProps} />
+      case 'embed':
+        return <EmbedLayout {...layoutProps} />
+      case 'kanban':
+        return <KanbanLayout {...layoutProps} />
+      default:
+        return null
+    }
+  }
+  const custom = props.renderLayout?.(layout, layoutProps) ?? builtin()
   const tableType = layout === 'table' && viewTypes.length === 1 ? viewTypes[0] : undefined
-  const customizePages = tableType
-    ? [
-        { key: 'table', label: 'Table', icon: 'ph-table', body: <TableCustomizePage type={tableType} state={state} onState={onState} /> },
-        ...(props.customizePages ?? []),
-      ]
-    : props.customizePages
+  const cardLayout = layout === 'grid' || layout === 'wall' || layout === 'gallery' || layout === 'kanban'
+  const customizePages = [
+    ...(tableType
+      ? [{ key: 'table', label: 'Table', icon: 'ph-table', body: <TableCustomizePage type={tableType} state={state} onState={onState} /> }]
+      : []),
+    ...(cardLayout
+      ? [{ key: 'card', label: 'Card view', icon: 'ph-cards', body: <CardCustomizePage types={viewTypes} state={state} onState={onState} /> }]
+      : []),
+    ...(props.customizePages ?? []),
+  ]
 
   const empty = !props.loading && total === 0
   const createType = viewTypes[0]
