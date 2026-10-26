@@ -10,9 +10,9 @@ export const meta = {
 }
 
 const { plan: PLAN, base: BASE, backend: BACK, frontend: FRONT, integrate: INTEG, milestone: MS } = args
-const REPO = 'C:\\Git\\object'
+const REPO = args.repo || 'the current working directory (the repository root)'
 const RULES = `
-Repository: ${REPO} (git repo, branch master). Plan: ${PLAN}. Spec: docs/superpowers/specs/2026-10-23-object-design.md. Visual reference: docs/README.md and its PNGs.
+Repository: ${REPO} (git repo). Plan: ${PLAN}. Spec: docs/superpowers/specs/2026-10-23-object-design.md. Visual reference: docs/README.md and its PNGs.
 Rules:
 - Read the plan's header sections (Global Constraints, API contract if present, Review Focus, File Structure) and YOUR task section fully before writing code. Follow interfaces exactly (names, signatures, fields): other agents build against them in parallel.
 - TDD as the plan's steps say: failing tests first, run, implement, run green. Also keep ALL existing tests green (uv run pytest backend/tests -q; cd frontend && npx vitest run).
