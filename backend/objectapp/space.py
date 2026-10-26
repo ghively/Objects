@@ -31,7 +31,21 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .frontmatter import FlowList, delete_keys, parse_fm, replace_in_value, set_keys
+from ruamel.yaml.scalarstring import SingleQuotedScalarString
+
+from .changetype import (
+    CARRIED_KEYS,
+    CHANGE_FROM_ALLOWED,
+    CHANGE_TO_ALLOWED,
+    MappingRow,
+    compatible,
+    mapping_targets,
+    remembered_mapping,
+    save_change_type_preference,
+    suggest_mapping,
+    type_category,
+)
+from .frontmatter import FlowList, delete_keys, parse_fm, rename_key, replace_in_value, set_keys
 from .ids import new_ulid
 from .objfile import ObjectFile, join_object
 from .propvalues import (
@@ -71,6 +85,7 @@ from .typemodel import (
 
 __all__ = [
     "ChangeKindResult",
+    "ChangeTypeResult",
     "ConfirmRequired",
     "Conflict",
     "ObjectSummary",
@@ -292,6 +307,27 @@ class RenameResult:
     """Other objects whose links to it were rewritten (unstamped)."""
     skipped: list[Skip]
     """Other objects with such links that could not be rewritten."""
+
+    def to_api(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "version": self.version,
+            "relinked": list(self.relinked),
+            "skipped": _skips_api(self.skipped),
+        }
+
+
+@dataclass
+class ChangeTypeResult:
+    path: str
+    """The object's path after the change (in the new type's folder)."""
+    version: str
+    relinked: list[str]
+    """Other objects whose links to it were rewritten (unstamped)."""
+    skipped: list[Skip]
+    """Other objects with such links that could not be rewritten."""
+    typeWritten: bool = False
+    """Not in the API: the target type's JSON was written (first use, or new label options)."""
 
     def to_api(self) -> dict[str, Any]:
         return {
@@ -1118,6 +1154,198 @@ class Space:
             elif wrote and wrote[-1]:
                 relinked.append(ref)
         return RenameResult(new_rel, version, relinked, skipped)
+
+    # -- change type ----------------------------------------------------------
+
+    def _change_type_pair(self, rel: str, type_id: str) -> tuple[TypeDefinition, TypeDefinition]:
+        """(current type, target type) of a type change; raises when it isn't allowed."""
+        dst = self.type_by_id(type_id)
+        if dst is None:
+            raise KeyError(type_id)
+        src = self._type_of(rel)
+        if src is None:
+            raise KeyError(rel)
+        if type_category(src) not in CHANGE_FROM_ALLOWED:
+            raise InvalidValue(f"The type of a {src.name} object can't be changed")
+        if type_category(dst) not in CHANGE_TO_ALLOWED:
+            raise InvalidValue(f"An object can't be changed to a {dst.name}")
+        if src.id == dst.id:
+            raise InvalidValue(f"The object already is a {dst.name}")
+        return src, dst
+
+    def suggest_change_type(self, path: str, type_id: str) -> list[MappingRow]:
+        """The suggested property mapping for changing the object to ``type_id``.
+
+        The mapping last used between the two types is preferred (``ui.json``).
+        Raises `KeyError` and `InvalidValue` (a type that can't change, or be changed to).
+        """
+        rel = self._rel(path)
+        if not (self.root / rel).is_file():
+            raise KeyError(rel)
+        src, dst = self._change_type_pair(rel, type_id)
+        _of, fm, _v = self.read(rel)
+        return suggest_mapping(src, dst, fm, remembered_mapping(self.root, src.id, dst.id))
+
+    def _check_mapping(
+        self, src: TypeDefinition, dst: TypeDefinition, mapping: dict[str, Any]
+    ) -> dict[str, str | None]:
+        targets = {q.key: q for q in mapping_targets(dst)}
+        used: set[str] = set()
+        out: dict[str, str | None] = {}
+        for frm, to in (mapping or {}).items():
+            if not isinstance(frm, str) or frm in CARRIED_KEYS:
+                raise InvalidValue(f"{frm!r} can't be mapped: it carries over as it is")
+            if to is None:
+                out[frm] = None
+                continue
+            p = src.prop(frm)
+            q = targets.get(to) if isinstance(to, str) else None
+            if p is None:
+                raise InvalidValue(f"{src.name} has no property {frm!r}")
+            if q is None:
+                raise InvalidValue(f"{dst.name} has no property {to!r} to map to")
+            if q.key in used:
+                raise InvalidValue(f"{q.name} can only take one value")
+            if not compatible(p, q):
+                raise InvalidValue(f"{p.name} can't become {q.name}")
+            used.add(q.key)
+            out[frm] = q.key
+        return out
+
+    def change_type(
+        self, path: str, type_id: str, mapping: dict[str, Any], base_version: str
+    ) -> ChangeTypeResult:
+        """Change an object's type, mapping its property values, and move it to the type's folder.
+
+        A file without frontmatter gets a fence block with ``id``, ``type``,
+        ``title`` and ``lastUpdated``; otherwise the ``type:`` line is rewritten
+        keeping its quotes. Each ``mapping`` entry ``from: to`` moves a value:
+        an unchanged kind renames the key in place, another kind is converted
+        (`convert_value`) into the target key and the source key is removed.
+        Unmapped keys (``to`` is None, or not in the mapping) stay as they are.
+        The write is stamped; the file then moves to ``<folder>/<safe_filename(title)>.md``
+        (made unique). Links in other files that no longer resolve to it are
+        relinked to its title, unstamped. The mapping is remembered in ``ui.json``.
+
+        Raises `Conflict`, `ReadOnly`, `KeyError`, `TypeReadOnly` (a target type
+        whose file can't be read gets new label options) and `InvalidValue`.
+        """
+        rel = self._rel(path)
+        if not (self.root / rel).is_file():
+            raise KeyError(rel)
+        src, dst = self._change_type_pair(rel, type_id)
+        clean = self._check_mapping(src, dst, mapping)
+        with self._lock:
+            summary = self._summaries.get(rel)
+        if summary is None:
+            raise KeyError(rel)
+        title = summary.title
+
+        # Converting into a label may add options to the target type.
+        needs_options = any(
+            to is not None
+            and dst.prop(to).type == "label"
+            and src.prop(frm) is not None
+            and src.prop(frm).type != "label"
+            for frm, to in clean.items()
+        )
+        dst_edit: TypeDefinition | None = None
+        dst_revision = ""
+        if needs_options:
+            dst_edit, dst_revision = self._editable_type(dst.id)
+        defs = dst_edit or dst
+        options_before = json.dumps(
+            [p.to_json() for p in defs.propertyDefinitions], sort_keys=True, default=str
+        )
+        referrers = self._referrers(rel, title)
+        name = dst.name
+
+        def apply(src_text: str | None, fm: dict) -> str:
+            if src_text is None:
+                new = set_keys(f"type: {_yaml_single_quoted(name)}\n", {"title": title})
+            elif isinstance(fm.get("type"), str):
+                new = replace_in_value(src_text, "type", lambda _v: name)
+            else:
+                new = set_keys(src_text, {"type": SingleQuotedScalarString(name)})
+            sets: dict[str, Any] = {}
+            removals: list[str] = []
+            for frm, to in clean.items():
+                if to is None or frm not in fm:
+                    continue
+                p = src.prop(frm)
+                q = defs.prop(to)
+                assert p is not None and q is not None
+                if p.type == q.type and frm == to:
+                    continue
+                if p.type == q.type and to not in fm:
+                    new = rename_key(new, frm, to)
+                    continue
+                raw = fm.get(frm)
+                try:
+                    value, _lossy = convert_value(p, q, raw)
+                    encoded = encode_value(q, value, fm.get(to))
+                except InvalidValue:
+                    encoded = None
+                if encoded is not None or to in fm:
+                    sets[to] = encoded
+                removals.append(frm)
+            if sets:
+                new = set_keys(new, sets)
+            return delete_keys(new, [k for k in removals if k not in sets])
+
+        def edit(of: ObjectFile, fm: dict) -> ObjectFile | None:
+            return replace(of, frontmatter_src=apply(of.frontmatter_src, fm))
+
+        with self._lock:
+            type_written = False
+            if dst_edit is None:
+                type_written = self._persist_type(dst)
+            version = self._write(rel, base_version, edit)
+            if dst_edit is not None:
+                after = json.dumps(
+                    [p.to_json() for p in dst_edit.propertyDefinitions], sort_keys=True, default=str
+                )
+                if after != options_before or not dst_revision:
+                    self._commit_type(dst_edit, dst_revision)
+                    type_written = True
+            folder = dst.folder.strip("/")
+            new_rel = unique_path(self.root, folder, safe_filename(title), same_as=rel)
+            if new_rel != rel:
+                (self.root / folder).mkdir(parents=True, exist_ok=True)
+                self._move_file(rel, new_rel, version)
+
+        try:
+            save_change_type_preference(
+                self.root, src.id, dst.id, [MappingRow(f, t, False) for f, t in clean.items()]
+            )
+        except OSError:
+            pass  # a preference that can't be saved is only not remembered
+
+        relinked: list[str] = []
+        skipped: list[Skip] = []
+        for ref in sorted(referrers):
+            own = ref == rel
+            at = new_rel if own else ref
+            stale = {t for t in referrers[ref] if self.resolve(t, at) != new_rel}
+            if not stale:
+                continue
+            relink = self._relink_edit(stale, self._link_text(new_rel, at))
+            wrote: list[bool] = []
+
+            def tracked(of: ObjectFile, fm: dict, e=relink, w=wrote) -> ObjectFile | None:
+                out = e(of, fm)
+                w.append(out is not None)
+                return out
+
+            result = self._rewrite_other(at, tracked)
+            if own:
+                if not isinstance(result, Skip):
+                    version = result
+            elif isinstance(result, Skip):
+                skipped.append(result)
+            elif wrote and wrote[-1]:
+                relinked.append(ref)
+        return ChangeTypeResult(new_rel, version, relinked, skipped, type_written)
 
     # -- create ---------------------------------------------------------------
 

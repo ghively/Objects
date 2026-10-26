@@ -18,6 +18,12 @@ Routes (all JSON):
   ``{path, version, relinked, skipped}``; ``409 {currentVersion}``, ``423``, ``422 {detail}``
   (empty title, daily note), ``404``. Announces ``renamed`` (with ``oldPath``) when the
   file moved, else ``changed`` when written, and ``changed`` for each relinked object.
+- ``GET /api/object/change-type?path=&typeId=`` -> ``{rows: [{fromKey, toKey, lossy}]}``
+  (the suggested mapping); ``422`` when the type can't change (or be changed to), ``404``.
+- ``POST /api/object/change-type`` ``{path, typeId, mapping, baseVersion, clientId?}`` ->
+  ``{path, version, relinked, skipped}``; ``409 {currentVersion}``, ``423``, ``422 {detail}``,
+  ``404``. Announces ``renamed`` (with ``oldPath``) when the file moved, ``changed`` for each
+  relinked object, and ``types`` when the target type's JSON was written.
 - ``POST /api/objects`` ``{typeId, title?, templateId?, clientId?}`` -> ``201 {path, version}``;
   ``404`` for an unknown type. Announces ``created`` (and ``types`` when an
   inferred type was saved for the first time).
@@ -146,6 +152,14 @@ class EnsureIdRequest(BaseModel):
 class RenameRequest(BaseModel):
     path: str
     title: str
+    baseVersion: str
+    clientId: str | None = None
+
+
+class ChangeTypeRequest(BaseModel):
+    path: str
+    typeId: str
+    mapping: dict[str, str | None] = {}
     baseVersion: str
     clientId: str | None = None
 
@@ -385,6 +399,49 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
                 "renamed", result.path, result.version, origin=req.clientId, oldPath=rel
             )
             announce(renamed)
+        elif result.version != req.baseVersion:
+            announce(ChangeEvent("changed", rel, result.version, origin=req.clientId))
+        for path in result.relinked:
+            announce(
+                ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId)
+            )
+        return _display_safe(result.to_api())
+
+    @api.get("/object/change-type")
+    def suggest_change_type(path: str, typeId: str):
+        try:
+            rows = space.suggest_change_type(path, typeId)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {path!r} or no object type {typeId!r}")
+        return {"rows": [r.to_api() for r in rows]}
+
+    @api.post("/object/change-type")
+    def change_type(req: ChangeTypeRequest):
+        try:
+            result = space.change_type(req.path, req.typeId, req.mapping, req.baseVersion)
+        except Conflict as exc:
+            return JSONResponse({"currentVersion": exc.current_version}, status_code=409)
+        except (ReadOnly, TypeReadOnly) as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {req.path!r} or no object type {req.typeId!r}")
+        rel = _norm(req.path)
+        if result.typeWritten:
+            announce(ChangeEvent("types", req.typeId, None, origin=req.clientId))
+        if result.path != rel:
+            announce(
+                ChangeEvent(
+                    "renamed", result.path, result.version, origin=req.clientId, oldPath=rel
+                )
+            )
         elif result.version != req.baseVersion:
             announce(ChangeEvent("changed", rel, result.version, origin=req.clientId))
         for path in result.relinked:
