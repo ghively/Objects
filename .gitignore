@@ -10,6 +10,7 @@ docs/ui-reference/03-settings-account.png
 # Build and runtime
 node_modules/
 dist/
+!reference/app-unpacked/dist/
 .venv/
 __pycache__/
 *.pyc

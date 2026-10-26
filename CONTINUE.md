@@ -7,7 +7,7 @@ Everything needed to resume is in this repo. Rules and layout: `CLAUDE.md`. Proc
 Always take the current state from `docs/superpowers/plans/remaining-work.md` and `git log`; this file doesn't track it. As of 2026-10-26:
 
 - M1 (shell, objects on disk, editor) and M2 (types and properties) are built and verified by tests. Gene's hands-on checks on a copy of the CPI export are still open (`m1-acceptance.md`, `m2-acceptance.md`).
-- M3 (views, collections, queries) was built from `plans/2026-10-26-m3-views-collections-queries.md` by the build workflow; its review, fix pass, final gate and `m3-acceptance.md` hand-checks follow. Check `remaining-work.md` for whether it finished.
+- M3 (views, collections, queries): all 16 tasks built and committed (`a89c8cb..bd386e6`), stopped at the review gate. Still to do: whole-milestone review, one fix pass, the final gate, and Gene's hand-checks (`plans/m3-acceptance.md`). Resume with the build script and `resumeFromRunId wf_359eade1-0d4` if that run is still available, otherwise run the review, fix and gate stages by hand.
 - M4 (calendar, daily notes, tasks) is planned (`plans/2026-10-26-m4-calendar-daily-tasks.md`, 16 tasks) but not built. Before building it, re-read what M3 actually produced and correct interface names in the plan.
 - M5 (search, command palette, backlinks, graph), M6 (whiteboards and pen), M7 (remaining blocks, light mode, polish) are listed in `remaining-work.md` and need plans.
 

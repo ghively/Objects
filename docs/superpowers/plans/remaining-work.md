@@ -1,47 +1,37 @@
 # Object: remaining work
 
-Status as of 2026-10-26 (updated after M2 Task 20). Spec: `docs/superpowers/specs/2026-10-23-object-design.md`. Capacities reference for every item below: `.reference/` (models in `recovered-ts/src/shared-logic/models/`, English UI strings in `app-unpacked/dist/virtual_intlify-i18n-0366822.js`, CSS in `app-unpacked/dist/index36682.css`).
+Status as of 2026-10-26 (after the M3 build, before its review). Spec: `docs/superpowers/specs/2026-10-23-object-design.md`. How to resume: `CONTINUE.md`; rules: `CLAUDE.md`; process: `docs/superpowers/build-process.md`. Capacities reference for every item below: `reference/` in the repo (a trimmed subset: models in `recovered-ts/src/shared-logic/models/`, English UI strings in `app-unpacked/dist/virtual_intlify-i18n-0366822.js`, CSS in `app-unpacked/dist/index36682.css`). On Gene's machine the full unpacked app is in the git-ignored `.reference/`.
 
 ## How we build (changed 2026-10-26)
 
-- Each milestone gets one plan, then one build workflow: a back-end track and a front-end track in parallel, each task built and committed with its own tests.
-- **No per-task reviews.** Gene, 2026-10-26: review ceremony burns tokens; review once, after all tasks are complete. One whole-milestone review runs (correctness + file safety, and faithfulness to Capacities), then a fix pass and a final test gate.
+- Each milestone gets one plan (writer, three critics, one resolve pass), then one build workflow (`scripts/workflows/object-milestone-build.js`): tracks run in parallel, each task built and committed with its own tests. Track count follows the plan's file ownership (see `build-process.md`; M2 and M3 ran only two tracks, which was too cautious).
+- **No per-task reviews.** Gene, 2026-10-26: review ceremony burns tokens; review once, after all tasks are complete. One whole-milestone review runs (correctness, file safety, faithfulness to Capacities), then a fix pass and a final test gate.
 - Gene checks each milestone hands-on before the next one's results are relied on.
 
 ## Done
 
 | Milestone | State |
 |---|---|
-| **M1** shell, objects on disk, editor | Built and verified 2026-10-23: 95 back-end + 67 front-end tests, the round-trip leaves files untouched, the shell and peek render. **Open:** Gene's hands-on check on a copy of the CPI export (`m1-acceptance.md` checklist). |
+| **M1** shell, objects on disk, editor | Built and verified 2026-10-23. **Open:** Gene's hands-on check on a copy of the CPI export (`m1-acceptance.md`). |
+| **M2** object types and properties | 20 tasks built; whole-milestone review and fixes done (`32c7fe2..39432ce`); 372 back-end + 249 front-end tests; `m2_acceptance.py` 52/52 on the sample spaces. **Open:** Gene's hands-on checks (`m2-acceptance.md`). Known nit: `editor/preserve.test.ts` "1MB body splits under 300ms" can fail on timing when the machine is loaded. |
 
-## In progress: M2, object types and properties
+## In progress: M3, views, collections, queries
 
-Plan: `2026-10-23-m2-types-properties.md` (20 tasks). **All 20 tasks are built and committed.** Acceptance: `m2-acceptance.md`.
+Plan: `2026-10-26-m3-views-collections-queries.md` (16 tasks). **All 16 tasks are built and committed** (`a89c8cb..bd386e6`). The build was stopped at the review gate on 2026-10-26. Automated results at the end of Task 16 (445 back-end, 465 front-end tests, `tsc` clean, build ok, `m3_acceptance.py` PASS on `space-sample` and `space-v1`) and Gene's unchecked hand-run list are in `m3-acceptance.md`.
 
-| Task | | State |
-|---|---|---|
-| 1–7 | Type model and migration, codec, property updates, trash, type API, kind change and two-way linking, rename with relink | committed, reviewed |
-| 8–10 | Change type; templates; tags, icons and cover images | committed (not yet reviewed) |
-| 11–15 | API client, formatting, cells and pickers, editable panel | committed, reviewed |
-| 16–19 | Property definition editing; Object Type Settings; page layouts; lifecycle UI | committed (not yet reviewed) |
-| 20 | Acceptance: fixtures, `scripts/m2_acceptance.py` (PASS on `space-sample` and `space-v1`), end-to-end API check on port 8791, build | committed |
+What remains for M3:
 
-What remains for M2:
+1. **One whole-milestone review** (correctness, file safety, fidelity), **a fix pass**, then the **final gate**: `uv run pytest backend/tests -q`, `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build`, `scripts/m1_roundtrip.py`, `scripts/m2_acceptance.py`, `scripts/m3_acceptance.py` (each on a fixture copy). Resume the build workflow run `wf_359eade1-0d4` (same script and args, `resumeFromRunId`) or run the review stages from the script by hand.
+2. Start the app on a scratch copy of the sample space and look at views, collections and queries.
+3. Gene's hand-run checks in `m3-acceptance.md`.
 
-1. **One whole-milestone review** (correctness and file safety, and faithfulness to Capacities), concentrating on the unreviewed Tasks 8–10 and 16–19 and the plan's Review Focus.
-2. **A fix pass** for its findings, then the **final gate**: `uv run pytest backend/tests -q`, `cd frontend && npx vitest run`, `npx tsc -b --noEmit`, `npm run build`, and both `m2_acceptance.py` runs.
-3. **Gene's hand-run checks** in `m2-acceptance.md`: the sample walk-through in the native window, then the CPI copy (13 types migrate, one-line diffs, rename count, and side by side with Capacities).
-4. Known nit: `editor/preserve.test.ts` "1MB body splits under 300ms" can fail on timing when the machine is loaded; it could get a looser budget.
+### M4 status
 
-Found and fixed during acceptance: the file watcher thread died when "Empty Trash" removed a deleted type's folder (Windows `resolve()` error), which stopped external-change detection until restart.
-
-### M3 status
-
-**Built** (`2026-10-26-m3-views-collections-queries.md`, Tasks 1-16). Automated results and Gene's unchecked hand-run list are in `m3-acceptance.md`. The whole-milestone review and fix pass are tracked separately from this task.
+Planned, not built: `2026-10-26-m4-calendar-daily-tasks.md` (16 tasks, critiqued and revised). It was written against the M3 *plan*; before building, re-read what M3 actually produced and correct interface names in the M4 plan. Don't start M4 until Gene says so.
 
 ## To do
 
-### M3: views, collections, queries (built; hand checks pending in `m3-acceptance.md`)
+### M3: views, collections, queries (built; review and hand checks pending)
 
 - **View layouts:** list, grid, wall (cards), table, embed, kanban, gallery, on type pages, collections and query results.
 - **Table:** resizable columns, wrap content, pinned column, hide/show columns, column calculations, inline cell editing (reuses the M2 cells).
@@ -114,6 +104,7 @@ Accounts, login, billing, sync, sharing/publishing, mobile, integrations (Readwi
 
 ## Open items for Gene
 
-1. Hands-on check of M1, then M2, on a copy of the CPI export kept outside the repo.
-2. Run the M2 hand-run checks (`m2-acceptance.md`) before M3's results are relied on.
-3. Keeping the PC awake during workflow runs: an overnight sleep paused M2 for a weekend.
+1. Hands-on checks of M1, M2 and M3 on a copy of the CPI export kept outside the repo (`m1-`, `m2-`, `m3-acceptance.md`).
+2. Say when to resume the M3 review, fix pass and gate, and when to start M4.
+3. Keep the PC awake during workflow runs: an overnight sleep paused M2 for a weekend.
+4. The repo goes to a private GitHub repo (`Objects`); the trimmed `reference/` set is committed so a cloud session can continue.
