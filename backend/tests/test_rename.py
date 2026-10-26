@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from objectapp import space as space_mod
 from objectapp.propvalues import InvalidValue
-from objectapp.relink import relink_frontmatter, replace_wikilinks
+from objectapp.relink import relink_frontmatter, replace_wikilinks, wikilink_targets
 from objectapp.server import create_app
 from objectapp.space import Conflict, Space, version_of
 
@@ -213,6 +213,27 @@ def test_rename_keeps_alias_and_heading_suffix(space_dir: Path):
         .decode()
         .endswith("See [[Ada King|Ada L]] and [[Ada King#Life]] and [[Ada King]].\n")
     )
+
+
+@pytest.mark.parametrize(
+    ("title", "stem"),
+    [("Ada [x]", "Ada x"), ("Ada #1", "Ada 1"), ("Ada|B", "Ada"), ("Ada: K's #1", "Ada")],
+)
+def test_rename_to_a_link_breaking_title_uses_the_path_form(space_dir: Path, title, stem):
+    ref = space_dir / "Pages" / "Ref.md"
+    ref.write_bytes(b"---\ntype: 'Page'\ntitle: Ref\n---\n\nSee [[Ada Lovelace#Life]].\n")
+    space = Space(space_dir)
+    result = _rename_ada(space, title)
+
+    assert result.path == f"People/{stem}.md"
+    assert space.get(result.path).title == title
+    for referrer in ("Tasks/Write docs.md", "Servers/Alpha.md", "Pages/Ref.md"):
+        text = (space_dir / referrer).read_text(encoding="utf-8")
+        assert f"[[People/{stem}" in text
+        for target in wikilink_targets(text):
+            if target.startswith("People/"):
+                assert space.resolve(target, referrer) == result.path
+    assert f"[[People/{stem}#Life]]" in ref.read_text(encoding="utf-8")
 
 
 def test_rename_skips_links_to_colliding_title(space_dir: Path):
