@@ -30,7 +30,8 @@ Routes (all JSON):
 - ``DELETE /api/object?path=&baseVersion=&clientId=`` -> ``{trashId, typeIds}``; ``404``,
   ``409 {currentVersion}``. Moves the file to the trash; announces ``deleted``.
 - ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
-  ``{paths, typeIds}`` (announces ``created`` per path and ``types`` per type);
+  ``{paths, typeIds}`` (announces ``created`` per path and ``types`` per type); ``422`` when a
+  saved type now has the trashed type's id or name;
   ``DELETE /api/trash/{id}`` and ``DELETE /api/trash`` -> ``{purged}``; ``404``.
 - ``POST /api/types`` ``{name, pluralName, icon?, color?, clientId?}`` -> ``201 TypeDef``;
   ``422``. Announces ``types``.
@@ -602,6 +603,8 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
     def restore_trash(trash_id: str, clientId: str | None = Query(default=None)):
         try:
             result = space.restore(trash_id)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
         except KeyError:
             return _error(404, f"No trash entry {trash_id!r}")
         for type_id in result["typeIds"]:
