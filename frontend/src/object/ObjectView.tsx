@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { useTabs } from '@/nav/tabs'
 import { ConflictDialog } from './ConflictDialog'
 import { ensureNewTags, ObjectHeader, openTag } from './ObjectHeader'
+import { PageLayout, pageDesign, panelVariant } from './PageLayout'
 import { PropertyPanel } from './PropertyPanel'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
 import { useTypeEditor } from './useTypeEditor'
@@ -360,145 +361,178 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
   const onOpenTag = (name: string) => void openTag(name).catch(() => undefined)
   const onOpenObject = (p: string) => useTabs.getState().open({ kind: 'object', path: p })
 
-  return (
-    <div className="flex h-full min-h-0 w-full" data-object-view={mode}>
-      {detail && panelOpen && (
-        <PropertyPanel
-          type={type}
-          frontmatter={detail.frontmatter}
-          links={detail.links}
-          summary={detail.summary}
-          readOnly={propsReadOnly}
-          onChange={(key, value) => writeProperties({ [key]: value })}
-          onTypeChange={onTypeChange}
-          onOpenTag={onOpenTag}
-          onOpenObject={onOpenObject}
-        />
-      )}
-      <div className="relative flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between px-3.5 pt-3.5">
-          <button
-            type="button"
-            aria-label={panelOpen ? 'Hide properties' : 'Show properties'}
-            title={panelOpen ? 'Hide properties' : 'Show properties'}
-            aria-pressed={panelOpen}
-            onClick={() => setPanelOpen((v) => !v)}
-            className="flex size-10 items-center justify-center rounded-[11px] border border-[#29282d] bg-[#18181b] p-[3px] text-fg"
-          >
-            <span
-              className={cn(
-                'flex size-full items-center justify-center rounded-lg hover:bg-hover',
-                panelOpen && 'bg-line hover:bg-line',
-              )}
-            >
-              <Icon name="ph-sidebar-simple" size={17} />
-            </span>
-          </button>
-          <div className="flex h-10 items-center gap-0.5 rounded-xl border border-[#232226] bg-[#18181b] px-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="More"
-                  title="More"
-                  className="flex size-8 items-center justify-center rounded-md hover:bg-hover"
-                >
-                  <Icon name="ph-dots-three" size={18} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[272px] border-line bg-raised">
-                <DropdownMenuItem
-                  onSelect={() => {
-                    useTabs.getState().open({ kind: 'object', path }, { newTab: true })
-                    onDismiss?.()
-                  }}
-                >
-                  <Icon name="ph-arrow-square-out" size={14} />
-                  Open in new tab
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void api.reveal(path).catch(() => undefined)}>
-                  <Icon name="ph-folder-open" size={14} />
-                  Reveal in Explorer
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem checked={raw} onCheckedChange={() => void toggleRaw()}>
-                  Raw Markdown
-                </DropdownMenuCheckboxItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {onExpand && <ToolButton label="Open as page" icon="ph-arrows-out-simple" onClick={onExpand} />}
-          </div>
-        </div>
+  const design = pageDesign(type)
+  const properties =
+    detail && panelOpen ? (
+      <PropertyPanel
+        type={type}
+        frontmatter={detail.frontmatter}
+        links={detail.links}
+        summary={detail.summary}
+        readOnly={propsReadOnly}
+        onChange={(key, value) => writeProperties({ [key]: value })}
+        onTypeChange={onTypeChange}
+        onOpenTag={onOpenTag}
+        onOpenObject={onOpenObject}
+        variant={panelVariant(design)}
+      />
+    ) : null
 
-        <div className="min-h-0 flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-[820px] px-12 pt-10 pb-24" data-object-path={path}>
-            {error && (
-              <div className="rounded-lg border border-line bg-raised p-4">
-                <p className="font-semibold">Couldn't open this object.</p>
-                <p className="mt-1 text-fg-muted">{error}</p>
+  const toolbar = (
+    <div className="flex items-center justify-between px-3.5 pt-3.5">
+      <button
+        type="button"
+        aria-label={panelOpen ? 'Hide properties' : 'Show properties'}
+        title={panelOpen ? 'Hide properties' : 'Show properties'}
+        aria-pressed={panelOpen}
+        onClick={() => setPanelOpen((v) => !v)}
+        className="flex size-10 items-center justify-center rounded-[11px] border border-[#29282d] bg-[#18181b] p-[3px] text-fg"
+      >
+        <span
+          className={cn(
+            'flex size-full items-center justify-center rounded-lg hover:bg-hover',
+            panelOpen && 'bg-line hover:bg-line',
+          )}
+        >
+          <Icon name="ph-sidebar-simple" size={17} />
+        </span>
+      </button>
+      <div className="flex h-10 items-center gap-0.5 rounded-xl border border-[#232226] bg-[#18181b] px-1">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="More"
+              title="More"
+              className="flex size-8 items-center justify-center rounded-md hover:bg-hover"
+            >
+              <Icon name="ph-dots-three" size={18} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[272px] border-line bg-raised">
+            <DropdownMenuItem
+              onSelect={() => {
+                useTabs.getState().open({ kind: 'object', path }, { newTab: true })
+                onDismiss?.()
+              }}
+            >
+              <Icon name="ph-arrow-square-out" size={14} />
+              Open in new tab
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void api.reveal(path).catch(() => undefined)}>
+              <Icon name="ph-folder-open" size={14} />
+              Reveal in Explorer
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem checked={raw} onCheckedChange={() => void toggleRaw()}>
+              Raw Markdown
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {onExpand && <ToolButton label="Open as page" icon="ph-arrows-out-simple" onClick={onExpand} />}
+      </div>
+    </div>
+  )
+
+  const overlays = (
+    <>
+      {footer && <div className="absolute right-4 bottom-4">{footer}</div>}
+      <ConflictDialog
+        open={pending !== null}
+        path={path}
+        mine={pending?.mine ?? ''}
+        theirs={pending?.theirs.body ?? ''}
+        onKeepMine={keepMine}
+        onTakeTheirs={takeTheirs}
+      />
+      {typeEditor.dialog}
+    </>
+  )
+
+  if (!detail || !summary) {
+    return (
+      <div className="flex h-full min-h-0 w-full" data-object-view={mode}>
+        <div className="relative flex min-w-0 flex-1 flex-col">
+          {toolbar}
+          <div className="min-h-0 flex-1 overflow-auto">
+            <div className="mx-auto w-full max-w-[var(--page-content-width)] px-12 pt-10 pb-24" data-object-path={path}>
+              {error ? (
+                <div className="rounded-lg border border-line bg-raised p-4">
+                  <p className="font-semibold">Couldn't open this object.</p>
+                  <p className="mt-1 text-fg-muted">{error}</p>
+                </div>
+              ) : (
+                <p className="text-fg-muted">Loading…</p>
+              )}
+            </div>
+          </div>
+          {overlays}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-full min-h-0 w-full" data-object-view={mode}>
+      <PageLayout
+        type={type}
+        summary={summary}
+        mode={mode}
+        toolbar={toolbar}
+        properties={properties}
+        onCoverChange={propsReadOnly ? undefined : (next) => writeProperties({ coverImage: next })}
+        header={
+          <ObjectHeader
+            summary={summary}
+            type={type}
+            readOnly={propsReadOnly}
+            onRename={(title) => void writes.rename(title)}
+            onPropertiesChange={writeProperties}
+            onOpenTag={onOpenTag}
+          />
+        }
+        body={
+          <>
+            {readOnly && (
+              <div role="status" className="mb-4 rounded-lg border border-line bg-raised px-3 py-2 text-[14px] text-fg-muted">
+                {summary.readOnlyReason
+                  ? `This object opens read-only: ${summary.readOnlyReason}. Fix the file to edit it.`
+                  : "This object's frontmatter couldn't be read, so it opens read-only. Fix the file to edit it."}
               </div>
             )}
-            {!detail && !error && <p className="text-fg-muted">Loading…</p>}
-            {detail && summary && (
-              <>
-                <ObjectHeader
-                  summary={summary}
-                  type={type}
-                  readOnly={propsReadOnly}
-                  onRename={(title) => void writes.rename(title)}
-                  onPropertiesChange={writeProperties}
-                  onOpenTag={onOpenTag}
-                />
-                {readOnly && (
-                  <div role="status" className="mb-4 rounded-lg border border-line bg-raised px-3 py-2 text-[14px] text-fg-muted">
-                    {summary.readOnlyReason
-                      ? `This object opens read-only: ${summary.readOnlyReason}. Fix the file to edit it.`
-                      : "This object's frontmatter couldn't be read, so it opens read-only. Fix the file to edit it."}
-                  </div>
-                )}
-                {deleted && (
-                  <div role="alert" className="mb-4 rounded-lg border border-danger/60 bg-raised px-3 py-2 text-[14px]">
-                    This object's file was deleted or moved on disk. Edits here aren't saved.
-                  </div>
-                )}
-                <div className="text-[17px]">
-                  {raw ? (
-                    <RawMode
-                      path={path}
-                      text={detail.body}
-                      version={version}
-                      readOnly={readOnly}
-                      onSaved={adoptVersion}
-                      onConflict={onConflict}
-                      controlRef={editorRef}
-                    />
-                  ) : (
-                    <Editor
-                      path={path}
-                      body={detail.body}
-                      version={version}
-                      readOnly={readOnly}
-                      onSaved={adoptVersion}
-                      onConflict={onConflict}
-                      controlRef={editorRef}
-                    />
-                  )}
-                </div>
-              </>
+            {deleted && (
+              <div role="alert" className="mb-4 rounded-lg border border-danger/60 bg-raised px-3 py-2 text-[14px]">
+                This object's file was deleted or moved on disk. Edits here aren't saved.
+              </div>
             )}
-          </div>
-        </div>
-        {footer && <div className="absolute right-4 bottom-4">{footer}</div>}
-        <ConflictDialog
-          open={pending !== null}
-          path={path}
-          mine={pending?.mine ?? ''}
-          theirs={pending?.theirs.body ?? ''}
-          onKeepMine={keepMine}
-          onTakeTheirs={takeTheirs}
-        />
-        {typeEditor.dialog}
-      </div>
+            <div className="text-[17px]">
+              {raw ? (
+                <RawMode
+                  path={path}
+                  text={detail.body}
+                  version={version}
+                  readOnly={readOnly}
+                  onSaved={adoptVersion}
+                  onConflict={onConflict}
+                  controlRef={editorRef}
+                />
+              ) : (
+                <Editor
+                  path={path}
+                  body={detail.body}
+                  version={version}
+                  readOnly={readOnly}
+                  onSaved={adoptVersion}
+                  onConflict={onConflict}
+                  controlRef={editorRef}
+                />
+              )}
+            </div>
+          </>
+        }
+      >
+        {overlays}
+      </PageLayout>
     </div>
   )
 }
