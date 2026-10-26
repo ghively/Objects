@@ -290,10 +290,10 @@ def test_external_write_during_save_is_a_conflict(space: Space, space_dir: Path,
     external = target.read_bytes() + b"written elsewhere mid-save\n"
     real_stamp = space_mod.now_stamp
 
-    def stamp_after_external_write() -> str:
+    def stamp_after_external_write(*args) -> str:
         # Runs after save_body has checked the version but before it writes.
         target.write_bytes(external)
-        return real_stamp()
+        return real_stamp(*args)
 
     monkeypatch.setattr(space_mod, "now_stamp", stamp_after_external_write)
 

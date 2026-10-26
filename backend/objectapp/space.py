@@ -28,7 +28,7 @@ import re
 import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, tzinfo
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -61,6 +61,7 @@ from .frontmatter import (
 from .ids import new_ulid
 from .collections import CollectionDef, SaveCollectionResult
 from .jsonstore import DefinitionUnreadable, JsonStore
+from .localtime import SystemTz, to_local
 from .queries import DEFAULT_NAME as DEFAULT_QUERY_NAME
 from .queries import LIMIT_SIZES, MAX_SEARCH_TERMS, QueryDef, query_type_ids
 from .objfile import ObjectFile, join_object
@@ -73,6 +74,7 @@ from .propvalues import (
     encode_updates,
     encode_value,
 )
+from .taskhook import TaskResult, on_status_change
 from .relink import relink_frontmatter, replace_wikilinks, rewrite_tag_lists, wikilink_targets
 from .templates import TemplateError, creation_variable, expand_title, resolve_date_variable
 from .textfile import atomic_write, create_new, encode_like, move_no_overwrite, retry_os
@@ -97,6 +99,7 @@ from .typemodel import (
     UnreadableType,
     load_types,
     system_property_defs,
+    topup_task_type,
     type_revision,
     write_type_json,
 )
@@ -245,9 +248,9 @@ class ReadOnly(Exception):
         self.reason = reason
 
 
-def now_stamp() -> str:
-    """The current UTC time as ``YYYY-MM-DDTHH:MM:SS.sssZ``."""
-    now = datetime.now(UTC)
+def now_stamp(instant: datetime | None = None) -> str:
+    """``instant`` (default: the current time) in UTC as ``YYYY-MM-DDTHH:MM:SS.sssZ``."""
+    now = (instant or datetime.now(UTC)).astimezone(UTC)
     return now.strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
 
 
@@ -294,6 +297,8 @@ class UpdateResult:
     """Other objects written by relation syncing."""
     skipped: list[Skip]
     """Other objects relation syncing could not write."""
+    task: TaskResult | None = None
+    """What the Task status hook did (only when a Task's status changed category)."""
 
 
 class RestoreConflict(Exception):
@@ -606,6 +611,10 @@ class Space:
         self.own_deletes: dict[str, str] = {}
         """Path -> version of a file the app moved away (to the trash); the watcher stays silent."""
         self.trash = Trash(self.root)
+        self.clock: Callable[[], datetime] = lambda: datetime.now(UTC)
+        """The only source of "now" for stamps, the Task hook and the calendar (tests set it)."""
+        self.tz: tzinfo = SystemTz()
+        """The local zone (DST-aware) that turns instants into local days (tests set it)."""
         for rel in iter_object_paths(self.root):
             try:
                 self._raw[rel] = read_raw(self.root, rel)
@@ -617,6 +626,8 @@ class Space:
         self.unreadable_types: list[UnreadableType] = list(unreadable)
         self._add_placeholders(inferred)
         self._merge_types(inferred)
+        for t in self.types:
+            topup_task_type(t)
         self._loaded_revisions: dict[str, str] = {
             t.id: type_revision(self.root, t.id) for t in self.types if not t.readOnlyReason
         }
@@ -671,6 +682,8 @@ class Space:
             current = type_revision(self.root, type_id)
             if current and current != self._loaded_revisions.get(type_id):
                 stored = self._stored_type(type_id)
+                if stored is not None:
+                    topup_task_type(stored)
                 if stored is not None and stored.id == type_id:
                     self.types = [stored if x.id == type_id else x for x in self.types]
                     self._sort_types()
@@ -1391,7 +1404,12 @@ class Space:
     # -- the write engine -----------------------------------------------------
 
     def _write(
-        self, rel: str, base_version: str | None, edit: Edit, stamp: bool = True
+        self,
+        rel: str,
+        base_version: str | None,
+        edit: Edit,
+        stamp: bool = True,
+        now: datetime | None = None,
     ) -> str:
         """Apply `edit` to an object file safely; return its (new) version.
 
@@ -1401,6 +1419,7 @@ class Space:
         ``lastUpdated`` is set and an ``id`` inserted first when missing. A file
         without frontmatter gets a new fence block. Line endings, BOM and every
         untouched line's bytes are kept; the replace re-checks the version.
+        ``now`` is the write's instant for the stamp (default: `Space.clock`).
         """
         rel = self._rel(rel)
         full = self.root / rel
@@ -1420,7 +1439,7 @@ class Space:
                 insert_first = None if _str_or_none(raw.fm.get("id")) else {"id": new_ulid()}
                 fm_src = set_keys(
                     of.frontmatter_src or "",
-                    {"lastUpdated": now_stamp()},
+                    {"lastUpdated": now_stamp(now or self.clock())},
                     insert_first=insert_first,
                 )
                 of = replace(of, frontmatter_src=fm_src)
@@ -1618,12 +1637,20 @@ class Space:
                 raise InvalidValue(f"{key!r} can't be changed as a property")
         t = self._type_of(rel)
         before: dict = {}
+        task: list[TaskResult | None] = [None]
+        now = self.clock()  # one instant for `completed`, `lastUpdated` and "today"
+
+        def hook(fm: dict, sets: dict[str, Any], removals: list[str]) -> None:
+            task[0] = on_status_change(
+                t, fm, sets, removals, now, self.tz, explicit={*updates, *remove}
+            )
 
         def apply(src: str, fm: dict) -> str:
             before.update(fm)
-            return self._apply_values(t, rel, src, fm, updates, remove)
+            task[0] = None
+            return self._apply_values(t, rel, src, fm, updates, remove, hook=hook)
 
-        version = self._write(rel, base_version, self._fm_edit(apply))
+        version = self._write(rel, base_version, self._fm_edit(apply), now=now)
         _of, fm, _v = self.read(rel)
         synced, skipped = self._sync_relations(rel, t, before, fm)
         return UpdateResult(
@@ -1632,6 +1659,7 @@ class Space:
             links=self.links_of(rel, fm),
             synced=synced,
             skipped=skipped,
+            task=task[0],
         )
 
     def _apply_values(
@@ -1643,11 +1671,15 @@ class Space:
         updates: dict[str, Any],
         remove: Iterable[str] = (),
         merge_collections: bool = False,
+        hook: Callable[[dict, dict[str, Any], list[str]], None] | None = None,
     ) -> str:
         """Frontmatter source ``src`` with ``updates`` encoded in and the ``remove`` keys dropped.
 
         With ``merge_collections`` the ``collections`` names are added to the ones
-        already in ``fm`` (a new object from a template).
+        already in ``fm`` (a new object from a template). ``hook(fm, sets,
+        removals)`` (the Task status hook, `update_properties` only) may edit
+        what is written before it is; a ``date`` it rewrites keeps its line's
+        quotes and trailing comment.
         """
         sets: dict[str, Any] = {}
         removals: list[str] = []
@@ -1669,8 +1701,17 @@ class Space:
             sets.update(u)
             removals.extend(r)
         removals.extend(k for k in remove if k in fm)
+        in_place: dict[str, str] = {}
+        if hook is not None:
+            explicit_date = "date" in sets
+            hook(fm, sets, removals)
+            new_date = sets.get("date")
+            if not explicit_date and isinstance(new_date, str) and isinstance(fm.get("date"), str):
+                in_place["date"] = sets.pop("date")
         out = set_keys(src, sets) if sets else src
-        return delete_keys(out, [k for k in removals if k not in sets])
+        for key, value in in_place.items():
+            out = replace_in_value(out, key, lambda _old, value=value: value)
+        return delete_keys(out, [k for k in removals if k not in sets and k not in in_place])
 
     def _sync_relations(
         self, rel: str, t: TypeDefinition | None, old: dict, new: dict
@@ -2268,13 +2309,14 @@ class Space:
             if not self._templates_allowed(t):
                 raise TemplateError(f"{t.name} objects have no templates")
             tmpl = self._find_template(t, template_id)
-        created = datetime.now().astimezone()
+        instant = self.clock()
+        created = to_local(instant, self.tz)
         title = " ".join(str(title or "").split("\n")).strip()
         if not title and tmpl is not None:
             pattern = _str_or_none(tmpl.fm.get("title"))
             if pattern:
                 title = " ".join(expand_title(pattern, created).split("\n")).strip()
-        stamp = now_stamp()
+        stamp = now_stamp(instant)
         fm_src = set_keys(
             f"type: {_yaml_single_quoted(t.name)}\n",
             {**({"title": title} if title else {}), "createdAt": stamp, "lastUpdated": stamp},
@@ -3038,7 +3080,8 @@ class Space:
                 raise TypeReadOnly(mem.readOnlyReason)
             if current != (base_revision or ""):
                 raise RevisionConflict(current)
-            old = self._stored_type(mem.id) or mem
+            stored = self._stored_type(mem.id)
+            old = topup_task_type(stored) if stored is not None else mem
             new = copy.deepcopy(t)
             new.id, new.folder, new.basic = old.id, old.folder, old.basic
             new.formerNames = list(old.formerNames)

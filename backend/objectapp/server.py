@@ -521,15 +521,16 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             announce(
                 ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId)
             )
-        return _display_safe(
-            {
-                "version": result.version,
-                "frontmatter": result.frontmatter,
-                "links": result.links,
-                "synced": result.synced,
-                "skipped": [asdict(s) for s in result.skipped],
-            }
-        )
+        out = {
+            "version": result.version,
+            "frontmatter": result.frontmatter,
+            "links": result.links,
+            "synced": result.synced,
+            "skipped": [asdict(s) for s in result.skipped],
+        }
+        if result.task is not None:  # only when a Task's status changed category
+            out["task"] = result.task.to_api()
+        return _display_safe(out)
 
     @api.post("/object/ensure-id")
     def ensure_id(req: EnsureIdRequest):
