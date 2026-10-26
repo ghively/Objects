@@ -218,6 +218,15 @@ export interface PropertyPanelProps {
   onChangeType?(): void
   /** The type editor ObjectView saves through; property settings use it for 428s and kind changes. */
   typeEditor?: TypeEditor
+  /** Where the page layout puts the panel: the left side panel (Standard), a card, a column or an infobox. */
+  variant?: 'side' | 'card' | 'column' | 'infobox'
+}
+
+const PANEL_CLASS: Record<NonNullable<PropertyPanelProps['variant']>, string> = {
+  side: 'w-[370px] shrink-0 overflow-auto border-r border-line bg-panel px-6 pt-8 pb-6',
+  card: 'mb-8 rounded-xl border border-line bg-raised px-5 py-5',
+  column: 'w-full',
+  infobox: 'w-[var(--infobox-width)] shrink-0 self-start rounded-xl border border-line bg-raised px-4 py-5',
 }
 
 function Row({
@@ -276,6 +285,7 @@ export function PropertyPanel({
   onOpenObject,
   onChangeType,
   typeEditor,
+  variant = 'side',
 }: PropertyPanelProps) {
   const [showHidden, setShowHidden] = useState(false)
   const [menuFor, setMenuFor] = useState<string | null>(null)
@@ -353,7 +363,8 @@ export function PropertyPanel({
   return (
     <aside
       aria-label="Properties"
-      className="group/panel w-[370px] shrink-0 overflow-auto border-r border-line bg-panel px-6 pt-8 pb-6 text-fg"
+      data-panel-variant={variant}
+      className={`group/panel text-fg ${PANEL_CLASS[variant]}`}
     >
       {visible.map((def, i) => (
         <Fragment key={def.id}>

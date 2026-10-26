@@ -147,6 +147,18 @@
   --radius-2xl-v: 16px;
   --radius-3xl-v: 24px;
 
+  /* M2: the type's page font (Capacities' --font-sans / --font-serif / --font-mono). */
+  --object-font-sans-serif: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --object-font-serif: Georgia, serif;
+  --object-font-monospace: "Courier New", monospace;
+
+  /* M2: page layout sizes. Content width as M1; a cropped cover is a fixed-height band. */
+  --page-content-width: 820px;
+  --cover-crop-height: 240px;
+  --profile-image-size: 132px;
+  --profile-column-width: 280px;
+  --infobox-width: 300px;
+
   color-scheme: dark;
 }
 
