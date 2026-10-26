@@ -1,0 +1,2879 @@
+{
+  "components": {
+    "MediaAudio": {
+      "description": "Eine Audiospur",
+      "name": "Audio",
+      "pluralName": "Audio",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME-Typ"
+        },
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_audioCategory": {
+          "description": "",
+          "name": "Kategorie",
+          "set": {
+            "ambient": "Umgebungsgeräusch",
+            "dictation": "Diktat",
+            "interview": "Interview",
+            "lecture": "Vortrag",
+            "meeting": "Meeting",
+            "music": "Musik",
+            "other": "Sonstiges",
+            "phone-call": "Telefonat",
+            "podcast": "Podcast",
+            "voice-memo": "Sprachmemo"
+          }
+        },
+        "media_audioSource": {
+          "name": "Herkunft"
+        },
+        "media_duration": {
+          "name": "Dauer"
+        },
+        "media_fileSize": {
+          "name": "Dateigröße"
+        },
+        "media_notes": {
+          "description": "Sammle Gedanken und Ideen zu diesem Inhalt",
+          "name": "Notizen"
+        }
+      }
+    },
+    "MediaFile": {
+      "description": "Dateien von deinem Computer",
+      "name": "Datei",
+      "pluralName": "Dateien",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME-Typ"
+        },
+        "media_fileSize": {
+          "name": "Dateigröße"
+        },
+        "media_notes": {
+          "description": "Sammle Gedanken und Ideen zu diesem Inhalt",
+          "name": "Notizen"
+        }
+      }
+    },
+    "MediaImage": {
+      "description": "Ein Grafik, ein Bild, eine Visualisierung",
+      "name": "Bild",
+      "pluralName": "Bilder",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME-Typ"
+        },
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_fileSize": {
+          "name": "Dateigröße"
+        },
+        "media_imageCategory": {
+          "description": "",
+          "name": "Kategorie",
+          "set": {
+            "book-page": "Buchseite",
+            "business-card": "Visitenkarte",
+            "code": "Code",
+            "cover": "Titelbild",
+            "diagram": "Diagramm",
+            "document": "Dokument",
+            "handwritten-note": "Handschriftliche Notiz",
+            "illustration": "Illustration",
+            "infographic": "Infografik",
+            "logo-icon": "Logo/Icon",
+            "map": "Karte",
+            "medical": "Medizinisch",
+            "meme": "Meme",
+            "other": "Sonstiges",
+            "painting": "Gemälde",
+            "photo-animal": "Foto (Tier)",
+            "photo-architecture": "Foto (Architektur)",
+            "photo-event": "Foto (Event)",
+            "photo-food": "Foto (Essen)",
+            "photo-nature": "Foto (Natur)",
+            "photo-object": "Foto (Objekt)",
+            "photo-people": "Foto (Personen)",
+            "receipt": "Quittung",
+            "scientific": "Wissenschaftlich",
+            "screenshot": "Screenshot",
+            "ui-mockup": "UI-Mockup",
+            "whiteboard": "Whiteboard"
+          }
+        },
+        "media_imageColors": {
+          "description": "",
+          "name": "Farben",
+          "set": {
+            "beige": "Beige",
+            "black": "Schwarz",
+            "blue": "Blau",
+            "brown": "Braun",
+            "cyan": "Cyan",
+            "fuchsia": "Fuchsia",
+            "gold": "Gold",
+            "gray": "Grau",
+            "green": "Grün",
+            "indigo": "Indigo",
+            "magenta": "Magenta",
+            "orange": "Orange",
+            "pink": "Rosa",
+            "purple": "Lila",
+            "red": "Rot",
+            "tan": "Hellbraun",
+            "teal": "Petrol",
+            "turquoise": "Türkis",
+            "violet": "Violett",
+            "white": "Weiß",
+            "yellow": "Gelb"
+          }
+        },
+        "media_imageHeight": {
+          "name": "Höhe"
+        },
+        "media_imageSource": {
+          "name": "Herkunft"
+        },
+        "media_imageWidth": {
+          "name": "Breite"
+        },
+        "media_notes": {
+          "description": "Sammle Gedanken und Ideen zu diesem Inhalt",
+          "name": "Notizen"
+        }
+      },
+      "structureViews": {
+        "MediaImage_embed_fullWidthCappedHeight": {
+          "title": "Volle Breite"
+        },
+        "MediaImage_embed_main": {
+          "title": "Eingebettet"
+        },
+        "MediaImage_embed_square": {
+          "title": "Quadrat"
+        },
+        "MediaImage_inline_main": {
+          "title": "Link-Block"
+        },
+        "MediaImage_page_main": {
+          "title": "Seite"
+        },
+        "MediaImage_smallCard_main": {
+          "title": "Kleine Kachel"
+        },
+        "MediaImage_smallCard_square": {
+          "title": "Kleine Kachel (Quadratisch)"
+        },
+        "MediaImage_wideCard_main": {
+          "title": "Breite Kachel"
+        }
+      }
+    },
+    "MediaPDF": {
+      "description": "Bette eine PDF-Datei ein",
+      "name": "PDF",
+      "pluralName": "PDFs",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME-Typ"
+        },
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_fileSize": {
+          "name": "Dateigröße"
+        },
+        "media_notes": {
+          "description": "Sammle Gedanken und Ideen zu diesem Inhalt",
+          "name": "Notizen"
+        },
+        "media_pdfDocumentType": {
+          "description": "",
+          "name": "Dokumententyp",
+          "set": {
+            "academic-paper": "Wissenschaftliche Arbeit",
+            "article": "Artikel",
+            "book": "Buch",
+            "educational-material": "Lehrmaterial",
+            "financial-document": "Finanzdokument",
+            "form": "Formular",
+            "legal-document": "Juristisches Dokument",
+            "letter": "Brief",
+            "manual": "Handbuch",
+            "marketing-material": "Marketingmaterial",
+            "other": "Sonstiges",
+            "policy-document": "Richtliniendokument",
+            "presentation": "Präsentation",
+            "report": "Bericht",
+            "scanned-document": "Gescanntes Dokument"
+          }
+        },
+        "media_pdfHasTOC": {
+          "name": "Inhaltsverzeichnis"
+        },
+        "media_pdfNumberOfPages": {
+          "name": "Seitenanzahl"
+        },
+        "media_pdfSource": {
+          "name": "Quelle"
+        },
+        "media_pdfTopic": {
+          "description": "",
+          "name": "Thema",
+          "set": {
+            "ai-ml": "KI/ML",
+            "arts-culture": "Kunst & Kultur",
+            "business": "Wirtschaft",
+            "design": "Design",
+            "education": "Bildung",
+            "finance": "Finanzen",
+            "government": "Regierung",
+            "history": "Geschichte",
+            "legal": "Recht",
+            "marketing": "Marketing",
+            "medicine": "Medizin",
+            "operations": "Betrieb",
+            "other": "Sonstiges",
+            "personal": "Persönlich",
+            "policy": "Richtlinie",
+            "product": "Produkt",
+            "programming": "Programmierung",
+            "research": "Forschung",
+            "science": "Wissenschaft",
+            "technology": "Technologie"
+          }
+        },
+        "media_previewImage": {
+          "name": "Vorschaubild"
+        }
+      }
+    },
+    "MediaTweet": {
+      "cannotDisplayVideoAndGif": "Aufgrund von Beschränkungen der Twitter-API können wir derzeit keine Videos und GIFs anzeigen. Öffne den Tweet auf Twitter, um alle Medien zu sehen.",
+      "description": "Ein Twitter-Tweet",
+      "name": "Tweet",
+      "openOnTwitter": "Auf Twitter öffnen",
+      "pluralName": "Tweets",
+      "propertyDefinitions": {
+        "is_thread": {
+          "name": "Thread"
+        },
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_notes": {
+          "name": "Notizen"
+        },
+        "media_tweets": {
+          "name": "Tweets"
+        },
+        "tweet_attachments": {
+          "description": "",
+          "name": "Anhänge"
+        },
+        "tweet_language": {
+          "name": "Sprache"
+        },
+        "twitter_userName": {
+          "name": "Twitter-Handle"
+        }
+      },
+      "turnThreadIntoTweet": "Nur den letzten Tweet des Threads behalten",
+      "tweetGenerationFailed": "Eine lokale Version des Tweets konnte nicht erstellt werden."
+    },
+    "MediaVideo": {
+      "OptionalDescription": {
+        "button": "Beschreibung hinzufügen"
+      },
+      "description": "Nutze die Macht von Videos.",
+      "name": "Video",
+      "pluralName": "Videos",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME-Typ"
+        },
+        "media_duration": {
+          "name": "Dauer"
+        },
+        "media_fileSize": {
+          "name": "Dateigröße"
+        }
+      },
+      "text": {
+        "description": {
+          "placeholder": "Beschreibung..."
+        },
+        "main": {
+          "placeholder": "Titel..."
+        }
+      },
+      "videoUrlInput": {
+        "placeholder": "YouTube-Link oder YouTube-ID"
+      }
+    },
+    "MediaWebResource": {
+      "addEmbed": "Einbettung-URL hinzufügen",
+      "addPreviewImage": "Vorschaubild hinzufügen",
+      "annotations": {
+        "addComment": "Kommentar hinzufügen",
+        "analyzePrompt": "Analysiere diese Seite für verlässlichere Highlights in Reader und Browser.",
+        "collapseComments": "Weniger anzeigen",
+        "commentPlaceholder": "Kommentar hinzufügen...",
+        "highlightWithColor": "Mit {color} hervorheben",
+        "moreComments": "{count} weitere",
+        "openInReader": "Im Reader öffnen"
+      },
+      "browser": {
+        "back": "Zurück",
+        "electronOnly": "Die Browser-Ansicht ist nur in der Desktop-App verfügbar.",
+        "forward": "Weiter",
+        "missingUrl": "Dieser Weblink hat keine URL.",
+        "openExternal": "Extern öffnen",
+        "reload": "Neu laden",
+        "stop": "Laden stoppen"
+      },
+      "browserView": "Browser",
+      "copyUrlToClipboard": "URL in Zwischenablage kopieren",
+      "create": {
+        "button": "Erstellen"
+      },
+      "deleteImage": "Bild löschen",
+      "description": "Erstelle eine Referenz zu einer Internetseite",
+      "editEmbed": "Einbettung-URL bearbeiten",
+      "name": "Weblink",
+      "pluralName": "Weblinks",
+      "propertyDefinitions": {
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_host": {
+          "description": "Host-Adresse des Weblinks",
+          "name": "Domain"
+        },
+        "media_iframeReference": {
+          "name": "Iframe-URL"
+        },
+        "media_notes": {
+          "description": "Sammle Gedanken und Ideen zu diesem Inhalt",
+          "name": "Notizen"
+        },
+        "media_previewImage": {
+          "name": "Vorschaubild"
+        },
+        "media_weblinkCategory": {
+          "description": "",
+          "name": "Kategorie",
+          "set": {
+            "about": "Über",
+            "app": "App",
+            "article": "Artikel",
+            "audio": "Audio",
+            "blog-post": "Blogpost",
+            "code": "Code",
+            "course": "Kurs",
+            "documentation": "Dokumentation",
+            "event": "Event",
+            "forum-thread": "Forumsbeitrag",
+            "guide": "Leitfaden",
+            "how-to": "Anleitung",
+            "image-gallery": "Bildergalerie",
+            "infographic": "Infografik",
+            "marketplace": "Marktplatz",
+            "news": "Nachrichten",
+            "other": "Sonstiges",
+            "podcast": "Podcast",
+            "portfolio": "Portfolio",
+            "product": "Produkt",
+            "profile": "Profil",
+            "q-and-a": "Q&A",
+            "recipe": "Rezept",
+            "repository": "Repository",
+            "service": "Service",
+            "shop": "Shop",
+            "social-post": "Social Post",
+            "tool": "Tool",
+            "tutorial": "Tutorial",
+            "video": "Video",
+            "webinar": "Webinar"
+          }
+        },
+        "media_weblinkTopic": {
+          "description": "",
+          "name": "Thema",
+          "set": {
+            "academic": "Akademisch",
+            "ai-ml": "KI/ML",
+            "art": "Kunst",
+            "business": "Business",
+            "creative": "Kreativität",
+            "current-events": "Aktuelles",
+            "design": "Design",
+            "education": "Bildung",
+            "entertainment": "Unterhaltung",
+            "finance": "Finanzen",
+            "fitness": "Fitness",
+            "food": "Essen",
+            "gaming": "Gaming",
+            "health": "Gesundheit",
+            "learning": "Lernen",
+            "lifestyle": "Lifestyle",
+            "marketing": "Marketing",
+            "media": "Medien",
+            "news": "Nachrichten",
+            "other": "Sonstiges",
+            "politics": "Politik",
+            "productivity": "Produktivität",
+            "programming": "Programmierung",
+            "research": "Forschung",
+            "science": "Wissenschaft",
+            "technology": "Technologie",
+            "tools": "Tools",
+            "travel": "Reisen",
+            "wellness": "Wellness"
+          }
+        }
+      },
+      "reader": {
+        "errorDescription": "Diese Seite konnte nicht in einen lesbaren Artikel umgewandelt werden.",
+        "errorTitle": "Reader-Ansicht nicht verfügbar",
+        "extracting": "Reader-Ansicht wird vorbereitet…",
+        "idleDescription": "Öffne zuerst den Browser-Tab und aktualisiere dann die Reader-Ansicht.",
+        "idleTitle": "Reader-Ansicht noch nicht bereit",
+        "refresh": "Aktualisieren",
+        "title": "Reader"
+      },
+      "readerView": "Reader",
+      "retryAnalysis": "Analyse erneut versuchen",
+      "search": "Seite durchsuchen",
+      "structureViews": {
+        "MediaWebResource_embed_main": {
+          "title": "Eingebettet"
+        },
+        "MediaWebResource_embed_wide": {
+          "title": "Einbettung (Breit)"
+        },
+        "MediaWebResource_inline_main": {
+          "title": "Linkblock"
+        },
+        "MediaWebResource_page_main": {
+          "title": "Seite"
+        },
+        "MediaWebResource_smallCard_main": {
+          "title": "Kleine Karte"
+        },
+        "MediaWebResource_wideCard_main": {
+          "title": "Große Karte"
+        }
+      },
+      "webEmbed": "Webeinbettung"
+    },
+    "QueryDataView": {
+      "invalidVariableQueryInfo": {
+        "description": "Diese Query enthält einen Verweis auf ein Objekt. Du musst sie als Einbettung in einem anderen Objekt verwenden, um Ergebnisse anzuzeigen.",
+        "heading": "Variable Queries müssen als Embed in anderen Objekten verwendet werden"
+      }
+    },
+    "RootAIChat": {
+      "description": "Ein Chat mit einem KI-Assistenten",
+      "name": "KI-Chat",
+      "pluralName": "KI-Chats",
+      "propertyDefinitions": {
+        "chat_context": {
+          "description": "",
+          "name": "Kontext"
+        },
+        "media_notes": {
+          "name": "Notizen"
+        },
+        "util_aiChat": {
+          "description": "",
+          "name": "KI-Chat"
+        }
+      },
+      "saveChat": "Als Objekt speichern"
+    },
+    "RootBlocksTemplate": {
+      "description": "Ein Gruppe von Blöcken die dupliziert werden können",
+      "name": "Vorlage",
+      "pluralName": "Vorlagen",
+      "propertyDefinitions": {
+        "template_blocks": {
+          "description": "Diese Blöcke werden dupliziert, wenn dieses Template verwendet wird",
+          "name": "Vorlageninhalt"
+        }
+      }
+    },
+    "RootDailyNote": {
+      "createDailyNote": "Tägliche Notiz erstellen",
+      "createdOnThatDay": "An diesem Tag erstellt",
+      "createdToday": "Heute erstellt",
+      "createdYesterday": "Gestern erstellt",
+      "description": "Eine tägliche Notiz",
+      "emptyStates": {
+        "month": "Für diesen Monat wurden keine täglichen Notizen erstellt."
+      },
+      "name": "Tägliche Notiz",
+      "openAsPage": "Als Seite öffnen",
+      "openOnDashboard": "Kalender",
+      "placeholder": "Beginne deine tägliche Notiz",
+      "pluralName": "Tägliche Notizen",
+      "propertyDefinitions": {
+        "RootDailyNote_notes": {
+          "name": "Notizen"
+        },
+        "RootDailyNote_reviewed": {
+          "name": "Geprüft"
+        }
+      },
+      "queries": {
+        "7e3c1a94-5b28-4d06-9f81-2a6c8e0d4b17": {
+          "name": "Ungeprüft"
+        }
+      },
+      "templates": {
+        "createNewTemplate": {
+          "label": "Neue Vorlage"
+        },
+        "delete": {
+          "tooltip": "Vorlage löschen"
+        },
+        "edit": {
+          "tooltip": "Vorlage bearbeiten"
+        },
+        "empty": {
+          "label": "Leere Notiz"
+        },
+        "markAsDefault": {
+          "tooltip": "Als Standard markieren"
+        },
+        "noTemplates": "Noch keine Templates"
+      }
+    },
+    "RootDatabase": {
+      "create": "Einen Objekttyp hinzufügen",
+      "createShort": "Neuer Typ",
+      "databaseViews": {
+        "grid": {
+          "defaultName": "Rasteransicht",
+          "new": "Neue Rasteransicht"
+        },
+        "list": {
+          "defaultName": "Listenansicht",
+          "new": "Neue Listenansicht"
+        },
+        "table": {
+          "defaultName": "Tabellenansicht",
+          "new": "Neue Tabellenansicht"
+        },
+        "wall": {
+          "new": "Neue Wandansicht"
+        }
+      },
+      "default": {
+        "name": "Default"
+      },
+      "delete": {
+        "modal": {
+          "body": "Beim Löschen einer Sammlung werden alle Einträge gelöscht. Einträge, die noch in einer anderen Sammlung vorhanden sind, bleiben dort bestehen.",
+          "header": "Willst Du diese Sammlung wirklich löschen?"
+        }
+      },
+      "description": "Organisiere deine Inhalte",
+      "emptyStateText": "Keine Einträge",
+      "name": "Sammlung",
+      "newCollectionTitle": "Neue Sammlung",
+      "panels": {
+        "title": {
+          "content-panel": "Beschreibung",
+          "definition-panel": "Definition",
+          "entries-panel": "Einträge",
+          "views-panel": "Ansichten"
+        }
+      },
+      "pluralName": "Sammlungen",
+      "propertyDefinitions": {
+        "entityTemplates": {
+          "name": "Vorlagen"
+        },
+        "isDefaultDatabase": {
+          "name": "Default-Sammlung"
+        },
+        "structures": {
+          "name": "Struktur"
+        }
+      }
+    },
+    "RootEntity": {
+      "description": "Ein Objekt",
+      "hidePropertySection": "Merkmale verbergen",
+      "hideTOCSection": "Inhaltsverzeichnis verbergen",
+      "name": "Eintrag",
+      "pluralName": "Einträge",
+      "showPropertySection": "Merkmale anzeigen",
+      "showTOCSection": "Inhaltsverzeichnis anzeigen"
+    },
+    "RootPage": {
+      "create": "Erstelle eine Seite",
+      "createTooltip": "Füge eine neue Seite zu Deinen Favoriten hinzu",
+      "delete": {
+        "modal": {
+          "body": "Diese Seite wird aus deiner Raum-Navigation gelöscht. \nWenn du sie woanders verwendest, ist sie dort weiterhin verfügbar.",
+          "header": "Möchtest du diese Seite wirklich löschen?"
+        }
+      },
+      "description": "Eine Seite für Notizen",
+      "labels": {
+        "worksheet": {
+          "name": "Page",
+          "tooltip": "test"
+        }
+      },
+      "name": "Seite",
+      "pluralName": "Seiten",
+      "propertyDefinitions": {
+        "cdde4a50-df94-40f3-944a-d0b7034f13d5": {
+          "name": "Inhalt"
+        },
+        "d6bebd5b-7ad3-4d09-b87c-3e021b880903": {
+          "name": "Vorschaubild"
+        }
+      }
+    },
+    "RootQuery": {
+      "addDate": "Datum",
+      "addExcludeType": "Typ ausschließen",
+      "addGroup": "Gruppe hinzufügen",
+      "addLimit": "Limit",
+      "addObjectType": "Objekttyp hinzufügen",
+      "addOtherTag": "Query erstellen",
+      "addProperty": "Eigenschaft",
+      "addSearchTerm": "Weiteren Begriff hinzufügen, ein Ergebnis kann mit einem beliebigen übereinstimmen.",
+      "addSort": "Sortierung hinzufügen",
+      "addTag": "Schlagwort",
+      "addTagOrBacklink": "Schlagwort oder Rückverweis hinzufügen",
+      "addTagOrLink": "Schlagwort oder Link",
+      "addType": "Typ",
+      "adjustSearch": "Optionen",
+      "aiQuery": {
+        "debug": "KI-Query-Debug",
+        "debugExplanation": "Erklärung",
+        "debugPrompt": "Nutzerabsicht",
+        "debugResponse": "Modellantwort",
+        "error": "Query konnte nicht generiert werden. Bitte versuche es erneut.",
+        "generate": "Query erstellen",
+        "generating": "Query wird generiert…",
+        "label": "KI fragen",
+        "orBuildManually": "oder baue die Query selbst",
+        "orEditManually": "oder bearbeite die Query direkt",
+        "placeholder": "Beschreibe die gewünschte Query…",
+        "placeholderUpdate": "Beschreibe, was du ändern möchtest …",
+        "stop": "Stopp",
+        "thinking": {
+          "filters": "Filter werden angewendet …",
+          "finalizing": "Alles wird zusammengeführt …",
+          "objectTypes": "Durchsuche deine Objekttypen …",
+          "reviewingExisting": "Bestehende Query wird geprüft …",
+          "sortingGrouping": "Sortierung und Gruppierung werden gewählt …",
+          "tagsCollections": "Schlagwörter und Collections werden abgeglichen …",
+          "understanding": "Anfrage wird verstanden …"
+        },
+        "update": "Query aktualisieren",
+        "updating": "Query wird aktualisiert …"
+      },
+      "allContent": "Alle Notizen",
+      "allExcept": "alle außer",
+      "allObjectTypes": "Alle Objekttypen",
+      "anyCollection": "Beliebige Sammlung",
+      "anyOfThese": "eines von",
+      "blocks": "Objekte und Blöcke",
+      "butNo": "Aber keine",
+      "butOnly": "Jedoch nur",
+      "changeQueryType": "Abfrage-Typ ändern",
+      "closeOptions": "Optionen schließen",
+      "closeQueryEditor": "Editor schließen",
+      "collectionAll": "Alle",
+      "collectionExcluded": "{count} Sammlung ausgeschlossen",
+      "collectionIncluded": "{count} Sammlung eingeschlossen",
+      "collections": "Sammlungen",
+      "collectionsExcluded": "{count} Sammlungen ausgeschlossen",
+      "collectionsIncluded": "{count} Sammlungen eingeschlossen",
+      "collectionsMenuSelectable": "Wählbar",
+      "collectionsMenuSelected": "Ausgewählt",
+      "collectionsNeedObjectType": "Füge zuerst einen Objekttyp als Filter hinzu.",
+      "collectionsSelected": "{count} Sammlungen ausgewählt",
+      "collectionsUnsupported": "Dieser Objekttyp unterstützt keine Sammlungen.",
+      "constrainedBy": "Eingeschränkt durch",
+      "constraintHelp": {
+        "excludeTagsAndBacklinks": "Ein Schlagwort sitzt auf der Notiz. Ein Rückverweis ist eine Notiz, die auf die gewählte verweist. Übereinstimmungen werden ausgeschlossen.",
+        "tagsAndBacklinks": "Ein Schlagwort sitzt auf der Notiz. Ein Rückverweis ist eine Notiz, die auf die gewählte verweist. \"Eines von\" trifft auf eine zu; \"Alle von\" auf jede."
+      },
+      "dates": "Daten",
+      "describeAChange": "Beschreibe eine Änderung",
+      "describeAQuery": "Beschreibe eine Query",
+      "description": "Sammle Inhalte basierend auf Regeln",
+      "display": "Anzeige",
+      "displayGroup": "Gruppe",
+      "editQuery": "Query bearbeiten",
+      "emptyState": "Keine Inhalte gefunden",
+      "excludeCollections": "Sammlungen ausschließen",
+      "excludeObjectTypes": "Objekttypen ausschließen",
+      "excludeTags": "Schlagwörter oder Rückverweise ausschließen",
+      "filterByCollection": "Nach Sammlung filtern",
+      "filterByDate": "Nach Datum filtern",
+      "filterByObjectType": "Nach Objekttyp filtern",
+      "filterBySearch": "Nach Suche filtern",
+      "filterByTagsAndBacklinks": "Nach Schlagwörtern oder Rückverweisen filtern",
+      "filterCollections": "Sammlungen filtern",
+      "filterObjectTypes": "Auf Objekttypen beschränken",
+      "filterProperties": "Nach Merkmalen filtern",
+      "filterTags": "Nach Schlagwörtern filtern",
+      "filterTagsOrLinks": "Nach Schlagwörtern oder Links filtern",
+      "filteredBy": "Gefiltert mit",
+      "first": "die ersten",
+      "group": "Gruppieren nach",
+      "groupByType": "Nach Objekttyp gruppieren",
+      "groupedBy": "Gruppiert nach",
+      "in": "in",
+      "inAnyCollection": "In einer Sammlung",
+      "inCollection": "In einer Sammlung",
+      "inNoCollection": "In keiner Sammlung",
+      "inTitleAndBody": "In Titel und Inhalt",
+      "invalidQuery": "Ungültige Query",
+      "limit": "Begrenzung",
+      "limitResults": "Ergebnisse begrenzen",
+      "limitedTo": "Begrenzt auf",
+      "matching": "Mit Suchbegriff(en)",
+      "mode": "Modus",
+      "moveSortToTop": "Nach oben verschieben",
+      "nObjectTypes": "{count} Objekttypen",
+      "name": "Query",
+      "narrowFurther": "Filtern",
+      "noDefinition": "Keine Definition",
+      "noGroup": "Keine Gruppe",
+      "noLimit": "Keine Begrenzung",
+      "noSort": "Keine Sortierung",
+      "notIn": "nicht in",
+      "notTaggedWith": "aber nicht mit",
+      "objectType": "Objekttyp",
+      "objectTypeAllOfHint": "Ein Objekt hat nur einen Typ, daher ist \"Alle von\" nicht verfügbar.",
+      "objectTypes": "Objekttypen",
+      "objectsFilteredBy": "Objekte gefiltert nach",
+      "offlineQuery": {
+        "description": "Für diese Ansicht müssen alle Inhalte auf deinem Gerät geladen sein. \nSie wird aktualisiert, sobald dies fertig ist.",
+        "heading": "Ansicht ist noch nicht bereit"
+      },
+      "onlyBlocks": "Nur Blöcke",
+      "onlyObjects": "Nur Objekte",
+      "pinToDatabase": "An Dashboard anpinnen",
+      "pinToSpaceOverview": "In Übersicht des Objekttyps anheften",
+      "pluralName": "Queries",
+      "properties": "Eigenschaften",
+      "queryBuilder": {
+        "addTag": "Schlagwort hinzufügen",
+        "advanced": "Erweitert",
+        "aiLabel": "KI",
+        "allObjects": "Alle Objekte",
+        "allTypes": "Alle",
+        "allTypesTooltip": "Nicht nach Objekttyp filtern",
+        "autoTitle": {
+          "linkedTo": "verlinkt mit {entities}",
+          "notLinkedTo": "nicht verlinkt mit {entities}",
+          "notTagged": "nicht mit {tags} getaggt",
+          "tagged": "getaggt mit {tags}"
+        },
+        "buildWithAi": "Mit KI erstellen",
+        "clearCollectionFilters": "Kollektionen-Filter löschen",
+        "clearExcludeTypes": "Löschen",
+        "closeAi": "KI-Builder schließen",
+        "collectionFiltersActive": "Kollektionen-Filter sind für diese Query aktiv.",
+        "convertExcludeToSelection": "In Auswahl umwandeln",
+        "convolutionPaused": "Sortier- und Eigenschafts-Filter pausieren während der Suche.",
+        "excludeTagDisabled": "Das Ausschließen von Schlagwörtern erfordert einen Suchbegriff oder ein enthaltenes Schlagwort.",
+        "excludeTagHint": "Klicken, um dieses Schlagwort einzuschließen oder auszuschließen",
+        "excludeTypes": "Typen ausschließen",
+        "excludeTypesHint": "Füge einen Suchbegriff oder ein Schlagwort hinzu, um Objekttypen auszuschließen.",
+        "excludeTypesInactive": "Hat keine Wirkung, wenn bestimmte Typen ausgewählt sind.",
+        "instructions": "Nutze beliebige Kombinationen aus Suchbegriffen, Objekttypen und Schlagwörtern. Lasse alles weg, was du nicht brauchst. Alles, was du hinzufügst, schränkt die Ergebnisse weiter ein.",
+        "invalidDescription": "Dieser Entwurf ist gespeichert, liefert aber keine Ergebnisse, bis du einen Suchbegriff, ein Schlagwort oder einen Objekttyp hinzufügst.",
+        "invalidTitle": "Query ist noch nicht bereit",
+        "moreTypes": "+{count} mehr",
+        "notTag": "nicht",
+        "releaseConstraintTooltip": "In eine normale Query umwandeln und die Einzeltyp-Einschränkung entfernen. Öffnet die Query als Seite und entfernt diesen Tab im Typ-Dashboard.",
+        "scopeShiftNotice": "Passt jetzt Schlagwörter überall an, auch in Inline-Erwähnungen.",
+        "searchHint": "Drücke Enter zum Hinzufügen",
+        "searchLabel": "Suche",
+        "searchPlaceholder": "Suchbegriffe…",
+        "searchTermCount": "{count}/{max}",
+        "searchTooShort": "Mindestens 2 Zeichen verwenden",
+        "showBlocks": "Blöcke",
+        "showDisabled": "Objekte und Blöcke werden angezeigt, wenn gesucht oder nach Schlagwörtern gefiltert wird.",
+        "showEverything": "Alles",
+        "showObjects": "Objekte",
+        "tagsLabel": "Schlagwörter oder Rückverweise",
+        "typesLabel": "Typen"
+      },
+      "random": "zufällige",
+      "recurringTasksInfo": "Wiederkehrende Aufgaben haben Einschränkungen bei Abfragen: Abgeschlossene Instanzen werden nicht angezeigt und zukünftige Instanzen können nicht abgefragt werden.",
+      "removeAllFilters": "Alle Filter entfernen",
+      "results": "Ergebnisse",
+      "return": "Zeige",
+      "returnAll": "Gib zurück alle",
+      "saveAsQuery": "Als Query speichern",
+      "saveAsQueryTooltip": "Aktuelle Ansicht der Inhalte als Query speichern",
+      "searchModes": {
+        "auto": {
+          "label": "Automatisch",
+          "tooltip": "Kombiniert Suchmodi, um die relevantesten Treffer zu finden."
+        },
+        "fullText": {
+          "label": "Exakt",
+          "tooltip": "Durchsucht alle Inhalte und findet exakte Begriffe."
+        },
+        "semantic": {
+          "label": "Semantisch",
+          "meaning": "Bedeutung",
+          "tooltip": "Liefert semantisch verwandte Inhalte zu den Suchbegriffen."
+        },
+        "title": {
+          "label": "Titel",
+          "tooltip": "Durchsucht nur den Titel und findet exakte Begriffe."
+        }
+      },
+      "searchQueryTagFilterInfo": "Diese Query gibt alle Inhalte zurück, die mit den ausgewählten Schlagwörtern getagged sind. \nWenn du erweiterte Tag-basierte Filter benötigst, erstelle eine Query mit dem Typ „Schlagwörter“.",
+      "searchTerm": "Suche",
+      "searchTerms": "Suche",
+      "selectQueryType": "Query starten mit...",
+      "showBlocks": "Blöcke",
+      "showObjects": "Objekte",
+      "sort": "Sortieren",
+      "sortedBy": "Sortiert nach",
+      "subscriptionNeeded": "Mithilfe von Abfragen kannst du Inhalte basierend auf Regeln sammeln. \nSie sind eine Funktion von Capacities Pro.",
+      "tagOperators": {
+        "and": "Alle der Folgenden",
+        "or": "Einer der Folgenden"
+      },
+      "taggedWith": "Inhalte mit folgenden Schlagwörtern",
+      "taggedWithOrLinkedTo": "Mit Schlagwort / Link versehen",
+      "tagsAndBacklinks": "Schlagwörter oder Rückverweise",
+      "tagsAndLinks": "Schlagwörter und Links",
+      "tagsInfo": "Abfragen nach Objekttypen werden nur nach Schlagwörtern auf oberster Ebene gefiltert. Wenn du Objekte und Blöcke nach Schlagwort filtern möchtest, musst du Schlagwort-Queries verwenden.",
+      "unpinFromDatabase": "Vom Dashboard entfernen",
+      "unpinFromSpaceOverview": "Aus Übersicht des Objekttyps lösen",
+      "unsavedChanges": "Es gibt ungespeicherte Änderungen. Speichere diese bevor du den Query-Editor schließt.",
+      "updatingStates": {
+        "live": {
+          "tooltip": "Alle Inhalte dieser Query sind live und werden automatisch über Geräte hinweg aktualisiert."
+        },
+        "show": {
+          "button": "Aktualisieren",
+          "tooltip": "Diese Abfrage ruft Inhalte nicht automatisch von anderen Geräten ab. \nDu kannst auf „Aktualisieren“ klicken, wenn du Inhalte vermisst."
+        }
+      },
+      "withTags": "Mit Schlagwörtern"
+    },
+    "RootSimpleTable": {
+      "description": "Eine Tabelle mit Formatierungsmöglichkeiten und Formeln",
+      "name": "Tabelle",
+      "pluralName": "Tabellen",
+      "propertyDefinitions": {
+        "RootSimpleTable_coverImage": {
+          "name": "Vorschaubild"
+        },
+        "RootSimpleTable_notes": {
+          "name": "Notizen"
+        },
+        "RootSimpleTable_simpleTableBlock": {
+          "name": "Tabelle"
+        }
+      }
+    },
+    "RootSpace": {
+      "addSpace": "Raum hinzufügen",
+      "create": "Raum erstellen",
+      "description": "TODO.",
+      "name": "Raum",
+      "newContent": {
+        "name": "Neu"
+      },
+      "overview": "Raumübersicht",
+      "pluralName": "Räume",
+      "propertyDefinitions": {
+        "databases": {
+          "name": "Sammlungen"
+        },
+        "pages": {
+          "name": "Seiten"
+        },
+        "workspace_pages": {
+          "name": "Favoriten"
+        }
+      },
+      "setup": {
+        "blankSpace": {
+          "blank": "Leerer Raum",
+          "description": "Beginne mit einem leeren Raum"
+        },
+        "chooseLanguage": {
+          "explain": "Wähle deine Sprache. Alle Inhalte in diesem Space verwenden diese Sprache als Hauptsprache. Du kannst deinen Inhalt dann in andere Sprachen übersetzen."
+        },
+        "chooseTemplate": {
+          "explain": "Starte von einer Vorlage oder beginne mit einem leeren Raum."
+        },
+        "explain": {
+          "heading": "Räume sind isoliert. Erstelle keinen neuen Raum für Inhalte die Verbindungen zu Inhalten in anderen Räumen haben.",
+          "text": "Alle Inhalte existieren nur in einem Raum. Erstelle einen neuen Raum nur, wenn du dessen Inhalte vollständig von Inhalten in anderen Räumen isolieren willst."
+        },
+        "heading": "Erstelle einen neuen Raum",
+        "intro": "Wähle einen Namen für Deinen Raum. Wenn Du willst, kannst Du auch ein Icon auswählen, um Deinen Inhalt besser wiederzuerkennen.",
+        "namePlaceholder": "Wähle einen Namen, der Deinen Raum beschreibt"
+      },
+      "text": {
+        "main": {
+          "placeholder": "Schreibe einen Text oder suche nach Blöcken"
+        }
+      }
+    },
+    "RootStructure": {
+      "cardDefinitions": "Kacheln",
+      "computedProperties": "Berechnete Merkmale",
+      "create": "Typ erstellen",
+      "databaseName": "Datenbank",
+      "databaseProperties": "Datenbank-Merkmale",
+      "description": "Einen Objekttyp definieren",
+      "filters": "Filter",
+      "name": "Objekttyp",
+      "pluralName": "Objekttypen",
+      "properties": {
+        "add": "Eigenschaft hinzufügen",
+        "name": "Merkmale"
+      },
+      "propertyDefinitions": {
+        "pluralName": {
+          "name": "Plural des Titels"
+        }
+      },
+      "structureViews": {
+        "defaultViewType": {
+          "description": "Damit legst Du den Typ fest, der für diese Struktur bei einer externen Verwendung als Standard\n                    benutzt wird."
+        },
+        "deleteStructureView": {
+          "modal": {
+            "explanation": "Das Löschen einer Ansicht kann nicht rückgängig gemacht werden. Alle Verwendungen werden mit der Standardansicht überschrieben.",
+            "header": "Willst Du diese Ansicht wirklich löschen?"
+          }
+        },
+        "embed": {
+          "first": "Eingebettete Ansicht",
+          "new": "Neue Ansicht"
+        },
+        "emptyState": {
+          "description": "Noch keine Objekte dieser Struktur vorhanden. Erstelle welche, um eine vollständige Vorschau zu erhalten."
+        },
+        "inline": {
+          "first": "Link mit voller Breite",
+          "new": "Neue Textansicht"
+        },
+        "page": {
+          "first": "Seitenansicht",
+          "new": "Neue Seitenansicht"
+        },
+        "smallCard": {
+          "first": "Kleine Kachel",
+          "new": "Neue Kachelansicht"
+        },
+        "wideCard": {
+          "first": "Breite Kachel",
+          "new": "Neue Kachelansicht"
+        }
+      },
+      "templateDefinitions": "Vorlagen",
+      "title": "Inhaltsstruktur",
+      "views": {
+        "add": "Ansicht hinzufügen",
+        "puralName": "Ansichten"
+      }
+    },
+    "RootTag": {
+      "byType": {
+        "heading": "Nach Typ"
+      },
+      "description": "Sammle Inhalte zu einem Thema",
+      "edit": "Schlagwort hinzufügen",
+      "emptyStateText": "Keine Inhalte gefunden",
+      "hideTagsInText": "Im Text erwähnte Schlagwörter verbergen",
+      "inText": "Im Inhalt erwähnt",
+      "mobileEdit": "Schlagwörter bearbeiten",
+      "name": "Schlagwort",
+      "noContent": {
+        "heading": "Keine Inhalte"
+      },
+      "noTags": "Schlagwörter",
+      "pluralName": "Schlagwörter",
+      "propertyDefinitions": {
+        "tag_colorTheme": {
+          "description": "Farbname des Schlagworts",
+          "name": "Farbe"
+        }
+      },
+      "relatedTags": "Verwandte Tags",
+      "selectedTags": "Ausgewählte Schlagwörter",
+      "showAll": {
+        "heading": "Alle zusammen"
+      },
+      "showTagsInText": "Im Text erwähnte Schlagwörter anzeigen",
+      "showTagsNetwork": "Schlagwort-Netzwerk anzeigen",
+      "tagDropdownLabel": "Suche nach Schlagwörtern oder erstelle einen neuen",
+      "tagDropdownLabelWithStructures": "Füge ein Schlagwort hinzu oder wandle in einen Typen um",
+      "turnInto": {
+        "label": "Block umwandeln",
+        "tooltip": ""
+      }
+    },
+    "RootTask": {
+      "createNewTask": "Aufgabe erstellen",
+      "description": "Eine Aufgabe, die erledigt werden muss",
+      "habitStats": {
+        "allTime": "Gesamt",
+        "atRisk": "Gefährdet",
+        "bestStreak": "Bester Lauf",
+        "cellState": {
+          "completed": "Abgeschlossen",
+          "excused": "Entschuldigt",
+          "future": "Geplant",
+          "missed": "Verpasst",
+          "none": "Keine Wiederholung",
+          "skipped": "Übersprungen"
+        },
+        "completionRate": "Abschlussrate",
+        "completionRateSubtitle": "Abgeschlossen vs. übersprungen oder verpasst",
+        "completions": "Abschlüsse",
+        "currentStreak": "Fortschrittsserie",
+        "dayUnit": "Tag|Tage",
+        "heading": "Aufgabenstatistiken",
+        "keepGoing": "Weiter so",
+        "monthUnit": "Monat|Monate",
+        "startToday": "Heute starten",
+        "weekUnit": "Woche|Wochen",
+        "yearUnit": "Jahr|Jahre"
+      },
+      "name": "Aufgabe",
+      "occurrenceLog": {
+        "deleteEntry": {
+          "description": "Dieser Protokolleintrag wird dauerhaft aus dem Erledigungsverlauf entfernt.",
+          "title": "Eintrag aus Erledigungsprotokoll löschen"
+        },
+        "heading": "Erledigungsprotokoll"
+      },
+      "overdue": "Überfällig",
+      "overdueWithCount": "Überfällig ({count})",
+      "pluralName": "Aufgaben",
+      "propertyDefinitions": {
+        "RootTask_notes": {
+          "name": "Notizen"
+        },
+        "backlinks": {
+          "name": "Kontext"
+        },
+        "completed": {
+          "name": "Erledigt"
+        },
+        "date": {
+          "name": "Datum"
+        },
+        "deadline": {
+          "name": "Frist"
+        },
+        "priority": {
+          "description": "",
+          "name": "Priorität",
+          "set": {
+            "high": "Hoch",
+            "low": "Niedrig",
+            "medium": "Mittel"
+          }
+        },
+        "status": {
+          "description": "",
+          "name": "Status",
+          "set": {
+            "done": "Erledigt",
+            "in-progress": "In Bearbeitung",
+            "next-up": "Als Nächstes",
+            "not-started": "Nicht begonnen",
+            "on-hold": "In Warteschleife"
+          }
+        }
+      },
+      "turnBlockIntoTaskObject": "In Aufgabenobjekt umwandeln",
+      "virtualizedInstance": {
+        "completed": {
+          "editStatus": {
+            "description": "Dies ist eine vergangene Instanz einer wiederkehrenden Aufgabe. Öffne die Aufgabe, um das Abschlussprotokoll zu verwalten.",
+            "heading": "Abgeschlossene Aufgabeninstanz"
+          }
+        },
+        "future": {
+          "editAttempt": {
+            "description": "Dies ist eine zukünftige Instanz einer wiederkehrenden Aufgabe. Öffne die Aufgabe, um den Zeitplan oder Status zu bearbeiten.",
+            "heading": "Zukünftige Aufgabeninstanz"
+          }
+        }
+      }
+    },
+    "RootWhiteboard": {
+      "create": "Whiteboard erstellen",
+      "description": "Eine unendliche Fläche zum Anordnen von Blöcken und Objekten",
+      "name": "Whiteboard",
+      "pluralName": "Whiteboards",
+      "propertyDefinitions": {
+        "RootWhiteboard_canvas": {
+          "name": "Fläche"
+        },
+        "RootWhiteboard_notes": {
+          "name": "Notizen"
+        }
+      }
+    },
+    "User": {
+      "description": "Ein Nutzer",
+      "name": "Nutzer",
+      "pluralName": "Nutzer",
+      "propertyDefinitions": {
+        "firstName": {
+          "name": "Vorname"
+        },
+        "lastName": {
+          "name": "Nachname"
+        }
+      }
+    },
+    "UserPersonal": {
+      "description": "Deine persönliche Nutzerseite ",
+      "name": "Nutzer (Persönlich)",
+      "pluralName": "Nutzer (Persönlich)",
+      "propertyDefinitions": {
+        "firstName": {
+          "name": "Vorname"
+        },
+        "lastName": {
+          "name": "Nachname"
+        },
+        "spaces": {
+          "name": "Meine Räume"
+        },
+        "user": {
+          "name": "Nutzerprofil"
+        }
+      },
+      "setup": {
+        "continue": "Los gehts",
+        "firstSpaceName": "Notizen",
+        "heading": "Willkommen bei Capacities!",
+        "step1": {
+          "firstName": {
+            "heading": "Vorname",
+            "placeHolder": "Albert"
+          },
+          "intro": "Gib zunächst Deinen Namen an, um dein Profil zu erstellen.",
+          "language": {
+            "description": "Wähle eine Sprache."
+          },
+          "lastName": {
+            "heading": "Nachname",
+            "placeHolder": "Einstein"
+          },
+          "newsletter": {
+            "heading": "",
+            "text": ""
+          }
+        }
+      }
+    },
+    "UtilDate": {
+      "description": "Ein Zeitelement",
+      "name": "Datum",
+      "pluralName": "Daten",
+      "propertyDefinitions": {
+        "date": {
+          "name": "Date"
+        }
+      }
+    },
+    "area": {
+      "description": "Gruppiere Arbeit und Leben in Verantwortungsbereiche.",
+      "name": "Bereich",
+      "pluralName": "Bereiche",
+      "propertyDefinitions": {
+        "0eaee1b1-b0ca-4b87-84d5-a4eada2dd1b6": {
+          "name": "Inhalt"
+        }
+      }
+    },
+    "atomicNote": {
+      "description": "Schreibe kleine eigenständige Notizen, die du später wiederverwenden kannst.",
+      "name": "Atombare Notiz",
+      "pluralName": "Atombare Notizen",
+      "propertyDefinitions": {
+        "4aa50950-c907-4fd4-927b-4b86d9531cb1": {
+          "name": "Titelbild"
+        },
+        "a8313d1b-0248-42e2-8323-927cf29b1130": {
+          "name": "Notizen"
+        }
+      },
+      "queries": {
+        "7b2e9d14-0c58-4a31-86f0-5d1c8e4a9b27": {
+          "description": "Fünf zufällige Notizen zum Prüfen",
+          "name": "Zufällig"
+        },
+        "d3a81c4e-6f20-4b59-8c17-9e4a2b70d1f5": {
+          "name": "Nicht verschlagwortet"
+        }
+      }
+    },
+    "book": {
+      "description": "Baue eine Lesebibliothek mit Autoren, Bewertung und Genre auf.",
+      "name": "Buch",
+      "pluralName": "Bücher",
+      "propertyDefinitions": {
+        "2c5536d9-23a6-4a46-bccd-03c6f78590bd": {
+          "name": "Bewertung"
+        },
+        "34462708-c7b4-459f-8464-be70b3161adc": {
+          "name": "Typ",
+          "set": {
+            "6161edf4-2b8f-4add-b826-5aa5772f7bbb": "Sachbuch",
+            "7434b33f-2665-4c1d-b68e-f43a6bcd176b": "Belletristik"
+          }
+        },
+        "63956525-9c0e-4945-ab24-00c9e198204e": {
+          "name": "Titelbild"
+        },
+        "6fcd3f53-5181-4092-a511-3981494473e5": {
+          "name": "Autoren"
+        },
+        "82c2dfb7-24ee-4167-b438-31f735f9cd85": {
+          "name": "Notizen"
+        },
+        "d9fac6c3-5407-4bb1-9fd3-0e1c921e270a": {
+          "name": "Genre",
+          "set": {
+            "008e5dcd-84ea-49e0-a3ae-824286c99fe8": "Art",
+            "078bf7cc-b956-4fbd-858f-320c4cc1b59e": "Nachschlagewerk",
+            "121f78e9-b248-49a5-9786-6730be40ff7e": "Fantasy",
+            "15af2aef-7bd3-4710-9d09-c31b645686a9": "Literarische Fiktion",
+            "19bbc4ec-a79c-41f3-94df-5e5f255d1851": "Wirtschaft & Finanzen",
+            "1acf0009-3b93-4ef9-a28a-e9f92b702f61": "Philosophie",
+            "1b9299f1-2c18-47c4-accf-7949b836fa1c": "Politik",
+            "233164e8-7964-476c-809a-2ec1ecc2b535": "Religion & Spiritualität",
+            "23612a75-48a7-453f-a63c-cf1a327fc506": "Klassiker",
+            "25c8ecf7-8428-4519-9d96-ea425d0bc37d": "Musik",
+            "27422b2c-8808-4c29-bc8c-7baa8bcba1cf": "Familie & Beziehungen",
+            "27ce2f8d-b4f9-4003-9ac9-b976592272e3": "Bildung",
+            "28c4eec2-8160-4166-852a-7cedb17c8dc3": "Lyrik",
+            "2c437e06-52d3-4ae3-9776-befada9640ae": "Kochen",
+            "302985b0-7959-48b5-bbec-85117a27cec3": "Historische Fiktion",
+            "407ee749-7d23-48d2-b5c7-48f838ca6f12": "Wissenschaft",
+            "4a64d844-1a64-4242-9ea7-88946858d3b2": "Sprache & Schreiben",
+            "4bdb8011-caf4-41c2-a2ac-c8381544ae6e": "Jugendbuch",
+            "69fec508-43d0-4ac6-810b-98b7af561fc6": "Drama",
+            "70e8b3fc-f8ce-4bba-9ce9-29997b84f99e": "Comics & Graphic Novels",
+            "71aee57d-bd2a-4514-9b81-43f1a50b1e3f": "Ratgeber",
+            "890f4b4c-05f2-4aee-9836-5fd9983c6971": "Psychologie",
+            "897093c9-764f-42ac-8391-04b2b7092b20": "Basteln & Hobbys",
+            "9379b008-43de-4b99-aa6f-3eb2295aa227": "Natur",
+            "9ab0ef59-9a90-4e18-8159-7556709776a7": "Medizin",
+            "9c8d1e9a-ba63-4af0-8f74-e36cde515ea1": "Krimi",
+            "9db86852-e9b4-4019-b1a5-88359177b3a0": "Recht",
+            "a100a455-5687-45dd-a707-84e431a0f0fb": "Reisen",
+            "c008926d-b729-496c-8718-f8bd3e62bf2c": "Abenteuer",
+            "c1d8d6e4-ccd9-4cf8-ba42-1ea6a455f8e1": "Kinderbuch",
+            "c5603c1f-920e-4cfc-85ad-0e411cbbdce8": "Sozialwissenschaften",
+            "c811276b-f64d-4f4e-992d-f30065bece69": "Wahre Kriminalfälle",
+            "c8c138ee-b7c2-4213-8ac9-ce664f1e71cb": "Technik",
+            "cd4ed125-36d2-4a3c-a711-22f326333a77": "Haus & Garten",
+            "d0902e06-46dc-40ec-8603-7e011a43230b": "Horror",
+            "d22a5fc7-48f4-4532-aa6f-5e6b8ccd4918": "Science-Fiction",
+            "d75c9168-e658-4605-9ca0-175dd387b4dd": "Thriller",
+            "db6869ae-aa3d-499a-ac68-887dec35da0d": "Geschichte",
+            "e37ee33e-6b03-4983-a361-eaf3e109d3ec": "Krimi",
+            "e8743d0e-d007-4f2c-b9ad-988c8b353606": "Liebesroman",
+            "ea666d4b-0c1a-4fb2-99b5-cdaafaa8a868": "Gesundheit & Fitness",
+            "eef64eed-c067-4bc2-b4e6-4a764bcd12ca": "Humor",
+            "ef661d67-611b-450e-9313-f003021abf6a": "Sport",
+            "f68c0fc0-446a-4104-ac9b-a45fd64872e1": "Biografie",
+            "f9ef3bfe-d610-4281-bb0d-0ebd4aea660b": "Mathematik"
+          }
+        },
+        "e974b1e1-a892-4f40-8fce-131d642ed800": {
+          "description": "Beginne, wenn du anfängst, und beende, wenn du fertig bist",
+          "name": "Lesetimeline"
+        }
+      },
+      "queries": {
+        "04edc609-6d1f-4044-a76b-1ae57fb6b76b": {
+          "name": "Sachbuch"
+        },
+        "2ab9ccff-c7cf-4154-a278-dd6d526c56fe": {
+          "description": "Bewerte diese Bücher und wähle einen Typ",
+          "name": "Pflege"
+        },
+        "73a2b120-cc79-40a2-9bed-f3ad28f783a6": {
+          "name": "Dieses Jahr gelesen"
+        },
+        "8718e9ef-e8e4-4ebc-94f9-589fb6953c7f": {
+          "name": "Aktuell gelesen"
+        },
+        "c5f0763d-b78d-4d99-a61d-d3ed7c987dcf": {
+          "name": "Belletristik"
+        },
+        "f82f9132-7fda-4eb8-980f-82011cddb365": {
+          "name": "Leseliste"
+        }
+      }
+    },
+    "day": {
+      "description": "Einen Tag mit Energie, Stimmung und Highlights festhalten.",
+      "name": "Tag",
+      "pluralName": "Tage",
+      "propertyDefinitions": {
+        "3c7e20a3-e45b-4f03-a55c-1d3bd3e7a0fb": {
+          "name": "Inhalt"
+        },
+        "3ce51242-87d5-4757-a35a-8c85ad29634f": {
+          "description": "Was war heute besonders?",
+          "name": "Highlight des Tages"
+        },
+        "692cfd34-099e-4d98-86ce-e7ba87206dca": {
+          "description": "Wie fühlst du dich?",
+          "name": "Stimmung",
+          "set": {
+            "0b9ffa66-82a9-4549-a1d4-143fcf1f061a": "Schwankend",
+            "67ee83e7-3d4c-438b-84e2-9e2d9fce76f7": "Gut",
+            "a87a85b3-c971-4ea2-b375-9fdce93271f2": "Großartig",
+            "bf2e919a-3e4e-42d0-8e23-1cb9126c3708": "Niedrig",
+            "e5946a0e-38e4-4c72-a23a-b8406d0848de": "Okay"
+          }
+        },
+        "809c9fdd-2731-4a97-a0b9-7efc902fcbad": {
+          "description": "Wie ist deine Energie?",
+          "name": "Energie",
+          "set": {
+            "4043fe60-b266-4dc5-a92e-6fa4f1dd91d2": "Niedrig",
+            "533c559a-7229-47d6-8b79-162d67d587a5": "Sehr niedrig",
+            "5efda625-ba81-47ca-81c5-50ed75670dd6": "Sehr hoch",
+            "804e9658-ca3f-4097-98c2-0268d02afe6d": "Hoch",
+            "cdf9c669-ee16-4bc6-a038-333a179e6938": "Mittel"
+          }
+        },
+        "c005f29b-8aa0-402f-94e6-02910534b0b5": {
+          "name": "Datum"
+        },
+        "f797f804-a0e6-4738-b455-1ef95f8a0dfc": {
+          "description": "Wofür bist du dankbar?",
+          "name": "Dankbarkeit"
+        }
+      },
+      "queries": {
+        "6e084344-605a-4bb8-bd06-88dc38589c9b": {
+          "name": "Gestern"
+        },
+        "d6ecd383-1293-4232-ba9d-eda60b5a6938": {
+          "name": "Heute"
+        }
+      },
+      "templates": {
+        "4b27277b-74a8-4413-a1be-2faf37dc5c8c": {
+          "name": "Tag"
+        }
+      }
+    },
+    "definition": {
+      "description": "Erfasse einen Begriff, den du dir merken möchtest.",
+      "name": "Definition",
+      "pluralName": "Definitionen",
+      "propertyDefinitions": {
+        "2b53849c-b6b4-4b8b-b7d4-79af4641cd4e": {
+          "name": "Notizen"
+        }
+      },
+      "queries": {
+        "3f6a1c80-9d24-4e17-b5a2-8c0e7d1f4b63": {
+          "description": "Eine zufällige Definition zum Prüfen",
+          "name": "Zufällig"
+        }
+      }
+    },
+    "film": {
+      "description": "Sammle Filme, die du schaust und dir merken willst.",
+      "name": "Film",
+      "pluralName": "Filme",
+      "propertyDefinitions": {
+        "3f8e2b91-6c4a-4d17-b8e5-9a2c1d7f4e06": {
+          "name": "Notizen"
+        },
+        "7d2a1c4e-8b3f-4e61-9a50-6c1d8e4f2b79": {
+          "name": "Poster"
+        },
+        "97c3a1eb-726f-46aa-918a-adfbe404029c": {
+          "name": "Genre",
+          "set": {
+            "0c23ecc0-6894-4b02-a1b2-a12aca207bd7": "Animation",
+            "0dd117d6-cf60-4bbe-8de1-35bcf189db1a": "Komödie",
+            "12507e47-f27a-4200-9bdd-4ced0dae5fc9": "Geschichte",
+            "151e05f8-404c-481e-9388-1514fd4a0c12": "Abenteuer",
+            "1ecef032-830b-412d-a18f-5bbbc67d6bad": "Liebesfilm",
+            "3356786f-9a82-433b-aa5e-416b9283e5bd": "Fantasy",
+            "38b2c9f4-fe43-4ca4-8adf-a63142eaebbf": "Musik",
+            "3d88333f-4aff-47a9-b4a4-3c9f2c1273c8": "Musical",
+            "41946939-66fa-4b23-9f8d-8f99b1143330": "Dokumentation",
+            "4b3a6b0f-261e-4db8-bc3f-af8e067c750f": "Science-Fiction",
+            "5a86e68e-6394-41ae-ac20-cedd3142bc4f": "Familie",
+            "5b19dd5c-654c-42c4-ab1b-9ada2a7cf79b": "Kurzfilm",
+            "6781baa1-481c-4d45-b9c9-0da7d5428c51": "Western",
+            "70437be4-113e-466b-8299-39b50a04d802": "Krieg",
+            "70d5ef2e-8a7d-4c04-9325-8f8730748b73": "Film Noir",
+            "7ee35543-8e30-4708-bc49-ec0eb93eb6ba": "Drama",
+            "85d54d05-48b9-45c0-9091-eb418f63c7f6": "Sport",
+            "951cf89f-146f-4e24-800c-ce23260b2ad8": "Action",
+            "955bb7d4-13d3-4c1c-87ec-c3aef5dd4204": "Krimi",
+            "c20f111a-6fbd-4255-903d-1a84623a70f6": "Horror",
+            "e0fc52ae-2324-481a-a7b2-a9e42d2ceb2d": "Biografie",
+            "e14991a7-3a59-48a0-9216-2b9cd3f3758b": "Mystery",
+            "efe9fef8-228b-4f65-a1b2-bb372f9c31b6": "Thriller"
+          }
+        },
+        "b1c9e4a7-2d58-4f03-a6e1-8d4b7c2f9a15": {
+          "name": "Regie"
+        },
+        "b91b642c-a7af-4cce-8500-540f90a84be9": {
+          "name": "Gesehen am"
+        },
+        "cf2f791f-267e-4121-919c-349207b84ae1": {
+          "name": "Bewertung"
+        }
+      },
+      "queries": {
+        "86f622b7-a2c8-4bb6-a414-ecc88854834d": {
+          "description": "Füge diesen Filmen eine Bewertung und ein Genre hinzu",
+          "name": "Pflege"
+        },
+        "8fe5b94b-c465-4704-921c-2010b0034652": {
+          "name": "Beste Filme"
+        },
+        "b3ff619f-dc25-4dae-832a-65e49ce4df3a": {
+          "name": "Dieses Jahr gesehen"
+        }
+      }
+    },
+    "general": {
+      "structureViews": {
+        "embed": {
+          "title": "Eingebettet"
+        },
+        "inline": {
+          "title": "Link-Block"
+        },
+        "page": {
+          "title": "Seite"
+        },
+        "smallCard": {
+          "title": "Kleine Kachel"
+        },
+        "wideCard": {
+          "title": "Große Kachel"
+        }
+      }
+    },
+    "meeting": {
+      "description": "Erfasse Gespräche mit Teilnehmenden und Datum.",
+      "name": "Meeting",
+      "pluralName": "Meetings",
+      "propertyDefinitions": {
+        "42722a2e-f79a-4031-98c8-287f3dfdd443": {
+          "name": "Typ",
+          "set": {
+            "08627d5c-6464-4e17-bd30-838a2d6e4f28": "Workshop",
+            "62ce4a59-9ca5-4c3a-ba26-3de8764ec809": "Kundenmeeting",
+            "87c04a34-94f4-48d8-8012-faede1144977": "Präsentation",
+            "ae1eaadd-4e42-45dc-8b4f-4f1bf6a9f3c0": "Brainstorming",
+            "bd198f8e-1908-450a-9ae5-d09d053aafe7": "Konferenz",
+            "eb4bd1fe-bdbd-4d05-a36b-ec2809e61434": "Interview",
+            "eefeb90a-b898-4d68-8a8e-ce5f9840d048": "Teammeeting",
+            "f32e5e65-324d-4d93-87b9-33642202d531": "Eins-zu-eins-Meeting"
+          }
+        },
+        "5cfda7d3-8067-4ecf-961a-7c1f8f80e0ce": {
+          "name": "Projekt"
+        },
+        "8fc8ff3b-eedb-462f-9165-a0e0a2d64571": {
+          "name": "Datum"
+        },
+        "98ee798b-2f62-4bcf-913f-a46121f9eeb1": {
+          "name": "Notizen"
+        },
+        "bf200cbe-5f53-4f77-adf3-122e2c40ae12": {
+          "name": "Titelbild"
+        },
+        "c8b6a0f8-b2dc-4257-bd99-766bae41c929": {
+          "name": "Teilnehmende"
+        },
+        "dc6fd9d0-b46d-4f27-8f24-9068dbe2cb5c": {
+          "name": "Geprüft"
+        }
+      },
+      "queries": {
+        "36f29792-4031-4690-9e8c-3888f34f7b64": {
+          "name": "Ungeprüft"
+        }
+      }
+    },
+    "month": {
+      "description": "Plane oder reflektiere einen Monat.",
+      "name": "Monat",
+      "pluralName": "Monate",
+      "propertyDefinitions": {
+        "59b0120a-23a5-4e6d-b68f-dfcc17646920": {
+          "name": "Datum"
+        },
+        "8f8076e7-3499-4b3c-a6bc-93c43ab1e96b": {
+          "name": "Notizen"
+        }
+      },
+      "queries": {
+        "c7b4e1a0-5f29-4d83-91c6-8e3a2f0d7b15": {
+          "name": "Dieser Monat"
+        },
+        "e5a8c2d1-7f40-4b16-82d9-3c6e1a9f4b70": {
+          "name": "Letzter Monat"
+        }
+      },
+      "templates": {
+        "341f957f-675f-473c-b7b9-d048d8716c4b": {
+          "name": "Monat"
+        }
+      }
+    },
+    "organization": {
+      "description": "Halte Notizen zu Unternehmen und anderen Institutionen fest.",
+      "name": "Organisation",
+      "pluralName": "Organisationen",
+      "propertyDefinitions": {
+        "00aa672b-29d5-4765-9d71-20e090db8ce9": {
+          "name": "Notizen"
+        },
+        "110300a6-1ddc-48f3-a7a8-72a53ee8e02d": {
+          "name": "Kategorie",
+          "set": {
+            "8ccf1327-a54b-46a9-a938-4085077e535e": "Gemeinnützig",
+            "95ed1c75-0074-442b-9bfa-56a0130a5c08": "Unternehmen",
+            "b9f02819-63cb-4397-aa2d-eff4d8e60dc1": "NGO",
+            "c393061e-2121-45e3-a70e-def2455560c5": "Startup",
+            "c5e8322b-5f0c-4eda-9484-aebacd9eedda": "Staatlich",
+            "f669be17-9441-4ab1-ba1b-d61a0c6e5789": "Universität"
+          }
+        },
+        "a70ae3cc-86d4-4ac0-bbe1-ac3c31a59836": {
+          "name": "Titelbild"
+        },
+        "aac0bc75-7ccd-4697-a929-1e294a9ba83c": {
+          "name": "Personen"
+        },
+        "ac159e47-df40-4388-87c5-7587c2adae5d": {
+          "name": "Projekte"
+        }
+      },
+      "queries": {
+        "6c4f1a2e-0b8d-4d3a-9f71-2e5a8c9b0147": {
+          "name": "Nach Kategorie"
+        }
+      }
+    },
+    "person": {
+      "description": "Halte Notizen zu Menschen fest, die du triffst, mit denen du arbeitest oder denen du folgst.",
+      "name": "Person",
+      "pluralName": "Personen",
+      "propertyDefinitions": {
+        "1f49b552-d7b9-4b1f-8cd8-7785f9ccb49f": {
+          "name": "Meetings"
+        },
+        "28457c6c-6439-4eb7-996b-465e8511ac7a": {
+          "name": "Notizen"
+        },
+        "864b648a-0eb8-4b12-8873-4ffb2b6be475": {
+          "name": "Organisationen"
+        },
+        "9aab7abf-bd21-4df3-86fe-5a92243712f8": {
+          "name": "Projekte"
+        },
+        "b7c4d315-9004-46b5-bc82-ed96471eda05": {
+          "name": "Bild"
+        },
+        "d79ca610-d096-4c3a-b0ec-51c55f154673": {
+          "name": "Kategorie",
+          "set": {
+            "0851f5b6-b850-4345-be20-97d97c531031": "Künstler:in",
+            "12c42506-0955-48d7-8874-246311579d34": "Unternehmer:in",
+            "2a7018fb-e12a-4053-976e-bd3b8182c6bd": "Wissenschaftler:in",
+            "45822c36-91f1-47c1-9c6b-3959dec926eb": "Philosoph:in",
+            "6173b336-c746-4fcd-b421-b17a477c639d": "Freund:innen",
+            "7b8d8b19-6e67-4e89-8886-ac1b2a2bad5e": "Politiker:in",
+            "8bbdea9e-c7d2-4294-a54f-568d64b874ee": "Kollege",
+            "b598aad7-4049-4654-9267-4961608c1827": "Autor:in",
+            "b85c8372-0e32-4b69-89e8-4ffed168ca43": "Journalist:in",
+            "bf46f270-931d-46d7-aab8-ae949be22652": "Akademiker:in",
+            "d813d7b2-564a-40a2-9585-59b85209418f": "Familie"
+          }
+        }
+      },
+      "queries": {
+        "85d12d17-cc79-4f5b-a5ec-4ed85e96cdbc": {
+          "name": "Nach Kategorie"
+        }
+      }
+    },
+    "podcast": {
+      "description": "Speichere Podcasts, die du hörst und wiederfinden willst.",
+      "name": "Podcast",
+      "pluralName": "Podcasts",
+      "propertyDefinitions": {
+        "17408a53-dec8-4054-bcb6-11f26bdbd46c": {
+          "name": "URL"
+        },
+        "69b9c271-4c8d-4397-a7eb-865a06800264": {
+          "name": "Gehört am"
+        },
+        "8421e86d-7a8e-45bc-b98c-8bec04f54dbc": {
+          "name": "Notizen"
+        },
+        "f28e781b-71d1-481d-acbc-e51d3ae392c0": {
+          "name": "Personen"
+        }
+      },
+      "queries": {
+        "4e1c9a70-2b8d-4f13-91a6-7c3d5e8f0b24": {
+          "name": "Dieses Jahr gehört"
+        },
+        "9a6d2c18-5e40-4b77-8f31-0c4a7d9e2b56": {
+          "description": "Füge diesen Podcasts eine URL hinzu",
+          "name": "Pflege"
+        }
+      }
+    },
+    "project": {
+      "description": "Verwalte Arbeit mit Status, Mitarbeitenden und Meetings.",
+      "name": "Projekt",
+      "pluralName": "Projekte",
+      "propertyDefinitions": {
+        "40771bce-7329-40f2-a224-23fa402d409f": {
+          "name": "Meetings"
+        },
+        "45bb99d4-914b-4364-9949-4a7e62ab0b29": {
+          "description": "Beginne, wenn es losgeht, und beende, wenn es abgeschlossen ist",
+          "name": "Zeitraum"
+        },
+        "77b38594-493a-46fa-bfcf-b304fe7df928": {
+          "name": "Organisationen"
+        },
+        "78d193a0-debe-4ac9-8431-cd9bfe4cee5c": {
+          "name": "Mitarbeitende"
+        },
+        "82a38e65-4d2a-4df0-ba32-4bedf58ff614": {
+          "name": "Notizen"
+        },
+        "99980329-b66f-4af3-9f9a-c43dc6db039b": {
+          "name": "Status",
+          "set": {
+            "0b685096-c8e9-4bb4-9aaf-5f965c393c70": "Abgeschlossen",
+            "269fd5dc-abfe-422b-ba4a-f9c6f80dabd7": "Geplant",
+            "3a7d295f-2c79-4303-a8cd-1998a83bfea3": "In Bearbeitung",
+            "a92da3b5-90a9-4a6e-bacc-4aecdc123846": "Pausiert"
+          }
+        },
+        "aa230cb5-f001-43b8-ae74-9264124433e5": {
+          "name": "Titelbild"
+        },
+        "bad4e82d-ca42-4703-b224-fa180aaaf4f1": {
+          "name": "Typ",
+          "set": {
+            "3fc51b26-8e17-4911-b47c-926a9b15e474": "Privat",
+            "878ef25e-ccd5-4c02-82ea-810020a7536b": "Arbeit"
+          }
+        }
+      },
+      "queries": {
+        "06c46eeb-434f-4fd2-82a6-284044abba8f": {
+          "name": "Privat"
+        },
+        "a811d6f7-7e61-4572-b089-2356e69a44d2": {
+          "name": "Arbeit"
+        },
+        "b6d573a5-a607-45fc-abaa-790905494d27": {
+          "name": "Nach Organisation"
+        },
+        "e2b2efab-33dd-4337-8f09-721084cbb1c0": {
+          "name": "Status"
+        },
+        "fba8a495-484b-4249-acc1-956ce6f84d23": {
+          "name": "Nach Mitarbeitenden"
+        }
+      }
+    },
+    "tvSeries": {
+      "description": "Verfolge Serien, die du schaust und zu denen du zurückkehren möchtest.",
+      "name": "Serie",
+      "pluralName": "Serien",
+      "propertyDefinitions": {
+        "0d010ef3-83b5-457f-a333-ee6d111f1a83": {
+          "name": "Bewertung"
+        },
+        "2ce2e467-d119-41b0-bf4b-5eb91c5c82b4": {
+          "name": "Genre",
+          "set": {
+            "0c298c70-273c-4d37-8b4c-10f39b976346": "Krieg",
+            "0dd9f36b-b86a-4c91-a291-20c80d1b80f4": "Western",
+            "20e18b9a-f46b-47a4-b8a9-d31cd55adfd6": "Liebesfilm",
+            "320e9cf5-8be2-48eb-9a57-ff448c2f402a": "Abenteuer",
+            "4faa8579-ccbf-4c47-959f-cffeab77621f": "Mystery",
+            "545afdec-bf72-4470-a2b9-7050c4b4d531": "Biografie",
+            "5c515920-28ec-4da8-a9f5-03aa9f526008": "Talkshow",
+            "6be83832-5063-41a8-ba46-220b31b11e5c": "Animation",
+            "7c5305c0-5c7a-41aa-adbd-2d9eeb43091e": "Action",
+            "7e707c84-b60f-4fa1-8e1b-b60789b4b260": "Familie",
+            "7ea1533f-6e04-44f2-bd0f-7003de6a33bc": "Science-Fiction",
+            "85203d2e-0d87-4a48-b8ec-99bb8f8e18a1": "Musik",
+            "90aabee5-9d04-42cd-bf86-79a0497c0148": "Geschichte",
+            "920c821f-4cfe-4349-bd39-0566b51ae2c6": "Dokumentation",
+            "9707903a-5399-4343-8e20-21a504665abb": "Horror",
+            "9a15fdaa-ea94-4327-ad8a-24e3226976ab": "Sport",
+            "9a16c9ab-bd5d-463b-a78f-2f3b12844da2": "Gameshow",
+            "a6bbef4c-c3f8-45f9-ab44-fc37c4ad2ebd": "Musical",
+            "a95e6518-d222-4403-868e-689b3bc04bc4": "Reality-TV",
+            "b4849a44-8a67-42ca-84fb-7cba92d21372": "Krimi",
+            "c81d079e-68cf-4c38-8396-57f78f301d4c": "Nachrichten",
+            "cf89e605-73c6-4f0f-8c56-3e8dfa790afc": "Drama",
+            "d7f52804-94e0-4a46-babe-edfc9df0ee7f": "Komödie",
+            "e0c615fc-6729-498b-b668-b1e2c9893adc": "Kurzfilm",
+            "e5e7338e-03ae-489a-9e1b-5f850143b362": "Thriller",
+            "ff02352f-349b-43ae-8a76-e3d43b58ed3a": "Fantasy"
+          }
+        },
+        "3db60ae3-ad0e-49dd-b873-b1f0eaf202b4": {
+          "name": "Schauspieler:innen"
+        },
+        "952855a3-0dbd-41f0-929d-7d4378c374a3": {
+          "name": "Gesehen am"
+        },
+        "963da948-8728-4c36-97b6-86b63dcfb57c": {
+          "name": "Notizen"
+        },
+        "aa86ea26-3c48-4c9b-9340-06652dd061a2": {
+          "name": "Titelbild"
+        },
+        "cf4babe7-1510-4942-944d-06e96e96d5f1": {
+          "name": "Regie"
+        }
+      },
+      "queries": {
+        "805c2792-ec36-4913-bb26-e988a1a788eb": {
+          "description": "Füge diesen Serien eine Bewertung und ein Genre hinzu",
+          "name": "Pflege"
+        },
+        "e03e6b2e-eda7-43e8-b5a2-a56769fe4ae0": {
+          "name": "Dieses Jahr gesehen"
+        },
+        "eedbe41a-f42b-4130-89bf-2c716f9b8878": {
+          "name": "Beste Serien"
+        }
+      }
+    },
+    "week": {
+      "description": "Plane oder reflektiere eine Woche.",
+      "name": "Woche",
+      "pluralName": "Wochen",
+      "propertyDefinitions": {
+        "4ec1bdff-cd41-4355-b97d-da3f4b2b526f": {
+          "name": "Datum"
+        },
+        "f5fd7df0-3c78-46c2-b6bd-d3df0c075b1b": {
+          "name": "Notizen"
+        }
+      },
+      "queries": {
+        "1f8c3a92-6d4b-4e17-9a50-2c7e8d1b4f60": {
+          "name": "Diese Woche"
+        },
+        "a2d9e7c4-3b18-4f06-8e51-7c0a9b6d2e34": {
+          "name": "Letzte Woche"
+        }
+      },
+      "templates": {
+        "2b70216b-63e6-47bf-8e91-02c16d1c8b67": {
+          "name": "Woche"
+        }
+      }
+    }
+  },
+  "general": {
+    "aWeekAgo": "Vor einer Woche",
+    "abort": "Abbrechen",
+    "above": "Darüber",
+    "actions": "Aktionen",
+    "active": "Aktiv",
+    "add": "Hinzufügen",
+    "addTo": "Hinzufügen zu",
+    "advanced": "Fortgeschritten",
+    "ahead": "Vornedran",
+    "aliases": "Aliase",
+    "all": "Alle",
+    "allowOnce": "Einmal erlauben",
+    "alwaysAllow": "Immer erlauben",
+    "analyze": "Analysieren",
+    "and": "und",
+    "apply": "Anwenden",
+    "archive": "Archiv",
+    "asObjects": "Als Objekte",
+    "automatic": "Automatisch",
+    "availableContext": "Verfügbarer Kontext",
+    "back": "Zurück",
+    "backToHome": "Zurück zur Startseite",
+    "backup": "Sicherung",
+    "behind": "Hintendran",
+    "below": "Darunter",
+    "block": "Block",
+    "blockOptions": "Block-Optionen",
+    "bulkImport": "Massenimport",
+    "by": "von",
+    "cancel": "Abbrechen",
+    "cancelled": "Abgebrochen",
+    "change": "Ändern",
+    "choose": "Wählen",
+    "clear": "Leeren",
+    "clipboard": "Zwischenablage",
+    "close": "Schließen",
+    "collection": "Sammlung",
+    "comingSoon": "Demnächst",
+    "confirm": "Bestätigen",
+    "confirmed": "Bestätigt",
+    "contactUs": "Kontaktiere uns",
+    "content": "Inhalt",
+    "context": "Kontext",
+    "continue": "Weiter",
+    "copiedToClipboard": "In die Zwischenablage kopiert",
+    "copy": {
+      "noun": "Kopie",
+      "verb": "Kopieren"
+    },
+    "copyright": "Alle Rechte vorbehalten",
+    "create": "Erstellen",
+    "createAndAdd": "Erstellen und hinzufügen zu",
+    "createObject": "{name} erstellen",
+    "currentSelection": "Aktuelle Auswahl",
+    "custom": "Benutzerdefiniert",
+    "customize": "Anpassen",
+    "cut": "Ausschneiden",
+    "daily": "Täglich",
+    "darkMode": "Dunkler Modus",
+    "dataProtection": "Datenschutzerklärung",
+    "date": "Datum",
+    "deactivated": "Deaktiviert",
+    "default": "Default",
+    "delete": "Löschen",
+    "deleted": "Gelöscht",
+    "deletedUser": "Gelöschter Nutzer",
+    "deprecated": "Veraltet",
+    "description": "Beschreibung",
+    "deselectAll": "Auswahl aufheben",
+    "details": "Details",
+    "diagnostics": "Diagnose",
+    "documentation": "Dokumentation",
+    "done": "Fertig",
+    "dontShowAgain": "Nicht mehr anzeigen",
+    "down": "Runter",
+    "download": "Herunterladen",
+    "downloadFile": "Datei herunterladen",
+    "downloading": "Wird heruntergeladen...",
+    "duplicate": "Duplizieren",
+    "edit": "Bearbeiten",
+    "editSelection": "Auswahl bearbeiten",
+    "empty": "Leer",
+    "emptyStateSearch": "Keine Inhalte gefunden",
+    "enter": "Eingeben",
+    "entries": "Einträge",
+    "entry": "Eintrag",
+    "error": "Fehler",
+    "eventCancelled": "Abgesagt",
+    "eventDeleted": "Gelöscht",
+    "eventNotFound": "Nicht gefunden",
+    "exitOnboarding": "Onboarding beenden",
+    "experimental": "Experimentell",
+    "explore": "Entdecken",
+    "exploreContext": "Kontext erkunden",
+    "exploreMore": "Mehr entdecken",
+    "export": "Exportieren",
+    "exporting": "Exportieren...",
+    "extract": "Extrahieren",
+    "failed": "Fehlgeschlagen",
+    "file": "Datei|Dateien",
+    "findMore": "Mehr finden",
+    "finish": "Beenden",
+    "finishAndContinue": "Beenden & weiterführen",
+    "firstName": "Vorname",
+    "forward": "Vor",
+    "general": "Allgemein",
+    "generic": "Allgemein",
+    "goBack": "Zurück",
+    "gotIt": "Verstanden",
+    "guide": "Handbuch",
+    "help": "Hilfe",
+    "hide": "Verbergen",
+    "home": "Startseite",
+    "horizontal": "horizontal",
+    "icon": "Icon",
+    "ignore": "Ignorieren",
+    "import": "Importieren",
+    "importFiles": "Datei(en) importieren",
+    "importInto": "Importieren in",
+    "importing": "Importiere ...",
+    "impressum": "Impressum",
+    "imprint": "Impressum",
+    "inAWeek": "In einer Woche",
+    "inBeta": "Testphase",
+    "internal": "Intern",
+    "language": "Sprache",
+    "languages": {
+      "de": "Deutsch",
+      "en": "Englisch"
+    },
+    "last": "Letzte | Letzte {count}",
+    "lastEdited": "Letzte Änderung",
+    "lastName": "Nachname",
+    "learnMore": "Mehr erfahren",
+    "letsGo": "Los geht's!",
+    "lightMode": "Heller Modus",
+    "loadMore": "Mehr laden",
+    "local": "Lokal",
+    "logout": "Abmelden",
+    "logoutAndRetry": "Abmelden & erneut versuchen",
+    "logs": "Protokolle",
+    "manual": {
+      "export": "1 Space exportieren | {n} Spaces exportieren"
+    },
+    "mapping": "Mapping",
+    "mappingAdvanced": "Zuordnung (Erweitert)",
+    "media": "Medien",
+    "mediaFiles": "Mediendateien",
+    "menu": "Menü",
+    "migrate": "Migrieren",
+    "migrateFrom": "Migrieren von",
+    "minimize": "Minimieren",
+    "monthly": "Monatlich",
+    "months": {
+      "april": "April",
+      "august": "August",
+      "december": "Dezember",
+      "february": "Februar",
+      "january": "Januar",
+      "july": "Juli",
+      "june": "Juni",
+      "march": "März",
+      "may": "Mai",
+      "november": "November",
+      "october": "Oktober",
+      "september": "September"
+    },
+    "more": "Mehr",
+    "multiple": "Mehrere",
+    "multipleSelect": "Mehrfachauswahl",
+    "name": "Name",
+    "neutral": "Neutral",
+    "new": "Neu",
+    "newGender": {
+      "female": "Neue {name}",
+      "male": "Neuer {name}",
+      "neutral": "Neues {name}"
+    },
+    "newObject": "Neues {name}",
+    "next": "Weiter",
+    "no": "Nein",
+    "noThanks": "Nein, danke!",
+    "none": "Keine",
+    "notAvailableWhenOffline": "Offline nicht verfügbar",
+    "notIncluded": "Nicht enthalten",
+    "notes": "Notizen",
+    "notion": "Notion",
+    "now": "Jetzt",
+    "object": "Objekt|Objekte",
+    "objectBlockOptions": "Objektblock-Optionen",
+    "objectContext": "Objektkontext",
+    "objectType": "Objekttyp|Objekttypen",
+    "objects": "Objekte",
+    "obsidian": "Obsidian",
+    "of": "{a} von {b}",
+    "open": "Öffnen",
+    "openObject": "Objekt öffnen",
+    "openRelevantContent": "Relevante Inhalte öffnen",
+    "openSearch": "Suche öffnen",
+    "openSettings": "Einstellungen öffnen",
+    "optional": "Optional",
+    "options": "Optionen",
+    "or": "Oder",
+    "other": "Sonstiges",
+    "outOf": "von",
+    "overview": "Überblick",
+    "page": "Seite",
+    "pick": "Auswählen",
+    "pinned": "Angefügt",
+    "planned": "Geplant",
+    "preview": "Vorschau",
+    "previous": "Vorherige",
+    "privacyPolicy": "Datenschutzrichtlinie",
+    "processing": "Vearbeitung",
+    "properties": "Eigenschaften",
+    "property": "Eigenschaft",
+    "published": "Veröffentlicht",
+    "randomize": "Randomisieren",
+    "readOnly": "Nicht bearbeitbar",
+    "recentItems": "Kürzlich verwendete Elemente",
+    "recentlyUsed": "Zuletzt verwendet",
+    "recommended": "Empfohlen",
+    "recreate": "Wiederherstellen",
+    "refresh": "Aktualisieren",
+    "relevantContent": "Relevante Inhalte",
+    "reloadApp": {
+      "button": "App neu laden"
+    },
+    "remove": "Entfernen",
+    "removeFrom": "Entfernen aus",
+    "rename": "Umbenennen",
+    "reset": "Zurücksetzen",
+    "restart": "Neu starten",
+    "retry": "Neu laden",
+    "reuse": "Wiederverwenden",
+    "save": "Speichern",
+    "saveChanges": "Änderungen speichern",
+    "schedule": "Zeitplan",
+    "search": "Suchen",
+    "searchAll": "Alle {name} durchsuchen",
+    "searchInside": "Durchsuchen",
+    "searchMore": "Weiter suchen",
+    "searchOrCreate": "Suchen oder erstellen",
+    "searchTerm": "Suchbegriff",
+    "select": "Auswählen",
+    "selectAll": "Alle {name} auswählen",
+    "selected": "Ausgewählt",
+    "separately": "Einzeln",
+    "set": "Festlegen",
+    "settings": "Einstellungen",
+    "share": {
+      "action": "Teilen",
+      "toClipboard": "Kopieren"
+    },
+    "shared": "Geteilt",
+    "show": "Anzeigen",
+    "showAll": "Alle anzeigen",
+    "showLess": "Weniger anzeigen",
+    "showMore": "Mehr anzeigen",
+    "single": "Einzeln",
+    "singleOrMultiple": "Einfach oder Mehrfach",
+    "skip": "Überspringen",
+    "sort": "Sortieren",
+    "spaces": "Räume",
+    "start": "Start",
+    "step": "Schritt {a} von {b}",
+    "storage": "Speicher",
+    "style": "Stil",
+    "submit": "Einreichen",
+    "summary": "Zusammenfassung",
+    "support": "Support",
+    "switch": "Wechseln",
+    "syncIssue": {
+      "description": "Deine Inhalte sind momentan nicht vollständig synchronisiert. Das ist kein Problem, solange diese Nachricht nach ein paar Minuten verschwindet wenn du online bist. Falls dies nicht der Fall ist, starte die App neu unter \"Account > Einstellungen > App neustarten (unten links\")."
+    },
+    "synced": {
+      "description": "Dein Inhalt ist in der Cloud gesichert.",
+      "heading": "Gesichert"
+    },
+    "synchronize": "Synchronisieren",
+    "synchronizing": "Synchronisierung",
+    "syncing": {
+      "description": "Deine Inhalte werden gerade mit dem Server synchronisiert. Es bleiben {objectCount} Objekte übrig."
+    },
+    "tag": "Tag",
+    "template": "Vorlage",
+    "tentative": "Vorläufig",
+    "termsAndConditions": "Nutzungsbedingungen",
+    "theme": "Design",
+    "time": "Uhrzeit",
+    "title": "Titel",
+    "today": "Heute",
+    "together": "Zusammen",
+    "tomorrow": "Morgen",
+    "total": "Gesamt",
+    "trigger": "Auslösen",
+    "trustAlways": "Immer vertrauen",
+    "trustOnce": "Einmal vertrauen",
+    "tryAgain": "Erneut versuchen",
+    "undoDelete": "Wiederherstellen",
+    "unknown": "Unbekannt",
+    "untitled": "Ohne Titel",
+    "up": "Hoch",
+    "update": "Speichern",
+    "upload": "Hochladen",
+    "uploading": "Hochladen",
+    "userIdentifier": "Nutzername",
+    "vertical": "vertikal",
+    "video": "Video",
+    "viewMore": "Mehr anzeigen",
+    "visible": "Sichtbar",
+    "visit": "Besuchen",
+    "voiceNote": "Sprachnotiz",
+    "weekdays": {
+      "friday": "Freitag",
+      "monday": "Montag",
+      "saturday": "Samstag",
+      "sunday": "Sonntag",
+      "thursday": "Donnerstag",
+      "tuesday": "Dienstag",
+      "wednesday": "Mittwoch"
+    },
+    "weekly": "Wöchentlich",
+    "width": "Breite",
+    "workbench": "Arbeitsplatz",
+    "yes": "Ja",
+    "yesterday": "Gestern",
+    "yourSpaces": "Deine Räume",
+    "zoom": "Zoom"
+  },
+  "DateOptions": {
+    "earlier": {
+      "title": "Früher"
+    },
+    "lastWeek": {
+      "title": "Letzte Woche"
+    },
+    "nextWeek": {
+      "title": "Nächste Woche"
+    },
+    "now": {
+      "title": "Jetzt - Zeitstempel"
+    },
+    "overdue": {
+      "title": "Überfällig"
+    },
+    "theDayAfterTomorrow": {
+      "title": "Übermorgen"
+    },
+    "theDayBeforeYesterday": {
+      "title": "Vorgestern"
+    },
+    "thisWeek": {
+      "title": "Diese Woche"
+    },
+    "today": {
+      "title": "Heute"
+    },
+    "tomorrow": {
+      "title": "Morgen"
+    },
+    "yesterday": {
+      "title": "Gestern"
+    }
+  },
+  "group": {
+    "sortOptions": {
+      "general": {
+        "week": "Woche"
+      }
+    }
+  },
+  "propertyTypes": {
+    "blocks": {
+      "description": "Der Hauptnotenbereich eines Objekts – Rich-Text mit Formatierung und Verlinkung.",
+      "name": "Inhalt"
+    },
+    "boolean": {
+      "description": "Wahr oder falsch",
+      "name": "Checkbox"
+    },
+    "color": {
+      "description": "",
+      "name": "Farbe"
+    },
+    "computed_preview": {
+      "description": "",
+      "name": "Inhaltsvorschau"
+    },
+    "computed_wordCount": {
+      "description": "",
+      "name": "Wortanzahl"
+    },
+    "date": {
+      "description": "Nur das Datum",
+      "name": "Datum"
+    },
+    "datetime": {
+      "description": "Datum und Uhrzeit zusammen",
+      "name": "Datum & Uhrzeit"
+    },
+    "datetimeSimple": {
+      "description": "",
+      "name": "Datum/Zeit"
+    },
+    "entity": {
+      "description": "Ein Inhalt, der einer Struktur folgt",
+      "name": "Objekt"
+    },
+    "entity_aliases": {
+      "description": "Zusätzliche Namen für diesen Inhalt",
+      "name": "Aliase"
+    },
+    "entity_backlinks": {
+      "addBacklink": "Kontext hinzufügen",
+      "description": "Objekte, die auf dieses verlinken",
+      "name": "Kontext"
+    },
+    "entity_collections": {
+      "description": "Sammlungen, in denen dieser Inhalt enthalten ist",
+      "name": "Sammlungen"
+    },
+    "entity_createdAt": {
+      "description": "Datum und Uhrzeit der Erstellung des Eintrags",
+      "name": "Erstellt am"
+    },
+    "entity_description": {
+      "description": "Weitere Informationen zum Eintrag",
+      "name": "Beschreibung"
+    },
+    "entity_icon": {
+      "description": "Eine schnelle visuelle Kennzeichnung",
+      "name": "Icon"
+    },
+    "entity_lastUpdated": {
+      "description": "Enthält Datum und Uhrzeit der letzten Bearbeitung",
+      "name": "Zuletzt bearbeitet"
+    },
+    "entity_permissions": {
+      "description": "Erlaubt die granulare Kontrolle darüber, wer diesen Eintrag sehen und bearbeiten kann",
+      "name": "Zugriffsrechte"
+    },
+    "entity_tags": {
+      "description": "Allgemeine Schlagwörter dieses Inhalts",
+      "name": "Schlagwörter"
+    },
+    "entity_title": {
+      "description": "Der Titel dient als primärer Bezeichner für einen Eintrag",
+      "name": "Titel"
+    },
+    "entity_type": {
+      "description": "Der Typ des Inhalts",
+      "name": "Inhaltstyp"
+    },
+    "label": {
+      "description": "Ein einfaches Label, um ein Objekt zu kategorisieren. Kann einfach- oder mehrfachauswahl sein.",
+      "name": "Label"
+    },
+    "math": {
+      "description": "TeX-Formel.",
+      "name": "Mathe"
+    },
+    "media_audioFileResource": {
+      "description": "",
+      "name": "Audiodatei"
+    },
+    "media_fileFileResource": {
+      "description": "",
+      "name": "Datei"
+    },
+    "media_imageFileResource": {
+      "description": "",
+      "name": "Bilddatei"
+    },
+    "media_pdfFileResource": {
+      "description": "",
+      "name": "PDF-Datei"
+    },
+    "media_previewImage": {
+      "description": "",
+      "name": "Vorschaubild"
+    },
+    "media_tweets": {
+      "description": "",
+      "name": "Tweets"
+    },
+    "media_videoFileResource": {
+      "description": "",
+      "name": "Videodatei"
+    },
+    "number": {
+      "description": "Ein Zahlenwert",
+      "name": "Zahl"
+    },
+    "structure": {
+      "description": "Ein Inhaltstyp",
+      "name": "Datenbank"
+    },
+    "tag": {
+      "description": "Schlagwörter, um Elemente zu kategorisieren",
+      "name": "Schlagwort"
+    },
+    "text": {
+      "description": "Einfaches Textfeld",
+      "name": "Text"
+    },
+    "textBlock": {
+      "description": "Ein einzelner Paragraph mit der Möglichkeit zu formatieren und zu verlinken.",
+      "name": "Text"
+    },
+    "time": {
+      "description": "Zeitangabe wie auf der Dauer",
+      "name": "Uhrzeit"
+    },
+    "url": {
+      "description": "Einfache Web-URL",
+      "name": "URL"
+    },
+    "util_aiChat": {
+      "description": "",
+      "name": "KI-Chat"
+    },
+    "util_dateEvent": {
+      "description": "",
+      "name": "Datumsevent"
+    },
+    "util_dateOEvent": {
+      "description": "",
+      "name": "Datumsereignis"
+    },
+    "util_dateObject": {
+      "description": "",
+      "name": "Datumsobjekt"
+    }
+  },
+  "propertyDefinition": {
+    "deleteProperty": {
+      "modal": {
+        "blocksPropertyWarning": "Eine Inhalts-Eigenschaft ist in der Regel der Hauptteil eines Objekts. Nur wenn du mehrere Inhalts-Eigenschaften hast, werden sie mit einem Label unterschieden. Stelle sicher, dass du nicht versehentlich den Hauptinhalt deiner Notizen löschst!",
+        "confirm": "Mir ist bewusst, dass ich den gesamten Inhalt dieses Merkmals in allen Objekten diesen Typs löschen werde.",
+        "confirmTextMatchLabel": "Gib \"{value}\" ein, um zu bestätigen",
+        "explanation": "Dadurch wird das gesamte Merkmal von diesem Objekttyp gelöscht und es wird von allen Objekten diesen Typs entfernt. Dieser Schritt kann nicht rückgängig gemacht werden.",
+        "explanationWithoutWarning": "Wenn du diese Eigenschaft löschst, wird sie vom gesamten Objekttyp entfernt – das bedeutet, dass sie aus allen Objekten dieses Typs entfernt wird.",
+        "generalWarning": "Das Merkmal wird von allen Objekten diesen Typs entfernt.",
+        "header": "Willst Du dieses Merkmal wirklich von allen Objekten diesen Typs löschen?",
+        "onlyBlocksPropertyWarning": "Dies ist die einzige Inhalts-Eigenschaft in diesem Objekttyp. Dadurch wird der Hauptinhalt (Body) für alle Objekte dieses Typs gelöscht."
+      }
+    },
+    "description": {
+      "label": "Beschreibung",
+      "placeholder": "Gib anderen eine Vorstellung was dieses Merkmal bedeutet"
+    },
+    "newPropertyName": "Neues Merkmal"
+  },
+  "convolution": {
+    "customDefinitions": {
+      "custom_backlinks_count": {
+        "name": "Anzahl rückverknüpfter (Kontext-)Objekte"
+      },
+      "custom_backlinks_object_types": {
+        "name": "Rückverknüpfte (Kontext-)Objekttypen"
+      },
+      "custom_backlinks_objects": {
+        "name": "Rückverknüpfte (Kontext-)Objekte"
+      },
+      "custom_is_shared": {
+        "name": "Geteilt"
+      },
+      "custom_linked_object_types": {
+        "name": "Verlinkte Objekttypen"
+      },
+      "custom_linked_objects": {
+        "name": "Verlinkte Objekte"
+      },
+      "custom_linked_objects_count": {
+        "name": "Anzahl verlinkter Objekte"
+      }
+    },
+    "filter": {
+      "options": {
+        "boolean": {
+          "isChecked": "ist ausgewählt",
+          "isNotSelected": "ist nicht ausgewählt"
+        },
+        "dateTime": {
+          "endIs": "endet am",
+          "endIsAfter": "endet nach",
+          "endIsBefore": "endet vor",
+          "endIsEmpty": "Ende ist leer",
+          "endIsNotEmpty": "Ende ist nicht leer",
+          "endIsOnOrAfter": "endet am oder nach",
+          "endIsOnOrBefore": "endet am oder vor",
+          "hasNoReminder": "hat keine Erinnerung",
+          "hasReminder": "hat Erinnerung",
+          "is": "ist",
+          "isAfter": "ist nach",
+          "isBefore": "ist vor",
+          "isNotRecurring": "ist nicht wiederkehrend",
+          "isOnOrAfter": "ist an oder nach",
+          "isOnOrBefore": "ist an oder vor",
+          "isRecurring": "ist wiederkehrend",
+          "startIs": "startet",
+          "startIsAfter": "startet nach",
+          "startIsBefore": "startet vor",
+          "startIsNotEmpty": "Beginn ist nicht leer",
+          "startIsOnOrAfter": "startet am oder nach",
+          "startIsOnOrBefore": "startet am oder vor",
+          "valueOptions": {
+            "exactDate": "Datum",
+            "inOneMonth": "in einem Monat",
+            "inOneWeek": "in einer Woche",
+            "oneMonthAgo": "vor einem Monat",
+            "oneWeekAgo": "vor einer Woche",
+            "overdue": "überfällig",
+            "thisMonth": "dieser Monat",
+            "thisWeek": "diese Woche",
+            "thisYear": "dieses Jahr",
+            "today": "heute",
+            "tomorrow": "morgen",
+            "yesterday": "gestern"
+          }
+        },
+        "entity": {
+          "contains": "ist",
+          "notContains": "ist nicht"
+        },
+        "general": {
+          "contains": "enthält",
+          "is": "ist",
+          "isEmpty": "ist leer",
+          "isNot": "ist nicht",
+          "isNotEmpty": "ist nicht leer",
+          "isNotPlural": "beinhaltet nicht",
+          "isPlural": "beinhaltet",
+          "notContains": "enthält nicht"
+        },
+        "isShared": {
+          "isNotShared": "ist nicht geteilt",
+          "isShared": "ist geteilt"
+        },
+        "string": {
+          "endsWith": "endet mit",
+          "startsWith": "beginnt mit"
+        }
+      }
+    },
+    "group": {
+      "groupBy": {
+        "blocks": "Blöcke",
+        "boolean": {
+          "checked": "Abgehakt",
+          "unchecked": "Nicht abgehakt"
+        },
+        "entity": "Nach verlinkten Objekten",
+        "hourPeriod": "{date}, {period}",
+        "number": {
+          "default": "Nach exaktem Wert",
+          "range": "Nach Bereich"
+        },
+        "numberRange": {
+          "groupEvery": "Gruppieren alle",
+          "max": "Max",
+          "min": "Min",
+          "range": "Gruppenbereich"
+        },
+        "objects": "Objekte",
+        "open": "Offen",
+        "other": "Andere",
+        "textBlock": {
+          "default": "Nach Text"
+        }
+      },
+      "sortOptions": {
+        "createdAt": {
+          "ascending": "Älteste zuerst erstellt",
+          "descending": "Neueste zuerst erstellt"
+        },
+        "general": {
+          "ascending": "aufsteigend",
+          "day": "Nach Tag",
+          "default": "Standard",
+          "descending": "absteigend",
+          "hour": "Nach Stunde",
+          "month": "Nach Monat",
+          "relative": "Relativ",
+          "scheduled": "Geplant",
+          "sizeAscending": "kleinste zuerst",
+          "sizeDescending": "größte zuerst",
+          "week": "Nach Woche",
+          "year": "Nach Jahr"
+        },
+        "label": {
+          "default": "Reihenfolge",
+          "defaultDescending": "Umgekehrte Reihenfolge"
+        }
+      }
+    },
+    "sort": {
+      "options": {
+        "datetime": {
+          "ascending": "Älteste zuerst",
+          "ascendingExists": "leere zuerst",
+          "descending": "Neueste zuerst",
+          "descendingExists": "leere zuletzt"
+        },
+        "general": {
+          "ascending": "aufsteigend",
+          "descending": "absteigend"
+        }
+      }
+    }
+  },
+  "aiAssistant": {
+    "ai": "KI",
+    "budgetExceeded": {
+      "plus": {
+        "button": "Zusätzliches KI-Budget kaufen",
+        "description": "Füge jederzeit extra KI-Budget hinzu. Es verfällt nie und wird jeden Monat übertragen.",
+        "title": "Dein KI-Guthaben ist aufgebraucht"
+      },
+      "plusWithCredits": {
+        "button": "Zusätzliches KI-Budget kaufen",
+        "description": "Dein monatliches Budget ist verbraucht. Lade sofort auf und mach weiter.",
+        "title": "Dein KI-Guthaben ist aufgebraucht"
+      },
+      "pro": {
+        "button": "{plan} holen",
+        "description": "Steige auf {plan} um für ein deutlich größeres monatliches KI-Budget und arbeite ohne Unterbrechung weiter.",
+        "title": "Dein KI-Guthaben ist aufgebraucht"
+      },
+      "trial": {
+        "button": "Upgrade auf Pro",
+        "description": "Wechsle zu Pro für ein monatliches KI-Budget und das volle Capacities-Erlebnis.",
+        "title": "Dein KI-Guthaben ist aufgebraucht"
+      }
+    },
+    "chat": {
+      "aiAssistant": "KI-Assistent",
+      "basicCommands": {
+        "change-tone": {
+          "description": "",
+          "title": "Ton ändern zu..."
+        },
+        "continuation": {
+          "description": "Setzt den gegebenen Text fort",
+          "title": "Weiter schreiben"
+        },
+        "counter-arguments": {
+          "description": "Gibt eine Liste von Gegenargumenten zu dem im Kontext gegebenen Inhalt zurück",
+          "title": "Gegenargumente auflisten"
+        },
+        "critique": {
+          "description": "Gibt eine Kritik des gegebenen Kontexts zurück",
+          "title": "Kritik"
+        },
+        "define-term-dictionary": {
+          "description": "",
+          "title": "Im Wörterbuch nachschlagen"
+        },
+        "define-term-encyclopedia": {
+          "description": "",
+          "title": "Enzyklopädieeintrag erhalten"
+        },
+        "define-term-theasaurus": {
+          "description": "",
+          "title": "Thesauruseintrag erhalten"
+        },
+        "expand-text-to": {
+          "description": "",
+          "title": "Text erweitern zu..."
+        },
+        "expand-text": {
+          "description": "",
+          "title": "Text erweitern"
+        },
+        "explain-term": {
+          "description": "",
+          "title": "Dies erklären"
+        },
+        "extract-and-format": {
+          "description": "",
+          "title": "Extrahieren ... und formatieren als..."
+        },
+        "extract-tasks": {
+          "description": "",
+          "title": "Aufgaben identifizieren"
+        },
+        "find-evidence": {
+          "description": "Liefert Beweise aus dem im Kontext gegebenen Inhalt",
+          "title": "Beweise finden"
+        },
+        "find-research-questions": {
+          "description": "Gibt eine Liste von Forschungsfragen aus dem im Kontext gegebenen Inhalt zurück",
+          "title": "Forschungsfragen finden"
+        },
+        "fix-spelling-grammar": {
+          "description": "",
+          "title": "Rechtschreibung und Grammatik überprüfen"
+        },
+        "generate-draft": {
+          "description": "",
+          "title": "Entwurf erstellen für..."
+        },
+        "generate-outline": {
+          "description": "",
+          "title": "Gliederung erstellen für..."
+        },
+        "generate-vocab-card": {
+          "description": "",
+          "title": "Vokabelkarte erstellen..."
+        },
+        "get-term-antonyms": {
+          "description": "",
+          "title": "Antonyme finden"
+        },
+        "get-term-etymology": {
+          "description": "",
+          "title": "Etymologie des Begriffs"
+        },
+        "get-term-examples": {
+          "description": "",
+          "title": "Beispiele dafür finden"
+        },
+        "get-term-pronunciation": {
+          "description": "",
+          "title": "Aussprache erhalten"
+        },
+        "get-term-synonyms": {
+          "description": "",
+          "title": "Synonyme finden"
+        },
+        "get-term-translation": {
+          "description": "",
+          "title": "Übersetzung finden für..."
+        },
+        "identify-assumptions": {
+          "description": "Gibt eine Liste von Annahmen aus dem im Kontext gegebenen Inhalt zurück",
+          "title": "Annahmen identifizieren"
+        },
+        "rewrite-text-for": {
+          "description": "",
+          "title": "Umschreiben für..."
+        },
+        "rewrite-text": {
+          "description": "",
+          "title": "Text umschreiben & verbessern"
+        },
+        "short-biography": {
+          "description": "",
+          "title": "Kurze Biografie geben"
+        },
+        "shorten-text-to": {
+          "description": "",
+          "title": "Text kürzen zu..."
+        },
+        "shorten-text": {
+          "description": "",
+          "title": "Text kürzen"
+        },
+        "simplify": {
+          "description": "Vereinfacht den gegebenen Text",
+          "title": "Text vereinfachen"
+        },
+        "summarize-text": {
+          "description": "",
+          "title": "Zusammenfassen"
+        },
+        "summarize": {
+          "description": "Gibt eine kurze Zusammenfassung des gegebenen Texts zurück",
+          "title": "Zusammenfassung"
+        },
+        "takeaways": {
+          "description": "Gibt eine Liste der wichtigsten Erkenntnisse aus dem gegebenen Kontext zurück",
+          "title": "Wichtige Erkenntnisse auflisten"
+        },
+        "tl-dr": {
+          "description": "",
+          "title": "TLDR"
+        },
+        "translate": {
+          "description": "Übersetzt den gegebenen Inhalt in die angegebene Sprache",
+          "title": "Übersetze nach {variantValue}",
+          "variants": {
+            "chinese": "Chinesisch (vereinfacht)",
+            "chinese_traditional": "Chinesisch (traditionell)",
+            "english": "Englisch",
+            "french": "Französisch",
+            "german": "Deutsch",
+            "hindu": "Hindu",
+            "italian": "Italienisch",
+            "japanese": "Japanisch",
+            "korean": "Koreanisch",
+            "portuguese": "Portugiesisch",
+            "spanish": "Spanisch"
+          }
+        }
+      },
+      "chats": "Chats",
+      "closeChat": "Chat schließen",
+      "commandNotFound": "Befehl nicht gefunden",
+      "contextSuggestion": {
+        "entity": {
+          "full": "\"{title}\" als Kontext verwenden",
+          "properties": "Titel und Merkmale von \"{title}\" als Kontext verwenden"
+        }
+      },
+      "heading": "KI Chat",
+      "model": "Modell",
+      "openChats": "Offene Chats",
+      "user": "Du"
+    },
+    "errors": {
+      "aiBudgetExceeded": "Mehr KI-Guthaben benötigt? Steige auf und mach weiter.",
+      "aiBudgetExceededButton": "Eigenen API-Schlüssel hinzufügen"
+    },
+    "titleAutofill": {
+      "customCommand": "Generiere einen kurzen, aussagekräftigen Titel (max. 10 Wörter), der das Hauptthema oder den Zweck dieses Inhalts zusammenfasst."
+    }
+  },
+  "inputProcessing": {
+    "fileTypeNotSupported": "Dateityp nicht unterstützt",
+    "fileUploadFailed": "Upload fehlgeschlagen",
+    "voiceMessage": "Sprachnachricht"
+  },
+  "telegramInput": {
+    "helpWhenNotRegistered": "Verbinde Telegram mit deinem Capacities-Account um zu starten. Du findest unter folgendem Link weitere Informationen: https://docs.capacities.io/reference/integrations/telegram",
+    "helpWhenRegistered": "Sende einfach Nachrichten an diesen Chat. Sie werden automatisch in Capacities gespeichert. Du kannst hier über alle Optionen lesen: https://docs.capacities.io/reference/integrations/telegram",
+    "verificationSuccessful": "Dein Account wurde verifiziert. 🎉 Du kannst nun Inhalte in Capacities speichern indem du Nachrichten, Bilder oder Dateien an diesen Chat sendest. Du findest mehr zu allen Möglichkeiten hier: https://docs.capacities.io/reference/integrations/telegram",
+    "verifyFirst": "Hallo 👋 Verbinde Telegram mit deinem Capacities-Account um zu starten. Du findest unter folgendem Link weitere Informationen: https://docs.capacities.io/reference/integrations/telegram"
+  },
+  "whatsappInput": {
+    "helpWhenNotRegistered": "Verbinde Telegram mit deinem Capacities-Account um zu starten. Du findest unter folgendem Link weitere Informationen: https://docs.capacities.io/reference/integrations/telegram",
+    "helpWhenRegistered": "Sende einfach Nachrichten an diesen Chat. Sie werden automatisch in Capacities gespeichert. Du kannst hier über alle Optionen lesen: https://docs.capacities.io/reference/integrations/whatsapp",
+    "verificationSuccessful": "Dein Account wurde verifiziert. 🎉 Du kannst nun Inhalte in Capacities speichern indem du Nachrichten, Bilder oder Dateien an diesen Chat sendest. Du findest mehr zu allen Möglichkeiten hier: https://docs.capacities.io/reference/integrations/telegram",
+    "verifyFirst": "Hallo 👋 Verbinde WhatsApp mit deinem Capacities-Account um zu starten. Du findest unter folgendem Link weitere Informationen: https://docs.capacities.io/reference/integrations/telegram"
+  },
+  "xRay": {
+    "actions": {
+      "header": "Aktionen"
+    },
+    "collections": {
+      "emptyState": "Bisher in keiner Sammlung enthalten",
+      "header": "Sammlungen"
+    },
+    "context": {
+      "emptyState": "Keine Objekte im Inhalt",
+      "header": "Objekte im Inhalt"
+    },
+    "header": "Aktuelle Seite",
+    "tags": {
+      "header": "Schlagwörter"
+    },
+    "textStats": {
+      "header": "Textstatistiken"
+    },
+    "toc": {
+      "emptyState": "Keine Überschriften in diesem Inhalt vorhanden",
+      "header": "Inhaltsverzeichnis"
+    }
+  },
+  "Electron": {
+    "Menu": {
+      "capacities": {
+        "about": "Über",
+        "name": "Datei",
+        "preferences": "Einstellungen",
+        "quit": "Schließen",
+        "settings": "Einstellungen"
+      },
+      "edit": {
+        "copy": "Kopieren",
+        "cut": "Ausschneiden",
+        "main": "Bearbeiten",
+        "paste": "Einfügen",
+        "redo": "Wiederholen",
+        "selectAll": "Alles auswählen",
+        "undo": "Rückgängig"
+      },
+      "file": {
+        "main": "Datei"
+      },
+      "help": {
+        "learn": "Dokumentation öffnen",
+        "main": "Hilfe"
+      },
+      "view": {
+        "devTools": "Entwicklertools öffnen",
+        "fullScreen": "Vollbild",
+        "main": "Ansicht",
+        "minimize": "Minimieren",
+        "reload": "Neu laden",
+        "resetZoom": "Zoom zurücksetzen",
+        "softReload": "Neu laden",
+        "zoomIn": "Hereinzoomen",
+        "zoomOut": "Herauszoomen"
+      }
+    },
+    "OpenBufferRequest": {
+      "details": "Name: '{name}'\\nGröße: {size}",
+      "message": "Möchtest du wirklich eine nicht verifizierte Datei auf deinem System öffnen? Dies könnte zu Sicherheitsrisiken führen.",
+      "title": "Öffnen einer Datei bestätigen"
+    },
+    "OverwriteCloseRequest": {
+      "cancel": "Abbrechen",
+      "confirm": "Neu laden",
+      "message": "Einige deiner Inhalte sind nicht synchronisiert und gehen verloren.",
+      "title": "Willst du wirklich neu laden?"
+    },
+    "QuitCompletelyRequest": {
+      "cancel": "Abbrechen",
+      "confirm": "Schließen",
+      "message": "Einige deiner Inhalte sind nicht synchronisiert und werden erst synchronisiert, wenn du die App erneut öffnest.",
+      "title": "Möchtest du capacities wirklich vollständig schließen?"
+    },
+    "TrayMenu": {
+      "open": {
+        "main": "Öffnen",
+        "quitCompletely": "Vollständig schließen"
+      }
+    }
+  },
+  "BulkImport": {
+    "errors": {
+      "ACCESS_DENIED": "Du hast keinen Zugriff auf den Massenimport.",
+      "APPLYING_IMPORT_FAILED": "Der Import konnte nicht angewendet werden.",
+      "DAILY_NOTE_ALREADY_EXISTS": "Eine oder mehrere Tagesnotizen konnten nicht importiert werden, da für diese Tage bereits ein Eintrag vorhanden war.",
+      "DUPLICATE_DAILY_NOTE": "Eine oder mehrere Tagesnotizen konnten nicht importiert werden, da es doppelte Einträge mit demselben Datum gab.",
+      "EXTRACTION_FAILED": "Eine oder mehrere Dateien konnten nicht extrahiert werden.",
+      "FILE_TYPE_NOT_SUPPORTED": "Eine oder mehrere Dateien haben einen nicht unterstützten Dateityp.",
+      "MAXIMUM_FILE_SIZE_EXCEEDED": "Die Dateigröße überschreitet die maximal erlaubte Größe.",
+      "MISCELLANEOUS_ERROR": "Ein unbekannter Fehler ist aufgetreten.",
+      "NO_FILES_TO_IMPORT": "Keine gültigen Dateien zum Importieren.",
+      "PROCESSING_FAILED": "Eine oder mehrere Dateien konnten nicht verarbeitet werden.",
+      "SPACE_NOT_FOUND": "Der Space konnte nicht gefunden werden.",
+      "TOO_MANY_FILES": "Zu viele Dateien zum Importieren.",
+      "TOO_MANY_OBJECTS_GLOBAL": "Du hast die maximale Anzahl an Objekten erreicht, die du importieren kannst.",
+      "TOO_MANY_OBJECTS_LOCAL": "Zu viele Objekte zum Importieren.",
+      "UPLOADING_FAILED": "Eine oder mehrere Dateien konnten nicht hochgeladen werden.",
+      "WRITING_FAILED": "Eine oder mehrere Dateien konnten nicht geschrieben werden."
+    },
+    "success": "1 Objekt erfolgreich importiert. | {n} Objekte erfolgreich importiert.",
+    "worker": {
+      "properties": {
+        "content": "Inhalt",
+        "file": {
+          "extension": "Dateiendung",
+          "name": "Dateiname",
+          "size": "Dateigröße",
+          "type": "Dateityp"
+        },
+        "heading": "Eigenschaften",
+        "rowName": "Zeilenname",
+        "title": "Titel"
+      }
+    }
+  }
+}

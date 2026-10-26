@@ -1,0 +1,2874 @@
+{
+  "components": {
+    "MediaAudio": {
+      "description": "Hangfájlok beágyazása és lejátszása",
+      "name": "Hang",
+      "pluralName": "Hangok",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME típus"
+        },
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_audioCategory": {
+          "description": "",
+          "name": "Kategória",
+          "set": {
+            "ambient": "Környezeti",
+            "dictation": "Diktálás",
+            "interview": "Interjú",
+            "lecture": "Előadás",
+            "meeting": "Találkozó",
+            "music": "Zene",
+            "other": "Egyéb",
+            "phone-call": "Telefonhívás",
+            "podcast": "Podcast",
+            "voice-memo": "Hangjegyzet"
+          }
+        },
+        "media_audioSource": {
+          "name": "Eredet"
+        },
+        "media_duration": {
+          "name": "Hossz"
+        },
+        "media_fileSize": {
+          "name": "Fájlméret"
+        },
+        "media_notes": {
+          "description": "Gondolatok és ötletek rögzítése a tartalomról",
+          "name": "Jegyzetek"
+        }
+      }
+    },
+    "MediaFile": {
+      "description": "Fájlok a számítógépről",
+      "name": "Fájl",
+      "pluralName": "Fájlok",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME típus"
+        },
+        "media_fileSize": {
+          "name": "Fájlméret"
+        },
+        "media_notes": {
+          "description": "Gondolatok és ötletek rögzítése a tartalomról",
+          "name": "Jegyzetek"
+        }
+      }
+    },
+    "MediaImage": {
+      "description": "Kép a számítógépről vagy a weben",
+      "name": "Kép",
+      "pluralName": "Képek",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME típus"
+        },
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_fileSize": {
+          "name": "Fájlméret"
+        },
+        "media_imageCategory": {
+          "description": "",
+          "name": "Kategória",
+          "set": {
+            "book-page": "Könyvlap",
+            "business-card": "Névjegykártya",
+            "code": "Kód",
+            "cover": "Borító",
+            "diagram": "Diagram",
+            "document": "Dokumentum",
+            "handwritten-note": "Kézzel írt jegyzet",
+            "illustration": "Illusztráció",
+            "infographic": "Infografika",
+            "logo-icon": "Logó/ikon",
+            "map": "Térkép",
+            "medical": "Orvosi",
+            "meme": "Mém",
+            "other": "Egyéb",
+            "painting": "Festmény",
+            "photo-animal": "Fotó (állat)",
+            "photo-architecture": "Fotó (építészet)",
+            "photo-event": "Fotó (esemény)",
+            "photo-food": "Fotó (étel)",
+            "photo-nature": "Fotó (természet)",
+            "photo-object": "Fotó (tárgy)",
+            "photo-people": "Fotó (emberek)",
+            "receipt": "Blokk",
+            "scientific": "Tudományos",
+            "screenshot": "Képernyőkép",
+            "ui-mockup": "UI vázlat",
+            "whiteboard": "Fehértábla"
+          }
+        },
+        "media_imageColors": {
+          "description": "",
+          "name": "Színek",
+          "set": {
+            "beige": "Bézs",
+            "black": "Fekete",
+            "blue": "Kék",
+            "brown": "Barna",
+            "cyan": "Cián",
+            "fuchsia": "Fukszia",
+            "gold": "Arany",
+            "gray": "Szürke",
+            "green": "Zöld",
+            "indigo": "Indigó",
+            "magenta": "Magenta",
+            "orange": "Narancs",
+            "pink": "Rózsaszín",
+            "purple": "Lila",
+            "red": "Piros",
+            "tan": "Drapp",
+            "teal": "Türkizkék",
+            "turquoise": "Türkiz",
+            "violet": "Ibolya",
+            "white": "Fehér",
+            "yellow": "Sárga"
+          }
+        },
+        "media_imageHeight": {
+          "name": "Magasság"
+        },
+        "media_imageSource": {
+          "name": "Forrás"
+        },
+        "media_imageWidth": {
+          "name": "Szélesség"
+        },
+        "media_notes": {
+          "description": "Gondolatok és ötletek rögzítése a tartalomról",
+          "name": "Jegyzetek"
+        }
+      },
+      "structureViews": {
+        "MediaImage_embed_fullWidthCappedHeight": {
+          "title": "Teljes szélesség"
+        },
+        "MediaImage_embed_main": {
+          "title": "Beágyazás"
+        },
+        "MediaImage_embed_square": {
+          "title": "Négyszög"
+        },
+        "MediaImage_inline_main": {
+          "title": "Hivatkozás blokként"
+        },
+        "MediaImage_page_main": {
+          "title": "Oldal"
+        },
+        "MediaImage_smallCard_main": {
+          "title": "Kis kártya"
+        },
+        "MediaImage_smallCard_square": {
+          "title": "Kis kártya (Négyszög)"
+        },
+        "MediaImage_wideCard_main": {
+          "title": "Széles kártya"
+        }
+      }
+    },
+    "MediaPDF": {
+      "description": "PDF-ek hozzáadása és beágyazása",
+      "name": "PDF",
+      "pluralName": "PDF-ek",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME típus"
+        },
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_fileSize": {
+          "name": "Fájlméret"
+        },
+        "media_notes": {
+          "description": "Gondolatok és ötletek rögzítése a tartalomról",
+          "name": "Jegyzetek"
+        },
+        "media_pdfDocumentType": {
+          "description": "",
+          "name": "Dokumentumtípus",
+          "set": {
+            "academic-paper": "Tudományos dolgozat",
+            "article": "Cikk",
+            "book": "Könyv",
+            "educational-material": "Oktatási anyag",
+            "financial-document": "Pénzügyi dokumentum",
+            "form": "Űrlap",
+            "legal-document": "Jogi dokumentum",
+            "letter": "Levél",
+            "manual": "Kézikönyv",
+            "marketing-material": "Marketinganyag",
+            "other": "Egyéb",
+            "policy-document": "Szabályzat",
+            "presentation": "Prezentáció",
+            "report": "Jelentés",
+            "scanned-document": "Szkennelt dokumentum"
+          }
+        },
+        "media_pdfHasTOC": {
+          "name": "Tartalomjegyzék"
+        },
+        "media_pdfNumberOfPages": {
+          "name": "Oldalak száma"
+        },
+        "media_pdfSource": {
+          "name": "Forrás"
+        },
+        "media_pdfTopic": {
+          "description": "",
+          "name": "Téma",
+          "set": {
+            "ai-ml": "AI/ML",
+            "arts-culture": "Művészet & kultúra",
+            "business": "Üzlet",
+            "design": "Dizájn",
+            "education": "Oktatás",
+            "finance": "Pénzügy",
+            "government": "Kormányzat",
+            "history": "Történelem",
+            "legal": "Jogi",
+            "marketing": "Marketing",
+            "medicine": "Orvostudomány",
+            "operations": "Működés",
+            "other": "Egyéb",
+            "personal": "Személyes",
+            "policy": "Szabályzat",
+            "product": "Termék",
+            "programming": "Programozás",
+            "research": "Kutatás",
+            "science": "Tudomány",
+            "technology": "Technológia"
+          }
+        },
+        "media_previewImage": {
+          "name": "Előnézeti kép"
+        }
+      }
+    },
+    "MediaTweet": {
+      "cannotDisplayVideoAndGif": "A Twitter API korlátozásai miatt jelenleg nem tudunk videókat és GIF-eket megjeleníteni. Nyisd meg a tweetet a Twitteren, hogy lásd az összes médiatartalmat.",
+      "description": "Egy Twitter tweet",
+      "name": "Tweet",
+      "openOnTwitter": "Megnyitás Twitteren",
+      "pluralName": "Tweetek",
+      "propertyDefinitions": {
+        "is_thread": {
+          "name": "Szál"
+        },
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_notes": {
+          "name": "Jegyzetek"
+        },
+        "media_tweets": {
+          "name": "Tweetek"
+        },
+        "tweet_attachments": {
+          "description": "",
+          "name": "Mellékletek"
+        },
+        "tweet_language": {
+          "name": "Nyelv"
+        },
+        "twitter_userName": {
+          "name": "Twitter Felhasználónév"
+        }
+      },
+      "turnThreadIntoTweet": "Csak az utolsó tweet megtartása a szálból",
+      "tweetGenerationFailed": "Ennek a tweetnek a helyi verziója nem generálható"
+    },
+    "MediaVideo": {
+      "OptionalDescription": {
+        "button": "Opcionális leírás hozzáadása"
+      },
+      "description": "Beágyazandó videofájl",
+      "name": "Videó",
+      "pluralName": "Videók",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME típus"
+        },
+        "media_duration": {
+          "name": "Hossz"
+        },
+        "media_fileSize": {
+          "name": "Fájlméret"
+        }
+      },
+      "text": {
+        "description": {
+          "placeholder": "Leírás..."
+        },
+        "main": {
+          "placeholder": "Cím..."
+        }
+      },
+      "videoUrlInput": {
+        "placeholder": "YouTube link vagy YouTube ID"
+      }
+    },
+    "MediaWebResource": {
+      "addEmbed": "Beágyazási URL hozzáadása",
+      "addPreviewImage": "Előnézeti kép hozzáadása",
+      "annotations": {
+        "addComment": "Hozzászólás hozzáadása",
+        "analyzePrompt": "Elemezd ezt az oldalt, hogy megbízhatóbb kiemeléseket kapj az Olvasóban és a Böngészőben.",
+        "collapseComments": "Kevesebb mutatása",
+        "commentPlaceholder": "Írj hozzászólást…",
+        "highlightWithColor": "Kiemelés ezzel a színnel: {color}",
+        "moreComments": "Még {count}",
+        "openInReader": "Megnyitás Olvasóban"
+      },
+      "browser": {
+        "back": "Vissza",
+        "electronOnly": "A böngésző nézet csak az asztali alkalmazásban érhető el.",
+        "forward": "Előre",
+        "missingUrl": "Ennek a webhivatkozásnak nincs URL-je.",
+        "openExternal": "Megnyitás külső böngészőben",
+        "reload": "Újratöltés",
+        "stop": "Betöltés leállítása"
+      },
+      "browserView": "Böngésző",
+      "copyUrlToClipboard": "URL másolása a vágólapra",
+      "create": {
+        "button": "Létrehozás"
+      },
+      "deleteImage": "Kép törlése",
+      "description": "Egy link vagy beágyazás egy másik weboldalra",
+      "editEmbed": "Beágyazási URL szerkesztése",
+      "name": "Weblink",
+      "pluralName": "Weblinkek",
+      "propertyDefinitions": {
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_host": {
+          "description": "A weblink gazdacímének megadása",
+          "name": "Domain"
+        },
+        "media_iframeReference": {
+          "name": "Iframe URL"
+        },
+        "media_notes": {
+          "description": "Gondolatok és ötletek rögzítése ezzel a tartalommal kapcsolatban",
+          "name": "Jegyzetek"
+        },
+        "media_previewImage": {
+          "name": "Előnézeti kép"
+        },
+        "media_weblinkCategory": {
+          "description": "",
+          "name": "Kategória",
+          "set": {
+            "about": "Névjegy",
+            "app": "Alkalmazás",
+            "article": "Cikk",
+            "audio": "Hang",
+            "blog-post": "Blogbejegyzés",
+            "code": "Kód",
+            "course": "Tanfolyam",
+            "documentation": "Dokumentáció",
+            "event": "Esemény",
+            "forum-thread": "Fórumtéma",
+            "guide": "Útmutató",
+            "how-to": "Útmutató (How-To)",
+            "image-gallery": "Képgaléria",
+            "infographic": "Infografika",
+            "marketplace": "Piactér",
+            "news": "Hír",
+            "other": "Egyéb",
+            "podcast": "Podcast",
+            "portfolio": "Portfólió",
+            "product": "Termék",
+            "profile": "Profil",
+            "q-and-a": "Kérdés-válasz",
+            "recipe": "Recept",
+            "repository": "Adattár",
+            "service": "Szolgáltatás",
+            "shop": "Bolt",
+            "social-post": "Közösségi poszt",
+            "tool": "Eszköz",
+            "tutorial": "Oktatóanyag",
+            "video": "Videó",
+            "webinar": "Webinárium"
+          }
+        },
+        "media_weblinkTopic": {
+          "description": "",
+          "name": "Téma",
+          "set": {
+            "academic": "Akadémiai",
+            "ai-ml": "AI/ML",
+            "art": "Művészet",
+            "business": "Üzlet",
+            "creative": "Kreatív",
+            "current-events": "Aktuális események",
+            "design": "Design",
+            "education": "Oktatás",
+            "entertainment": "Szórakozás",
+            "finance": "Pénzügy",
+            "fitness": "Fitnesz",
+            "food": "Étel",
+            "gaming": "Játék",
+            "health": "Egészség",
+            "learning": "Tanulás",
+            "lifestyle": "Életmód",
+            "marketing": "Marketing",
+            "media": "Média",
+            "news": "Hírek",
+            "other": "Egyéb",
+            "politics": "Politika",
+            "productivity": "Produktivitás",
+            "programming": "Programozás",
+            "research": "Kutatás",
+            "science": "Tudomány",
+            "technology": "Technológia",
+            "tools": "Eszközök",
+            "travel": "Utazás",
+            "wellness": "Wellness"
+          }
+        }
+      },
+      "reader": {
+        "errorDescription": "Ez az oldal nem alakítható át olvasható cikké.",
+        "errorTitle": "Az olvasó nézet nem elérhető",
+        "extracting": "Olvasó nézet előkészítése…",
+        "idleDescription": "Először nyisd meg a Böngésző fület, majd frissítsd az olvasó nézetet.",
+        "idleTitle": "Az olvasó nézet még nem kész",
+        "refresh": "Frissítés",
+        "title": "Olvasó"
+      },
+      "readerView": "Olvasó",
+      "retryAnalysis": "Elemzés újrapróbálása",
+      "search": "Keresés az oldalon",
+      "structureViews": {
+        "MediaWebResource_embed_main": {
+          "title": "Beágyazás"
+        },
+        "MediaWebResource_embed_wide": {
+          "title": "Beágyazás (széles)"
+        },
+        "MediaWebResource_inline_main": {
+          "title": "Link blokk"
+        },
+        "MediaWebResource_page_main": {
+          "title": "Oldal"
+        },
+        "MediaWebResource_smallCard_main": {
+          "title": "Kis kártya"
+        },
+        "MediaWebResource_wideCard_main": {
+          "title": "Széles kártya"
+        }
+      },
+      "webEmbed": "Beágyazás"
+    },
+    "QueryDataView": {
+      "invalidVariableQueryInfo": {
+        "description": "Ez a lekérdezés egy objektumra hivatkozik. Beágyazásként kell használnod egy másik objektumban, hogy az eredmények megjelenjenek.",
+        "heading": "A változó lekérdezéseket más objektumokba ágyazva kell használni"
+      }
+    },
+    "RootAIChat": {
+      "description": "Egy beszélgetés az AI-val",
+      "name": "AI Chat",
+      "pluralName": "AI Chatek",
+      "propertyDefinitions": {
+        "chat_context": {
+          "description": "",
+          "name": "Kontextus"
+        },
+        "media_notes": {
+          "name": "Jegyzetek"
+        },
+        "util_aiChat": {
+          "name": "AI Chat"
+        }
+      },
+      "saveChat": "Mentés objektumként"
+    },
+    "RootBlocksTemplate": {
+      "description": "Blokkok csoportja, amelyeket gyorsan meg lehet duplikálni",
+      "name": "Sablon",
+      "pluralName": "Sablonok",
+      "propertyDefinitions": {
+        "template_blocks": {
+          "description": "Az itteni összes blokk duplikálódik a sablon aktiválásakor",
+          "name": "Sablon tartalom"
+        }
+      }
+    },
+    "RootDailyNote": {
+      "createDailyNote": "Napi jegyzet létrehozása",
+      "createdOnThatDay": "Ezen a napon készült",
+      "createdToday": "Ma készült",
+      "createdYesterday": "Tegnap készült",
+      "description": "Napi jegyzet",
+      "emptyStates": {
+        "month": "Nincs létrehozott napi jegyzet ebben a hónapban."
+      },
+      "name": "Napi jegyzet",
+      "openAsPage": "Megnyitás oldalként",
+      "openOnDashboard": "Naptár",
+      "placeholder": "Kezdje el a napi jegyzetet",
+      "pluralName": "Napi jegyzetek",
+      "propertyDefinitions": {
+        "RootDailyNote_notes": {
+          "name": "Jegyzetek"
+        },
+        "RootDailyNote_reviewed": {
+          "name": "Átnézett"
+        }
+      },
+      "queries": {
+        "7e3c1a94-5b28-4d06-9f81-2a6c8e0d4b17": {
+          "name": "Nem átnézettek"
+        }
+      },
+      "templates": {
+        "createNewTemplate": {
+          "label": "Új sablon"
+        },
+        "delete": {
+          "tooltip": "Sablon törlése"
+        },
+        "edit": {
+          "tooltip": "Sablon szerkesztése"
+        },
+        "empty": {
+          "label": "Üres jegyzet"
+        },
+        "markAsDefault": {
+          "tooltip": "Alapértelmezett jelölése"
+        },
+        "noTemplates": "Még nincsenek sablonok"
+      }
+    },
+    "RootDatabase": {
+      "create": "Objektumtípus hozzáadása",
+      "createShort": "Új típus",
+      "databaseViews": {
+        "grid": {
+          "defaultName": "Rácsnézet",
+          "new": "Új rácsnézet"
+        },
+        "list": {
+          "defaultName": "Lista nézet",
+          "new": "Új lista nézet"
+        },
+        "table": {
+          "defaultName": "Táblázat nézet",
+          "new": "Új táblázat nézet"
+        },
+        "wall": {
+          "new": "Új fal nézet"
+        }
+      },
+      "default": {
+        "name": "Alapértelmezett"
+      },
+      "delete": {
+        "modal": {
+          "body": "Ha egy gyűjteményt töröl, az összes bejegyzés is törlésre kerül. Azok a bejegyzések, amelyek más gyűjteményekben is szerepelnek, ott megmaradnak.",
+          "header": "Tényleg törölni szeretné ezt a gyűjteményt?"
+        }
+      },
+      "description": "Szervezd meg a tartalmaidat",
+      "emptyStateText": "Nincs bejegyzés",
+      "name": "Gyűjtemény",
+      "newCollectionTitle": "Új gyűjtemény",
+      "panels": {
+        "title": {
+          "content-panel": "Leírás",
+          "definition-panel": "Meghatározás",
+          "entries-panel": "Bejegyzések",
+          "views-panel": "Nézetek"
+        }
+      },
+      "pluralName": "Gyűjtemények",
+      "propertyDefinitions": {
+        "entityTemplates": {
+          "name": "Sablonok"
+        },
+        "isDefaultDatabase": {
+          "name": "Alapértelmezett gyűjtemény"
+        },
+        "structures": {
+          "name": "Struktúra"
+        }
+      }
+    },
+    "RootEntity": {
+      "description": "Egy objektum",
+      "hidePropertySection": "Tulajdonságszakasz elrejtése",
+      "hideTOCSection": "Tartalomjegyzék elrejtése",
+      "name": "Objektum",
+      "pluralName": "Objektumok",
+      "showPropertySection": "Tulajdonságszakasz megjelenítése",
+      "showTOCSection": "Tartalomjegyzék megjelenítése"
+    },
+    "RootPage": {
+      "create": "Oldal létrehozása",
+      "createTooltip": "Új kedvenc oldal létrehozása",
+      "delete": {
+        "modal": {
+          "body": "Ez az oldal törlődik az Ön térképéről. Ha máshol használja, ott továbbra is elérhető marad.",
+          "header": "Tényleg törölni szeretné ezt az oldalt?"
+        }
+      },
+      "description": "Egy egyszerű oldal",
+      "labels": {
+        "worksheet": {
+          "name": "Oldal",
+          "tooltip": "teszt"
+        }
+      },
+      "name": "Oldal",
+      "pluralName": "Oldalak",
+      "propertyDefinitions": {
+        "cdde4a50-df94-40f3-944a-d0b7034f13d5": {
+          "name": "Tartalom"
+        },
+        "d6bebd5b-7ad3-4d09-b87c-3e021b880903": {
+          "name": "Borítókép"
+        }
+      }
+    },
+    "RootQuery": {
+      "addDate": "Dátum",
+      "addExcludeType": "Típus kizárása",
+      "addGroup": "Csoport hozzáadása",
+      "addLimit": "Limit",
+      "addObjectType": "Objektumtípus hozzáadása",
+      "addOtherTag": "Lekérdezés létrehozása",
+      "addProperty": "Tulajdonság",
+      "addSearchTerm": "Adj hozzá egy új keresési feltételt; bármelyik egyezés visszaad eredményt.",
+      "addSort": "Rendezés hozzáadása",
+      "addTag": "Címke",
+      "addTagOrBacklink": "Címke vagy visszahivatkozás hozzáadása",
+      "addTagOrLink": "Címke vagy hivatkozás",
+      "addType": "Típus",
+      "adjustSearch": "Opciók",
+      "aiQuery": {
+        "debug": "AI lekérdezés hibakeresés",
+        "debugExplanation": "Magyarázat",
+        "debugPrompt": "Felhasználói szándék",
+        "debugResponse": "Modell válasza",
+        "error": "Nem sikerült lekérdezni. Próbáld újra.",
+        "generate": "Lekérdezés létrehozása",
+        "generating": "Lekérdezés generálása…",
+        "label": "Kérdezd az AI-t",
+        "orBuildManually": "vagy építsd fel a lekérdezést manuálisan",
+        "orEditManually": "vagy szerkeszd közvetlenül a lekérdezést",
+        "placeholder": "Írd le, milyen lekérdezést szeretnél…",
+        "placeholderUpdate": "Írd le, mit szeretnél módosítani…",
+        "stop": "Leállítás",
+        "thinking": {
+          "filters": "Szűrők beállítása…",
+          "finalizing": "Minden részlet összerakása…",
+          "objectTypes": "Objektumtípusok átnézése…",
+          "reviewingExisting": "Jelenlegi lekérdezésed áttekintése…",
+          "sortingGrouping": "Rendezés és csoportosítás kiválasztása…",
+          "tagsCollections": "Címkék és gyűjtemények egyeztetése…",
+          "understanding": "Kérésed értelmezése…"
+        },
+        "update": "Lekérdezés frissítése",
+        "updating": "Lekérdezés frissítése…"
+      },
+      "allContent": "Minden jegyzet",
+      "allExcept": "kivéve",
+      "allObjectTypes": "Minden objektumtípus",
+      "anyCollection": "Bármely gyűjtemény",
+      "anyOfThese": "bármelyik",
+      "blocks": "Objektumok és blokkok",
+      "butNo": "Ne jelenjen meg",
+      "butOnly": "De csak",
+      "changeQueryType": "Lekérdezés típusának módosítása",
+      "closeOptions": "Opciók bezárása",
+      "closeQueryEditor": "Szerkesztő bezárása",
+      "collectionAll": "Mind",
+      "collectionExcluded": "{count} gyűjtemény kizárva",
+      "collectionIncluded": "{count} gyűjtemény hozzáadva",
+      "collections": "Gyűjtemények",
+      "collectionsExcluded": "{count} gyűjtemény kizárva",
+      "collectionsIncluded": "{count} gyűjtemény hozzáadva",
+      "collectionsMenuSelectable": "Kiválasztható",
+      "collectionsMenuSelected": "Kiválasztva",
+      "collectionsNeedObjectType": "Először adj hozzá egy objektumtípust szűrőként.",
+      "collectionsSelected": "{count} gyűjtemény kiválasztva",
+      "collectionsUnsupported": "Ez az objektumtípus nem támogatja a gyűjteményeket.",
+      "constrainedBy": "Korlátozva",
+      "constraintHelp": {
+        "excludeTagsAndBacklinks": "A címke a jegyzettartalmon van. A visszahivatkozás olyan jegyzet, ami erre mutat. Ezeket a találatokat kizárjuk.",
+        "tagsAndBacklinks": "A címke a jegyzettartalmon van. A visszahivatkozás olyan jegyzet, ami erre mutat. \"Bármelyik\" bármelyik egyezést adja vissza; \"Mind\" minden feltételnek megfelelőt."
+      },
+      "dates": "Dátumok",
+      "describeAChange": "Változás leírása",
+      "describeAQuery": "Lekérdezés leírása",
+      "description": "Tartalom gyűjtése szabályok alapján",
+      "display": "Megjelenítés",
+      "displayGroup": "Csoportosítás",
+      "editQuery": "Lekérdezés szerkesztése",
+      "emptyState": "Nincs találat",
+      "excludeCollections": "Gyűjtemények kizárása",
+      "excludeObjectTypes": "Objektumtípusok kizárása",
+      "excludeTags": "Címkék vagy visszahivatkozások kizárása",
+      "filterByCollection": "Szűrés gyűjtemény szerint",
+      "filterByDate": "Szűrés dátum szerint",
+      "filterByObjectType": "Szűrés objektumtípus szerint",
+      "filterBySearch": "Szűrés kereséssel",
+      "filterByTagsAndBacklinks": "Szűrés címkék vagy visszahivatkozások alapján",
+      "filterCollections": "Gyűjtemények szűrése",
+      "filterObjectTypes": "Objektumtípusok szűrése",
+      "filterProperties": "Szűrés tulajdonságok szerint",
+      "filterTags": "Szűrés címkék szerint",
+      "filterTagsOrLinks": "Szűrés címkék vagy hivatkozások alapján",
+      "filteredBy": "Szűrve",
+      "first": "első",
+      "group": "Csoportosítás",
+      "groupByType": "Csoportosítás típus szerint",
+      "groupedBy": "Csoportosítva",
+      "in": "ben",
+      "inAnyCollection": "Bármelyik gyűjteményben",
+      "inCollection": "Bármelyik gyűjteményben",
+      "inNoCollection": "Egyik gyűjteményben sem",
+      "inTitleAndBody": "Címben és tartalomban",
+      "invalidQuery": "Érvénytelen lekérdezés",
+      "limit": "Limit",
+      "limitResults": "Korlátozza az eredményeket",
+      "limitedTo": "Korlátozva",
+      "matching": "Egyezés",
+      "mode": "Mód",
+      "moveSortToTop": "Legfelülre helyezés",
+      "nObjectTypes": "{count} objektumtípus",
+      "name": "Lekérdezés",
+      "narrowFurther": "További szűrés",
+      "noDefinition": "Nincs definíció",
+      "noGroup": "Nincs csoport",
+      "noLimit": "Nincs limit",
+      "noSort": "Nincs rendezés",
+      "notIn": "nem a(z)",
+      "notTaggedWith": "de ne ezzel",
+      "objectType": "Objektumtípus",
+      "objectTypeAllOfHint": "Egy objektumnak csak egy típusa van, ezért a \"Mind\" nem elérhető.",
+      "objectTypes": "Objektumtípusok",
+      "objectsFilteredBy": "Objektumok szűrve a(z)",
+      "offlineQuery": {
+        "description": "Ez a nézet megköveteli az összes tartalom betöltését az eszközre. Frissül, amint készen áll.",
+        "heading": "A nézet még nincs készen"
+      },
+      "onlyBlocks": "Csak blokkok",
+      "onlyObjects": "Csak objektumok",
+      "pinToDatabase": "Rögzítés a vezérlőpulton",
+      "pinToSpaceOverview": "Rögzítés az objektumtípushoz",
+      "pluralName": "Lekérdezések",
+      "properties": "Tulajdonságok",
+      "queryBuilder": {
+        "addTag": "Címke hozzáadása",
+        "advanced": "Speciális",
+        "aiLabel": "AI",
+        "allObjects": "Minden objektum",
+        "allTypes": "Mind",
+        "allTypesTooltip": "Ne szűrj objektumtípus szerint",
+        "autoTitle": {
+          "linkedTo": "kapcsolódik: {entities}",
+          "notLinkedTo": "nem kapcsolódik: {entities}",
+          "notTagged": "nincs címkézve: {tags}",
+          "tagged": "címkézve: {tags}"
+        },
+        "buildWithAi": "Létrehozás AI-jal",
+        "clearCollectionFilters": "Gyűjteményszűrők törlése",
+        "clearExcludeTypes": "Törlés",
+        "closeAi": "AI szerkesztő bezárása",
+        "collectionFiltersActive": "Gyűjteményszűrők aktívak ezen a lekérdezésen.",
+        "convertExcludeToSelection": "Átalakítás kijelöléssé",
+        "convolutionPaused": "Rendezés és tulajdonságszűrők szünetelnek kereséskor.",
+        "excludeTagDisabled": "Címke kizárásához adj meg keresési kifejezést vagy jelölj ki egy címkét.",
+        "excludeTagHint": "Kattints a címke be- vagy kizárásához",
+        "excludeTypes": "Típusok kizárása",
+        "excludeTypesHint": "Adj meg keresési kifejezést vagy címkét az objektumtípusok kizárásához.",
+        "excludeTypesInactive": "Nincs hatása, ha konkrét típusok vannak kiválasztva.",
+        "instructions": "Használj tetszőleges kombinációt a keresési kifejezésekből, objektumtípusokból és címkékből. Hagyd ki, amire nincs szükséged. Minden, amit hozzáadsz, szűkíti az eredményt.",
+        "invalidDescription": "Ez a piszkozat el van mentve, de nem ad eredményt, amíg nem adsz meg keresési kifejezést, címkét vagy objektumtípust.",
+        "invalidTitle": "A lekérdezés nincs kész",
+        "moreTypes": "+még {count}",
+        "notTag": "nem",
+        "releaseConstraintTooltip": "Alakítsd normál lekérdezéssé, és távolítsd el az egytípusú megszorítást. Megnyitja a lekérdezést oldalként, és törli ezt a fület a típus műszerfaláról.",
+        "scopeShiftNotice": "Mostantól a címkék mindenhol egyeznek, beleértve a beágyazott említéseket is.",
+        "searchHint": "Enter-rel hozzáadhatod",
+        "searchLabel": "Keresés",
+        "searchPlaceholder": "Keresési kifejezések…",
+        "searchTermCount": "{count}/{max}",
+        "searchTooShort": "Használj legalább 2 karaktert",
+        "showBlocks": "Blokkok",
+        "showDisabled": "Objektumok és blokkok megjelenítése kereséskor vagy címkével való szűréskor elérhető.",
+        "showEverything": "Minden",
+        "showObjects": "Objektumok",
+        "tagsLabel": "Címkék vagy visszahivatkozások",
+        "typesLabel": "Típusok"
+      },
+      "random": "véletlenszerű",
+      "recurringTasksInfo": "Ismétlődő feladatokra vonatkozó lekérdezéseknek vannak korlátai: a befejezett példányok nem jelennek meg, a jövőbeli példányok pedig nem lekérdezhetők.",
+      "removeAllFilters": "Az összes szűrő eltávolítása",
+      "results": "eredmények",
+      "return": "Megjelenítés",
+      "returnAll": "Az összes visszaadása",
+      "saveAsQuery": "Mentés lekérdezésként",
+      "saveAsQueryTooltip": "Az aktuális nézet mentése lekérdezésként",
+      "searchModes": {
+        "auto": {
+          "label": "Auto",
+          "tooltip": "Kombinálja a keresési módokat a legrelevánsabb találatokért."
+        },
+        "fullText": {
+          "label": "Pontos",
+          "tooltip": "Minden tartalomban keres, és pontos kifejezéseket talál meg."
+        },
+        "semantic": {
+          "label": "Szemantikus",
+          "meaning": "Jelentés",
+          "tooltip": "A keresési kifejezésekhez szemantikailag kapcsolódó tartalmat ad vissza."
+        },
+        "title": {
+          "label": "Cím",
+          "tooltip": "Csak a címekben keres, és pontos kifejezéseket talál meg."
+        }
+      },
+      "searchQueryTagFilterInfo": "A lekérdezés minden tartalmat visszaad, ami egyezik és valahol a választott címkékkel van megjelölve. Ha more advanced tag-alapú szűrőket keres, hozzon létre egy \"Tags\" típusú lekérdezést.",
+      "searchTerm": "Keresés",
+      "searchTerms": "Keresés",
+      "selectQueryType": "Indítsd a lekérdezést ezzel...",
+      "showBlocks": "Blokkok",
+      "showObjects": "Objektumok",
+      "sort": "Rendezés",
+      "sortedBy": "Rendezve",
+      "subscriptionNeeded": "A lekérdezések lehetővé teszik a tartalom szabályok alapján történő gyűjtését. Ezek a Capacities Pro egyik funkciói.",
+      "tagOperators": {
+        "and": "Mindegyik",
+        "or": "Bármelyik"
+      },
+      "taggedWith": "Címkézett tartalom",
+      "taggedWithOrLinkedTo": "Címkézett / Kapcsolódó",
+      "tagsAndBacklinks": "Címkék vagy visszahivatkozások",
+      "tagsAndLinks": "Címkék és hivatkozások",
+      "tagsInfo": "Az objektumtípus-lekérdezések csak a legfelső szintű tagek alapján szűrnek. Ha objektumokat és blokkokat szeretnél tagek alapján megjeleníteni, tagekhez tartozó lekérdezéseket kell használnod.",
+      "unpinFromDatabase": "Rögzítés eltávolítása a vezérlőpultból",
+      "unpinFromSpaceOverview": "Rögzítés eltávolítása az objektumtípusból",
+      "unsavedChanges": "Mentetlen módosításai vannak. Kérjük, mentse őket a lekérdező szerkesztő elhagyása előtt.",
+      "updatingStates": {
+        "live": {
+          "tooltip": "Minden tartalom ebben a lekérdezésben élő, és automatikusan frissül a különböző eszközökön."
+        },
+        "show": {
+          "button": "Frissítés",
+          "tooltip": "Ez a lekérdezés nem húz automatikusan tartalmat más eszközökről. Kattintson a „Frissítés” gombra, ha hiányzik néhány tartalom."
+        }
+      },
+      "withTags": "Címkézett"
+    },
+    "RootSimpleTable": {
+      "description": "Egy táblázat formázási lehetőségekkel és képletekkel",
+      "name": "Táblázat",
+      "pluralName": "Táblázatok",
+      "propertyDefinitions": {
+        "RootSimpleTable_coverImage": {
+          "name": "Borítókép"
+        },
+        "RootSimpleTable_notes": {
+          "name": "Jegyzetek"
+        },
+        "RootSimpleTable_simpleTableBlock": {
+          "name": "Táblázat"
+        }
+      }
+    },
+    "RootSpace": {
+      "addSpace": "Hely hozzáadása",
+      "create": "Hely létrehozása",
+      "description": "Egy hely, amely tartalmat tárol",
+      "name": "Hely",
+      "newContent": {
+        "name": "Új"
+      },
+      "overview": "Áttekintés",
+      "pluralName": "Helyek",
+      "propertyDefinitions": {
+        "databases": {
+          "name": "Gyűjtemények"
+        },
+        "pages": {
+          "name": "Oldalak"
+        },
+        "workspace_pages": {
+          "name": "Rögzítve"
+        }
+      },
+      "setup": {
+        "blankSpace": {
+          "blank": "Üres",
+          "description": "Kezdjen egy üres hellyel"
+        },
+        "chooseLanguage": {
+          "explain": "Válassza ki a nyelvet. Az adott hely tartalma ezt a nyelvet fogja elsődleges nyelvként használni. Lehetősége lesz a tartalamak más nyelvekre fordítására is."
+        },
+        "chooseTemplate": {
+          "explain": "Kezdhet egy sablonnal vagy egy üres hellyel is."
+        },
+        "explain": {
+          "heading": "A helyek elkülönítettek. Ne hozzon létre új helyet olyan tartalomhoz, amely talán összekapcsolódna más helyen lévő tartalommal.",
+          "text": "Minden tartalom csak egy helyen létezik. Hozzon létre új helyet csak akkor, ha teljesen elkülöníteni szeretné annak tartalmát más helyeitől."
+        },
+        "heading": "Új hely létrehozása",
+        "intro": "Válasszon egy nevet a helyéhez. Ha szeretné, választhat ikont is, hogy könnyebben felismerje.",
+        "namePlaceholder": "Válasszon egy nevet, amely leírja a helyét"
+      },
+      "text": {
+        "main": {
+          "placeholder": "Írja be a szöveget vagy keressen blokkokat..."
+        }
+      }
+    },
+    "RootStructure": {
+      "cardDefinitions": "Kártya definíciók",
+      "computedProperties": "Számított tulajdonságok",
+      "create": "Objektumtípus létrehozása",
+      "databaseName": "Adatbázis",
+      "databaseProperties": "Objektum tulajdonságok",
+      "description": "Objektumtípus meghatározása",
+      "filters": "Szűrők",
+      "name": "Objektumtípus",
+      "pluralName": "Objektumtípusok",
+      "properties": {
+        "add": "Tulajdonság hozzáadása",
+        "name": "Tulajdonságok"
+      },
+      "propertyDefinitions": {
+        "pluralName": {
+          "name": "Cím többes számban"
+        }
+      },
+      "structureViews": {
+        "defaultViewType": {
+          "description": "Válasszon egy típust, amelyet alapértelmezettként fog használni ez a szerkezet."
+        },
+        "deleteStructureView": {
+          "modal": {
+            "explanation": "Nézet törlése nem vonható vissza. Minden használatát felülírjuk az alapértelmezett nézettel.",
+            "header": "Biztosan törölni szeretné ezt a nézetet?"
+          }
+        },
+        "embed": {
+          "first": "Beágyazott nézet",
+          "new": "Új beágyazott nézet"
+        },
+        "emptyState": {
+          "description": "Még nincsenek objektumok. Először hozzon létre objektumokat, hogy láthassa az előnézetüket a struktúra tervezése közben."
+        },
+        "inline": {
+          "first": "Teljes szélességű hivatkozás",
+          "new": "Új inline nézet"
+        },
+        "page": {
+          "first": "Oldalnézet",
+          "new": "Új oldalnézet"
+        },
+        "smallCard": {
+          "first": "Kiskártya nézet",
+          "new": "Új kiskártya nézet"
+        },
+        "wideCard": {
+          "first": "Széles kártya nézet",
+          "new": "Új széles kártya nézet"
+        }
+      },
+      "templateDefinitions": "Sablonok",
+      "title": "Adatbázis",
+      "views": {
+        "add": "Nézet hozzáadása",
+        "puralName": "Nézetek"
+      }
+    },
+    "RootTag": {
+      "byType": {
+        "heading": "Típus szerint"
+      },
+      "description": "Tartalom gyűjtése egy témában",
+      "edit": "Címke hozzáadása",
+      "emptyStateText": "Nem található tartalom",
+      "hideTagsInText": "Címkék említéseinek elrejtése a tartalomban",
+      "inText": "Említve a tartalomban",
+      "mobileEdit": "Címkék szerkesztése",
+      "name": "Címke",
+      "noContent": {
+        "heading": "Nincs tartalom"
+      },
+      "noTags": "Címkék",
+      "pluralName": "Címkék",
+      "propertyDefinitions": {
+        "tag_colorTheme": {
+          "description": "A címke színcímkéje",
+          "name": "Szín"
+        }
+      },
+      "relatedTags": "Kapcsolódó címkék",
+      "selectedTags": "Kiválasztott címkék",
+      "showAll": {
+        "heading": "Mind együtt"
+      },
+      "showTagsInText": "Címkék említéseinek megjelenítése a tartalomban",
+      "showTagsNetwork": "Címkehálózat megjelenítése",
+      "tagDropdownLabel": "Keresés címkék között vagy új létrehozása",
+      "tagDropdownLabelWithStructures": "Címke hozzáadása vagy típusra átalakítás",
+      "turnInto": {
+        "label": "Blokk átalakítása",
+        "tooltip": ""
+      }
+    },
+    "RootTask": {
+      "createNewTask": "Feladat létrehozása",
+      "description": "Egy elvégzendő feladat",
+      "habitStats": {
+        "allTime": "Mindig",
+        "atRisk": "Veszélyben",
+        "bestStreak": "Legjobb",
+        "cellState": {
+          "completed": "Teljesítve",
+          "excused": "Felmentve",
+          "future": "Ütemezve",
+          "missed": "Lemaradt",
+          "none": "Nincs előfordulás",
+          "skipped": "Kihagyva"
+        },
+        "completionRate": "Teljesítési arány",
+        "completionRateSubtitle": "Teljesítve vs kihagyva vagy elmulasztva",
+        "completions": "Teljesítések",
+        "currentStreak": "Sorozat",
+        "dayUnit": "nap|nap",
+        "heading": "Feladat statisztikák",
+        "keepGoing": "Csak így tovább",
+        "monthUnit": "hónap|hónapok",
+        "startToday": "Kezdd el ma",
+        "weekUnit": "hét|hetek",
+        "yearUnit": "év|évek"
+      },
+      "name": "Feladat",
+      "occurrenceLog": {
+        "deleteEntry": {
+          "description": "Ez a naplóbejegyzés véglegesen el lesz távolítva a teljesítési előzményekből.",
+          "title": "Teljesítési naplóbejegyzés törlése"
+        },
+        "heading": "Teljesítési napló"
+      },
+      "overdue": "Lejárt",
+      "overdueWithCount": "Lejárt ({count})",
+      "pluralName": "Feladatok",
+      "propertyDefinitions": {
+        "RootTask_notes": {
+          "name": "Jegyzetek"
+        },
+        "backlinks": {
+          "name": "Kontextus"
+        },
+        "completed": {
+          "name": "Kész"
+        },
+        "date": {
+          "name": "Dátum"
+        },
+        "deadline": {
+          "name": "Határidő"
+        },
+        "priority": {
+          "description": "",
+          "name": "Prioritás",
+          "set": {
+            "high": "Magas",
+            "low": "Alacsony",
+            "medium": "Közepes"
+          }
+        },
+        "status": {
+          "description": "",
+          "name": "Állapot",
+          "set": {
+            "done": "Kész",
+            "in-progress": "Folyamatban",
+            "next-up": "Következő",
+            "not-started": "Nincs elkezdve",
+            "on-hold": "Felfüggesztve"
+          }
+        }
+      },
+      "turnBlockIntoTaskObject": "Alakítsd át feladatobjektummá",
+      "virtualizedInstance": {
+        "completed": {
+          "editStatus": {
+            "description": "Ez egy visszatérő feladat korábbi példánya. Nyisd meg a feladatot a befejezési napló kezeléséhez.",
+            "heading": "Lezárt feladatpéldány"
+          }
+        },
+        "future": {
+          "editAttempt": {
+            "description": "Ez egy visszatérő feladat jövőbeli példánya. Nyisd meg a feladatot az ütemezés vagy állapot szerkesztéséhez.",
+            "heading": "Jövőbeli feladatpéldány"
+          }
+        }
+      }
+    },
+    "RootWhiteboard": {
+      "create": "Fehér tábla létrehozása",
+      "description": "Egy végtelen vászon blokkok és objektumok elrendezéséhez",
+      "name": "Fehér tábla",
+      "pluralName": "Fehér táblák",
+      "propertyDefinitions": {
+        "RootWhiteboard_canvas": {
+          "name": "Vászon"
+        },
+        "RootWhiteboard_notes": {
+          "name": "Jegyzetek"
+        }
+      }
+    },
+    "User": {
+      "description": "Egy felhasználó",
+      "name": "Felhasználó",
+      "pluralName": "Felhasználók",
+      "propertyDefinitions": {
+        "firstName": {
+          "name": "Keresztnév"
+        },
+        "lastName": {
+          "name": "Vezetéknév"
+        }
+      }
+    },
+    "UserPersonal": {
+      "description": "Az Ön személyes felhasználói oldala",
+      "name": "Felhasználó (Személyes)",
+      "pluralName": "Felhasználók (Személyes)",
+      "propertyDefinitions": {
+        "firstName": {
+          "name": "Keresztnév"
+        },
+        "lastName": {
+          "name": "Vezetéknév"
+        },
+        "spaces": {
+          "name": "Saját Helyek"
+        },
+        "user": {
+          "name": "Felhasználói Profil"
+        }
+      },
+      "setup": {
+        "continue": "Gyerünk",
+        "firstSpaceName": "Jegyzetek",
+        "heading": "Üdvözöljük a Capacities-ban!",
+        "step1": {
+          "firstName": {
+            "heading": "Keresztnév",
+            "placeHolder": "Albert"
+          },
+          "intro": "Adja meg nevét a profil létrehozásához.",
+          "language": {
+            "description": "Válasszon nyelvet."
+          },
+          "lastName": {
+            "heading": "Vezetéknév",
+            "placeHolder": "Einstein"
+          },
+          "newsletter": {
+            "heading": "",
+            "text": ""
+          }
+        }
+      }
+    },
+    "UtilDate": {
+      "description": "Egy adott időpont",
+      "name": "Dátum",
+      "pluralName": "Dátumok",
+      "propertyDefinitions": {
+        "date": {
+          "name": "Dátum"
+        }
+      }
+    },
+    "area": {
+      "description": "Szervezd a munkát és a magánéletet felelősségi területekre.",
+      "name": "Terület",
+      "pluralName": "Területek",
+      "propertyDefinitions": {
+        "0eaee1b1-b0ca-4b87-84d5-a4eada2dd1b6": {
+          "name": "Tartalom"
+        }
+      }
+    },
+    "atomicNote": {
+      "description": "Írj kis, önálló jegyzeteket, amelyeket később újra felhasználhatsz.",
+      "name": "Atomi jegyzet",
+      "pluralName": "Atomi jegyzetek",
+      "propertyDefinitions": {
+        "4aa50950-c907-4fd4-927b-4b86d9531cb1": {
+          "name": "Borítókép"
+        },
+        "a8313d1b-0248-42e2-8323-927cf29b1130": {
+          "name": "Jegyzetek"
+        }
+      },
+      "queries": {
+        "7b2e9d14-0c58-4a31-86f0-5d1c8e4a9b27": {
+          "description": "Öt véletlenszerű jegyzet átnézésre",
+          "name": "Véletlen"
+        },
+        "d3a81c4e-6f20-4b59-8c17-9e4a2b70d1f5": {
+          "name": "Nincs címkézve"
+        }
+      }
+    },
+    "book": {
+      "description": "Építs fel egy olvasási könyvtárat szerzőkkel, értékeléssel és műfajjal.",
+      "name": "Könyv",
+      "pluralName": "Könyvek",
+      "propertyDefinitions": {
+        "2c5536d9-23a6-4a46-bccd-03c6f78590bd": {
+          "name": "Értékelés"
+        },
+        "34462708-c7b4-459f-8464-be70b3161adc": {
+          "name": "Típus",
+          "set": {
+            "6161edf4-2b8f-4add-b826-5aa5772f7bbb": "Non-fiction",
+            "7434b33f-2665-4c1d-b68e-f43a6bcd176b": "Fikció"
+          }
+        },
+        "63956525-9c0e-4945-ab24-00c9e198204e": {
+          "name": "Borítókép"
+        },
+        "6fcd3f53-5181-4092-a511-3981494473e5": {
+          "name": "Szerzők"
+        },
+        "82c2dfb7-24ee-4167-b438-31f735f9cd85": {
+          "name": "Jegyzetek"
+        },
+        "d9fac6c3-5407-4bb1-9fd3-0e1c921e270a": {
+          "name": "Műfaj",
+          "set": {
+            "008e5dcd-84ea-49e0-a3ae-824286c99fe8": "Művészet",
+            "078bf7cc-b956-4fbd-858f-320c4cc1b59e": "Referencia",
+            "121f78e9-b248-49a5-9786-6730be40ff7e": "Fantasy",
+            "15af2aef-7bd3-4710-9d09-c31b645686a9": "Szépirodalom",
+            "19bbc4ec-a79c-41f3-94df-5e5f255d1851": "Üzlet és közgazdaságtan",
+            "1acf0009-3b93-4ef9-a28a-e9f92b702f61": "Filozófia",
+            "1b9299f1-2c18-47c4-accf-7949b836fa1c": "Politika",
+            "233164e8-7964-476c-809a-2ec1ecc2b535": "Vallás és spiritualitás",
+            "23612a75-48a7-453f-a63c-cf1a327fc506": "Klasszikus",
+            "25c8ecf7-8428-4519-9d96-ea425d0bc37d": "Zene",
+            "27422b2c-8808-4c29-bc8c-7baa8bcba1cf": "Család és kapcsolatok",
+            "27ce2f8d-b4f9-4003-9ac9-b976592272e3": "Oktatás",
+            "28c4eec2-8160-4166-852a-7cedb17c8dc3": "Költészet",
+            "2c437e06-52d3-4ae3-9776-befada9640ae": "Főzés",
+            "302985b0-7959-48b5-bbec-85117a27cec3": "Történelmi regény",
+            "407ee749-7d23-48d2-b5c7-48f838ca6f12": "Tudomány",
+            "4a64d844-1a64-4242-9ea7-88946858d3b2": "Nyelv és írás",
+            "4bdb8011-caf4-41c2-a2ac-c8381544ae6e": "Ifjúsági irodalom",
+            "69fec508-43d0-4ac6-810b-98b7af561fc6": "Dráma",
+            "70e8b3fc-f8ce-4bba-9ce9-29997b84f99e": "Képregények és graphic novelek",
+            "71aee57d-bd2a-4514-9b81-43f1a50b1e3f": "Önfejlesztés",
+            "890f4b4c-05f2-4aee-9836-5fd9983c6971": "Pszichológia",
+            "897093c9-764f-42ac-8391-04b2b7092b20": "Kézművesség és hobbi",
+            "9379b008-43de-4b99-aa6f-3eb2295aa227": "Természet",
+            "9ab0ef59-9a90-4e18-8159-7556709776a7": "Orvostudomány",
+            "9c8d1e9a-ba63-4af0-8f74-e36cde515ea1": "Krimi",
+            "9db86852-e9b4-4019-b1a5-88359177b3a0": "Jog",
+            "a100a455-5687-45dd-a707-84e431a0f0fb": "Utazás",
+            "c008926d-b729-496c-8718-f8bd3e62bf2c": "Kaland",
+            "c1d8d6e4-ccd9-4cf8-ba42-1ea6a455f8e1": "Gyermekirodalom",
+            "c5603c1f-920e-4cfc-85ad-0e411cbbdce8": "Társadalomtudomány",
+            "c811276b-f64d-4f4e-992d-f30065bece69": "Valós bűnügyek",
+            "c8c138ee-b7c2-4213-8ac9-ce664f1e71cb": "Technológia",
+            "cd4ed125-36d2-4a3c-a711-22f326333a77": "Otthon és kert",
+            "d0902e06-46dc-40ec-8603-7e011a43230b": "Horror",
+            "d22a5fc7-48f4-4532-aa6f-5e6b8ccd4918": "Tudományos-fantasztikus",
+            "d75c9168-e658-4605-9ca0-175dd387b4dd": "Thriller",
+            "db6869ae-aa3d-499a-ac68-887dec35da0d": "Történelem",
+            "e37ee33e-6b03-4983-a361-eaf3e109d3ec": "Rejtély",
+            "e8743d0e-d007-4f2c-b9ad-988c8b353606": "Romantika",
+            "ea666d4b-0c1a-4fb2-99b5-cdaafaa8a868": "Egészség és fitnesz",
+            "eef64eed-c067-4bc2-b4e6-4a764bcd12ca": "Humor",
+            "ef661d67-611b-450e-9313-f003021abf6a": "Sport",
+            "f68c0fc0-446a-4104-ac9b-a45fd64872e1": "Életrajz",
+            "f9ef3bfe-d610-4281-bb0d-0ebd4aea660b": "Matematika"
+          }
+        },
+        "e974b1e1-a892-4f40-8fce-131d642ed800": {
+          "description": "Kezdd el, amikor olvasni kezdesz, fejezd be, amikor befejezted",
+          "name": "Olvasási idővonal"
+        }
+      },
+      "queries": {
+        "04edc609-6d1f-4044-a76b-1ae57fb6b76b": {
+          "name": "Non-fiction"
+        },
+        "2ab9ccff-c7cf-4154-a278-dd6d526c56fe": {
+          "description": "Adj értékelést és típust ezekhez a könyvekhez",
+          "name": "Karbantartás"
+        },
+        "73a2b120-cc79-40a2-9bed-f3ad28f783a6": {
+          "name": "Ebben az évben olvasva"
+        },
+        "8718e9ef-e8e4-4ebc-94f9-589fb6953c7f": {
+          "name": "Jelenleg olvasás alatt"
+        },
+        "c5f0763d-b78d-4d99-a61d-d3ed7c987dcf": {
+          "name": "Fikció"
+        },
+        "f82f9132-7fda-4eb8-980f-82011cddb365": {
+          "name": "Olvasási lista"
+        }
+      }
+    },
+    "day": {
+      "description": "Egy nap rögzítése energiával, hangulattal és a legemlékezetesebb pillanattal.",
+      "name": "Nap",
+      "pluralName": "Napok",
+      "propertyDefinitions": {
+        "3c7e20a3-e45b-4f03-a55c-1d3bd3e7a0fb": {
+          "name": "Tartalom"
+        },
+        "3ce51242-87d5-4757-a35a-8c85ad29634f": {
+          "description": "Mi volt ma a különleges?",
+          "name": "A nap fénypontja"
+        },
+        "692cfd34-099e-4d98-86ce-e7ba87206dca": {
+          "description": "Hogy érzed magad?",
+          "name": "Hangulat",
+          "set": {
+            "0b9ffa66-82a9-4549-a1d4-143fcf1f061a": "Durva",
+            "67ee83e7-3d4c-438b-84e2-9e2d9fce76f7": "Jó",
+            "a87a85b3-c971-4ea2-b375-9fdce93271f2": "Szuper",
+            "bf2e919a-3e4e-42d0-8e23-1cb9126c3708": "Alacsony",
+            "e5946a0e-38e4-4c72-a23a-b8406d0848de": "Oké"
+          }
+        },
+        "809c9fdd-2731-4a97-a0b9-7efc902fcbad": {
+          "description": "Milyen az energiád?",
+          "name": "Energia",
+          "set": {
+            "4043fe60-b266-4dc5-a92e-6fa4f1dd91d2": "Alacsony",
+            "533c559a-7229-47d6-8b79-162d67d587a5": "Nagyon alacsony",
+            "5efda625-ba81-47ca-81c5-50ed75670dd6": "Nagyon magas",
+            "804e9658-ca3f-4097-98c2-0268d02afe6d": "Magas",
+            "cdf9c669-ee16-4bc6-a038-333a179e6938": "Közepes"
+          }
+        },
+        "c005f29b-8aa0-402f-94e6-02910534b0b5": {
+          "name": "Dátum"
+        },
+        "f797f804-a0e6-4738-b455-1ef95f8a0dfc": {
+          "description": "Miért vagy hálás?",
+          "name": "Hálás vagyok"
+        }
+      },
+      "queries": {
+        "6e084344-605a-4bb8-bd06-88dc38589c9b": {
+          "name": "Tegnap"
+        },
+        "d6ecd383-1293-4232-ba9d-eda60b5a6938": {
+          "name": "Ma"
+        }
+      },
+      "templates": {
+        "4b27277b-74a8-4413-a1be-2faf37dc5c8c": {
+          "name": "Nap"
+        }
+      }
+    },
+    "definition": {
+      "description": "Jegyezd fel a megjegyezni kívánt fogalmat.",
+      "name": "Definíció",
+      "pluralName": "Definíciók",
+      "propertyDefinitions": {
+        "2b53849c-b6b4-4b8b-b7d4-79af4641cd4e": {
+          "name": "Jegyzetek"
+        }
+      },
+      "queries": {
+        "3f6a1c80-9d24-4e17-b5a2-8c0e7d1f4b63": {
+          "description": "Egy véletlenszerű definíció áttekintésre",
+          "name": "Véletlen"
+        }
+      }
+    },
+    "film": {
+      "description": "Gyűjtsd össze a megnézett és megjegyzendő filmeket.",
+      "name": "Film",
+      "pluralName": "Filmek",
+      "propertyDefinitions": {
+        "3f8e2b91-6c4a-4d17-b8e5-9a2c1d7f4e06": {
+          "name": "Jegyzetek"
+        },
+        "7d2a1c4e-8b3f-4e61-9a50-6c1d8e4f2b79": {
+          "name": "Poszter"
+        },
+        "97c3a1eb-726f-46aa-918a-adfbe404029c": {
+          "name": "Műfaj",
+          "set": {
+            "0c23ecc0-6894-4b02-a1b2-a12aca207bd7": "Animáció",
+            "0dd117d6-cf60-4bbe-8de1-35bcf189db1a": "Vígjáték",
+            "12507e47-f27a-4200-9bdd-4ced0dae5fc9": "Történelem",
+            "151e05f8-404c-481e-9388-1514fd4a0c12": "Kaland",
+            "1ecef032-830b-412d-a18f-5bbbc67d6bad": "Romantika",
+            "3356786f-9a82-433b-aa5e-416b9283e5bd": "Fantasy",
+            "38b2c9f4-fe43-4ca4-8adf-a63142eaebbf": "Zene",
+            "3d88333f-4aff-47a9-b4a4-3c9f2c1273c8": "Musical",
+            "41946939-66fa-4b23-9f8d-8f99b1143330": "Dokumentumfilm",
+            "4b3a6b0f-261e-4db8-bc3f-af8e067c750f": "Sci-fi",
+            "5a86e68e-6394-41ae-ac20-cedd3142bc4f": "Családi",
+            "5b19dd5c-654c-42c4-ab1b-9ada2a7cf79b": "Rövidfilm",
+            "6781baa1-481c-4d45-b9c9-0da7d5428c51": "Western",
+            "70437be4-113e-466b-8299-39b50a04d802": "Háborús",
+            "70d5ef2e-8a7d-4c04-9325-8f8730748b73": "Film noir",
+            "7ee35543-8e30-4708-bc49-ec0eb93eb6ba": "Dráma",
+            "85d54d05-48b9-45c0-9091-eb418f63c7f6": "Sport",
+            "951cf89f-146f-4e24-800c-ce23260b2ad8": "Akció",
+            "955bb7d4-13d3-4c1c-87ec-c3aef5dd4204": "Krimi",
+            "c20f111a-6fbd-4255-903d-1a84623a70f6": "Horror",
+            "e0fc52ae-2324-481a-a7b2-a9e42d2ceb2d": "Életrajz",
+            "e14991a7-3a59-48a0-9216-2b9cd3f3758b": "Misztikus",
+            "efe9fef8-228b-4f65-a1b2-bb372f9c31b6": "Thriller"
+          }
+        },
+        "b1c9e4a7-2d58-4f03-a6e1-8d4b7c2f9a15": {
+          "name": "Rendező"
+        },
+        "b91b642c-a7af-4cce-8500-540f90a84be9": {
+          "name": "Megnézve ekkor"
+        },
+        "cf2f791f-267e-4121-919c-349207b84ae1": {
+          "name": "Értékelés"
+        }
+      },
+      "queries": {
+        "86f622b7-a2c8-4bb6-a414-ecc88854834d": {
+          "description": "Adj értékelést és műfajt ezekhez a filmekhez",
+          "name": "Karbantartás"
+        },
+        "8fe5b94b-c465-4704-921c-2010b0034652": {
+          "name": "Legjobb filmek"
+        },
+        "b3ff619f-dc25-4dae-832a-65e49ce4df3a": {
+          "name": "Ebben az évben nézve"
+        }
+      }
+    },
+    "general": {
+      "structureViews": {
+        "embed": {
+          "title": "Beágyazás"
+        },
+        "inline": {
+          "title": "Hivatkozás blokk"
+        },
+        "page": {
+          "title": "Oldal"
+        },
+        "smallCard": {
+          "title": "Kis kártya"
+        },
+        "wideCard": {
+          "title": "Széles kártya"
+        }
+      }
+    },
+    "meeting": {
+      "description": "Rögzítsd a beszélgetéseket résztvevőkkel és dátummal.",
+      "name": "Találkozó",
+      "pluralName": "Találkozók",
+      "propertyDefinitions": {
+        "42722a2e-f79a-4031-98c8-287f3dfdd443": {
+          "name": "Típus",
+          "set": {
+            "08627d5c-6464-4e17-bd30-838a2d6e4f28": "Workshop",
+            "62ce4a59-9ca5-4c3a-ba26-3de8764ec809": "Ügyféltalálkozó",
+            "87c04a34-94f4-48d8-8012-faede1144977": "Prezentáció",
+            "ae1eaadd-4e42-45dc-8b4f-4f1bf6a9f3c0": "Brainstorming",
+            "bd198f8e-1908-450a-9ae5-d09d053aafe7": "Konferencia",
+            "eb4bd1fe-bdbd-4d05-a36b-ec2809e61434": "Interjú",
+            "eefeb90a-b898-4d68-8a8e-ce5f9840d048": "Csapatmegbeszélés",
+            "f32e5e65-324d-4d93-87b9-33642202d531": "Egyéni egyeztetés"
+          }
+        },
+        "5cfda7d3-8067-4ecf-961a-7c1f8f80e0ce": {
+          "name": "Projekt"
+        },
+        "8fc8ff3b-eedb-462f-9165-a0e0a2d64571": {
+          "name": "Dátum"
+        },
+        "98ee798b-2f62-4bcf-913f-a46121f9eeb1": {
+          "name": "Jegyzetek"
+        },
+        "bf200cbe-5f53-4f77-adf3-122e2c40ae12": {
+          "name": "Borítókép"
+        },
+        "c8b6a0f8-b2dc-4257-bd99-766bae41c929": {
+          "name": "Résztvevők"
+        },
+        "dc6fd9d0-b46d-4f27-8f24-9068dbe2cb5c": {
+          "name": "Átnézve"
+        }
+      },
+      "queries": {
+        "36f29792-4031-4690-9e8c-3888f34f7b64": {
+          "name": "Nem átnézett"
+        }
+      }
+    },
+    "month": {
+      "description": "Tervezd vagy értékeld egy hónapodat.",
+      "name": "Hónap",
+      "pluralName": "Hónapok",
+      "propertyDefinitions": {
+        "59b0120a-23a5-4e6d-b68f-dfcc17646920": {
+          "name": "Dátum"
+        },
+        "8f8076e7-3499-4b3c-a6bc-93c43ab1e96b": {
+          "name": "Jegyzetek"
+        }
+      },
+      "queries": {
+        "c7b4e1a0-5f29-4d83-91c6-8e3a2f0d7b15": {
+          "name": "Ez a hónap"
+        },
+        "e5a8c2d1-7f40-4b16-82d9-3c6e1a9f4b70": {
+          "name": "Előző hónap"
+        }
+      },
+      "templates": {
+        "341f957f-675f-473c-b7b9-d048d8716c4b": {
+          "name": "Hónap"
+        }
+      }
+    },
+    "organization": {
+      "description": "Jegyzetelj cégekről és más intézményekről.",
+      "name": "Szervezet",
+      "pluralName": "Szervezetek",
+      "propertyDefinitions": {
+        "00aa672b-29d5-4765-9d71-20e090db8ce9": {
+          "name": "Jegyzetek"
+        },
+        "110300a6-1ddc-48f3-a7a8-72a53ee8e02d": {
+          "name": "Kategória",
+          "set": {
+            "8ccf1327-a54b-46a9-a938-4085077e535e": "Nonprofit",
+            "95ed1c75-0074-442b-9bfa-56a0130a5c08": "Cég",
+            "b9f02819-63cb-4397-aa2d-eff4d8e60dc1": "NGO",
+            "c393061e-2121-45e3-a70e-def2455560c5": "Startup",
+            "c5e8322b-5f0c-4eda-9484-aebacd9eedda": "Állami",
+            "f669be17-9441-4ab1-ba1b-d61a0c6e5789": "Egyetem"
+          }
+        },
+        "a70ae3cc-86d4-4ac0-bbe1-ac3c31a59836": {
+          "name": "Borítókép"
+        },
+        "aac0bc75-7ccd-4697-a929-1e294a9ba83c": {
+          "name": "Emberek"
+        },
+        "ac159e47-df40-4388-87c5-7587c2adae5d": {
+          "name": "Projektek"
+        }
+      },
+      "queries": {
+        "6c4f1a2e-0b8d-4d3a-9f71-2e5a8c9b0147": {
+          "name": "Kategória szerint"
+        }
+      }
+    },
+    "person": {
+      "description": "Jegyzetelj azokról az emberekről, akikkel találkozol, együtt dolgozol vagy követed őket.",
+      "name": "Személy",
+      "pluralName": "Személyek",
+      "propertyDefinitions": {
+        "1f49b552-d7b9-4b1f-8cd8-7785f9ccb49f": {
+          "name": "Találkozók"
+        },
+        "28457c6c-6439-4eb7-996b-465e8511ac7a": {
+          "name": "Jegyzetek"
+        },
+        "864b648a-0eb8-4b12-8873-4ffb2b6be475": {
+          "name": "Szervezetek"
+        },
+        "9aab7abf-bd21-4df3-86fe-5a92243712f8": {
+          "name": "Projektek"
+        },
+        "b7c4d315-9004-46b5-bc82-ed96471eda05": {
+          "name": "Kép"
+        },
+        "d79ca610-d096-4c3a-b0ec-51c55f154673": {
+          "name": "Kategória",
+          "set": {
+            "0851f5b6-b850-4345-be20-97d97c531031": "Művész",
+            "12c42506-0955-48d7-8874-246311579d34": "Vállalkozó",
+            "2a7018fb-e12a-4053-976e-bd3b8182c6bd": "Tudós",
+            "45822c36-91f1-47c1-9c6b-3959dec926eb": "Filozófus",
+            "6173b336-c746-4fcd-b421-b17a477c639d": "Barátok",
+            "7b8d8b19-6e67-4e89-8886-ac1b2a2bad5e": "Politikus",
+            "8bbdea9e-c7d2-4294-a54f-568d64b874ee": "Kolléga",
+            "b598aad7-4049-4654-9267-4961608c1827": "Szerző",
+            "b85c8372-0e32-4b69-89e8-4ffed168ca43": "Újságíró",
+            "bf46f270-931d-46d7-aab8-ae949be22652": "Akadémikus",
+            "d813d7b2-564a-40a2-9585-59b85209418f": "Család"
+          }
+        }
+      },
+      "queries": {
+        "85d12d17-cc79-4f5b-a5ec-4ed85e96cdbc": {
+          "name": "Kategória szerint"
+        }
+      }
+    },
+    "podcast": {
+      "description": "Mentsd el a meghallgatott és visszatérni kívánt podcasteket.",
+      "name": "Podcast",
+      "pluralName": "Podcastok",
+      "propertyDefinitions": {
+        "17408a53-dec8-4054-bcb6-11f26bdbd46c": {
+          "name": "URL"
+        },
+        "69b9c271-4c8d-4397-a7eb-865a06800264": {
+          "name": "Meghallgatva ekkor"
+        },
+        "8421e86d-7a8e-45bc-b98c-8bec04f54dbc": {
+          "name": "Jegyzetek"
+        },
+        "f28e781b-71d1-481d-acbc-e51d3ae392c0": {
+          "name": "Személyek"
+        }
+      },
+      "queries": {
+        "4e1c9a70-2b8d-4f13-91a6-7c3d5e8f0b24": {
+          "name": "Ebben az évben hallgatva"
+        },
+        "9a6d2c18-5e40-4b77-8f31-0c4a7d9e2b56": {
+          "description": "Adj URL-t ezekhez a podcastekhez",
+          "name": "Karbantartás"
+        }
+      }
+    },
+    "project": {
+      "description": "Kövesd a munkát státusszal, együttműködőkkel és találkozókkal.",
+      "name": "Projekt",
+      "pluralName": "Projektek",
+      "propertyDefinitions": {
+        "40771bce-7329-40f2-a224-23fa402d409f": {
+          "name": "Találkozók"
+        },
+        "45bb99d4-914b-4364-9949-4a7e62ab0b29": {
+          "description": "Kezdd, amikor elkezdődik, fejezd be, amikor vége",
+          "name": "Időintervallum"
+        },
+        "77b38594-493a-46fa-bfcf-b304fe7df928": {
+          "name": "Szervezetek"
+        },
+        "78d193a0-debe-4ac9-8431-cd9bfe4cee5c": {
+          "name": "Együttműködők"
+        },
+        "82a38e65-4d2a-4df0-ba32-4bedf58ff614": {
+          "name": "Jegyzetek"
+        },
+        "99980329-b66f-4af3-9f9a-c43dc6db039b": {
+          "name": "Státusz",
+          "set": {
+            "0b685096-c8e9-4bb4-9aaf-5f965c393c70": "Befejezve",
+            "269fd5dc-abfe-422b-ba4a-f9c6f80dabd7": "Tervezett",
+            "3a7d295f-2c79-4303-a8cd-1998a83bfea3": "Folyamatban",
+            "a92da3b5-90a9-4a6e-bacc-4aecdc123846": "Szünetel"
+          }
+        },
+        "aa230cb5-f001-43b8-ae74-9264124433e5": {
+          "name": "Borítókép"
+        },
+        "bad4e82d-ca42-4703-b224-fa180aaaf4f1": {
+          "name": "Típus",
+          "set": {
+            "3fc51b26-8e17-4911-b47c-926a9b15e474": "Személyes",
+            "878ef25e-ccd5-4c02-82ea-810020a7536b": "Munka"
+          }
+        }
+      },
+      "queries": {
+        "06c46eeb-434f-4fd2-82a6-284044abba8f": {
+          "name": "Személyes"
+        },
+        "a811d6f7-7e61-4572-b089-2356e69a44d2": {
+          "name": "Munka"
+        },
+        "b6d573a5-a607-45fc-abaa-790905494d27": {
+          "name": "Szervezet szerint"
+        },
+        "e2b2efab-33dd-4337-8f09-721084cbb1c0": {
+          "name": "Állapot"
+        },
+        "fba8a495-484b-4249-acc1-956ce6f84d23": {
+          "name": "Együttműködő szerint"
+        }
+      }
+    },
+    "tvSeries": {
+      "description": "Kövesd a sorozatokat, amiket nézel, és szeretnél visszatérni hozzájuk.",
+      "name": "Sorozat",
+      "pluralName": "Sorozatok",
+      "propertyDefinitions": {
+        "0d010ef3-83b5-457f-a333-ee6d111f1a83": {
+          "name": "Értékelés"
+        },
+        "2ce2e467-d119-41b0-bf4b-5eb91c5c82b4": {
+          "name": "Műfaj",
+          "set": {
+            "0c298c70-273c-4d37-8b4c-10f39b976346": "Háborús",
+            "0dd9f36b-b86a-4c91-a291-20c80d1b80f4": "Western",
+            "20e18b9a-f46b-47a4-b8a9-d31cd55adfd6": "Romantika",
+            "320e9cf5-8be2-48eb-9a57-ff448c2f402a": "Kaland",
+            "4faa8579-ccbf-4c47-959f-cffeab77621f": "Misztikus",
+            "545afdec-bf72-4470-a2b9-7050c4b4d531": "Életrajz",
+            "5c515920-28ec-4da8-a9f5-03aa9f526008": "Talk show",
+            "6be83832-5063-41a8-ba46-220b31b11e5c": "Animáció",
+            "7c5305c0-5c7a-41aa-adbd-2d9eeb43091e": "Akció",
+            "7e707c84-b60f-4fa1-8e1b-b60789b4b260": "Családi",
+            "7ea1533f-6e04-44f2-bd0f-7003de6a33bc": "Sci-fi",
+            "85203d2e-0d87-4a48-b8ec-99bb8f8e18a1": "Zene",
+            "90aabee5-9d04-42cd-bf86-79a0497c0148": "Történelem",
+            "920c821f-4cfe-4349-bd39-0566b51ae2c6": "Dokumentumfilm",
+            "9707903a-5399-4343-8e20-21a504665abb": "Horror",
+            "9a15fdaa-ea94-4327-ad8a-24e3226976ab": "Sport",
+            "9a16c9ab-bd5d-463b-a78f-2f3b12844da2": "Játékshow",
+            "a6bbef4c-c3f8-45f9-ab44-fc37c4ad2ebd": "Musical",
+            "a95e6518-d222-4403-868e-689b3bc04bc4": "Reality TV",
+            "b4849a44-8a67-42ca-84fb-7cba92d21372": "Krimi",
+            "c81d079e-68cf-4c38-8396-57f78f301d4c": "Hírek",
+            "cf89e605-73c6-4f0f-8c56-3e8dfa790afc": "Dráma",
+            "d7f52804-94e0-4a46-babe-edfc9df0ee7f": "Vígjáték",
+            "e0c615fc-6729-498b-b668-b1e2c9893adc": "Rövidfilm",
+            "e5e7338e-03ae-489a-9e1b-5f850143b362": "Thriller",
+            "ff02352f-349b-43ae-8a76-e3d43b58ed3a": "Fantasy"
+          }
+        },
+        "3db60ae3-ad0e-49dd-b873-b1f0eaf202b4": {
+          "name": "Színészek"
+        },
+        "952855a3-0dbd-41f0-929d-7d4378c374a3": {
+          "name": "Megnézve ekkor"
+        },
+        "963da948-8728-4c36-97b6-86b63dcfb57c": {
+          "name": "Jegyzetek"
+        },
+        "aa86ea26-3c48-4c9b-9340-06652dd061a2": {
+          "name": "Borítókép"
+        },
+        "cf4babe7-1510-4942-944d-06e96e96d5f1": {
+          "name": "Rendező"
+        }
+      },
+      "queries": {
+        "805c2792-ec36-4913-bb26-e988a1a788eb": {
+          "description": "Adj értékelést és műfajt ezekhez a sorozatokhoz",
+          "name": "Karbantartás"
+        },
+        "e03e6b2e-eda7-43e8-b5a2-a56769fe4ae0": {
+          "name": "Ebben az évben nézve"
+        },
+        "eedbe41a-f42b-4130-89bf-2c716f9b8878": {
+          "name": "Legjobb sorozatok"
+        }
+      }
+    },
+    "week": {
+      "description": "Tervezd meg vagy értékeld a hetedet.",
+      "name": "Hét",
+      "pluralName": "Hetek",
+      "propertyDefinitions": {
+        "4ec1bdff-cd41-4355-b97d-da3f4b2b526f": {
+          "name": "Dátum"
+        },
+        "f5fd7df0-3c78-46c2-b6bd-d3df0c075b1b": {
+          "name": "Jegyzetek"
+        }
+      },
+      "queries": {
+        "1f8c3a92-6d4b-4e17-9a50-2c7e8d1b4f60": {
+          "name": "Ez a hét"
+        },
+        "a2d9e7c4-3b18-4f06-8e51-7c0a9b6d2e34": {
+          "name": "Előző hét"
+        }
+      },
+      "templates": {
+        "2b70216b-63e6-47bf-8e91-02c16d1c8b67": {
+          "name": "Hét"
+        }
+      }
+    }
+  },
+  "general": {
+    "aWeekAgo": "Egy hete",
+    "abort": "Megszakítás",
+    "above": "Felett",
+    "actions": "Műveletek",
+    "active": "Aktív",
+    "add": "Hozzáadás",
+    "addTo": "Hozzáadás ehhez",
+    "advanced": "Haladó",
+    "ahead": "Előtt",
+    "aliases": "Aliasok",
+    "all": "Minden",
+    "allowOnce": "Engedélyezés egyszer",
+    "alwaysAllow": "Mindig engedélyez",
+    "analyze": "Elemzés",
+    "and": "és",
+    "apply": "Alkalmaz",
+    "archive": "Archívum",
+    "asObjects": "Objektumként",
+    "automatic": "Automatikus",
+    "availableContext": "Elérhető kontextus",
+    "back": "Vissza",
+    "backToHome": "Vissza a kezdőlapra",
+    "backup": "Biztonsági mentés",
+    "behind": "Mögött",
+    "below": "Alatt",
+    "block": "Blokk",
+    "blockOptions": "Blokkbeállítások",
+    "bulkImport": "Tömeges importálás",
+    "by": "által",
+    "cancel": "Mégse",
+    "cancelled": "Törölve",
+    "change": "Változtat",
+    "choose": "Választ",
+    "clear": "Törlés",
+    "clipboard": "Vágólap",
+    "close": "Bezárás",
+    "collection": "Gyűjtemény",
+    "comingSoon": "Hamarosan",
+    "confirm": "Megerősít",
+    "confirmed": "Megerősítve",
+    "contactUs": "Kapcsolatfelvétel",
+    "content": "Tartalom",
+    "context": "Kontextus",
+    "continue": "Folytatás",
+    "copiedToClipboard": "Másolva a vágólapra",
+    "copy": {
+      "noun": "Másolat",
+      "verb": "Másol"
+    },
+    "copyright": "Minden jog fenntartva",
+    "create": "Létrehozás",
+    "createAndAdd": "Létrehozás és hozzáadás",
+    "createObject": "{name} létrehozása",
+    "currentSelection": "Jelenlegi kiválasztás",
+    "custom": "Egyéni",
+    "customize": "Testreszabás",
+    "cut": "Kivágás",
+    "daily": "Napi",
+    "darkMode": "Sötét mód",
+    "dataProtection": "Adatvédelmi irányelvek",
+    "date": "Dátum",
+    "deactivated": "Inaktiválva",
+    "default": "Alapértelmezett",
+    "delete": "Törlés",
+    "deleted": "Törölve",
+    "deletedUser": "Törölt felhasználó",
+    "deprecated": "Elavult",
+    "description": "Leírás",
+    "deselectAll": "Kijelölés megszüntetése",
+    "details": "Részletek",
+    "diagnostics": "Diagnosztika",
+    "documentation": "Dokumentáció",
+    "done": "Kész",
+    "dontShowAgain": "Ne mutasd újra",
+    "down": "Le",
+    "download": "Letöltés",
+    "downloadFile": "Fájl letöltése",
+    "downloading": "Letöltés...",
+    "duplicate": "Másolat készítése",
+    "edit": "Szerkeszt",
+    "editSelection": "Kiválasztás szerkesztése",
+    "empty": "Üres",
+    "emptyStateSearch": "Nincs találat",
+    "enter": "Belépés",
+    "entries": "bejegyzések",
+    "entry": "bejegyzés",
+    "error": "Hiba",
+    "eventCancelled": "Törölve",
+    "eventDeleted": "Törölve",
+    "eventNotFound": "Nem található",
+    "exitOnboarding": "Kilépés a bevezetőből",
+    "experimental": "Kísérleti",
+    "explore": "Felfedezés",
+    "exploreContext": "Kontextus felfedezése",
+    "exploreMore": "Fedezz fel többet",
+    "export": "Exportálás",
+    "exporting": "Exportálás folyamatban...",
+    "extract": "Kinyerés",
+    "failed": "Sikertelen",
+    "file": "Fájl|Fájlok",
+    "findMore": "Továbbiak keresése",
+    "finish": "Befejezés",
+    "finishAndContinue": "Befejezés és folytatás",
+    "firstName": "Keresztnév",
+    "forward": "Előre",
+    "general": "Általános",
+    "generic": "Általános",
+    "goBack": "Menj vissza",
+    "gotIt": "Értem",
+    "guide": "Útmutató",
+    "help": "Segítség",
+    "hide": "Elrejtés",
+    "home": "Kezdőlap",
+    "horizontal": "vízszintes",
+    "icon": "Ikon",
+    "ignore": "Kihagyás",
+    "import": "Importálás",
+    "importFiles": "Fájl(ok) importálása",
+    "importInto": "Importálás ide",
+    "importing": "Importálás...",
+    "impressum": "Impresszum",
+    "imprint": "Impresszum",
+    "inAWeek": "Egy hét múlva",
+    "inBeta": "Béta",
+    "internal": "Belső",
+    "language": "Nyelv",
+    "languages": {
+      "de": "Német",
+      "en": "Angol"
+    },
+    "last": "Utolsó | Utolsó {count}",
+    "lastEdited": "Utoljára szerkesztve",
+    "lastName": "Vezetéknév",
+    "learnMore": "Tudj meg többet",
+    "letsGo": "Indulás!",
+    "lightMode": "Világos mód",
+    "loadMore": "Továbbiak betöltése",
+    "local": "Helyi",
+    "logout": "Kijelentkezés",
+    "logoutAndRetry": "Kijelentkezés és újrapróbálkozás",
+    "logs": "Naplók",
+    "manual": {
+      "export": "1 hely exportálása | {n} hely exportálása"
+    },
+    "mapping": "Leképezés",
+    "mappingAdvanced": "Párosítás (haladó)",
+    "media": "Média",
+    "mediaFiles": "Médialefájlok",
+    "menu": "Menü",
+    "migrate": "Migrálás",
+    "migrateFrom": "Migrálás innen",
+    "minimize": "Kicsinyítés",
+    "monthly": "Havi",
+    "months": {
+      "april": "Április",
+      "august": "Augusztus",
+      "december": "December",
+      "february": "Február",
+      "january": "Január",
+      "july": "Július",
+      "june": "Június",
+      "march": "Március",
+      "may": "Május",
+      "november": "November",
+      "october": "Október",
+      "september": "Szeptember"
+    },
+    "more": "Továbbiak",
+    "multiple": "Több",
+    "multipleSelect": "Többszörös kiválasztás",
+    "name": "Név",
+    "neutral": "Semleges",
+    "new": "Új",
+    "newGender": {
+      "female": "Új {name}",
+      "male": "Új {name}",
+      "neutral": "Új {name}"
+    },
+    "newObject": "Új {name}",
+    "next": "Következő",
+    "no": "Nem",
+    "noThanks": "Nem, köszönöm!",
+    "none": "Nincs",
+    "notAvailableWhenOffline": "Nem elérhető offline módban",
+    "notIncluded": "Nem tartalmazza",
+    "notes": "Jegyzetek",
+    "notion": "Notion",
+    "now": "Most",
+    "object": "Objektum|Objektumok",
+    "objectBlockOptions": "Objektum blokk beállításai",
+    "objectContext": "Objektum kontextus",
+    "objectType": "Objektumtípus|Objektumtípusok",
+    "objects": "Objektumok",
+    "obsidian": "Obsidian",
+    "of": "{a} / {b}",
+    "open": "Megnyitás",
+    "openObject": "Objektum megnyitása",
+    "openRelevantContent": "Releváns tartalom megnyitása",
+    "openSearch": "Keresés megnyitása",
+    "openSettings": "Beállítások megnyitása",
+    "optional": "Opcionális",
+    "options": "Beállítások",
+    "or": "Vagy",
+    "other": "Egyéb",
+    "outOf": "-ból/-ből",
+    "overview": "Áttekintés",
+    "page": "Oldal",
+    "pick": "Kiválasztás",
+    "pinned": "Rögzítve",
+    "planned": "Tervezett",
+    "preview": "Előnézet",
+    "previous": "Vissza",
+    "privacyPolicy": "Adatvédelmi irányelvek",
+    "processing": "Feldolgozás",
+    "properties": "Tulajdonságok",
+    "property": "Tulajdonság",
+    "published": "Közzétéve",
+    "randomize": "Véletlenszerűsítés",
+    "readOnly": "Csak olvasható",
+    "recentItems": "Legutóbbi elemek",
+    "recentlyUsed": "Nemrég használt",
+    "recommended": "Ajánlott",
+    "recreate": "Újrateremtés",
+    "refresh": "Frissítés",
+    "relevantContent": "Releváns tartalom",
+    "reloadApp": {
+      "button": "Alkalmazás újratöltése"
+    },
+    "remove": "Eltávolítás",
+    "removeFrom": "Eltávolítás innen",
+    "rename": "Átnevezés",
+    "reset": "Visszaállítás",
+    "restart": "Újraindítás",
+    "retry": "Újrapróbálás",
+    "reuse": "Újrahasznosítás",
+    "save": "Mentés",
+    "saveChanges": "Változások mentése",
+    "schedule": "Ütemezés",
+    "search": "Keresés",
+    "searchAll": "Böngéssz az összes {name} között",
+    "searchInside": "Keresés",
+    "searchMore": "Keress tovább",
+    "searchOrCreate": "Keresés vagy létrehozás",
+    "searchTerm": "Keresés bármi után...",
+    "select": "Kiválasztás",
+    "selectAll": "Összes {name} kijelölése",
+    "selected": "Kiválasztva",
+    "separately": "Külön-külön",
+    "set": "Beállít",
+    "settings": "Beállítások",
+    "share": {
+      "action": "Megosztás",
+      "toClipboard": "Másolás"
+    },
+    "shared": "Megosztva",
+    "show": "Mutat",
+    "showAll": "Minden megjelenítése",
+    "showLess": "Kevesebb megjelenítése",
+    "showMore": "Több megjelenítése",
+    "single": "Egyetlen",
+    "singleOrMultiple": "Egyes vagy többszörös",
+    "skip": "Kihagyás",
+    "sort": "Rendezés",
+    "spaces": "Helyek",
+    "start": "Kezdés",
+    "step": "{a}. lépés / {b}",
+    "storage": "Tárhely",
+    "style": "Stílus",
+    "submit": "Beküldés",
+    "summary": "Összefoglaló",
+    "support": "Támogatás",
+    "switch": "Kapcsoló",
+    "syncIssue": {
+      "description": "Jelenleg nincs szinkronizálva. Ez nem jelent problémát, amíg ez az üzenet el nem tűnik néhány perccel az újra online állapotba kerülés után. Ha nem, kérjük, tegye a következőt: \"Fiók > Beállítások > Alkalmazás újraindítása (alul balra)\"."
+    },
+    "synced": {
+      "description": "A tartalmad a felhőnkben van tárolva.",
+      "heading": "Mentve"
+    },
+    "synchronize": "Szinkronizálás",
+    "synchronizing": "Szinkronizálás",
+    "syncing": {
+      "description": "A tartalmad jelenleg szinkronizálódik a szerverrel. Még {objectCount} objektum van hátra."
+    },
+    "tag": "Címke",
+    "template": "Sablon",
+    "tentative": "Előzetes",
+    "termsAndConditions": "Általános Szerződési Feltételek",
+    "theme": "Téma",
+    "time": "Idő",
+    "title": "Cím",
+    "today": "Ma",
+    "together": "Együtt",
+    "tomorrow": "Holnap",
+    "total": "Összesen",
+    "trigger": "Indító",
+    "trustAlways": "Mindig megbízom",
+    "trustOnce": "Egyszeri bizalom",
+    "tryAgain": "Próbálja újra",
+    "undoDelete": "Törlés visszavonása",
+    "unknown": "Ismeretlen",
+    "untitled": "Cím nélküli",
+    "up": "Fel",
+    "update": "Frissítés",
+    "upload": "Feltöltés",
+    "uploading": "Feltöltés",
+    "userIdentifier": "Felhasználói azonosító",
+    "vertical": "függőleges",
+    "video": "Videó",
+    "viewMore": "Továbbiak megtekintése",
+    "visible": "Látható",
+    "visit": "Látogatás",
+    "voiceNote": "Hangjegyzet",
+    "weekdays": {
+      "friday": "Péntek",
+      "monday": "Hétfő",
+      "saturday": "Szombat",
+      "sunday": "Vasárnap",
+      "thursday": "Csütörtök",
+      "tuesday": "Kedd",
+      "wednesday": "Szerda"
+    },
+    "weekly": "Heti",
+    "width": "szélesség",
+    "workbench": "Munkaterület",
+    "yes": "igen",
+    "yesterday": "Tegnap",
+    "yourSpaces": "Az ön helyei",
+    "zoom": "Nagyítás"
+  },
+  "DateOptions": {
+    "earlier": {
+      "title": "Korábbiak"
+    },
+    "lastWeek": {
+      "title": "Elmúlt hét"
+    },
+    "nextWeek": {
+      "title": "Jövő hét"
+    },
+    "now": {
+      "title": "Most – időbélyeg"
+    },
+    "overdue": {
+      "title": "Lejárt"
+    },
+    "theDayAfterTomorrow": {
+      "title": "Holnapután"
+    },
+    "theDayBeforeYesterday": {
+      "title": "Tegnapelőtt"
+    },
+    "thisWeek": {
+      "title": "Ez a hét"
+    },
+    "today": {
+      "title": "Ma"
+    },
+    "tomorrow": {
+      "title": "Holnap"
+    },
+    "yesterday": {
+      "title": "Tegnap"
+    }
+  },
+  "group": {
+    "sortOptions": {
+      "general": {
+        "week": "Hét"
+      }
+    }
+  },
+  "propertyTypes": {
+    "blocks": {
+      "description": "Egy objektum fő jegyzetelési területe — formázható, gazdag szöveg, linkeléssel.",
+      "name": "Tartalom"
+    },
+    "boolean": {
+      "description": "Igaz vagy hamis érték",
+      "name": "Jelölőnégyzet"
+    },
+    "color": {
+      "description": "",
+      "name": "Szín"
+    },
+    "computed_preview": {
+      "description": "",
+      "name": "Tartalom előnézete"
+    },
+    "computed_wordCount": {
+      "description": "",
+      "name": "Szószám"
+    },
+    "date": {
+      "description": "Csak a dátum, mint a naptárban",
+      "name": "Dátum"
+    },
+    "datetime": {
+      "description": "Idő és dátum együtt",
+      "name": "Dátum és idő"
+    },
+    "datetimeSimple": {
+      "description": "",
+      "name": "Dátum és idő"
+    },
+    "entity": {
+      "description": "Hivatkozás más objektumokra",
+      "name": "Objektum"
+    },
+    "entity_aliases": {
+      "description": "További nevek ehhez a tartalomhoz",
+      "name": "Aliasok"
+    },
+    "entity_backlinks": {
+      "addBacklink": "Kontextus hozzáadása",
+      "description": "Az objektumra hivatkozó objektumok",
+      "name": "Kontextus"
+    },
+    "entity_collections": {
+      "description": "Gyűjtemények, amelyekhez ez a tartalom tartozik",
+      "name": "Gyűjtemények"
+    },
+    "entity_createdAt": {
+      "description": "Létrehozás dátuma és ideje",
+      "name": "Létrehozva"
+    },
+    "entity_description": {
+      "description": "További információ az elem részletes megismertetésére",
+      "name": "Leírás"
+    },
+    "entity_icon": {
+      "description": "Gyors vizuális azonosító",
+      "name": "Ikon"
+    },
+    "entity_lastUpdated": {
+      "description": "Utolsó szerkesztés dátuma és ideje",
+      "name": "Utolsó frissítés"
+    },
+    "entity_permissions": {
+      "description": "Finomhangolt hozzáférés-ellenőrzést tesz lehetővé.",
+      "name": "Engedélyek"
+    },
+    "entity_tags": {
+      "description": "A tartalom általános kulcsszavai",
+      "name": "Címkék"
+    },
+    "entity_title": {
+      "description": "Az azonosításhoz használt fő cím minden bejegyzéshez",
+      "name": "Cím"
+    },
+    "entity_type": {
+      "description": "A tartalom típusa",
+      "name": "Objektumtípus"
+    },
+    "label": {
+      "description": "Egy egyszerű címke, amivel kategorizálhatod az objektumot. Lehet egy- vagy többválasztós.",
+      "name": "Címke"
+    },
+    "math": {
+      "description": "TeX-képlet.",
+      "name": "Matek"
+    },
+    "media_audioFileResource": {
+      "description": "",
+      "name": "Hangfájl"
+    },
+    "media_fileFileResource": {
+      "description": "",
+      "name": "Fájl"
+    },
+    "media_imageFileResource": {
+      "description": "",
+      "name": "Képfájl"
+    },
+    "media_pdfFileResource": {
+      "description": "",
+      "name": "PDF fájl"
+    },
+    "media_previewImage": {
+      "description": "",
+      "name": "Előnézeti kép"
+    },
+    "media_tweets": {
+      "description": "",
+      "name": "Tweetek"
+    },
+    "media_videoFileResource": {
+      "description": "",
+      "name": "Videófájl"
+    },
+    "number": {
+      "description": "Szám különböző formázási lehetőségekkel",
+      "name": "Szám"
+    },
+    "structure": {
+      "description": "Újrafelhasználható gyűjtemény bejegyzések meghatározása",
+      "name": "Struktúra"
+    },
+    "tag": {
+      "description": "Kulcsszavak egy elem megcímkézésére",
+      "name": "Címke"
+    },
+    "text": {
+      "description": "Egyszerű sima szöveg",
+      "name": "Szöveg"
+    },
+    "textBlock": {
+      "description": "Egyetlen bekezdés formázással és hivatkozással.",
+      "name": "Szöveg"
+    },
+    "time": {
+      "description": "Csak az idő, mint az óra",
+      "name": "Idő"
+    },
+    "url": {
+      "description": "Egyszerű URL cím",
+      "name": "URL"
+    },
+    "util_aiChat": {
+      "description": "",
+      "name": "AI csevegés"
+    },
+    "util_dateOEvent": {
+      "description": "",
+      "name": "Dátum esemény"
+    },
+    "util_dateObject": {
+      "description": "",
+      "name": "Dátumtárgy"
+    }
+  },
+  "propertyDefinition": {
+    "deleteProperty": {
+      "modal": {
+        "blocksPropertyWarning": "A tartalom tulajdonság általában egy objektum fő szövege. Csak akkor lesznek külön címkékkel ellátva, ha több tartalom tulajdonságod is van. Győződj meg róla, hogy nem törlöd véletlenül a jegyzeteid fő tartalmát!",
+        "confirm": "Megértem, hogy az összes ilyen típusú objektumban törlöm ennek a tulajdonságnak a tartalmát.",
+        "confirmTextMatchLabel": "Írd be: \"{value}\" a megerősítéshez",
+        "explanation": "A tulajdonság törlése eltávolítja a teljes objektumtípusból, így minden ilyen típusú objektumból is eltávolításra kerül. Ez a lépés nem visszavonható.",
+        "explanationWithoutWarning": "Ennek a tulajdonságnak a törlése eltávolítja az egész objektumtípusból, vagyis minden ilyen típusú objektumból is eltávolításra kerül.",
+        "generalWarning": "A tulajdonság minden ilyen típusú objektumból törlődik.",
+        "header": "Biztosan törölni akarja ezt a tulajdonságot minden ilyen típusú objektumból?",
+        "onlyBlocksPropertyWarning": "Ez az egyetlen tartalom tulajdonság ebben az objektumtípusban. Ez minden ilyen típusú objektum fő tartalmát (törzsét) törölni fogja."
+      }
+    },
+    "description": {
+      "label": "Leírás",
+      "placeholder": "Adjon másoknak egy képet arról, hogy mit jelent ez a tulajdonság"
+    },
+    "newPropertyName": "Új tulajdonság"
+  },
+  "convolution": {
+    "customDefinitions": {
+      "custom_backlinks_count": {
+        "name": "Visszahivatkozott (környezeti) objektumok száma"
+      },
+      "custom_backlinks_object_types": {
+        "name": "Visszahivatkozás (környezeti) objektumtípusok"
+      },
+      "custom_backlinks_objects": {
+        "name": "Visszahivatkozott (környezeti) objektumok"
+      },
+      "custom_is_shared": {
+        "name": "Megosztott"
+      },
+      "custom_linked_object_types": {
+        "name": "Kapcsolódó objektumtípusok"
+      },
+      "custom_linked_objects": {
+        "name": "Kapcsolódó objektumok"
+      },
+      "custom_linked_objects_count": {
+        "name": "Kapcsolódó objektumok száma"
+      }
+    },
+    "filter": {
+      "options": {
+        "boolean": {
+          "isChecked": "ki van választva",
+          "isNotSelected": "nincs kiválasztva"
+        },
+        "dateTime": {
+          "endIs": "vége",
+          "endIsAfter": "vége később van",
+          "endIsBefore": "vége hamarabb van",
+          "endIsEmpty": "a befejezés üres",
+          "endIsNotEmpty": "a befejezés nem üres",
+          "endIsOnOrAfter": "vége ekkor vagy később van",
+          "endIsOnOrBefore": "vége ekkor vagy korábban van",
+          "hasNoReminder": "nincs emlékeztető",
+          "hasReminder": "van emlékeztető",
+          "is": "ekkor van",
+          "isAfter": "később van",
+          "isBefore": "hamarabb van",
+          "isNotRecurring": "nem ismétlődő",
+          "isOnOrAfter": "ekkor vagy később van",
+          "isOnOrBefore": "ekkor vagy korábban van",
+          "isRecurring": "ismétlődő",
+          "startIs": "kezdete",
+          "startIsAfter": "kezdete később van",
+          "startIsBefore": "kezdete hamarabb van",
+          "startIsNotEmpty": "a kezdés nem üres",
+          "startIsOnOrAfter": "kezdete ekkor vagy később van",
+          "startIsOnOrBefore": "kezdete ekkor vagy korábban van",
+          "valueOptions": {
+            "exactDate": "Meghatározott dátum",
+            "inOneMonth": "egy hónap múlva",
+            "inOneWeek": "egy hét múlva",
+            "oneMonthAgo": "egy hónapja",
+            "oneWeekAgo": "egy hete",
+            "overdue": "lejárt",
+            "thisMonth": "ebben a hónapban",
+            "thisWeek": "ezen a héten",
+            "thisYear": "ebben az évben",
+            "today": "ma",
+            "tomorrow": "holnap",
+            "yesterday": "tegnap"
+          }
+        },
+        "entity": {
+          "contains": "tartalmazza",
+          "notContains": "nem tartalmazza"
+        },
+        "general": {
+          "contains": "tartalmazza",
+          "is": "van",
+          "isEmpty": "üres",
+          "isNot": "nincs",
+          "isNotEmpty": "nem üres",
+          "isNotPlural": "nem tartalmazza",
+          "isPlural": "tartalmazza",
+          "notContains": "nem tartalmazza"
+        },
+        "isShared": {
+          "isNotShared": "nincs megosztva",
+          "isShared": "meg van osztva"
+        },
+        "string": {
+          "endsWith": "végződik erre",
+          "startsWith": "kezdődik ezzel"
+        }
+      }
+    },
+    "group": {
+      "groupBy": {
+        "blocks": "Blokkok",
+        "boolean": {
+          "checked": "Bejelölve",
+          "unchecked": "Nincs bejelölve"
+        },
+        "entity": "Kapcsolt objektumok szerint",
+        "hourPeriod": "{date}, {period}",
+        "number": {
+          "default": "Pontos érték szerint",
+          "range": "Tartomány szerint"
+        },
+        "numberRange": {
+          "groupEvery": "Csoportosítás minden",
+          "max": "Max",
+          "min": "Min",
+          "range": "Csoport tartomány"
+        },
+        "objects": "Objektumok",
+        "open": "Nyitott",
+        "other": "Egyéb",
+        "textBlock": {
+          "default": "Szöveg szerint"
+        }
+      },
+      "sortOptions": {
+        "createdAt": {
+          "ascending": "Legrégebben létrehozott elöl",
+          "descending": "Legutóbb létrehozott elöl"
+        },
+        "general": {
+          "ascending": "növekvő",
+          "day": "Nap szerint",
+          "default": "alapértelmezett",
+          "descending": "csökkenő",
+          "hour": "Óra szerint",
+          "month": "Hónap szerint",
+          "relative": "Relatív",
+          "scheduled": "Ütemezett",
+          "sizeAscending": "legkisebb elöl",
+          "sizeDescending": "legnagyobb elöl",
+          "week": "Hét szerint",
+          "year": "Év szerint"
+        },
+        "label": {
+          "default": "Sorrend",
+          "defaultDescending": "Fordított sorrend"
+        }
+      }
+    },
+    "sort": {
+      "options": {
+        "datetime": {
+          "ascending": "Legrégebbi elöl",
+          "ascendingExists": "üres elöl",
+          "descending": "Legújabb elöl",
+          "descendingExists": "üres hátul"
+        },
+        "general": {
+          "ascending": "növekvő",
+          "descending": "csökkenő"
+        }
+      }
+    }
+  },
+  "aiAssistant": {
+    "ai": "MI",
+    "budgetExceeded": {
+      "plus": {
+        "button": "További AI költségkeret vásárlása",
+        "description": "Bármikor hozzáadhatsz extra AI költségkeretet. Soha nem jár le, minden hónapban átvihető.",
+        "title": "Elfogytak az AI kredited"
+      },
+      "plusWithCredits": {
+        "button": "További AI költségkeret vásárlása",
+        "description": "A havi költségkereted elfogyott. Töltsd fel azonnal, és alkoss tovább.",
+        "title": "Elfogytak az AI kredited"
+      },
+      "pro": {
+        "button": "Szerezd meg: {plan}",
+        "description": "Válts {plan} csomagra, hogy sokkal nagyobb havi AI költségkereted legyen, és zavartalanul alkothass tovább.",
+        "title": "Elfogytak az AI kredited"
+      },
+      "trial": {
+        "button": "Frissítés Pro-ra",
+        "description": "Válts Pro-ra, hogy havi AI költségkeretet és a teljes Capacities élményt kapj.",
+        "title": "Elfogytak az AI kredited"
+      }
+    },
+    "chat": {
+      "aiAssistant": "MI Asszisztens",
+      "basicCommands": {
+        "change-tone": {
+          "description": "",
+          "title": "Hangnem megváltoztatása..."
+        },
+        "continuation": {
+          "description": "Folytatja a megadott kontextust",
+          "title": "Írás folytatása"
+        },
+        "counter-arguments": {
+          "description": "Ellenvetések listáját adja vissza a kontextusként adott tartalomhoz",
+          "title": "Ellenvetés listázása"
+        },
+        "critique": {
+          "description": "Kritika a megadott kontextus alapján",
+          "title": "Kritika"
+        },
+        "define-term-dictionary": {
+          "description": "",
+          "title": "Szótári keresés"
+        },
+        "define-term-encyclopedia": {
+          "description": "",
+          "title": "Enciklopédia bejegyzés keresése"
+        },
+        "define-term-theasaurus": {
+          "description": "",
+          "title": "Szinonimaszótári bejegyzés keresése"
+        },
+        "expand-text-to": {
+          "description": "",
+          "title": "Szöveg kibővítése a következőig..."
+        },
+        "expand-text": {
+          "description": "",
+          "title": "Szöveg kibővítése"
+        },
+        "explain-term": {
+          "description": "",
+          "title": "Ezt magyarázza el"
+        },
+        "extract-and-format": {
+          "description": "",
+          "title": "Kivonatolás és formázás mint..."
+        },
+        "extract-tasks": {
+          "description": "",
+          "title": "Feladatok azonosítása"
+        },
+        "find-evidence": {
+          "description": "Bizonyítékok visszaadása a kontextusként adott tartalomból",
+          "title": "Bizonyíték keresése"
+        },
+        "find-research-questions": {
+          "description": "Kutatási kérdések listája a kontextusként adott tartalomból",
+          "title": "Kutatási kérdések keresése"
+        },
+        "fix-spelling-grammar": {
+          "description": "",
+          "title": "Helyesírás és nyelvtan ellenőrzése"
+        },
+        "generate-draft": {
+          "description": "",
+          "title": "Vázlat készítése a következőhöz..."
+        },
+        "generate-outline": {
+          "description": "",
+          "title": "Vázlat készítése a következőhöz..."
+        },
+        "generate-vocab-card": {
+          "description": "",
+          "title": "Szókártya generálása..."
+        },
+        "get-term-antonyms": {
+          "description": "",
+          "title": "Ellentétek keresése"
+        },
+        "get-term-etymology": {
+          "description": "",
+          "title": "Kifejezés etimológiája"
+        },
+        "get-term-examples": {
+          "description": "",
+          "title": "Példák keresése erre"
+        },
+        "get-term-pronunciation": {
+          "description": "",
+          "title": "Kiejtés keresése"
+        },
+        "get-term-synonyms": {
+          "description": "",
+          "title": "Szinonimák keresése"
+        },
+        "get-term-translation": {
+          "description": "",
+          "title": "Fordítás a következő nyelvre..."
+        },
+        "identify-assumptions": {
+          "description": "Feltételezések listáját adja vissza a kontextusként adott tartalomból",
+          "title": "Feltételezések azonosítása"
+        },
+        "rewrite-text-for": {
+          "description": "",
+          "title": "Újraírás a következő célra..."
+        },
+        "rewrite-text": {
+          "description": "",
+          "title": "Szöveg újraírása és javítása"
+        },
+        "short-biography": {
+          "description": "",
+          "title": "Rövid életrajz megadása"
+        },
+        "shorten-text-to": {
+          "description": "",
+          "title": "Szöveg rövidítése a következőig..."
+        },
+        "shorten-text": {
+          "description": "",
+          "title": "Szöveg rövidítése"
+        },
+        "simplify": {
+          "description": "Egyszerűsíti a megadott kontextust",
+          "title": "Szöveg egyszerűsítése"
+        },
+        "summarize-text": {
+          "description": "",
+          "title": "Összefoglalás"
+        },
+        "summarize": {
+          "description": "Rövid összefoglalót ad a megadott kontextus alapján",
+          "title": "Összefoglalás"
+        },
+        "takeaways": {
+          "description": "Kulcsfontosságú megállapítások listáját adja vissza a megadott kontextus alapján",
+          "title": "Kulcsfontosságú megállapítások listázása"
+        },
+        "tl-dr": {
+          "description": "",
+          "title": "TLDR"
+        },
+        "translate": {
+          "description": "A megadott tartalmat a megadott nyelvre fordítja le",
+          "title": "Fordítás {variantValue} nyelvre",
+          "variants": {
+            "chinese": "Kínai (egyszerűsített)",
+            "chinese_traditional": "Kínai (hagyományos)",
+            "english": "Angol",
+            "french": "Francia",
+            "german": "Német",
+            "hindu": "Hindi",
+            "italian": "Olasz",
+            "japanese": "Japán",
+            "korean": "Koreai",
+            "portuguese": "Portugál",
+            "spanish": "Spanyol"
+          }
+        }
+      },
+      "chats": "Csevegések",
+      "closeChat": "Csevegés bezárása",
+      "commandNotFound": "Parancs nem található",
+      "contextSuggestion": {
+        "entity": {
+          "full": "\"Kontextusként hozzáadja a(z) \"{title}\" címet",
+          "properties": "\"Kontextusként hozzáadja a(z) \"{title}\" címet és tulajdonságait"
+        }
+      },
+      "heading": "MI Csevegés",
+      "model": "Modell",
+      "openChats": "Nyitott csevegések",
+      "user": "Ön"
+    },
+    "errors": {
+      "aiBudgetExceeded": "Szükséged van több AI kreditre? Válts magasabb csomagra, hogy tovább alkothass.",
+      "aiBudgetExceededButton": "Egyéni API kulcs hozzáadása"
+    },
+    "titleAutofill": {
+      "customCommand": "Készíts rövid, beszédes címet (max. 10 szó), amely összefoglalja a tartalom fő témáját vagy célját."
+    }
+  },
+  "inputProcessing": {
+    "fileTypeNotSupported": "A fájltípus nem támogatott",
+    "fileUploadFailed": "Feltöltés nem sikerült",
+    "voiceMessage": "Hangüzenet"
+  },
+  "telegramInput": {
+    "helpWhenNotRegistered": "Csatlakoztassa a Telegram fiókját a Capacities fiókjához a kezdéshez. Itt olvashat róla: https://docs.capacities.io/reference/integrations/telegram",
+    "helpWhenRegistered": "Küldjön üzeneteket erre a csevegésre. Automatikusan elmentésre kerülnek a Capacities rendszerébe. Minden lehetőségről itt olvashat: https://docs.capacities.io/reference/integrations/telegram",
+    "verificationSuccessful": "Fiókja hitelesítve van. 🎉 Most már elmentheti az üzeneteket a Capacities-be, egyszerűen csak üzeneteket, képeket vagy fájlokat küldve ebbe a csevegésbe. Minden lehetőségről itt olvashat: https://docs.capacities.io/reference/integrations/telegram",
+    "verifyFirst": "Szia 👋 Csatlakoztassa a Telegramot a Capacities fiókjához a kezdéshez. Itt kezdheti el: https://docs.capacities.io/reference/integrations/telegram"
+  },
+  "whatsappInput": {
+    "helpWhenNotRegistered": "Kapcsolja össze a Telegramot a Capacities fiókjával a kezdéshez. Olvasson róla itt: https://docs.capacities.io/reference/integrations/whatsapp",
+    "helpWhenRegistered": "Küldjön üzeneteket erre a csevegésre. Automatikusan elmentésre kerülnek a Capacities rendszerébe. Minden lehetőségről itt olvashat: https://docs.capacities.io/reference/integrations/whatsapp",
+    "verificationSuccessful": "Fiókja igazolva van. 🎉 Mostantól üzeneteket, képeket vagy fájlokat küldhet a csevegésbe, és azok mentésre kerülnek a Capacities-ba. Minden lehetőségről itt olvashat: https://docs.capacities.io/reference/integrations/whatsapp",
+    "verifyFirst": "Helló 👋 Kapcsolja össze a WhatsApp-ot a Capacities fiókjával a kezdéshez. Kezdheti itt: https://docs.capacities.io/reference/integrations/whatsapp"
+  },
+  "xRay": {
+    "actions": {
+      "header": "Műveletek"
+    },
+    "collections": {
+      "emptyState": "Még nem része egyetlen gyűjteménynek sem",
+      "header": "Gyűjtemények"
+    },
+    "context": {
+      "emptyState": "Nincsenek objektumok a tartalomban",
+      "header": "Objektumok belül"
+    },
+    "header": "Aktuális oldal",
+    "tags": {
+      "header": "Címkék"
+    },
+    "textStats": {
+      "header": "Szöveg statisztikák"
+    },
+    "toc": {
+      "emptyState": "Nincsenek címek ebben a tartalomban",
+      "header": "Tartalomjegyzék"
+    }
+  },
+  "Electron": {
+    "Menu": {
+      "capacities": {
+        "about": "Névjegy",
+        "name": "Fájl",
+        "preferences": "Beállítások",
+        "quit": "Kilépés",
+        "settings": "Beállítások"
+      },
+      "edit": {
+        "copy": "Másolás",
+        "cut": "Kivágás",
+        "main": "Szerkesztés",
+        "paste": "Beillesztés",
+        "redo": "Ismétlés",
+        "selectAll": "Az összes kijelölése",
+        "undo": "Visszavonás"
+      },
+      "file": {
+        "main": "Fájl"
+      },
+      "help": {
+        "learn": "Dokumentáció megnyitása",
+        "main": "Súgó"
+      },
+      "view": {
+        "devTools": "Fejlesztői eszközök megnyitása",
+        "fullScreen": "Teljes képernyő",
+        "main": "Nézet",
+        "minimize": "Kicsinyítés",
+        "reload": "Újratöltés",
+        "resetZoom": "Nagyítás alaphelyzetbe",
+        "softReload": "Újratöltés",
+        "zoomIn": "Nagyítás",
+        "zoomOut": "Kicsinyítés"
+      }
+    },
+    "OpenBufferRequest": {
+      "details": "Név: '{name}'",
+      "message": "Biztosan meg akar nyitni egy nem ellenőrzött fájlt a rendszerén? Ez biztonsági kockázatokat okozhat.",
+      "title": "Fájl megnyitásának megerősítése"
+    },
+    "OverwriteCloseRequest": {
+      "cancel": "Mégse",
+      "confirm": "Újratöltés",
+      "message": "A tartalma nincs szinkronizálva és el fog veszni.",
+      "title": "Biztosan újra szeretné tölteni?"
+    },
+    "QuitCompletelyRequest": {
+      "cancel": "Mégse",
+      "confirm": "Kilépés",
+      "message": "Néhány tartalma nincs szinkronizálva, és csak akkor fog szinkronizálni, ha újra megnyitja az alkalmazást.",
+      "title": "Biztosan teljesen ki szeretne lépni?"
+    },
+    "TrayMenu": {
+      "open": {
+        "main": "Megnyitás",
+        "quitCompletely": "Teljes kilépés"
+      }
+    }
+  },
+  "BulkImport": {
+    "errors": {
+      "ACCESS_DENIED": "Nincs hozzáférésed a tömeges importáláshoz.",
+      "APPLYING_IMPORT_FAILED": "Az importálás nem alkalmazható.",
+      "DAILY_NOTE_ALREADY_EXISTS": "Egy vagy több napi jegyzetet nem sikerült importálni, mert már volt bejegyzés az adott napokra.",
+      "DUPLICATE_DAILY_NOTE": "Egy vagy több napi jegyzetet nem sikerült importálni, mert ugyanarra a dátumra több bejegyzés is volt.",
+      "EXTRACTION_FAILED": "Egy vagy több fájlt nem sikerült kicsomagolni.",
+      "FILE_TYPE_NOT_SUPPORTED": "Egy vagy több fájl típusa nem támogatott.",
+      "MAXIMUM_FILE_SIZE_EXCEEDED": "A fájl mérete meghaladja a megengedett maximumot.",
+      "MISCELLANEOUS_ERROR": "Ismeretlen hiba történt.",
+      "NO_FILES_TO_IMPORT": "Nincs importálható érvényes fájl.",
+      "PROCESSING_FAILED": "Egy vagy több fájlt nem sikerült feldolgozni.",
+      "SPACE_NOT_FOUND": "A space nem található.",
+      "TOO_MANY_FILES": "Túl sok fájl az importáláshoz.",
+      "TOO_MANY_OBJECTS_GLOBAL": "Elérted az importálható objektumok maximális számát.",
+      "TOO_MANY_OBJECTS_LOCAL": "Túl sok objektum az importáláshoz.",
+      "UPLOADING_FAILED": "Egy vagy több fájlt nem sikerült feltölteni.",
+      "WRITING_FAILED": "Egy vagy több fájlt nem sikerült menteni."
+    },
+    "success": "Sikeresen importáltál 1 objektumot. | Sikeresen importáltál {n} objektumot.",
+    "worker": {
+      "properties": {
+        "content": "Tartalom",
+        "file": {
+          "extension": "Fájl kiterjesztés",
+          "name": "Fájlnév",
+          "size": "Fájlméret",
+          "type": "Fájl típusa"
+        },
+        "heading": "Tulajdonságok",
+        "rowName": "Sor neve",
+        "title": "Cím"
+      }
+    }
+  }
+}

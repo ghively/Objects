@@ -1,0 +1,2874 @@
+{
+  "components": {
+    "MediaAudio": {
+      "description": "Embed and play audio files",
+      "name": "Audio",
+      "pluralName": "Audios",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME type"
+        },
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_audioCategory": {
+          "description": "",
+          "name": "Category",
+          "set": {
+            "ambient": "Ambient",
+            "dictation": "Dictation",
+            "interview": "Interview",
+            "lecture": "Lecture",
+            "meeting": "Meeting",
+            "music": "Music",
+            "other": "Other",
+            "phone-call": "Phone Call",
+            "podcast": "Podcast",
+            "voice-memo": "Voice Memo"
+          }
+        },
+        "media_audioSource": {
+          "name": "Origin"
+        },
+        "media_duration": {
+          "name": "Duration"
+        },
+        "media_fileSize": {
+          "name": "File size"
+        },
+        "media_notes": {
+          "description": "Capture thoughts and ideas about this content",
+          "name": "Notes"
+        }
+      }
+    },
+    "MediaFile": {
+      "description": "Files from your computer",
+      "name": "File",
+      "pluralName": "Files",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME type"
+        },
+        "media_fileSize": {
+          "name": "File size"
+        },
+        "media_notes": {
+          "description": "Capture thoughts and ideas about this content",
+          "name": "Notes"
+        }
+      }
+    },
+    "MediaImage": {
+      "description": "An image from your computer or the web",
+      "name": "Image",
+      "pluralName": "Images",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME type"
+        },
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_fileSize": {
+          "name": "File size"
+        },
+        "media_imageCategory": {
+          "description": "",
+          "name": "Category",
+          "set": {
+            "book-page": "Book Page",
+            "business-card": "Business Card",
+            "code": "Code",
+            "cover": "Cover",
+            "diagram": "Diagram",
+            "document": "Document",
+            "handwritten-note": "Handwritten Note",
+            "illustration": "Illustration",
+            "infographic": "Infographic",
+            "logo-icon": "Logo/Icon",
+            "map": "Map",
+            "medical": "Medical",
+            "meme": "Meme",
+            "other": "Other",
+            "painting": "Painting",
+            "photo-animal": "Photo (Animal)",
+            "photo-architecture": "Photo (Architecture)",
+            "photo-event": "Photo (Event)",
+            "photo-food": "Photo (Food)",
+            "photo-nature": "Photo (Nature)",
+            "photo-object": "Photo (Object)",
+            "photo-people": "Photo (People)",
+            "receipt": "Receipt",
+            "scientific": "Scientific",
+            "screenshot": "Screenshot",
+            "ui-mockup": "UI Mockup",
+            "whiteboard": "Whiteboard"
+          }
+        },
+        "media_imageColors": {
+          "description": "",
+          "name": "Colors",
+          "set": {
+            "beige": "Beige",
+            "black": "Black",
+            "blue": "Blue",
+            "brown": "Brown",
+            "cyan": "Cyan",
+            "fuchsia": "Fuchsia",
+            "gold": "Gold",
+            "gray": "Gray",
+            "green": "Green",
+            "indigo": "Indigo",
+            "magenta": "Magenta",
+            "orange": "Orange",
+            "pink": "Pink",
+            "purple": "Purple",
+            "red": "Red",
+            "tan": "Tan",
+            "teal": "Teal",
+            "turquoise": "Turquoise",
+            "violet": "Violet",
+            "white": "White",
+            "yellow": "Yellow"
+          }
+        },
+        "media_imageHeight": {
+          "name": "Height"
+        },
+        "media_imageSource": {
+          "name": "Source"
+        },
+        "media_imageWidth": {
+          "name": "Width"
+        },
+        "media_notes": {
+          "description": "Capture thoughts and ideas about this content",
+          "name": "Notes"
+        }
+      },
+      "structureViews": {
+        "MediaImage_embed_fullWidthCappedHeight": {
+          "title": "Full Width"
+        },
+        "MediaImage_embed_main": {
+          "title": "Embed"
+        },
+        "MediaImage_embed_square": {
+          "title": "Square"
+        },
+        "MediaImage_inline_main": {
+          "title": "Link block"
+        },
+        "MediaImage_page_main": {
+          "title": "Page"
+        },
+        "MediaImage_smallCard_main": {
+          "title": "Small card"
+        },
+        "MediaImage_smallCard_square": {
+          "title": "Small card (Square)"
+        },
+        "MediaImage_wideCard_main": {
+          "title": "Wide card"
+        }
+      }
+    },
+    "MediaPDF": {
+      "description": "Add and embed PDFs",
+      "name": "PDF",
+      "pluralName": "PDFs",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME type"
+        },
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_fileSize": {
+          "name": "File size"
+        },
+        "media_notes": {
+          "description": "Capture thoughts and ideas about this content",
+          "name": "Notes"
+        },
+        "media_pdfDocumentType": {
+          "description": "",
+          "name": "Document type",
+          "set": {
+            "academic-paper": "Academic paper",
+            "article": "Article",
+            "book": "Book",
+            "educational-material": "Educational material",
+            "financial-document": "Financial document",
+            "form": "Form",
+            "legal-document": "Legal document",
+            "letter": "Letter",
+            "manual": "Manual",
+            "marketing-material": "Marketing material",
+            "other": "Other",
+            "policy-document": "Policy document",
+            "presentation": "Presentation",
+            "report": "Report",
+            "scanned-document": "Scanned document"
+          }
+        },
+        "media_pdfHasTOC": {
+          "name": "Table of Contents"
+        },
+        "media_pdfNumberOfPages": {
+          "name": "Number of Pages"
+        },
+        "media_pdfSource": {
+          "name": "Source"
+        },
+        "media_pdfTopic": {
+          "description": "",
+          "name": "Topic",
+          "set": {
+            "ai-ml": "AI/ML",
+            "arts-culture": "Arts & culture",
+            "business": "Business",
+            "design": "Design",
+            "education": "Education",
+            "finance": "Finance",
+            "government": "Government",
+            "history": "History",
+            "legal": "Legal",
+            "marketing": "Marketing",
+            "medicine": "Medicine",
+            "operations": "Operations",
+            "other": "Other",
+            "personal": "Personal",
+            "policy": "Policy",
+            "product": "Product",
+            "programming": "Programming",
+            "research": "Research",
+            "science": "Science",
+            "technology": "Technology"
+          }
+        },
+        "media_previewImage": {
+          "name": "Preview Image"
+        }
+      }
+    },
+    "MediaTweet": {
+      "cannotDisplayVideoAndGif": "Due to restrictions of the Twitter API, we currently cannot display videos and GIFs. Open the tweet on Twitter to see all media.",
+      "description": "A Twitter tweet",
+      "name": "Tweet",
+      "openOnTwitter": "Open on Twitter",
+      "pluralName": "Tweets",
+      "propertyDefinitions": {
+        "is_thread": {
+          "name": "Thread"
+        },
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_notes": {
+          "name": "Notes"
+        },
+        "media_tweets": {
+          "name": "Tweets"
+        },
+        "tweet_attachments": {
+          "description": "",
+          "name": "Attachments"
+        },
+        "tweet_language": {
+          "name": "Language"
+        },
+        "twitter_userName": {
+          "name": "Twitter Handle"
+        }
+      },
+      "turnThreadIntoTweet": "Only keep last tweet of thread",
+      "tweetGenerationFailed": "A local version of this tweet could not be generated"
+    },
+    "MediaVideo": {
+      "OptionalDescription": {
+        "button": "Add optional description"
+      },
+      "description": "A video file to embed",
+      "name": "Video",
+      "pluralName": "Videos",
+      "propertyDefinitions": {
+        "media_MIMEType": {
+          "name": "MIME Type"
+        },
+        "media_duration": {
+          "name": "Duration"
+        },
+        "media_fileSize": {
+          "name": "File Size"
+        }
+      },
+      "text": {
+        "description": {
+          "placeholder": "Description..."
+        },
+        "main": {
+          "placeholder": "Title..."
+        }
+      },
+      "videoUrlInput": {
+        "placeholder": "YouTube link or YouTube ID"
+      }
+    },
+    "MediaWebResource": {
+      "addEmbed": "Add Embed URL",
+      "addPreviewImage": "Add Preview Image",
+      "annotations": {
+        "addComment": "Add comment",
+        "analyzePrompt": "Analyze this page for more reliable highlights across Reader and Browser.",
+        "collapseComments": "Show less",
+        "commentPlaceholder": "Add a comment...",
+        "highlightWithColor": "Highlight with {color}",
+        "moreComments": "{count} more",
+        "openInReader": "Open in Reader"
+      },
+      "browser": {
+        "back": "Back",
+        "electronOnly": "The browser view is only available in the desktop app.",
+        "forward": "Forward",
+        "missingUrl": "This web link does not have a URL.",
+        "openExternal": "Open externally",
+        "reload": "Reload",
+        "stop": "Stop loading"
+      },
+      "browserView": "Browser",
+      "copyUrlToClipboard": "Copy URL to clipboard",
+      "create": {
+        "button": "Create"
+      },
+      "deleteImage": "Delete Image",
+      "description": "A link or embed to another website",
+      "editEmbed": "Edit Embed URL",
+      "name": "Weblink",
+      "pluralName": "Weblinks",
+      "propertyDefinitions": {
+        "media_URLReference": {
+          "name": "URL"
+        },
+        "media_host": {
+          "description": "Host address of weblink",
+          "name": "Domain"
+        },
+        "media_iframeReference": {
+          "name": "Iframe URL"
+        },
+        "media_notes": {
+          "description": "Capture thoughts and ideas about this content",
+          "name": "Notes"
+        },
+        "media_previewImage": {
+          "name": "Preview Image"
+        },
+        "media_weblinkCategory": {
+          "description": "",
+          "name": "Category",
+          "set": {
+            "about": "About",
+            "app": "App",
+            "article": "Article",
+            "audio": "Audio",
+            "blog-post": "Blog Post",
+            "code": "Code",
+            "course": "Course",
+            "documentation": "Documentation",
+            "event": "Event",
+            "forum-thread": "Forum Thread",
+            "guide": "Guide",
+            "how-to": "How-To",
+            "image-gallery": "Image Gallery",
+            "infographic": "Infographic",
+            "marketplace": "Marketplace",
+            "news": "News",
+            "other": "Other",
+            "podcast": "Podcast",
+            "portfolio": "Portfolio",
+            "product": "Product",
+            "profile": "Profile",
+            "q-and-a": "Q&A",
+            "recipe": "Recipe",
+            "repository": "Repository",
+            "service": "Service",
+            "shop": "Shop",
+            "social-post": "Social Post",
+            "tool": "Tool",
+            "tutorial": "Tutorial",
+            "video": "Video",
+            "webinar": "Webinar"
+          }
+        },
+        "media_weblinkTopic": {
+          "description": "",
+          "name": "Topic",
+          "set": {
+            "academic": "Academic",
+            "ai-ml": "AI/ML",
+            "art": "Art",
+            "business": "Business",
+            "creative": "Creative",
+            "current-events": "Current Events",
+            "design": "Design",
+            "education": "Education",
+            "entertainment": "Entertainment",
+            "finance": "Finance",
+            "fitness": "Fitness",
+            "food": "Food",
+            "gaming": "Gaming",
+            "health": "Health",
+            "learning": "Learning",
+            "lifestyle": "Lifestyle",
+            "marketing": "Marketing",
+            "media": "Media",
+            "news": "News",
+            "other": "Other",
+            "politics": "Politics",
+            "productivity": "Productivity",
+            "programming": "Programming",
+            "research": "Research",
+            "science": "Science",
+            "technology": "Technology",
+            "tools": "Tools",
+            "travel": "Travel",
+            "wellness": "Wellness"
+          }
+        }
+      },
+      "reader": {
+        "errorDescription": "This page could not be converted into a readable article.",
+        "errorTitle": "Reader view is unavailable",
+        "extracting": "Preparing reader view...",
+        "idleDescription": "Open the Browser tab first, then refresh the reader view.",
+        "idleTitle": "Reader view is not ready yet",
+        "refresh": "Refresh",
+        "title": "Reader"
+      },
+      "readerView": "Reader",
+      "retryAnalysis": "Retry Analysis",
+      "search": "Search page",
+      "structureViews": {
+        "MediaWebResource_embed_main": {
+          "title": "Embed"
+        },
+        "MediaWebResource_embed_wide": {
+          "title": "Embed (Wide)"
+        },
+        "MediaWebResource_inline_main": {
+          "title": "Link Block"
+        },
+        "MediaWebResource_page_main": {
+          "title": "Page"
+        },
+        "MediaWebResource_smallCard_main": {
+          "title": "Small Card"
+        },
+        "MediaWebResource_wideCard_main": {
+          "title": "Wide Card"
+        }
+      },
+      "webEmbed": "Embed"
+    },
+    "QueryDataView": {
+      "invalidVariableQueryInfo": {
+        "description": "This query includes a reference to an object. You need to use it as an embed in another object to show results.",
+        "heading": "Variable queries need to be used as embeds in other objects"
+      }
+    },
+    "RootAIChat": {
+      "description": "A conversation with an AI",
+      "name": "AI Chat",
+      "pluralName": "AI Chats",
+      "propertyDefinitions": {
+        "chat_context": {
+          "description": "",
+          "name": "Context"
+        },
+        "media_notes": {
+          "name": "Notes"
+        },
+        "util_aiChat": {
+          "name": "AI Chat"
+        }
+      },
+      "saveChat": "Save as Object"
+    },
+    "RootBlocksTemplate": {
+      "description": "A group of blocks that you can duplicate fast",
+      "name": "Template",
+      "pluralName": "Templates",
+      "propertyDefinitions": {
+        "template_blocks": {
+          "description": "All blocks in here will be duplicated when activating template",
+          "name": "Template Content"
+        }
+      }
+    },
+    "RootDailyNote": {
+      "createDailyNote": "Create Daily Note",
+      "createdOnThatDay": "Created on This Day",
+      "createdToday": "Created Today",
+      "createdYesterday": "Created Yesterday",
+      "description": "A daily note",
+      "emptyStates": {
+        "month": "No daily notes created for this month."
+      },
+      "name": "Daily Note",
+      "openAsPage": "Open as Page",
+      "openOnDashboard": "Calendar",
+      "placeholder": "Start your daily note",
+      "pluralName": "Daily Notes",
+      "propertyDefinitions": {
+        "RootDailyNote_notes": {
+          "name": "Notes"
+        },
+        "RootDailyNote_reviewed": {
+          "name": "Reviewed"
+        }
+      },
+      "queries": {
+        "7e3c1a94-5b28-4d06-9f81-2a6c8e0d4b17": {
+          "name": "Unreviewed"
+        }
+      },
+      "templates": {
+        "createNewTemplate": {
+          "label": "New Template"
+        },
+        "delete": {
+          "tooltip": "Delete Template"
+        },
+        "edit": {
+          "tooltip": "Edit Template"
+        },
+        "empty": {
+          "label": "Empty Note"
+        },
+        "markAsDefault": {
+          "tooltip": "Mark as Default"
+        },
+        "noTemplates": "No templates yet"
+      }
+    },
+    "RootDatabase": {
+      "create": "Add an Object Type",
+      "createShort": "New Type",
+      "databaseViews": {
+        "grid": {
+          "defaultName": "Grid View",
+          "new": "New Grid View"
+        },
+        "list": {
+          "defaultName": "List View",
+          "new": "New List View"
+        },
+        "table": {
+          "defaultName": "Table View",
+          "new": "New Table View"
+        },
+        "wall": {
+          "new": "New Wall View"
+        }
+      },
+      "default": {
+        "name": "Default"
+      },
+      "delete": {
+        "modal": {
+          "body": "By deleting a collection all entries will be removed as well. Entries that exist in other collections will be kept there.",
+          "header": "Do you really want to delete this collection?"
+        }
+      },
+      "description": "Organize your content",
+      "emptyStateText": "No entries",
+      "name": "Collection",
+      "newCollectionTitle": "New Collection",
+      "panels": {
+        "title": {
+          "content-panel": "Description",
+          "definition-panel": "Definition",
+          "entries-panel": "Entries",
+          "views-panel": "Views"
+        }
+      },
+      "pluralName": "Collections",
+      "propertyDefinitions": {
+        "entityTemplates": {
+          "name": "Templates"
+        },
+        "isDefaultDatabase": {
+          "name": "Default collection"
+        },
+        "structures": {
+          "name": "Structure"
+        }
+      }
+    },
+    "RootEntity": {
+      "description": "An object",
+      "hidePropertySection": "Hide property section",
+      "hideTOCSection": "Hide table of contents",
+      "name": "Object",
+      "pluralName": "Objects",
+      "showPropertySection": "Show property section",
+      "showTOCSection": "Show table of contents"
+    },
+    "RootPage": {
+      "create": "Create page",
+      "createTooltip": "Create a new favorite page",
+      "delete": {
+        "modal": {
+          "body": "This page will be deleted from your space navigation. If you use it somewhere else it will still be available there.",
+          "header": "Do you really want to delete this page?"
+        }
+      },
+      "description": "A simple page",
+      "labels": {
+        "worksheet": {
+          "name": "Page",
+          "tooltip": "test"
+        }
+      },
+      "name": "Page",
+      "pluralName": "Pages",
+      "propertyDefinitions": {
+        "cdde4a50-df94-40f3-944a-d0b7034f13d5": {
+          "name": "Content"
+        },
+        "d6bebd5b-7ad3-4d09-b87c-3e021b880903": {
+          "name": "Cover image"
+        }
+      }
+    },
+    "RootQuery": {
+      "addOtherTag": "Create query",
+      "addSearchTerm": "Add another term, and a result can match any of them.",
+      "adjustSearch": "Options",
+      "aiQuery": {
+        "debug": "AI Query Debug",
+        "debugExplanation": "Explanation",
+        "debugPrompt": "User intent",
+        "debugResponse": "Model response",
+        "error": "Could not generate query. Please try again.",
+        "generate": "Generate query",
+        "generating": "Generating query…",
+        "label": "Ask AI",
+        "orBuildManually": "or build the query yourself",
+        "orEditManually": "or edit the query directly",
+        "placeholder": "Describe the query you want…",
+        "placeholderUpdate": "Describe what you'd like to change…",
+        "stop": "Stop",
+        "thinking": {
+          "filters": "Putting filters in place…",
+          "finalizing": "Putting it all together…",
+          "objectTypes": "Looking through your object types…",
+          "reviewingExisting": "Reviewing your current query…",
+          "sortingGrouping": "Choosing sorting and grouping…",
+          "tagsCollections": "Matching tags and collections…",
+          "understanding": "Understanding your request…"
+        },
+        "update": "Update query",
+        "updating": "Updating query…"
+      },
+      "allContent": "All notes",
+      "allExcept": "all except",
+      "anyCollection": "Any collection",
+      "anyOfThese": "any of",
+      "addDate": "Date",
+      "addProperty": "Property",
+      "blocks": "Objects and blocks",
+      "butNo": "Don't show",
+      "butOnly": "But only",
+      "changeQueryType": "Change query type",
+      "closeOptions": "Close options",
+      "closeQueryEditor": "Close editor",
+      "collectionAll": "All",
+      "collections": "Collections",
+      "collectionsMenuSelectable": "Selectable",
+      "collectionsMenuSelected": "Selected",
+      "collectionsNeedObjectType": "Add an object type as a filter first.",
+      "collectionsSelected": "{count} collections selected",
+      "collectionIncluded": "{count} collection included",
+      "collectionsIncluded": "{count} collections included",
+      "collectionExcluded": "{count} collection excluded",
+      "collectionsExcluded": "{count} collections excluded",
+      "collectionsUnsupported": "This object type does not support collections.",
+      "constrainedBy": "Constrained by",
+      "constraintHelp": {
+        "excludeTagsAndBacklinks": "A tag sits on the note. A backlink is a note that points at the one you choose. Matches here are left out.",
+        "tagsAndBacklinks": "A tag sits on the note. A backlink is a note that points at the one you choose. Any of matches one; All of matches every."
+      },
+      "dates": "Dates",
+      "describeAChange": "Describe a change",
+      "describeAQuery": "Describe a query",
+      "display": "Display",
+      "displayGroup": "Group",
+      "description": "Collect content based on rules",
+      "addExcludeType": "Exclude type",
+      "addLimit": "Limit",
+      "addTag": "Tag",
+      "addTagOrBacklink": "Add tag or backlink",
+      "addTagOrLink": "Tag or link",
+      "addType": "Type",
+      "addObjectType": "Add object type",
+      "allObjectTypes": "All object types",
+      "nObjectTypes": "{count} object types",
+      "editQuery": "Edit query",
+      "emptyState": "No content found",
+      "excludeCollections": "Exclude collections",
+      "excludeObjectTypes": "Exclude object types",
+      "excludeTags": "Exclude tags or backlinks",
+      "filterByCollection": "Filter by collection",
+      "filterByDate": "Filter by date",
+      "filterByObjectType": "Filter by object type",
+      "filterBySearch": "Filter by search",
+      "filterCollections": "Filter collections",
+      "filterObjectTypes": "Filter object types",
+      "filterProperties": "Filter by properties",
+      "filterTags": "Filter by tags",
+      "filterByTagsAndBacklinks": "Filter by tags or backlinks",
+      "filterTagsOrLinks": "Filter by tags or links",
+      "filteredBy": "Filtered by",
+      "first": "first",
+      "group": "Group by",
+      "groupByType": "Group by type",
+      "groupedBy": "Grouped by",
+      "in": "in",
+      "inAnyCollection": "In any collection",
+      "inCollection": "In any collection",
+      "inNoCollection": "In no collection",
+      "inTitleAndBody": "In title and body",
+      "invalidQuery": "Invalid query",
+      "limit": "Limit",
+      "limitResults": "Limit results",
+      "limitedTo": "Limited to",
+      "matching": "Matching",
+      "name": "Query",
+      "narrowFurther": "Filter",
+      "noDefinition": "No definition",
+      "noGroup": "No group",
+      "noLimit": "No limit",
+      "noSort": "No sort",
+      "addSort": "Add sort",
+      "addGroup": "Add group",
+      "moveSortToTop": "Move to top",
+      "notIn": "not in",
+      "notTaggedWith": "but not with",
+      "objectType": "Object type",
+      "objectTypeAllOfHint": "An object has one type, so All of is not available.",
+      "objectTypes": "Object types",
+      "objectsFilteredBy": "Objects filtered by",
+      "offlineQuery": {
+        "description": "This view requires all content to be loaded on your device. It will update as soon as it's ready.",
+        "heading": "View is not ready yet"
+      },
+      "onlyBlocks": "Only blocks",
+      "onlyObjects": "Only objects",
+      "pinToDatabase": "Pin to dashboard",
+      "pinToSpaceOverview": "Pin to object type",
+      "pluralName": "Queries",
+      "properties": "Properties",
+      "queryBuilder": {
+        "addTag": "Add tag",
+        "advanced": "Advanced",
+        "autoTitle": {
+          "linkedTo": "linked to {entities}",
+          "notLinkedTo": "not linked to {entities}",
+          "notTagged": "not tagged {tags}",
+          "tagged": "tagged {tags}"
+        },
+        "aiLabel": "AI",
+        "allObjects": "All objects",
+        "allTypes": "All",
+        "allTypesTooltip": "Do not filter by object type",
+        "buildWithAi": "Build with AI",
+        "clearCollectionFilters": "Clear collection filters",
+        "closeAi": "Close AI builder",
+        "clearExcludeTypes": "Clear",
+        "collectionFiltersActive": "Collection filters are active on this query.",
+        "convertExcludeToSelection": "Convert to selection",
+        "convolutionPaused": "Sort and property filters pause while searching.",
+        "excludeTagDisabled": "Excluding tags requires a search term or an included tag.",
+        "excludeTagHint": "Click to include or exclude this tag",
+        "excludeTypes": "Exclude types",
+        "excludeTypesHint": "Add a search term or tag to exclude object types.",
+        "excludeTypesInactive": "Has no effect when specific types are selected.",
+        "invalidDescription": "This draft is saved, but returns no results until you add a search term, choose a tag, or select an object type.",
+        "invalidTitle": "Query isn’t ready",
+        "instructions": "Use any combination of search terms, object types, and tags. Leave out anything you don’t need. Everything you add narrows the results.",
+        "moreTypes": "+{count} more",
+        "notTag": "not",
+        "releaseConstraintTooltip": "Turn into a normal query and remove the single type constraint. Opens the query as a page and removes this tab from the type dashboard.",
+        "scopeShiftNotice": "Now matches tags anywhere, including inline mentions.",
+        "searchHint": "Press Enter to add",
+        "searchLabel": "Search",
+        "searchPlaceholder": "Search terms…",
+        "searchTermCount": "{count}/{max}",
+        "searchTooShort": "Use at least 2 characters",
+        "showBlocks": "Blocks",
+        "showDisabled": "Showing objects and blocks is available when searching or filtering by tags.",
+        "showEverything": "Everything",
+        "showObjects": "Objects",
+        "tagsLabel": "Tags or backlinks",
+        "typesLabel": "Types"
+      },
+      "random": "random",
+      "recurringTasksInfo": "Recurring tasks have limitations in queries: completed instances are not displayed, and future instances cannot be queried.",
+      "removeAllFilters": "Remove all filters",
+      "results": "results",
+      "return": "Show",
+      "returnAll": "Return all",
+      "saveAsQuery": "Save as query",
+      "saveAsQueryTooltip": "Save current view of content as query",
+      "mode": "Mode",
+      "searchModes": {
+        "auto": {
+          "label": "Auto",
+          "tooltip": "Combines search modes to find most relevant matches."
+        },
+        "fullText": {
+          "label": "Exact",
+          "tooltip": "Searches all content and matches exact terms."
+        },
+        "semantic": {
+          "label": "Semantic",
+          "meaning": "Meaning",
+          "tooltip": "Returns semantically related content to the search terms."
+        },
+        "title": {
+          "label": "Title",
+          "tooltip": "Searches only title and matches exact terms."
+        }
+      },
+      "searchQueryTagFilterInfo": "The query returns all content that matches and is somewhere tagged with your selected tags. If you need for more advanced tag-based filters create a query with type \"Tags\".",
+      "showBlocks": "Blocks",
+      "showObjects": "Objects",
+      "searchTerm": "Search",
+      "searchTerms": "Search",
+      "selectQueryType": "Start query with...",
+      "sort": "Sort",
+      "sortedBy": "Sorted by",
+      "subscriptionNeeded": "Queries allow you to collect content based on rules. They are a feature of Capacities Pro.",
+      "tagOperators": {
+        "and": "All of",
+        "or": "Any of"
+      },
+      "taggedWith": "Content tagged with",
+      "taggedWithOrLinkedTo": "Tagged with / Linked to",
+      "tagsAndBacklinks": "Tags or backlinks",
+      "tagsAndLinks": "Tags and links",
+      "tagsInfo": "Object type queries are only filtered by top level-tags. If you want to return objects and blocks by tag you have to use tag queries.",
+      "unpinFromDatabase": "Unpin from dashboard",
+      "unpinFromSpaceOverview": "Unpin from object type",
+      "unsavedChanges": "You have unsaved changes. Please save them before leaving query editor.",
+      "updatingStates": {
+        "live": {
+          "tooltip": "All content in this query is live and gets updated automatically across devices."
+        },
+        "show": {
+          "button": "Update",
+          "tooltip": "This query is not automatically pulling content from other devices. You can click \"Update\" if you miss some content."
+        }
+      },
+      "withTags": "Tagged with"
+    },
+    "RootSimpleTable": {
+      "description": "A table with formatting options and formulas",
+      "name": "Table",
+      "pluralName": "Tables",
+      "propertyDefinitions": {
+        "RootSimpleTable_coverImage": {
+          "name": "Cover image"
+        },
+        "RootSimpleTable_notes": {
+          "name": "Notes"
+        },
+        "RootSimpleTable_simpleTableBlock": {
+          "name": "Table"
+        }
+      }
+    },
+    "RootWhiteboard": {
+      "create": "Create whiteboard",
+      "description": "An infinite canvas for arranging blocks and objects",
+      "name": "Whiteboard",
+      "pluralName": "Whiteboards",
+      "propertyDefinitions": {
+        "RootWhiteboard_canvas": {
+          "name": "Canvas"
+        },
+        "RootWhiteboard_notes": {
+          "name": "Notes"
+        }
+      }
+    },
+    "RootSpace": {
+      "addSpace": "Add space",
+      "create": "Create space",
+      "description": "A place that holds content",
+      "name": "Space",
+      "newContent": {
+        "name": "New"
+      },
+      "overview": "Overview",
+      "pluralName": "Spaces",
+      "propertyDefinitions": {
+        "databases": {
+          "name": "Collections"
+        },
+        "pages": {
+          "name": "Pages"
+        },
+        "workspace_pages": {
+          "name": "Pinned"
+        }
+      },
+      "setup": {
+        "blankSpace": {
+          "blank": "Blank",
+          "description": "Start with an empty space"
+        },
+        "chooseLanguage": {
+          "explain": "Select your language. All content in this space will use this language as a primary language. You can then translate your content in other languages."
+        },
+        "chooseTemplate": {
+          "explain": "You can start from a template or with an empty space."
+        },
+        "explain": {
+          "heading": "Spaces are isolated. Do not create a new space for content that might be interconnected to content in other spaces.",
+          "text": "All content only lives within one space. Create a new space only if you want to completely isolate its content from your other spaces."
+        },
+        "heading": "Create new space",
+        "intro": "Choose a name for your space. If you want you can also pick an icon to recognize it more easily.",
+        "namePlaceholder": "Choose a name that describes your space"
+      },
+      "text": {
+        "main": {
+          "placeholder": "Write your text or search for blocks..."
+        }
+      }
+    },
+    "RootStructure": {
+      "cardDefinitions": "Card definitions",
+      "computedProperties": "Computed properties",
+      "create": "Create object type",
+      "databaseName": "Database",
+      "databaseProperties": "Object properties",
+      "description": "Define an object type",
+      "filters": "Filters",
+      "name": "Object type",
+      "pluralName": "Object types",
+      "properties": {
+        "add": "Add Property",
+        "name": "Properties"
+      },
+      "propertyDefinitions": {
+        "pluralName": {
+          "name": "Plural of title"
+        }
+      },
+      "structureViews": {
+        "defaultViewType": {
+          "description": "Select a type that will be used as a standard when using this structure."
+        },
+        "deleteStructureView": {
+          "modal": {
+            "explanation": "Deleting a view cannot be undone. All usages will be overwritten with the default view.",
+            "header": "Do you really want to delete this view?"
+          }
+        },
+        "embed": {
+          "first": "Embed view",
+          "new": "New embed view"
+        },
+        "emptyState": {
+          "description": "No objects yet. Create objects first to see a preview of them while designing your structure."
+        },
+        "inline": {
+          "first": "Full-width link",
+          "new": "New inline view"
+        },
+        "page": {
+          "first": "Page view",
+          "new": "New Page View"
+        },
+        "smallCard": {
+          "first": "Small card view",
+          "new": "New small card view"
+        },
+        "wideCard": {
+          "first": "Wide card view",
+          "new": "New wide card view"
+        }
+      },
+      "templateDefinitions": "Templates",
+      "title": "Database",
+      "views": {
+        "add": "Add view",
+        "puralName": "Views"
+      }
+    },
+    "RootTag": {
+      "byType": {
+        "heading": "By type"
+      },
+      "description": "Collect content on a topic",
+      "edit": "Add tag",
+      "emptyStateText": "No content found",
+      "hideTagsInText": "Hide mentions of tags in content",
+      "inText": "Mentioned in content",
+      "mobileEdit": "Edit tags",
+      "name": "Tag",
+      "noContent": {
+        "heading": "No content"
+      },
+      "noTags": "Tags",
+      "pluralName": "Tags",
+      "propertyDefinitions": {
+        "tag_colorTheme": {
+          "description": "Color label of the tag",
+          "name": "Color"
+        }
+      },
+      "relatedTags": "Related tags",
+      "selectedTags": "Selected tags",
+      "showAll": {
+        "heading": "All together"
+      },
+      "showTagsInText": "Show mentions of tags in content",
+      "showTagsNetwork": "Show tags network",
+      "tagDropdownLabel": "Search for tags or create a new one",
+      "tagDropdownLabelWithStructures": "Add tag or convert to type",
+      "turnInto": {
+        "label": "Turn block into",
+        "tooltip": ""
+      }
+    },
+    "RootTask": {
+      "createNewTask": "Create Task",
+      "description": "A task to be completed",
+      "habitStats": {
+        "allTime": "All-time",
+        "atRisk": "At risk",
+        "bestStreak": "Best",
+        "cellState": {
+          "completed": "Completed",
+          "excused": "Excused",
+          "future": "Scheduled",
+          "missed": "Missed",
+          "none": "No occurrence",
+          "skipped": "Skipped"
+        },
+        "completionRate": "Completion rate",
+        "completionRateSubtitle": "Completed vs skipped or missed",
+        "completions": "Completions",
+        "currentStreak": "Streak",
+        "dayUnit": "day|days",
+        "heading": "Task Stats",
+        "keepGoing": "Keep it up",
+        "monthUnit": "month|months",
+        "startToday": "Start today",
+        "weekUnit": "week|weeks",
+        "yearUnit": "year|years"
+      },
+      "name": "Task",
+      "occurrenceLog": {
+        "deleteEntry": {
+          "description": "This log entry will be permanently removed from the completion history.",
+          "title": "Delete completion log entry"
+        },
+        "heading": "Completion Log"
+      },
+      "overdue": "Overdue",
+      "overdueWithCount": "Overdue ({count})",
+      "pluralName": "Tasks",
+      "propertyDefinitions": {
+        "RootTask_notes": {
+          "name": "Notes"
+        },
+        "backlinks": {
+          "name": "Context"
+        },
+        "completed": {
+          "name": "Completed"
+        },
+        "date": {
+          "name": "Date"
+        },
+        "deadline": {
+          "name": "Deadline"
+        },
+        "priority": {
+          "description": "",
+          "name": "Priority",
+          "set": {
+            "high": "High",
+            "low": "Low",
+            "medium": "Medium"
+          }
+        },
+        "status": {
+          "description": "",
+          "name": "Status",
+          "set": {
+            "done": "Done",
+            "in-progress": "In Progress",
+            "next-up": "Next Up",
+            "not-started": "Not Started",
+            "on-hold": "On Hold"
+          }
+        }
+      },
+      "turnBlockIntoTaskObject": "Turn into task object",
+      "virtualizedInstance": {
+        "completed": {
+          "editStatus": {
+            "description": "This is a past instance of a recurring task. Open the task to manage its completion log.",
+            "heading": "Closed task instance"
+          }
+        },
+        "future": {
+          "editAttempt": {
+            "description": "This is a future instance of a recurring task. Open the task to edit its schedule or status.",
+            "heading": "Future task instance"
+          }
+        }
+      }
+    },
+    "User": {
+      "description": "A user",
+      "name": "User",
+      "pluralName": "Users",
+      "propertyDefinitions": {
+        "firstName": {
+          "name": "First Name"
+        },
+        "lastName": {
+          "name": "Last Name"
+        }
+      }
+    },
+    "UserPersonal": {
+      "description": "Your personal user page",
+      "name": "User (Personal)",
+      "pluralName": "Users (Personal)",
+      "propertyDefinitions": {
+        "firstName": {
+          "name": "First Name"
+        },
+        "lastName": {
+          "name": "Last Name"
+        },
+        "spaces": {
+          "name": "My Spaces"
+        },
+        "user": {
+          "name": "User Profile"
+        }
+      },
+      "setup": {
+        "continue": "Let's go",
+        "firstSpaceName": "Notes",
+        "heading": "Welcome to Capacities!",
+        "step1": {
+          "firstName": {
+            "heading": "First name",
+            "placeHolder": "Albert"
+          },
+          "intro": "Enter your name to create a profile.",
+          "language": {
+            "description": "Select a language."
+          },
+          "lastName": {
+            "heading": "Last name",
+            "placeHolder": "Einstein"
+          },
+          "newsletter": {
+            "heading": "",
+            "text": ""
+          }
+        }
+      }
+    },
+    "UtilDate": {
+      "description": "A point in time",
+      "name": "Date",
+      "pluralName": "Dates",
+      "propertyDefinitions": {
+        "date": {
+          "name": "Date"
+        }
+      }
+    },
+    "area": {
+      "description": "Group work and life into areas of responsibility.",
+      "name": "Area",
+      "pluralName": "Areas",
+      "propertyDefinitions": {
+        "0eaee1b1-b0ca-4b87-84d5-a4eada2dd1b6": {
+          "name": "Content"
+        }
+      }
+    },
+    "atomicNote": {
+      "description": "Write small standalone notes you can reuse later.",
+      "name": "Atomic note",
+      "pluralName": "Atomic notes",
+      "propertyDefinitions": {
+        "4aa50950-c907-4fd4-927b-4b86d9531cb1": {
+          "name": "Cover image"
+        },
+        "a8313d1b-0248-42e2-8323-927cf29b1130": {
+          "name": "Notes"
+        }
+      },
+      "queries": {
+        "7b2e9d14-0c58-4a31-86f0-5d1c8e4a9b27": {
+          "description": "Five random notes to review",
+          "name": "Random"
+        },
+        "d3a81c4e-6f20-4b59-8c17-9e4a2b70d1f5": {
+          "name": "Not tagged"
+        }
+      }
+    },
+    "book": {
+      "description": "Build a reading library with authors, rating, and genre.",
+      "name": "Book",
+      "pluralName": "Books",
+      "propertyDefinitions": {
+        "2c5536d9-23a6-4a46-bccd-03c6f78590bd": {
+          "name": "Rating"
+        },
+        "34462708-c7b4-459f-8464-be70b3161adc": {
+          "name": "Type",
+          "set": {
+            "6161edf4-2b8f-4add-b826-5aa5772f7bbb": "Non-fiction",
+            "7434b33f-2665-4c1d-b68e-f43a6bcd176b": "Fiction"
+          }
+        },
+        "63956525-9c0e-4945-ab24-00c9e198204e": {
+          "name": "Cover image"
+        },
+        "6fcd3f53-5181-4092-a511-3981494473e5": {
+          "name": "Authors"
+        },
+        "82c2dfb7-24ee-4167-b438-31f735f9cd85": {
+          "name": "Notes"
+        },
+        "d9fac6c3-5407-4bb1-9fd3-0e1c921e270a": {
+          "name": "Genre",
+          "set": {
+            "008e5dcd-84ea-49e0-a3ae-824286c99fe8": "Art",
+            "078bf7cc-b956-4fbd-858f-320c4cc1b59e": "Reference",
+            "121f78e9-b248-49a5-9786-6730be40ff7e": "Fantasy",
+            "15af2aef-7bd3-4710-9d09-c31b645686a9": "Literary Fiction",
+            "19bbc4ec-a79c-41f3-94df-5e5f255d1851": "Business & Economics",
+            "1acf0009-3b93-4ef9-a28a-e9f92b702f61": "Philosophy",
+            "1b9299f1-2c18-47c4-accf-7949b836fa1c": "Politics",
+            "233164e8-7964-476c-809a-2ec1ecc2b535": "Religion & Spirituality",
+            "23612a75-48a7-453f-a63c-cf1a327fc506": "Classic",
+            "25c8ecf7-8428-4519-9d96-ea425d0bc37d": "Music",
+            "27422b2c-8808-4c29-bc8c-7baa8bcba1cf": "Family & Relationships",
+            "27ce2f8d-b4f9-4003-9ac9-b976592272e3": "Education",
+            "28c4eec2-8160-4166-852a-7cedb17c8dc3": "Poetry",
+            "2c437e06-52d3-4ae3-9776-befada9640ae": "Cooking",
+            "302985b0-7959-48b5-bbec-85117a27cec3": "Historical Fiction",
+            "407ee749-7d23-48d2-b5c7-48f838ca6f12": "Science",
+            "4a64d844-1a64-4242-9ea7-88946858d3b2": "Language & Writing",
+            "4bdb8011-caf4-41c2-a2ac-c8381544ae6e": "Young Adult",
+            "69fec508-43d0-4ac6-810b-98b7af561fc6": "Drama",
+            "70e8b3fc-f8ce-4bba-9ce9-29997b84f99e": "Comics & Graphic Novels",
+            "71aee57d-bd2a-4514-9b81-43f1a50b1e3f": "Self-Help",
+            "890f4b4c-05f2-4aee-9836-5fd9983c6971": "Psychology",
+            "897093c9-764f-42ac-8391-04b2b7092b20": "Crafts & Hobbies",
+            "9379b008-43de-4b99-aa6f-3eb2295aa227": "Nature",
+            "9ab0ef59-9a90-4e18-8159-7556709776a7": "Medicine",
+            "9c8d1e9a-ba63-4af0-8f74-e36cde515ea1": "Crime",
+            "9db86852-e9b4-4019-b1a5-88359177b3a0": "Law",
+            "a100a455-5687-45dd-a707-84e431a0f0fb": "Travel",
+            "c008926d-b729-496c-8718-f8bd3e62bf2c": "Adventure",
+            "c1d8d6e4-ccd9-4cf8-ba42-1ea6a455f8e1": "Children's",
+            "c5603c1f-920e-4cfc-85ad-0e411cbbdce8": "Social Science",
+            "c811276b-f64d-4f4e-992d-f30065bece69": "True Crime",
+            "c8c138ee-b7c2-4213-8ac9-ce664f1e71cb": "Technology",
+            "cd4ed125-36d2-4a3c-a711-22f326333a77": "Home & Garden",
+            "d0902e06-46dc-40ec-8603-7e011a43230b": "Horror",
+            "d22a5fc7-48f4-4532-aa6f-5e6b8ccd4918": "Science Fiction",
+            "d75c9168-e658-4605-9ca0-175dd387b4dd": "Thriller",
+            "db6869ae-aa3d-499a-ac68-887dec35da0d": "History",
+            "e37ee33e-6b03-4983-a361-eaf3e109d3ec": "Mystery",
+            "e8743d0e-d007-4f2c-b9ad-988c8b353606": "Romance",
+            "ea666d4b-0c1a-4fb2-99b5-cdaafaa8a868": "Health & Fitness",
+            "eef64eed-c067-4bc2-b4e6-4a764bcd12ca": "Humor",
+            "ef661d67-611b-450e-9313-f003021abf6a": "Sports",
+            "f68c0fc0-446a-4104-ac9b-a45fd64872e1": "Biography",
+            "f9ef3bfe-d610-4281-bb0d-0ebd4aea660b": "Mathematics"
+          }
+        },
+        "e974b1e1-a892-4f40-8fce-131d642ed800": {
+          "description": "Start when you begin, end when you finish",
+          "name": "Reading timeline"
+        }
+      },
+      "queries": {
+        "04edc609-6d1f-4044-a76b-1ae57fb6b76b": {
+          "name": "Non-fiction"
+        },
+        "2ab9ccff-c7cf-4154-a278-dd6d526c56fe": {
+          "description": "Add a rating and a type to these books",
+          "name": "Maintenance"
+        },
+        "73a2b120-cc79-40a2-9bed-f3ad28f783a6": {
+          "name": "Reading this year"
+        },
+        "8718e9ef-e8e4-4ebc-94f9-589fb6953c7f": {
+          "name": "Currently reading"
+        },
+        "c5f0763d-b78d-4d99-a61d-d3ed7c987dcf": {
+          "name": "Fiction"
+        },
+        "f82f9132-7fda-4eb8-980f-82011cddb365": {
+          "name": "Reading list"
+        }
+      }
+    },
+    "day": {
+      "description": "Log a day with energy, mood, and what stood out.",
+      "name": "Day",
+      "pluralName": "Days",
+      "propertyDefinitions": {
+        "3c7e20a3-e45b-4f03-a55c-1d3bd3e7a0fb": {
+          "name": "Content"
+        },
+        "3ce51242-87d5-4757-a35a-8c85ad29634f": {
+          "description": "What stood out today?",
+          "name": "Highlight of the day"
+        },
+        "692cfd34-099e-4d98-86ce-e7ba87206dca": {
+          "description": "How are you feeling?",
+          "name": "Mood",
+          "set": {
+            "0b9ffa66-82a9-4549-a1d4-143fcf1f061a": "Rough",
+            "67ee83e7-3d4c-438b-84e2-9e2d9fce76f7": "Good",
+            "a87a85b3-c971-4ea2-b375-9fdce93271f2": "Great",
+            "bf2e919a-3e4e-42d0-8e23-1cb9126c3708": "Low",
+            "e5946a0e-38e4-4c72-a23a-b8406d0848de": "Okay"
+          }
+        },
+        "809c9fdd-2731-4a97-a0b9-7efc902fcbad": {
+          "description": "How's your energy?",
+          "name": "Energy",
+          "set": {
+            "4043fe60-b266-4dc5-a92e-6fa4f1dd91d2": "Low",
+            "533c559a-7229-47d6-8b79-162d67d587a5": "Very low",
+            "5efda625-ba81-47ca-81c5-50ed75670dd6": "Very high",
+            "804e9658-ca3f-4097-98c2-0268d02afe6d": "High",
+            "cdf9c669-ee16-4bc6-a038-333a179e6938": "Medium"
+          }
+        },
+        "c005f29b-8aa0-402f-94e6-02910534b0b5": {
+          "name": "Date"
+        },
+        "f797f804-a0e6-4738-b455-1ef95f8a0dfc": {
+          "description": "What are you grateful for?",
+          "name": "Grateful For"
+        }
+      },
+      "queries": {
+        "6e084344-605a-4bb8-bd06-88dc38589c9b": {
+          "name": "Yesterday"
+        },
+        "d6ecd383-1293-4232-ba9d-eda60b5a6938": {
+          "name": "Today"
+        }
+      },
+      "templates": {
+        "4b27277b-74a8-4413-a1be-2faf37dc5c8c": {
+          "name": "Day"
+        }
+      }
+    },
+    "definition": {
+      "description": "Capture a term you want to remember.",
+      "name": "Definition",
+      "pluralName": "Definitions",
+      "propertyDefinitions": {
+        "2b53849c-b6b4-4b8b-b7d4-79af4641cd4e": {
+          "name": "Notes"
+        }
+      },
+      "queries": {
+        "3f6a1c80-9d24-4e17-b5a2-8c0e7d1f4b63": {
+          "description": "One random definition to review",
+          "name": "Random"
+        }
+      }
+    },
+    "film": {
+      "description": "Collect films you watch and want to remember.",
+      "name": "Film",
+      "pluralName": "Films",
+      "propertyDefinitions": {
+        "3f8e2b91-6c4a-4d17-b8e5-9a2c1d7f4e06": {
+          "name": "Notes"
+        },
+        "7d2a1c4e-8b3f-4e61-9a50-6c1d8e4f2b79": {
+          "name": "Poster"
+        },
+        "97c3a1eb-726f-46aa-918a-adfbe404029c": {
+          "name": "Genre",
+          "set": {
+            "0c23ecc0-6894-4b02-a1b2-a12aca207bd7": "Animation",
+            "0dd117d6-cf60-4bbe-8de1-35bcf189db1a": "Comedy",
+            "12507e47-f27a-4200-9bdd-4ced0dae5fc9": "History",
+            "151e05f8-404c-481e-9388-1514fd4a0c12": "Adventure",
+            "1ecef032-830b-412d-a18f-5bbbc67d6bad": "Romance",
+            "3356786f-9a82-433b-aa5e-416b9283e5bd": "Fantasy",
+            "38b2c9f4-fe43-4ca4-8adf-a63142eaebbf": "Music",
+            "3d88333f-4aff-47a9-b4a4-3c9f2c1273c8": "Musical",
+            "41946939-66fa-4b23-9f8d-8f99b1143330": "Documentary",
+            "4b3a6b0f-261e-4db8-bc3f-af8e067c750f": "Sci-fi",
+            "5a86e68e-6394-41ae-ac20-cedd3142bc4f": "Family",
+            "5b19dd5c-654c-42c4-ab1b-9ada2a7cf79b": "Short",
+            "6781baa1-481c-4d45-b9c9-0da7d5428c51": "Western",
+            "70437be4-113e-466b-8299-39b50a04d802": "War",
+            "70d5ef2e-8a7d-4c04-9325-8f8730748b73": "Film noir",
+            "7ee35543-8e30-4708-bc49-ec0eb93eb6ba": "Drama",
+            "85d54d05-48b9-45c0-9091-eb418f63c7f6": "Sport",
+            "951cf89f-146f-4e24-800c-ce23260b2ad8": "Action",
+            "955bb7d4-13d3-4c1c-87ec-c3aef5dd4204": "Crime",
+            "c20f111a-6fbd-4255-903d-1a84623a70f6": "Horror",
+            "e0fc52ae-2324-481a-a7b2-a9e42d2ceb2d": "Biography",
+            "e14991a7-3a59-48a0-9216-2b9cd3f3758b": "Mystery",
+            "efe9fef8-228b-4f65-a1b2-bb372f9c31b6": "Thriller"
+          }
+        },
+        "b1c9e4a7-2d58-4f03-a6e1-8d4b7c2f9a15": {
+          "name": "Director"
+        },
+        "b91b642c-a7af-4cce-8500-540f90a84be9": {
+          "name": "Watched on"
+        },
+        "cf2f791f-267e-4121-919c-349207b84ae1": {
+          "name": "Rating"
+        }
+      },
+      "queries": {
+        "86f622b7-a2c8-4bb6-a414-ecc88854834d": {
+          "description": "Add a rating and a genre to these films",
+          "name": "Maintenance"
+        },
+        "8fe5b94b-c465-4704-921c-2010b0034652": {
+          "name": "Best films"
+        },
+        "b3ff619f-dc25-4dae-832a-65e49ce4df3a": {
+          "name": "Watched this year"
+        }
+      }
+    },
+    "general": {
+      "structureViews": {
+        "embed": {
+          "title": "Embed"
+        },
+        "inline": {
+          "title": "Link block"
+        },
+        "page": {
+          "title": "Page"
+        },
+        "smallCard": {
+          "title": "Small card"
+        },
+        "wideCard": {
+          "title": "Wide card"
+        }
+      }
+    },
+    "meeting": {
+      "description": "Capture conversations with attendees and a date.",
+      "name": "Meeting",
+      "pluralName": "Meetings",
+      "propertyDefinitions": {
+        "42722a2e-f79a-4031-98c8-287f3dfdd443": {
+          "name": "Type",
+          "set": {
+            "08627d5c-6464-4e17-bd30-838a2d6e4f28": "Workshop",
+            "62ce4a59-9ca5-4c3a-ba26-3de8764ec809": "Client Meeting",
+            "87c04a34-94f4-48d8-8012-faede1144977": "Presentation",
+            "ae1eaadd-4e42-45dc-8b4f-4f1bf6a9f3c0": "Brainstorming",
+            "bd198f8e-1908-450a-9ae5-d09d053aafe7": "Conference",
+            "eb4bd1fe-bdbd-4d05-a36b-ec2809e61434": "Interview",
+            "eefeb90a-b898-4d68-8a8e-ce5f9840d048": "Team Meeting",
+            "f32e5e65-324d-4d93-87b9-33642202d531": "One-on-One"
+          }
+        },
+        "5cfda7d3-8067-4ecf-961a-7c1f8f80e0ce": {
+          "name": "Project"
+        },
+        "8fc8ff3b-eedb-462f-9165-a0e0a2d64571": {
+          "name": "Date"
+        },
+        "98ee798b-2f62-4bcf-913f-a46121f9eeb1": {
+          "name": "Notes"
+        },
+        "bf200cbe-5f53-4f77-adf3-122e2c40ae12": {
+          "name": "Cover image"
+        },
+        "c8b6a0f8-b2dc-4257-bd99-766bae41c929": {
+          "name": "Attendees"
+        },
+        "dc6fd9d0-b46d-4f27-8f24-9068dbe2cb5c": {
+          "name": "Reviewed"
+        }
+      },
+      "queries": {
+        "36f29792-4031-4690-9e8c-3888f34f7b64": {
+          "name": "Unreviewed"
+        }
+      }
+    },
+    "month": {
+      "description": "Plan or review a month.",
+      "name": "Month",
+      "pluralName": "Months",
+      "propertyDefinitions": {
+        "59b0120a-23a5-4e6d-b68f-dfcc17646920": {
+          "name": "Date"
+        },
+        "8f8076e7-3499-4b3c-a6bc-93c43ab1e96b": {
+          "name": "Notes"
+        }
+      },
+      "queries": {
+        "c7b4e1a0-5f29-4d83-91c6-8e3a2f0d7b15": {
+          "name": "This month"
+        },
+        "e5a8c2d1-7f40-4b16-82d9-3c6e1a9f4b70": {
+          "name": "Last month"
+        }
+      },
+      "templates": {
+        "341f957f-675f-473c-b7b9-d048d8716c4b": {
+          "name": "Month"
+        }
+      }
+    },
+    "organization": {
+      "description": "Keep notes on companies and other institutions.",
+      "name": "Organization",
+      "pluralName": "Organizations",
+      "propertyDefinitions": {
+        "00aa672b-29d5-4765-9d71-20e090db8ce9": {
+          "name": "Notes"
+        },
+        "110300a6-1ddc-48f3-a7a8-72a53ee8e02d": {
+          "name": "Category",
+          "set": {
+            "8ccf1327-a54b-46a9-a938-4085077e535e": "Nonprofit",
+            "95ed1c75-0074-442b-9bfa-56a0130a5c08": "Company",
+            "b9f02819-63cb-4397-aa2d-eff4d8e60dc1": "NGO",
+            "c393061e-2121-45e3-a70e-def2455560c5": "Startup",
+            "c5e8322b-5f0c-4eda-9484-aebacd9eedda": "Government",
+            "f669be17-9441-4ab1-ba1b-d61a0c6e5789": "University"
+          }
+        },
+        "a70ae3cc-86d4-4ac0-bbe1-ac3c31a59836": {
+          "name": "Cover image"
+        },
+        "aac0bc75-7ccd-4697-a929-1e294a9ba83c": {
+          "name": "People"
+        },
+        "ac159e47-df40-4388-87c5-7587c2adae5d": {
+          "name": "Projects"
+        }
+      },
+      "queries": {
+        "6c4f1a2e-0b8d-4d3a-9f71-2e5a8c9b0147": {
+          "name": "By category"
+        }
+      }
+    },
+    "person": {
+      "description": "Keep notes on people you meet, work with, or follow.",
+      "name": "Person",
+      "pluralName": "People",
+      "propertyDefinitions": {
+        "1f49b552-d7b9-4b1f-8cd8-7785f9ccb49f": {
+          "name": "Meetings"
+        },
+        "28457c6c-6439-4eb7-996b-465e8511ac7a": {
+          "name": "Notes"
+        },
+        "864b648a-0eb8-4b12-8873-4ffb2b6be475": {
+          "name": "Organizations"
+        },
+        "9aab7abf-bd21-4df3-86fe-5a92243712f8": {
+          "name": "Projects"
+        },
+        "b7c4d315-9004-46b5-bc82-ed96471eda05": {
+          "name": "Picture"
+        },
+        "d79ca610-d096-4c3a-b0ec-51c55f154673": {
+          "name": "Category",
+          "set": {
+            "0851f5b6-b850-4345-be20-97d97c531031": "Artist",
+            "12c42506-0955-48d7-8874-246311579d34": "Entrepreneur",
+            "2a7018fb-e12a-4053-976e-bd3b8182c6bd": "Scientist",
+            "45822c36-91f1-47c1-9c6b-3959dec926eb": "Philosopher",
+            "6173b336-c746-4fcd-b421-b17a477c639d": "Friends",
+            "7b8d8b19-6e67-4e89-8886-ac1b2a2bad5e": "Politician",
+            "8bbdea9e-c7d2-4294-a54f-568d64b874ee": "Colleague",
+            "b598aad7-4049-4654-9267-4961608c1827": "Author",
+            "b85c8372-0e32-4b69-89e8-4ffed168ca43": "Journalist",
+            "bf46f270-931d-46d7-aab8-ae949be22652": "Academic",
+            "d813d7b2-564a-40a2-9585-59b85209418f": "Family"
+          }
+        }
+      },
+      "queries": {
+        "85d12d17-cc79-4f5b-a5ec-4ed85e96cdbc": {
+          "name": "By category"
+        }
+      }
+    },
+    "podcast": {
+      "description": "Save podcasts you listen to and want to revisit.",
+      "name": "Podcast",
+      "pluralName": "Podcasts",
+      "propertyDefinitions": {
+        "17408a53-dec8-4054-bcb6-11f26bdbd46c": {
+          "name": "URL"
+        },
+        "69b9c271-4c8d-4397-a7eb-865a06800264": {
+          "name": "Listened on"
+        },
+        "8421e86d-7a8e-45bc-b98c-8bec04f54dbc": {
+          "name": "Notes"
+        },
+        "f28e781b-71d1-481d-acbc-e51d3ae392c0": {
+          "name": "People"
+        }
+      },
+      "queries": {
+        "4e1c9a70-2b8d-4f13-91a6-7c3d5e8f0b24": {
+          "name": "Listened this year"
+        },
+        "9a6d2c18-5e40-4b77-8f31-0c4a7d9e2b56": {
+          "description": "Add a URL to these podcasts",
+          "name": "Maintenance"
+        }
+      }
+    },
+    "project": {
+      "description": "Track work with status, collaborators, and meetings.",
+      "name": "Project",
+      "pluralName": "Projects",
+      "propertyDefinitions": {
+        "40771bce-7329-40f2-a224-23fa402d409f": {
+          "name": "Meetings"
+        },
+        "45bb99d4-914b-4364-9949-4a7e62ab0b29": {
+          "description": "Start when it begins, end when it's done",
+          "name": "Timeframe"
+        },
+        "77b38594-493a-46fa-bfcf-b304fe7df928": {
+          "name": "Organizations"
+        },
+        "78d193a0-debe-4ac9-8431-cd9bfe4cee5c": {
+          "name": "Collaborators"
+        },
+        "82a38e65-4d2a-4df0-ba32-4bedf58ff614": {
+          "name": "Notes"
+        },
+        "99980329-b66f-4af3-9f9a-c43dc6db039b": {
+          "name": "Status",
+          "set": {
+            "0b685096-c8e9-4bb4-9aaf-5f965c393c70": "Completed",
+            "269fd5dc-abfe-422b-ba4a-f9c6f80dabd7": "Planned",
+            "3a7d295f-2c79-4303-a8cd-1998a83bfea3": "In Progress",
+            "a92da3b5-90a9-4a6e-bacc-4aecdc123846": "On Hold"
+          }
+        },
+        "aa230cb5-f001-43b8-ae74-9264124433e5": {
+          "name": "Cover image"
+        },
+        "bad4e82d-ca42-4703-b224-fa180aaaf4f1": {
+          "name": "Type",
+          "set": {
+            "3fc51b26-8e17-4911-b47c-926a9b15e474": "Personal",
+            "878ef25e-ccd5-4c02-82ea-810020a7536b": "Work"
+          }
+        }
+      },
+      "queries": {
+        "06c46eeb-434f-4fd2-82a6-284044abba8f": {
+          "name": "Personal"
+        },
+        "a811d6f7-7e61-4572-b089-2356e69a44d2": {
+          "name": "Work"
+        },
+        "b6d573a5-a607-45fc-abaa-790905494d27": {
+          "name": "By organization"
+        },
+        "e2b2efab-33dd-4337-8f09-721084cbb1c0": {
+          "name": "Status"
+        },
+        "fba8a495-484b-4249-acc1-956ce6f84d23": {
+          "name": "By collaborator"
+        }
+      }
+    },
+    "tvSeries": {
+      "description": "Track series you watch and want to come back to.",
+      "name": "TV series",
+      "pluralName": "TV series",
+      "propertyDefinitions": {
+        "0d010ef3-83b5-457f-a333-ee6d111f1a83": {
+          "name": "Rating"
+        },
+        "2ce2e467-d119-41b0-bf4b-5eb91c5c82b4": {
+          "name": "Genre",
+          "set": {
+            "0c298c70-273c-4d37-8b4c-10f39b976346": "War",
+            "0dd9f36b-b86a-4c91-a291-20c80d1b80f4": "Western",
+            "20e18b9a-f46b-47a4-b8a9-d31cd55adfd6": "Romance",
+            "320e9cf5-8be2-48eb-9a57-ff448c2f402a": "Adventure",
+            "4faa8579-ccbf-4c47-959f-cffeab77621f": "Mystery",
+            "545afdec-bf72-4470-a2b9-7050c4b4d531": "Biography",
+            "5c515920-28ec-4da8-a9f5-03aa9f526008": "Talk show",
+            "6be83832-5063-41a8-ba46-220b31b11e5c": "Animation",
+            "7c5305c0-5c7a-41aa-adbd-2d9eeb43091e": "Action",
+            "7e707c84-b60f-4fa1-8e1b-b60789b4b260": "Family",
+            "7ea1533f-6e04-44f2-bd0f-7003de6a33bc": "Sci-fi",
+            "85203d2e-0d87-4a48-b8ec-99bb8f8e18a1": "Music",
+            "90aabee5-9d04-42cd-bf86-79a0497c0148": "History",
+            "920c821f-4cfe-4349-bd39-0566b51ae2c6": "Documentary",
+            "9707903a-5399-4343-8e20-21a504665abb": "Horror",
+            "9a15fdaa-ea94-4327-ad8a-24e3226976ab": "Sport",
+            "9a16c9ab-bd5d-463b-a78f-2f3b12844da2": "Game show",
+            "a6bbef4c-c3f8-45f9-ab44-fc37c4ad2ebd": "Musical",
+            "a95e6518-d222-4403-868e-689b3bc04bc4": "Reality TV",
+            "b4849a44-8a67-42ca-84fb-7cba92d21372": "Crime",
+            "c81d079e-68cf-4c38-8396-57f78f301d4c": "News",
+            "cf89e605-73c6-4f0f-8c56-3e8dfa790afc": "Drama",
+            "d7f52804-94e0-4a46-babe-edfc9df0ee7f": "Comedy",
+            "e0c615fc-6729-498b-b668-b1e2c9893adc": "Short",
+            "e5e7338e-03ae-489a-9e1b-5f850143b362": "Thriller",
+            "ff02352f-349b-43ae-8a76-e3d43b58ed3a": "Fantasy"
+          }
+        },
+        "3db60ae3-ad0e-49dd-b873-b1f0eaf202b4": {
+          "name": "Actors"
+        },
+        "952855a3-0dbd-41f0-929d-7d4378c374a3": {
+          "name": "Watched on"
+        },
+        "963da948-8728-4c36-97b6-86b63dcfb57c": {
+          "name": "Notes"
+        },
+        "aa86ea26-3c48-4c9b-9340-06652dd061a2": {
+          "name": "Cover image"
+        },
+        "cf4babe7-1510-4942-944d-06e96e96d5f1": {
+          "name": "Director"
+        }
+      },
+      "queries": {
+        "805c2792-ec36-4913-bb26-e988a1a788eb": {
+          "description": "Add a rating and a genre to these TV series",
+          "name": "Maintenance"
+        },
+        "e03e6b2e-eda7-43e8-b5a2-a56769fe4ae0": {
+          "name": "Watched this year"
+        },
+        "eedbe41a-f42b-4130-89bf-2c716f9b8878": {
+          "name": "Best TV series"
+        }
+      }
+    },
+    "week": {
+      "description": "Plan or review a single week.",
+      "name": "Week",
+      "pluralName": "Weeks",
+      "propertyDefinitions": {
+        "4ec1bdff-cd41-4355-b97d-da3f4b2b526f": {
+          "name": "Date"
+        },
+        "f5fd7df0-3c78-46c2-b6bd-d3df0c075b1b": {
+          "name": "Notes"
+        }
+      },
+      "queries": {
+        "1f8c3a92-6d4b-4e17-9a50-2c7e8d1b4f60": {
+          "name": "This week"
+        },
+        "a2d9e7c4-3b18-4f06-8e51-7c0a9b6d2e34": {
+          "name": "Last week"
+        }
+      },
+      "templates": {
+        "2b70216b-63e6-47bf-8e91-02c16d1c8b67": {
+          "name": "Week"
+        }
+      }
+    }
+  },
+  "general": {
+    "aWeekAgo": "A week ago",
+    "abort": "Abort",
+    "above": "Above",
+    "actions": "Actions",
+    "active": "Active",
+    "add": "Add",
+    "addTo": "Add to",
+    "advanced": "Advanced",
+    "ahead": "Ahead",
+    "aliases": "Aliases",
+    "all": "All",
+    "allowOnce": "Allow Once",
+    "alwaysAllow": "Always Allow",
+    "analyze": "Analyze",
+    "and": "and",
+    "apply": "Apply",
+    "archive": "Archive",
+    "asObjects": "As Objects",
+    "automatic": "Automatic",
+    "availableContext": "Available Context",
+    "back": "Back",
+    "backToHome": "Back to home",
+    "backup": "Backup",
+    "behind": "Behind",
+    "below": "Below",
+    "block": "Block",
+    "blockOptions": "Block Options",
+    "bulkImport": "Bulk Import",
+    "by": "by",
+    "cancel": "Cancel",
+    "cancelled": "Canceled",
+    "change": "Change",
+    "choose": "Choose",
+    "clear": "Clear",
+    "clipboard": "Clipboard",
+    "close": "Close",
+    "collection": "Collection",
+    "comingSoon": "Coming soon",
+    "confirm": "Confirm",
+    "confirmed": "Confirmed",
+    "contactUs": "Contact us",
+    "content": "Content",
+    "context": "Context",
+    "continue": "Continue",
+    "copiedToClipboard": "Copied to clipboard",
+    "copy": {
+      "noun": "Copy",
+      "verb": "Copy"
+    },
+    "copyright": "All rights reserved",
+    "create": "Create",
+    "createAndAdd": "Create and add to",
+    "createObject": "Create {name}",
+    "currentSelection": "Current Selection",
+    "custom": "Custom",
+    "customize": "Customize",
+    "cut": "Cut",
+    "daily": "Daily",
+    "darkMode": "Dark mode",
+    "dataProtection": "Privacy Policy",
+    "date": "Date",
+    "deactivated": "Deactivated",
+    "default": "Default",
+    "delete": "Delete",
+    "deleted": "Deleted",
+    "deletedUser": "Deleted User",
+    "deprecated": "Deprecated",
+    "description": "Description",
+    "deselectAll": "Deselect all",
+    "details": "Details",
+    "diagnostics": "Diagnostics",
+    "documentation": "Documentation",
+    "done": "Done",
+    "dontShowAgain": "Don't show again",
+    "down": "Down",
+    "download": "Download",
+    "downloadFile": "Download file",
+    "downloading": "Downloading...",
+    "duplicate": "Duplicate",
+    "edit": "Edit",
+    "editSelection": "Edit selection",
+    "empty": "Empty",
+    "emptyStateSearch": "No content found",
+    "enter": "Enter",
+    "entries": "entries",
+    "entry": "entry",
+    "error": "Error",
+    "eventCancelled": "Cancelled",
+    "eventDeleted": "Deleted",
+    "eventNotFound": "Not found",
+    "exitOnboarding": "Exit onboarding",
+    "experimental": "Experimental",
+    "explore": "Explore",
+    "exploreContext": "Explore Context",
+    "exploreMore": "Explore More",
+    "export": "Export",
+    "exporting": "Exporting...",
+    "extract": "Extract",
+    "failed": "Failed",
+    "file": "File|Files",
+    "findMore": "Find More",
+    "finish": "Finish",
+    "finishAndContinue": "Finish & continue",
+    "firstName": "First Name",
+    "forward": "Forward",
+    "general": "General",
+    "generic": "Generic",
+    "goBack": "Go back",
+    "gotIt": "Got it",
+    "guide": "Guide",
+    "help": "Help",
+    "hide": "Hide",
+    "home": "Home",
+    "horizontal": "horizontal",
+    "icon": "Icon",
+    "ignore": "Ignore",
+    "import": "Import",
+    "importFiles": "Import File(s)",
+    "importInto": "Import Into",
+    "importing": "Importing...",
+    "impressum": "Impressum",
+    "imprint": "Imprint",
+    "inAWeek": "In a week",
+    "inBeta": "Beta",
+    "internal": "Internal",
+    "language": "Language",
+    "languages": {
+      "de": "German",
+      "en": "English"
+    },
+    "last": "Last | Last {count}",
+    "lastEdited": "Last edited",
+    "lastName": "Last Name",
+    "learnMore": "Learn more",
+    "letsGo": "Let's go!",
+    "lightMode": "Light mode",
+    "loadMore": "Load more",
+    "local": "Local",
+    "logout": "Logout",
+    "logoutAndRetry": "Log out & retry",
+    "logs": "Logs",
+    "manual": {
+      "export": "Export 1 Space | Export {n} Spaces"
+    },
+    "mapping": "Mapping",
+    "mappingAdvanced": "Mapping (Advanced)",
+    "media": "Media",
+    "mediaFiles": "Media Files",
+    "menu": "Menu",
+    "migrate": "Migrate",
+    "migrateFrom": "Migrate From",
+    "minimize": "Minimize",
+    "monthly": "Monthly",
+    "months": {
+      "april": "April",
+      "august": "August",
+      "december": "December",
+      "february": "February",
+      "january": "January",
+      "july": "July",
+      "june": "June",
+      "march": "March",
+      "may": "May",
+      "november": "November",
+      "october": "October",
+      "september": "September"
+    },
+    "more": "More",
+    "multiple": "Multiple",
+    "multipleSelect": "Multiple select",
+    "name": "Name",
+    "neutral": "Neutral",
+    "new": "New",
+    "newGender": {
+      "female": "New {name}",
+      "male": "New {name}",
+      "neutral": "New {name}"
+    },
+    "newObject": "New {name}",
+    "next": "Next",
+    "no": "no",
+    "noThanks": "No, thanks!",
+    "none": "None",
+    "notAvailableWhenOffline": "Not available when offline",
+    "notIncluded": "Not Included",
+    "notes": "Notes",
+    "notion": "Notion",
+    "now": "Now",
+    "object": "Object|Objects",
+    "objectBlockOptions": "Object Block Options",
+    "objectContext": "Object Context",
+    "objectType": "Object Type|Object Types",
+    "objects": "Objects",
+    "obsidian": "Obsidian",
+    "of": "{a} of {b}",
+    "open": "Open",
+    "openObject": "Open Object",
+    "openRelevantContent": "Open Relevant Content",
+    "openSearch": "Open Search",
+    "openSettings": "Open settings",
+    "optional": "Optional",
+    "options": "Options",
+    "or": "Or",
+    "other": "Other",
+    "outOf": "of",
+    "overview": "Overview",
+    "page": "Page",
+    "pick": "Pick",
+    "pinned": "Pinned",
+    "planned": "Planned",
+    "preview": "Preview",
+    "previous": "Back",
+    "privacyPolicy": "Privacy Policy",
+    "processing": "Processing",
+    "properties": "Properties",
+    "property": "Property",
+    "published": "Published",
+    "randomize": "Randomize",
+    "readOnly": "Read only",
+    "recentItems": "Recent items",
+    "recentlyUsed": "Recently used",
+    "recommended": "Recommended",
+    "recreate": "Recreate",
+    "refresh": "Refresh",
+    "relevantContent": "Relevant Content",
+    "reloadApp": {
+      "button": "Reload app"
+    },
+    "remove": "Remove",
+    "removeFrom": "Remove from",
+    "rename": "Rename",
+    "reset": "Reset",
+    "restart": "Restart",
+    "retry": "Retry",
+    "reuse": "Reuse",
+    "save": "Save",
+    "saveChanges": "Save changes",
+    "schedule": "Schedule",
+    "search": "Search",
+    "searchAll": "Browse all {name}",
+    "searchInside": "Search",
+    "searchMore": "Search More",
+    "searchOrCreate": "Search or Create",
+    "searchTerm": "Search for anything...",
+    "select": "Select",
+    "selectAll": "Select all {name}",
+    "selected": "Selected",
+    "separately": "Separately",
+    "set": "Set",
+    "settings": "Settings",
+    "share": {
+      "action": "Share",
+      "toClipboard": "Copy"
+    },
+    "shared": "Shared",
+    "show": "Show",
+    "showAll": "Show all",
+    "showLess": "Show less",
+    "showMore": "Show more",
+    "single": "Single",
+    "singleOrMultiple": "Single or Multiple",
+    "skip": "Skip",
+    "sort": "Sort",
+    "spaces": "Spaces",
+    "start": "Start",
+    "step": "Step {a} of {b}",
+    "storage": "Storage",
+    "style": "Style",
+    "submit": "Submit",
+    "summary": "Summary",
+    "support": "Support",
+    "switch": "Switch",
+    "syncIssue": {
+      "description": "You're currently out of sync. This should not be a problem as long as this message disappears after a few minutes when being online again. If not, please do \"Account > Settings > Restart app (bottom left)\"."
+    },
+    "synced": {
+      "description": "Your content is stored in our cloud.",
+      "heading": "Saved"
+    },
+    "synchronize": "Synchronize",
+    "synchronizing": "Synchronizing",
+    "syncing": {
+      "description": "Your content gets synchronized with the server at the moment. There are {objectCount} objects left."
+    },
+    "tag": "Tag",
+    "template": "Template",
+    "tentative": "Tentative",
+    "termsAndConditions": "Terms & Conditions",
+    "theme": "Theme",
+    "time": "Time",
+    "title": "Title",
+    "today": "Today",
+    "together": "Together",
+    "tomorrow": "Tomorrow",
+    "total": "Total",
+    "trigger": "Trigger",
+    "trustAlways": "Trust Always",
+    "trustOnce": "Trust Once",
+    "tryAgain": "Try again",
+    "undoDelete": "Undo Delete",
+    "unknown": "Unknown",
+    "untitled": "Untitled",
+    "up": "Up",
+    "update": "Update",
+    "upload": "Upload",
+    "uploading": "Uploading",
+    "userIdentifier": "User Handle",
+    "vertical": "vertical",
+    "video": "Video",
+    "viewMore": "View More",
+    "visible": "Visible",
+    "visit": "Visit",
+    "voiceNote": "Voice note",
+    "weekdays": {
+      "friday": "Friday",
+      "monday": "Monday",
+      "saturday": "Saturday",
+      "sunday": "Sunday",
+      "thursday": "Thursday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday"
+    },
+    "weekly": "Weekly",
+    "width": "width",
+    "workbench": "Workbench",
+    "yes": "yes",
+    "yesterday": "Yesterday",
+    "yourSpaces": "Your spaces",
+    "zoom": "Zoom"
+  },
+  "DateOptions": {
+    "earlier": {
+      "title": "Earlier"
+    },
+    "lastWeek": {
+      "title": "Last week"
+    },
+    "nextWeek": {
+      "title": "Next week"
+    },
+    "now": {
+      "title": "Now – timestamp"
+    },
+    "overdue": {
+      "title": "Overdue"
+    },
+    "theDayAfterTomorrow": {
+      "title": "The day after tomorrow"
+    },
+    "theDayBeforeYesterday": {
+      "title": "The day before yesterday"
+    },
+    "thisWeek": {
+      "title": "This week"
+    },
+    "today": {
+      "title": "Today"
+    },
+    "tomorrow": {
+      "title": "Tomorrow"
+    },
+    "yesterday": {
+      "title": "Yesterday"
+    }
+  },
+  "group": {
+    "sortOptions": {
+      "general": {
+        "week": "Week"
+      }
+    }
+  },
+  "propertyTypes": {
+    "blocks": {
+      "description": "The main notes area of an object — rich text with formatting and linking.",
+      "name": "Content"
+    },
+    "boolean": {
+      "description": "True or false value",
+      "name": "Checkbox"
+    },
+    "color": {
+      "description": "",
+      "name": "Color"
+    },
+    "computed_preview": {
+      "description": "",
+      "name": "Content preview"
+    },
+    "computed_wordCount": {
+      "description": "",
+      "name": "Word count"
+    },
+    "date": {
+      "description": "Just the date as in the calendar",
+      "name": "Date"
+    },
+    "datetime": {
+      "description": "Time and date together",
+      "name": "Date time"
+    },
+    "datetimeSimple": {
+      "description": "",
+      "name": "Date time"
+    },
+    "entity": {
+      "description": "Link to other objects",
+      "name": "Object"
+    },
+    "entity_aliases": {
+      "description": "Additional names for this content",
+      "name": "Aliases"
+    },
+    "entity_backlinks": {
+      "addBacklink": "Add context",
+      "description": "Objects linking to this one",
+      "name": "Context"
+    },
+    "entity_collections": {
+      "description": "Collections this content is included in",
+      "name": "Collections"
+    },
+    "entity_createdAt": {
+      "description": "Date and time of creation",
+      "name": "Created at"
+    },
+    "entity_description": {
+      "description": "Additional information to further describe an item",
+      "name": "Description"
+    },
+    "entity_icon": {
+      "description": "A quick visual identifier",
+      "name": "Icon"
+    },
+    "entity_lastUpdated": {
+      "description": "Date and time of last edit",
+      "name": "Last updated"
+    },
+    "entity_permissions": {
+      "description": "Allows for fine-grained control of who can access and edit this entry",
+      "name": "Permissions"
+    },
+    "entity_tags": {
+      "description": "General tags of this content",
+      "name": "Tags"
+    },
+    "entity_title": {
+      "description": "The title serves as the main identifier for any entry",
+      "name": "Title"
+    },
+    "entity_type": {
+      "description": "The type of this content",
+      "name": "Object type"
+    },
+    "label": {
+      "description": "A simple label to categorize an object. Can be single or multi-select.",
+      "name": "Label"
+    },
+    "math": {
+      "description": "TeX-formula.",
+      "name": "Math"
+    },
+    "media_audioFileResource": {
+      "description": "",
+      "name": "Audio file"
+    },
+    "media_fileFileResource": {
+      "description": "",
+      "name": "File"
+    },
+    "media_imageFileResource": {
+      "description": "",
+      "name": "Image file"
+    },
+    "media_pdfFileResource": {
+      "description": "",
+      "name": "PDF file"
+    },
+    "media_previewImage": {
+      "description": "",
+      "name": "Preview image"
+    },
+    "media_tweets": {
+      "description": "",
+      "name": "Tweets"
+    },
+    "media_videoFileResource": {
+      "description": "",
+      "name": "Video file"
+    },
+    "number": {
+      "description": "A number with various formatting options",
+      "name": "Number"
+    },
+    "structure": {
+      "description": "A reusable definition of collection entries",
+      "name": "Structure"
+    },
+    "tag": {
+      "description": "Keywords to tag an item",
+      "name": "Tag"
+    },
+    "text": {
+      "description": "Simple plain text",
+      "name": "Text"
+    },
+    "textBlock": {
+      "description": "A single paragraph that allows formatting and linking.",
+      "name": "Text"
+    },
+    "time": {
+      "description": "Just the time as on the clock",
+      "name": "Time"
+    },
+    "url": {
+      "description": "A plain web url",
+      "name": "URL"
+    },
+    "util_aiChat": {
+      "description": "",
+      "name": "AI chat"
+    },
+    "util_dateOEvent": {
+      "description": "",
+      "name": "Date event"
+    },
+    "util_dateObject": {
+      "description": "",
+      "name": "Date object"
+    }
+  },
+  "propertyDefinition": {
+    "deleteProperty": {
+      "modal": {
+        "blocksPropertyWarning": "A content property generally is the main body of an object. Only if you have several content properties, they will be distinguished with a label. Make sure you don't accidentally delete the main content of your notes!",
+        "confirm": "I understand that I'll delete all content of this property in all objects of this type.",
+        "confirmTextMatchLabel": "Type \"{value}\" to confirm",
+        "explanation": "Deleting this property will remove it from the whole object type, meaning that it will be removed from all objects of this type. This step cannot be reversed.",
+        "explanationWithoutWarning": "Deleting this property will remove it from the whole object type, meaning that it will be removed from all objects of this type.",
+        "generalWarning": "The property will be removed from all objects of this type.",
+        "header": "Do you really want to delete this property on all objects of this type?",
+        "onlyBlocksPropertyWarning": "This is the only content property present in this object type. This will delete the main content (body) for all objects of this type."
+      }
+    },
+    "description": {
+      "label": "Description",
+      "placeholder": "Give others an idea of what this property means"
+    },
+    "newPropertyName": "New property"
+  },
+  "convolution": {
+    "customDefinitions": {
+      "custom_backlinks_count": {
+        "name": "Backlinked (context) objects count"
+      },
+      "custom_backlinks_objects": {
+        "name": "Backlinked (context) objects"
+      },
+      "custom_backlinks_object_types": {
+        "name": "Backlink (context) object types"
+      },
+      "custom_is_shared": {
+        "name": "Shared"
+      },
+      "custom_linked_objects": {
+        "name": "Linked objects"
+      },
+      "custom_linked_object_types": {
+        "name": "Linked object types"
+      },
+      "custom_linked_objects_count": {
+        "name": "Linked objects count"
+      }
+    },
+    "filter": {
+      "options": {
+        "boolean": {
+          "isChecked": "is selected",
+          "isNotSelected": "is not selected"
+        },
+        "dateTime": {
+          "endIs": "ends on",
+          "endIsAfter": "ends after",
+          "endIsBefore": "ends before",
+          "endIsEmpty": "end is empty",
+          "endIsNotEmpty": "end is not empty",
+          "endIsOnOrAfter": "ends on or after",
+          "endIsOnOrBefore": "ends on or before",
+          "hasNoReminder": "has no reminder",
+          "hasReminder": "has reminder",
+          "is": "is",
+          "isAfter": "is after",
+          "isBefore": "is before",
+          "isNotRecurring": "is not recurring",
+          "isOnOrAfter": "is on or after",
+          "isOnOrBefore": "is on or before",
+          "isRecurring": "is recurring",
+          "startIs": "starts",
+          "startIsAfter": "starts after",
+          "startIsBefore": "starts before",
+          "startIsNotEmpty": "start is not empty",
+          "startIsOnOrAfter": "starts on or after",
+          "startIsOnOrBefore": "starts on or before",
+          "valueOptions": {
+            "exactDate": "Specific date",
+            "inOneMonth": "in one month",
+            "inOneWeek": "in one week",
+            "oneMonthAgo": "one month ago",
+            "oneWeekAgo": "one week ago",
+            "overdue": "overdue",
+            "thisMonth": "this month",
+            "thisWeek": "this week",
+            "thisYear": "this year",
+            "today": "today",
+            "tomorrow": "tomorrow",
+            "yesterday": "yesterday"
+          }
+        },
+        "entity": {
+          "contains": "is",
+          "notContains": "is not"
+        },
+        "general": {
+          "contains": "includes",
+          "is": "is",
+          "isEmpty": "is empty",
+          "isNot": "is not",
+          "isNotEmpty": "is not empty",
+          "isNotPlural": "does not include",
+          "isPlural": "includes",
+          "notContains": "does not include"
+        },
+        "isShared": {
+          "isNotShared": "is not shared",
+          "isShared": "is shared"
+        },
+        "string": {
+          "endsWith": "ends with",
+          "startsWith": "starts with"
+        }
+      }
+    },
+    "group": {
+      "groupBy": {
+        "blocks": "Blocks",
+        "boolean": {
+          "checked": "Checked",
+          "unchecked": "Unchecked"
+        },
+        "entity": "By Linked Objects",
+        "hourPeriod": "{date}, {period}",
+        "number": {
+          "default": "By Exact Value",
+          "range": "By Range"
+        },
+        "numberRange": {
+          "groupEvery": "Group every",
+          "max": "Max",
+          "min": "Min",
+          "range": "Group range"
+        },
+        "objects": "Objects",
+        "open": "Open",
+        "other": "Other",
+        "textBlock": {
+          "default": "By Text"
+        }
+      },
+      "sortOptions": {
+        "createdAt": {
+          "ascending": "Created oldest first",
+          "descending": "Created newest first"
+        },
+        "general": {
+          "ascending": "ascending",
+          "day": "By Day",
+          "default": "default",
+          "descending": "descending",
+          "hour": "By Hour",
+          "month": "By Month",
+          "relative": "Relative",
+          "scheduled": "Scheduled",
+          "week": "By Week",
+          "year": "By Year",
+          "sizeAscending": "smallest first",
+          "sizeDescending": "largest first"
+        },
+        "label": {
+          "default": "Order",
+          "defaultDescending": "Order inverse"
+        }
+      }
+    },
+    "sort": {
+      "options": {
+        "datetime": {
+          "ascending": "Oldest first",
+          "ascendingExists": "is empty first",
+          "descending": "Newest first",
+          "descendingExists": "is empty last"
+        },
+        "general": {
+          "ascending": "ascending",
+          "descending": "descending"
+        }
+      }
+    }
+  },
+  "aiAssistant": {
+    "ai": "AI",
+    "budgetExceeded": {
+      "plus": {
+        "button": "Buy additional AI budget",
+        "description": "Add extra AI budget anytime. It never expires and rolls over each month.",
+        "title": "You've run out of AI credits"
+      },
+      "plusWithCredits": {
+        "button": "Buy additional AI budget",
+        "description": "Your monthly budget is used up. Top up instantly and keep creating.",
+        "title": "You've run out of AI credits"
+      },
+      "pro": {
+        "button": "Get {plan}",
+        "description": "Level up to {plan} for a much larger monthly AI budget and keep creating without interruption.",
+        "title": "You've run out of AI credits"
+      },
+      "trial": {
+        "button": "Upgrade to Pro",
+        "description": "Upgrade to Pro for a monthly AI budget and the full Capacities experience.",
+        "title": "You've run out of AI credits"
+      }
+    },
+    "chat": {
+      "aiAssistant": "AI Assistant",
+      "basicCommands": {
+        "change-tone": {
+          "description": "",
+          "title": "Change tone to..."
+        },
+        "continuation": {
+          "description": "Continues the text given as context",
+          "title": "Continue writing"
+        },
+        "counter-arguments": {
+          "description": "Returns a list of counter arguments to the content given as context",
+          "title": "List counter argument"
+        },
+        "critique": {
+          "description": "Returns a critique of the content given as context",
+          "title": "Critique"
+        },
+        "define-term-dictionary": {
+          "description": "",
+          "title": "Look up in dictionary"
+        },
+        "define-term-encyclopedia": {
+          "description": "",
+          "title": "Get encyclopedia entry"
+        },
+        "define-term-theasaurus": {
+          "description": "",
+          "title": "Get thesaurus entry"
+        },
+        "expand-text": {
+          "description": "",
+          "title": "Expand text"
+        },
+        "expand-text-to": {
+          "description": "",
+          "title": "Expand text to..."
+        },
+        "explain-term": {
+          "description": "",
+          "title": "Explain this"
+        },
+        "extract-and-format": {
+          "description": "",
+          "title": "Extract ... and format as..."
+        },
+        "extract-tasks": {
+          "description": "",
+          "title": "Identify tasks"
+        },
+        "find-evidence": {
+          "description": "Return evidence from the content given as context",
+          "title": "Find evidence"
+        },
+        "find-research-questions": {
+          "description": "Returns a list of research questions from the content given as context",
+          "title": "Find research questions"
+        },
+        "fix-spelling-grammar": {
+          "description": "",
+          "title": "Check spelling and grammar"
+        },
+        "generate-draft": {
+          "description": "",
+          "title": "Generate draft for..."
+        },
+        "generate-outline": {
+          "description": "",
+          "title": "Generate outline for..."
+        },
+        "generate-vocab-card": {
+          "description": "",
+          "title": "Generate vocab card..."
+        },
+        "get-term-antonyms": {
+          "description": "",
+          "title": "Find antonyms"
+        },
+        "get-term-etymology": {
+          "description": "",
+          "title": "Etymology of term"
+        },
+        "get-term-examples": {
+          "description": "",
+          "title": "Find examples for this"
+        },
+        "get-term-pronunciation": {
+          "description": "",
+          "title": "Get pronunciation"
+        },
+        "get-term-synonyms": {
+          "description": "",
+          "title": "Find synonyms"
+        },
+        "get-term-translation": {
+          "description": "",
+          "title": "Translate to..."
+        },
+        "identify-assumptions": {
+          "description": "Returns a list of assumptions from the content given as context",
+          "title": "Identify assumptions"
+        },
+        "rewrite-text": {
+          "description": "",
+          "title": "Rewrite & improve text"
+        },
+        "rewrite-text-for": {
+          "description": "",
+          "title": "Rewrite for..."
+        },
+        "short-biography": {
+          "description": "",
+          "title": "Give short biography"
+        },
+        "shorten-text": {
+          "description": "",
+          "title": "Shorten text"
+        },
+        "shorten-text-to": {
+          "description": "",
+          "title": "Shorten text to..."
+        },
+        "simplify": {
+          "description": "Simplifies the text given as context",
+          "title": "Simplify text"
+        },
+        "summarize": {
+          "description": "Returns a short summary of the content given as context",
+          "title": "Summarize"
+        },
+        "summarize-text": {
+          "description": "",
+          "title": "Summarize"
+        },
+        "takeaways": {
+          "description": "Returns a list of key takeaways from the content given as context",
+          "title": "List key takeaways"
+        },
+        "tl-dr": {
+          "description": "",
+          "title": "TLDR"
+        },
+        "translate": {
+          "description": "Translates the content given into the language specified",
+          "title": "Translate to {variantValue}",
+          "variants": {
+            "chinese": "Chinese (simplified)",
+            "chinese_traditional": "Chinese (traditional)",
+            "english": "English",
+            "french": "French",
+            "german": "German",
+            "hindu": "Hindu",
+            "italian": "Italian",
+            "japanese": "Japanese",
+            "korean": "Korean",
+            "portuguese": "Portuguese",
+            "spanish": "Spanish"
+          }
+        }
+      },
+      "chats": "Chats",
+      "closeChat": "Close chat",
+      "commandNotFound": "Command not found",
+      "contextSuggestion": {
+        "entity": {
+          "full": "Add \"{title}\" as context",
+          "properties": "Add title and properties of \"{title}\" as context"
+        }
+      },
+      "heading": "AI Chat",
+      "model": "Model",
+      "openChats": "Open chats",
+      "user": "You"
+    },
+    "errors": {
+      "aiBudgetExceeded": "Need more AI credits? Level up to keep creating.",
+      "aiBudgetExceededButton": "Add custom API key"
+    },
+    "titleAutofill": {
+      "customCommand": "Generate a short, descriptive title (max 10 words) that summarizes the main topic or purpose of this content."
+    }
+  },
+  "inputProcessing": {
+    "fileTypeNotSupported": "File type not supported",
+    "fileUploadFailed": "Upload failed",
+    "voiceMessage": "Voice message"
+  },
+  "telegramInput": {
+    "helpWhenNotRegistered": "Connect Telegram to your Capacities account to get started. You can read about it here: https://docs.capacities.io/reference/integrations/telegram",
+    "helpWhenRegistered": "Just send messages to this chat. They will automatically be saved to Capacities. You can read about all options here: https://docs.capacities.io/reference/integrations/telegram",
+    "verificationSuccessful": "Your account is verified. 🎉 You can now start saving messages to Capacities by simply sending messages, images, or files to this chat. You can read about all options here: https://docs.capacities.io/reference/integrations/telegram",
+    "verifyFirst": "Hello 👋 Connect Telegram to your Capacities account to get started. You can get started here: https://docs.capacities.io/reference/integrations/telegram"
+  },
+  "whatsappInput": {
+    "helpWhenNotRegistered": "Connect Telegram to your Capacities account to get started. You can read about it here: https://docs.capacities.io/reference/integrations/whatsapp",
+    "helpWhenRegistered": "Just send messages to this chat. They will automatically be saved to Capacities. You can read about all options here: https://docs.capacities.io/reference/integrations/whatsapp",
+    "verificationSuccessful": "Your account is verified. 🎉 You can now start saving messages to Capacities by simply sending messages, images, or files to this chat. You can read about all options here: https://docs.capacities.io/reference/integrations/whatsapp",
+    "verifyFirst": "Hello 👋 Connect WhatsApp to your Capacities account to get started. You can get started here: https://docs.capacities.io/reference/integrations/whatsapp"
+  },
+  "xRay": {
+    "actions": {
+      "header": "Actions"
+    },
+    "collections": {
+      "emptyState": "Not part of any collection yet",
+      "header": "Collections"
+    },
+    "context": {
+      "emptyState": "No objects in content",
+      "header": "Objects inside"
+    },
+    "header": "Current page",
+    "tags": {
+      "header": "Tags"
+    },
+    "textStats": {
+      "header": "Text stats"
+    },
+    "toc": {
+      "emptyState": "No headings in this content",
+      "header": "Table of contents"
+    }
+  },
+  "Electron": {
+    "Menu": {
+      "capacities": {
+        "about": "About",
+        "name": "File",
+        "preferences": "Preferences",
+        "quit": "Quit",
+        "settings": "Settings"
+      },
+      "edit": {
+        "copy": "Copy",
+        "cut": "Cut",
+        "main": "Edit",
+        "paste": "Paste",
+        "redo": "Redo",
+        "selectAll": "Select all",
+        "undo": "Undo"
+      },
+      "file": {
+        "main": "File"
+      },
+      "help": {
+        "learn": "Open Documentation",
+        "main": "Help"
+      },
+      "view": {
+        "devTools": "Open Developer Tools",
+        "fullScreen": "Full Screen",
+        "main": "View",
+        "minimize": "Minimize",
+        "reload": "Reload",
+        "resetZoom": "Reset zoom",
+        "softReload": "Reload",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out"
+      }
+    },
+    "OpenBufferRequest": {
+      "details": "Name: '{name}'\nSize: {size}",
+      "message": "Are you sure you want to open an unverified file on your system? This might lead to security risks.",
+      "title": "Confirm Opening a File"
+    },
+    "OverwriteCloseRequest": {
+      "cancel": "Cancel",
+      "confirm": "Reload",
+      "message": "Some of your content is not synced and will be lost.",
+      "title": "Do you really want to reload?"
+    },
+    "QuitCompletelyRequest": {
+      "cancel": "Cancel",
+      "confirm": "Quit",
+      "message": "Some of your content is not synced and will only get synced once you open the app again.",
+      "title": "Do you really want to quit completely?"
+    },
+    "TrayMenu": {
+      "open": {
+        "main": "Open",
+        "quitCompletely": "Quit completely"
+      }
+    }
+  },
+  "BulkImport": {
+    "errors": {
+      "ACCESS_DENIED": "You do not have access to bulk import.",
+      "APPLYING_IMPORT_FAILED": "The import could not be applied.",
+      "DAILY_NOTE_ALREADY_EXISTS": "One or more daily notes could not be imported because there was already an entry for those days.",
+      "DUPLICATE_DAILY_NOTE": "One or more daily notes could not be imported because there were duplicate entries with the same date.",
+      "EXTRACTION_FAILED": "One or more files could not be extracted.",
+      "FILE_TYPE_NOT_SUPPORTED": "One or more files have an unsupported file type.",
+      "MAXIMUM_FILE_SIZE_EXCEEDED": "The file size exceeds the maximum allowed size.",
+      "MISCELLANEOUS_ERROR": "An unknown error occurred.",
+      "NO_FILES_TO_IMPORT": "No valid files to import.",
+      "PROCESSING_FAILED": "One or more files could not be processed.",
+      "SPACE_NOT_FOUND": "The space could not be found.",
+      "TOO_MANY_FILES": "Too many files to import.",
+      "TOO_MANY_OBJECTS_GLOBAL": "You have reached the maximum number of objects you can import.",
+      "TOO_MANY_OBJECTS_LOCAL": "Too many objects to import.",
+      "UPLOADING_FAILED": "One or more files could not be uploaded.",
+      "WRITING_FAILED": "One or more files could not be written."
+    },
+    "success": "Successfully imported 1 object. | Successfully imported {n} objects.",
+    "worker": {
+      "properties": {
+        "content": "Content",
+        "file": {
+          "extension": "File Extension",
+          "name": "File Name",
+          "size": "File Size",
+          "type": "File Type"
+        },
+        "heading": "Heading",
+        "rowName": "Row Name",
+        "title": "Title"
+      }
+    }
+  }
+}
