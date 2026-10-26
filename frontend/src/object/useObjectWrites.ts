@@ -35,8 +35,8 @@ export interface ObjectWritesOptions {
   onConflict(currentVersion: string): void
   /** A property write succeeded: merge `res.frontmatter` and `res.links`, drop `remove`. */
   onUpdated?(res: UpdateResult, updates: Record<string, unknown>, remove: string[]): void
-  /** A rename succeeded (`res.path` may differ from `oldPath`). */
-  onRenamed?(res: RenameResult, oldPath: string): void
+  /** A rename to `title` succeeded (`res.path` may differ from `oldPath`, or not). */
+  onRenamed?(res: RenameResult, oldPath: string, title: string): void
   /** A write failed for another reason (read-only, invalid value, gone). */
   onError?(err: unknown): void
 }
@@ -144,7 +144,7 @@ export function useObjectWrites(opts: ObjectWritesOptions): ObjectWrites {
         const o = optsRef.current
         o.adoptVersion(res.version)
         void o.bodyControl.resume(res.version)
-        o.onRenamed?.(res, path)
+        o.onRenamed?.(res, path, title)
         return res
       }),
     [enqueue],

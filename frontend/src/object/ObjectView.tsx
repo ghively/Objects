@@ -199,8 +199,18 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
         }
       })
     },
-    onRenamed: (res: RenameResult, oldPath: string) => {
-      setDetail((d) => (d ? { ...d, summary: { ...d.summary, path: res.path }, version: res.version } : d))
+    onRenamed: (res: RenameResult, oldPath: string, title: string) => {
+      // The title changed even when the path didn't (safe_filename may map both titles to one name).
+      setDetail((d) =>
+        d
+          ? {
+              ...d,
+              frontmatter: { ...d.frontmatter, title },
+              summary: { ...d.summary, path: res.path, title },
+              version: res.version,
+            }
+          : d,
+      )
       if (res.path !== oldPath) {
         renamedToRef.current = res.path
         useTabs.getState().retarget(oldPath, res.path)
