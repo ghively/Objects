@@ -22,6 +22,15 @@ Routes (all JSON):
 - ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
   ``{paths, typeIds}`` (announces ``created`` per path and ``types`` per type);
   ``DELETE /api/trash/{id}`` and ``DELETE /api/trash`` -> ``{purged}``; ``404``.
+- ``POST /api/types`` ``{name, pluralName, icon?, color?, clientId?}`` -> ``201 TypeDef``;
+  ``422``. Announces ``types``.
+- ``PUT /api/types/{id}`` ``{type, baseRevision, confirm?, clientId?}`` ->
+  ``{type, rewritten, skipped}`` (``type.revision`` is the new revision);
+  ``409 {currentRevision}``, ``422 {detail}``, ``423``, ``428 {detail, affected}``, ``404``.
+  Announces ``types`` and ``changed`` for each rewritten file.
+- ``DELETE /api/types/{id}?confirm=true&clientId=`` -> ``{trashId}``; ``422``,
+  ``428 {detail, affected}``, ``404``. Announces ``types`` (this type and each type
+  whose relations stopped allowing it) and ``deleted`` per object and template.
 - ``GET /api/resolve?link=&from=`` -> ``{path}`` or ``404``
 - ``POST /api/reveal`` ``{path}`` -> ``200 {ok}``: show the file in the OS file manager
 - ``GET /api/events`` -> Server-Sent Events; event ``change`` with a
@@ -51,9 +60,9 @@ from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from .propvalues import InvalidValue
-from .space import Conflict, ReadOnly, Space
+from .space import ConfirmRequired, Conflict, ReadOnly, Space
 from .typedefs import has_undecodable
-from .typemodel import type_revision
+from .typemodel import RevisionConflict, TypeDefinition, TypeReadOnly, type_revision
 from .watcher import ChangeEvent, SpaceWatcher
 
 __all__ = ["EventHub", "create_app"]
@@ -127,6 +136,21 @@ class CreateObjectRequest(BaseModel):
     typeId: str
     title: str | None = None
     templateId: str | None = None
+    clientId: str | None = None
+
+
+class CreateTypeRequest(BaseModel):
+    name: str = ""
+    pluralName: str = ""
+    icon: Any = None
+    color: str | None = None
+    clientId: str | None = None
+
+
+class SaveTypeRequest(BaseModel):
+    type: dict[str, Any]
+    baseRevision: str = ""
+    confirm: bool = False
     clientId: str | None = None
 
 
@@ -370,6 +394,72 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
     def empty_trash(clientId: str | None = Query(default=None)):
         del clientId
         return {"purged": space.empty_trash()}
+
+    @api.post("/types", status_code=201)
+    def create_type(req: CreateTypeRequest):
+        try:
+            t = space.create_type(req.name, req.pluralName, icon=req.icon, color=req.color)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        announce(ChangeEvent("types", t.id, None, origin=req.clientId))
+        return JSONResponse(t.to_api(type_revision(space.root, t.id)), status_code=201)
+
+    @api.put("/types/{type_id}")
+    def save_type(type_id: str, req: SaveTypeRequest):
+        data = {**req.type, "id": type_id}
+        data.setdefault("schemaVersion", 2)
+        for field in ("name", "pluralName"):
+            # `from_json` would fill these in; an edit that clears them is refused.
+            if not isinstance(data.get(field), str) or not data[field].strip():
+                return _error(422, "An object type needs a name and a plural name")
+        try:
+            t = TypeDefinition.from_json(data, fallback_id=type_id)
+            result = space.save_type(t, req.baseRevision, confirm=req.confirm)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except TypeReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except ConfirmRequired as exc:
+            return JSONResponse({"detail": exc.detail, "affected": exc.affected}, status_code=428)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except KeyError:
+            return _error(404, f"No object type {type_id!r}")
+        announce(ChangeEvent("types", type_id, None, origin=req.clientId))
+        for path in result.rewritten:
+            announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
+        return _display_safe(result.to_api())
+
+    @api.delete("/types/{type_id}")
+    def delete_type(
+        type_id: str,
+        confirm: bool = Query(default=False),
+        clientId: str | None = Query(default=None),
+    ):
+        try:
+            item = space.delete_type(type_id, confirm=confirm)
+        except ConfirmRequired as exc:
+            return JSONResponse({"detail": exc.detail, "affected": exc.affected}, status_code=428)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except KeyError:
+            return _error(404, f"No object type {type_id!r}")
+        manifest = space.trash.manifest(item.id) or {}
+        type_ids = [type_id]
+        for ref in manifest.get("allowedTypesRefs") or []:
+            other = str(ref.get("typeId"))
+            if other not in type_ids:
+                type_ids.append(other)
+        for tid in type_ids:
+            announce(ChangeEvent("types", tid, None, origin=clientId))
+        paths = [str(p) for p in manifest.get("templates") or []]
+        for oid in manifest.get("objectTrashIds") or []:
+            meta = space.trash.object_meta(oid)
+            if meta is not None:
+                paths.append(str(meta.get("originalPath", "")))
+        for path in paths:
+            announce(ChangeEvent("deleted", path, None, origin=clientId))
+        return {"trashId": item.id}
 
     @api.get("/resolve")
     def resolve(link: str, from_: str | None = Query(default=None, alias="from")):

@@ -179,3 +179,23 @@ def test_create_emits_no_watcher_event(space_dir: Path):
         assert await _drain(watcher, QUIET) == []
 
     _run(space_dir, scenario)
+
+
+def test_watcher_silent_for_type_cascade(space_dir: Path):
+    import copy
+
+    from objectapp.typemodel import type_revision
+
+    async def scenario(space: Space, watcher: SpaceWatcher):
+        t = copy.deepcopy(space.type_by_id("server"))
+        t.name = "Machine"
+        t.propertyDefinitions = [p for p in t.propertyDefinitions if p.key != "cores"]
+        result = await asyncio.to_thread(
+            space.save_type, t, type_revision(space.root, "server"), True
+        )
+        assert result.rewritten == ["Servers/Alpha.md"]
+        assert await _drain(watcher, QUIET) == []
+        await asyncio.to_thread(space.delete_type, "server", True)
+        assert await _drain(watcher, QUIET) == []
+
+    _run(space_dir, scenario)
