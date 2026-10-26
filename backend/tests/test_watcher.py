@@ -246,3 +246,56 @@ def test_relpath_survives_vanished_parent(space_dir: Path, monkeypatch):
     assert watcher._relpath(str(space.root / "Pages" / "Gone.md")) == "Pages/Gone.md"
     watcher._touch_folder(str(space.root / "Pages"))  # must not raise
     watcher.stop()
+
+
+def test_watcher_reports_external_collection_edit(space_dir: Path):
+    target = space_dir / ".capacities" / "collections" / "x.json"
+
+    async def scenario(space: Space, watcher: SpaceWatcher):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        data = b'{"id": "x", "name": "X"}\n'
+        target.write_bytes(data)
+        ev = await _next_event(watcher)
+        assert ev == ChangeEvent(kind="collections", path="x", version=version_of(data))
+        assert await _drain(watcher, QUIET) == []
+        # The app's own write is silent; a later external edit is reported again.
+        await asyncio.to_thread(space.store("collections").write, "x", {"id": "x", "n": 1}, version_of(data))
+        assert await _drain(watcher, QUIET) == []
+        other = b'{"id": "x", "n": 2}\n'
+        target.write_bytes(other)
+        ev = await _next_event(watcher)
+        assert (ev.kind, ev.path, ev.version) == ("collections", "x", version_of(other))
+        target.unlink()
+        ev = await _next_event(watcher)
+        assert (ev.kind, ev.path, ev.version) == ("collections", "x", None)
+
+    _run(space_dir, scenario)
+
+
+def test_watcher_definition_kinds_and_ignored_dot_files(space_dir: Path):
+    cap = space_dir / ".capacities"
+
+    async def scenario(space: Space, watcher: SpaceWatcher):
+        (cap / "queries").mkdir(parents=True)
+        (cap / "views").mkdir()
+        (cap / "queries" / "q.json").write_text("{}\n")
+        (cap / "views" / "task.json").write_text("{}\n")
+        (cap / "ui.json").write_text("{}\n")
+        (cap / "scratch.json").write_text("{}\n")  # not a watched definition
+        (cap / "queries" / "notes.txt").write_text("x")
+        events = {(e.kind, e.path) for e in await _drain(watcher, QUIET)}
+        assert events == {("queries", "q"), ("views", "task"), ("ui", "ui.json")}
+
+    _run(space_dir, scenario)
+
+
+def test_watcher_silent_for_own_ui_and_views_writes(space_dir: Path):
+    from objectapp.uistate import patch_ui
+
+    async def scenario(space: Space, watcher: SpaceWatcher):
+        await asyncio.to_thread(patch_ui, space, {"pinned": []}, "")
+        await asyncio.to_thread(space.store("views").write, "task", {"a": 1}, "")
+        space.store("views").remove("task")
+        assert await _drain(watcher, QUIET) == []
+
+    _run(space_dir, scenario)

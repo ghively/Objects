@@ -165,6 +165,22 @@ class Trash:
         for p in (self.object_file(trash_id), self.object_meta_file(trash_id)):
             p.unlink(missing_ok=True)
 
+    def definition_ids(self, folder: str) -> set[str]:
+        """Ids of the collections or queries held by trash entries (``collections`` / ``queries``)."""
+        found: set[str] = set()
+        base = self.dir / folder
+        if folder == "collections":
+            for manifest in base.glob("*/manifest.json"):
+                data = _load(manifest)
+                if data and isinstance(data.get("collectionId"), str):
+                    found.add(data["collectionId"])
+        elif folder == "queries":
+            for entry in base.glob("*.json"):
+                data = _load(entry)
+                if data and isinstance(data.get("id"), str):
+                    found.add(data["id"])
+        return found
+
     def remove_type(self, trash_id: str) -> None:
         shutil.rmtree(self.type_dir(trash_id), ignore_errors=True)
 
