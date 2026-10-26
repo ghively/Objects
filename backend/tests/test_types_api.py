@@ -727,3 +727,33 @@ def test_external_type_edit_is_served_and_kept_by_the_next_save(space_dir: Path)
     saved = json.loads(path.read_text(encoding="utf-8"))
     assert saved["description"] == "Edited outside the app"
     assert saved["color"] == "blue"
+
+
+def test_tightened_relation_keeps_comments_and_quotes_of_kept_links(space_dir: Path):
+    _group_type(space_dir)
+    team = _write(
+        space_dir / "Groups" / "Team.md",
+        "---\ntype: 'Group'\nmembers:\n  - '[[Ada Lovelace]]'   # lead dev\n"
+        '  - "[[Alpha]]"\n  - "[[Nobody]]"\n---\n',
+    )
+    space = Space(space_dir)
+    t = _edit(space, "group")
+    t.prop("members").options["allowedTypes"] = ["person"]
+    _save(space, t, confirm=True)
+    assert team.read_text(encoding="utf-8") == (
+        "---\ntype: 'Group'\nmembers:\n  - '[[Ada Lovelace]]'   # lead dev\n"
+        '  - "[[Nobody]]"\n---\n'
+    )
+
+
+def test_deleted_label_option_keeps_the_rest_of_the_list_bytes(space_dir: Path):
+    _group_type(space_dir)
+    team = _write(
+        space_dir / "Groups" / "Team.md",
+        "---\ntype: 'Group'\ntopics: ['A', \"B\", C]  # note\n---\n",
+    )
+    space = Space(space_dir)
+    t = _edit(space, "group")
+    t.prop("topics").options["set"] = [o for o in t.prop("topics").options["set"] if o["text"] != "C"]
+    _save(space, t, confirm=True)
+    assert team.read_text(encoding="utf-8") == "---\ntype: 'Group'\ntopics: ['A', \"B\"]  # note\n---\n"
