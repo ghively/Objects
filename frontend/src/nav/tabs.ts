@@ -21,6 +21,10 @@ export type Target =
   | { kind: 'queries' }
   /** The All notes view. */
   | { kind: 'allNotes' }
+  /** The Calendar page (M4). */
+  | { kind: 'calendar' }
+  /** The Tasks page (M4). */
+  | { kind: 'tasks' }
 
 export interface Tab {
   id: string
@@ -71,6 +75,8 @@ export function sameTarget(a: Target | null | undefined, b: Target | null | unde
     case 'trash':
     case 'queries':
     case 'allNotes':
+    case 'calendar':
+    case 'tasks':
       return true
   }
 }

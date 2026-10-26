@@ -1,7 +1,10 @@
 import type {
+  CalendarRange,
+  CalendarUi,
   ChangeEvent,
   ChangeKindResult,
   Collection,
+  CreatedDailyNote,
   CreatedFile,
   DeleteCollectionResult,
   Icon,
@@ -18,6 +21,7 @@ import type {
   SaveTypeResult,
   SpaceInfo,
   SyncResult,
+  TasksUi,
   TrashItem,
   TypeDef,
   UiState,
@@ -79,6 +83,23 @@ export class ReadOnlyError extends ApiError {
   }
 }
 
+/** 409 on `POST /api/daily-notes`: a note for the day exists at `path`. Nothing was written. */
+export class DailyNoteExistsError extends ApiError {
+  readonly path: string
+  constructor(message: string, path: string) {
+    super(409, message)
+    this.name = 'DailyNoteExistsError'
+    this.path = path
+  }
+}
+
+/** The keys `PUT /api/ui` accepts (M3's, plus M4's `calendar`, `tasks` and `reminders`). */
+export type UiPatch = Partial<Pick<UiState, 'pinned' | 'sections' | 'allNotesLayout'>> & {
+  calendar?: CalendarUi
+  tasks?: TasksUi
+  reminders?: { enabled: boolean }
+}
+
 const BASE = '/api'
 
 function qs(params: Record<string, string | null | undefined>): string {
@@ -110,7 +131,7 @@ function detailOf(data: unknown): Record<string, unknown> {
   return {}
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, on409?: (d: Record<string, unknown>) => Error): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: { Accept: 'application/json', ...(init?.headers ?? {}) },
@@ -118,6 +139,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const data = await readJson(res)
   if (res.ok) return data as T
   const d = detailOf(data)
+  if (res.status === 409 && on409) throw on409(d)
   if (res.status === 409) {
     const current = String(d.currentVersion ?? d.currentRevision ?? '')
     if (path.startsWith('/types') || d.currentRevision !== undefined) throw new RevisionConflictError(current)
@@ -250,7 +272,8 @@ export const api = {
 
   /**
    * Set (or clear with `null`) frontmatter properties; `remove` deletes keys. Announces `changed`
-   * for the object and for each relation-synced object.
+   * for the object and for each relation-synced object. A Task `status` change that crosses a
+   * category also returns `task` (completed, reopened or advanced; M4).
    */
   async updateProperties(
     path: string,
@@ -316,6 +339,27 @@ export const api = {
     // An inferred type saved for the first time: the server's `types` event is our own echo.
     emitLocal([created(res.path, res.version), ...(res.typeIds ?? []).map((t) => typesEvent(t))])
     return { path: res.path, version: res.version }
+  },
+
+  /**
+   * Create the daily note for `date` (YYYY-MM-DD). `templateId`: an id, `null` for the type's
+   * default, `"none"` for no template. A 409 (a note for the day exists) throws
+   * `DailyNoteExistsError` carrying the existing note's path.
+   */
+  async createDailyNote(date: string, opts: { templateId?: string | null } = {}): Promise<CreatedDailyNote> {
+    const body: Record<string, unknown> = { date }
+    if (opts.templateId !== undefined) body.templateId = opts.templateId
+    body.clientId = CLIENT_ID
+    const res = await request<CreatedDailyNote>('/daily-notes', json('POST', body), (d) =>
+      new DailyNoteExistsError(typeof d.detail === 'string' ? d.detail : 'A daily note for this day exists', String(d.path ?? '')),
+    )
+    emitLocal([created(res.path, res.version), ...(res.typeIds ?? []).map((t) => typesEvent(t))])
+    return { path: res.path, version: res.version, typeIds: res.typeIds ?? [] }
+  },
+
+  /** The calendar's days from `from` to `to` (YYYY-MM-DD, inclusive; at most 100 days). */
+  calendar(from: string, to: string): Promise<CalendarRange> {
+    return request<CalendarRange>(`/calendar${qs({ from, to })}`)
   },
 
   /** Move an object to the Trash. */
@@ -594,14 +638,14 @@ export const api = {
     return res
   },
 
-  /** Pinned items, custom sidebar sections and the All notes layout. */
+  /** Pinned items, custom sidebar sections, the All notes layout and (M4) calendar, tasks and reminders. */
   ui(): Promise<{ ui: UiState; revision: string }> {
     return request<{ ui: UiState; revision: string }>('/ui')
   },
 
   /** Rejects with `ConflictError` (409, `currentRevision`) when `baseRevision` is stale. */
   async patchUi(
-    patch: Partial<Pick<UiState, 'pinned' | 'sections' | 'allNotesLayout'>>,
+    patch: UiPatch,
     opts: { baseRevision: string },
   ): Promise<{ ui: UiState; revision: string }> {
     const res = await request<{ ui: UiState; revision: string }>(

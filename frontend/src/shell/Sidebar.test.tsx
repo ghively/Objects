@@ -66,12 +66,46 @@ describe('Sidebar', () => {
     expect(onOpenTypeSettings).toHaveBeenCalledWith(expect.objectContaining({ id: 'page' }))
   })
 
-  it('renders disabled Calendar, Tasks and Graph placeholders', () => {
+  it('renders a disabled Graph placeholder', () => {
     render(<Sidebar types={TYPES} />)
     const nav = screen.getByRole('navigation', { name: /main/i })
-    for (const label of ['Calendar', 'Tasks', 'Graph']) {
-      expect(within(nav).getByRole('button', { name: label })).toBeDisabled()
-    }
+    expect(within(nav).getByRole('button', { name: 'Graph' })).toBeDisabled()
+  })
+
+  it('test sidebar Calendar and Tasks items open targets and show active state', async () => {
+    const user = userEvent.setup()
+    const onOpenTarget = vi.fn()
+    const { rerender } = render(<Sidebar types={TYPES} onOpenTarget={onOpenTarget} />)
+    const nav = screen.getByRole('navigation', { name: /main/i })
+    const calendar = within(nav).getByRole('button', { name: 'Calendar' })
+    const tasks = within(nav).getByRole('button', { name: 'Tasks' })
+    expect(calendar).toBeEnabled()
+    expect(tasks).toBeEnabled()
+    expect(calendar).not.toHaveAttribute('aria-current')
+    await user.click(calendar)
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'calendar' }, { newTab: false })
+    await user.click(tasks)
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'tasks' }, { newTab: false })
+    fireEvent.click(calendar, { ctrlKey: true })
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'calendar' }, { newTab: true })
+    await user.hover(calendar)
+    expect(screen.queryByText(/arrives in M4/)).toBeNull()
+
+    rerender(<Sidebar types={TYPES} onOpenTarget={onOpenTarget} calendarActive />)
+    expect(within(nav).getByRole('button', { name: 'Calendar' })).toHaveAttribute('aria-current', 'page')
+    expect(within(nav).getByRole('button', { name: 'Tasks' })).not.toHaveAttribute('aria-current')
+    rerender(<Sidebar types={TYPES} onOpenTarget={onOpenTarget} tasksActive />)
+    expect(within(nav).getByRole('button', { name: 'Tasks' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('test M3 sidebar items still present', () => {
+    render(<Sidebar types={TYPES} />)
+    const nav = screen.getByRole('navigation', { name: /main/i })
+    expect(within(nav).getByRole('button', { name: 'All notes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Queries' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Pinned' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Trash' })).toBeInTheDocument()
   })
 
   it('renders Pinned with an italic empty state', () => {

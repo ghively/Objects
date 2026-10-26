@@ -10,6 +10,8 @@
 import { vi } from 'vitest'
 import type { Api } from '@/api/client'
 import type {
+  CalendarDay,
+  CalendarRange,
   Collection,
   Layout,
   ObjectDetail,
@@ -17,6 +19,7 @@ import type {
   PropertyDef,
   Query,
   Row,
+  TaskEntry,
   TypeDef,
   ViewState,
   Views,
@@ -155,6 +158,30 @@ export function query(partial: Partial<Query> & Pick<Query, 'id'>): Query {
   }
 }
 
+/** A calendar day with every contract field; `partial` overrides. */
+export function calendarDay(partial: Partial<CalendarDay> = {}): CalendarDay {
+  return { dailyNote: null, tasks: [], dated: [], created: [], updated: [], ...partial }
+}
+
+/** A calendar range with every contract field; `partial` overrides. */
+export function calendarRange(partial: Partial<CalendarRange> = {}): CalendarRange {
+  const from = partial.from ?? '2026-10-01'
+  return {
+    from,
+    to: partial.to ?? from,
+    today: partial.today ?? from,
+    days: {},
+    summaries: {},
+    warnings: [],
+    ...partial,
+  }
+}
+
+/** A task entry with every contract field; `partial` overrides. */
+export function taskEntry(partial: Partial<TaskEntry> = {}): TaskEntry {
+  return { path: 'Tasks/Untitled.md', kind: 'date', day: '2026-10-01', done: false, ...partial }
+}
+
 type Fn =(...args: never[]) => unknown
 
 function defaults(): Api {
@@ -188,6 +215,8 @@ function defaults(): Api {
       path: `${typeId}/${opts.title || 'Untitled'}.md`,
       version: 'v1',
     }),
+    createDailyNote: async (date: string) => ({ path: `DailyNotes/${date}.md`, version: 'v1', typeIds: [] }),
+    calendar: async (from: string, to: string) => calendarRange({ from, to, today: from }),
     deleteObject: async () => ({ trashId: 'trash-1' }),
     trash: async () => [],
     restore: async () => ({ paths: [], typeIds: [], collectionIds: [], queryIds: [], skipped: [] }),

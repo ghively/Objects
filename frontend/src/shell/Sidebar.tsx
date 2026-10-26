@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import { Icon, IconOrEmoji, iconName } from '@/components/Icon'
 import {
   ContextMenu,
@@ -40,6 +40,10 @@ export interface SidebarProps {
   queriesActive?: boolean
   /** Highlights the "All notes" entry. */
   allNotesActive?: boolean
+  /** Highlights the "Calendar" entry. */
+  calendarActive?: boolean
+  /** Highlights the "Tasks" entry. */
+  tasksActive?: boolean
 }
 
 /** The sidebar entry for the All notes view. */
@@ -116,6 +120,34 @@ function NavItem({ icon, label, hint }: { icon: string; label: string; hint: str
   )
 }
 
+/** A live entry of the main nav (All notes, Calendar, Tasks); Ctrl+click opens a new tab. */
+function MainNavButton({
+  icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: string
+  label: string
+  active?: boolean
+  onClick: (e: MouseEvent<HTMLButtonElement>) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'flex h-[38px] w-full items-center gap-2 rounded-lg px-2 text-left text-[15px] font-medium text-fg hover:bg-hover',
+        active && 'bg-hover',
+      )}
+    >
+      <Icon name={icon} size={16} />
+      <span>{label}</span>
+    </button>
+  )
+}
+
 export function Sidebar({
   types,
   activeTypeId,
@@ -130,6 +162,8 @@ export function Sidebar({
   onOpenTarget,
   queriesActive,
   allNotesActive,
+  calendarActive,
+  tasksActive,
 }: SidebarProps) {
   // "Queries" sits among the types where a type of that name would be, in the by-name order.
   type Entry = { kind: 'type'; type: TypeDef } | { kind: 'queries' }
@@ -163,20 +197,24 @@ export function Sidebar({
 
       <TooltipProvider>
       <nav aria-label="Main" className="flex flex-col gap-0.5">
-        <button
-          type="button"
+        <MainNavButton
+          icon="ph-note"
+          label={ALL_NOTES_LABEL}
+          active={allNotesActive}
           onClick={(e) => onOpenTarget?.({ kind: 'allNotes' }, { newTab: e.ctrlKey || e.metaKey })}
-          aria-current={allNotesActive ? 'page' : undefined}
-          className={cn(
-            'flex h-[38px] w-full items-center gap-2 rounded-lg px-2 text-left text-[15px] font-medium text-fg hover:bg-hover',
-            allNotesActive && 'bg-hover',
-          )}
-        >
-          <Icon name="ph-note" size={16} />
-          <span>{ALL_NOTES_LABEL}</span>
-        </button>
-        <NavItem icon="ph-calendar-blank" label="Calendar" hint="Calendar arrives in M4" />
-        <NavItem icon="ph-check-circle" label="Tasks" hint="Tasks arrive in M4" />
+        />
+        <MainNavButton
+          icon="ph-calendar-blank"
+          label="Calendar"
+          active={calendarActive}
+          onClick={(e) => onOpenTarget?.({ kind: 'calendar' }, { newTab: e.ctrlKey || e.metaKey })}
+        />
+        <MainNavButton
+          icon="ph-check-circle"
+          label="Tasks"
+          active={tasksActive}
+          onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
+        />
         <NavItem icon="ph-graph" label="Graph" hint="Graph arrives in M5" />
       </nav>
       </TooltipProvider>
