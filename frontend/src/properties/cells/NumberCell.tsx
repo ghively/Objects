@@ -89,7 +89,7 @@ export function NumberCell({ def, value, readOnly, onChange }: CellProps<number 
           <div
             data-testid="progress-bar"
             className="h-full rounded-full"
-            style={{ width: `${pct}%`, backgroundColor: lineColor(fmt?.options.progress?.color) }}
+            style={{ width: `${pct}%`, backgroundColor: lineColor(fmt?.options.progress?.color ?? 'blue') }}
           />
         </div>
       )}

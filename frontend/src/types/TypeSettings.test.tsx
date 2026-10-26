@@ -64,12 +64,19 @@ describe('TypeSettings', () => {
     for (const l of ['Page layout', 'Font', 'Wide layout', 'Cover image mode', 'Display of cover image']) {
       expect(within(config).getAllByText(l).length).toBeGreaterThan(0)
     }
-    expect(within(config).getAllByRole('radio').map((r) => r.textContent)).toEqual([
+    expect(within(config).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
       'Standard',
       'Index card',
       'Profile',
       'Encyclopedia',
     ])
+    expect(within(config).getByRole('radio', { name: 'Standard' })).toHaveTextContent(
+      'Neutral default focused on functionality.',
+    )
+    expect(
+      within(config).getByText('Customize how objects of this type look and behave across pages, cards, and the calendar.'),
+    ).toBeInTheDocument()
+    expect(within(config).getByRole('option', { name: 'Sans Serif' })).toBeInTheDocument()
     expect(screen.queryByText(/Calendar/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Card view/i)).not.toBeInTheDocument()
     expect(await screen.findByText('Kickoff')).toBeInTheDocument()
