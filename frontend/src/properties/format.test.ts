@@ -108,6 +108,11 @@ describe('placeholderFor', () => {
     expect(placeholderFor(propertyDef({ id: 'a' }))).toBe('Empty')
     expect(placeholderFor(propertyDef({ id: 'a', description: 'Who owns it' }))).toBe('Who owns it')
   })
+
+  it('test an empty table cell is blank', () => {
+    expect(placeholderFor(propertyDef({ id: 'a', description: 'Who owns it' }), 'table')).toBe('')
+    expect(placeholderFor(propertyDef({ id: 'a' }), 'panel')).toBe('Empty')
+  })
 })
 
 describe('CURRENCIES', () => {

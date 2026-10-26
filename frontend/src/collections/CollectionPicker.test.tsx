@@ -70,6 +70,15 @@ describe('CollectionsCell', () => {
     expect(onChange).toHaveBeenLastCalledWith([])
   })
 
+  test('an empty table cell is a blank hit area, the panel shows the placeholder', () => {
+    const def = propertyDef({ id: 'collections', key: 'collections', name: 'Collections', type: 'entity_collections' })
+    const { unmount } = render(<CollectionsCell def={def} value={[]} density="table" typeId="server" onChange={() => undefined} />)
+    expect(screen.getByRole('button', { name: 'Edit Collections' }).textContent).toBe('')
+    unmount()
+    render(<CollectionsCell def={def} value={[]} typeId="server" onChange={() => undefined} />)
+    expect(screen.getByRole('button', { name: 'Edit Collections' })).toHaveTextContent('Add to a collection')
+  })
+
   test('a read-only cell shows chips and no editor', () => {
     const def = propertyDef({ id: 'collections', key: 'collections', name: 'Collections', type: 'entity_collections' })
     render(<CollectionsCell def={def} value={['Tooling']} readOnly typeId="server" onChange={() => undefined} />)

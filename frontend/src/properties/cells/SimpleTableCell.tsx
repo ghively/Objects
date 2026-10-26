@@ -55,7 +55,7 @@ const SMALL_BTN = 'flex items-center gap-1 rounded px-1.5 text-[13px] text-fg-mu
  * cell saves the whole table. "Add row" and "Add column" grow it. An empty cell shows the
  * placeholder, and "Add table" starts a 2×2 table (saved once a cell has text).
  */
-export function SimpleTableCell({ def, value, readOnly, onChange }: CellProps<string | null>) {
+export function SimpleTableCell({ def, value, readOnly, density, onChange }: CellProps<string | null>) {
   const [rows, setRows] = useState(() => parseGfmTable(value))
   const editing = useRef(false)
   useEffect(() => {
@@ -71,7 +71,7 @@ export function SimpleTableCell({ def, value, readOnly, onChange }: CellProps<st
   if (!rows.length) {
     return (
       <div className="flex items-center gap-2 text-[15px]">
-        <span className="text-fg-muted">{placeholderFor(def)}</span>
+        <span className="text-fg-muted">{placeholderFor(def, density)}</span>
         {!readOnly && (
           <button
             type="button"

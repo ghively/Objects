@@ -26,7 +26,7 @@ export function LabelCell({ def, value, readOnly, density, onChange, onDefChange
     pills.length > 0 ? (
       <span className={table ? 'flex flex-nowrap gap-1' : 'flex flex-wrap gap-1'}>{pills}</span>
     ) : (
-      <span className="text-[15px] text-fg-muted">{placeholderFor(def)}</span>
+      <span className="text-[15px] text-fg-muted">{placeholderFor(def, density)}</span>
     )
   if (readOnly) return <div className="py-0.5">{shown}</div>
   return (

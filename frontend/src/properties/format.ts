@@ -123,6 +123,8 @@ export function propertyIsEmpty(def: Pick<PropertyDef, 'type'>, value: unknown):
 }
 
 /** The text an empty cell shows: the property's description, else "Empty". */
-export function placeholderFor(def: Pick<PropertyDef, 'description'>): string {
+/** An empty value's placeholder: the description, else "Empty"; none in a table cell (blank, as in Object). */
+export function placeholderFor(def: Pick<PropertyDef, 'description'>, density?: 'panel' | 'table'): string {
+  if (density === 'table') return ''
   return def.description?.trim() || 'Empty'
 }

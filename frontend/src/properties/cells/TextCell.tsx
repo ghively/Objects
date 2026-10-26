@@ -23,7 +23,7 @@ export function TextCell({ def, value, readOnly, density, onChange }: CellProps<
       aria-label={def.name}
       value={text}
       readOnly={readOnly}
-      placeholder={placeholderFor(def)}
+      placeholder={placeholderFor(def, density)}
       onFocus={() => (focused.current = true)}
       onChange={(e) => setText(e.target.value)}
       onBlur={() => {

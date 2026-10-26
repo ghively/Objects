@@ -48,7 +48,7 @@ export function RelationCell({ def, value, readOnly, density, onChange, onOpenOb
     chips.length > 0 ? (
       <span className={table ? 'flex flex-nowrap gap-1' : 'flex flex-wrap gap-1'}>{chips}</span>
     ) : (
-      <span className="text-[15px] text-fg-muted">{placeholderFor(def)}</span>
+      <span className="text-[15px] text-fg-muted">{placeholderFor(def, density)}</span>
     )
   if (readOnly) return <div className="py-0.5">{shown}</div>
   return (

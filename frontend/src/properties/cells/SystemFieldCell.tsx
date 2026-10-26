@@ -60,16 +60,16 @@ export function CollectionsCell({ value, readOnly, density, typeId, onChange }: 
           </span>
         )
       })}
-      {names.length === 0 && !editable && <span className="text-[15px] text-fg-muted">—</span>}
+      {names.length === 0 && !editable && !table && <span className="text-[15px] text-fg-muted">—</span>}
       {editable && (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <button
               type="button"
               aria-label="Edit Collections"
-              className="flex items-center gap-1 rounded px-1 text-[15px] text-fg-muted hover:bg-hover hover:text-fg"
+              className={`flex items-center gap-1 rounded px-1 text-[15px] text-fg-muted hover:bg-hover hover:text-fg ${table && names.length === 0 ? 'min-w-0 flex-1 self-stretch' : ''}`}
             >
-              {names.length === 0 ? 'Add to a collection' : <Icon name="ph-plus" size={14} />}
+              {names.length === 0 ? (table ? null : 'Add to a collection') : <Icon name="ph-plus" size={14} />}
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-auto border-line bg-raised p-0 text-fg">
