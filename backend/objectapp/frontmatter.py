@@ -38,7 +38,9 @@ __all__ = [
     "FlowList",
     "FrontmatterError",
     "delete_keys",
+    "insert_in_list",
     "parse_fm",
+    "remove_from_list",
     "remove_items",
     "rename_key",
     "replace_in_value",
@@ -617,4 +619,142 @@ def remove_items(src: str, key: str, drop: Callable[[str], bool]) -> str | None:
             return None
     except FrontmatterError:
         return None
+    return out
+
+
+
+
+# -- list membership edits ---------------------------------------------------------
+
+
+def _crlf(src: str) -> bool:
+    return "\r\n" in src and "\n" not in src.replace("\r\n", "")
+
+
+def _empty_list_line(lines: list[str], row: int, col: int) -> str:
+    """The key's own line rewritten as ``key: []``, keeping its indent and EOL."""
+    line = lines[row]
+    head = line[: _value_start(lines, row, col)]
+    eol = "\n" if line.endswith("\n") else ""
+    return f"{head} []{eol}"
+
+
+def remove_from_list(
+    src: str, key: str, pred: Callable[[str], bool]
+) -> tuple[str, list[int]]:
+    """Remove every scalar item of one key's list for which ``pred`` is true.
+
+    Returns the new source and the removed indexes. Only the removed items' bytes
+    go (in a flow list the item and one adjacent separator, in a block list the
+    item's whole line); a list that becomes empty becomes ``key: []`` on the
+    key's own line. A scalar value that ``pred`` accepts also becomes ``key: []``.
+    An absent key or no match returns ``src`` unchanged.
+    """
+    if _crlf(src):
+        out, idx = remove_from_list(src.replace("\r\n", "\n"), key, pred)
+        return out.replace("\n", "\r\n"), idx
+    data = _load_rt(src)
+    if data is None or key not in data:
+        return src, []
+    value = data[key]
+    if isinstance(value, str):
+        if not pred(str(value)):
+            return src, []
+        return set_keys(src, {key: FlowList()}), [0]
+    if not isinstance(value, CommentedSeq):
+        return src, []
+    plain = [_plain(v) for v in value]
+    dropped = [i for i, v in enumerate(plain) if isinstance(v, str) and pred(v)]
+    if not dropped:
+        return src, []
+    if len(dropped) == len(plain):
+        if data.fa.flow_style():
+            return set_keys(src, {key: FlowList()}), dropped
+        lines = _lines(src)
+        start, end = _key_spans(data, lines)[key]
+        row, col = data.lc.key(key)
+        out = "".join(lines[:start]) + _empty_list_line(lines, row, col) + "".join(lines[end:])
+        return out, dropped
+    gone = {plain[i] for i in dropped}
+    done = remove_items(src, key, lambda item: item in gone)
+    if done is None:
+        kept = [v for i, v in enumerate(plain) if i not in set(dropped)]
+        done = set_keys(src, {key: FlowList(kept)})
+    return done, dropped
+
+
+def insert_in_list(src: str, key: str, index: int, value: str) -> str:
+    """Insert ``value`` at ``index`` (clamped) in one key's list, in the list's own style.
+
+    ``key: []``, an absent key and a scalar value become a flow list holding the
+    value (a scalar keeps its place relative to the new item).
+    """
+    if _crlf(src):
+        return insert_in_list(src.replace("\r\n", "\n"), key, index, value).replace(
+            "\n", "\r\n"
+        )
+    data = _load_rt(src)
+    current = None if data is None or key not in data else data[key]
+    if isinstance(current, str) or (isinstance(current, CommentedSeq) and len(current) == 0):
+        items = [str(current)] if isinstance(current, str) else []
+        items.insert(max(0, min(index, len(items))), value)
+        if data.fa.flow_style():
+            return set_keys(src, {key: FlowList(items)})
+        lines = _lines(src)
+        start, end = _key_spans(data, lines)[key]
+        row, col = data.lc.key(key)
+        head = lines[row][: _value_start(lines, row, col)]
+        eol = "\n" if lines[row].endswith("\n") else ""
+        body = ", ".join(_encode_item(v, "flow", "") for v in items)
+        out = "".join(lines[:start]) + f"{head} [{body}]{eol}" + "".join(lines[end:])
+        return out if parse_fm(out).get(key) == items else set_keys(src, {key: FlowList(items)})
+    if not isinstance(current, CommentedSeq):
+        return set_keys(src, {key: FlowList([value])})
+    plain = [_plain(v) for v in current]
+    index = max(0, min(index, len(plain)))
+    expected = [*plain[:index], value, *plain[index:]]
+
+    def fallback() -> str:
+        return set_keys(src, {key: FlowList(expected)})
+
+    if data.fa.flow_style():
+        return fallback()
+    flow = bool(current.fa.flow_style())
+    lines = _lines(src)
+    start, end = _key_spans(data, lines)[key]
+    row, col = data.lc.key(key)
+    head = "".join(lines[:start])
+    text = "".join(lines[start:end])
+    tail = "".join(lines[end:])
+    spans = _scan_items(text, _value_start(lines, row, col))
+    if len(spans) != len(plain):
+        return fallback()
+    if flow:
+        enc = _encode_item(value, "flow", "")
+        if index < len(spans):
+            s = spans[index][0]
+            text = text[:s] + enc + ", " + text[s:]
+        else:
+            e = spans[-1][1]
+            text = text[:e] + ", " + enc + text[e:]
+    else:
+        first = spans[0][0]
+        line_start = text.rfind("\n", 0, first) + 1
+        prefix = text[line_start:first]
+        if not re.fullmatch(r"[ \t]*-[ \t]+", prefix):
+            return fallback()
+        enc = _encode_item(value, "plain", "")
+        new_line = prefix + enc + "\n"
+        if index < len(spans):
+            at = text.rfind("\n", 0, spans[index][0]) + 1
+        else:
+            nl = text.find("\n", spans[-1][1])
+            at = len(text) if nl < 0 else nl + 1
+        text = text[:at] + new_line + text[at:]
+    out = head + text + tail
+    try:
+        if parse_fm(out).get(key) != expected:
+            return fallback()
+    except FrontmatterError:
+        return fallback()
     return out

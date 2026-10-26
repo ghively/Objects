@@ -79,7 +79,6 @@ _READ_ONLY_KINDS = frozenset(
         "entity_type",
         "entity_createdAt",
         "entity_lastUpdated",
-        "entity_collections",
         "entity_backlinks",
     }
 )
@@ -391,6 +390,19 @@ def _encode_string_list(pdef: PropertyDefinition, value: Any) -> FlowList | None
     return FlowList(items) if items else None
 
 
+def _encode_collections(pdef: PropertyDefinition, value: Any) -> FlowList:
+    """Collection names as a flow list; ``[]`` stays an (empty) list so ``key: []`` is written."""
+    if value is None:
+        return FlowList()
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise InvalidValue("Expected a list of collection names")
+    items = [v.strip() for v in value if v.strip()]
+    folded = [v.casefold() for v in items]
+    if len(set(folded)) != len(folded):
+        raise InvalidValue(f"{pdef.name} must be unique")
+    return FlowList(items)
+
+
 def _encode_label(pdef: PropertyDefinition, value: Any, existing_raw: Any) -> Any:
     if isinstance(value, str):
         value = [value]
@@ -471,6 +483,8 @@ def encode_value(
     kind = pdef.type
     if kind in _READ_ONLY_KINDS:
         raise InvalidValue(f"{pdef.name} can't be edited as a property")
+    if kind == "entity_collections":
+        return _encode_collections(pdef, value)
     if value is None or (value == [] and kind in _LIST_KINDS):
         return None
     if kind in _STRING_KINDS:
@@ -520,6 +534,8 @@ def encode_updates(
     encoded = encode_value(pdef, value, fm.get(key), link_for=link_for)
     updates: dict[str, Any] = {}
     removals: list[str] = []
+    if pdef.type == "entity_collections" and not encoded and key not in fm:
+        encoded = None  # nothing to clear: an absent key stays absent
     if encoded is not None or key in fm:
         updates[key] = encoded
     if pdef.type == "entity_icon":

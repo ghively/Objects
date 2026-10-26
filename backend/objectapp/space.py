@@ -48,8 +48,11 @@ from .changetype import (
 )
 from .frontmatter import (
     FlowList,
+    FrontmatterError,
     delete_keys,
+    insert_in_list,
     parse_fm,
+    remove_from_list,
     remove_items,
     rename_key,
     replace_in_value,
@@ -59,6 +62,7 @@ from .ids import new_ulid
 from .collections import CollectionDef, SaveCollectionResult
 from .jsonstore import DefinitionUnreadable, JsonStore
 from .objfile import ObjectFile, join_object
+from .rows import member_of
 from .propvalues import (
     KIND_TRANSFORMS,
     InvalidValue,
@@ -100,9 +104,11 @@ __all__ = [
     "ChangeTypeResult",
     "ConfirmRequired",
     "Conflict",
+    "DeleteCollectionResult",
     "ObjectSummary",
     "ReadOnly",
     "RenameResult",
+    "RestoreConflict",
     "SaveTypeResult",
     "Skip",
     "Space",
@@ -286,6 +292,37 @@ class UpdateResult:
     """Other objects written by relation syncing."""
     skipped: list[Skip]
     """Other objects relation syncing could not write."""
+
+
+class RestoreConflict(Exception):
+    """A restore that would clash with a live definition (the API answers 409)."""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(detail)
+        self.detail = detail
+
+
+COLLECTION_DELETE_DETAIL = (
+    "By deleting a collection all entries will be removed as well. "
+    "Entries that exist in other collections will be kept there."
+)
+
+
+@dataclass
+class DeleteCollectionResult:
+    trash_id: str
+    removed_from: list[str] = field(default_factory=list)
+    """Paths of the members that lost the collection's item (they stay)."""
+    skipped: list[dict[str, str]] = field(default_factory=list)
+    deleted: list[str] = field(default_factory=list)
+    """Paths of the sole members that went to the trash."""
+
+    def to_api(self) -> dict[str, Any]:
+        return {
+            "trashId": self.trash_id,
+            "removedFrom": list(self.removed_from),
+            "skipped": list(self.skipped),
+        }
 
 
 class ConfirmRequired(Exception):
@@ -781,9 +818,318 @@ class Space:
                 if tid not in known:
                     raise InvalidValue(f"Unknown object type {tid!r}.")
             c.readOnlyReason = None
+            old_name = before.name.strip()
+            renamed = bool(old_name) and c.name != before.name
+            if renamed and old_name.casefold() not in {
+                n.strip().casefold() for n in c.formerNames
+            }:
+                c.formerNames = [*c.formerNames, before.name]
             revision = store.write(c.id, c.to_json(), base_revision)
             self.collections[c.id] = c
-            return SaveCollectionResult(collection=c, revision=revision)
+            result = SaveCollectionResult(collection=c, revision=revision)
+            if renamed:
+                result.rewritten, result.skipped = self._rename_members(old_name, c.name)
+            return result
+
+    def _rename_members(self, old: str, new: str) -> tuple[list[str], list[dict[str, str]]]:
+        """Rewrite the ``collections:`` items naming ``old`` to ``new`` (unstamped, one item each)."""
+        folded = old.casefold()
+        with self._lock:
+            paths = sorted(
+                s.path
+                for s in self._summaries.values()
+                if any(n.strip().casefold() == folded for n in s.collections)
+            )
+
+        def rename(src: str, _fm: dict) -> str:
+            try:
+                return replace_in_value(
+                    src, "collections", lambda item: new if item.strip().casefold() == folded else item
+                )
+            except FrontmatterError as exc:
+                raise ReadOnly(str(exc)) from exc
+
+        rewritten: list[str] = []
+        skipped: list[Skip] = []
+        for rel in paths:
+            before = self.cached_version(rel)
+            res = self._rewrite_other(rel, self._fm_edit(rename))
+            if isinstance(res, Skip):
+                skipped.append(res)
+            elif res != before:
+                rewritten.append(rel)
+        return rewritten, _skips_api(skipped)
+
+    def _collection_lookup(self) -> tuple[dict[str, str], dict[str, str]]:
+        """Case-folded collection name -> id, and former name -> id (readable collections)."""
+        by_name: dict[str, str] = {}
+        by_former: dict[str, str] = {}
+        for cid, names in self._collection_names().items():
+            if not names:
+                continue
+            by_name.setdefault(names[0].strip().casefold(), cid)
+            for former in names[1:]:
+                by_former.setdefault(former.strip().casefold(), cid)
+        return by_name, by_former
+
+    def _resolve_collection_names(
+        self, t: TypeDefinition | None, names: Any, existing: list[str]
+    ) -> list[str]:
+        """Validate collection names for an object of type ``t``; return each as its current name.
+
+        A name already in the object's list (``existing``) is kept even when it no
+        longer resolves or the collection no longer holds the type.
+        """
+        if names is None:
+            return []
+        if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+            raise InvalidValue("Expected a list of collection names")
+        had = {n.strip().casefold() for n in existing}
+        out: list[str] = []
+        seen_ids: set[str] = set()
+        seen_loose: set[str] = set()
+        for raw in names:
+            name = raw.strip()
+            if not name:
+                continue
+            key = name.casefold()
+            c = self.collection_by_name(name)
+            if c is None:
+                if key not in had:
+                    raise InvalidValue(f"There is no collection named {name!r}.")
+                if key not in seen_loose:
+                    seen_loose.add(key)
+                    out.append(name)
+                continue
+            if c.id in seen_ids:
+                continue
+            seen_ids.add(c.id)
+            if key not in had and (t is None or t.id not in c.typeIds):
+                raise InvalidValue("This collection doesn't hold objects of this type.")
+            out.append(c.name)
+        return out
+
+    # -- collection delete and restore ------------------------------------------
+
+    def _rewrite_with_snapshot(self, rel: str, edit: Edit) -> tuple[bytes, str] | Skip:
+        """`_rewrite_other` that also returns the file's bytes from just before the write."""
+        full = self.root / rel
+        for attempt in range(2):
+            try:
+                data = full.read_bytes()
+            except OSError:
+                return Skip(rel, "The file no longer exists")
+            try:
+                return data, self._write(rel, version_of(data), edit, stamp=False)
+            except Conflict:
+                if attempt:
+                    return Skip(rel, "The file changed on disk while it was being updated")
+            except ReadOnly as exc:
+                return Skip(rel, exc.reason)
+            except (KeyError, FileNotFoundError):
+                return Skip(rel, "The file no longer exists")
+            except PermissionError as exc:
+                return Skip(rel, f"The file could not be written: {exc.strerror or exc}")
+        raise AssertionError("unreachable")
+
+    def _write_exact(self, rel: str, base_version: str, data: bytes) -> bool:
+        """Put ``data`` back at ``rel`` if it is still at ``base_version``; False when it changed."""
+        full = self.root / rel
+        new_version = version_of(data)
+
+        def unchanged() -> None:
+            try:
+                now = version_of(full.read_bytes())
+            except OSError as exc:
+                raise KeyError(rel) from exc
+            if now != base_version:
+                raise Conflict(now)
+
+        with self._lock:
+            self.own_writes[rel] = new_version
+            try:
+                atomic_write(full, data, check=unchanged)
+            except (Conflict, KeyError):
+                if self.own_writes.get(rel) == new_version:
+                    del self.own_writes[rel]
+                return False
+            except BaseException:
+                if self.own_writes.get(rel) == new_version:
+                    del self.own_writes[rel]
+                raise
+            self.rescan_file(rel)
+            return True
+
+    def delete_collection(self, collection_id: str, confirm: bool = False) -> DeleteCollectionResult:
+        """Move a collection to the trash, with its sole members; restorable.
+
+        Members in no other collection become object trash entries (``collectionTrashId``).
+        For every other member the collection's item is removed from its
+        ``collections:`` (unstamped), its bytes from before kept in the trash folder.
+        Raises `KeyError`, `ReadOnly` (unreadable file) and `ConfirmRequired` (without
+        ``confirm``; ``affected`` = every member).
+        """
+        with self._lock:
+            c = self.collections.get(collection_id)
+            if c is None:
+                raise KeyError(collection_id)
+            if c.readOnlyReason:
+                raise ReadOnly(c.readOnlyReason)
+            by_name, by_former = self._collection_lookup()
+            sole: list[str] = []
+            shared: list[str] = []
+            for s in sorted(self._summaries.values(), key=lambda s: s.path):
+                if s.template is not None:
+                    continue
+                ids = member_of(s.collections, by_name, by_former)
+                if collection_id in ids:
+                    (sole if ids == {collection_id} else shared).append(s.path)
+            if not confirm:
+                raise ConfirmRequired(len(sole) + len(shared), COLLECTION_DELETE_DETAIL)
+
+            store = self.store("collections")
+            trash_id = new_ulid()
+            folder = self.trash.collection_dir(trash_id)
+            (folder / "before").mkdir(parents=True, exist_ok=True)
+            result = DeleteCollectionResult(trash_id=trash_id)
+            skipped: list[Skip] = []
+            object_ids: list[str] = []
+            removed: list[dict[str, Any]] = []
+
+            for rel in sole:
+                try:
+                    item = self.delete_object(rel, collection_trash_id=trash_id)
+                except (OSError, KeyError) as exc:
+                    skipped.append(Skip(rel, f"The file could not be moved: {exc}"))
+                    continue
+                object_ids.append(item.id)
+                result.deleted.append(rel)
+
+            def ours(item: str) -> bool:
+                return member_of([item], by_name, by_former) == {collection_id}
+
+            for rel in shared:
+                indexes: list[int] = []
+
+                def edit(src: str, _fm: dict, indexes=indexes) -> str:
+                    out, idx = remove_from_list(src, "collections", ours)
+                    indexes[:] = idx
+                    return out
+
+                res = self._rewrite_with_snapshot(rel, self._fm_edit(edit))
+                if isinstance(res, Skip):
+                    skipped.append(res)
+                    continue
+                before_bytes, version_after = res
+                if not indexes:
+                    continue  # no longer names the collection: nothing was removed
+                n = len(removed)
+                (folder / "before" / f"{n}.md").write_bytes(before_bytes)
+                removed.append(
+                    {
+                        "path": rel,
+                        "index": indexes[0],
+                        "versionAfter": version_after,
+                        "before": f"before/{n}.md",
+                    }
+                )
+                result.removed_from.append(rel)
+
+            result.skipped = _skips_api(skipped)
+            stored = store.path(collection_id)
+            (folder / "collection.json").write_bytes(stored.read_bytes())
+            self.trash.write_json(
+                folder / "manifest.json",
+                {
+                    "id": trash_id,
+                    "kind": "collection",
+                    "collectionId": collection_id,
+                    "name": c.name,
+                    "deletedAt": now_stamp(),
+                    "objectTrashIds": object_ids,
+                    "removedFrom": removed,
+                    "skipped": result.skipped,
+                },
+            )
+            store.remove(collection_id)
+            self.collections.pop(collection_id, None)
+            return result
+
+    def _restore_collection_entry(self, trash_id: str, manifest: dict) -> dict[str, Any]:
+        """Bring a deleted collection back: its file, its sole members and its items in the others."""
+        folder = self.trash.collection_dir(trash_id)
+        cid = str(manifest.get("collectionId", ""))
+        stored = folder / "collection.json"
+        try:
+            data = json.loads(stored.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = None
+        if not isinstance(data, dict):
+            raise InvalidValue("The deleted collection's file could not be read.")
+        restored = CollectionDef.from_json(data, fallback_id=cid)
+        store = self.store("collections")
+        self.reload_collections()
+        if store.path(cid).exists():
+            raise RestoreConflict("Its id is used by another definition.")
+        low = restored.name.strip().casefold()
+        if any(
+            o.id != cid and not o.readOnlyReason and o.name.strip().casefold() == low
+            for o in self.collections.values()
+        ):
+            raise RestoreConflict("A collection with this name already exists.")
+
+        live = store.path(cid)
+        live.parent.mkdir(parents=True, exist_ok=True)
+        self.own_writes[store.rel(cid)] = version_of(stored.read_bytes())
+        move_no_overwrite(stored, live)
+        self.reload_collection(cid)
+
+        paths: list[str] = []
+        for oid in manifest.get("objectTrashIds") or []:
+            ometa = self.trash.object_meta(oid)
+            if ometa is not None:
+                paths.append(self._restore_object_entry(oid, ometa))
+
+        rewritten: list[str] = []
+        skipped: list[Skip] = []
+        folded = restored.name.casefold()
+        for n, entry in enumerate(manifest.get("removedFrom") or []):
+            rel = str(entry.get("path", ""))
+            full = self.root / rel
+            if not full.is_file():
+                skipped.append(Skip(rel, "The file no longer exists"))
+                continue
+            before = folder / str(entry.get("before") or f"before/{n}.md")
+            try:
+                current = version_of(full.read_bytes())
+                if before.is_file() and current == entry.get("versionAfter"):
+                    if self._write_exact(rel, current, before.read_bytes()):
+                        rewritten.append(rel)
+                        continue
+            except OSError as exc:
+                skipped.append(Skip(rel, f"The file could not be written: {exc}"))
+                continue
+            index = int(entry.get("index") or 0)
+
+            def insert(src: str, fm: dict, index=index) -> str:
+                if any(i.strip().casefold() == folded for i in _str_list(fm.get("collections"))):
+                    return src
+                return insert_in_list(src, "collections", index, restored.name)
+
+            res = self._rewrite_other(rel, self._fm_edit(insert))
+            if isinstance(res, Skip):
+                skipped.append(res)
+            else:
+                rewritten.append(rel)
+        self.trash.remove_collection(trash_id)
+        return {
+            "paths": paths,
+            "typeIds": [],
+            "collectionIds": [cid],
+            "queryIds": [],
+            "skipped": _skips_api(skipped),
+            "rewritten": rewritten,
+        }
 
     def rows(
         self,
@@ -1110,23 +1456,7 @@ class Space:
 
         def apply(src: str, fm: dict) -> str:
             before.update(fm)
-            sets: dict[str, Any] = {}
-            removals: list[str] = []
-            for key, value in updates.items():
-                pdef = self._pdef(t, key)
-                if pdef is None:
-                    encoded = _json_scalar(key, value)
-                    if encoded is not None or key in fm:
-                        sets[key] = encoded
-                    continue
-                if pdef.type == "entity":
-                    self._check_fixed_set(pdef, value, rel)
-                u, r = encode_updates(pdef, value, fm, link_for=self._link_for(rel))
-                sets.update(u)
-                removals.extend(r)
-            removals.extend(k for k in remove if k in fm)
-            out = set_keys(src, sets) if sets else src
-            return delete_keys(out, [k for k in removals if k not in sets])
+            return self._apply_values(t, rel, src, fm, updates, remove)
 
         version = self._write(rel, base_version, self._fm_edit(apply))
         _of, fm, _v = self.read(rel)
@@ -1138,6 +1468,44 @@ class Space:
             synced=synced,
             skipped=skipped,
         )
+
+    def _apply_values(
+        self,
+        t: TypeDefinition | None,
+        rel: str,
+        src: str,
+        fm: dict,
+        updates: dict[str, Any],
+        remove: Iterable[str] = (),
+        merge_collections: bool = False,
+    ) -> str:
+        """Frontmatter source ``src`` with ``updates`` encoded in and the ``remove`` keys dropped.
+
+        With ``merge_collections`` the ``collections`` names are added to the ones
+        already in ``fm`` (a new object from a template).
+        """
+        sets: dict[str, Any] = {}
+        removals: list[str] = []
+        for key, value in updates.items():
+            pdef = self._pdef(t, key)
+            if pdef is None:
+                encoded = _json_scalar(key, value)
+                if encoded is not None or key in fm:
+                    sets[key] = encoded
+                continue
+            if pdef.type == "entity":
+                self._check_fixed_set(pdef, value, rel)
+            if pdef.type == "entity_collections":
+                existing = _str_list(fm.get(key))
+                if merge_collections and isinstance(value, list):
+                    value = [*existing, *value]
+                value = self._resolve_collection_names(t, value, existing)
+            u, r = encode_updates(pdef, value, fm, link_for=self._link_for(rel))
+            sets.update(u)
+            removals.extend(r)
+        removals.extend(k for k in remove if k in fm)
+        out = set_keys(src, sets) if sets else src
+        return delete_keys(out, [k for k in removals if k not in sets])
 
     def _sync_relations(
         self, rel: str, t: TypeDefinition | None, old: dict, new: dict
@@ -1694,7 +2062,11 @@ class Space:
         return True
 
     def create_object(
-        self, type_id: str, title: str = "", template_id: str | None = None
+        self,
+        type_id: str,
+        title: str = "",
+        template_id: str | None = None,
+        values: dict[str, Any] | None = None,
     ) -> tuple[str, str]:
         """Create an object of the type in its folder; return (path, version).
 
@@ -1706,6 +2078,11 @@ class Space:
         exists), ``"none"`` applies none, anything else that template (see
         `apply_template`). Without a title, a template's ``title`` (with its
         ``{date:FMT}`` placeholders expanded) is used.
+
+        ``values`` (API form, like `update_properties`' ``updates``) go into the
+        creating write; after a template they win, except ``collections``, which
+        are merged with the template's. An invalid value raises `InvalidValue`
+        before anything is written.
 
         Raises `KeyError` for an unknown type and `TemplateError` when the
         template can't be found or applied (nothing is written then).
@@ -1741,9 +2118,25 @@ class Space:
         of = ObjectFile(fm_src, body, True, None)
         if tmpl is not None:
             of = self._template_edit(t, tmpl, created)(of, parse_fm(fm_src)) or of
+        stem = safe_filename(title) if title else "Untitled"
+        if values:
+            for key in values:
+                if key in _LOCKED_KEYS:
+                    raise InvalidValue(f"{key!r} can't be changed as a property")
+            src = of.frontmatter_src or ""
+            of = replace(
+                of,
+                frontmatter_src=self._apply_values(
+                    t,
+                    f"{t.folder.strip('/')}/{stem}.md",
+                    src,
+                    parse_fm(src),
+                    values,
+                    merge_collections=True,
+                ),
+            )
         data = join_object(of).encode("utf-8")
         version = version_of(data)
-        stem = safe_filename(title) if title else "Untitled"
         with self._lock:
             self._persist_type(t)
             folder = t.folder.strip("/")
@@ -1789,7 +2182,11 @@ class Space:
         self.rescan_file(rel)
 
     def delete_object(
-        self, path: str, base_version: str | None = None, type_trash_id: str | None = None
+        self,
+        path: str,
+        base_version: str | None = None,
+        type_trash_id: str | None = None,
+        collection_trash_id: str | None = None,
     ) -> TrashItem:
         """Move an object to the trash (bytes unchanged); links to it are left dangling.
 
@@ -1816,10 +2213,17 @@ class Space:
                 type=summary.type if summary else "",
                 deletedAt=now_stamp(),
                 typeTrashId=type_trash_id,
+                collectionTrashId=collection_trash_id,
             )
-            meta = {k: v for k, v in item.to_api().items() if k != "objectCount"}
+            meta = {
+                k: v
+                for k, v in item.to_api().items()
+                if k not in ("objectCount", "collectionId", "name")
+            }
             if type_trash_id is None:
                 meta.pop("typeTrashId")
+            if collection_trash_id is None:
+                meta.pop("collectionTrashId")
             meta_file = self.trash.object_meta_file(item.id)
             self.trash.write_json(meta_file, meta)
             try:
@@ -2261,7 +2665,10 @@ class Space:
                 return {"paths": [obj_path, *paths], "typeIds": type_ids}
             manifest = self.trash.manifest(trash_id)
             if manifest is None:
-                raise KeyError(trash_id)
+                collection = self.trash.collection_manifest(trash_id)
+                if collection is None:
+                    raise KeyError(trash_id)
+                return self._restore_collection_entry(trash_id, collection)
             self._check_type_restorable(trash_id, manifest)
             objects: list[str] = []
             for oid in manifest.get("objectTrashIds") or []:
@@ -2279,7 +2686,16 @@ class Space:
                 return 1
             manifest = self.trash.manifest(trash_id)
             if manifest is None:
-                raise KeyError(trash_id)
+                collection = self.trash.collection_manifest(trash_id)
+                if collection is None:
+                    raise KeyError(trash_id)
+                count = 1
+                for oid in collection.get("objectTrashIds") or []:
+                    if self.trash.object_meta(oid) is not None:
+                        self.trash.remove_object(oid)
+                        count += 1
+                self.trash.remove_collection(trash_id)
+                return count
             count = 1
             for oid in manifest.get("objectTrashIds") or []:
                 if self.trash.object_meta(oid) is not None:

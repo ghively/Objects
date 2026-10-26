@@ -7,7 +7,12 @@ Layout:
 - a type: ``types/<ulid>/`` with ``type.json``, ``templates/<original path>``
   for each of its template files, and ``manifest.json`` ``{id, kind: 'type',
   typeId, name, deletedAt, objectTrashIds, allowedTypesRefs, templates}``. Its
-  objects are ordinary object entries carrying ``typeTrashId``.
+  objects are ordinary object entries carrying ``typeTrashId``;
+- a collection: ``collections/<ulid>/`` with ``collection.json``, ``before/<n>.md``
+  (a member's bytes before its ``collections:`` item was removed) and
+  ``manifest.json`` ``{id, kind: 'collection', collectionId, name, deletedAt,
+  objectTrashIds, removedFrom, skipped}``. Its sole members are ordinary object
+  entries carrying ``collectionTrashId``.
 
 This module only knows the folder layout and the metadata; `Space` moves the
 files (so it can keep the watcher quiet and its index current).
@@ -34,7 +39,7 @@ RETENTION = timedelta(days=30)
 class TrashItem:
     id: str
     kind: str
-    """``'object'`` or ``'type'``."""
+    """``'object'``, ``'type'`` or ``'collection'``."""
     originalPath: str
     """The object's space path; for a type, its type JSON's space path."""
     title: str
@@ -44,7 +49,13 @@ class TrashItem:
     typeTrashId: str | None = None
     """For an object trashed with its type: that type's trash entry id."""
     objectCount: int | None = None
-    """For a type: how many of its objects are still in the trash."""
+    """For a type or collection: how many of its objects are still in the trash."""
+    collectionTrashId: str | None = None
+    """For an object trashed by a collection delete: that collection's trash entry id."""
+    collectionId: str | None = None
+    """For a collection entry: the collection's id."""
+    name: str | None = None
+    """For a collection entry: its name."""
 
     def to_api(self) -> dict[str, Any]:
         return asdict(self)
@@ -75,6 +86,7 @@ class Trash:
     def __init__(self, root: Path) -> None:
         self.dir = Path(root) / ".capacities" / "trash"
         self.types_dir = self.dir / "types"
+        self.collections_dir = self.dir / "collections"
 
     # -- paths ---------------------------------------------------------------
 
@@ -86,6 +98,9 @@ class Trash:
 
     def type_dir(self, trash_id: str) -> Path:
         return self.types_dir / trash_id
+
+    def collection_dir(self, trash_id: str) -> Path:
+        return self.collections_dir / trash_id
 
     @staticmethod
     def _safe_id(trash_id: str) -> bool:
@@ -106,6 +121,18 @@ class Trash:
         if not self._safe_id(trash_id):
             return None
         return _load(self.type_dir(trash_id) / "manifest.json")
+
+    def collection_manifest(self, trash_id: str) -> dict[str, Any] | None:
+        if not self._safe_id(trash_id):
+            return None
+        return _load(self.collection_dir(trash_id) / "manifest.json")
+
+    def collection_trash_ids(self) -> list[str]:
+        if not self.collections_dir.is_dir():
+            return []
+        return sorted(
+            p.name for p in self.collections_dir.iterdir() if (p / "manifest.json").is_file()
+        )
 
     def object_ids(self) -> list[str]:
         if not self.dir.is_dir():
@@ -137,6 +164,7 @@ class Trash:
                     type=str(meta.get("type", "")),
                     deletedAt=str(meta.get("deletedAt", "")),
                     typeTrashId=meta.get("typeTrashId") or None,
+                    collectionTrashId=meta.get("collectionTrashId") or None,
                 )
             )
         out = list(objects)
@@ -154,6 +182,25 @@ class Trash:
                     type=type_id,
                     deletedAt=str(manifest.get("deletedAt", "")),
                     objectCount=sum(1 for o in objects if o.typeTrashId == tid),
+                )
+            )
+        for cid in self.collection_trash_ids():
+            manifest = self.collection_manifest(cid)
+            if manifest is None:
+                continue
+            collection_id = str(manifest.get("collectionId", ""))
+            name = str(manifest.get("name", collection_id))
+            out.append(
+                TrashItem(
+                    id=cid,
+                    kind="collection",
+                    originalPath=f".capacities/collections/{collection_id}.json",
+                    title=name,
+                    type="",
+                    deletedAt=str(manifest.get("deletedAt", "")),
+                    objectCount=sum(1 for o in objects if o.collectionTrashId == cid),
+                    collectionId=collection_id,
+                    name=name,
                 )
             )
         out.sort(key=lambda i: (i.deletedAt, i.id), reverse=True)
@@ -183,6 +230,9 @@ class Trash:
 
     def remove_type(self, trash_id: str) -> None:
         shutil.rmtree(self.type_dir(trash_id), ignore_errors=True)
+
+    def remove_collection(self, trash_id: str) -> None:
+        shutil.rmtree(self.collection_dir(trash_id), ignore_errors=True)
 
     def expired(self, now: datetime) -> list[str]:
         """Ids of the entries deleted more than `RETENTION` before `now`."""

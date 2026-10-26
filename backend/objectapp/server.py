@@ -31,6 +31,9 @@ Routes (all JSON):
   inferred type was saved for the first time).
 - ``DELETE /api/object?path=&baseVersion=&clientId=`` -> ``{trashId, typeIds}``; ``404``,
   ``409 {currentVersion}``. Moves the file to the trash; announces ``deleted``.
+- ``DELETE /api/collections/{id}?confirm=true&clientId=`` -> ``{trashId, removedFrom, skipped}``;
+  ``404``, ``428 {detail, affected}``, ``423``. ``POST /api/trash/{id}/restore`` of a collection
+  entry also answers ``409`` (name taken, or its id is used by another definition).
 - ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
   ``{paths, typeIds}`` (announces ``created`` per path and ``types`` per type); ``422`` when a
   saved type now has the trashed type's id or name;
@@ -102,7 +105,7 @@ from .collections import CollectionDef
 from .jsonstore import DefinitionUnreadable, default_views, json_revision
 from .media import NotAnImage, image_media_type, image_path, import_image, list_images
 from .propvalues import InvalidValue
-from .space import ConfirmRequired, Conflict, ReadOnly, Space
+from .space import ConfirmRequired, Conflict, ReadOnly, RestoreConflict, Space
 from .typedefs import has_undecodable
 from .typemodel import (
     RevisionConflict,
@@ -200,6 +203,7 @@ class CreateObjectRequest(BaseModel):
     typeId: str
     title: str | None = None
     templateId: str | None = None
+    values: dict[str, Any] | None = None
     clientId: str | None = None
 
 
@@ -562,7 +566,9 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         had_file = bool(type_revision(space.root, req.typeId)) if t is not None else False
         templates_before = space.template_versions()
         try:
-            path, version = space.create_object(req.typeId, req.title or "", req.templateId)
+            path, version = space.create_object(
+                req.typeId, req.title or "", req.templateId, req.values
+            )
         except InvalidValue as exc:
             announce_template_ids(templates_before, req.clientId)
             return _error(422, str(exc))
@@ -656,12 +662,19 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             result = space.restore(trash_id)
         except InvalidValue as exc:
             return _error(422, str(exc))
+        except RestoreConflict as exc:
+            return _error(409, exc.detail)
         except KeyError:
             return _error(404, f"No trash entry {trash_id!r}")
+        rewritten = result.pop("rewritten", [])
         for type_id in result["typeIds"]:
             announce(ChangeEvent("types", type_id, None, origin=clientId))
+        for collection_id in result.get("collectionIds", []):
+            announce(ChangeEvent("collections", collection_id, None, origin=clientId))
         for path in result["paths"]:
             announce(ChangeEvent("created", path, space.cached_version(path), origin=clientId))
+        for path in rewritten:
+            announce(ChangeEvent("changed", path, space.cached_version(path), origin=clientId))
         return result
 
     @api.delete("/trash/{trash_id}")
@@ -769,6 +782,27 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         announce(ChangeEvent("collections", collection_id, result.revision, origin=req.clientId))
         for path in result.rewritten:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
+        return _display_safe(result.to_api())
+
+    @api.delete("/collections/{collection_id}")
+    def delete_collection(
+        collection_id: str,
+        confirm: bool = Query(default=False),
+        clientId: str | None = Query(default=None),
+    ):
+        try:
+            result = space.delete_collection(collection_id, confirm=confirm)
+        except ConfirmRequired as exc:
+            return JSONResponse({"detail": exc.detail, "affected": exc.affected}, status_code=428)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except KeyError:
+            return _error(404, f"No collection {collection_id!r}")
+        announce(ChangeEvent("collections", collection_id, None, origin=clientId))
+        for path in result.deleted:
+            announce(ChangeEvent("deleted", path, None, origin=clientId))
+        for path in result.removed_from:
+            announce(ChangeEvent("changed", path, space.cached_version(path), origin=clientId))
         return _display_safe(result.to_api())
 
     @api.post("/types", status_code=201)
