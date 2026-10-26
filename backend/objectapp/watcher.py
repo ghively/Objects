@@ -46,6 +46,14 @@ class ChangeEvent:
     """For ``renamed``: the object's path before the move."""
 
 
+def _has_exact_name(full: Path) -> bool:
+    """True when the folder holds ``full``'s name with exactly this spelling (case included)."""
+    try:
+        return full.name in os.listdir(full.parent)
+    except OSError:
+        return False
+
+
 class _Handler(FileSystemEventHandler):
     def __init__(self, watcher: SpaceWatcher) -> None:
         self._watcher = watcher
@@ -180,6 +188,13 @@ class SpaceWatcher:
             space.own_writes.pop(rel, None)
             return ChangeEvent(kind="deleted", path=rel, version=None)
 
+        if known is None and not _has_exact_name(full):
+            # Another spelling of a file the space knows under its real name (a
+            # case-insensitive file system), e.g. the old name after a case-only
+            # rename: not a new object.
+            space.own_deletes.pop(rel, None)
+            space.own_writes.pop(rel, None)
+            return None
         version = version_of(data)
         # The file is back (restored or re-created): a pending own delete is stale.
         space.own_deletes.pop(rel, None)

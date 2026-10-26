@@ -199,3 +199,30 @@ def test_watcher_silent_for_type_cascade(space_dir: Path):
         assert await _drain(watcher, QUIET) == []
 
     _run(space_dir, scenario)
+
+
+def test_watcher_silent_for_rename_and_relinked_referrer(space_dir: Path):
+    async def scenario(space: Space, watcher: SpaceWatcher):
+        _of, _fm, version = space.read("People/Ada Lovelace.md")
+        result = await asyncio.to_thread(
+            space.rename_object, "People/Ada Lovelace.md", "Ada King", version
+        )
+        assert result.path == "People/Ada King.md"
+        assert result.relinked == ["Servers/Alpha.md", "Tasks/Write docs.md"]
+        assert await _drain(watcher, QUIET) == []
+        # A case-only rename is silent too.
+        result = await asyncio.to_thread(
+            space.rename_object, result.path, "Ada king", result.version
+        )
+        assert result.path == "People/Ada king.md"
+        assert await _drain(watcher, QUIET) == []
+        assert [s.path for s in space.list() if s.path.startswith("People/")] == [
+            "People/Ada king.md"
+        ]
+        # External edits are still reported.
+        target = space_dir / "People" / "Ada king.md"
+        target.write_bytes(target.read_bytes() + b"external\n")
+        ev = await _next_event(watcher)
+        assert (ev.kind, ev.path) == ("changed", "People/Ada king.md")
+
+    _run(space_dir, scenario)
