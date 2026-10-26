@@ -222,7 +222,7 @@ export function setDecimals(def: PropertyDef, n: number | null): PropertyDef {
 export function setProgress(def: PropertyDef, patch: { steps?: number; color?: string }): PropertyDef {
   const fmt = def.options.numberFormat
   if (!fmt) return def
-  const progress = { ...(fmt.options.progress ?? { steps: 10, color: 'gray' }), ...patch }
+  const progress = { ...(fmt.options.progress ?? { steps: 10, color: 'blue' }), ...patch }
   return withFormat(def, { ...fmt, options: { ...fmt.options, progress } })
 }
 

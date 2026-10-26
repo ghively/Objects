@@ -67,6 +67,12 @@ describe('NumberCell', () => {
     expect(screen.getByTestId('progress-bar')).toHaveStyle({ width: '40%' })
   })
 
+  it('a progress format without a colour renders blue, as in Capacities', () => {
+    const d = def('number', { options: { numberFormat: { type: 'progress', options: {} } } })
+    render(<NumberCell def={d} value={4} onChange={() => {}} />)
+    expect(screen.getByTestId('progress-bar').getAttribute('style')).toContain('var(--line-blue)')
+  })
+
   it('shows the formatted number when not focused', () => {
     const d = def('number', {
       options: { numberFormat: { type: 'currency', options: { currency: 'EUR', decimals: { min: 2, max: 2 } } } },

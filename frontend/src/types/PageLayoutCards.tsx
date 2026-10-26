@@ -12,11 +12,19 @@ export interface PageLayoutCardsProps {
   disabled?: boolean
 }
 
-export const PAGE_LAYOUTS: readonly { value: ViewDesign | null; name: string }[] = [
-  { value: null, name: 'Standard' },
-  { value: 'indexCard', name: 'Index card' },
-  { value: 'profile', name: 'Profile' },
-  { value: 'encyclopedia', name: 'Encyclopedia' },
+export const PAGE_LAYOUTS: readonly { value: ViewDesign | null; name: string; description: string }[] = [
+  { value: null, name: 'Standard', description: 'Neutral default focused on functionality.' },
+  { value: 'indexCard', name: 'Index card', description: 'Compact layout for short-form or draft-like content.' },
+  {
+    value: 'profile',
+    name: 'Profile',
+    description: 'Circular preview and side properties — ideal for people or organizations.',
+  },
+  {
+    value: 'encyclopedia',
+    name: 'Encyclopedia',
+    description: 'Side properties, with a table of contents, linked objects, and text stats.',
+  },
 ]
 
 const line = (x: number, y: number, w: number, key?: string | number) => (
@@ -82,6 +90,8 @@ export function PageLayoutCards({ value, onChange, disabled }: PageLayoutCardsPr
             type="button"
             role="radio"
             aria-checked={selected}
+            aria-label={l.name}
+            title={l.description}
             disabled={disabled}
             onClick={() => !selected && onChange(l.value)}
             className={cn(
@@ -94,6 +104,7 @@ export function PageLayoutCards({ value, onChange, disabled }: PageLayoutCardsPr
               <Sketch value={l.value} />
             </svg>
             <span>{l.name}</span>
+            <span className="text-center text-[11px] leading-tight text-fg-muted">{l.description}</span>
           </button>
         )
       })}

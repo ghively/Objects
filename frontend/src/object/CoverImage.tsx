@@ -1,7 +1,7 @@
 /**
  * An object's cover image (`coverImage`). `wide` spans the whole panel, otherwise the content
  * width; `crop` fixes the height with `object-fit: cover`, otherwise the image keeps its natural
- * height. Hovering offers "Change" (the image picker) and "Remove".
+ * height. Hovering offers "Pick cover image" (the image picker) and "Remove cover image".
  */
 import { useState } from 'react'
 import { api } from '@/api/client'
@@ -45,7 +45,7 @@ export function CoverImage({ path, wide, crop, onChange }: CoverImageProps) {
           <Popover open={picking} onOpenChange={setPicking}>
             <PopoverTrigger asChild>
               <button type="button" className={ACTION}>
-                Change
+                Pick cover image
               </button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-auto border-line bg-raised p-0 text-fg">
@@ -59,7 +59,7 @@ export function CoverImage({ path, wide, crop, onChange }: CoverImageProps) {
             </PopoverContent>
           </Popover>
           <button type="button" className={ACTION} onClick={() => onChange(null)}>
-            Remove
+            Remove cover image
           </button>
         </div>
       )}

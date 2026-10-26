@@ -172,7 +172,7 @@ describe('cover image on the object page', () => {
     expect(cover.querySelector('img')?.getAttribute('src')).toBe(mocked.fileUrl('Attachments/cover.png'))
     expect(screen.queryByRole('button', { name: 'Add cover image' })).not.toBeInTheDocument()
 
-    await user.click(within(cover).getByRole('button', { name: 'Remove' }))
+    await user.click(within(cover).getByRole('button', { name: 'Remove cover image' }))
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenLastCalledWith(PATH, { coverImage: null }, 'v2', undefined))
     await waitFor(() => expect(container.querySelector('[data-cover-image]')).toBeNull())
   })

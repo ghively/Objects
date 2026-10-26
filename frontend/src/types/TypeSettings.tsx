@@ -54,6 +54,7 @@ export const TYPE_SETTINGS_TEXT = {
   addProperty: 'Add Property',
   templates: 'Templates',
   configuration: 'Configuration',
+  configurationExplanation: 'Customize how objects of this type look and behave across pages, cards, and the calendar.',
   page: 'Page',
   pageLayout: 'Page layout',
   pageLayoutExplanation: 'Choose a page layout for this object type.',
@@ -74,7 +75,7 @@ export const TYPE_SETTINGS_TEXT = {
 }
 
 const FONTS: readonly { value: TypeFont; name: string }[] = [
-  { value: 'sans-serif', name: 'Sans-serif' },
+  { value: 'sans-serif', name: 'Sans Serif' },
   { value: 'serif', name: 'Serif' },
   { value: 'monospace', name: 'Monospace' },
 ]
@@ -394,7 +395,7 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
             <TemplateManager typeId={type.id} editor={editor} onOpenTemplate={onOpenTemplate} disabled={readOnly} />
           </Section>
 
-          <Section title={TYPE_SETTINGS_TEXT.configuration}>
+          <Section title={TYPE_SETTINGS_TEXT.configuration} explanation={TYPE_SETTINGS_TEXT.configurationExplanation}>
             <section aria-label={TYPE_SETTINGS_TEXT.page}>
               <h3 className="mb-2 text-[15px] font-semibold text-fg-muted">{TYPE_SETTINGS_TEXT.page}</h3>
               <Field label={TYPE_SETTINGS_TEXT.pageLayout} explanation={TYPE_SETTINGS_TEXT.pageLayoutExplanation}>
