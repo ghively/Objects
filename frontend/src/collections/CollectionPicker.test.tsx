@@ -75,6 +75,10 @@ describe('CollectionsCell', () => {
     const { unmount } = render(<CollectionsCell def={def} value={[]} density="table" typeId="server" onChange={() => undefined} />)
     expect(screen.getByRole('button', { name: 'Edit Collections' }).textContent).toBe('')
     unmount()
+    // A wrapped table cell renders at panel density but is still blank.
+    const wrapped = render(<CollectionsCell def={def} value={[]} density="panel" inTable typeId="server" onChange={() => undefined} />)
+    expect(screen.getByRole('button', { name: 'Edit Collections' }).textContent).toBe('')
+    wrapped.unmount()
     render(<CollectionsCell def={def} value={[]} typeId="server" onChange={() => undefined} />)
     expect(screen.getByRole('button', { name: 'Edit Collections' })).toHaveTextContent('Add to a collection')
   })

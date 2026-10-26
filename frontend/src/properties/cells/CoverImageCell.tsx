@@ -6,7 +6,7 @@ import { placeholderFor } from '../format'
 import type { CellProps } from './types'
 
 /** The cover image: a thumbnail and its file name; a click opens the ImagePicker. */
-export function CoverImageCell({ def, value, readOnly, density, onChange }: CellProps<string | null>) {
+export function CoverImageCell({ def, value, readOnly, density, inTable, onChange }: CellProps<string | null>) {
   const [open, setOpen] = useState(false)
   const shown = value ? (
     <span className="flex min-w-0 items-center gap-2">
@@ -14,7 +14,7 @@ export function CoverImageCell({ def, value, readOnly, density, onChange }: Cell
       <span className="truncate text-[15px] text-fg">{value.split('/').pop()}</span>
     </span>
   ) : (
-    <span className="text-[15px] text-fg-muted">{placeholderFor(def, density)}</span>
+    <span className="text-[15px] text-fg-muted">{placeholderFor(def, inTable ? 'table' : density)}</span>
   )
   if (readOnly) return <div className="py-0.5">{shown}</div>
   return (

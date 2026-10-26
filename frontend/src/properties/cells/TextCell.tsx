@@ -6,7 +6,7 @@ import { CELL_TEXT, type CellProps } from './types'
  * A single line of plain text (`text`). Commits on blur and Enter; Esc blurs, which commits. An
  * empty text commits `null`; an unchanged text commits nothing.
  */
-export function TextCell({ def, value, readOnly, density, onChange }: CellProps<string | null>) {
+export function TextCell({ def, value, readOnly, density, inTable, onChange }: CellProps<string | null>) {
   const [text, setText] = useState(value ?? '')
   const focused = useRef(false)
   useEffect(() => {
@@ -23,7 +23,7 @@ export function TextCell({ def, value, readOnly, density, onChange }: CellProps<
       aria-label={def.name}
       value={text}
       readOnly={readOnly}
-      placeholder={placeholderFor(def, density)}
+      placeholder={placeholderFor(def, inTable ? 'table' : density)}
       onFocus={() => (focused.current = true)}
       onChange={(e) => setText(e.target.value)}
       onBlur={() => {
