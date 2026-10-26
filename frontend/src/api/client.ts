@@ -344,6 +344,8 @@ export const api = {
       ...(res.typeIds ?? []).map((t) => typesEvent(t)),
       ...(res.collectionIds ?? []).map((c) => defEvent('collections', c)),
       ...(res.queryIds ?? []).map((q) => defEvent('queries', q)),
+      // Members whose `collections:` item a collection restore wrote back.
+      ...(res.rewritten ?? []).map((p) => changed(p)),
     ])
     return res
   },
@@ -556,11 +558,12 @@ export const api = {
       `/collections/${seg(id)}${qs({ confirm: opts.confirm ? 'true' : undefined, clientId: CLIENT_ID })}`,
       { method: 'DELETE' },
     )
-    // Sole members went to the Trash and the others lost one `collections:` item; a collection
-    // event makes every open view reload its rows, which covers both.
+    // Sole members went to the Trash (`deleted`, so a view open on one holds its edits) and the
+    // others lost one `collections:` item (`changed`); the collection event reloads every view.
     const skipped = new Set((res.skipped ?? []).map((s) => s.path))
     emitLocal([
       defEvent('collections', id),
+      ...(res.deleted ?? []).map((p): ChangeEvent => ({ kind: 'deleted', path: p, version: null, origin: CLIENT_ID })),
       ...(res.removedFrom ?? []).filter((p) => !skipped.has(p)).map((p) => changed(p)),
     ])
     return res

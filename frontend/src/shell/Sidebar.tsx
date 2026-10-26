@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { PinnedSection } from './PinnedSection'
 import { AddSection, SidebarSections } from './SidebarSections'
 import { chipStyle } from './typeColor'
+import { QUERY_ICON } from '@/lib/defIcons'
 
 export interface SidebarProps {
   types: TypeDef[]
@@ -50,6 +51,9 @@ export const QUERIES_LABEL = 'Queries'
 export function byPluralName(a: TypeDef, b: TypeDef): number {
   return a.pluralName.localeCompare(b.pluralName, undefined, { sensitivity: 'base' })
 }
+
+/** The sidebar "Queries" entry's tile: RootQuery's icon in a type-chip tile (green, as in the reference). */
+const QUERIES_CHIP: Pick<TypeDef, 'icon' | 'color'> = { icon: { type: 'iconify', val: QUERY_ICON }, color: 'green' }
 
 export function TypeChip({ type, size = 22 }: { type: Pick<TypeDef, 'icon' | 'color'>; size?: number }) {
   return (
@@ -213,9 +217,7 @@ export function Sidebar({
                         queriesActive && 'bg-hover',
                       )}
                     >
-                      <span className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-line bg-raised text-fg-muted">
-                        <Icon name="ph-magnifying-glass" size={15} />
-                      </span>
+                      <TypeChip type={QUERIES_CHIP} size={22} />
                       <span className="min-w-0 flex-1 truncate">{QUERIES_LABEL}</span>
                     </button>
                   </li>

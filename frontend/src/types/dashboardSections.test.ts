@@ -47,14 +47,28 @@ describe('buildSections', () => {
     const s = buildSections(NOTE, views(), ctx())
     expect(s.map((x) => [x.key, x.label, x.icon, x.inFullView])).toEqual([
       ['recentlyAccessed', 'Recently Opened', 'ph-clock-clockwise', false],
-      ['collections', 'Collections', 'ph-stack', false],
-      ['queries', 'Queries', 'ph-magnifying-glass', false],
+      ['collections', 'Collections', 'ph-cards-three', false],
+      ['queries', 'Queries', 'ph-list-magnifying-glass', false],
       ['inNoCollection', 'Not in any collection', 'ph-placeholder', true],
       ['notTagged', 'Not tagged', 'ph-tag', true],
     ])
     expect(sectionInFullView('query:q1')).toBe(true)
     expect(sectionInFullView('collection:c1')).toBe(true)
     expect(sectionInFullView('collections')).toBe(false)
+  })
+
+  test('an uncustomised query section is labelled with its automatic title, as on its page', () => {
+    const q = query({
+      id: 'q1',
+      name: 'New Query',
+      titleIsCustom: false,
+      definition: { structures: [{ id: 'note' }], filterGroup: { type: 'filterGroup', operator: 'and', elements: [] }, sorts: [], groupBy: null },
+    })
+    const titleCtx = { types: [{ id: 'note', pluralName: 'Notes' }], tagIdsToTitles: {} }
+    const [s] = buildSections(NOTE, views(['query:q1']), { ...ctx({ queries: [q] }), titleCtx })
+    expect(s.label).toBe('Notes')
+    const custom = buildSections(NOTE, views(['query:q1']), { ...ctx({ queries: [{ ...q, name: 'Mine', titleIsCustom: true }] }), titleCtx })
+    expect(custom[0].label).toBe('Mine')
   })
 
   test('a collection of the type is appended unless removed; other types and unknown ids are dropped', () => {

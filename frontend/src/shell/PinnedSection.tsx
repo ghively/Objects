@@ -12,11 +12,12 @@ import type { Target } from '@/nav/tabs'
 import { ObjectIcon } from '@/object/ObjectHeader'
 import { queryTitle } from '@/queries/autoTitle'
 import { useTitleCtx } from '@/queries/QueryPage'
-import { useDefs } from '@/types/useDefinitions'
+import { useDefinitions } from '@/types/useDefinitions'
 import { cn } from '@/lib/utils'
 import { TypeChip } from './Sidebar'
 import { PINNED_TEXT } from './pinText'
 import { usePinned } from './usePinned'
+import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 
 export const pinKey = (r: PinRef) => `${r.kind}:${r.id}`
 
@@ -33,7 +34,7 @@ function useResolver(): (ref: PinRef) => Resolved | 'missing' | null {
   const objects = useLinkIndex((s) => s.objects)
   const types = useLinkIndex((s) => s.types)
   const indexLoaded = useLinkIndex((s) => s.loaded)
-  const { collections, queries, loaded: defsLoaded } = useDefs()
+  const { collections, queries, loaded: defsLoaded } = useDefinitions()
   const titleCtx = useTitleCtx(types)
   return useMemo(
     () => (ref: PinRef) => {
@@ -59,7 +60,7 @@ function useResolver(): (ref: PinRef) => Resolved | 'missing' | null {
           return {
             target: { kind: 'collection', id: c.id },
             label: c.name,
-            leading: <IconOrEmoji icon={c.icon} fallback="ph-stack" size={16} />,
+            leading: <IconOrEmoji icon={c.icon} fallback={COLLECTION_ICON} size={16} />,
           }
         }
         case 'query': {
@@ -68,7 +69,7 @@ function useResolver(): (ref: PinRef) => Resolved | 'missing' | null {
           return {
             target: { kind: 'query', id: q.id },
             label: queryTitle(q, titleCtx) || 'Query',
-            leading: <IconOrEmoji icon={q.icon} fallback="ph-magnifying-glass" size={16} />,
+            leading: <IconOrEmoji icon={q.icon} fallback={QUERY_ICON} size={16} />,
           }
         }
       }

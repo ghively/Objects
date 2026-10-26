@@ -41,6 +41,7 @@ import { PageLayout, pageDesign, panelVariant } from './PageLayout'
 import { PropertyPanel } from './PropertyPanel'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
 import { useTypeEditor } from './useTypeEditor'
+import { COLLECTION_ICON } from '@/lib/defIcons'
 
 installWikilinkPresenter()
 installLinkPicker()
@@ -565,7 +566,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
               disabled={propsReadOnly || !summary || isTemplate}
               onSelect={() => setCollectionsOpen(true)}
             >
-              <Icon name="ph-stack" size={14} />
+              <Icon name={COLLECTION_ICON} size={14} />
               Edit Collections
             </DropdownMenuItem>
             {type && (

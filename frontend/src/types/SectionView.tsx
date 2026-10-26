@@ -17,6 +17,7 @@ import { useRows } from '@/views/useRows'
 import { createAndOpen } from '@/create/createAndOpen'
 import { SECTION_TEXT, keyId, type RenderedSection } from './dashboardSections'
 import { useDefinitions } from './useDefinitions'
+import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 
 /** How many recent objects the "Recently Opened" strip shows. */
 export const RECENT_SHOWN = 10
@@ -238,7 +239,7 @@ export function SectionView({ type, section, search, heading, onCreateCollection
                 <DefinitionCard
                   key={c.id}
                   icon={c.icon}
-                  fallback="ph-stack"
+                  fallback={COLLECTION_ICON}
                   name={c.name}
                   description={c.description}
                   onClick={() => open({ kind: 'collection', id: c.id })}
@@ -274,7 +275,7 @@ export function SectionView({ type, section, search, heading, onCreateCollection
                 <DefinitionCard
                   key={q.id}
                   icon={q.icon}
-                  fallback="ph-magnifying-glass"
+                  fallback={QUERY_ICON}
                   name={q.name || 'Query'}
                   description={q.description}
                   onClick={() => open({ kind: 'query', id: q.id })}

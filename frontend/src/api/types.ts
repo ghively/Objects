@@ -323,6 +323,8 @@ export interface RestoreResult {
   collectionIds?: string[]
   queryIds?: string[]
   skipped?: SkippedFile[]
+  /** Other files the restore wrote back (a collection's members); announced as `changed`. */
+  rewritten?: string[]
 }
 
 export interface SaveTypeResult {
@@ -601,6 +603,8 @@ export interface DeleteCollectionResult {
   trashId: string
   removedFrom: string[]
   skipped: SkippedFile[]
+  /** The sole members moved to the Trash. */
+  deleted: string[]
 }
 
 export interface SaveCollectionResult {

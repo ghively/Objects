@@ -16,6 +16,7 @@ import { PinMenuItems } from '@/shell/PinToMenu'
 import { autoTitle, queryTitle, titleIsCustom } from './autoTitle'
 import { useTitleCtx } from './QueryPage'
 import { removeQuery, useQueries } from './useQueries'
+import { QUERY_ICON } from '@/lib/defIcons'
 
 export const QUERIES_TEXT = {
   heading: 'Queries',
@@ -57,7 +58,7 @@ export function QueriesPage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-6 pt-5 pb-16">
       <header className="flex items-center gap-2.5 pb-4">
-        <Icon name="ph-magnifying-glass" size={20} />
+        <Icon name={QUERY_ICON} size={20} />
         <h1 className="dataview-heading min-w-0 flex-1 text-[20px] font-bold md:text-[22px]">{QUERIES_TEXT.heading}</h1>
         <button
           type="button"
@@ -82,7 +83,7 @@ export function QueriesPage() {
                 onClick={(e) => open(q.id, e)}
                 className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 px-2 text-left"
               >
-                <IconOrEmoji icon={q.icon} fallback="ph-magnifying-glass" size={16} />
+                <IconOrEmoji icon={q.icon} fallback={QUERY_ICON} size={16} />
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-[15px] font-medium">{title}</span>
                   {subtitle && <span className="truncate text-[13px] text-fg-muted">{subtitle}</span>}

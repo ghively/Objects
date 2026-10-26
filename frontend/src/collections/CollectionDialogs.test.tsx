@@ -24,7 +24,7 @@ describe('DeleteCollectionDialog', () => {
   test('test delete dialog shows affected count then confirms', async () => {
     const user = userEvent.setup()
     mocked.deleteCollection.mockRejectedValueOnce(new ConfirmRequiredError('confirm', 3))
-    mocked.deleteCollection.mockResolvedValueOnce({ trashId: 't1', removedFrom: [], skipped: [] })
+    mocked.deleteCollection.mockResolvedValueOnce({ trashId: 't1', removedFrom: [], skipped: [], deleted: [] })
     const onOpenChange = vi.fn()
     render(<DeleteCollectionDialog collection={C} open onOpenChange={onOpenChange} />)
     expect(screen.getByText('Do you really want to delete this collection?')).toBeInTheDocument()
@@ -45,6 +45,7 @@ describe('DeleteCollectionDialog', () => {
       trashId: 't1',
       removedFrom: [],
       skipped: [{ path: 'Servers/Alpha.md', reason: 'read-only' }],
+      deleted: [],
     })
     const onDeleted = vi.fn()
     render(<DeleteCollectionDialog collection={C} open onOpenChange={() => undefined} onDeleted={onDeleted} />)

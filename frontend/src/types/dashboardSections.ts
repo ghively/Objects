@@ -1,6 +1,8 @@
 // The Overview's sections: which exist for a type, in what order, which are also header tabs.
 // Pure functions over the saved `Views`, the type, and the space's collections and queries.
 import type { Collection, DashboardSection, DashboardSectionKey, Icon, Query, TypeDef, Views } from '@/api/types'
+import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
+import { queryTitle, type TitleCtx } from '@/queries/autoTitle'
 
 /** The built-in sections a type page can show (`noBacklinks` comes with M5, `pinned` is a collection's). */
 export const BUILTIN_KEYS = ['recentlyAccessed', 'collections', 'queries', 'inNoCollection', 'notTagged'] as const
@@ -34,8 +36,8 @@ export const SECTION_TEXT = {
 
 const BUILTIN_META: Record<BuiltinKey, { label: string; icon: string; inFullView: boolean }> = {
   recentlyAccessed: { label: SECTION_TEXT.recentlyAccessed, icon: 'ph-clock-clockwise', inFullView: false },
-  collections: { label: SECTION_TEXT.collections, icon: 'ph-stack', inFullView: false },
-  queries: { label: SECTION_TEXT.queries, icon: 'ph-magnifying-glass', inFullView: false },
+  collections: { label: SECTION_TEXT.collections, icon: COLLECTION_ICON, inFullView: false },
+  queries: { label: SECTION_TEXT.queries, icon: QUERY_ICON, inFullView: false },
   inNoCollection: { label: SECTION_TEXT.inNoCollection, icon: 'ph-placeholder', inFullView: true },
   notTagged: { label: SECTION_TEXT.notTagged, icon: 'ph-tag', inFullView: true },
 }
@@ -57,7 +59,11 @@ export const typeHasTags = (type: Pick<TypeDef, 'propertyDefinitions'>): boolean
 export interface SectionCtx {
   collections: Collection[]
   queries: Query[]
+  /** For a query section's automatic title (as on the query's page); none: type ids stand bare. */
+  titleCtx?: TitleCtx
 }
+
+const NO_TITLE_CTX: TitleCtx = { types: [], tagIdsToTitles: {} }
 
 export interface RenderedSection {
   key: DashboardSectionKey
@@ -91,12 +97,12 @@ function describe(type: TypeDef, key: string, ctx: SectionCtx): Described | null
   if (isCollectionKey(key)) {
     const c = ctx.collections.find((x) => x.id === keyId(key))
     if (!c || !c.typeIds.includes(type.id)) return null
-    return { key, defaultLabel: c.name, icon: 'ph-stack', ownIcon: c.icon, inFullView: true, refId: c.id }
+    return { key, defaultLabel: c.name, icon: COLLECTION_ICON, ownIcon: c.icon, inFullView: true, refId: c.id }
   }
   if (isQueryKey(key)) {
     const q = ctx.queries.find((x) => x.id === keyId(key))
     if (!q) return null
-    return { key, defaultLabel: q.name || 'Query', icon: 'ph-magnifying-glass', ownIcon: q.icon, inFullView: true, refId: q.id }
+    return { key, defaultLabel: queryTitle(q, ctx.titleCtx ?? NO_TITLE_CTX) || 'Query', icon: QUERY_ICON, ownIcon: q.icon, inFullView: true, refId: q.id }
   }
   return null
 }

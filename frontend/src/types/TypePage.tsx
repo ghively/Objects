@@ -38,6 +38,8 @@ import { orderTemplates, templateKey, templatesAllowed } from './TemplateManager
 import { TypeOverview } from './TypeOverview'
 import { useDefinitions } from './useDefinitions'
 import { useTypeViews, type ViewsEdit } from './useTypeViews'
+import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
+import { useTitleCtx } from '@/queries/QueryPage'
 
 function mods(e: MouseEvent): OpenMods {
   return { ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey }
@@ -314,7 +316,11 @@ export function TypePage({ type }: { type: TypeDef }) {
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false)
   const [deletingCollection, setDeletingCollection] = useState<string | null>(null)
 
-  const ctx = useMemo(() => ({ collections: defs.collections, queries: defs.queries }), [defs.collections, defs.queries])
+  const titleCtx = useTitleCtx(indexTypes)
+  const ctx = useMemo(
+    () => ({ collections: defs.collections, queries: defs.queries, titleCtx }),
+    [defs.collections, defs.queries, titleCtx],
+  )
   const sections = useMemo(() => (views ? buildSections(type, views, ctx) : []), [type, views, ctx])
   const tabs = tabSections(sections)
 
@@ -380,7 +386,7 @@ export function TypePage({ type }: { type: TypeDef }) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="border-line bg-raised">
             <DropdownMenuItem onSelect={() => setCreateCollectionOpen(true)}>
-              <Icon name="ph-stack" size={14} />
+              <Icon name={COLLECTION_ICON} size={14} />
               {SECTION_TEXT.createCollection}
             </DropdownMenuItem>
             <PinMenuItems pin={{ kind: 'type', id: type.id }} />
@@ -388,7 +394,7 @@ export function TypePage({ type }: { type: TypeDef }) {
               <DropdownMenuItem
                 onClick={() => void saveAsQuery().catch((e: unknown) => console.warn('Could not save the query:', e))}
               >
-                <Icon name="ph-magnifying-glass" size={14} />
+                <Icon name={QUERY_ICON} size={14} />
                 Save as query
               </DropdownMenuItem>
             )}

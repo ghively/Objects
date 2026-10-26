@@ -54,11 +54,11 @@ beforeEach(() => {
     objects: [objectSummary({ path: 'Servers/Atlas.md', id: 'OBJ1', title: 'Atlas', type: 'server' })],
     loaded: true,
   })
-  useDefs.setState({
-    collections: [collection({ id: 'tooling', name: 'Tooling', typeIds: ['server'] })],
-    queries: [query({ id: 'open', name: 'Open servers' })],
-    loaded: true,
-  })
+  const collections = [collection({ id: 'tooling', name: 'Tooling', typeIds: ['server'] })]
+  const queries = [query({ id: 'open', name: 'Open servers' })]
+  mocked.collections.mockResolvedValue(collections)
+  mocked.queries.mockResolvedValue(queries)
+  useDefs.setState({ collections, queries, loaded: true })
 })
 
 const labels = () => screen.getAllByRole('listitem').map((li) => li.textContent)
@@ -68,6 +68,15 @@ describe('PinnedSection', () => {
     render(<PinnedSection />)
     await screen.findByText('Atlas')
     expect(labels()).toEqual(['Open servers', 'Atlas', 'Tooling', 'Servers'])
+  })
+
+  test('test collection and query pins load with no other definitions consumer', async () => {
+    useDefs.setState({ collections: [], queries: [], loaded: false })
+    render(<PinnedSection />)
+    await screen.findByText('Tooling')
+    expect(labels()).toEqual(['Open servers', 'Atlas', 'Tooling', 'Servers'])
+    expect(mocked.collections).toHaveBeenCalled()
+    expect(mocked.queries).toHaveBeenCalled()
   })
 
   test('test No pinned content when empty', async () => {

@@ -29,6 +29,7 @@ import { autoTitle, queryTitle, titleIsCustom, type TitleCtx } from './autoTitle
 import { QueryBuilder } from './QueryBuilder'
 import { PAUSED_HINT, isQueryReady, isSearching, queryScope, runQuery } from './runQuery'
 import { collectionHasQuery, editQuery, removeQuery, setQueryOnCollection, setQueryOnType, viewsHaveQuery } from './useQueries'
+import { QUERY_ICON } from '@/lib/defIcons'
 
 export const QUERY_TEXT = {
   edit: 'Edit query',
@@ -186,7 +187,7 @@ export function QueryPage({ id }: { id: string }) {
               disabled={readOnly}
               className="flex size-8 items-center justify-center rounded-lg border border-line hover:bg-hover"
             >
-              <IconOrEmoji icon={q.icon} fallback="ph-magnifying-glass" size={18} />
+              <IconOrEmoji icon={q.icon} fallback={QUERY_ICON} size={18} />
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-auto border-line bg-raised p-2 text-fg">
