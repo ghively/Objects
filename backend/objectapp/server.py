@@ -14,6 +14,10 @@ Routes (all JSON):
   ``423 {reason}``, ``422 {detail}``, ``404``. Announces ``changed`` for the
   object (when written) and for each synced object.
 - ``POST /api/object/ensure-id`` ``{path, clientId?}`` -> ``{id, version}``; ``423``, ``404``.
+- ``POST /api/object/rename`` ``{path, title, baseVersion, clientId?}`` ->
+  ``{path, version, relinked, skipped}``; ``409 {currentVersion}``, ``423``, ``422 {detail}``
+  (empty title, daily note), ``404``. Announces ``renamed`` (with ``oldPath``) when the
+  file moved, else ``changed`` when written, and ``changed`` for each relinked object.
 - ``POST /api/objects`` ``{typeId, title?, templateId?, clientId?}`` -> ``201 {path, version}``;
   ``404`` for an unknown type. Announces ``created`` (and ``types`` when an
   inferred type was saved for the first time).
@@ -136,6 +140,13 @@ class UpdatePropertiesRequest(BaseModel):
 
 class EnsureIdRequest(BaseModel):
     path: str
+    clientId: str | None = None
+
+
+class RenameRequest(BaseModel):
+    path: str
+    title: str
+    baseVersion: str
     clientId: str | None = None
 
 
@@ -353,6 +364,34 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         if version != before:
             announce(ChangeEvent("changed", _norm(req.path), version, origin=req.clientId))
         return {"id": object_id, "version": version}
+
+    @api.post("/object/rename")
+    def rename_object(req: RenameRequest):
+        try:
+            result = space.rename_object(req.path, req.title, req.baseVersion)
+        except Conflict as exc:
+            return JSONResponse({"currentVersion": exc.current_version}, status_code=409)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {req.path!r}")
+        rel = _norm(req.path)
+        if result.path != rel:
+            renamed = ChangeEvent(
+                "renamed", result.path, result.version, origin=req.clientId, oldPath=rel
+            )
+            announce(renamed)
+        elif result.version != req.baseVersion:
+            announce(ChangeEvent("changed", rel, result.version, origin=req.clientId))
+        for path in result.relinked:
+            announce(
+                ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId)
+            )
+        return _display_safe(result.to_api())
 
     @api.post("/objects", status_code=201)
     def create_object(req: CreateObjectRequest):

@@ -42,6 +42,7 @@ from .propvalues import (
     encode_updates,
     encode_value,
 )
+from .relink import relink_frontmatter, replace_wikilinks, wikilink_targets
 from .textfile import atomic_write, encode_like
 from .trash import Trash, TrashItem
 from .typedefs import (
@@ -74,6 +75,7 @@ __all__ = [
     "Conflict",
     "ObjectSummary",
     "ReadOnly",
+    "RenameResult",
     "SaveTypeResult",
     "Skip",
     "Space",
@@ -278,6 +280,25 @@ class ChangeKindResult:
             "rewritten": list(self.rewritten),
             "skipped": _skips_api(self.skipped),
             "lossy": self.lossy,
+        }
+
+
+@dataclass
+class RenameResult:
+    path: str
+    """The object's path after the rename (unchanged when the file name stays)."""
+    version: str
+    relinked: list[str]
+    """Other objects whose links to it were rewritten (unstamped)."""
+    skipped: list[Skip]
+    """Other objects with such links that could not be rewritten."""
+
+    def to_api(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "version": self.version,
+            "relinked": list(self.relinked),
+            "skipped": _skips_api(self.skipped),
         }
 
 
@@ -924,6 +945,179 @@ class Space:
 
         version = self._write(path, None, self._fm_edit(apply), stamp=False)
         return found[-1], version
+
+    # -- rename -------------------------------------------------------------
+
+    def _is_title_locked(self, rel: str) -> bool:
+        """A daily note's title is its date: it can't be renamed."""
+        t = self._type_of(rel)
+        return t is not None and t.basic and t.name.lower() == "dailynote"
+
+    def _referrers(self, rel: str, old_title: str) -> dict[str, set[str]]:
+        """Files linking to ``rel`` by its title or file name: path -> the link targets that do.
+
+        A link qualifies when its target text equals the old title, file stem
+        or space path (without ``.md``), case-insensitively, **and** it resolves
+        to ``rel`` from the linking file. Links that reach it through an alias,
+        or that resolve to another object with the same title, don't.
+        """
+        names = {_fold(old_title), _fold(PurePosixPath(rel).stem), _fold(rel[:-3])}
+        with self._lock:
+            raws = list(self._raw.values())
+        out: dict[str, set[str]] = {}
+        for raw in raws:
+            text = (raw.of.frontmatter_src or "") + raw.of.body
+            if "[[" not in text:
+                continue
+            found = {
+                t
+                for t in wikilink_targets(text)
+                if _fold(t) in names and self.resolve(t, raw.path) == rel
+            }
+            if found:
+                out[raw.path] = found
+        return out
+
+    @staticmethod
+    def _relink_edit(targets: set[str], new_text: str) -> Edit:
+        """Rewrite the links whose target is one of ``targets`` (exactly) to ``new_text``."""
+
+        def should(t: str) -> bool:
+            return t in targets
+
+        def edit(of: ObjectFile, fm: dict) -> ObjectFile | None:
+            body = replace_wikilinks(of.body, should, new_text)
+            src = of.frontmatter_src
+            if src is not None:
+                src = relink_frontmatter(src, fm, should, new_text)
+            if body == of.body and src == of.frontmatter_src:
+                return None
+            return replace(of, frontmatter_src=src, body=body)
+
+        return edit
+
+    def _move_file(self, rel: str, new_rel: str, version: str) -> None:
+        """Move an object file within the space, never overwriting, quietly for the watcher.
+
+        A case-only rename goes through a temporary (dot) name, so it works on
+        case-insensitive file systems too.
+        """
+        src = self.root / rel
+        dest = self.root / new_rel
+        case_only = rel.lower() == new_rel.lower()
+        if not case_only and dest.exists():
+            raise FileExistsError(new_rel)
+        self.own_deletes[rel] = version
+        self.own_writes[new_rel] = version
+        try:
+            if case_only:
+                tmp = src.with_name(f".rename-{new_ulid()}.tmp")
+                os.rename(src, tmp)
+                try:
+                    os.rename(tmp, dest)
+                except BaseException:
+                    os.rename(tmp, src)
+                    raise
+            else:
+                os.rename(src, dest)
+        except BaseException:
+            self.own_deletes.pop(rel, None)
+            self.own_writes.pop(new_rel, None)
+            raise
+        if case_only and src.exists():
+            # Case-insensitive file system: the old spelling names the new file,
+            # and the watcher only ever sees that one.
+            self.own_deletes.pop(rel, None)
+        self.own_writes.pop(rel, None)
+        with self._lock:
+            self._raw.pop(rel, None)
+            self._summaries.pop(rel, None)
+        self.rescan_file(new_rel)
+
+    def _rename_target(self, rel: str, new_title: str) -> str:
+        """The new path for ``rel`` titled ``new_title`` (in its folder, made unique)."""
+        parent = PurePosixPath(rel).parent.as_posix()
+        folder = "" if parent == "." else parent
+        stem = safe_filename(new_title)
+        new_rel = unique_path(self.root, folder, stem, same_as=rel)
+        dest = self.root / new_rel
+        if new_rel == rel or not dest.exists():
+            return new_rel
+        try:
+            same = os.path.samefile(self.root / rel, dest)
+        except OSError:
+            same = False
+        # On a case-sensitive file system both spellings can exist: then pick a free name.
+        return new_rel if same else unique_path(self.root, folder, stem)
+
+    def rename_object(self, path: str, new_title: str, base_version: str) -> RenameResult:
+        """Set an object's title, rename its file to match, and relink references to it.
+
+        The title (and the first ``# Old title`` heading of the body) is written
+        as a stamped user edit; the file then moves to `safe_filename` of the
+        new title in the same folder, made unique (never overwriting; a
+        case-only change keeps the name without a suffix). Links in other files
+        that reached it by its old title or file name are rewritten, unstamped,
+        link text only; the ones that can't be are reported in ``skipped``.
+        Raises `Conflict`, `ReadOnly`, `KeyError`, and `InvalidValue` for an
+        empty title or a daily note.
+        """
+        rel = self._rel(path)
+        new_title = " ".join(str(new_title or "").split())
+        if not (self.root / rel).is_file():
+            raise KeyError(rel)
+        if not new_title:
+            raise InvalidValue("The title can't be empty")
+        if self._is_title_locked(rel):
+            raise InvalidValue("A daily note's title is its date and can't be changed")
+        with self._lock:
+            summary = self._summaries.get(rel)
+        if summary is None:
+            raise KeyError(rel)
+        old_title = summary.title
+        if new_title == old_title:
+            version = self._write(rel, base_version, lambda _of, _fm: None)
+            return RenameResult(rel, version, [], [])
+
+        referrers = self._referrers(rel, old_title)
+
+        def edit(of: ObjectFile, _fm: dict) -> ObjectFile | None:
+            src = set_keys(of.frontmatter_src or "", {"title": new_title})
+            body = of.body
+            for m in _HEADING_RE.finditer(body):
+                if m.group(1).strip() == old_title:
+                    body = body[: m.start()] + f"# {new_title}" + body[m.end() :]
+                    break
+            return replace(of, frontmatter_src=src, body=body)
+
+        with self._lock:
+            version = self._write(rel, base_version, edit)
+            new_rel = self._rename_target(rel, new_title)
+            if new_rel != rel:
+                self._move_file(rel, new_rel, version)
+
+        relinked: list[str] = []
+        skipped: list[Skip] = []
+        for ref in sorted(referrers):
+            own = ref == rel
+            at = new_rel if own else ref
+            relink = self._relink_edit(referrers[ref], self._link_text(new_rel, at))
+            wrote: list[bool] = []
+
+            def tracked(of: ObjectFile, fm: dict, e=relink, w=wrote) -> ObjectFile | None:
+                out = e(of, fm)
+                w.append(out is not None)
+                return out
+
+            result = self._rewrite_other(at, tracked)
+            if own:  # links to itself: part of the rename, not a referrer
+                if not isinstance(result, Skip):
+                    version = result
+            elif isinstance(result, Skip):
+                skipped.append(result)
+            elif wrote and wrote[-1]:
+                relinked.append(ref)
+        return RenameResult(new_rel, version, relinked, skipped)
 
     # -- create ---------------------------------------------------------------
 
