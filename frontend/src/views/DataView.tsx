@@ -1,6 +1,6 @@
 // The data view: toolbar, filter -> sort -> group pipeline and a layout, reused by type pages,
 // collections, queries and All notes. The caller owns the state (see `useViewState`).
-import { useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Collection, Layout, Row, RowsScope, TypeDef, ViewState } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { useLinkIndex } from '@/links/linkIndex'
@@ -82,8 +82,58 @@ export interface DataViewProps {
   customizePages?: CustomizePage[]
   /** Replace one row after an inline edit (from `useRows`). */
   patchRow?(path: string, row: Row): void
+  /** Right-click menu of a row (list, card or table row): the items for that row, or none. */
+  rowMenu?(row: Row): RowMenuItem[]
   /** Renders layouts other than the list (table, cards, kanban). */
   renderLayout?(layout: Layout, props: LayoutProps): ReactNode | null
+}
+
+export interface RowMenuItem {
+  key: string
+  label: string
+  icon: string
+  destructive?: boolean
+  onSelect(): void
+}
+
+/** A small context menu at the pointer: closes on a click elsewhere, Escape or scroll. */
+function RowContextMenu({ x, y, items, onClose }: { x: number; y: number; items: RowMenuItem[]; onClose(): void }) {
+  useEffect(() => {
+    const close = () => onClose()
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('click', close)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('keydown', key)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('keydown', key)
+    }
+  }, [onClose])
+  return (
+    <div
+      role="menu"
+      data-testid="row-menu"
+      style={{ left: x, top: y }}
+      className="fixed z-50 min-w-48 rounded-lg border border-line bg-raised p-1 text-[14px] shadow-lg"
+    >
+      {items.map((it) => (
+        <button
+          key={it.key}
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            onClose()
+            it.onSelect()
+          }}
+          className={cn('flex h-8 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-hover', it.destructive && 'text-red-400')}
+        >
+          <Icon name={it.icon} size={14} />
+          {it.label}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 const defaultPipeline: Pipeline = (rows, state, ctx) => {
@@ -97,6 +147,7 @@ export function DataView(props: DataViewProps) {
   const collections = props.collections ?? []
   const objects = useLinkIndex((s) => s.objects)
   const [visible, setVisible] = useState(LOAD_PAGE)
+  const [menu, setMenu] = useState<{ x: number; y: number; items: RowMenuItem[] } | null>(null)
 
   const typesById = useMemo(() => Object.fromEntries(types.map((t) => [t.id, t])), [types])
 
@@ -235,6 +286,18 @@ export function DataView(props: DataViewProps) {
   return (
     <section
       data-testid="data-view"
+      onContextMenu={
+        props.rowMenu
+          ? (e) => {
+              const path = (e.target as Element).closest('[data-path]')?.getAttribute('data-path')
+              const row = path ? flat.find((r) => r.summary.path === path) : undefined
+              const items = row ? props.rowMenu?.(row) ?? [] : []
+              if (items.length === 0) return
+              e.preventDefault()
+              setMenu({ x: e.clientX, y: e.clientY, items })
+            }
+          : undefined
+      }
       className={cn('mx-auto flex w-full flex-col gap-2', props.embedded ? 'max-w-[50rem]' : 'max-w-5xl', props.compact && 'gap-1')}
     >
       <div className="flex items-center justify-between gap-2">
@@ -302,6 +365,7 @@ export function DataView(props: DataViewProps) {
           )}
         </>
       )}
+      {menu && <RowContextMenu {...menu} onClose={() => setMenu(null)} />}
     </section>
   )
 }

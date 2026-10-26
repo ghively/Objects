@@ -5,6 +5,7 @@ import { Icon, IconOrEmoji } from '@/components/Icon'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { createAndOpen } from '@/create/createAndOpen'
 import { NewObjectMenu } from '@/create/NewObjectMenu'
+import { CollectionPage } from '@/collections/CollectionPage'
 import { LinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, stemOf, useLinkIndex } from '@/links/linkIndex'
 import { canGoBack, canGoForward, currentTarget, tabTarget, usePeek, useTabs, type Tab } from '@/nav/tabs'
@@ -266,8 +267,9 @@ export default function App() {
     )
   } else if (target?.kind === 'trash') {
     content = <TrashView />
+  } else if (target?.kind === 'collection') {
+    content = <CollectionPage key={target.id} id={target.id} />
   } else if (
-    target?.kind === 'collection' ||
     target?.kind === 'query' ||
     target?.kind === 'queries' ||
     target?.kind === 'allNotes'

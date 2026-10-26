@@ -35,6 +35,8 @@ export interface CellExtras {
   onChangeType?(): void
   /** LabelCell and RelationCell: open the property's settings from their menu. */
   onOpenSettings?(): void
+  /** CollectionsCell: the object's type id (the picker lists collections that hold it). */
+  typeId?: string
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each cell takes its own value type

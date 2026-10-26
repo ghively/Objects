@@ -15,7 +15,7 @@ export function ListLayout({ rows, typesById, multiType, onOpen }: ListLayoutPro
   return (
     <ul role="list" className="flex flex-col">
       {rows.map((row) => (
-        <li key={row.summary.path} style={{ minHeight: MIN_ROW_HEIGHT }} className="flex">
+        <li key={row.summary.path} data-path={row.summary.path} style={{ minHeight: MIN_ROW_HEIGHT }} className="flex">
           <button
             type="button"
             onClick={(e) => onOpen(row, e)}

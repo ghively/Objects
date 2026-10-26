@@ -20,6 +20,10 @@ let off: (() => void) | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
 let seq = 0
 
+export async function reloadDefinitions(): Promise<void> {
+  return reload()
+}
+
 async function reload(): Promise<void> {
   const n = ++seq
   try {
