@@ -1,2 +1,5 @@
 # Fixture files are byte-exact test inputs (CRLF, no trailing newline...).
 * -text
+# space-calendar: the status hook byte cases (already covered by the rule above).
+space-calendar/Tasks/crlf?bom?task.md -text
+space-calendar/Tasks/no?trailing?newline.md -text
