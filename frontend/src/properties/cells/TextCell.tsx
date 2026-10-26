@@ -6,7 +6,7 @@ import { CELL_TEXT, type CellProps } from './types'
  * A single line of plain text (`text`). Commits on blur and Enter; Esc blurs, which commits. An
  * empty text commits `null`; an unchanged text commits nothing.
  */
-export function TextCell({ def, value, readOnly, onChange }: CellProps<string | null>) {
+export function TextCell({ def, value, readOnly, density, onChange }: CellProps<string | null>) {
   const [text, setText] = useState(value ?? '')
   const focused = useRef(false)
   useEffect(() => {
@@ -36,7 +36,7 @@ export function TextCell({ def, value, readOnly, onChange }: CellProps<string | 
           e.currentTarget.blur()
         }
       }}
-      className={CELL_TEXT}
+      className={density === 'table' ? `${CELL_TEXT} truncate text-ellipsis` : CELL_TEXT}
     />
   )
 }

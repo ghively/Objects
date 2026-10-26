@@ -11,16 +11,17 @@ export interface TagsCellProps extends CellProps<string[] | null> {
 }
 
 /** Tags: chips coloured from their Tag objects; "+" opens the TagPicker. */
-export function TagsCell({ def, value, readOnly, onChange, onOpenTag }: TagsCellProps) {
+export function TagsCell({ def, value, readOnly, density, onChange, onOpenTag }: TagsCellProps) {
   const [open, setOpen] = useState(false)
   const tags = useTagObjects()
   const names = value ?? []
+  const table = density === 'table'
   return (
-    <div className="group/tags flex flex-wrap items-center gap-1 py-0.5">
+    <div className={`group/tags flex items-center gap-1 py-0.5 ${table ? 'flex-nowrap' : 'flex-wrap'}`}>
       {names.map((name) => (
         <span
           key={name}
-          className="inline-flex items-center rounded-md text-[13px]"
+          className={`inline-flex shrink-0 items-center rounded-md ${table ? 'text-[12px]' : 'text-[13px]'}`}
           style={tagStyle(tagColor(tags, name))}
         >
           <button type="button" onClick={() => onOpenTag?.(name)} className="px-1.5 py-[1px]">

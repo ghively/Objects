@@ -13,17 +13,18 @@ export interface LabelCellProps extends CellProps<string[] | null> {
 }
 
 /** A label (single or multi-select): pills; a click opens the LabelMenu. */
-export function LabelCell({ def, value, readOnly, onChange, onDefChange, onOpenSettings }: LabelCellProps) {
+export function LabelCell({ def, value, readOnly, density, onChange, onDefChange, onOpenSettings }: LabelCellProps) {
   const [open, setOpen] = useState(false)
   const selected = value ?? []
   const set = def.options.set ?? []
+  const table = density === 'table'
   const pills = selected.map((text) => {
     const option = set.find((o) => o.text === text) ?? { text, color: null, icon: null }
-    return <LabelPill key={text} option={option} />
+    return <LabelPill key={text} option={option} className={table ? 'px-1.5 py-0 text-[12px]' : undefined} />
   })
   const shown =
     pills.length > 0 ? (
-      <span className="flex flex-wrap gap-1">{pills}</span>
+      <span className={table ? 'flex flex-nowrap gap-1' : 'flex flex-wrap gap-1'}>{pills}</span>
     ) : (
       <span className="text-[15px] text-fg-muted">{placeholderFor(def)}</span>
     )

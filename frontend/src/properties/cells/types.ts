@@ -9,6 +9,8 @@ export interface CellProps<T> {
   def: PropertyDef
   value: T
   readOnly?: boolean
+  /** `table`: a compact one-line rendering for a table cell (truncated, smaller pills); default `panel`. */
+  density?: 'panel' | 'table'
   onChange(next: T): void
 }
 
