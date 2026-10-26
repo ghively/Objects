@@ -10,6 +10,8 @@ import type { CustomizePage } from './CustomizeMenu'
 import { applyFilters } from './filter'
 import { groupRows, type Group, type GroupCtx } from './group'
 import { ListLayout } from './layouts/ListLayout'
+import { TableLayout } from './table/TableLayout'
+import { TableCustomizePage } from './table/TableCustomize'
 import { LOAD_PAGE } from './model'
 import { propertyChoices } from './properties'
 import { applySorts } from './sort'
@@ -45,6 +47,12 @@ export interface LayoutProps {
   /** A collapsible group header; layouts that group call it per group. */
   header(group: Group, count: number): ReactNode
   closed(group: Group): boolean
+  /** Every row that survives the view, in order. */
+  flat: Row[]
+  /** Replace one row after an inline edit. */
+  patchRow?(path: string, row: Row): void
+  /** A group's size before paging (for its header). */
+  groupCount(group: Group): number
 }
 
 export interface DataViewProps {
@@ -66,6 +74,8 @@ export interface DataViewProps {
   pipeline?: Pipeline
   pausedHint?: string
   customizePages?: CustomizePage[]
+  /** Replace one row after an inline edit (from `useRows`). */
+  patchRow?(path: string, row: Row): void
   /** Renders layouts other than the list (table, cards, kanban). */
   renderLayout?(layout: Layout, props: LayoutProps): ReactNode | null
 }
@@ -177,8 +187,19 @@ export function DataView(props: DataViewProps) {
     onOpen,
     header,
     closed,
+    flat,
+    patchRow: props.patchRow,
+    groupCount: (g) => result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length,
   }
-  const custom = props.renderLayout?.(layout, layoutProps) ?? null
+  const custom =
+    props.renderLayout?.(layout, layoutProps) ?? (layout === 'table' ? <TableLayout {...layoutProps} /> : null)
+  const tableType = layout === 'table' && viewTypes.length === 1 ? viewTypes[0] : undefined
+  const customizePages = tableType
+    ? [
+        { key: 'table', label: 'Table', icon: 'ph-table', body: <TableCustomizePage type={tableType} state={state} onState={onState} /> },
+        ...(props.customizePages ?? []),
+      ]
+    : props.customizePages
 
   const empty = !props.loading && total === 0
   const createType = viewTypes[0]
@@ -205,7 +226,7 @@ export function DataView(props: DataViewProps) {
           groups={result.groups}
           hidden={result.hidden ?? []}
           pausedHint={props.pausedHint}
-          extraPages={props.customizePages}
+          extraPages={customizePages}
           structureId={viewTypes.length === 1 ? viewTypes[0].id : undefined}
         />
       </div>

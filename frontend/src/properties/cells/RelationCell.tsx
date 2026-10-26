@@ -16,11 +16,12 @@ export interface RelationCellProps extends CellProps<EntityRef[] | null> {
 }
 
 /** A relation (`entity`): chips of the linked objects; a click on the cell opens the RelationPicker. */
-export function RelationCell({ def, value, readOnly, onChange, onOpenObject, onOpenSettings }: RelationCellProps) {
+export function RelationCell({ def, value, readOnly, density, onChange, onOpenObject, onOpenSettings }: RelationCellProps) {
   const [open, setOpen] = useState(false)
   // Re-render when summaries load or change.
   useLinkIndex((s) => s.revision)
   const refs = value ?? []
+  const table = density === 'table'
   const chips = refs.map((ref, i) => {
     const summary = ref.path ? summaryOf(ref.path) : undefined
     const type = typeOf(summary?.type)
@@ -33,7 +34,7 @@ export function RelationCell({ def, value, readOnly, onChange, onOpenObject, onO
           e.stopPropagation()
           onOpenObject(ref.path)
         }}
-        className={`inline-flex max-w-full items-center gap-1 truncate rounded-md px-1.5 py-[1px] text-[13px] ${
+        className={`inline-flex max-w-full items-center gap-1 truncate rounded-md px-1.5 py-[1px] ${table ? 'shrink-0 text-[12px]' : 'text-[13px]'} ${
           ref.path ? 'bg-[var(--chip-bg)] text-[var(--chip-fg)]' : 'text-fg-muted line-through'
         }`}
         style={chipStyle(type?.color)}
@@ -45,7 +46,7 @@ export function RelationCell({ def, value, readOnly, onChange, onOpenObject, onO
   })
   const shown =
     chips.length > 0 ? (
-      <span className="flex flex-wrap gap-1">{chips}</span>
+      <span className={table ? 'flex flex-nowrap gap-1' : 'flex flex-wrap gap-1'}>{chips}</span>
     ) : (
       <span className="text-[15px] text-fg-muted">{placeholderFor(def)}</span>
     )
