@@ -192,6 +192,10 @@ export interface TypeDef {
   wideCoverImage: boolean
   cropCoverImage: boolean
   templates: { ids: string[]; defaultTemplateId: string | null }
+  /** Per-view card settings (store-only in M3 other than the small card). */
+  structureViews?: Record<string, unknown>
+  defaultViewType?: 'inline' | 'smallCard' | 'wideCard' | 'embed'
+  smallCardViewConfig?: SmallCardViewConfig
   /** API only: set when the type file can't be read. */
   readOnlyReason: string | null
   /** API only: sha256 of the type file, `''` if unsaved. */
@@ -220,6 +224,8 @@ export interface ObjectSummary {
   readOnly: boolean
   /** Why the object opens read-only (absent or null when it can be saved). */
   readOnlyReason?: string | null
+  /** Raw names from the `collections:` key; `[]` when absent. */
+  collections?: string[]
 }
 
 /** GET /api/space */
@@ -296,18 +302,27 @@ export interface CreatedFile {
 
 export interface TrashItem {
   id: string
-  kind: 'object' | 'type'
+  kind: 'object' | 'type' | 'collection' | 'query'
   originalPath: string
   title: string
   type: string
   deletedAt: string
   typeTrashId?: string | null
   objectCount?: number
+  /** Object entries trashed by a collection delete. */
+  collectionTrashId?: string | null
+  /** Collection and query entries. */
+  collectionId?: string
+  queryId?: string
+  name?: string
 }
 
 export interface RestoreResult {
   paths: string[]
   typeIds: string[]
+  collectionIds?: string[]
+  queryIds?: string[]
+  skipped?: SkippedFile[]
 }
 
 export interface SaveTypeResult {
@@ -327,7 +342,16 @@ export interface SyncResult {
   skipped: SkippedFile[]
 }
 
-export type ChangeKind = 'created' | 'changed' | 'deleted' | 'renamed' | 'types'
+export type ChangeKind =
+  | 'created'
+  | 'changed'
+  | 'deleted'
+  | 'renamed'
+  | 'types'
+  | 'collections'
+  | 'queries'
+  | 'views'
+  | 'ui'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {
@@ -339,4 +363,248 @@ export interface ChangeEvent {
   origin?: string | null
   /** `renamed` only: the path before the move. */
   oldPath?: string | null
+}
+
+// ---------------------------------------------------------------------------------------------
+// M3: views, collections, queries (docs/superpowers/plans/2026-10-26-m3-views-collections-queries.md,
+// "API contract (M3)").
+
+/** One row of `POST /api/rows`: an object with its decoded values. */
+export interface Row {
+  summary: ObjectSummary
+  version: string
+  /** Every key of the type's propertyDefinitions, in the M2 API value form. */
+  values: Record<string, unknown>
+  /** Entity values' resolved paths. */
+  links: Record<string, (string | null)[]>
+  /** Plain text of the body, Markdown stripped, at most 280 characters. */
+  preview: string
+}
+
+export type Layout = 'list' | 'grid' | 'wall' | 'table' | 'embed' | 'kanban' | 'gallery'
+
+export type DateRelative =
+  | 'overdue'
+  | 'today'
+  | 'yesterday'
+  | 'tomorrow'
+  | 'thisWeek'
+  | 'thisMonth'
+  | 'thisYear'
+  | 'oneWeekAgo'
+  | 'inOneWeek'
+  | 'oneMonthAgo'
+  | 'inOneMonth'
+
+/** text: string, number: number, label: option ids, entity and tags: object ids, entity_type: type ids,
+ *  entity_collections: collection ids, dates: relative or exact. */
+export type FilterReference = string | number | string[] | { relative: DateRelative } | { exactDate: string }
+
+export interface Filter {
+  type: 'filter'
+  /** The property key. */
+  propertyId: string
+  option: string
+  referenceValue?: FilterReference
+  /** A type id: the filter applies to rows of that type only. */
+  structureId?: string
+}
+
+export interface FilterGroup {
+  type: 'filterGroup'
+  operator: 'and' | 'or'
+  elements: (Filter | FilterGroup)[]
+}
+
+export type SortOption = 'ascending' | 'descending' | 'ascendingExists' | 'descendingExists'
+
+export interface Sort {
+  propertyId: string
+  option: SortOption
+  structureId?: string
+}
+
+export type GroupSortOption =
+  | 'default'
+  | 'defaultDescending'
+  | 'ascending'
+  | 'descending'
+  | 'createdAscending'
+  | 'createdDescending'
+  | 'sizeAscending'
+  | 'sizeDescending'
+  | 'manual'
+
+export interface GroupByEntry {
+  propertyId: string
+  option: string
+  structureId?: string
+  numberRangeConfig?: { min?: number; max?: number; step?: number }
+}
+
+export interface GroupBy {
+  groups: GroupByEntry[]
+  sortOption?: GroupSortOption
+}
+
+export type CalcKind = string
+
+export interface TableColumn {
+  id: string
+  type: string
+  isHidden: boolean
+  wrapContent: boolean
+  /** rem, 2..50 */
+  colWidth: number
+  calculation?: CalcKind
+}
+
+export interface TableViewConfig {
+  wrapAllContent: boolean
+  pinnedColumnIndex?: number
+  properties: TableColumn[]
+}
+
+export interface SmallCardViewConfig {
+  entityViewType: 'smallCard'
+  /** `propertyId` `'computed_preview'` is the body preview. */
+  properties: { propertyType: string; propertyId: string }[]
+}
+
+export interface DataViewDefinition {
+  dataViewLayout: Layout
+  tableConfigs?: Record<string, TableViewConfig>
+  groupByConfig?: {
+    groups: { id: string; isHidden: boolean; isClosed: boolean }[]
+    hideByDefault?: boolean
+    hideEmptyGroups?: boolean
+  }
+  calculations?: { propertyId: string; structureId: string; kind: CalcKind }[]
+  smallCardViewConfigs?: Record<string, SmallCardViewConfig>
+}
+
+export interface ViewState {
+  viewDefinition: DataViewDefinition
+  filterGroup: FilterGroup
+  sorts: Sort[]
+  groupBy: GroupBy | null
+  showDataViewDetails?: boolean
+}
+
+export type DashboardSectionKey =
+  | 'allContent'
+  | 'recentlyAccessed'
+  | 'collections'
+  | 'queries'
+  | 'inNoCollection'
+  | 'notTagged'
+  | 'noBacklinks'
+  | 'pinned'
+  | `query:${string}`
+  | `collection:${string}`
+
+export interface DashboardSection {
+  key: DashboardSectionKey
+  collapsed: boolean
+  viewDefinition?: DataViewDefinition
+  /** A tab rename (our addition). */
+  title?: string
+}
+
+export interface Views {
+  /** 'overview' | 'all' | a full-view section key */
+  activeTab: string
+  all: ViewState
+  dashboard: { sections: DashboardSection[]; removedSections: string[] }
+}
+
+export interface Collection {
+  schemaVersion: 1
+  id: string
+  name: string
+  formerNames: string[]
+  icon: Icon | null
+  color: string | null
+  description: string
+  typeIds: string[]
+  views: Views
+  pinned: { ids: string[]; isHidden: boolean }
+  templates: { ids: string[]; defaultTemplateId: string | null }
+  /** API only. */
+  readOnlyReason?: string | null
+  /** API only. */
+  revision: string
+  [extra: string]: unknown
+}
+
+export interface QueryDefinition {
+  structures: {
+    id: string
+    collectionIds?: string[]
+    excludeCollectionIds?: string[]
+    inAnyCollection?: boolean
+    inNoCollection?: boolean
+  }[]
+  excludeStructureIds?: string[]
+  tags?: { ids: string[]; operator: 'or' | 'and' }
+  excludeTags?: { ids: string[] }
+  search?: { searchTerms: { text: string }[]; searchMode: 'auto' | 'fullText' | 'semantic' | 'title' }
+  filterGroup: FilterGroup
+  sorts: Sort[]
+  groupBy: GroupBy | null
+  limit?: { size: number; random?: boolean }
+}
+
+export interface Query {
+  schemaVersion: 1
+  id: string
+  name: string
+  titleIsCustom: boolean
+  icon: Icon | null
+  description: string
+  definition: QueryDefinition
+  view: { viewDefinition: DataViewDefinition; showDataViewDetails?: boolean }
+  readOnlyReason?: string | null
+  revision: string
+  [extra: string]: unknown
+}
+
+export interface PinRef {
+  kind: 'object' | 'type' | 'collection' | 'query'
+  id: string
+}
+
+/** A custom sidebar section such as "In Progress". */
+export interface SidebarSection {
+  id: string
+  name: string
+  icon: Icon | null
+  items: PinRef[]
+}
+
+export interface UiState {
+  pinned: PinRef[]
+  sections: SidebarSection[]
+  allNotesLayout: 'list' | 'grid' | 'wall' | 'embed'
+  [extra: string]: unknown
+}
+
+/** `POST /api/rows` request. */
+export interface RowsScope {
+  typeIds?: string[]
+  collectionIds?: string[]
+  paths?: string[]
+  search?: { terms: string[]; mode: 'auto' | 'fullText' | 'semantic' | 'title' }
+}
+
+export interface DeleteCollectionResult {
+  trashId: string
+  removedFrom: string[]
+  skipped: SkippedFile[]
+}
+
+export interface SaveCollectionResult {
+  collection: Collection
+  rewritten: string[]
+  skipped: SkippedFile[]
 }

@@ -1,20 +1,28 @@
 import type {
   ChangeEvent,
   ChangeKindResult,
+  Collection,
   CreatedFile,
+  DeleteCollectionResult,
   Icon,
   MappingRow,
   ObjectDetail,
   ObjectSummary,
+  Query,
   RenameResult,
   RestoreResult,
+  Row,
+  RowsScope,
+  SaveCollectionResult,
   SaveResult,
   SaveTypeResult,
   SpaceInfo,
   SyncResult,
   TrashItem,
   TypeDef,
+  UiState,
   UpdateResult,
+  Views,
 } from './types'
 
 /** Any non-2xx response that is not a conflict or a read-only refusal. */
@@ -172,6 +180,10 @@ function typesEvent(id: string, revision: string | null = null): ChangeEvent {
   return { kind: 'types', path: id, version: revision, origin: CLIENT_ID }
 }
 
+function defEvent(kind: 'collections' | 'queries' | 'views' | 'ui', path: string, version: string | null = null): ChangeEvent {
+  return { kind, path, version, origin: CLIENT_ID }
+}
+
 /** `renamed` when the write moved the file, else `changed`. */
 function movedOrChanged(oldPath: string, path: string, version: string | null): ChangeEvent {
   if (path === oldPath) return changed(path, version)
@@ -293,10 +305,12 @@ export const api = {
   },
 
   /** Create an object. `templateId`: an id, `null` for the type's default, `"none"` for no template. */
-  async createObject(typeId: string, opts: { title?: string; templateId?: string | null } = {}): Promise<CreatedFile> {
+  async createObject(typeId: string, opts: { title?: string; templateId?: string | null; values?: Record<string, unknown> } = {},
+  ): Promise<CreatedFile> {
     const body: Record<string, unknown> = { typeId }
     if (opts.title !== undefined) body.title = opts.title
     if (opts.templateId !== undefined) body.templateId = opts.templateId
+    if (opts.values !== undefined) body.values = opts.values
     body.clientId = CLIENT_ID
     const res = await request<CreatedFile & { typeIds?: string[] }>('/objects', json('POST', body))
     // An inferred type saved for the first time: the server's `types` event is our own echo.
@@ -325,7 +339,12 @@ export const api = {
   /** Restore a Trash entry. Announces `created` per restored file and `types` per restored type. */
   async restore(id: string): Promise<RestoreResult> {
     const res = await request<RestoreResult>(`/trash/${seg(id)}/restore${qs({ clientId: CLIENT_ID })}`, { method: 'POST' })
-    emitLocal([...(res.paths ?? []).map((p) => created(p)), ...(res.typeIds ?? []).map((t) => typesEvent(t))])
+    emitLocal([
+      ...(res.paths ?? []).map((p) => created(p)),
+      ...(res.typeIds ?? []).map((t) => typesEvent(t)),
+      ...(res.collectionIds ?? []).map((c) => defEvent('collections', c)),
+      ...(res.queryIds ?? []).map((q) => defEvent('queries', q)),
+    ])
     return res
   },
 
@@ -482,6 +501,112 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path }),
     })
+  },
+
+  // ---- M3: rows, views, collections, queries, ui ----
+
+  /** Objects with decoded values and previews, scoped by type, collection, paths and search. */
+  async rows(scope: RowsScope = {}): Promise<Row[]> {
+    const res = await request<{ rows: Row[] }>('/rows', json('POST', scope))
+    return res?.rows ?? []
+  },
+
+  /** A type page's views (defaults and revision `''` when none are saved). */
+  views(typeId: string): Promise<{ views: Views; revision: string }> {
+    return request<{ views: Views; revision: string }>(`/views/${seg(typeId)}`)
+  },
+
+  async saveViews(typeId: string, views: Views, baseRevision: string): Promise<{ revision: string }> {
+    const res = await request<{ revision: string }>(
+      `/views/${seg(typeId)}`,
+      json('PUT', { views, baseRevision, clientId: CLIENT_ID }),
+    )
+    emitLocal([defEvent('views', typeId, res.revision ?? null)])
+    return res
+  },
+
+  collections(): Promise<Collection[]> {
+    return request<Collection[]>('/collections')
+  },
+
+  async createCollection(name: string, typeIds: string[], icon?: Icon | null): Promise<Collection> {
+    const body: Record<string, unknown> = { name, typeIds, clientId: CLIENT_ID }
+    if (icon !== undefined) body.icon = icon
+    const res = await request<Collection>('/collections', json('POST', body))
+    emitLocal([defEvent('collections', res.id, res.revision ?? null)])
+    return res
+  },
+
+  /** Save a collection. A rename also announces `changed` for each rewritten member. */
+  async saveCollection(c: Collection, opts: { baseRevision: string }): Promise<SaveCollectionResult> {
+    const res = await request<SaveCollectionResult>(
+      `/collections/${seg(c.id)}`,
+      json('PUT', { collection: c, baseRevision: opts.baseRevision, clientId: CLIENT_ID }),
+    )
+    emitLocal([
+      defEvent('collections', res.collection?.id ?? c.id, res.collection?.revision ?? null),
+      ...(res.rewritten ?? []).map((p) => changed(p)),
+    ])
+    return res
+  },
+
+  /** Delete a collection (to the Trash). Rejects with 428 unless `confirm`. */
+  async deleteCollection(id: string, opts: { confirm?: boolean } = {}): Promise<DeleteCollectionResult> {
+    const res = await request<DeleteCollectionResult>(
+      `/collections/${seg(id)}${qs({ confirm: opts.confirm ? 'true' : undefined, clientId: CLIENT_ID })}`,
+      { method: 'DELETE' },
+    )
+    // Sole members went to the Trash and the others lost one `collections:` item; a collection
+    // event makes every open view reload its rows, which covers both.
+    const skipped = new Set((res.skipped ?? []).map((s) => s.path))
+    emitLocal([
+      defEvent('collections', id),
+      ...(res.removedFrom ?? []).filter((p) => !skipped.has(p)).map((p) => changed(p)),
+    ])
+    return res
+  },
+
+  queries(): Promise<Query[]> {
+    return request<Query[]>('/queries')
+  },
+
+  async createQuery(init: Partial<Pick<Query, 'name' | 'definition' | 'view'>> = {}): Promise<Query> {
+    const res = await request<Query>('/queries', json('POST', { ...init, clientId: CLIENT_ID }))
+    emitLocal([defEvent('queries', res.id, res.revision ?? null)])
+    return res
+  },
+
+  async saveQuery(q: Query, opts: { baseRevision: string }): Promise<{ query: Query }> {
+    const res = await request<{ query: Query }>(
+      `/queries/${seg(q.id)}`,
+      json('PUT', { query: q, baseRevision: opts.baseRevision, clientId: CLIENT_ID }),
+    )
+    emitLocal([defEvent('queries', res.query?.id ?? q.id, res.query?.revision ?? null)])
+    return res
+  },
+
+  async deleteQuery(id: string): Promise<{ trashId: string }> {
+    const res = await request<{ trashId: string }>(`/queries/${seg(id)}${qs({ clientId: CLIENT_ID })}`, { method: 'DELETE' })
+    emitLocal([defEvent('queries', id)])
+    return res
+  },
+
+  /** Pinned items, custom sidebar sections and the All notes layout. */
+  ui(): Promise<{ ui: UiState; revision: string }> {
+    return request<{ ui: UiState; revision: string }>('/ui')
+  },
+
+  /** Rejects with `ConflictError` (409, `currentRevision`) when `baseRevision` is stale. */
+  async patchUi(
+    patch: Partial<Pick<UiState, 'pinned' | 'sections' | 'allNotesLayout'>>,
+    opts: { baseRevision: string },
+  ): Promise<{ ui: UiState; revision: string }> {
+    const res = await request<{ ui: UiState; revision: string }>(
+      '/ui',
+      json('PUT', { patch, baseRevision: opts.baseRevision, clientId: CLIENT_ID }),
+    )
+    emitLocal([defEvent('ui', 'ui.json', res.revision ?? null)])
+    return res
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */
