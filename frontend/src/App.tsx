@@ -5,6 +5,7 @@ import { Icon, IconOrEmoji } from '@/components/Icon'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { createAndOpen } from '@/create/createAndOpen'
 import { NewObjectMenu } from '@/create/NewObjectMenu'
+import { AllNotesView } from '@/allnotes/AllNotesView'
 import { CollectionPage } from '@/collections/CollectionPage'
 import { QueriesPage } from '@/queries/QueriesPage'
 import { QueryPage } from '@/queries/QueryPage'
@@ -89,7 +90,7 @@ function TabLabel({ tab, space }: { tab: Tab; space: SpaceInfo | null }) {
   if (target.kind === 'allNotes') {
     return (
       <>
-        <Icon name="ph-notepad" size={15} />
+        <Icon name="ph-note" size={15} />
         <span className="truncate">All notes</span>
       </>
     )
@@ -276,8 +277,7 @@ export default function App() {
   } else if (target?.kind === 'queries') {
     content = <QueriesPage />
   } else if (target?.kind === 'allNotes') {
-    // Replaced by the All notes page (Task 15).
-    content = <p className="p-8 text-center text-[14px] text-fg-muted">Loading results…</p>
+    content = <AllNotesView />
   } else {
     content = <Centered title="Pick an object type" subtitle="Choose a type in the sidebar to see its objects." />
   }
@@ -312,6 +312,7 @@ export default function App() {
               trashActive={target?.kind === 'trash'}
               onOpenTarget={(t, o) => tabs.open(t, o)}
               queriesActive={target?.kind === 'queries'}
+              allNotesActive={target?.kind === 'allNotes'}
             />
           )}
           <MainPanel aside={<RightPanel open={rightOpen} />}>{content}</MainPanel>

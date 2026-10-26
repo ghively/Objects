@@ -254,6 +254,7 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
     }
     case 'datetime':
     case 'datetimeSimple':
+    case 'entity_createdAt':
     case 'entity_lastUpdated': {
       const span = dateSpan(dateOf(row, entry.propertyId))
       return span ? [dateBucket(span.start, entry.option, ctx.now)] : []

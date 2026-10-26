@@ -32,6 +32,7 @@ import { templatesAllowed } from '@/types/TemplateManager'
 import { ChangeTypeDialog } from './ChangeTypeDialog'
 import { ConflictDialog } from './ConflictDialog'
 import { DeleteObjectDialog, DELETE_OBJECT_TEXT, useDeleteRequest } from './DeleteObjectDialog'
+import { PinMenuItems } from '@/shell/PinToMenu'
 import { DeletedBanner } from './DeletedBanner'
 import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
@@ -527,6 +528,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
               <Icon name="ph-folder-open" size={14} />
               Reveal in Explorer
             </DropdownMenuItem>
+            <PinMenuItems pin={{ kind: 'object', path, id: summary?.id }} />
             <DropdownMenuSeparator />
             <DropdownMenuSub>
               <DropdownMenuSubTrigger disabled={propsReadOnly || !summary || isTemplate}>

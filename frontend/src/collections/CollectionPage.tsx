@@ -29,6 +29,7 @@ import { createAndOpen, type OpenMods } from '@/create/createAndOpen'
 import { fuzzyMatch } from '@/links/LinkPicker'
 import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { useTabs } from '@/nav/tabs'
+import { PinMenuItems } from '@/shell/PinToMenu'
 import { TypeChip } from '@/shell/Sidebar'
 import { SECTION_TEXT, patchSection, removeSection, visibleSections, type RenderedSection } from '@/types/dashboardSections'
 import { NewSplitButton, SectionTab, TabPill } from '@/types/TypePage'
@@ -545,11 +546,7 @@ export function CollectionPage({ id }: { id: string }) {
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <TemplatesMenu collection={c} types={types} />
-            {/* Wired by Task 15 (pins). */}
-            <DropdownMenuItem disabled>
-              <Icon name="ph-push-pin" size={14} />
-              Pin to sidebar
-            </DropdownMenuItem>
+            <PinMenuItems pin={{ kind: 'collection', id: c.id }} />
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" disabled={readOnly} onSelect={() => setDeleteOpen(true)}>
               <Icon name="ph-trash" size={14} />
