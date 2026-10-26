@@ -1,6 +1,6 @@
 # Object
 
-"Object" is a local, Markdown-backed recreation of Capacities: the same UI and full object model, stored as a folder of `.md` files, with no cloud. Read `CONTINUE.md` first for status and how to resume work.
+"Object" is a local, Markdown-backed recreation of Capacities: the same UI and full object model, stored as a folder of `.md` files, with no cloud. Read `HANDOFF.md` (what to do first), then `CONTINUE.md` for status and how to resume work.
 
 ## Ground rules (set by Gene Hively, the owner)
 
