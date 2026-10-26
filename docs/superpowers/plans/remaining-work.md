@@ -1,6 +1,6 @@
 # Object: remaining work
 
-Status as of 2026-10-26. Spec: `docs/superpowers/specs/2026-10-23-object-design.md`. Capacities reference for every item below: `.reference/` (models in `recovered-ts/src/shared-logic/models/`, English UI strings in `app-unpacked/dist/virtual_intlify-i18n-0366822.js`, CSS in `app-unpacked/dist/index36682.css`).
+Status as of 2026-10-26 (updated after M2 Task 20). Spec: `docs/superpowers/specs/2026-10-23-object-design.md`. Capacities reference for every item below: `.reference/` (models in `recovered-ts/src/shared-logic/models/`, English UI strings in `app-unpacked/dist/virtual_intlify-i18n-0366822.js`, CSS in `app-unpacked/dist/index36682.css`).
 
 ## How we build (changed 2026-10-26)
 
@@ -16,32 +16,28 @@ Status as of 2026-10-26. Spec: `docs/superpowers/specs/2026-10-23-object-design.
 
 ## In progress: M2, object types and properties
 
-Plan: `2026-10-23-m2-types-properties.md` (20 tasks).
+Plan: `2026-10-23-m2-types-properties.md` (20 tasks). **All 20 tasks are built and committed.** Acceptance: `m2-acceptance.md`.
 
 | Task | | State |
 |---|---|---|
-| 1 | Type model v2 + lossless migration | committed, reviewed |
-| 2 | Frontmatter key removal, value codec | committed, reviewed |
-| 3 | Property updates, relation sync | committed, reviewed |
-| 4 | Create / delete / trash / restore | committed, reviewed |
-| 5 | Type API with cascading rewrites | committed, reviewed |
-| 6 | Property kind change, two-way linking | committed, reviewed |
-| 7 | Title edit, rename with relink | committed, reviewed |
-| 8 | Change type | committed |
-| 9 | Templates | building |
-| 10 | Tags as objects, icons, cover images | to build |
-| 11 | API client v2, palette, icons | committed, reviewed |
-| 12 | Kind metadata, formatting | committed, reviewed |
-| 13 | Scalar cells, date picker | committed, reviewed |
-| 14 | Choice/system cells, pickers | committed, reviewed |
-| 15 | Editable panel, header, title | committed, reviewed |
-| 16 | Property definition editing | building |
-| 17 | Object Type Settings, create/delete type, sidebar | to build |
-| 18 | Object page layout (profile / index card / encyclopedia, wide, cover) | to build |
-| 19 | Object lifecycle UI (+ New, Ctrl+N, delete, trash) | to build |
-| 20 | Acceptance | after 1–19 |
+| 1–7 | Type model and migration, codec, property updates, trash, type API, kind change and two-way linking, rename with relink | committed, reviewed |
+| 8–10 | Change type; templates; tags, icons and cover images | committed (not yet reviewed) |
+| 11–15 | API client, formatting, cells and pickers, editable panel | committed, reviewed |
+| 16–19 | Property definition editing; Object Type Settings; page layouts; lifecycle UI | committed (not yet reviewed) |
+| 20 | Acceptance: fixtures, `scripts/m2_acceptance.py` (PASS on `space-sample` and `space-v1`), end-to-end API check on port 8791, build | committed |
 
-Then: the whole-milestone review, fixes, and the final gate.
+What remains for M2:
+
+1. **One whole-milestone review** (correctness and file safety, and faithfulness to Capacities), concentrating on the unreviewed Tasks 8–10 and 16–19 and the plan's Review Focus.
+2. **A fix pass** for its findings, then the **final gate**: `uv run pytest backend/tests -q`, `cd frontend && npx vitest run`, `npx tsc -b --noEmit`, `npm run build`, and both `m2_acceptance.py` runs.
+3. **Gene's hand-run checks** in `m2-acceptance.md`: the sample walk-through in the native window, then the CPI copy (13 types migrate, one-line diffs, rename count, and side by side with Capacities).
+4. Known nit: `editor/preserve.test.ts` "1MB body splits under 300ms" can fail on timing when the machine is loaded; it could get a looser budget.
+
+Found and fixed during acceptance: the file watcher thread died when "Empty Trash" removed a deleted type's folder (Windows `resolve()` error), which stopped external-change detection until restart.
+
+### M3 status
+
+The plan is written (`2026-10-26-m3-views-collections-queries.md`); its build starts once M2's review and fix pass land.
 
 ## To do
 
@@ -119,5 +115,5 @@ Accounts, login, billing, sync, sharing/publishing, mobile, integrations (Readwi
 ## Open items for Gene
 
 1. Hands-on check of M1, then M2, on a copy of the CPI export kept outside the repo.
-2. Whether to plan M3 while M2 finishes, to overlap planning with building.
+2. Run the M2 hand-run checks (`m2-acceptance.md`) before M3's results are relied on.
 3. Keeping the PC awake during workflow runs: an overnight sleep paused M2 for a weekend.

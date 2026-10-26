@@ -1,0 +1,24 @@
+{
+  "id": "person",
+  "name": "Person",
+  "pluralName": "People",
+  "folder": "People",
+  "icon": "ph-user",
+  "color": "orange",
+  "propertyDefinitions": [
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "label",
+      "isArray": true
+    },
+    {
+      "id": "website",
+      "key": "website",
+      "name": "Website",
+      "type": "url",
+      "isArray": false
+    }
+  ]
+}

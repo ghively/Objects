@@ -1,0 +1,24 @@
+{
+  "id": "task",
+  "name": "Task",
+  "pluralName": "Tasks",
+  "folder": "Tasks",
+  "icon": "ph-check-circle",
+  "color": "pink",
+  "propertyDefinitions": [
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "label",
+      "isArray": true
+    },
+    {
+      "id": "status",
+      "key": "status",
+      "name": "Status",
+      "type": "label",
+      "isArray": false
+    }
+  ]
+}
