@@ -11,10 +11,17 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { api } from '@/api/client'
-import type { TypeDef } from '@/api/types'
+import type { DataViewDefinition, TypeDef, ViewState } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { useLinkIndex } from '@/links/linkIndex'
+import { DataView, type Pipeline } from '@/views/DataView'
+import { applyFilters } from '@/views/filter'
+import { defaultViewState } from '@/views/model'
+import { useRows } from '@/views/useRows'
+import { searchRows } from './SectionView'
+import { useDefinitions } from './useDefinitions'
 import {
   SECTION_TEXT,
   addableSections,
@@ -26,12 +33,62 @@ import {
   removeSection,
   showSection,
   visibleSections,
+  unreviewedRows,
   type RenderedSection,
   type SectionCtx,
 } from './dashboardSections'
 import { queryRecommendations } from './queryRecommendations'
 import { SectionView } from './SectionView'
 import type { ViewsEdit } from './useTypeViews'
+
+/** "Unreviewed" keeps its order (newest first) whatever the view's sorts: the view's filters, then that. */
+const unreviewedPipeline: Pipeline = (rows, state, ctx) => {
+  const kept = unreviewedRows(applyFilters(rows, state.filterGroup, ctx))
+  return { rows: kept, groups: [{ id: 'other', label: 'Objects', rows: kept }] }
+}
+
+/** The DailyNote Overview's "Unreviewed": daily notes not marked reviewed, newest first, as a list. */
+function UnreviewedSection({
+  type,
+  section,
+  search,
+  heading,
+  onViewDefinition,
+}: {
+  type: TypeDef
+  section: RenderedSection
+  search: string
+  heading: ReactNode
+  onViewDefinition(def: DataViewDefinition): void
+}) {
+  const indexTypes = useLinkIndex((s) => s.types)
+  const { collections } = useDefinitions()
+  const scope = useMemo(() => ({ typeIds: [type.id] }), [type.id])
+  const { rows, loading, patchRow } = useRows(scope)
+  const [state, setState] = useState<ViewState>(() => ({
+    ...defaultViewState(type),
+    viewDefinition: section.viewDefinition ?? { dataViewLayout: 'list' },
+  }))
+  const shown = useMemo(() => searchRows(rows, search), [rows, search])
+  return (
+    <DataView
+      rows={shown}
+      types={indexTypes.length > 0 ? indexTypes : [type]}
+      collections={collections}
+      scope={scope}
+      loading={loading}
+      state={state}
+      onState={(s) => {
+        setState(s)
+        if (s.viewDefinition !== state.viewDefinition) onViewDefinition(s.viewDefinition)
+      }}
+      layouts={['list']}
+      heading={<div className="min-w-0">{heading}</div>}
+      pipeline={unreviewedPipeline}
+      patchRow={patchRow}
+    />
+  )
+}
 
 function SortableEntry({ section, onHide }: { section: RenderedSection; onHide(): void }) {
   const s = useSortable({ id: section.key })
@@ -229,6 +286,14 @@ export function TypeOverview({
           <section key={s.key} aria-label={s.label} data-testid="overview-section" data-section={s.key}>
             {s.collapsed ? (
               heading
+            ) : s.key === 'unreviewed' ? (
+              <UnreviewedSection
+                type={type}
+                section={s}
+                search={search}
+                heading={heading}
+                onViewDefinition={(def) => update((v) => patchSection(v, sections, s.key, { viewDefinition: def }))}
+              />
             ) : (
               <SectionView
                 type={type}

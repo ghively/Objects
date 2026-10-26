@@ -1,11 +1,14 @@
 // The Overview's sections: which exist for a type, in what order, which are also header tabs.
 // Pure functions over the saved `Views`, the type, and the space's collections and queries.
-import type { Collection, DashboardSection, DashboardSectionKey, Icon, Query, TypeDef, Views } from '@/api/types'
+import type { Collection, DashboardSection, DashboardSectionKey, Icon, Query, Row, TypeDef, Views } from '@/api/types'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { queryTitle, type TitleCtx } from '@/queries/autoTitle'
 
-/** The built-in sections a type page can show (`noBacklinks` comes with M5, `pinned` is a collection's). */
-export const BUILTIN_KEYS = ['recentlyAccessed', 'collections', 'queries', 'inNoCollection', 'notTagged'] as const
+/**
+ * The built-in sections a type page can show (`noBacklinks` comes with M5, `pinned` is a collection's).
+ * `unreviewed` exists only on the basic DailyNote type (and not while it hides reviewing).
+ */
+export const BUILTIN_KEYS = ['recentlyAccessed', 'collections', 'queries', 'inNoCollection', 'notTagged', 'unreviewed'] as const
 export type BuiltinKey = (typeof BUILTIN_KEYS)[number]
 
 export const SECTION_TEXT = {
@@ -24,6 +27,8 @@ export const SECTION_TEXT = {
   createQuery: 'Create query',
   inNoCollection: 'Not in any collection',
   notTagged: 'Not tagged',
+  unreviewed: 'Unreviewed',
+  unreviewedDescription: 'Daily notes that have not been marked as reviewed.',
   openAll: 'Open all',
   customize: 'Customize Overview',
   visibleSections: 'Visible Sections',
@@ -40,6 +45,7 @@ const BUILTIN_META: Record<BuiltinKey, { label: string; icon: string; inFullView
   queries: { label: SECTION_TEXT.queries, icon: QUERY_ICON, inFullView: false },
   inNoCollection: { label: SECTION_TEXT.inNoCollection, icon: 'ph-placeholder', inFullView: true },
   notTagged: { label: SECTION_TEXT.notTagged, icon: 'ph-tag', inFullView: true },
+  unreviewed: { label: SECTION_TEXT.unreviewed, icon: 'ph-check-circle', inFullView: false },
 }
 
 export const isBuiltin = (key: string): key is BuiltinKey => key in BUILTIN_META
@@ -51,6 +57,32 @@ export const keyId = (key: string): string => key.slice(key.indexOf(':') + 1)
 export function sectionInFullView(key: string): boolean {
   if (isQueryKey(key) || isCollectionKey(key)) return true
   return isBuiltin(key) ? BUILTIN_META[key].inFullView : false
+}
+
+/** The basic DailyNote type (its id or name; only the basic one has the Reviewed flag). */
+export const isBasicDailyNote = (type: Pick<TypeDef, 'basic' | 'id' | 'name'>): boolean =>
+  type.basic && (type.id === 'dailynote' || type.name.replace(/\s+/g, '').toLowerCase() === 'dailynote')
+
+/** Whether the type shows the "Unreviewed" section: the basic DailyNote type, unless it hides reviewing. */
+export const hasUnreviewed = (type: TypeDef): boolean => isBasicDailyNote(type) && !type.hideReviewing
+
+/** A daily note row's day: its `date` value, else a `YYYY-MM-DD` title, else a `YYYY-MM-DD` file stem. */
+export function dailyNoteDay(row: Row): string {
+  const v = row.values.date as { start?: unknown } | null | undefined
+  if (v && typeof v.start === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v.start)) return v.start.slice(0, 10)
+  const day = /^\d{4}-\d{2}-\d{2}$/
+  if (day.test(row.summary.title)) return row.summary.title
+  const stem = row.summary.path.split('/').pop()?.replace(/\.md$/i, '') ?? ''
+  return day.test(stem) ? stem : ''
+}
+
+/** "Unreviewed": daily notes whose `reviewed` is not true, newest day first. */
+export function unreviewedRows(rows: Row[]): Row[] {
+  return rows
+    .filter((r) => r.values.reviewed !== true)
+    .map((r) => ({ r, day: dailyNoteDay(r) }))
+    .sort((a, b) => (a.day === b.day ? a.r.summary.path.localeCompare(b.r.summary.path) : a.day < b.day ? 1 : -1))
+    .map((x) => x.r)
 }
 
 export const typeHasTags = (type: Pick<TypeDef, 'propertyDefinitions'>): boolean =>
@@ -91,6 +123,7 @@ type Described = Omit<RenderedSection, 'collapsed' | 'hidden' | 'viewDefinition'
 function describe(type: TypeDef, key: string, ctx: SectionCtx): Described | null {
   if (isBuiltin(key)) {
     if (key === 'notTagged' && !typeHasTags(type)) return null
+    if (key === 'unreviewed' && !hasUnreviewed(type)) return null
     const m = BUILTIN_META[key]
     return { key, defaultLabel: m.label, icon: m.icon, ownIcon: null, inFullView: m.inFullView }
   }
@@ -110,7 +143,7 @@ function describe(type: TypeDef, key: string, ctx: SectionCtx): Described | null
 /**
  * Every section of the Overview in the saved order, then the removed ones (`hidden: true`).
  * A `collection:<id>` for each collection holding the type that is neither saved nor removed is
- * appended. Keys that no longer name anything (a deleted query, a collection of another type,
+ * appended, and so is `unreviewed` on the basic DailyNote type (same rule). Keys that no longer name anything (a deleted query, a collection of another type,
  * `notTagged` on a type without tags, `noBacklinks`, `pinned`) are dropped.
  */
 export function buildSections(type: TypeDef, views: Views, ctx: SectionCtx): RenderedSection[] {
@@ -136,6 +169,7 @@ export function buildSections(type: TypeDef, views: Views, ctx: SectionCtx): Ren
     const key: DashboardSectionKey = `collection:${c.id}`
     if (c.typeIds.includes(type.id) && !removed.has(key)) push({ key, collapsed: false }, false)
   }
+  if (!removed.has('unreviewed')) push({ key: 'unreviewed', collapsed: false }, false)
   for (const key of views.dashboard.removedSections) push({ key: key as DashboardSectionKey, collapsed: false }, true)
   return out
 }

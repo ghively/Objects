@@ -4,6 +4,7 @@ import type { DateConstraints, PropertyDef, PropertyOptions, PropertyType, TypeD
 import { ColorPicker } from '@/components/ColorPicker'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useTypeEditor, type TypeEditor } from '@/object/useTypeEditor'
@@ -51,6 +52,9 @@ const TEXT = {
   rangePreferenceDescription: 'Choose if you want your date to be initialized as a range.',
   defaultDescription: 'Choose a default start date for the date and time picker.',
   descriptionPlaceholder: 'Give others an idea of what this property means',
+  // Our strings: the reference's `hideCalendarEvents` flag has no property-settings label.
+  hideInCalendar: 'Hide in calendar',
+  hideInCalendarDescription: "Values of this property don't show on their days in the calendar.",
 }
 
 export interface PropertySettingsProps {
@@ -367,6 +371,13 @@ function DateSection({ def, save }: { def: PropertyDef; save(next: PropertyDef):
             )}
           </div>
         )}
+      </Section>
+      <Section title={TEXT.hideInCalendar} description={TEXT.hideInCalendarDescription}>
+        <Switch
+          aria-label={TEXT.hideInCalendar}
+          checked={!!def.options.hideCalendarEvents}
+          onCheckedChange={(v) => save({ ...def, options: { ...def.options, hideCalendarEvents: v } })}
+        />
       </Section>
     </>
   )
