@@ -1,0 +1,123 @@
+# Object: remaining work
+
+Status as of 2026-10-26. Spec: `docs/superpowers/specs/2026-10-23-object-design.md`. Object reference for every item below: `.reference/` (models in `design-notes`, English UI strings in `docs/strings.txt`, CSS in `docs/design.css`).
+
+## How we build (changed 2026-10-26)
+
+- Each milestone gets one plan, then one build workflow: a back-end track and a front-end track in parallel, each task built and committed with its own tests.
+- **No per-task reviews.** Gene, 2026-10-26: review ceremony burns tokens; review once, after all tasks are complete. One whole-milestone review runs (correctness + file safety, and faithfulness to Object), then a fix pass and a final test gate.
+- Gene checks each milestone hands-on before the next one's results are relied on.
+
+## Done
+
+| Milestone | State |
+|---|---|
+| **M1** shell, objects on disk, editor | Built and verified 2026-10-23: 95 back-end + 67 front-end tests, the round-trip leaves files untouched, the shell and peek render. **Open:** Gene's hands-on check on a copy of the CPI export (`m1-acceptance.md` checklist). |
+
+## In progress: M2, object types and properties
+
+Plan: `2026-10-23-m2-types-properties.md` (20 tasks).
+
+| Task | | State |
+|---|---|---|
+| 1 | Type model v2 + lossless migration | committed, reviewed |
+| 2 | Frontmatter key removal, value codec | committed, reviewed |
+| 3 | Property updates, relation sync | committed, reviewed |
+| 4 | Create / delete / trash / restore | committed, reviewed |
+| 5 | Type API with cascading rewrites | committed, reviewed |
+| 6 | Property kind change, two-way linking | committed, reviewed |
+| 7 | Title edit, rename with relink | committed, reviewed |
+| 8 | Change type | committed |
+| 9 | Templates | building |
+| 10 | Tags as objects, icons, cover images | to build |
+| 11 | API client v2, palette, icons | committed, reviewed |
+| 12 | Kind metadata, formatting | committed, reviewed |
+| 13 | Scalar cells, date picker | committed, reviewed |
+| 14 | Choice/system cells, pickers | committed, reviewed |
+| 15 | Editable panel, header, title | committed, reviewed |
+| 16 | Property definition editing | building |
+| 17 | Object Type Settings, create/delete type, sidebar | to build |
+| 18 | Object page layout (profile / index card / encyclopedia, wide, cover) | to build |
+| 19 | Object lifecycle UI (+ New, Ctrl+N, delete, trash) | to build |
+| 20 | Acceptance | after 1–19 |
+
+Then: the whole-milestone review, fixes, and the final gate.
+
+## To do
+
+### M3: views, collections, queries
+
+- **View layouts:** list, grid, wall (cards), table, embed, kanban, gallery, on type pages, collections and query results.
+- **Table:** resizable columns, wrap content, pinned column, hide/show columns, column calculations, inline cell editing (reuses the M2 cells).
+- **Filters:** filter groups (AND/OR), per-kind operators; **sorts**; **group-by** with group order, hide/collapse groups, hide empty groups.
+- **Saved views per type:** the Overview / All tabs, view settings saved in `.object/`.
+- **Card settings:** how objects render as small card, wide card, inline and embed (the type-settings options M2 stored but doesn't apply yet).
+- **Collections:**
+  - create, rename, delete, icon
+  - add/remove objects (`collections:` key)
+  - each collection's own views, pinned items, templates and dashboard sections
+  - the collections system property becomes live
+- **Queries:** saved filter/sort/group definitions shown as objects with a view; the sidebar's "In Progress" style pinned query.
+- **Sidebar Pinned section:** pin objects, types, collections and queries; drag to reorder.
+- **"All notes" view.**
+
+### M4: calendar, daily notes, tasks
+
+- **Calendar views:** Day, Three days, Week, Month; Today ‹ ›.
+- **Day header:** coloured weekday, Today pill, large date, week number.
+- **Mini month** in the right panel, marking days that have a daily note.
+- **Day sections:** daily note inline, tasks due, created today, updated today; filter tabs (All / Daily note / Tasks / Created Today); quick-create chips for chosen types.
+- **Daily notes:** one per date (`DailyNotes/YYYY-MM-DD.md`), the reviewed flag, templates, "+ Daily Note".
+- **Calendar options per type:** create-in-calendar and hide-from-calendar (stored in M2).
+- **Date properties in the calendar:** objects with date/datetime values appear on their dates, with ranges.
+- **Tasks view:** all task-role objects grouped by status category (not-started / in-progress / blocked / done); list and kanban; filters; drag between columns changes status.
+- **Task fields:** priority, due date, **recurrence** (every N day/week/month/year, by due date or completion date), **reminders** (local OS notifications only).
+
+### M5: search, command palette, backlinks, graph
+
+- SQLite FTS5 index in `.object-cache/`, rebuilt from files and kept current by the watcher.
+- **Ctrl+K command palette:** fuzzy titles + full text, filter by type, commands (new object of type, go to calendar/graph, switch space, toggle panels).
+- Find in page (Ctrl+F) beyond the editor's own.
+- **References section** on objects: tabs All / Backlinks / Related / Mentions / Related tags; unlinked mentions; the backlinks system property becomes live.
+- **Global graph:** nodes coloured by type, sized by links; filters for type include/exclude, show completed tasks, minimal nodes, hide large nodes, hide dates, hide indirect links, tag network; click to peek.
+- **Local graph** in the right panel (1–2 hops).
+- Smooth at 5,000 objects / 50,000 links.
+
+### M6: whiteboards and pen
+
+- A whiteboard is an object (`Whiteboards/<Title>.md` + a board data file).
+- **Canvas:** 30 px grid, pan and zoom, multi-select, snap.
+- **Items:**
+  - blocks: text and embedded objects, which open in the peek
+  - 12 shapes: rectangle, rounded rectangle, ellipse, diamond, triangle, triangle down, star, parallelogram, bubble, block arrow left/right, heart
+  - frames
+  - points
+  - logic-circuit gates: not, and, nand, or, nor, xor, xnor, high, low
+- **Connectors:** straight / cornered / curved; solid / dashed / dotted; end markers none / arrow / dot / double; labels.
+- **Freehand ink (Gene's addition):** Wacom pressure through Pointer Events and `perfect-freehand`; pen, highlighter, eraser; colours and widths; stored as SVG beside the board.
+- Undo/redo; drag objects in from the sidebar and search.
+
+### M7: remaining blocks, light mode, polish
+
+- **Block options:**
+  - toggles; text and background colours; alignment
+  - standout quotes; alphabetical and roman lists
+  - grid / columns; groups; simple tables with header row/column
+  - math (KaTeX); code previews (Markdown, Mermaid); horizontal line
+  - embedded objects with their own view settings
+  - media blocks: image, PDF, audio, video, file, web link
+  - the annotation syntax for options plain Markdown can't hold
+- **Editor:** slash menu completeness, drag handles, block selection, keyboard shortcuts matching Object.
+- **Tabs:** breadcrumbs, the three-area side panel (area 1/2/3) with resizing, persistent and pinned tabs.
+- **Light mode** (tokens from the shipped CSS), **settings modal** completeness for local options, **spaces** (create, switch, rename).
+- **Final side-by-side fidelity pass** against Object on every screen.
+
+## Out of scope (by design)
+
+Accounts, login, billing, sync, sharing/publishing, mobile, integrations (Readwise, Kindle, calendar feeds, messaging), AI features (a Claude Code agent comes later), telemetry, importing Object data, migrating `C:\Git\wiki` (a separate later project).
+
+## Open items for Gene
+
+1. Hands-on check of M1, then M2, on a copy of the CPI export kept outside the repo.
+2. Whether to plan M3 while M2 finishes, to overlap planning with building.
+3. Keeping the PC awake during workflow runs: an overnight sleep paused M2 for a weekend.
