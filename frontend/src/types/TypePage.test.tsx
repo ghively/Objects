@@ -86,10 +86,13 @@ describe('TypePage', () => {
     expect(base).toBe('r0')
   })
 
-  test('the header has the plural name, search field and the New button', async () => {
+  test('the header has the plural name, a search button that opens the field, and the New button', async () => {
+    const user = userEvent.setup()
     render(<TypePage type={TASK} />)
     expect(await screen.findByRole('heading', { name: 'Tasks' })).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Search title...')).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Search title...')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    expect(screen.getByPlaceholderText('Search title...')).toHaveFocus()
     expect(screen.getByRole('button', { name: 'New Task' })).toBeInTheDocument()
   })
 
@@ -303,12 +306,27 @@ describe('TypePage', () => {
     expect(screen.queryByRole('menuitem', { name: 'Save as query' })).not.toBeInTheDocument()
   })
 
+  test('test the All tab toolbar sits in the tab row, right-aligned, under the header divider', async () => {
+    const user = userEvent.setup()
+    render(<TypePage type={TASK} />)
+    await screen.findByTestId('data-view')
+    const slot = screen.getByTestId('toolbar-slot')
+    const toolbar = await screen.findByTestId('toolbar')
+    expect(slot).toContainElement(toolbar)
+    expect(toolbar.className).not.toMatch(/\bw-full\b/)
+    expect(screen.getByRole('heading', { name: 'Tasks' }).closest('header')).toHaveClass('border-b')
+    expect(screen.getByRole('tablist', { name: 'Views' })).not.toHaveClass('border-b')
+    await user.click(screen.getByRole('tab', { name: 'Overview' }))
+    await waitFor(() => expect(slot).toBeEmptyDOMElement())
+  })
+
   test('test search title filters the All view client-side', async () => {
     const user = userEvent.setup()
     render(<TypePage type={TASK} />)
     await screen.findByTestId('data-view')
     await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(4))
     const calls = mocked.rows.mock.calls.length
+    await user.click(screen.getByRole('button', { name: 'Search' }))
     await user.type(screen.getByPlaceholderText('Search title...'), 'a')
     // "a" is in Alpha, Alphabet, Beta and Gamma; narrow it further.
     await user.type(screen.getByPlaceholderText('Search title...'), 'lph')
@@ -325,6 +343,7 @@ describe('TypePage', () => {
     mocked.rows.mockResolvedValue([mk('Tasks/Alpha.md', 'Alpha', { aliases: ['first'] }), mk('Tasks/Beta.md', 'Beta')])
     render(<TypePage type={TASK} />)
     await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2))
+    await user.click(screen.getByRole('button', { name: 'Search' }))
     await user.type(screen.getByPlaceholderText('Search title...'), 'FIRS')
     await waitFor(() => expect(screen.getAllByRole('listitem').map((l) => l.textContent)).toEqual(['Alpha']))
   })

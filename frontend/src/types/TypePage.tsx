@@ -18,7 +18,7 @@ import { TypeChip } from '@/shell/Sidebar'
 import { matchingValues } from '@/views/matching'
 import { FULL_VIEW_LAYOUTS } from '@/views/model'
 import { useRows } from '@/views/useRows'
-import { DataView } from '@/views/DataView'
+import { DataView, ToolbarSlot } from '@/views/DataView'
 import { CreateCollectionDialog, DeleteCollectionDialog } from '@/collections/CollectionDialogs'
 import { removeQuery } from '@/queries/useQueries'
 import { DeleteTypeDialog } from './DeleteTypeDialog'
@@ -312,6 +312,8 @@ export function TypePage({ type }: { type: TypeDef }) {
   const defs = useDefinitions()
   const indexTypes = useLinkIndex((s) => s.types)
   const [search, setSearch] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false)
   const [deletingCollection, setDeletingCollection] = useState<string | null>(null)
@@ -362,18 +364,38 @@ export function TypePage({ type }: { type: TypeDef }) {
 
   return (
     <div className="w-full">
-      <header className="flex flex-wrap items-center gap-2.5 px-4 pt-5 pb-3">
+      <header className="flex flex-wrap items-center gap-2.5 border-b border-line px-4 pt-5 pb-3">
         <TypeChip type={type} size={32} />
         <h1 className="dataview-heading text-[20px] font-bold md:text-[22px]">{type.pluralName}</h1>
         <div className="flex-1" />
-        <input
-          type="search"
-          aria-label="Search title..."
-          placeholder="Search title..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-8 w-48 rounded-lg border border-line bg-transparent px-2.5 text-[14px] outline-none focus:border-fg-muted"
-        />
+        {searchOpen || search ? (
+          <input
+            type="search"
+            autoFocus
+            aria-label="Search title..."
+            placeholder="Search title..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onBlur={() => !search && setSearchOpen(false)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setSearch('')
+                setSearchOpen(false)
+              }
+            }}
+            className="h-8 w-48 rounded-lg border border-line bg-transparent px-2.5 text-[14px] outline-none focus:border-fg-muted"
+          />
+        ) : (
+          <button
+            type="button"
+            aria-label="Search"
+            title="Search"
+            onClick={() => setSearchOpen(true)}
+            className="flex size-8 items-center justify-center rounded-lg border border-line bg-raised hover:bg-hover"
+          >
+            <Icon name="ph-magnifying-glass" size={16} />
+          </button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -412,34 +434,38 @@ export function TypePage({ type }: { type: TypeDef }) {
         </DropdownMenu>
         <NewSplitButton type={type} values={newValues} />
       </header>
-      <nav role="tablist" aria-label="Views" className="flex flex-wrap items-center gap-1 border-b border-line px-4 pb-3">
-        <TabPill active={tab === 'overview'} onClick={() => select('overview')} icon="ph-layout">
-          {SECTION_TEXT.overview}
-        </TabPill>
-        <TabPill active={tab === 'all'} onClick={() => select('all')} icon="ph-list-bullets">
-          {SECTION_TEXT.all}
-        </TabPill>
-        {tabs.map((t) => (
-          <SectionTab
-            key={t.key}
-            section={t}
-            active={tab === t.key}
-            onSelect={() => select(t.key)}
-            onRename={(title) => update((v) => patchSection(v, sections, t.key, { title: title || undefined }))}
-            onDelete={
-              isCollectionKey(t.key)
-                ? () => setDeletingCollection(keyId(t.key))
-                : isQueryKey(t.key)
-                  ? () => void removeQuery(keyId(t.key)).catch((e: unknown) => console.warn('Could not delete the query:', e))
-                  : undefined
-            }
-            onRemove={() =>
-              update((v) => ({ ...removeSection(v, sections, t.key), activeTab: v.activeTab === t.key ? 'overview' : v.activeTab }))
-            }
-          />
-        ))}
-      </nav>
-      <div className="mx-auto w-full px-6 pt-4 pb-16">
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+        <nav role="tablist" aria-label="Views" className="flex flex-wrap items-center gap-1">
+          <TabPill active={tab === 'overview'} onClick={() => select('overview')} icon="ph-layout">
+            {SECTION_TEXT.overview}
+          </TabPill>
+          <TabPill active={tab === 'all'} onClick={() => select('all')} icon="ph-list-bullets">
+            {SECTION_TEXT.all}
+          </TabPill>
+          {tabs.map((t) => (
+            <SectionTab
+              key={t.key}
+              section={t}
+              active={tab === t.key}
+              onSelect={() => select(t.key)}
+              onRename={(title) => update((v) => patchSection(v, sections, t.key, { title: title || undefined }))}
+              onDelete={
+                isCollectionKey(t.key)
+                  ? () => setDeletingCollection(keyId(t.key))
+                  : isQueryKey(t.key)
+                    ? () => void removeQuery(keyId(t.key)).catch((e: unknown) => console.warn('Could not delete the query:', e))
+                    : undefined
+              }
+              onRemove={() =>
+                update((v) => ({ ...removeSection(v, sections, t.key), activeTab: v.activeTab === t.key ? 'overview' : v.activeTab }))
+              }
+            />
+          ))}
+        </nav>
+        {/* The All or section tab's toolbar renders here, right-aligned (see `ToolbarSlot`). */}
+        <div ref={setToolbarSlot} data-testid="toolbar-slot" className="ml-auto flex min-w-0 flex-1 justify-end" />
+      </div>
+      <div className="mx-auto w-full px-6 pt-1 pb-16">
         {!views && <p className="py-8 text-center text-[14px] text-fg-muted">Loading results…</p>}
         {views && tab === 'overview' && (
           <TypeOverview
@@ -451,16 +477,18 @@ export function TypePage({ type }: { type: TypeDef }) {
             onCreateCollection={() => setCreateCollectionOpen(true)}
           />
         )}
-        {views && tab === 'all' && <AllTab type={type} views={views} search={search} update={update} />}
-        {views && activeSection && (
-          <SectionView
-            key={activeSection.key}
-            type={type}
-            section={activeSection}
-            search={search}
-            onViewDefinition={(def) => update((v) => patchSection(v, sections, activeSection.key, { viewDefinition: def }))}
-          />
-        )}
+        <ToolbarSlot.Provider value={toolbarSlot}>
+          {views && tab === 'all' && <AllTab type={type} views={views} search={search} update={update} />}
+          {views && activeSection && (
+            <SectionView
+              key={activeSection.key}
+              type={type}
+              section={activeSection}
+              search={search}
+              onViewDefinition={(def) => update((v) => patchSection(v, sections, activeSection.key, { viewDefinition: def }))}
+            />
+          )}
+        </ToolbarSlot.Provider>
       </div>
       <CreateCollectionDialog
         open={createCollectionOpen}

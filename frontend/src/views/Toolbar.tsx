@@ -70,10 +70,12 @@ export function Toolbar(p: ToolbarProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [narrow, setNarrow] = useState(false)
   useEffect(() => {
-    const el = ref.current
+    // The toolbar only takes the width it needs (so a heading beside it keeps its room); how
+    // narrow the view is shows in the row it sits in.
+    const el = ref.current?.parentElement ?? ref.current
     if (!el || typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver((entries) => {
-      // An unmeasured (zero-width) toolbar counts as wide.
+      // An unmeasured (zero-width) row counts as wide.
       const w = entries[0]?.contentRect.width ?? 0
       setNarrow(w > 0 && w < NARROW_PX)
     })
@@ -88,7 +90,7 @@ export function Toolbar(p: ToolbarProps) {
   const hint = p.pausedHint
 
   return (
-    <div ref={ref} data-testid="toolbar" className="flex w-full justify-end">
+    <div ref={ref} data-testid="toolbar" className="ml-auto flex shrink-0 justify-end">
       <div className="flex items-center gap-0.5 rounded-lg border border-line bg-raised px-1 py-0.5 text-[13px]">
         <span title={p.count === 1 ? '1 entry' : `${p.count} entries`} className="px-1.5 text-fg-muted">
           {p.count}
