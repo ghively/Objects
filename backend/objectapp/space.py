@@ -34,7 +34,14 @@ from typing import Any
 from .frontmatter import FlowList, delete_keys, parse_fm, replace_in_value, set_keys
 from .ids import new_ulid
 from .objfile import ObjectFile, join_object
-from .propvalues import InvalidValue, decode_value, encode_updates
+from .propvalues import (
+    KIND_TRANSFORMS,
+    InvalidValue,
+    convert_value,
+    decode_value,
+    encode_updates,
+    encode_value,
+)
 from .textfile import atomic_write, encode_like
 from .trash import Trash, TrashItem
 from .typedefs import (
@@ -62,6 +69,7 @@ from .typemodel import (
 )
 
 __all__ = [
+    "ChangeKindResult",
     "ConfirmRequired",
     "Conflict",
     "ObjectSummary",
@@ -69,6 +77,7 @@ __all__ = [
     "SaveTypeResult",
     "Skip",
     "Space",
+    "SyncResult",
     "TrashItem",
     "UpdateResult",
     "now_stamp",
@@ -245,8 +254,86 @@ class SaveTypeResult:
         }
 
 
+def _skips_api(skipped: Iterable[Skip]) -> list[dict[str, str]]:
+    return [{"path": s.path, "reason": s.reason} for s in skipped]
+
+
+@dataclass
+class ChangeKindResult:
+    type: TypeDefinition
+    newPropertyId: str
+    rewritten: list[str]
+    """Files that got the converted value under the new key (unstamped)."""
+    skipped: list[Skip]
+    lossy: int
+    """How many values converted lossily."""
+    revision: str = ""
+    """The type file's new revision (``type.revision`` in the API)."""
+
+    def to_api(self) -> dict[str, Any]:
+        """The route's response: ``{type, newPropertyId, rewritten, skipped, lossy}``."""
+        return {
+            "type": self.type.to_api(self.revision),
+            "newPropertyId": self.newPropertyId,
+            "rewritten": list(self.rewritten),
+            "skipped": _skips_api(self.skipped),
+            "lossy": self.lossy,
+        }
+
+
+@dataclass
+class SyncResult:
+    types: list[TypeDefinition]
+    """Every type whose definition changed (the source first)."""
+    rewritten: list[str]
+    """Objects the backfill linked back (unstamped)."""
+    skipped: list[Skip]
+    revisions: dict[str, str] = field(default_factory=dict)
+    """Type id -> its file's new revision."""
+
+    def to_api(self) -> dict[str, Any]:
+        """The route's response: ``{types, rewritten, skipped}``."""
+        return {
+            "types": [t.to_api(self.revisions.get(t.id, "")) for t in self.types],
+            "rewritten": list(self.rewritten),
+            "skipped": _skips_api(self.skipped),
+        }
+
+
+_KEY_WORD_RE = re.compile(r"[^\W_]+")
+
+
+def camel_key(name: str) -> str:
+    """The camelCase key for a property name (``CPU cores`` -> ``cpuCores``)."""
+    words = _KEY_WORD_RE.findall(str(name or ""))
+    if not words:
+        return "property"
+    return words[0].lower() + "".join(w[:1].upper() + w[1:].lower() for w in words[1:])
+
+
+def unique_key(name: str, taken: Iterable[str]) -> str:
+    """A new property key: `camel_key` of the name, never reserved or taken.
+
+    A collision appends ``_`` (as the export does), then ``_2``, ``_3``...
+    """
+    taken = set(taken) | SYSTEM_KEYS | {"backlinks"}
+    base = camel_key(name)
+    if base not in taken:
+        return base
+    if f"{base}_" not in taken:
+        return f"{base}_"
+    n = 2
+    while f"{base}_{n}" in taken:
+        n += 1
+    return f"{base}_{n}"
+
+
 # Capacities' en-US texts.
 BASIC_LOCKED = "Properties of basic object types cannot be edited."
+NO_TRANSFORMATIONS = (
+    "This property type cannot be changed. If you need to change it, please add a ticket "
+    "to our feedback board including the types you need."
+)
 SYNC_MULTI_ONLY = (
     "Synced properties are only available for multi-select properties without a fixed set. "
     "You need to change your settings above or in your linked object type to enable "
@@ -1664,6 +1751,286 @@ class Space:
                     "and templates move to the Trash.",
                 )
             return self.trash_type(t, objects)
+
+    # -- kind change and two-way linking ------------------------------------------
+
+    def _editable_type(self, type_id: str) -> tuple[TypeDefinition, str]:
+        """A copy of the type as stored (or inferred) and its file's revision.
+
+        Raises `KeyError` (unknown type) and `TypeReadOnly` (unreadable file).
+        """
+        mem = self.type_by_id(type_id)
+        if mem is None:
+            raise KeyError(type_id)
+        if mem.readOnlyReason:
+            raise TypeReadOnly(mem.readOnlyReason)
+        current = type_revision(self.root, mem.id)
+        t = copy.deepcopy(self._stored_type(mem.id) or mem)
+        t.readOnlyReason = None
+        return t, current
+
+    def _commit_type(self, t: TypeDefinition, base_revision: str) -> str:
+        """Write a type's JSON and put it in memory; return the new revision."""
+        revision = write_type_json(self.root, t, base_revision)
+        if any(x.id == t.id for x in self.types):
+            self.types = [t if x.id == t.id else x for x in self.types]
+        else:
+            self.types.append(t)
+        self._sort_types()
+        return revision
+
+    def change_property_kind(
+        self, type_id: str, pid: str, to_type: str, base_revision: str
+    ) -> ChangeKindResult:
+        """Change a property's kind as Capacities does: by adding a new property.
+
+        The new definition goes right after the old one, with the same name,
+        icon, description and visibility, a new id and a new unique key. Each
+        object (and template) of the type with a value gets the converted value
+        under the new key, as one added line (unstamped); entity → label builds
+        the option set from the values. The old property and its values stay.
+
+        Raises `KeyError` (unknown type or property), `TypeReadOnly`,
+        `RevisionConflict` and `InvalidValue` (basic type, or a kind the
+        property can't change to).
+        """
+        with self._lock:
+            t, current = self._editable_type(type_id)
+            if current != (base_revision or ""):
+                raise RevisionConflict(current)
+            index = next(
+                (i for i, p in enumerate(t.propertyDefinitions) if p.id == pid), None
+            )
+            if index is None:
+                raise KeyError(pid)
+            src = t.propertyDefinitions[index]
+            if t.basic:
+                raise InvalidValue(BASIC_LOCKED)
+            if to_type == src.type or to_type not in KIND_TRANSFORMS.get(src.type, ()):
+                raise InvalidValue(NO_TRANSFORMATIONS)
+
+            members = self._type_members(t.id)
+            raws = {rel: self._raw[rel] for rel in members if rel in self._raw}
+            taken = {p.key for p in t.propertyDefinitions}
+            for raw in raws.values():
+                taken |= {k for k in raw.fm if isinstance(k, str)}
+            spec: dict[str, Any] = {
+                "id": new_ulid(),
+                "key": unique_key(src.name, taken),
+                "name": src.name,
+                "type": to_type,
+                "description": src.description,
+                "icon": src.icon.to_json() if src.icon else None,
+                "visibility": src.visibility,
+            }
+            if to_type == "label":
+                spec["options"] = {"isArray": src.type == "entity" and _is_multi(src), "set": []}
+            elif to_type in ("datetime", "datetimeSimple") and "constraints" in src.options:
+                spec["options"] = {"constraints": copy.deepcopy(src.options["constraints"])}
+            dst = PropertyDefinition.from_json(spec)
+
+            def converted(fm: dict) -> tuple[Any, bool]:
+                """(encoded value or None, lossy) of this file's old value."""
+                raw = fm.get(src.key)
+                if raw is None or raw == "" or raw == []:
+                    return None, False
+                try:
+                    value, lossy = convert_value(src, dst, raw)
+                    return encode_value(dst, value), lossy
+                except InvalidValue:
+                    return None, True
+
+            # Plan first: it counts the lossy values and builds a label's options.
+            lossy = 0
+            to_write: list[str] = []
+            for rel, raw in raws.items():
+                if dst.key in raw.fm:
+                    continue
+                encoded, was_lossy = converted(raw.fm)
+                lossy += was_lossy
+                if encoded is not None:
+                    to_write.append(rel)
+
+            def run(fm_src: str, _rel: str) -> str:
+                fm = parse_fm(fm_src) if fm_src else {}
+                if dst.key in fm:
+                    return fm_src
+                encoded, _ = converted(fm)
+                return set_keys(fm_src, {dst.key: encoded}) if encoded is not None else fm_src
+
+            t.propertyDefinitions.insert(index + 1, dst)
+            rewritten, skipped = self._apply_type_ops(to_write, run)
+            revision = self._commit_type(t, current)
+            return ChangeKindResult(t, dst.id, rewritten, skipped, lossy, revision)
+
+    def set_property_sync(
+        self,
+        type_id: str,
+        pid: str,
+        target_pid: str | None,
+        create_name: str | None = None,
+        base_revision: str = "",
+    ) -> SyncResult:
+        """Link (or unlink) a relation with its counterpart on the linked type.
+
+        With ``target_pid`` the existing counterpart is used; with
+        ``create_name`` one is created on the linked type (a multi relation
+        back to this type); with neither, the property and its counterparts are
+        unlinked and nothing is rewritten. Both type JSONs get each other's
+        property id in ``propertySyncing.propertyIds``. Linking backfills: for
+        every link A1 → B1, ``[[A1]]`` is added to B1's counterpart value
+        (unstamped; read-only or conflicting files are in ``skipped``). The
+        type JSONs are written last.
+
+        Raises `KeyError`, `TypeReadOnly`, `RevisionConflict` and
+        `InvalidValue` with Capacities' texts when syncing isn't allowed.
+        """
+        with self._lock:
+            src_t, current = self._editable_type(type_id)
+            if current != (base_revision or ""):
+                raise RevisionConflict(current)
+            p = next((q for q in src_t.propertyDefinitions if q.id == pid), None)
+            if p is None:
+                raise KeyError(pid)
+            edited: dict[str, TypeDefinition] = {src_t.id: src_t}
+            revisions: dict[str, str] = {src_t.id: current}
+
+            def editable(tid: str) -> TypeDefinition:
+                if tid not in edited:
+                    edited[tid], revisions[tid] = self._editable_type(tid)
+                return edited[tid]
+
+            def unlink(owner: TypeDefinition, prop: PropertyDefinition) -> None:
+                """Drop ``prop``'s links and its id from every counterpart's list."""
+                for other in self.types:
+                    for q in other.propertyDefinitions:
+                        if prop.id in _sync_ids(q) and not (
+                            other.id == owner.id and q.id == prop.id
+                        ):
+                            if other.readOnlyReason:
+                                continue
+                            qq = editable(other.id).prop(q.key)
+                            if qq is None:
+                                continue
+                            ids = [i for i in _sync_ids(qq) if i != prop.id]
+                            if ids:
+                                qq.options["propertySyncing"] = {"propertyIds": ids}
+                            else:
+                                qq.options.pop("propertySyncing", None)
+                prop.options.pop("propertySyncing", None)
+
+            if target_pid is None and not (create_name or "").strip():
+                unlink(src_t, p)
+                result_types = list(edited.values())
+                new_revisions = {
+                    t.id: self._commit_type(t, revisions[t.id]) for t in result_types
+                }
+                return SyncResult(result_types, [], [], new_revisions)
+
+            lookup = {x.id: x for x in self.types}
+            lookup[src_t.id] = src_t
+            # Validate the source with a placeholder link (Capacities' texts).
+            probe = copy.deepcopy(p)
+            probe.options.pop("propertySyncing", None)
+            problem = self.sync_problem(src_t, probe, lookup)
+            if problem:
+                raise InvalidValue(problem)
+            target_type_id = p.options["allowedTypes"][0]
+            target_t = editable(target_type_id)
+            lookup[target_t.id] = target_t
+
+            if target_pid is not None:
+                q = next((x for x in target_t.propertyDefinitions if x.id == target_pid), None)
+                if q is None:
+                    raise KeyError(target_pid)
+                if q is p or (target_t.id == src_t.id and q.id == p.id):
+                    raise InvalidValue(SYNC_MULTI_ONLY)
+                probe_q = copy.deepcopy(q)
+                probe_q.options.pop("propertySyncing", None)
+                problem = self.sync_problem(target_t, probe_q, lookup)
+                if problem:
+                    raise InvalidValue(problem)
+                if probe_q.options.get("allowedTypes") != [src_t.id]:
+                    raise InvalidValue(SYNC_NOT_ALLOWED)
+            else:
+                taken = {x.key for x in target_t.propertyDefinitions}
+                name = " ".join(str(create_name).split())
+                q = PropertyDefinition.from_json(
+                    {
+                        "id": new_ulid(),
+                        "key": unique_key(name, taken),
+                        "name": name,
+                        "type": "entity",
+                        "options": {
+                            "isArray": True,
+                            "allowedTypes": [src_t.id],
+                            "hasFixedSet": False,
+                            "fixedSet": [],
+                        },
+                    }
+                )
+                target_t.propertyDefinitions.append(q)
+
+            # Leave any previous pairing first, then pair the two.
+            unlink(src_t, p)
+            unlink(target_t, q)
+            p.options["propertySyncing"] = {"propertyIds": [q.id]}
+            q.options["propertySyncing"] = {"propertyIds": [p.id]}
+
+            rewritten, skipped = self._backfill_sync(src_t, p, target_t, q)
+            result_types = list(edited.values())
+            new_revisions = {t.id: self._commit_type(t, revisions[t.id]) for t in result_types}
+            return SyncResult(result_types, rewritten, skipped, new_revisions)
+
+    def _backfill_sync(
+        self,
+        src_t: TypeDefinition,
+        p: PropertyDefinition,
+        target_t: TypeDefinition,
+        q: PropertyDefinition,
+    ) -> tuple[list[str], list[Skip]]:
+        """Add ``[[A1]]`` to B1's ``q`` for every existing link A1 → B1 (unstamped)."""
+        rewritten: list[str] = []
+        skipped: list[Skip] = []
+        pairs: list[tuple[str, str]] = []
+        for rel in self._type_members(src_t.id, templates=False):
+            with self._lock:
+                raw = self._raw.get(rel)
+            if raw is None:
+                continue
+            for target in sorted(self._linked_paths(p, raw.fm.get(p.key), rel)):
+                pairs.append((rel, target))
+        # Each target is rewritten once per linking object, in path order.
+        pairs.sort(key=lambda pair: (pair[1], pair[0]))
+        reported: set[str] = set()
+        for rel, target in pairs:
+            with self._lock:
+                summary = self._summaries.get(target)
+            if summary is None:
+                continue
+            if summary.readOnly:
+                if target not in reported:
+                    skipped.append(Skip(target, summary.readOnlyReason or "Object is read-only"))
+                    reported.add(target)
+                continue
+            if summary.type != target_t.id:
+                continue
+            edit = self._backlink_edit(q, rel, target, add=True)
+            wrote: list[bool] = []
+
+            def tracked(of: ObjectFile, fm: dict, edit=edit, wrote=wrote) -> ObjectFile | None:
+                out = edit(of, fm)
+                wrote.append(out is not None)
+                return out
+
+            result = self._rewrite_other(target, tracked)
+            if isinstance(result, Skip):
+                if target not in reported:
+                    skipped.append(result)
+                    reported.add(target)
+            elif wrote and wrote[-1] and target not in rewritten:
+                rewritten.append(target)
+        return rewritten, skipped
 
     def cached_version(self, path: str) -> str | None:
         """The version of the object as last scanned, or None if the space doesn't know it."""
