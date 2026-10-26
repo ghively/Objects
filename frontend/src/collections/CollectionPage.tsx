@@ -3,7 +3,7 @@
 // `saveCollectionEdit`; membership is the `collections:` key of each object.
 import { useMemo, useState, type MouseEvent } from 'react'
 import { api, ConflictError } from '@/api/client'
-import type { Collection, DashboardSectionKey, Layout, ObjectSummary, Row, TypeDef, ViewState, Views } from '@/api/types'
+import type { Collection, DashboardSectionKey, Layout, ObjectSummary, Query, Row, TypeDef, ViewState, Views } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
 import {
@@ -49,6 +49,9 @@ import {
   skippedMessage,
 } from './CollectionDialogs'
 import { editCollectionViews, flushCollectionViews, saveCollectionEdit } from './useCollections'
+import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
+import { queryTitle, type TitleCtx } from '@/queries/autoTitle'
+import { useTitleCtx } from '@/queries/QueryPage'
 
 export const COLLECTION_PAGE_TEXT = {
   empty: 'This collection is empty. Create a record or add existing content.',
@@ -72,8 +75,18 @@ export function namesCollection(c: Pick<Collection, 'name' | 'formerNames'>, nam
   return c.name.toLowerCase() === n || c.formerNames.some((f) => f.toLowerCase() === n)
 }
 
+/** A query section's label: the query's title as its own page shows it. */
+function sectionQueryTitle(q: Pick<Query, 'name'> & Partial<Pick<Query, 'titleIsCustom' | 'definition'>>, ctx: TitleCtx): string {
+  const title = q.definition ? queryTitle({ name: q.name, titleIsCustom: q.titleIsCustom ?? q.name.trim() !== '', definition: q.definition }, ctx) : q.name
+  return title || 'Query'
+}
+
 /** The sections of a collection's Overview: `pinned`, then its query sections, then the removed ones. */
-export function collectionSections(c: Collection, queries: { id: string; name: string; icon: Collection['icon'] }[]): RenderedSection[] {
+export function collectionSections(
+  c: Collection,
+  queries: (Pick<Query, 'id' | 'name' | 'icon'> & Partial<Pick<Query, 'titleIsCustom' | 'definition'>>)[],
+  titleCtx: TitleCtx = { types: [], tagIdsToTitles: {} },
+): RenderedSection[] {
   const removed = new Set(c.views.dashboard.removedSections)
   const out: RenderedSection[] = []
   const seen = new Set<string>()
@@ -85,7 +98,7 @@ export function collectionSections(c: Collection, queries: { id: string; name: s
     } else if (key.startsWith('query:')) {
       const q = queries.find((x) => x.id === key.slice('query:'.length))
       if (q) {
-        base = { key: key as DashboardSectionKey, defaultLabel: q.name || 'Query', icon: 'ph-magnifying-glass', ownIcon: q.icon, inFullView: true, refId: q.id }
+        base = { key: key as DashboardSectionKey, defaultLabel: sectionQueryTitle(q, titleCtx), icon: QUERY_ICON, ownIcon: q.icon, inFullView: true, refId: q.id }
       }
     }
     if (!base) return
@@ -284,7 +297,8 @@ export function CollectionPage({ id }: { id: string }) {
   const [removing, setRemoving] = useState<Row | null>(null)
 
   const types = useMemo(() => (c ? c.typeIds.map((t) => allTypes.find((x) => x.id === t)).filter((t): t is TypeDef => !!t) : []), [c, allTypes])
-  const sections = useMemo(() => (c ? collectionSections(c, defs.queries) : []), [c, defs.queries])
+  const titleCtx = useTitleCtx(allTypes)
+  const sections = useMemo(() => (c ? collectionSections(c, defs.queries, titleCtx) : []), [c, defs.queries, titleCtx])
   const tabs = sections.filter((s) => !s.hidden && s.inFullView)
 
   if (!c) {
@@ -459,7 +473,7 @@ export function CollectionPage({ id }: { id: string }) {
               disabled={readOnly}
               className="flex size-8 items-center justify-center rounded-lg border border-line hover:bg-hover"
             >
-              <IconOrEmoji icon={c.icon} fallback="ph-stack" size={18} />
+              <IconOrEmoji icon={c.icon} fallback={COLLECTION_ICON} size={18} />
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-auto border-line bg-raised p-2 text-fg">
@@ -629,9 +643,9 @@ export function CollectionPage({ id }: { id: string }) {
                   .filter((q) => !sections.some((s) => !s.hidden && s.key === `query:${q.id}`))
                   .map((q) => ({
                     key: `query:${q.id}` as const,
-                    label: q.name || 'Query',
-                    defaultLabel: q.name || 'Query',
-                    icon: 'ph-magnifying-glass',
+                    label: sectionQueryTitle(q, titleCtx),
+                    defaultLabel: sectionQueryTitle(q, titleCtx),
+                    icon: QUERY_ICON,
                     ownIcon: q.icon,
                     collapsed: false,
                     inFullView: true,

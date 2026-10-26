@@ -26,7 +26,7 @@ beforeEach(() => {
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockReset()
   mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE] } satisfies SpaceInfo)
   mocked.collections.mockResolvedValue([collection({ id: 'reading', name: 'Reading list', typeIds: ['page'], icon: { type: 'iconify', val: 'ph-books' } })])
-  mocked.queries.mockResolvedValue([query({ id: 'open', name: 'Open pages' }), query({ id: 'auto', name: '' })])
+  mocked.queries.mockResolvedValue([query({ id: 'open', name: 'Open pages' }), query({ id: 'auto', name: 'New Query', titleIsCustom: false, definition: { structures: [{ id: 'page' }], filterGroup: { type: 'filterGroup', operator: 'and', elements: [] }, sorts: [], groupBy: null } })])
   mocked.onChange.mockReturnValue(() => undefined)
 })
 
@@ -42,7 +42,9 @@ describe('new targets', () => {
     useTabs.getState().open({ kind: 'query', id: 'open' })
     await waitFor(() => expect(within(strip).getByText('Open pages')).toBeInTheDocument())
     useTabs.getState().open({ kind: 'query', id: 'auto' })
-    await waitFor(() => expect(within(strip).getByText('Query')).toBeInTheDocument())
+    // An uncustomised query's tab shows its automatic title, as its page does.
+    await waitFor(() => expect(within(strip).getByText('Pages')).toBeInTheDocument())
+    expect(within(strip).queryByText('New Query')).toBeNull()
     useTabs.getState().open({ kind: 'queries' })
     await waitFor(() => expect(within(strip).getByText('Queries')).toBeInTheDocument())
     useTabs.getState().open({ kind: 'allNotes' })

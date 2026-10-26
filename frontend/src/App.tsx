@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import type { SpaceInfo, TypeDef } from '@/api/types'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { createAndOpen } from '@/create/createAndOpen'
@@ -8,7 +9,7 @@ import { NewObjectMenu } from '@/create/NewObjectMenu'
 import { AllNotesView } from '@/allnotes/AllNotesView'
 import { CollectionPage } from '@/collections/CollectionPage'
 import { QueriesPage } from '@/queries/QueriesPage'
-import { QueryPage } from '@/queries/QueryPage'
+import { QueryPage, useTitleCtx } from '@/queries/QueryPage'
 import { LinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, stemOf, useLinkIndex } from '@/links/linkIndex'
 import { canGoBack, canGoForward, currentTarget, tabTarget, usePeek, useTabs, type Tab } from '@/nav/tabs'
@@ -27,6 +28,8 @@ import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
 import { TypePage } from '@/types/TypePage'
 import { TypeSettings } from '@/types/TypeSettings'
 import { useDefinitions } from '@/types/useDefinitions'
+import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
+import { queryTitle } from '@/queries/autoTitle'
 
 const REFRESH_DELAY_MS = 150
 
@@ -60,12 +63,13 @@ function TabLabel({ tab, space }: { tab: Tab; space: SpaceInfo | null }) {
   const objects = useLinkIndex((s) => s.objects)
   const types = useSpaceTypes(space)
   const { collections, queries } = useDefinitions()
+  const titleCtx = useTitleCtx(types)
   if (!target) return <span className="truncate">New tab</span>
   if (target.kind === 'collection') {
     const c = collections.find((x) => x.id === target.id)
     return (
       <>
-        <IconOrEmoji icon={c?.icon} size={15} fallback="ph-stack" />
+        <IconOrEmoji icon={c?.icon} size={15} fallback={COLLECTION_ICON} />
         <span className="truncate">{c?.name ?? target.id}</span>
       </>
     )
@@ -74,15 +78,15 @@ function TabLabel({ tab, space }: { tab: Tab; space: SpaceInfo | null }) {
     const q = queries.find((x) => x.id === target.id)
     return (
       <>
-        <IconOrEmoji icon={q?.icon} size={15} fallback="ph-magnifying-glass" />
-        <span className="truncate">{q?.name || 'Query'}</span>
+        <IconOrEmoji icon={q?.icon} size={15} fallback={QUERY_ICON} />
+        <span className="truncate">{(q && queryTitle(q, titleCtx)) || 'Query'}</span>
       </>
     )
   }
   if (target.kind === 'queries') {
     return (
       <>
-        <Icon name="ph-magnifying-glass" size={15} />
+        <Icon name={QUERY_ICON} size={15} />
         <span className="truncate">Queries</span>
       </>
     )
@@ -299,23 +303,29 @@ export default function App() {
         />
         <div className="flex min-h-0 flex-1">
           {sidebarOpen && (
-            <Sidebar
-              types={types}
-              activeTypeId={activeType?.id}
-              onOpenType={(t) => tabs.open({ kind: 'type', typeId: t.id })}
-              counts={counts}
-              onNew={() => setNewMenuOpen(true)}
-              onCreateType={() => setCreateTypeOpen(true)}
-              onOpenTypeSettings={(t) => tabs.open({ kind: 'typeSettings', typeId: t.id })}
-              onDeleteType={setDeleting}
-              onOpenTrash={() => tabs.open({ kind: 'trash' })}
-              trashActive={target?.kind === 'trash'}
-              onOpenTarget={(t, o) => tabs.open(t, o)}
-              queriesActive={target?.kind === 'queries'}
-              allNotesActive={target?.kind === 'allNotes'}
-            />
+            <ErrorBoundary what="The sidebar">
+              <Sidebar
+                types={types}
+                activeTypeId={activeType?.id}
+                onOpenType={(t) => tabs.open({ kind: 'type', typeId: t.id })}
+                counts={counts}
+                onNew={() => setNewMenuOpen(true)}
+                onCreateType={() => setCreateTypeOpen(true)}
+                onOpenTypeSettings={(t) => tabs.open({ kind: 'typeSettings', typeId: t.id })}
+                onDeleteType={setDeleting}
+                onOpenTrash={() => tabs.open({ kind: 'trash' })}
+                trashActive={target?.kind === 'trash'}
+                onOpenTarget={(t, o) => tabs.open(t, o)}
+                queriesActive={target?.kind === 'queries'}
+                allNotesActive={target?.kind === 'allNotes'}
+              />
+            </ErrorBoundary>
           )}
-          <MainPanel aside={<RightPanel open={rightOpen} />}>{content}</MainPanel>
+          <MainPanel aside={<RightPanel open={rightOpen} />}>
+            <ErrorBoundary what="This page" resetKey={target ? JSON.stringify(target) : ''}>
+              {content}
+            </ErrorBoundary>
+          </MainPanel>
         </div>
         <ObjectPeek />
         <LinkPicker />

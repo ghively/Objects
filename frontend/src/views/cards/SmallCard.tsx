@@ -9,6 +9,7 @@ import { cellForDef } from '@/properties/cellFor'
 import { chipStyle, tagStyle } from '@/theme/palette'
 import { displayTitle } from '../filter'
 import type { CardProperty } from './cardConfig'
+import { COLLECTION_ICON } from '@/lib/defIcons'
 
 /** The image shown on a card: the cover, else a media preview image kept in the space. */
 export function cardImage(row: Row): string | null {
@@ -83,7 +84,7 @@ export function CardProperties({
             const names = row.summary.collections ?? []
             return (
               <span key={p.propertyId} data-testid="card-collections" className="flex items-center gap-1 text-[13px] text-fg-muted">
-                <Icon name="ph-stack" size={12} />
+                <Icon name={COLLECTION_ICON} size={12} />
                 <span className="truncate">{names.length ? names.join(', ') : 'Collections'}</span>
               </span>
             )
