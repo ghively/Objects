@@ -1,8 +1,11 @@
 // The Calendar page: the chrome over the view chosen in `useCalendar`.
 import type { Target } from '@/nav/tabs'
-import { rangeFor, type DayRange } from './dates'
 import { CalendarChrome } from './CalendarChrome'
+import { rangeFor } from './dates'
 import { DayView } from './DayView'
+import { MonthView } from './MonthView'
+import { ThreeDaysView } from './ThreeDaysView'
+import { WeekView } from './WeekView'
 import { useCalendar, useWeekStart } from './useCalendar'
 
 export interface CalendarPageProps {
@@ -10,15 +13,6 @@ export interface CalendarPageProps {
   rightPanelOpen: boolean
   onToggleRightPanel: () => void
   onOpenTarget: (t: Target) => void
-}
-
-/** A view's placeholder until its task lands (Three days, Week, Month: Task 14). */
-function Pending({ view, range }: { view: string; range: DayRange }) {
-  return (
-    <div className="p-8 text-fg-muted" data-view={view} data-from={range.from} data-to={range.to}>
-      Loading results…
-    </div>
-  )
 }
 
 export function CalendarPage({ rightPanelOpen, onToggleRightPanel, onOpenTarget }: CalendarPageProps) {
@@ -33,13 +27,13 @@ export function CalendarPage({ rightPanelOpen, onToggleRightPanel, onOpenTarget 
       body = <DayView day={anchor} onOpenTarget={onOpenTarget} />
       break
     case 'rolling':
-      body = <Pending view="rolling" range={range} />
+      body = <ThreeDaysView anchor={anchor} weekStart={weekStart} />
       break
     case 'week':
-      body = <Pending view="week" range={range} />
+      body = <WeekView anchor={anchor} weekStart={weekStart} />
       break
     case 'month':
-      body = <Pending view="month" range={range} />
+      body = <MonthView anchor={anchor} weekStart={weekStart} />
       break
   }
 
@@ -51,7 +45,9 @@ export function CalendarPage({ rightPanelOpen, onToggleRightPanel, onOpenTarget 
         onToggleRightPanel={onToggleRightPanel}
         onOpenTarget={onOpenTarget}
       />
-      <div className="min-h-0 flex-1 overflow-auto">{body}</div>
+      <div className="min-h-0 flex-1 overflow-auto" data-view={view} data-from={range.from} data-to={range.to}>
+        {body}
+      </div>
     </div>
   )
 }
