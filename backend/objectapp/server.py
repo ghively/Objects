@@ -4,6 +4,8 @@ Routes (all JSON):
 
 - ``GET /api/space`` -> ``{name, root, types}``
 - ``GET /api/objects?type=`` -> ``ObjectSummary[]``
+- ``POST /api/rows`` ``{typeIds?, collectionIds?, paths?, search?: {terms, mode}}`` ->
+  ``{rows: [{summary, version, values, links, preview}]}``; ``422`` for a bad search.
 - ``GET /api/object?path=`` -> ``{summary, frontmatter, body, version, links}``
   (``links``: each entity value resolved from this file, ``null`` when dangling)
 - ``PUT /api/object/body`` ``{path, body, baseVersion, clientId?}`` -> ``200 {version}``,
@@ -237,6 +239,18 @@ class SaveViewsRequest(BaseModel):
     views: dict[str, Any]
     baseRevision: str = ""
     clientId: str | None = None
+
+
+class RowsSearch(BaseModel):
+    terms: list[str] = []
+    mode: str = "auto"
+
+
+class RowsRequest(BaseModel):
+    typeIds: list[str] | None = None
+    collectionIds: list[str] | None = None
+    paths: list[str] | None = None
+    search: RowsSearch | None = None
 
 
 class PatchUiRequest(BaseModel):
@@ -648,6 +662,15 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
     def empty_trash(clientId: str | None = Query(default=None)):
         del clientId
         return {"purged": space.empty_trash()}
+
+    @api.post("/rows")
+    def post_rows(req: RowsRequest):
+        search = (req.search.terms, req.search.mode) if req.search is not None else None
+        try:
+            rows = space.rows(req.typeIds, req.collectionIds, req.paths, search)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        return _display_safe({"rows": [asdict(r) for r in rows]})
 
     @api.get("/views/{type_id}")
     def get_views(type_id: str):
