@@ -326,6 +326,7 @@ export function TableLayout(props: TableLayoutProps) {
                   density={wrapped ? 'panel' : 'table'}
                   onChange={(next: unknown) => void commit(row, def, next)}
                   onDefChange={onDefChange}
+                  typeId={row.summary.type}
                   onOpenObject={(path: string) => useTabs.getState().open({ kind: 'object', path })}
                   onOpenSettings={canEditType ? () => setSettingsFor(def.id) : undefined}
                 />

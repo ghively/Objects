@@ -37,7 +37,7 @@ describe('new targets', () => {
     render(<App />)
     const strip = screen.getByRole('tablist', { name: 'Tabs' })
     await waitFor(() => expect(within(strip).getByText('Reading list')).toBeInTheDocument())
-    expect(screen.getByText('Loading results…')).toBeInTheDocument()
+    expect(await screen.findByRole('textbox', { name: 'Collection name' })).toHaveValue('Reading list')
 
     useTabs.getState().open({ kind: 'query', id: 'open' })
     await waitFor(() => expect(within(strip).getByText('Open pages')).toBeInTheDocument())

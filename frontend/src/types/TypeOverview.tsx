@@ -65,11 +65,14 @@ export function CustomizeOverview({
   sections,
   ctx,
   update,
+  addable: addableOverride,
 }: {
-  type: TypeDef
+  type?: TypeDef
   sections: RenderedSection[]
   ctx: SectionCtx
   update(edit: ViewsEdit): void
+  /** What "Add a section" offers, when it is not the type's collections and queries (a collection's page). */
+  addable?: RenderedSection[]
 }) {
   const [adding, setAdding] = useState(false)
   const sensors = useSensors(
@@ -78,7 +81,7 @@ export function CustomizeOverview({
   )
   const visible = visibleSections(sections)
   const hidden = hiddenSections(sections)
-  const addable = addableSections(type, sections, ctx)
+  const addable = addableOverride ?? (type ? addableSections(type, sections, ctx) : [])
   const queryItems = addable.filter((s) => isQueryKey(s.key))
   const otherItems = addable.filter((s) => !isQueryKey(s.key))
 

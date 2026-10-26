@@ -18,6 +18,7 @@ import { matchingValues } from '@/views/matching'
 import { FULL_VIEW_LAYOUTS } from '@/views/model'
 import { useRows } from '@/views/useRows'
 import { DataView } from '@/views/DataView'
+import { CreateCollectionDialog, DeleteCollectionDialog } from '@/collections/CollectionDialogs'
 import { DeleteTypeDialog } from './DeleteTypeDialog'
 import {
   SECTION_TEXT,
@@ -44,7 +45,16 @@ function mods(e: MouseEvent): OpenMods {
  * The type's "New" split button: "New {TypeName}" creates one (with the default template), and the
  * caret lists "New '{TemplateName}'" per template.
  */
-export function NewSplitButton({ type, values }: { type: TypeDef; values?: Record<string, unknown> }) {
+export function NewSplitButton({
+  type,
+  values,
+  defaultTemplateId,
+}: {
+  type: TypeDef
+  values?: Record<string, unknown>
+  /** A collection's default template: used by the plain "New" click instead of the type's default. */
+  defaultTemplateId?: string | null
+}) {
   const [templates, setTemplates] = useState<ObjectSummary[]>([])
   const allowed = templatesAllowed(type)
 
@@ -64,7 +74,11 @@ export function NewSplitButton({ type, values }: { type: TypeDef; values?: Recor
   }, [type.id, allowed])
 
   const create = (templateId: string | undefined, m: OpenMods) =>
-    void createAndOpen(type.id, { ...(templateId !== undefined ? { templateId } : {}), ...(values ? { values } : {}) }, m).catch((e: unknown) =>
+    void createAndOpen(
+      type.id,
+      { ...((templateId ?? defaultTemplateId ?? undefined) !== undefined ? { templateId: templateId ?? defaultTemplateId ?? undefined } : {}), ...(values ? { values } : {}) },
+      m,
+    ).catch((e: unknown) =>
       console.warn('Could not create an object:', e),
     )
 
@@ -107,7 +121,7 @@ export function NewSplitButton({ type, values }: { type: TypeDef; values?: Recor
 
 type TabKey = 'overview' | 'all' | string
 
-function TabPill({
+export function TabPill({
   active,
   onClick,
   icon,
@@ -138,18 +152,21 @@ function TabPill({
 }
 
 /** A header tab for a full-view section, with its menu (right-click or the caret). */
-function SectionTab({
+export function SectionTab({
   section,
   active,
   onSelect,
   onRename,
   onRemove,
+  onDelete,
 }: {
   section: RenderedSection
   active: boolean
   onSelect(): void
   onRename(title: string): void
   onRemove(): void
+  /** "Delete collection" / "Delete" on a collection or query tab. */
+  onDelete?(): void
 }) {
   const [menu, setMenu] = useState(false)
   const [renaming, setRenaming] = useState(false)
@@ -236,6 +253,12 @@ function SectionTab({
             <Icon name="ph-x" size={14} />
             Remove
           </DropdownMenuItem>
+          {onDelete && (
+            <DropdownMenuItem variant="destructive" onClick={onDelete}>
+              <Icon name="ph-trash" size={14} />
+              {isCollectionKey(section.key) ? 'Delete collection' : 'Delete'}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -284,6 +307,8 @@ export function TypePage({ type }: { type: TypeDef }) {
   const indexTypes = useLinkIndex((s) => s.types)
   const [search, setSearch] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [createCollectionOpen, setCreateCollectionOpen] = useState(false)
+  const [deletingCollection, setDeletingCollection] = useState<string | null>(null)
 
   const ctx = useMemo(() => ({ collections: defs.collections, queries: defs.queries }), [defs.collections, defs.queries])
   const sections = useMemo(() => (views ? buildSections(type, views, ctx) : []), [type, views, ctx])
@@ -350,8 +375,7 @@ export function TypePage({ type }: { type: TypeDef }) {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="border-line bg-raised">
-            {/* Wired by Task 13 (collections). */}
-            <DropdownMenuItem disabled>
+            <DropdownMenuItem onSelect={() => setCreateCollectionOpen(true)}>
               <Icon name="ph-stack" size={14} />
               {SECTION_TEXT.createCollection}
             </DropdownMenuItem>
@@ -391,6 +415,7 @@ export function TypePage({ type }: { type: TypeDef }) {
             active={tab === t.key}
             onSelect={() => select(t.key)}
             onRename={(title) => update((v) => patchSection(v, sections, t.key, { title: title || undefined }))}
+            onDelete={isCollectionKey(t.key) ? () => setDeletingCollection(keyId(t.key)) : undefined}
             onRemove={() =>
               update((v) => ({ ...removeSection(v, sections, t.key), activeTab: v.activeTab === t.key ? 'overview' : v.activeTab }))
             }
@@ -400,7 +425,14 @@ export function TypePage({ type }: { type: TypeDef }) {
       <div className="mx-auto w-full px-6 pt-4 pb-16">
         {!views && <p className="py-8 text-center text-[14px] text-fg-muted">Loading results…</p>}
         {views && tab === 'overview' && (
-          <TypeOverview type={type} sections={sections} ctx={ctx} search={search} update={update} />
+          <TypeOverview
+            type={type}
+            sections={sections}
+            ctx={ctx}
+            search={search}
+            update={update}
+            onCreateCollection={() => setCreateCollectionOpen(true)}
+          />
         )}
         {views && tab === 'all' && <AllTab type={type} views={views} search={search} update={update} />}
         {views && activeSection && (
@@ -413,6 +445,19 @@ export function TypePage({ type }: { type: TypeDef }) {
           />
         )}
       </div>
+      <CreateCollectionDialog
+        open={createCollectionOpen}
+        onOpenChange={setCreateCollectionOpen}
+        typeId={type.id}
+        onCreated={(c) => useTabs.getState().open({ kind: 'collection', id: c.id })}
+      />
+      {deletingCollection && defs.collections.some((c) => c.id === deletingCollection) && (
+        <DeleteCollectionDialog
+          collection={defs.collections.find((c) => c.id === deletingCollection)!}
+          open
+          onOpenChange={(o) => !o && setDeletingCollection(null)}
+        />
+      )}
       {deleteOpen && (
         <DeleteTypeDialog
           type={type}

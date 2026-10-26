@@ -5,7 +5,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { ObjectDetail, ObjectSummary, RenameResult, TypeDef, UpdateResult } from '@/api/types'
+import { CollectionPicker } from '@/collections/CollectionPicker'
 import { Icon } from '@/components/Icon'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -93,6 +95,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
   /** The Trash entry of this window's own delete ("Undo Delete"). */
   const [trashId, setTrashId] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [collectionsOpen, setCollectionsOpen] = useState(false)
   const [undoError, setUndoError] = useState<string | null>(null)
   const [changeTo, setChangeTo] = useState<TypeDef | null>(null)
   /** Mirrors `deleted` for the change listener (which must not wait for a render). */
@@ -556,6 +559,13 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             )}
+            <DropdownMenuItem
+              disabled={propsReadOnly || !summary || isTemplate}
+              onSelect={() => setCollectionsOpen(true)}
+            >
+              <Icon name="ph-stack" size={14} />
+              Edit Collections
+            </DropdownMenuItem>
             {type && (
               <DropdownMenuItem onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>
                 <Icon name="ph-gear-six" size={14} />
@@ -595,6 +605,19 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
       />
       {typeEditor.dialog}
       <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} />
+      {summary && (
+        <Dialog open={collectionsOpen} onOpenChange={setCollectionsOpen}>
+          <DialogContent className="w-auto border-line bg-raised p-0 text-fg sm:max-w-none">
+            <DialogTitle className="sr-only">Edit Collections</DialogTitle>
+            <DialogDescription className="sr-only">Choose the collections this object belongs to.</DialogDescription>
+            <CollectionPicker
+              value={summary.collections ?? []}
+              typeId={summary.type}
+              onChange={(next) => writeProperties({ collections: next })}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
       {changeTo && (
         <ChangeTypeDialog
           open
