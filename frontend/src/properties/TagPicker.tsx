@@ -14,6 +14,8 @@ export interface TagPickerProps {
   onChange(next: string[]): void
   /** Opens a tag's object page (a click on a selected tag). */
   onOpenTag?(name: string): void
+  /** The search to start with (the title's `#query`). */
+  initialQuery?: string
 }
 
 /** The space's Tag objects. */
@@ -33,9 +35,9 @@ export function tagColor(tags: ObjectSummary[], name: string): string | null {
  * not yet selected, then "Create 'x'" when no tag has that name. The parent creates the Tag
  * object (`api.ensureTag`) when it saves.
  */
-export function TagPicker({ value, onChange, onOpenTag }: TagPickerProps) {
+export function TagPicker({ value, onChange, onOpenTag, initialQuery }: TagPickerProps) {
   const tags = useTagObjects()
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery ?? '')
 
   useEffect(() => {
     void ensureLinkIndex()

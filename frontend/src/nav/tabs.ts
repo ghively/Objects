@@ -32,6 +32,8 @@ export interface TabsState {
   newTab(): void
   /** Drop every tab (tests, and recovery from bad persisted state). */
   reset(): void
+  /** An object moved (renamed or retyped): point every tab's history and the peek at its new path. */
+  retarget(oldPath: string, newPath: string): void
 }
 
 let seq = 0
@@ -131,6 +133,17 @@ export const useTabs = create<TabsState>()(
       reset() {
         set({ tabs: [], activeId: null })
       },
+
+      retarget(oldPath, newPath) {
+        if (oldPath !== newPath) {
+          const moved = (t: Target): Target => (t.kind === 'object' && t.path === oldPath ? { kind: 'object', path: newPath } : t)
+          const s = get()
+          if (s.tabs.some((t) => t.history.some((h) => h.kind === 'object' && h.path === oldPath))) {
+            set({ tabs: s.tabs.map((t) => ({ ...t, history: t.history.map(moved) })) })
+          }
+        }
+        usePeek.getState().retarget(oldPath, newPath)
+      },
     }),
     {
       name: 'object.tabs',
@@ -160,6 +173,8 @@ export interface PeekState {
   close(): void
   next(): void
   prev(): void
+  /** An object moved: replace `oldPath` in the peek and its pager list. */
+  retarget(oldPath: string, newPath: string): void
 }
 
 export const usePeek = create<PeekState>()((set, get) => ({
@@ -186,5 +201,11 @@ export const usePeek = create<PeekState>()((set, get) => ({
     const { list, index, path } = get()
     if (path === null || index <= 0) return
     set({ index: index - 1, path: list[index - 1] })
+  },
+
+  retarget(oldPath, newPath) {
+    const { list, path } = get()
+    if (oldPath === newPath || (path !== oldPath && !list.includes(oldPath))) return
+    set({ path: path === oldPath ? newPath : path, list: list.map((p) => (p === oldPath ? newPath : p)) })
   },
 }))

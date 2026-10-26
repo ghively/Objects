@@ -103,7 +103,7 @@ describe('ObjectPeek', () => {
     const dialog = await openPeekAt(0)
     const panel = within(dialog).getByRole('complementary', { name: 'Properties' })
     expect(within(panel).getByText('Email')).toBeInTheDocument()
-    expect(within(panel).getByText('Empty')).toBeInTheDocument()
+    expect(within(panel).getByPlaceholderText('Empty')).toBeInTheDocument()
   })
 
   test('unresolved wikilink renders dimmed', async () => {

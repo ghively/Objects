@@ -2,9 +2,9 @@
  * An object's full view, shared by the page and the peek: property panel,
  * header and body editor (formatted or raw), with the `…` menu.
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
-import type { ObjectDetail } from '@/api/types'
+import type { ObjectDetail, ObjectSummary, RenameResult, TypeDef, UpdateResult } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import {
   DropdownMenu,
@@ -23,8 +23,10 @@ import { installWikilinkPresenter } from '@/links/wikilinkPresenter'
 import { cn } from '@/lib/utils'
 import { useTabs } from '@/nav/tabs'
 import { ConflictDialog } from './ConflictDialog'
-import { ObjectHeader } from './ObjectHeader'
+import { ensureNewTags, ObjectHeader, openTag } from './ObjectHeader'
 import { PropertyPanel } from './PropertyPanel'
+import { useObjectWrites, type BodyControl } from './useObjectWrites'
+import { useTypeEditor } from './useTypeEditor'
 
 installWikilinkPresenter()
 installLinkPicker()
@@ -38,6 +40,22 @@ export interface ObjectViewProps {
   onDismiss?: () => void
   /** Bottom-right slot (the peek's pager). */
   footer?: ReactNode
+}
+
+/** The summary fields a property write changes, read back from the written frontmatter. */
+export function patchSummary(summary: ObjectSummary, fm: Record<string, unknown>): ObjectSummary {
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null)
+  const list = (v: unknown) => (Array.isArray(v) ? v : v == null ? [] : [v]).filter((x) => x != null).map(String)
+  const next = { ...summary }
+  if ('title' in fm) next.title = str(fm.title) ?? summary.title
+  if ('icon' in fm) next.icon = str(fm.icon)
+  if ('icon' in fm || 'iconColor' in fm) next.iconColor = str(fm.iconColor)
+  if ('description' in fm) next.description = str(fm.description)
+  if ('aliases' in fm) next.aliases = list(fm.aliases)
+  if ('tags' in fm) next.tags = list(fm.tags)
+  if ('coverImage' in fm) next.coverImage = str(fm.coverImage)
+  if ('color' in fm) next.color = str(fm.color)
+  return next
 }
 
 function ToolButton({ label, icon, onClick }: { label: string; icon: string; onClick?: () => void }) {
@@ -80,6 +98,30 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
     setVersion(v)
   }, [])
 
+  /**
+   * True while a conflict (a body save or a property write rejected with 409, or an external
+   * change colliding with unsaved edits) is unresolved: property writes wait for it.
+   */
+  const blockedRef = useRef(false)
+  /** Mirrors `pending` for callbacks that must not wait for a render. */
+  const pendingRef = useRef(false)
+  /** The path our own rename moved this object to (its reload keeps the view on screen). */
+  const renamedToRef = useRef<string | null>(null)
+
+  const bodyControl = useRef<BodyControl>({
+    flush: async () => {
+      if (!blockedRef.current) {
+        try {
+          await editorRef.current?.flush()
+        } catch {
+          /* the save reported its own error */
+        }
+      }
+      return { ok: !blockedRef.current }
+    },
+    resume: (v: string) => editorRef.current?.resume(v),
+  }).current
+
   const load = useCallback(async () => {
     const d = await api.object(path)
     setDetail(d)
@@ -112,6 +154,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
         h?.reload(theirs.body, theirs.version)
         setDetail(theirs)
         adoptVersion(theirs.version)
+        unblockRef.current()
         return
       }
       if (theirs.body === h.savedBody() || theirs.body === mine) {
@@ -120,13 +163,62 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
         setDetail((d) => (d ? { ...theirs, body: d.body } : theirs))
         adoptVersion(theirs.version)
         void h.resume(theirs.version, fromConflict)
+        unblockRef.current()
         return
       }
       setDetail((d) => (d ? { ...theirs, body: d.body } : theirs))
+      blockedRef.current = true
+      pendingRef.current = true
       setPending({ mine, theirs })
     },
     [path, adoptVersion, markDeleted],
   )
+
+  const onConflict = useCallback(() => {
+    blockedRef.current = true
+    enqueueRef.current(true)
+  }, [])
+
+  const writes = useObjectWrites({
+    path,
+    versionRef,
+    bodyControl,
+    adoptVersion,
+    onConflict,
+    onUpdated: (res: UpdateResult, _updates, remove) => {
+      setDetail((d) => {
+        if (!d) return d
+        const frontmatter = { ...d.frontmatter, ...res.frontmatter }
+        for (const k of remove) delete frontmatter[k]
+        return {
+          ...d,
+          frontmatter,
+          links: { ...d.links, ...res.links },
+          summary: patchSummary(d.summary, res.frontmatter),
+          version: res.version,
+        }
+      })
+    },
+    onRenamed: (res: RenameResult, oldPath: string) => {
+      setDetail((d) => (d ? { ...d, summary: { ...d.summary, path: res.path }, version: res.version } : d))
+      if (res.path !== oldPath) {
+        renamedToRef.current = res.path
+        useTabs.getState().retarget(oldPath, res.path)
+      }
+    },
+  })
+
+  /** The conflict is resolved: property writes queued behind it are sent on the new version. */
+  const replay = writes.replay
+  const unblock = useCallback(() => {
+    if (pendingRef.current) return
+    blockedRef.current = false
+    replay()
+  }, [replay])
+  const unblockRef = useRef(unblock)
+  useLayoutEffect(() => {
+    unblockRef.current = unblock
+  }, [unblock])
 
   // Change events arrive one at a time; handle them in order.
   const queueRef = useRef<Promise<void>>(Promise.resolve())
@@ -136,6 +228,10 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
     },
     [reconcile],
   )
+  const enqueueRef = useRef(enqueue)
+  useLayoutEffect(() => {
+    enqueueRef.current = enqueue
+  }, [enqueue])
 
   useEffect(() => {
     return api.onChange((e) => {
@@ -161,23 +257,46 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
     const h = editorRef.current
     const p = pending
     setPending(null)
+    pendingRef.current = false
     if (!h || !p) return
     // Save my text against the version now on disk; a further conflict asks again.
+    adoptVersion(p.theirs.version)
     void h.resume(p.theirs.version, true)
+    unblockRef.current()
   }
 
   const takeTheirs = () => {
     const h = editorRef.current
     const p = pending
     setPending(null)
+    pendingRef.current = false
     if (!p) return
     h?.reload(p.theirs.body, p.theirs.version)
     setDetail(p.theirs)
     adoptVersion(p.theirs.version)
+    unblockRef.current()
   }
 
   useEffect(() => {
     let alive = true
+    blockedRef.current = false
+    pendingRef.current = false
+    setPending(null)
+    if (renamedToRef.current === path) {
+      // Our own rename: keep showing the object while its new path loads.
+      renamedToRef.current = null
+      api
+        .object(path)
+        .then((d) => {
+          if (!alive) return
+          setDetail(d)
+          adoptVersion(d.version)
+        })
+        .catch(() => undefined)
+      return () => {
+        alive = false
+      }
+    }
     setDetail(null)
     setError(null)
     markDeleted(false)
@@ -215,12 +334,37 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
   }
 
   const summary = detail?.summary
-  const type = typeOf(summary?.type)
+  const typeEditor = useTypeEditor(summary?.type)
+  const type = typeEditor.type ?? typeOf(summary?.type)
   const readOnly = !!summary?.readOnly
+  /** Properties and the title can't be written while the file is gone. */
+  const propsReadOnly = readOnly || deleted
+
+  const writeProperties = (updates: Record<string, unknown>) => {
+    if ('tags' in updates && Array.isArray(updates.tags)) {
+      ensureNewTags(detail?.summary.tags ?? [], updates.tags as string[])
+    }
+    void writes.updateProperties(updates)
+  }
+  const onTypeChange = (next: TypeDef) => typeEditor.save(next)
+  const onOpenTag = (name: string) => void openTag(name).catch(() => undefined)
+  const onOpenObject = (p: string) => useTabs.getState().open({ kind: 'object', path: p })
 
   return (
     <div className="flex h-full min-h-0 w-full" data-object-view={mode}>
-      {detail && panelOpen && <PropertyPanel type={type} frontmatter={detail.frontmatter} />}
+      {detail && panelOpen && (
+        <PropertyPanel
+          type={type}
+          frontmatter={detail.frontmatter}
+          links={detail.links}
+          summary={detail.summary}
+          readOnly={propsReadOnly}
+          onChange={(key, value) => writeProperties({ [key]: value })}
+          onTypeChange={onTypeChange}
+          onOpenTag={onOpenTag}
+          onOpenObject={onOpenObject}
+        />
+      )}
       <div className="relative flex min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between px-3.5 pt-3.5">
           <button
@@ -287,7 +431,14 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
             {!detail && !error && <p className="text-fg-muted">Loading…</p>}
             {detail && summary && (
               <>
-                <ObjectHeader summary={summary} type={type} />
+                <ObjectHeader
+                  summary={summary}
+                  type={type}
+                  readOnly={propsReadOnly}
+                  onRename={(title) => void writes.rename(title)}
+                  onPropertiesChange={writeProperties}
+                  onOpenTag={onOpenTag}
+                />
                 {readOnly && (
                   <div role="status" className="mb-4 rounded-lg border border-line bg-raised px-3 py-2 text-[14px] text-fg-muted">
                     {summary.readOnlyReason
@@ -308,7 +459,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
                       version={version}
                       readOnly={readOnly}
                       onSaved={adoptVersion}
-                      onConflict={() => enqueue(true)}
+                      onConflict={onConflict}
                       controlRef={editorRef}
                     />
                   ) : (
@@ -318,7 +469,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
                       version={version}
                       readOnly={readOnly}
                       onSaved={adoptVersion}
-                      onConflict={() => enqueue(true)}
+                      onConflict={onConflict}
                       controlRef={editorRef}
                     />
                   )}
@@ -336,6 +487,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
           onKeepMine={keepMine}
           onTakeTheirs={takeTheirs}
         />
+        {typeEditor.dialog}
       </div>
     </div>
   )
