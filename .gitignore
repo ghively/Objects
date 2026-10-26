@@ -10,6 +10,7 @@ docs/03-settings-account.png
 # Build and runtime
 node_modules/
 dist/
+!docs/design-notes
 .venv/
 __pycache__/
 *.pyc
