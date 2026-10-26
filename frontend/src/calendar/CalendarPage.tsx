@@ -2,6 +2,7 @@
 import type { Target } from '@/nav/tabs'
 import { rangeFor, type DayRange } from './dates'
 import { CalendarChrome } from './CalendarChrome'
+import { DayView } from './DayView'
 import { useCalendar, useWeekStart } from './useCalendar'
 
 export interface CalendarPageProps {
@@ -11,7 +12,7 @@ export interface CalendarPageProps {
   onOpenTarget: (t: Target) => void
 }
 
-/** A view's placeholder until its task lands (Day: Task 13; Three days, Week, Month: Task 14). */
+/** A view's placeholder until its task lands (Three days, Week, Month: Task 14). */
 function Pending({ view, range }: { view: string; range: DayRange }) {
   return (
     <div className="p-8 text-fg-muted" data-view={view} data-from={range.from} data-to={range.to}>
@@ -29,7 +30,7 @@ export function CalendarPage({ rightPanelOpen, onToggleRightPanel, onOpenTarget 
   let body
   switch (view) {
     case 'day':
-      body = <Pending view="day" range={range} />
+      body = <DayView day={anchor} onOpenTarget={onOpenTarget} />
       break
     case 'rolling':
       body = <Pending view="rolling" range={range} />
