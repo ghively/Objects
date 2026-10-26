@@ -299,3 +299,32 @@ def test_watcher_silent_for_own_ui_and_views_writes(space_dir: Path):
         assert await _drain(watcher, QUIET) == []
 
     _run(space_dir, scenario)
+
+
+def test_watcher_external_collection_edit_refreshes_space(space_dir: Path):
+    def _member(space: Space, name: str, type_name: str, coll: str) -> str:
+        path = f"Pages/{name}.md"
+        (space_dir / "Pages").mkdir(exist_ok=True)
+        text = "---\ntype: " + type_name + "\ncollections: [" + coll + "]\n---\n"
+        (space_dir / path).write_text(text, encoding="utf-8", newline="\n")
+        space.rescan_file(path)
+        return path
+
+    async def scenario(space: Space, watcher: SpaceWatcher):
+        page = space.type_by_id("page")
+        c = await asyncio.to_thread(space.create_collection, "Tooling", [page.id])
+        gear = _member(space, "In Gear", page.name, "Gear")
+        tool = _member(space, "In Tooling", page.name, "Tooling")
+        await _drain(watcher, QUIET)
+        assert [r.summary.path for r in space.rows(collection_ids=[c.id])] == [tool]
+        file = space_dir / ".object" / "collections" / f"{c.id}.json"
+        data = json.loads(file.read_text("utf-8"))
+        data["name"] = "Gear"
+        file.write_text(json.dumps(data), encoding="utf-8")
+        ev = await _next_event(watcher)
+        assert (ev.kind, ev.path) == ("collections", c.id)
+        assert space.collection_by_name("Gear").id == c.id
+        assert space.collection_by_name("Tooling") is None
+        assert [r.summary.path for r in space.rows(collection_ids=[c.id])] == [gear]
+
+    _run(space_dir, scenario)

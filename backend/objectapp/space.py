@@ -56,7 +56,8 @@ from .frontmatter import (
     set_keys,
 )
 from .ids import new_ulid
-from .jsonstore import JsonStore
+from .collections import CollectionDef, SaveCollectionResult
+from .jsonstore import DefinitionUnreadable, JsonStore
 from .objfile import ObjectFile, join_object
 from .propvalues import (
     KIND_TRANSFORMS,
@@ -582,6 +583,10 @@ class Space:
         """Type id -> the revision of its file when the in-memory copy was loaded or written."""
         for rel, raw in self._raw.items():
             self._summaries[rel] = self._summarize(raw)
+        self.collections: dict[str, CollectionDef] = {}
+        """Collection id -> definition (unreadable files included, read-only)."""
+        for cid, data, _rev, err in self.store("collections").list():
+            self.collections[cid] = self._load_collection(cid, data, err)
         self.purge_expired(datetime.now(UTC))
 
     # -- types --------------------------------------------------------------
@@ -658,18 +663,127 @@ class Space:
             lock=self._lock,
         )
 
+    # -- collections ---------------------------------------------------------
+
+    @staticmethod
+    def _load_collection(cid: str, data: dict | None, error: str | None) -> CollectionDef:
+        if data is None:
+            c = CollectionDef(id=cid, name=cid)
+            c.readOnlyReason = error or "The collection file could not be read."
+            return c
+        return CollectionDef.from_json(data, fallback_id=cid)
+
+    def reload_collection(self, collection_id: str) -> None:
+        """Re-read one collection file into `self.collections` (drop it when the file is gone)."""
+        with self._lock:
+            store = self.store("collections")
+            try:
+                data, _rev = store.read(collection_id)
+                error = None
+            except DefinitionUnreadable as exc:
+                data, error = None, exc.error
+            except ValueError:
+                self.collections.pop(collection_id, None)
+                return
+            if data is None and error is None:
+                self.collections.pop(collection_id, None)
+            else:
+                self.collections[collection_id] = self._load_collection(collection_id, data, error)
+
+    def reload_collections(self) -> None:
+        """Re-read every collection file (the list route does this, so it is never stale)."""
+        with self._lock:
+            found = {}
+            for cid, data, _rev, err in self.store("collections").list():
+                found[cid] = self._load_collection(cid, data, err)
+            self.collections = found
+
+    def list_collections(self) -> list[CollectionDef]:
+        with self._lock:
+            return sorted(self.collections.values(), key=lambda c: (c.name.lower(), c.id))
+
+    def collection_revision(self, collection_id: str) -> str:
+        return self.store("collections").revision(collection_id)
+
+    def collection_by_name(self, name: str) -> CollectionDef | None:
+        """The readable collection `name` names: by name first, then by former name."""
+        key = name.strip().casefold()
+        with self._lock:
+            live = [c for c in self.list_collections() if not c.readOnlyReason]
+            for c in live:
+                if c.name.strip().casefold() == key:
+                    return c
+            for c in live:
+                if any(f.strip().casefold() == key for f in c.formerNames):
+                    return c
+        return None
+
     def _collection_names(self) -> dict[str, list[str]]:
-        """Collection id -> [its name, *formerNames], from the readable collection files."""
-        out: dict[str, list[str]] = {}
-        for cid, data, _rev, _err in self.store("collections").list():
-            if not isinstance(data, dict):
-                continue
-            names = [str(data.get("name") or "")]
-            former = data.get("formerNames")
-            if isinstance(former, list):
-                names += [str(f) for f in former if isinstance(f, str)]
-            out[cid] = names
-        return out
+        """Collection id -> [its name, *formerNames], from the readable collections."""
+        with self._lock:
+            return {
+                c.id: [c.name, *c.formerNames]
+                for c in self.collections.values()
+                if not c.readOnlyReason
+            }
+
+    def _check_collection_name(self, name: str, except_id: str | None) -> None:
+        low = name.strip().casefold()
+        for c in self.collections.values():
+            if c.id != except_id and not c.readOnlyReason and c.name.strip().casefold() == low:
+                raise InvalidValue("A collection with this name already exists.")
+
+    def create_collection(
+        self, name: str, type_ids: list[str], icon: object | None = None
+    ) -> CollectionDef:
+        with self._lock:
+            known = {t.id for t in self.types}
+            for tid in type_ids:
+                if tid not in known:
+                    raise InvalidValue(f"Unknown object type {tid!r}.")
+            name = name.strip()
+            if name:
+                self._check_collection_name(name, None)
+            else:
+                name, n = "New Collection", 1
+                taken = {c.name.strip().casefold() for c in self.collections.values()}
+                while name.casefold() in taken:
+                    n += 1
+                    name = f"New Collection {n}"
+            store = self.store("collections")
+            cid = store.new_id(name)
+            c = CollectionDef(
+                id=cid,
+                name=name,
+                icon=Icon.parse(icon),
+                typeIds=list(dict.fromkeys(type_ids)),
+            )
+            store.write(cid, c.to_json(), "")
+            self.collections[cid] = c
+            return c
+
+    def save_collection(self, c: CollectionDef, base_revision: str) -> SaveCollectionResult:
+        """Save `c` over its file if still at `base_revision` (`RevisionConflict`, `ReadOnly`)."""
+        with self._lock:
+            store = self.store("collections")
+            try:
+                stored, _rev = store.read(c.id)
+            except DefinitionUnreadable as exc:
+                raise ReadOnly(exc.error) from exc
+            if stored is None:
+                raise KeyError(c.id)
+            before = CollectionDef.from_json(stored, fallback_id=c.id)
+            if not c.name.strip():
+                raise InvalidValue("A collection needs a name.")
+            self._check_collection_name(c.name, c.id)
+            known = {t.id for t in self.types} | set(before.typeIds)
+            for tid in c.typeIds:
+                if tid not in known:
+                    raise InvalidValue(f"Unknown object type {tid!r}.")
+            c.readOnlyReason = None
+            revision = store.write(c.id, c.to_json(), base_revision)
+            self.collections[c.id] = c
+            return SaveCollectionResult(collection=c, revision=revision)
 
     def rows(
         self,
