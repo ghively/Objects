@@ -90,11 +90,31 @@ describe('TrashView', () => {
     await waitFor(() => expect(useLinkIndex.getState().types.map((t) => t.id)).toContain('book'))
   })
 
-  test('Delete permanently purges one entry', async () => {
+  test('Delete permanently purges one entry only after confirming', async () => {
     const user = userEvent.setup()
     render(<TrashView />)
     const row = await screen.findByRole('listitem', { name: 'Note' })
     await user.click(within(row).getByRole('button', { name: 'Delete permanently' }))
+    const dialog = await screen.findByRole('alertdialog', { name: 'Permanently delete' })
+    expect(dialog).toHaveTextContent(
+      'Are you sure you want to permanently delete 1 object(s)? This action cannot be undone.',
+    )
+    expect(mocked.purge).not.toHaveBeenCalled()
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect(mocked.purge).not.toHaveBeenCalled()
+
+    await user.click(within(row).getByRole('button', { name: 'Delete permanently' }))
+    const again = await screen.findByRole('alertdialog', { name: 'Permanently delete' })
+    await user.click(within(again).getByRole('button', { name: 'Delete permanently' }))
     await waitFor(() => expect(mocked.purge).toHaveBeenCalledWith('o1'))
+  })
+
+  test('a type row counts the type and its objects', async () => {
+    const user = userEvent.setup()
+    render(<TrashView />)
+    const row = await screen.findByRole('listitem', { name: 'Book' })
+    await user.click(within(row).getByRole('button', { name: 'Delete permanently' }))
+    const dialog = await screen.findByRole('alertdialog', { name: 'Permanently delete' })
+    expect(dialog).toHaveTextContent('permanently delete 4 object(s)?')
   })
 })
