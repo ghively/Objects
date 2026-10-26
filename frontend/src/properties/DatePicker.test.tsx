@@ -102,3 +102,146 @@ describe('parseDateInput', () => {
     expect(parseDateInput('', NOW)).toBeNull()
   })
 })
+
+// M4 Task 9: the Task date picker (schedule suggestions, Repeat, Reminder).
+describe('DatePicker: the Task date', () => {
+  const TASK_C = { resolutionPreference: 'day' as const, endTimeSettings: 'notAllowed' as const, supportsReminders: true }
+
+  it('test reminder presets follow resolution', async () => {
+    const { unmount } = render(
+      <DatePicker
+        value={{ start: '2026-10-30', resolution: 'day' }}
+        constraints={TASK_C}
+        onChange={() => {}}
+        task={{ repeat: null, remind: null }}
+        onTaskChange={() => {}}
+        now={NOW}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Reminder: No reminder' }))
+    const dayItems = screen.getAllByRole('menuitemradio').map((b) => b.textContent)
+    expect(dayItems).toEqual(['No reminder', 'On the day', '1 day before', '2 days before', '7 days before'])
+    expect(screen.getByLabelText('Time')).toHaveValue('09:00')
+    for (const s of ['Morning', 'Noon', 'Afternoon', 'Evening', 'Night']) expect(screen.getByRole('button', { name: s })).toBeInTheDocument()
+    unmount()
+
+    render(
+      <DatePicker
+        value={{ start: new Date(2026, 9, 30, 14, 0).toISOString(), resolution: 'time' }}
+        constraints={TASK_C}
+        onChange={() => {}}
+        task={{ repeat: null, remind: null }}
+        onTaskChange={() => {}}
+        now={NOW}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Reminder: No reminder' }))
+    const timeItems = screen.getAllByRole('menuitemradio').map((b) => b.textContent)
+    expect(timeItems).toEqual(['No reminder', 'At time of event', '5 minutes before', '15 minutes before', '30 minutes before', '1 hour before'])
+    expect(screen.queryByLabelText('Time')).toBeNull()
+  })
+
+  it('shows the schedule suggestions and the repeat presets named from the date', async () => {
+    const onTaskChange = vi.fn()
+    render(
+      <DatePicker
+        value={{ start: '2026-10-30', resolution: 'day' }}
+        constraints={TASK_C}
+        onChange={() => {}}
+        task={{ repeat: null, remind: null }}
+        onTaskChange={onTaskChange}
+        now={NOW}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Next month' })).toHaveAttribute('title', 'Schedule task for the next month')
+    expect(screen.queryByRole('button', { name: 'Yesterday' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Next week' }))
+    expect(onTaskChange).toHaveBeenLastCalledWith({ date: { start: '2026-10-28', resolution: 'day' }, repeat: null, remind: null })
+    await userEvent.click(screen.getByRole('button', { name: 'Repeat: No repeat' }))
+    expect(screen.getAllByRole('menuitemradio').map((b) => b.textContent)).toEqual([
+      'No repeat',
+      'Daily',
+      'Every weekday',
+      'Weekly on Friday',
+      'Monthly on day 30',
+      'Yearly on October 30',
+      'Custom',
+    ])
+    await userEvent.click(screen.getByRole('menuitemradio', { name: 'Monthly on day 30' }))
+    expect(onTaskChange).toHaveBeenLastCalledWith({ date: { start: '2026-10-30', resolution: 'day' }, repeat: 'every month', remind: null })
+  })
+
+  it('the Reminder row needs supportsReminders', () => {
+    render(
+      <DatePicker
+        value={{ start: '2026-10-30', resolution: 'day' }}
+        constraints={{ resolutionPreference: 'day', endTimeSettings: 'notAllowed' }}
+        onChange={() => {}}
+        task={{ repeat: null, remind: null }}
+        onTaskChange={() => {}}
+        now={NOW}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Repeat: No repeat' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Reminder:/ })).toBeNull()
+  })
+
+  it('test invalid repeat shown with hint and kept', async () => {
+    const onTaskChange = vi.fn()
+    render(
+      <DatePicker
+        value={{ start: '2026-10-30', resolution: 'day' }}
+        constraints={TASK_C}
+        onChange={() => {}}
+        task={{ repeat: 'every 2 fortnights', remind: null }}
+        onTaskChange={onTaskChange}
+        now={NOW}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Repeat: every 2 fortnights' })).toBeInTheDocument()
+    expect(screen.getByText('Not a valid repeat.')).toBeInTheDocument()
+    // A date change keeps the text as it is.
+    await userEvent.click(screen.getByRole('button', { name: 'Tomorrow' }))
+    expect(onTaskChange).toHaveBeenLastCalledWith({ date: { start: '2026-10-22', resolution: 'day' }, repeat: 'every 2 fortnights', remind: null })
+  })
+
+  it("a reminder that doesn't fit the date is shown with a hint and kept", async () => {
+    const onTaskChange = vi.fn()
+    render(
+      <DatePicker
+        value={{ start: '2026-10-30', resolution: 'day' }}
+        constraints={TASK_C}
+        onChange={() => {}}
+        task={{ repeat: null, remind: '15 minutes before' }}
+        onTaskChange={onTaskChange}
+        now={NOW}
+      />,
+    )
+    expect(screen.getByText("Doesn't fit this date.")).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Tomorrow' }))
+    expect(onTaskChange).toHaveBeenLastCalledWith({ date: { start: '2026-10-22', resolution: 'day' }, repeat: null, remind: '15 minutes before' })
+  })
+
+  it('Custom opens the Custom repeat panel in place and saves the rule', async () => {
+    const onTaskChange = vi.fn()
+    render(
+      <DatePicker
+        value={{ start: '2026-10-30', resolution: 'day' }}
+        constraints={TASK_C}
+        onChange={() => {}}
+        task={{ repeat: null, remind: null }}
+        onTaskChange={onTaskChange}
+        now={NOW}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Repeat: No repeat' }))
+    await userEvent.click(screen.getByRole('menuitemradio', { name: 'Custom' }))
+    expect(screen.getByRole('dialog', { name: 'Custom repeat' })).toBeInTheDocument()
+    const every = screen.getByLabelText('Every')
+    await userEvent.clear(every)
+    await userEvent.type(every, '3')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(onTaskChange).toHaveBeenLastCalledWith({ date: { start: '2026-10-30', resolution: 'day' }, repeat: 'every 3 days', remind: null })
+    expect(screen.queryByRole('dialog', { name: 'Custom repeat' })).toBeNull()
+  })
+})
