@@ -1,12 +1,91 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
 import { api } from '@/api/client'
 import type { ObjectSummary, TypeDef } from '@/api/types'
+import { Icon } from '@/components/Icon'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { createAndOpen, type OpenMods } from '@/create/createAndOpen'
 import { ObjectIcon } from '@/object/ObjectHeader'
+import { templateName } from '@/object/UseTemplateMenu'
 import { usePeek } from '@/nav/tabs'
 import { TypeChip } from '@/shell/Sidebar'
+import { orderTemplates, templateKey, templatesAllowed } from './TemplateManager'
 
 /** Change events arrive in bursts (a git checkout, a sync tool): reload once per burst. */
 const RELOAD_DELAY_MS = 150
+
+function mods(e: MouseEvent): OpenMods {
+  return { ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey }
+}
+
+/**
+ * The type's "New" split button: "New {TypeName}" creates one (with the default template), and the
+ * caret lists "New '{TemplateName}'" per template.
+ */
+export function NewSplitButton({ type }: { type: TypeDef }) {
+  const [templates, setTemplates] = useState<ObjectSummary[]>([])
+  const allowed = templatesAllowed(type)
+
+  useEffect(() => {
+    if (!allowed) {
+      setTemplates([])
+      return
+    }
+    let alive = true
+    api
+      .templates(type.id)
+      .then((ts) => alive && setTemplates(ts ?? []))
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [type.id, allowed])
+
+  const create = (templateId: string | undefined, m: OpenMods) =>
+    void createAndOpen(type.id, templateId !== undefined ? { templateId } : {}, m).catch((e: unknown) =>
+      console.warn('Could not create an object:', e),
+    )
+
+  const ordered = orderTemplates(type, templates)
+
+  return (
+    <div className="flex h-8 items-stretch overflow-hidden rounded-lg border border-line bg-raised text-[14px] font-medium">
+      <button
+        type="button"
+        onClick={(e) => create(undefined, mods(e))}
+        className="flex items-center gap-1.5 px-2.5 hover:bg-hover"
+      >
+        <Icon name="ph-plus" size={14} />
+        {`New ${type.name}`}
+      </button>
+      {ordered.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="New from template"
+              className="flex items-center border-l border-line px-1.5 hover:bg-hover"
+            >
+              <Icon name="ph-caret-down" size={13} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="border-line bg-raised">
+            {ordered.map((t) => (
+              <DropdownMenuItem key={templateKey(t)} onClick={(e) => create(templateKey(t), mods(e))}>
+                <Icon name="ph-file-dashed" size={14} />
+                {`New '${templateName(t)}'`}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  )
+}
 
 /** M1 type page: header (icon tile + plural name) and a plain list of titles; click to peek. */
 export function TypePage({ type }: { type: TypeDef }) {
@@ -57,6 +136,8 @@ export function TypePage({ type }: { type: TypeDef }) {
             {objects.length}
           </span>
         )}
+        <div className="flex-1" />
+        <NewSplitButton type={type} />
       </header>
       <div className="mx-auto w-full max-w-[1100px] px-10 pt-6 pb-16">
       {error && <p className="text-fg-muted">{error}</p>}
