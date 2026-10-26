@@ -1,10 +1,8 @@
 import type { Sort } from '@/api/types'
 import { Icon } from '@/components/Icon'
-import { cn } from '@/lib/utils'
+import { MenuSelect, propertyOptions } from './MenuSelect'
 import { choiceFor, type PropChoice } from './properties'
 import { SORT_OPTIONS } from './sort'
-
-const SELECT = 'h-7 max-w-full rounded-md border border-line bg-raised px-1.5 text-[13px] text-fg outline-none'
 
 export interface SortEditorProps {
   sorts: Sort[]
@@ -34,11 +32,11 @@ export function SortEditor({ sorts, onChange, choices }: SortEditorProps) {
         const options = c ? SORT_OPTIONS(c.kind) : []
         return (
           <div key={`${s.propertyId}-${i}`} className="flex items-center gap-1.5">
-            <select
-              aria-label="Sort property"
+            <MenuSelect
+              label="Sort property"
               value={c ? s.propertyId : ''}
-              onChange={(e) => {
-                const n = choiceFor(choices, e.target.value)
+              onChange={(v) => {
+                const n = choiceFor(choices, v)
                 if (n)
                   setAt(i, {
                     propertyId: n.key,
@@ -46,29 +44,16 @@ export function SortEditor({ sorts, onChange, choices }: SortEditorProps) {
                     ...(n.structureId ? { structureId: n.structureId } : {}),
                   })
               }}
-              className={cn(SELECT, 'min-w-[7rem] flex-1')}
-            >
-              {!c && <option value="">Invalid</option>}
-              {usable
-                .filter((u) => u.key === s.propertyId || free.includes(u))
-                .map((u) => (
-                  <option key={u.key} value={u.key}>
-                    {u.name}
-                  </option>
-                ))}
-            </select>
-            <select
-              aria-label="Sort option"
+              options={propertyOptions(usable.filter((u) => u.key === s.propertyId || free.includes(u)))}
+              placeholder="Invalid"
+              className="min-w-[7rem] flex-1"
+            />
+            <MenuSelect
+              label="Sort option"
               value={s.option}
-              onChange={(e) => setAt(i, { ...s, option: e.target.value as Sort['option'] })}
-              className={SELECT}
-            >
-              {options.map((o) => (
-                <option key={o.key} value={o.key}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setAt(i, { ...s, option: v as Sort['option'] })}
+              options={options.map((o) => ({ value: o.key, label: o.label }))}
+            />
             {i > 0 && (
               <button
                 type="button"
