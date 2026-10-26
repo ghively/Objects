@@ -160,7 +160,7 @@ export function AddPropertyMenu({ type, types, onSave, onClose }: AddPropertyMen
         </div>
         <textarea
           aria-label="Description"
-          placeholder="Description"
+          placeholder="Give others an idea of what this property means"
           value={d.description}
           onChange={(e) => set({ description: e.target.value })}
           rows={2}

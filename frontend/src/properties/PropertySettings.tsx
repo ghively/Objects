@@ -40,7 +40,17 @@ const TEXT = {
     'Changing the type of a property can lead to data loss as some values might not be compatible with the new type.',
   noTransformations: 'This property type cannot be changed.',
   confirmText: 'I understand the process and know that some data might be lost.',
-  deleteDescription: 'Deleting a property will be applied to all objects of this type. It moves no objects to the Trash.',
+  deleteDescription: 'Deleting a property will be applied to all objects of this type. This action cannot be reverted.',
+  blocksPropertyWarning:
+    "A content property generally is the main body of an object. Only if you have several content properties, they will be distinguished with a label. Make sure you don't accidentally delete the main content of your notes!",
+  onlyBlocksPropertyWarning:
+    'This is the only content property present in this object type. This will delete the main content (body) for all objects of this type.',
+  datePickerHeading: 'Settings for dates',
+  timeDescription: 'Choose if you want to include time in the date and time picker.',
+  timePreferenceDescription: 'Choose if you want to initialize your date.',
+  rangePreferenceDescription: 'Choose if you want your date to be initialized as a range.',
+  defaultDescription: 'Choose a default start date for the date and time picker.',
+  descriptionPlaceholder: 'Give others an idea of what this property means',
 }
 
 export interface PropertySettingsProps {
@@ -275,10 +285,12 @@ function DateSection({ def, save }: { def: PropertyDef; save(next: PropertyDef):
     )
   return (
     <>
-      <Section title="Time" description="Choose if you want to include a time in the date and time picker.">
+      <h3 className="pt-1 text-[14px] font-semibold">{TEXT.datePickerHeading}</h3>
+      <Section title="Time" description={TEXT.timeDescription}>
         <Segmented label="Time" options={RULES} value={time} onChange={setTime} />
+        {time === 'optional' && <p className="mt-2 text-[13px] text-fg-muted">{TEXT.timePreferenceDescription}</p>}
         {time === 'optional' && (
-          <div className="mt-2 flex gap-1.5" role="group" aria-label="Time preference">
+          <div className="mt-1 flex gap-1.5" role="group" aria-label="Time preference">
             <Choice
               selected={c.resolutionPreference !== 'time'}
               onClick={() => save(withConstraints(def, { resolutionPreference: 'day' }))}
@@ -296,8 +308,9 @@ function DateSection({ def, save }: { def: PropertyDef; save(next: PropertyDef):
       </Section>
       <Section title="Range" description="Choose if you want to include a range in the date and time picker.">
         <Segmented label="Range" options={RULES} value={range} onChange={setRange} />
+        {range === 'optional' && <p className="mt-2 text-[13px] text-fg-muted">{TEXT.rangePreferenceDescription}</p>}
         {range === 'optional' && (
-          <div className="mt-2 flex gap-1.5" role="group" aria-label="Range preference">
+          <div className="mt-1 flex gap-1.5" role="group" aria-label="Range preference">
             <Choice selected={!c.endTimePreference} onClick={() => save(withConstraints(def, { endTimePreference: false }))}>
               As date
             </Choice>
@@ -307,7 +320,7 @@ function DateSection({ def, save }: { def: PropertyDef; save(next: PropertyDef):
           </div>
         )}
       </Section>
-      <Section title="Default" description="Choose the date the date and time picker starts from.">
+      <Section title="Default" description={TEXT.defaultDescription}>
         <div className="flex gap-1.5">
           <Choice
             selected={!custom}
@@ -640,11 +653,25 @@ function ChangeKindSection({
 }
 
 /** "Delete property": the user types `delete` (`delete-all-content` for a content property). */
-export function DeletePropertySection({ def, onDelete }: { def: PropertyDef; onDelete(): void }) {
+export function DeletePropertySection({
+  def,
+  onDelete,
+  onlyContent = false,
+}: {
+  def: PropertyDef
+  onDelete(): void
+  /** True when `def` is the type's only content (blocks) property. */
+  onlyContent?: boolean
+}) {
   const word = def.type === 'blocks' ? 'delete-all-content' : 'delete'
   const [typed, setTyped] = useState('')
   return (
     <Section title="Delete property" description={TEXT.deleteDescription}>
+      {def.type === 'blocks' && (
+        <p role="note" className="mb-2 text-[13px] text-amber-400">
+          {onlyContent ? TEXT.onlyBlocksPropertyWarning : TEXT.blocksPropertyWarning}
+        </p>
+      )}
       <input
         aria-label={`Type "${word}" to confirm`}
         placeholder={word}
@@ -716,6 +743,7 @@ export function PropertySettings({ typeId, propertyId, open, onOpenChange, onOpe
               <span className="text-fg-muted">Description</span>
               <textarea
                 aria-label="Description"
+                placeholder={TEXT.descriptionPlaceholder}
                 value={description}
                 rows={2}
                 onChange={(e) => setDescription(e.target.value)}
@@ -743,7 +771,14 @@ export function PropertySettings({ typeId, propertyId, open, onOpenChange, onOpe
               </Section>
             )}
             {!type.basic && <ChangeKindSection key={def.id} def={def} editor={ed} onOpenProperty={onOpenProperty} />}
-            {canDeleteProperty(type, def) && <DeletePropertySection key={def.id} def={def} onDelete={() => void remove()} />}
+            {canDeleteProperty(type, def) && (
+              <DeletePropertySection
+                key={def.id}
+                def={def}
+                onDelete={() => void remove()}
+                onlyContent={!type.propertyDefinitions.some((d) => d.type === 'blocks' && d.id !== def.id)}
+              />
+            )}
             {ed.error && (
               <p role="alert" className="text-[13px] text-red-400">
                 {ed.error}
