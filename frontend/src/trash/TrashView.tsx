@@ -28,6 +28,9 @@ export const TRASH_TEXT = {
   emptyTrash: 'Empty Trash',
   emptyConfirmDescription: (count: number) =>
     `Are you sure you want to permanently delete all ${count} object(s) in trash? This action cannot be undone.`,
+  purgeConfirmTitle: 'Permanently delete',
+  purgeConfirmDescription: (count: number) =>
+    `Are you sure you want to permanently delete ${count} object(s)? This action cannot be undone.`,
   typeToConfirm: 'Type "Delete" to confirm',
   confirmWord: 'Delete',
   objectType: 'Object type',
@@ -45,6 +48,7 @@ export function TrashView() {
   const [busy, setBusy] = useState<string | null>(null)
   const [confirmEmpty, setConfirmEmpty] = useState(false)
   const [typed, setTyped] = useState('')
+  const [purging, setPurging] = useState<TrashItem | null>(null)
 
   const load = useCallback(() => {
     return api
@@ -136,7 +140,7 @@ export function TrashView() {
                   size="sm"
                   className="text-red-400"
                   disabled={busy !== null}
-                  onClick={() => void act(item.id, () => api.purge(item.id))}
+                  onClick={() => setPurging(item)}
                 >
                   {TRASH_TEXT.deletePermanently}
                 </Button>
@@ -145,6 +149,32 @@ export function TrashView() {
           </ul>
         )}
       </div>
+      <AlertDialog open={purging !== null} onOpenChange={(o) => !o && setPurging(null)}>
+        <AlertDialogContent className="border-line bg-raised-2 text-fg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[17px]">{TRASH_TEXT.purgeConfirmTitle}</AlertDialogTitle>
+            <AlertDialogDescription className="text-[14px] text-fg-muted">
+              {TRASH_TEXT.purgeConfirmDescription(
+                purging?.kind === 'type' ? 1 + (purging.objectCount ?? 0) : 1,
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={busy !== null}
+              onClick={() => {
+                const item = purging
+                setPurging(null)
+                if (item) void act(item.id, () => api.purge(item.id))
+              }}
+            >
+              {TRASH_TEXT.deletePermanently}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={confirmEmpty} onOpenChange={setConfirmEmpty}>
         <AlertDialogContent className="border-line bg-raised-2 text-fg">
           <AlertDialogHeader>
