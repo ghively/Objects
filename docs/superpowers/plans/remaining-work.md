@@ -1,6 +1,6 @@
 # Object: remaining work
 
-Status as of 2026-10-26 (after the M3 build, before its review). Spec: `docs/superpowers/specs/2026-10-23-object-design.md`. How to resume: `CONTINUE.md`; rules: `CLAUDE.md`; process: `docs/superpowers/build-process.md`. Object reference for every item below: `reference/` in the repo (a trimmed subset: models in `design-notes`, English UI strings in `docs/strings.txt`, CSS in `docs/design.css`). On Gene's machine the full unpacked app is in the git-ignored `.reference/`.
+Status as of 2026-10-26 (M3 built, reviewed, fixed and through its final gate; Gene asked on 2026-10-26 for all remaining milestones to be built, so M4 onward proceed now and his hand-checks follow later). Spec: `docs/superpowers/specs/2026-10-23-object-design.md`. How to resume: `CONTINUE.md`; rules: `CLAUDE.md`; process: `docs/superpowers/build-process.md`. Object reference for every item below: `reference/` in the repo (a trimmed subset: models in `design-notes`, English UI strings in `docs/strings.txt`, CSS in `docs/design.css`). On Gene's machine the full unpacked app is in the git-ignored `.reference/`.
 
 ## How we build (changed 2026-10-26)
 
@@ -14,24 +14,21 @@ Status as of 2026-10-26 (after the M3 build, before its review). Spec: `docs/sup
 |---|---|
 | **M1** shell, objects on disk, editor | Built and verified 2026-10-23. **Open:** Gene's hands-on check on a copy of the CPI export (`m1-acceptance.md`). |
 | **M2** object types and properties | 20 tasks built; whole-milestone review and fixes done (`32c7fe2..39432ce`); 372 back-end + 249 front-end tests; `m2_acceptance.py` 52/52 on the sample spaces. **Open:** Gene's hands-on checks (`m2-acceptance.md`). Known nit: `editor/preserve.test.ts` "1MB body splits under 300ms" can fail on timing when the machine is loaded. |
+| **M3** views, collections, queries | 16 tasks built (`a89c8cb..bd386e6`), whole-milestone review and fix pass done (`bd386e6..925b023`), final gate green 2026-10-26: 459 back-end tests, 479 front-end tests (66 files), `tsc -b --noEmit` clean, `npm run build` ok; `m1_roundtrip.py` PASS, `m2_acceptance.py` PASS (52/52 checks on `space-sample`, 50/50 on `space-v1`), `m3_acceptance.py` PASS (14/14 checks on each); the built app served headless on a scratch copy of `space-sample` rendered home, a type page (Overview and All), a collection, a query, the Queries page and All notes in Playwright with 0 console errors. **Open:** Gene's hands-on checks (`m3-acceptance.md`, unchecked). |
 
-## In progress: M3, views, collections, queries
+## M3 final gate (2026-10-26)
 
-Plan: `2026-10-26-m3-views-collections-queries.md` (16 tasks). **All 16 tasks are built and committed** (`a89c8cb..bd386e6`). The build was stopped at the review gate on 2026-10-26. Automated results at the end of Task 16 (445 back-end, 465 front-end tests, `tsc` clean, build ok, `m3_acceptance.py` PASS on `space-sample` and `space-v1`) and Gene's unchecked hand-run list are in `m3-acceptance.md`.
+All automated checks are green: 459 back-end tests, 479 front-end tests (66 files), `tsc -b --noEmit` clean, `npm run build` ok; `m1_roundtrip.py` PASS, `m2_acceptance.py` PASS (52/52 checks on `space-sample`, 50/50 on `space-v1`), `m3_acceptance.py` PASS (14/14 checks on each); the built app served headless on a scratch copy of `space-sample` rendered home, a type page (Overview and All), a collection, a query, the Queries page and All notes in Playwright with 0 console errors.
 
-What remains for M3:
-
-1. **One whole-milestone review** (correctness, file safety, fidelity), **a fix pass**, then the **final gate**: `uv run pytest backend/tests -q`, `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build`, `scripts/m1_roundtrip.py`, `scripts/m2_acceptance.py`, `scripts/m3_acceptance.py` (each on a fixture copy). Resume the build workflow run `wf_359eade1-0d4` (same script and args, `resumeFromRunId`) or run the review stages from the script by hand.
-2. Start the app on a scratch copy of the sample space and look at views, collections and queries.
-3. Gene's hand-run checks in `m3-acceptance.md`.
+What is left for Gene on M3: the hand-run list in `m3-acceptance.md` (on a copy of the CPI export kept outside the repo), as for M1 and M2.
 
 ### M4 status
 
-Planned, not built: `2026-10-26-m4-calendar-daily-tasks.md` (16 tasks, critiqued and revised). It was written against the M3 *plan*; before building, re-read what M3 actually produced and correct interface names in the M4 plan. Don't start M4 until Gene says so.
+Planned, not built: `2026-10-26-m4-calendar-daily-tasks.md` (16 tasks, critiqued and revised). It was written against the M3 *plan*; before building, re-read what M3 actually produced and correct interface names in the M4 plan. Gene said on 2026-10-26 to build all remaining milestones now.
 
 ## To do
 
-### M3: views, collections, queries (built; review and hand checks pending)
+### M3: views, collections, queries (built and gated 2026-10-26; Gene's hand checks pending)
 
 - **View layouts:** list, grid, wall (cards), table, embed, kanban, gallery, on type pages, collections and query results.
 - **Table:** resizable columns, wrap content, pinned column, hide/show columns, column calculations, inline cell editing (reuses the M2 cells).
@@ -105,6 +102,6 @@ Accounts, login, billing, sync, sharing/publishing, mobile, integrations (Readwi
 ## Open items for Gene
 
 1. Hands-on checks of M1, M2 and M3 on a copy of the CPI export kept outside the repo (`m1-`, `m2-`, `m3-acceptance.md`).
-2. Say when to resume the M3 review, fix pass and gate, and when to start M4.
+2. (Done 2026-10-26: Gene asked for all remaining milestones to be built now; his hand-checks of each follow later.)
 3. Keep the PC awake during workflow runs: an overnight sleep paused M2 for a weekend.
 4. The repo goes to a private GitHub repo (`Objects`); the trimmed `reference/` set is committed so a cloud session can continue.

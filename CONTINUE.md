@@ -7,14 +7,15 @@ Everything needed to resume is in this repo. Rules and layout: `CLAUDE.md`. Proc
 Always take the current state from `docs/superpowers/plans/remaining-work.md` and `git log`; this file doesn't track it. As of 2026-10-26:
 
 - M1 (shell, objects on disk, editor) and M2 (types and properties) are built and verified by tests. Gene's hands-on checks on a copy of the CPI export are still open (`m1-acceptance.md`, `m2-acceptance.md`).
-- M3 (views, collections, queries): all 16 tasks built and committed (`a89c8cb..bd386e6`), stopped at the review gate. Still to do: whole-milestone review, one fix pass, the final gate, and Gene's hand-checks (`plans/m3-acceptance.md`). In a cloud session (no local run cache) run `scripts/workflows/object-milestone-review-gate.js` with args `{"plan":"docs/superpowers/plans/2026-10-26-m3-views-collections-queries.md","base":"39432ce","milestone":"Milestone 3"}`; on Gene's own machine `resumeFromRunId wf_359eade1-0d4` also works.
+- M3 (views, collections, queries): built (`a89c8cb..bd386e6`), reviewed and fixed (`..925b023`), final gate green 2026-10-26 (459 back-end tests, 479 front-end tests (66 files), `tsc -b --noEmit` clean, `npm run build` ok; `m1_roundtrip.py` PASS, `m2_acceptance.py` PASS (52/52 checks on `space-sample`, 50/50 on `space-v1`), `m3_acceptance.py` PASS (14/14 checks on each); the built app served headless on a scratch copy of `space-sample` rendered home, a type page (Overview and All), a collection, a query, the Queries page and All notes in Playwright with 0 console errors). Gene's hand-checks (`plans/m3-acceptance.md`) are pending.
+- Gene asked on 2026-10-26 for all remaining milestones to be built now; his hand-checks of each milestone are still pending and stay unchecked until he does them.
 - M4 (calendar, daily notes, tasks) is planned (`plans/2026-10-26-m4-calendar-daily-tasks.md`, 16 tasks) but not built. Before building it, re-read what M3 actually produced and correct interface names in the plan.
 - M5 (search, command palette, backlinks, graph), M6 (whiteboards and pen), M7 (remaining blocks, light mode, polish) are listed in `remaining-work.md` and need plans.
 
 ## The next step, in order
 
 1. Finish the open milestone: review once, fix pass, final gate (`uv run pytest backend/tests -q`; `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build`; the acceptance scripts on fixture copies; start the app on a scratch copy of a sample space and look at it).
-2. Update `remaining-work.md`, give Gene the hand-check steps, then stop. Don't start the next milestone's planning or build until Gene says so.
+2. Update `remaining-work.md` and leave Gene the hand-check steps. (Gene, 2026-10-26: build all remaining milestones without waiting; his hand-checks come later.)
 3. For a new milestone: write the plan (writer agent, three critics, one resolve pass, following the M3/M4 plan format), then build with `scripts/workflows/object-milestone-build.js`.
 
 ## Running a build

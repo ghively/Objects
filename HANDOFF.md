@@ -5,8 +5,8 @@ Written 2026-10-26 by Gene Hively's local Claude session. You are continuing dev
 ## Where things stand
 
 - **M1, M2:** built and tested. Gene's hands-on checks on a CPI export copy are open (he does those locally).
-- **M3 (views, collections, queries):** all 16 tasks are built and committed (`a89c8cb..bd386e6`). It has NOT had its whole-milestone review, fix pass or final gate. Task 16's own results: 445 back-end and 465 front-end tests passing, `tsc` clean, build ok, `scripts/m3_acceptance.py` PASS on `space-sample` and `space-v1` (see `docs/superpowers/plans/m3-acceptance.md`; its hand-check list is Gene's).
-- **M4 (calendar, daily notes, tasks):** planned in `docs/superpowers/plans/2026-10-26-m4-calendar-daily-tasks.md` (16 tasks, critiqued and revised), not built. **Do not start M4 planning or building until Gene says so.**
+- **M3 (views, collections, queries):** built, reviewed, fixed and through its final gate on 2026-10-26 (459 back-end tests, 479 front-end tests (66 files), `tsc -b --noEmit` clean, `npm run build` ok; `m1_roundtrip.py` PASS, `m2_acceptance.py` PASS (52/52 checks on `space-sample`, 50/50 on `space-v1`), `m3_acceptance.py` PASS (14/14 checks on each); the built app served headless on a scratch copy of `space-sample` rendered home, a type page (Overview and All), a collection, a query, the Queries page and All notes in Playwright with 0 console errors). Gene's hand-check list in `docs/superpowers/plans/m3-acceptance.md` is pending.
+- **M4 (calendar, daily notes, tasks):** planned in `docs/superpowers/plans/2026-10-26-m4-calendar-daily-tasks.md` (16 tasks, critiqued and revised), not built yet. Gene asked on 2026-10-26 for all remaining milestones to be built now; his hand-checks of each are pending.
 - **M5-M7:** listed in `docs/superpowers/plans/remaining-work.md`, no plans yet.
 
 ## What to do first
