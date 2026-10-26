@@ -38,9 +38,11 @@ __all__ = [
     "TypeDefinition",
     "TypeReadOnly",
     "UnreadableType",
+    "is_task_type",
     "load_types",
     "status_category",
     "system_property_defs",
+    "topup_task_type",
     "type_revision",
     "write_type_json",
 ]
@@ -853,3 +855,80 @@ def load_types(
         write_type_json(root, t, type_revision(root, t.id))
         loaded.append(t)
     return _sorted(loaded), unreadable
+
+
+# -- the Task fields (M4) ----------------------------------------------------------
+
+_TASK_STATUS_TEXTS = ("Not Started", "Next Up", "In Progress", "On Hold", "Done")
+_TASK_PRIORITY = (("low", "Low", "amber"), ("medium", "Medium", "orange"), ("high", "High", "red"))
+
+
+def _task_field_defs() -> list[PropertyDefinition]:
+    """Fresh definitions of Object's `RootTask` fields (`basicStructures.ts`), plus
+    our hidden ``repeat`` and ``remind`` text fields, in the order they are appended."""
+
+    def define(key, name, kind, icon, options=None, visibility="alwaysShow"):
+        return PropertyDefinition.from_json(
+            {
+                "id": key,
+                "key": key,
+                "name": name,
+                "type": kind,
+                "description": "",
+                "icon": {"type": "iconify", "val": icon},
+                "visibility": visibility,
+                "options": options or {},
+            }
+        )
+
+    return [
+        define(
+            "status", "Status", "label", "ph-trend-up",
+            {"isArray": False, "isStatus": True,
+             "set": label_options(_TASK_STATUS_TEXTS, status=True)},
+        ),
+        define(
+            "priority", "Priority", "label", "ph-flag",
+            {"isArray": False,
+             "set": [{"id": i, "text": t, "color": c, "icon": None} for i, t, c in _TASK_PRIORITY]},
+        ),
+        define(
+            "date", "Date", "datetimeSimple", "ph-calendar",
+            {"constraints": {"resolutionPreference": "day", "endTimeSettings": "notAllowed",
+                             "supportsReminders": True}},
+        ),
+        define(
+            "deadline", "Deadline", "datetimeSimple", "ph-hourglass-medium",
+            {"constraints": {"resolutionPreference": "day", "endTimeSettings": "notAllowed"}},
+        ),
+        define(
+            "completed", "Completed", "datetimeSimple", "ph-calendar-check",
+            {"constraints": {"resolutionPreference": "time", "endTimeSettings": "notAllowed"}},
+            visibility="hidden",
+        ),
+        define("repeat", "Repeat", "text", PROPERTY_ICONS["text"], visibility="hidden"),
+        define("remind", "Remind", "text", PROPERTY_ICONS["text"], visibility="hidden"),
+    ]  # fmt: skip
+
+
+def is_task_type(t: TypeDefinition | None) -> bool:
+    """True for the basic Task type."""
+    return t is not None and t.basic and _basic_name(t.name) == "Task"
+
+
+def topup_task_type(t: TypeDefinition) -> TypeDefinition:
+    """Give the basic Task type the Task fields it lacks, in memory; return ``t``.
+
+    Each missing key of ``status``, ``priority``, ``date``, ``deadline``,
+    ``completed``, ``repeat`` and ``remind`` is appended after the existing
+    properties; a key the type already defines keeps its own definition and
+    options. Any other type comes back untouched. Never writes: the fields reach
+    ``task.json`` the first time the type is persisted.
+    """
+    if not is_task_type(t):
+        return t
+    have = {p.key for p in t.propertyDefinitions}
+    for p in _task_field_defs():
+        if p.key not in have:
+            t.propertyDefinitions.append(p)
+    return t
