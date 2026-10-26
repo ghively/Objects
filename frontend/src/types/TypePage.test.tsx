@@ -368,6 +368,24 @@ describe('TypePage', () => {
     await waitFor(() => expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true'))
   })
 
+  test('test Task type page has no Overview tab', async () => {
+    const BASIC = { ...TASK, basic: true }
+    load(views({ activeTab: 'overview' }))
+    useLinkIndex.setState({ types: [BASIC], objects: ROWS.map((r) => r.summary), loaded: true })
+    render(<TypePage type={BASIC} />)
+    // A saved `overview` is ignored: All is shown, and the tabs are All plus the section tabs.
+    expect(await screen.findByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument()
+    expect(tabNames()[0]).toBe('All')
+    await screen.findByText('Alpha')
+  })
+
+  test('other types keep the Overview tab', async () => {
+    load(views({ activeTab: 'overview' }))
+    render(<TypePage type={{ ...TASK, id: 'page', name: 'Page', basic: true }} />)
+    expect(await screen.findByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+  })
+
   test('a 409 on save reloads the views, re-applies the edit and saves again', async () => {
     const { ConflictError } = await import('@/api/client')
     const user = userEvent.setup()

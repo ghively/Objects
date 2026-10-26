@@ -125,6 +125,9 @@ export function NewSplitButton({
 
 type TabKey = 'overview' | 'all' | string
 
+/** The basic Task type (by flag and name, as the server infers it). */
+export const isBasicTaskType = (type: TypeDef): boolean => type.basic && type.name.toLowerCase() === 'task'
+
 export function TabPill({
   active,
   onClick,
@@ -326,9 +329,19 @@ export function TypePage({ type }: { type: TypeDef }) {
   const sections = useMemo(() => (views ? buildSections(type, views, ctx) : []), [type, views, ctx])
   const tabs = tabSections(sections)
 
+  // The basic Task type has no Overview (Capacities' `hideDashboard`): All plus section tabs,
+  // All by default, and a saved `overview` falls back to All.
+  const noOverview = isBasicTaskType(type)
+  const home: TabKey = noOverview ? 'all' : 'overview'
   const saved: TabKey = views?.activeTab ?? 'all'
   const tab: TabKey | null =
-    saved === 'overview' || saved === 'all' ? saved : tabs.some((t) => t.key === saved) ? saved : defs.loaded ? 'overview' : null
+    saved === 'all' || (saved === 'overview' && !noOverview)
+      ? saved
+      : tabs.some((t) => t.key === saved)
+        ? saved
+        : defs.loaded || noOverview
+          ? home
+          : null
   const activeSection = tabs.find((t) => t.key === tab)
 
   const select = (key: TabKey) => {
@@ -436,9 +449,11 @@ export function TypePage({ type }: { type: TypeDef }) {
       </header>
       <div data-toolbar-row="" className="flex flex-wrap items-center gap-2 px-4 py-3">
         <nav role="tablist" aria-label="Views" className="flex flex-wrap items-center gap-1">
-          <TabPill active={tab === 'overview'} onClick={() => select('overview')} icon="ph-layout">
-            {SECTION_TEXT.overview}
-          </TabPill>
+          {!noOverview && (
+            <TabPill active={tab === 'overview'} onClick={() => select('overview')} icon="ph-layout">
+              {SECTION_TEXT.overview}
+            </TabPill>
+          )}
           <TabPill active={tab === 'all'} onClick={() => select('all')} icon="ph-list-bullets">
             {SECTION_TEXT.all}
           </TabPill>
@@ -457,7 +472,7 @@ export function TypePage({ type }: { type: TypeDef }) {
                     : undefined
               }
               onRemove={() =>
-                update((v) => ({ ...removeSection(v, sections, t.key), activeTab: v.activeTab === t.key ? 'overview' : v.activeTab }))
+                update((v) => ({ ...removeSection(v, sections, t.key), activeTab: v.activeTab === t.key ? home : v.activeTab }))
               }
             />
           ))}

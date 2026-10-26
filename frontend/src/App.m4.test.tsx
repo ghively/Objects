@@ -75,8 +75,8 @@ describe('M4 targets in the app', () => {
     expect(within(strip).getByRole('tab').querySelector('[data-icon="ph-check-circle"]')).not.toBeNull()
     expect(within(nav).getByRole('button', { name: 'Tasks' })).toHaveAttribute('aria-current', 'page')
     expect(within(nav).getByRole('button', { name: 'Calendar' })).not.toHaveAttribute('aria-current')
-    // The Tasks stub renders its placeholder.
-    expect(screen.getByText('Loading results…')).toBeInTheDocument()
+    // The Tasks page (M4 Task 11 replaced the stub) renders its heading.
+    expect(await screen.findByRole('heading', { name: 'Tasks' })).toBeInTheDocument()
   })
 
   test('test right panel toggle', async () => {
