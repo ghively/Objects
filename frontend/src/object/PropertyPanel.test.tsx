@@ -108,3 +108,43 @@ describe('cellValue', () => {
     expect(decodeDate(day, '2026-03-26T00:00:00.000Z')).toEqual({ start: '2026-03-26', resolution: 'day' })
   })
 })
+
+describe('PropertyPanel definition editing', () => {
+  test('a row label opens the PropertyMenu and Add Property adds a property to the type', async () => {
+    const user = userEvent.setup()
+    const onTypeChange = vi.fn()
+    render(
+      <PropertyPanel
+        type={TYPE}
+        frontmatter={{ title: 'X', note: 'hi' }}
+        summary={objectSummary({ path: 'Projects/X.md', type: 'project' })}
+        onChange={vi.fn()}
+        onTypeChange={onTypeChange}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Note property menu' }))
+    await user.click(screen.getByRole('button', { name: 'Hidden' }))
+    expect(onTypeChange.mock.calls[0][0].propertyDefinitions.find((d: { id: string }) => d.id === 'p-note').visibility).toBe(
+      'hidden',
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Add Property' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Checkbox' }))
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+    const added = onTypeChange.mock.calls[1][0].propertyDefinitions.at(-1)
+    expect(added).toMatchObject({ type: 'boolean', key: 'checkbox', name: 'Checkbox' })
+  })
+
+  test('Add Property is disabled on a basic type', () => {
+    render(
+      <PropertyPanel
+        type={{ ...TYPE, basic: true }}
+        frontmatter={{ title: 'X' }}
+        summary={objectSummary({ path: 'Projects/X.md', type: 'project' })}
+        onChange={vi.fn()}
+        onTypeChange={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Add Property' })).toBeDisabled()
+  })
+})

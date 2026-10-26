@@ -9,9 +9,17 @@ import type {
   TypeDef,
 } from '@/api/types'
 import { Icon, IconOrEmoji, isIconifyId } from '@/components/Icon'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useLinkIndex } from '@/links/linkIndex'
+import { AddPropertyMenu, BASIC_TYPE_INFO } from '@/properties/AddPropertyMenu'
 import { cellForDef } from '@/properties/cellFor'
 import { propertyIsEmpty } from '@/properties/format'
 import { kindIcon } from '@/properties/kinds'
+import { PropertyMenu } from '@/properties/PropertyMenu'
+import { DeletePropertySection, PropertySettings } from '@/properties/PropertySettings'
+import { removeProperty } from '@/properties/typeEdits'
+import type { TypeEditor } from './useTypeEditor'
 
 /** Frontmatter keys shown elsewhere (header, metadata) or kept by the app, never as extra properties. */
 const CORE_KEYS = new Set([
@@ -208,15 +216,48 @@ export interface PropertyPanelProps {
   onOpenTag?(name: string): void
   onOpenObject?(path: string): void
   onChangeType?(): void
+  /** The type editor ObjectView saves through; property settings use it for 428s and kind changes. */
+  typeEditor?: TypeEditor
 }
 
-function Row({ label, icon, children }: { label: string; icon: IconValue | string; children: ReactNode }) {
+function Row({
+  label,
+  icon,
+  menu,
+  children,
+}: {
+  label: string
+  icon: IconValue | string
+  /** The PropertyMenu for this row; without one the label is plain text. */
+  menu?: { open: boolean; onOpenChange(open: boolean): void; content: ReactNode }
+  children: ReactNode
+}) {
+  const heading = (
+    <>
+      <IconOrEmoji icon={icon} size={15} fallback="ph-note-blank" />
+      <span>{label}</span>
+    </>
+  )
   return (
     <div className="px-1" data-property-row={label}>
-      <div className="flex items-center gap-2 text-[15px] font-medium">
-        <IconOrEmoji icon={icon} size={15} fallback="ph-note-blank" />
-        <span>{label}</span>
-      </div>
+      {menu ? (
+        <Popover open={menu.open} onOpenChange={menu.onOpenChange}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label={`${label} property menu`}
+              className="-mx-1 flex items-center gap-2 rounded px-1 text-[15px] font-medium hover:bg-hover"
+            >
+              {heading}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-auto border-line bg-raised p-1.5 text-fg">
+            {menu.content}
+          </PopoverContent>
+        </Popover>
+      ) : (
+        <div className="flex items-center gap-2 text-[15px] font-medium">{heading}</div>
+      )}
       <div className="mt-2">{children}</div>
     </div>
   )
@@ -234,8 +275,17 @@ export function PropertyPanel({
   onOpenTag,
   onOpenObject,
   onChangeType,
+  typeEditor,
 }: PropertyPanelProps) {
   const [showHidden, setShowHidden] = useState(false)
+  const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [settingsFor, setSettingsFor] = useState<string | null>(null)
+  const [deleteFor, setDeleteFor] = useState<string | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const allTypes = useLinkIndex((s) => s.types)
+  // Property definitions are edited through the type, whatever the object's own read-only state.
+  const canEditType = !!type && !!onTypeChange && !type.readOnlyReason
+  const deleting = deleteFor ? type?.propertyDefinitions.find((d) => d.id === deleteFor) : undefined
   const typed = (type?.propertyDefinitions.length ?? 0) > 0
   const rows = propertyRows(type, frontmatter).filter((d) => d.type !== 'entity_title')
   const visible: PropertyDef[] = []
@@ -260,8 +310,30 @@ export function PropertyPanel({
     const value = cellValue(def, frontmatter, links, summary)
     // Without a type definition (M1 inference) the row is a plain read-only value.
     const ro = !!readOnly || !typed || !onChange
+    const menu =
+      canEditType && typed && type
+        ? {
+            open: menuFor === def.id,
+            onOpenChange: (o: boolean) => setMenuFor(o ? def.id : null),
+            content: (
+              <PropertyMenu
+                type={type}
+                def={def}
+                onSave={(next) => onTypeChange?.(next)}
+                onEditProperty={() => {
+                  setMenuFor(null)
+                  setSettingsFor(def.id)
+                }}
+                onDelete={() => {
+                  setMenuFor(null)
+                  setDeleteFor(def.id)
+                }}
+              />
+            ),
+          }
+        : undefined
     return (
-      <Row label={def.name} icon={def.icon ?? kindIcon(def.type)}>
+      <Row label={def.name} icon={def.icon ?? kindIcon(def.type)} menu={menu}>
         {Cell ? (
           <Cell
             def={def}
@@ -325,15 +397,61 @@ export function PropertyPanel({
           })}
         </section>
       )}
-      <button
-        type="button"
-        disabled
-        title="Adding properties arrives with property editing"
-        className="mt-5 flex items-center gap-2 px-1 text-[15px] text-fg-muted opacity-15 transition-opacity group-hover/panel:opacity-100"
-      >
-        <Icon name="ph-plus" size={14} />
-        Add Property
-      </button>
+      <Popover open={addOpen} onOpenChange={setAddOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            disabled={!canEditType || !!type?.basic}
+            title={type?.basic ? BASIC_TYPE_INFO : undefined}
+            className="mt-5 flex items-center gap-2 px-1 text-[15px] text-fg-muted opacity-15 transition-opacity group-hover/panel:opacity-100 hover:text-fg disabled:hover:text-fg-muted"
+          >
+            <Icon name="ph-plus" size={14} />
+            Add Property
+          </button>
+        </PopoverTrigger>
+        {type && (
+          <PopoverContent align="start" className="w-auto border-line bg-raised p-1.5 text-fg">
+            <AddPropertyMenu
+              type={type}
+              types={allTypes}
+              onSave={(next) => onTypeChange?.(next)}
+              onClose={() => setAddOpen(false)}
+            />
+          </PopoverContent>
+        )}
+      </Popover>
+      {type && settingsFor && (
+        <PropertySettings
+          typeId={type.id}
+          propertyId={settingsFor}
+          open
+          onOpenChange={(o) => !o && setSettingsFor(null)}
+          onOpenProperty={setSettingsFor}
+          editor={typeEditor}
+        />
+      )}
+      {type && deleting && (
+        <Dialog open onOpenChange={(o) => !o && setDeleteFor(null)}>
+          <DialogContent className="border-line bg-raised-2 text-fg">
+            <DialogHeader>
+              <DialogTitle className="text-[17px]">{`Delete "${deleting.name}"?`}</DialogTitle>
+              <DialogDescription className="text-[13px] text-fg-muted">
+                The property and its values are removed from every object of this type.
+              </DialogDescription>
+            </DialogHeader>
+            <DeletePropertySection
+              def={deleting}
+              onDelete={() => {
+                setDeleteFor(null)
+                const next = removeProperty(type, deleting.id)
+                // The user typed the confirmation word, so no second (428) confirmation.
+                if (typeEditor) void typeEditor.save(next, { confirm: true })
+                else void onTypeChange?.(next)
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </aside>
   )
 }
