@@ -31,7 +31,7 @@ export function tagColor(tags: ObjectSummary[], name: string): string | null {
 }
 
 /**
- * "Search for tags or create one": the selected tags (click opens, × removes), then matching tags
+ * "Search for tags or create a new one": the selected tags (click opens, × removes), then matching tags
  * not yet selected, then "Create 'x'" when no tag has that name. The parent creates the Tag
  * object (`api.ensureTag`) when it saves.
  */
@@ -82,7 +82,7 @@ export function TagPicker({ value, onChange, onOpenTag, initialQuery }: TagPicke
       <div className="border-b border-line p-1.5">
         <input
           aria-label="Search for tags"
-          placeholder="Search for tags or create one"
+          placeholder="Search for tags or create a new one"
           value={query}
           autoFocus
           onChange={(e) => setQuery(e.target.value)}

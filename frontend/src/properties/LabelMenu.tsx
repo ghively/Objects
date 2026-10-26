@@ -45,6 +45,8 @@ export interface LabelMenuProps {
   onDefChange(next: PropertyDef): void | Promise<void>
   /** Called after a single-select pick, so the parent can close its popover. */
   onClose?(): void
+  /** Opens the property's settings (the gear in the search field). */
+  onOpenSettings?(): void
 }
 
 function newId(): string {
@@ -90,7 +92,7 @@ export function LabelPill({ option, className }: { option: Pick<LabelOption, 'te
  * label the options sit in four sections; dragging an option to another section changes its
  * `statusCategory`, and an empty section offers "Create".
  */
-export function LabelMenu({ def, value, onChange, onDefChange, onClose }: LabelMenuProps) {
+export function LabelMenu({ def, value, onChange, onDefChange, onClose, onOpenSettings }: LabelMenuProps) {
   const set = useMemo(() => def.options.set ?? [], [def.options.set])
   const multi = def.options.isArray ?? false
   const isStatus = !!def.options.isStatus
@@ -236,10 +238,10 @@ export function LabelMenu({ def, value, onChange, onDefChange, onClose }: LabelM
 
   return (
     <div className="flex max-h-[20rem] w-64 flex-col">
-      <div className="border-b border-line p-1.5">
+      <div className="flex items-center gap-1 border-b border-line p-1.5">
         <input
-          aria-label="Search or create"
-          placeholder="Search or create"
+          aria-label="Search or Create"
+          placeholder="Search or Create"
           value={query}
           autoFocus
           maxLength={MAX_TEXT}
@@ -253,6 +255,17 @@ export function LabelMenu({ def, value, onChange, onDefChange, onClose }: LabelM
           }}
           className="h-7 w-full rounded bg-transparent px-1.5 text-[14px] text-fg outline-none placeholder:text-fg-muted"
         />
+        {onOpenSettings && (
+          <button
+            type="button"
+            title="Go to property settings"
+            aria-label="Go to property settings"
+            onClick={onOpenSettings}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-fg-muted hover:bg-hover hover:text-fg"
+          >
+            <Icon name="ph-gear-six" size={15} />
+          </button>
+        )}
       </div>
       <div role="listbox" aria-multiselectable={multi} aria-label={def.name} className="flex-1 overflow-y-auto p-1">
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>

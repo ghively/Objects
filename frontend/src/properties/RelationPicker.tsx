@@ -12,6 +12,14 @@ export interface RelationPickerProps {
   onChange(next: EntityRef[]): void
   /** Called after a single-select pick. */
   onClose?(): void
+  /** "Edit Property": opens the property's settings. */
+  onOpenSettings?(): void
+}
+
+export const RELATION_PICKER_TEXT = {
+  nothingFound: 'Nothing found',
+  nothingToSelect: 'Nothing to select in this set. Search the whole database to add objects to the set.',
+  editProperty: 'Edit Property',
 }
 
 function folderOf(path: string): string {
@@ -36,7 +44,7 @@ export function relationCandidates(def: PropertyDef, objects: ObjectSummary[]): 
  * "Selection set", when there is one). Two objects with the same title show their folder.
  * Values are `EntityRef`s with the picked object's path.
  */
-export function RelationPicker({ def, value, onChange, onClose }: RelationPickerProps) {
+export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }: RelationPickerProps) {
   const objects = useLinkIndex((s) => s.objects)
   const [query, setQuery] = useState('')
   const multi = def.options.isArray ?? true
@@ -123,10 +131,24 @@ export function RelationPicker({ def, value, onChange, onClose }: RelationPicker
         })}
         {shown.length === 0 && (
           <p className="px-2 py-1 text-[13px] text-fg-muted">
-            {candidates.length === 0 ? 'Nothing to select' : 'No results'}
+            {def.options.hasFixedSet && candidates.length === 0
+              ? RELATION_PICKER_TEXT.nothingToSelect
+              : RELATION_PICKER_TEXT.nothingFound}
           </p>
         )}
       </div>
+      {onOpenSettings && (
+        <div className="border-t border-line p-1">
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[14px] text-fg-muted hover:bg-hover hover:text-fg"
+          >
+            <Icon name="ph-gear-six" size={14} />
+            {RELATION_PICKER_TEXT.editProperty}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

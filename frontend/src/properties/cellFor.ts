@@ -33,6 +33,8 @@ export interface CellExtras {
   onOpenObject?(path: string): void
   /** TypeChipCell: opens "Change type". */
   onChangeType?(): void
+  /** LabelCell and RelationCell: open the property's settings from their menu. */
+  onOpenSettings?(): void
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each cell takes its own value type

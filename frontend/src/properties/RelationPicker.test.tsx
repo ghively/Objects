@@ -101,4 +101,34 @@ describe('RelationPicker', () => {
     expect(onChange).toHaveBeenLastCalledWith([{ target: 'Grace', path: 'People/Grace.md' }])
     expect(onClose).toHaveBeenCalled()
   })
+
+  it("empty states use Capacities' strings and Edit Property opens the settings", async () => {
+    const user = userEvent.setup()
+    const onOpenSettings = vi.fn()
+    const { unmount } = render(
+      <RelationPicker
+        def={relDef({ isArray: true, allowedTypes: ['person'] })}
+        value={[]}
+        onChange={vi.fn()}
+        onOpenSettings={onOpenSettings}
+      />,
+    )
+    await user.type(screen.getByRole('textbox', { name: 'Search for objects' }), 'zzzz')
+    expect(screen.getByText('Nothing found')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Edit Property' }))
+    expect(onOpenSettings).toHaveBeenCalled()
+    unmount()
+
+    render(
+      <RelationPicker
+        def={relDef({ isArray: true, allowedTypes: ['person'], hasFixedSet: true, fixedSet: [] })}
+        value={[]}
+        onChange={vi.fn()}
+      />,
+    )
+    expect(
+      screen.getByText('Nothing to select in this set. Search the whole database to add objects to the set.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit Property' })).not.toBeInTheDocument()
+  })
 })

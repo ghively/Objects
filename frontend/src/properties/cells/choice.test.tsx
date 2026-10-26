@@ -31,11 +31,13 @@ beforeEach(() => {
 })
 
 describe('TagPicker', () => {
-  it('test TagPicker placeholder "Search for tags or create one"; create calls onChange', async () => {
+  // The plan named this test after a shortened string; Capacities' tagDropdownLabel is
+  // "Search for tags or create a new one".
+  it('test TagPicker placeholder "Search for tags or create a new one"; create calls onChange', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     render(<TagPicker value={['Math']} onChange={onChange} />)
-    const input = screen.getByPlaceholderText('Search for tags or create one')
+    const input = screen.getByPlaceholderText('Search for tags or create a new one')
     await user.type(input, 'Mu')
     expect(screen.getByRole('option', { name: /Music/ })).toBeInTheDocument()
     await user.clear(input)
