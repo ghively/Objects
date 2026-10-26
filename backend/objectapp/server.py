@@ -319,7 +319,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         return {
             "name": space.name,
             "root": str(space.root),
-            "types": [t.to_api(type_revision(space.root, t.id)) for t in space.types],
+            "types": [t.to_api(rev) for t, rev in space.types_with_revisions()],
         }
 
     @api.get("/objects")
