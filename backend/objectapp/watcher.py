@@ -227,6 +227,10 @@ class SpaceWatcher:
         except (FileNotFoundError, NotADirectoryError, OSError):
             data = None
         version = None if data is None else version_of(data)
+        parts = PurePosixPath(rel).parts
+        if len(parts) == 3 and parts[1] == "collections":
+            # Name resolution must see an external edit before any client reloads.
+            space.reload_collection(PurePosixPath(rel).stem)
         own = space.own_writes.get(rel)
         if own is not None:
             if own == (version or ""):
@@ -234,7 +238,6 @@ class SpaceWatcher:
                     space.own_writes.pop(rel, None)
                 return None
             space.own_writes.pop(rel, None)
-        parts = PurePosixPath(rel).parts
         if len(parts) == 2:
             return ChangeEvent(kind="ui", path="ui.json", version=version)
         return ChangeEvent(kind=parts[1], path=PurePosixPath(rel).stem, version=version)

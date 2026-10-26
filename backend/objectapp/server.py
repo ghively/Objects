@@ -98,6 +98,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
+from .collections import CollectionDef
 from .jsonstore import DefinitionUnreadable, default_views, json_revision
 from .media import NotAnImage, image_media_type, image_path, import_image, list_images
 from .propvalues import InvalidValue
@@ -255,6 +256,19 @@ class RowsRequest(BaseModel):
 
 class PatchUiRequest(BaseModel):
     patch: dict[str, Any]
+    baseRevision: str = ""
+    clientId: str | None = None
+
+
+class CreateCollectionRequest(BaseModel):
+    name: str = ""
+    typeIds: list[str] = []
+    icon: Any = None
+    clientId: str | None = None
+
+
+class SaveCollectionRequest(BaseModel):
+    collection: dict[str, Any]
     baseRevision: str = ""
     clientId: str | None = None
 
@@ -719,6 +733,43 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
         announce(ChangeEvent("ui", "ui.json", revision, origin=req.clientId))
         return {"ui": ui_with_defaults(data), "revision": revision}
+
+    @api.get("/collections")
+    def get_collections():
+        space.reload_collections()
+        return _display_safe(
+            [c.to_api(space.collection_revision(c.id)) for c in space.list_collections()]
+        )
+
+    @api.post("/collections", status_code=201)
+    def create_collection(req: CreateCollectionRequest):
+        try:
+            c = space.create_collection(req.name, req.typeIds, req.icon)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        announce(ChangeEvent("collections", c.id, None, origin=req.clientId))
+        return JSONResponse(_display_safe(c.to_api(space.collection_revision(c.id))), status_code=201)
+
+    @api.put("/collections/{collection_id}")
+    def save_collection(collection_id: str, req: SaveCollectionRequest):
+        if collection_id not in space.collections:
+            return _error(404, f"No collection {collection_id!r}")
+        c = CollectionDef.from_json(req.collection, fallback_id=collection_id)
+        c.id = collection_id
+        try:
+            result = space.save_collection(c, req.baseRevision)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except KeyError:
+            return _error(404, f"No collection {collection_id!r}")
+        announce(ChangeEvent("collections", collection_id, result.revision, origin=req.clientId))
+        for path in result.rewritten:
+            announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
+        return _display_safe(result.to_api())
 
     @api.post("/types", status_code=201)
     def create_type(req: CreateTypeRequest):

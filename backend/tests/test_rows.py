@@ -70,6 +70,7 @@ def test_rows_scope_types_collections_paths(space_dir):
     space.store("collections").write(
         "tooling", {"id": "tooling", "name": "Tooling", "formerNames": ["Tools"]}, ""
     )
+    space.reload_collection("tooling")
     _write(space_dir, "Pages/In.md", "---\ntype: 'Page'\ntitle: In\ncollections: [Tooling]\n---\n")
     _write(space_dir, "Pages/Old.md", "---\ntype: 'Page'\ntitle: Old\ncollections: [tools]\n---\n")
     _write(space_dir, "Pages/Out.md", "---\ntype: 'Page'\ntitle: Out\ncollections: [Nope]\n---\n")
