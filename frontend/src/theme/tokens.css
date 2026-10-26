@@ -43,25 +43,26 @@
   --type-gray-fg: #e4e3e2;
   --type-gray-bg: #3c3b3e;
 
-  /* M2: the 9 type colours M1 lacked (fg = tokenText, bg = blockBg). */
-  --type-rose-fg: #f45a73;
-  --type-rose-bg: #672d3d;
-  --type-fuchsia-fg: #de62f0;
-  --type-fuchsia-bg: #562c59;
-  --type-violet-fg: #9975f4;
-  --type-violet-bg: #4f3773;
-  --type-indigo-fg: #7279f1;
-  --type-indigo-bg: #3e3c67;
-  --type-sky-fg: #26aeeb;
-  --type-sky-bg: #1f3d4e;
-  --type-cyan-fg: #19bed8;
-  --type-cyan-bg: #213a43;
-  --type-emerald-fg: #26c18b;
-  --type-emerald-bg: #183e33;
-  --type-lime-fg: #92d22a;
-  --type-lime-bg: #2f3d1e;
-  --type-amber-fg: #f2ad1d;
-  --type-amber-bg: #633f2a;
+  /* M2: the 9 type colours M1 lacked, derived the same way from each colour's hue
+     (fill ~24% lightness, ink ~87%), so all 18 sidebar and type chips match. */
+  --type-rose-fg: #ffbdc7;
+  --type-rose-bg: #52282f;
+  --type-fuchsia-fg: #f7bdff;
+  --type-fuchsia-bg: #4d2852;
+  --type-violet-fg: #cfbdff;
+  --type-violet-bg: #342852;
+  --type-indigo-fg: #bdc0ff;
+  --type-indigo-bg: #282b52;
+  --type-sky-fg: #bdeaff;
+  --type-sky-bg: #284552;
+  --type-cyan-fg: #bdf6ff;
+  --type-cyan-bg: #284c52;
+  --type-emerald-fg: #bdffe8;
+  --type-emerald-bg: #285244;
+  --type-lime-fg: #e6ffbd;
+  --type-lime-bg: #425228;
+  --type-amber-fg: #ffeabd;
+  --type-amber-bg: #524528;
 
   /* M2: tag chips (tagBg / tagText). */
   --tag-bg-gray: #333337;
@@ -100,6 +101,44 @@
   --tag-text-orange: #fff7ed;
   --tag-bg-red: #723131;
   --tag-text-red: #fef2f2;
+
+  /* M2: label pills: blockBg fill with tokenText ink (and --label-border-<c>). */
+  --label-bg-gray: #28282b;
+  --label-text-gray: #7b7776;
+  --label-bg-rose: #672d3d;
+  --label-text-rose: #f45a73;
+  --label-bg-pink: #662f45;
+  --label-text-pink: #ec5fa7;
+  --label-bg-fuchsia: #562c59;
+  --label-text-fuchsia: #de62f0;
+  --label-bg-purple: #513469;
+  --label-text-purple: #b26ef6;
+  --label-bg-violet: #4f3773;
+  --label-text-violet: #9975f4;
+  --label-bg-indigo: #3e3c67;
+  --label-text-indigo: #7279f1;
+  --label-bg-blue: #334069;
+  --label-text-blue: #4f93f3;
+  --label-bg-sky: #1f3d4e;
+  --label-text-sky: #26aeeb;
+  --label-bg-cyan: #213a43;
+  --label-text-cyan: #19bed8;
+  --label-bg-teal: #1f3e3c;
+  --label-text-teal: #25c0af;
+  --label-bg-emerald: #183e33;
+  --label-text-emerald: #26c18b;
+  --label-bg-green: #254833;
+  --label-text-green: #3ace70;
+  --label-bg-lime: #2f3d1e;
+  --label-text-lime: #92d22a;
+  --label-bg-yellow: #543c24;
+  --label-text-yellow: #ecbc13;
+  --label-bg-amber: #633f2a;
+  --label-text-amber: #f2ad1d;
+  --label-bg-orange: #63392b;
+  --label-text-orange: #f4832d;
+  --label-bg-red: #643131;
+  --label-text-red: #f05d5d;
 
   /* M2: label pill borders; each also serves as the colour's line colour (gray's line is darker). */
   --label-border-gray: #636060;

@@ -28,11 +28,25 @@ describe('palette', () => {
     expect(tagStyle('nope')).toEqual({ backgroundColor: 'var(--tag-bg-gray)', color: 'var(--tag-text-gray)' })
     expect(tagStyle('bg-rose')).toEqual({ backgroundColor: 'var(--tag-bg-rose)', color: 'var(--tag-text-rose)' })
     expect(labelStyle('sky')).toEqual({
-      backgroundColor: 'var(--type-sky-bg)',
+      backgroundColor: 'var(--label-bg-sky)',
       borderColor: 'var(--label-border-sky)',
-      color: 'var(--type-sky-fg)',
+      color: 'var(--label-text-sky)',
     })
     expect(lineColor('nope')).toBe('var(--line-gray)')
+  })
+
+  test('every colour defines its type chip and label pill tokens', async () => {
+    const { readFileSync } = await import('node:fs')
+    const css = readFileSync(`${process.cwd()}/src/theme/tokens.css`, 'utf8')
+    for (const c of THEME_COLORS) {
+      for (const token of [`--type-${c}-fg`, `--type-${c}-bg`, `--label-bg-${c}`, `--label-text-${c}`, `--label-border-${c}`]) {
+        expect(css.match(new RegExp(`${token}:`, 'g'))?.length, token).toBe(1)
+      }
+    }
+    expect(css).toMatch(/--label-bg-blue: #334069;/)
+    expect(css).toMatch(/--label-text-blue: #4f93f3;/)
+    expect(css).toMatch(/--label-bg-gray: #28282b;/)
+    expect(css).toMatch(/--label-text-gray: #7b7776;/)
     expect(lineColor('red')).toBe('var(--line-red)')
   })
 })
