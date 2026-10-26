@@ -19,6 +19,7 @@ import { FULL_VIEW_LAYOUTS } from '@/views/model'
 import { useRows } from '@/views/useRows'
 import { DataView } from '@/views/DataView'
 import { CreateCollectionDialog, DeleteCollectionDialog } from '@/collections/CollectionDialogs'
+import { removeQuery } from '@/queries/useQueries'
 import { DeleteTypeDialog } from './DeleteTypeDialog'
 import {
   SECTION_TEXT,
@@ -415,7 +416,13 @@ export function TypePage({ type }: { type: TypeDef }) {
             active={tab === t.key}
             onSelect={() => select(t.key)}
             onRename={(title) => update((v) => patchSection(v, sections, t.key, { title: title || undefined }))}
-            onDelete={isCollectionKey(t.key) ? () => setDeletingCollection(keyId(t.key)) : undefined}
+            onDelete={
+              isCollectionKey(t.key)
+                ? () => setDeletingCollection(keyId(t.key))
+                : isQueryKey(t.key)
+                  ? () => void removeQuery(keyId(t.key)).catch((e: unknown) => console.warn('Could not delete the query:', e))
+                  : undefined
+            }
             onRemove={() =>
               update((v) => ({ ...removeSection(v, sections, t.key), activeTab: v.activeTab === t.key ? 'overview' : v.activeTab }))
             }

@@ -6,6 +6,8 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { createAndOpen } from '@/create/createAndOpen'
 import { NewObjectMenu } from '@/create/NewObjectMenu'
 import { CollectionPage } from '@/collections/CollectionPage'
+import { QueriesPage } from '@/queries/QueriesPage'
+import { QueryPage } from '@/queries/QueryPage'
 import { LinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, stemOf, useLinkIndex } from '@/links/linkIndex'
 import { canGoBack, canGoForward, currentTarget, tabTarget, usePeek, useTabs, type Tab } from '@/nav/tabs'
@@ -269,12 +271,12 @@ export default function App() {
     content = <TrashView />
   } else if (target?.kind === 'collection') {
     content = <CollectionPage key={target.id} id={target.id} />
-  } else if (
-    target?.kind === 'query' ||
-    target?.kind === 'queries' ||
-    target?.kind === 'allNotes'
-  ) {
-    // Replaced by the collection, query, query list and All notes pages (Tasks 13 to 15).
+  } else if (target?.kind === 'query') {
+    content = <QueryPage key={target.id} id={target.id} />
+  } else if (target?.kind === 'queries') {
+    content = <QueriesPage />
+  } else if (target?.kind === 'allNotes') {
+    // Replaced by the All notes page (Task 15).
     content = <p className="p-8 text-center text-[14px] text-fg-muted">Loading results…</p>
   } else {
     content = <Centered title="Pick an object type" subtitle="Choose a type in the sidebar to see its objects." />
@@ -308,6 +310,8 @@ export default function App() {
               onDeleteType={setDeleting}
               onOpenTrash={() => tabs.open({ kind: 'trash' })}
               trashActive={target?.kind === 'trash'}
+              onOpenTarget={(t, o) => tabs.open(t, o)}
+              queriesActive={target?.kind === 'queries'}
             />
           )}
           <MainPanel aside={<RightPanel open={rightOpen} />}>{content}</MainPanel>

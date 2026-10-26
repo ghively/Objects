@@ -79,6 +79,8 @@ export interface DataViewProps {
   compact?: boolean
   pipeline?: Pipeline
   pausedHint?: string
+  /** Replaces the "nothing here" block when the view has no rows (queries: "No content found"). */
+  emptyState?: ReactNode
   customizePages?: CustomizePage[]
   /** Replace one row after an inline edit (from `useRows`). */
   patchRow?(path: string, row: Row): void
@@ -325,6 +327,8 @@ export function DataView(props: DataViewProps) {
       )}
       {props.loading && rows.length === 0 ? (
         <p className="py-6 text-center text-[14px] text-fg-muted">Loading results…</p>
+      ) : empty && props.emptyState ? (
+        props.emptyState
       ) : empty ? (
         <div className="flex flex-col items-center gap-1 py-10 text-center">
           <p className="text-[15px] text-fg">There&apos;s nothing here (yet).</p>
