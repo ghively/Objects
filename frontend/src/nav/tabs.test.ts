@@ -101,3 +101,28 @@ describe('usePeek', () => {
     expect(usePeek.getState().index).toBe(0)
   })
 })
+
+describe('retarget', () => {
+  test('test retarget rewrites history and peek list', () => {
+    const s = useTabs.getState
+    s().open(objT('Pages/Old.md'))
+    s().open(typeT('page'))
+    s().open(objT('Pages/Other.md'), { newTab: true })
+    s().open(objT('Pages/Old.md'))
+    usePeek.getState().peek('Pages/Old.md', ['Pages/A.md', 'Pages/Old.md', 'Pages/B.md'])
+
+    s().retarget('Pages/Old.md', 'Pages/New.md')
+
+    expect(s().tabs[0].history).toEqual([objT('Pages/New.md'), typeT('page')])
+    expect(s().tabs[1].history).toEqual([objT('Pages/Other.md'), objT('Pages/New.md')])
+    expect(currentTarget(s())).toEqual(objT('Pages/New.md'))
+    expect(usePeek.getState().path).toBe('Pages/New.md')
+    expect(usePeek.getState().list).toEqual(['Pages/A.md', 'Pages/New.md', 'Pages/B.md'])
+    expect(usePeek.getState().index).toBe(1)
+
+    // Unrelated paths and a second call are no-ops.
+    const before = s().tabs
+    s().retarget('Pages/Missing.md', 'Pages/X.md')
+    expect(s().tabs).toBe(before)
+  })
+})

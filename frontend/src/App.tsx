@@ -108,7 +108,10 @@ export default function App() {
   // colours and resolutions). Bursts of events coalesce into one reload.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null
-    const off = api.onChange(() => {
+    const off = api.onChange((e) => {
+      // A file moved (renamed, or retyped into another folder): every tab and the peek follow it.
+      if (e.kind === 'renamed' && e.oldPath) useTabs.getState().retarget(e.oldPath, e.path)
+      // `types` (a type definition saved) and every file change reload the summaries and types.
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => {
         timer = null
