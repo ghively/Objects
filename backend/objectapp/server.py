@@ -28,6 +28,13 @@ Routes (all JSON):
   ``{type, rewritten, skipped}`` (``type.revision`` is the new revision);
   ``409 {currentRevision}``, ``422 {detail}``, ``423``, ``428 {detail, affected}``, ``404``.
   Announces ``types`` and ``changed`` for each rewritten file.
+- ``POST /api/types/{id}/properties/{pid}/change-kind`` ``{toType, baseRevision, clientId?}``
+  -> ``{type, newPropertyId, rewritten, skipped, lossy}``; ``409 {currentRevision}``,
+  ``422 {detail}``, ``423``, ``404``. Announces ``types`` and ``changed`` per rewritten file.
+- ``POST /api/types/{id}/properties/{pid}/sync``
+  ``{targetPropertyId, createName?, baseRevision, clientId?}`` -> ``{types, rewritten, skipped}``;
+  ``409 {currentRevision}``, ``422 {detail}``, ``423``, ``404``. Announces ``types`` per
+  changed type and ``changed`` per backfilled object.
 - ``DELETE /api/types/{id}?confirm=true&clientId=`` -> ``{trashId}``; ``422``,
   ``428 {detail, affected}``, ``404``. Announces ``types`` (this type and each type
   whose relations stopped allowing it) and ``deleted`` per object and template.
@@ -151,6 +158,19 @@ class SaveTypeRequest(BaseModel):
     type: dict[str, Any]
     baseRevision: str = ""
     confirm: bool = False
+    clientId: str | None = None
+
+
+class ChangeKindRequest(BaseModel):
+    toType: str
+    baseRevision: str = ""
+    clientId: str | None = None
+
+
+class SyncRequest(BaseModel):
+    targetPropertyId: str | None = None
+    createName: str | None = None
+    baseRevision: str = ""
     clientId: str | None = None
 
 
@@ -426,6 +446,47 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         except KeyError:
             return _error(404, f"No object type {type_id!r}")
         announce(ChangeEvent("types", type_id, None, origin=req.clientId))
+        for path in result.rewritten:
+            announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
+        return _display_safe(result.to_api())
+
+    @api.post("/types/{type_id}/properties/{pid}/change-kind")
+    def change_kind(type_id: str, pid: str, req: ChangeKindRequest):
+        try:
+            result = space.change_property_kind(type_id, pid, req.toType, req.baseRevision)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except TypeReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except KeyError:
+            return _error(404, f"No property {pid!r} on object type {type_id!r}")
+        announce(ChangeEvent("types", type_id, None, origin=req.clientId))
+        for path in result.rewritten:
+            announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
+        return _display_safe(result.to_api())
+
+    @api.post("/types/{type_id}/properties/{pid}/sync")
+    def sync_property(type_id: str, pid: str, req: SyncRequest):
+        try:
+            result = space.set_property_sync(
+                type_id,
+                pid,
+                req.targetPropertyId,
+                create_name=req.createName,
+                base_revision=req.baseRevision,
+            )
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except TypeReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except KeyError:
+            return _error(404, f"No property {pid!r} on object type {type_id!r}")
+        for t in result.types:
+            announce(ChangeEvent("types", t.id, None, origin=req.clientId))
         for path in result.rewritten:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
         return _display_safe(result.to_api())
