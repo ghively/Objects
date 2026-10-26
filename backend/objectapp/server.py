@@ -34,6 +34,12 @@ Routes (all JSON):
 - ``DELETE /api/collections/{id}?confirm=true&clientId=`` -> ``{trashId, removedFrom, skipped}``;
   ``404``, ``428 {detail, affected}``, ``423``. ``POST /api/trash/{id}/restore`` of a collection
   entry also answers ``409`` (name taken, or its id is used by another definition).
+- ``GET /api/queries`` -> ``Query[]``; ``POST /api/queries`` ``{name?, definition?, view?, clientId?}``
+  -> ``201 Query`` (``422``); ``PUT /api/queries/{id}`` ``{query, baseRevision, clientId?}`` ->
+  ``{query}`` (``404``, ``409 {currentRevision}``, ``422``, ``423``);
+  ``DELETE /api/queries/{id}?clientId=`` -> ``{trashId}`` (restorable; ``404``, ``423``).
+  Announces ``queries``. Restoring one re-creates its file under the original id
+  (``409`` when that file exists).
 - ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
   ``{paths, typeIds}`` (announces ``created`` per path and ``types`` per type); ``422`` when a
   saved type now has the trashed type's id or name;
@@ -105,6 +111,7 @@ from .collections import CollectionDef
 from .jsonstore import DefinitionUnreadable, default_views, json_revision
 from .media import NotAnImage, image_media_type, image_path, import_image, list_images
 from .propvalues import InvalidValue
+from .queries import QueryDef
 from .space import ConfirmRequired, Conflict, ReadOnly, RestoreConflict, Space
 from .typedefs import has_undecodable
 from .typemodel import (
@@ -273,6 +280,19 @@ class CreateCollectionRequest(BaseModel):
 
 class SaveCollectionRequest(BaseModel):
     collection: dict[str, Any]
+    baseRevision: str = ""
+    clientId: str | None = None
+
+
+class CreateQueryRequest(BaseModel):
+    name: str | None = None
+    definition: dict[str, Any] | None = None
+    view: dict[str, Any] | None = None
+    clientId: str | None = None
+
+
+class SaveQueryRequest(BaseModel):
+    query: dict[str, Any]
     baseRevision: str = ""
     clientId: str | None = None
 
@@ -671,6 +691,8 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             announce(ChangeEvent("types", type_id, None, origin=clientId))
         for collection_id in result.get("collectionIds", []):
             announce(ChangeEvent("collections", collection_id, None, origin=clientId))
+        for query_id in result.get("queryIds", []):
+            announce(ChangeEvent("queries", query_id, None, origin=clientId))
         for path in result["paths"]:
             announce(ChangeEvent("created", path, space.cached_version(path), origin=clientId))
         for path in rewritten:
@@ -804,6 +826,47 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         for path in result.removed_from:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=clientId))
         return _display_safe(result.to_api())
+
+    @api.get("/queries")
+    def get_queries():
+        return _display_safe([q.to_api(space.query_revision(q.id)) for q in space.list_queries()])
+
+    @api.post("/queries", status_code=201)
+    def create_query(req: CreateQueryRequest):
+        try:
+            q = space.create_query(req.name, req.definition, req.view)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        announce(ChangeEvent("queries", q.id, None, origin=req.clientId))
+        return JSONResponse(_display_safe(q.to_api(space.query_revision(q.id))), status_code=201)
+
+    @api.put("/queries/{query_id}")
+    def save_query(query_id: str, req: SaveQueryRequest):
+        q = QueryDef.from_json(req.query, fallback_id=query_id)
+        q.id = query_id
+        try:
+            q, revision = space.save_query(q, req.baseRevision)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except (KeyError, ValueError):
+            return _error(404, f"No query {query_id!r}")
+        announce(ChangeEvent("queries", query_id, revision, origin=req.clientId))
+        return _display_safe({"query": q.to_api(revision)})
+
+    @api.delete("/queries/{query_id}")
+    def delete_query(query_id: str, clientId: str | None = Query(default=None)):
+        try:
+            trash_id = space.delete_query(query_id)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except (KeyError, ValueError):
+            return _error(404, f"No query {query_id!r}")
+        announce(ChangeEvent("queries", query_id, None, origin=clientId))
+        return {"trashId": trash_id}
 
     @api.post("/types", status_code=201)
     def create_type(req: CreateTypeRequest):

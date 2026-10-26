@@ -12,7 +12,9 @@ Layout:
   (a member's bytes before its ``collections:`` item was removed) and
   ``manifest.json`` ``{id, kind: 'collection', collectionId, name, deletedAt,
   objectTrashIds, removedFrom, skipped}``. Its sole members are ordinary object
-  entries carrying ``collectionTrashId``.
+  entries carrying ``collectionTrashId``;
+- a query: ``queries/<ulid>.json``, the query file's bytes unchanged (its ``id`` is the
+  original id; the deletion time is the ulid's).
 
 This module only knows the folder layout and the metadata; `Space` moves the
 files (so it can keep the watcher quiet and its index current).
@@ -29,7 +31,7 @@ from typing import Any
 
 from .textfile import atomic_write
 
-__all__ = ["RETENTION", "Trash", "TrashItem", "parse_stamp"]
+__all__ = ["RETENTION", "Trash", "TrashItem", "parse_stamp", "ulid_time"]
 
 RETENTION = timedelta(days=30)
 """Entries older than this are purged when the space opens."""
@@ -39,7 +41,7 @@ RETENTION = timedelta(days=30)
 class TrashItem:
     id: str
     kind: str
-    """``'object'``, ``'type'`` or ``'collection'``."""
+    """``'object'``, ``'type'``, ``'collection'`` or ``'query'``."""
     originalPath: str
     """The object's space path; for a type, its type JSON's space path."""
     title: str
@@ -55,7 +57,9 @@ class TrashItem:
     collectionId: str | None = None
     """For a collection entry: the collection's id."""
     name: str | None = None
-    """For a collection entry: its name."""
+    """For a collection or query entry: its name."""
+    queryId: str | None = None
+    """For a query entry: the query's id."""
 
     def to_api(self) -> dict[str, Any]:
         return asdict(self)
@@ -68,6 +72,22 @@ def parse_stamp(text: str) -> datetime | None:
     except ValueError:
         return None
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+
+
+_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+def ulid_time(ulid: str) -> datetime | None:
+    """The millisecond timestamp a ULID starts with, as an aware UTC datetime."""
+    if len(ulid) != 26:
+        return None
+    try:
+        value = 0
+        for ch in ulid[:10].upper():
+            value = value * 32 + _CROCKFORD.index(ch)
+        return datetime.fromtimestamp(value / 1000, UTC)
+    except (ValueError, OverflowError, OSError):
+        return None
 
 
 def _dump(data: dict[str, Any]) -> bytes:
@@ -87,6 +107,7 @@ class Trash:
         self.dir = Path(root) / ".capacities" / "trash"
         self.types_dir = self.dir / "types"
         self.collections_dir = self.dir / "collections"
+        self.queries_dir = self.dir / "queries"
 
     # -- paths ---------------------------------------------------------------
 
@@ -101,6 +122,9 @@ class Trash:
 
     def collection_dir(self, trash_id: str) -> Path:
         return self.collections_dir / trash_id
+
+    def query_file(self, trash_id: str) -> Path:
+        return self.queries_dir / f"{trash_id}.json"
 
     @staticmethod
     def _safe_id(trash_id: str) -> bool:
@@ -133,6 +157,25 @@ class Trash:
         return sorted(
             p.name for p in self.collections_dir.iterdir() if (p / "manifest.json").is_file()
         )
+
+    def query_trash_ids(self) -> list[str]:
+        if not self.queries_dir.is_dir():
+            return []
+        return sorted(p.stem for p in self.queries_dir.glob("*.json") if self._safe_id(p.stem))
+
+    def query_data(self, trash_id: str) -> dict[str, Any] | None:
+        if not self._safe_id(trash_id):
+            return None
+        return _load(self.query_file(trash_id))
+
+    def query_deleted_at(self, trash_id: str) -> str:
+        when = ulid_time(trash_id)
+        if when is None:
+            try:
+                when = datetime.fromtimestamp(self.query_file(trash_id).stat().st_mtime, UTC)
+            except OSError:
+                return ""
+        return when.strftime("%Y-%m-%dT%H:%M:%S.") + f"{when.microsecond // 1000:03d}Z"
 
     def object_ids(self) -> list[str]:
         if not self.dir.is_dir():
@@ -203,6 +246,24 @@ class Trash:
                     name=name,
                 )
             )
+        for qid in self.query_trash_ids():
+            data = self.query_data(qid)
+            if data is None:
+                continue
+            query_id = str(data.get("id") or "")
+            name = str(data.get("name") or "") or query_id
+            out.append(
+                TrashItem(
+                    id=qid,
+                    kind="query",
+                    originalPath=f".capacities/queries/{query_id}.json",
+                    title=name,
+                    type="",
+                    deletedAt=self.query_deleted_at(qid),
+                    queryId=query_id,
+                    name=name,
+                )
+            )
         out.sort(key=lambda i: (i.deletedAt, i.id), reverse=True)
         return out
 
@@ -233,6 +294,13 @@ class Trash:
 
     def remove_collection(self, trash_id: str) -> None:
         shutil.rmtree(self.collection_dir(trash_id), ignore_errors=True)
+
+    def has_query(self, trash_id: str) -> bool:
+        return self._safe_id(trash_id) and self.query_file(trash_id).is_file()
+
+    def remove_query(self, trash_id: str) -> None:
+        if self._safe_id(trash_id):
+            self.query_file(trash_id).unlink(missing_ok=True)
 
     def expired(self, now: datetime) -> list[str]:
         """Ids of the entries deleted more than `RETENTION` before `now`."""

@@ -226,6 +226,7 @@ def test_open_twice_writes_nothing(space_dir: Path):
             assert c.get(f"/api/views/{t.id}").status_code == 200
         assert c.get("/api/ui").status_code == 200
         assert c.get("/api/collections").json() == []
+        assert c.get("/api/queries").json() == []
     first = _snapshot(space_dir)
     space2, c2, _pub2 = _client(space_dir)
     with c2:
@@ -233,9 +234,11 @@ def test_open_twice_writes_nothing(space_dir: Path):
             assert c2.get(f"/api/views/{t.id}").status_code == 200
         assert c2.get("/api/ui").status_code == 200
         assert c2.get("/api/collections").json() == []
+        assert c2.get("/api/queries").json() == []
     assert _snapshot(space_dir) == first
     assert not (space_dir / ".capacities" / "views").exists()
     assert not (space_dir / ".capacities" / "collections").exists()
+    assert not (space_dir / ".capacities" / "queries").exists()
     assert not (space_dir / ".capacities" / "ui.json").exists()
 
 
