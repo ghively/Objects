@@ -44,12 +44,13 @@ export function openObject(path: string, mods: OpenMods = {}, typeId?: string | 
 /** Create an object of `typeId` (`templateId`: an id, `null` for the default, `"none"`) and open it. */
 export async function createAndOpen(
   typeId: string,
-  opts: { title?: string; templateId?: string | null } = {},
+  opts: { title?: string; templateId?: string | null; values?: Record<string, unknown> } = {},
   mods: OpenMods = {},
 ): Promise<CreatedFile> {
-  const req: { title?: string; templateId?: string | null } = {}
+  const req: { title?: string; templateId?: string | null; values?: Record<string, unknown> } = {}
   if (opts.title !== undefined) req.title = opts.title
   if (opts.templateId !== undefined) req.templateId = opts.templateId
+  if (opts.values !== undefined && Object.keys(opts.values).length > 0) req.values = opts.values
   const res = await api.createObject(typeId, req)
   openObject(res.path, mods, typeId)
   void invalidateLinkIndex()

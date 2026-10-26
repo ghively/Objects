@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { activeTab, currentTarget, usePeek, useTabs, type Target } from './tabs'
+import { useRecent } from './recent'
+import { activeTab, currentTarget, sameTarget, usePeek, useTabs, type Target } from './tabs'
 
 const typeT = (typeId: string): Target => ({ kind: 'type', typeId })
 const objT = (path: string): Target => ({ kind: 'object', path })
@@ -8,6 +9,7 @@ beforeEach(() => {
   localStorage.clear()
   useTabs.getState().reset()
   usePeek.getState().close()
+  useRecent.getState().clear()
 })
 
 describe('useTabs', () => {
@@ -124,5 +126,59 @@ describe('retarget', () => {
     const before = s().tabs
     s().retarget('Pages/Missing.md', 'Pages/X.md')
     expect(s().tabs).toBe(before)
+  })
+})
+
+describe('collection, query, queries and allNotes targets', () => {
+  test('test collection, query, queries and allNotes targets open and go back', () => {
+    const s = useTabs.getState
+    s().open(typeT('task'))
+    for (const t of [
+      { kind: 'collection', id: 'reading' },
+      { kind: 'query', id: 'open-tasks' },
+      { kind: 'queries' },
+      { kind: 'allNotes' },
+    ] as Target[]) {
+      s().open(t)
+      expect(currentTarget(s())).toEqual(t)
+    }
+    s().back()
+    expect(currentTarget(s())).toEqual({ kind: 'queries' })
+    s().back()
+    expect(currentTarget(s())).toEqual({ kind: 'query', id: 'open-tasks' })
+    s().back()
+    expect(currentTarget(s())).toEqual({ kind: 'collection', id: 'reading' })
+    s().back()
+    expect(currentTarget(s())).toEqual(typeT('task'))
+  })
+
+  test('sameTarget compares ids, and the singleton targets are always equal', () => {
+    expect(sameTarget({ kind: 'collection', id: 'a' }, { kind: 'collection', id: 'a' })).toBe(true)
+    expect(sameTarget({ kind: 'collection', id: 'a' }, { kind: 'query', id: 'a' })).toBe(false)
+    expect(sameTarget({ kind: 'query', id: 'a' }, { kind: 'query', id: 'b' })).toBe(false)
+    expect(sameTarget({ kind: 'queries' }, { kind: 'queries' })).toBe(true)
+    expect(sameTarget({ kind: 'allNotes' }, { kind: 'allNotes' })).toBe(true)
+    // Re-opening the same target is a no-op.
+    useTabs.getState().open({ kind: 'queries' })
+    useTabs.getState().open({ kind: 'queries' })
+    expect(activeTab(useTabs.getState())?.history).toHaveLength(1)
+  })
+})
+
+describe('useRecent', () => {
+  test('objects opened in a tab or the peek are recorded, newest first, without duplicates', () => {
+    useTabs.getState().open(objT('Tasks/A.md'))
+    useTabs.getState().open(typeT('task'))
+    usePeek.getState().peek('Tasks/B.md')
+    useTabs.getState().open(objT('Tasks/A.md'))
+    expect(useRecent.getState().paths).toEqual(['Tasks/A.md', 'Tasks/B.md'])
+  })
+
+  test('keeps at most 50 and follows a rename', () => {
+    for (let i = 0; i < 60; i++) useRecent.getState().add(`P/${i}.md`)
+    expect(useRecent.getState().paths).toHaveLength(50)
+    expect(useRecent.getState().paths[0]).toBe('P/59.md')
+    useTabs.getState().retarget('P/59.md', 'P/renamed.md')
+    expect(useRecent.getState().paths[0]).toBe('P/renamed.md')
   })
 })

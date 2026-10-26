@@ -60,11 +60,14 @@ describe('TypeSettings', () => {
       expect(nodes[i - 1].compareDocumentPosition(nodes[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     }
     const config = screen.getByRole('region', { name: 'Configuration' })
-    expect(within(config).getByRole('heading', { level: 3 })).toHaveTextContent('Page')
+    expect(within(config).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'Page',
+      'Card view and linking',
+    ])
     for (const l of ['Page layout', 'Font', 'Wide layout', 'Cover image mode', 'Display of cover image']) {
       expect(within(config).getAllByText(l).length).toBeGreaterThan(0)
     }
-    expect(within(config).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
+    expect(within(within(config).getByRole('region', { name: 'Page' })).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
       'Standard',
       'Index card',
       'Profile',
@@ -78,7 +81,6 @@ describe('TypeSettings', () => {
     ).toBeInTheDocument()
     expect(within(config).getByRole('option', { name: 'Sans Serif' })).toBeInTheDocument()
     expect(screen.queryByText(/Calendar/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Card view/i)).not.toBeInTheDocument()
     expect(await screen.findByText('Kickoff')).toBeInTheDocument()
   })
 
