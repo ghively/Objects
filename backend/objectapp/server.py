@@ -114,7 +114,9 @@ from .collections import CollectionDef
 from .jsonstore import DefinitionUnreadable, default_views, json_revision, normalize_views
 from .media import NotAnImage, image_media_type, image_path, import_image, list_images
 from .propvalues import InvalidValue
+from .notify import FileNotifier, system_notifier
 from .queries import QueryDef
+from .reminders import ReminderScheduler, file_clock
 from .space import ConfirmRequired, Conflict, DailyNoteExists, ReadOnly, RestoreConflict, Space
 from .typedefs import has_undecodable
 from .typemodel import (
@@ -465,16 +467,33 @@ def _tasks_ui_problem(tasks: Any) -> str | None:
 
 
 def create_app(space: Space, static_dir: Path | None = None, watch: bool = True) -> FastAPI:
-    """The app for `space`. With `watch`, a `SpaceWatcher` runs for the app's lifespan."""
+    """The app for `space`. With `watch`, a `SpaceWatcher` runs for the app's lifespan.
+
+    The reminder scheduler runs for the app's lifespan either way. Test hooks,
+    ignored unless set: ``OBJECT_CLOCK_FILE`` (a file holding an ISO UTC instant
+    that `Space.clock` re-reads on every call), ``OBJECT_FAKE_NOTIFY_FILE`` (a
+    file-appending notifier instead of the OS one, and ``POST /api/_test/tick``)
+    and ``OBJECT_STATE_DIR`` (where the reminder ledger lives; read by `reminders`).
+    """
     hub = EventHub()
+    clock_file = os.environ.get("OBJECT_CLOCK_FILE")
+    if clock_file:
+        space.clock = file_clock(Path(clock_file))
+    fake_notify = os.environ.get("OBJECT_FAKE_NOTIFY_FILE")
+    notifier = FileNotifier(Path(fake_notify)) if fake_notify else system_notifier()
+    scheduler = ReminderScheduler(space, notifier)
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI):
         hub.loop = asyncio.get_running_loop()
         hub.closed = False
+        scheduler.start()
         if not watch:
-            yield
-            hub.close()
+            try:
+                yield
+            finally:
+                hub.close()
+                await asyncio.to_thread(scheduler.stop)
             return
         watcher = SpaceWatcher(space, hub.loop)
         watcher.start()
@@ -492,12 +511,14 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             with contextlib.suppress(asyncio.CancelledError):
                 await task
             await asyncio.to_thread(watcher.stop)
+            await asyncio.to_thread(scheduler.stop)
 
     app = FastAPI(
         title="Object", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
     )
     app.state.space = space
     app.state.hub = hub
+    app.state.reminders = scheduler
 
     @app.exception_handler(OSError)
     async def os_error(_request: Request, exc: OSError) -> JSONResponse:
@@ -1216,6 +1237,19 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
                 yield ServerSentEvent(event="change", data=json.dumps(asdict(event)))
 
         return EventSourceResponse(stream(), ping=15)
+
+    if fake_notify:
+
+        @api.post("/_test/tick")
+        def test_tick():
+            """Run one reminder check at the clock's instant (test hook only)."""
+            fired = scheduler.tick(space.clock())
+            return {
+                "fired": [
+                    {"path": d.path, "title": d.title, "body": d.body, "trigger": d.trigger.isoformat()}
+                    for d in fired
+                ]
+            }
 
     app.include_router(api)
 

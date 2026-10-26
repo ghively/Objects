@@ -39,3 +39,18 @@ def calendar_space_dir(tmp_path: Path) -> Path:
     dest = tmp_path / "space-calendar"
     shutil.copytree(FIXTURES / "space-calendar", dest)
     return dest
+
+
+@pytest.fixture(autouse=True)
+def _reminders_stay_in_the_sandbox(tmp_path_factory, monkeypatch):
+    """M4 Task 6: every app lifespan runs the reminder scheduler.
+
+    Keep its ledger out of the real per-user state folder and never spawn a
+    real OS notification from a test (tests that check those set their own).
+    """
+    monkeypatch.setenv("OBJECT_STATE_DIR", str(tmp_path_factory.mktemp("object-state")))
+    for name in ("OBJECT_CLOCK_FILE", "OBJECT_FAKE_NOTIFY_FILE"):
+        monkeypatch.delenv(name, raising=False)
+    from objectapp import notify
+
+    monkeypatch.setattr(notify, "_launch", lambda argv, env: None)
