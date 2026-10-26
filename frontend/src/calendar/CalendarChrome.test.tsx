@@ -86,11 +86,11 @@ describe('CalendarChrome', () => {
     expect(anchor()).toBe(TODAY)
   })
 
-  test('the page shows the view placeholder over the view range', () => {
+  test('the page shows the view over the view range', () => {
     useCalendar.setState({ view: 'week' })
     const { container } = renderPage()
     const pending = container.querySelector('[data-view="week"]')!
-    expect(pending).toHaveTextContent('Loading results…')
+    expect(pending.querySelector('[data-testid="week-view"]')).not.toBeNull()
     expect(pending).toHaveAttribute('data-from', '2026-10-18')
     expect(pending).toHaveAttribute('data-to', '2026-10-24')
   })
