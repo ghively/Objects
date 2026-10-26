@@ -306,7 +306,33 @@ class SaveQueryRequest(BaseModel):
     clientId: str | None = None
 
 
-_UI_PATCH_KEYS = frozenset({"pinned", "sections", "allNotesLayout"})
+_UI_PATCH_KEYS = frozenset(
+    {"pinned", "sections", "allNotesLayout", "calendar", "tasks", "reminders"}
+)
+_WEEK_STARTS = ("sunday", "monday")
+_CALENDAR_HIDE_KEYS = (
+    "hideDailyNote",
+    "hideTasks",
+    "hideDated",
+    "hideCreatedOnDay",
+    "hideUpdated",
+    "hideCreateObjects",
+)
+_CALENDAR_VIEW_KEYS = ("tasksView", "createdView", "updatedView", "datedView")
+_TASK_SECTION_KEYS = frozenset(
+    {
+        "status",
+        "today",
+        "inbox",
+        "open",
+        "deadline",
+        "scheduled",
+        "recurring",
+        "reminders",
+        "tags",
+        "completed",
+    }
+)
 
 
 class EnsureTagRequest(BaseModel):
@@ -389,6 +415,52 @@ def _ui_problem(patch: dict[str, Any]) -> str | None:
             return "sections must be a list of sections with a list of items."
     if "allNotesLayout" in patch and not isinstance(patch["allNotesLayout"], str):
         return "allNotesLayout must be a string."
+    if "calendar" in patch:
+        problem = _calendar_ui_problem(patch["calendar"])
+        if problem:
+            return problem
+    if "tasks" in patch:
+        problem = _tasks_ui_problem(patch["tasks"])
+        if problem:
+            return problem
+    if "reminders" in patch:
+        reminders = patch["reminders"]
+        if not isinstance(reminders, dict) or not isinstance(reminders.get("enabled"), bool):
+            return "reminders must be {enabled: true|false}."
+    return None
+
+
+def _calendar_ui_problem(cal: Any) -> str | None:
+    """Why a ``calendar`` ui patch is not a ``CalendarUi``, else None."""
+    if not isinstance(cal, dict):
+        return "calendar must be an object."
+    if "weekStart" in cal and cal["weekStart"] not in _WEEK_STARTS:
+        return "calendar.weekStart must be 'sunday' or 'monday'."
+    if "daily" in cal:
+        daily = cal["daily"]
+        if not isinstance(daily, dict):
+            return "calendar.daily must be an object."
+        for key in _CALENDAR_HIDE_KEYS:
+            if key in daily and not isinstance(daily[key], bool):
+                return f"calendar.daily.{key} must be true or false."
+        for key in _CALENDAR_VIEW_KEYS:
+            if key in daily and not isinstance(daily[key], dict):
+                return f"calendar.daily.{key} must be a view state object."
+    return None
+
+
+def _tasks_ui_problem(tasks: Any) -> str | None:
+    """Why a ``tasks`` ui patch is not a ``TasksUi``, else None."""
+    if not isinstance(tasks, dict):
+        return "tasks must be an object."
+    if "activeTab" in tasks and tasks["activeTab"] not in _TASK_SECTION_KEYS:
+        return "tasks.activeTab must be a task section key."
+    if "views" in tasks:
+        views = tasks["views"]
+        if not isinstance(views, dict) or not all(
+            k in _TASK_SECTION_KEYS and isinstance(v, dict) for k, v in views.items()
+        ):
+            return "tasks.views must map task section keys to view state objects."
     return None
 
 
@@ -785,6 +857,15 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
     def empty_trash(clientId: str | None = Query(default=None)):
         del clientId
         return {"purged": space.empty_trash()}
+
+    @api.get("/calendar")
+    def get_calendar(from_: str | None = Query(default=None, alias="from"), to: str | None = None):
+        if not from_ or not to:
+            return _error(422, "A calendar range needs from and to (YYYY-MM-DD).")
+        try:
+            return _display_safe(space.calendar(from_, to))
+        except InvalidValue as exc:
+            return _error(422, str(exc))
 
     @api.post("/rows")
     def post_rows(req: RowsRequest):
