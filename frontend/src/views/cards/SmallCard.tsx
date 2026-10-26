@@ -23,7 +23,7 @@ export const isEmptyValue = (v: unknown): boolean =>
   v === null || v === undefined || v === '' || v === false || (Array.isArray(v) && v.length === 0)
 
 export const CARD_BASE =
-  'preview-card-base preview-card-core relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised text-left shadow-sm active:brightness-[1.02]'
+  'preview-card-base preview-card-core relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised text-left shadow-[0_2px_3px_#00000001,0_4px_9px_#00000003,0_8px_12px_#00000001] active:brightness-[1.02]'
 
 function TypeLabel({ type }: { type?: TypeDef }) {
   if (!type) return null

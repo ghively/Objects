@@ -24,14 +24,14 @@ const blocksTheme = EditorView.theme(
  * 600 ms after typing stops and on blur; an empty text saves `null`. While it has focus, a new
  * value from outside doesn't replace what the user is typing.
  */
-export function BlocksCell({ def, value, readOnly, onChange }: CellProps<string | null>) {
+export function BlocksCell({ def, value, readOnly, density, onChange }: CellProps<string | null>) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const lastRef = useRef<string | null>(value)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
-  const initial = useRef({ value, placeholder: placeholderFor(def) })
+  const initial = useRef({ value, placeholder: placeholderFor(def, density) })
 
   const flushRef = useRef(() => {})
   flushRef.current = () => {

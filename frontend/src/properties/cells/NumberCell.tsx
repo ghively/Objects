@@ -11,7 +11,7 @@ const DEBOUNCE_MS = 250
  * blur; an empty input saves `null` and text that isn't a number is ignored. Unfocused it shows
  * the number in its format, and a progress format also shows a bar of the steps done.
  */
-export function NumberCell({ def, value, readOnly, onChange }: CellProps<number | null>) {
+export function NumberCell({ def, value, readOnly, density, onChange }: CellProps<number | null>) {
   const fmt = def.options.numberFormat ?? null
   // A percentage stores the fraction (0.25) and is edited as the percent (25).
   const scale = fmt?.type === 'percentage' ? 100 : 1
@@ -50,7 +50,7 @@ export function NumberCell({ def, value, readOnly, onChange }: CellProps<number 
         inputMode="decimal"
         value={shown}
         readOnly={readOnly}
-        placeholder={placeholderFor(def)}
+        placeholder={placeholderFor(def, density)}
         onFocus={() => {
           setFocused(true)
           setText(

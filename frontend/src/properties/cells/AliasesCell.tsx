@@ -7,7 +7,7 @@ import { CELL_TEXT, type CellProps } from './types'
 export const MAX_ALIASES = 8
 
 /** Aliases: up to 8 unique names as chips, with an input that adds one on Enter. */
-export function AliasesCell({ def, value, readOnly, onChange }: CellProps<string[] | null>) {
+export function AliasesCell({ def, value, readOnly, density, onChange }: CellProps<string[] | null>) {
   const aliases = value ?? []
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -49,12 +49,12 @@ export function AliasesCell({ def, value, readOnly, onChange }: CellProps<string
             )}
           </span>
         ))}
-        {readOnly && aliases.length === 0 && <span className="text-[15px] text-fg-muted">{placeholderFor(def)}</span>}
+        {readOnly && aliases.length === 0 && <span className="text-[15px] text-fg-muted">{placeholderFor(def, density)}</span>}
         {!readOnly && (
           <input
             aria-label="Add alias"
             value={draft}
-            placeholder={aliases.length === 0 ? placeholderFor(def) : ''}
+            placeholder={aliases.length === 0 ? placeholderFor(def, density) : ''}
             onChange={(e) => {
               setDraft(e.target.value)
               setError(null)

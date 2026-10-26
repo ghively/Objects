@@ -6,13 +6,13 @@ import { formatDate, placeholderFor } from '../format'
 import type { CellProps } from './types'
 
 /** A date, a time or a range (`datetime`, `datetimeSimple`); a click opens the DatePicker. */
-export function DateCell({ def, value, readOnly, onChange }: CellProps<DateValue | null>) {
+export function DateCell({ def, value, readOnly, density, onChange }: CellProps<DateValue | null>) {
   const [open, setOpen] = useState(false)
   const text = formatDate(value)
   const shown = text ? (
     <span className="text-fg">{text}</span>
   ) : (
-    <span className="text-fg-muted">{placeholderFor(def)}</span>
+    <span className="text-fg-muted">{placeholderFor(def, density)}</span>
   )
   if (readOnly) return <p className="text-[15px]">{shown}</p>
   return (
