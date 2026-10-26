@@ -15,7 +15,7 @@ export interface GroupEditorProps {
 export function GroupEditor({ groupBy, onChange, choices }: GroupEditorProps) {
   const entry = groupBy?.groups?.[0]
   const choice = entry ? choiceFor(choices, entry.propertyId) : undefined
-  const options = choice ? GROUP_OPTIONS(choice.kind) : []
+  const options = choice ? GROUP_OPTIONS(choice.kind, choice.def) : []
   const sortOptions = choice ? GROUP_SORT_OPTIONS(choice.kind) : []
 
   const setEntry = (next: GroupByEntry) => onChange({ ...(groupBy ?? {}), groups: [next] })
@@ -43,7 +43,7 @@ export function GroupEditor({ groupBy, onChange, choices }: GroupEditorProps) {
               groups: [
                 {
                   propertyId: c.key,
-                  option: GROUP_OPTIONS(c.kind)[0]?.key ?? 'default',
+                  option: GROUP_OPTIONS(c.kind, c.def)[0]?.key ?? 'default',
                   ...(c.structureId ? { structureId: c.structureId } : {}),
                 },
               ],

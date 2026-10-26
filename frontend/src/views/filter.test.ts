@@ -292,3 +292,70 @@ describe('filter engine', () => {
     expect(matchFilter(R('a', { note: 'q' }), f('note', 'is', 'q'), ctx())).toBe(true)
   })
 })
+
+describe('task date filters (M4)', () => {
+  const taskDate = propertyDef({
+    id: 'date',
+    type: 'datetimeSimple',
+    options: { constraints: { resolutionPreference: 'day', endTimeSettings: 'notAllowed', supportsReminders: true } },
+  })
+  const deadline = propertyDef({ id: 'deadline', type: 'datetimeSimple', options: { constraints: { resolutionPreference: 'day', endTimeSettings: 'notAllowed' } } })
+  const taskType = typeDef({
+    id: 'task',
+    propertyDefinitions: [
+      propertyDef({ id: 'title', type: 'entity_title' }),
+      taskDate,
+      deadline,
+      propertyDef({ id: 'repeat', type: 'text', visibility: 'hidden' }),
+      propertyDef({ id: 'remind', type: 'text', visibility: 'hidden' }),
+    ],
+  })
+  const tctx = (): FilterCtx => ({ types: [taskType, page], collections: [], tagIdsToTitles: {}, now })
+  const day = (s: string) => ({ start: s, resolution: 'day' as const })
+  const T = (path: string, values: Row['values'] = {}): Row =>
+    R(path, { date: null, repeat: null, remind: null, ...values }, {}, 'task')
+  const TASK_OPS = ['isRecurring', 'isNotRecurring', 'hasReminder', 'hasNoReminder']
+
+  test('new options only offered on the Task date property', () => {
+    const keys = (d: Pick<PropertyDef, 'type' | 'options'>) => filterOptionsFor(d).map((o) => o.key)
+    expect(filterOptionsFor(taskDate).slice(-4).map((o) => `${o.key}:${o.label}`)).toEqual([
+      'isRecurring:is recurring',
+      'isNotRecurring:is not recurring',
+      'hasReminder:has reminder',
+      'hasNoReminder:has no reminder',
+    ])
+    for (const d of [deadline, propertyDef({ id: 'x', type: 'datetime' }), { type: 'entity_createdAt' as const, options: {} }]) {
+      expect(keys(d).filter((k) => TASK_OPS.includes(k))).toEqual([])
+    }
+    // The kind table itself is unchanged: the operators come from the definition.
+    expect(FILTER_OPTIONS.datetimeSimple.map((o) => o.key).filter((k) => TASK_OPS.includes(k))).toEqual([])
+    expect(filterIsValid(f('date', 'isRecurring'), { task: taskType })).toBe(true)
+    expect(filterIsValid(f('deadline', 'isRecurring'), { task: taskType })).toBe(false)
+  })
+
+  test('isRecurring and hasReminder filters', () => {
+    const rows = [
+      T('weekly', { date: day('2026-10-23'), repeat: 'every week' }),
+      T('bad', { date: day('2026-10-23'), repeat: 'weekly' }),
+      T('nodate', { repeat: 'every day', remind: 'on the day at 09:00' }),
+      T('remDay', { date: day('2026-10-23'), remind: '1 day before at 18:30' }),
+      T('remMisfit', { date: day('2026-10-23'), remind: '15 minutes before' }),
+      T('remTime', { date: { start: '2026-10-23T09:00:00Z', resolution: 'time' }, remind: '1 hour before' }),
+      T('plain', { date: day('2026-10-23') }),
+    ]
+    const run = (o: string) => paths(applyFilters(rows, group('and', f('date', o)), tctx()))
+    expect(run('isRecurring')).toEqual(['weekly'])
+    expect(run('isNotRecurring')).toEqual(['bad', 'nodate', 'remDay', 'remMisfit', 'remTime', 'plain'])
+    expect(run('hasReminder')).toEqual(['remDay', 'remTime'])
+    expect(run('hasNoReminder')).toEqual(['weekly', 'bad', 'nodate', 'remMisfit', 'plain'])
+  })
+
+  test('task filters on rows of another type', () => {
+    const other = R('page', { due: day('2026-10-23') })
+    expect(matchFilter(other, f('date', 'isRecurring', undefined, 'task'), tctx())).toBe(true) // another type passes a scoped filter
+    expect(matchFilter(other, f('date', 'isRecurring'), tctx())).toBe(false)
+    expect(matchFilter(other, f('date', 'isNotRecurring'), tctx())).toBe(true)
+    expect(matchFilter(other, f('date', 'hasReminder'), tctx())).toBe(false)
+    expect(matchFilter(other, f('date', 'hasNoReminder'), tctx())).toBe(true)
+  })
+})
