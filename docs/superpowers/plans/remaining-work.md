@@ -15,6 +15,7 @@ Status as of 2026-10-26 (M3 built, reviewed, fixed and through its final gate; G
 | **M1** shell, objects on disk, editor | Built and verified 2026-10-23. **Open:** Gene's hands-on check on a copy of the CPI export (`m1-acceptance.md`). |
 | **M2** object types and properties | 20 tasks built; whole-milestone review and fixes done (`32c7fe2..39432ce`); 372 back-end + 249 front-end tests; `m2_acceptance.py` 52/52 on the sample spaces. **Open:** Gene's hands-on checks (`m2-acceptance.md`). Known nit: `editor/preserve.test.ts` "1MB body splits under 300ms" can fail on timing when the machine is loaded. |
 | **M3** views, collections, queries | 16 tasks built (`a89c8cb..bd386e6`), whole-milestone review and fix pass done (`bd386e6..925b023`), final gate green 2026-10-26: 459 back-end tests, 479 front-end tests (66 files), `tsc -b --noEmit` clean, `npm run build` ok; `m1_roundtrip.py` PASS, `m2_acceptance.py` PASS (52/52 checks on `space-sample`, 50/50 on `space-v1`), `m3_acceptance.py` PASS (14/14 checks on each); the built app served headless on a scratch copy of `space-sample` rendered home, a type page (Overview and All), a collection, a query, the Queries page and All notes in Playwright with 0 console errors. **Open:** Gene's hands-on checks (`m3-acceptance.md`, unchecked). |
+| **M4** calendar, daily notes, tasks | 16 tasks built (`c771907..d97c007`, acceptance in Task 16); 611 back-end tests, 652 front-end tests (99 files), `tsc -b --noEmit` clean, lint 0 errors, `npm run build` ok; `m4_acceptance.py` PASS (24/24 on `space-calendar`, `space-sample` and `space-v1`). Whole-milestone review and fix pass not yet run. **Open:** Gene's hands-on checks (`m4-acceptance.md`, unchecked). |
 
 ## M3 final gate (2026-10-26)
 
@@ -24,7 +25,11 @@ What is left for Gene on M3: the hand-run list in `m3-acceptance.md` (on a copy 
 
 ### M4 status
 
-Planned, not built: `2026-10-26-m4-calendar-daily-tasks.md` (16 tasks, critiqued and revised). It was written against the M3 *plan*; before building, re-read what M3 actually produced and correct interface names in the M4 plan. Gene said on 2026-10-26 to build all remaining milestones now.
+Built (Tasks 1–15), and the Task 16 acceptance passed on 2026-10-26; see `m4-acceptance.md`. Task 16 found:
+
+- No contract mismatches between the server and `api/client.ts`. The built app rendered the Calendar and Tasks pages with 0 console errors.
+- A Task type whose status options are inferred (`space-sample`, `space-v1`) has no done-category option. Opening keeps a type's own options, so such a task can't be completed until a Done option is added in the type settings. The acceptance script adds one over the API first. Gene should check his CPI export for this.
+- Still open: the whole-milestone review, its fix pass and the final gate (build-process.md), then Gene's hand checks.
 
 ## To do
 
@@ -44,7 +49,7 @@ Planned, not built: `2026-10-26-m4-calendar-daily-tasks.md` (16 tasks, critiqued
 - **Sidebar Pinned section:** pin objects, types, collections and queries; drag to reorder.
 - **"All notes" view.**
 
-### M4: calendar, daily notes, tasks
+### M4: calendar, daily notes, tasks (built and accepted 2026-10-26; review and Gene's hand checks pending)
 
 - **Calendar views:** Day, Three days, Week, Month; Today ‹ ›.
 - **Day header:** coloured weekday, Today pill, large date, week number.
