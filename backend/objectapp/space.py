@@ -59,7 +59,7 @@ from .propvalues import (
 )
 from .relink import relink_frontmatter, replace_wikilinks, rewrite_tag_lists, wikilink_targets
 from .templates import TemplateError, creation_variable, expand_title, resolve_date_variable
-from .textfile import atomic_write, encode_like
+from .textfile import atomic_write, create_new, encode_like, move_no_overwrite, retry_os
 from .trash import Trash, TrashItem
 from .typedefs import (
     SYSTEM_KEYS,
@@ -1080,14 +1080,14 @@ class Space:
         try:
             if case_only:
                 tmp = src.with_name(f".rename-{new_ulid()}.tmp")
-                os.rename(src, tmp)
+                retry_os(lambda: os.rename(src, tmp))
                 try:
-                    os.rename(tmp, dest)
+                    retry_os(lambda: os.rename(tmp, dest))
                 except BaseException:
                     os.rename(tmp, src)
                     raise
             else:
-                os.rename(src, dest)
+                move_no_overwrite(src, dest)
         except BaseException:
             self.own_deletes.pop(rel, None)
             self.own_writes.pop(new_rel, None)
@@ -1162,7 +1162,12 @@ class Space:
             version = self._write(rel, base_version, edit)
             new_rel = self._rename_target(rel, new_title)
             if new_rel != rel:
-                self._move_file(rel, new_rel, version)
+                try:
+                    self._move_file(rel, new_rel, version)
+                except OSError:
+                    # The title change stands; the file just keeps its old name
+                    # (locked by another program, or the name was taken meanwhile).
+                    new_rel = rel
 
         relinked: list[str] = []
         skipped: list[Skip] = []
@@ -1527,15 +1532,10 @@ class Space:
     def _place(self, rel: str, data: bytes) -> bool:
         """Write a new file at ``rel`` unless something is there by then; True if written."""
         full = self.root / self._rel(rel)
-
-        def absent() -> None:
-            if full.exists():
-                raise FileExistsError(rel)
-
         self.own_writes[rel] = version_of(data)
         try:
             full.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write(full, data, check=absent)
+            create_new(full, data)
         except FileExistsError:
             self.own_writes.pop(rel, None)
             return False
@@ -1556,7 +1556,7 @@ class Space:
         except OSError:
             self.own_deletes[rel] = ""
         try:
-            os.replace(full, dest)
+            retry_os(lambda: os.replace(full, dest))
         except BaseException:
             self.own_deletes.pop(rel, None)
             raise

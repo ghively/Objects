@@ -11,6 +11,10 @@ loop). Nothing is emitted for:
   and files it moves to the trash (``own_deletes``): the server announces those
   itself, tagged with the saving client's id;
 - events that leave the file bytes as the space already knows them.
+
+Files are only opened (read, or resolved) while holding the space's lock, so a
+read never overlaps one of the app's own replaces (Windows refuses to replace a
+file another handle has open).
 """
 
 from __future__ import annotations
@@ -139,13 +143,17 @@ class SpaceWatcher:
         return rel.as_posix()
 
     def _touch(self, path: str) -> None:
-        rel = self._relpath(path)
+        # `resolve()` opens the file on Windows; doing that while the app
+        # replaces it would make the replace fail, so wait for the space's lock.
+        with self.space._lock:
+            rel = self._relpath(path)
         if rel is not None:
             self._schedule(rel)
 
     def _touch_folder(self, path: str) -> None:
         """A folder moved or vanished: re-check every known object beneath it."""
-        rel = self._space_rel(path)
+        with self.space._lock:
+            rel = self._space_rel(path)
         if rel is None:
             return
         prefix = rel.as_posix() + "/"
@@ -174,7 +182,10 @@ class SpaceWatcher:
         if self._stopped:
             return
         try:
-            event = self._refresh(rel)
+            # Read under the space's lock: an open read handle (no FILE_SHARE_DELETE
+            # on Windows) would make a concurrent save's replace fail.
+            with self.space._lock:
+                event = self._refresh(rel)
         except Exception:  # never let a bad file kill the watcher thread
             return
         if event is not None and not self._stopped:

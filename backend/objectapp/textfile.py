@@ -10,6 +10,7 @@ from __future__ import annotations
 import difflib
 import os
 import tempfile
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -93,6 +94,23 @@ def encode_like(original: bytes, new_text: str) -> bytes:
     return BOM + data if tf.bom else data
 
 
+# Windows refuses to replace or rename a file another handle has open without
+# FILE_SHARE_DELETE (a virus scanner, an indexer, a reader thread). Such locks
+# are brief, so a few short retries ride them out.
+RETRY_DELAYS = (0.02, 0.03, 0.05, 0.08, 0.12)
+
+
+def retry_os(fn: Callable[[], None]) -> None:
+    """Run `fn` (a replace or rename), retrying a few times on `PermissionError`."""
+    for delay in RETRY_DELAYS:
+        try:
+            fn()
+            return
+        except PermissionError:
+            time.sleep(delay)
+    fn()
+
+
 def atomic_write(path: Path, data: bytes, check: Callable[[], None] | None = None) -> None:
     """Write `data` to `path` via a temp file in the same folder and `os.replace`.
 
@@ -108,10 +126,85 @@ def atomic_write(path: Path, data: bytes, check: Callable[[], None] | None = Non
             os.fsync(fh.fileno())
         if check is not None:
             check()
-        os.replace(tmp_name, path)
+        retry_os(lambda: os.replace(tmp_name, path))
     except BaseException:
         try:
             os.unlink(tmp_name)
         except FileNotFoundError:
             pass
+        raise
+
+
+def _write_temp(path: Path, data: bytes) -> str:
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+            fh.flush()
+            os.fsync(fh.fileno())
+    except BaseException:
+        os.unlink(tmp_name)
+        raise
+    return tmp_name
+
+
+def create_new(path: Path, data: bytes) -> None:
+    """Write `data` as a new file at `path`; raise `FileExistsError` if anything is there.
+
+    The file is written to a temp name first and then hard-linked into place,
+    which fails atomically when `path` exists (a check-then-replace would
+    overwrite a file created in between). Where hard links are unsupported,
+    Windows' ``os.rename`` (which never overwrites) is used instead.
+    """
+    path = Path(path)
+    tmp_name = _write_temp(path, data)
+    try:
+        try:
+            os.link(tmp_name, path)
+        except FileExistsError:
+            raise
+        except OSError:
+            if os.name == "nt":
+                retry_os(lambda: os.rename(tmp_name, path))
+                return
+            if path.exists():
+                raise FileExistsError(str(path)) from None
+            os.replace(tmp_name, path)
+            return
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except FileNotFoundError:
+            pass
+        raise
+    try:
+        retry_os(lambda: os.unlink(tmp_name))
+    except OSError:
+        pass  # a stray temp dot-file is harmless; the new file is in place
+
+
+def move_no_overwrite(src: Path, dest: Path) -> None:
+    """Move `src` to `dest`, raising `FileExistsError` rather than replace anything there.
+
+    On Windows ``os.rename`` already refuses to overwrite (retried on a brief
+    sharing lock). Elsewhere ``os.rename`` would replace `dest`, so the file
+    is hard-linked to `dest` (atomic, fails if it exists) and `src` unlinked.
+    """
+    src, dest = Path(src), Path(dest)
+    if os.name == "nt":
+        retry_os(lambda: os.rename(src, dest))
+        return
+    try:
+        os.link(src, dest)
+    except FileExistsError:
+        raise
+    except OSError:
+        if dest.exists():
+            raise FileExistsError(str(dest)) from None
+        os.rename(src, dest)
+        return
+    try:
+        os.unlink(src)
+    except BaseException:
+        os.unlink(dest)
         raise
