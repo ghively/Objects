@@ -13,6 +13,7 @@ import { useLinkIndex } from '@/links/linkIndex'
 import { useTabs } from '@/nav/tabs'
 import { templateName } from '@/object/UseTemplateMenu'
 import { cn } from '@/lib/utils'
+import { PinMenuItems } from '@/shell/PinToMenu'
 import { TypeChip } from '@/shell/Sidebar'
 import { matchingValues } from '@/views/matching'
 import { FULL_VIEW_LAYOUTS } from '@/views/model'
@@ -244,11 +245,13 @@ export function SectionTab({
             Rename
           </DropdownMenuItem>
           {openable && (
-            // Wired by Task 15 (pins).
-            <DropdownMenuItem disabled>
-              <Icon name="ph-push-pin" size={14} />
-              Pin to sidebar
-            </DropdownMenuItem>
+            <PinMenuItems
+              pin={
+                isCollectionKey(section.key)
+                  ? { kind: 'collection', id: keyId(section.key) }
+                  : { kind: 'query', id: keyId(section.key) }
+              }
+            />
           )}
           <DropdownMenuItem onClick={onRemove}>
             <Icon name="ph-x" size={14} />
@@ -380,6 +383,7 @@ export function TypePage({ type }: { type: TypeDef }) {
               <Icon name="ph-stack" size={14} />
               {SECTION_TEXT.createCollection}
             </DropdownMenuItem>
+            <PinMenuItems pin={{ kind: 'type', id: type.id }} />
             {tab === 'all' && (
               <DropdownMenuItem
                 onClick={() => void saveAsQuery().catch((e: unknown) => console.warn('Could not save the query:', e))}

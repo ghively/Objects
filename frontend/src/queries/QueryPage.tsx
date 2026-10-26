@@ -19,6 +19,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useTabs } from '@/nav/tabs'
+import { PinMenuItems } from '@/shell/PinToMenu'
 import { useDefinitions } from '@/types/useDefinitions'
 import { api } from '@/api/client'
 import { DataView, type Pipeline } from '@/views/DataView'
@@ -235,11 +236,7 @@ export function QueryPage({ id }: { id: string }) {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="border-line bg-raised">
-            {/* Wired by Task 15 (pins). */}
-            <DropdownMenuItem disabled>
-              <Icon name="ph-push-pin" size={14} />
-              {QUERY_TEXT.pinToSidebar}
-            </DropdownMenuItem>
+            <PinMenuItems pin={{ kind: 'query', id: q.id }} />
             {structures.map((t) => (
               <DropdownMenuItem key={t.id} onSelect={() => toggleType(t)}>
                 <Icon name={typePins[t.id] ? 'ph-push-pin-slash' : 'ph-push-pin'} size={14} />

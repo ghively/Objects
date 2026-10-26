@@ -11,6 +11,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import type { TypeDef } from '@/api/types'
 import type { Target } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
+import { PinnedSection } from './PinnedSection'
+import { AddSection, SidebarSections } from './SidebarSections'
 import { chipStyle } from './typeColor'
 
 export interface SidebarProps {
@@ -35,7 +37,12 @@ export interface SidebarProps {
   onOpenTarget?: (target: Target, opts: { newTab?: boolean }) => void
   /** Highlights the "Queries" entry. */
   queriesActive?: boolean
+  /** Highlights the "All notes" entry. */
+  allNotesActive?: boolean
 }
+
+/** The sidebar entry for the All notes view. */
+export const ALL_NOTES_LABEL = 'All notes'
 
 /** The sidebar entry for the query list (the reference's `RootQuery.pluralName`). */
 export const QUERIES_LABEL = 'Queries'
@@ -118,6 +125,7 @@ export function Sidebar({
   trashActive,
   onOpenTarget,
   queriesActive,
+  allNotesActive,
 }: SidebarProps) {
   // "Queries" sits among the types where a type of that name would be, in the by-name order.
   type Entry = { kind: 'type'; type: TypeDef } | { kind: 'queries' }
@@ -151,6 +159,18 @@ export function Sidebar({
 
       <TooltipProvider>
       <nav aria-label="Main" className="flex flex-col gap-0.5">
+        <button
+          type="button"
+          onClick={(e) => onOpenTarget?.({ kind: 'allNotes' }, { newTab: e.ctrlKey || e.metaKey })}
+          aria-current={allNotesActive ? 'page' : undefined}
+          className={cn(
+            'flex h-[38px] w-full items-center gap-2 rounded-lg px-2 text-left text-[15px] font-medium text-fg hover:bg-hover',
+            allNotesActive && 'bg-hover',
+          )}
+        >
+          <Icon name="ph-note" size={16} />
+          <span>{ALL_NOTES_LABEL}</span>
+        </button>
         <NavItem icon="ph-calendar-blank" label="Calendar" hint="Calendar arrives in M4" />
         <NavItem icon="ph-check-circle" label="Tasks" hint="Tasks arrive in M4" />
         <NavItem icon="ph-graph" label="Graph" hint="Graph arrives in M5" />
@@ -158,10 +178,9 @@ export function Sidebar({
       </TooltipProvider>
 
       <ScrollArea className="min-h-0 flex-1">
-        <section aria-labelledby="sb-pinned">
-          <SectionHeader id="sb-pinned">Pinned</SectionHeader>
-          <p className="px-2 text-[14px] text-fg-muted italic">No pinned content</p>
-        </section>
+        <SidebarSections onOpenTarget={onOpenTarget} />
+        <PinnedSection onOpenTarget={onOpenTarget} />
+        <AddSection />
 
         <section aria-labelledby="sb-types">
           <SectionHeader

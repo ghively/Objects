@@ -142,8 +142,8 @@ describe('TypePage', () => {
     mocked.collections.mockResolvedValue([c])
     render(<TypePage type={TASK} />)
     await user.click(await screen.findByRole('button', { name: 'Reading menu' }))
-    // Pinning is Task 15's: present but disabled; Delete is hidden until Tasks 13 and 14.
-    expect(await screen.findByRole('menuitem', { name: 'Pin to sidebar' })).toHaveAttribute('aria-disabled', 'true')
+    expect(await screen.findByRole('menuitem', { name: 'Pin to sidebar' })).not.toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('menuitem', { name: 'Pin to...' })).toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: 'Open' }))
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'collection', id: 'c1' })

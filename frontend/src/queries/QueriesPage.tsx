@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useTabs } from '@/nav/tabs'
+import { PinMenuItems } from '@/shell/PinToMenu'
 import { autoTitle, queryTitle, titleIsCustom } from './autoTitle'
 import { useTitleCtx } from './QueryPage'
 import { removeQuery, useQueries } from './useQueries'
@@ -103,11 +104,7 @@ export function QueriesPage() {
                     <Icon name="ph-arrows-out-simple" size={14} />
                     {QUERIES_TEXT.open}
                   </DropdownMenuItem>
-                  {/* Wired by Task 15 (pins). */}
-                  <DropdownMenuItem disabled>
-                    <Icon name="ph-push-pin" size={14} />
-                    {QUERIES_TEXT.pin}
-                  </DropdownMenuItem>
+                  <PinMenuItems pin={{ kind: 'query', id: q.id }} />
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     variant="destructive"
