@@ -199,7 +199,7 @@ describe('serialized writes', () => {
     const user = userEvent.setup()
     await openPage()
     await user.click(screen.getByRole('button', { name: 'Edit Stage' }))
-    await user.type(await screen.findByPlaceholderText('Search or create'), 'Blocked')
+    await user.type(await screen.findByPlaceholderText('Search or Create'), 'Blocked')
     await user.click(screen.getByRole('button', { name: "New 'Blocked'" }))
 
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(1))

@@ -11,10 +11,12 @@ import type { CellProps } from './types'
 export interface RelationCellProps extends CellProps<EntityRef[] | null> {
   /** Opens a linked object (a click on its chip). */
   onOpenObject?(path: string): void
+  /** "Edit Property" in the picker: opens the property's settings. */
+  onOpenSettings?(): void
 }
 
 /** A relation (`entity`): chips of the linked objects; a click on the cell opens the RelationPicker. */
-export function RelationCell({ def, value, readOnly, onChange, onOpenObject }: RelationCellProps) {
+export function RelationCell({ def, value, readOnly, onChange, onOpenObject, onOpenSettings }: RelationCellProps) {
   const [open, setOpen] = useState(false)
   // Re-render when summaries load or change.
   useLinkIndex((s) => s.revision)
@@ -56,7 +58,19 @@ export function RelationCell({ def, value, readOnly, onChange, onOpenObject }: R
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto border-line bg-raised p-0 text-fg">
-        <RelationPicker def={def} value={refs} onChange={onChange} onClose={() => setOpen(false)} />
+        <RelationPicker
+          def={def}
+          value={refs}
+          onChange={onChange}
+          onClose={() => setOpen(false)}
+          onOpenSettings={
+            onOpenSettings &&
+            (() => {
+              setOpen(false)
+              onOpenSettings()
+            })
+          }
+        />
       </PopoverContent>
     </Popover>
   )

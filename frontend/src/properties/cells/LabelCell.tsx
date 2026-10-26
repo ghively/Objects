@@ -8,10 +8,12 @@ import type { CellProps } from './types'
 export interface LabelCellProps extends CellProps<string[] | null> {
   /** Saves an edited option set (the parent saves the type before it applies the value). */
   onDefChange?(next: PropertyDef): void | Promise<void>
+  /** Opens the property's settings (from the menu's gear). */
+  onOpenSettings?(): void
 }
 
 /** A label (single or multi-select): pills; a click opens the LabelMenu. */
-export function LabelCell({ def, value, readOnly, onChange, onDefChange }: LabelCellProps) {
+export function LabelCell({ def, value, readOnly, onChange, onDefChange, onOpenSettings }: LabelCellProps) {
   const [open, setOpen] = useState(false)
   const selected = value ?? []
   const set = def.options.set ?? []
@@ -40,6 +42,13 @@ export function LabelCell({ def, value, readOnly, onChange, onDefChange }: Label
           onChange={onChange}
           onDefChange={onDefChange ?? (() => undefined)}
           onClose={() => setOpen(false)}
+          onOpenSettings={
+            onOpenSettings &&
+            (() => {
+              setOpen(false)
+              onOpenSettings()
+            })
+          }
         />
       </PopoverContent>
     </Popover>

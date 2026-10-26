@@ -354,6 +354,7 @@ export function PropertyPanel({
             onOpenTag={onOpenTag}
             onOpenObject={onOpenObject}
             onChangeType={onChangeType}
+            onOpenSettings={canEditType && typed && type ? () => setSettingsFor(def.id) : undefined}
           />
         ) : null}
       </Row>

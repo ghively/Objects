@@ -51,7 +51,7 @@ describe('ObjectHeader', () => {
 
     const list = await screen.findByRole('listbox', { name: 'Tags' })
     // The picker starts searching for the query.
-    expect(screen.getByPlaceholderText('Search for tags or create one')).toHaveValue('do')
+    expect(screen.getByPlaceholderText('Search for tags or create a new one')).toHaveValue('do')
     fireEvent.click(within(list).getByRole('option', { name: /Docs/ }))
 
     expect(onPropertiesChange).toHaveBeenCalledWith({ tags: ['Docs'] })
@@ -148,7 +148,7 @@ describe('ObjectHeader', () => {
     const onPropertiesChange = vi.fn()
     render(<ObjectHeader summary={page({ tags: ['Docs'] })} type={PAGE} onRename={vi.fn()} onPropertiesChange={onPropertiesChange} />)
     await user.click(screen.getByRole('button', { name: 'Edit Tags' }))
-    await user.type(screen.getByPlaceholderText('Search for tags or create one'), 'Physics')
+    await user.type(screen.getByPlaceholderText('Search for tags or create a new one'), 'Physics')
     await user.click(screen.getByRole('option', { name: /Create 'Physics'/ }))
     expect(onPropertiesChange).toHaveBeenCalledWith({ tags: ['Docs', 'Physics'] })
     expect(mocked.ensureTag).toHaveBeenCalledWith('Physics')

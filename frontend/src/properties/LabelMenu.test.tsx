@@ -50,7 +50,7 @@ describe('LabelMenu', () => {
     render(
       <LabelMenu def={labelDef([opt('a', 'Alpha')])} value={[]} onChange={onChange} onDefChange={onDefChange} />,
     )
-    await user.type(screen.getByRole('textbox', { name: 'Search or create' }), 'Beta')
+    await user.type(screen.getByRole('textbox', { name: 'Search or Create' }), 'Beta')
     expect(screen.queryByText('Alpha')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: "New 'Beta'" }))
 
@@ -68,7 +68,7 @@ describe('LabelMenu', () => {
   it('an exact match offers no "New" item', async () => {
     const user = userEvent.setup()
     render(<LabelMenu def={labelDef([opt('a', 'Alpha')])} value={[]} onChange={vi.fn()} onDefChange={vi.fn()} />)
-    await user.type(screen.getByRole('textbox', { name: 'Search or create' }), 'alpha')
+    await user.type(screen.getByRole('textbox', { name: 'Search or Create' }), 'alpha')
     expect(screen.queryByRole('button', { name: /^New / })).not.toBeInTheDocument()
   })
 
@@ -218,7 +218,7 @@ describe('LabelCell', () => {
     await user.click(screen.getByRole('button', { name: 'Edit Stage' }))
     await user.click(await screen.findByRole('option', { name: /Alpha/ }))
     expect(onChange).toHaveBeenLastCalledWith(['Alpha'])
-    expect(screen.queryByRole('textbox', { name: 'Search or create' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Search or Create' })).not.toBeInTheDocument()
     unmount()
 
     onChange.mockClear()
@@ -233,7 +233,7 @@ describe('LabelCell', () => {
     await user.click(screen.getByRole('button', { name: 'Edit Stage' }))
     await user.click(await screen.findByRole('option', { name: /Alpha/ }))
     expect(onChange).toHaveBeenLastCalledWith(['Beta', 'Alpha'])
-    expect(screen.getByRole('textbox', { name: 'Search or create' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Search or Create' })).toBeInTheDocument()
   })
 
   it('renders the selected options as pills', () => {
@@ -246,5 +246,23 @@ describe('LabelCell', () => {
       />,
     )
     expect(screen.getByText('Alpha')).toBeInTheDocument()
+  })
+})
+
+describe('LabelMenu settings gear', () => {
+  it('opens the property settings from the search field', async () => {
+    const user = userEvent.setup()
+    const onOpenSettings = vi.fn()
+    const { unmount } = render(
+      <LabelMenu def={labelDef([opt('a', 'Alpha')])} value={[]} onChange={vi.fn()} onDefChange={vi.fn()} onOpenSettings={onOpenSettings} />,
+    )
+    expect(screen.getByRole('textbox', { name: 'Search or Create' })).toHaveAttribute('placeholder', 'Search or Create')
+    const gear = screen.getByRole('button', { name: 'Go to property settings' })
+    expect(gear).toHaveAttribute('title', 'Go to property settings')
+    await user.click(gear)
+    expect(onOpenSettings).toHaveBeenCalled()
+    unmount()
+    render(<LabelMenu def={labelDef([opt('a', 'Alpha')])} value={[]} onChange={vi.fn()} onDefChange={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Go to property settings' })).not.toBeInTheDocument()
   })
 })
