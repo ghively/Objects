@@ -1,5 +1,6 @@
 // The inline (linkToken) view of an object: its icon and title, and a type chip when the view
 // spans several types.
+import type { ReactNode } from 'react'
 import type { Row, TypeDef } from '@/api/types'
 import { IconOrEmoji } from '@/components/Icon'
 import { cn } from '@/lib/utils'
@@ -11,15 +12,26 @@ export function InlineToken({
   type,
   showType,
   className,
+  leading,
+  trailing,
 }: {
   row: Row
   type?: TypeDef
   showType?: boolean
   className?: string
+  /** Before the icon (a task's checkbox). */
+  leading?: ReactNode
+  /** After the title and type chip (a task's date, deadline and priority). */
+  trailing?: ReactNode
 }) {
   const icon = row.summary.icon ?? type?.icon ?? null
   return (
     <span className={cn('inline-flex min-w-0 items-center gap-2', className)}>
+      {leading != null && (
+        <span data-slot="leading" className="inline-flex shrink-0 items-center">
+          {leading}
+        </span>
+      )}
       <span className="inline-flex w-5 shrink-0 justify-center">
         <IconOrEmoji icon={icon} fallback="ph-file-text" size={16} />
       </span>
@@ -31,6 +43,11 @@ export function InlineToken({
           style={chipStyle(type.color)}
         >
           {type.name}
+        </span>
+      )}
+      {trailing != null && (
+        <span data-slot="trailing" className="inline-flex shrink-0 items-center gap-2">
+          {trailing}
         </span>
       )}
     </span>

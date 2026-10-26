@@ -2,7 +2,7 @@
 // collections, queries and All notes. The caller owns the state (see `useViewState`).
 import { createContext, useContext, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import type { Collection, Layout, Row, RowsScope, TypeDef, ViewState } from '@/api/types'
+import type { Collection, Layout, Row, RowsScope, TypeDef, UpdateResult, ViewState } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
@@ -66,6 +66,16 @@ export interface LayoutProps {
   patchRow?(path: string, row: Row): void
   /** A group's size before paging (for its header). */
   groupCount(group: Group): number
+  /** Per-row slots: list rows and cards render them (M4: a task's checkbox, dates and priority). */
+  rowExtras?(row: Row): RowExtras
+  /** A layout wrote a row (the kanban drop) and reloaded it; `result` is the server's answer. */
+  onWritten?(row: Row, result: UpdateResult): void
+}
+
+/** What an owner adds to one row: `leading` before its title, `trailing` after it. */
+export interface RowExtras {
+  leading?: ReactNode
+  trailing?: ReactNode
 }
 
 export interface DataViewProps {
@@ -95,6 +105,10 @@ export interface DataViewProps {
   rowMenu?(row: Row): RowMenuItem[]
   /** Renders layouts other than the list (table, cards, kanban). */
   renderLayout?(layout: Layout, props: LayoutProps): ReactNode | null
+  /** Per-row slots for list rows and cards (see `LayoutProps.rowExtras`); without it rows render as in M3. */
+  rowExtras?(row: Row): RowExtras
+  /** Called after a layout's own write (the kanban drop) with the row and the update result. */
+  onWritten?(row: Row, result: UpdateResult): void
 }
 
 export interface RowMenuItem {
@@ -255,6 +269,8 @@ export function DataView(props: DataViewProps) {
     closed,
     flat,
     patchRow: props.patchRow,
+    rowExtras: props.rowExtras,
+    onWritten: props.onWritten,
     groupCount: (g) => result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length,
   }
   const builtin = (): ReactNode => {
@@ -367,7 +383,7 @@ export function DataView(props: DataViewProps) {
                 <div key={g.id} className="flex flex-col">
                   {grouped && header(g, result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length)}
                   {!(grouped && closed(g)) && (
-                    <ListLayout rows={g.rows} typesById={typesById} multiType={multiType} onOpen={onOpen} />
+                    <ListLayout rows={g.rows} typesById={typesById} multiType={multiType} onOpen={onOpen} rowExtras={props.rowExtras} />
                   )}
                 </div>
               ))}

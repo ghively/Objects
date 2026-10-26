@@ -8,6 +8,17 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
+// A probe cell for the `probe` key: shows what the panel hands a cell (frontmatter, onChangeMany).
+vi.mock('@/properties/cellFor', async (orig) => {
+  const real = await orig<typeof import('@/properties/cellFor')>()
+  const Probe = (p: { frontmatter?: Record<string, unknown>; onChangeMany?(u: Record<string, unknown>, r?: string[]): void }) => (
+    <button type="button" data-fm={JSON.stringify(p.frontmatter ?? null)} onClick={() => p.onChangeMany?.({ probe: 'x', sibling: 'y' }, ['gone'])}>
+      probe
+    </button>
+  )
+  return { ...real, cellForDef: (def: { key: string }) => (def.key === 'probe' ? Probe : real.cellForDef(def as never)) }
+})
+
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { cellValue, decodeDate, PropertyPanel } from './PropertyPanel'
 
@@ -146,5 +157,20 @@ describe('PropertyPanel definition editing', () => {
       />,
     )
     expect(screen.getByRole('button', { name: 'Add Property' })).toBeDisabled()
+  })
+})
+
+describe('multi-key cell writes', () => {
+  test('test property panel passes frontmatter and onChangeMany', async () => {
+    const user = userEvent.setup()
+    const PROBE = propertyDef({ id: 'p-probe', key: 'probe', name: 'Probe', type: 'text' })
+    const T = typeDef({ id: 'project', name: 'Project', propertyDefinitions: [PROBE] })
+    const onChangeMany = vi.fn()
+    const fm = { probe: 'a', sibling: 'b' }
+    render(<PropertyPanel type={T} frontmatter={fm} onChange={vi.fn()} onChangeMany={onChangeMany} />)
+    const probe = screen.getByRole('button', { name: 'probe' })
+    expect(JSON.parse(probe.getAttribute('data-fm')!)).toEqual(fm)
+    await user.click(probe)
+    expect(onChangeMany).toHaveBeenCalledWith({ probe: 'x', sibling: 'y' }, ['gone'])
   })
 })

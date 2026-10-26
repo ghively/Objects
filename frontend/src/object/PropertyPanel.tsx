@@ -211,6 +211,8 @@ export interface PropertyPanelProps {
   readOnly?: boolean
   /** A cell committed `value` for the frontmatter `key`. */
   onChange?(key: string, value: unknown): void
+  /** A cell committed several keys at once (one write; `remove` deletes keys). Passed to every cell. */
+  onChangeMany?(updates: Record<string, unknown>, remove?: string[]): void
   /** Save the type (a label option set changed); awaited before the cell's value is applied. */
   onTypeChange?(next: TypeDef): Promise<unknown> | void
   onOpenTag?(name: string): void
@@ -280,6 +282,7 @@ export function PropertyPanel({
   summary,
   readOnly,
   onChange,
+  onChangeMany,
   onTypeChange,
   onOpenTag,
   onOpenObject,
@@ -350,6 +353,8 @@ export function PropertyPanel({
             value={value}
             readOnly={ro}
             onChange={(next: unknown) => onChange?.(def.key, next)}
+            frontmatter={frontmatter}
+            onChangeMany={ro ? undefined : onChangeMany}
             onDefChange={onDefChange}
             onOpenTag={onOpenTag}
             onOpenObject={onOpenObject}
