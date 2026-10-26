@@ -9,7 +9,18 @@
 // is a sensible empty answer, so `mockReset()` brings a function back to that default.
 import { vi } from 'vitest'
 import type { Api } from '@/api/client'
-import type { ObjectDetail, ObjectSummary, PropertyDef, TypeDef } from '@/api/types'
+import type {
+  Collection,
+  Layout,
+  ObjectDetail,
+  ObjectSummary,
+  PropertyDef,
+  Query,
+  Row,
+  TypeDef,
+  ViewState,
+  Views,
+} from '@/api/types'
 
 /** A v2 type with every contract field; `partial` overrides. */
 export function typeDef(partial: Partial<TypeDef> & Pick<TypeDef, 'id'>): TypeDef {
@@ -86,7 +97,65 @@ export function objectDetail(partial: Partial<ObjectDetail> & { summary: ObjectS
   }
 }
 
-type Fn = (...args: never[]) => unknown
+const emptyGroup = () => ({ type: 'filterGroup' as const, operator: 'and' as const, elements: [] })
+
+function viewState(layout: Layout = 'list'): ViewState {
+  return { viewDefinition: { dataViewLayout: layout }, filterGroup: emptyGroup(), sorts: [], groupBy: null }
+}
+
+/** Default type-page views, as the server returns them when none are saved. */
+export function defaultViews(): Views {
+  return { activeTab: 'all', all: viewState(), dashboard: { sections: [], removedSections: [] } }
+}
+
+/** A row with every contract field; `partial` overrides (`path` is shorthand for a default summary). */
+export function row(partial: Partial<Row> & { path?: string } = {}): Row {
+  const { path, ...rest } = partial
+  const summary = rest.summary ?? objectSummary({ path: path ?? 'Pages/Untitled.md' })
+  return { summary, version: 'v1', values: {}, links: {}, preview: '', ...rest }
+}
+
+/** A collection with every contract field; `partial` overrides. */
+export function collection(partial: Partial<Collection> & Pick<Collection, 'id'>): Collection {
+  return {
+    schemaVersion: 1,
+    name: partial.id,
+    formerNames: [],
+    icon: null,
+    color: null,
+    description: '',
+    typeIds: [],
+    views: {
+      activeTab: 'all',
+      all: viewState(),
+      dashboard: { sections: [{ key: 'pinned', collapsed: false }], removedSections: [] },
+    },
+    pinned: { ids: [], isHidden: false },
+    templates: { ids: [], defaultTemplateId: null },
+    readOnlyReason: null,
+    revision: '',
+    ...partial,
+  }
+}
+
+/** A query with every contract field; `partial` overrides. */
+export function query(partial: Partial<Query> & Pick<Query, 'id'>): Query {
+  const name = partial.name ?? ''
+  return {
+    schemaVersion: 1,
+    name,
+    titleIsCustom: name !== '',
+    icon: null,
+    description: '',
+    definition: { structures: [], filterGroup: emptyGroup(), sorts: [], groupBy: null },
+    view: { viewDefinition: { dataViewLayout: 'list' } },
+    readOnlyReason: null,
+    revision: '',
+    ...partial,
+  }
+}
+
+type Fn =(...args: never[]) => unknown
 
 function defaults(): Api {
   return {
@@ -121,7 +190,7 @@ function defaults(): Api {
     }),
     deleteObject: async () => ({ trashId: 'trash-1' }),
     trash: async () => [],
-    restore: async () => ({ paths: [], typeIds: [] }),
+    restore: async () => ({ paths: [], typeIds: [], collectionIds: [], queryIds: [], skipped: [] }),
     purge: async () => ({ purged: 1 }),
     emptyTrash: async () => ({ purged: 0 }),
     createType: async (input: { name: string; pluralName: string }) =>
@@ -148,6 +217,23 @@ function defaults(): Api {
     fileUrl: (path: string) => `/api/file?path=${encodeURIComponent(path)}`,
     resolve: async () => null,
     reveal: async () => undefined,
+    rows: async () => [],
+    views: async () => ({ views: defaultViews(), revision: '' }),
+    saveViews: async () => ({ revision: 'r1' }),
+    collections: async () => [],
+    createCollection: async (name: string, typeIds: string[]) =>
+      collection({ id: name.toLowerCase().replace(/\s+/g, '-'), name, typeIds, revision: 'r1' }),
+    saveCollection: async (c: Collection) => ({ collection: { ...c, revision: `${c.revision}+1` }, rewritten: [], skipped: [] }),
+    deleteCollection: async () => ({ trashId: 'trash-collection-1', removedFrom: [], skipped: [] }),
+    queries: async () => [],
+    createQuery: async (init: Partial<Query> = {}) => query({ ...init, id: 'new-query', name: init.name ?? '', revision: 'r1' }),
+    saveQuery: async (q: Query) => ({ query: { ...q, revision: `${q.revision}+1` } }),
+    deleteQuery: async () => ({ trashId: 'trash-query-1' }),
+    ui: async () => ({ ui: { pinned: [], sections: [], allNotesLayout: 'list' as const }, revision: '' }),
+    patchUi: async (patch: Record<string, unknown>) => ({
+      ui: { pinned: [], sections: [], allNotesLayout: 'list' as const, ...patch },
+      revision: 'r1',
+    }),
     onChange: () => () => undefined,
   } as unknown as Api
 }
