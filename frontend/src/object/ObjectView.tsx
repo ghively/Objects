@@ -1,6 +1,7 @@
 /**
  * An object's full view, shared by the page and the peek: property panel,
- * header and body editor (formatted or raw), with the `…` menu.
+ * header and body editor (formatted or raw), with the `…` menu. `mode='inline'` (M4: the
+ * calendar's daily note) renders only the body editor and its autosave.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { api, ConflictError } from '@/api/client'
@@ -48,7 +49,13 @@ installLinkPicker()
 
 export interface ObjectViewProps {
   path: string
-  mode: 'page' | 'peek'
+  mode: 'page' | 'peek' | 'inline'
+  /** Inline only: muted text shown while the body is empty. */
+  placeholder?: string
+  /** Inline only: focus the editor once the object has loaded. */
+  autoFocus?: boolean
+  /** Called with each version this view adopts (load, saves, reloads). */
+  onVersion?: (version: string) => void
   /** Peek only: open the object as a page in the current tab. */
   onExpand?: () => void
   /** Called after an action that should dismiss the peek (e.g. open in new tab). */
@@ -87,7 +94,7 @@ function ToolButton({ label, icon, onClick }: { label: string; icon: string; onC
   )
 }
 
-export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectViewProps) {
+export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholder, autoFocus, onVersion }: ObjectViewProps) {
   const [detail, setDetail] = useState<ObjectDetail | null>(null)
   const [version, setVersion] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -114,9 +121,12 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
   const editorRef = useRef<BodyEditorHandle | null>(null)
   /** The version the editor's next save is based on (mirrors `version` without waiting for a render). */
   const versionRef = useRef('')
+  const onVersionRef = useRef(onVersion)
+  onVersionRef.current = onVersion
   const adoptVersion = useCallback((v: string) => {
     versionRef.current = v
     setVersion(v)
+    onVersionRef.current?.(v)
   }, [])
 
   /**
@@ -596,6 +606,24 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
     </div>
   )
 
+  // Inline mode: the placeholder while the body is empty, and focus once loaded.
+  const inlineRef = useRef<HTMLDivElement | null>(null)
+  const [bodyEmpty, setBodyEmpty] = useState(true)
+  const loadedBody = detail?.body
+  useEffect(() => {
+    if (loadedBody !== undefined) setBodyEmpty(loadedBody.trim() === '')
+  }, [loadedBody])
+  const focusedRef = useRef(false)
+  const hasDetail = detail !== null
+  useEffect(() => {
+    if (mode !== 'inline' || !autoFocus || !hasDetail || focusedRef.current) return
+    const el = inlineRef.current?.querySelector<HTMLElement>('.ProseMirror')
+    if (el) {
+      focusedRef.current = true
+      el.focus()
+    }
+  }, [mode, autoFocus, hasDetail])
+
   const overlays = (
     <>
       {footer && <div className="absolute right-4 bottom-4">{footer}</div>}
@@ -650,6 +678,56 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
       )}
     </>
   )
+
+  if (mode === 'inline') {
+    const checkEmpty = () => {
+      const b = editorRef.current?.getBody()
+      if (b != null) setBodyEmpty(b.trim() === '')
+    }
+    return (
+      <div className="relative w-full" data-object-view="inline" data-object-path={path} ref={inlineRef}>
+        {!detail || !summary ? (
+          error ? (
+            <p className="text-[14px] text-fg-muted">{`Couldn't open this object. ${error}`}</p>
+          ) : (
+            <p className="text-[14px] text-fg-muted">Loading…</p>
+          )
+        ) : (
+          <>
+            {deleted && (
+              <div role="alert" className="mb-3 rounded-lg border border-danger/60 bg-raised px-3 py-2 text-[14px]">
+                This object's file was deleted or moved on disk. Edits here aren't saved.
+              </div>
+            )}
+            <div className="relative text-[17px]" onInput={checkEmpty} onKeyUp={checkEmpty} onBlur={checkEmpty}>
+              {placeholder && bodyEmpty && (
+                <div aria-hidden data-testid="inline-placeholder" className="pointer-events-none absolute top-0 left-0 text-fg-muted">
+                  {placeholder}
+                </div>
+              )}
+              <Editor
+                path={path}
+                body={detail.body}
+                version={version}
+                readOnly={readOnly || deleted}
+                onSaved={adoptVersion}
+                onConflict={onConflict}
+                controlRef={editorRef}
+              />
+            </div>
+          </>
+        )}
+        <ConflictDialog
+          open={pending !== null}
+          path={path}
+          mine={pending?.mine ?? ''}
+          theirs={pending?.theirs.body ?? ''}
+          onKeepMine={keepMine}
+          onTakeTheirs={takeTheirs}
+        />
+      </div>
+    )
+  }
 
   if (!detail || !summary) {
     return (

@@ -15,6 +15,7 @@ import { serializeBody } from '@/editor/document'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPage } from './ObjectPage'
+import { ObjectView } from './ObjectView'
 
 const mocked = vi.mocked(api)
 
@@ -272,5 +273,23 @@ describe('App events', () => {
       for (const cb of [...listeners]) cb({ kind: 'types', path: 'project', version: 'r2' })
     })
     await waitFor(() => expect(mocked.space.mock.calls.length).toBeGreaterThan(spaceCalls))
+  })
+})
+
+describe('inline mode', () => {
+  test('test ObjectView inline mode has no property panel or header', async () => {
+    const utils = render(<ObjectView path={PATH} mode="inline" placeholder="Start your daily note" />)
+    const editor = await waitFor(() => pmEditor(utils.container))
+    await waitFor(() => expect(serializeBody(editor)).toBe(ORIGINAL))
+    expect(utils.container.querySelector('[data-object-view="inline"]')).not.toBeNull()
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Hide properties' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Edit Stage' })).toBeNull()
+    // The body has text: no placeholder.
+    expect(screen.queryByTestId('inline-placeholder')).toBeNull()
+    // The body still autosaves on the object's version, and external changes reload it.
+    const mine = typeInBody(editor, ' inline')
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(PATH, mine, 'v1'), { timeout: 3000 })
   })
 })

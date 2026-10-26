@@ -138,8 +138,9 @@ describe('CalendarChrome', () => {
     fireEvent.keyDown(window, { key: 'T', shiftKey: true })
     expect(anchor()).toBe(TODAY)
     await waitFor(() => expect(onOpenTarget).toHaveBeenCalledTimes(2))
-    // A plain click (or T) only moves the anchor.
-    act(() => useCalendar.setState({ anchor: '2026-10-01' }))
+    // A plain click (or T) only moves the anchor. (In the Week view: the Day view itself loads
+    // today's range, Task 13.)
+    act(() => useCalendar.setState({ view: 'week', anchor: '2026-10-01' }))
     mocked.calendar.mockClear()
     fireEvent.click(screen.getByRole('button', { name: 'Today' }))
     fireEvent.keyDown(window, { key: 't' })
