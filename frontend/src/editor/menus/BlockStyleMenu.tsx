@@ -1,9 +1,10 @@
 /**
  * The block style sub-menus ("Hierarchy", "List", "Quote", "Color", "Icon"),
  * rendered inside a dropdown menu's content (Task 12's block menu). Each item
- * applies to the current block through the document model's commands
- * (`setHierarchy`, `setListType`, `setBlockOption`, `toggleBlockquote`), which
- * also cover a block selection once one exists.
+ * applies to every target block (the block selection, else the block with the
+ * cursor), as the block menu's other rows and the shortcuts do: per block
+ * through `forEachTargetBlock` (hierarchy, quote, colour, icon), or over the
+ * whole range through `withTargetSelection` (a list joins the blocks into one).
  *
  * Strings are Object's (`blocksMenu.*`, `styles.color`, `tokensMenu.color.*`,
  * `colorThemes.*`, `ControlDropdown.custom.*`) except where marked "our string".
@@ -21,6 +22,7 @@ import {
   DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { Option } from '../annotations'
+import { forEachTargetBlock, withTargetSelection } from '../extensions/blockSelection'
 import { blockChain, type Hierarchy, type ListType } from '../nodes/blockOptions'
 import {
   BLOCK_COLORS,
@@ -118,29 +120,54 @@ export function currentBlockStyle(editor: Editor): BlockStyle {
   return style
 }
 
-/** Turn the current block into a quote, or back (`toggleBlockquote`), keeping the layout option off. */
+/** Turn the target blocks into quotes, or back (`toggleBlockquote`), keeping the layout option off. */
 export function setQuote(editor: Editor, on: boolean): boolean {
-  const { quote } = currentBlockStyle(editor)
-  if (quote === on) return true
-  return editor.chain().focus().toggleBlockquote().run()
+  editor.commands.focus()
+  return forEachTargetBlock(editor, (e) => {
+    if (currentBlockStyle(e).quote === on) return true
+    return e.commands.toggleBlockquote()
+  })
 }
 
-/** Turn the standout layout on or off (making the block a quote first when it is not one). */
+/** Turn the standout layout on or off (making each target block a quote first when it is not one). */
 export function setStandout(editor: Editor, on: boolean): boolean {
-  const { quote } = currentBlockStyle(editor)
-  if (!quote) {
-    if (!on) return true
-    if (!editor.chain().focus().toggleBlockquote().run()) return false
-  }
-  return editor.chain().focus().setBlockOption('quote', on ? 'standout' : null).run()
+  editor.commands.focus()
+  return forEachTargetBlock(editor, (e) => {
+    if (!currentBlockStyle(e).quote) {
+      if (!on) return true
+      if (!e.commands.toggleBlockquote()) return false
+    }
+    return e.commands.setBlockOption('quote', on ? 'standout' : null)
+  })
 }
 
-/** Set a text or background colour, or remove the colour of that kind (`null`). */
+/** Set a text or background colour on the target blocks, or remove the colour of that kind (`null`). */
 export function setBlockColor(editor: Editor, kind: ColorKind, color: (typeof BLOCK_COLORS)[number] | null): boolean {
-  if (color) return editor.chain().focus().setBlockOption('color', colorValue(kind, color)).run()
-  const current = parseColorValue(currentBlockStyle(editor).color)
-  if (!current || current.kind !== kind) return true
-  return editor.chain().focus().setBlockOption('color', null).run()
+  editor.commands.focus()
+  return forEachTargetBlock(editor, (e) => {
+    if (color) return e.commands.setBlockOption('color', colorValue(kind, color))
+    const current = parseColorValue(currentBlockStyle(e).color)
+    if (!current || current.kind !== kind) return true
+    return e.commands.setBlockOption('color', null)
+  })
+}
+
+/** Set the hierarchy (Standard, Small, Heading 1-4) of every target block. */
+export function setBlocksHierarchy(editor: Editor, level: Hierarchy): boolean {
+  editor.commands.focus()
+  return forEachTargetBlock(editor, (e) => e.commands.setHierarchy(level))
+}
+
+/** Make the target blocks one list of `type`, or no list (`null`). */
+export function setBlocksListType(editor: Editor, type: ListType | null): boolean {
+  editor.commands.focus()
+  return withTargetSelection(editor, (e) => e.commands.setListType(type))
+}
+
+/** Set (or with `null` remove) the icon of every target block. */
+export function setBlocksIcon(editor: Editor, icon: string | null): boolean {
+  editor.commands.focus()
+  return forEachTargetBlock(editor, (e) => e.commands.setBlockOption('icon', icon))
 }
 
 function Check({ on }: { on: boolean }) {
@@ -203,7 +230,7 @@ export function BlockStyleMenu({ editor, onDone }: BlockStyleMenuProps) {
         <DropdownMenuSubTrigger>{T.hierarchy}</DropdownMenuSubTrigger>
         <DropdownMenuSubContent>
           {HIERARCHY_ITEMS.map((h) => (
-            <DropdownMenuItem key={h.level} onSelect={() => editor.chain().focus().setHierarchy(h.level).run()}>
+            <DropdownMenuItem key={h.level} onSelect={() => setBlocksHierarchy(editor, h.level)}>
               {h.name}
               <Check on={style.hierarchy === h.level} />
             </DropdownMenuItem>
@@ -214,7 +241,7 @@ export function BlockStyleMenu({ editor, onDone }: BlockStyleMenuProps) {
         <DropdownMenuSubTrigger>{T.list}</DropdownMenuSubTrigger>
         <DropdownMenuSubContent>
           {LIST_ITEMS.map((l) => (
-            <DropdownMenuItem key={l.name} onSelect={() => editor.chain().focus().setListType(l.type).run()}>
+            <DropdownMenuItem key={l.name} onSelect={() => setBlocksListType(editor, l.type)}>
               {l.name}
               <Check on={(l.type ?? 'none') === style.list} />
             </DropdownMenuItem>
@@ -257,7 +284,7 @@ export function BlockStyleMenu({ editor, onDone }: BlockStyleMenuProps) {
           <IconPicker
             value={iconValue}
             onChange={(next) => {
-              editor.chain().focus().setBlockOption('icon', next ? next.val : null).run()
+              setBlocksIcon(editor, next ? next.val : null)
               onDone?.()
             }}
           />
