@@ -7,9 +7,14 @@
  * Empty text shows "Write a Mermaid diagram to see the preview"
  * (`blocks.CodeBlock.mermaidEmpty`); a failure shows "Diagram rendering error"
  * (`blocks.CodeBlock.mermaidError`) with Mermaid's message.
+ *
+ * M8 Task 29: a rendered diagram offers "Download as SVG" and "Download as PNG"
+ * (our labels; `exportDiagram.ts`).
  */
+import { Download } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { useThemeName } from '@/theme/applyTheme'
+import { downloadPng, downloadSvg } from './exportDiagram'
 
 type State = { status: 'empty' } | { status: 'pending' } | { status: 'ok'; svg: string } | { status: 'error'; message: string }
 
@@ -58,6 +63,37 @@ export function MermaidPreview({ text }: { text: string }) {
     )
   }
   if (state.status === 'pending') return <div className="mermaid-preview" aria-busy="true" />
-  // Mermaid's own output under `securityLevel: 'strict'` (sanitised by Mermaid).
-  return <div className="mermaid-preview" data-testid="mermaid-svg" dangerouslySetInnerHTML={{ __html: state.svg }} />
+  return (
+    <>
+      {/* Mermaid's own output under `securityLevel: 'strict'` (sanitised by Mermaid). */}
+      <div className="mermaid-preview" data-testid="mermaid-svg" dangerouslySetInnerHTML={{ __html: state.svg }} />
+      <MermaidExport svg={state.svg} text={text} dark={dark} />
+    </>
+  )
+}
+
+function MermaidExport({ svg, text, dark }: { svg: string; text: string; dark: boolean }) {
+  const [busy, setBusy] = useState(false)
+  const png = async () => {
+    setBusy(true)
+    try {
+      await downloadPng(text, dark)
+    } catch {
+      // The export render failed (it rendered once already): nothing to save.
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="mermaid-export">
+      <button type="button" className="mermaid-export-btn" onClick={() => downloadSvg(svg)}>
+        <Download size={12} aria-hidden />
+        Download as SVG
+      </button>
+      <button type="button" className="mermaid-export-btn" disabled={busy} onClick={png}>
+        <Download size={12} aria-hidden />
+        Download as PNG
+      </button>
+    </div>
+  )
 }

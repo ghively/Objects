@@ -9,6 +9,9 @@
  * wrap, lock, copy, download, the Markdown and Mermaid previews) and the lock
  * guard: while a block has `lock`, no transaction may change the text inside
  * it (option changes, moving or deleting the whole block still work).
+ *
+ * M8 Task 29: syntax highlighting as a decoration plugin (`code/highlight.ts`);
+ * the text and bytes never change.
  */
 import { CodeBlock as BaseCodeBlock } from '@tiptap/extension-code-block'
 import type { Node as PMNode } from '@tiptap/pm/model'
@@ -16,6 +19,8 @@ import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/p
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import type { Option } from '../annotations'
 import { CodeBlockView } from '../code/CodeBlockView'
+import { codeHighlightPlugin } from '../code/highlight'
+import '../../theme/codeSyntax.css'
 import './codeBlock.css'
 
 export function isLockedCodeBlock(node: PMNode): boolean {
@@ -59,6 +64,7 @@ export const CodeBlock = BaseCodeBlock.extend({
         key: CodeBlockLockKey,
         filterTransaction: (tr, state) => !touchesLockedCode(tr, state),
       }),
+      codeHighlightPlugin(this.name),
     ]
   },
 })

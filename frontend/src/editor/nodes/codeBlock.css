@@ -144,3 +144,83 @@
   height: 0;
 }
 .object-editor.ProseMirror hr.ProseMirror-selectednode { outline: 2px solid var(--block-selection-border); outline-offset: 3px; }
+
+/* Syntax highlighting (M8 Task 29). highlight.js's `hljs-*` classes onto Object's `--code-*`
+   syntax tokens (theme/codeSyntax.css, all four themes), following Object's own `tok-*` rules
+   (keyword, atom/bool, regex/escape, inserted/literal, deleted/string, number, variableName,
+   typeName, className, propertyName, operator, comment, meta, punctuation, heading, emphasis,
+   strong, link). Which hljs scope takes which token is our choice where CodeMirror's names differ.
+   A run carries its innermost scope, after a `hljs-tag` / `hljs-meta` context (code/highlight.ts). */
+.object-editor .code-block .hljs-keyword,
+.object-editor .code-block .hljs-doctag,
+.object-editor .code-block .hljs-selector-tag { color: var(--code-keyword); }
+.object-editor .code-block .hljs-literal,
+.object-editor .code-block .hljs-symbol,
+.object-editor .code-block .hljs-link { color: var(--code-bool); }
+.object-editor .code-block .hljs-regexp,
+.object-editor .code-block .hljs-char.escape_ { color: var(--code-regex); }
+.object-editor .code-block .hljs-addition,
+.object-editor .code-block .hljs-formula { color: var(--code-literal); }
+.object-editor .code-block .hljs-string,
+.object-editor .code-block .hljs-deletion { color: var(--code-string); }
+.object-editor .code-block .hljs-number { color: var(--code-number); }
+.object-editor .code-block .hljs-code { color: var(--code-string-2); }
+.object-editor .code-block .hljs-variable,
+.object-editor .code-block .hljs-template-variable { color: var(--code-variable-name); }
+.object-editor .code-block .hljs-params { color: var(--code-variable-name-local); }
+.object-editor .code-block .hljs-title,
+.object-editor .code-block .hljs-title.function_ { color: var(--code-variable-name-definition); }
+.object-editor .code-block .hljs-built_in,
+.object-editor .code-block .hljs-variable.language_ { color: var(--code-variable-name-2); }
+.object-editor .code-block .hljs-type,
+.object-editor .code-block .hljs-name { color: var(--code-type-name); }
+.object-editor .code-block .hljs-title.class_,
+.object-editor .code-block .hljs-title.class_.inherited__,
+.object-editor .code-block .hljs-class,
+.object-editor .code-block .hljs-selector-class,
+.object-editor .code-block .hljs-selector-id { color: var(--code-class-name); }
+.object-editor .code-block .hljs-selector-attr,
+.object-editor .code-block .hljs-selector-pseudo { color: var(--code-macro-name); }
+.object-editor .code-block .hljs-attr,
+.object-editor .code-block .hljs-attribute,
+.object-editor .code-block .hljs-property { color: var(--code-property-name); }
+.object-editor .code-block .hljs-operator,
+.object-editor .code-block .hljs-bullet { color: var(--code-operator); }
+.object-editor .code-block .hljs-comment,
+.object-editor .code-block .hljs-quote { color: var(--code-comment); }
+.object-editor .code-block .hljs-meta { color: var(--code-meta); }
+.object-editor .code-block .hljs-meta.hljs-keyword { color: var(--code-keyword); }
+.object-editor .code-block .hljs-meta.hljs-string { color: var(--code-string); }
+.object-editor .code-block .hljs-punctuation,
+.object-editor .code-block .hljs-tag { color: var(--code-punctuation); }
+.object-editor .code-block .hljs-tag.hljs-name { color: var(--code-type-name); }
+.object-editor .code-block .hljs-tag.hljs-attr { color: var(--code-property-name); }
+.object-editor .code-block .hljs-subst { color: var(--code-text); }
+.object-editor .code-block .hljs-section { font-weight: 700; text-decoration: underline; }
+.object-editor .code-block .hljs-emphasis { font-style: italic; }
+.object-editor .code-block .hljs-strong { font-weight: 700; }
+.object-editor .code-block .hljs-link { text-decoration: underline; }
+
+/* Mermaid export buttons (M8 Task 29): the code block bar's button look, under the diagram. */
+.object-editor .mermaid-export {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 6px;
+}
+.object-editor .mermaid-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: var(--code-bg);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  cursor: pointer;
+}
+.object-editor .mermaid-export-btn:hover { background: var(--bg-hover-2); color: var(--text); }
+.object-editor .mermaid-export-btn:disabled { cursor: default; opacity: 0.6; }
