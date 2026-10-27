@@ -106,6 +106,8 @@ export interface ToolboxProps {
   memory?: WhiteboardBoardToolMemory
   /** The whole board is read-only (an unreadable file): tools that edit are disabled. */
   readOnly?: boolean
+  /** M8: "Play" presents the board frame by frame; the button shows when this is given. */
+  onPlay?(): void
 }
 
 export interface SelectionToolbarProps {

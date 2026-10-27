@@ -5,6 +5,10 @@
  * over the selection, the read-only banner, the delete flow as `ObjectView` has it and
  * "Clear Whiteboard" (board and ink, one undo step).
  * M8: the board menu's "Export as PNG" (and "Export selection as PNG") call the canvas's exporter.
+ * M8 (Task 23): the floating inspector (top right; "Outline", "Frames", "Stats", "Pin"), "Play"
+ * (the toolbox) presenting the frames in reading order, and the board's "Notes" under the canvas:
+ * M1's body editor on the board's `.md` body, collapsed by default (our choice). Opening the
+ * notes never writes; only an edit saves the body (revision-checked like any body save).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { NodeToolbar, Panel } from '@xyflow/react'
@@ -14,12 +18,17 @@ import type { WhiteboardBoardToolMemory } from '@/api/whiteboardTypes'
 import { Icon } from '@/components/Icon'
 import { invalidateLinkIndex, stemOf } from '@/links/linkIndex'
 import { canGoBack, useTabs } from '@/nav/tabs'
+import { Editor } from '@/editor/Editor'
+import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { DeleteObjectDialog, useDeleteRequest } from '@/object/DeleteObjectDialog'
 import { DeletedBanner } from '@/object/DeletedBanner'
 import { BoardHeader } from './BoardHeader'
 import type { BoardExporter, CanvasControls } from './WhiteboardCanvas'
 import { WhiteboardCanvas } from './WhiteboardCanvas'
 import { BoardMenu, SelectionToolbar, Toolbox, ZoomMenu } from './chrome'
+import { BoardPresentation } from './chrome/BoardPresentation'
+import { FloatingInspector, loadInspectorPinned, saveInspectorPinned } from './chrome/FloatingInspector'
+import { presentationSlides, setFrameOrder } from './readingOrder'
 import { defaultHost, WhiteboardHostContext, type WhiteboardHost } from './host'
 import { isCircuitLabel, resolveLastUsedTool } from './model'
 import type { InkDoc, InkPlugin, InkStroke } from './plugin'
@@ -114,6 +123,11 @@ export function WhiteboardPage({
   const [trashId, setTrashId] = useState<string | null>(null)
   const [undoError, setUndoError] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  // ---- the board's Notes (the .md body) ----
+  const [notes, setNotes] = useState<{ body: string; version: string } | null>(null)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [notesToast, setNotesToast] = useState<string | null>(null)
+  const notesRef = useRef<BodyEditorHandle | null>(null)
 
   const loadDetail = useCallback(async () => {
     try {
@@ -121,6 +135,10 @@ export function WhiteboardPage({
       versionRef.current = d.version
       setTitle(d.summary.title)
       setHasDetail(true)
+      // Notes with unsaved edits keep them when the body changed on disk; their next save
+      // meets the revision check and `onNotesConflict` settles it.
+      const h = notesRef.current
+      if (!(h && h.isDirty() && d.body !== h.savedBody())) setNotes({ body: d.body, version: d.version })
     } catch {
       /* the board still opens; rename and delete wait for the title */
     }
@@ -155,13 +173,53 @@ export function WhiteboardPage({
   const flushAll = useCallback(async () => {
     await flush()
     await inkRef.current.flush()
+    await notesRef.current?.flush()
   }, [flush])
+
+  const onNotesSaved = useCallback((version: string) => {
+    versionRef.current = version
+    setNotes((n) => ({ body: notesRef.current?.savedBody() ?? n?.body ?? '', version }))
+  }, [])
+
+  /** A notes save met a newer file: keep the edits when only other lines changed, else reload. */
+  const onNotesConflict = useCallback(async () => {
+    try {
+      const d = await api.object(path)
+      versionRef.current = d.version
+      setTitle(d.summary.title)
+      const h = notesRef.current
+      setNotes({ body: d.body, version: d.version })
+      if (h && d.body === h.savedBody()) {
+        await h.resume(d.version, true)
+      } else {
+        h?.reload(d.body, d.version)
+        setNotesToast(WB.changedElsewhere.text)
+      }
+    } catch {
+      /* the next edit retries */
+    }
+  }, [path])
+
+  const toggleNotes = useCallback(async () => {
+    if (!notesOpen) {
+      setNotesOpen(true)
+      return
+    }
+    const h = notesRef.current
+    if (h) {
+      await h.flush()
+      const saved = h.savedBody()
+      if (saved !== null) setNotes((n) => (n ? { ...n, body: saved } : n))
+    }
+    setNotesOpen(false)
+  }, [notesOpen])
 
   const rename = useCallback(
     async (next: string) => {
       await flushAll()
       const res = await api.renameObject(path, next, versionRef.current)
       versionRef.current = res.version
+      setNotes((n) => (n ? { ...n, version: res.version } : n))
       setTitle(next)
       if (res.path !== path) useTabs.getState().retarget(path, res.path)
       void invalidateLinkIndex()
@@ -226,10 +284,17 @@ export function WhiteboardPage({
     return () => clearTimeout(t)
   }, [toast, dismissToast])
 
+  useEffect(() => {
+    if (!notesToast) return
+    const t = setTimeout(() => setNotesToast(null), TOAST_MS)
+    return () => clearTimeout(t)
+  }, [notesToast])
+
   return (
     <WhiteboardHostContext.Provider value={host}>
       <BoardStoreContext.Provider value={store}>
-        <div className="relative h-full w-full overflow-hidden" data-whiteboard-page={mode} data-testid="whiteboard-page">
+        <div className="flex h-full w-full flex-col overflow-hidden" data-whiteboard-page={mode} data-testid="whiteboard-page">
+        <div className="relative min-h-0 w-full flex-1 overflow-hidden">
           {status === 'ready' && (
             <WhiteboardCanvas
               boardKey={path}
@@ -277,19 +342,87 @@ export function WhiteboardPage({
             }
           />
           <Banners deleted={deleted} trashId={trashId} undoError={undoError} onBack={goBack} onUndo={() => void undoDelete()} />
-          {toast && (
+          {(toast || notesToast) && (
             <div
               role="status"
               className="absolute top-16 left-1/2 z-30 -translate-x-1/2 rounded-lg border border-line bg-raised-2 px-3 py-2 text-[13px]"
             >
-              {toast}
+              {toast || notesToast}
             </div>
           )}
           {footer && <div className="absolute bottom-4 left-4 z-10">{footer}</div>}
           <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} />
         </div>
+        {notes && (
+          <BoardNotes
+            path={path}
+            body={notes.body}
+            version={notes.version}
+            readOnly={deleted}
+            open={notesOpen}
+            onToggle={() => void toggleNotes()}
+            controlRef={notesRef}
+            onSaved={onNotesSaved}
+            onConflict={() => void onNotesConflict()}
+          />
+        )}
+        </div>
       </BoardStoreContext.Provider>
     </WhiteboardHostContext.Provider>
+  )
+}
+
+/**
+ * The board's "Notes" (`components.RootWhiteboard.propertyDefinitions.RootWhiteboard_notes.name`):
+ * a bar under the canvas that opens M1's body editor on the board's `.md` body (collapsed by
+ * default; the bar and its height are our choice).
+ */
+function BoardNotes({
+  path,
+  body,
+  version,
+  readOnly,
+  open,
+  onToggle,
+  controlRef,
+  onSaved,
+  onConflict,
+}: {
+  path: string
+  body: string
+  version: string
+  readOnly: boolean
+  open: boolean
+  onToggle(): void
+  controlRef: { current: BodyEditorHandle | null }
+  onSaved(version: string): void
+  onConflict(currentVersion: string): void
+}) {
+  return (
+    <section className="shrink-0 border-t border-line bg-app" data-testid="whiteboard-notes" data-open={open || undefined}>
+      <button
+        type="button"
+        aria-expanded={open}
+        className="flex w-full items-center gap-1.5 px-4 py-2 text-left text-[13px] font-medium text-fg-muted hover:text-fg"
+        onClick={onToggle}
+      >
+        <Icon name={open ? 'ph-caret-down' : 'ph-caret-right'} size={12} />
+        <span>{WB.propNotes.text}</span>
+      </button>
+      {open && (
+        <div className="max-h-[40vh] min-h-[120px] overflow-y-auto px-6 pb-6" data-testid="whiteboard-notes-editor">
+          <Editor
+            path={path}
+            body={body}
+            version={version}
+            readOnly={readOnly}
+            onSaved={onSaved}
+            onConflict={onConflict}
+            controlRef={controlRef}
+          />
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -364,7 +497,30 @@ function BoardChrome({
   const canvas = useBoardState((s) => s.canvas)
   const selection = useBoardState((s) => s.selection)
   const board = useBoardState((s) => s.doc.board)
+  const strokes = useBoardState((s) => s.doc.strokes)
   const editable = !readOnlyReason && !locked
+
+  // ---- M8: the floating inspector and the presentation ----
+  const [pinned, setPinned] = useState(loadInspectorPinned)
+  const [inspectorOpen, setInspectorOpen] = useState(pinned)
+  const [presenting, setPresenting] = useState(false)
+  const slides = useMemo(() => presentationSlides(board), [board])
+  const pin = useCallback((next: boolean) => {
+    setPinned(next)
+    saveInspectorPinned(next)
+  }, [])
+  const play = useCallback(() => {
+    if (!slides.length) return
+    actions.select([])
+    setPresenting(true)
+  }, [slides.length, actions])
+  const reorderFrames = useCallback(
+    (ids: string[]) => {
+      if (!editable) return
+      actions.apply('readingOrder', (b) => setFrameOrder(b, ids))
+    },
+    [actions, editable],
+  )
 
   const selNodes = useMemo(() => selection.map((id) => board.nodes[id]).filter(Boolean), [selection, board])
   const selEdges = useMemo(() => selection.map((id) => board.edges[id]).filter(Boolean), [selection, board])
@@ -374,8 +530,45 @@ function BoardChrome({
       <SelectionToolbar nodes={selNodes} edges={selEdges} blocks={board.blocks} actions={actions} />
     ) : null
 
+  if (presenting) {
+    return (
+      <Panel position="bottom-center">
+        <BoardPresentation
+          slides={slides}
+          onShow={(slide) => controls.zoomToBox(slide.box, { fill: true })}
+          onExit={() => setPresenting(false)}
+        />
+      </Panel>
+    )
+  }
+
   return (
     <>
+      <Panel position="top-right" style={{ marginTop: 64 }}>
+        <div className="flex flex-col items-end gap-2">
+          <button
+            type="button"
+            aria-label={WB.inspector.text}
+            title={WB.inspector.text}
+            aria-expanded={inspectorOpen}
+            className="flex size-8 items-center justify-center rounded-md border border-line bg-raised text-fg-muted shadow-sm hover:bg-hover hover:text-fg"
+            onClick={() => setInspectorOpen((o) => !o)}
+          >
+            <Icon name="ph-list-bullets" size={16} />
+          </button>
+          {inspectorOpen && (
+            <FloatingInspector
+              board={board}
+              strokes={strokes}
+              editable={editable}
+              pinned={pinned}
+              onPin={pin}
+              onZoomTo={controls.zoomToNode}
+              onReorderFrames={reorderFrames}
+            />
+          )}
+        </div>
+      </Panel>
       <Panel position="bottom-center">
         <Toolbox
           tool={tool}
@@ -395,6 +588,7 @@ function BoardChrome({
           canRedo={canRedo && !readOnlyReason}
           memory={memory}
           readOnly={!!readOnlyReason}
+          onPlay={play}
         />
       </Panel>
       <Panel position="bottom-right">

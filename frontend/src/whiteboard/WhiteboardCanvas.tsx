@@ -16,6 +16,8 @@
  * clipboard (`clipboard.ts`; pasted text, URLs and images become text blocks, web-link cards and
  * media nodes in the middle of the view), and `exportRef` gives the page "Export as PNG"
  * (`exportPng.ts`).
+ * M8 (Task 23): the chrome's controls also zoom to a node (the inspector) and fit a box (the
+ * presentation, which magnifies a frame to fill the view).
  * Panning and zooming never touch the board; the camera is kept per viewer in localStorage.
  */
 import '@xyflow/react/dist/base.css'
@@ -136,6 +138,10 @@ export type BoardExporter = (title: string, opts?: { selection?: boolean }) => P
 export interface CanvasControls {
   zoom: number
   onZoom(cmd: ZoomCommand): void
+  /** M8 (inspector): zoom to fit one node (a heading's block or a frame). */
+  zoomToNode(id: string): void
+  /** M8 (presentation): fit a box; `fill` magnifies past 100 % so a frame fills the view. */
+  zoomToBox(box: Box, opts?: { fill?: boolean }): void
 }
 
 export interface WhiteboardCanvasProps {
@@ -405,6 +411,24 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
       }
     },
     [rf, paneSize, setCamera, allBoxes, store],
+  )
+
+  const zoomToBox = useCallback(
+    (box: Box, opts: { fill?: boolean } = {}) => {
+      setCamera(fitBox([box], paneSize(), FIT_PADDING, opts.fill ? ZOOM_MAX : undefined))
+    },
+    [paneSize, setCamera],
+  )
+
+  const zoomToNode = useCallback(
+    (id: string) => {
+      const n = store.getState().doc.board.nodes[id]
+      if (!n) return
+      const b = nodeBox(n)
+      const m = measured[id]
+      zoomToBox(m && typeof n.width !== 'number' ? { ...b, width: m.width, height: typeof n.height === 'number' ? b.height : m.height } : b)
+    },
+    [store, measured, zoomToBox],
   )
 
   const onMoveEnd = useCallback(
@@ -915,7 +939,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
           />
         )}
         {!isEmpty && <LostState paneSize={paneSize} onBack={() => onZoom('fit')} />}
-        {renderChrome?.({ zoom, onZoom })}
+        {renderChrome?.({ zoom, onZoom, zoomToNode, zoomToBox })}
       </ReactFlow>
       {placing && <PlacementLayer tool={tool} snapToGrid={settings.isSnappingToGrid} onPlace={place} />}
       {isEmpty && (
