@@ -52,7 +52,9 @@ def _diff(before: bytes, after: bytes) -> tuple[list[bytes], list[bytes]]:
 
 
 def _keys_of(lines: list[bytes]) -> set[str]:
-    return {ln.decode("utf-8").lstrip("﻿").split(":", 1)[0] for ln in lines}
+    # M8: indented lines continue a block value (the occurrence log's entries).
+    texts = (ln.decode("utf-8").lstrip("﻿") for ln in lines)
+    return {t.split(":", 1)[0] for t in texts if not t[:1].isspace()}
 
 
 def test_complete_nonrecurring_sets_completed(space: Space, calendar_space_dir: Path):
@@ -85,7 +87,9 @@ def test_complete_recurring_advances_in_one_write(space: Space, calendar_space_d
     assert space.read(rel)[2] == result.version != version
     removed, added = _diff(raw_before, (calendar_space_dir / rel).read_bytes())
     assert _keys_of(removed) == {"date", "lastUpdated"}  # status stays "Not Started"
-    assert _keys_of(added) == {"date", "lastUpdated", "completed"}
+    # M8: the completion also appends `<old date> completed <now>` to the occurrence log.
+    assert _keys_of(added) == {"date", "lastUpdated", "completed", "occurrenceLog"}
+    assert after["occurrenceLog"] == "2026-10-14 completed 2026-10-23T10:00:00Z"
 
 
 def test_complete_completion_mode_uses_completion_day(space: Space, calendar_space_dir: Path):
@@ -172,7 +176,7 @@ def test_explicit_date_in_same_update_wins(space: Space, calendar_space_dir: Pat
 
 _CASES = [
     # (file, new status, changed keys, keys whose lines are added only)
-    ("Tasks/crlf bom task.md", "Done", {"date", "lastUpdated"}, {"completed"}),
+    ("Tasks/crlf bom task.md", "Done", {"date", "lastUpdated"}, {"completed", "occurrenceLog"}),
     ("Tasks/no trailing newline.md", "Done", {"lastUpdated", "status"}, {"completed"}),
     ("Tasks/quoted date.md", "Done", {"lastUpdated", "status"}, {"completed"}),
     ("Tasks/Buy stamps.md", "Done", {"lastUpdated", "status"}, {"completed"}),
@@ -203,7 +207,11 @@ def test_status_hook_touches_only_expected_keys(
         assert raw_after.count(b"\n") == raw_after.count(b"\r\n")
     if not text_before.endswith("\n"):
         assert not text_after.endswith("\n")
-    if "completed" in inserted:
+    if "occurrenceLog" in inserted:  # M8: the log follows `completed`
+        fm_lines = text_after.split("---", 2)[1].splitlines()
+        assert fm_lines[-3].startswith("completed: ")
+        assert fm_lines[-2:] == ["occurrenceLog: |-", "  2026-10-21 completed 2026-10-23T10:00:00Z"]
+    elif "completed" in inserted:
         fm_lines = text_after.split("---", 2)[1].splitlines()
         assert fm_lines[-1].startswith("completed: ")  # inserted at the end of the block
     if rel == "Tasks/quoted date.md":

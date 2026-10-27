@@ -5,6 +5,11 @@ path only, after the generic encoding built ``sets``/``removals`` and before
 they are written, so a completion (and a recurring advance) is the one stamped
 write M2 already makes. It is the only place that completes, reopens or
 advances a task.
+
+M8: completing a recurring Task with a date also appends ``<old date>
+completed <now>`` to its `occurrenceLog` (unless the caller's update writes
+the log itself, as ``POST /api/tasks/occurrence`` does); reopening never
+removes a line.
 """
 
 from __future__ import annotations
@@ -17,6 +22,7 @@ from typing import Any
 from .localtime import to_local
 from .propvalues import decode_value, encode_value, label_lookup
 from .recurrence import next_date
+from .tasklog import LOG_KEY, format_entry, log_value
 from .taskmodel import parse_repeat
 from .typemodel import PropertyDefinition, TypeDefinition, is_task_type, status_category
 
@@ -133,8 +139,6 @@ def on_status_change(
     if "completed" not in explicit:
         sets["completed"] = stamp(now)
     result = TaskResult(completed=True, advanced=False)
-    if "date" in explicit:
-        return result
     date_def = t.prop("date")
     repeat_raw = sets["repeat"] if "repeat" in sets else fm.get("repeat")
     rule = parse_repeat(repeat_raw) if isinstance(repeat_raw, str) else None
@@ -142,6 +146,11 @@ def on_status_change(
         return result
     current = _current_date(decode_value(date_def, fm.get("date"), fm))
     if current is None:
+        return result
+    if LOG_KEY not in explicit:  # M8: one `<old date> completed <now>` line per completion
+        line = format_entry(current, "completed", now)
+        sets[LOG_KEY] = log_value(fm.get(LOG_KEY), [line])
+    if "date" in explicit:
         return result
     reset = _first_not_started(sdef)
     if reset is None:
