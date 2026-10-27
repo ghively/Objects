@@ -1,0 +1,95 @@
+/* Simple tables (Capacities' SimpleTableBlock). Cell padding is Capacities'
+   --p-table-cell-x / --p-table-cell-y (.375rem, index36682.css). The displayed
+   header role follows the table's options (TableMenu.tsx: data-cell-header);
+   the file's header row is unchanged. */
+
+.object-editor .tableWrapper {
+  overflow-x: auto;
+}
+.object-editor th,
+.object-editor td {
+  padding: 0.375rem;
+}
+
+/* `no-header-row`: the first row shows as ordinary cells. */
+.object-editor th[data-cell-header='false'] {
+  background: none;
+  font-weight: inherit;
+}
+/* `header-column`: the first column shows as header cells. */
+.object-editor td[data-cell-header='true'] {
+  background: var(--bg-raised);
+  font-weight: 600;
+}
+
+/* The menu bar sits above the table's top-left corner (a table is only as
+   wide as its cells), shown on hover or while the table holds the cursor. */
+.object-editor .table-menu-anchor {
+  position: relative;
+  height: 0;
+  user-select: none;
+}
+.object-editor .table-menu-bar {
+  position: absolute;
+  left: 0;
+  bottom: 2px;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  background: var(--bg-raised);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms;
+  z-index: 2;
+}
+.object-editor .table-menu-anchor[data-active] .table-menu-bar,
+.object-editor .table-menu-anchor:hover .table-menu-bar,
+.object-editor .table-menu-anchor:has(+ .tableWrapper:hover) .table-menu-bar,
+.object-editor .table-menu-anchor:focus-within .table-menu-bar {
+  opacity: 1;
+  pointer-events: auto;
+}
+.object-editor .table-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  border-radius: 0.375rem;
+  color: var(--text-muted);
+}
+.object-editor .table-menu-btn:hover:not(:disabled) {
+  background: var(--bg-hover-2);
+  color: var(--text);
+}
+.object-editor .table-menu-btn:disabled {
+  opacity: 0.4;
+}
+
+/* The switch drawn inside "Header row" / "Header column" (menus portal out of
+   the editor, so these are not scoped to it). */
+.table-menu-switch {
+  display: inline-flex;
+  align-items: center;
+  width: 26px;
+  height: 15px;
+  padding: 1px;
+  border-radius: 999px;
+  background: var(--bg-hover-2);
+  transition: background 120ms;
+}
+.table-menu-switch[data-state='checked'] {
+  background: var(--primary-btn);
+}
+.table-menu-switch-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: var(--bg-raised);
+  transition: transform 120ms;
+}
+.table-menu-switch[data-state='checked'] .table-menu-switch-thumb {
+  transform: translateX(11px);
+}

@@ -1,1 +1,69 @@
-/* Task 7: plain rendering; styled by the task that owns this node's view. */
+/* The columns block (Capacities' GridBlock): a CSS grid with one track per
+   column at its widths (ColumnsView sets --columns-template and
+   --columns-gap). The gap and the grid layout's track size are our values;
+   the reference CSS has no grid-block rule. */
+.object-editor .block-columns {
+  position: relative;
+  margin-block: 0.5em;
+}
+.object-editor .block-columns[data-block-color] {
+  margin-inline: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+}
+.object-editor .block-columns-body {
+  position: relative;
+}
+.object-editor .block-columns-grid > [data-node-view-content-react] {
+  display: grid;
+  grid-template-columns: var(--columns-template, repeat(2, minmax(0, 1fr)));
+  column-gap: var(--columns-gap, 24px);
+  row-gap: 0.75rem;
+}
+/* "Grid": the columns wrap into a responsive grid. */
+.object-editor .block-columns[data-layout='grid'] .block-columns-grid > [data-node-view-content-react] {
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+}
+.object-editor .block-column {
+  min-width: 0;
+}
+.object-editor .block-column > :first-child {
+  margin-top: 0;
+}
+.object-editor .block-column > :last-child {
+  margin-bottom: 0;
+}
+
+/* An empty column keeps one line you can type on, drawn as a faint rule. */
+.object-editor .column-empty {
+  min-height: 1.5em;
+  border-radius: 0.25rem;
+  box-shadow: inset 0 -1px 0 var(--border-subtle);
+}
+
+/* The divider between two columns: a thin line in the gap, wider to grab. */
+.object-editor .columns-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  margin-left: -6px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 1;
+}
+.object-editor .columns-divider::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 5.5px;
+  width: 1px;
+  background: var(--border-subtle);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.object-editor .block-columns:hover .columns-divider::after,
+.object-editor .columns-divider:active::after {
+  opacity: 1;
+}
