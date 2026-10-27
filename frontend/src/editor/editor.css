@@ -29,6 +29,7 @@
 .object-editor ul[data-type='taskList'] li > div { flex: 1; }
 .object-editor blockquote {
   border-left: 3px solid var(--editor-quote-line);
+  padding-block: 6px; /* Capacities' .quote>.block-middle */
   padding-left: 1.125rem;
   color: inherit;
 }
