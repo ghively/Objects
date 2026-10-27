@@ -15,13 +15,13 @@
 - **Back end:** attachments of every kind (serve with safe headers and HTTP ranges, import, list, open with the OS), `.capacities/space.json` (name, icon, description, hide task management), device settings and the spaces registry in per-user app data (beside M4's reminder ledger, never inside a space), and a launcher loop that restarts the server on another space when the UI switches.
 - **Front end, outside the editor:** tabs gain `persistent`, `pinned`, per-step breadcrumbs and a per-tab side panel (Capacities' `TabEntry`); the theme becomes four token sets selected by `data-theme` on `<html>`; a Settings modal and a spaces menu use the new routes.
 
-**Tech Stack:** as M6, plus these frontend dependencies, **installed up front in one commit before the build** (`cd frontend && npm install --save-exact katex@0.19.0 mermaid@12.1.0 @tiptap/suggestion@3.32.0 @tiptap/extension-code-block@3.32.0`, commit `chore(deps): katex, mermaid, tiptap suggestion and code block for M7` with the Co-Authored-By trailer). No M7 task edits `package.json`, `package-lock.json`, `pyproject.toml` or `uv.lock`.
+**Tech Stack:** as M6, plus these frontend dependencies, **already installed and committed** in `35b7959` (`chore(deps): add M7 frontend dependencies up front`; `frontend/package.json` pins them exactly, `node_modules` has them; tasks run `npm ci`, never `npm install`). No M7 task edits `package.json`, `package-lock.json`, `pyproject.toml` or `uv.lock`.
 
 | Package | Exact version | Why |
 |---|---|---|
 | `katex` | `0.19.0` (released 2026-10-01) | Math blocks and inline formulas (spec §3 "math (KaTeX)"). Ships its own types and fonts; `katex/dist/katex.min.css` is bundled by Vite, so nothing loads from the network. |
 | `mermaid` | `12.1.0` (released 2026-10-02) | The Mermaid preview of code blocks (spec §3). Loaded with a dynamic `import('mermaid')` so it is code-split out of the main bundle; rendered with `securityLevel: 'strict'`. |
-| `@tiptap/suggestion` | `3.32.0` | The `/` menu trigger, query tracking and keyboard handling. Must equal the installed `@tiptap/core` (3.32.0 today; at the reconcile pass, use whatever `@tiptap/core` is then). |
+| `@tiptap/suggestion` | `3.32.0` | The `/` menu trigger, query tracking and keyboard handling. Equals the installed `@tiptap/core` (3.32.0, checked at the reconcile pass). |
 | `@tiptap/extension-code-block` | `3.32.0` | Already in the tree through `@tiptap/starter-kit`; listed as a direct dependency so Task 7 can extend `CodeBlock` (language, options, node view) instead of importing a transitive package. Same version rule as above. |
 
 **No new Python dependencies.** HTTP range requests come from Starlette's `FileResponse` (1.9.0 here, ranges supported); opening a file with the OS uses `os.startfile` / `open` / `xdg-open`. **Considered and not added:** `@tiptap/extension-drag-handle(-react)` (it pulls in the collaboration and Yjs peers; Task 12's handle is ~150 lines over ProseMirror's own drag), `@tiptap/extension-mathematics` (our nodes need our annotation and byte rules), `pdfjs-dist` (WebView2 and Chromium display PDFs natively in an `<iframe>`), `react-resizable-panels` (one pointer-drag divider component serves the side panel, columns and embeds), `dompurify` (the Markdown preview renders through our own read-only editor, which never injects raw HTML; Mermaid sanitises in strict mode), a syntax highlighter (spec §3 asks for language, wrap and previews, not highlighting).
@@ -42,25 +42,25 @@
 | 1 (built) | shell, objects on disk, page + peek, block editor with byte preservation, wikilinks, external changes |
 | 2 (built) | object types and all property kinds, type settings and page layouts, title edit and relink, change type, templates, tags as objects, trash |
 | 3 (built) | views, filters, sorts, group-by, collections, queries, pinned, All notes |
-| 4 (built by the time M7 builds) | calendar, daily notes, tasks, recurrence, reminders |
-| 5 (built by the time M7 builds) | SQLite FTS index, Ctrl+K palette, find in page, references and backlinks, global and local graph |
-| 6 (built by the time M7 builds) | whiteboards and pen |
+| 4 (built) | calendar, daily notes, tasks, recurrence, reminders |
+| 5 (built) | SQLite FTS index, Ctrl+K palette, find in page, references and backlinks, global and local graph |
+| 6 (built) | whiteboards and pen |
 | **7 (this plan)** | remaining blocks and the annotation syntax, slash menu, handles, block selection, editor shortcuts; persistent and pinned tabs, breadcrumbs, the three-area side panel; light mode; the Settings modal; spaces; the final side-by-side pass |
 
 ## Global Constraints
 
 **Carried forward from M1–M6** (all of them, unchanged):
 - **Server and toolchain:** `127.0.0.1` only (default port 8790), no outbound network from the server, Python `>=3.13` with uv, Node `>=22`. Every commit message ends with a blank line and `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-- **Never write on read.** Opening a space, any GET, listing attachments, reading settings and the spaces list write nothing inside the space. Property edits change only their own lines. Deletes go to the trash and are restorable. Writes are atomic and keep CRLF/BOM and the trailing-newline state. Destructive confirmations use 428. Every route that writes an object announces `ChangeEvent(origin=clientId)` for each path it wrote.
+- **Never write on read.** Opening a space, any GET, listing attachments, reading settings and the spaces list write nothing inside the space. Property edits change only their own lines. Deletes go to the trash and are restorable. Writes are atomic and keep CRLF/BOM and the trailing-newline state. Destructive confirmations use 428. Every route that writes an object announces `ChangeEvent(origin=clientId)` for each path it wrote. (The one thing serving a space does create is M5's search index, `.capacities-cache/` inside the space unless `OBJECT_CACHE_DIR` points elsewhere; it holds no user content. Every M7 "writes nothing" check excludes it or sets `OBJECT_CACHE_DIR`, as `conftest.py`'s autouse fixture and `m6_acceptance.py` already do.)
 - **Byte preservation of untouched blocks is sacred** (M1's `editor/preserve.ts`, `editor/blocks.ts`, `editor/document.ts`, `editor/extensions/blockSource.ts`): loading a body and saving it without an edit gives the identical bytes; an edit changes only the lines of the blocks it touched; an unedited block is emitted byte for byte, whatever kind it is, including every annotation line and every container line around it. M7 adds kinds of blocks, never a way to rewrite one that wasn't edited. Undoing an edit restores the original bytes; moving a block keeps its bytes.
 - **Definition files and `ui.json`** follow M3/M4: `JsonStore`/`uistate.patch_ui`, revisions, 409 on a stale `baseRevision`, 423 on an unreadable file (never replaced), `PUT /api/ui` accepts only `server.py`'s `_UI_PATCH_KEYS` and checks shapes in `_ui_problem`.
 - **Per-user app data, never the space,** holds machine state: M4's reminder ledger, and now device settings and the spaces registry (Storage table). `OBJECT_STATE_DIR` overrides the folder in tests and acceptance.
-- **Tests:** baseline is this branch after M6's integration and final gate (the reconcile pass records the counts). Every task keeps all earlier tests green. A test that passes before its task's code exists is labelled "regression guard (green from the start)". Backend tests use the synthetic `space-blocks` space (Task 1) or `tmp_path`, never assert absolute fixture counts, and set `OBJECT_STATE_DIR` to a temp folder. Frontend tests mock `api` (`test/mockApi.ts`) and `mermaid`.
+- **Tests:** baseline is this branch after M5+M6's final gate (`c4a087c`, unchanged at `88865a3`): **854 back-end tests passing (855 collected, 1 skipped), 1013 front-end tests in 164 test files**, `tsc -b --noEmit` clean, `npm run build` ok. Every task keeps all earlier tests green. A test that passes before its task's code exists is labelled "regression guard (green from the start)". Backend tests use the synthetic `space-blocks` space (Task 1) or `tmp_path` and never assert absolute fixture counts; `backend/tests/conftest.py`'s autouse fixtures already point `OBJECT_STATE_DIR` and `OBJECT_CACHE_DIR` at per-test temp folders and stub OS notifications, so a test sets them itself only to inspect them. Frontend tests mock `api` (`test/mockApi.ts`) and `mermaid`. The vitest case "1MB body splits under 300ms" (`editor/preserve.test.ts`) is load-sensitive: rerun it alone before calling it a failure.
 - **Fidelity.** Labels, icons, option keys, defaults and orders come from the reference extract. A string marked "our string" has no Capacities original; every other quoted string must be found verbatim in `virtual_intlify-i18n-0366822.js`. A Capacities string that names "Capacities" or a cloud feature is adapted and marked "our string, adapted from `<key>`".
 - **Out of scope** (spec §2): accounts, sync, sharing and publishing, AI, telemetry, integrations, mobile.
 
 **New in M7**
-- **Start condition.** M4, M5 and M6 are built and integrated on this branch. This plan was written on 2026-10-26 against the code at `a8e0d7f` (M4 mid-build) and the M4 plan; **a reconcile pass must run before the build** (see "Reconcile before building") and correct names, files and the test baseline to what M4–M6 actually built.
+- **Start condition.** M4, M5 and M6 are built, integrated and through their final gate on this branch. This plan was written on 2026-10-26 against `a8e0d7f` (M4 mid-build) and **reconciled on 2026-10-27 against `88865a3`** (see "Reconcile before building" and "Change history"); every interface name, file and count below is the built code's.
 - **Annotation syntax** (spec §4: "the annotation syntax is the builder's choice"; this plan fixes it so every task agrees). An annotation is an **HTML comment on a line of its own**. Markdown renderers (GitHub, VS Code, Obsidian) hide comments, so the file reads as ordinary Markdown in any editor: toggle children show expanded, columns show stacked, colours are simply absent.
 
   ```
@@ -140,8 +140,8 @@
   | Tabs (persistent, pinned, breadcrumbs, side panel per tab), recent | `localStorage`, keyed per space root (`object.tabs:<root>`, `object.recent:<root>`); Capacities keeps tabs in local navigation too (`RootSpaceData.tabs` is deprecated "Copied into local navigation") | the client |
   | Theme for first paint | `localStorage` `object.theme` (a cache of the device setting) | the client |
 
-  `<state dir>` is `OBJECT_STATE_DIR` when set, else `%LOCALAPPDATA%/object` on Windows, else `~/.local/state/object` (M4's ledger folder; Task 3 makes `appstate.state_dir()` its single owner).
-- **Theme tokens.** Our dark tokens stay the screenshot-measured values in `theme/tokens.css` (unchanged bytes for every existing token). Light, Light Dimmed and Dark Dimmed are computed from `themes.ts` + `colors.ts` with this mapping (Task 16 computes the values with a throwaway script outside the repo and commits only the CSS):
+  `<state dir>` is `OBJECT_STATE_DIR` when set, else `%LOCALAPPDATA%/object` on Windows (`~/AppData/Local/object` when `LOCALAPPDATA` is unset), else `$XDG_STATE_HOME/object`, else `~/.local/state/object`: exactly M4's `reminders._state_dir()` today (the ledger is `<state dir>/reminders-<hash>.json`); Task 3 moves that function to `appstate.state_dir()` unchanged and makes it the single owner.
+- **Theme tokens.** Our dark tokens stay the screenshot-measured values in `theme/tokens.css` (unchanged bytes for every existing token). **Task 5 adds every new token below to `tokens.css` with its dark value** (so lanes B and C can use them before Task 16 lands); Light, Light Dimmed and Dark Dimmed are computed from `themes.ts` + `colors.ts` with this mapping (Task 16 computes the values with a throwaway script outside the repo and commits only the CSS):
 
   | Our token | Capacities token | Light | Light Dimmed | Dark Dimmed |
   |---|---|---|---|---|
@@ -158,6 +158,8 @@
   | `--primary-btn` / `--primary-btn-text` (new) | `bg-button-primary` / `text-button-primary` | gray 700 / gray 100 | gray 675 / gray 125 | gray 200 / gray 800 |
   | `--text-section` (new; dark `#a7a2a1`, the sidebar section headings) | `text-subtle` | gray 500 | gray 450 | gray 450 |
   | `--chrome-btn-border` (new; dark `#2a292d`, the "+ New" and search buttons) | `border-el-subtle` | gray 200 | gray 200 | gray 700 |
+| `--float-bg` / `--float-border` / `--float-btn-border` (new; dark `#18181b` / `#232226` / `#29282d`: the floating chrome of the object page's header buttons (`object/ObjectView.tsx`) and M5's find bar (`find/FindBar.tsx`)) | `bg-front` / `border-front` / `border-el-subtle` (our mapping: no reference screenshot of this chrome in light mode) | as `--bg-raised` / `--border-subtle` / `--chrome-btn-border` | same rule | same rule |
+| `--card-shadow` (new; dark = the literal in `views/cards/SmallCard.tsx`, `0 2px 3px #00000001, 0 4px 9px #00000003, 0 8px 12px #00000001`) | (our token; the same shadow in every theme) | same | same | same |
   | `--block-selection-bg` / `--block-selection-border` / `--text-selection-bg` (new) | `bg-block-selection` / `border-block-selection` / `bg-text-selection` | `#4494f748` / blue 400 / `#4494f748` | same | dark's `#5090dd3a` / blue 400 / `#5090dd3a` |
   | `--editor-bullet`, `--editor-bullet-nested`, `--editor-quote-line`, `--editor-hr`, `--editor-toggle`, `--editor-toggle-empty`, `--editor-toggle-outline` (new; dark = today's `#e4e3e2`, `#7c7c7d`, `#4e4b4c`, `--border-subtle`, and `content.*` dark values) | `content.bulletColor`, nested bullet (our: `text-subtle`), `quoteLineColor`, `horizontalLineColor`, `toggleColor`, `toggleColorEmpty`, `toggleOutlineColor` | from `content` | from `content` | from `content` |
   | `--code-bg`, `--code-border`, `--code-text` (new) | `code.code-bg`, `code-border`, `code-text` | gray 25 / 200 / 900 | from `lightDimmed.code` | from `darkDimmed.code` |
@@ -166,7 +168,10 @@
   | `--label-bg-<c>` / `--label-text-<c>` / `--label-border-<c>` / `--line-<c>` | `blockBg` / `tokenText` / `typeLabelBorder` / `bulletColor` | 50 / 500 (gray 600) / 300 / 500 | from mappings | from mappings |
 
   Block colours in the editor use the label tokens: `text-<c>` is `color: var(--label-text-<c>)`, `bg-<c>` is `background: var(--label-bg-<c>)` (Capacities' `blockText`/`blockBg`, which our dark `--label-*` values already are). `--accent-today` and `--danger` are the same in every theme. `color-scheme` is `light` for the light themes.
-- **No raw colour literals** (hex, `rgb()`, `oklch()`) in `frontend/src/**/*.{ts,tsx,css}` outside `theme/`; every component uses tokens. Task 16 adds the test; a file with a content palette (for example M6's whiteboard shape colours) opts out with a first-line comment `/* colour-literals: content palette */` (or `//` in TS), listed in the test's allowlist at the reconcile pass.
+- **No raw colour literals** (hex, `rgb()`, `oklch()`) in `frontend/src/**/*.{ts,tsx,css}` outside `theme/`; every component uses tokens. Task 16 adds the test; a file with a content palette opts out with a first-line comment `/* colour-literals: content palette */` (or `//` in TS). **Found at the reconcile pass** (`88865a3`):
+  - *Content palettes, marked by Task 16:* `whiteboard/colors.ts` (Capacities' `colorValues` light/dark shape colours), `whiteboard/ink/inkModel.ts` (ink colours, written into the `.ink.svg`), `whiteboard/WhiteboardCanvas.tsx` (`INK_DEFAULT_COLOR`), `graph/graphStyle.ts` (sigma draws on WebGL and cannot read `var(--…)`; it reads tokens through `getComputedStyle` with literal fallbacks), `graph/GraphCanvas.tsx` (`rgba(0,0,0,0)` for hidden nodes).
+  - *Converted to tokens by Task 16:* `index.css` (shadcn's `:root` block, `--ring`, `--primary-foreground`, `--sidebar-primary-foreground`, `--chart-*`), `shell/Sidebar.tsx`, `shell/PinnedSection.tsx`, `shell/SidebarSections.tsx` (`#a7a2a1` → `--text-section`, `#2a292d` → `--chrome-btn-border`), `components/ui/dropdown-menu.tsx` (`#a7a2a1`), `components/ImagePicker.tsx` (the `#f05d5d` fallback), `find/FindBar.tsx` (`--float-*`), `views/cards/SmallCard.tsx` (`--card-shadow`).
+  - *Converted by other lanes, in Task 16's `PENDING` list until Task 19 empties it:* `editor/editor.css` (Task 7), `object/ObjectView.tsx` (Task 15).
 - **Shortcut keys.** One registry, `lib/shortcuts.ts` (Task 5), holds every shortcut by its Capacities id (`heading1`, `toggleDarkMode`, …), its category (`shortcuts.categories.*`), its name (`shortcuts.<id>.name`) and its keys. **The keys are not in the trimmed reference.** The keys in this plan are **provisional** (marked so in the registry); before the build, whoever has `.reference/` (Gene's machine, or the reconcile pass there) greps the renderer bundle for the ids, adds that single bundle file under `reference/` at the same relative path (as `CONTINUE.md` allows), and corrects the table in `lib/shortcuts.ts` and below. Gene confirms them in the hand-check.
 
   | Id (category) | Provisional keys |
@@ -182,9 +187,13 @@
   | `closeTab`, `openNewTab`, `navigateTabs`, `openTabList` (navigation) | Mod-w, Mod-t, Ctrl-Tab, Mod-Shift-a |
   | `navigateBack`, `navigateForward` (navigation) | Alt-ArrowLeft, Alt-ArrowRight |
   | `toggleSidepanel`, `toggleLeftSidebar`, `toggleCalendarSidebar` (global) | Mod-Shift-\\, Mod-\\, Mod-Shift-y |
-  | `toggleDarkMode`, `openSettings`, `toggleShortcutsMenu` (global) | Mod-Shift-d, Mod-, (comma), Mod-/ |
+  | `toggleDarkMode`, `openSettings`, `toggleShortcutsMenu` (global) | Mod-Shift-d, Mod-, (comma; verified, see below), Mod-/ |
 
-  These avoid M1–M4's bindings (Ctrl+U, Ctrl+N, Ctrl+Backspace outside the editor; Tiptap's defaults inside it). A key that collides with an M5/M6 binding found at the reconcile pass is changed here first.
+  `openSettings` is **not provisional**: `reference/recovered-ts/src/electron/electron-menu.ts:87,124` binds the Settings menu item to `CmdOrCtrl+,`. Every id above exists verbatim under `shortcuts.*` in the strings file (checked at the reconcile pass; `textAlign*` have a `name` and no `description`).
+
+  **Existing bindings** (M1–M6 keep their handlers where they are; Task 5 registers them in `lib/shortcuts.ts` as display-only entries, `bound: false`, so the Shortcuts sheet lists them and the collision test sees them): `openSearchPalette` Mod-k and `openCommandPalette` Mod-p (M5, `palette/CommandPalette.tsx`); find in page Mod-f (M5, `object/ObjectView.tsx`; no Capacities id, our id `findInPage`, name "Find in page" our string); `openAddEntityMenu` Mod-u, `createNewEntityOfType` Mod-n, `deleteCurrentPage` Mod-Backspace (M1–M3, `App.tsx`, outside editable targets); `goToToday` t, `setViewToMonth`/`Week`/`Rolling`/`Day` m/w/r/d, `goToPrevious`/`goToNext` arrows (M4, `calendar/CalendarChrome.tsx`); the `whiteboard*` ids (M6, `whiteboard/shortcuts.ts` `keyToCommand`: tools, zoom Mod-=/Mod--/Mod-0/Shift-1/Shift-2, order Mod-]/Mod-[, wrap in frame Mod-Alt-g, duplicate Mod-d, nudge arrows, flip Shift-h/Shift-v, cycle Tab, pan Space, undo/redo).
+
+  **Collisions checked at the reconcile pass:** none in the same scope. `toggle` (Mod-Alt-g, editor scope) equals M6's wrap in frame, and `duplicateBlocks` (Mod-d, only while blocks are selected) equals M6's duplicate, but `whiteboard/shortcuts.ts` ignores every key typed in a `.ProseMirror` or input, and the editor never sees canvas keys. Mod-p, Mod-k and Mod-f are not used by any provisional key. Task 5's `test provisional keys do not collide with existing bindings in the same scope` keeps it so.
 - **Not in M7** (recorded so they are not built by accident): block references and "Copy block reference" (`BlockMenu.copyBlockReference.*`); inline text colour and highlight marks (`tokensMenu.color.*`: M7 colours whole blocks, `ControlDropdown.custom.block_color_*`); indenting non-list blocks (`tokensMenu.indent.*` applies to list items only); a list item's own annotation (options apply to the whole list block); table formulas, sorting and CSV export (`blocks.simpleTable.formulas.*`, `sortColumn*`, `export`); "Turn into object/task" (`shortcuts.turnIntoObject`, `turnBlockIntoTaskObject`); web embeds, iframes and bookmark metadata fetching (`blocks.BookmarkBlock.dataProtection.*`, `pasteInput.embed`; no network); audio recording and transcription; Mermaid AI and PNG/SVG export; embedding collections or queries as data views (they are not Markdown objects in our model); code syntax highlighting; "Start with basic setup" and onboarding (`OnboardingSpace.howToStart.basicSetup.*`); deleting a space folder (`DeleteHandler.space.*`: Object only removes a space from its list); language, decimal separator and time-zone settings (English only; the system zone, as M4); presentation and focus modes; version history; anything AI.
 
 ## API contract (M7): shared by all lanes
@@ -192,7 +201,7 @@
 ```
 AttachmentKind = 'image'|'pdf'|'audio'|'video'|'file'
 Attachment     { path: string, kind: AttachmentKind, size: number }
-SpaceInfo     += { icon: string|null, description: string|null, hideTaskManagement: boolean, revision: string }   /* name: space.json name, else the folder name */
+SpaceInfo     += { icon: string|null, description: string|null, hideTaskManagement: boolean, revision: string }   /* today {name, root, types}; name: space.json name, else the folder name */
 DeviceSettings {
   themeMode: 'light'|'dark'                          /* default 'dark' (ThemeMenu.options.*) */
   lightTheme: 'light'|'lightDimmed'                  /* default 'light' */
@@ -213,9 +222,9 @@ UiState.calendar += { hideCalendarSidebar?: boolean }
 
 | Route | Request | Success | Errors |
 |---|---|---|---|
-| `GET /api/attachments` | | `Attachment[]` (every file under the space outside dot-folders whose kind is not `file`, plus everything under `Attachments/`), sorted by path | |
+| `GET /api/attachments` | | `Attachment[]` (every file under the space outside dot-folders whose kind is not `file`, plus everything under `Attachments/`; never M6's whiteboard sidecars), sorted by path | |
 | `POST /api/attachments?name=` | raw bytes | 201 `{path, kind}` (`Attachments/<safe name>.<ext>`, ` (2)` when taken) | 413 over 100 MiB (detail: `EntityPicker.uploadLimitSize`), 422 empty or unusable name |
-| `GET /api/file?path=` (extended from M2's images) | | images as M2 (CSP `sandbox`); `pdf` `application/pdf` inline; `audio`/`video` their type, inline, with `Accept-Ranges` and 206 for a `Range`; every other file `application/octet-stream` with `Content-Disposition: attachment`; all with `X-Content-Type-Options: nosniff` | 404 (missing, outside the space, in a dot-folder) |
+| `GET /api/file?path=` (extended from M2's images) | | images as M2 (CSP `sandbox`); `pdf` `application/pdf` inline; `audio`/`video` their type, inline, with `Accept-Ranges` and 206 for a `Range`; every other file `application/octet-stream` with `Content-Disposition: attachment`; all with `X-Content-Type-Options: nosniff` | 404 (missing, outside the space, in a dot-folder, or an M6 whiteboard sidecar: `<stem>.ink.svg` / `<stem>.whiteboard.json` beside its `.md`, which `GET`/`PUT /api/whiteboard/ink` and `/api/whiteboard` serve); 415 for a `.md` file (objects are opened, not served; M2's `test_file_route_refuses_non_image_415` stays green) |
 | `POST /api/attachments/open` | `{path}` | `{ok: true}` (opened with the OS default app) | 404 as above; 415 for executable or script extensions, detail "Open it from the file manager instead." (our string) |
 | `GET /api/space` (extended) | | `SpaceInfo` with the new fields | |
 | `PUT /api/space` | `{patch: {name?, icon?, description?, hideTaskManagement?}, baseRevision, clientId?}` | `SpaceInfo` | 409 stale, 422 empty/over-long name or wrong type, 423 unreadable `space.json` |
@@ -226,10 +235,10 @@ UiState.calendar += { hideCalendarSidebar?: boolean }
 | `POST /api/spaces/open` | `{path}` | `{path}` (registers an existing folder) | 404 not a folder |
 | `DELETE /api/spaces?path=` | | `{ok: true}` (removes from the registry only) | 409 it is the current space |
 | `POST /api/spaces/switch` | `{path}` | 202 `{path}`; the launcher then restarts the server on that space on the same port | 404 not a folder; 503 "Switching spaces needs the Object launcher." (our string) when the app runs without the launcher |
-| `PUT /api/ui` (extended) | `calendar.hideCalendarSidebar: boolean` accepted | as M4 | as M4 |
+| `PUT /api/ui` (extended) | `calendar.hideCalendarSidebar: boolean` accepted (`_calendar_ui_problem`). `uistate.write_ui_patch` replaces **top-level** keys, so a client always sends the whole `calendar` object (as `calendar/calendarUi.ts` does today) | as M4 | as M4 |
 
 - **Test hooks (server).** Ignored unless set: `OBJECT_FAKE_OPEN_FILE` (Task 2: the "open with the OS" call appends the absolute path to this file instead of launching anything), plus M4's `OBJECT_STATE_DIR`.
-- **Client:** `api.attachments()`, `api.uploadAttachment(blob, name)`, `api.openAttachment(path)`, `api.fileUrl(path)` (M2's, now for every kind), `api.patchSpace(patch, {baseRevision})`, `api.settings()`, `api.patchSettings(patch, {baseRevision})`, `api.spaces()`, `api.createSpace(name, location)`, `api.openSpace(path)`, `api.removeSpace(path)`, `api.switchSpace(path)`.
+- **Client:** `api.attachments()`, `api.uploadAttachment(blob, name)`, `api.openAttachment(path)`, `api.fileUrl(path)` (M2's, now for every kind; M2's `api.images()` and `api.importImage(name, data)` stay for the cover-image picker), `api.patchSpace(patch, {baseRevision})`, `api.settings()`, `api.patchSettings(patch, {baseRevision})`, `api.spaces()`, `api.createSpace(name, location)`, `api.openSpace(path)`, `api.removeSpace(path)`, `api.switchSpace(path)`.
 
 ## Review Focus
 
@@ -237,7 +246,7 @@ UiState.calendar += { hideCalendarSidebar?: boolean }
    - *(Task 6: `test every fixture body groups and joins back byte for byte`, `test lenient spellings parse and keep their text`, `test malformed containers fall back to plain blocks`, `test detached annotation stays a comment`, `test math block spans blank lines`; Task 7: `test no-edit save is byte identical for every fixture`, `test option change rewrites only the annotation line`, `test removing the last option removes only its line`, `test edit inside a toggle rewrites only that child`, `test undo restores original bytes`, `test moving a block keeps its bytes`, `test unknown options survive an edit`, `test CRLF document inserts CRLF annotation lines`; Task 19: the round-trip harness over every acceptance space)*
 2. **The annotation syntax is the one in Global Constraints, and it reads cleanly.** Canonical writing order, quoting and escaping, case rules, the option table per block kind, the container shapes, the embed and inline-math rules.
    - *(Task 6: `test canonical format orders options and quotes values`, `test caption with quotes and backslashes round trips`, `test inline math follows Pandoc dollar rules`, `test embed line rules pick image, media or object embed`)*
-3. **Opening writes nothing, inside the space or out.** `GET /api/space`, `/api/settings`, `/api/spaces`, `/api/attachments` and `/api/file` change no file; a missing `space.json` or `settings.json` is not created by a read; start-up writes only the registry in the state dir.
+3. **Opening writes nothing, inside the space or out.** `GET /api/space`, `/api/settings`, `/api/spaces`, `/api/attachments` and `/api/file` change no file; a missing `space.json` or `settings.json` is not created by a read; start-up writes only the registry in the state dir (and M5's search cache, which the checks point at `OBJECT_CACHE_DIR`).
    - *(Task 2: `test_listing_and_serving_write_nothing`; Task 3: `test_get_space_and_settings_write_nothing`, `test_space_json_absent_reads_folder_name`; Task 4: `test_startup_writes_only_registry_outside_space`)*
 4. **File safety for attachments and spaces.** Paths stay inside the space (no `..`, absolute, drive-letter or dot-folder paths); an HTML or SVG attachment can never run in the app's origin; uploads never overwrite; opening refuses executables; creating a space never touches an existing folder; removing a space never deletes a folder; a switch is refused for a non-folder.
    - *(Task 2: `test_file_route_rejects_traversal_and_dot_folders`, `test_html_attachment_served_as_download`, `test_svg_keeps_sandbox_csp`, `test_upload_never_overwrites`, `test_open_refuses_executables`, `test_range_request_206`; Task 4: `test_create_space_refuses_existing_folder`, `test_remove_space_keeps_folder`, `test_switch_rejects_non_folder`)*
@@ -256,12 +265,14 @@ UiState.calendar += { hideCalendarSidebar?: boolean }
 
 ```
 backend/objectapp/  appstate.py spaceconfig.py settings.py spaces.py                                   NEW
-                    media.py rows.py server.py space.py reminders.py __main__.py                       MOD
-backend/tests/      fixtures/space-blocks/   conftest.py (MOD: `blocks_space_dir`)
+                    media.py rows.py searchtext.py server.py space.py reminders.py __main__.py         MOD
+backend/tests/      fixtures/space-blocks/   fixtures/.gitattributes (MOD: binary attachments)   conftest.py (MOD: `blocks_space_dir`)
                     test_{fixtures_m7,attachments,spaceconfig,settings,appstate,spaces,spacehost}.py
+                    test_rows.py test_searchtext.py test_calendarquery.py                              MOD (new cases)
 scripts/m7_acceptance.py
 frontend/index.html                                                                                    MOD (Task 16)
-frontend/src/main.tsx  api/{types,client}.ts  test/mockApi.ts                                           MOD (Task 5 only)
+frontend/src/main.tsx  api/{types,client}.ts  test/mockApi.ts  calendar/calendarUi.ts                    MOD (Task 5 only)
+frontend/src/theme/tokens.css                                                                          MOD (Task 5: new tokens' dark values; then Task 16)
 frontend/src/lib/{shortcuts,flush}.ts  settings/useSettings.ts  shell/GlobalOverlays.tsx               NEW (Task 5)
 frontend/src/editor/  annotations.ts blockTree.ts                                                      NEW (Task 6)
                       blocks.ts                                                                         MOD (Task 6)
@@ -278,12 +289,14 @@ frontend/src/editor/  annotations.ts blockTree.ts                               
 frontend/src/links/LinkPicker.tsx                                                                      MOD (Task 11)
 frontend/src/nav/{tabs,recent}.ts  App.tsx                                                              MOD (Tasks 13, 14, 15 in order; recent.ts Task 13)
 frontend/src/shell/{TabStrip,TabMenu}.tsx shell/shortcuts.ts                                           NEW (Task 13)
-frontend/src/shell/Breadcrumbs.tsx  create/createAndOpen.ts links/wikilinkPresenter.ts                  NEW/MOD (Task 14; createAndOpen also Task 15)
+frontend/src/shell/Breadcrumbs.tsx  create/createAndOpen.ts links/wikilinkPresenter.ts object/ObjectPeek.tsx   NEW/MOD (Task 14; createAndOpen also Task 15)
 frontend/src/shell/{SidePanel,SidePanelArea,Resizer}.tsx nav/sidepanel.ts                              NEW (Task 15)
 frontend/src/shell/{RightPanel,MainPanel}.tsx object/ObjectView.tsx calendar/{CalendarPage,CalendarSidePanel}.tsx   MOD (Task 15)
+frontend/src/App.m4.test.tsx App.m5.test.tsx                                                           MOD (Task 15: their right-panel tests follow the side panel)
 frontend/src/theme/{themes.css,applyTheme.ts,shortcuts.ts,noRawColours.test.ts}                         NEW (Task 16)
 frontend/src/theme/{tokens.css,palette.ts} index.css shell/{Sidebar,PinnedSection,SidebarSections}.tsx
-             components/ui/dropdown-menu.tsx components/ImagePicker.tsx                                 MOD (Task 16; Sidebar also Task 17)
+             components/ui/dropdown-menu.tsx components/ImagePicker.tsx find/FindBar.tsx views/cards/SmallCard.tsx
+             graph/{GraphCanvas.tsx,graphStyle.ts} whiteboard/{WhiteboardCanvas.tsx,colors.ts,ink/inkModel.ts}   MOD (Task 16; Sidebar also Task 17)
 frontend/src/settings/{SettingsModal.tsx,sections/*.tsx,ShortcutsSheet.tsx} properties/format.ts       NEW/MOD (Task 17)
 frontend/src/spaces/{SpacesMenu.tsx,CreateSpaceDialog.tsx,switchSpace.ts} shell/TopBar.tsx             NEW/MOD (Task 18)
 docs/superpowers/plans/m7-acceptance.md  docs/superpowers/plans/remaining-work.md                      Task 19
@@ -293,8 +306,9 @@ docs/superpowers/plans/m7-acceptance.md  docs/superpowers/plans/remaining-work.m
 
 | File | Edited by | Why it forces order |
 |---|---|---|
-| `backend/objectapp/server.py` | Tasks 2, 3, 4 | one backend lane, strictly in order; `media.py`, `rows.py`: Task 2; `space.py`, `reminders.py`, `appstate.py`, `spaceconfig.py`, `settings.py`: Task 3; `spaces.py`, `__main__.py`: Task 4; `backend/tests/conftest.py`: Task 1 |
-| `frontend/src/api/{types,client}.ts`, `test/mockApi.ts`, `main.tsx`, `lib/shortcuts.ts`, `lib/flush.ts`, `settings/useSettings.ts` | **Task 5 only** | Tasks 8, 11, 12, 13 and 16–18 start only once Task 5's commit (`feat(app): M7 client contract, settings store, shortcut registry`) is on the branch (check `git log`; wait and re-check). After it no task touches these files. |
+| `backend/objectapp/server.py` | Tasks 2, 3, 4 | one backend lane, strictly in order; `media.py`, `rows.py`, `searchtext.py`, `tests/test_tags.py` (only if a case must change; none should): Task 2; `space.py`, `reminders.py`, `appstate.py`, `spaceconfig.py`, `settings.py`: Task 3; `spaces.py`, `__main__.py`: Task 4; `backend/tests/conftest.py`, `backend/tests/fixtures/.gitattributes`: Task 1 |
+| `frontend/src/api/{types,client}.ts`, `test/mockApi.ts`, `main.tsx`, `lib/shortcuts.ts`, `lib/flush.ts`, `settings/useSettings.ts`, `calendar/calendarUi.ts` | **Task 5 only** | Tasks 7, 8, 11, 12, 13 and 16–18 start only once Task 5's commit (`feat(app): M7 client contract, settings store, shortcut registry`) is on the branch (check `git log`; wait and re-check). After it no task touches these files. |
+| `theme/tokens.css` | Task 5 (new tokens' dark values), then Task 16 | one lane, in order |
 | `shell/GlobalOverlays.tsx` | Task 5 (stub mounted in `main.tsx`), then 16, 17, 18 | one lane, in order |
 | `editor/blocks.ts`, `editor/annotations.ts`, `editor/blockTree.ts` | Task 6 only | |
 | `editor/document.ts`, `editor/extensions/blockSource.ts`, `editor/preserve.ts` | **Task 7 only** | the round-trip owner; every sub-lane task consumes them unchanged |
@@ -305,15 +319,15 @@ docs/superpowers/plans/m7-acceptance.md  docs/superpowers/plans/remaining-work.m
 | `editor/extensions/{slashMenu,blockSelection}.ts`, `editor/Editor.tsx` | Task 7 (stubs, not Editor.tsx), then Task 12 | Task 12 runs after Task 8 in sub-lane B1 (it uses `menus/BlockStyleMenu.tsx`) |
 | `nav/tabs.ts`, `App.tsx` | Tasks 13, 14, 15 | one lane, in order; `nav/recent.ts`: Task 13 |
 | `create/createAndOpen.ts` | Task 5 (the `OpenMods.via` type only), then Tasks 14, 15 | in order (lane C waits for Task 5) |
-| `links/wikilinkPresenter.ts` | Task 14 only (in-page `via: 'link'` and the inline-link icon setting) | |
-| `object/ObjectView.tsx`, `calendar/CalendarPage.tsx`, `calendar/CalendarSidePanel.tsx`, `shell/RightPanel.tsx`, `shell/MainPanel.tsx` | Task 15 only | |
-| `theme/*`, `index.css`, `frontend/index.html`, `shell/PinnedSection.tsx`, `shell/SidebarSections.tsx`, `components/ui/dropdown-menu.tsx`, `components/ImagePicker.tsx` | Task 16 only (`theme/noRawColours.test.ts`: Task 16, then Task 19 empties its pending list) | |
+| `links/wikilinkPresenter.ts`, `object/ObjectPeek.tsx` | Task 14 only (`via: 'link'` and the inline-link icon setting) | |
+| `object/ObjectView.tsx`, `calendar/CalendarPage.tsx`, `calendar/CalendarSidePanel.tsx`, `shell/RightPanel.tsx`, `shell/MainPanel.tsx`, `App.m4.test.tsx`, `App.m5.test.tsx` | Task 15 only | |
+| `theme/*` (except `tokens.css`, above), `index.css`, `frontend/index.html`, `shell/PinnedSection.tsx`, `shell/SidebarSections.tsx`, `components/ui/dropdown-menu.tsx`, `components/ImagePicker.tsx`, `find/FindBar.tsx`, `views/cards/SmallCard.tsx`, `graph/GraphCanvas.tsx`, `graph/graphStyle.ts`, `whiteboard/WhiteboardCanvas.tsx`, `whiteboard/colors.ts`, `whiteboard/ink/inkModel.ts` | Task 16 only (`theme/noRawColours.test.ts`: Task 16, then Task 19 empties its pending list) | |
 | `shell/Sidebar.tsx` | Tasks 16, 17 | one lane, in order |
 | `properties/format.ts` | Task 17 only | |
 | `shell/TopBar.tsx` | Task 18 only (space switcher; the `+` label "Create new tab", `SpaceHeader.createNewTab`; the side-panel button's tooltips) | |
 | `docs/superpowers/plans/remaining-work.md` | Task 19 only | |
 
-Dependency edges: Task 5 → Tasks 8, 11, 12, 13, 16; Task 6 → 7 → 8, 9, 10, 11; Task 8 → 12; 13 → 14 → 15; 16 → 17 → 18; the backend lane is independent of the frontend lanes (the frontend mocks the contract). Task 18's flush of open editors uses `lib/flush.ts` (Task 5); editors register with it in Task 12, so before Task 12 lands the flush is a no-op and nothing waits on it.
+Dependency edges: Task 5 → Tasks 7, 8, 11, 12, 13, 16; Task 6 → 7 → 8, 9, 10, 11; Task 8 → 12; 13 → 14 → 15; 16 → 17 → 18; the backend lane is independent of the frontend lanes (the frontend mocks the contract). Task 18's flush of open editors uses `lib/flush.ts` (Task 5); editors register with it in Task 12, so before Task 12 lands the flush is a no-op and nothing waits on it.
 
 ---
 
@@ -323,10 +337,10 @@ Every commit message named in a task's last step is the subject line; the full m
 
 **Files:**
 - Create: `backend/tests/fixtures/space-blocks/**`, `backend/tests/test_fixtures_m7.py`
-- Modify: `backend/tests/conftest.py` (adds `blocks_space_dir`, a `shutil.copytree` into `tmp_path`; existing fixtures untouched)
+- Modify: `backend/tests/conftest.py` (adds `blocks_space_dir`, a `shutil.copytree` into `tmp_path` like the existing `links_space_dir`/`calendar_space_dir`; existing fixtures untouched), `backend/tests/fixtures/.gitattributes` (adds `space-blocks/Attachments/* binary`; its `* -text` already keeps every fixture byte-exact)
 
 **Interfaces:**
-- Produces: a synthetic, self-contained space for every M7 backend test and for Task 19's acceptance run. Nothing here touches `space-sample`, `space-v1` or `space-calendar`.
+- Produces: a synthetic, self-contained space for every M7 backend test and for Task 19's acceptance run. Nothing here touches `space-sample`, `space-v1`, `space-calendar`, `space-links` (M5) or `space-whiteboard` (M6).
 
 The space (all content invented):
 - `.capacities/types/page.json`, `person.json`; **no** `space.json`, **no** `ui.json`.
@@ -335,7 +349,7 @@ The space (all content invented):
 - `Pages/CRLF BOM blocks.md` (CRLF line endings, UTF-8 BOM, a toggle, a columns block, a math block), `Pages/No trailing newline blocks.md` (LF, ends without a newline right after `<!-- /toggle -->`).
 - `Pages/Embedded target.md`, `People/Ada Lovelace.md` (embed targets).
 - `Attachments/`: `pixel.png` (a valid 1×1 PNG), `report.pdf` (a minimal valid PDF), `clip.wav` (a valid 0.1 s silent WAV), `clip.mp4` (placeholder bytes), `data.xlsx` (placeholder bytes), `page.html` (`<script>alert(1)</script>`, to prove it is served as a download), `tool.exe` (placeholder bytes, to prove opening is refused), `notes.svg` (an SVG with a `<script>`, to prove the sandbox CSP stays).
-- `.gitattributes`: like the other fixture spaces, plus `-text` on the CRLF/BOM and no-trailing-newline files and `binary` on the attachments.
+- No `.gitattributes` inside the space (no other fixture space has one): `backend/tests/fixtures/.gitattributes` (`* -text`) already covers the CRLF/BOM and no-trailing-newline files; Task 1 adds the `binary` line for the attachments there.
 
 - [ ] **Step 1: Write failing tests** (`test_fixtures_m7.py`)
   - `test_every_md_has_frontmatter_and_unique_paths`
@@ -349,19 +363,19 @@ The space (all content invented):
 ### Task 2: Attachments of every kind (lane: backend)
 
 **Files:**
-- Modify: `media.py` (kinds, serving rules, import of any file, listing, open with the OS), `rows.py` (`body_preview` drops `$$` fence lines and annotation lines), `server.py` (the routes in the contract; `GET /api/file` extended; `GET /api/images` and `POST /api/images` kept unchanged for M2's image picker)
-- Test: `test_attachments.py`, new cases in the existing rows/preview tests (`test_rows.py` or wherever `body_preview` is tested today)
+- Modify: `media.py` (kinds, serving rules, import of any file, listing, open with the OS), `rows.py` (`body_preview` drops `$$` fence lines and annotation lines), `searchtext.py` (M5's `plain_body`, which the FTS index stores, drops the same lines), `server.py` (the routes in the contract; `GET /api/file` extended (today it calls `image_path` and answers 415 "Only image files can be served" for anything else); `GET /api/images` and `POST /api/images` kept unchanged for M2's image picker)
+- Test: `test_attachments.py`, new cases in `test_rows.py` (`body_preview`) and `test_searchtext.py` (`plain_body`); `test_tags.py`'s M2 file-route cases and `test_whiteboard_integration.py::test_ink_svg_not_listed_as_image` stay green unchanged
 
 **Interfaces:**
-- Consumes: M2's `media.py` (`image_path` checks, `import_image` naming, `safe_filename`, `create_new`), Starlette `FileResponse` (ranges), Task 1.
+- Consumes: M2's `media.py` as built (`ATTACHMENTS`, `IMAGE_EXTENSIONS`, `NotAnImage`, `is_image_name`, `image_media_type`, `list_images`, `image_path`, `_safe_image_name`, `import_image`, `_hidden`, and M6's `_is_ink_sidecar`), `space.safe_filename`, `textfile.create_new`, M6's `whiteboardfile.sidecar_owner(rel)` (`BOARD_SUFFIX` `.whiteboard.json`, `INK_SUFFIX` `.ink.svg`), Starlette `FileResponse` (ranges), Task 1.
 - Produces:
   - `media.kind_of(name) -> AttachmentKind`: image `png jpg jpeg gif webp svg` (M2's set); pdf `pdf`; audio `mp3 wav m4a ogg oga flac aac opus`; video `mp4 webm mov m4v ogv`; everything else `file`.
-  - `media.attachment_path(root, path) -> Path`: M2's `image_path` checks for any kind (raises `FileNotFoundError` for traversal, absolute, drive-letter, dot-folder or missing paths).
-  - `media.list_attachments(root) -> list[Attachment]` per the contract (stat errors skipped, never raised).
+  - `media.attachment_path(root, path) -> Path`: M2's `image_path` checks for any kind (raises `FileNotFoundError` for traversal, absolute, drive-letter, dot-folder, missing paths and M6 sidecars (`sidecar_owner(rel)` set and its `.md` present, as `_is_ink_sidecar` does for ink today); raises `NotServed` (415) for `.md`). `image_path`, `list_images` and `import_image` stay as they are for `/api/images`.
+  - `media.list_attachments(root) -> list[Attachment]` per the contract (stat errors skipped, never raised; sidecars skipped).
   - `media.import_attachment(root, name, data) -> (path, kind)`: `Attachments/<safe_filename(stem)>.<ext>` where `ext` is the lower-cased extension reduced to `[a-z0-9]{1,10}` (none when it doesn't fit), ` (2)`… when taken (case-insensitive, `create_new`, never overwrites); 100 MiB limit (`TooLarge` → 413).
   - `media.serve_headers(kind) -> dict`: the per-kind headers of the contract (image: M2's CSP sandbox; pdf: inline, no sandbox, `nosniff`; audio/video: inline, `nosniff`; file: `application/octet-stream`, `Content-Disposition: attachment; filename*=UTF-8''…`, `nosniff`).
   - `media.open_with_system(full)`: `os.startfile` on Windows, `open` on macOS, `xdg-open` elsewhere, arguments as a list, never a shell; refuses `exe bat cmd com ps1 psm1 vbs vbe js jse wsf wsh msi msp scr lnk url hta cpl reg jar sh bash zsh app command` with `RefusedToOpen` (415). With `OBJECT_FAKE_OPEN_FILE` set it appends the absolute path to that file instead.
-  - `body_preview`: lines that are only an annotation comment and `$$` fence lines contribute nothing (the comment lines already vanish through `_TAG_RE`; this pins it with a test).
+  - `rows.body_preview` and `searchtext.plain_body`: lines that are only an annotation comment and `$$` fence lines contribute nothing (the comment lines already vanish through `rows._TAG_RE`, which `searchtext` imports; the `$$` lines are new; tests pin both).
 
 - [ ] **Step 1: Write failing tests** (`blocks_space_dir`, `OBJECT_STATE_DIR` and `OBJECT_FAKE_OPEN_FILE` in `tmp_path`)
   - `test_kind_of_table` (one case per extension group, upper-case extensions, no extension → `file`)
@@ -375,7 +389,8 @@ The space (all content invented):
   - `test_upload_name_sanitised` (`../../evil.sh` → `Attachments/evil.sh`; `con.txt` and illegal characters follow M2's `safe_filename`; empty name 422) and `test_upload_over_limit_413` (monkeypatched limit).
   - `test_open_uses_os_and_refuses_executables`: the fake opener records `report.pdf`; `tool.exe` → 415 with the detail, nothing recorded; a path outside the space → 404.
   - `test_listing_and_serving_write_nothing`: hashes of every file in the space are unchanged after the GET routes.
-  - `test_preview_skips_annotations_and_math_fences`
+  - `test_preview_skips_annotations_and_math_fences` (`test_rows.py`) and `test_search_text_skips_annotations_and_math_fences` (`test_searchtext.py`)
+  - `test_md_and_whiteboard_sidecars_not_served`: `Pages/Every block.md` → 415; a sidecar beside its board → 404 and not listed.
 - [ ] **Step 2:** Run `uv run pytest backend/tests/test_attachments.py -q`. Expected: FAIL (all but the regression guard).
 - [ ] **Step 3:** Implement as specified in Interfaces.
 - [ ] **Step 4:** Run `uv run pytest backend/tests -q`. Expected: PASS.
@@ -385,11 +400,11 @@ The space (all content invented):
 
 **Files:**
 - Create: `appstate.py`, `spaceconfig.py`, `settings.py`
-- Modify: `reminders.py` (`_state_dir()` delegates to `appstate.state_dir()`; nothing else), `space.py` (`Space.name` reads `space.json`'s `name`, else the folder name, re-read on access), `server.py` (`GET /api/space` adds the fields; `PUT /api/space`; `GET`/`PUT /api/settings`; `_ui_problem` accepts `calendar.hideCalendarSidebar` as a boolean)
-- Test: `test_appstate.py`, `test_spaceconfig.py`, `test_settings.py`, a new case in M4's ui test for `hideCalendarSidebar`
+- Modify: `reminders.py` (`_state_dir()` delegates to `appstate.state_dir()`; `ledger_path_for` and everything else unchanged), `space.py` (`Space.name` is today a plain attribute set in `__init__` (`self.name = self.root.name`); it becomes a property reading `space.json`'s `name`, else the folder name, re-read on access), `server.py` (`GET /api/space` (today `{name, root, types}`) adds the fields; `PUT /api/space`; `GET`/`PUT /api/settings`; `_calendar_ui_problem`, which `_ui_problem` calls for `calendar`, accepts `hideCalendarSidebar` as a boolean)
+- Test: `test_appstate.py`, `test_spaceconfig.py`, `test_settings.py`, a new case beside M4's calendar ui patch tests in `test_calendarquery.py` for `hideCalendarSidebar`
 
 **Interfaces:**
-- Consumes: `jsonstore.dump_json`/`parse_json_object`/`json_revision`, `textfile.atomic_write`, M4's `reminders._state_dir` (moved, same behaviour), M3's `_ui_problem`.
+- Consumes: `jsonstore.dump_json`/`parse_json_object`/`json_revision`, `textfile.atomic_write`, `space.ReadOnly` (423), `typemodel.RevisionConflict` (409; server.py already maps both), M4's `reminders._state_dir` (moved, same behaviour), M3/M4's `_ui_problem`/`_calendar_ui_problem`.
 - Produces:
   - `appstate.state_dir() -> Path` (the Storage rule; created lazily only by a writer, never by a reader).
   - `spaceconfig.read(root) -> (data, revision, error)`; `spaceconfig.patch(root, patch, base_revision) -> (data, revision)`: keys `name` (non-empty after trim, ≤ 120 characters), `icon` (string or null), `description` (string or null), `hideTaskManagement` (bool); other keys already in the file are kept; atomic; `RevisionConflict` (409) on a stale revision (the revision of a missing file is `''`); an unreadable file is `ReadOnly` (423) and never replaced.
@@ -411,15 +426,15 @@ The space (all content invented):
 
 **Files:**
 - Create: `spaces.py`
-- Modify: `server.py` (`create_app(space, static_dir=None, watch=True, on_switch=None)`; the `/api/spaces*` routes), `__main__.py` (`--space` becomes optional; the `SpaceHost` loop; the start-up choice)
+- Modify: `server.py` (`create_app(space, static_dir=None, watch=True)` today gains `on_switch=None`; the `/api/spaces*` routes), `__main__.py` (today: `--space` required, `--port` default 8790, `--browser`, `build_server_config(space, port, static_dir)`, one uvicorn thread, pywebview window; `--space` becomes optional; `build_server_config` gains `on_switch=None` and passes it through (the acceptance scripts keep calling it with three arguments); the `SpaceHost` loop; the start-up choice)
 - Test: `test_spaces.py`, `test_spacehost.py`
 
 **Interfaces:**
-- Consumes: Task 3 (`appstate`, `spaceconfig`, `settings.read()` for `startupSpace`), M2's `safe_filename`, M4's lifespan (watcher and reminder scheduler stop cleanly on server exit).
+- Consumes: Task 3 (`appstate`, `spaceconfig`, `settings.read()` for `startupSpace`), `space.safe_filename`, `create_app`'s lifespan as built (watcher, M4's reminder scheduler and M5's `SearchIndex` start and stop with each server), and `__main__`'s shutdown rule: close `server.config.app.state.hub` before setting `should_exit` (SSE streams on a worker thread never see signals).
 - Produces:
   - `spaces.Registry(state_dir)`: `list() -> list[SpaceEntry]` (name and icon from each folder's `space.json`, `missing` when the folder is gone; never writes), `register(path, now)` (adds or moves `lastOpened`; atomic write of `spaces.json`), `remove(path)`, `last_opened() -> Path | None`. An unreadable `spaces.json` reads as empty and is replaced on the next write (it holds no user content).
   - `spaces.create_space(name, location) -> Path`: `location` must be an existing folder; the target is `<location>/<safe_filename(name)>`; it must not exist (`FileExistsError` → 409); creates the folder, `.capacities/`, and `space.json` `{"name": name}` (the original name, not the safe one), nothing else.
-  - `__main__.SpaceHost(port, static_dir)`: `run(first_root)` loops: build `Space(root)`, `registry.register(root)`, serve `create_app(space, static_dir, on_switch=self.request_switch)` on `127.0.0.1:port` until it exits; when `request_switch(path)` was called, start again on that path (same port), otherwise stop. `request_switch` records the path and sets the uvicorn server's `should_exit`. The window (pywebview) or browser stays open throughout; the server thread is replaced.
+  - `__main__.SpaceHost(port, static_dir)`: `run(first_root)` loops: build `Space(root)`, `registry.register(root)`, serve `build_server_config(space, port, static_dir, on_switch=self.request_switch)` on `127.0.0.1:port` until it exits; when `request_switch(path)` was called, start again on that path (same port), otherwise stop. `request_switch` records the path, closes the current app's `state.hub` and sets the uvicorn server's `should_exit`. The window (pywebview) or browser stays open throughout; the server thread is replaced. `main()` uses it for both the window and `--browser` paths.
   - Start-up root: `--space PATH` if given; else `settings.startupSpace == 'specific'` and that folder exists; else the registry's `lastOpened` if it exists; else `parser.error("Pass --space PATH the first time.")` (our string).
   - `POST /api/spaces/switch` calls `on_switch(path)` after the response is sent (a background task), so the client gets its 202; without `on_switch` it is the 503 of the contract.
 
@@ -442,16 +457,16 @@ The space (all content invented):
 ### Task 5: Client contract, settings store, shortcut registry (lane: look; first)
 
 **Files:**
-- Modify: `api/types.ts`, `api/client.ts`, `test/mockApi.ts`, `main.tsx` (mounts `<GlobalOverlays />` beside `<App />`), `create/createAndOpen.ts` (type only: `OpenMods` gains `via?: 'link' | 'nav'`, ignored until Task 14)
+- Modify: `api/types.ts`, `api/client.ts`, `test/mockApi.ts`, `main.tsx` (today renders `<App />` alone inside `StrictMode`; mounts `<GlobalOverlays />` beside it), `create/createAndOpen.ts` (type only: `OpenMods` (`ctrlKey`, `metaKey`, `altKey`, `shiftKey` today) gains `via?: 'link' | 'nav'`, ignored until Task 14), `calendar/calendarUi.ts` (`calendarOf` keeps `hideCalendarSidebar`; new `saveCalendarUi(patch: Partial<Pick<CalendarUi, 'weekStart' | 'hideCalendarSidebar'>>)` beside `saveCalendarDaily`, same queue, optimistic `useUiStore` update and one 409 retry, always sending the whole `calendar` object), `theme/tokens.css` (the new tokens of the mapping table, dark values only)
 - Create: `lib/shortcuts.ts`, `lib/flush.ts`, `settings/useSettings.ts`, `shell/GlobalOverlays.tsx` (renders nothing yet; Tasks 16–18 fill it)
-- Test: `api/client.m7.test.ts`, `lib/shortcuts.test.ts`, `lib/flush.test.ts`, `settings/useSettings.test.ts`
+- Test: `api/client.m7.test.ts`, `lib/shortcuts.test.ts`, `lib/flush.test.ts`, `settings/useSettings.test.ts`, `calendar/calendarUi.test.ts`
 
 **Interfaces:**
 - Consumes: the API contract.
 - Produces:
-  - TS types for every contract shape; `SpaceInfo` gains its fields; `UiState['calendar']` gains `hideCalendarSidebar?`; `api.*` methods of the contract (a 409 throws M3's `ConflictError`; `uploadAttachment` sends the raw bytes with `?name=`; `api.fileUrl(path)` unchanged). `mockApi` defaults plus builders `deviceSettings(partial)`, `spaceEntry(partial)`, `attachment(partial)` next to M3's `row(partial)`.
+  - TS types for every contract shape; `SpaceInfo` (`name`, `root`, `types` today) gains its fields; `CalendarUi` (`weekStart`, `daily` today; `UiState.calendar?: CalendarUi`) gains `hideCalendarSidebar?`; `api.*` methods of the contract (a 409 throws M3's `ConflictError`; `uploadAttachment` sends the raw bytes with `?name=` and `Content-Type: application/octet-stream`, as `importImage` does, and emits a local `created` change; `api.fileUrl(path)` unchanged). `mockApi` defaults plus builders `deviceSettings(partial)`, `spaceEntry(partial)`, `attachment(partial)` next to the existing `row(partial)`, `typeDef`, `objectSummary`, `searchResult`, `graphData`, `calendarRange` and `taskEntry` builders.
   - `useSettings` (zustand): `{settings: DeviceSettings (the defaults until loaded), revision, loaded, load(), patch(partial): Promise<void>}`; `patch` applies optimistically, sends one `api.patchSettings`, and on `ConflictError` reloads and re-applies the patch once (M3's `useViewState` rule); `settingsDefaults` is exported for tests.
-  - `lib/shortcuts.ts`: `type ShortcutDef = {id, category, name, keys: string[], scope: 'global'|'editor'|'calendar'|'table', provisional: boolean}`; `registerShortcuts(defs)`, `allShortcuts()` (for the cheat sheet), `keysFor(id)`, `matches(e: KeyboardEvent, keys)` (`Mod` = Ctrl on Windows/Linux, Cmd on macOS), and `useGlobalShortcut(id, handler, {allowInEditable?})` (one window `keydown` listener; ignores events from editable targets unless allowed, with `App.tsx`'s `isEditableTarget` rule copied here; Task 13 makes `App.tsx` import it from here).
+  - `lib/shortcuts.ts`: `type ShortcutDef = {id, category, name, keys: string[], scope: 'global'|'editor'|'calendar'|'table'|'whiteboard', provisional: boolean, bound?: boolean /* false: display-only, handled elsewhere */}`; `registerShortcuts(defs)`, `allShortcuts()` (for the cheat sheet), `keysFor(id)`, `matches(e: KeyboardEvent, keys)` (`Mod` = Ctrl on Windows/Linux, Cmd on macOS), and `useGlobalShortcut(id, handler, {allowInEditable?})` (one window `keydown` listener; ignores events from editable targets unless allowed, with `App.tsx`'s exported `isEditableTarget` rule copied here; Task 13 makes `App.tsx` import it from here and re-export it, since `App.shortcuts.test.tsx` imports it from `App`). It also registers the **existing bindings** of Global Constraints ("Shortcut keys") as `bound: false` entries.
   - `create/createAndOpen.ts`: `OpenMods.via?: 'link' | 'nav'` (the type only; no behaviour).
   - `lib/flush.ts`: `registerFlusher(fn: () => Promise<void>) -> unregister`, `flushAll(): Promise<void>` (awaits every registered flusher; errors are collected and rethrown after all ran).
 
@@ -460,6 +475,8 @@ The space (all content invented):
   - `test settings store loads defaults, patches optimistically and reapplies once on 409`
   - `test shortcut matches Mod per platform and skips editable targets unless allowed`
   - `test registry lists registered shortcuts by category`
+  - `test provisional keys do not collide with existing bindings in the same scope`
+  - `test saveCalendarUi keeps weekStart, daily and hideCalendarSidebar together` (`calendar/calendarUi.test.ts`)
   - `test flushAll awaits every flusher and reports errors after all ran`
   - `test GlobalOverlays is mounted beside App` (renders without error)
 - [ ] **Step 2:** Run `cd frontend && npx vitest run src/api src/lib src/settings`. Expected: FAIL.
@@ -470,9 +487,9 @@ The space (all content invented):
 ### Task 6: Annotation codec and block tree (lane: editor; first)
 
 **Files:**
-- Create: `editor/annotations.ts`, `editor/blockTree.ts`, fixtures `editor/__fixtures__/blocks-every.md`, `blocks-handwritten.md`, `blocks-crlf.md` (CRLF + BOM; add `-text` to `editor/__fixtures__/.gitattributes`), `blocks-no-eol.md` (the same forms as Task 1's Pages, written from the Global Constraints table; this lane does not read the backend fixtures)
+- Create: `editor/annotations.ts`, `editor/blockTree.ts`, fixtures `editor/__fixtures__/blocks-every.md`, `blocks-handwritten.md`, `blocks-crlf.md` (CRLF + BOM; `editor/__fixtures__/.gitattributes` is already `* -text`), `blocks-no-eol.md` (the same forms as Task 1's Pages, written from the Global Constraints table; this lane does not read the backend fixtures)
 - Modify: `editor/blocks.ts` (a local `Marked` instance with a block-level `math` extension for rule 6; `splitBlocks` keeps its join invariant and its exported shape)
-- Test: `editor/annotations.test.ts`, `editor/blockTree.test.ts`, new cases in `editor/blocks.test.ts` (or wherever `splitBlocks` is tested today)
+- Test: `editor/annotations.test.ts`, `editor/blockTree.test.ts`, a new `editor/blocks.test.ts` (M1's `splitBlocks` cases live in `editor/preserve.test.ts` and `editor/Editor.test.tsx` and stay there, green)
 
 **Interfaces:**
 - Consumes: M1's `splitBlocks(body) -> SourceBlock[]` (`{kind, raw}`; `joinBlocks` invariant), `marked` (already a dependency).
@@ -496,7 +513,7 @@ The space (all content invented):
   - `test math block spans blank lines` and `test one-line math block`
   - `test inline math follows Pandoc dollar rules` (a helper `findInlineMath(text)` exported for Task 7: `$a$` yes; `$5 and $6` no; `\$` no; `$$` no; `$ a$` no; `$a $` no; `$a$5` no)
   - `test embed line rules pick image, media or object embed` (`classifyEmbedLine(raw)`, exported for Task 7)
-  - `test every fixture body groups and joins back byte for byte` (all four fixtures, plus every existing `editor/__fixtures__` file)
+  - `test every fixture body groups and joins back byte for byte` (all four fixtures, plus every existing `editor/__fixtures__` file: `DailyNotes-2026-10-23.md`, `Pages-*.md`, `People-Ada-Lovelace.md`, `Servers-Alpha.md`, `Tasks-*.md`, `mixed.md`, `mixed-crlf.md`, and `bigBody.ts`'s body)
 - [ ] **Step 2:** Run `npx vitest run src/editor/annotations.test.ts src/editor/blockTree.test.ts src/editor/blocks.test.ts`. Expected: FAIL (all but the regression guard).
 - [ ] **Step 3:** Implement as specified in Interfaces.
 - [ ] **Step 4:** Run `npx vitest run && npx tsc -b --noEmit`. Expected: PASS (the M2 timing nit in `preserve.test.ts` excepted when the machine is loaded, as recorded in `remaining-work.md`).
@@ -506,8 +523,9 @@ The space (all content invented):
 
 **Files:**
 - Create: `editor/nodes/{blockOptions,toggle,group,columns,mathBlock,inlineMath,codeBlock,media,objectEmbed,bookmark}.ts` and one `.css` file beside each (imported by its node module), `editor/extensions/{slashMenu,blockSelection,fileDrop}.ts` (empty `Extension.create` stubs, registered now so later tasks never touch `document.ts`)
-- Modify: `editor/document.ts` (`editorExtensions(opts?: {numberedListInputRule?: boolean})`, `loadBody` builds from `buildTree`, `serializeBody` recurses), `editor/extensions/blockSource.ts` (nested blocks, the keep rule), `editor/preserve.ts` (only if a helper must be exported; no behaviour change for existing kinds), `editor/editor.css` (the hard-coded `#4e4b4c`, `#e4e3e2`, `#7c7c7d` become `var(--editor-quote-line)`, `var(--editor-bullet)`, `var(--editor-bullet-nested)`; `hr` uses `var(--editor-hr)`)
-- Test: `editor/document.blocks.test.ts`, `editor/blockSource.nested.test.ts`, `editor/roundtrip.space.test.ts` (skipped unless `OBJECT_ROUNDTRIP_SPACE` is set; Task 19 runs it); all M1–M6 editor tests stay green
+- Modify: `editor/document.ts` (`editorExtensions()` takes no arguments today and is also called by M6's `whiteboard/nodes/TextBlockEditor.tsx` with `loadBody`/`serializeBody`; it becomes `editorExtensions(opts?: {numberedListInputRule?: boolean})` with the old behaviour as the default, so whiteboard text blocks keep working and gain the new nodes; M5's `FindInPage` stays added by `Editor.tsx`, not here; `loadBody` builds from `buildTree`, `serializeBody` recurses; `NODE_KIND` gains the new node types; the mermaid line in `sourceToNode` goes), `editor/extensions/blockSource.ts` (nested blocks, the keep rule), `editor/preserve.ts` (only if a helper must be exported; no behaviour change for existing kinds), `editor/editor.css` (the hard-coded `#4e4b4c`, `#e4e3e2`, `#7c7c7d` become `var(--editor-quote-line)`, `var(--editor-bullet)`, `var(--editor-bullet-nested)`; `hr` uses `var(--editor-hr)`)
+- Test: `editor/document.blocks.test.ts`, `editor/blockSource.nested.test.ts`, `editor/roundtrip.space.test.ts` (skipped unless `OBJECT_ROUNDTRIP_SPACE` is set; Task 19 runs it); all M1–M6 editor tests stay green, including `whiteboard/nodes/TextBlockEditor.test.tsx` and `whiteboard/nodes/BlockNode.test.tsx`
+- Starts once Task 5's commit is on the branch (its `editor.css` change uses the `--editor-*` tokens Task 5 adds to `tokens.css`).
 
 **Interfaces:**
 - Consumes: Task 6; M1's `loadBody`/`serializeBody`/`preserveBlock`/`serializeWithPreservation`, `BlockSource` (`blockSource`, `blockOrigin`, `blockTrailing`, `BLOCK_SOURCE_META`, `TOP_LEVEL_TYPES`), `RawBlock`, `Wikilink`, `@tiptap/markdown` (`markdownTokenizer`/`parseMarkdown`/`renderMarkdown`, the Wikilink pattern), `@tiptap/extension-code-block` (`CodeBlock.extend`).
@@ -517,7 +535,7 @@ The space (all content invented):
   - **Leaves:** `mathBlock` (attrs `text`; markdown: the `math` source block; edited form `$$⏎text⏎$$`), `inlineMath` (inline atom, attrs `text`; `markdownTokenizer` using `findInlineMath`; renders `$text$`), `codeBlock` (`CodeBlock.extend` with `language`; StarterKit's own `codeBlock: false`; the M1 "mermaid fence → raw block" rule is removed, so a Mermaid fence becomes a code block whose language is `mermaid`; the content-key fallback to a raw block still applies to anything that doesn't round-trip), `media` (atom; attrs `form: 'md'|'wiki'`, `src`/`alt` or `target`/`label`, `kind` from the extension), `objectEmbed` (atom; attrs `target`, `label`), `bookmark` (atom; attrs `href`, `title`; only with the `bookmark` option and a one-link paragraph).
   - **Loading:** `loadBody` walks `buildTree`: a leaf becomes the node `sourceToNode` gives (now also `math`, image/media/object-embed lines and bookmarks) with `blockAnnotation` and `blockOptions` when annotated; a container becomes its node with its children loaded the same way (recursively), each child stamped with its own `blockSource`/`blockOrigin`/`blockTrailing`.
   - **Serializing:** a node whose `blockSource` survives is emitted verbatim (for a container, the whole region). Otherwise: a leaf emits its annotation (the original `blockAnnotation` when `optionsEqual(current, parsed original)`, else `formatAnnotation` with the document's EOL, nothing when no options are left) and then its block through M1's `preserveBlock` against `blockOrigin` (or its fresh Markdown when new); a container emits `containerOpen` (or the canonical open line if its options changed), `containerLeading`, its children (recursively, with their `blockTrailing`), each `column.separator`, and `containerClose`. New containers and columns are emitted canonically with the document's EOL.
-  - **`BlockSource` for nested blocks:** the global attributes cover every node type above; the clearing plugin walks `doc.descendants`, so an edit inside a container clears the container's `blockSource` and the edited child's, never the siblings'. **Keep rule:** a node whose content and non-source attributes equal the snapshot taken at load (a `WeakMap` from its `blockOrigin` string to the loaded node's JSON) keeps or regains its `blockSource`. This is what makes undo and block moves byte-exact.
+  - **`BlockSource` for nested blocks:** the global attributes (today on `TOP_LEVEL_TYPES`: `paragraph`, `heading`, `bulletList`, `orderedList`, `taskList`, `blockquote`, `codeBlock`, `horizontalRule`, `table`, `rawBlock`) cover every node type above; the clearing plugin walks `doc.descendants`, so an edit inside a container clears the container's `blockSource` and the edited child's, never the siblings'. **Keep rule:** a node whose content and non-source attributes equal the snapshot taken at load (a `WeakMap` from its `blockOrigin` string to the loaded node's JSON) keeps or regains its `blockSource`. This is what makes undo and block moves byte-exact.
   - **Data-level commands** (the UI tasks call them; tested here): `setBlockOption(key, value | null)` (on the block at the selection, or on every selected block once Task 12's selection exists), `setListType('bullet'|'numerical'|'alphabetical'|'roman'|'todo'|null)`, `setHierarchy('Base'|'S'|'H1'|'H2'|'H3'|'H4')`, `wrapInToggle()`, `unwrapToggle()`, `setToggleOpen(pos, open)`, `wrapInGroup()`, `unwrapGroup()`, `insertColumns(n = 2)`, `setColumnWidths(pos, widths)`, `insertMathBlock(text = '')`, `insertInlineMath(text)`, `insertMedia(attrs)`, `insertObjectEmbed(target)`, `insertBookmark(href, title)`; stubs that return `false` until Task 11 implements them: `pickMedia(kind)`, `pickObjectEmbed()`.
   - `editorExtensions({numberedListInputRule})`: when false, the ordered-list input rule is left out (`EditorSettings.disableNumberedListTransformation`; Task 12 passes the setting).
   - `roundtrip.space.test.ts`: for every `.md` under `OBJECT_ROUNDTRIP_SPACE`, the body (after M1's frontmatter split) loads into a headless editor and serializes byte-identical; for every annotated leaf and container, toggling one option on and off again gives the identical bytes. It prints a one-line summary (`N files, M annotated blocks, 0 differences`) and fails on any difference.
@@ -551,7 +569,7 @@ The space (all content invented):
 - Test: `editor/nodes/blockOptions.test.tsx`, `editor/nodes/toggle.test.tsx`, `editor/menus/BlockStyleMenu.test.tsx`
 
 **Interfaces:**
-- Consumes: Task 7 (attributes, `setBlockOption`, `setListType`, `setHierarchy`, `setToggleOpen`, `wrapInToggle`), Task 5 (`useSettings`: `toggleStyle`, `hideOutlinerLines`), M2's `THEME_COLORS`, `colorName` (`theme/palette.ts`), `IconPicker` (`components/IconPicker.tsx`).
+- Consumes: Task 7 (attributes, `setBlockOption`, `setListType`, `setHierarchy`, `setToggleOpen`, `wrapInToggle`), Task 5 (`useSettings`: `toggleStyle`, `hideOutlinerLines`), M2's `THEME_COLORS`, `colorName` (`theme/palette.ts`), `IconPicker({value, onChange})` (`components/IconPicker.tsx`), `Icon`/`IconOrEmoji` (`components/Icon.tsx`).
 - Produces:
   - **Rendering** (values from `index36682.css`: grep `.editor-prose`, `--ep-`, `.quote>`, `.block-outer`, `toggle-outline-color`): `small` is Capacities' "S" size; `color=text-<c>` / `bg-<c>` per Global Constraints (a background block gets Capacities' block padding and radius); `align`; `icon` shows the icon before the block's text (Iconify or emoji, as M2's `Icon`/`IconOrEmoji`); `quote=standout` is the standout layout (larger, no rail); `list=alphabetical|roman` sets `list-style-type: lower-alpha|lower-roman` on the list and its nested lists.
   - **Toggle node view:** a caret before the toggle's first child, rotated when open; children hidden when closed; clicking the caret calls `setToggleOpen` (so the file's open line changes, rule 2); an empty toggle (no children) shows the caret in `--editor-toggle-empty`; the outliner line (a vertical rule along the children, `--editor-toggle-outline`) unless `hideOutlinerLines`; `toggleStyle: 'bullet'` shows a bullet that turns into the caret on hover (`EditorSettings.toggleStyle.description`).
@@ -637,7 +655,7 @@ The space (all content invented):
 - Test: `editor/media/MediaView.test.tsx`, `editor/media/upload.test.ts`, `editor/embed/ObjectEmbedView.test.tsx`, new cases in `links/LinkPicker.test.tsx`
 
 **Interfaces:**
-- Consumes: Task 7 (nodes, `setBlockOption`, `insertMedia`, `insertObjectEmbed`, the `pickMedia`/`pickObjectEmbed` stubs to implement), Task 5 (`api.attachments`, `api.uploadAttachment`, `api.openAttachment`, `api.fileUrl`), M3's `ObjectCard` (`views/cards/ObjectCard.tsx`, views `inline | smallCard | wideCard | embed`), `cardProperties`, `api.rows({paths})`, `useLinkIndex` (`resolve`, summaries), `openObject` (`create/createAndOpen.ts`), `TypeDef.defaultViewType`.
+- Consumes: Task 7 (nodes, `setBlockOption`, `insertMedia`, `insertObjectEmbed`, the `pickMedia`/`pickObjectEmbed` stubs to implement), Task 5 (`api.attachments`, `api.uploadAttachment`, `api.openAttachment`, `api.fileUrl`), M3's `ObjectCard({row, type, view, props, hide?, onOpen?})` (`views/cards/ObjectCard.tsx`, `view` `inline | smallCard | wideCard | embed`), `cardProperties(type)` (`views/cards/cardConfig.ts`), `api.rows({paths})` (`RowsScope.paths`), `links/linkIndex.ts` (`resolveLink(link, from)` (cached `api.resolve`), `summaryOf(path)`, `typeOf(typeId)`; the store `useLinkIndex` has no `resolve`), `openObject(path, mods, typeId)` (`create/createAndOpen.ts`), `TypeDef.defaultViewType`, the `useLinkPicker` store and `installLinkPicker` (`links/LinkPicker.tsx`).
 - Produces:
   - **`ResizableEmbed`:** a right-edge drag handle writing `width` on release, alignment buttons "Align left" / "Align center" / "Align right" (`ResizableEmbed.align*`, writing `align`; left removes it), and "Add caption" / "Remove caption" with the placeholder "Caption..." (`ResizableEmbed.*`, writing `caption`).
   - **Media views:** image (`<img>` from `api.fileUrl`, or the URL as written for `http(s)` sources; a failed load shows "This image could not be loaded. Please try again or delete the object." (`RenderImage.loadingError`)); PDF (an `<iframe>` of `api.fileUrl` at `height`, default 600 px, our value, with a bottom resize handle writing `height`); audio (`<audio controls>`); video (`<video controls>`, resizable width); file (a card with a file icon by extension, the name, the size from `api.attachments()`, "Open {type} on system" (`EntityMenu.openMediaOnSystem`, `api.openAttachment`), "Download {mediaType}" (`EntityMenu.downloadMedia.text`, an anchor with `download`)); a missing attachment shows "File not found." (our string). Every media block has a `…` menu with "Remove Block" (`EntityMenu.deleteEntityBlock.text`).
@@ -672,7 +690,7 @@ The space (all content invented):
 - Test: `editor/slash/slashItems.test.ts`, `editor/slash/SlashMenu.test.tsx`, `editor/handles/BlockHandles.test.tsx`, `editor/handles/BlockMenu.test.tsx`, `editor/extensions/blockSelection.test.ts`, `editor/shortcuts.test.ts`, new cases in `editor/Editor.test.tsx`
 
 **Interfaces:**
-- Consumes: Tasks 7 and 8 (commands, `BlockStyleMenu`), Task 5 (`useSettings`: `disableSpellcheck`, `disableNumberedListTransformation`; `registerShortcuts`, `keysFor`; `registerFlusher`), `@tiptap/suggestion@3.32.0`, M3's `fuzzyScore` (`links/LinkPicker.tsx`), M4's `api.createDailyNote` is **not** used (a daily-note link is a wikilink; the note need not exist yet), `api.createObject`, the types list (`useLinkIndex().types`), `typeOf`.
+- Consumes: Tasks 7 and 8 (commands, `BlockStyleMenu`), Task 5 (`useSettings`: `disableSpellcheck`, `disableNumberedListTransformation`; `registerShortcuts`, `keysFor`; `registerFlusher`), `@tiptap/suggestion@3.32.0`, M3's `fuzzyScore(query, title)` (`links/LinkPicker.tsx`), M4's `api.createDailyNote` is **not** used (a daily-note link is a wikilink; the note need not exist yet), `api.createObject(typeId, {title})`, the types list (`useLinkIndex((s) => s.types)`), `typeOf`, `Editor.tsx` as built (`extensions: [...editorExtensions(), FindInPage]`, `editorProps.attributes` `{class: 'object-editor', spellcheck: 'true'}`, the autosave's `settle()` already exposed as `controlRef.flush`; `views/cards/EmbedCard.tsx` also renders `Editor`).
 - Produces:
   - **Slash menu** (`/` anywhere in a text block; the query is the text typed after it; Escape or a space with no match closes): the filter is `fuzzyScore` over each item's name and description. Sections and items, in order:
     - "Create a block" (`CreateDropdown.sections.blocks.label`): "Text" (`blocks.TextBlock.name`), "Heading 1"–"Heading 4", "Small", "Bullet list", "Numbered list", "Alphabetical list", "Roman list", "To-do", "Toggle", "Quote block", "Group", "Icon", "Text" and "Background" colour items opening the colour lists (`ControlDropdown.custom.block_*.name`, each with its `.description` as the row's second line), "Two Columns", "Horizontal line", "Code", "Math", "Table" (`blocks.*.name` and `.description`), "Insert image", "Insert PDF", "Insert audio", "Insert video", "Insert file", "Create bookmark" (`pasteInput.*`).
@@ -684,7 +702,7 @@ The space (all content invented):
   - **Block menu:** "Turn Into" (`tokensMenu.turnInto.name`: Text, Heading 1–4, Small, Bullet list, Numbered list, Alphabetical list, Roman list, To-do, Toggle, Quote block, Code), Task 8's "Hierarchy", "List", "Quote", "Color" and "Icon" menus, "Insert block above" / "Insert block below" (`BlockMenu.insertAbove`, `.insertBelow`), "Move up" / "Move down" (`tokensMenu.moveUp.shortName`, `.moveDown.shortName`), "Duplicate" (`EntityMenu.duplicateObject.text`), "Remove style" (`blocksMenu.operations.removeStyle`: clears every option) and "Delete" (`general.delete`). Each row shows its shortcut keys from the registry.
   - **Block selection** (`blockSelection` extension; plugin state `{anchor, head}` over sibling blocks, drawn as decorations with `--block-selection-bg` and `--block-selection-border`): Escape selects the block holding the cursor; Shift+Up/Down extend; Mod-a in a block selects all its siblings, again selects the top level; Backspace/Delete deletes the selection; Mod-c copies the selected blocks' **serialized source** (their original bytes when unedited) as `text/plain`, Mod-x cuts; Mod-d duplicates; Mod-Shift-Up/Down moves; Tab/Shift-Tab indent and unindent list items; typing replaces the selection with a paragraph; a click in text clears it. A small pill shows "{count} block | {count} blocks" (`EditorPanel.selectionStats.blocks`) while two or more are selected.
   - **Editor shortcuts:** `editor/shortcuts.ts` registers the editor-scope ids of the Global Constraints table (names from `shortcuts.<id>.name`, categories `shortcuts.categories.text` / `.block`, `provisional: true`) and `blockSelection` binds them through `addKeyboardShortcuts` from `keysFor(id)`, so correcting a key in `lib/shortcuts.ts`/this file needs no other edit.
-  - **`Editor.tsx`:** renders `BlockHandles` and `SlashMenu`; `spellcheck` follows `disableSpellcheck`; `editorExtensions({numberedListInputRule: !disableNumberedListTransformation})`; registers its autosave's `settle()` with `registerFlusher` for its lifetime; the empty-body placeholder is "Write your text or search for blocks..." (`components.RootSpace.text.main.placeholder`).
+  - **`Editor.tsx`:** renders `BlockHandles` and `SlashMenu` (not when `readOnly`); `spellcheck` follows `disableSpellcheck`; `[...editorExtensions({numberedListInputRule: !disableNumberedListTransformation}), FindInPage]`; registers its autosave's `settle()` with `registerFlusher` for its lifetime (read-only editors too, where it resolves at once); the empty-body placeholder is "Write your text or search for blocks..." (`components.RootSpace.text.main.placeholder`).
 
 - [ ] **Step 1: Write failing tests**
   - `test slash menu sections and item names match reference` (every name and description above, in order)
@@ -710,11 +728,11 @@ The space (all content invented):
 
 **Files:**
 - Modify: `nav/tabs.ts`, `nav/recent.ts`, `App.tsx`
-- Create: `shell/TabStrip.tsx` (moved out of `App.tsx`), `shell/TabMenu.tsx`, `shell/shortcuts.ts`
-- Test: `nav/tabs.m7.test.ts`, `shell/TabStrip.test.tsx`, `shell/TabMenu.test.tsx`, `App.m7.test.tsx`
+- Create: `shell/TabStrip.tsx` (moved out of `App.tsx`, where `TabStrip` and `TabLabel` are local functions today), `shell/TabMenu.tsx`, `shell/shortcuts.ts`
+- Test: `nav/tabs.m7.test.ts`, `shell/TabStrip.test.tsx`, `shell/TabMenu.test.tsx`, `App.m7.test.tsx`; M1–M6's `nav/tabs.test.ts`, `App.shortcuts.test.tsx`, `App.targets.test.tsx`, `App.m3/m4/m5.test.tsx` stay green
 
 **Interfaces:**
-- Consumes: M1–M4 `useTabs` (`tabs`, `activeId`, `open(target, {newTab})`, `back`, `forward`, `close`, `activate`, `newTab`, `retarget`), `sameTarget`, `TabLabel` (moves with the strip), Task 5 (`useGlobalShortcut`, `registerShortcuts`, `useSettings().settings.openOnStart`), `api.space()` (`root`).
+- Consumes: M1–M5 `useTabs` as built (`Tab {id, history: Target[], index}`; `tabs`, `activeId`, `open(target, {newTab})`, `back`, `forward`, `close`, `activate`, `newTab`, `reset`, `retarget(oldPath, newPath)`; persisted with zustand `persist` under `object.tabs`, version 1, with a validating `merge`; `HISTORY_LIMIT` trims history), `Target` (kinds `type`, `object`, `typeSettings`, `trash`, `collection`, `query`, `queries`, `allNotes`, `calendar`, `tasks`, `graph`), `sameTarget`, `activeTab`, `tabTarget`, `currentTarget`, `canGoBack`/`canGoForward`, `useRecent` (`nav/recent.ts`, persisted as `object.recent`, version 1), `TabLabel` (moves with the strip), Task 5 (`useGlobalShortcut`, `registerShortcuts`, `useSettings().settings.openOnStart`), `api.space()` (`root`).
 - Produces:
   - `Tab` gains `persistent?: boolean`, `pinned?: boolean`, `crumbs: Target[][]` (one trail per history entry, parallel to `history`, Capacities' `breadcrumbs: string[][]`; Task 14 fills and renders it; here it is kept in step with `history` on open, back, forward and history trimming) and the side-panel fields Task 15 uses (`sidepanel?`, `sidepanelLayout?`, `hideSidepanel?`), typed now so the persisted shape changes once.
   - **Semantics** (`SpaceHeader.tabsExplanation`): a non-persistent tab (the default) navigates in place, as today; **in a persistent tab any new page opens in a new tab** (inserted right after it, non-persistent, active); back and forward stay in the tab. `togglePersistent(id)`, `pin(id)`, `unpin(id)`. Pinned tabs sort before the others (keeping their order) and have no close button; middle-click does not close them (our rule, flagged for Gene).
@@ -744,8 +762,8 @@ The space (all content invented):
 
 **Files:**
 - Create: `shell/Breadcrumbs.tsx`
-- Modify: `nav/tabs.ts` (`open(target, {newTab?, via?: 'link'|'nav'})`), `App.tsx` (renders `Breadcrumbs` above the content), `create/createAndOpen.ts` (`openObject` hands `mods.via` to `useTabs().open`), `links/wikilinkPresenter.ts` (wikilink clicks pass `via: 'link'`; the type icon before inline links honours `hideEntityIconsOnInlineLinks`)
-- Test: `shell/Breadcrumbs.test.tsx`, new cases in `nav/tabs.m7.test.ts`, `links/wikilinkPresenter.test.ts`
+- Modify: `nav/tabs.ts` (`open(target, {newTab?, via?: 'link'|'nav'})`), `App.tsx` (renders `Breadcrumbs` above the content), `create/createAndOpen.ts` (`openObject` hands `mods.via` to `useTabs().open`), `links/wikilinkPresenter.ts` (as built, a plain click peeks (`usePeek.peek`) and Ctrl/Meta-click or middle-click opens a new tab through `useTabs.open` directly; those tab opens pass `via: 'link'`; the plain click keeps M1's peek; the type icon before inline links honours `hideEntityIconsOnInlineLinks`), `object/ObjectPeek.tsx` (its two "Open as page" `onExpand` handlers open with `via: 'link'`, so a link followed through the peek extends the trail)
+- Test: `shell/Breadcrumbs.test.tsx`, new cases in `nav/tabs.m7.test.ts`, new files `links/wikilinkPresenter.test.ts` and `create/createAndOpen.test.ts` (neither exists today)
 
 **Interfaces:**
 - Consumes: Task 13 (`crumbs`), Task 5 (`useSettings`; `OpenMods.via?: 'link' | 'nav'`, which Task 5 adds to `create/createAndOpen.ts` as a type only, so Task 11's embed view can already pass `{...mods, via: 'link'}`), M3/M4 `openObject(path, mods, typeId)`.
@@ -758,7 +776,7 @@ The space (all content invented):
   - `test back and forward show each entry's trail`
   - `test clicking a crumb goes back to it`
   - `test long trails collapse the middle`
-  - `test wikilink click opens via link` and `test inline link icon follows the setting`
+  - `test wikilink new-tab opens and peek open-as-page go via link` and `test inline link icon follows the setting`
   - `test openObject passes via from its modifiers to the tabs store`
 - [ ] **Step 2:** Run `npx vitest run src/shell src/nav src/links`. Expected: FAIL.
 - [ ] **Step 3:** Implement as specified in Interfaces.
@@ -769,17 +787,17 @@ The space (all content invented):
 
 **Files:**
 - Create: `shell/SidePanel.tsx`, `shell/SidePanelArea.tsx`, `shell/Resizer.tsx`, `nav/sidepanel.ts` (pure helpers over a tab's entries)
-- Modify: `nav/tabs.ts` (side-panel actions), `App.tsx` (the side panel replaces `RightPanel` in `MainPanel`'s `aside`; the top-bar toggle drives it), `shell/RightPanel.tsx` (deleted; its one use is gone), `shell/MainPanel.tsx`, `create/createAndOpen.ts` (Shift → side panel; `alwaysOpenAsFullPage`), `object/ObjectView.tsx` ("Open in side panel" in the `…` menu's Open group; the two raw colours at its header buttons become `--chrome-btn-border`/`--bg-raised` tokens), `calendar/CalendarPage.tsx` and `calendar/CalendarSidePanel.tsx` (the calendar sidebar moves inside the Calendar page)
-- Test: `nav/sidepanel.test.ts`, `shell/SidePanel.test.tsx`, `shell/Resizer.test.tsx`, new cases in `create/createAndOpen.test.ts`, `object/ObjectView.menu.test.tsx` (or the existing `…` menu test), `calendar/CalendarPage.test.tsx`
+- Modify: `nav/tabs.ts` (side-panel actions), `App.tsx` (the side panel replaces `RightPanel` in `MainPanel`'s `aside`, which today shows `CalendarSidePanel` for the Calendar and M5's `LocalGraphPanel` for an object; the top-bar toggle drives it; `CommandPalette`'s existing `onToggleRightPanel` ("Toggle sidepanel" action) and `onShowRightPanel` ("Open graph view" action) props are fed `toggleSidepanel` and `openInSidepanel({kind: 'localGraph'})`; the palette files are unchanged), `shell/RightPanel.tsx` (deleted; its one use is gone), `shell/MainPanel.tsx`, `create/createAndOpen.ts` (Shift → side panel; `alwaysOpenAsFullPage`), `object/ObjectView.tsx` ("Open in side panel" right after "Open in new tab" in the `…` menu (it has no Open group); the raw colours of its header buttons (`#29282d`, `#232226`, `#18181b`) become `--float-btn-border`, `--float-border`, `--float-bg`), `calendar/CalendarPage.tsx` and `calendar/CalendarSidePanel.tsx` (the calendar sidebar moves inside the Calendar page), `App.m4.test.tsx` and `App.m5.test.tsx` (their "Right panel" tests become side-panel tests: the calendar sidebar inside the Calendar page, the local graph as a side-panel entry)
+- Test: `nav/sidepanel.test.ts`, `shell/SidePanel.test.tsx`, `shell/Resizer.test.tsx`, new cases in `create/createAndOpen.test.ts` (Task 14 creates it), new files `object/ObjectView.menu.test.tsx` and `calendar/CalendarPage.test.tsx`
 
 **Interfaces:**
-- Consumes: Tasks 13–14, Task 5 (`useSettings`: `alwaysOpenAsFullPage`; `registerShortcuts`), M1 `ObjectView` (`mode='page'` renders inside an area), M4's `CalendarPage` (`rightPanelOpen`/`onToggleRightPanel` props from `App`) and `CalendarSidePanel`, M3's `api.patchUi` (`calendar.hideCalendarSidebar`), M5's side content (see "Reconcile before building").
+- Consumes: Tasks 13–14, Task 5 (`useSettings`: `alwaysOpenAsFullPage`; `registerShortcuts`; `saveCalendarUi` in `calendar/calendarUi.ts`), `object/ObjectPage({path})` (renders inside an area; it picks M6's `WhiteboardPage` for a board and `ObjectView mode='page'` otherwise), M4's `CalendarPage({rightPanelOpen, onToggleRightPanel, onOpenTarget})` (the first two are passed on to `CalendarChrome`, whose chrome button toggles them) and `CalendarSidePanel()`, M5's `LocalGraphPanel({path})` (`graph/LocalGraphPanel.tsx`).
 - Produces:
-  - **Model** (Capacities' `TabEntry`/`SidepanelEntry`, per tab): `SidepanelEntry {id, target: Target | null /* null = the empty "Explore" entry */, isOpen, panelArea: 'area1'|'area2'|'area3', isPersistent?}`; `Tab.sidepanelLayout {width?: number /* px, default 500, M1's width */, area2Size?: number, area3Size?: number /* fractions of the panel height */}`; `Tab.hideSidepanel`. Actions: `openInSidepanel(target, {area?: 'area1'|'area2'|'area3'})` (area 1 by default; replaces that area's open non-persistent entry, else adds a new open entry), `newSidepanelEntry(area)`, `closeSidepanelEntry(id)`, `activateSidepanelEntry(id)`, `moveSidepanelEntry(id, area)`, `swapWithMain(id)` (the entry's target and the tab's current target exchange places; the main side gets a new history entry), `setSidepanelLayout(patch)`, `toggleSidepanel()`.
+  - **Model** (Capacities' `TabEntry`/`SidepanelEntry`, per tab): `SidepanelEntry {id, target: SidepanelTarget | null /* null = the empty "Explore" entry */, isOpen, panelArea: 'area1'|'area2'|'area3', isPersistent?}` with `SidepanelTarget = Target | {kind: 'localGraph'}` (M5's local graph, which follows the tab's current object as the right panel does today; "Open graph view" opens or reveals it); `Tab.sidepanelLayout {width?: number /* px, default 500, M1's width */, area2Size?: number, area3Size?: number /* fractions of the panel height */}`; `Tab.hideSidepanel`. Actions: `openInSidepanel(target, {area?: 'area1'|'area2'|'area3'})` (area 1 by default; replaces that area's open non-persistent entry, else adds a new open entry), `newSidepanelEntry(area)`, `closeSidepanelEntry(id)`, `activateSidepanelEntry(id)`, `moveSidepanelEntry(id, area)`, `swapWithMain(id)` (the entry's target and the tab's current target exchange places; the main side gets a new history entry), `setSidepanelLayout(patch)`, `toggleSidepanel()`.
   - **Layout** (no reference screenshot; flagged for Gene's check): the side panel is a column at the right of the main card behind a 1 px rule (M1's `RightPanel` place); each area with an open entry is shown stacked top to bottom (area 1, area 2, area 3); area 2 and area 3 take `area2Size`/`area3Size` of the height and area 1 the rest; a horizontal `Resizer` between areas and a vertical one on the panel's left edge (min 320 px, max 60 % of the window) write the layout on pointer up. Each area has a header: the entry's icon and title, "Browse sidepanel tabs" (`RenderSidepanel.tabList`: the entries of that area), "Swap" (`RenderSidepanel.swapWithMainWindow.button`, tooltip `.tooltip`), "Open as page" (`EntityMenu.navigateToEntity`), "Open sidepanel menu" (`RenderSidepanel.openSidepanelMenu`: move to area 1 / 2 / 3, our strings "Move to area 1" etc., and close), and a close button. "New Sidepanel Tab" (`RenderSidepanel.createNewSidepanelEntry`) adds an empty entry, which shows "Explore" (`RenderSidepanel.emptyState.title`) and "Open relevant content or view the graph view to expand the context of your work." (our string, adapted from `RenderSidepanel.emptyState.description` without the AI chat).
   - **Opening:** `openModeFor` returns `'sidepanel'` for Shift (Capacities' rule; M2/M4's "Shift opens the peek until the side panel exists" deviation ends); Alt+Shift stays the peek; Ctrl/Meta a new tab; with `alwaysOpenAsFullPage`, a plain click on a Task opens it as a page instead of the peek (`EditorSettings.alwaysOpenAsFullPage.description`). The `…` menu's Open group gains "Open in side panel" (`EntityMenu.openInSidepanel`). Links clicked inside a side-panel entry navigate that entry (with `via: 'link'` trails of its own: the entry keeps a small history; back and forward buttons in its header).
   - **Toggle:** the top-bar button (M1's, wired through `TopBar`'s existing `onToggleRightPanel`/`rightPanelOpen` props, which `App` now feeds from the active tab's `hideSidepanel`) toggles the panel; `toggleSidepanel` shortcut. Opening content while hidden shows the panel. (The button's tooltips become "Show sidepanel" / "Hide sidepanel" in Task 18, which owns `TopBar.tsx`.)
-  - **Calendar sidebar:** `CalendarPage` renders `CalendarSidePanel` itself at its right edge, open unless `ui.calendar.hideCalendarSidebar`; its chrome button keeps M4's tooltips ("Hide calendar sidebar" / "Show calendar sidebar") and writes the key; `toggleCalendarSidebar` shortcut. `App` no longer passes `rightPanelOpen`/`onToggleRightPanel` and no longer renders `CalendarSidePanel`.
+  - **Calendar sidebar:** `CalendarPage` renders `CalendarSidePanel` itself at its right edge, open unless `ui.calendar.hideCalendarSidebar`; `CalendarChrome`'s button keeps M4's tooltips ("Hide calendar sidebar" / "Show calendar sidebar") and writes the key through `saveCalendarUi({hideCalendarSidebar})`; `toggleCalendarSidebar` shortcut. `CalendarPage` drops its `rightPanelOpen`/`onToggleRightPanel` props (it reads the key and passes the state to `CalendarChrome`, whose prop names stay); `App` no longer renders `CalendarSidePanel`.
 
 - [ ] **Step 1: Write failing tests**
   - `test shift click opens in side panel area 1` (and Alt+Shift still peeks, Ctrl a new tab)
@@ -802,8 +820,9 @@ The space (all content invented):
 
 **Files:**
 - Create: `theme/themes.css` (Light, Light Dimmed, Dark Dimmed, monochrome and font overrides), `theme/applyTheme.ts`, `theme/shortcuts.ts`, `theme/noRawColours.test.ts`
-- Modify: `theme/tokens.css` (the new tokens' dark values; existing dark values unchanged; `body` uses `var(--app-font)`), `theme/palette.ts` (only if a helper must read a monochrome flag; CSS overrides are preferred), `index.css` (shadcn's `:root` neutrals become the same token mapping as `.dark`, so both modes use our tokens), `frontend/index.html` (an inline script applies the cached theme before first paint; `class="dark"` stays the no-cache default), `shell/GlobalOverlays.tsx` (applies the theme from `useSettings` and binds `toggleDarkMode`), `shell/Sidebar.tsx` (the footer's sun button toggles the mode with the tooltips "Dark mode" / "Light mode" (`SpaceOverview.setDarkMode`, `.setLightMode`); raw colours → tokens), `shell/PinnedSection.tsx`, `shell/SidebarSections.tsx`, `components/ui/dropdown-menu.tsx`, `components/ImagePicker.tsx` (raw colours → tokens)
-- Test: `theme/themes.test.ts`, `theme/applyTheme.test.ts`, `theme/noRawColours.test.ts`, new cases in `shell/Sidebar.test.tsx`
+- Modify: `theme/tokens.css` (the new tokens' dark values; existing dark values unchanged; `body` uses `var(--app-font)`), `theme/palette.ts` (only if a helper must read a monochrome flag; CSS overrides are preferred), `index.css` (shadcn's `:root` neutrals become the same token mapping as `.dark`, so both modes use our tokens), `frontend/index.html` (an inline script applies the cached theme before first paint; `class="dark"` stays the no-cache default), `shell/GlobalOverlays.tsx` (applies the theme from `useSettings` and binds `toggleDarkMode`), `shell/Sidebar.tsx` (the footer's sun button toggles the mode with the tooltips "Dark mode" / "Light mode" (`SpaceOverview.setDarkMode`, `.setLightMode`); raw colours → tokens), `shell/PinnedSection.tsx`, `shell/SidebarSections.tsx`, `components/ui/dropdown-menu.tsx`, `components/ImagePicker.tsx`, `find/FindBar.tsx`, `views/cards/SmallCard.tsx` (raw colours → tokens), `whiteboard/colors.ts`, `whiteboard/ink/inkModel.ts`, `whiteboard/WhiteboardCanvas.tsx`, `graph/graphStyle.ts`, `graph/GraphCanvas.tsx` (the content-palette marker; plus the theme follow-up below)
+- Test: `theme/themes.test.ts`, `theme/applyTheme.test.ts`, `theme/noRawColours.test.ts`, new cases in `shell/Sidebar.test.tsx`, `graph/GraphCanvas.test.tsx` and the whiteboard canvas test
+- The sidebar footer today has disabled `Profile`, `Settings` (`ph-gear`), `Theme` (`ph-sun`) and `Share` buttons; Task 16 enables the sun button, Task 17 the gear.
 
 **Interfaces:**
 - Consumes: Task 5 (`useSettings`, `registerShortcuts`, `useGlobalShortcut`), the token mapping table (Global Constraints), `themes.ts`/`colors.ts`.
@@ -811,7 +830,8 @@ The space (all content invented):
   - `themes.css`: `html[data-theme='light']`, `[data-theme='lightDimmed']`, `[data-theme='darkDimmed']` blocks overriding **every** token in `tokens.css` (the dark block stays the default under `:root`); `html[data-mono-tags]` maps every `--tag-bg-<c>`/`--tag-text-<c>` to gray's; `html[data-mono-type-labels]` maps every `--type-<c>-*` to gray's; `html[data-font='serif'|'monospace']` sets `--app-font` to M2's `--object-font-serif`/`--object-font-monospace` (Georgia, Courier New: `AppearanceSettings.font.*`). A comment at the top records the mapping and the source files.
   - `applyTheme(settings, root = document.documentElement)`: `data-theme` = `themeMode === 'light' ? lightTheme : darkTheme`, the `dark` class only for the dark themes (so Tailwind `dark:` variants keep working), `data-mono-*`, `data-font`; it writes the result to `localStorage` `object.theme` (try/catch); `index.html`'s inline script reads that cache (try/catch) and sets the same attributes before the bundle loads.
   - `theme/shortcuts.ts` registers `toggleDarkMode` (provisional key); toggling flips `themeMode` through `useSettings().patch`.
-  - `noRawColours.test.ts`: scans `src/**/*.{ts,tsx,css}` (tests and `theme/` excluded) for hex, `rgb(a)(`, `hsl(a)(` and `oklch(` literals; a file whose first line carries the `colour-literals: content palette` marker is skipped; a `PENDING` list names files other lanes still have to convert (`object/ObjectView.tsx`, Task 15) and Task 19 empties it.
+  - **M5/M6 canvases follow the theme:** `applyTheme.ts` exports `useThemeName()` (re-renders on a `data-theme` change). M5's graph (`GraphCanvas.tsx`) re-reads `canvasColors()`/`colorValue()` and refreshes sigma when it changes. M6's board (`WhiteboardCanvas.tsx`) passes `colorMode={dark ? 'dark' : 'light'}` to `@xyflow/react` (it sets none today, so React Flow draws its light defaults) and re-renders when it changes, so `whiteboard/colors.ts`'s `isDarkMode()` (the `dark` class) picks the light or dark `colorValues`.
+  - `noRawColours.test.ts`: scans `src/**/*.{ts,tsx,css}` (tests, `__fixtures__`, `test/` and `theme/` excluded; `index.css` included) for hex, `rgb(a)(`, `hsl(a)(` and `oklch(` literals; a file whose first line carries the `colour-literals: content palette` marker is skipped; a `PENDING` list names files other lanes still have to convert (`editor/editor.css`, Task 7; `object/ObjectView.tsx`, Task 15) and Task 19 empties it.
 
 - [ ] **Step 1: Write failing tests**
   - `test every dark token is defined in every theme` (parse both CSS files; every custom property of the dark `:root` block appears in each of the three theme blocks)
@@ -820,6 +840,7 @@ The space (all content invented):
   - `test theme attribute and dark class follow settings` (all four themes, monochrome flags, fonts)
   - `test first paint applies the cached theme` (the inline script with a cached value; with none, dark)
   - `test sidebar sun button toggles the mode with reference tooltips` and `test toggle dark mode shortcut`
+  - `test graph and whiteboard canvases follow a theme change`
   - `test no raw colour literals outside theme files`
 - [ ] **Step 2:** Run `npx vitest run src/theme src/shell`. Expected: FAIL (all but the regression guard).
 - [ ] **Step 3:** Compute the three themes' values from `themes.ts` + `colors.ts` with a throwaway script outside the repo (as the strings flattening is done), write `themes.css`, then implement the rest as specified in Interfaces.
@@ -830,11 +851,11 @@ The space (all content invented):
 
 **Files:**
 - Create: `settings/SettingsModal.tsx`, `settings/sections/{Appearance,Editor,DateTime,Notifications,SpaceSettings,ObjectTypes,TaskManagement}.tsx`, `settings/ShortcutsSheet.tsx`, `settings/useSettingsModal.ts` (open state and the requested section)
-- Modify: `shell/GlobalOverlays.tsx` (mounts the modal and the sheet; binds `openSettings` and `toggleShortcutsMenu`), `shell/Sidebar.tsx` (the footer gear opens the modal, tooltip "Settings" (`SpaceOverview.settings.tooltip`); the Tasks item is hidden while `hideTaskManagement`), `properties/format.ts` (dates and times follow `twentyFourHourTime` and `dateFormatting`)
+- Modify: `shell/GlobalOverlays.tsx` (mounts the modal and the sheet; binds `openSettings` and `toggleShortcutsMenu`), `shell/Sidebar.tsx` (the footer gear, disabled today, opens the modal, tooltip "Settings" (`SpaceOverview.settings.tooltip`); the main-nav "Tasks" entry is hidden while `hideTaskManagement`), `properties/format.ts` (dates and times follow `twentyFourHourTime` and `dateFormatting`)
 - Test: `settings/SettingsModal.test.tsx`, one test file per section, `settings/ShortcutsSheet.test.tsx`, new cases in `properties/format.test.ts` and `shell/Sidebar.test.tsx`
 
 **Interfaces:**
-- Consumes: Task 5 (`useSettings`, `api.space`/`api.patchSpace`, `allShortcuts`, `useGlobalShortcut`), M3/M4's `api.ui`/`api.patchUi` (`calendar.weekStart`, `reminders.enabled`), M2's `IconPicker`, the types list, `useTabs().open` (Object Types rows open Type Settings).
+- Consumes: Task 5 (`useSettings`, `api.space`/`api.patchSpace`, `allShortcuts`, `useGlobalShortcut`, `saveCalendarUi({weekStart})`), M3's `useUiStore` (`shell/usePinned.ts`) and M4's `useWeekStart` (`calendar/useCalendar.ts`) for the current values, `api.patchUi({reminders: {enabled}})` with the `useUiStore` revision, M2's `IconPicker`, the types list, `useTabs().open` (Object Types rows open Type Settings).
 - Produces:
   - **Modal layout** (README's description of `03-settings-account.png`): a left nav (~340 px) with "Search settings" (`AppSettings.search.placeholder`; filters sections by heading and option labels; "No results"), group headings and section rows; the content shows an icon tile, the section heading and description, then sections with a bold title, muted help and the control. Title "Settings" (`AppSettings.heading`). Changes save immediately (device settings through `useSettings().patch`, `ui.json` keys through `api.patchUi`, space keys through `api.patchSpace`); a 409 reloads and re-applies once.
   - **General** (`general.general`):
@@ -847,7 +868,7 @@ The space (all content invented):
     - "Object Types" (`StructureGeneralSettings.heading`, `.explanation`): "Your object types" (`contentTypes.heading`, `.explanation`), grouped "Basic object types" / "Custom object types" (`StructureSettings.*`); a row opens that type's Type Settings tab and closes the modal.
     - "Task management" (`TaskManagementSettings.heading`, `.description`): "Hide Task Management" with its description and info (`hideTaskManagement.*` → `space.json`), and "Task Object Customization" with "Open settings" (`taskObjectCustomization.*`, opening the Task type's settings).
   - **`ShortcutsSheet`** ("Shortcuts", `ShortcutsCheatSheet.tooltip`): every registered shortcut grouped by `shortcuts.categories.*`, name and keys, provisional keys marked with a small "unverified" tag (our string) until Gene confirms; opened with `toggleShortcutsMenu` and from a "Shortcuts" row at the bottom of the settings nav.
-  - `properties/format.ts`: `formatTime`/`formatDateTime` use 24-hour time when set; `dateFormatting` `DMY`/`MDY`/`YMD` switch the numeric date order (`localized` keeps today's output byte for byte).
+  - `properties/format.ts`: there is no `formatTime`/`formatDateTime`; `formatDate(v)` formats through the module's `formatPoint` with `DAY_FORMAT` (`dateStyle: 'medium'`, UTC) and `TIME_FORMAT` (`dateStyle: 'medium', timeStyle: 'short'`). It reads `useSettings.getState().settings`: 24-hour time when set (`hourCycle: 'h23'`); `dateFormatting` `DMY`/`MDY`/`YMD` switch to a numeric date in that order; `localized` keeps today's output byte for byte. Stored values never change.
 
 - [ ] **Step 1: Write failing tests**
   - `test settings nav groups and section headings match reference`
@@ -870,8 +891,8 @@ The space (all content invented):
 
 **Files:**
 - Create: `spaces/SpacesMenu.tsx`, `spaces/CreateSpaceDialog.tsx`, `spaces/switchSpace.ts`
-- Modify: `shell/TopBar.tsx` (the space button opens `SpacesMenu`, tooltip "Change space" (`SpaceOverview.changeSpace.tooltip`); the `+` button's label becomes "Create new tab" (`SpaceHeader.createNewTab`); the right-panel button's label becomes "Hide sidepanel" / "Show sidepanel" (`RenderSidepanel.hideSidepanel`, `.showSidepanel`) from its `rightPanelOpen` prop), `shell/GlobalOverlays.tsx` (mounts the dialog and the switching overlay)
-- Test: `spaces/SpacesMenu.test.tsx`, `spaces/CreateSpaceDialog.test.tsx`, `spaces/switchSpace.test.ts`, new cases in `shell/TopBar.test.tsx`
+- Modify: `shell/TopBar.tsx` (the space button, today `title="Space"` with `ph-lightbulb` and `ph-caret-up-down`, opens `SpacesMenu`, tooltip "Change space" (`SpaceOverview.changeSpace.tooltip`), and shows the space icon when set; the `+` button's label "New tab" becomes "Create new tab" (`SpaceHeader.createNewTab`); the right-panel button's label "Toggle right panel" becomes "Hide sidepanel" / "Show sidepanel" (`RenderSidepanel.hideSidepanel`, `.showSidepanel`) from its `rightPanelOpen` prop; prop names unchanged), `shell/GlobalOverlays.tsx` (mounts the dialog and the switching overlay)
+- Test: `spaces/SpacesMenu.test.tsx`, `spaces/CreateSpaceDialog.test.tsx`, `spaces/switchSpace.test.ts`, a new `shell/TopBar.test.tsx` (none exists today)
 
 **Interfaces:**
 - Consumes: Task 5 (`api.spaces`, `createSpace`, `openSpace`, `removeSpace`, `switchSpace`, `space`, `patchSpace`; `flushAll`), Task 17 (`useSettingsModal().open('space')`).
@@ -901,7 +922,7 @@ The space (all content invented):
 - Modify: `theme/noRawColours.test.ts` (empties `PENDING` once every listed file is converted), `docs/superpowers/plans/remaining-work.md` (the M7 rows only)
 
 - [ ] **Step 1:** Run `uv run pytest backend/tests -q` and `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run lint && npm run build`. Expected: all green. Empty `noRawColours.test.ts`'s `PENDING` list and re-run it; check that wikilinks and embedded objects both open with `via: 'link'` (Tasks 11 and 14).
-- [ ] **Step 2:** Write `scripts/m7_acceptance.py SPACE [--keep]` (run as `uv run python scripts/m7_acceptance.py SPACE`). Like `m4_acceptance.py`, it works on a temporary git-committed copy, sets `OBJECT_STATE_DIR` and `OBJECT_FAKE_OPEN_FILE` to temp paths, and starts the server on a free port. Over HTTP it checks:
+- [ ] **Step 2:** Write `scripts/m7_acceptance.py SPACE [--keep]` (run as `uv run python scripts/m7_acceptance.py SPACE`). Like `m6_acceptance.py`, it works on a temporary git-committed copy, sets `OBJECT_STATE_DIR`, `OBJECT_CACHE_DIR` and `OBJECT_FAKE_OPEN_FILE` to temp paths, and serves `create_app(space, None, watch=True)` with uvicorn on a free `127.0.0.1` port. Over HTTP it checks:
   1. Starting twice and calling every M7 read route (`GET /api/space`, `/api/settings`, `/api/spaces`, `/api/attachments`, `/api/file` for one file of each kind) changes no file (`git status` clean); no `space.json` or `settings.json` appears; the state dir holds only `spaces.json` (and M4's ledger if a reminder fired, which none does here).
   2. Uploading a PNG, a PDF, a WAV and an XLSX creates exactly those files under `Attachments/`; a second upload with the same name adds ` (2)`; `GET /api/file` returns each with the contract's headers; a `Range` request on the WAV is 206; an uploaded `.html` comes back as an octet-stream download; `POST /api/attachments/open` records the PDF with the fake opener and refuses an `.exe` with 415.
   3. `PUT /api/space` with a new name changes only `.capacities/space.json` (created if absent); the folder name is unchanged; a stale revision is 409.
@@ -909,8 +930,8 @@ The space (all content invented):
   5. Spaces: `POST /api/spaces` in a temp location creates a folder holding only `.capacities/space.json`; a second create is 409 and leaves the folder byte-identical; `DELETE /api/spaces` removes it from the list and the folder stays; a `SpaceHost` on a free port switches to it and `GET /api/space` reports its root.
   6. The editor round trip: `cd frontend && OBJECT_ROUNDTRIP_SPACE=<copy> npx vitest run src/editor/roundtrip.space.test.ts` reports 0 differences (every body byte-identical without edits; every annotated block's option toggled on and off restores the bytes).
   7. The M1 no-edit pass over HTTP: 0 files changed.
-- [ ] **Step 3:** Run it on `backend/tests/fixtures/space-blocks`, `space-sample`, `space-v1` and `space-calendar` (and the M5/M6 fixture spaces, if any). Expected: every check prints `[ok]`.
-- [ ] **Step 4:** Run `npm run build`, then `uv run objectapp --space <copy of space-blocks>`, and walk through: every block kind from the slash menu (and its menus), drag and `+` handles, block selection and copy, a toggle opened and closed with `git diff` showing one line, columns resized, a table's header row and column, a Mermaid diagram and a formula in light and dark, an image resized with a caption, a PDF, audio and video, a file opened with the OS, an embedded object switched between its four views, files pasted and dropped; tabs (persistent, pinned, the tab menu), breadcrumbs, the side panel (Shift+click, three areas, resizing, swap, the calendar sidebar inside the Calendar); all four themes on every screen; every Settings section; creating, renaming, switching and removing a space. Record anything that differs from this plan in `m7-acceptance.md`.
+- [ ] **Step 3:** Run it on `backend/tests/fixtures/space-blocks`, `space-sample`, `space-v1`, `space-calendar`, `space-links` (M5) and `space-whiteboard` (M6). Expected: every check prints `[ok]`. Also rerun `m1_roundtrip.py` and `m2`–`m6_acceptance.py` on `space-sample` (all PASS at the baseline).
+- [ ] **Step 4:** Run `npm run build`, then serve a copy of `space-blocks` headless (`build_server_config` with uvicorn on `127.0.0.1`, as the acceptance scripts do; in a cloud container there is no display for the pywebview window) and drive it with Playwright (Chromium is preinstalled: `require('playwright')`, `chromium.launch()`), taking screenshots; leave no process running. Walk through: every block kind from the slash menu (and its menus), drag and `+` handles, block selection and copy, a toggle opened and closed with `git diff` showing one line, columns resized, a table's header row and column, a Mermaid diagram and a formula in light and dark, an image resized with a caption, a PDF, audio and video, a file opened with the OS, an embedded object switched between its four views, files pasted and dropped; tabs (persistent, pinned, the tab menu), breadcrumbs, the side panel (Shift+click, three areas, resizing, swap, the calendar sidebar inside the Calendar); all four themes on every screen; every Settings section; creating, renaming, switching and removing a space. Record anything that differs from this plan in `m7-acceptance.md`.
 - [ ] **Step 5:** Write `m7-acceptance.md` with Gene's hand-check list, to run on his CPI copy outside the repo with `git init` done there:
   - opening his space changes no file; his existing notes with HTML comments, Mermaid fences and `$` signs keep their bytes (`git status` clean after opening and scrolling every note); editing one block changes only its lines
   - **the shortcut keys:** compare each provisional key in the Shortcuts sheet with Capacities and list the ones that differ (the reconcile pass fixes them in `lib/shortcuts.ts` and the editor registry)
@@ -920,21 +941,21 @@ The space (all content invented):
 
 ## Build lanes
 
-Each lane runs its "first" tasks in order, then its sub-lanes in parallel (each in order). Lanes run side by side; the only cross-lane waits are on Task 5's commit (noted on Tasks 8, 11, 12 and 13).
+Each lane runs its "first" tasks in order, then its sub-lanes in parallel (each in order). Lanes run side by side; the only cross-lane waits are on Task 5's commit (noted on Tasks 7, 8, 11, 12 and 13).
 
 | Lane | First (in order) | Then sub-lanes (parallel, each in order) | Files it owns (summary) |
 |---|---|---|---|
 | **A: backend** | 1 → 2 → 3 → 4 | (none) | `backend/**`, `scripts/` (Task 19 adds the acceptance script) |
 | **B: editor** | 6 → 7 | **B1:** 8 → 12 · **B2:** 9 · **B3:** 10 · **B4:** 11 | `frontend/src/editor/**`, `links/LinkPicker.tsx` |
-| **C: shell** | 13 → 14 → 15 | (none) | `nav/**`, `App.tsx`, `shell/{TabStrip,TabMenu,Breadcrumbs,SidePanel,SidePanelArea,Resizer,RightPanel,MainPanel,shortcuts}`, `create/createAndOpen.ts`, `links/wikilinkPresenter.ts`, `object/ObjectView.tsx`, `calendar/CalendarPage.tsx`, `calendar/CalendarSidePanel.tsx` |
-| **D: look** | 5 → 16 → 17 → 18 | (none) | `api/**`, `test/mockApi.ts`, `main.tsx`, `lib/**`, `settings/**`, `theme/**`, `index.css`, `frontend/index.html`, `shell/{GlobalOverlays,Sidebar,PinnedSection,SidebarSections,TopBar}.tsx`, `components/ui/dropdown-menu.tsx`, `components/ImagePicker.tsx`, `properties/format.ts`, `spaces/**` (and the `OpenMods.via` type in `create/createAndOpen.ts`, Task 5) |
+| **C: shell** | 13 → 14 → 15 | (none) | `nav/**`, `App.tsx`, `App.m4.test.tsx`, `App.m5.test.tsx`, `shell/{TabStrip,TabMenu,Breadcrumbs,SidePanel,SidePanelArea,Resizer,RightPanel,MainPanel,shortcuts}`, `create/createAndOpen.ts`, `links/wikilinkPresenter.ts`, `object/ObjectPeek.tsx`, `object/ObjectView.tsx`, `calendar/CalendarPage.tsx`, `calendar/CalendarSidePanel.tsx` |
+| **D: look** | 5 → 16 → 17 → 18 | (none) | `api/**`, `test/mockApi.ts`, `main.tsx`, `lib/**`, `settings/**`, `theme/**`, `index.css`, `frontend/index.html`, `shell/{GlobalOverlays,Sidebar,PinnedSection,SidebarSections,TopBar}.tsx`, `components/ui/dropdown-menu.tsx`, `components/ImagePicker.tsx`, `properties/format.ts`, `spaces/**`, `calendar/calendarUi.ts` (Task 5), `find/FindBar.tsx`, `views/cards/SmallCard.tsx`, `graph/{GraphCanvas.tsx,graphStyle.ts}`, `whiteboard/{WhiteboardCanvas.tsx,colors.ts,ink/inkModel.ts}` (Task 16) (and the `OpenMods.via` type in `create/createAndOpen.ts`, Task 5) |
 | **integrate** | 19 (after every lane) | | `scripts/m7_acceptance.py`, `docs/superpowers/plans/m7-acceptance.md`, `remaining-work.md`, `theme/noRawColours.test.ts` (its `PENDING` list) |
 
-Workflow args (for `scripts/workflows/object-milestone-build.js`, which takes tracks): `{"plan":"docs/superpowers/plans/2026-10-26-m7-blocks-lightmode-polish.md","base":"<HEAD sha after the deps commit>","backend":[1,2,3,4],"frontend":[5,6,7,8,9,10,11,12,13,14,15,16,17,18],"integrate":19,"milestone":"Milestone 7","perTaskReview":false}`, with the frontend split into the lanes above when the script's track support allows (B's sub-lanes B1–B4 after Task 7; C and D beside B).
+Workflow args (for `scripts/workflows/object-milestone-build.js`, which takes tracks): `{"plan":"docs/superpowers/plans/2026-10-26-m7-blocks-lightmode-polish.md","base":"<HEAD sha after the reconcile commit; the deps are already in 35b7959>","backend":[1,2,3,4],"frontend":[5,6,7,8,9,10,11,12,13,14,15,16,17,18],"integrate":19,"milestone":"Milestone 7","perTaskReview":false}`, with the frontend split into the lanes above when the script's track support allows (B's sub-lanes B1–B4 after Task 7; C and D beside B).
 
 ## Reconcile before building
 
-M4 is being built while this plan is written, and M5 and M6 build before M7. Before any M7 task starts, re-read what they produced and correct this plan (names, files, test baseline, and anything below), recording each change in "Change history":
+**Done on 2026-10-27 against `88865a3`** (results folded into the tasks above and listed in "Change history"). The checklist that was run, kept for the record:
 - **M4:** `CalendarPage`'s props and `App`'s right-panel wiring (Task 15 moves the calendar sidebar into the page); `_UI_PATCH_KEYS`/`_ui_problem` for `calendar` (Task 3 adds `hideCalendarSidebar`); `reminders._state_dir` (Task 3 delegates it); the Task "Date" picker's time display (Task 17's `format.ts` change must not alter M4's stored values, only display); `ObjectView`'s modes (`inline` exists; Task 15 adds the menu item); `createAndOpen`'s Shift rule.
 - **M5:** the graph's colours under light mode (M5 renders with `sigma` 3.0.3 on a canvas, so its node, edge and label colours must read tokens through `getComputedStyle` and repaint on a theme change; Task 16's acceptance covers it); where the local graph, the references/backlinks views and the command palette live. If M5 put the local graph or references in the right panel, they become side-panel entry kinds in Task 15 (`target` gains `{kind: 'localGraph'}` etc.); the palette's "switch space" and "toggle panels" commands call Task 18's `switchSpace` and Task 15's `toggleSidepanel`; M5's shortcuts (Ctrl+K, Ctrl+F) move into `lib/shortcuts.ts` and the provisional keys here must not collide with them. If M5's FTS indexing reads bodies, check that annotation lines and `$$` fences are skipped like Task 2's preview.
 - **M6:** whiteboard canvas colours under light mode (Task 16: the canvas, grid, selection and default shape colours get tokens; content palettes take the `colour-literals` marker; M6 builds on `@xyflow/react` 12.12.0, whose `colorMode` follows the theme); whiteboard pages inside a side-panel entry (Task 15); M6's keyboard shortcuts in the registry; whether M6 added an attachment or SVG route that Task 2's `GET /api/file` must stay compatible with.
@@ -943,3 +964,24 @@ M4 is being built while this plan is written, and M5 and M6 build before M7. Bef
 ## Change history
 
 - **2026-10-26:** written against `a8e0d7f` (M4 mid-build) and the M4 plan (the M5/M6 dependency commit `ccfb23d` adds no package M7 needs); M5 and M6 plans were being written at the same time and are not yet reflected (see "Reconcile before building").
+- **2026-10-27 (reconcile pass, against `88865a3`, M4–M6 built and gated):**
+  - *Dependencies:* already committed in `35b7959` (katex 0.19.0, mermaid 12.1.0, `@tiptap/suggestion` and `@tiptap/extension-code-block` 3.32.0 = `@tiptap/core` 3.32.0); the "install before the build" step is gone.
+  - *Baseline:* 854 back-end tests passing (855 collected, 1 skipped), 1013 front-end tests (164 files); `conftest.py` already isolates `OBJECT_STATE_DIR` and `OBJECT_CACHE_DIR`.
+  - *M5 search cache:* `.capacities-cache/` inside the space is the one thing serving creates; every "writes nothing" check sets `OBJECT_CACHE_DIR`; `searchtext.plain_body` (FTS) joins `body_preview` in Task 2's annotation/`$$` rule.
+  - *Task 1:* fixture `.gitattributes` lives at `backend/tests/fixtures/.gitattributes` (`* -text`), not per space; `space-links` and `space-whiteboard` are left alone.
+  - *Task 2:* real `media.py` names; `.md` stays 415 on `/api/file` (keeps M2's test); M6 sidecars (`.ink.svg`, `.whiteboard.json`) are neither listed nor served.
+  - *Task 3:* `_state_dir` also honours `XDG_STATE_HOME`; `Space.name` is an attribute, becomes a property; `RevisionConflict` is in `typemodel`, `ReadOnly` in `space`; the calendar check is `_calendar_ui_problem`; `ui.json` patches replace top-level keys; the ui test goes in `test_calendarquery.py`.
+  - *Task 4:* `build_server_config` gains `on_switch`; the host closes `app.state.hub` before each restart; M5's `SearchIndex` stops with the lifespan.
+  - *Task 5:* now also owns `calendar/calendarUi.ts` (`calendarOf` dropped unknown calendar keys, so `hideCalendarSidebar` would have been lost by `saveCalendarDaily`; new `saveCalendarUi`) and adds the new tokens' dark values to `tokens.css` (so Task 7 and Task 15 can use them); registers M1–M6's existing bindings display-only and tests collisions; `openSettings` Mod-, is verified from `electron-menu.ts`; new tokens `--float-bg/-border/-btn-border` (exact dark values of the object header and find bar chrome) and `--card-shadow`.
+  - *Task 6:* `splitBlocks` tests live in `preserve.test.ts`/`Editor.test.tsx`; `blocks.test.ts` is new; `__fixtures__/.gitattributes` already `* -text`.
+  - *Task 7:* `editorExtensions()` is also used by M6's `TextBlockEditor`; the option is optional with the old default; `FindInPage` stays in `Editor.tsx`; waits for Task 5.
+  - *Task 11:* link resolution is `resolveLink`/`summaryOf`/`typeOf` (no `useLinkIndex().resolve`); `ObjectCard`'s props spelled out.
+  - *Task 12:* `Editor.tsx`'s real extension list and `spellcheck` attribute; `EmbedCard` also renders `Editor`.
+  - *Task 13:* `TabStrip`/`TabLabel` are local to `App.tsx`; `isEditableTarget` is re-exported from `App` for `App.shortcuts.test.tsx`; real `useTabs` shape and persist keys.
+  - *Task 14:* wikilink plain click peeks (M1); only its new-tab opens and the peek's "Open as page" (`object/ObjectPeek.tsx`, added to lane C) go `via: 'link'`; `wikilinkPresenter.test.ts` and `createAndOpen.test.ts` are new files.
+  - *Task 15:* M5 put `LocalGraphPanel` in the right panel and wired the palette's "Toggle sidepanel"/"Open graph view" to it; side-panel targets gain `{kind: 'localGraph'}` and `App` rewires those palette props; areas render `ObjectPage` (whiteboards included); `ObjectView`'s menu has no Open group; `CalendarChrome` keeps its prop names; `App.m4/m5.test.tsx` right-panel tests move to lane C.
+  - *Task 16:* raw-colour inventory recorded in Global Constraints (markers on M5/M6 content palettes; `FindBar`, `SmallCard`, `index.css` converted; `editor/editor.css` added to `PENDING`); the graph and the board follow theme changes (React Flow had no `colorMode`); these M5/M6 files join lane D.
+  - *Task 17:* `format.ts` has `formatDate`/`formatPoint`, not `formatTime`/`formatDateTime`; week start writes through `saveCalendarUi`.
+  - *Task 18:* the top bar's current labels ("Space", "New tab", "Toggle right panel"); `TopBar.test.tsx` is new.
+  - *Task 19:* acceptance follows `m6_acceptance.py` (cache dir too), runs on `space-links` and `space-whiteboard` as well, and the walkthrough runs headless with Playwright.
+  - *Lanes:* unchanged (A 1–4; B 6–7 then B1 8→12, B2 9, B3 10, B4 11; C 13–15; D 5, 16–18; integrate 19); the new files each have exactly one owner, and Task 7 now also waits for Task 5's commit.
