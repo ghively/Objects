@@ -1,5 +1,7 @@
 // Calendar date helpers (pure). A "day" is a local calendar day written `YYYY-MM-DD`; arithmetic is
-// done on UTC dates built from the day's numbers, so DST never shifts a day.
+// done on UTC dates built from the day's numbers, so DST never shifts a day. "Today" follows the
+// "Time zone" setting (`lib/zonedTime.ts`), as the server's `Space.tz` does.
+import { zonedToday } from '@/lib/zonedTime'
 
 export type Day = string
 export type WeekStart = 'sunday' | 'monday'
@@ -15,8 +17,8 @@ export function ymd(date: Date = new Date()): Day {
   return `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
-/** The viewer's local day. */
-export const todayYmd = (): Day => ymd(new Date())
+/** Today in the "Time zone" setting's zone (the device's when unset). */
+export const todayYmd = (): Day => zonedToday()
 
 /** `YYYY-MM-DD` as a local-midnight Date; null for a malformed or impossible day. */
 export function parseYmd(day: string): Date | null {

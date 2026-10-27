@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import {
   addDays,
   addMonths,
@@ -8,6 +9,7 @@ import {
   monthGrid,
   parseYmd,
   rangeFor,
+  todayYmd,
   startOfWeek,
   weekNumber,
   weekdayColor,
@@ -83,5 +85,24 @@ describe('dates', () => {
     expect(mo).toMatchObject({ from: '2026-10-01', to: '2026-10-31' })
     expect(mo.days).toHaveLength(31)
     expect(rangeFor('month', '2026-02-10', 'monday').days).toHaveLength(28)
+  })
+})
+
+describe('todayYmd (M8)', () => {
+  test('test calendar today follows the zone', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-27T23:30:00Z'))
+    try {
+      useSettings.setState({ settings: { ...settingsDefaults, timeZone: 'Europe/Berlin' } })
+      expect(todayYmd()).toBe('2026-10-28')
+      useSettings.setState({ settings: { ...settingsDefaults, timeZone: 'America/Los_Angeles' } })
+      expect(todayYmd()).toBe('2026-10-27')
+      // No setting: the device's local day.
+      useSettings.setState({ settings: settingsDefaults })
+      expect(todayYmd()).toBe(ymd(new Date()))
+    } finally {
+      vi.useRealTimers()
+      useSettings.setState({ settings: settingsDefaults })
+    }
   })
 })
