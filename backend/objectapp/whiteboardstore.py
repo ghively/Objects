@@ -309,6 +309,8 @@ def _save_sidecar(
                 if now_rev != base_revision:
                     raise BoardConflict(now_rev)
 
+            if current is not None and current != data:
+                space._call_before_write(sidecar, current)  # M8 version history
             atomic_write(full, data, check=unchanged_on_disk)
     except BaseException:
         forget()
