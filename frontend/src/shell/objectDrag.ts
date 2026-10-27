@@ -1,6 +1,7 @@
 /**
  * Dragging an object out of a list onto a whiteboard (M6 Task 13). A row sets the board's
- * `OBJECT_DRAG_MIME` (the object's path) and a `[[Title]]` text on a native drag.
+ * `OBJECT_DRAG_MIME` (the object's path) and a `[[Title]]` text on a native drag
+ * (the path form for a duplicate title or one a wikilink can't hold, see `wikilinkFor`).
  *
  * The sidebar's pinned rows reorder with dnd-kit, whose pointer sensor cancels native drags, so
  * a pinned row released outside its list hands the object over with `dropObjectAt`: a synthetic
@@ -8,6 +9,7 @@
  * object (its `dragover` handler calls `preventDefault`, as the board canvas does).
  */
 import { OBJECT_DRAG_MIME } from '@/whiteboard/dnd'
+import { wikilinkFor } from '@/whiteboard/linkText'
 
 interface WritableData {
   setData(format: string, data: string): void
@@ -19,7 +21,7 @@ export function setObjectDragData(dt: WritableData | null | undefined, path: str
   if (!dt) return
   try {
     dt.setData(OBJECT_DRAG_MIME, path)
-    dt.setData('text/plain', `[[${title}]]`)
+    dt.setData('text/plain', wikilinkFor(path, title))
     dt.effectAllowed = 'copy'
   } catch {
     // A read-only DataTransfer (not a dragstart): nothing to carry.

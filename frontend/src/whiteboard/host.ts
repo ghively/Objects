@@ -6,9 +6,10 @@ import { createContext, useContext } from 'react'
 import { api } from '@/api/client'
 import type { ObjectSummary, Row } from '@/api/types'
 import { openObject as openWithMods } from '@/create/createAndOpen'
-import { resolveLink, stemOf, summaryOf } from '@/links/linkIndex'
+import { resolveLink } from '@/links/linkIndex'
 import { usePeek } from '@/nav/tabs'
 import { useDeleteRequest } from '@/object/DeleteObjectDialog'
+import { wikilinkFor } from './linkText'
 
 export interface WhiteboardHost {
   /** Double-click on an embedded object: the peek; with Ctrl/Cmd, a new tab. */
@@ -30,7 +31,7 @@ export const defaultHost: WhiteboardHost = {
     else usePeek.getState().peek(path)
   },
   linkFor(path) {
-    return `[[${summaryOf(path)?.title ?? stemOf(path)}]]`
+    return wikilinkFor(path)
   },
   resolve(link, from) {
     return resolveLink(link, from)

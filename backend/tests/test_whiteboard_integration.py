@@ -123,6 +123,36 @@ def test_restore_whiteboard_collision_takes_one_stem(wb_dir: Path):
     assert orphan.read_bytes() == b"orphan"
 
 
+def test_create_whiteboard_never_adopts_orphan_sidecar(wb_dir: Path):
+    _space, c, _events = _client(wb_dir)
+    assert (wb_dir / "Whiteboards/Orphan (2).whiteboard.json").is_file()
+    first = c.post("/api/whiteboards", json={"title": "Orphan"})
+    assert first.status_code == 201 and first.json()["path"] == "Whiteboards/Orphan.md"
+    second = c.post("/api/whiteboards", json={"title": "Orphan"})
+    assert second.status_code == 201
+    path = second.json()["path"]
+    assert path == "Whiteboards/Orphan (3).md"
+    r = c.get("/api/whiteboard", params={"path": path})
+    assert r.status_code == 200
+    assert r.json()["revision"] == ""
+    assert r.json()["board"]["nodes"] == {}
+
+
+def test_restore_whiteboard_without_sidecars_never_adopts_orphan(wb_dir: Path):
+    _space, c, _events = _client(wb_dir)
+    before = _bytes(wb_dir, EMPTY)
+    trash_id = _delete(c, wb_dir, EMPTY)
+    assert c.post("/api/whiteboards", json={"title": "Empty board"}).status_code == 201
+    orphan = wb_dir / "Whiteboards/Empty board (2).ink.svg"
+    orphan.write_bytes(b"orphan")
+    r = c.post(f"/api/trash/{trash_id}/restore")
+    assert r.status_code == 200, r.text
+    assert r.json()["paths"] == ["Whiteboards/Empty board (3).md"]
+    assert (wb_dir / "Whiteboards/Empty board (3).md").read_bytes() == before[EMPTY]
+    assert not (wb_dir / "Whiteboards/Empty board (3).ink.svg").exists()
+    assert orphan.read_bytes() == b"orphan"
+
+
 def test_purge_and_expiry_remove_sidecars(wb_dir: Path):
     space, c, _events = _client(wb_dir)
     first = _delete(c, wb_dir, NETWORK)

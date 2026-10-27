@@ -177,6 +177,7 @@ export const WB = {
   readOnly: s("This whiteboard file has content Object can't read, so it opens read-only.", 'ours'),
   newerVersion: s('This whiteboard was saved by a newer version of Object.', 'ours'),
   changedElsewhere: s('Changed elsewhere. Reloaded.', 'ours'),
+  saveFailed: s('Could not save the whiteboard.', 'ours'),
   searchObjects: s('Search objects', 'ours'),
   pickType: s('Pick a type', 'ours'),
 } as const satisfies Record<string, WbString>
