@@ -1,6 +1,8 @@
 // Display formatting for property values: numbers (with Object's number formats and
 // separators), dates, emptiness and placeholders.
 import type { DateValue, NumberFormat, PropertyDef } from '@/api/types'
+import type { DeviceSettings } from '@/api/types'
+import { useSettings } from '@/settings/useSettings'
 import { currencySymbol } from './currencies'
 
 const LOCALE = 'en-US'
@@ -72,19 +74,46 @@ export function parseNumberInput(s: string, fmt?: NumberFormat | null): number |
 
 const DAY_FORMAT = new Intl.DateTimeFormat(LOCALE, { dateStyle: 'medium', timeZone: 'UTC' })
 const TIME_FORMAT = new Intl.DateTimeFormat(LOCALE, { dateStyle: 'medium', timeStyle: 'short' })
+const TIME_FORMAT_24 = new Intl.DateTimeFormat(LOCALE, { dateStyle: 'medium', timeStyle: 'short', hourCycle: 'h23' })
+const CLOCK_FORMAT = new Intl.DateTimeFormat(LOCALE, { timeStyle: 'short' })
+const CLOCK_FORMAT_24 = new Intl.DateTimeFormat(LOCALE, { timeStyle: 'short', hourCycle: 'h23' })
+
+type DateFormatting = DeviceSettings['dateFormatting']
+
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/** A numeric date in the order of `DateAndTimeSettings.dateFormatting.option*`. */
+function numericDate(y: number, m: number, d: number, order: Exclude<DateFormatting, 'localized'>): string {
+  if (order === 'DMY') return `${pad(d)}-${pad(m)}-${y}`
+  if (order === 'MDY') return `${pad(m)}/${pad(d)}/${y}`
+  return `${y}-${pad(m)}-${pad(d)}`
+}
 
 function formatPoint(iso: string, resolution: DateValue['resolution']): string {
+  // Display only: the device settings never change a stored value.
+  const { twentyFourHourTime, dateFormatting } = useSettings.getState().settings
+  const order = dateFormatting === 'DMY' || dateFormatting === 'MDY' || dateFormatting === 'YMD' ? dateFormatting : null
   if (resolution === 'day') {
     // A day is a calendar date, never shifted by the time zone.
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
     if (!m) return iso
+    if (order) return numericDate(+m[1], +m[2], +m[3], order)
     return DAY_FORMAT.format(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])))
   }
   const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? iso : TIME_FORMAT.format(d)
+  if (Number.isNaN(d.getTime())) return iso
+  if (order) {
+    const clock = (twentyFourHourTime ? CLOCK_FORMAT_24 : CLOCK_FORMAT).format(d)
+    return `${numericDate(d.getFullYear(), d.getMonth() + 1, d.getDate(), order)}, ${clock}`
+  }
+  return (twentyFourHourTime ? TIME_FORMAT_24 : TIME_FORMAT).format(d)
 }
 
-/** A date value in en-US (`Oct 30, 2026`, `Oct 30, 2026, 2:00 PM`); a range joins with " → ". */
+/**
+ * A date value in en-US (`Oct 30, 2026`, `Oct 30, 2026, 2:00 PM`); a range joins with " → ".
+ * The device settings switch the time to 24-hour (`14:00`) and the date to a numeric order
+ * (`30-10-2026`, `10/30/2026`, `2026-10-30`); "Localized" keeps the output above.
+ */
 export function formatDate(v: DateValue | null | undefined): string {
   if (!v || !v.start) return ''
   const start = formatPoint(v.start, v.resolution)

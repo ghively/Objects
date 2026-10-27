@@ -4,11 +4,18 @@
  *
  * Task 16: applies the device settings' theme to `<html>` (once they are loaded or changed here,
  * so the defaults never overwrite the cached first-paint theme) and binds `toggleDarkMode`.
+ *
+ * Task 17: mounts the Settings modal and the Shortcuts sheet and binds `openSettings` and
+ * `toggleShortcutsMenu` (also while typing: neither changes text).
  */
 import { useEffect } from 'react'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { applyTheme } from '@/theme/applyTheme'
 import { useThemeShortcuts } from '@/theme/shortcuts'
+import { useGlobalShortcut } from '@/lib/shortcuts'
+import { SettingsModal } from '@/settings/SettingsModal'
+import { ShortcutsSheet } from '@/settings/ShortcutsSheet'
+import { useSettingsModal } from '@/settings/useSettingsModal'
 
 function ThemeFollower() {
   const settings = useSettings((s) => s.settings)
@@ -23,8 +30,24 @@ function ThemeFollower() {
   return null
 }
 
+function SettingsOverlays() {
+  useGlobalShortcut('openSettings', () => useSettingsModal.getState().open(), { allowInEditable: true })
+  useGlobalShortcut('toggleShortcutsMenu', () => useSettingsModal.getState().toggleShortcuts(), { allowInEditable: true })
+  return (
+    <>
+      <SettingsModal />
+      <ShortcutsSheet />
+    </>
+  )
+}
+
 export function GlobalOverlays() {
-  return <ThemeFollower />
+  return (
+    <>
+      <ThemeFollower />
+      <SettingsOverlays />
+    </>
+  )
 }
 
 export default GlobalOverlays
