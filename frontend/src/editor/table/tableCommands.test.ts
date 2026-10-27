@@ -17,7 +17,9 @@ import {
   selectedCell,
   setHeaderColumn,
   setHeaderRow,
+  sortColumn,
   tableAt,
+  tableGrid,
 } from './tableCommands'
 
 const editors: TiptapEditor[] = []
@@ -144,5 +146,53 @@ describe('tableCommands', () => {
     })
     editor.commands.setTextSelection(at)
     expect(selectedCell(editor.state, pos)).toEqual({ row: 2, col: 1 })
+  })
+
+  test('test sort ascending and descending keeps header', () => {
+    const rows = [
+      '| Name  | Qty |',
+      '| ----- | --- |',
+      '| pear  | 10  |',
+      '| Apple | 2   |',
+      '|       | 7   |',
+      '| fig   | =SUM(5,-1) |',
+      '| beta  | 9   |',
+    ]
+    const body = `Before\n\n${rows.join('\n')}\n\nAfter\n`
+    const editor = headless(body)
+    const names = () => tableGrid(tableAt(editor.state.doc, tablePos(editor))!).map((r) => r[0])
+    const qty = () => tableGrid(tableAt(editor.state.doc, tablePos(editor))!).map((r) => r[1])
+
+    // Text case-insensitively, empty cells last.
+    expect(sortColumn(editor, tablePos(editor), 0, 'asc')).toBe(true)
+    expect(names()).toEqual(['Name', 'Apple', 'beta', 'fig', 'pear', ''])
+    let out = serializeBody(editor)
+    expect(out.startsWith('Before\n\n| Name')).toBe(true)
+    expect(out.endsWith('\n\nAfter\n')).toBe(true)
+    const lines = out.split('\n')
+    expect(lines[3]).toBe('| ----- | --- |')
+    expect(lines[4]).toBe('| Apple | 2   |')
+    // One edit: a single undo restores the original bytes.
+    editor.commands.undo()
+    expect(serializeBody(editor)).toBe(body)
+
+    sortColumn(editor, tablePos(editor), 0, 'desc')
+    expect(names()).toEqual(['Name', 'pear', 'fig', 'beta', 'Apple', ''])
+
+    // Numbers numerically (2 < 4 < 7 < 9 < 10), a formula by its value.
+    editor.commands.setContent('')
+    loadBody(editor, body)
+    sortColumn(editor, tablePos(editor), 1, 'asc')
+    expect(qty()).toEqual(['Qty', '2', '=SUM(5,-1)', '7', '9', '10'])
+    sortColumn(editor, tablePos(editor), 1, 'desc')
+    expect(qty()[0]).toBe('Qty')
+    expect(qty().slice(1, 3)).toEqual(['10', '9'])
+
+    // Already in order: no edit.
+    const before = serializeBody(editor)
+    const doc = editor.state.doc
+    sortColumn(editor, tablePos(editor), 1, 'desc')
+    expect(editor.state.doc).toBe(doc)
+    expect(serializeBody(editor)).toBe(before)
   })
 })

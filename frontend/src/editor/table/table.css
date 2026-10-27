@@ -93,3 +93,68 @@
 .table-menu-switch[data-state='checked'] .table-menu-switch-thumb {
   transform: translateX(11px);
 }
+
+/* Formula cells (FormulaCell.tsx): the cell shows its value; the `=…` text
+   shows while the caret is in it. Values align right like numbers (our choice). */
+.object-editor .formula-cell {
+  position: relative;
+}
+.object-editor .formula-source {
+  display: none;
+}
+.object-editor .formula-value {
+  font-variant-numeric: tabular-nums;
+  user-select: text;
+}
+.object-editor .formula-error {
+  color: var(--destructive, #dc2626);
+  cursor: help;
+}
+.object-editor .formula-placeholder {
+  color: var(--text-muted);
+  pointer-events: none;
+  user-select: none;
+}
+.object-editor .formula-menu-anchor {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 5;
+  font-weight: normal;
+  text-align: left;
+}
+.object-editor .formula-menu {
+  min-width: 16rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  margin-top: 2px;
+  padding: 0.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  background: var(--bg-raised);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.12);
+  font-size: 0.875rem;
+}
+.object-editor .formula-menu-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+.object-editor .formula-menu-item:hover,
+.object-editor .formula-menu-item[data-active] {
+  background: var(--bg-hover-2);
+}
+.object-editor .formula-menu-name {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-weight: 600;
+}
+.object-editor .formula-menu-desc,
+.object-editor .formula-menu-empty {
+  color: var(--text-muted);
+}
+.object-editor .formula-menu-empty {
+  padding: 0.25rem 0.5rem;
+}
