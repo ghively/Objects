@@ -959,3 +959,26 @@ export function quickCreate(
   const linked = connectDrop(next, drop, nodeId, opts.style, opts.ids?.edge)
   return linked === next ? board : linked
 }
+
+// ---- M8: Add to whiteboard ----
+
+/** The gap between a board's content and an object added to it ("Add to whiteboard"; two grid cells, our choice). */
+export const ADD_TO_BOARD_GAP = GRID * 2
+
+/**
+ * Where "Add to whiteboard" puts a new entity node: its top-left corner `ADD_TO_BOARD_GAP` right
+ * of the board's content, level with the content's top (snapped to the grid); the origin on an
+ * empty board.
+ */
+export function rightOfContent(board: WhiteboardData): WhiteboardPosition {
+  const b = boundsOf(Object.values(board.nodes).map(nodeBox))
+  if (!b) return { x: 0, y: 0 }
+  return snapPosition({ x: b.x + b.width + ADD_TO_BOARD_GAP, y: b.y })
+}
+
+/** Adds an entity node for `link` with its top-left corner at `rightOfContent(board)`. */
+export function addEntityRightOfContent(board: WhiteboardData, link: string, opts: { id?: string } = {}): WhiteboardData {
+  const at = rightOfContent(board)
+  const centre = { x: at.x + LINK_BLOCK_MIN_WIDTH / 2, y: at.y + DEFAULT_ENTITY_HEIGHT / 2 }
+  return createEntity(board, link, centre, { id: opts.id, snap: false })
+}

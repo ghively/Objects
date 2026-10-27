@@ -126,6 +126,10 @@ export interface BoardMenuProps {
   onClear(): void
   onDelete(): void
   onOpenAsPage?(): void
+  /** M8: "Export as PNG" (the whole board). */
+  onExportPng?(): void
+  /** M8: "Export selection as PNG", offered while something is selected. */
+  onExportSelectionPng?(): void
   /** Clear is unavailable (locked or read-only board). */
   disabled?: boolean
 }
