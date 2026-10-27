@@ -147,3 +147,29 @@ def test_rows_never_write(space_dir):
     assert res.status_code == 200
     assert len(res.json()["rows"]) == len(space.list())
     assert _hashes(space_dir) == before
+
+
+def test_rows_carry_backlinks(links_space_dir):
+    """M5 Task 2: the `entity_backlinks` definition's key holds the live backlinks."""
+    space = Space(links_space_dir)
+    rows = _by_path(space.rows())
+    ada = rows["People/Ada Lovelace.md"]
+    assert ada.values["backlinks"] == space.backlinks("People/Ada Lovelace.md")
+    assert {"target": "Charles Babbage", "path": "People/Charles Babbage.md"} in ada.values[
+        "backlinks"
+    ]
+    assert all(set(r) == {"target", "path"} for r in ada.values["backlinks"])
+    assert rows["People/Charles Babbage.md"].values["backlinks"] == space.backlinks(
+        "People/Charles Babbage.md"
+    )
+    # Page has no backlinks definition: its values are unchanged.
+    page_type = space.type_by_id("page")
+    assert not any(p.type == "entity_backlinks" for p in page_type.propertyDefinitions)
+    assert "backlinks" not in rows["Pages/Analytical Engine.md"].values
+    # Through the route too.
+    client = TestClient(create_app(space, watch=False))
+    res = client.post("/api/rows", json={"typeIds": ["project"]})
+    (diff,) = res.json()["rows"]
+    assert diff["values"]["backlinks"] == [
+        {"target": "Draft outline", "path": "Tasks/Draft outline.md"}
+    ]

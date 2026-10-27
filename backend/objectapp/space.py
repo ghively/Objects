@@ -22,6 +22,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import logging
 import os
 import random
 import re
@@ -76,7 +77,9 @@ from .propvalues import (
     encode_value,
 )
 from .taskhook import TaskResult, on_status_change
+from .linkindex import LinkIndex
 from .relink import relink_frontmatter, replace_wikilinks, rewrite_tag_lists, wikilink_targets
+from .resolver import Resolver, link_candidates
 from .templates import TemplateError, creation_variable, expand_title, resolve_date_variable
 from .textfile import atomic_write, create_new, encode_like, move_no_overwrite, retry_os
 from .trash import Trash, TrashItem
@@ -118,6 +121,7 @@ __all__ = [
     "SaveTypeResult",
     "Skip",
     "Space",
+    "SpaceChange",
     "SyncResult",
     "TrashItem",
     "UpdateResult",
@@ -126,6 +130,8 @@ __all__ = [
     "unique_path",
     "version_of",
 ]
+
+_log = logging.getLogger(__name__)
 
 Edit = Callable[[ObjectFile, dict], "ObjectFile | None"]
 """An edit for `Space._write`: (current file, its frontmatter) -> new file, or None for no change."""
@@ -279,6 +285,25 @@ class ObjectSummary:
     """A Tag's colour (``bg-<c>``), else None."""
     collections: list[str] = field(default_factory=list)
     """The raw names of the ``collections:`` key (``[]`` when absent)."""
+
+
+@dataclass(frozen=True)
+class SpaceChange:
+    """A change to the space's in-memory scan, for `Space.add_listener` listeners.
+
+    ``kind`` is ``'object'`` (``path`` is the object's space path; it may be gone
+    now) or ``'types'`` (a type definition changed; ``path`` is None).
+    """
+
+    kind: str
+    path: str | None
+
+
+def _names_key(s: ObjectSummary | None) -> tuple | None:
+    """What link resolution reads from a summary (None when the object is gone)."""
+    if s is None:
+        return None
+    return (s.title, tuple(s.aliases), s.createdAt, s.template, s.type)
 
 
 @dataclass(frozen=True)
@@ -585,19 +610,7 @@ def _yaml_single_quoted(text: str) -> str:
     return "'" + text.replace("'", "''") + "'"
 
 
-def _link_candidates(link: str) -> list[str]:
-    """The link text as given, then without ``[[ ]]``, ``|alias`` and ``#heading`` parts."""
-    text = link.strip()
-    if text.startswith("[[") and text.endswith("]]"):
-        text = text[2:-2].strip()
-    out = [text]
-    for sep in ("|", "#"):
-        for c in list(out):
-            if sep in c:
-                head = c.split(sep, 1)[0].strip()
-                if head not in out:
-                    out.append(head)
-    return [c for c in out if c]
+_link_candidates = link_candidates
 
 
 class Space:
@@ -607,6 +620,12 @@ class Space:
         self._lock = threading.RLock()
         self._raw: dict[str, RawObject] = {}
         self._summaries: dict[str, ObjectSummary] = {}
+        self._listeners: list[Callable[[SpaceChange], None]] = []
+        self._names_rev = 0
+        """Bumped whenever the set of link names changes (see `_names_changed`)."""
+        self._resolver: Resolver | None = None
+        self._links = LinkIndex(self)
+        self._listeners.append(self._links.on_change)
         self.own_writes: dict[str, str] = {}
         """Path -> version of the last write `save_body` made (for self-write suppression)."""
         self.own_deletes: dict[str, str] = {}
@@ -664,10 +683,14 @@ class Space:
         known = {t.name.lower() for t in self.types} | {t.id for t in self.types}
         for t in self.types:
             known |= {f.lower() for f in t.formerNames}
+        added = False
         for t in inferred:
             if t.name.lower() not in known and t.id not in known:
                 self.types.append(t)
                 known |= {t.name.lower(), t.id}
+                added = True
+        if added:
+            self._types_changed()
 
     def refresh_type(self, type_id: str) -> tuple[TypeDefinition | None, str]:
         """The type and its file's revision, reloading it when the file changed outside the app.
@@ -689,6 +712,7 @@ class Space:
                     self.types = [stored if x.id == type_id else x for x in self.types]
                     self._sort_types()
                     mem = stored
+                    self._types_changed(type_id)
                 self._loaded_revisions[type_id] = current
             return mem, current
 
@@ -1895,7 +1919,9 @@ class Space:
         self.own_writes.pop(rel, None)
         with self._lock:
             self._raw.pop(rel, None)
-            self._summaries.pop(rel, None)
+            if self._summaries.pop(rel, None) is not None:
+                self._names_changed()
+            self._fire(SpaceChange("object", rel))
         self.rescan_file(new_rel)
 
     def _rename_target(self, rel: str, new_title: str) -> str:
@@ -2267,6 +2293,7 @@ class Space:
             write_type_json(self.root, t, "")
         except (RevisionConflict, TypeReadOnly):
             return False
+        self._types_changed(t.id)
         return True
 
     def create_object(
@@ -2433,6 +2460,7 @@ class Space:
             }
         )  # fmt: skip
         self.types.append(t)
+        self._types_changed(t.id)
         return t
 
     def create_daily_note(self, day: str, template_id: str | None = None) -> tuple[str, str]:
@@ -2641,6 +2669,7 @@ class Space:
         except (RevisionConflict, TypeReadOnly):
             return False
         self.types = [new if x.id == t.id else x for x in self.types]
+        self._types_changed(t.id)
         return True
 
     def unregister_template(self, type_id: str, template_id: str) -> bool:
@@ -2791,6 +2820,7 @@ class Space:
             write_type_json(self.root, t, type_revision(self.root, t.id))
         except (RevisionConflict, TypeReadOnly):
             return False
+        self._types_changed(t.id)
         return True
 
     def trash_type(self, type_def: TypeDefinition, object_paths: Iterable[str]) -> TrashItem:
@@ -2860,6 +2890,7 @@ class Space:
                 },
             )
             self.types = [t for t in self.types if t.id != type_def.id]
+            self._types_changed(type_def.id)
             return TrashItem(
                 id=trash_id,
                 kind="type",
@@ -2935,6 +2966,7 @@ class Space:
             ]
             self.types.append(restored)
             self.types.sort(key=lambda t: (t.name.lower(), t.name))
+            self._types_changed(restored.id)
         stored_views = folder / "views.json"
         if stored_views.is_file():
             views_file = self.root / ".capacities" / "views" / f"{type_id}.json"
@@ -3150,6 +3182,7 @@ class Space:
             write_type_json(self.root, t, "")
             self.types.append(t)
             self._sort_types()
+            self._types_changed(t.id)
             return t
 
     def sync_problem(
@@ -3244,11 +3277,13 @@ class Space:
             # The rewritten files are rescanned as they are written, so they must
             # already resolve to the edited type (a renamed type by its new name).
             self.types = [new if x.id == new.id else x for x in self.types]
+            self._types_changed(new.id)
             try:
                 rewritten, skipped = self._apply_type_ops(to_write, run)
                 revision = write_type_json(self.root, new, current)
             except BaseException:
                 self.types = [mem if x.id == new.id else x for x in self.types]
+                self._types_changed(new.id)
                 for rel in members:
                     self.rescan_file(rel)
                 raise
@@ -3566,6 +3601,7 @@ class Space:
         else:
             self.types.append(t)
         self._sort_types()
+        self._types_changed(t.id)
         return revision
 
     def change_property_kind(
@@ -3829,26 +3865,101 @@ class Space:
             return version_of(raw.data) if raw is not None else None
 
     def rescan_file(self, path: str) -> None:
-        """Refresh one object's summary from disk (or drop it if the file is gone)."""
+        """Refresh one object's summary from disk (or drop it if the file is gone).
+
+        Every exit tells the listeners (`add_listener`) about the path, and a
+        change to the names links resolve by invalidates the resolver.
+        """
         rel = self._rel(path)
         full = self.root / rel
         with self._lock:
-            if not full.is_file():
+            before = self._summaries.get(rel)
+            raw: RawObject | None = None
+            if full.is_file():
+                try:
+                    raw = read_raw(self.root, rel)
+                except OSError:
+                    raw = None
+            if raw is None:
                 self._raw.pop(rel, None)
                 self._summaries.pop(rel, None)
-                return
+            else:
+                self._raw[rel] = raw
+                if self._type_id(raw.typeName) not in {t.id for t in self.types}:
+                    self._merge_types(infer_types_from(self._raw.values()))
+                self._summaries[rel] = self._summarize(raw)
+            if _names_key(before) != _names_key(self._summaries.get(rel)):
+                self._names_changed()
+            self._fire(SpaceChange("object", rel))
+
+    # -- change listeners -------------------------------------------------------
+
+    def add_listener(self, fn: Callable[[SpaceChange], None]) -> Callable[[], None]:
+        """Call ``fn(SpaceChange)`` after every change to the scan; returns an unsubscribe.
+
+        Listeners may run while the space lock is held: they must only record or
+        enqueue (never block, read files or take another lock). One that raises
+        is logged and never breaks the write.
+        """
+        with self._lock:
+            self._listeners.append(fn)
+
+        def unsubscribe() -> None:
+            with self._lock:
+                if fn in self._listeners:
+                    self._listeners.remove(fn)
+
+        return unsubscribe
+
+    def _fire(self, change: SpaceChange) -> None:
+        for fn in list(self._listeners):
             try:
-                raw = read_raw(self.root, rel)
-            except OSError:
-                self._raw.pop(rel, None)
-                self._summaries.pop(rel, None)
-                return
-            self._raw[rel] = raw
-            if self._type_id(raw.typeName) not in {t.id for t in self.types}:
-                self._merge_types(infer_types_from(self._raw.values()))
-            self._summaries[rel] = self._summarize(raw)
+                fn(change)
+            except Exception:  # noqa: BLE001 - a listener must never break a write
+                _log.exception("A space change listener failed on %s", change)
+
+    def _types_changed(self, type_id: str | None = None) -> None:
+        """Tell the listeners that a type definition changed (``type_id`` is informative)."""
+        self._fire(SpaceChange("types", None))
+
+    def _names_changed(self) -> None:
+        """The set of link names changed: rebuild the resolver on its next use."""
+        self._names_rev += 1
+        self._resolver = None
 
     # -- links --------------------------------------------------------------
+
+    @property
+    def links(self) -> LinkIndex:
+        """The space's link index (built lazily from the scan on first read)."""
+        return self._links
+
+    def backlinks(self, path: str) -> list[dict[str, Any]]:
+        """The distinct objects linking to ``path`` as entity references, title then path.
+
+        Each is ``{target: <its link text from path>, path}``.
+        """
+        rel = self._rel(path)
+        return [
+            {"target": self._link_text(src, rel), "path": src}
+            for src in self._links.backlinks(rel)
+        ]
+
+    def outgoing(self, path: str) -> list[str]:
+        """The objects ``path`` links to, sorted by path."""
+        return sorted(self._links.outgoing(self._rel(path)))
+
+    def _current_resolver(self) -> Resolver:
+        r = self._resolver
+        if r is not None:
+            return r
+        with self._lock:
+            r = self._resolver
+            if r is None:
+                aliases = {rel: _str_list(raw.fm.get("aliases")) for rel, raw in self._raw.items()}
+                r = Resolver.build(list(self._summaries.values()), aliases)
+                self._resolver = r
+            return r
 
     def resolve(self, link: str, from_path: str | None) -> str | None:
         """Resolve ``[[link]]`` text to an object path, deterministically.
@@ -3858,48 +3969,6 @@ class Space:
         folder; exact title anywhere (oldest ``createdAt``, then path); alias;
         case-insensitive title or file stem. Within each step the linking
         object's folder wins, then the oldest ``createdAt``, then the path.
+        Answered by a cached `Resolver`, rebuilt when the names change.
         """
-        candidates = _link_candidates(link)
-        with self._lock:
-            for text in candidates:
-                found = self._summaries.get(f"{text}.md") if "/" in text else None
-                if found is not None and found.template is None:
-                    return found.path
-        from_folder = None
-        if from_path:
-            from_folder = PurePosixPath(str(from_path).replace("\\", "/")).parent.as_posix()
-        with self._lock:
-            summaries = [s for s in self._summaries.values() if s.template is None]
-            aliases = {
-                rel: [a.lower() for a in _str_list(raw.fm.get("aliases"))]
-                for rel, raw in self._raw.items()
-            }
-
-        def folder(s: ObjectSummary) -> str:
-            return PurePosixPath(s.path).parent.as_posix()
-
-        def best(matches: list[ObjectSummary]) -> str | None:
-            if not matches:
-                return None
-            matches.sort(
-                key=lambda s: (
-                    folder(s) != from_folder,
-                    s.createdAt is None,
-                    s.createdAt or "",
-                    s.path,
-                )
-            )
-            return matches[0].path
-
-        for text in candidates:
-            low = text.lower()
-            steps = (
-                lambda s: s.title == text,
-                lambda s: low in aliases.get(s.path, ()),
-                lambda s: s.title.lower() == low or PurePosixPath(s.path).stem.lower() == low,
-            )
-            for match in steps:
-                found = best([s for s in summaries if match(s)])
-                if found:
-                    return found
-        return None
+        return self._current_resolver().resolve(link, from_path)
