@@ -13,6 +13,7 @@ export type Command =
   | { type: 'zoom'; zoom: 'in' | 'out' | 'reset' | 'fit' | 'selection' }
   | { type: 'duplicate' }
   | { type: 'nudge'; dx: number; dy: number }
+  | { type: 'resize'; dw: number; dh: number }
   | { type: 'order'; mode: OrderMode }
   | { type: 'flip'; axis: 'x' | 'y' }
   | { type: 'wrap' }
@@ -42,6 +43,15 @@ export interface ShortcutContext {
 /** Nudge distances: one grid cell, five with Shift (our choice). */
 export const NUDGE = GRID
 export const NUDGE_FAR = GRID * 5
+
+/**
+ * Keyboard resize (M8, `whiteboardResize` / `whiteboardResizeLarge`, provisional keys
+ * Mod-Alt-Arrow and Mod-Alt-Shift-Arrow): one grid step, five with Shift. Right and Down grow,
+ * Left and Up shrink ("Grows or shrinks from the right or bottom edge"). Alt-Arrow alone stays
+ * `navigateBack`/`navigateForward`.
+ */
+export const RESIZE = GRID
+export const RESIZE_FAR = GRID * 5
 
 /** Whether keys typed at `target` belong to an editor or input rather than the canvas. */
 export function isEditableTarget(target: EventTarget | null | undefined): boolean {
@@ -89,6 +99,14 @@ export function keyToCommand(e: KeyLike, ctx: ShortcutContext = {}): Command | n
   if (mod && alt && (lower === 'g' || code === 'KeyG')) return sel ? { type: 'wrap' } : null
   // Duplicate: Ctrl+D
   if (mod && !alt && !shift && lower === 'd') return sel ? { type: 'duplicate' } : null
+
+  // Resize selection: Ctrl+Alt+Arrow (with Shift: farther)
+  if (mod && alt && key in ARROWS) {
+    if (!sel) return null
+    const [x, y] = ARROWS[key]
+    const step = shift ? RESIZE_FAR : RESIZE
+    return { type: 'resize', dw: x * step, dh: y * step }
+  }
 
   if (mod || alt) return null
 

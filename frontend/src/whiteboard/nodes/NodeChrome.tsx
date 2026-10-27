@@ -7,12 +7,17 @@
  * Handles are always rendered, because React Flow positions a connector from the handles of
  * its two nodes; when the board or the node is locked (or the node is a point) they are hidden
  * and not connectable, and the resizer and knob are left out.
+ *
+ * M8: a locked node (`locked`, Capacities' per-node lock) shows a lock icon on hover
+ * (`whiteboard.css` `.whiteboard-node-lock`; our placement, top right).
  */
 import { Fragment, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Handle, NodeResizer, Position } from '@xyflow/react'
+import { Icon } from '@/components/Icon'
 import type { WhiteboardNode, WhiteboardNodeKind } from '@/api/whiteboardTypes'
 import { AUTO_MAX_HEIGHT, AUTO_MAX_WIDTH, AUTO_MIN_WIDTH, AUTO_TEXT_MIN_HEIGHT, LINK_BLOCK_MIN_WIDTH, minSizeFor } from '../model'
 import { isEditable, useBoardActions, useBoardState } from '../store'
+import { WB } from '../strings'
 
 export const HANDLE_IDS = ['top', 'right', 'bottom', 'left'] as const
 export type HandleId = (typeof HANDLE_IDS)[number]
@@ -214,6 +219,11 @@ export function NodeChrome({ node, selected, entity, editing, keepAspectRatio, c
       {showResizer && node.kind === 'shape' && <RotationKnob node={node} />}
       <Handles visible={editable && !point} point={point} />
       {children}
+      {node.locked === true && !point && (
+        <div className="whiteboard-node-lock" data-whiteboard-node-locked="" title={WB.nodeLocked.text} aria-label={WB.nodeLocked.text}>
+          <Icon name="ph-lock-simple" size={14} />
+        </div>
+      )}
     </>
   )
 }

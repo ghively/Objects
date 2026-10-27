@@ -6,6 +6,8 @@
  * "Remove frame title" (one frame) and "Delete". Locked nodes are left out of every edit (they
  * can still be duplicated). With only connectors selected it shows `EdgeStyleMenu`.
  * Every control is one undo step over the whole selection.
+ * M8: "View" for embedded objects (`EntityViewMenu`) and "Lock" / "Unlock" (our strings) for
+ * the per-node lock: a locked node can't be moved, resized or deleted until it is unlocked.
  */
 import type { WhiteboardNode, WhiteboardTextBlock, WhiteboardThemeColor } from '@/api/whiteboardTypes'
 import { ColorPicker } from '@/components/ColorPicker'
@@ -16,6 +18,7 @@ import { isCircuitNode } from '../model'
 import { WB } from '../strings'
 import { ChromeButton, hint, KEY_HINT, MenuRow, MenuSeparator, PopoverMenu } from './controls'
 import { EdgeStyleMenu } from './EdgeStyleMenu'
+import { EntityViewMenu } from './EntityViewMenu'
 
 /** Our string: the order controls' menu (Capacities shows its four items; no group name in the reference). */
 export const ORDER_LABEL = 'Order'
@@ -82,6 +85,11 @@ export function SelectionToolbar({ nodes, edges, blocks, actions }: SelectionToo
       (n.kind === 'block' && n.blockId !== undefined && blocks[n.blockId]?.type === 'text'),
   )
   const flipTargets = editable.filter((n) => n.kind === 'shape')
+  const entityTargets = editable.filter(
+    (n) => n.kind === 'block' && n.blockId !== undefined && blocks[n.blockId]?.type === 'entity',
+  )
+  const lockable = nodes.filter((n) => n.kind !== 'point')
+  const allLocked = lockable.length > 0 && lockable.every((n) => n.locked === true)
   const oneFrame = nodes.length === 1 && editable.length === 1 && editable[0].kind === 'frame' ? editable[0] : null
 
   const patchNodes = (label: string, targets: WhiteboardNode[], patch: Partial<WhiteboardNode>) =>
@@ -169,6 +177,7 @@ export function SelectionToolbar({ nodes, edges, blocks, actions }: SelectionToo
           )}
         </PopoverMenu>
       )}
+      {entityTargets.length > 0 && <EntityViewMenu nodes={entityTargets} blocks={blocks} actions={actions} />}
       {flipTargets.length > 0 && (
         <PopoverMenu label={WB.controlFlip.text} trigger={<Icon name="ph-flip-horizontal" size={16} />}>
           {(close) => (
@@ -263,6 +272,16 @@ export function SelectionToolbar({ nodes, edges, blocks, actions }: SelectionToo
             <Icon name="ph-text-t" size={16} />
           </ChromeButton>
         ))}
+      {lockable.length > 0 && (
+        <ChromeButton
+          label={allLocked ? WB.nodeUnlock.text : WB.nodeLock.text}
+          pressed={allLocked}
+          data-whiteboard-node-lock=""
+          onClick={() => actions.apply(allLocked ? 'unlock' : 'lock', (b) => A.setNodesLocked(b, lockable.map((n) => n.id), !allLocked))}
+        >
+          <Icon name={allLocked ? 'ph-lock-simple' : 'ph-lock-simple-open'} size={16} />
+        </ChromeButton>
+      )}
       {editable.length > 0 && (
         <ChromeButton
           label={WB.controlDelete.text}

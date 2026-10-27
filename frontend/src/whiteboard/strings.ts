@@ -88,6 +88,22 @@ export const WB = {
   controlRemoveLabel: s('Remove arrow label', 'Whiteboard.control.removeLabel'),
   controlAddTitle: s('Add frame title', 'Whiteboard.control.addTitle'),
   controlRemoveTitle: s('Remove frame title', 'Whiteboard.control.removeTitle'),
+  controlView: s('View', 'Whiteboard.control.view'),
+
+  // The entity node View menu (M8): M7's four views (structureViewTypes.*.name)
+  viewInline: s('Link block', 'structureViewTypes.inline.name'),
+  viewSmallCard: s('Small card', 'structureViewTypes.smallCard.name'),
+  viewWideCard: s('Wide card', 'structureViewTypes.wideCard.name'),
+  viewEmbed: s('Embed', 'structureViewTypes.embed.name'),
+
+  // Quick-create on a connector drop (M8, Whiteboard.quickCreate.*; "Link {name}" is
+  // `Whiteboard.quickCreate.linkTyped`, a template: QUICK_CREATE_LINK_TYPED below)
+  quickCreateObjects: s('Objects', 'Whiteboard.quickCreate.objects'),
+  quickCreateCreateObject: s('Create Object', 'Whiteboard.quickCreate.createObject'),
+  quickCreateLinkObject: s('Link Object', 'Whiteboard.quickCreate.linkObject'),
+  quickCreateShapes: s('Shapes', 'Whiteboard.quickCreate.shapes'),
+  quickCreateNone: s('Nothing', 'Whiteboard.quickCreate.none'),
+  quickCreateDiscard: s('Remove', 'Whiteboard.quickCreate.discard'),
 
   // Place (Whiteboard.align.*)
   placeLeft: s('Place left', 'Whiteboard.align.left'),
@@ -174,6 +190,9 @@ export const WB = {
   shortcutFlipHorizontal: s('Flip horizontal', 'shortcuts.whiteboardFlipHorizontal.name'),
   shortcutFlipVertical: s('Flip vertical', 'shortcuts.whiteboardFlipVertical.name'),
   shortcutWrapInFrame: s('Wrap in frame', 'shortcuts.whiteboardWrapInFrame.name'),
+  shortcutResize: s('Resize selection', 'shortcuts.whiteboardResize.name'),
+  shortcutResizeDescription: s('Grows or shrinks from the right or bottom edge', 'shortcuts.whiteboardResize.description'),
+  shortcutResizeLarge: s('Resize selection farther', 'shortcuts.whiteboardResizeLarge.name'),
   shortcutCycle: s('Cycle selected objects', 'shortcuts.whiteboardCycle.name'),
   shortcutCycleBack: s('Cycle selected objects backward', 'shortcuts.whiteboardCycleBack.name'),
   shortcutUndo: s('Undo last change', 'shortcuts.undo.name'),
@@ -193,7 +212,17 @@ export const WB = {
   saveFailed: s('Could not save the whiteboard.', 'ours'),
   searchObjects: s('Search objects', 'ours'),
   pickType: s('Pick a type', 'ours'),
+  // M8: the per-node lock (Capacities has the `locked` key but no label in the reference)
+  nodeLock: s('Lock', 'ours'),
+  nodeUnlock: s('Unlock', 'ours'),
+  nodeLocked: s('Locked', 'ours'),
 } as const satisfies Record<string, WbString>
+
+/** `Whiteboard.quickCreate.linkTyped` ("Link {name}"), filled with a type's name. */
+export const QUICK_CREATE_LINK_TYPED = { text: 'Link {name}', ref: 'Whiteboard.quickCreate.linkTyped' } as const
+export function quickCreateLinkTyped(name: string): string {
+  return QUICK_CREATE_LINK_TYPED.text.replace('{name}', name)
+}
 
 export type WbKey = keyof typeof WB
 

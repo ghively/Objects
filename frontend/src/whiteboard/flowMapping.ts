@@ -95,7 +95,7 @@ export function toFlow(
 /**
  * Applies React Flow's position and size changes to the board. Only fields that actually changed
  * are rewritten (every other key, known or not, is kept), unchanged nodes keep their identity and
- * the board itself is returned as is when nothing changed. Selection, add, remove and replace
+ * the board itself is returned as is when nothing changed. Locked nodes take neither (M8). Selection, add, remove and replace
  * changes are ignored (the store owns those), and so are size changes from measuring: only a
  * resize (`resizing` or `setAttributes`) writes `width`/`height`.
  */
@@ -109,14 +109,16 @@ export function fromFlowChange(board: WhiteboardData, changes: readonly NodeChan
   for (const c of changes) {
     if (c.type === 'position') {
       const n = current(c.id)
-      if (!n || !c.position) continue
+      // A locked node (M8) can't be moved until it is unlocked.
+      if (!n || !c.position || n.locked) continue
       const { x, y } = c.position
       if (!Number.isFinite(x) || !Number.isFinite(y)) continue
       if (n.position.x === x && n.position.y === y) continue
       put({ ...n, position: { ...n.position, x, y } })
     } else if (c.type === 'dimensions') {
       const n = current(c.id)
-      if (!n || !c.dimensions) continue
+      // …nor resized.
+      if (!n || !c.dimensions || n.locked) continue
       if (!c.resizing && !c.setAttributes) continue
       const setW = c.setAttributes !== 'height'
       const setH = c.setAttributes !== 'width'

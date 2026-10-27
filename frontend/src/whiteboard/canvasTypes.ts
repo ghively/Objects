@@ -132,6 +132,8 @@ export interface BoardMenuProps {
 
 export interface ObjectPickerProps {
   mode: 'link' | 'create'
+  /** M8 ("Link {name}" in the quick-create menu): list only objects of this type. */
+  typeId?: string
   host: WhiteboardHost
   onPick(result: { path: string }): void
   onClose(): void

@@ -9,6 +9,9 @@
  * `Attachments/` and place a media node of the default size on the grid; Web link asks for a URL
  * and an optional title and places a card, never fetching), and files dropped on the board
  * become media nodes the same way.
+ * M8 (Task 21): a connector dropped on empty canvas opens the quick-create menu at the drop
+ * point (`QuickCreateMenu`); Ctrl/Cmd+Alt+Arrow resizes the selection from its right or bottom
+ * edge by a grid step (five with Shift); locked nodes stay put.
  * Panning and zooming never touch the board; the camera is kept per viewer in localStorage.
  */
 import '@xyflow/react/dist/base.css'
@@ -35,6 +38,7 @@ import {
   useStore as useFlowStore,
   useViewport,
   type Connection,
+  type FinalConnectionState,
   type EdgeTypes as FlowEdgeTypes,
   type EdgeChange,
   type NodeChange,
@@ -43,13 +47,14 @@ import {
 } from '@xyflow/react'
 import type { WhiteboardMediaTool, WhiteboardPosition, WhiteboardTool } from '@/api/whiteboardTypes'
 import { MAX_UPLOAD_BYTES, openFilePicker, showToast, UPLOAD_LIMIT_MESSAGE } from '@/editor/media/upload'
-import { boundsOf, createMedia, createWeblink, newId, nodeBox } from './actions'
+import { boundsOf, createMedia, createWeblink, newId, nodeBox, quickCreate, resizeBy, type ConnectorDrop, type QuickCreateChoice } from './actions'
 import { fitBox, zoomStep, wheelViewport, type Viewport } from './camera'
 import type { Placement, ResolvedSettings, ZoomCommand } from './canvasTypes'
 import { ObjectPicker } from './chrome'
 import { mayCarryObject, readDroppedObject } from './dnd'
 import { MarkerDefs, edgeTypes } from './edges'
 import { toFlow, type FlowEdge, type FlowNode } from './flowMapping'
+import { QuickCreateMenu, type QuickCreatePick } from './chrome/QuickCreateMenu'
 import { WeblinkInput } from './chrome/WeblinkInput'
 import { mediaHost, type WhiteboardHost } from './host'
 import { GRID, MEDIA_TOOL_KIND, ZOOM_MAX, ZOOM_MIN, isConnectorTool, isMediaTool, isTool, type Box } from './model'
@@ -145,7 +150,9 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [ctrlHeld, setCtrlHeld] = useState(false)
   const [guides, setGuides] = useState<SnapGuide[]>([])
-  const [picker, setPicker] = useState<{ mode: 'link' | 'create'; at: WhiteboardPosition } | null>(null)
+  // `drop` (M8): the picker was opened from the quick-create menu; the pick is connected to it.
+  const [picker, setPicker] = useState<{ mode: 'link' | 'create'; at: WhiteboardPosition; typeId?: string; drop?: ConnectorDrop } | null>(null)
+  const [quick, setQuick] = useState<{ drop: ConnectorDrop; left: number; top: number } | null>(null)
   const [weblinkAt, setWeblinkAt] = useState<WhiteboardPosition | null>(null)
   const [zoom, setZoom] = useState(1)
 
@@ -256,6 +263,70 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
     },
     [actions],
   )
+
+  // ---- quick-create on a connector drop (M8) ----
+
+  const onConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent, state: FinalConnectionState) => {
+      if (!isEditable(store.getState())) return
+      if (state.isValid || state.toNode || !state.fromNode || !state.fromHandle) return
+      const target = event.target as Element | null
+      // Let go over a node (not on a handle): no quick-create (our choice).
+      if (target && typeof target.closest === 'function' && target.closest('.react-flow__node')) return
+      const pt = 'changedTouches' in event && event.changedTouches.length ? event.changedTouches[0] : (event as MouseEvent)
+      const at = rf.screenToFlowPosition({ x: pt.clientX, y: pt.clientY }, { snapToGrid: false })
+      const rect = wrapperRef.current?.getBoundingClientRect()
+      // Kept inside the canvas (the menu is 240 wide, at most 420 tall; our choice).
+      const left = Math.max(8, Math.min(pt.clientX - (rect?.left ?? 0), (rect?.width ?? 1280) - 248))
+      const top = Math.max(8, Math.min(pt.clientY - (rect?.top ?? 0), (rect?.height ?? 800) - 428))
+      setQuick({
+        drop: {
+          nodeId: state.fromNode.id,
+          handleId: state.fromHandle.id ?? null,
+          fromTarget: state.fromHandle.type === 'target',
+          at,
+        },
+        left,
+        top,
+      })
+    },
+    [rf, store],
+  )
+
+  /** Places `choice` at the drop point and connects it, as one step; selects what was placed. */
+  const finishQuick = useCallback(
+    (drop: ConnectorDrop, choice: QuickCreateChoice) => {
+      if (!isEditable(store.getState())) return
+      const m = store.getState().memory
+      const ids = { node: newId(), edge: newId() }
+      actions.apply('create', (b) =>
+        quickCreate(b, drop, choice, {
+          snap: settings.isSnappingToGrid,
+          style: { connection: m.lastEdgeConnection, line: m.lastEdgeLine },
+          ids,
+        }),
+      )
+      const board = store.getState().doc.board
+      if (ids.node in board.nodes && choice.kind !== 'none') actions.select([ids.node])
+    },
+    [actions, store, settings.isSnappingToGrid],
+  )
+
+  const onQuickPick = useCallback(
+    (pick: QuickCreatePick) => {
+      const q = quick
+      setQuick(null)
+      if (!q) return
+      if (pick.kind === 'remove') return
+      if (pick.kind === 'none') finishQuick(q.drop, { kind: 'none' })
+      else if (pick.kind === 'shape') finishQuick(q.drop, { kind: 'shape', shape: pick.shape })
+      else if (pick.kind === 'createObject') setPicker({ mode: 'create', at: q.drop.at, drop: q.drop })
+      else setPicker({ mode: 'link', at: q.drop.at, drop: q.drop, typeId: pick.typeId })
+    },
+    [quick, finishQuick],
+  )
+
+  const closeQuick = useCallback(() => setQuick(null), [])
 
   // ---- camera ----
 
@@ -408,10 +479,14 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
       const p = picker
       setPicker(null)
       if (!p) return
+      if (p.drop) {
+        finishQuick(p.drop, { kind: 'entity', link: host.linkFor(path) })
+        return
+      }
       actions.createEntity(host.linkFor(path), p.at, { snap: settings.isSnappingToGrid })
       actions.setTool('select')
     },
-    [picker, actions, host, settings.isSnappingToGrid],
+    [picker, actions, host, settings.isSnappingToGrid, finishQuick],
   )
 
   // ---- drag and drop of objects ----
@@ -475,6 +550,11 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
         case 'nudge':
           actions.nudge(cmd.dx, cmd.dy)
           return true
+        case 'resize': {
+          const sel = st.selection
+          actions.apply('resize', (b) => resizeBy(b, sel, cmd.dw, cmd.dh, measured))
+          return true
+        }
         case 'order':
           actions.order(cmd.mode)
           return true
@@ -494,6 +574,10 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
           actions.removeSelection()
           return true
         case 'escape':
+          if (quick) {
+            setQuick(null)
+            return true
+          }
           if (picker) {
             setPicker(null)
             return true
@@ -527,7 +611,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
       }
       return false
     },
-    [store, actions, canvas, ink, inkReadOnly, onZoom, picker, weblinkAt],
+    [store, actions, canvas, ink, inkReadOnly, onZoom, picker, weblinkAt, quick, measured],
   )
 
   const onKeyDown = useCallback(
@@ -558,7 +642,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
   }, [])
 
   const toolAttr = !editable ? 'locked' : inkTool ? inkTool.tool : tool
-  const placing = editable && !inkTool && !spaceHeld && isPlacementTool(tool) && !picker && !weblinkAt
+  const placing = editable && !inkTool && !spaceHeld && isPlacementTool(tool) && !picker && !weblinkAt && !quick
   const isEmpty = Object.keys(board.nodes).length === 0 && strokes.length === 0
 
   return (
@@ -588,6 +672,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
         onSelectionDragStart={onSelectionDragStart}
         onSelectionDragStop={onNodeDragStop}
         onConnect={onConnect}
+        onConnectEnd={onConnectEnd}
         onMoveEnd={onMoveEnd}
         minZoom={ZOOM_MIN}
         maxZoom={ZOOM_MAX}
@@ -634,10 +719,20 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
           <WeblinkInput onSubmit={onWeblink} onClose={() => setWeblinkAt(null)} />
         </div>
       )}
+      {quick && (
+        <div
+          className="absolute z-20"
+          style={{ left: quick.left, top: quick.top }}
+          data-testid="whiteboard-quick-create-anchor"
+        >
+          <QuickCreateMenu onPick={onQuickPick} onClose={closeQuick} />
+        </div>
+      )}
       {picker && (
         <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
           <ObjectPicker
             mode={picker.mode}
+            typeId={picker.typeId}
             host={host}
             onPick={onPick}
             onClose={() => {
