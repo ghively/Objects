@@ -1,1 +1,197 @@
-/* Task 7: plain rendering; styled by the task that owns this node's view. */
+/* Media blocks (Task 11). Spacing from Object's index CSS: an entity block
+   (`.EntityBlock.block-outer.embed`) sits `--ep-stack` (.2em) below the block
+   before it; the radius is --border-radius-base (.5rem). Colours are tokens. */
+.object-editor .media-block {
+  margin-block-start: 0.2em;
+  position: relative;
+}
+
+/* The ResizableEmbed frame (shared with object embeds). */
+.object-editor .resizable-embed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+.object-editor .resizable-embed[data-align='center'] { align-items: center; }
+.object-editor .resizable-embed[data-align='right'] { align-items: flex-end; }
+.object-editor .resizable-embed-frame {
+  position: relative;
+  max-width: 100%;
+  min-width: 0;
+}
+.object-editor .resizable-embed-frame:not([data-width]) { width: 100%; }
+.object-editor .resizable-embed-toolbar {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.object-editor .resizable-embed-frame:hover > .resizable-embed-toolbar,
+.object-editor .resizable-embed-frame:focus-within > .resizable-embed-toolbar,
+.object-editor .bookmark-frame:hover > .resizable-embed-toolbar,
+.object-editor .bookmark-frame:focus-within > .resizable-embed-toolbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+.object-editor .resizable-embed-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+.object-editor .resizable-embed-btn:hover { background: var(--bg-hover-2); color: var(--text); }
+.object-editor .resizable-embed-btn[aria-pressed='true'] { color: var(--text); background: var(--bg-raised-2); }
+.object-editor .resizable-embed-handle-x {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -6px;
+  display: flex;
+  align-items: stretch;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.object-editor .resizable-embed-handle-y {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  display: flex;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.object-editor .resizable-embed-frame:hover > .resizable-embed-handle-x,
+.object-editor .resizable-embed-frame:hover > .resizable-embed-handle-y { opacity: 1; }
+.object-editor .resizable-embed-handle-x [role='separator'],
+.object-editor .resizable-embed-handle-y [role='separator'] {
+  border-radius: 3px;
+  background: var(--border-subtle);
+}
+.object-editor .resizable-embed-caption {
+  width: 100%;
+  margin-top: 4px;
+  font-size: 0.875em;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: inherit;
+}
+.object-editor .resizable-embed[data-align='center'] .resizable-embed-caption { text-align: center; }
+.object-editor .resizable-embed[data-align='right'] .resizable-embed-caption { text-align: right; }
+.object-editor .resizable-embed-caption::placeholder { color: var(--text-muted); opacity: 0.7; }
+
+/* The views. */
+.object-editor .media-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+.object-editor .media-pdf {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  background: var(--bg-raised);
+}
+.object-editor .media-audio { display: block; width: 100%; }
+.object-editor .media-video { display: block; width: 100%; border-radius: 0.5rem; background: var(--bg-raised); }
+.object-editor .media-file,
+.object-editor .media-missing,
+.object-editor .media-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  background: var(--bg-raised);
+}
+.object-editor .media-missing,
+.object-editor .media-error { color: var(--text-muted); font-size: 0.9em; }
+.object-editor .media-missing-name { color: var(--text); }
+.object-editor .media-file-text { flex: 1; min-width: 0; }
+.object-editor .media-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.object-editor .media-file-size { font-size: 0.8em; color: var(--text-muted); }
+.object-editor .media-file-actions { display: flex; gap: 2px; margin-right: 34px; }
+.object-editor .media-file-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  text-decoration: none;
+  cursor: pointer;
+}
+.object-editor .media-file-btn:hover { background: var(--bg-hover-2); color: var(--text); }
+.object-editor .media-block.is-selected .resizable-embed-frame,
+.object-editor .object-embed.is-selected .resizable-embed-frame,
+.object-editor .bookmark-block.is-selected .bookmark-frame {
+  outline: 2px solid var(--block-selection-border);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+/* The block's "…" menu (rendered in a portal, outside .object-editor). */
+.embed-menu-heading {
+  padding: 6px 8px 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.embed-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+.embed-menu-item:hover { background: var(--bg-hover-2); }
+
+/* Upload toasts (media/upload.ts). */
+.editor-toasts {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.editor-toast {
+  max-width: 480px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--card-shadow);
+}

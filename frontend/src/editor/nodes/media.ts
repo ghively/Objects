@@ -5,10 +5,13 @@
  *   ![[Attachments/Quarterly report.pdf]]  form 'wiki' (target, label): any kind
  *
  * `kind` comes from the extension (Task 2's kinds). View settings (width,
- * height, align, caption) are block options. Rendering is minimal here; Task 11
- * adds the media views.
+ * height, align, caption) are block options. Drawn by `media/MediaView.tsx`
+ * (Task 11); `renderHTML` stays the plain form for copy and HTML export.
  */
 import { Node, mergeAttributes } from '@tiptap/core'
+import { ReactNodeViewRenderer } from '@tiptap/react'
+import { MediaView } from '../media/MediaView'
+import { pickAndInsert } from '../media/upload'
 import { attachmentKind, type AttachmentKind } from '../annotations'
 import { insertBlockNode } from './containers'
 import './media.css'
@@ -27,7 +30,7 @@ declare module '@tiptap/core' {
     media: {
       /** Insert a media block below the current block. */
       insertMedia: (attrs: MediaAttrs) => ReturnType
-      /** Pick a file of `kind`, upload it and insert it (Task 11; `false` until then). */
+      /** Pick a file of `kind`, upload it and insert its block (the upload finishes later). */
       pickMedia: (kind: AttachmentKind) => ReturnType
     }
   }
@@ -84,6 +87,10 @@ export const Media = Node.create({
     return ['div', mergeAttributes(HTMLAttributes, { 'data-media': '', class: 'media-block' }), name || '']
   },
 
+  addNodeView() {
+    return ReactNodeViewRenderer(MediaView)
+  },
+
   renderText({ node }) {
     return mediaMarkdown(node.attrs as MediaAttrs)
   },
@@ -101,7 +108,12 @@ export const Media = Node.create({
           insertBlockNode(tr, state.schema.nodes.media.create(mediaAttrs(attrs)))
           return true
         },
-      pickMedia: () => () => false,
+      pickMedia:
+        (kind) =>
+        ({ editor, dispatch }) => {
+          if (dispatch) pickAndInsert(editor, kind)
+          return true
+        },
     }
   },
 })

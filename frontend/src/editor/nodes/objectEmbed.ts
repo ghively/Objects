@@ -2,9 +2,12 @@
  * `objectEmbed`: an embedded object, a line that is exactly `![[Title]]` (or
  * `![[Title|label]]`) whose target is not a media file (rule 7). Its view
  * ("Link block", "Small card", "Wide card", "Embed") is the `view` option.
- * Rendering is minimal here; Task 11 adds the card view.
+ * Drawn by `embed/ObjectEmbedView.tsx` (Task 11); `renderHTML` stays the plain
+ * form for copy and HTML export.
  */
-import { Node, mergeAttributes } from '@tiptap/core'
+import { Node, mergeAttributes, type Editor } from '@tiptap/core'
+import { ReactNodeViewRenderer } from '@tiptap/react'
+import { ObjectEmbedView } from '../embed/ObjectEmbedView'
 import { insertBlockNode } from './containers'
 import './objectEmbed.css'
 
@@ -13,10 +16,18 @@ declare module '@tiptap/core' {
     objectEmbed: {
       /** Insert an embed of the object titled `target` below the current block. */
       insertObjectEmbed: (target: string, label?: string | null) => ReturnType
-      /** Pick an object to embed (Task 11; `false` until then). */
+      /** Pick an object to embed (the link picker in `embed` mode; `false` when none is installed). */
       pickObjectEmbed: () => ReturnType
     }
   }
+}
+
+type EmbedPicker = (editor: Editor, range: { from: number; to: number }) => void
+let embedPicker: EmbedPicker | null = null
+
+/** Route `pickObjectEmbed()` to the app's picker (`installLinkPicker` sets it; `null` clears). */
+export function setObjectEmbedPicker(fn: EmbedPicker | null): void {
+  embedPicker = fn
 }
 
 export function objectEmbedMarkdown(target: string, label: string | null | undefined): string {
@@ -57,6 +68,10 @@ export const ObjectEmbed = Node.create({
     ]
   },
 
+  addNodeView() {
+    return ReactNodeViewRenderer(ObjectEmbedView)
+  },
+
   renderText({ node }) {
     return objectEmbedMarkdown(node.attrs.target, node.attrs.label)
   },
@@ -74,7 +89,13 @@ export const ObjectEmbed = Node.create({
           insertBlockNode(tr, state.schema.nodes.objectEmbed.create({ target, label }))
           return true
         },
-      pickObjectEmbed: () => () => false,
+      pickObjectEmbed:
+        () =>
+        ({ editor, state, dispatch }) => {
+          if (!embedPicker) return false
+          if (dispatch) embedPicker(editor, { from: state.selection.from, to: state.selection.to })
+          return true
+        },
     }
   },
 })

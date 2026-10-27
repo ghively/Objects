@@ -1,1 +1,27 @@
-/* Task 7: plain rendering; styled by the task that owns this node's view. */
+/* The web link block (Task 11): a card with title, domain and URL. */
+.object-editor .bookmark-block { margin-block-start: 0.2em; }
+.object-editor .bookmark-frame { position: relative; }
+.object-editor .bookmark-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  background: var(--bg-raised);
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+}
+.object-editor .bookmark-card:hover { background: var(--bg-hover); }
+.object-editor .bookmark-icon { flex-shrink: 0; margin-top: 2px; color: var(--text-muted); }
+.object-editor .bookmark-text { display: flex; flex-direction: column; min-width: 0; }
+.object-editor .bookmark-title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.object-editor .bookmark-domain,
+.object-editor .bookmark-url {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
