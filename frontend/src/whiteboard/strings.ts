@@ -205,6 +205,27 @@ export const WB = {
   delete: s('Delete', 'general.delete'),
   deleteObject: s('Delete', 'EntityMenu.delete'),
 
+  // The floating inspector (M8, FloatingInspector.*); the Stats rows are our choice of stats
+  inspectorOutline: s('Outline', 'FloatingInspector.tabs.outline'),
+  inspectorFrames: s('Frames', 'FloatingInspector.tabs.frames'),
+  inspectorStats: s('Stats', 'FloatingInspector.tabs.stats'),
+  inspectorEmptyOutline: s('No headings in this page', 'FloatingInspector.emptyOutline'),
+  inspectorEmptyFrames: s('No frames on this whiteboard', 'FloatingInspector.emptyFrames'),
+  inspectorPin: s('Pin', 'FloatingInspector.pin'),
+  inspectorUnpin: s('Unpin', 'FloatingInspector.unpin'),
+  statText: s('Text', 'Whiteboard.tools.text'),
+  statObjects: s('Objects', 'general.objects'),
+  statMedia: s('Media', 'general.media'),
+  statShapes: s('Shapes', 'Whiteboard.tools.shapes'),
+  statFrames: s('Frames', 'FloatingInspector.tabs.frames'),
+  statWords: s('Words', 'MergeResolutionModal.wordCount'),
+
+  // The board presentation (M8)
+  controlPlay: s('Play', 'Whiteboard.control.play'),
+  controlPagePrev: s('Previous page', 'Whiteboard.control.pagePrev'),
+  controlPageNext: s('Next page', 'Whiteboard.control.pageNext'),
+  presentationExit: s('Exit presentation', 'FloatingToolbox.presentation.exit'),
+
   // Ours: no Object original
   readOnly: s("This whiteboard file has content Object can't read, so it opens read-only.", 'ours'),
   newerVersion: s('This whiteboard was saved by a newer version of Object.', 'ours'),
@@ -216,6 +237,11 @@ export const WB = {
   nodeLock: s('Lock', 'ours'),
   nodeUnlock: s('Unlock', 'ours'),
   nodeLocked: s('Locked', 'ours'),
+  // M8: the floating inspector's toggle and the Stats rows with no Object label
+  inspector: s('Inspector', 'ours'),
+  statWeblinks: s('Web links', 'ours'),
+  statConnectors: s('Connectors', 'ours'),
+  statStrokes: s('Ink strokes', 'ours'),
 } as const satisfies Record<string, WbString>
 
 /** `Whiteboard.quickCreate.linkTyped` ("Link {name}"), filled with a type's name. */

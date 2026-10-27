@@ -4,7 +4,8 @@
  * last pointer tool, with a caret for both), Text, Existing object, New object, Media (M8: re-arms
  * the last of Image, PDF, Audio, File and Web link, else Image; `resolveWhiteboardMediaTool`), Shapes (re-arms
  * the last shape-menu tool, else Rectangle), Gates (Engineering mode; the last gate, else NAND),
- * Frame, then the ink plugin's pen group, Undo/Redo, Lock and "More options" → "Canvas display".
+ * Frame, then the ink plugin's pen group, Undo/Redo, Lock, "Play" (M8: presents the board frame
+ * by frame; works on a locked or read-only board too) and "More options" → "Canvas display".
  */
 import type { ReactNode } from 'react'
 import type { WhiteboardMediaTool, WhiteboardTool } from '@/api/whiteboardTypes'
@@ -84,6 +85,7 @@ export function Toolbox({
   canRedo,
   memory = {},
   readOnly = false,
+  onPlay,
 }: ToolboxProps) {
   const editable = !locked && !readOnly
   const pointer = isPointerTool(tool) ? tool : resolvePointerTool(memory.lastPointerTool, memory.lastUsedTool)
@@ -236,6 +238,11 @@ export function Toolbox({
       >
         <Icon name={locked ? 'ph-lock-simple' : 'ph-lock-simple-open'} size={18} />
       </ChromeButton>
+      {onPlay && (
+        <ChromeButton label={WB.controlPlay.text} onClick={onPlay}>
+          <Icon name="ph-play" size={18} />
+        </ChromeButton>
+      )}
       <PopoverMenu label={WB.toolMore.text} trigger={<Icon name="ph-dots-three" size={18} />} align="end">
         {() => <DisplayMenu settings={settings} onSettings={onSettings} />}
       </PopoverMenu>

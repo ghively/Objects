@@ -64,6 +64,8 @@ export function fitBox(
   boxes: readonly Box[],
   pane: { width: number; height: number },
   padding = 0,
+  /** The highest zoom used (M8: a presented frame fills the view, up to the 400 % limit). */
+  maxZoom = FIT_MAX_ZOOM,
 ): Viewport {
   if (boxes.length === 0) return { x: 0, y: 0, zoom: 1 }
   let minX = Infinity
@@ -81,8 +83,8 @@ export function fitBox(
   const aw = Math.max(1, pane.width - 2 * padding)
   const ah = Math.max(1, pane.height - 2 * padding)
   let zoom = Math.min(bw > 0 ? aw / bw : Infinity, bh > 0 ? ah / bh : Infinity)
-  if (!Number.isFinite(zoom)) zoom = FIT_MAX_ZOOM
-  zoom = clampZoom(Math.min(FIT_MAX_ZOOM, zoom))
+  if (!Number.isFinite(zoom)) zoom = maxZoom
+  zoom = clampZoom(Math.min(maxZoom, zoom))
   const cx = minX + bw / 2
   const cy = minY + bh / 2
   return { x: pane.width / 2 - cx * zoom, y: pane.height / 2 - cy * zoom, zoom }
