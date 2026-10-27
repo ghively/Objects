@@ -1,9 +1,10 @@
 /**
  * Recently opened objects, newest first (max 50). Fed by `useTabs.open` and `usePeek.peek` for
- * objects. A per-viewer convenience kept in localStorage; it never reaches the server.
+ * objects. A per-viewer convenience kept in localStorage, one list per space; it never reaches the server.
  */
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { switchStoreSpace } from './spaceStorage'
 
 export const RECENT_LIMIT = 50
 
@@ -48,3 +49,11 @@ export const useRecent = create<RecentState>()(
     },
   ),
 )
+
+/**
+ * Keep this space's recent list under `object.recent:<root>` (the old global `object.recent` is
+ * migrated into the first space once and deleted). `null` goes back to the global key (tests).
+ */
+export function setRecentSpace(root: string | null): Promise<void> {
+  return switchStoreSpace(useRecent, 'object.recent', root, { paths: [] })
+}
