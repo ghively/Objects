@@ -144,19 +144,28 @@ class Registry:
 
     # -- writing ----------------------------------------------------------------
 
-    def register(self, path: Path | str, now: datetime | str | None = None) -> None:
-        """Add `path` (or refresh its ``lastOpened``) and make it the registry's ``lastOpened``."""
+    def register(
+        self, path: Path | str, now: datetime | str | None = None, *, touch: bool = True
+    ) -> None:
+        """Add `path` (or refresh its ``lastOpened``) and make it the registry's ``lastOpened``.
+
+        ``touch=False`` only adds the entry (with no ``lastOpened``) when it is not
+        listed yet: nothing was opened, so neither timestamp moves.
+        """
         root = str(normalize(path))
-        stamp = _iso(now)
+        stamp = _iso(now) if touch else None
         with _lock:
             data = self._load()
             for item in data["spaces"]:
                 if _key(item["path"]) == _key(root):
+                    if not touch:
+                        return
                     item["lastOpened"] = stamp
                     break
             else:
                 data["spaces"].append({"path": root, "lastOpened": stamp})
-            data["lastOpened"] = root
+            if touch:
+                data["lastOpened"] = root
             self._save(data)
 
     def remove(self, path: Path | str) -> None:
