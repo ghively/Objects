@@ -55,6 +55,7 @@ export function DateCell({
       if (value !== null) updates[def.key] = null
       if (present(frontmatter, 'repeat')) remove.push('repeat')
       if (present(frontmatter, 'remind')) remove.push('remind')
+      if (present(frontmatter, 'occurrenceLog')) remove.push('occurrenceLog')
     } else {
       if (!sameDate(d.date, value)) updates[def.key] = d.date
       for (const [key, before, after] of [
@@ -66,6 +67,8 @@ export function DateCell({
           if (present(frontmatter, key)) remove.push(key)
         } else updates[key] = after
       }
+      // M8: removing the recurrence discards its occurrence log in the same write.
+      if (d.repeat === null && repeat !== null && present(frontmatter, 'occurrenceLog')) remove.push('occurrenceLog')
     }
     if (Object.keys(updates).length === 0 && remove.length === 0) return
     onChangeMany?.(updates, remove.length ? remove : undefined)
@@ -112,7 +115,7 @@ export function DateCell({
             value={draft.date}
             constraints={def.options.constraints}
             onChange={() => {}}
-            task={{ repeat: draft.repeat, remind: draft.remind }}
+            task={{ repeat: draft.repeat, remind: draft.remind, occurrenceLog: textOf(frontmatter?.occurrenceLog) }}
             onTaskChange={(next) => {
               if (next.date === null) {
                 commit(next)

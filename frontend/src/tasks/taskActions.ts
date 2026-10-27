@@ -1,11 +1,21 @@
 // What the task UI does to a task: one `updateProperties` call for the status (the server's status
 // hook completes, reopens or advances it), then one `api.rows` reload, because the returned
 // frontmatter is raw and can't patch a decoded `Row`. A 409 reloads only, never retries.
-import { ConflictError, type Api } from '@/api/client'
+import { api as realApi, ConflictError, type Api } from '@/api/client'
 import type { DateValue, Row, TaskResult, TypeDef } from '@/api/types'
+import { localDayOf, parseRepeat } from './repeat'
 import { firstOptionOf, isOpen, statusDef } from './statusCategory'
+import { taskClient, type CatchUp, type OccurrenceAction, type TaskClient } from './taskContract'
 
-export type TaskApi = Pick<Api, 'updateProperties' | 'rows'>
+export type TaskApi = Pick<Api, 'updateProperties' | 'rows'> & Partial<Pick<TaskClient, 'overdue' | 'occurrence'>>
+
+/** The real calls (read at call time, so a mocked `api` module is used in tests). */
+export const DEFAULT_TASK_API: TaskApi = {
+  updateProperties: (...a) => realApi.updateProperties(...a),
+  rows: (...a) => realApi.rows(...a),
+  overdue: (path) => taskClient.overdue(path),
+  occurrence: (path, action, opts) => taskClient.occurrence(path, action, opts),
+}
 
 export interface TaskOutcome {
   /** The status hook's answer; undefined when nothing was written or the hook didn't run. */
@@ -46,6 +56,40 @@ export async function toggleDone(api: TaskApi, row: Row, type: TypeDef | undefin
   const target = firstOptionOf(type, isOpen(row, type) ? 'done' : 'not-started')
   if (!target) return { result: undefined, row: undefined, conflict: false, error: 'This type has no status for that.' }
   return setStatus(api, row, type, target.text)
+}
+
+/**
+ * Skip, Excuse, or a catch-up choice (M8): one `POST /api/tasks/occurrence` with the row's
+ * version (the server logs the line and moves the date), then one reload. A 409 reloads only.
+ */
+export async function occurrenceAction(
+  api: TaskApi,
+  row: Row,
+  action: OccurrenceAction,
+  catchUp?: CatchUp,
+): Promise<TaskOutcome> {
+  const path = row.summary.path
+  if (!api.occurrence) return { result: undefined, row: undefined, conflict: false, error: 'Not available yet' }
+  try {
+    const res = await api.occurrence(path, action, catchUp ? { catchUp, baseVersion: row.version } : { baseVersion: row.version })
+    return { result: res.task ?? undefined, row: await reload(api, path), conflict: false }
+  } catch (err) {
+    if (err instanceof ConflictError) return { result: undefined, row: await reload(api, path), conflict: true }
+    return { result: undefined, row: undefined, conflict: false, error: err instanceof Error ? err.message : 'Could not save.' }
+  }
+}
+
+/** The task's recurrence rule (`repeat`), or null. */
+export const repeatOf = (row: Row) => parseRepeat(row.values.repeat)
+
+/** A recurring task by due date whose date is before `now`'s day (it may have missed occurrences). */
+export function maybeOverdue(row: Row, now: Date = new Date()): boolean {
+  const rule = repeatOf(row)
+  const date = row.values.date as DateValue | null | undefined
+  if (!rule || rule.mode !== 'dueDate' || !date?.start) return false
+  const day = localDayOf(date.start)
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return !!day && day < today
 }
 
 /** A date value as a short day (`2026-10-28`; a time date adds its local `HH:mm`). */

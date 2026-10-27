@@ -64,4 +64,65 @@ describe('CustomRepeatDialog', () => {
     expect(onCancel).toHaveBeenCalledTimes(1)
     expect(onSave).not.toHaveBeenCalled()
   })
+
+  it('test on row writes canonical rules', async () => {
+    // 2026-10-30 is the 5th and last Friday of October (and not its last day).
+    const cases: [string, (u: ReturnType<typeof userEvent.setup>) => Promise<void>, string][] = [
+      [
+        'week',
+        async (u) => {
+          await u.click(screen.getByRole('button', { name: 'Friday' }))
+          await u.click(screen.getByRole('button', { name: 'Monday' }))
+        },
+        'every week on mon, fri',
+      ],
+      ['week', async () => {}, 'every week'],
+      ['month', async () => {}, 'every month on the 30th'],
+      ['month', async (u) => u.selectOptions(screen.getByLabelText('On'), 'Last Friday'), 'every month on the last friday'],
+      ['year', async () => {}, 'every year on october 30'],
+      ['year', async (u) => u.selectOptions(screen.getByLabelText('On'), 'Last Friday of October'), 'every year on the last friday of october'],
+    ]
+    for (const [unit, act, text] of cases) {
+      const onSave = vi.fn()
+      const u = userEvent.setup()
+      const { unmount } = render(<CustomRepeatDialog initial={null} day="2026-10-30" onSave={onSave} onCancel={() => {}} />)
+      await u.selectOptions(screen.getByLabelText('Unit'), unit)
+      await act(u)
+      await u.click(screen.getByRole('button', { name: 'Save' }))
+      expect(formatRepeat(onSave.mock.calls[0][0]), text).toBe(text)
+      unmount()
+    }
+  })
+
+  it('the on choices follow the day and the strings of the reference', async () => {
+    // 2026-10-13 is the 2nd Tuesday; 2026-09-30 is the last day and the last Wednesday.
+    const { unmount } = render(<CustomRepeatDialog initial={null} day="2026-10-13" onSave={() => {}} onCancel={() => {}} />)
+    await userEvent.selectOptions(screen.getByLabelText('Unit'), 'month')
+    expect(screen.getAllByRole('option').map((o) => o.textContent).slice(4)).toEqual(['The 13th', '2nd Tuesday'])
+    await userEvent.selectOptions(screen.getByLabelText('Unit'), 'year')
+    expect(screen.getAllByRole('option').map((o) => o.textContent).slice(4)).toEqual(['October 13', '2nd Tuesday of October'])
+    unmount()
+    render(<CustomRepeatDialog initial={null} day="2026-09-30" onSave={() => {}} onCancel={() => {}} />)
+    await userEvent.selectOptions(screen.getByLabelText('Unit'), 'month')
+    expect(screen.getAllByRole('option').map((o) => o.textContent).slice(4)).toEqual(['The 30th', 'Last day', 'Last Wednesday'])
+    // the On row is by scheduled date only
+    await userEvent.click(screen.getByLabelText('Completed date'))
+    expect(screen.queryByLabelText('On')).toBeNull()
+  })
+
+  it('starts from an anchored rule', async () => {
+    const onSave = vi.fn()
+    render(
+      <CustomRepeatDialog
+        initial={{ every: 2, unit: 'week', mode: 'dueDate', on: { weekdays: ['tue', 'thu'] } }}
+        day="2026-10-30"
+        onSave={onSave}
+        onCancel={() => {}}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Tuesday' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Friday' })).toHaveAttribute('aria-pressed', 'false')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(formatRepeat(onSave.mock.calls[0][0])).toBe('every 2 weeks on tue, thu')
+  })
 })
