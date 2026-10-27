@@ -490,6 +490,21 @@ const ITEM_NODES = new Set(['listItem', 'taskItem'])
  * but each list's first, which has nothing to nest under) or unindent their
  * nested items. Always handled while blocks are selected (focus stays here).
  */
+/**
+ * Tab / Shift-Tab with the cursor in a list item: sink or lift that item. This was the list
+ * extensions' own key; the registry owns it now (`indentBlocks`, `unindentBlocks`).
+ */
+export function indentListItemAtCursor(editor: Editor, dir: 1 | -1): boolean {
+  if (getBlockSelection(editor.state)) return false
+  const $from = editor.state.selection.$from
+  for (let d = $from.depth; d >= 1; d--) {
+    const name = $from.node(d).type.name
+    if (!ITEM_NODES.has(name)) continue
+    return dir === 1 ? editor.commands.sinkListItem(name) : editor.commands.liftListItem(name)
+  }
+  return false
+}
+
 export function indentBlocks(editor: Editor, dir: 1 | -1): boolean {
   const range = blockSelectionRange(editor.state)
   if (!range) return false
@@ -619,8 +634,8 @@ export const BlockSelection = Extension.create({
       copyBlocksAsMarkdown: () => copyBlocksAsMarkdown(editor),
       moveSelectedBlocksUp: () => moveBlocks(editor, -1),
       moveSelectedBlocksDown: () => moveBlocks(editor, 1),
-      indentBlocks: () => indentBlocks(editor, 1),
-      unindentBlocks: () => indentBlocks(editor, -1),
+      indentBlocks: () => indentBlocks(editor, 1) || indentListItemAtCursor(editor, 1),
+      unindentBlocks: () => indentBlocks(editor, -1) || indentListItemAtCursor(editor, -1),
       toggleTodoInBlockWithCursor: () => toggleTodoInBlock(editor),
       toggleToggleInBlockWithCursor: () => toggleToggleInBlock(editor),
       insertBlockAbove: () => insertBlock(editor, 'above'),
