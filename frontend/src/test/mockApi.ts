@@ -10,9 +10,11 @@
 import { vi } from 'vitest'
 import type { Api } from '@/api/client'
 import type {
+  Attachment,
   CalendarDay,
   CalendarRange,
   Collection,
+  DeviceSettings,
   GraphData,
   Layout,
   ObjectDetail,
@@ -22,11 +24,13 @@ import type {
   References,
   Row,
   SearchResult,
+  SpaceEntry,
   TaskEntry,
   TypeDef,
   ViewState,
   Views,
 } from '@/api/types'
+import { settingsDefaults } from '@/settings/defaults'
 
 /** A v2 type with every contract field; `partial` overrides. */
 export function typeDef(partial: Partial<TypeDef> & Pick<TypeDef, 'id'>): TypeDef {
@@ -219,11 +223,43 @@ export function taskEntry(partial: Partial<TaskEntry> = {}): TaskEntry {
   return { path: 'Tasks/Untitled.md', kind: 'date', day: '2026-10-01', done: false, ...partial }
 }
 
+/** Device settings: the contract defaults; `partial` overrides. */
+export function deviceSettings(partial: Partial<DeviceSettings> = {}): DeviceSettings {
+  return { ...settingsDefaults, openOnStart: {}, ...partial }
+}
+
+/** A spaces-registry entry with every contract field; `partial` overrides. */
+export function spaceEntry(partial: Partial<SpaceEntry> = {}): SpaceEntry {
+  const path = partial.path ?? '/spaces/Space'
+  return {
+    path,
+    name: path.replace(/[\\/]+$/, '').replace(/^.*[\\/]/, ''),
+    icon: null,
+    current: false,
+    missing: false,
+    lastOpened: null,
+    ...partial,
+  }
+}
+
+/** An attachment with every contract field; `partial` overrides. */
+export function attachment(partial: Partial<Attachment> = {}): Attachment {
+  return { path: 'Attachments/file.pdf', kind: 'pdf', size: 1024, ...partial }
+}
+
 type Fn =(...args: never[]) => unknown
 
 function defaults(): Api {
   return {
-    space: async () => ({ name: 'space', root: '/space', types: [] }),
+    space: async () => ({
+      name: 'space',
+      root: '/space',
+      types: [],
+      icon: null,
+      description: null,
+      hideTaskManagement: false,
+      revision: '',
+    }),
     objects: async () => [],
     object: async (path: string) => objectDetail({ summary: objectSummary({ path }) }),
     saveBody: async (_path: string, _body: string, baseVersion: string) => ({ version: `${baseVersion}+1` }),
@@ -305,6 +341,26 @@ function defaults(): Api {
     references: async () => references(),
     linkMention: async (input: { baseVersion: string }) => ({ version: `${input.baseVersion}+1` }),
     graph: async () => graphData(),
+    attachments: async () => [],
+    uploadAttachment: async (_blob: Blob | ArrayBuffer, name: string) => ({ path: `Attachments/${name}`, kind: 'file' as const }),
+    openAttachment: async () => ({ ok: true as const }),
+    patchSpace: async (patch: Record<string, unknown>) => ({
+      name: 'space',
+      root: '/space',
+      types: [],
+      icon: null,
+      description: null,
+      hideTaskManagement: false,
+      ...patch,
+      revision: 'r1',
+    }),
+    settings: async () => ({ settings: deviceSettings(), revision: '' }),
+    patchSettings: async (patch: Partial<DeviceSettings>) => ({ settings: deviceSettings(patch), revision: 'r1' }),
+    spaces: async () => [spaceEntry({ path: '/space', name: 'space', current: true })],
+    createSpace: async (name: string, location: string) => ({ path: `${location.replace(/[\\/]+$/, '')}/${name}` }),
+    openSpace: async (path: string) => ({ path }),
+    removeSpace: async () => ({ ok: true as const }),
+    switchSpace: async (path: string) => ({ path }),
     onChange: () => () => undefined,
   } as unknown as Api
 }

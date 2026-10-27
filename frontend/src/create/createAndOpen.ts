@@ -16,6 +16,8 @@ export interface OpenMods {
   metaKey?: boolean
   altKey?: boolean
   shiftKey?: boolean
+  /** M7: how the open was asked for (a link, or sidebar/nav); breadcrumbs use it (Task 14). */
+  via?: 'link' | 'nav'
 }
 
 export type OpenMode = 'current' | 'newTab' | 'peek'

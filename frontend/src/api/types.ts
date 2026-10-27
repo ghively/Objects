@@ -240,9 +240,85 @@ export interface ObjectSummary {
 
 /** GET /api/space */
 export interface SpaceInfo {
+  /** `.capacities/space.json`'s `name`, else the folder name. */
   name: string
   root: string
   types: TypeDef[]
+  /**
+   * M7: `space.json` keys (null / false when absent). The server always sends these four;
+   * they are optional here only so M1–M6 test fixtures that build a three-field `SpaceInfo`
+   * still type-check. Read them as `icon ?? null`, `hideTaskManagement ?? false`, `revision ?? ''`.
+   */
+  icon?: string | null
+  description?: string | null
+  hideTaskManagement?: boolean
+  /** M7: the revision of `space.json` (`''` when the file is absent). */
+  revision?: string
+}
+
+/** M7 `PUT /api/space` patch: only these keys are written to `space.json`. */
+export interface SpacePatch {
+  name?: string
+  icon?: string | null
+  description?: string | null
+  hideTaskManagement?: boolean
+}
+
+/** M7: the kind of an attachment file (Task 2's `media.py` kinds). */
+export type AttachmentKind = 'image' | 'pdf' | 'audio' | 'video' | 'file'
+
+/** M7 `GET /api/attachments` entry. */
+export interface Attachment {
+  path: string
+  kind: AttachmentKind
+  size: number
+}
+
+/** M7 `POST /api/attachments` → 201. */
+export interface UploadedAttachment {
+  path: string
+  kind: AttachmentKind
+}
+
+export type OpenOnStartMode = 'lastOpenedPage' | 'today' | 'calendar' | 'specificObject'
+
+/** M7: per-device settings (`<state dir>/settings.json`, defaults merged by the server). */
+export interface DeviceSettings {
+  themeMode: 'light' | 'dark'
+  lightTheme: 'light' | 'lightDimmed'
+  darkTheme: 'dark' | 'darkDimmed'
+  font: 'sans-serif' | 'serif' | 'monospace'
+  monochromeTags: boolean
+  monochromeTypeLabels: boolean
+  toggleStyle: 'toggle' | 'bullet'
+  disableNumberedListTransformation: boolean
+  disableSpellcheck: boolean
+  alwaysOpenAsFullPage: boolean
+  hideEntityIconsOnInlineLinks: boolean
+  hideOutlinerLines: boolean
+  twentyFourHourTime: boolean
+  dateFormatting: 'localized' | 'DMY' | 'MDY' | 'YMD'
+  /** Keyed by space root; a missing entry means `lastOpenedPage`. */
+  openOnStart: { [spaceRoot: string]: { mode: OpenOnStartMode; path?: string } }
+  startupSpace: 'lastOpened' | 'specific'
+  startupSpacePath: string | null
+}
+
+/** M7 `GET`/`PUT /api/settings` → 200. */
+export interface SettingsResponse {
+  settings: DeviceSettings
+  revision: string
+}
+
+/** M7 `GET /api/spaces` entry (registry order; the current space is always listed). */
+export interface SpaceEntry {
+  path: string
+  name: string
+  icon: string | null
+  current: boolean
+  /** The folder no longer exists. */
+  missing: boolean
+  lastOpened: string | null
 }
 
 /** GET /api/object?path= */
@@ -712,6 +788,8 @@ export interface TaskResult {
 
 export interface CalendarUi {
   weekStart: 'sunday' | 'monday'
+  /** M7: the calendar's right sidebar is closed (Capacities' `RootSpaceData.calendar` key). */
+  hideCalendarSidebar?: boolean
   daily: {
     hideDailyNote?: boolean
     hideTasks?: boolean
