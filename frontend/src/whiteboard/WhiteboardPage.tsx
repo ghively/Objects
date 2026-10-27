@@ -4,6 +4,7 @@
  * centre (with the ink plugin's pen group), the zoom menu bottom right, the selection toolbar
  * over the selection, the read-only banner, the delete flow as `ObjectView` has it and
  * "Clear Whiteboard" (board and ink, one undo step).
+ * M8: the board menu's "Export as PNG" (and "Export selection as PNG") call the canvas's exporter.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { NodeToolbar, Panel } from '@xyflow/react'
@@ -16,7 +17,7 @@ import { canGoBack, useTabs } from '@/nav/tabs'
 import { DeleteObjectDialog, useDeleteRequest } from '@/object/DeleteObjectDialog'
 import { DeletedBanner } from '@/object/DeletedBanner'
 import { BoardHeader } from './BoardHeader'
-import type { CanvasControls } from './WhiteboardCanvas'
+import type { BoardExporter, CanvasControls } from './WhiteboardCanvas'
 import { WhiteboardCanvas } from './WhiteboardCanvas'
 import { BoardMenu, SelectionToolbar, Toolbox, ZoomMenu } from './chrome'
 import { defaultHost, WhiteboardHostContext, type WhiteboardHost } from './host'
@@ -70,6 +71,7 @@ export function WhiteboardPage({
     }
   })
   const { store, status, error, toast, dismissToast, flush } = useBoard(path, client, storeOptions)
+  const exportRef = useRef<BoardExporter | null>(null)
   const settingsState = useWhiteboardSettings(client)
   const useInk = ink?.useInkDoc ?? useNoInkDoc
   const inkDoc = useInk(path)
@@ -235,6 +237,7 @@ export function WhiteboardPage({
               host={host}
               ink={ink}
               inkReadOnly={!!inkDoc.readOnlyReason || deleted}
+              exportRef={exportRef}
               renderChrome={(controls) => (
                 <BoardChrome controls={controls} ink={ink} inkDoc={inkDoc} settingsState={settingsState} />
               )}
@@ -255,6 +258,8 @@ export function WhiteboardPage({
                 onClear={() => store.getState().actions.clearBoard()}
                 onDelete={() => host.requestDelete(path, mode)}
                 onOpenAsPage={onExpand}
+                onExportPng={() => void exportRef.current?.(title)}
+                onExportSelectionPng={() => void exportRef.current?.(title, { selection: true })}
               />
             }
             actions={
@@ -321,9 +326,19 @@ function Banners({
   )
 }
 
-function BoardMenuSlot(props: { onClear(): void; onDelete(): void; onOpenAsPage?(): void }) {
+function BoardMenuSlot({
+  onExportSelectionPng,
+  ...props
+}: {
+  onClear(): void
+  onDelete(): void
+  onOpenAsPage?(): void
+  onExportPng?(): void
+  onExportSelectionPng?(): void
+}) {
   const editable = useBoardState((s) => isEditable(s))
-  return <BoardMenu {...props} disabled={!editable} />
+  const hasSelection = useBoardState((s) => s.selection.some((id) => id in s.doc.board.nodes))
+  return <BoardMenu {...props} onExportSelectionPng={hasSelection ? onExportSelectionPng : undefined} disabled={!editable} />
 }
 
 /** Toolbox (bottom centre), zoom (bottom right) and the selection toolbar, inside the canvas. */

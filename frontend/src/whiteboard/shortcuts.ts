@@ -23,6 +23,10 @@ export type Command =
   | { type: 'delete' }
   | { type: 'escape' }
   | { type: 'pan' }
+  /** M8: system-clipboard copy, cut and paste of the selection (Ctrl/Cmd+C, X, V). */
+  | { type: 'copy' }
+  | { type: 'cut' }
+  | { type: 'paste' }
 
 export interface KeyLike {
   key: string
@@ -99,6 +103,11 @@ export function keyToCommand(e: KeyLike, ctx: ShortcutContext = {}): Command | n
   if (mod && alt && (lower === 'g' || code === 'KeyG')) return sel ? { type: 'wrap' } : null
   // Duplicate: Ctrl+D
   if (mod && !alt && !shift && lower === 'd') return sel ? { type: 'duplicate' } : null
+
+  // Clipboard (M8): Ctrl+C / Ctrl+X need a selection; Ctrl+V always.
+  if (mod && !alt && !shift && (lower === 'c' || code === 'KeyC')) return sel ? { type: 'copy' } : null
+  if (mod && !alt && !shift && (lower === 'x' || code === 'KeyX')) return sel ? { type: 'cut' } : null
+  if (mod && !alt && !shift && (lower === 'v' || code === 'KeyV')) return { type: 'paste' }
 
   // Resize selection: Ctrl+Alt+Arrow (with Shift: farther)
   if (mod && alt && key in ARROWS) {

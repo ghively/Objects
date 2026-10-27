@@ -12,6 +12,10 @@
  * M8 (Task 21): a connector dropped on empty canvas opens the quick-create menu at the drop
  * point (`QuickCreateMenu`); Ctrl/Cmd+Alt+Arrow resizes the selection from its right or bottom
  * edge by a grid step (five with Shift); locked nodes stay put.
+ * M8 (Task 22): Ctrl/Cmd+C, X and V copy, cut and paste the selection through the system
+ * clipboard (`clipboard.ts`; pasted text, URLs and images become text blocks, web-link cards and
+ * media nodes in the middle of the view), and `exportRef` gives the page "Export as PNG"
+ * (`exportPng.ts`).
  * Panning and zooming never touch the board; the camera is kept per viewer in localStorage.
  */
 import '@xyflow/react/dist/base.css'
@@ -47,6 +51,19 @@ import {
 } from '@xyflow/react'
 import type { WhiteboardMediaTool, WhiteboardPosition, WhiteboardTool } from '@/api/whiteboardTypes'
 import { MAX_UPLOAD_BYTES, openFilePicker, showToast, UPLOAD_LIMIT_MESSAGE } from '@/editor/media/upload'
+import {
+  contentOfPasteEvent,
+  parsePayload,
+  pastePayload,
+  pasteText,
+  PASTE_OFFSET,
+  readClipboard,
+  selectionPayload,
+  serializePayload,
+  writeClipboard,
+  type ClipboardContent,
+} from './clipboard'
+import { backgroundOf, downloadDataUrl, EXPORT_FAILED, exportFileName, renderBoardPng, strokeBoxes } from './exportPng'
 import { boundsOf, createMedia, createWeblink, newId, nodeBox, quickCreate, resizeBy, type ConnectorDrop, type QuickCreateChoice } from './actions'
 import { fitBox, zoomStep, wheelViewport, type Viewport } from './camera'
 import type { Placement, ResolvedSettings, ZoomCommand } from './canvasTypes'
@@ -60,7 +77,7 @@ import { mediaHost, type WhiteboardHost } from './host'
 import { GRID, MEDIA_TOOL_KIND, ZOOM_MAX, ZOOM_MIN, isConnectorTool, isMediaTool, isTool, type Box } from './model'
 import { nodeTypes } from './nodes'
 import type { InkPlugin, InkStroke, InkToolState } from './plugin'
-import { keyToCommand, type Command } from './shortcuts'
+import { isEditableTarget, keyToCommand, type Command } from './shortcuts'
 import { snapToNodes, type SnapGuide } from './snapGuides'
 import { isEditable, useBoardStore, useBoardState } from './store'
 import { WB } from './strings'
@@ -107,6 +124,15 @@ function isPlacementTool(tool: WhiteboardTool): boolean {
   return isTool(tool) && tool !== 'select' && tool !== 'hand'
 }
 
+/**
+ * How long a Ctrl/Cmd+C or V waits for the browser's own copy or paste event (which carries the
+ * clipboard without a permission prompt) before using `navigator.clipboard` instead (our choice).
+ */
+export const CLIPBOARD_EVENT_WAIT_MS = 60
+
+/** "Export as PNG": the whole board, or with `selection` the selected nodes; false when nothing was exported. */
+export type BoardExporter = (title: string, opts?: { selection?: boolean }) => Promise<boolean>
+
 export interface CanvasControls {
   zoom: number
   onZoom(cmd: ZoomCommand): void
@@ -122,6 +148,8 @@ export interface WhiteboardCanvasProps {
   inkReadOnly?: boolean
   /** Chrome rendered inside the canvas (toolbox, zoom menu, selection toolbar). */
   renderChrome?(controls: CanvasControls): ReactNode
+  /** M8: set to the board's PNG exporter while the canvas is mounted. */
+  exportRef?: { current: BoardExporter | null }
 }
 
 export function WhiteboardCanvas(props: WhiteboardCanvasProps) {
@@ -132,7 +160,7 @@ export function WhiteboardCanvas(props: WhiteboardCanvasProps) {
   )
 }
 
-function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome }: WhiteboardCanvasProps) {
+function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome, exportRef }: WhiteboardCanvasProps) {
   const store = useBoardStore()
   const board = useBoardState((s) => s.doc.board)
   const strokes = useBoardState((s) => s.doc.strokes) as InkStroke[]
@@ -155,6 +183,8 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
   const [quick, setQuick] = useState<{ drop: ConnectorDrop; left: number; top: number } | null>(null)
   const [weblinkAt, setWeblinkAt] = useState<WhiteboardPosition | null>(null)
   const [zoom, setZoom] = useState(1)
+  // M8: while exporting, every node is rendered (not only those on screen).
+  const [exporting, setExporting] = useState(false)
 
   // The theme (M7): React Flow's own colours follow `colorMode`, and the nodes and edges get new
   // data on a change so their memoized views re-read `isDarkMode()` (whiteboard/colors.ts).
@@ -449,6 +479,176 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
     [weblinkAt, actions, store, settings.isSnappingToGrid],
   )
 
+  // ---- clipboard (M8) ----
+
+  /** The last copied (or pasted) clipboard text and how often it was pasted since. */
+  const pasteCount = useRef<{ text: string; count: number } | null>(null)
+  const pendingCopy = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingPaste = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /** The selection as clipboard text, or null when nothing is selected. */
+  const copyText = useCallback((): string | null => {
+    const st = store.getState()
+    const payload = selectionPayload(st.doc.board, st.selection)
+    if (!payload) return null
+    const text = serializePayload(payload)
+    pasteCount.current = { text, count: 0 }
+    return text
+  }, [store])
+
+  /** The middle of the visible part of the board (where pasted text, links and images go). */
+  const viewCentre = useCallback((): WhiteboardPosition => {
+    const rect = wrapperRef.current?.getBoundingClientRect()
+    const pane = paneSize()
+    const cx = (rect?.left ?? 0) + (rect?.width || pane.width) / 2
+    const cy = (rect?.top ?? 0) + (rect?.height || pane.height) / 2
+    return rf.screenToFlowPosition({ x: cx, y: cy }, { snapToGrid: false })
+  }, [rf, paneSize])
+
+  const applyPaste = useCallback(
+    (content: ClipboardContent) => {
+      if (!isEditable(store.getState())) return
+      if (content.files.length) {
+        const at = viewCentre()
+        void uploadFiles(host, content.files, (path, i) => placeMedia(path, at, i))
+        return
+      }
+      const text = content.text
+      if (!text) return
+      const payload = parsePayload(text)
+      if (payload) {
+        const prev = pasteCount.current
+        const count = prev && prev.text === text ? prev.count + 1 : 1
+        pasteCount.current = { text, count }
+        let ids: string[] = []
+        actions.apply('paste', (b) => {
+          const r = pastePayload(b, payload, PASTE_OFFSET * count)
+          ids = r.ids
+          return r.board
+        })
+        if (ids.length) actions.select(ids)
+        return
+      }
+      const id = newId()
+      actions.apply('create', (b) => pasteText(b, text, viewCentre(), { id, snap: settings.isSnappingToGrid }))
+      if (id in store.getState().doc.board.nodes) actions.select([id])
+    },
+    [store, actions, host, viewCentre, placeMedia, settings.isSnappingToGrid],
+  )
+
+  const clearPending = (ref: { current: ReturnType<typeof setTimeout> | null }) => {
+    if (ref.current !== null) clearTimeout(ref.current)
+    ref.current = null
+  }
+
+  /** Ctrl/Cmd+C or X: copy now if the browser's copy event doesn't come; X then removes the selection. */
+  const startCopy = useCallback(
+    (cut: boolean) => {
+      clearPending(pendingCopy)
+      const sel = [...store.getState().selection]
+      pendingCopy.current = setTimeout(() => {
+        pendingCopy.current = null
+        const text = copyText()
+        if (!text) return
+        void writeClipboard(text)
+        if (cut && isEditable(store.getState())) actions.removeSelection(sel)
+      }, CLIPBOARD_EVENT_WAIT_MS)
+    },
+    [store, copyText, actions],
+  )
+
+  const startPaste = useCallback(() => {
+    clearPending(pendingPaste)
+    pendingPaste.current = setTimeout(() => {
+      pendingPaste.current = null
+      void readClipboard().then(applyPaste)
+    }, CLIPBOARD_EVENT_WAIT_MS)
+  }, [applyPaste])
+
+  // The browser's own copy, cut and paste events while the canvas has focus (they target the
+  // body when the focused element isn't editable, so they are caught on the document).
+  useEffect(() => {
+    const ours = (): boolean => {
+      const el = wrapperRef.current
+      const active = document.activeElement
+      return !!el && !!active && el.contains(active) && !isEditableTarget(active)
+    }
+    const onCopy = (e: ClipboardEvent, cut: boolean) => {
+      if (!ours() || !e.clipboardData) return
+      const text = copyText()
+      if (!text) return
+      clearPending(pendingCopy)
+      e.preventDefault()
+      e.clipboardData.setData('text/plain', text)
+      if (cut && isEditable(store.getState())) actions.removeSelection()
+    }
+    const copy = (e: ClipboardEvent) => onCopy(e, false)
+    const cut = (e: ClipboardEvent) => onCopy(e, true)
+    const paste = (e: ClipboardEvent) => {
+      if (!ours()) return
+      clearPending(pendingPaste)
+      e.preventDefault()
+      applyPaste(contentOfPasteEvent(e.clipboardData))
+    }
+    document.addEventListener('copy', copy)
+    document.addEventListener('cut', cut)
+    document.addEventListener('paste', paste)
+    return () => {
+      document.removeEventListener('copy', copy)
+      document.removeEventListener('cut', cut)
+      document.removeEventListener('paste', paste)
+      clearPending(pendingCopy)
+      clearPending(pendingPaste)
+    }
+  }, [copyText, applyPaste, actions, store])
+
+  // ---- PNG export (M8) ----
+
+  const exportPng = useCallback<BoardExporter>(
+    async (title, opts = {}) => {
+      const st = store.getState()
+      const board = st.doc.board
+      const payload = opts.selection ? selectionPayload(board, st.selection) : null
+      if (opts.selection && !payload) return false
+      const nodesIn = payload ? payload.nodes : Object.values(board.nodes)
+      const boxes = nodesIn.map((n) => {
+        const b = nodeBox(n)
+        const m = measured[n.id]
+        return m && typeof n.width !== 'number' ? { ...b, width: m.width, height: typeof n.height === 'number' ? b.height : m.height } : b
+      })
+      if (!payload) boxes.push(...strokeBoxes(st.doc.strokes as InkStroke[]))
+      if (!boxes.length) return false
+      const only = payload ? new Set([...payload.nodes.map((n) => n.id), ...payload.edges.map((e) => e.id)]) : undefined
+      const kept = [...st.selection]
+      actions.select([])
+      setExporting(true)
+      try {
+        await nextFrames(2)
+        const viewport = wrapperRef.current?.querySelector<HTMLElement>('.react-flow__viewport')
+        if (!viewport) return false
+        const url = await renderBoardPng({ viewport, boxes, background: backgroundOf(wrapperRef.current), only })
+        if (!url) return false
+        downloadDataUrl(url, exportFileName(title))
+        return true
+      } catch {
+        showToast(EXPORT_FAILED)
+        return false
+      } finally {
+        setExporting(false)
+        actions.select(kept)
+      }
+    },
+    [store, actions, measured],
+  )
+
+  useEffect(() => {
+    if (!exportRef) return
+    exportRef.current = exportPng
+    return () => {
+      if (exportRef.current === exportPng) exportRef.current = null
+    }
+  }, [exportRef, exportPng])
+
   // ---- placement ----
 
   const place = useCallback(
@@ -608,10 +808,19 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
         case 'pan':
           if (!e.repeat) setSpaceHeld(true)
           return true
+        // The clipboard keys keep their default so the browser's own event can carry the data.
+        case 'copy':
+        case 'cut':
+          startCopy(cmd.type === 'cut')
+          return false
+        case 'paste':
+          if (!isEditable(st)) return false
+          startPaste()
+          return false
       }
       return false
     },
-    [store, actions, canvas, ink, inkReadOnly, onZoom, picker, weblinkAt, quick, measured],
+    [store, actions, canvas, ink, inkReadOnly, onZoom, picker, weblinkAt, quick, measured, startCopy, startPaste],
   )
 
   const onKeyDown = useCallback(
@@ -688,7 +897,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
         nodesDraggable={editable && !panning}
         nodesConnectable={editable}
         elementsSelectable={!panning}
-        onlyRenderVisibleElements
+        onlyRenderVisibleElements={!exporting}
         proOptions={{ hideAttribution: true }}
       >
         <CameraInit boardKey={boardKey} onZoom={setZoom} paneSize={paneSize} />
@@ -744,6 +953,18 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
       )}
     </div>
   )
+}
+
+/** Resolves after `n` animation frames (so React Flow has rendered every node for the export). */
+function nextFrames(n: number): Promise<void> {
+  return new Promise((resolve) => {
+    const step = (left: number) => {
+      if (left <= 0) resolve()
+      else if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => step(left - 1))
+      else setTimeout(() => step(left - 1), 16)
+    }
+    step(n)
+  })
 }
 
 /** Whether a drag carries files from the OS. */
