@@ -1,18 +1,14 @@
 /**
- * STUB (Task 9): replaced in full by Task 11. The export names and prop types are final
- * (`canvasTypes.ts`): `edgeTypes` (the `connector` edge) and `MarkerDefs`.
+ * The canvas connectors (Task 11): `edgeTypes` maps React Flow's `connector` edge type to
+ * `ConnectorEdge`, and `MarkerDefs` renders the tip definitions once per board. Export names and
+ * prop types are fixed by `canvasTypes.ts`.
  */
-import { createElement } from 'react'
-import { BaseEdge, getStraightPath } from '@xyflow/react'
-import type { EdgeTypes, MarkerDefsProps, WhiteboardEdgeProps } from '../canvasTypes'
+import type { EdgeTypes } from '../canvasTypes'
+import { ConnectorEdge } from './ConnectorEdge'
 
-function StraightConnector({ id, sourceX, sourceY, targetX, targetY }: WhiteboardEdgeProps) {
-  const [path] = getStraightPath({ sourceX, sourceY, targetX, targetY })
-  return createElement(BaseEdge, { id, path })
-}
+export const edgeTypes: EdgeTypes = { connector: ConnectorEdge }
 
-export const edgeTypes: EdgeTypes = { connector: StraightConnector }
-
-export function MarkerDefs(_props: MarkerDefsProps) {
-  return null
-}
+export { MarkerDefs } from './Markers'
+export { ConnectorEdge } from './ConnectorEdge'
+export { EdgeLabel } from './EdgeLabel'
+export { edgeColor, markerIds, pathFor, strokeFor } from './connectorStyle'
