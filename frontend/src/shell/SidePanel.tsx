@@ -6,8 +6,12 @@
  * areas set their heights; both write the tab's layout on pointer up. When the main card is too
  * narrow for both, the panel gives way down to 320 px so the main column keeps its minimum width. (No reference screenshot of
  * this layout: flagged for Gene's check.)
+ *
+ * M8: an entry dragged by its title and dropped anywhere on the main view (`[data-main-column]`)
+ * swaps with it, as "Swap" does ("Drag onto the main content to swap."). The drop is taken in the
+ * capture phase, only for that drag's data, so the main view's own drop targets never see it.
  */
-import { Fragment, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import type { SpaceInfo } from '@/api/types'
 import {
   areaFractions,
@@ -22,7 +26,44 @@ import {
 } from '@/nav/sidepanel'
 import { activeTab, useTabs } from '@/nav/tabs'
 import { Resizer } from './Resizer'
-import { SidePanelArea, type RenderSidepanelTarget } from './SidePanelArea'
+import { SIDEPANEL_ENTRY_MIME, SidePanelArea, type RenderSidepanelTarget } from './SidePanelArea'
+
+function carriesEntry(e: DragEvent): boolean {
+  const types = e.dataTransfer?.types
+  return !!types && Array.from(types).includes(SIDEPANEL_ENTRY_MIME)
+}
+
+function overMain(e: DragEvent): boolean {
+  const el = e.target instanceof Element ? e.target : null
+  return !!el?.closest('[data-main-column]')
+}
+
+/** While mounted, a side-panel entry dropped on the main view swaps with it. */
+function useDropToSwap(): void {
+  useEffect(() => {
+    const over = (e: DragEvent) => {
+      if (!carriesEntry(e) || !overMain(e)) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+    }
+    const drop = (e: DragEvent) => {
+      if (!carriesEntry(e) || !overMain(e)) return
+      e.preventDefault()
+      e.stopPropagation()
+      const id = e.dataTransfer?.getData(SIDEPANEL_ENTRY_MIME)
+      if (id) useTabs.getState().swapWithMain(id)
+    }
+    document.addEventListener('dragenter', over, true)
+    document.addEventListener('dragover', over, true)
+    document.addEventListener('drop', drop, true)
+    return () => {
+      document.removeEventListener('dragenter', over, true)
+      document.removeEventListener('dragover', over, true)
+      document.removeEventListener('drop', drop, true)
+    }
+  }, [])
+}
 
 export interface SidePanelProps {
   space: SpaceInfo | null
@@ -35,6 +76,7 @@ export function SidePanel({ space, renderTarget }: SidePanelProps) {
   // Live sizes while a resizer is dragged (written to the tab on pointer up).
   const [dragWidth, setDragWidth] = useState<number | null>(null)
   const [dragArea, setDragArea] = useState<{ area: PanelArea; size: number } | null>(null)
+  useDropToSwap()
   if (!tab || !isSidepanelShown(tab)) return null
 
   const entries = entriesOf(tab)

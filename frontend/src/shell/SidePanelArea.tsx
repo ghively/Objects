@@ -3,6 +3,10 @@
  * "Browse sidepanel tabs", "New Sidepanel Tab", "Swap", "Open as page", "Open sidepanel menu" and
  * close) over the open entry's content. An empty entry shows "Explore". A plain click on an object
  * link inside the entry navigates the entry, which keeps its own back and forward.
+ *
+ * M8: the backlinks entry (`{kind: 'backlinks'}`) shows `BacklinksPanel` for the tab's main
+ * object and follows it; "Explore" offers it beside the graph. The entry's title can be dragged
+ * onto the main view to swap, as "Swap" does (`SidePanel` takes the drop).
  */
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import type { SpaceInfo } from '@/api/types'
@@ -16,9 +20,22 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { AREAS, entryCanGoBack, entryCanGoForward, type PanelArea } from '@/nav/sidepanel'
-import { useTabs, type OpenOptions, type SidepanelEntry, type SidepanelTarget, type Target } from '@/nav/tabs'
+import {
+  AREAS,
+  BACKLINKS_TARGET,
+  entryCanGoBack,
+  entryCanGoForward,
+  isBacklinksTarget,
+  isPageTarget,
+  type PanelArea,
+} from '@/nav/sidepanel'
+import { currentTarget, useTabs, type OpenOptions, type SidepanelEntry, type SidepanelTarget, type Target } from '@/nav/tabs'
+import { BacklinksPanel } from '@/references/BacklinksPanel'
+import { REFERENCES_TEXT } from '@/references/referencesUi'
 import { TargetLabel } from '@/shell/TabStrip'
+
+/** The drag data of a side-panel entry dragged by its title (its id). */
+export const SIDEPANEL_ENTRY_MIME = 'application/x-object-sidepanel-entry'
 
 export const SIDEPANEL_TEXT = {
   /** `RenderSidepanel.tabList` */
@@ -47,6 +64,16 @@ export const SIDEPANEL_TEXT = {
   graph: 'Graph View',
   /** `SpaceTab.doubleClickToPersist` */
   doubleClickToPersist: 'Double click to make tab persistent.',
+  /** `EditorSettings.backlinkSectionsDefault.backlinks` */
+  backlinks: REFERENCES_TEXT.backlinksPanelTitle,
+  /** `RenderSidepanel.backlinks.tooltip`, its Markdown bold as a plain first line */
+  backlinksTooltip: 'Backlinks & Mentions\n\nShows the backlinks and mentions of the object in the main window.',
+}
+
+/** The backlinks entry's content: the tab's main object, followed as the tab navigates. */
+function BacklinksEntry() {
+  const main = useTabs((s) => currentTarget(s))
+  return <BacklinksPanel path={main?.kind === 'object' ? main.path : null} />
 }
 
 /** What an area renders for a target; `open` navigates the entry the content sits in. */
@@ -80,6 +107,14 @@ function HeaderButton({
 }
 
 export function EntryLabel({ entry, space }: { entry: SidepanelEntry; space: SpaceInfo | null }) {
+  if (isBacklinksTarget(entry.target)) {
+    return (
+      <>
+        <Icon name="ph-link-simple" size={15} />
+        <span className="truncate">{SIDEPANEL_TEXT.backlinks}</span>
+      </>
+    )
+  }
   if (entry.target?.kind === 'localGraph') {
     return (
       <>
@@ -104,7 +139,7 @@ export function SidePanelArea({ area, entries, space, renderTarget }: SidePanelA
   if (!entry) return null
   const s = useTabs.getState
   const target = entry.target
-  const pageTarget: Target | null = target && target.kind !== 'localGraph' ? target : null
+  const pageTarget: Target | null = isPageTarget(target) ? target : null
   const areaNumber = AREAS.indexOf(area) + 1
 
   // A plain click on a resolved object link inside the entry navigates the entry (Ctrl/Meta-click,
@@ -135,6 +170,16 @@ export function SidePanelArea({ area, entries, space, renderTarget }: SidePanelA
           data-testid="sidepanel-entry-title"
           title={entry.isPersistent ? undefined : SIDEPANEL_TEXT.doubleClickToPersist}
           onDoubleClick={() => s().toggleSidepanelEntryPersistent(entry.id)}
+          draggable={!!pageTarget}
+          onDragStart={(e) => {
+            if (!pageTarget) return
+            try {
+              e.dataTransfer.setData(SIDEPANEL_ENTRY_MIME, entry.id)
+              e.dataTransfer.effectAllowed = 'move'
+            } catch {
+              // A read-only DataTransfer: nothing to carry.
+            }
+          }}
           className={cn('flex min-w-0 flex-1 items-center gap-1.5 px-1 text-[14px] font-medium', !entry.isPersistent && 'italic')}
         >
           <EntryLabel entry={entry} space={space} />
@@ -206,7 +251,9 @@ export function SidePanelArea({ area, entries, space, renderTarget }: SidePanelA
       </header>
       <div className="min-h-0 flex-1 overflow-auto" data-sidepanel-entry={entry.id} onClickCapture={onClickCapture}>
         <ErrorBoundary what="This side panel tab" resetKey={target ? JSON.stringify(target) : ''}>
-          {target ? (
+          {isBacklinksTarget(target) ? (
+            <BacklinksEntry />
+          ) : target ? (
             renderTarget(target, nav)
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
@@ -219,6 +266,15 @@ export function SidePanelArea({ area, entries, space, renderTarget }: SidePanelA
               >
                 <Icon name="ph-graph" size={15} />
                 {SIDEPANEL_TEXT.graph}
+              </button>
+              <button
+                type="button"
+                title={SIDEPANEL_TEXT.backlinksTooltip}
+                onClick={() => s().navigateSidepanelEntry(entry.id, BACKLINKS_TARGET)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line px-3 text-[14px] hover:bg-hover"
+              >
+                <Icon name="ph-link-simple" size={15} />
+                {SIDEPANEL_TEXT.backlinks}
               </button>
             </div>
           )}
