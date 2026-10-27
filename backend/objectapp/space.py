@@ -76,6 +76,7 @@ from .propvalues import (
     encode_updates,
     encode_value,
 )
+from .spaceconfig import space_fields
 from .taskhook import TaskResult, on_status_change
 from .linkindex import LinkIndex
 from .relink import relink_frontmatter, replace_wikilinks, rewrite_tag_lists, wikilink_targets
@@ -615,9 +616,13 @@ _link_candidates = link_candidates
 
 
 class Space:
+    @property
+    def name(self) -> str:
+        """``.object/space.json``'s ``name``, else the folder name (re-read on every access)."""
+        return space_fields(self.root)["name"]
+
     def __init__(self, root: Path) -> None:
         self.root = Path(root).resolve()
-        self.name = self.root.name
         self._lock = threading.RLock()
         self._raw: dict[str, RawObject] = {}
         self._summaries: dict[str, ObjectSummary] = {}
