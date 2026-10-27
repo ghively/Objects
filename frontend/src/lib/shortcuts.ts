@@ -384,5 +384,48 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   def('redo', 'whiteboard', 'Redo last change', ['Mod-Shift-z', 'Mod-y'], 'whiteboard', false, false),
 ]
 
+/**
+ * M8's shortcuts (the plan's "Shortcut keys (new ids, provisional)" table; names
+ * `shortcuts.<id>.name`, verbatim). Every key is provisional. Editor ones are bound by Task 25
+ * (`editor/shortcuts.ts`), focus and presentation ones by Task 9, whiteboard ones by Task 21.
+ * `exitPresentationMode`, `nextPresentationSlide` and `previousPresentationSlide` are active only
+ * while presenting (scope `presentation` is not a scope here: they are global, and only the
+ * presentation view binds them, so they never fire otherwise).
+ */
+export const M8_SHORTCUTS: ShortcutDef[] = [
+  def('copyBlockReference', 'block', 'Copy block reference', ['Mod-Alt-r'], 'editor', P, true),
+  def('turnIntoObject', 'block', 'Turn into object', ['Mod-Alt-o'], 'editor', P, true),
+  def('turnIntoTask', 'block', 'Turn into task', ['Mod-Alt-k'], 'editor', P, true),
+  def('turnBlockIntoTaskObject', 'block', 'Turn block into task object', ['Mod-Alt-Shift-k'], 'editor', P, true),
+  def('highlightText', 'text', 'Highlight text selection', ['Mod-Shift-h'], 'editor', P, true),
+  def('toggleFocusMode', 'global', 'Toggle focus mode', ['Mod-Shift-f'], 'global', P, true),
+  def('openPresentationMode', 'page', 'Start presentation mode', ['Mod-Alt-p'], 'global', P, true),
+  def('exitPresentationMode', 'page', 'Exit presentation mode', ['Escape'], 'global', P, true),
+  def('nextPresentationSlide', 'page', 'Next presentation slide', ['ArrowRight'], 'global', P, true),
+  def('previousPresentationSlide', 'page', 'Previous presentation slide', ['ArrowLeft'], 'global', P, true),
+  def(
+    'whiteboardResize',
+    'whiteboard',
+    'Resize selection',
+    ['Mod-Alt-ArrowUp', 'Mod-Alt-ArrowDown', 'Mod-Alt-ArrowLeft', 'Mod-Alt-ArrowRight'],
+    'whiteboard',
+    P,
+    true,
+  ),
+  def(
+    'whiteboardResizeLarge',
+    'whiteboard',
+    'Resize selection farther',
+    ['Mod-Alt-Shift-ArrowUp', 'Mod-Alt-Shift-ArrowDown', 'Mod-Alt-Shift-ArrowLeft', 'Mod-Alt-Shift-ArrowRight'],
+    'whiteboard',
+    P,
+    true,
+  ),
+]
+
+/** The ids only bound while presenting (the plan: "the last three only while presenting"). */
+export const PRESENTATION_ONLY_IDS: readonly string[] = ['exitPresentationMode', 'nextPresentationSlide', 'previousPresentationSlide']
+
 registerShortcuts(EXISTING_SHORTCUTS)
 registerShortcuts(M7_SHORTCUTS)
+registerShortcuts(M8_SHORTCUTS)

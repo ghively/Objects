@@ -123,7 +123,7 @@ export function EntryLabel({ entry, space }: { entry: SidepanelEntry; space: Spa
       </>
     )
   }
-  return <TargetLabel target={entry.target} space={space} />
+  return <TargetLabel target={entry.target as Target | null} space={space} />
 }
 
 export interface SidePanelAreaProps {

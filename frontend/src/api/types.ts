@@ -302,6 +302,34 @@ export interface DeviceSettings {
   openOnStart: { [spaceRoot: string]: { mode: OpenOnStartMode; path?: string } }
   startupSpace: 'lastOpened' | 'specific'
   startupSpacePath: string | null
+  // ---- M8 (plan "API contract (M8)") ----
+  /** Sets the formatting locale only; the interface stays English. */
+  language: SettingsLanguage
+  /** `automatic` follows the language. */
+  decimalSeparator: 'automatic' | 'dot' | 'comma'
+  /** IANA zone name; `null` = the device's zone. */
+  timeZone: string | null
+  backlinkSectionsDefault: { backlinks: Tri; relatedContent: Tri; unlinkedMentions: Tri }
+  backlinkContentView: 'inline' | 'smallCard' | 'wideCard' | 'embed'
+  /** Type ids whose objects related content leaves out. */
+  relatedContentHiddenTypes: string[]
+  nestedBacklinkView: 'showBlockContainingBacklink' | 'showFullPathAbove'
+  presentation: PresentationSettings
+}
+
+/** M8 `DeviceSettings.language`. */
+export type SettingsLanguage = 'en' | 'en-gb' | 'de' | 'fr' | 'es' | 'it' | 'nl' | 'pt-br' | 'hu'
+
+/** M8 backlink section default: open, closed or hidden. */
+export type Tri = 'open' | 'closed' | 'hidden'
+
+/** M8 `DeviceSettings.presentation`. */
+export interface PresentationSettings {
+  hideCoverImage: boolean
+  hideProgressIndicator: boolean
+  hideTitle: boolean
+  footerLeft: string
+  footerRight: string
 }
 
 /** M7 `GET`/`PUT /api/settings` → 200. */
@@ -727,7 +755,18 @@ export interface RepeatRule {
   mode: 'dueDate' | 'completionDate'
   /** YYYY-MM-DD */
   until?: string
+  /** M8: a custom rule's anchor (by due date only). */
+  on?: RepeatOn
 }
+
+/** M8 weekday names in the `repeat` text form. */
+export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
+
+/** M8: the `on` part of a custom repeat rule. */
+export type RepeatOn =
+  | { weekdays?: Weekday[] }
+  | { monthDay: number | 'last'; month?: number }
+  | { weekdayPos: 1 | 2 | 3 | 4 | 'last'; weekday: Weekday; month?: number }
 
 /** The parsed `remind` text form. */
 export interface ReminderRule {
@@ -762,6 +801,20 @@ export interface CalendarDay {
   dated: DatedEntry[]
   created: string[]
   updated: string[]
+  /** M8 (Task 15): objects linking to the day. Optional: read with `?? []`. */
+  backlinks?: string[]
+  /** M8 (Task 15): objects holding date tokens for the day. */
+  references?: { path: string; count: number }[]
+  /** M8 (Task 15): the day's timed items. */
+  timeline?: CalendarTimelineItem[]
+}
+
+/** M8: one Timeline item; `at` a UTC instant, `key` the date property of a `dated` item. */
+export interface CalendarTimelineItem {
+  path: string
+  at: string
+  kind: 'created' | 'dated' | 'task'
+  key?: string
 }
 
 /** GET /api/calendar?from=&to= (at most 100 days). */
@@ -862,6 +915,8 @@ export interface BodyContext {
   context: string
   start: number
   end: number
+  /** M8 (Task 18): the parent blocks' first lines, outermost first. */
+  ancestors?: string[]
 }
 
 export interface BacklinkEntry {
@@ -943,3 +998,83 @@ export interface GraphCustomization {
   showTagsNetwork?: boolean
   showSpaceTagsNetwork?: boolean
 }
+
+// ---------------------------------------------------------------------------------------------
+// M8: deferred features (docs/superpowers/plans/2026-10-27-m8-deferred-features.md,
+// "API contract (M8)").
+
+export type OccurrenceAction = 'complete' | 'skip' | 'excuse'
+export type CatchUp = 'advanceOne' | 'catchUpBeforeNow' | 'catchUpThroughNow'
+
+export interface OccurrenceLogEntry {
+  scheduled: DateValue
+  action: 'completed' | 'skipped' | 'excused'
+  /** UTC ISO instant. */
+  at: string
+}
+
+/** GET /api/tasks/overdue */
+export interface OverdueInfo {
+  count: number
+  capped: boolean
+  /** Scheduled days or instants, oldest first, at most 99. */
+  missed: string[]
+  current: DateValue | null
+  today: string
+}
+
+export type TaskStatsCellState = 'completed' | 'excused' | 'skipped' | 'missed' | 'future' | 'none'
+
+/** GET /api/tasks/stats */
+export interface TaskStats {
+  unit: 'day' | 'week' | 'month' | 'year'
+  currentStreak: number
+  bestStreak: number
+  completions: number
+  completionRate: number | null
+  atRisk: boolean
+  cells: { scheduled: string; state: TaskStatsCellState }[]
+}
+
+/** GET /api/block */
+export interface BlockInfo {
+  path: string
+  id: string
+  markdown: string
+  version: string
+}
+
+/** GET /api/history entry. */
+export interface VersionInfo {
+  id: string
+  number: number
+  at: string
+  size: number
+  kind: 'object' | 'whiteboard'
+  title: string | null
+}
+
+/** GET /api/history/version */
+export interface VersionContent {
+  id: string
+  /** null for whiteboards. */
+  text: string | null
+}
+
+/** POST /api/history/restore: `version` for objects, `revision` for boards. */
+export interface RestoreVersionResult {
+  version?: string
+  revision?: string
+}
+
+/** POST /api/object/merge */
+export interface MergeResult {
+  target: string
+  version: string
+  relinked: string[]
+  skipped: SkippedFile[]
+  dropped: string[]
+  trashId: string
+}
+
+export type SpaceSetup = 'blank' | 'basic'

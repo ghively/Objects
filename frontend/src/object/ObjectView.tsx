@@ -41,12 +41,19 @@ import { PinMenuItems } from '@/shell/PinToMenu'
 import { DeletedBanner } from './DeletedBanner'
 import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
-import { ensureNewTags, ObjectHeader, openTag } from './ObjectHeader'
+import { ensureNewTags, isTagType, ObjectHeader, openTag } from './ObjectHeader'
 import { PageLayout, type PanelVariant } from './PageLayout'
 import { PropertyPanel } from './PropertyPanel'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
 import { useTypeEditor } from './useTypeEditor'
 import { COLLECTION_ICON } from '@/lib/defIcons'
+import { isTaskRoleType } from '@/editor/embed/ObjectEmbedView'
+import { useFocusMode } from '@/focus/useFocusMode'
+import { useVersionHistory } from '@/history/useVersionHistory'
+import { useMerge } from '@/merge/useMerge'
+import { usePresentation } from '@/present/usePresentation'
+import { TaskStatsSection } from '@/tasks/TaskStatsSection'
+import { useAddToWhiteboard } from '@/whiteboard/AddToWhiteboardDialog'
 
 installWikilinkPresenter()
 installLinkPicker()
@@ -90,12 +97,31 @@ export const OPEN_IN_SIDEPANEL_MENU_ITEM = 'Open in side panel'
 /** The `…` menu item (`FindInPage.menuItem`). */
 export const FIND_IN_PAGE_MENU_ITEM = 'Find in page'
 
-function ToolButton({ label, icon, onClick }: { label: string; icon: string; onClick?: () => void }) {
+/** M8 menu items and the focus-mode button (reference strings). */
+export const OBJECT_M8_TEXT = {
+  /** `EntityMenu.versionHistory.text` */
+  versionHistory: 'Version History',
+  /** `EntityMenu.mergeObject.text` */
+  mergeObject: 'Merge into object',
+  /** `EntityMenu.mergeTag.text` */
+  mergeTag: 'Merge into tag',
+  /** `EntityMenu.presentationMode.text` */
+  present: 'Present',
+  /** `Whiteboard.addTo.action` */
+  addToWhiteboard: 'Add to whiteboard',
+  /** `ComponentHeader.focusMode.enterLabel` */
+  enterFocusMode: 'Enter Focus Mode',
+  /** `ComponentHeader.focusMode.leaveLabel` */
+  leaveFocusMode: 'Leave Focus Mode',
+} as const
+
+function ToolButton({ label, icon, onClick, pressed }: { label: string; icon: string; onClick?: () => void; pressed?: boolean }) {
   return (
     <button
       type="button"
       aria-label={label}
       title={label}
+      aria-pressed={pressed}
       onClick={onClick}
       className="flex size-8 items-center justify-center rounded-md text-fg hover:bg-hover"
     >
@@ -501,10 +527,14 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   const otherTypes = allTypes.filter((t) => t.id !== summary?.type).sort(byPluralName)
   const isTemplate = summary?.template != null
   const canTemplate = !!type && !isTemplate && templatesAllowed(type)
+  const isTag = !!summary && isTagType(type, summary.type)
+  const isTask = !!summary && !isTemplate && isTaskRoleType(type, summary.type)
+  const focusOn = useFocusMode((s) => s.on)
 
   // A render function: the layout picks the variant (inline as a card when the page is narrow).
   const properties =
     detail && panelOpen ? (variant: PanelVariant) => (
+      <>
       <PropertyPanel
         type={type}
         frontmatter={detail.frontmatter}
@@ -520,6 +550,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         onOpenObject={onOpenObject}
         variant={variant}
       />
+      {/* M8: "Task Stats" under the property panel of a task-role object (empty unless recurring). */}
+      {isTask && <TaskStatsSection path={path} version={version} />}
+      </>
     ) : null
 
   const toolbar = (
@@ -544,6 +577,14 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
       <div className="flex min-w-0 items-center gap-2">
       <FindBar path={path} editorRef={editorRef} />
       <div className="flex h-10 shrink-0 items-center gap-0.5 rounded-xl border border-[var(--float-border)] bg-[var(--float-bg)] px-1">
+        {mode === 'page' && (
+          <ToolButton
+            label={focusOn ? OBJECT_M8_TEXT.leaveFocusMode : OBJECT_M8_TEXT.enterFocusMode}
+            icon={focusOn ? 'ph-arrows-in-simple' : 'ph-frame-corners'}
+            pressed={focusOn}
+            onClick={() => useFocusMode.getState().toggle()}
+          />
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -584,6 +625,24 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
               <DropdownMenuShortcut>Ctrl F</DropdownMenuShortcut>
             </DropdownMenuItem>
             <PinMenuItems pin={{ kind: 'object', path, id: summary?.id }} />
+            <DropdownMenuItem disabled={!summary} onSelect={() => useVersionHistory.getState().open(path)}>
+              <Icon name="ph-clock-counter-clockwise" size={14} />
+              {OBJECT_M8_TEXT.versionHistory}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!summary}
+              onSelect={() => {
+                usePresentation.getState().start(path)
+                onDismiss?.()
+              }}
+            >
+              <Icon name="ph-presentation" size={14} />
+              {OBJECT_M8_TEXT.present}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!summary || isTemplate} onSelect={() => useAddToWhiteboard.getState().open(path)}>
+              <Icon name="ph-chalkboard-simple" size={14} />
+              {OBJECT_M8_TEXT.addToWhiteboard}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuSub>
               <DropdownMenuSubTrigger disabled={propsReadOnly || !summary || isTemplate}>
@@ -622,6 +681,13 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
             >
               <Icon name={COLLECTION_ICON} size={14} />
               Edit Collections
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={propsReadOnly || !summary || isTemplate}
+              onSelect={() => useMerge.getState().open(path)}
+            >
+              <Icon name="ph-git-merge" size={14} />
+              {isTag ? OBJECT_M8_TEXT.mergeTag : OBJECT_M8_TEXT.mergeObject}
             </DropdownMenuItem>
             {type && (
               <DropdownMenuItem onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>

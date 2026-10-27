@@ -51,6 +51,9 @@ export function useTargetTitle(space: SpaceInfo | null): (target: Target | null)
           return 'Tasks'
         case 'graph':
           return 'Graph'
+        case 'search':
+          // `LocalSpaceQuery.heading`
+          return 'Search'
         case 'trash':
           return 'Trash'
         case 'type':
@@ -88,6 +91,8 @@ export function TargetLabel({ target, space }: { target: Target | null; space: S
     icon = <Icon name="ph-check-circle" size={15} />
   } else if (target?.kind === 'graph') {
     icon = <Icon name="ph-graph" size={15} />
+  } else if (target?.kind === 'search') {
+    icon = <Icon name="ph-magnifying-glass" size={15} />
   } else if (target?.kind === 'trash') {
     icon = <Icon name="ph-trash" size={15} />
   } else if (target?.kind === 'type' || target?.kind === 'typeSettings') {
