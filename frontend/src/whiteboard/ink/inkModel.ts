@@ -1,3 +1,4 @@
+// colour-literals: content palette
 import { getStroke, type StrokeOptions } from 'perfect-freehand'
 import { THEME_COLORS, type ThemeColor } from '@/theme/palette'
 import type { InkStroke, InkStrokeTool, InkToolState } from './types'

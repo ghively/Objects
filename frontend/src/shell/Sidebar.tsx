@@ -15,6 +15,8 @@ import { AddSection, SidebarSections } from './SidebarSections'
 import { chipStyle } from './typeColor'
 import { QUERY_ICON } from '@/lib/defIcons'
 import { usePalette } from '@/palette/usePalette'
+import { useSettings } from '@/settings/useSettings'
+import { toggleDarkMode } from '@/theme/shortcuts'
 
 export interface SidebarProps {
   types: TypeDef[]
@@ -46,6 +48,30 @@ export interface SidebarProps {
   tasksActive?: boolean
   /** Highlights the "Graph" entry. */
   graphActive?: boolean
+}
+
+/** The footer theme button's tooltips: the mode it switches to (`SpaceOverview.setDarkMode`, `.setLightMode`). */
+export const SET_DARK_MODE = 'Dark mode'
+export const SET_LIGHT_MODE = 'Light mode'
+
+/** The footer's sun button: switches between the light and the dark theme. */
+function ThemeButton() {
+  const light = useSettings((s) => s.settings.themeMode === 'light')
+  const label = light ? SET_DARK_MODE : SET_LIGHT_MODE
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      data-theme-toggle=""
+      onClick={() => {
+        toggleDarkMode().catch(() => undefined)
+      }}
+      className="flex size-8 items-center justify-center rounded-md hover:bg-hover hover:text-fg"
+    >
+      <Icon name="ph-sun" size={17} />
+    </button>
+  )
 }
 
 /** The square search button's tooltip (`shortcuts.openSearchPalette.name`). */
@@ -93,7 +119,7 @@ function SectionHeader({
     <div className="group/sh flex items-center pr-1">
       <h2
         id={id}
-        className="flex flex-1 items-center gap-1.5 px-2 pt-5 pb-2 text-[14px] font-semibold text-[#a7a2a1]"
+        className="flex flex-1 items-center gap-1.5 px-2 pt-5 pb-2 text-[14px] font-semibold text-[var(--text-section)]"
       >
         {icon && <Icon name={icon} size={14} />}
         {children}
@@ -164,7 +190,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={() => onNew?.()}
-          className="flex h-[42px] flex-1 items-center gap-2 rounded-xl border border-[#2a292d] bg-raised px-3 text-[15px] font-medium hover:bg-hover"
+          className="flex h-[42px] flex-1 items-center gap-2 rounded-xl border border-[var(--chrome-btn-border)] bg-raised px-3 text-[15px] font-medium hover:bg-hover"
         >
           <Icon name="ph-plus" size={16} />
           New
@@ -174,7 +200,7 @@ export function Sidebar({
           aria-label={SEARCH_THIS_SPACE}
           title={SEARCH_THIS_SPACE}
           onClick={() => usePalette.getState().show('search')}
-          className="flex size-[42px] items-center justify-center rounded-xl border border-[#2a292d] bg-raised hover:bg-hover"
+          className="flex size-[42px] items-center justify-center rounded-xl border border-[var(--chrome-btn-border)] bg-raised hover:bg-hover"
         >
           <Icon name="ph-magnifying-glass" size={18} />
         </button>
@@ -312,9 +338,7 @@ export function Sidebar({
         <button type="button" disabled aria-label="Settings" className="flex size-8 items-center justify-center rounded-md disabled:opacity-60">
           <Icon name="ph-gear" size={17} />
         </button>
-        <button type="button" disabled aria-label="Theme" className="flex size-8 items-center justify-center rounded-md disabled:opacity-60">
-          <Icon name="ph-sun" size={17} />
-        </button>
+        <ThemeButton />
         <button type="button" disabled aria-label="Share" className="ml-auto flex size-8 items-center justify-center rounded-md disabled:opacity-60">
           <Icon name="ph-share-fat" size={17} />
         </button>

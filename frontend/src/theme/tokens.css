@@ -1,4 +1,5 @@
-/* Object theme tokens (dark). Values from docs/ui-reference/README.md. */
+/* Object theme tokens (dark, the default). Values from docs/ui-reference/README.md.
+   Light, Light Dimmed and Dark Dimmed override every colour token in themes.css. */
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/500.css";
 @import "@fontsource/inter/600.css";
@@ -41,6 +42,15 @@
   --code-bg: #28282b; /* code.code-bg: gray 825 */
   --code-border: #333337; /* code.code-border: gray 775 */
   --code-text: #e4e3e2; /* code.code-text: gray 200 */
+
+  /* M7 (Task 16): shadcn's focus ring (index.css's former literal; border-el-hover in the other
+     themes), and M5's search highlights, moved here from index.css so every theme can set them.
+     Our values (the reference's are not in the trimmed set): the yellow type ink at 30 % alpha for
+     matches, 55 % for the current find match; listed for Gene's check. */
+  --focus-ring: #5a5960;
+  --bg-search-highlight: rgb(255 240 168 / 0.3);
+  --bg-search-highlight-current: rgb(255 240 168 / 0.55);
+  --text-search-highlight: var(--text);
 
   /* Card edge: color-mix(border-front 80%, bg-back), as Capacities' .app-window-chrome. */
   --border-chrome: #27262b;
@@ -213,6 +223,8 @@
   --object-font-sans-serif: "Inter", ui-sans-serif, system-ui, sans-serif;
   --object-font-serif: Georgia, serif;
   --object-font-monospace: "Courier New", monospace;
+  /* M7: the app's font ("Font" in Settings; themes.css switches it with html[data-font]). */
+  --app-font: var(--object-font-sans-serif);
 
   /* M2: page layout sizes. Content width as M1; a cropped cover is a fixed-height band. */
   --page-content-width: 820px;
@@ -259,7 +271,7 @@ body,
 
 body {
   margin: 0;
-  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--app-font);
   font-size: 15px;
   background: var(--bg-app);
   color: var(--text);

@@ -1,3 +1,4 @@
+// colour-literals: content palette
 /**
  * The canvas: React Flow (the React sibling of the Vue Flow canvas Capacities uses) over the
  * board store. Pan and zoom (2 % to 400 %), the 30 px dotted grid, snap to grid and to nodes,
@@ -53,6 +54,7 @@ import { snapToNodes, type SnapGuide } from './snapGuides'
 import { isEditable, useBoardStore, useBoardState } from './store'
 import { WB } from './strings'
 import { loadCamera, saveCamera } from './toolMemory'
+import { useThemeName } from '@/theme/applyTheme'
 
 /** Padding around "Zoom to fit" / "Zoom to selection" (two grid cells; our choice). */
 export const FIT_PADDING = GRID * 2
@@ -112,13 +114,25 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
   const [picker, setPicker] = useState<{ mode: 'link' | 'create'; at: WhiteboardPosition } | null>(null)
   const [zoom, setZoom] = useState(1)
 
+  // The theme (M7): React Flow's own colours follow `colorMode`, and the nodes and edges get new
+  // data on a change so their memoized views re-read `isDarkMode()` (whiteboard/colors.ts).
+  const themeName = useThemeName()
+  const dark = themeName === 'dark' || themeName === 'darkDimmed'
   const selected = useMemo(() => new Set(selection), [selection])
   const flow = useMemo(() => toFlow(board, selected), [board, selected])
   const nodes = useMemo(
-    () => flow.nodes.map((n) => (measured[n.id] ? { ...n, measured: measured[n.id] } : n)),
-    [flow.nodes, measured],
+    () =>
+      flow.nodes.map((n) => ({
+        ...n,
+        ...(measured[n.id] ? { measured: measured[n.id] } : {}),
+        data: { ...n.data, theme: themeName },
+      })),
+    [flow.nodes, measured, themeName],
   )
-  const edges = flow.edges
+  const edges = useMemo(
+    () => flow.edges.map((e) => (e.data ? { ...e, data: { ...e.data, theme: themeName } } : e)),
+    [flow.edges, themeName],
+  )
 
   const panning = spaceHeld || tool === 'hand'
   const snapGrid = settings.isSnappingToGrid && !ctrlHeld
@@ -467,6 +481,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
       onDrop={onDrop}
     >
       <ReactFlow<FlowNode, FlowEdge>
+        colorMode={dark ? 'dark' : 'light'}
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
