@@ -410,7 +410,8 @@ def test_topup_adds_missing_task_fields_in_memory(calendar_space_dir):
     space = Space(calendar_space_dir)
     t = space.type_by_id("task")
     keys = [p.key for p in t.propertyDefinitions]
-    assert keys[-6:] == list(_TASK_FIELDS[1:])  # appended after the existing ones
+    # appended after the existing ones (M8's hidden `occurrenceLog` last)
+    assert keys[-7:] == [*_TASK_FIELDS[1:], "occurrenceLog"]
     assert t.prop("priority").options["set"][2] == {
         "id": "high", "text": "High", "color": "red", "icon": None
     }  # fmt: skip
@@ -432,7 +433,7 @@ def test_topup_adds_missing_task_fields_in_memory(calendar_space_dir):
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     t2, _rev = space.refresh_type("task")
     assert t2.description == "edited by hand"
-    assert [p.key for p in t2.propertyDefinitions][-6:] == list(_TASK_FIELDS[1:])
+    assert [p.key for p in t2.propertyDefinitions][-7:] == [*_TASK_FIELDS[1:], "occurrenceLog"]
 
     # Saving the type persists the fields (the first write of the type).
     t3, rev = space.refresh_type("task")
@@ -455,7 +456,7 @@ def test_topup_keeps_existing_definitions(calendar_space_dir):
     assert [o["text"] for o in t.prop("priority").options["set"]] == ["P1"]
     keys = [p.key for p in t.propertyDefinitions]
     assert keys.count("priority") == 1
-    assert keys[-2:] == ["deadline", "remind"]
+    assert keys[-3:] == ["deadline", "remind", "occurrenceLog"]  # M8 adds the log last
 
 
 def test_topup_not_applied_to_other_types(calendar_space_dir):

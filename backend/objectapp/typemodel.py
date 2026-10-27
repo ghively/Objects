@@ -866,7 +866,8 @@ _TASK_PRIORITY = (("low", "Low", "amber"), ("medium", "Medium", "orange"), ("hig
 
 def _task_field_defs() -> list[PropertyDefinition]:
     """Fresh definitions of Capacities' `RootTask` fields (`basicStructures.ts`), plus
-    our hidden ``repeat`` and ``remind`` text fields, in the order they are appended."""
+    our hidden ``repeat``, ``remind`` and (M8) ``occurrenceLog`` text fields, in the order
+    they are appended."""
 
     def define(key, name, kind, icon, options=None, visibility="alwaysShow"):
         return PropertyDefinition.from_json(
@@ -909,6 +910,9 @@ def _task_field_defs() -> list[PropertyDefinition]:
         ),
         define("repeat", "Repeat", "text", PROPERTY_ICONS["text"], visibility="hidden"),
         define("remind", "Remind", "text", PROPERTY_ICONS["text"], visibility="hidden"),
+        # M8: the recurrence's occurrence log ("Occurrence log" is our string).
+        define("occurrenceLog", "Occurrence log", "text", PROPERTY_ICONS["text"],
+               visibility="hidden"),
     ]  # fmt: skip
 
 
@@ -921,7 +925,7 @@ def topup_task_type(t: TypeDefinition) -> TypeDefinition:
     """Give the basic Task type the Task fields it lacks, in memory; return ``t``.
 
     Each missing key of ``status``, ``priority``, ``date``, ``deadline``,
-    ``completed``, ``repeat`` and ``remind`` is appended after the existing
+    ``completed``, ``repeat``, ``remind`` and ``occurrenceLog`` is appended after the existing
     properties; a key the type already defines keeps its own definition and
     options. Any other type comes back untouched. Never writes: the fields reach
     ``task.json`` the first time the type is persisted.
