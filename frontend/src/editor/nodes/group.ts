@@ -26,26 +26,13 @@ import './group.css'
 export const GROUP_PLACEHOLDER = 'Box heading...'
 
 /**
- * Replace the group at `pos` by its blocks, keeping the blank line that
- * followed the group after its last block (so that block never runs into the
- * next one in the file).
+ * Replace the group at `pos` by its blocks; `unwrapAt` keeps the blank line
+ * that followed the group after its last block.
  */
 export function ungroupAt(tr: Transaction, pos: number): boolean {
   const node = tr.doc.nodeAt(pos)
   if (!node || node.type.name !== 'group') return false
-  const trailing = node.attrs.blockTrailing as string | null | undefined
-  const last = node.lastChild
-  if (!unwrapAt(tr, pos)) return false
-  if (trailing && last && 'blockTrailing' in last.attrs && !last.attrs.blockTrailing) {
-    const lastPos = pos + node.content.size - last.nodeSize
-    // A container's last block keeps its own line end in its source; the
-    // container's trailing starts with the close line's, so drop that one.
-    const origin = String(last.attrs.blockOrigin ?? '')
-    const eol = /\r\n$/.exec(origin)?.[0] ?? /\n$/.exec(origin)?.[0] ?? ''
-    const rest = eol && trailing.startsWith(eol) ? trailing.slice(eol.length) : trailing
-    if (origin && rest && tr.doc.nodeAt(lastPos)?.type === last.type) tr.setNodeAttribute(lastPos, 'blockTrailing', rest)
-  }
-  return true
+  return unwrapAt(tr, pos)
 }
 
 const groupPlaceholderKey = new PluginKey<DecorationSet>('groupPlaceholder')
