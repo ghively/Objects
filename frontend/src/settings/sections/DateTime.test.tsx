@@ -10,7 +10,7 @@ vi.mock('@/api/client', async (orig) => ({
 import { api } from '@/api/client'
 import { resetPinned, useUiStore } from '@/shell/usePinned'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
-import { DateTimeSection } from './DateTime'
+import { DateTimeSection, deviceTimeZone, timeZoneList } from './DateTime'
 
 const mocked = vi.mocked(api)
 
@@ -61,5 +61,43 @@ describe('DateTimeSection', () => {
     ])
     await user.click(within(fmt).getByRole('radio', { name: 'year-month-day (ISO 8601)' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ dateFormatting: 'YMD' }, expect.anything())
+  })
+
+  test('test time zone picker saves and shows mismatch', async () => {
+    const user = userEvent.setup()
+    const device = deviceTimeZone()
+    const other = device === 'Asia/Tokyo' ? 'Europe/Berlin' : 'Asia/Tokyo'
+    expect(timeZoneList()).toContain(device)
+    expect(timeZoneList()).toContain(other)
+    const { rerender } = render(<DateTimeSection />)
+    expect(screen.getByRole('heading', { name: 'Time zone' })).toBeInTheDocument()
+    expect(screen.getByText('Select your preferred time zone.')).toBeInTheDocument()
+    // No setting: the device's zone, no mismatch.
+    const button = screen.getByRole('button', { name: 'Time zone' })
+    expect(button).toHaveTextContent(device)
+    expect(screen.queryByText('Your time zone in Object does not match the time zone of your device.')).toBeNull()
+
+    await user.click(button)
+    await user.type(screen.getByRole('searchbox', { name: 'Search time zones' }), other.split('/')[1])
+    const list = screen.getByRole('listbox', { name: 'Time zone' })
+    await user.click(within(list).getByRole('option', { name: other }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ timeZone: other }, expect.anything())
+    rerender(<DateTimeSection />)
+    expect(screen.getByRole('button', { name: 'Time zone' })).toHaveTextContent(other)
+    expect(screen.getByText('Your time zone in Object does not match the time zone of your device.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Set to local time zone' })).toBeInTheDocument()
+  })
+
+  test('test reset sets the device zone', async () => {
+    const user = userEvent.setup()
+    const device = deviceTimeZone()
+    const other = device === 'Asia/Tokyo' ? 'Europe/Berlin' : 'Asia/Tokyo'
+    useSettings.setState({ settings: { ...settingsDefaults, timeZone: other }, revision: 'r0', loaded: true })
+    render(<DateTimeSection />)
+    await user.click(screen.getByRole('button', { name: 'Set to local time zone' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ timeZone: null }, expect.anything())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Time zone' })).toHaveTextContent(device))
+    expect(screen.queryByText('Your time zone in Object does not match the time zone of your device.')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Set to local time zone' })).toBeNull()
   })
 })

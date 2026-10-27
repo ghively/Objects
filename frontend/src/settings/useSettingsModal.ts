@@ -7,6 +7,7 @@ export type SettingsSectionId =
   | 'appearance'
   | 'editor'
   | 'dateTime'
+  | 'language'
   | 'notifications'
   | 'space'
   | 'objectTypes'

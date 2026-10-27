@@ -1,15 +1,19 @@
 // "Editor": toggle style, the editor switches, what this space opens on and which space Object
-// starts with. Every change is a device setting (`useSettings().patch`); "When this space opens"
-// is stored per space root in `openOnStart`.
+// starts with, and (M8) the backlink defaults: each section's default state, the backlink content
+// view, the types whose pages hide related content and how nested backlinks show. Every change is
+// a device setting (`useSettings().patch`); "When this space opens" is stored per space root in
+// `openOnStart`.
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/api/client'
-import type { DeviceSettings, OpenOnStartMode, SpaceEntry } from '@/api/types'
+import type { DeviceSettings, OpenOnStartMode, SpaceEntry, Tri } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ensureLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { useSettings } from '@/settings/useSettings'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
-import { OptionCards, SaveError, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
+import { LINK_VIEWS } from '@/types/CardViewSettings'
+import { OptionCards, SaveError, SecondaryButton, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
+import { useSettingsTypes } from './ObjectTypes'
 
 export const EDITOR_TEXT = {
   heading: 'Editor', // EditorSettings.heading
@@ -50,6 +54,29 @@ export const EDITOR_TEXT = {
   startupLast: 'Last opened space', // EditorSettings.startupSpace.lastOpened
   startupSpecific: 'Specific space', // EditorSettings.startupSpace.specific
   noObjects: 'No results', // AppSettings.search.noResults
+  // M8: EditorSettings.backlinkSectionsDefault.*
+  backlinkSections: 'Default state for backlink sections',
+  backlinkSectionsDescription:
+    'Choose whether these sections should start open or closed on object pages. You can still change them per object.',
+  sections: {
+    backlinks: 'Backlinks',
+    relatedContent: 'Related Content',
+    unlinkedMentions: 'Unlinked Mentions',
+  },
+  tri: { open: 'Open', closed: 'Closed', hidden: 'Hidden' },
+  backlinkContentView: 'Backlink content view',
+  backlinkContentViewDescription: 'Choose the default view for backlink content. Embed is the default when no option is selected.',
+  hiddenTypes: 'Hide related content for object types',
+  hiddenTypesDescription: 'Select object types for which the related content section should be hidden on their pages.',
+  clearAll: 'Clear all',
+  // M8: EditorSettings.defaultContextualBacklinkViewMode.*
+  nestedBacklinks: 'Default display of nested backlinks',
+  nestedBacklinksDescription:
+    'Set the default behavior of how to display contextual backlinks when they are nested within other blocks. You can get a more compact view by starting with the block with the actual backlink as root or get a more detailed view by showing the full path that is leading to the block with the backlink.',
+  nestedModes: {
+    showBlockContainingBacklink: 'Only block with backlink',
+    showFullPathAbove: 'Full path above',
+  },
 } as const
 
 const T = EDITOR_TEXT
@@ -69,7 +96,49 @@ export const EDITOR_SEARCH: string[] = [
   T.startupSpace,
   T.startupLast,
   T.startupSpecific,
+  T.backlinkSections,
+  ...Object.values(T.sections),
+  T.backlinkContentView,
+  T.hiddenTypes,
+  T.nestedBacklinks,
+  ...Object.values(T.nestedModes),
 ]
+
+const SECTION_KEYS = ['backlinks', 'relatedContent', 'unlinkedMentions'] as const
+const TRIS: Tri[] = ['open', 'closed', 'hidden']
+const NESTED_MODES = ['showBlockContainingBacklink', 'showFullPathAbove'] as const
+
+/** "Hide related content for object types": a checkbox per type and "Clear all". */
+function HiddenTypes({ value, onChange }: { value: string[]; onChange(next: string[]): void }) {
+  const types = useSettingsTypes()
+  const hidden = new Set(value)
+  return (
+    <div className="flex flex-col gap-2">
+      <div role="group" aria-label={T.hiddenTypes} className="flex flex-wrap gap-1.5">
+        {types.map((t) => {
+          const checked = hidden.has(t.id)
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="checkbox"
+              aria-checked={checked}
+              aria-label={t.pluralName || t.name}
+              onClick={() => onChange(checked ? value.filter((id) => id !== t.id) : [...value, t.id])}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-md border bg-raised px-2.5 text-[14px] text-fg hover:bg-hover ${checked ? 'border-fg-muted' : 'border-line'}`}
+            >
+              <Icon name={checked ? 'ph-check-square' : 'ph-square'} size={14} />
+              <span className="truncate">{t.pluralName || t.name}</span>
+            </button>
+          )
+        })}
+      </div>
+      <SecondaryButton disabled={value.length === 0} onClick={() => onChange([])}>
+        {T.clearAll}
+      </SecondaryButton>
+    </div>
+  )
+}
 
 const OPEN_MODES: OpenOnStartMode[] = ['lastOpenedPage', 'today', 'calendar', 'specificObject']
 
@@ -154,6 +223,11 @@ export function EditorSection() {
       .getState()
       .patch(p)
       .catch((e: unknown) => setError(errorText(e)))
+  }
+
+  const sectionsDefault: DeviceSettings['backlinkSectionsDefault'] = {
+    ...settingsDefaults.backlinkSectionsDefault,
+    ...(settings.backlinkSectionsDefault as Partial<DeviceSettings['backlinkSectionsDefault']> | undefined),
   }
 
   const entry = root ? settings.openOnStart?.[root] : undefined
@@ -248,6 +322,41 @@ export function EditorSection() {
             ))}
           </select>
         )}
+      </SettingGroup>
+      <SettingGroup title={T.backlinkSections} help={T.backlinkSectionsDescription}>
+        {SECTION_KEYS.map((k) => (
+          <div key={k} className="flex items-center gap-4">
+            <span className="w-[160px] shrink-0 text-[14px] text-fg">{T.sections[k]}</span>
+            <div className="min-w-0 flex-1">
+              <OptionCards
+                label={T.sections[k]}
+                value={sectionsDefault[k]}
+                options={TRIS.map((v) => ({ value: v, label: T.tri[v] }))}
+                onChange={(v) => set({ backlinkSectionsDefault: { ...sectionsDefault, [k]: v } })}
+              />
+            </div>
+          </div>
+        ))}
+      </SettingGroup>
+      <SettingGroup title={T.backlinkContentView} help={T.backlinkContentViewDescription}>
+        <OptionCards
+          label={T.backlinkContentView}
+          value={settings.backlinkContentView ?? 'embed'}
+          columns={4}
+          options={LINK_VIEWS.map((v) => ({ value: v.value, label: v.name }))}
+          onChange={(backlinkContentView) => set({ backlinkContentView })}
+        />
+      </SettingGroup>
+      <SettingGroup title={T.hiddenTypes} help={T.hiddenTypesDescription}>
+        <HiddenTypes value={settings.relatedContentHiddenTypes ?? []} onChange={(relatedContentHiddenTypes) => set({ relatedContentHiddenTypes })} />
+      </SettingGroup>
+      <SettingGroup title={T.nestedBacklinks} help={T.nestedBacklinksDescription}>
+        <OptionCards
+          label={T.nestedBacklinks}
+          value={settings.nestedBacklinkView ?? 'showBlockContainingBacklink'}
+          options={NESTED_MODES.map((m) => ({ value: m, label: T.nestedModes[m] }))}
+          onChange={(nestedBacklinkView) => set({ nestedBacklinkView })}
+        />
       </SettingGroup>
       <SaveError error={error} />
     </div>

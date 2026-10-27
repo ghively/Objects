@@ -9,7 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { objectSummary, spaceEntry } from '@/test/mockApi'
+import { objectSummary, spaceEntry, typeDef } from '@/test/mockApi'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { EditorSection } from './Editor'
@@ -95,5 +95,66 @@ describe('EditorSection', () => {
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ startupSpace: 'specific', startupSpacePath: '/space' }, expect.anything())
     await user.selectOptions(screen.getByRole('combobox', { name: 'Specific space' }), 'Work')
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ startupSpacePath: '/other/Work' }, expect.anything())
+  })
+
+  test('test backlink defaults save each section', async () => {
+    const user = userEvent.setup()
+    useLinkIndex.setState({
+      types: [typeDef({ id: 'Person', name: 'Person', pluralName: 'People' }), typeDef({ id: 'Book', name: 'Book', pluralName: 'Books' })],
+      loaded: true,
+    })
+    render(<EditorSection />)
+    expect(screen.getByRole('heading', { name: 'Default state for backlink sections' })).toBeInTheDocument()
+    expect(
+      screen.getByText('Choose whether these sections should start open or closed on object pages. You can still change them per object.'),
+    ).toBeInTheDocument()
+    for (const name of ['Backlinks', 'Related Content', 'Unlinked Mentions']) {
+      const g = screen.getByRole('radiogroup', { name })
+      expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Open', 'Closed', 'Hidden'])
+      expect(within(g).getByRole('radio', { name: 'Open' })).toHaveAttribute('aria-checked', 'true')
+    }
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Related Content' })).getByRole('radio', { name: 'Closed' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith(
+      { backlinkSectionsDefault: { backlinks: 'open', relatedContent: 'closed', unlinkedMentions: 'open' } },
+      expect.anything(),
+    )
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Unlinked Mentions' })).getByRole('radio', { name: 'Hidden' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith(
+      { backlinkSectionsDefault: { backlinks: 'open', relatedContent: 'closed', unlinkedMentions: 'hidden' } },
+      expect.anything(),
+    )
+
+    const view = screen.getByRole('radiogroup', { name: 'Backlink content view' })
+    expect(within(view).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
+      'Link block',
+      'Small card',
+      'Wide card',
+      'Embed',
+    ])
+    expect(within(view).getByRole('radio', { name: 'Embed' })).toHaveAttribute('aria-checked', 'true')
+    await user.click(within(view).getByRole('radio', { name: 'Small card' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ backlinkContentView: 'smallCard' }, expect.anything())
+
+    const hidden = screen.getByRole('group', { name: 'Hide related content for object types' })
+    const clear = screen.getByRole('button', { name: 'Clear all' })
+    expect(clear).toBeDisabled()
+    await user.click(within(hidden).getByRole('checkbox', { name: 'Books' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ relatedContentHiddenTypes: ['Book'] }, expect.anything())
+    await user.click(within(hidden).getByRole('checkbox', { name: 'People' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ relatedContentHiddenTypes: ['Book', 'Person'] }, expect.anything())
+    expect(within(hidden).getByRole('checkbox', { name: 'Books' })).toHaveAttribute('aria-checked', 'true')
+    await user.click(screen.getByRole('button', { name: 'Clear all' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ relatedContentHiddenTypes: [] }, expect.anything())
+  })
+
+  test('test nested backlink mode saves', async () => {
+    const user = userEvent.setup()
+    render(<EditorSection />)
+    expect(screen.getByRole('heading', { name: 'Default display of nested backlinks' })).toBeInTheDocument()
+    const g = screen.getByRole('radiogroup', { name: 'Default display of nested backlinks' })
+    expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Only block with backlink', 'Full path above'])
+    expect(within(g).getByRole('radio', { name: 'Only block with backlink' })).toHaveAttribute('aria-checked', 'true')
+    await user.click(within(g).getByRole('radio', { name: 'Full path above' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ nestedBacklinkView: 'showFullPathAbove' }, expect.anything())
   })
 })
