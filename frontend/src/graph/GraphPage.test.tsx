@@ -124,6 +124,40 @@ describe('GraphPage', () => {
     expect(sigma.camera.animatedReset).toHaveBeenCalledTimes(1)
   })
 
+  test('test export button downloads graph png', async () => {
+    const user = userEvent.setup()
+    const drawn: HTMLCanvasElement[] = []
+    const ctx = { fillStyle: '', fillRect: vi.fn(), drawImage: (c: HTMLCanvasElement) => drawn.push(c) }
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockImplementation(() => ctx as unknown as CanvasRenderingContext2D)
+    const toBlob = vi
+      .spyOn(HTMLCanvasElement.prototype, 'toBlob')
+      .mockImplementation((cb, type) => cb(new Blob(['png'], { type: type ?? '' })))
+    const blobs: Blob[] = []
+    const createUrl = vi.spyOn(URL, 'createObjectURL').mockImplementation((b) => {
+      blobs.push(b as Blob)
+      return 'blob:graph'
+    })
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const downloads: string[] = []
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      downloads.push(this.download)
+    })
+    try {
+      render(<GraphPage onOpenTarget={vi.fn()} />)
+      const sigma = await sigmaReady()
+      const before = sigma.refreshes
+      await user.click(screen.getByRole('button', { name: 'Export view as PNG' }))
+      await waitFor(() => expect(downloads).toEqual(['graph.png']))
+      expect(sigma.refreshes).toBe(before + 1)
+      expect(drawn).toEqual(Object.values(sigma.canvases))
+      expect(blobs.map((b) => b.type)).toEqual(['image/png'])
+    } finally {
+      for (const s of [getContext, toBlob, createUrl, revoke, click]) s.mockRestore()
+    }
+  })
+
   test('show simplified graph hides labels', async () => {
     setUi({ showMinimalNodes: true })
     render(<GraphPage onOpenTarget={vi.fn()} />)

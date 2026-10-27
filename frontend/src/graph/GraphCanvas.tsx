@@ -4,13 +4,14 @@
 // node keeps it and its neighbours bright and dims the rest; `showMinimalNodes` hides labels.
 // sigma is loaded on first use: it touches WebGL at import, and it stays out of the main bundle.
 import Graph from 'graphology'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import type Sigma from 'sigma'
 import type { GraphCustomization, GraphData } from '@/api/types'
 import { useLinkIndex } from '@/links/linkIndex'
 import type { VisibleGraph } from './filterGraph'
 import { useThemeName } from '@/theme/applyTheme'
 import type { ThemeColor } from '@/theme/palette'
+import type { GraphRenderer } from './exportPng'
 import { canvasColors, colorValue, edgeStyle, nodeColor, nodeSize, type EdgeKind } from './graphStyle'
 import { runLayout } from './layout'
 
@@ -27,6 +28,8 @@ export interface GraphCanvasProps {
   highlightPath?: string | null
   /** Layout progress, for `GraphLoading`. */
   onLayout?(state: { running: boolean; progress: number }): void
+  /** Set to the sigma renderer while it runs (null before it starts and after unmount), for "Export view as PNG". */
+  rendererRef?: MutableRefObject<GraphRenderer | null>
 }
 
 interface NodeAttrs {
@@ -51,7 +54,17 @@ interface EdgeAttrs {
 
 type SigmaClick = { node: string; event?: { original?: MouseEvent | TouchEvent } }
 
-export function GraphCanvas({ data, visible, custom, onNodeClick, focusPath, fitSignal, highlightPath, onLayout }: GraphCanvasProps) {
+export function GraphCanvas({
+  data,
+  visible,
+  custom,
+  onNodeClick,
+  focusPath,
+  fitSignal,
+  highlightPath,
+  onLayout,
+  rendererRef,
+}: GraphCanvasProps) {
   const container = useRef<HTMLDivElement>(null)
   const sigmaRef = useRef<Sigma<NodeAttrs, EdgeAttrs> | null>(null)
   const keyByPath = useRef(new Map<string, string>())
@@ -59,6 +72,8 @@ export function GraphCanvas({ data, visible, custom, onNodeClick, focusPath, fit
   const highlight = useRef<string | null>(highlightPath ?? null)
   const clickRef = useRef(onNodeClick)
   const layoutRef = useRef(onLayout)
+  const exposeRef = useRef(rendererRef)
+  exposeRef.current = rendererRef
   clickRef.current = onNodeClick
   layoutRef.current = onLayout
   highlight.current = highlightPath ?? null
@@ -84,16 +99,19 @@ export function GraphCanvas({ data, visible, custom, onNodeClick, focusPath, fit
     if (!el) return
     let cancelled = false
     let sigma: Sigma<NodeAttrs, EdgeAttrs> | null = null
+    const expose = exposeRef.current
     void import('sigma')
       .then(({ default: SigmaClass }) => {
         if (cancelled) return
         sigma = start(SigmaClass, el)
         sigmaRef.current = sigma
+        if (expose) expose.current = sigma
         setSigmaReady((n) => n + 1)
       })
       .catch((e: unknown) => console.warn('Could not load the graph renderer:', e))
     return () => {
       cancelled = true
+      if (expose && expose.current === sigma) expose.current = null
       sigma?.kill()
       sigmaRef.current = null
     }

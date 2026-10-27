@@ -1,13 +1,15 @@
 /**
  * Find in page for the body editor: the `find-in-page-chrome` at the top right of the object
- * view while `useFind.path` is this object. Drives the formatted editor's `FindControl`
- * (`BodyEditorHandle.find`); raw mode has none, so the bar opens disabled there.
+ * view while `useFind.path` is this object. Drives the editor's `FindControl`
+ * (`BodyEditorHandle.find`): the formatted editor's ProseMirror plugin, or raw mode's CodeMirror
+ * adapter (`rawFind.ts`). While no editor offers one (none mounted yet) the bar opens disabled.
  */
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import { Icon } from '@/components/Icon'
 import type { FindStatus } from '@/editor/extensions/findInPage'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { cn } from '@/lib/utils'
+import { isRawFindControl } from './rawFind'
 import { useFind } from './useFind'
 
 export interface FindBarProps {
@@ -30,11 +32,20 @@ export const FIND_TEXT = {
   noResults: (query: string) => `No results for "${query}"`,
   /** Our string: the count of matches, `{i}/{n}`. */
   count: (index: number, count: number) => `${index + 1}/${count}`,
-  /** Our string: Find works only in the formatted editor. */
-  rawMode: 'Find works in the formatted editor.',
+  /** Our string: no editor to search is mounted (yet). */
+  unavailable: 'Find is not available here.',
 }
 
 const NO_STATUS: FindStatus = { index: -1, count: 0 }
+
+/** Which editor offers find: re-bind (subscribe, apply the query) when it changes. */
+type FindSource = 'none' | 'formatted' | 'raw'
+
+function findSource(handle: BodyEditorHandle | null): FindSource {
+  const find = handle?.find
+  if (!find) return 'none'
+  return isRawFindControl(find) ? 'raw' : 'formatted'
+}
 
 function BarButton({
   label,
@@ -79,16 +90,18 @@ export function FindBar({ path, editorRef }: FindBarProps) {
   const chromeRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
-  // The editor handle is a ref: re-read after every commit whether it offers find (raw mode doesn't).
-  const [available, setAvailable] = useState(false)
+  // The editor handle is a ref: re-read after every commit whether it offers find (switching
+  // between formatted and raw mode swaps the control).
+  const [source, setSource] = useState<FindSource>('none')
   useEffect(() => {
-    const next = Boolean(editorRef.current?.find)
-    if (next !== available) setAvailable(next)
+    const next = findSource(editorRef.current)
+    if (next !== source) setSource(next)
   })
+  const available = source !== 'none'
 
   // Follow the editor: every transaction (an edit, a move) may change the matches.
   useEffect(() => {
-    if (!open || !available) return
+    if (!open || source === 'none') return
     const find = editorRef.current?.find
     if (!find) return
     const sync = () => {
@@ -102,16 +115,16 @@ export function FindBar({ path, editorRef }: FindBarProps) {
       // Closing (or leaving) clears the decorations.
       find.clear()
     }
-  }, [open, available, editorRef])
+  }, [open, source, editorRef])
 
   // Apply the query and options.
   useEffect(() => {
-    if (!open || !available) return
+    if (!open || source === 'none') return
     const find = editorRef.current?.find
     if (!find) return
     find.set(query, { matchCase, wholeWord })
     setStatus(find.status())
-  }, [open, available, query, matchCase, wholeWord, editorRef])
+  }, [open, source, query, matchCase, wholeWord, editorRef])
 
   // Opening (again) focuses the input with its text selected.
   useEffect(() => {
@@ -251,7 +264,7 @@ export function FindBar({ path, editorRef }: FindBarProps) {
       )}
       {(disabled || noMatches) && (
         <div role="status" className="px-2 pt-0.5 pb-1 text-[12px] text-fg-muted">
-          {disabled ? FIND_TEXT.rawMode : FIND_TEXT.noResults(query)}
+          {disabled ? FIND_TEXT.unavailable : FIND_TEXT.noResults(query)}
         </div>
       )}
     </div>
