@@ -1,9 +1,24 @@
 // "Custom repeat" (`DatePicker.recurrenceCustom.*`): Every N and a unit, "Based on" (Scheduled
 // date / Completed date, with their tooltips), "Ends" (Never / On date (inclusive)), Cancel, Save.
 // It renders in place inside the date picker (a portaled dialog would dismiss the picker's popover).
+// M8: the "On" row (by scheduled date only): weekday chips for weeks; "The {day}", "{pos} {day}",
+// "Last day", "Last {day}" for months; "{month} {day}", "{weekday} of {month}" for years. The
+// choices are the task day's own (our choice, as Capacities' picker derives them from the date).
 import { useState } from 'react'
-import type { RepeatRule } from '@/api/types'
-import { validDay } from './repeat'
+import type { RepeatRule } from './taskContract'
+import {
+  formatOn,
+  localDayOf,
+  monthName,
+  ordinal,
+  presetOn,
+  validDay,
+  WEEKDAY_KEYS,
+  weekdayName,
+  weekdayOf,
+  type RepeatOn,
+  type Weekday,
+} from './repeat'
 
 type Unit = 'day' | 'week' | 'month' | 'year'
 
@@ -27,6 +42,36 @@ export interface CustomRepeatDialogProps {
   onCancel(): void
 }
 
+/** The "On" label of an anchored month or year rule (`DatePicker.recurrenceCustom.*`). */
+export function onLabel(on: RepeatOn): string {
+  const month = 'month' in on && on.month ? monthName(on.month) : null
+  let base: string
+  if ('weekdayPos' in on) {
+    base = on.weekdayPos === 'last' ? `Last ${weekdayName(on.weekday)}` : `${ordinal(on.weekdayPos)} ${weekdayName(on.weekday)}`
+  } else if ('monthDay' in on && on.monthDay === 'last') {
+    base = 'Last day'
+  } else if ('monthDay' in on && typeof on.monthDay === 'number') {
+    if (month) return `${month} ${on.monthDay}`
+    base = `The ${ordinal(on.monthDay)}`
+  } else return ''
+  return month ? `${base} of ${month}` : base
+}
+
+/** The "On" choices for a month or year rule from the task's day `d`. */
+export function onChoices(unit: 'month' | 'year', d: Date): RepeatOn[] {
+  const wd = weekdayOf(d)
+  const pos = Math.floor((d.getDate() - 1) / 7) + 1
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+  const lastWeek = d.getDate() + 7 > lastDay
+  const month = unit === 'year' ? { month: d.getMonth() + 1 } : {}
+  const out: RepeatOn[] = []
+  out.push(unit === 'year' ? { month: d.getMonth() + 1, monthDay: d.getDate() } : { monthDay: d.getDate() })
+  if (pos <= 4) out.push({ ...month, weekdayPos: pos as 1 | 2 | 3 | 4, weekday: wd })
+  if (unit === 'month' && d.getDate() === lastDay) out.push({ monthDay: 'last' })
+  if (lastWeek) out.push({ ...month, weekdayPos: 'last', weekday: wd })
+  return out
+}
+
 const FIELD =
   'h-8 rounded-md border border-line bg-raised px-2 text-[14px] text-fg outline-none focus:border-fg-muted [color-scheme:dark]'
 
@@ -37,13 +82,33 @@ export function CustomRepeatDialog({ initial, day, onSave, onCancel }: CustomRep
   const [mode, setMode] = useState<RepeatRule['mode']>(initial && !fromWeekday ? initial.mode : 'dueDate')
   const [ends, setEnds] = useState<'never' | 'on'>(initial?.until ? 'on' : 'never')
   const [until, setUntil] = useState(initial?.until ?? day)
+  const taskDay = localDayOf(day) ?? new Date()
+  const initialOn = initial?.on && initial.unit === unit ? initial.on : null
+  const [weekdays, setWeekdays] = useState<Weekday[]>(
+    initialOn && 'weekdays' in initialOn && initialOn.weekdays ? initialOn.weekdays : [],
+  )
+  const defaultOn = (u: Unit): RepeatOn | null =>
+    u === 'month' || u === 'year' ? (initial?.on && initial.unit === u ? initial.on : presetOn(u, taskDay)) : null
+  const [on, setOn] = useState<RepeatOn | null>(defaultOn(unit))
 
   const n = /^\d+$/.test(every.trim()) ? parseInt(every, 10) : NaN
   const valid = Number.isInteger(n) && n >= 1 && (ends === 'never' || validDay(until))
 
+  const changeUnit = (u: Unit) => {
+    setUnit(u)
+    setOn(defaultOn(u))
+  }
+
+  const choices = unit === 'month' || unit === 'year' ? onChoices(unit, taskDay) : []
+  if (on && !choices.some((c) => formatOn(c) === formatOn(on))) choices.unshift(on)
+
   const save = () => {
     if (!valid) return
     const rule: RepeatRule = { every: n, unit, mode }
+    if (mode === 'dueDate') {
+      if (unit === 'week' && weekdays.length > 0) rule.on = { weekdays: WEEKDAY_KEYS.filter((w) => weekdays.includes(w)) }
+      if ((unit === 'month' || unit === 'year') && on) rule.on = on
+    }
     if (ends === 'on') rule.until = until
     onSave(rule)
   }
@@ -67,7 +132,7 @@ export function CustomRepeatDialog({ initial, day, onSave, onCancel }: CustomRep
         <select
           aria-label="Unit"
           value={unit}
-          onChange={(e) => setUnit(e.target.value as Unit)}
+          onChange={(e) => changeUnit(e.target.value as Unit)}
           className={`${FIELD} flex-1`}
         >
           {UNITS.map((u) => (
@@ -77,6 +142,49 @@ export function CustomRepeatDialog({ initial, day, onSave, onCancel }: CustomRep
           ))}
         </select>
       </div>
+
+      {mode === 'dueDate' && unit === 'week' && (
+        <div role="group" aria-label="On" className="flex items-center gap-2 px-1">
+          <span className="w-16 text-[14px]">On</span>
+          <div className="flex flex-wrap gap-1">
+            {WEEKDAY_KEYS.map((w) => {
+              const pressed = weekdays.includes(w)
+              return (
+                <button
+                  key={w}
+                  type="button"
+                  aria-label={weekdayName(w)}
+                  aria-pressed={pressed}
+                  onClick={() => setWeekdays((cur) => (pressed ? cur.filter((x) => x !== w) : [...cur, w]))}
+                  className={`h-7 w-7 rounded-full text-[12px] ${pressed ? 'bg-primary-btn text-app' : 'bg-hover text-fg hover:opacity-90'}`}
+                >
+                  {weekdayName(w).slice(0, 2)}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {mode === 'dueDate' && (unit === 'month' || unit === 'year') && on && (
+        <div className="flex items-center gap-2 px-1">
+          <label htmlFor="custom-repeat-on" className="w-16 text-[14px]">
+            On
+          </label>
+          <select
+            id="custom-repeat-on"
+            value={formatOn(on)}
+            onChange={(e) => setOn(choices.find((c) => formatOn(c) === e.target.value) ?? on)}
+            className={`${FIELD} flex-1`}
+          >
+            {choices.map((c) => (
+              <option key={formatOn(c)} value={formatOn(c)}>
+                {onLabel(c)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <fieldset className="px-1">
         <legend className="pb-1 text-[13px] font-medium text-fg-muted">Based on</legend>

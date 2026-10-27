@@ -306,7 +306,7 @@ describe('DateCell: the Task date', () => {
     await userEvent.keyboard('{Escape}')
     expect(onChangeMany).toHaveBeenCalledTimes(1)
     expect(onChangeMany).toHaveBeenCalledWith(
-      { date: { start: '2026-10-30', resolution: 'day' }, repeat: 'every week', remind: '1 day before at 09:00' },
+      { date: { start: '2026-10-30', resolution: 'day' }, repeat: 'every week on fri', remind: '1 day before at 09:00' },
       undefined,
     )
     expect(onChange).not.toHaveBeenCalled()
@@ -331,6 +331,29 @@ describe('DateCell: the Task date', () => {
     await userEvent.keyboard('{Escape}')
     expect(onChangeMany).toHaveBeenCalledTimes(1)
     expect(onChangeMany).toHaveBeenCalledWith({}, ['repeat', 'remind'])
+  })
+
+  it('test remove recurrence asks when history exists and removes the log with it', async () => {
+    const onChangeMany = vi.fn()
+    const fm = { date: '2026-10-30', repeat: 'every day', occurrenceLog: '2026-10-29 completed 2026-10-29T07:55:10Z' }
+    render(
+      <DateCell
+        def={TASK_DATE}
+        value={{ start: '2026-10-30', resolution: 'day' }}
+        typeId="task"
+        frontmatter={fm}
+        onChange={() => {}}
+        onChangeMany={onChangeMany}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Date' }))
+    await userEvent.click(screen.getByRole('button', { name: /^Repeat:/ }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Remove recurrence' }))
+    expect(screen.getByRole('alertdialog', { name: 'Remove recurrence?' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Remove recurrence' }))
+    await userEvent.keyboard('{Escape}')
+    expect(onChangeMany).toHaveBeenCalledTimes(1)
+    expect(onChangeMany).toHaveBeenCalledWith({}, ['repeat', 'occurrenceLog'])
   })
 
   it('test removing the date removes repeat and remind', async () => {

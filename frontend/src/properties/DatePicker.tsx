@@ -185,8 +185,10 @@ export interface DatePickerProps {
    * The Task `date` (M4): its current `repeat` and `remind` texts. Given with `onTaskChange`, the
    * picker shows the schedule suggestions and the Repeat row (and the Reminder row when
    * `constraints.supportsReminders`), and every change goes to `onTaskChange` instead of `onChange`.
+   * A non-empty `occurrenceLog` (M8) makes "Remove recurrence" ask first; the owner removes the log
+   * with `repeat`.
    */
-  task?: { repeat: string | null; remind: string | null }
+  task?: { repeat: string | null; remind: string | null; occurrenceLog?: string | null }
   onTaskChange?(next: TaskDateChange): void
 }
 
@@ -503,6 +505,7 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
             date={start}
             onChange={(repeat) => emitTask(shownDate(), repeat, task!.remind)}
             onCustom={() => setCustomOpen(true)}
+            hasHistory={!!task!.occurrenceLog?.trim()}
           />
           {reminders && (
             <ReminderMenu

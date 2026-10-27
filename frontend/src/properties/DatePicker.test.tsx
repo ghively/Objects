@@ -168,7 +168,7 @@ describe('DatePicker: the Task date', () => {
       'Custom',
     ])
     await userEvent.click(screen.getByRole('menuitemradio', { name: 'Monthly on day 30' }))
-    expect(onTaskChange).toHaveBeenLastCalledWith({ date: { start: '2026-10-30', resolution: 'day' }, repeat: 'every month', remind: null })
+    expect(onTaskChange).toHaveBeenLastCalledWith({ date: { start: '2026-10-30', resolution: 'day' }, repeat: 'every month on the 30th', remind: null })
   })
 
   it('the Reminder row needs supportsReminders', () => {
