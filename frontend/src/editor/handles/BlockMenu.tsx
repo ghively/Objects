@@ -1,9 +1,11 @@
 /**
  * The block menu (Task 12), opened by clicking a block's drag handle (the
  * block is then the block selection): "Turn Into", Task 8's "Hierarchy",
- * "List", "Quote", "Color" and "Icon" menus, "Insert block above/below",
- * "Move up/down", "Duplicate", "Remove style" and "Delete". Each row shows its
- * shortcut keys from the registry. Strings are Capacities' (keys beside them).
+ * "List", "Quote", "Color" and "Icon" menus, M8's "Copy block reference",
+ * "Turn into object" (pick a type), "Turn into task object" (to-dos only) and
+ * "Turn into whiteboard", "Insert block above/below", "Move up/down",
+ * "Duplicate", "Remove style" and "Delete". Each row shows its shortcut keys
+ * from the registry. Strings are Capacities' (keys beside them).
  */
 import type { Editor } from '@tiptap/core'
 import type { ReactNode } from 'react'
@@ -18,7 +20,11 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import type { TypeDef } from '@/api/types'
+import { useLinkIndex } from '@/links/linkIndex'
+import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
 import { formatKeys, keysFor } from '@/lib/shortcuts'
+import { TypeChip } from '@/shell/Sidebar'
 import {
   deleteBlocks,
   duplicateBlocks,
@@ -28,7 +34,10 @@ import {
   turnInto,
   type TurnIntoKind,
 } from '../extensions/blockSelection'
+import { showToast } from '../media/upload'
 import { BlockStyleMenu } from '../menus/BlockStyleMenu'
+import { copyBlockReference } from '../nodes/blockRef'
+import { hasTodoAt, turnIntoObject, turnIntoWhiteboard, turnTodoIntoTask } from '../turnInto'
 
 export const BLOCK_MENU_TEXT = {
   turnInto: 'Turn Into', // tokensMenu.turnInto.name
@@ -39,6 +48,17 @@ export const BLOCK_MENU_TEXT = {
   duplicate: 'Duplicate', // EntityMenu.duplicateObject.text
   removeStyle: 'Remove style', // blocksMenu.operations.removeStyle
   delete: 'Delete', // general.delete
+  copyBlockReference: 'Copy block reference', // BlockMenu.copyBlockReference.text
+  turnIntoObject: 'Turn into object', // HighlightMenu.turnIntoObject.label
+  turnIntoTaskObject: 'Turn into task object', // components.RootTask.turnBlockIntoTaskObject
+  turnIntoWhiteboard: 'Turn into whiteboard', // Whiteboard.turnInto.action
+}
+
+/** Run an async block action; a part another task hasn't built yet shows "Not available yet". */
+function run(action: () => Promise<boolean>): void {
+  void action().catch((err) => {
+    if (err instanceof NotBuiltYet) showToast(NOT_AVAILABLE)
+  })
 }
 
 /** "Turn Into" items: name (Capacities' key), kind, and the shortcut id whose keys the row shows. */
@@ -86,6 +106,8 @@ export interface BlockMenuProps {
 
 export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps) {
   const close = () => onOpenChange(false)
+  const types = useLinkIndex((s) => s.types).filter((t: TypeDef) => !t.readOnlyReason)
+  const todo = open && hasTodoAt(editor)
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange} modal={false}>
       <DropdownMenuTrigger asChild>
@@ -114,6 +136,30 @@ export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <BlockStyleMenu editor={editor} onDone={close} />
+        <DropdownMenuSeparator />
+        <Row shortcut="copyBlockReference" onSelect={() => copyBlockReference(editor)}>
+          {BLOCK_MENU_TEXT.copyBlockReference}
+        </Row>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            {BLOCK_MENU_TEXT.turnIntoObject}
+            {shortcutHint('turnIntoObject') && <DropdownMenuShortcut>{shortcutHint('turnIntoObject')}</DropdownMenuShortcut>}
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="max-h-[420px] overflow-auto">
+            {types.map((t) => (
+              <DropdownMenuItem key={t.id} onSelect={() => run(() => turnIntoObject(editor, t.id))}>
+                <TypeChip type={t} size={18} />
+                {t.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        {todo && (
+          <Row shortcut="turnBlockIntoTaskObject" onSelect={() => run(() => turnTodoIntoTask(editor))}>
+            {BLOCK_MENU_TEXT.turnIntoTaskObject}
+          </Row>
+        )}
+        <Row onSelect={() => run(() => turnIntoWhiteboard(editor))}>{BLOCK_MENU_TEXT.turnIntoWhiteboard}</Row>
         <DropdownMenuSeparator />
         <Row shortcut="insertBlockAbove" onSelect={() => insertBlock(editor, 'above')}>
           {BLOCK_MENU_TEXT.insertAbove}

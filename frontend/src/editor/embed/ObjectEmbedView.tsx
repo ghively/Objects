@@ -9,12 +9,16 @@
  * writing `view`, and "Remove Block" (`EntityMenu.deleteEntityBlock.text`).
  * Clicking the card opens the object as a link (`via: 'link'`). An unresolved
  * target shows the muted `[[target]]` chip, as M1's unresolved wikilinks.
+ *
+ * M8: a task-role object (the basic Task type) in the Link block view shows M4's
+ * `TaskCheckbox` before its token, as Capacities' task embeds do.
  */
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { useEffect, useState, type MouseEvent } from 'react'
 import { api } from '@/api/client'
 import type { Row, TypeDef } from '@/api/types'
 import { openObject } from '@/create/createAndOpen'
+import { TaskCheckbox } from '@/tasks/TaskCheckbox'
 import { ensureLinkIndex, resolveLink, typeOf, useLinkIndex } from '@/links/linkIndex'
 import { cardProperties } from '@/views/cards/cardConfig'
 import { ObjectCard, type CardView } from '@/views/cards/ObjectCard'
@@ -36,6 +40,12 @@ export function embedViewOf(options: readonly Option[] | null | undefined, type:
   const v = (options ?? []).find((o) => o.key === 'view')?.value
   if (typeof v === 'string' && VIEW_SET.has(v)) return v as CardView
   return type?.defaultViewType ?? 'smallCard'
+}
+
+/** A task-role type: the basic Task type (as `isTaskDate` reads it). */
+export function isTaskRoleType(type: TypeDef | undefined, typeId?: string | null): boolean {
+  if (type) return type.basic && type.name.toLowerCase() === 'task'
+  return !!typeId && typeId.toLowerCase() === 'task'
 }
 
 type Loaded = { status: 'loading' } | { status: 'missing' } | { status: 'ok'; row: Row }
@@ -125,7 +135,22 @@ export function ObjectEmbedView({ node, editor, getPos, selected }: NodeViewProp
   } else if (!row) {
     body = <div className="object-embed-loading" aria-busy="true" />
   } else {
-    body = <ObjectCard row={row} type={type} view={view} props={type ? cardProperties(type) : []} onOpen={onOpen} />
+    const card = <ObjectCard row={row} type={type} view={view} props={type ? cardProperties(type) : []} onOpen={onOpen} />
+    body =
+      view === 'inline' && isTaskRoleType(type, row.summary.type) ? (
+        <span className="object-embed-task inline-flex max-w-full items-center gap-1" data-testid="object-embed-task">
+          <TaskCheckbox
+            row={row}
+            type={type}
+            onResult={(outcome) => {
+              if (outcome.row) setLoaded({ status: 'ok', row: outcome.row })
+            }}
+          />
+          {card}
+        </span>
+      ) : (
+        card
+      )
   }
 
   return (

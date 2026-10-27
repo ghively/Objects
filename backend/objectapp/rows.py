@@ -56,6 +56,8 @@ _EM_UNDER_RE = re.compile(r"(?<!\w)_(.+?)_(?!\w)")
 _STRIKE_RE = re.compile(r"~~(.+?)~~")
 _CODE_RE = re.compile(r"`+([^`]*)`+")
 _SPACE_RE = re.compile(r"\s+")
+# M8: a block id (`` ^<id>``, six ``[a-z0-9]``) at the end of a line is not text.
+_BLOCK_ID_RE = re.compile(r" \^[a-z0-9]{6}[ \t]*$")
 
 
 def _wiki(m: re.Match[str]) -> str:
@@ -81,6 +83,7 @@ def body_preview(body: str, limit: int = 280) -> str:
             continue
         if _COMMENT_LINE_RE.match(line) or _MATH_FENCE_RE.match(line):
             continue
+        line = _BLOCK_ID_RE.sub("", line)
         line = _HEADING_RE.sub("", line)
         line = _QUOTE_RE.sub("", line)
         line = _LIST_RE.sub("", line)
