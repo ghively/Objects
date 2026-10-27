@@ -1,7 +1,11 @@
 """The Task `repeat` and `remind` text forms (pure, no I/O).
 
-repeat:  every [N] (day|week|month|year)[s] [after completion] [until YYYY-MM-DD]
+repeat:  every [N] (day|week|month|year)[s] [ON] [after completion] [until YYYY-MM-DD]
          every weekday [until YYYY-MM-DD]
+         ON (by due date only, M8):
+           weeks:  on mon[, tue ...]           (full names read too; written in week order)
+           months: on the 15th | on the last day | on the 2nd tuesday | on the last friday
+           years:  on march 15 | on the 2nd tuesday of march | on the last day of february
 remind:  time dates: at time | N minutes before | N hours before
          day dates:  on the day at HH:mm | N day[s] before at HH:mm
 
@@ -44,22 +48,67 @@ class _DictLike:
         return NotImplemented
 
     def __hash__(self) -> int:
-        return hash(tuple(sorted(self.to_dict().items())))
+        return hash(repr(sorted(self.to_dict().items())))
+
+
+WEEKDAYS: tuple[str, ...] = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+MONTHS: tuple[str, ...] = (
+    "january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december",
+)
+_MONTH_MAX_DAYS = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+
+@dataclass(frozen=True, eq=False)
+class RepeatOn(_DictLike):
+    """The `on` part of a custom rule (M8).
+
+    Exactly one shape is set:
+    - weeks:  `weekdays` (mon..sun, in week order, no duplicates)
+    - months: `monthDay` (1..31 or 'last') or `weekdayPos` (1..4 or 'last') + `weekday`
+    - years:  the month shapes plus `month` (1..12)
+    """
+
+    weekdays: tuple[str, ...] | None = None
+    monthDay: int | str | None = None
+    weekdayPos: int | str | None = None
+    weekday: str | None = None
+    month: int | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        if self.weekdays is not None:
+            out["weekdays"] = list(self.weekdays)
+        if self.month is not None:
+            out["month"] = self.month
+        if self.monthDay is not None:
+            out["monthDay"] = self.monthDay
+        if self.weekdayPos is not None:
+            out["weekdayPos"] = self.weekdayPos
+        if self.weekday is not None:
+            out["weekday"] = self.weekday
+        return out
 
 
 @dataclass(frozen=True, eq=False)
 class RepeatRule(_DictLike):
-    """`{every, unit, mode, until?}` as in the M4 API contract."""
+    """`{every, unit, mode, until?, on?}`: the M4 API contract plus M8's `on`.
+
+    `to_dict` adds `on` only when present, so M4 rules keep M4's shape.
+    """
 
     every: int
     unit: Unit
     mode: Mode = "dueDate"
     until: str | None = None  # 'YYYY-MM-DD', inclusive
+    on: RepeatOn | None = None
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {"every": self.every, "unit": self.unit, "mode": self.mode}
         if self.until is not None:
             out["until"] = self.until
+        if self.on is not None:
+            out["on"] = self.on.to_dict()
         return out
 
     @property
@@ -101,9 +150,113 @@ class ReminderRule(_DictLike):
 
 _REPEAT = re.compile(
     r"every(?:\s+(?P<n>\d+))?\s+(?P<unit>day|week|month|year|weekday)(?P<plural>s)?"
+    r"(?:\s+on\b(?P<on>.*?))?"
     r"(?P<after>\s+after\s+completion)?"
     r"(?:\s+until\s+(?P<until>\d{4}-\d{2}-\d{2}))?"
 )
+
+_WEEKDAY_NAMES = {
+    **{w: w for w in WEEKDAYS},
+    "monday": "mon", "tuesday": "tue", "wednesday": "wed", "thursday": "thu",
+    "friday": "fri", "saturday": "sat", "sunday": "sun",
+}
+_MONTH_NAMES = {**{m: i + 1 for i, m in enumerate(MONTHS)}, **{m[:3]: i + 1 for i, m in enumerate(MONTHS)}}
+_ORDINAL = r"(?P<pos>\d+)(?:st|nd|rd|th)"
+_ON_LAST_DAY = re.compile(r"the last day")
+_ON_MONTH_DAY = re.compile(r"the " + _ORDINAL)
+_ON_NTH_WEEKDAY = re.compile(r"the (?:" + _ORDINAL + r"|(?P<last>last)) (?P<wd>[a-z]+)")
+_ON_YEAR_DATE = re.compile(r"(?P<month>[a-z]+) (?P<day>\d+)")
+
+
+def _parse_on_weeks(s: str) -> RepeatOn | None:
+    names = [part.strip() for part in s.split(",")]
+    if not names or any(n not in _WEEKDAY_NAMES for n in names):
+        return None
+    chosen = {_WEEKDAY_NAMES[n] for n in names}
+    return RepeatOn(weekdays=tuple(w for w in WEEKDAYS if w in chosen))
+
+
+def _parse_on_month_part(s: str, month: int | None) -> RepeatOn | None:
+    """`the 15th` | `the last day` | `the 2nd tuesday` | `the last friday`."""
+    if _ON_LAST_DAY.fullmatch(s):
+        return RepeatOn(monthDay="last", month=month)
+    m = _ON_MONTH_DAY.fullmatch(s)
+    if m:
+        day = int(m["pos"])
+        limit = _MONTH_MAX_DAYS[month - 1] if month else 31
+        if not 1 <= day <= limit:
+            return None
+        return RepeatOn(monthDay=day, month=month)
+    m = _ON_NTH_WEEKDAY.fullmatch(s)
+    if m and m["wd"] in _WEEKDAY_NAMES:
+        if m["last"]:
+            pos: int | str = "last"
+        else:
+            pos = int(m["pos"])
+            if not 1 <= pos <= 4:
+                return None
+        return RepeatOn(weekdayPos=pos, weekday=_WEEKDAY_NAMES[m["wd"]], month=month)
+    return None
+
+
+def _parse_on_years(s: str) -> RepeatOn | None:
+    m = _ON_YEAR_DATE.fullmatch(s)
+    if m:
+        month = _MONTH_NAMES.get(m["month"])
+        day = int(m["day"])
+        if month is None or not 1 <= day <= _MONTH_MAX_DAYS[month - 1]:
+            return None
+        return RepeatOn(month=month, monthDay=day)
+    head, sep, tail = s.rpartition(" of ")
+    if not sep or tail not in _MONTH_NAMES:
+        return None
+    return _parse_on_month_part(head, _MONTH_NAMES[tail])
+
+
+def _parse_on(unit: str, s: str) -> RepeatOn | None:
+    s = s.strip()
+    if not s:
+        return None
+    if unit == "week":
+        return _parse_on_weeks(s)
+    if unit == "month":
+        return _parse_on_month_part(s, None)
+    if unit == "year":
+        return _parse_on_years(s)
+    return None
+
+
+def _ordinal(n: int) -> str:
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def format_on(on: RepeatOn) -> str:
+    """The canonical text after `on ` (no leading `on`)."""
+    if on.weekdays is not None:
+        return ", ".join(on.weekdays)
+    if on.weekdayPos is not None:
+        pos = "last" if on.weekdayPos == "last" else _ordinal(int(on.weekdayPos))
+        out = f"the {pos} {_full_weekday(on.weekday or '')}"
+    elif on.monthDay == "last":
+        out = "the last day"
+    elif on.month is not None:
+        return f"{MONTHS[on.month - 1]} {on.monthDay}"
+    else:
+        out = f"the {_ordinal(int(on.monthDay or 0))}"
+    if on.month is not None:
+        out += f" of {MONTHS[on.month - 1]}"
+    return out
+
+
+_FULL_WEEKDAY = {v: k for k, v in _WEEKDAY_NAMES.items() if len(k) > 3}
+
+
+def _full_weekday(wd: str) -> str:
+    return _FULL_WEEKDAY.get(wd, wd)
 
 
 def _norm(text: object) -> str | None:
@@ -127,14 +280,22 @@ def parse_repeat(text: object) -> RepeatRule | None:
         except ValueError:
             return None
     if unit == "weekday":
-        if m["n"] is not None or m["plural"] or m["after"]:
+        if m["n"] is not None or m["plural"] or m["after"] or m["on"] is not None:
             return None
         return RepeatRule(every=1, unit="weekday", mode="dueDate", until=until)
     every = int(m["n"]) if m["n"] is not None else 1
     if every < 1:
         return None
+    on: RepeatOn | None = None
+    if m["on"] is not None:
+        # by due date only: Capacities' completionDate rule has only an interval
+        if m["after"]:
+            return None
+        on = _parse_on(unit, m["on"])
+        if on is None:
+            return None
     mode: Mode = "completionDate" if m["after"] else "dueDate"
-    return RepeatRule(every=every, unit=unit, mode=mode, until=until)  # type: ignore[arg-type]
+    return RepeatRule(every=every, unit=unit, mode=mode, until=until, on=on)  # type: ignore[arg-type]
 
 
 def format_repeat(rule: RepeatRule) -> str:
@@ -144,6 +305,8 @@ def format_repeat(rule: RepeatRule) -> str:
         out = f"every {rule.unit}"
     else:
         out = f"every {rule.every} {rule.unit}s"
+    if rule.on is not None:
+        out += f" on {format_on(rule.on)}"
     if rule.mode == "completionDate" and rule.unit != "weekday":
         out += " after completion"
     if rule.until:
