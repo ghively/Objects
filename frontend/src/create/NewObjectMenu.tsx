@@ -83,6 +83,7 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
   const [active, setActive] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const busy = useRef(false)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (open) {
@@ -92,6 +93,13 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
       setError(null)
     }
   }, [open, initialTypeId])
+
+  // The search box keeps focus across the type step: a click on an option is not a focus
+  // change (see the options' onMouseDown), and moving to step 2 refocuses it, so typing and
+  // Enter go to "Search or Create" whichever way the type was picked.
+  useEffect(() => {
+    if (open) inputRef.current?.focus()
+  }, [open, typeId])
 
   const type = typeId ? types.find((t) => t.id === typeId) : undefined
   const q = query.trim()
@@ -173,6 +181,7 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
         <div className="flex items-center gap-2 border-b border-line px-3">
           {type ? <TypeChip type={type} size={22} /> : <Icon name="ph-magnifying-glass" size={16} />}
           <input
+            ref={inputRef}
             autoFocus
             aria-label={typeId ? NEW_OBJECT_TEXT.searchOrCreate : NEW_OBJECT_TEXT.searchTypes}
             placeholder={typeId ? NEW_OBJECT_TEXT.searchOrCreate : NEW_OBJECT_TEXT.searchTypes}
@@ -197,6 +206,7 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
               role="option"
               aria-selected={i === active}
               onMouseEnter={() => setActive(i)}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => void pick(item, mods(e))}
               className={cn(
                 'flex h-9 cursor-default items-center gap-2 rounded-md px-2 text-[15px]',
