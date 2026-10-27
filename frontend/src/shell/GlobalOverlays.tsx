@@ -7,6 +7,8 @@
  *
  * Task 17: mounts the Settings modal and the Shortcuts sheet and binds `openSettings` and
  * `toggleShortcutsMenu` (also while typing: neither changes text).
+ *
+ * Task 18: mounts the "Create new space" dialog and the "Switching space…" overlay.
  */
 import { useEffect } from 'react'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
@@ -16,6 +18,8 @@ import { useGlobalShortcut } from '@/lib/shortcuts'
 import { SettingsModal } from '@/settings/SettingsModal'
 import { ShortcutsSheet } from '@/settings/ShortcutsSheet'
 import { useSettingsModal } from '@/settings/useSettingsModal'
+import { CreateSpaceDialog } from '@/spaces/CreateSpaceDialog'
+import { SpaceSwitchOverlay } from '@/spaces/SpacesMenu'
 
 function ThemeFollower() {
   const settings = useSettings((s) => s.settings)
@@ -46,6 +50,8 @@ export function GlobalOverlays() {
     <>
       <ThemeFollower />
       <SettingsOverlays />
+      <CreateSpaceDialog />
+      <SpaceSwitchOverlay />
     </>
   )
 }
