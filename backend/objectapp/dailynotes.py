@@ -20,12 +20,17 @@ FILE_NAME_TAKEN = "A file with that name already exists."  # our string
 
 
 class DailyNoteExists(Exception):
-    """A note for the day exists (or its file name is taken); the API answers 409 with ``path``."""
+    """A note for the day exists (or its file name is taken); the API answers 409 with ``path``.
+
+    ``reason`` tells the two apart: ``"exists"`` when ``path`` is the day's note,
+    ``"nameTaken"`` when ``path`` is some other file holding the note's name.
+    """
 
     def __init__(self, path: str, detail: str = DAILY_NOTE_EXISTS) -> None:
         super().__init__(detail)
         self.path = path
         self.detail = detail
+        self.reason = "nameTaken" if detail == FILE_NAME_TAKEN else "exists"
 
 
 def parse_day(text: Any) -> str | None:

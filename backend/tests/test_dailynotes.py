@@ -261,6 +261,7 @@ def test_name_collision_with_unindexed_file_409_no_suffix_file(
     assert res.json() == {
         "detail": "A file with that name already exists.",
         "path": rel,
+        "reason": "nameTaken",
     }
 
 
@@ -355,6 +356,7 @@ def test_route_created_and_409(space: Space, calendar_space_dir: Path):
     assert res.json() == {
         "detail": "There is already a daily note for this day.",
         "path": "DailyNotes/2026-10-27.md",
+        "reason": "exists",
     }
     res = client.post(
         "/api/daily-notes", json={"date": "2026-10-29", "templateId": "nope"}

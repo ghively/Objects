@@ -72,7 +72,7 @@ export function DailyNoteSlot({ day, note, heading, onChanged, collapsed, onTogg
       setFocus(true)
       void invalidateLinkIndex()
     } catch (e) {
-      if (e instanceof DailyNoteExistsError && e.path) {
+      if (e instanceof DailyNoteExistsError && e.reason === 'exists' && e.path) {
         setLocal({ day, path: e.path })
         setFocus(true)
       } else {

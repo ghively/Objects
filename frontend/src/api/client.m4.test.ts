@@ -61,8 +61,20 @@ describe('api client M4', () => {
     expect(err).toBeInstanceOf(ApiError)
     expect((err as DailyNoteExistsError).status).toBe(409)
     expect((err as DailyNoteExistsError).path).toBe('DailyNotes/2026-10-26.md')
+    expect((err as DailyNoteExistsError).reason).toBe('exists')
     expect(urlOf(fetchMock)).toBe('/api/daily-notes')
     expect(bodyOf(fetchMock)).toEqual({ date: '2026-10-26', clientId: CLIENT_ID })
+  })
+
+  test('createDailyNote 409 nameTaken carries the reason', async () => {
+    vi.stubGlobal(
+      'fetch',
+      respond(409, { detail: 'A file with that name already exists.', path: 'DailyNotes/2026-11-01.md', reason: 'nameTaken' }),
+    )
+    const err = await api.createDailyNote('2026-11-01').catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(DailyNoteExistsError)
+    expect((err as DailyNoteExistsError).reason).toBe('nameTaken')
+    expect((err as DailyNoteExistsError).message).toBe('A file with that name already exists.')
   })
 
   test('createDailyNote 201 sends templateId and emits created and types events', async () => {

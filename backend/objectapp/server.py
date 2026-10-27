@@ -757,7 +757,9 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             path, version = space.create_daily_note(req.date, req.templateId)
         except DailyNoteExists as exc:
             announce_template_ids(templates_before, req.clientId)
-            return JSONResponse({"detail": exc.detail, "path": exc.path}, status_code=409)
+            return JSONResponse(
+                {"detail": exc.detail, "path": exc.path, "reason": exc.reason}, status_code=409
+            )
         except InvalidValue as exc:
             announce_template_ids(templates_before, req.clientId)
             return _error(422, str(exc))
