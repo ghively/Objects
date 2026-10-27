@@ -158,6 +158,9 @@ from .propvalues import InvalidValue
 from .queries import QueryDef
 from .reminders import ReminderScheduler, file_clock
 from .searchindex import SearchIndex
+from .settings import SettingsProblem
+from .settings import patch as patch_settings
+from .settings import read as read_settings
 from .space import (
     ConfirmRequired,
     Conflict,
@@ -166,6 +169,8 @@ from .space import (
     RestoreConflict,
     Space,
 )
+from .spaceconfig import SpaceConfigProblem, space_fields
+from .spaceconfig import patch as patch_space_config
 from .typedefs import has_undecodable
 from .typemodel import (
     RevisionConflict,
@@ -400,6 +405,17 @@ _TASK_SECTION_KEYS = frozenset(
 )
 
 
+class PatchSpaceRequest(BaseModel):
+    patch: dict[str, Any]
+    baseRevision: str = ""
+    clientId: str | None = None
+
+
+class PatchSettingsRequest(BaseModel):
+    patch: dict[str, Any]
+    baseRevision: str = ""
+
+
 class EnsureTagRequest(BaseModel):
     name: str = ""
     clientId: str | None = None
@@ -531,6 +547,8 @@ def _calendar_ui_problem(cal: Any) -> str | None:
         return "calendar must be an object."
     if "weekStart" in cal and cal["weekStart"] not in _WEEK_STARTS:
         return "calendar.weekStart must be 'sunday' or 'monday'."
+    if "hideCalendarSidebar" in cal and not isinstance(cal["hideCalendarSidebar"], bool):
+        return "calendar.hideCalendarSidebar must be true or false."
     if "daily" in cal:
         daily = cal["daily"]
         if not isinstance(daily, dict):
@@ -630,13 +648,53 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         return JSONResponse({"detail": detail, "reason": detail}, status_code=503)
     api = APIRouter(prefix="/api")
 
-    @api.get("/space")
-    def get_space():
+    def space_info() -> dict[str, Any]:
+        fields = space_fields(space.root)
         return {
-            "name": space.name,
+            "name": fields["name"],
             "root": str(space.root),
             "types": [t.to_api(rev) for t, rev in space.types_with_revisions()],
+            "icon": fields["icon"],
+            "description": fields["description"],
+            "hideTaskManagement": fields["hideTaskManagement"],
+            "revision": fields["revision"],
         }
+
+    @api.get("/space")
+    def get_space():
+        return space_info()
+
+    @api.put("/space")
+    def put_space(req: PatchSpaceRequest):
+        try:
+            patch_space_config(space.root, req.patch, req.baseRevision)
+        except SpaceConfigProblem as exc:
+            return _error(422, exc.message)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        return space_info()
+
+    @api.get("/settings")
+    def get_settings():
+        try:
+            data, revision = read_settings()
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        return {"settings": data, "revision": revision}
+
+    @api.put("/settings")
+    def put_settings(req: PatchSettingsRequest):
+        try:
+            data, revision = patch_settings(req.patch, req.baseRevision)
+        except SettingsProblem as exc:
+            return _error(422, exc.message)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        return {"settings": data, "revision": revision}
 
     @api.get("/objects")
     def list_objects(type: str | None = Query(default=None)):

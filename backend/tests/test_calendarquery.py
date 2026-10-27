@@ -458,3 +458,23 @@ def test_ui_accepts_calendar_tasks_reminders_keys(calendar_space_dir: Path):
         stale = c.put("/api/ui", json={"patch": {"reminders": {"enabled": True}}, "baseRevision": base})
         assert stale.status_code == 409
         assert c.get("/api/ui").json()["ui"]["reminders"] == {"enabled": False}
+
+
+def test_ui_accepts_hide_calendar_sidebar(calendar_space_dir: Path):
+    # M7 Task 3: the calendar's "hide sidebar" toggle is stored in `ui.json`'s calendar object.
+    space = _space(calendar_space_dir)
+    with TestClient(create_app(space, None, watch=False)) as c:
+        rev = c.get("/api/ui").json()["revision"]
+        calendar = {"weekStart": "sunday", "hideCalendarSidebar": True}
+        r = c.put("/api/ui", json={"patch": {"calendar": calendar}, "baseRevision": rev})
+        assert r.status_code == 200, r.text
+        assert c.get("/api/ui").json()["ui"]["calendar"] == calendar
+        rev = r.json()["revision"]
+        for bad in ("yes", 1, None, [True]):
+            bad_r = c.put(
+                "/api/ui",
+                json={"patch": {"calendar": {"hideCalendarSidebar": bad}}, "baseRevision": rev},
+            )
+            assert bad_r.status_code == 422, (bad, bad_r.text)
+            assert "hideCalendarSidebar" in bad_r.json()["detail"]
+        assert c.get("/api/ui").json()["ui"]["calendar"] == calendar

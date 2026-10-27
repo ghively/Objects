@@ -25,7 +25,6 @@ import hashlib
 import json
 import logging
 import os
-import sys
 import threading
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -33,6 +32,7 @@ from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from pathlib import Path
 from typing import Any
 
+from .appstate import state_dir
 from .localtime import from_local, to_local
 from .notify import Notifier
 from .propvalues import decode_value, label_lookup
@@ -61,7 +61,6 @@ log = logging.getLogger(__name__)
 
 CATCH_UP_FALLBACK = timedelta(hours=12)
 LEDGER_RETENTION = timedelta(days=30)
-STATE_DIR_ENV = "OBJECT_STATE_DIR"
 
 
 def _parse_instant(text: object) -> datetime | None:
@@ -233,14 +232,8 @@ def due(space, since: datetime | None, now: datetime, ledger: Ledger) -> list[Du
 
 
 def _state_dir() -> Path:
-    override = os.environ.get(STATE_DIR_ENV)
-    if override:
-        return Path(override)
-    if sys.platform == "win32":
-        base = os.environ.get("LOCALAPPDATA")
-        return (Path(base) if base else Path.home() / "AppData" / "Local") / "object"
-    xdg = os.environ.get("XDG_STATE_HOME")
-    return (Path(xdg) if xdg else Path.home() / ".local" / "state") / "object"
+    """The per-user state folder (`appstate.state_dir`, the single owner of the rule)."""
+    return state_dir()
 
 
 def ledger_path_for(space_root: Path) -> Path:
