@@ -16,19 +16,24 @@
  * line, after an item comment) and a quote (its last line); other blocks have
  * no line of their own to carry an id (our choice).
  *
- * Plain rendering here (a muted line naming its target); Task 27 draws the
- * live, read-only transclusion.
+ * Drawn by `blockref/BlockRefView.tsx` (Task 27: the referenced block, live and
+ * read-only); `renderHTML` stays the plain line for copy and HTML export. A
+ * block whose id other objects reference shows "Referenced in" after its text
+ * (`blockref/ReferencedIn.tsx`, a widget, in editable editors only).
  */
 import { Node, mergeAttributes, type Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type Transaction } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { ReactNodeViewRenderer } from '@tiptap/react'
 import { stemOf, summaryOf } from '@/links/linkIndex'
 import { BLOCK_ID_SUFFIX, blockIdsIn, blockRefMarkdown, newBlockId } from '../blocks'
 import { serializeBody } from '../document'
 import { showToast } from '../media/upload'
 import { insertBlockNode } from './containers'
 import { leafBlockAt } from './blockOptions'
+import { BlockRefView } from '../blockref/BlockRefView'
+import { mountReferencedIn } from '../blockref/ReferencedIn'
 
 /** `BlockMenu.copyBlockReference.copied` */
 export const BLOCK_REFERENCE_COPIED = 'Block reference copied'
@@ -133,6 +138,37 @@ export function copyBlockReference(editor: Editor, random?: () => number): boole
 
 const blockIdKey = new PluginKey<DecorationSet>('blockIds')
 
+/** "Referenced in" widgets: one at the end of each block carrying an id (`referencedInFor`). */
+function referencedInWidgets(editor: Editor, state: { doc: PMNode }, ids: DecorationSet): DecorationSet {
+  const obj = editorObjects.get(editor)
+  if (!obj || !editor.isEditable) return ids
+  const widgets: Decoration[] = []
+  for (const d of ids.find()) {
+    const id = (d.spec as { blockId?: string }).blockId
+    if (!id) continue
+    const path = obj.path
+    widgets.push(
+      Decoration.widget(
+        d.to,
+        () => {
+          const el = document.createElement('span')
+          el.className = 'block-referenced-in-host'
+          el.contentEditable = 'false'
+          ;(el as HTMLElement & { unmountReferencedIn?: () => void }).unmountReferencedIn = mountReferencedIn(el, path, id)
+          return el
+        },
+        {
+          side: 1,
+          key: `referenced-in:${path}:${id}`,
+          ignoreSelection: true,
+          destroy: (node: globalThis.Node) => (node as HTMLElement & { unmountReferencedIn?: () => void }).unmountReferencedIn?.(),
+        },
+      ),
+    )
+  }
+  return widgets.length ? ids.add(state.doc, widgets) : ids
+}
+
 /** The trailing ` ^id` of each text block, drawn muted. */
 function blockIdDecorations(doc: PMNode): DecorationSet {
   const decos: Decoration[] = []
@@ -143,7 +179,7 @@ function blockIdDecorations(doc: PMNode): DecorationSet {
     const m = last?.isText ? BLOCK_ID_SUFFIX.exec(last.text ?? '') : null
     if (m) {
       const end = pos + 1 + node.content.size
-      decos.push(Decoration.inline(end - m[0].length + 1, end, { class: 'block-id', 'data-block-id': m[1] }))
+      decos.push(Decoration.inline(end - m[0].length + 1, end, { class: 'block-id', 'data-block-id': m[1] }, { blockId: m[1] }))
     }
     return false
   })
@@ -189,6 +225,10 @@ export const BlockRef = Node.create({
     ]
   },
 
+  addNodeView() {
+    return ReactNodeViewRenderer(BlockRefView)
+  },
+
   renderText({ node }) {
     return blockRefMarkdown(node.attrs.target, node.attrs.id, node.attrs.label)
   },
@@ -198,6 +238,7 @@ export const BlockRef = Node.create({
   },
 
   addProseMirrorPlugins() {
+    const editor = this.editor
     return [
       new Plugin<DecorationSet>({
         key: blockIdKey,
@@ -205,7 +246,12 @@ export const BlockRef = Node.create({
           init: (_, state) => blockIdDecorations(state.doc),
           apply: (tr, old) => (tr.docChanged ? blockIdDecorations(tr.doc) : old),
         },
-        props: { decorations: (state) => blockIdKey.getState(state) },
+        props: {
+          decorations: (state) => {
+            const ids = blockIdKey.getState(state)
+            return ids ? referencedInWidgets(editor, state, ids) : ids
+          },
+        },
       }),
     ]
   },

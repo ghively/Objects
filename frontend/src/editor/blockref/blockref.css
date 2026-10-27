@@ -1,0 +1,68 @@
+/* Block references (M8; our choice of look, in the theme's tokens): the referenced block inside a
+   quiet frame with its source's title under it, as Object's `.EntityBlock.block-reference`. */
+.object-editor .block-ref {
+  color: inherit;
+  border-left: none;
+  padding: 0;
+  margin-block-start: 0.2em;
+}
+.object-editor .block-ref-frame {
+  border-left: 3px solid var(--border-subtle);
+  padding: 2px 0 2px 0.75em;
+  border-radius: 2px;
+}
+.object-editor .block-ref.is-selected .block-ref-frame {
+  background: var(--bg-hover);
+}
+.object-editor .block-ref-content {
+  cursor: pointer;
+}
+.object-editor .block-ref-content .object-editor {
+  padding: 0;
+}
+.object-editor .block-ref-content .object-editor > :first-child {
+  margin-top: 0;
+}
+.object-editor .block-ref-message {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  margin: 0;
+}
+.object-editor .block-ref-loading {
+  height: 1.5em;
+}
+.object-editor .block-ref-source {
+  display: inline-block;
+  color: var(--text-muted);
+  font-size: 0.75em;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.object-editor .block-ref-source:hover {
+  text-decoration: underline;
+}
+.block-ref-flash {
+  background: var(--bg-hover);
+  transition: background 0.6s ease-out;
+}
+
+/* "Referenced in" after a block whose id others reference. */
+.object-editor .block-referenced-in {
+  display: inline-flex;
+  gap: 0.35em;
+  margin-left: 0.5em;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  user-select: none;
+  vertical-align: baseline;
+}
+.object-editor .block-referenced-in-link {
+  padding: 0 0.3em;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}

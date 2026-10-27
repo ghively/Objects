@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from .propvalues import decode_value
 from .rows import (
+    _BLOCK_ID_RE,
     _COMMENT_LINE_RE,
     _EM_STAR_RE,
     _EM_UNDER_RE,
@@ -95,6 +96,7 @@ def plain_body(body: str) -> str:
             continue
         if _COMMENT_LINE_RE.match(line) or _MATH_FENCE_RE.match(line):
             continue
+        line = _BLOCK_ID_RE.sub("", line)
         stripped = line.strip()
         if stripped.startswith("|"):
             cells = [c.strip() for c in stripped.strip("|").split("|")]
