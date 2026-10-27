@@ -139,6 +139,7 @@ Edit = Callable[[ObjectFile, dict], "ObjectFile | None"]
 # Keys that `update_properties` refuses: they change through their own routes
 # (rename, change type) or are managed by the app.
 _LOCKED_KEYS = frozenset({"title", "type", "id", "template"})
+_WHITEBOARD_TYPE_ID = "whiteboard"  # whiteboardstore.WHITEBOARD_TYPE_ID (it imports this module)
 
 # Keys a template never copies into an object, and kinds the app maintains itself.
 _NOT_COPIED = frozenset({"template", "id", "type", "title", "createdAt", "lastUpdated", "iconColor"})
@@ -2451,8 +2452,13 @@ class Space:
             self._persist_type(t)
             folder = t.folder.strip("/")
             (self.root / folder).mkdir(parents=True, exist_ok=True)
+            free = unique_path
+            if t.id == _WHITEBOARD_TYPE_ID:
+                # A whiteboard's stem must be free for its .md and both sidecars, so a new
+                # board never adopts an orphan sidecar (M6).
+                from .whiteboardtrash import free_whiteboard_stem as free
             for _attempt in range(100):
-                rel = unique_path(self.root, folder, stem)
+                rel = free(self.root, folder, stem)
                 if self._place(rel, data):
                     return rel, version
         raise OSError(f"Could not find a free file name for {stem!r}")
@@ -2666,9 +2672,9 @@ class Space:
                 meta.pop("typeTrashId")
             if collection_trash_id is None:
                 meta.pop("collectionTrashId")
+            whiteboard = self._is_whiteboard(rel)
             meta_file = self.trash.object_meta_file(item.id)
             self.trash.write_json(meta_file, meta)
-            whiteboard = self._is_whiteboard(rel)
             try:
                 self._move_out(rel, self.trash.object_file(item.id))
             except BaseException:
@@ -3100,7 +3106,9 @@ class Space:
 
         data = self.trash.object_file(trash_id).read_bytes()
         original = str(meta.get("originalPath", ""))
-        if sidecar_trash_dir(self, trash_id).is_dir():
+        # A whiteboard comes back under a stem free for all three names, even when it had no
+        # sidecars to trash (restore_sidecars does nothing then), so it never adopts an orphan.
+        if meta.get("type") == _WHITEBOARD_TYPE_ID or sidecar_trash_dir(self, trash_id).is_dir():
             path = self._restore_whiteboard(trash_id, original, data)
         else:
             path = self._restore_file(original, data)

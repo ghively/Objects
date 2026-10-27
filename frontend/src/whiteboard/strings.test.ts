@@ -48,7 +48,7 @@ describe('whiteboard strings', () => {
 
   test('test our strings are marked ours and are not Capacities strings by accident', () => {
     const ours = Object.entries(WB).filter(([, v]) => v.ref === 'ours')
-    expect(ours.map(([k]) => k).sort()).toEqual(['changedElsewhere', 'newerVersion', 'pickType', 'readOnly', 'searchObjects'])
+    expect(ours.map(([k]) => k).sort()).toEqual(['changedElsewhere', 'newerVersion', 'pickType', 'readOnly', 'saveFailed', 'searchObjects'])
     expect(t('newerVersion')).toBe('This whiteboard was saved by a newer version of Object.')
     expect(t('changedElsewhere')).toBe('Changed elsewhere. Reloaded.')
   })

@@ -7,7 +7,7 @@
  * - On a 409 the server copy is fetched and this window's changes since the last save are merged
  *   onto it key by key (`mergeBoards`), then saved once with the new revision; a second 409
  *   reloads the server copy with the toast "Changed elsewhere. Reloaded.".
- * - A 423 switches the board to read-only.
+ * - A 423 switches the board to read-only; any other failed save shows a toast.
  * - An external `whiteboard` change for this board reloads it (clearing the history) when
  *   nothing is pending here.
  * - Pending changes are flushed on unmount and on `pagehide`.
@@ -30,7 +30,7 @@ export interface UseBoardResult {
   store: BoardStore
   status: BoardStatus
   error: string | null
-  /** The toast to show ("Changed elsewhere. Reloaded."), until dismissed. */
+  /** The toast to show ("Changed elsewhere. Reloaded.", or a failed save), until dismissed. */
   toast: string | null
   dismissToast(): void
   /** Saves pending changes now and waits for every save in flight. */
@@ -115,7 +115,7 @@ class BoardSaver {
       return
     }
     if (!(err instanceof ConflictError)) {
-      console.warn('Could not save the whiteboard:', err)
+      this.saveFailed(err)
       return
     }
     let remote
@@ -142,8 +142,15 @@ class BoardSaver {
     } catch (e) {
       if (e instanceof ConflictError) await this.failed(e, true)
       else if (e instanceof ReadOnlyError) await this.failed(e, true)
-      else console.warn('Could not save the whiteboard:', e)
+      else this.saveFailed(e)
     }
+  }
+
+  /** Any other failure (a 422, the server gone): told, not only logged; the next edit retries. */
+  private saveFailed(err: unknown): void {
+    console.warn('Could not save the whiteboard:', err)
+    const reason = err instanceof Error && err.message ? ` ${err.message}` : ''
+    this.onToast(`${WB.saveFailed.text}${reason}`)
   }
 
   /** The server copy replaces everything here (history cleared). */

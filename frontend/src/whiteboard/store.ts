@@ -34,7 +34,7 @@ export type { BoardDoc }
 export interface CanvasActions {
   /** A document from the server (first load or external reload): replaces the doc and forgets every step. */
   load(doc: BoardDoc): void
-  /** The board after a merge: replaces it without a history step and without marking it dirty. */
+  /** The board after a merge: replaces it without marking it dirty and restarts the history. */
   replaceBoard(board: WhiteboardData): void
   /** Strokes from the ink file (first load or the ink doc's own merge): no step, not dirty. */
   loadStrokes(strokes: InkStroke[]): void
@@ -300,7 +300,15 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
         })
       },
       replaceBoard(board) {
-        set({ doc: { ...get().doc, board } })
+        // Every older step lacks the other window's merged changes, so undoing to one would
+        // delete them on the next save: the history restarts here, as on an external reload.
+        const doc = { ...get().doc, board }
+        history.reset(doc)
+        set({
+          doc,
+          selection: get().selection.filter((id) => id in board.nodes || id in board.edges),
+          ...sync(),
+        })
       },
       loadStrokes(strokes) {
         const doc = { ...get().doc, strokes }

@@ -105,6 +105,44 @@ describe('useBoard', () => {
     expect(client.saveBoard).toHaveBeenCalledTimes(2)
   })
 
+  test('undo after a 409 merge never drops the merged remote change', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const client = mockWhiteboardApi(board([node({ id: 'a', position: { x: 0, y: 0 } })]), 'rev-1')
+    const { store } = await setup(client)
+    const remote = board([node({ id: 'a', position: { x: 0, y: 0 } }), node({ id: 'b', position: { x: 600, y: 0 } })])
+    client.board.mockResolvedValue({ path: PATH, board: remote, revision: 'rev-2' })
+    client.saveBoard.mockRejectedValueOnce(new RevisionConflictError('rev-2'))
+    act(() => store.getState().actions.nudge(30, 0, ['a']))
+    await advance(SAVE_DELAY_MS + 10)
+    await waitFor(() => expect(client.saveBoard).toHaveBeenCalledTimes(2))
+    // The merge restarts the history: nothing older (without b) can be undone to.
+    expect(store.getState().canUndo).toBe(false)
+    act(() => store.getState().actions.nudge(10, 0, ['a']))
+    await advance(SAVE_DELAY_MS + 10)
+    await waitFor(() => expect(client.saveBoard).toHaveBeenCalledTimes(3))
+    act(() => store.getState().actions.undo())
+    expect(store.getState().canUndo).toBe(false)
+    await advance(SAVE_DELAY_MS + 10)
+    await waitFor(() => expect(client.saveBoard).toHaveBeenCalledTimes(4))
+    const saved = client.saveBoard.mock.calls[3][1]
+    expect(saved.nodes.b).toBeDefined()
+    expect(saved.nodes.a.position).toEqual({ x: 30, y: 0 })
+  })
+
+  test('a refused save (422) shows a toast', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const client = mockWhiteboardApi(board([node({ id: 'a' })]), 'rev-1')
+    const { store, hook } = await setup(client)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    client.saveBoard.mockRejectedValueOnce(new Error("Block b has a link that isn't a [[wikilink]]."))
+    act(() => store.getState().actions.nudge(30, 0, ['a']))
+    await advance(SAVE_DELAY_MS + 10)
+    await waitFor(() =>
+      expect(hook.result.current.toast).toBe("Could not save the whiteboard. Block b has a link that isn't a [[wikilink]]."),
+    )
+    warn.mockRestore()
+  })
+
   test('second 409 reloads with the toast', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const client = mockWhiteboardApi(board([node({ id: 'a' })]), 'rev-1')
