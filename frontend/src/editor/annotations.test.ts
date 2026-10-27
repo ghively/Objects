@@ -171,6 +171,7 @@ describe('annotation lines', () => {
     expect(KNOWN_OPTIONS.map((o) => o.key)).toEqual([
       'small', 'color', 'align', 'icon', 'quote', 'list', 'wrap', 'lock', 'preview', 'header-column',
       'no-header-row', 'width', 'height', 'caption', 'view', 'bookmark', 'open', 'widths', 'layout',
+      'details', // M8: "Show details" on a collection or query embed
     ])
     expect(isKnownValue({ key: 'color', value: 'text-emerald' })).toBe(true)
     expect(isKnownValue({ key: 'color', value: 'bg-gray' })).toBe(true)

@@ -22,7 +22,7 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import type { Transaction } from '@tiptap/pm/state'
 
 /** Containers and columns: the clearing plugin descends into these only. */
-export const CONTAINER_TYPES = ['toggle', 'group', 'columns', 'column']
+export const CONTAINER_TYPES = ['toggle', 'group', 'columns', 'column', 'indent']
 
 /** Node types that can be loaded from source (top level or inside a container). */
 export const TOP_LEVEL_TYPES = [
@@ -40,6 +40,9 @@ export const TOP_LEVEL_TYPES = [
   'media',
   'objectEmbed',
   'bookmark',
+  // M8
+  'blockRef',
+  'dataViewEmbed',
   ...CONTAINER_TYPES,
 ]
 

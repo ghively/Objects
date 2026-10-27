@@ -8,7 +8,12 @@
  */
 import type { Editor } from '@tiptap/core'
 import { api } from '@/api/client'
-import type { AttachmentKind, TypeDef } from '@/api/types'
+import type { AttachmentKind, Collection, Query, TypeDef } from '@/api/types'
+import { useDefs } from '@/types/useDefinitions'
+import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
+import { recordAudio } from '../media/recordAudio'
+import { showToast } from '../media/upload'
+import { couldBeDate, parseDate } from './parseDate'
 import { fuzzyScore } from '@/links/LinkPicker'
 import { stemOf } from '@/links/linkIndex'
 import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
@@ -28,6 +33,8 @@ export interface SlashItem {
   /** A Phosphor icon id. */
   icon: string
   run: (editor: Editor) => void | SlashView | Promise<void>
+  /** M8: kept by the filter and listed first (the typed-date items). */
+  pinned?: boolean
 }
 
 export interface SlashSection {
@@ -58,6 +65,9 @@ export interface SlashContext {
   twentyFourHourTime: boolean
   /** "Now" (tests pass a fixed date). */
   now?: Date
+  /** M8: the collections and queries "Reuse any content" offers (default: the definitions store). */
+  collections?: Pick<Collection, 'id' | 'name'>[]
+  queries?: Pick<Query, 'id' | 'name'>[]
 }
 
 const block = (id: string, name: string, description: string | undefined, icon: string, run: SlashItem['run']): SlashItem =>
@@ -129,6 +139,12 @@ export const BLOCK_ITEMS: readonly SlashItem[] = [
   block('video', 'Insert video', undefined, 'ph-video-camera', media('video')), // pasteInput.video_from_url
   block('file', 'Insert file', undefined, 'ph-file', media('file')), // pasteInput.file
   block('bookmark', 'Create bookmark', undefined, 'ph-bookmark-simple', () => 'bookmark'), // pasteInput.bookmark
+  // CreateDropdown.recordAudio.*
+  block('recordAudio', 'Record audio', 'Record audio and embed it at the cursor.', 'ph-microphone', (e) => {
+    void recordAudio(e).catch((err) => {
+      if (err instanceof NotBuiltYet) showToast(NOT_AVAILABLE)
+    })
+  }),
 ]
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -147,6 +163,35 @@ export function timestampText(d: Date, twentyFourHourTime: boolean): string {
 
 function insertLink(e: Editor, target: string) {
   e.chain().focus().insertContent({ type: 'wikilink', attrs: { target, label: null } }).run()
+}
+
+function insertDateToken(e: Editor, day: string) {
+  e.chain().focus().insertDateToken(day).run()
+}
+
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** A day `YYYY-MM-DD` as menu text, `Tue, Oct 27, 2026` (our format). */
+export function dayLabel(day: string): string {
+  const [y, m, d] = day.split('-').map(Number)
+  const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+  return `${WEEKDAY_SHORT[weekday]}, ${MONTH_SHORT[m - 1]} ${d}, ${y}`
+}
+
+/**
+ * The typed-date items (M8): for a query that names a day (`parseDate`), a
+ * link to that daily note and a date token. Names are our strings, adapted
+ * from `ControlDropdown.custom.entity_dailyNote_today` and `token_date`.
+ */
+export function typedDateItems(query: string, today: string): SlashItem[] {
+  const day = parseDate(query, today)
+  if (!day) return []
+  const label = dayLabel(day)
+  return [
+    { id: `date:${day}`, name: label, description: 'Add a link to this daily note', icon: 'ph-calendar-blank', pinned: true, run: (e) => insertLink(e, day) },
+    { id: `dateToken:${day}`, name: `${label} - date link`, description: 'Add a link to this date.', icon: 'ph-calendar-check', pinned: true, run: (e) => insertDateToken(e, day) },
+  ]
 }
 
 function addDays(d: Date, n: number): Date {
@@ -171,6 +216,9 @@ async function createAndLink(e: Editor, type: TypeDef, title: string): Promise<v
 export function slashSections(ctx: SlashContext): SlashSection[] {
   const now = () => ctx.now ?? new Date()
   const title = ctx.query.trim()
+  const defs = useDefs.getState()
+  const collections = ctx.collections ?? defs.collections ?? []
+  const queries = ctx.queries ?? defs.queries ?? []
   return [
     { id: 'blocks', label: SLASH_TEXT.blocks, items: [...BLOCK_ITEMS] },
     {
@@ -187,6 +235,7 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
       id: 'dates',
       label: SLASH_TEXT.dates,
       items: [
+        ...typedDateItems(ctx.query, dailyNoteTitle(now())),
         // ControlDropdown.custom.entity_dailyNote_*, token_date, token_time
         block('today', 'Today', "Add a link to today's daily note", 'ph-calendar-blank', (e) => insertLink(e, dailyNoteTitle(now()))),
         block('tomorrow', 'Tomorrow', "Add a link to tomorrow's daily note", 'ph-calendar-plus', (e) =>
@@ -196,7 +245,7 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
           insertLink(e, dailyNoteTitle(addDays(now(), -1))),
         ),
         block('dateLink', 'Today - date link', "Add a link to today's date.", 'ph-calendar-check', (e) =>
-          insertLink(e, dailyNoteTitle(now())),
+          insertDateToken(e, dailyNoteTitle(now())),
         ),
         block('timestamp', 'Now – timestamp', 'Add a timestamp with the current time', 'ph-clock', (e) => {
           e.chain().focus().insertContent(timestampText(now(), ctx.twentyFourHourTime)).run()
@@ -210,6 +259,17 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
         block('reuse', SLASH_TEXT.reuse, undefined, 'ph-arrows-clockwise', (e) => {
           e.chain().focus().pickObjectEmbed().run()
         }),
+        // M8: embed a collection or a query as a live view (descriptions are our strings).
+        ...collections.map((c) =>
+          block(`collection:${c.id}`, c.name, 'Embed this collection', 'ph-stack', (e) => {
+            e.chain().focus().insertDataViewEmbed('collection', c.id).run()
+          }),
+        ),
+        ...queries.map((q) =>
+          block(`query:${q.id}`, q.name, 'Embed this query', 'ph-funnel', (e) => {
+            e.chain().focus().insertDataViewEmbed('query', q.id).run()
+          }),
+        ),
       ],
     },
   ]
@@ -235,16 +295,20 @@ export function filterSections(sections: SlashSection[], query: string): SlashSe
   return sections
     .map((s) => {
       if (s.id === 'structure') return s
+      const pinned = s.items.filter((item) => item.pinned)
       const scored = s.items
+        .filter((item) => !item.pinned)
         .map((item, index) => ({ item, index, score: itemScore(q, item) }))
         .filter((x): x is { item: SlashItem; index: number; score: number } => x.score !== null)
         .sort((a, b) => b.score - a.score || a.index - b.index)
-      return { ...s, items: scored.map((x) => x.item) }
+      return { ...s, items: [...pinned, ...scored.map((x) => x.item)] }
     })
     .filter((s) => s.items.length > 0)
 }
 
 /** Whether `query` matches any item other than the "Create an object" ones (a space then closes the menu). */
-export function hasRealMatch(sections: SlashSection[], query: string): boolean {
+export function hasRealMatch(sections: SlashSection[], query: string, now: Date = new Date()): boolean {
+  // M8: a phrase that is (or may still become) a date keeps the menu open.
+  if (couldBeDate(query, dailyNoteTitle(now))) return true
   return filterSections(sections, query).some((s) => s.id !== 'structure' && s.items.length > 0)
 }

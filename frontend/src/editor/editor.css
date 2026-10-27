@@ -93,3 +93,69 @@
   background: var(--bg-hover);
   border: 1px solid var(--border, transparent);
 }
+
+/* ---- M8 plain rendering (Task 25; Tasks 26, 27 and 30 add the real views).
+   Values are ours unless noted: the trimmed reference has no rule for these. */
+
+/* Inline colour and highlight: the colour itself is the mark's inline style
+   (menus/colors.ts tokens); a highlight gets the block colour's radius. */
+.object-editor mark.text-highlight {
+  border-radius: 0.25rem;
+  padding: 0 0.1em;
+}
+
+/* A block id (` ^ab12cd`): muted and small, it is the line's own text. */
+.object-editor .block-id {
+  color: var(--text-muted);
+  font-size: 0.75em;
+}
+
+/* A date token as text until Task 26's chip. */
+.object-editor .date-token {
+  border-radius: 4px;
+  padding: 0 0.2em;
+  background: var(--bg-hover);
+}
+
+/* The list-item options comment draws nothing; its item takes the options. */
+.object-editor .item-options {
+  display: none;
+}
+.object-editor li[data-item-small] {
+  font-size: 0.9em;
+}
+.object-editor li[data-item-align='center'] > p {
+  text-align: center;
+}
+.object-editor li[data-item-align='right'] > p {
+  text-align: right;
+}
+
+/* Indented children: the toggle's padding and outliner line, without the caret. */
+.object-editor .block-indent {
+  position: relative;
+}
+.object-editor .block-indent > * + * {
+  margin-top: calc(0.44em + 9px);
+  margin-left: 1.5em;
+}
+.object-editor .block-indent::after {
+  content: '';
+  position: absolute;
+  left: 0.75em;
+  top: calc(1.647em + 10px);
+  bottom: 0;
+  border-left: 1px solid var(--editor-toggle-outline);
+  pointer-events: none;
+}
+.object-editor .block-indent:has(> :only-child)::after {
+  display: none;
+}
+
+/* A block reference and an embedded collection or query, as a muted line. */
+.object-editor .block-ref,
+.object-editor .data-view-embed {
+  color: var(--text-muted);
+  border-left: 3px solid var(--border-subtle);
+  padding: 2px 0 2px 0.75em;
+}

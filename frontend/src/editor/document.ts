@@ -8,6 +8,10 @@
  * (toggle, group, columns) load with their children, each child stamped with
  * its own source. Serializing recurses into containers; an unedited container
  * is emitted as its whole region.
+ *
+ * M8 adds inline colour and highlight marks, date tokens, list-item option
+ * comments, the `indent` container, block references and collection / query
+ * embeds (each in `nodes/`); every one round-trips under the same byte rules.
  */
 import { getExtensionField, type AnyExtension, type Editor, type JSONContent } from '@tiptap/core'
 import { OrderedList, TaskItem } from '@tiptap/extension-list'
@@ -48,6 +52,15 @@ import { MathBlock, mathBlockMarkdown, mathBlockText } from './nodes/mathBlock'
 import { Media, mediaAttrs, mediaMarkdown, type MediaAttrs } from './nodes/media'
 import { ObjectEmbed, objectEmbedMarkdown } from './nodes/objectEmbed'
 import { Toggle } from './nodes/toggle'
+import { BlockRef } from './nodes/blockRef'
+import { DataViewEmbed, dataViewEmbedMarkdown } from './nodes/dataViewEmbed'
+import { DateToken } from './nodes/dateToken'
+import { Indent } from './nodes/indent'
+import { ListItemOptions } from './nodes/listItemOptions'
+import { Highlight, TextColor } from './nodes/textStyle'
+import { blockRefMarkdown } from './blocks'
+import { M8Keys } from './shortcuts'
+import { RecordAudio } from './media/recordAudio'
 
 export type EditorExtensionOptions = {
   /** `false` leaves out the "1. " input rule (`EditorSettings.disableNumberedListTransformation`). */
@@ -126,8 +139,18 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
     Group,
     Columns,
     Column,
+    // M8
+    TextColor,
+    Highlight,
+    DateToken,
+    ListItemOptions,
+    Indent,
+    BlockRef,
+    DataViewEmbed,
+    RecordAudio,
     SlashMenu,
     BlockSelection,
+    M8Keys,
     FileDrop,
   ]
 }
@@ -141,9 +164,9 @@ const edges = new WeakMap<Editor, Edges>()
 
 const FIELD_LINE = /^[^\s:][^:\n]*::/m
 const RAW_KINDS = new Set(['html', 'def', 'raw', 'text'])
-const CONTAINERS = new Set(['toggle', 'group', 'columns'])
+const CONTAINERS = new Set(['toggle', 'group', 'columns', 'indent'])
 /** Leaf types whose Markdown this module writes itself (`customMarkdown`). */
-const CUSTOM_TYPES = new Set(['mathBlock', 'media', 'objectEmbed', 'bookmark'])
+const CUSTOM_TYPES = new Set(['mathBlock', 'media', 'objectEmbed', 'bookmark', 'blockRef', 'dataViewEmbed'])
 
 const NODE_KIND: Record<string, string> = {
   paragraph: 'paragraph',
@@ -160,9 +183,12 @@ const NODE_KIND: Record<string, string> = {
   media: 'media',
   objectEmbed: 'objectEmbed',
   bookmark: 'bookmark',
+  blockRef: 'blockRef',
+  dataViewEmbed: 'dataView',
   toggle: 'container',
   group: 'container',
   columns: 'container',
+  indent: 'container',
 }
 
 /** Loose comparison used to decide whether Tiptap parsed a block without losing anything. */
@@ -200,6 +226,10 @@ function sourceToNode(editor: Editor, block: SourceBlock, options?: readonly Opt
       }
     if (embed?.kind === 'objectEmbed')
       return { type: 'objectEmbed', attrs: { target: embed.target, label: embed.label } }
+    if (embed?.kind === 'blockRef')
+      return { type: 'blockRef', attrs: { target: embed.target, id: embed.id, label: embed.label } }
+    if (embed?.kind === 'dataView')
+      return { type: 'dataViewEmbed', attrs: { kind: embed.dataKind, id: embed.id, label: embed.label } }
     if (hasFlag(options, 'bookmark')) {
       const link = singleLink(block.raw)
       if (link) return { type: 'bookmark', attrs: { href: link.href, title: link.title } }
@@ -332,6 +362,10 @@ function customMarkdown(json: JSONContent): string | null {
       return objectEmbedMarkdown(String(a.target ?? ''), a.label as string | null)
     case 'bookmark':
       return bookmarkMarkdown(String(a.href ?? ''), a.title as string | null)
+    case 'blockRef':
+      return blockRefMarkdown(String(a.target ?? ''), String(a.id ?? ''), a.label as string | null)
+    case 'dataViewEmbed':
+      return dataViewEmbedMarkdown(String(a.kind ?? 'collection'), String(a.id ?? ''), a.label as string | null)
     default:
       return null
   }

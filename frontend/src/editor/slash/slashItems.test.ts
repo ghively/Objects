@@ -7,6 +7,10 @@ vi.mock('@/api/client', async (orig) => ({
   ...(await orig<typeof import('@/api/client')>()),
   api: (await import('@/test/mockApi')).mockApi(),
 }))
+vi.mock('../media/recordAudio', async (orig) => ({
+  ...(await orig<typeof import('../media/recordAudio')>()),
+  recordAudio: vi.fn(async () => undefined),
+}))
 vi.mock('../media/upload', async (orig) => ({
   ...(await orig<typeof import('../media/upload')>()),
   pickAndInsert: vi.fn(),
@@ -14,11 +18,13 @@ vi.mock('../media/upload', async (orig) => ({
 
 import { api } from '@/api/client'
 import { editorExtensions, loadBody, serializeBody } from '../document'
+import { recordAudio } from '../media/recordAudio'
 import { pickAndInsert } from '../media/upload'
 import { setObjectEmbedPicker } from '../nodes/objectEmbed'
 import {
   BLOCK_ITEMS,
   dailyNoteTitle,
+  dayLabel,
   filterSections,
   hasRealMatch,
   slashSections,
@@ -76,6 +82,7 @@ describe('slash items', () => {
       ['Insert video', null],
       ['Insert file', null],
       ['Create bookmark', null],
+      ['Record audio', 'Record audio and embed it at the cursor.'], // CreateDropdown.recordAudio.*
     ])
     // One item per type (whiteboards are created from "+ New").
     expect(sections[1].items.map((i) => i.name)).toEqual(['Create Page', 'Create Person'])
@@ -141,6 +148,7 @@ describe('each block item runs its command', () => {
     ['video', () => expect(pickAndInsert).toHaveBeenCalledWith(expect.anything(), 'video')],
     ['file', () => expect(pickAndInsert).toHaveBeenCalledWith(expect.anything(), 'file')],
     ['bookmark', (_e, view) => expect(view).toBe('bookmark')],
+    ['recordAudio', (e) => expect(recordAudio).toHaveBeenCalledWith(e)],
   ]
 
   test('every block item has a case', () => {
@@ -195,10 +203,57 @@ describe('object and date items', () => {
     expect(run('today')).toBe('Hello[[2026-10-27]]\n')
     expect(run('tomorrow')).toBe('Hello[[2026-10-28]]\n')
     expect(run('yesterday')).toBe('Hello[[2026-10-26]]\n')
-    expect(run('dateLink')).toBe('Hello[[2026-10-27]]\n')
+    // M8: "Today - date link" inserts a date token.
+    expect(run('dateLink')).toBe('Hello<time datetime="2026-10-27">2026-10-27</time>\n')
     expect(run('timestamp')).toBe('Hello2:05 PM\n')
     expect(run('timestamp', true)).toBe('Hello14:05\n')
     expect(dailyNoteTitle(new Date(2026, 0, 3))).toBe('2026-01-03')
     expect(timestampText(new Date(2026, 0, 3, 0, 7), false)).toBe('12:07 AM')
+  })
+})
+
+describe('m8 typed dates and reuse items', () => {
+  const now = new Date(2026, 9, 27, 9, 0) // Tuesday
+
+  test('a typed date gives a daily-note link and a date token, first in its section', () => {
+    const q = 'next friday'
+    const sections = filterSections(slashSections(ctx(q, { now })), q)
+    const dates = sections.find((s) => s.id === 'dates')!
+    expect(dates.items.slice(0, 2).map((i) => [i.name, i.description])).toEqual([
+      ['Fri, Oct 30, 2026', 'Add a link to this daily note'],
+      ['Fri, Oct 30, 2026 - date link', 'Add a link to this date.'],
+    ])
+    const run = (index: number) => {
+      const editor = headless('Hello\n')
+      editor.commands.setTextSelection(6)
+      dates.items[index].run(editor)
+      return serializeBody(editor)
+    }
+    expect(run(0)).toBe('Hello[[2026-10-30]]\n')
+    expect(run(1)).toBe('Hello<time datetime="2026-10-30">2026-10-30</time>\n')
+    // ISO days, relative phrases and month names; nothing for other text.
+    expect(slashSections(ctx('2026-12-24', { now }))[2].items[0].name).toBe(dayLabel('2026-12-24'))
+    expect(slashSections(ctx('in 2 weeks', { now }))[2].items[0].id).toBe('date:2026-11-10')
+    expect(slashSections(ctx('march 15', { now }))[2].items[0].id).toBe('date:2026-03-15')
+    expect(slashSections(ctx('hello', { now }))[2].items[0].id).toBe('today')
+    // A phrase being typed keeps the menu open on a space.
+    expect(hasRealMatch(slashSections(ctx('next ', { now })), 'next ', now)).toBe(true)
+  })
+
+  test('reuse offers collections and queries as live views', () => {
+    const sections = slashSections(
+      ctx('', { collections: [{ id: 'reading-list', name: 'Reading list' }], queries: [{ id: 'open-tasks', name: 'Open tasks' }] }),
+    )
+    const reuse = sections.find((s) => s.id === 'reuse')!
+    expect(reuse.items.map((i) => [i.name, i.description ?? null])).toEqual([
+      ['Reuse any content', null],
+      ['Reading list', 'Embed this collection'],
+      ['Open tasks', 'Embed this query'],
+    ])
+    const editor = headless('Hello\n')
+    editor.commands.setTextSelection(6)
+    reuse.items[1].run(editor)
+    reuse.items[2].run(editor)
+    expect(serializeBody(editor)).toBe('Hello\n\n![[collection:reading-list]]\n\n![[query:open-tasks]]\n')
   })
 })
