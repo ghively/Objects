@@ -1,7 +1,10 @@
-import type { ComponentType } from 'react'
+import type { ReactNode } from 'react'
 
-/** The ink tools (Gene's addition; no Object original). */
-export type InkTool = 'pen' | 'highlighter' | 'eraser'
+/** The ink tools (Gene's addition; no Object original). `select` picks, moves and scales strokes (M8). */
+export type InkTool = 'pen' | 'highlighter' | 'eraser' | 'select'
+
+/** The eraser's modes: whole strokes (M6) or cutting strokes where it passes (M8; our choice of default `stroke`). */
+export type InkEraseMode = 'stroke' | 'partial'
 
 /** A stored stroke: a drawing tool, never the eraser. */
 export type InkStrokeTool = 'pen' | 'highlighter'
@@ -25,6 +28,8 @@ export interface InkToolState {
   tool: InkTool
   color: string
   width: number
+  /** The eraser's mode; absent means `stroke`. */
+  eraseMode?: InkEraseMode
 }
 
 /** `GET /api/whiteboard/ink`: `revision` `''` when the file doesn't exist yet. */
@@ -61,8 +66,14 @@ export interface InkDoc {
   flush(): Promise<void>
 }
 
+/**
+ * The ink module's plugin. `Layer` and `Toolbar` are plain function components (not
+ * `ComponentType`) so the canvas's declaration (`whiteboard/plugin.ts`), whose `InkToolState.tool`
+ * leaves out the ink-only `'select'`, still accepts them: the canvas only stores the tool state
+ * and passes it back.
+ */
 export interface InkPlugin {
-  Layer: ComponentType<InkLayerProps>
-  Toolbar: ComponentType<InkToolbarProps>
+  Layer: (props: InkLayerProps) => ReactNode
+  Toolbar: (props: InkToolbarProps) => ReactNode
   useInkDoc(path: string): InkDoc
 }

@@ -9,6 +9,14 @@ export const INK_STRINGS = {
   highlighter: 'Highlighter',
   /** our string */
   eraser: 'Eraser',
+  /** our string (M8): the ink selection tool */
+  selectInk: 'Select ink',
+  /** our string (M8): the eraser's mode group */
+  eraseMode: 'Eraser mode',
+  /** our string (M8): the eraser removes whole strokes (M6's behaviour, the default) */
+  eraseStrokes: 'Erase whole strokes',
+  /** our string (M8): the eraser cuts strokes where it passes */
+  erasePartially: 'Erase partially',
   /** our string */
   width: 'Width',
   /** our string */

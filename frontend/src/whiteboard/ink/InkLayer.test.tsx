@@ -214,3 +214,100 @@ describe('InkLayer', () => {
     expect((onWheel.mock.calls[0][0] as WheelEvent).deltaY).toBe(100)
   })
 })
+
+describe('InkLayer select and partial erase (M8)', () => {
+  const select: InkToolState = { tool: 'select', color: DEFAULT_INK.color, width: 4 }
+
+  test('lasso selects strokes and Delete removes them', () => {
+    const a = stroke('a', [[10, 10], [40, 40]])
+    const b = stroke('b', [[300, 300], [340, 300]])
+    const { capture, onStrokesChange, container } = setup({ strokes: [a, b], tool: select })
+    const el = capture() as HTMLElement
+    expect(el.style.cursor).toBe('default')
+    fire(el, 'pointerdown', { pointerType: 'mouse', x: 0, y: 0 })
+    fire(el, 'pointermove', { pointerType: 'mouse', x: 60, y: 0 })
+    fire(el, 'pointermove', { pointerType: 'mouse', x: 60, y: 60 })
+    expect(container.querySelector('[data-ink-lasso]')).not.toBeNull()
+    fire(el, 'pointermove', { pointerType: 'mouse', x: 0, y: 60 })
+    fire(el, 'pointerup', { pointerType: 'mouse', x: 0, y: 60 })
+    expect(container.querySelector('[data-ink-lasso]')).toBeNull()
+    expect(container.querySelectorAll('[data-ink-selection] [data-ink-handle]')).toHaveLength(4)
+    expect(onStrokesChange).not.toHaveBeenCalled()
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }))
+    })
+    expect(onStrokesChange).toHaveBeenCalledTimes(1)
+    expect(onStrokesChange.mock.calls[0]).toEqual([[b], 'erase'])
+  })
+
+  test('click selects a stroke; dragging moves only it', () => {
+    const a = stroke('a', [[10, 10], [100, 10]])
+    const b = stroke('b', [[10, 200], [100, 200]])
+    const { capture, onStrokesChange, container } = setup({ strokes: [a, b], tool: select })
+    const el = capture()!
+    fire(el, 'pointerdown', { pointerType: 'mouse', x: 50, y: 12 })
+    fire(el, 'pointermove', { pointerType: 'mouse', x: 70, y: 42 })
+    expect(container.querySelector('[data-ink-preview]')?.getAttribute('transform')).toBe('translate(20 30)')
+    fire(el, 'pointerup', { pointerType: 'mouse', x: 70, y: 42 })
+    expect(onStrokesChange).toHaveBeenCalledTimes(1)
+    const [next, label] = onStrokesChange.mock.calls[0] as [InkStroke[], string]
+    expect(label).toBe('draw')
+    expect(next[1]).toBe(b)
+    expect(next[0].id).toBe('a')
+    expect(next[0].points).toEqual([
+      [30, 40, 0.5],
+      [120, 40, 0.5],
+    ])
+  })
+
+  test('dragging a corner handle scales the selection', () => {
+    const a = stroke('a', [[0, 0], [100, 0], [100, 100]])
+    const { capture, onStrokesChange, rerender } = setup({ strokes: [a], tool: select })
+    const el = capture()!
+    // Select by clicking, then drag the se handle (box 102,102) out to 204,204.
+    fire(el, 'pointerdown', { pointerType: 'mouse', x: 50, y: 1 })
+    fire(el, 'pointerup', { pointerType: 'mouse', x: 50, y: 1 })
+    expect(onStrokesChange).not.toHaveBeenCalled()
+    void rerender
+    fire(el, 'pointerdown', { pointerType: 'mouse', x: 102, y: 102 })
+    fire(el, 'pointermove', { pointerType: 'mouse', x: 206, y: 206 })
+    fire(el, 'pointerup', { pointerType: 'mouse', x: 206, y: 206 })
+    expect(onStrokesChange).toHaveBeenCalledTimes(1)
+    const s = (onStrokesChange.mock.calls[0][0] as InkStroke[])[0]
+    expect(s.id).toBe('a')
+    expect(s.width).toBe(8)
+    expect(s.points.map(([x, y]) => [Math.round(x), Math.round(y)])).toEqual([
+      [2, 2],
+      [202, 2],
+      [202, 202],
+    ])
+  })
+
+  test('partial erase splits a stroke through the layer', () => {
+    const a = stroke('a', [[0, 100], [200, 100]])
+    const eraser: InkToolState = { tool: 'eraser', color: DEFAULT_INK.color, width: 4, eraseMode: 'partial' }
+    const { capture, onStrokesChange } = setup({ strokes: [a], tool: eraser })
+    const el = capture()!
+    fire(el, 'pointerdown', { pointerType: 'mouse', x: 100, y: 80 })
+    fire(el, 'pointermove', { pointerType: 'mouse', x: 100, y: 120 })
+    fire(el, 'pointerup', { pointerType: 'mouse', x: 100, y: 120 })
+    expect(onStrokesChange).toHaveBeenCalledTimes(1)
+    const [next, label] = onStrokesChange.mock.calls[0] as [InkStroke[], string]
+    expect(label).toBe('erase')
+    expect(next).toHaveLength(2)
+    expect(next.every((s) => s.id !== 'a')).toBe(true)
+    expect(new Set(next.map((s) => s.id)).size).toBe(2)
+  })
+
+  test('stroke mode unchanged', () => {
+    // Regression guard (green from the start): the eraser in stroke mode removes whole strokes.
+    const a = stroke('a', [[0, 100], [200, 100]])
+    const eraser: InkToolState = { tool: 'eraser', color: DEFAULT_INK.color, width: 4, eraseMode: 'stroke' }
+    const { capture, onStrokesChange } = setup({ strokes: [a], tool: eraser })
+    const el = capture()!
+    fire(el, 'pointerdown', { pointerType: 'mouse', x: 100, y: 80 })
+    fire(el, 'pointermove', { pointerType: 'mouse', x: 100, y: 120 })
+    fire(el, 'pointerup', { pointerType: 'mouse', x: 100, y: 120 })
+    expect(onStrokesChange.mock.calls[0]).toEqual([[], 'erase'])
+  })
+})

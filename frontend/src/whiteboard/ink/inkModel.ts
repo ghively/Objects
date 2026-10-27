@@ -71,9 +71,36 @@ function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n))
 }
 
+type TiltFields = { tiltX?: number; tiltY?: number; altitudeAngle?: number }
+
+/**
+ * The pen's altitude in radians (pi/2 upright, 0 flat): `altitudeAngle` when the browser reports
+ * it, else derived from `tiltX`/`tiltY` (degrees); upright when neither is known.
+ */
+export function penAltitude(e: TiltFields): number {
+  const alt = e.altitudeAngle
+  if (typeof alt === 'number' && Number.isFinite(alt)) return Math.min(Math.PI / 2, Math.max(0, alt))
+  const tx = typeof e.tiltX === 'number' && Number.isFinite(e.tiltX) ? e.tiltX : 0
+  const ty = typeof e.tiltY === 'number' && Number.isFinite(e.tiltY) ? e.tiltY : 0
+  if (tx === 0 && ty === 0) return Math.PI / 2
+  if (Math.abs(tx) >= 90 || Math.abs(ty) >= 90) return 0
+  const r = Math.PI / 180
+  const t = Math.hypot(Math.tan(tx * r), Math.tan(ty * r))
+  return Math.atan2(1, t)
+}
+
+/**
+ * Pen tilt scales the recorded pressure (our choice): `0.6 + 0.4 * sin(altitude)`, so an upright
+ * pen keeps its pressure and a pen laid flat writes at 60% of it. No file format change.
+ */
+export function tiltFactor(e: TiltFields): number {
+  return 0.6 + 0.4 * Math.sin(penAltitude(e))
+}
+
 /**
  * The samples of one pointer event in flow coordinates: every coalesced event when the browser
- * provides them (so fast strokes have no gaps). Pressure is the pen's; anything else records 0.5.
+ * provides them (so fast strokes have no gaps). Pressure is the pen's, scaled by its tilt
+ * (`tiltFactor`); anything else records 0.5 (mouse and touch have no tilt effect).
  */
 export function samplesFrom(e: PointerEvent, toFlow: (p: Point) => Point): [number, number, number][] {
   let events: PointerEvent[] = []
@@ -88,7 +115,13 @@ export function samplesFrom(e: PointerEvent, toFlow: (p: Point) => Point): [numb
   const pen = e.pointerType === 'pen'
   return events.map((ev) => {
     const p = toFlow({ x: ev.clientX, y: ev.clientY })
-    return [p.x, p.y, pen ? clamp01(ev.pressure) : 0.5]
+    if (!pen) return [p.x, p.y, 0.5]
+    const tilt: TiltFields = {
+      tiltX: (ev as TiltFields).tiltX ?? (e as TiltFields).tiltX,
+      tiltY: (ev as TiltFields).tiltY ?? (e as TiltFields).tiltY,
+      altitudeAngle: (ev as TiltFields).altitudeAngle ?? (e as TiltFields).altitudeAngle,
+    }
+    return [p.x, p.y, clamp01(clamp01(ev.pressure) * tiltFactor(tilt))]
   })
 }
 
@@ -175,7 +208,7 @@ export function strokeBounds(stroke: Pick<InkStroke, 'points'>): Bounds {
   return { minX, minY, maxX, maxY }
 }
 
-function pointSegDist2(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+export function pointSegDist2(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax
   const dy = by - ay
   const len2 = dx * dx + dy * dy
@@ -199,7 +232,7 @@ function segmentsIntersect(a: readonly number[], b: readonly number[], c: readon
 }
 
 /** The squared distance between segments ab and cd. */
-function segSegDist2(a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[]): number {
+export function segSegDist2(a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[]): number {
   if (segmentsIntersect(a, b, c, d)) return 0
   return Math.min(
     pointSegDist2(a[0], a[1], c[0], c[1], d[0], d[1]),
@@ -209,7 +242,7 @@ function segSegDist2(a: readonly number[], b: readonly number[], c: readonly num
   )
 }
 
-function segments(points: readonly (readonly number[])[]): [readonly number[], readonly number[]][] {
+export function segments(points: readonly (readonly number[])[]): [readonly number[], readonly number[]][] {
   if (points.length === 1) return [[points[0], points[0]]]
   const out: [readonly number[], readonly number[]][] = []
   for (let i = 0; i + 1 < points.length; i++) out.push([points[i], points[i + 1]])
@@ -248,27 +281,53 @@ export function hitStrokes(
   return hit
 }
 
+function sameStroke(a: InkStroke, b: InkStroke): boolean {
+  if (a === b) return true
+  return (
+    a.d === b.d &&
+    a.color === b.color &&
+    a.width === b.width &&
+    a.tool === b.tool &&
+    a.points.length === b.points.length &&
+    a.points.every((p, i) => p[0] === b.points[i][0] && p[1] === b.points[i][1] && p[2] === b.points[i][2])
+  )
+}
+
 /**
- * Apply what changed locally since `base` (strokes added and removed, by id) to `remote`.
- * Strokes never change in place, so additions and removals are the whole story.
+ * Apply what changed locally since `base` (strokes added, removed and, since M8's ink select,
+ * moved or scaled in place, by id) to `remote`. A stroke changed locally replaces the remote's
+ * copy of it; one the remote removed stays removed.
  */
 export function mergeStrokes(
   base: readonly InkStroke[],
   local: readonly InkStroke[],
   remote: readonly InkStroke[],
 ): InkStroke[] {
-  const baseIds = new Set(base.map((s) => s.id))
+  const baseById = new Map(base.map((s) => [s.id, s]))
   const localIds = new Set(local.map((s) => s.id))
-  const removed = new Set([...baseIds].filter((id) => !localIds.has(id)))
-  const out = remote.filter((s) => !removed.has(s.id))
+  const removed = new Set([...baseById.keys()].filter((id) => !localIds.has(id)))
+  const changed = new Map<string, InkStroke>()
+  for (const s of local) {
+    const was = baseById.get(s.id)
+    if (was && !sameStroke(was, s)) changed.set(s.id, s)
+  }
+  const out = remote.filter((s) => !removed.has(s.id)).map((s) => changed.get(s.id) ?? s)
   const have = new Set(out.map((s) => s.id))
   for (const s of local) {
-    if (!baseIds.has(s.id) && !have.has(s.id)) {
+    if (!baseById.has(s.id) && !have.has(s.id)) {
       out.push(s)
       have.add(s.id)
     }
   }
   return out
+}
+
+/**
+ * The pointer type a stored stroke was most likely drawn with, for recomputing its outline: mouse
+ * and touch record every pressure as 0.5, a pen almost never does.
+ */
+export function strokePointerType(stroke: Pick<InkStroke, 'points'>): 'pen' | 'mouse' {
+  return stroke.points.every((p) => p[2] === 0.5) ? 'mouse' : 'pen'
 }
 
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
