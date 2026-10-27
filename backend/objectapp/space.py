@@ -641,6 +641,10 @@ class Space:
         """The only source of "now" for stamps, the Task hook and the calendar (tests set it)."""
         self.tz: tzinfo = SystemTz()
         """The local zone (DST-aware) that turns instants into local days (tests set it)."""
+        self.before_write: Callable[[str, bytes], None] | None = None
+        """M8 version history: called as ``before_write(rel, current_bytes)`` inside the lock
+        right before the app replaces an existing file (never on create, never on read).
+        Errors it raises are logged and never stop the write (see `_call_before_write`)."""
         for rel in iter_object_paths(self.root):
             try:
                 self._raw[rel] = read_raw(self.root, rel)
@@ -981,6 +985,16 @@ class Space:
                 return Skip(rel, f"The file could not be written: {exc.strerror or exc}")
         raise AssertionError("unreachable")
 
+    def _call_before_write(self, rel: str, data: bytes) -> None:
+        """Run the `before_write` hook (M8 history) for ``rel``'s current bytes; never raises."""
+        hook = self.before_write
+        if hook is None:
+            return
+        try:
+            hook(rel, data)
+        except Exception:  # noqa: BLE001 - history must never stop a save
+            _log.exception("The pre-write hook failed for %s", rel)
+
     def _write_exact(self, rel: str, base_version: str, data: bytes) -> bool:
         """Put ``data`` back at ``rel`` if it is still at ``base_version``; False when it changed."""
         full = self.root / rel
@@ -995,6 +1009,12 @@ class Space:
                 raise Conflict(now)
 
         with self._lock:
+            try:
+                current = full.read_bytes()
+            except OSError:
+                current = None
+            if current is not None and version_of(current) == base_version and current != data:
+                self._call_before_write(rel, current)
             self.own_writes[rel] = new_version
             try:
                 atomic_write(full, data, check=unchanged)
@@ -1488,6 +1508,7 @@ class Space:
                 if now != current:
                     raise Conflict(now)
 
+            self._call_before_write(rel, raw.data)
             self.own_writes[rel] = new_version
             try:
                 atomic_write(full, data, check=unchanged_on_disk)
@@ -1894,7 +1915,9 @@ class Space:
         """Move an object file within the space, never overwriting, quietly for the watcher.
 
         A case-only rename goes through a temporary (dot) name, so it works on
-        case-insensitive file systems too.
+        case-insensitive file systems too. A move keeps the file's bytes, so it calls no
+        `before_write` hook (M8 history follows the object by its ``id``; the write before
+        a rename is where its version is kept).
         """
         src = self.root / rel
         dest = self.root / new_rel
