@@ -1,6 +1,6 @@
 # Object: remaining work
 
-Status as of 2026-10-27 (M3, M4, M5 and M6 built and through their final gates; M7 is next; Gene asked on 2026-10-26 for all remaining milestones to be built, so M4 onward proceed now and his hand-checks follow later). Spec: `docs/superpowers/specs/2026-10-23-object-design.md`. How to resume: `CONTINUE.md`; rules: `CLAUDE.md`; process: `docs/superpowers/build-process.md`. Object reference for every item below: `reference/` in the repo (a trimmed subset: models in `design-notes`, English UI strings in `docs/strings.txt`, CSS in `docs/design.css`). On Gene's machine the full unpacked app is in the git-ignored `.reference/`.
+Status as of 2026-10-27 (M3, M4, M5 and M6 built and through their final gates; M7 built with its acceptance run, review and fix pass next; Gene asked on 2026-10-26 for all remaining milestones to be built, so M4 onward proceed now and his hand-checks follow later). Spec: `docs/superpowers/specs/2026-10-23-object-design.md`. How to resume: `CONTINUE.md`; rules: `CLAUDE.md`; process: `docs/superpowers/build-process.md`. Object reference for every item below: `reference/` in the repo (a trimmed subset: models in `design-notes`, English UI strings in `docs/strings.txt`, CSS in `docs/design.css`). On Gene's machine the full unpacked app is in the git-ignored `.reference/`.
 
 ## How we build (changed 2026-10-26)
 
@@ -18,6 +18,7 @@ Status as of 2026-10-27 (M3, M4, M5 and M6 built and through their final gates; 
 | **M4** calendar, daily notes, tasks | 16 tasks built (`c771907..d97c007`, acceptance in Task 16), fix `4fc0b85` (daily-note 409 `exists` vs `nameTaken`); final gate green 2026-10-27 at `4fc0b85`: 611 back-end tests, 654 front-end tests (99 files), `tsc -b --noEmit` clean, `npm run build` ok; on `space-sample`: `m1_roundtrip.py` PASS, `m2_acceptance.py` PASS (52/52), `m3_acceptance.py` PASS (14/14), `m4_acceptance.py` PASS (24/24). **Open:** Gene's hands-on checks (`m4-acceptance.md`, unchecked). |
 | **M5** search, command palette, backlinks, graph | Built (`bbc0c30`..`c40fb0f`), reviewed, fix `5193e60`; final gate green 2026-10-27 at `c4a087c` (review fixes `5193e60` (M5 search highlight offsets to UTF-16) and `c4a087c` (M6 orphan sidecars, link text, merge undo, save toast)): 854 back-end tests (1 skipped), 1013 front-end tests, `tsc -b --noEmit` clean, `npm run build` ok; on `space-sample`: `m1_roundtrip.py` PASS, `m2_acceptance.py` PASS (52/52), `m3_acceptance.py` PASS (14/14), `m4_acceptance.py` PASS (24/24), `m5_acceptance.py` PASS (18/18), `m6_acceptance.py` PASS (19/19). **Open:** Gene's hands-on checks (`m5-acceptance.md`, unchecked). |
 | **M6** whiteboards and pen | Built (`ebcdcc8`..`c796383`), reviewed, fix `c4a087c`; same gate. **Open:** Gene's hands-on checks (`m6-acceptance.md`, unchecked), including the Wacom pressure check on real hardware. |
+| **M7** remaining blocks, light mode, polish | 18 build tasks built (`f98e401`..`dd3c63e`); Task 19 acceptance 2026-10-27: 933 back-end tests (1 skipped), 1332 front-end tests (225 files), `tsc -b --noEmit` clean, lint exit 0, `npm run build` ok; `m7_acceptance.py` PASS on `space-blocks`, `space-sample`, `space-v1`, `space-calendar`, `space-links`, `space-whiteboard` (editor round trip 0 differences on each); `m1_roundtrip.py` and `m2`–`m6_acceptance.py` PASS on `space-sample`. **Next:** the whole-milestone review and fix pass (known issues listed in `m7-acceptance.md`, first among them the lost final newline). **Open:** Gene's hands-on checks and the side-by-side fidelity pass (`m7-acceptance.md`, unchecked). |
 
 ## M3 final gate (2026-10-26)
 
@@ -96,7 +97,10 @@ Built by plan `2026-10-26-m6-whiteboards-pen.md` (lane commits `ebcdcc8`..`182a2
 - **Freehand ink (Gene's addition):** Wacom pressure through Pointer Events and `perfect-freehand`; pen, highlighter, eraser; colours and widths; stored as SVG beside the board.
 - Undo/redo; drag objects in from the sidebar and search.
 
-### M7: remaining blocks, light mode, polish
+### M7: remaining blocks, light mode, polish (built 2026-10-27; acceptance in `m7-acceptance.md`; review and fix pass next; Gene's hand checks pending)
+
+Task 19 found no contract gaps (every M7 route has a client method with a caller, and `m7_acceptance.py` exercises each over HTTP). It confirmed one file-safety bug for the fix pass: saving drops a body's final newline when the last block is replaced or a block is added after it (`editor/document.ts`). Six smaller items are listed in `m7-acceptance.md` under "Found in this pass".
+
 
 - **Block options:**
   - toggles; text and background colours; alignment

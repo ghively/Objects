@@ -9,7 +9,7 @@ import { describe, expect, test } from 'vitest'
 const SRC = join(process.cwd(), 'src')
 
 /** Files other lanes still convert; Task 19 empties this list. */
-const PENDING = ['editor/editor.css', 'object/ObjectView.tsx']
+const PENDING: string[] = []
 
 const MARKER = /^\s*(\/\/|\/\*)\s*colour-literals: content palette/
 
