@@ -1,6 +1,7 @@
 /**
  * The math block's node view (Capacities' `MathBlock`): the formula rendered
- * with KaTeX in display mode; clicking it opens an editing panel with the TeX
+ * with KaTeX in display mode, one row per blank-line-separated part
+ * (`renderDisplayMath`); clicking it opens an editing panel with the TeX
  * source and a live preview, "Close" (`blocks.MathBlock.closeEditor`) and the
  * hint "↵ to insert above/below" (`blocks.MathBlock.insertNewBlock`).
  *
@@ -11,7 +12,7 @@
  */
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { renderMath } from './renderMath'
+import { renderDisplayMath } from './renderMath'
 
 export function MathBlockView({ node, editor, getPos, updateAttributes, selected }: NodeViewProps) {
   const text = String(node.attrs.text ?? '')
@@ -29,7 +30,7 @@ export function MathBlockView({ node, editor, getPos, updateAttributes, selected
   }, [editing])
 
   const shown = editing ? draft : text
-  const html = useMemo(() => (shown.trim() ? renderMath(shown, { display: true }) : ''), [shown])
+  const html = useMemo(() => (shown.trim() ? renderDisplayMath(shown) : ''), [shown])
 
   const open = () => {
     if (!editor.isEditable) return

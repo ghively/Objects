@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { describe, expect, test } from 'vitest'
-import { renderMath } from './renderMath'
+import { displayMathRows, renderDisplayMath, renderMath } from './renderMath'
 
 describe('renderMath', () => {
   test('renders display and inline formulas with HTML and MathML', () => {
@@ -43,5 +43,22 @@ describe('renderMath', () => {
     const source = readFileSync(require.resolve('./renderMath.ts'), 'utf8')
     expect(source).toContain("import 'katex/dist/katex.min.css'")
     expect(source).not.toMatch(/https?:\/\//)
+  })
+  // Known issue 7: KaTeX ignores a blank line, so two formulas ran together on one line.
+  test('a blank line splits display math into rows', () => {
+    expect(displayMathRows('E = mc^2\n\na^2+b^2=c^2')).toEqual(['E = mc^2', 'a^2+b^2=c^2'])
+    expect(displayMathRows('a\n \t\n\n\nb\n\nc')).toEqual(['a', 'b', 'c'])
+    expect(displayMathRows('a\nb')).toEqual(['a\nb'])
+    expect(displayMathRows('\n\nx\n\n')).toEqual(['x'])
+    // A blank line inside a group or an environment does not split it.
+    expect(displayMathRows('\\begin{aligned}\na &= b\n\nc &= d\n\\end{aligned}\n\ne')).toEqual([
+      '\\begin{aligned}\na &= b\n\nc &= d\n\\end{aligned}',
+      'e',
+    ])
+    expect(displayMathRows('\\frac{a\n\nb}{c}')).toEqual(['\\frac{a\n\nb}{c}'])
+    expect(displayMathRows('\\{a\n\nb')).toEqual(['\\{a', 'b'])
+    const html = renderDisplayMath('E = mc^2\n\na^2+b^2=c^2')
+    expect(html.match(/class="katex-display"/g)).toHaveLength(2)
+    expect(renderDisplayMath('E = mc^2').match(/class="katex-display"/g)).toHaveLength(1)
   })
 })
