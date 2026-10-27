@@ -42,7 +42,7 @@ import { DeletedBanner } from './DeletedBanner'
 import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
 import { ensureNewTags, ObjectHeader, openTag } from './ObjectHeader'
-import { PageLayout, pageDesign, panelVariant } from './PageLayout'
+import { PageLayout, type PanelVariant } from './PageLayout'
 import { PropertyPanel } from './PropertyPanel'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
 import { useTypeEditor } from './useTypeEditor'
@@ -502,9 +502,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   const isTemplate = summary?.template != null
   const canTemplate = !!type && !isTemplate && templatesAllowed(type)
 
-  const design = pageDesign(type)
+  // A render function: the layout picks the variant (inline as a card when the page is narrow).
   const properties =
-    detail && panelOpen ? (
+    detail && panelOpen ? (variant: PanelVariant) => (
       <PropertyPanel
         type={type}
         frontmatter={detail.frontmatter}
@@ -517,7 +517,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         onTypeChange={onTypeChange}
         onOpenTag={onOpenTag}
         onOpenObject={onOpenObject}
-        variant={panelVariant(design)}
+        variant={variant}
       />
     ) : null
 

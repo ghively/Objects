@@ -3,7 +3,8 @@
  * behind a 1 px rule. Each area with an open entry is shown, stacked area 1, area 2, area 3; areas
  * 2 and 3 take `area2Size`/`area3Size` of the height and the first shown area the rest. A vertical
  * resizer on the left edge sets the width (320 px to 60 % of the window), horizontal ones between
- * areas set their heights; both write the tab's layout on pointer up. (No reference screenshot of
+ * areas set their heights; both write the tab's layout on pointer up. When the main card is too
+ * narrow for both, the panel gives way down to 320 px so the main column keeps its minimum width. (No reference screenshot of
  * this layout: flagged for Gene's check.)
  */
 import { Fragment, useRef, useState } from 'react'
@@ -15,6 +16,7 @@ import {
   DEFAULT_SIDEPANEL_WIDTH,
   entriesOf,
   isSidepanelShown,
+  MIN_SIDEPANEL_WIDTH,
   visibleAreas,
   type PanelArea,
 } from '@/nav/sidepanel'
@@ -56,8 +58,9 @@ export function SidePanel({ space, renderTarget }: SidePanelProps) {
       ref={ref}
       aria-label="Side panel"
       data-tab={tab.id}
-      style={{ width }}
-      className="relative flex h-full shrink-0 border-l border-line bg-panel"
+      // Shrinks (down to its minimum) before the main column gets narrower than its minimum.
+      style={{ width, minWidth: MIN_SIDEPANEL_WIDTH }}
+      className="relative flex h-full shrink border-l border-line bg-panel"
     >
       <Resizer
         direction="x"

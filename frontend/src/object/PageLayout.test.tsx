@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -13,7 +15,8 @@ import { api } from '@/api/client'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPage } from './ObjectPage'
-import { PageLayout } from './PageLayout'
+import { MIN_SIDEPANEL_WIDTH } from '@/nav/sidepanel'
+import { MIN_CONTENT_WIDTH, PageLayout, PROPERTIES_BESIDE_WIDTH, PROPERTY_PANEL_WIDTH, propertiesBeside, type PanelVariant } from './PageLayout'
 
 const mocked = vi.mocked(api)
 
@@ -110,6 +113,80 @@ describe('PageLayout', () => {
     expect(img.className).not.toContain('object-cover')
     expect(img.className).toContain('h-auto')
     expect(b.container.querySelector('[data-page-content]')?.contains(cover)).toBe(true)
+  })
+})
+
+describe('narrow layouts', () => {
+  function sized(width: number, viewDesign: ViewDesign | null = null) {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width, height: 800 } as DOMRect)
+    const type = typeDef({ id: 'person', viewDesign })
+    const summary = objectSummary({ path: 'People/Ada.md', type: 'person', title: 'Ada' })
+    const drawn: PanelVariant[] = []
+    const r = render(
+      <PageLayout
+        type={type}
+        summary={summary}
+        header={<h1>Ada</h1>}
+        properties={(variant) => {
+          drawn.push(variant)
+          return <aside aria-label="Properties" data-variant={variant}>props</aside>
+        }}
+        body={<p>Body text</p>}
+      />,
+    )
+    return { ...r, drawn }
+  }
+
+  test('test the width rule: the panel sits beside from panel plus minimum content width', () => {
+    expect(PROPERTY_PANEL_WIDTH).toBe(370)
+    expect(MIN_CONTENT_WIDTH).toBe(480)
+    expect(PROPERTIES_BESIDE_WIDTH).toBe(850)
+    expect(propertiesBeside(null)).toBe(true)
+    expect(propertiesBeside(850)).toBe(true)
+    expect(propertiesBeside(849)).toBe(false)
+    expect(propertiesBeside(320)).toBe(false)
+  })
+
+  test('test a wide standard page keeps the property panel beside the content', () => {
+    const { container } = sized(1052)
+    const props = screen.getByRole('complementary', { name: 'Properties' })
+    expect(props.dataset.variant).toBe('side')
+    expect(container.querySelector('[data-page-content]')?.contains(props)).toBe(false)
+    expect((container.querySelector('[data-page-layout]') as HTMLElement).dataset.properties).toBe('beside')
+  })
+
+  test('test a narrow standard page puts the property panel inline under the title', () => {
+    const { container } = sized(752)
+    const props = screen.getByRole('complementary', { name: 'Properties' })
+    expect(props.dataset.variant).toBe('card')
+    const inline = container.querySelector('[data-properties-inline]') as HTMLElement
+    expect(inline.contains(props)).toBe(true)
+    // Under the header, before the body.
+    const title = container.querySelector('[data-page-title]') as HTMLElement
+    const body = container.querySelector('[data-page-body]') as HTMLElement
+    expect(title.compareDocumentPosition(inline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(inline.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect((container.querySelector('[data-page-layout]') as HTMLElement).dataset.properties).toBe('inline')
+  })
+
+  test('test other designs keep their own placement when narrow', () => {
+    const { container } = sized(500, 'encyclopedia')
+    expect(screen.getByRole('complementary', { name: 'Properties' }).dataset.variant).toBe('infobox')
+    expect(container.querySelector('[data-properties-inline]')).toBeNull()
+    expect((container.querySelector('[data-page-layout]') as HTMLElement).dataset.properties).toBeUndefined()
+  })
+
+  test('test the main column keeps its minimum width and leaves the side panel its minimum', () => {
+    // index.css carries the shell's rule; its numbers are these constants.
+    const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8')
+    const rule = (sel: string) => {
+      const at = css.indexOf(`\n${sel} {`)
+      return at < 0 ? '' : css.slice(at, css.indexOf('}', at))
+    }
+    expect(rule('[data-main-column]')).toContain(`min-width: min(${MIN_CONTENT_WIDTH}px, calc(100% - ${MIN_SIDEPANEL_WIDTH}px))`)
+    expect(rule('[data-main-column]:has([data-page-layout][data-properties])')).toContain(
+      `min-width: min(${PROPERTIES_BESIDE_WIDTH}px, calc(100% - ${MIN_SIDEPANEL_WIDTH}px))`,
+    )
   })
 })
 
