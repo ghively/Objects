@@ -49,6 +49,22 @@ describe('DailyNoteSlot', () => {
     expect(mocked.object).toHaveBeenCalledWith('DailyNotes/Older/2026-10-24.md')
   })
 
+  test('test 409 name taken by another file shows the error and keeps the button', async () => {
+    const user = userEvent.setup()
+    const onChanged = vi.fn()
+    mocked.createDailyNote.mockRejectedValueOnce(
+      new DailyNoteExistsError('A file with that name already exists.', 'DailyNotes/2026-11-01.md', 'nameTaken'),
+    )
+    const { container } = render(<DailyNoteSlot day="2026-11-01" note={null} heading onChanged={onChanged} />)
+    await user.click(screen.getByRole('button', { name: 'Daily Note' }))
+    expect(await screen.findByText('A file with that name already exists.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Daily Note' })).toBeInTheDocument()
+    expect(container.querySelector('[data-object-view="inline"]')).toBeNull()
+    expect(container.querySelector('[data-object-path="DailyNotes/2026-11-01.md"]')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Daily note options' })).toBeNull()
+    expect(mocked.object).not.toHaveBeenCalledWith('DailyNotes/2026-11-01.md')
+  })
+
   test('test inline editor autosaves the body with the note\'s version', async () => {
     const path = 'DailyNotes/2026-10-23.md'
     mocked.object.mockResolvedValue(

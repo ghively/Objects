@@ -83,13 +83,18 @@ export class ReadOnlyError extends ApiError {
   }
 }
 
-/** 409 on `POST /api/daily-notes`: a note for the day exists at `path`. Nothing was written. */
+/**
+ * 409 on `POST /api/daily-notes`; nothing was written. `reason` `'exists'`: the day's note is
+ * at `path`. `'nameTaken'`: `path` is another file holding the note's name (not the day's note).
+ */
 export class DailyNoteExistsError extends ApiError {
   readonly path: string
-  constructor(message: string, path: string) {
+  readonly reason: 'exists' | 'nameTaken'
+  constructor(message: string, path: string, reason: 'exists' | 'nameTaken' = 'exists') {
     super(409, message)
     this.name = 'DailyNoteExistsError'
     this.path = path
+    this.reason = reason
   }
 }
 
@@ -343,15 +348,19 @@ export const api = {
 
   /**
    * Create the daily note for `date` (YYYY-MM-DD). `templateId`: an id, `null` for the type's
-   * default, `"none"` for no template. A 409 (a note for the day exists) throws
-   * `DailyNoteExistsError` carrying the existing note's path.
+   * default, `"none"` for no template. A 409 throws `DailyNoteExistsError` carrying the path and
+   * whether it is the day's note (`reason: 'exists'`) or another file with its name (`'nameTaken'`).
    */
   async createDailyNote(date: string, opts: { templateId?: string | null } = {}): Promise<CreatedDailyNote> {
     const body: Record<string, unknown> = { date }
     if (opts.templateId !== undefined) body.templateId = opts.templateId
     body.clientId = CLIENT_ID
     const res = await request<CreatedDailyNote>('/daily-notes', json('POST', body), (d) =>
-      new DailyNoteExistsError(typeof d.detail === 'string' ? d.detail : 'A daily note for this day exists', String(d.path ?? '')),
+      new DailyNoteExistsError(
+        typeof d.detail === 'string' ? d.detail : 'A daily note for this day exists',
+        String(d.path ?? ''),
+        d.reason === 'nameTaken' ? 'nameTaken' : 'exists',
+      ),
     )
     emitLocal([created(res.path, res.version), ...(res.typeIds ?? []).map((t) => typesEvent(t))])
     return { path: res.path, version: res.version, typeIds: res.typeIds ?? [] }
