@@ -23,6 +23,12 @@ export interface WhiteboardHost {
   /** Create an object of a type ("New object"); resolves with its path. */
   createObject(typeId: string): Promise<string>
   objects(): Promise<ObjectSummary[]>
+  /** M8: copy a file into `Attachments/` (never overwrites); resolves with its space path. */
+  uploadAttachment?(file: File): Promise<{ path: string }>
+  /** M8: the same-origin URL of a space file (`GET /api/file`). */
+  fileUrl?(path: string): string
+  /** M8: open a space file with the OS default app (double-click on a media node). */
+  openAttachment?(path: string): Promise<unknown>
 }
 
 export const defaultHost: WhiteboardHost = {
@@ -48,6 +54,24 @@ export const defaultHost: WhiteboardHost = {
   objects() {
     return api.objects()
   },
+  uploadAttachment(file) {
+    return api.uploadAttachment(file, file.name)
+  },
+  fileUrl(path) {
+    return api.fileUrl(path)
+  },
+  openAttachment(path) {
+    return api.openAttachment(path)
+  },
+}
+
+/** The host's media helpers, falling back to the real API for a host that doesn't give them. */
+export function mediaHost(host: WhiteboardHost): Required<Pick<WhiteboardHost, 'uploadAttachment' | 'fileUrl' | 'openAttachment'>> {
+  return {
+    uploadAttachment: (f) => (host.uploadAttachment ?? defaultHost.uploadAttachment!)(f),
+    fileUrl: (p) => (host.fileUrl ?? defaultHost.fileUrl!)(p),
+    openAttachment: (p) => (host.openAttachment ?? defaultHost.openAttachment!)(p),
+  }
 }
 
 export const WhiteboardHostContext = createContext<WhiteboardHost>(defaultHost)

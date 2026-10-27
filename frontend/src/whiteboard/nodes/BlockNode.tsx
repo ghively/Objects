@@ -1,5 +1,6 @@
 /**
- * `objectBlock`: a text block, or an embedded object (delegated to `EntityNode`).
+ * `objectBlock`: a text block, or an embedded object (delegated to `EntityNode`), a media file
+ * (`MediaNode`) or a web link (`WeblinkNode`) (M8).
  *
  * A text node with no `width`/`height` hugs its content (the model: "While they are absent the
  * node sizes itself to its content — growing in width up to the auto maximum, then wrapping and
@@ -12,6 +13,8 @@ import type { WhiteboardNodeProps } from '../canvasTypes'
 import { borderStyle, fillStyle } from '../colors'
 import { useBoardActions, useBoardState } from '../store'
 import { EntityNode } from './EntityNode'
+import { MediaNode } from './MediaNode'
+import { WeblinkNode } from './WeblinkNode'
 import { blockFrameStyle, isAutoSized, NodeChrome, useNodeEditable } from './NodeChrome'
 
 export { blockFrameStyle, isAutoSized }
@@ -79,7 +82,10 @@ function TextNode({ id, data, selected }: WhiteboardNodeProps) {
 }
 
 function BlockNodeImpl(props: WhiteboardNodeProps) {
-  if (props.data.block?.type === 'entity') return <EntityNode {...props} />
+  const kind = props.data.block?.type
+  if (kind === 'entity') return <EntityNode {...props} />
+  if (kind === 'media') return <MediaNode {...props} />
+  if (kind === 'weblink') return <WeblinkNode {...props} />
   return <TextNode {...props} />
 }
 

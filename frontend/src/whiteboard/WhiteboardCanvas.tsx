@@ -5,6 +5,10 @@
  * marquee and Shift multi-select, tool placement (click = default size, drag = a box snapped
  * with `snapBox`), connections, frames dragging what is inside them, Alt-drag duplicate,
  * dropping objects in, the empty and lost states, and the ink layer when a plugin is given.
+ * M8: the media tools (Image, PDF, Audio, File open the file picker for their kind, upload into
+ * `Attachments/` and place a media node of the default size on the grid; Web link asks for a URL
+ * and an optional title and places a card, never fetching), and files dropped on the board
+ * become media nodes the same way.
  * Panning and zooming never touch the board; the camera is kept per viewer in localStorage.
  */
 import '@xyflow/react/dist/base.css'
@@ -37,16 +41,18 @@ import {
   type OnNodeDrag,
   type Viewport as FlowViewport,
 } from '@xyflow/react'
-import type { WhiteboardPosition, WhiteboardTool } from '@/api/whiteboardTypes'
-import { boundsOf, nodeBox } from './actions'
+import type { WhiteboardMediaTool, WhiteboardPosition, WhiteboardTool } from '@/api/whiteboardTypes'
+import { MAX_UPLOAD_BYTES, openFilePicker, showToast, UPLOAD_LIMIT_MESSAGE } from '@/editor/media/upload'
+import { boundsOf, createMedia, createWeblink, newId, nodeBox } from './actions'
 import { fitBox, zoomStep, wheelViewport, type Viewport } from './camera'
 import type { Placement, ResolvedSettings, ZoomCommand } from './canvasTypes'
 import { ObjectPicker } from './chrome'
 import { mayCarryObject, readDroppedObject } from './dnd'
 import { MarkerDefs, edgeTypes } from './edges'
 import { toFlow, type FlowEdge, type FlowNode } from './flowMapping'
-import type { WhiteboardHost } from './host'
-import { GRID, ZOOM_MAX, ZOOM_MIN, isConnectorTool, isTool, type Box } from './model'
+import { WeblinkInput } from './chrome/WeblinkInput'
+import { mediaHost, type WhiteboardHost } from './host'
+import { GRID, MEDIA_TOOL_KIND, ZOOM_MAX, ZOOM_MIN, isConnectorTool, isMediaTool, isTool, type Box } from './model'
 import { nodeTypes } from './nodes'
 import type { InkPlugin, InkStroke, InkToolState } from './plugin'
 import { keyToCommand, type Command } from './shortcuts'
@@ -62,6 +68,34 @@ export const FIT_PADDING = GRID * 2
 /** Ink tool defaults when a shortcut arms one (the plan's pen 4, highlighter 16, gray). */
 const INK_DEFAULTS: Record<InkToolState['tool'], number> = { pen: 4, highlighter: 16, eraser: 4 }
 const INK_DEFAULT_COLOR = '#5c5959'
+
+/** Files dropped together are placed in a diagonal cascade this far apart (our choice: one grid step). */
+export const DROP_CASCADE = GRID
+
+/**
+ * Uploads `files` one after another (refusing any over 100 MiB before sending, M7's rule) and
+ * hands each uploaded path to `place` with its index. Failures show a toast and are skipped.
+ */
+export async function uploadFiles(
+  host: WhiteboardHost,
+  files: readonly File[],
+  place: (path: string, index: number) => void,
+): Promise<void> {
+  const media = mediaHost(host)
+  let placed = 0
+  for (const file of files) {
+    if (file.size > MAX_UPLOAD_BYTES) {
+      showToast(UPLOAD_LIMIT_MESSAGE)
+      continue
+    }
+    try {
+      const res = await media.uploadAttachment(file)
+      place(res.path, placed++)
+    } catch (err) {
+      showToast(err instanceof Error && err.message ? err.message : 'The file could not be uploaded.')
+    }
+  }
+}
 
 /** Tools that place something with a click or a drag on the canvas. */
 function isPlacementTool(tool: WhiteboardTool): boolean {
@@ -112,6 +146,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
   const [ctrlHeld, setCtrlHeld] = useState(false)
   const [guides, setGuides] = useState<SnapGuide[]>([])
   const [picker, setPicker] = useState<{ mode: 'link' | 'create'; at: WhiteboardPosition } | null>(null)
+  const [weblinkAt, setWeblinkAt] = useState<WhiteboardPosition | null>(null)
   const [zoom, setZoom] = useState(1)
 
   // The theme (M7): React Flow's own colours follow `colorMode`, and the nodes and edges get new
@@ -301,6 +336,48 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
     [rf, settings.isZoomingOnScroll],
   )
 
+  // ---- media (M8) ----
+
+  /** Places an uploaded file as a media node at `at` (plus the cascade offset) and selects it. */
+  const placeMedia = useCallback(
+    (path: string, at: WhiteboardPosition, index = 0, snap = settings.isSnappingToGrid) => {
+      if (!isEditable(store.getState())) return
+      const id = newId()
+      const p = { x: at.x + index * DROP_CASCADE, y: at.y + index * DROP_CASCADE }
+      actions.apply('create', (b) => createMedia(b, path, p, { id, snap }))
+      if (id in store.getState().doc.board.nodes) actions.select([id])
+    },
+    [actions, store, settings.isSnappingToGrid],
+  )
+
+  const startMedia = useCallback(
+    (tool: WhiteboardMediaTool, at: WhiteboardPosition, snap: boolean) => {
+      // One-shot, as every picker tool: control goes back to Move whether or not a file is chosen.
+      // The tool memory keeps the media tool (`setTool` remembered it when it was armed).
+      store.setState({ tool: 'select' })
+      if (tool === 'weblink') {
+        setWeblinkAt(at)
+        return
+      }
+      openFilePicker(MEDIA_TOOL_KIND[tool], (files) => {
+        void uploadFiles(host, files, (path, i) => placeMedia(path, at, i, snap))
+      })
+    },
+    [store, host, placeMedia],
+  )
+
+  const onWeblink = useCallback(
+    (link: { url: string; title?: string }) => {
+      const at = weblinkAt
+      setWeblinkAt(null)
+      if (!at || !isEditable(store.getState())) return
+      const id = newId()
+      actions.apply('create', (b) => createWeblink(b, link, at, { id, snap: settings.isSnappingToGrid }))
+      if (id in store.getState().doc.board.nodes) actions.select([id])
+    },
+    [weblinkAt, actions, store, settings.isSnappingToGrid],
+  )
+
   // ---- placement ----
 
   const place = useCallback(
@@ -313,11 +390,17 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
         setPicker({ mode: t, at: point })
         return
       }
+      if (isMediaTool(t)) {
+        // A drag places at the box's centre (the media node keeps its default size; our choice).
+        const point = 'start' in at ? at.start : 'width' in at ? { x: at.x + at.width / 2, y: at.y + at.height / 2 } : at
+        startMedia(t, point, snap)
+        return
+      }
       const id = actions.createFromTool(t, at, { snap })
       // A text block placed with the Text tool opens for typing at once (our choice).
       if (id && t === 'text') actions.beginEdit(id)
     },
-    [actions, store],
+    [actions, store, startMedia],
   )
 
   const onPick = useCallback(
@@ -335,7 +418,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
 
   const onDragOver = useCallback(
     (e: ReactDragEvent) => {
-      if (!editable || !mayCarryObject(e.dataTransfer)) return
+      if (!editable || !(mayCarryObject(e.dataTransfer) || carriesFiles(e.dataTransfer))) return
       e.preventDefault()
       e.dataTransfer.dropEffect = 'copy'
     },
@@ -345,6 +428,14 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
   const onDrop = useCallback(
     (e: ReactDragEvent) => {
       if (!isEditable(store.getState())) return
+      const files = Array.from(e.dataTransfer?.files ?? [])
+      if (files.length) {
+        // Files from the OS (M8): uploaded and placed where they were dropped.
+        e.preventDefault()
+        const at = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY })
+        void uploadFiles(host, files, (path, i) => placeMedia(path, at, i))
+        return
+      }
       const obj = readDroppedObject(e.dataTransfer)
       if (!obj) return
       e.preventDefault()
@@ -352,7 +443,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
       const link = 'path' in obj ? host.linkFor(obj.path) : obj.link
       actions.createEntity(link, at, { snap: settings.isSnappingToGrid })
     },
-    [store, rf, host, actions, settings.isSnappingToGrid],
+    [store, rf, host, actions, settings.isSnappingToGrid, placeMedia],
   )
 
   // ---- keys ----
@@ -407,6 +498,10 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
             setPicker(null)
             return true
           }
+          if (weblinkAt) {
+            setWeblinkAt(null)
+            return true
+          }
           if (st.inkTool) {
             canvas.setInkTool(null)
             return true
@@ -432,7 +527,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
       }
       return false
     },
-    [store, actions, canvas, ink, inkReadOnly, onZoom, picker],
+    [store, actions, canvas, ink, inkReadOnly, onZoom, picker, weblinkAt],
   )
 
   const onKeyDown = useCallback(
@@ -463,7 +558,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
   }, [])
 
   const toolAttr = !editable ? 'locked' : inkTool ? inkTool.tool : tool
-  const placing = editable && !inkTool && !spaceHeld && isPlacementTool(tool) && !picker
+  const placing = editable && !inkTool && !spaceHeld && isPlacementTool(tool) && !picker && !weblinkAt
   const isEmpty = Object.keys(board.nodes).length === 0 && strokes.length === 0
 
   return (
@@ -534,6 +629,11 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
           <p className="text-[14px] text-fg-muted">{WB.emptyStateDescription.text}</p>
         </div>
       )}
+      {weblinkAt && (
+        <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+          <WeblinkInput onSubmit={onWeblink} onClose={() => setWeblinkAt(null)} />
+        </div>
+      )}
       {picker && (
         <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
           <ObjectPicker
@@ -549,6 +649,12 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
       )}
     </div>
   )
+}
+
+/** Whether a drag carries files from the OS. */
+function carriesFiles(dt: DataTransfer | null): boolean {
+  if (!dt) return false
+  return Array.from(dt.types ?? []).includes('Files') || (dt.files?.length ?? 0) > 0
 }
 
 /** Sets the first camera: the viewer's saved camera, else the file's viewport, else fit. */

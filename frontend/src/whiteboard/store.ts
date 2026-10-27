@@ -21,6 +21,7 @@ import { History } from './history'
 import {
   emptyBoard,
   isCircuitLabel,
+  isMediaTool,
   isOneShotTool,
   isPointerTool,
   isShapeMenuTool,
@@ -179,6 +180,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
         if (isShapeMenuTool(tool)) patch.lastShapeTool = tool
         if (isShapeTool(tool)) patch.lastShape = tool
         if (isCircuitLabel(tool)) patch.lastCircuitTool = tool
+        if (isMediaTool(tool)) patch.lastMediaTool = tool
         remember(patch)
       },
       beginEdit(id) {

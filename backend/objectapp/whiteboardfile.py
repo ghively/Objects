@@ -6,6 +6,12 @@ and ``edges`` keyed by id, ``viewport?``, ``locked?``, ``readingOrder?``) plus o
 property (text blocks and embedded objects). Unknown keys at any level are kept: validation
 only checks the known fields, and `dump_board` writes exactly the dict it is given.
 
+M8 adds two block types (our format; Object's media nodes point at media objects, which
+our model keeps as attachments): ``{"type": "media", "path": "Attachments/<file>"}``, a
+relative space path that can't leave the space, and ``{"type": "weblink", "url": "https://…",
+"title"?: "…"}``, an ``http``/``https`` URL stored as typed and never fetched. An entity block
+may carry ``view`` (``inline``, ``smallCard``, ``wideCard`` or ``embed``; the View menu).
+
 Pure functions, no `Space`: the store (Task 3) reads and writes the bytes.
 """
 
@@ -15,6 +21,7 @@ import json
 import math
 import re
 from typing import Any
+from urllib.parse import urlsplit
 
 from .jsonstore import dump_json
 
@@ -23,6 +30,7 @@ __all__ = [
     "BOARD_SUFFIX",
     "CONNECTIONS",
     "DATA_VERSION",
+    "ENTITY_VIEWS",
     "INK_SUFFIX",
     "LINES",
     "MARKERS",
@@ -37,6 +45,8 @@ __all__ = [
     "BoardInvalid",
     "board_rel",
     "dump_board",
+    "media_path_problem",
+    "weblink_problem",
     "empty_board",
     "ink_rel",
     "load_board",
@@ -67,6 +77,8 @@ THEME_COLORS = frozenset({
 })
 BG_COLORS = frozenset(f"bg-{c}" for c in THEME_COLORS)
 TEXT_ALIGNS = frozenset({"left", "center", "right"})
+# M7's four object views, as an entity block's optional ``view`` (Task 21's View menu).
+ENTITY_VIEWS = frozenset({"inline", "smallCard", "wideCard", "embed"})
 V_ALIGNS = frozenset({"top", "center", "bottom"})
 
 # Our strings (no Object original).
@@ -74,6 +86,7 @@ NEWER_VERSION_REASON = "This whiteboard was saved by a newer version of Object."
 _UNREADABLE_PREFIX = "This whiteboard's file can't be read, so it opens read-only: "
 
 _ENTITY_LINK_RE = re.compile(r"^\[\[[^\[\]\n]+\]\]$")
+_WEBLINK_SCHEMES = frozenset({"http", "https"})
 
 
 class BoardInvalid(Exception):
@@ -165,6 +178,45 @@ def _record(value: Any, what: str) -> dict[str, Any]:
     return value
 
 
+def media_path_problem(path: Any) -> str | None:
+    """Why ``path`` can't be a media block's path, or ``None`` when it is a safe space path.
+
+    A relative POSIX path inside the space: not empty, no leading ``/``, no backslash, no
+    ``:`` (drive letters, URLs; our choice, it is also not portable), no control characters,
+    no empty, ``.`` or ``..`` segment and no dot-folder (``.object/``, ``.git/`` …).
+    """
+    if not isinstance(path, str) or not path:
+        return "has no file path"
+    if path.startswith("/") or "\\" in path or ":" in path:
+        return "has a file path outside the space"
+    if any(ord(c) < 32 or ord(c) == 127 for c in path):
+        return "has a file path outside the space"
+    parts = path.split("/")
+    for i, part in enumerate(parts):
+        if part in ("", ".", ".."):
+            return "has a file path outside the space"
+        if part.startswith(".") and i < len(parts) - 1:
+            return "has a file path inside a hidden folder"
+    return None
+
+
+def weblink_problem(url: Any) -> str | None:
+    """Why ``url`` can't be a web link, or ``None`` for an ``http``/``https`` URL with a host."""
+    if not isinstance(url, str) or not url:
+        return "has no URL"
+    if any(ord(c) <= 32 or ord(c) == 127 for c in url):
+        return "has a URL with spaces or control characters"
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return "has a URL that can't be read"
+    if parts.scheme.lower() not in _WEBLINK_SCHEMES:
+        return "has a URL that isn't http or https"
+    if not parts.netloc or not parts.hostname:
+        return "has a URL without a host"
+    return None
+
+
 def _validate_block(key: str, block: Any) -> None:
     owner = f"Block {key}"
     if not isinstance(block, dict):
@@ -178,6 +230,16 @@ def _validate_block(key: str, block: Any) -> None:
         link = block.get("link")
         if not isinstance(link, str) or not _ENTITY_LINK_RE.match(link):
             raise BoardInvalid(f"{owner} has a link that isn't a [[wikilink]].")
+        _optional(block, "view", lambda v: _enum(owner, "view", v, ENTITY_VIEWS))
+    elif kind == "media":
+        problem = media_path_problem(block.get("path"))
+        if problem:
+            raise BoardInvalid(f"{owner} {problem}.")
+    elif kind == "weblink":
+        problem = weblink_problem(block.get("url"))
+        if problem:
+            raise BoardInvalid(f"{owner} {problem}.")
+        _optional(block, "title", lambda v: _string(owner, "title", v))
     else:
         raise BoardInvalid(f"{owner} has an unknown type: {kind!r}.")
 

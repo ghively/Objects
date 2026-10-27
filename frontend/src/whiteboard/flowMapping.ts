@@ -2,7 +2,8 @@
  * Projection between the board file (`WhiteboardData`) and React Flow's nodes and edges.
  * Pure: types only from `@xyflow/react`. The node `type` names are Object's Vue Flow node
  * types (the `object*` classes in its CSS). `data.node`/`data.edge` hold the original
- * objects, so nothing the projection doesn't understand is lost.
+ * objects, so nothing the projection doesn't understand is lost. Media and web-link blocks (M8)
+ * ride on block nodes (`objectBlock`) like text and embedded objects; `BlockNode` picks the view.
  */
 import type { Edge, Node, NodeChange } from '@xyflow/react'
 import type {

@@ -10,6 +10,7 @@ import type {
   WhiteboardEdgeConnection,
   WhiteboardEdgeLine,
   WhiteboardMarker,
+  WhiteboardMediaTool,
   WhiteboardNode,
   WhiteboardNodeKind,
   WhiteboardPickerMarker,
@@ -21,6 +22,7 @@ import type {
   WhiteboardShapeMenuTool,
   WhiteboardTool,
 } from '@/api/whiteboardTypes'
+import { attachmentKind, type AttachmentKind } from '@/editor/annotations'
 
 export const DATA_VERSION = 1
 
@@ -139,13 +141,17 @@ export const DASHED_DASHARRAY = '8 8'
 /** Round caps plus zero-length dashes read as dots. */
 export const DOTTED_DASHARRAY = '0 10'
 
-/** `whiteboardTools` order, without the media tools (not in M6). */
+/** `whiteboardMediaTools` (M8), in the media menu's order. */
+export const MEDIA_TOOLS = ['image', 'pdf', 'audio', 'file', 'weblink'] as const satisfies readonly WhiteboardMediaTool[]
+
+/** `whiteboardTools` order. */
 export const TOOLS = [
   'select',
   'hand',
   'text',
   'link',
   'create',
+  ...MEDIA_TOOLS,
   'line',
   'arrow',
   ...SHAPES,
@@ -155,8 +161,8 @@ export const TOOLS = [
 
 export const POINTER_TOOLS = ['select', 'hand'] as const satisfies readonly WhiteboardPointerTool[]
 
-/** Tools that open a picker instead of placing directly (media tools left out). */
-export const PICKER_TOOLS = ['link', 'create'] as const satisfies readonly WhiteboardTool[]
+/** Tools that open a picker instead of placing directly (`whiteboardPickerTools`). */
+export const PICKER_TOOLS = ['link', 'create', ...MEDIA_TOOLS] as const satisfies readonly WhiteboardTool[]
 
 /** Tools that place one item and hand control back to Move. */
 export const ONE_SHOT_TOOLS: readonly WhiteboardTool[] = [
@@ -189,6 +195,7 @@ export const isConnectorTool = (t: unknown): t is WhiteboardConnectorTool => has
 export const isPointerTool = (t: unknown): t is WhiteboardPointerTool => has(POINTER_TOOLS, t)
 export const isShapeMenuTool = (t: unknown): t is WhiteboardShapeMenuTool => has(SHAPE_MENU_TOOLS, t)
 export const isOneShotTool = (t: unknown): boolean => has(ONE_SHOT_TOOLS, t)
+export const isMediaTool = (t: unknown): t is WhiteboardMediaTool => has(MEDIA_TOOLS, t)
 
 // ---- connectors ----
 
@@ -363,6 +370,13 @@ export function resolveShapeMenuTool(
   return 'rectangle'
 }
 
+/** The media button re-arms the last media-menu option, else Image (`resolveWhiteboardMediaTool`). */
+export function resolveWhiteboardMediaTool(lastMediaTool?: WhiteboardTool, lastUsed?: WhiteboardTool): WhiteboardMediaTool {
+  if (isMediaTool(lastMediaTool)) return lastMediaTool
+  if (isMediaTool(lastUsed)) return lastUsed
+  return 'image'
+}
+
 /** The Gates button re-arms the last gate, else NAND. */
 export function resolveCircuitTool(lastCircuitTool?: WhiteboardTool, lastUsed?: WhiteboardTool): WhiteboardCircuitLabel {
   if (isCircuitLabel(lastCircuitTool)) return lastCircuitTool
@@ -402,6 +416,73 @@ export function isCircuitNode(
   blocks: Record<string, WhiteboardBlock>,
 ): boolean {
   return circuitLabelOf(node, blocks) !== null
+}
+
+// ---- media (M8) ----
+
+/** The kind of a media block's file, from its extension (M7's `kind_of` rules). */
+export function mediaKindOf(path: string): AttachmentKind {
+  return attachmentKind(path)
+}
+
+/** The file kind each upload tool accepts (the picker's `accept`; File takes anything). */
+export const MEDIA_TOOL_KIND = {
+  image: 'image',
+  pdf: 'pdf',
+  audio: 'audio',
+  file: 'file',
+} as const satisfies Record<Exclude<WhiteboardMediaTool, 'weblink'>, AttachmentKind>
+
+/**
+ * A new media node's size by kind, on the grid (our choice; the trimmed reference has no
+ * defaults): image and video 420 × 300, PDF 420 × 540, audio 420 × 90, file 360 × 90.
+ */
+export const MEDIA_DEFAULT_SIZE: Record<AttachmentKind, { width: number; height: number }> = {
+  image: { width: GRID * 14, height: GRID * 10 },
+  video: { width: GRID * 14, height: GRID * 10 },
+  pdf: { width: GRID * 14, height: GRID * 18 },
+  audio: { width: GRID * 14, height: GRID * 3 },
+  file: { width: GRID * 12, height: GRID * 3 },
+}
+
+/** A new web-link card's size (our choice): 360 × 90, the embedded object's minimum width. */
+export const WEBLINK_DEFAULT_SIZE = { width: GRID * 12, height: GRID * 3 }
+
+/** Images and videos keep their aspect while resizing. */
+export function keepsAspect(kind: AttachmentKind): boolean {
+  return kind === 'image' || kind === 'video'
+}
+
+/**
+ * A URL a web link may store: `http`/`https` with a host, no spaces or control characters (the
+ * server's rule). A bare `example.org` gets `https://` in front (our choice); `null` otherwise.
+ */
+export function normalizeWeblinkUrl(input: string): string | null {
+  const raw = input.trim()
+  if (!raw) return null
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u0020\u007f]/.test(raw)) return null
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`
+  let url: URL
+  try {
+    url = new URL(withScheme)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+  if (!url.hostname) return null
+  // The authority must be written out (`https:///x` parses with a host in WHATWG URL, not on the server).
+  if (!/^[a-z]+:\/\/[^/?#]/i.test(withScheme)) return null
+  return withScheme
+}
+
+/** The host a web-link card shows (without `www.`), or `''` for something that isn't a URL. */
+export function weblinkHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
 }
 
 /** The empty board as the server writes it. */

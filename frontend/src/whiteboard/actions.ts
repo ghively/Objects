@@ -28,12 +28,14 @@ import {
   DEFAULT_NODE_WIDTH,
   GRID,
   LINK_BLOCK_MIN_WIDTH,
+  MEDIA_DEFAULT_SIZE,
   MIN_SHAPE_HEIGHT,
   MIN_SHAPE_WIDTH,
   isCircuitLabel,
   isConnectable,
   isConnectorTool,
   isShapeTool,
+  mediaKindOf,
   minSizeFor,
   nextContentZ,
   nextFrameTitle,
@@ -41,6 +43,7 @@ import {
   rememberedEdgeStyle,
   snapBox,
   snapPosition,
+  WEBLINK_DEFAULT_SIZE,
   type Box,
 } from './model'
 
@@ -299,6 +302,46 @@ export function createEntity(
     board,
     { id, kind: 'block', blockId, ...boxFields(box), z: nextContentZ(Object.values(board.nodes)) },
     { [blockId]: { type: 'entity', link } },
+  )
+}
+
+/**
+ * A media node (M8): a block node whose block is `{type: 'media', path}`, at its kind's default
+ * size (`MEDIA_DEFAULT_SIZE`) centred on `at` and snapped to the grid. `headless` is Object's
+ * flag for a media primitive placed from the media tool (no caption bar, fills its frame).
+ */
+export function createMedia(
+  board: WhiteboardData,
+  path: string,
+  at: WhiteboardPosition,
+  opts: { id?: string; snap?: boolean } = {},
+): WhiteboardData {
+  const id = opts.id ?? newId()
+  const blockId = newId()
+  const size = MEDIA_DEFAULT_SIZE[mediaKindOf(path)]
+  const box = placeBox(at, size, minSizeFor('block'), opts.snap !== false)
+  return addNode(
+    board,
+    { id, kind: 'block', blockId, ...boxFields(box), z: nextContentZ(Object.values(board.nodes)), headless: true },
+    { [blockId]: { type: 'media', path } },
+  )
+}
+
+/** A web-link card (M8): `{type: 'weblink', url, title?}`, 360 × 90 on the grid. Nothing is fetched. */
+export function createWeblink(
+  board: WhiteboardData,
+  link: { url: string; title?: string },
+  at: WhiteboardPosition,
+  opts: { id?: string; snap?: boolean } = {},
+): WhiteboardData {
+  const id = opts.id ?? newId()
+  const blockId = newId()
+  const box = placeBox(at, WEBLINK_DEFAULT_SIZE, minSizeFor('block'), opts.snap !== false)
+  const title = link.title?.trim()
+  return addNode(
+    board,
+    { id, kind: 'block', blockId, ...boxFields(box), z: nextContentZ(Object.values(board.nodes)) },
+    { [blockId]: { type: 'weblink', url: link.url, ...(title ? { title } : {}) } },
   )
 }
 

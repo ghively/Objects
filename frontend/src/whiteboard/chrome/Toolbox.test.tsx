@@ -43,6 +43,8 @@ describe('Toolbox', () => {
       'Text',
       'Existing object',
       'New object',
+      'Media',
+      TOOLBOX_TEXT.chooseMedia,
       'Shapes',
       TOOLBOX_TEXT.chooseShape,
       'Frame',

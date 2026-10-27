@@ -188,6 +188,14 @@
 .whiteboard-canvas .react-flow__node.selected:has([data-whiteboard-editing]) .whiteboard-node-frame {
   box-shadow: 0 0 0 var(--whiteboard-node-ring) var(--whiteboard-node-color-ring, var(--color-border-base));
 }
+/* M8 media primitives (reference CSS `[data-whiteboard-media-primitive]`): no resting ring, the
+   selection ring only when selected; the image covers the frame. */
+.whiteboard-canvas .react-flow__node:not(.react-flow__node-objectPoint) .whiteboard-node-frame[data-whiteboard-media-primitive] {
+  box-shadow: none;
+}
+.whiteboard-canvas .react-flow__node.selected:not(.react-flow__node-objectPoint) .whiteboard-node-frame[data-whiteboard-media-primitive] {
+  box-shadow: 0 0 0 3px var(--color-border-block-selection);
+}
 .whiteboard-canvas .whiteboard-node-surface {
   padding: var(--whiteboard-block-pad-y) var(--whiteboard-block-pad-x);
 }
