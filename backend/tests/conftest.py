@@ -49,6 +49,20 @@ def links_space_dir(tmp_path: Path) -> Path:
     return dest
 
 
+# `*.exe` is git-ignored and never committed, so the placeholder executable the M7
+# attachment tests need (opening it must be refused) is written into the copy here.
+BLOCKS_TOOL_EXE = b"MZ placeholder exe bytes for the blocks fixture\n"
+
+
+@pytest.fixture
+def blocks_space_dir(tmp_path: Path) -> Path:
+    """A fresh copy of the synthetic M7 `space-blocks` space (every block form, attachments)."""
+    dest = tmp_path / "space-blocks"
+    shutil.copytree(FIXTURES / "space-blocks", dest)
+    (dest / "Attachments" / "tool.exe").write_bytes(BLOCKS_TOOL_EXE)
+    return dest
+
+
 @pytest.fixture(scope="session")
 def _big_space(tmp_path_factory):
     from bigspace import make_big_space
