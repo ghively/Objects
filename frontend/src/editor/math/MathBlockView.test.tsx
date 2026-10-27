@@ -122,4 +122,12 @@ describe('InlineMathView', () => {
     await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Math' })).toBeNull())
     expect(serializeBody(editor)).toBe('Text$\\pi$\n')
   })
+  test('a blank line inside the block renders two display rows and keeps the source bytes', async () => {
+    const body = 'Intro\n\n$$\nE = mc^2\n\na^2+b^2=c^2\n$$\n'
+    const editor = await mount(body)
+    const el = await screen.findByTestId('math-block-render')
+    expect(el.querySelectorAll('.katex-display')).toHaveLength(2)
+    expect(el.textContent).toContain('E')
+    expect(serializeBody(editor)).toBe(body)
+  })
 })
