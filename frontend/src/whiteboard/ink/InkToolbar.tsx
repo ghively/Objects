@@ -3,13 +3,39 @@ import { Icon } from '@/components/Icon'
 import { colorName } from '@/theme/palette'
 import { DEFAULT_INK, HIGHLIGHTER_WIDTHS, INK_COLORS, PEN_WIDTHS } from './inkModel'
 import { INK_STRINGS } from './inkStrings'
-import type { InkTool, InkToolbarProps, InkToolState } from './types'
+import type { InkEraseMode, InkTool, InkToolbarProps, InkToolState } from './types'
 
-const TOOLS: { tool: InkTool; icon: string; label: string; key: string }[] = [
+/** `key` is the canvas shortcut shown in the tooltip; Select ink has none (our choice). */
+const TOOLS: { tool: InkTool; icon: string; label: string; key?: string }[] = [
   { tool: 'pen', icon: 'ph-pen-nib', label: INK_STRINGS.pen, key: 'P' },
   { tool: 'highlighter', icon: 'ph-highlighter', label: INK_STRINGS.highlighter, key: 'M' },
   { tool: 'eraser', icon: 'ph-eraser', label: INK_STRINGS.eraser, key: 'E' },
+  { tool: 'select', icon: 'ph-lasso', label: INK_STRINGS.selectInk },
 ]
+
+const ERASE_MODES: { mode: InkEraseMode; label: string }[] = [
+  { mode: 'stroke', label: INK_STRINGS.eraseStrokes },
+  { mode: 'partial', label: INK_STRINGS.erasePartially },
+]
+
+/** The eraser mode is a per-viewer convenience kept in localStorage. */
+export const ERASE_MODE_KEY = 'object.ink.eraseMode'
+
+function storedEraseMode(): InkEraseMode {
+  try {
+    return localStorage.getItem(ERASE_MODE_KEY) === 'partial' ? 'partial' : 'stroke'
+  } catch {
+    return 'stroke'
+  }
+}
+
+function storeEraseMode(mode: InkEraseMode): void {
+  try {
+    localStorage.setItem(ERASE_MODE_KEY, mode)
+  } catch {
+    /* storage unavailable: the mode lasts for this session only */
+  }
+}
 
 function widthsFor(tool: InkTool): readonly number[] {
   return tool === 'highlighter' ? HIGHLIGHTER_WIDTHS : PEN_WIDTHS
@@ -42,14 +68,22 @@ export function InkToolbar({ value, readOnly, onChange }: InkToolbarProps) {
     }
     const remembered = last.current.widths[tool]
     const width = remembered !== undefined && widthsFor(tool).includes(remembered) ? remembered : defaultWidth(tool)
-    onChange({ tool, color: value?.color ?? last.current.color, width })
+    const next: InkToolState = { tool, color: value?.color ?? last.current.color, width }
+    if (tool === 'eraser') next.eraseMode = storedEraseMode()
+    onChange(next)
+  }
+
+  const setEraseMode = (mode: InkEraseMode) => {
+    storeEraseMode(mode)
+    if (value) onChange({ ...value, eraseMode: mode })
   }
 
   const set = (patch: Partial<InkToolState>) => {
     if (value) onChange({ ...value, ...patch })
   }
 
-  const drawing = !readOnly && value !== null && value.tool !== 'eraser'
+  const drawing = !readOnly && value !== null && (value.tool === 'pen' || value.tool === 'highlighter')
+  const erasing = !readOnly && value !== null && value.tool === 'eraser'
 
   return (
     <div
@@ -66,13 +100,36 @@ export function InkToolbar({ value, readOnly, onChange }: InkToolbarProps) {
           className={BUTTON}
           aria-label={t.label}
           aria-pressed={!readOnly && value?.tool === t.tool}
-          title={readOnly ? INK_STRINGS.readOnly : `${t.label} (${t.key})`}
+          title={readOnly ? INK_STRINGS.readOnly : t.key ? `${t.label} (${t.key})` : t.label}
           disabled={readOnly}
           onClick={() => pick(t.tool)}
         >
           <Icon name={t.icon} size={18} />
         </button>
       ))}
+      {erasing && (
+        <div role="radiogroup" aria-label={INK_STRINGS.eraseMode} className="ml-1 flex items-center gap-0.5">
+          {ERASE_MODES.map((m) => {
+            const active = (value.eraseMode ?? 'stroke') === m.mode
+            return (
+              <button
+                key={m.mode}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                aria-label={m.label}
+                title={m.label}
+                data-erase-mode={m.mode}
+                className={BUTTON}
+                aria-pressed={active}
+                onClick={() => setEraseMode(m.mode)}
+              >
+                <Icon name={m.mode === 'partial' ? 'ph-scissors' : 'ph-eraser'} size={16} />
+              </button>
+            )
+          })}
+        </div>
+      )}
       {drawing && (
         <>
           <div role="radiogroup" aria-label={INK_STRINGS.inkColour} className="ml-1 flex flex-wrap items-center gap-0.5">

@@ -13,6 +13,7 @@ export const inkPlugin: InkPlugin = {
 export { InkLayer, InkToolbar, useInkDoc }
 export type {
   InkDoc,
+  InkEraseMode,
   InkLayerProps,
   InkPlugin,
   InkResponse,

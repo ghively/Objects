@@ -15,7 +15,10 @@ import {
   mergeStrokes,
   newStrokeId,
   outlineFor,
+  penAltitude,
   samplesFrom,
+  strokePointerType,
+  tiltFactor,
   strokeOptions,
   svgPathFromOutline,
 } from './inkModel'
@@ -187,5 +190,42 @@ describe('ink model', () => {
     expect(INK_COLORS.find((c) => c.name === 'gray')?.hex).toBe('#5c5959')
     expect(INK_COLORS.find((c) => c.name === 'blue')?.hex).toBe('#3f80eb')
     expect(INK_COLORS.find((c) => c.name === 'yellow')?.hex).toBe('#daaa14')
+  })
+
+  test('tilt scales pressure', () => {
+    const toFlow = (p: { x: number; y: number }) => p
+    // Upright: no change. Laid flat: 60% (0.6 + 0.4 * sin(altitude)).
+    expect(tiltFactor({ altitudeAngle: Math.PI / 2 })).toBeCloseTo(1)
+    expect(tiltFactor({ altitudeAngle: 0 })).toBeCloseTo(0.6)
+    expect(tiltFactor({ altitudeAngle: Math.PI / 6 })).toBeCloseTo(0.8)
+    // Without altitudeAngle, tiltX/tiltY (degrees) give the altitude; none means upright.
+    expect(penAltitude({})).toBeCloseTo(Math.PI / 2)
+    expect(penAltitude({ tiltX: 45, tiltY: 0 })).toBeCloseTo(Math.PI / 4)
+    expect(penAltitude({ tiltX: 90 })).toBe(0)
+    const tilted = fakePointer({ pointerType: 'pen', clientX: 1, clientY: 2, pressure: 0.5, altitudeAngle: Math.PI / 6 } as Partial<PointerEvent>)
+    expect(samplesFrom(tilted, toFlow)[0][2]).toBeCloseTo(0.4, 9)
+    const byTilt = fakePointer({ pointerType: 'pen', clientX: 1, clientY: 2, pressure: 1, tiltX: 45, tiltY: 0 })
+    expect(samplesFrom(byTilt, toFlow)[0][2]).toBeCloseTo(0.6 + 0.4 * Math.SQRT1_2, 6)
+    // Coalesced samples use their own tilt, else the event's.
+    const co = fakePointer({
+      pointerType: 'pen',
+      pressure: 1,
+      altitudeAngle: 0,
+      coalesced: [{ clientX: 0, clientY: 0, pressure: 1, altitudeAngle: Math.PI / 2 } as Partial<PointerEvent>, { clientX: 1, clientY: 0, pressure: 1 }],
+    } as Partial<PointerEvent> & { coalesced: Partial<PointerEvent>[] })
+    expect(samplesFrom(co, toFlow).map((p) => p[2])).toEqual([1, 0.6])
+  })
+
+  test('mouse input has no tilt effect', () => {
+    const toFlow = (p: { x: number; y: number }) => p
+    const mouse = fakePointer({ pointerType: 'mouse', clientX: 3, clientY: 4, pressure: 0.5, tiltX: 60, altitudeAngle: 0 } as Partial<PointerEvent>)
+    expect(samplesFrom(mouse, toFlow)).toEqual([[3, 4, 0.5]])
+    const touch = fakePointer({ pointerType: 'touch', clientX: 3, clientY: 4, pressure: 1, tiltY: 60 })
+    expect(samplesFrom(touch, toFlow)).toEqual([[3, 4, 0.5]])
+  })
+
+  test('stroke pointer type is inferred from the recorded pressure', () => {
+    expect(strokePointerType({ points: [[0, 0, 0.5], [1, 1, 0.5]] })).toBe('mouse')
+    expect(strokePointerType({ points: [[0, 0, 0.5], [1, 1, 0.42]] })).toBe('pen')
   })
 })

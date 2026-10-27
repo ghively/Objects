@@ -14,10 +14,17 @@ export interface InkStroke {
   d: string
 }
 
+/**
+ * The ink tool as the canvas sees it. The ink module's own `InkToolState` (`ink/types.ts`) also
+ * has `tool: 'select'` (M8): the canvas only stores and passes the value back, so it is left out
+ * of this union, which the canvas uses as a `Record` key for the drawing tools' default widths.
+ */
 export interface InkToolState {
   tool: 'pen' | 'highlighter' | 'eraser'
   color: string
   width: number
+  /** The eraser's mode (M8); absent means whole strokes. */
+  eraseMode?: 'stroke' | 'partial'
 }
 
 /** Rendered as a child of `<ReactFlow>`; may use useReactFlow/useViewport/ViewportPortal. */
