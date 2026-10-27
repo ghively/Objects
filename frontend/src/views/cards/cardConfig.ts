@@ -39,11 +39,10 @@ export interface CardPropertyChoice extends CardProperty {
   name: string
 }
 
-/** Every property a card can show for `type`: its definitions, the type label and the body preview. */
+/** Every property a card can show for `type`: its definitions (backlinks read-only), the type label and the body preview. */
 export function cardPropertyChoices(type: Pick<TypeDef, 'propertyDefinitions'>): CardPropertyChoice[] {
   const out: CardPropertyChoice[] = [{ propertyType: 'entity_type', propertyId: 'type', name: 'Type' }]
   for (const d of type.propertyDefinitions) {
-    if (d.type === 'entity_backlinks') continue
     if (out.some((c) => c.propertyId === d.key)) continue
     out.push({ propertyType: d.type, propertyId: d.key, name: d.name })
   }

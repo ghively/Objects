@@ -255,3 +255,28 @@ describe('task groupings (M4)', () => {
     expect(labels(groups)).toEqual(['Tomorrow', 'Next week'])
   })
 })
+
+describe('group by backlinks (M5)', () => {
+  test('test group by backlinks gives one group per linking object and Other', () => {
+    const bl = propertyDef({ id: 'backlinks', name: 'Backlinks', type: 'entity_backlinks' })
+    const person = typeDef({ id: 'person', propertyDefinitions: [propertyDef({ id: 'title', type: 'entity_title' }), bl] })
+    const P = (path: string, backlinks: { target: string; path: string | null }[]) =>
+      row({ summary: objectSummary({ path, type: 'person' }), values: { backlinks } })
+    const rows = [
+      P('a', [{ target: 'Ada', path: 'People/Ada.md' }]),
+      P('b', [
+        { target: 'Bob', path: 'People/Bob.md' },
+        { target: 'Ada', path: 'People/Ada.md' },
+      ]),
+      P('c', []),
+    ]
+    const c: GroupCtx = { types: [person], collections: [], tagIdsToTitles: {}, now, entityTitles: { 'People/Ada.md': 'Ada Lovelace' } }
+    const { groups } = groupRows(rows, by('backlinks'), undefined, c)
+    expect(ids(groups)).toEqual(['People/Ada.md', 'People/Bob.md', 'other'])
+    expect(labels(groups)).toEqual(['Ada Lovelace', 'Bob', 'Other'])
+    expect(groups.map((g) => paths(g.rows))).toEqual([['a', 'b'], ['b'], ['c']])
+    // Read-only: a drag into a backlinks group writes nothing.
+    expect(valueForGroup(by('backlinks'), groups[0], bl)).toBeNull()
+    expect(GROUP_SORT_OPTIONS('entity_backlinks').map((o) => o.label)).toContain('Created oldest first')
+  })
+})

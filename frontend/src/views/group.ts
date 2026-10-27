@@ -74,7 +74,7 @@ export function GROUP_SORT_OPTIONS(kind: PropertyType): { key: GroupSortOption; 
     { key: 'ascending', label: 'ascending' },
     { key: 'descending', label: 'descending' },
   ]
-  if (kind === 'entity') {
+  if (kind === 'entity' || kind === 'entity_backlinks') {
     out.push({ key: 'createdAscending', label: 'Created oldest first' }, { key: 'createdDescending', label: 'Created newest first' })
   }
   out.push(
@@ -243,7 +243,9 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
       }
       return out
     }
-    case 'entity': {
+    case 'entity':
+    case 'entity_backlinks': {
+      // Backlinks group like a relation: one group per linking object.
       const refs = Array.isArray(v) ? (v as EntityRef[]) : []
       const out: Bucket[] = []
       refs.forEach((r, i) => {
@@ -366,7 +368,7 @@ export function groupRows(
     for (const b of buckets) {
       let g = byId.get(b.id)
       if (!g) {
-        const created = def.type === 'entity' ? Date.parse(ctx.entityCreated?.[b.id] ?? '') : NaN
+        const created = def.type === 'entity' || def.type === 'entity_backlinks' ? Date.parse(ctx.entityCreated?.[b.id] ?? '') : NaN
         g = { id: b.id, label: b.label, rows: [], sort: b.sort, created: Number.isNaN(created) ? Infinity : created }
         if (def.type === 'entity_type') g.icon = ctx.types.find((x) => x.id === b.id)?.icon
         byId.set(b.id, g)
@@ -426,7 +428,7 @@ export function groupRows(
 
 /**
  * The update that moves a row into `group`, or null where a drag can't (created, updated, type,
- * number ranges and date periods).
+ * backlinks, number ranges and date periods).
  */
 export function valueForGroup(
   groupBy: GroupBy | GroupByEntry,
@@ -440,6 +442,7 @@ export function valueForGroup(
     case 'entity_createdAt':
     case 'entity_lastUpdated':
     case 'entity_type':
+    case 'entity_backlinks':
     case 'datetime':
     case 'datetimeSimple':
     case 'blocks':

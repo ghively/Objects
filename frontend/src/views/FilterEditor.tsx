@@ -391,7 +391,7 @@ function ValueEditor({
       />
     )
   }
-  if (kind === 'entity' || kind === 'entity_tags') {
+  if (kind === 'entity' || kind === 'entity_backlinks' || kind === 'entity_tags') {
     const def: PropertyDef =
       kind === 'entity_tags'
         ? ({

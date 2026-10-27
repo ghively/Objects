@@ -27,7 +27,6 @@ export function propertyChoices(viewTypes: TypeDef[]): PropChoice[] {
   const seen = new Map<string, { choice: PropChoice; count: number; typeId: string }>()
   for (const t of viewTypes) {
     for (const d of t.propertyDefinitions) {
-      if (d.type === 'entity_backlinks') continue
       const have = seen.get(d.key)
       if (have) {
         have.count += 1
