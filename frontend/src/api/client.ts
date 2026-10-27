@@ -1,4 +1,5 @@
 import type {
+  Attachment,
   CalendarRange,
   CalendarUi,
   ChangeEvent,
@@ -23,13 +24,18 @@ import type {
   SaveResult,
   SaveTypeResult,
   SearchResponse,
+  SettingsResponse,
+  DeviceSettings,
+  SpaceEntry,
   SpaceInfo,
+  SpacePatch,
   SyncResult,
   TasksUi,
   TrashItem,
   TypeDef,
   UiState,
   UpdateResult,
+  UploadedAttachment,
   Views,
 } from './types'
 import type { WhiteboardSettings } from './whiteboardTypes'
@@ -137,6 +143,11 @@ export interface LinkMentionInput {
 }
 
 const BASE = '/api'
+
+/** A 409 from the spaces routes is not a revision conflict: keep the server's message. */
+function spaceConflict(d: Record<string, unknown>): Error {
+  return new ApiError(409, typeof d.detail === 'string' ? d.detail : 'conflict')
+}
 
 function qs(params: Record<string, string | null | undefined>): string {
   const sp = new URLSearchParams()
@@ -734,6 +745,73 @@ export const api = {
   /** Every object as a graph node, with link and tag pairs. */
   graph(): Promise<GraphData> {
     return request<GraphData>('/graph')
+  },
+
+  // ---- M7: attachments, space settings, device settings, spaces ----
+
+  /** Every attachment in the space (images, PDFs, audio, video, and any file under `Attachments/`). */
+  attachments(): Promise<Attachment[]> {
+    return request<Attachment[]>('/attachments')
+  },
+
+  /**
+   * Copy a file into `Attachments/` (never overwrites: `name (2).ext` when taken). Sends the raw
+   * bytes, as `importImage` does. 413 over 100 MiB, 422 for an empty or unusable name.
+   */
+  async uploadAttachment(blob: Blob | ArrayBuffer, name: string): Promise<UploadedAttachment> {
+    const res = await request<UploadedAttachment>(`/attachments${qs({ name })}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: blob,
+    })
+    emitLocal([created(res.path)])
+    return res
+  },
+
+  /** Open an attachment with the OS default app. 415 for executables and scripts. */
+  openAttachment(path: string): Promise<{ ok: true }> {
+    return request<{ ok: true }>('/attachments/open', json('POST', { path }))
+  },
+
+  /** Write `space.json`'s name, icon, description or hide-task-management. 409 stale, 422, 423. */
+  patchSpace(patch: SpacePatch, opts: { baseRevision: string }): Promise<SpaceInfo> {
+    return request<SpaceInfo>('/space', json('PUT', { patch, baseRevision: opts.baseRevision, clientId: CLIENT_ID }))
+  },
+
+  /** This device's settings, defaults merged (revision `''` when no file exists). */
+  settings(): Promise<SettingsResponse> {
+    return request<SettingsResponse>('/settings')
+  },
+
+  /** Patch device settings. Rejects with `ConflictError` (409) on a stale `baseRevision`. */
+  patchSettings(patch: Partial<DeviceSettings>, opts: { baseRevision: string }): Promise<SettingsResponse> {
+    return request<SettingsResponse>('/settings', json('PUT', { patch, baseRevision: opts.baseRevision }))
+  },
+
+  /** The spaces registry (unwrapped from `{spaces}`), in registry order. */
+  async spaces(): Promise<SpaceEntry[]> {
+    const res = await request<{ spaces: SpaceEntry[] }>('/spaces')
+    return res?.spaces ?? []
+  },
+
+  /** Create `<location>/<safe name>/` with `space.json` and register it. 409 (`ApiError`) when the folder exists. */
+  createSpace(name: string, location: string): Promise<{ path: string }> {
+    return request<{ path: string }>('/spaces', json('POST', { name, location }), spaceConflict)
+  },
+
+  /** Register an existing folder as a space. 404 when it is not a folder. */
+  openSpace(path: string): Promise<{ path: string }> {
+    return request<{ path: string }>('/spaces/open', json('POST', { path }))
+  },
+
+  /** Remove a space from the list (its folder is never touched). 409 (`ApiError`) for the current space. */
+  removeSpace(path: string): Promise<{ ok: true }> {
+    return request<{ ok: true }>(`/spaces${qs({ path })}`, { method: 'DELETE' }, spaceConflict)
+  },
+
+  /** Ask the launcher to restart on `path` (202). 404 not a folder; 503 without the launcher. */
+  switchSpace(path: string): Promise<{ path: string }> {
+    return request<{ path: string }>('/spaces/switch', json('POST', { path }))
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */
