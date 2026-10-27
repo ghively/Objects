@@ -7,6 +7,7 @@
  * try/catch: storage can be missing, full or blocked, and the section works without it.
  */
 import type { ReferencesTab } from '@/api/types'
+import { cpToUtf16 } from '@/lib/codepoints'
 
 export interface ReferencesUi {
   tab: ReferencesTab
@@ -117,9 +118,9 @@ export function tabCount(
   }
 }
 
-/** Split `text` around `[start, end)` (clamped), for a highlighted span. */
+/** Split `text` around `[start, end)` code-point offsets from the backend (clamped), for a highlighted span. */
 export function splitAt(text: string, start: number, end: number): [string, string, string] {
-  const s = Math.max(0, Math.min(text.length, start))
-  const e = Math.max(s, Math.min(text.length, end))
+  const s = Math.max(0, Math.min(text.length, cpToUtf16(text, start)))
+  const e = Math.max(s, Math.min(text.length, cpToUtf16(text, end)))
   return [text.slice(0, s), text.slice(s, e), text.slice(e)]
 }

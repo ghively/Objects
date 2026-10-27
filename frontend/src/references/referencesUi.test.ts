@@ -64,5 +64,6 @@ describe('referencesUi', () => {
     expect(splitAt('hello world', 6, 11)).toEqual(['hello ', 'world', ''])
     expect(splitAt('abc', -3, 99)).toEqual(['', 'abc', ''])
     expect(splitAt('abc', 2, 1)).toEqual(['ab', '', 'c'])
+    expect(splitAt('🚀 Ada', 2, 5)).toEqual(['🚀 ', 'Ada', ''])
   })
 })
