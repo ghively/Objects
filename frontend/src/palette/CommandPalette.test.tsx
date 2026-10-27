@@ -213,7 +213,7 @@ describe('search mode', () => {
     expect(row.textContent).not.toContain('three')
   })
 
-  test('enter opens in the current tab, ctrl+enter in a new tab, shift+enter in the peek', async () => {
+  test('enter opens in the current tab, ctrl+enter in a new tab, shift+enter in the side panel', async () => {
     mocked.search.mockResolvedValue({ results: [searchResult({ path: 'Pages/Alpha.md', title: 'Alpha' })], partial: false })
     const { user } = setup()
 
@@ -235,7 +235,10 @@ describe('search mode', () => {
     await user.type(input, 'alpha')
     await screen.findByText('Alpha')
     await user.keyboard('{Shift>}{Enter}{/Shift}')
-    expect(usePeek.getState().path).toBe('Pages/Alpha.md')
+    // M7: Shift opens the side panel (Capacities' rule); Alt+Shift keeps the peek.
+    expect(usePeek.getState().path).toBeNull()
+    const tab = useTabs.getState().tabs.find((t) => t.id === useTabs.getState().activeId)!
+    expect(tab.sidepanel?.find((e) => e.isOpen)?.target).toEqual({ kind: 'object', path: 'Pages/Alpha.md' })
     expect(useTabs.getState().tabs).toHaveLength(2)
   })
 

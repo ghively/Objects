@@ -1,4 +1,4 @@
-// The Calendar's right panel (rendered by App only while the Calendar is the active target).
+// The calendar sidebar (the mini month), rendered by `CalendarPage` at its right edge.
 import { todayYmd } from './dates'
 import { MiniMonth } from './MiniMonth'
 import { useCalendar, useWeekStart } from './useCalendar'

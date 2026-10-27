@@ -1,15 +1,20 @@
 /**
  * The tab shortcuts (`shortcuts.categories.navigation`): close, open, cycle, the tab menu, back and
- * forward. Their keys are provisional (the plan's table, in `lib/shortcuts.ts`); `App` binds them
- * with `useTabShortcuts()`.
+ * forward; and the panel shortcuts (`shortcuts.categories.global`): the side panel, the left
+ * sidebar and the calendar sidebar. Their keys are provisional (the plan's table, in
+ * `lib/shortcuts.ts`); `App` binds them with `useTabShortcuts()` and `usePanelShortcuts()`.
  */
+import { toggleCalendarSidebar } from '@/calendar/CalendarPage'
 import { M7_SHORTCUTS, registerShortcuts, useGlobalShortcut } from '@/lib/shortcuts'
 import { useTabs } from '@/nav/tabs'
 import { useTabMenu } from '@/shell/TabMenu'
 
 export const TAB_SHORTCUT_IDS = ['closeTab', 'openNewTab', 'navigateTabs', 'openTabList', 'navigateBack', 'navigateForward'] as const
 
+export const PANEL_SHORTCUT_IDS = ['toggleSidepanel', 'toggleLeftSidebar', 'toggleCalendarSidebar'] as const
+
 registerShortcuts(M7_SHORTCUTS.filter((d) => (TAB_SHORTCUT_IDS as readonly string[]).includes(d.id)))
+registerShortcuts(M7_SHORTCUTS.filter((d) => (PANEL_SHORTCUT_IDS as readonly string[]).includes(d.id)))
 
 /** Close the active tab (a pinned tab stays: it has no close button either; our rule). */
 export function closeActiveTab(): void {
@@ -38,4 +43,11 @@ export function useTabShortcuts(): void {
   })
   useGlobalShortcut('navigateBack', () => useTabs.getState().back())
   useGlobalShortcut('navigateForward', () => useTabs.getState().forward())
+}
+
+/** The side panel (per tab), the left sidebar (App's state) and the calendar sidebar (`ui.json`). */
+export function usePanelShortcuts({ toggleLeftSidebar }: { toggleLeftSidebar: () => void }): void {
+  useGlobalShortcut('toggleSidepanel', () => useTabs.getState().toggleSidepanel(), { allowInEditable: true })
+  useGlobalShortcut('toggleLeftSidebar', toggleLeftSidebar, { allowInEditable: true })
+  useGlobalShortcut('toggleCalendarSidebar', () => void toggleCalendarSidebar())
 }

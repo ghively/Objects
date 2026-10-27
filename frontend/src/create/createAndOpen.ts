@@ -1,15 +1,15 @@
 /**
- * Create an object and open it where the modifier keys say:
- * - plain: the current tab (a Task opens in the peek by default),
+ * Create an object and open it where the modifier keys say (Capacities' rules):
+ * - plain: the current tab (a Task opens in the peek, unless "Always open as full page" is on),
  * - Ctrl or Meta: a new tab,
  * - Alt+Shift: the peek,
- * - Shift: also the peek, until the side panel exists (a deviation from Capacities, where Shift
- *   opens the side panel).
+ * - Shift: the side panel (area 1).
  */
 import { api } from '@/api/client'
 import type { CreatedFile } from '@/api/types'
 import { invalidateLinkIndex, typeOf } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
+import { useSettings } from '@/settings/useSettings'
 
 export interface OpenMods {
   ctrlKey?: boolean
@@ -20,18 +20,22 @@ export interface OpenMods {
   via?: 'link' | 'nav'
 }
 
-export type OpenMode = 'current' | 'newTab' | 'peek'
+export type OpenMode = 'current' | 'newTab' | 'peek' | 'sidepanel'
 
-/** Tasks open in the peek by default. */
+/**
+ * Tasks open in the peek by default; with "Always open as full page"
+ * (`EditorSettings.alwaysOpenAsFullPage`) they open as a page.
+ */
 function opensInPeek(typeId: string | null | undefined): boolean {
   if (!typeId) return false
+  if (useSettings.getState().settings.alwaysOpenAsFullPage) return false
   const t = typeOf(typeId)
   return (t?.name ?? typeId).toLowerCase() === 'task'
 }
 
 export function openModeFor(mods: OpenMods = {}, typeId?: string | null): OpenMode {
   if (mods.ctrlKey || mods.metaKey) return 'newTab'
-  if (mods.shiftKey) return 'peek' // Alt+Shift, and Shift until the side panel exists
+  if (mods.shiftKey) return mods.altKey ? 'peek' : 'sidepanel'
   return opensInPeek(typeId) ? 'peek' : 'current'
 }
 
@@ -39,6 +43,7 @@ export function openModeFor(mods: OpenMods = {}, typeId?: string | null): OpenMo
 export function openObject(path: string, mods: OpenMods = {}, typeId?: string | null): OpenMode {
   const mode = openModeFor(mods, typeId)
   if (mode === 'peek') usePeek.getState().peek(path)
+  else if (mode === 'sidepanel') useTabs.getState().openInSidepanel({ kind: 'object', path })
   else useTabs.getState().open({ kind: 'object', path }, { newTab: mode === 'newTab', via: mods.via })
   return mode
 }

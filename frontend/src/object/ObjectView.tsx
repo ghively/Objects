@@ -84,6 +84,9 @@ export function patchSummary(summary: ObjectSummary, fm: Record<string, unknown>
   return next
 }
 
+/** The `…` menu item (`EntityMenu.openInSidepanel`). */
+export const OPEN_IN_SIDEPANEL_MENU_ITEM = 'Open in side panel'
+
 /** The `…` menu item (`FindInPage.menuItem`). */
 export const FIND_IN_PAGE_MENU_ITEM = 'Find in page'
 
@@ -526,7 +529,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         title={panelOpen ? 'Hide properties' : 'Show properties'}
         aria-pressed={panelOpen}
         onClick={() => setPanelOpen((v) => !v)}
-        className="flex size-10 items-center justify-center rounded-[11px] border border-[#29282d] bg-[#18181b] p-[3px] text-fg"
+        className="flex size-10 items-center justify-center rounded-[11px] border border-[var(--float-btn-border)] bg-[var(--float-bg)] p-[3px] text-fg"
       >
         <span
           className={cn(
@@ -539,7 +542,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
       </button>
       <div className="flex min-w-0 items-center gap-2">
       <FindBar path={path} editorRef={editorRef} />
-      <div className="flex h-10 shrink-0 items-center gap-0.5 rounded-xl border border-[#232226] bg-[#18181b] px-1">
+      <div className="flex h-10 shrink-0 items-center gap-0.5 rounded-xl border border-[var(--float-border)] bg-[var(--float-bg)] px-1">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -560,6 +563,15 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
             >
               <Icon name="ph-arrow-square-out" size={14} />
               Open in new tab
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => {
+                useTabs.getState().openInSidepanel({ kind: 'object', path })
+                onDismiss?.()
+              }}
+            >
+              <Icon name="ph-square-split-horizontal" size={14} />
+              {OPEN_IN_SIDEPANEL_MENU_ITEM}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void api.reveal(path).catch(() => undefined)}>
               <Icon name="ph-folder-open" size={14} />
