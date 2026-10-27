@@ -1,0 +1,561 @@
+/**
+ * Test boards. `NETWORK_MAP` and `DOTTED_PLAN` mirror the backend fixture files in
+ * backend/tests/fixtures/space-whiteboard/Whiteboards/ (model.test.ts checks they still match).
+ */
+import type { WhiteboardData, WhiteboardEdge, WhiteboardNode, WhiteboardTextBlock } from '@/api/whiteboardTypes'
+import { emptyBoard } from '../model'
+
+/** `Network map.whiteboard.json`: every node kind, all 12 shapes, the 9 gates, frames, points, every connector style, unknown keys. */
+export const NETWORK_MAP: WhiteboardData = {
+  version: 1,
+  nodes: {
+    'n-text': {
+      id: 'n-text',
+      kind: 'block',
+      blockId: 'b-text',
+      position: {
+        x: 60,
+        y: 30
+      },
+      width: 420,
+      height: 60,
+      z: 1,
+      'x-future': 1
+    },
+    'n-router-a': {
+      id: 'n-router-a',
+      kind: 'block',
+      blockId: 'b-router-a',
+      position: {
+        x: 60,
+        y: 150
+      },
+      width: 360,
+      height: 120,
+      z: 2
+    },
+    'n-router-b': {
+      id: 'n-router-b',
+      kind: 'block',
+      blockId: 'b-router-b',
+      position: {
+        x: 600,
+        y: 150
+      },
+      width: 360,
+      height: 120,
+      z: 3
+    },
+    'n-shape-rectangle': {
+      id: 'n-shape-rectangle',
+      kind: 'shape',
+      shape: 'rectangle',
+      position: {
+        x: 60,
+        y: 360
+      },
+      width: 90,
+      height: 90,
+      z: 10,
+      fillColor: 'bg-blue',
+      borderColor: 'blue',
+      blockId: 'b-shape-rectangle'
+    },
+    'n-shape-roundedRectangle': {
+      id: 'n-shape-roundedRectangle',
+      kind: 'shape',
+      shape: 'roundedRectangle',
+      position: {
+        x: 180,
+        y: 360
+      },
+      width: 90,
+      height: 90,
+      z: 11
+    },
+    'n-shape-ellipse': {
+      id: 'n-shape-ellipse',
+      kind: 'shape',
+      shape: 'ellipse',
+      position: {
+        x: 300,
+        y: 360
+      },
+      width: 90,
+      height: 90,
+      z: 12,
+      fillColor: 'bg-green',
+      rotation: 15
+    },
+    'n-shape-diamond': {
+      id: 'n-shape-diamond',
+      kind: 'shape',
+      shape: 'diamond',
+      position: {
+        x: 420,
+        y: 360
+      },
+      width: 90,
+      height: 90,
+      z: 13,
+      borderColor: 'red',
+      textVerticalAlign: 'top',
+      blockId: 'b-shape-diamond'
+    },
+    'n-shape-triangle': {
+      id: 'n-shape-triangle',
+      kind: 'shape',
+      shape: 'triangle',
+      position: {
+        x: 540,
+        y: 360
+      },
+      width: 90,
+      height: 90,
+      z: 14
+    },
+    'n-shape-triangleDown': {
+      id: 'n-shape-triangleDown',
+      kind: 'shape',
+      shape: 'triangleDown',
+      position: {
+        x: 660,
+        y: 360
+      },
+      width: 90,
+      height: 90,
+      z: 15
+    },
+    'n-shape-star': {
+      id: 'n-shape-star',
+      kind: 'shape',
+      shape: 'star',
+      position: {
+        x: 60,
+        y: 480
+      },
+      width: 90,
+      height: 90,
+      z: 16,
+      blockId: 'b-shape-star'
+    },
+    'n-shape-parallelogram': {
+      id: 'n-shape-parallelogram',
+      kind: 'shape',
+      shape: 'parallelogram',
+      position: {
+        x: 180,
+        y: 480
+      },
+      width: 90,
+      height: 90,
+      z: 17,
+      flipX: true
+    },
+    'n-shape-bubble': {
+      id: 'n-shape-bubble',
+      kind: 'shape',
+      shape: 'bubble',
+      position: {
+        x: 300,
+        y: 480
+      },
+      width: 90,
+      height: 90,
+      z: 18,
+      flipY: true,
+      fillColor: 'bg-yellow'
+    },
+    'n-shape-blockArrow': {
+      id: 'n-shape-blockArrow',
+      kind: 'shape',
+      shape: 'blockArrow',
+      position: {
+        x: 420,
+        y: 480
+      },
+      width: 90,
+      height: 90,
+      z: 19,
+      rotation: 90,
+      borderColor: 'orange'
+    },
+    'n-shape-blockArrowLeft': {
+      id: 'n-shape-blockArrowLeft',
+      kind: 'shape',
+      shape: 'blockArrowLeft',
+      position: {
+        x: 540,
+        y: 480
+      },
+      width: 90,
+      height: 90,
+      z: 20
+    },
+    'n-shape-heart': {
+      id: 'n-shape-heart',
+      kind: 'shape',
+      shape: 'heart',
+      position: {
+        x: 660,
+        y: 480
+      },
+      width: 90,
+      height: 90,
+      z: 21
+    },
+    'n-gate-not': {
+      id: 'n-gate-not',
+      kind: 'shape',
+      shape: 'rectangle',
+      blockId: 'b-gate-not',
+      position: {
+        x: 60,
+        y: 660
+      },
+      width: 90,
+      height: 90,
+      z: 22
+    },
+    'n-gate-and': {
+      id: 'n-gate-and',
+      kind: 'shape',
+      shape: 'rectangle',
+      blockId: 'b-gate-and',
+      position: {
+        x: 180,
+        y: 660
+      },
+      width: 90,
+      height: 90,
+      z: 23
+    },
+    'n-gate-nand': {
+      id: 'n-gate-nand',
+      kind: 'shape',
+      shape: 'rectangle',
+      blockId: 'b-gate-nand',
+      position: {
+        x: 300,
+        y: 660
+      },
+      width: 90,
+      height: 90,
+      z: 24
+    },
+    'n-gate-or': {
+      id: 'n-gate-or',
+      kind: 'shape',
+      shape: 'rectangle',
+      blockId: 'b-gate-or',
+      position: {
+        x: 420,
+        y: 660
+      },
+      width: 90,
+      height: 90,
+      z: 25
+    },
+    'n-gate-nor': {
+      id: 'n-gate-nor',
+      kind: 'shape',
+      shape: 'rectangle',
+      blockId: 'b-gate-nor',
+      position: {
+        x: 540,
+        y: 660
+      },
+      width: 90,
+      height: 90,
+      z: 26
+    },
+    'n-gate-xor': {
+      id: 'n-gate-xor',
+      kind: 'shape',
+      shape: 'rectangle',
+      blockId: 'b-gate-xor',
+      position: {
+        x: 660,
+        y: 660
+      },
+      width: 90,
+      height: 90,
+      z: 27
+    },
+    'n-gate-xnor': {
+      id: 'n-gate-xnor',
+      kind: 'shape',
+      shape: 'rectangle',
+      blockId: 'b-gate-xnor',
+      position: {
+        x: 780,
+        y: 660
+      },
+      width: 90,
+      height: 90,
+      z: 28
+    },
+    'n-gate-high': {
+      id: 'n-gate-high',
+      kind: 'shape',
+      shape: 'rectangle',
+      blockId: 'b-gate-high',
+      position: {
+        x: 900,
+        y: 660
+      },
+      width: 90,
+      height: 90,
+      z: 29
+    },
+    'n-gate-low': {
+      id: 'n-gate-low',
+      kind: 'shape',
+      shape: 'rectangle',
+      blockId: 'b-gate-low',
+      position: {
+        x: 1020,
+        y: 660
+      },
+      width: 90,
+      height: 90,
+      z: 30
+    },
+    'n-frame-1': {
+      id: 'n-frame-1',
+      kind: 'frame',
+      title: 'Frame 1',
+      position: {
+        x: 30,
+        y: 330
+      },
+      width: 780,
+      height: 270,
+      z: -2
+    },
+    'n-frame-core': {
+      id: 'n-frame-core',
+      kind: 'frame',
+      title: 'Core',
+      position: {
+        x: 570,
+        y: 120
+      },
+      width: 420,
+      height: 180,
+      z: -1
+    },
+    'n-point-1': {
+      id: 'n-point-1',
+      kind: 'point',
+      position: {
+        x: 1080,
+        y: 60
+      }
+    },
+    'n-point-2': {
+      id: 'n-point-2',
+      kind: 'point',
+      position: {
+        x: 1260,
+        y: 240
+      }
+    }
+  },
+  edges: {
+    'e-straight': {
+      id: 'e-straight',
+      source: 'n-router-a',
+      target: 'n-router-b',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      connection: 'straight',
+      line: 'solid',
+      markerEnd: 'arrow',
+      color: 'blue',
+      blockId: 'b-edge-label'
+    },
+    'e-cornered': {
+      id: 'e-cornered',
+      source: 'n-router-a',
+      target: 'n-shape-rectangle',
+      sourceHandle: 'bottom',
+      targetHandle: 'top',
+      connection: 'cornered',
+      line: 'dashed',
+      markerStart: 'dot',
+      markerEnd: 'arrowClosed'
+    },
+    'e-curved': {
+      id: 'e-curved',
+      source: 'n-router-b',
+      target: 'n-shape-ellipse',
+      connection: 'curved',
+      line: 'dotted',
+      markerStart: 'double',
+      markerEnd: 'none',
+      label: 'legacy label'
+    },
+    'e-default': {
+      id: 'e-default',
+      source: 'n-gate-and',
+      target: 'n-gate-or',
+      'x-future': 1
+    },
+    'e-points': {
+      id: 'e-points',
+      source: 'n-point-1',
+      target: 'n-point-2',
+      markerStart: 'none',
+      markerEnd: 'double',
+      color: 'red'
+    }
+  },
+  blocks: {
+    'b-text': {
+      type: 'text',
+      markdown: '**Network map**\nAll links are synthetic.',
+      align: 'center'
+    },
+    'b-router-a': {
+      type: 'entity',
+      link: '[[Router A]]'
+    },
+    'b-router-b': {
+      type: 'entity',
+      link: '[[Router B]]'
+    },
+    'b-shape-rectangle': {
+      type: 'text',
+      markdown: 'Rectangle text'
+    },
+    'b-shape-diamond': {
+      type: 'text',
+      markdown: 'Diamond text'
+    },
+    'b-shape-star': {
+      type: 'text',
+      markdown: 'Star text'
+    },
+    'b-gate-not': {
+      type: 'text',
+      markdown: 'NOT'
+    },
+    'b-gate-and': {
+      type: 'text',
+      markdown: 'AND'
+    },
+    'b-gate-nand': {
+      type: 'text',
+      markdown: 'NAND'
+    },
+    'b-gate-or': {
+      type: 'text',
+      markdown: 'OR'
+    },
+    'b-gate-nor': {
+      type: 'text',
+      markdown: 'NOR'
+    },
+    'b-gate-xor': {
+      type: 'text',
+      markdown: 'XOR'
+    },
+    'b-gate-xnor': {
+      type: 'text',
+      markdown: 'XNOR'
+    },
+    'b-gate-high': {
+      type: 'text',
+      markdown: 'HIGH'
+    },
+    'b-gate-low': {
+      type: 'text',
+      markdown: 'LOW'
+    },
+    'b-edge-label': {
+      type: 'text',
+      markdown: 'uplink'
+    }
+  },
+  viewport: {
+    x: -40,
+    y: -20,
+    zoom: 0.75,
+    paneWidth: 1280,
+    paneHeight: 800
+  },
+  readingOrder: [
+    'n-text',
+    'n-router-a',
+    'n-router-b'
+  ],
+  'x-future': 1
+}
+
+/** `Dotted v1.2 plan.whiteboard.json`. */
+export const DOTTED_PLAN: WhiteboardData = {
+  version: 1,
+  nodes: {
+    'n-1': {
+      id: 'n-1',
+      kind: 'block',
+      blockId: 'b-1',
+      position: {
+        x: 0,
+        y: 0
+      },
+      width: 420,
+      height: 60,
+      z: 1
+    }
+  },
+  edges: {},
+  blocks: {
+    'b-1': {
+      type: 'text',
+      markdown: 'Plan for v1.2'
+    }
+  }
+}
+
+/** Every fixture board, fresh copies (for round-trip tests). */
+export function fixtureBoards(): { name: string; board: WhiteboardData }[] {
+  return [
+    { name: 'Network map', board: structuredClone(NETWORK_MAP) },
+    { name: 'Dotted v1.2 plan', board: structuredClone(DOTTED_PLAN) },
+    { name: 'empty', board: emptyBoard() },
+  ]
+}
+
+let seq = 0
+
+/** A node with defaults (a text block node at the origin); `id` is generated when omitted. */
+export function node(partial: Partial<WhiteboardNode> = {}): WhiteboardNode {
+  return { id: partial.id ?? `n-${++seq}`, kind: 'block', position: { x: 0, y: 0 }, ...partial }
+}
+
+/** An edge between `source` and `target` (defaults `a` → `b`); `id` is generated when omitted. */
+export function edge(partial: Partial<WhiteboardEdge> = {}): WhiteboardEdge {
+  return { id: partial.id ?? `e-${++seq}`, source: 'a', target: 'b', ...partial }
+}
+
+export function textBlock(markdown: string, align?: WhiteboardTextBlock['align']): WhiteboardTextBlock {
+  return align ? { type: 'text', markdown, align } : { type: 'text', markdown }
+}
+
+/** A board from node, edge and block lists. */
+export function board(
+  nodes: WhiteboardNode[] = [],
+  edges: WhiteboardEdge[] = [],
+  blocks: WhiteboardData['blocks'] = {},
+  extra: Partial<WhiteboardData> = {},
+): WhiteboardData {
+  return {
+    ...emptyBoard(),
+    nodes: Object.fromEntries(nodes.map((n) => [n.id, n])),
+    edges: Object.fromEntries(edges.map((e) => [e.id, e])),
+    blocks,
+    ...extra,
+  }
+}
