@@ -63,7 +63,11 @@ export function ancestorOfType(tr: Transaction, name: string): { node: PMNode; p
   return null
 }
 
-/** Replace the container at `pos` by its children (for columns: every column's children). */
+/**
+ * Replace the container at `pos` by its children (for columns: every column's
+ * children). The blank lines that followed the container move to its last
+ * child, so that block never runs into the next one in the file.
+ */
 export function unwrapAt(tr: Transaction, pos: number): boolean {
   const node = tr.doc.nodeAt(pos)
   if (!node) return false
@@ -74,7 +78,18 @@ export function unwrapAt(tr: Transaction, pos: number): boolean {
   })
   const $pos = tr.doc.resolve(pos)
   if (!BLOCK_PARENTS.has($pos.parent.type.name)) return false
+  const trailing = node.attrs.blockTrailing as string | null | undefined
   tr.replaceWith(pos, pos + node.nodeSize, children)
+  const last = children[children.length - 1]
+  if (trailing && last && 'blockTrailing' in last.attrs && !last.attrs.blockTrailing) {
+    const lastPos = pos + children.reduce((n, c) => n + c.nodeSize, 0) - last.nodeSize
+    // A container's last block keeps its own line end in its source; the
+    // container's trailing starts with the close line's, so drop that one.
+    const origin = String(last.attrs.blockOrigin ?? '')
+    const eol = /\r\n$/.exec(origin)?.[0] ?? /\n$/.exec(origin)?.[0] ?? ''
+    const rest = eol && trailing.startsWith(eol) ? trailing.slice(eol.length) : trailing
+    if (origin && rest && tr.doc.nodeAt(lastPos)?.type === last.type) tr.setNodeAttribute(lastPos, 'blockTrailing', rest)
+  }
   return true
 }
 

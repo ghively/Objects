@@ -91,12 +91,12 @@ The walkthrough did not cover every interaction in Step 4. These were not driven
 
 These are known issues. Task 19 did not fix them, because they are in files other tasks own. They are listed so the review and fix pass picks them up.
 
-1. **The final newline is lost (file safety; confirmed).** When the last block of a body is replaced by a new node, or a block is inserted after it, saving drops the body's final newline. Both cases were reproduced against `editor/document.ts`:
+1. **Fixed in the review fix pass:** `loadBody` records the body's final line break and `serializeBody` keeps that state. **The final newline is lost (file safety; confirmed).** When the last block of a body is replaced by a new node, or a block is inserted after it, saving drops the body's final newline. Both cases were reproduced against `editor/document.ts`:
    - `Hello world\n` → `toggleBulletList` → `- Hello world`
    - `First\n\nHello\n` with a paragraph appended → `First\n\nHello\n\nNew`
 
    The trailing line break is part of the last block's `raw`, not a `trailing` edge, so it goes with the block. One fix: `loadBody` records whether the body ended with a line break, and `serializeBody` adds `eol` back when the output doesn't. Tasks 8 and 11 reported this; their tests work around it.
-2. **`unwrapToggle` loses the blank line after a container.** `nodes/containers.ts` `unwrapAt` has this problem, reported by Task 10. Groups use Task 10's own `ungroupAt`, but toggles still go through `unwrapAt`.
+2. **Fixed in the review fix pass:** `unwrapAt` now keeps the container's trailing blank line on its last child, for every container. **`unwrapToggle` loses the blank line after a container.** `nodes/containers.ts` `unwrapAt` has this problem, reported by Task 10. Groups use Task 10's own `ungroupAt`, but toggles still go through `unwrapAt`.
 3. **StarterKit's own key bindings still fire** (Task 12). An example is Mod-Alt-1 for Heading 1. If the shortcut registry changes a key, the old StarterKit key keeps its action. Fixing this needs `document.ts` to configure StarterKit's keymaps off.
 4. **The block style menu acts only on the block at the cursor** (Task 8's `BlockStyleMenu`). The block menu and the shortcuts act on every selected block.
 5. **The main column gets very narrow when the side panel opens** (seen in the walkthrough). With the property panel open, the editor column shrinks to about 150 px at a 1440 px window, because the side panel and the property panel both keep their widths. Object's behaviour here needs checking.

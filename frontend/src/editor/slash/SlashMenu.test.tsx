@@ -118,6 +118,6 @@ describe('<SlashMenu>', () => {
     const input = await screen.findByPlaceholderText('Paste URL')
     fireEvent.change(input, { target: { value: 'https://example.com/docs' } })
     fireEvent.submit(input.closest('form')!)
-    expect(serializeBody(editor)).toBe('Hello\n\n<!-- block: bookmark -->\n[https://example.com/docs](https://example.com/docs)')
+    expect(serializeBody(editor)).toBe('Hello\n\n<!-- block: bookmark -->\n[https://example.com/docs](https://example.com/docs)\n')
   })
 })

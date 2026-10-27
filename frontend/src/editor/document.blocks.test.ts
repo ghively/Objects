@@ -5,6 +5,7 @@ import { afterEach, describe, expect, test } from 'vitest'
 import { makeBigBody } from './__fixtures__/bigBody'
 import type { Option } from './annotations'
 import { editorExtensions, loadBody, serializeBody } from './document'
+import { turnInto } from './extensions/blockSelection'
 
 const fixtures = import.meta.glob('./__fixtures__/*.md', {
   query: '?raw',
@@ -268,11 +269,11 @@ describe('M7 document model', () => {
     const cols = headless('Above.\r\n')
     cursorIn(cols, 'Above')
     cols.commands.insertColumns(2)
-    expect(serializeBody(cols)).toBe('Above.\r\n\r\n<!-- columns -->\r\n<!-- column -->\r\n<!-- /columns -->')
+    expect(serializeBody(cols)).toBe('Above.\r\n\r\n<!-- columns -->\r\n<!-- column -->\r\n<!-- /columns -->\r\n')
     // Type into the second column: it appears after the separator.
     const second = all(cols, 'column')[1]
     cols.commands.insertContentAt(second.pos + 2, 'Right')
-    expect(serializeBody(cols)).toBe('Above.\r\n\r\n<!-- columns -->\r\n<!-- column -->\r\nRight\r\n<!-- /columns -->')
+    expect(serializeBody(cols)).toBe('Above.\r\n\r\n<!-- columns -->\r\n<!-- column -->\r\nRight\r\n<!-- /columns -->\r\n')
     // And it loads back as the same structure.
     const again = headless(serializeBody(cols))
     expect(all(again, 'column').map((c) => c.node.textContent)).toEqual(['', 'Right'])
@@ -389,7 +390,7 @@ describe('M7 document model', () => {
     fresh.commands.setTextSelection(fresh.state.doc.content.size)
     fresh.commands.insertBookmark('https://pve.proxmox.com/wiki', 'Proxmox docs')
     expect(serializeBody(fresh)).toBe(
-      'Start\n\n$$\na=b\n$$\n\n<!-- block: bookmark -->\n[Proxmox docs](https://pve.proxmox.com/wiki)',
+      'Start\n\n$$\na=b\n$$\n\n<!-- block: bookmark -->\n[Proxmox docs](https://pve.proxmox.com/wiki)\n',
     )
     const back = headless(serializeBody(fresh))
     expect(all(back, 'mathBlock')).toHaveLength(1)
@@ -448,9 +449,9 @@ describe('M7 document model', () => {
     cursorIn(editor, 'Body')
     expect(editor.commands.setListType('roman')).toBe(true)
     expect(all(editor, 'orderedList')).toHaveLength(1)
-    expect(serializeBody(editor)).toBe('Title line\n\n<!-- block: list=roman -->\n1. Body text.')
+    expect(serializeBody(editor)).toBe('Title line\n\n<!-- block: list=roman -->\n1. Body text.\n')
     expect(editor.commands.setListType('numerical')).toBe(true)
-    expect(serializeBody(editor)).toBe('Title line\n\n1. Body text.')
+    expect(serializeBody(editor)).toBe('Title line\n\n1. Body text.\n')
     expect(editor.commands.setListType('bullet')).toBe(true)
     expect(all(editor, 'bulletList')).toHaveLength(1)
     expect(editor.commands.setListType(null)).toBe(true)
@@ -462,14 +463,14 @@ describe('M7 document model', () => {
     expect(all(editor, 'toggle')).toHaveLength(1)
     cursorIn(editor, 'Body')
     expect(editor.commands.setBlockOption('open', null)).toBe(true)
-    expect(serializeBody(editor)).toBe('Title line\n\n<!-- toggle -->\nBody text.\n<!-- /toggle -->')
+    expect(serializeBody(editor)).toBe('Title line\n\n<!-- toggle -->\nBody text.\n<!-- /toggle -->\n')
     expect(editor.commands.unwrapToggle()).toBe(true)
     expect(serializeBody(editor)).toBe('Title line\n\nBody text.\n')
     cursorIn(editor, 'Body')
     editor.commands.wrapInGroup()
     cursorIn(editor, 'Body')
     editor.commands.setBlockOption('color', 'bg-yellow', all(editor, 'group')[0].pos)
-    expect(serializeBody(editor)).toBe('Title line\n\n<!-- group color=bg-yellow -->\nBody text.\n<!-- /group -->')
+    expect(serializeBody(editor)).toBe('Title line\n\n<!-- group color=bg-yellow -->\nBody text.\n<!-- /group -->\n')
     expect(editor.commands.unwrapGroup()).toBe(true)
     expect(all(editor, 'group')).toHaveLength(0)
 
@@ -511,5 +512,76 @@ describe('M7 document model', () => {
     expect(para.commands.pickMedia('image')).toBe(true)
     document.querySelector('input[data-media-picker]')?.remove()
     expect(para.commands.pickObjectEmbed()).toBe(false)
+  })
+})
+
+describe('M7 review fixes', () => {
+  const types = (editor: TiptapEditor) => {
+    const out: string[] = []
+    editor.state.doc.forEach((n) => out.push(n.type.name))
+    return out
+  }
+
+  test('replacing the last block keeps the final newline (LF and CRLF)', () => {
+    const editor = headless('Hello world\n')
+    cursorIn(editor, 'Hello')
+    editor.commands.toggleBulletList()
+    expect(serializeBody(editor)).toBe('- Hello world\n')
+    const crlf = headless('Intro\r\n\r\nHello world\r\n')
+    cursorIn(crlf, 'Hello')
+    crlf.commands.toggleBulletList()
+    expect(serializeBody(crlf)).toBe('Intro\r\n\r\n- Hello world\r\n')
+  })
+
+  test('adding a block after the last one keeps the final newline; none stays none', () => {
+    const editor = headless('Hello world\n')
+    editor.commands.insertContentAt(editor.state.doc.content.size, { type: 'paragraph', content: [{ type: 'text', text: 'More' }] })
+    expect(serializeBody(editor)).toBe('Hello world\n\nMore\n')
+    const bare = headless('Hello world')
+    bare.commands.insertContentAt(bare.state.doc.content.size, { type: 'paragraph', content: [{ type: 'text', text: 'More' }] })
+    expect(serializeBody(bare)).toBe('Hello world\n\nMore')
+    const last = headless('One\n\nTwo')
+    cursorIn(last, 'Two')
+    last.commands.toggleBulletList()
+    expect(serializeBody(last)).toBe('One\n\n- Two')
+  })
+
+  test('Turn Into drops options that no longer apply: aligned paragraph -> code', () => {
+    const editor = headless('Before\n\n<!-- block: align=center x-note=1 -->\nCentered\n\nAfter\n')
+    cursorIn(editor, 'Centered')
+    expect(turnInto(editor, 'code')).toBe(true)
+    const out = serializeBody(editor)
+    expect(out).not.toContain('align=center')
+    expect(out).toContain('<!-- block: x-note=1 -->')
+    const reloaded = headless(out)
+    expect(types(reloaded)).toEqual(['paragraph', 'codeBlock', 'paragraph'])
+  })
+
+  test('Turn Into drops options that no longer apply: wrapped code -> text', () => {
+    const editor = headless('Before\n\n<!-- block: wrap -->\n```\ncode line\n```\n\nAfter\n')
+    cursorIn(editor, 'code line')
+    expect(turnInto(editor, 'text')).toBe(true)
+    const out = serializeBody(editor)
+    expect(out).not.toContain('<!--')
+    const reloaded = headless(out)
+    expect(types(reloaded)).toEqual(['paragraph', 'paragraph', 'paragraph'])
+    expect(all(reloaded, 'rawBlock')).toHaveLength(0)
+  })
+
+  test('an edited block keeps options as read when its type did not change', () => {
+    const editor = headless('<!-- block: align=center -->\nCentered\n')
+    typeAtEndOf(editor, 'Centered', '!')
+    expect(serializeBody(editor)).toBe('<!-- block: align=center -->\nCentered!\n')
+  })
+
+  test('unwrapping a toggle keeps the blank line after it', () => {
+    const body = '<!-- toggle open -->\nT\nchild\n<!-- /toggle -->\n\nafter\n'
+    const editor = headless(body)
+    cursorIn(editor, 'child')
+    expect(editor.commands.unwrapToggle()).toBe(true)
+    const out = serializeBody(editor)
+    expect(out).toBe('T\nchild\n\nafter\n')
+    const reloaded = headless(out)
+    expect(blockWith(reloaded, 'after').node.textContent).toBe('after')
   })
 })

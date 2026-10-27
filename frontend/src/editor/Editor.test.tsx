@@ -215,7 +215,7 @@ describe('document model', () => {
   test('a new paragraph is separated by a blank line', () => {
     const editor = headless('# Title\nIntro\n')
     editor.commands.insertContentAt(editor.state.doc.content.size, { type: 'paragraph', content: [{ type: 'text', text: 'New' }] })
-    expect(serializeBody(editor)).toBe('# Title\nIntro\n\nNew')
+    expect(serializeBody(editor)).toBe('# Title\nIntro\n\nNew\n')
     editor.destroy()
   })
 })

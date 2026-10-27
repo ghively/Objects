@@ -37,7 +37,7 @@ import { FileDrop } from './extensions/fileDrop'
 import { RawBlock } from './extensions/rawBlock'
 import { SlashMenu } from './extensions/slashMenu'
 import { Wikilink } from './extensions/wikilink'
-import { BlockOptions } from './nodes/blockOptions'
+import { BlockOptions, optionApplies } from './nodes/blockOptions'
 import { Bookmark, bookmarkMarkdown } from './nodes/bookmark'
 import { CodeBlock } from './nodes/codeBlock'
 import { Column, Columns } from './nodes/columns'
@@ -87,8 +87,11 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
   ]
 }
 
-/** Per-editor source that lives outside the node tree. */
-type Edges = { leading: string; trailing: string; eol: string }
+/**
+ * Per-editor source that lives outside the node tree. `final` is the line
+ * break the body ended with ('' when it had none), kept on save.
+ */
+type Edges = { leading: string; trailing: string; eol: string; final: string }
 const edges = new WeakMap<Editor, Edges>()
 
 const FIELD_LINE = /^[^\s:][^:\n]*::/m
@@ -264,7 +267,8 @@ export function loadBody(editor: Editor, body: string): void {
     .setMeta('preventUpdate', true)
   editor.view.dispatch(tr)
   takeSnapshots(editor, editor.state.doc)
-  edges.set(editor, { leading, trailing, eol: body.includes('\r\n') ? '\r\n' : '\n' })
+  const final = /(?:\r\n|\n|\r)$/.exec(body)?.[0] ?? ''
+  edges.set(editor, { leading, trailing, eol: body.includes('\r\n') ? '\r\n' : '\n', final })
 }
 
 // ---------------------------------------------------------------------------
@@ -319,9 +323,27 @@ function nodeMarkdown(editor: Editor, node: PMNode): string {
   return trimBreaks(editor.markdown?.serialize({ type: 'doc', content: [json] }) ?? '')
 }
 
-/** The annotation line for a leaf: the original while its options are unchanged, else canonical. */
-function leafAnnotation(node: PMNode, eol: string): string {
+/**
+ * The options a leaf writes. When the block's node type changed in the editor
+ * (Turn Into, a code fence typed at its start), known options that do not apply
+ * to the new type are left out; unknown options always stay (rule 3).
+ */
+function leafOptions(editor: Editor, node: PMNode): Option[] {
   const options = (node.attrs.blockOptions as Option[] | null) ?? []
+  if (node.type.name === 'rawBlock' || node.attrs.blockSource != null) return options
+  if (options.every((o) => optionApplies(o.key, node))) return options
+  const origin = node.attrs.blockOrigin as string | null | undefined
+  if (origin != null) {
+    const block = splitBlocks(origin).find((b) => b.kind !== 'space')
+    // Still the node type it was loaded as: its options are as read.
+    if (block && sourceToNode(editor, block, options).type === node.type.name) return options
+  }
+  return options.filter((o) => optionApplies(o.key, node))
+}
+
+/** The annotation line for a leaf: the original while its options are unchanged, else canonical. */
+function leafAnnotation(editor: Editor, node: PMNode, eol: string): string {
+  const options = leafOptions(editor, node)
   const original = node.attrs.blockAnnotation as string | null
   if (original != null) {
     const parsed = parseAnnotation(original)
@@ -362,7 +384,7 @@ function nodeEntry(editor: Editor, node: PMNode, eol: string): EditorBlock | nul
     return origin != null ? { raw: text, markdown: text, kind } : { markdown: text, kind }
   }
 
-  const annotation = leafAnnotation(node, eol)
+  const annotation = leafAnnotation(editor, node, eol)
   let text: string | null = null
   if (source != null) text = source
   else if (origin != null) {
@@ -421,7 +443,8 @@ function containerText(editor: Editor, node: PMNode, eol: string): string {
 
 /** Serialize the document, re-emitting every unedited block's original source. */
 export function serializeBody(editor: Editor): string {
-  const { leading, trailing, eol } = edges.get(editor) ?? { leading: '', trailing: '', eol: '\n' }
+  const loaded = edges.get(editor)
+  const { leading, trailing, eol, final } = loaded ?? { leading: '', trailing: '', eol: '\n', final: '' }
   const blocks: EditorBlock[] = []
   if (leading) blocks.push({ raw: leading, markdown: leading, kind: 'space' })
   editor.state.doc.forEach((node) => {
@@ -431,5 +454,10 @@ export function serializeBody(editor: Editor): string {
     if (after) blocks.push({ raw: after, markdown: after, kind: 'space' })
   })
   if (trailing) blocks.push({ raw: trailing, markdown: trailing, kind: 'space' })
-  return serializeWithPreservation(blocks, edges.has(editor) ? eol : undefined)
+  const out = serializeWithPreservation(blocks, loaded ? eol : undefined)
+  if (!loaded || out === '') return out
+  // Keep the body's trailing-newline state when its last block was replaced or added.
+  if (final && !endsWithBreak(out)) return out + final
+  if (!final && endsWithBreak(out)) return out.replace(/(?:\r\n|\n|\r)$/, '')
+  return out
 }
