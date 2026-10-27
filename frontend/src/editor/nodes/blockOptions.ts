@@ -8,12 +8,19 @@
  * - `blockAnnotation: string | null`: that original line with its EOL, re-emitted
  *   verbatim while the options are unchanged (`serializeBody`).
  *
- * Rendering is minimal here: one `data-block-<key>` attribute per known option
- * (Task 8 styles them). Neither attribute is kept on split.
+ * Rendering: one `data-block-<key>` attribute per known option, styled by
+ * `blockOptions.css`; a colour also paints inline with its theme tokens
+ * (`menus/colors.ts`), and an icon is drawn before the block's text by a widget
+ * decoration. Neither attribute is kept on split.
  */
 import { Extension } from '@tiptap/core'
 import type { Node as PMNode, ResolvedPos } from '@tiptap/pm/model'
-import { NodeSelection, type Transaction } from '@tiptap/pm/state'
+import { NodeSelection, Plugin, PluginKey, type Transaction } from '@tiptap/pm/state'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { createElement } from 'react'
+import { createRoot } from 'react-dom/client'
+import { Icon, isIconifyId } from '@/components/Icon'
+import { colorStyle } from '../menus/colors'
 import { isKnownValue, knownOption, makeOption, type Option, type OptionTarget } from '../annotations'
 import { attachmentKind } from '../annotations'
 import './blockOptions.css'
@@ -147,14 +154,63 @@ export function setOptionAt(tr: Transaction, pos: number, key: string, value: st
   return true
 }
 
-function renderOptions(options: Option[] | null | undefined): Record<string, string> {
+/** The DOM attributes of a block's options (`data-block-<key>`, and the colour's inline style). */
+export function renderOptions(options: Option[] | null | undefined): Record<string, string> {
   const out: Record<string, string> = {}
   for (const o of options ?? []) {
     if (!isKnownValue(o)) continue
     out[`data-block-${o.key}`] = o.value === true ? '' : o.value
+    if (o.key === 'color') out.style = colorStyle(o.value)
   }
   return out
 }
+
+/** Node types whose `icon` option draws an icon before their text. */
+const ICON_TYPES = new Set(['paragraph', 'heading'])
+
+/** The icon widget: an emoji as text, an Iconify id through M2's `Icon`. */
+function iconWidget(value: string): HTMLElement {
+  const el = document.createElement('span')
+  el.className = 'block-icon'
+  el.setAttribute('contenteditable', 'false')
+  el.setAttribute('data-icon-value', value)
+  el.setAttribute('aria-hidden', 'true')
+  if (isIconifyId(value)) {
+    const root = createRoot(el)
+    root.render(createElement(Icon, { name: value, size: 18 }))
+    ;(el as HTMLElement & { _root?: { unmount(): void } })._root = root
+  } else {
+    el.textContent = value
+  }
+  return el
+}
+
+function iconDecorations(doc: PMNode): DecorationSet {
+  const decos: Decoration[] = []
+  doc.descendants((node, pos) => {
+    if (!ICON_TYPES.has(node.type.name)) return true
+    const icon = ((node.attrs.blockOptions as Option[] | null) ?? []).find((o) => o.key === 'icon')
+    if (icon && isKnownValue(icon) && typeof icon.value === 'string') {
+      const value = icon.value
+      decos.push(
+        Decoration.widget(pos + 1, () => iconWidget(value), {
+          side: -1,
+          key: `block-icon:${value}`,
+          ignoreSelection: true,
+          destroy: (dom) => {
+            const root = (dom as HTMLElement & { _root?: { unmount(): void } })._root
+            // Unmount outside React's render phase (a widget can go mid-render).
+            if (root) queueMicrotask(() => root.unmount())
+          },
+        }),
+      )
+    }
+    return false
+  })
+  return DecorationSet.create(doc, decos)
+}
+
+export const blockIconKey = new PluginKey<DecorationSet>('blockIcons')
 
 function parseOptions(el: HTMLElement): Option[] | null {
   const out: Option[] = []
@@ -216,6 +272,21 @@ export const BlockOptions = Extension.create({
           blockAnnotation: { default: null, rendered: false, keepOnSplit: false },
         },
       },
+    ]
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin<DecorationSet>({
+        key: blockIconKey,
+        state: {
+          init: (_, state) => iconDecorations(state.doc),
+          apply: (tr, old) => (tr.docChanged ? iconDecorations(tr.doc) : old),
+        },
+        props: {
+          decorations: (state) => blockIconKey.getState(state),
+        },
+      }),
     ]
   },
 
