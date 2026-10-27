@@ -82,7 +82,7 @@ describe('M4 targets in the app', () => {
     expect(screen.queryByTestId('calendar-side-panel')).toBeNull()
 
     // The top-bar toggle shows the tab's side panel (an empty Explore entry), never the mini month.
-    await user.click(screen.getByRole('button', { name: 'Toggle right panel' }))
+    await user.click(screen.getByRole('button', { name: /^(Show|Hide) sidepanel$/ }))
     const panel = screen.getByRole('complementary', { name: 'Side panel' })
     expect(within(panel).getByText('Explore')).toBeInTheDocument()
     expect(screen.queryByTestId('calendar-side-panel')).toBeNull()
@@ -92,7 +92,7 @@ describe('M4 targets in the app', () => {
     await waitFor(() => expect(screen.queryByText('calendar page')).toBeNull())
     expect(screen.getByRole('complementary', { name: 'Side panel' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Toggle right panel' }))
+    await user.click(screen.getByRole('button', { name: /^(Show|Hide) sidepanel$/ }))
     expect(screen.queryByRole('complementary', { name: 'Side panel' })).toBeNull()
   })
 
@@ -101,7 +101,7 @@ describe('M4 targets in the app', () => {
     act(() => useTabs.getState().open({ kind: 'tasks' }))
     render(<App />)
     await screen.findByRole('heading', { name: 'Tasks' })
-    const toggle = screen.getByRole('button', { name: 'Toggle right panel' })
+    const toggle = screen.getByRole('button', { name: /^(Show|Hide) sidepanel$/ })
     expect(toggle).toHaveAttribute('aria-pressed', 'false')
 
     await user.click(toggle)

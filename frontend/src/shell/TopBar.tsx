@@ -1,5 +1,14 @@
-import type { ReactNode } from 'react'
-import { Icon } from '@/components/Icon'
+import { useEffect, type ReactNode } from 'react'
+import { Icon, IconOrEmoji } from '@/components/Icon'
+import { useSpaceInfo } from '@/settings/useSpaceInfo'
+import { SpacesMenu } from '@/spaces/SpacesMenu'
+
+export const TOP_BAR_TEXT = {
+  changeSpace: 'Change space', // SpaceOverview.changeSpace.tooltip
+  createNewTab: 'Create new tab', // SpaceHeader.createNewTab
+  hideSidepanel: 'Hide sidepanel', // RenderSidepanel.hideSidepanel
+  showSidepanel: 'Show sidepanel', // RenderSidepanel.showSidepanel
+} as const
 
 export interface TopBarProps {
   spaceName: string
@@ -57,18 +66,28 @@ export function TopBar({
   onNewTab,
   tabs,
 }: TopBarProps) {
+  // The stored space info follows renames and icon changes (Settings, the spaces menu) at once.
+  const info = useSpaceInfo((s) => s.space)
+  useEffect(() => {
+    void useSpaceInfo.getState().ensure()
+  }, [])
+  const name = info?.name || spaceName
+  const sidepanelLabel = rightPanelOpen ? TOP_BAR_TEXT.hideSidepanel : TOP_BAR_TEXT.showSidepanel
   return (
     <header className="flex h-[42px] shrink-0 items-center gap-1 bg-app pr-2 pl-2.5 text-fg">
       <div className="flex w-[348px] shrink-0 items-center justify-between">
-        <button
-          type="button"
-          className="flex h-8 items-center gap-1.5 rounded-md px-1.5 text-[15px] font-semibold hover:bg-hover"
-          title="Space"
-        >
-          <Icon name="ph-lightbulb" size={15} />
-          <span className="max-w-[220px] truncate">{spaceName}</span>
-          <Icon name="ph-caret-up-down" size={13} className="text-fg-muted" />
-        </button>
+        <SpacesMenu>
+          <button
+            type="button"
+            className="flex h-8 items-center gap-1.5 rounded-md px-1.5 text-[15px] font-semibold hover:bg-hover data-[state=open]:bg-hover"
+            title={TOP_BAR_TEXT.changeSpace}
+            aria-label={`${TOP_BAR_TEXT.changeSpace}: ${name}`}
+          >
+            <IconOrEmoji icon={info?.icon || null} fallback="ph-lightbulb" size={15} />
+            <span className="max-w-[220px] truncate">{name}</span>
+            <Icon name="ph-caret-up-down" size={13} className="text-fg-muted" />
+          </button>
+        </SpacesMenu>
         <BarButton label="Toggle sidebar" icon="ph-sidebar-simple" onClick={onToggleSidebar} />
       </div>
       <div className="flex items-center gap-0.5 pl-2">
@@ -77,10 +96,10 @@ export function TopBar({
       </div>
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden" data-slot="tab-strip">
         {tabs}
-        <BarButton label="New tab" icon="ph-plus" onClick={onNewTab} />
+        <BarButton label={TOP_BAR_TEXT.createNewTab} icon="ph-plus" onClick={onNewTab} />
       </div>
       <BarButton
-        label="Toggle right panel"
+        label={sidepanelLabel}
         icon="ph-square-split-horizontal"
         onClick={onToggleRightPanel}
         pressed={rightPanelOpen}
