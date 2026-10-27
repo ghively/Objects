@@ -1,21 +1,21 @@
 /**
- * STUB (Task 9): replaced in full by Task 10. The export name and prop types are final
- * (`canvasTypes.ts`): `nodeTypes` maps Object's four node types to node components.
+ * The whiteboard's node components (Task 10), keyed by Object's Vue Flow node type names
+ * (`canvasTypes.ts` `NODE_TYPE_KEYS`).
  */
-import { createElement } from 'react'
-import type { NodeTypes, WhiteboardNodeProps } from '../canvasTypes'
-
-function PlainNode({ data, type }: WhiteboardNodeProps) {
-  return createElement('div', {
-    'data-node-kind': data.node.kind,
-    'data-node-type': type,
-    style: { width: '100%', height: '100%', border: '1px solid var(--color-border-base)' },
-  })
-}
+import type { NodeTypes } from '../canvasTypes'
+import { BlockNode } from './BlockNode'
+import { FrameNode } from './FrameNode'
+import { PointNode } from './PointNode'
+import { ShapeNode } from './ShapeNode'
 
 export const nodeTypes: NodeTypes = {
-  objectBlock: PlainNode,
-  objectShape: PlainNode,
-  objectFrame: PlainNode,
-  objectPoint: PlainNode,
+  objectBlock: BlockNode,
+  objectShape: ShapeNode,
+  objectFrame: FrameNode,
+  objectPoint: PointNode,
 }
+
+export { BlockNode, FrameNode, PointNode, ShapeNode }
+export { EntityNode } from './EntityNode'
+export { NodeChrome } from './NodeChrome'
+export { MarkdownView, TextBlockEditor } from './TextBlockEditor'
