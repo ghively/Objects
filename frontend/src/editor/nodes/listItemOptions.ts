@@ -11,14 +11,19 @@
  * round-tripping through `@tiptap/markdown` and an edit elsewhere in the list
  * never touches the comment.
  *
- * Plain rendering here: the atom draws nothing, and a decoration gives its list
- * item `data-item-<key>` attributes and the colour's inline style. Task 26 adds
- * the menu and the finer styles.
+ * Rendering: the atom draws nothing; a decoration gives its list item
+ * `data-item-<key>` attributes and the colour's inline style (the bullet takes
+ * the colour too), and an `icon` is drawn before the item's text as a block's
+ * icon is (an emoji as text, an Iconify id through M2's `Icon`). The block style
+ * menu sets the options on the item at the caret (Task 26).
  */
 import { Node, type MarkdownToken } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type Transaction } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { createElement } from 'react'
+import { createRoot } from 'react-dom/client'
+import { Icon, isIconifyId } from '@/components/Icon'
 import {
   formatItemComment,
   isKnownValue,
@@ -146,13 +151,49 @@ export function itemOptionAttrs(options: readonly Option[]): Record<string, stri
 
 const itemDecoKey = new PluginKey<DecorationSet>('listItemOptions')
 
+type RootHolder = HTMLElement & { _root?: { unmount(): void } }
+
+/** An item's icon, before its text. */
+function itemIconWidget(value: string): HTMLElement {
+  const el: RootHolder = document.createElement('span')
+  el.className = 'item-icon'
+  el.setAttribute('contenteditable', 'false')
+  el.setAttribute('data-icon-value', value)
+  el.setAttribute('aria-hidden', 'true')
+  if (isIconifyId(value)) {
+    const root = createRoot(el)
+    root.render(createElement(Icon, { name: value, size: 16 }))
+    el._root = root
+  } else {
+    el.textContent = value
+  }
+  return el
+}
+
 function itemDecorations(doc: PMNode): DecorationSet {
   const decos: Decoration[] = []
   doc.descendants((node, pos) => {
     if (LIST_ITEM_TYPES.has(node.type.name)) {
       const found = itemOptionsNode(node, pos)
-      const attrs = found ? itemOptionAttrs((found.node.attrs.options as Option[] | null) ?? []) : {}
+      const options = found ? ((found.node.attrs.options as Option[] | null) ?? []) : []
+      const attrs = itemOptionAttrs(options)
       if (Object.keys(attrs).length) decos.push(Decoration.node(pos, pos + node.nodeSize, attrs))
+      const icon = options.find((o) => o.key === 'icon')
+      if (icon && isKnownValue(icon) && typeof icon.value === 'string' && node.firstChild?.isTextblock) {
+        const value = icon.value
+        // A to-do item's text block follows its checkbox: the icon goes at the start of the text.
+        decos.push(
+          Decoration.widget(pos + 2, () => itemIconWidget(value), {
+            side: -1,
+            key: `item-icon:${value}`,
+            ignoreSelection: true,
+            destroy: (dom) => {
+              const root = (dom as RootHolder)._root
+              if (root) queueMicrotask(() => root.unmount())
+            },
+          }),
+        )
+      }
     }
     return !node.isTextblock
   })

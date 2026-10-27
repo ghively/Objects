@@ -6,11 +6,20 @@
  * through `forEachTargetBlock` (hierarchy, quote, colour, icon), or over the
  * whole range through `withTargetSelection` (a list joins the blocks into one).
  *
+ * M8 (Task 26): with the caret in a list item (and no block selection) the
+ * colour, the icon and Standard / Small act on that one item, written as its
+ * item comment (`- Buy milk <!-- item: color=text-red -->`); headings and the
+ * list type still act on the list. "Indent" / "Unindent" rows
+ * (`tokensMenu.indent.shortName`, `tokensMenu.unindent.shortName`) nest the
+ * block under the one before it, or move it back out (a list item sinks or
+ * lifts; a block selection indents its list items as Tab does).
+ *
  * Strings are Object's (`blocksMenu.*`, `styles.color`, `tokensMenu.color.*`,
  * `colorThemes.*`, `ControlDropdown.custom.*`) except where marked "our string".
  */
 import type { Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
+import { TextSelection } from '@tiptap/pm/state'
 import { CheckIcon } from 'lucide-react'
 import type { Icon as IconValue } from '@/api/types'
 import { isIconifyId } from '@/components/Icon'
@@ -22,8 +31,15 @@ import {
   DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { Option } from '../annotations'
-import { forEachTargetBlock, withTargetSelection } from '../extensions/blockSelection'
+import {
+  blockSelectionRange,
+  clearBlockSelection,
+  forEachTargetBlock,
+  indentBlocks,
+  withTargetSelection,
+} from '../extensions/blockSelection'
 import { blockChain, type Hierarchy, type ListType } from '../nodes/blockOptions'
+import { currentItemOptions, listItemAt } from '../nodes/listItemOptions'
 import {
   BLOCK_COLORS,
   bgColorToken,
@@ -46,6 +62,18 @@ export const T = {
   removeText: 'Remove text color', // colorThemes.theme-remove-text-color
   removeBg: 'Remove background color', // colorThemes.theme-remove-bg-color
   icon: 'Icon', // ControlDropdown.custom.block_icon.name
+  indent: 'Indent', // tokensMenu.indent.shortName
+  unindent: 'Unindent', // tokensMenu.unindent.shortName
+}
+
+/** Whether the menu acts on one list item: the caret is in an item and there is no block selection. */
+export function inListItem(editor: Editor): boolean {
+  if (blockSelectionRange(editor.state)) return false
+  return listItemAt(editor.state.tr) !== null
+}
+
+function itemOption(editor: Editor, key: string): string | true | undefined {
+  return currentItemOptions(editor.state.tr).find((o) => o.key === key)?.value
 }
 
 export const HIERARCHY_ITEMS: readonly { level: Hierarchy; name: string }[] = [
@@ -117,6 +145,14 @@ export function currentBlockStyle(editor: Editor): BlockStyle {
   }
   const icon = optionOf(leaf, 'icon')
   style.icon = typeof icon === 'string' ? icon : null
+  if (inListItem(editor)) {
+    // One item: its own options.
+    style.hierarchy = itemOption(editor, 'small') === true ? 'S' : 'Base'
+    const c = itemOption(editor, 'color')
+    style.color = typeof c === 'string' ? c : null
+    const i = itemOption(editor, 'icon')
+    style.icon = typeof i === 'string' ? i : null
+  }
   return style
 }
 
@@ -144,6 +180,12 @@ export function setStandout(editor: Editor, on: boolean): boolean {
 /** Set a text or background colour on the target blocks, or remove the colour of that kind (`null`). */
 export function setBlockColor(editor: Editor, kind: ColorKind, color: (typeof BLOCK_COLORS)[number] | null): boolean {
   editor.commands.focus()
+  if (inListItem(editor)) {
+    if (color) return editor.commands.setListItemOptions({ color: colorValue(kind, color) })
+    const current = parseColorValue(currentBlockStyle(editor).color)
+    if (!current || current.kind !== kind) return true
+    return editor.commands.setListItemOptions({ color: null })
+  }
   return forEachTargetBlock(editor, (e) => {
     if (color) return e.commands.setBlockOption('color', colorValue(kind, color))
     const current = parseColorValue(currentBlockStyle(e).color)
@@ -155,6 +197,9 @@ export function setBlockColor(editor: Editor, kind: ColorKind, color: (typeof BL
 /** Set the hierarchy (Standard, Small, Heading 1-4) of every target block. */
 export function setBlocksHierarchy(editor: Editor, level: Hierarchy): boolean {
   editor.commands.focus()
+  if ((level === 'S' || level === 'Base') && inListItem(editor)) {
+    return editor.commands.setListItemOptions({ small: level === 'S' ? true : null })
+  }
   return forEachTargetBlock(editor, (e) => e.commands.setHierarchy(level))
 }
 
@@ -167,7 +212,57 @@ export function setBlocksListType(editor: Editor, type: ListType | null): boolea
 /** Set (or with `null` remove) the icon of every target block. */
 export function setBlocksIcon(editor: Editor, icon: string | null): boolean {
   editor.commands.focus()
+  if (inListItem(editor)) return editor.commands.setListItemOptions({ icon })
   return forEachTargetBlock(editor, (e) => e.commands.setBlockOption('icon', icon))
+}
+
+/** Put the caret at the start of the child at `index` of the block parent whose content starts at `parentStart`. */
+function caretIntoChild(editor: Editor, parentStart: number, index: number): boolean {
+  const doc = editor.state.doc
+  const parent = parentStart === 0 ? doc : doc.resolve(parentStart).parent
+  if (index < 0 || index >= parent.childCount) return false
+  let pos = parentStart
+  for (let i = 0; i < index; i++) pos += parent.child(i).nodeSize
+  editor.view.dispatch(editor.state.tr.setSelection(TextSelection.near(doc.resolve(pos + 1))))
+  return true
+}
+
+const LIST_NODES = new Set(['bulletList', 'orderedList', 'taskList'])
+
+/**
+ * "Indent" (`dir` 1) / "Unindent" (-1).
+ * - A block selection holding lists indents their items as Tab does. Other
+ *   selected blocks are nested one by one under the block before the first
+ *   (Unindent moves the first selected block out, the ones after it going
+ *   with it as its children: outliner semantics, our choice).
+ * - A list item at the caret sinks or lifts.
+ * - Any other block nests under the block before it, or moves out of its
+ *   indent container.
+ */
+export function indentRow(editor: Editor, dir: 1 | -1): boolean {
+  const range = blockSelectionRange(editor.state)
+  if (range) {
+    if (range.blocks.some((b) => LIST_NODES.has(b.node.type.name))) return indentBlocks(editor, dir)
+    clearBlockSelection(editor)
+    if (dir === -1) {
+      return caretIntoChild(editor, range.parentStart, range.first) && editor.commands.unindentBlock()
+    }
+    let ok = false
+    // Each indent merges the block at `first` into the container before it, so the next one moves to `first`.
+    for (let k = range.first; k <= range.last; k++) {
+      if (!caretIntoChild(editor, range.parentStart, range.first) || !editor.commands.indentBlock()) break
+      ok = true
+    }
+    editor.commands.focus()
+    return ok
+  }
+  editor.commands.focus()
+  const item = listItemAt(editor.state.tr)
+  if (item) {
+    const name = item.node.type.name
+    return dir === 1 ? editor.commands.sinkListItem(name) : editor.commands.liftListItem(name)
+  }
+  return dir === 1 ? editor.commands.indentBlock() : editor.commands.unindentBlock()
 }
 
 function Check({ on }: { on: boolean }) {
@@ -290,6 +385,8 @@ export function BlockStyleMenu({ editor, onDone }: BlockStyleMenuProps) {
           />
         </DropdownMenuSubContent>
       </DropdownMenuSub>
+      <DropdownMenuItem onSelect={() => indentRow(editor, 1)}>{T.indent}</DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => indentRow(editor, -1)}>{T.unindent}</DropdownMenuItem>
     </>
   )
 }

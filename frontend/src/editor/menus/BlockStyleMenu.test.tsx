@@ -54,9 +54,17 @@ async function pick(sub: string, item: string, editor: TiptapEditor) {
 }
 
 describe('BlockStyleMenu', () => {
-  test('lists the five sub-menus with reference names', () => {
+  test('lists the five sub-menus and the indent rows with reference names', () => {
     renderMenu(headless('Hello world\n', 'Hello'))
-    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Hierarchy', 'List', 'Quote', 'Color', 'Icon'])
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual([
+      'Hierarchy',
+      'List',
+      'Quote',
+      'Color',
+      'Icon',
+      'Indent', // tokensMenu.indent.shortName
+      'Unindent', // tokensMenu.unindent.shortName
+    ])
   })
 
   test('colour menu lists 18 text and 18 background colours with reference names', async () => {
@@ -238,6 +246,88 @@ describe('BlockStyleMenu', () => {
       expect(serializeBody(editor)).toBe(
         '<!-- block: icon="⭐" -->\nOne\n\n<!-- block: icon="⭐" -->\nTwo\n\n<!-- block: icon="⭐" -->\nThree\n\nAfter.\n',
       )
+    })
+  })
+
+  describe('M8: one list item and indent rows', () => {
+    const LIST = '- Buy milk\n- Call Ada\n- Book trip\n'
+
+    test('test block style menu styles one list item', async () => {
+      const editor = headless(LIST, 'Call')
+      const view = renderMenu(editor)
+      await openSub('Color')
+      const text = await openSub('Text color')
+      fireEvent.click(within(text).getByRole('menuitem', { name: 'Red text' }))
+      view.unmount()
+      expect(serializeBody(editor)).toBe('- Buy milk\n- Call Ada <!-- item: color=text-red -->\n- Book trip\n')
+      expect(currentBlockStyle(editor).color).toBe('text-red')
+
+      await pick('Hierarchy', 'Small', editor)
+      expect(serializeBody(editor)).toBe('- Buy milk\n- Call Ada <!-- item: small color=text-red -->\n- Book trip\n')
+      expect(currentBlockStyle(editor).hierarchy).toBe('S')
+
+      // Removing the colour keeps the other option; Standard removes "small" and with it the comment.
+      const v2 = renderMenu(editor)
+      await openSub('Color')
+      const t2 = await openSub('Text color')
+      fireEvent.click(within(t2).getByRole('menuitem', { name: 'Remove text color' }))
+      v2.unmount()
+      expect(serializeBody(editor)).toBe('- Buy milk\n- Call Ada <!-- item: small -->\n- Book trip\n')
+      await pick('Hierarchy', 'Standard', editor)
+      expect(serializeBody(editor)).toBe(LIST)
+    })
+
+    test('an item colour is drawn on its own list item', () => {
+      const element = document.createElement('div')
+      document.body.appendChild(element)
+      const editor = new TiptapEditor({ element, extensions: editorExtensions() })
+      editors.push(editor)
+      loadBody(editor, '- Buy milk\n- Call Ada <!-- item: color=text-red icon="⭐" -->\n')
+      const items = editor.view.dom.querySelectorAll('li')
+      expect(items[0]).not.toHaveAttribute('data-item-color')
+      expect(items[1]).toHaveAttribute('data-item-color', 'text-red')
+      expect(items[1].getAttribute('style')).toContain('var(--label-text-red)')
+      expect(items[1].querySelector('.item-icon')).toHaveTextContent('⭐')
+      element.remove()
+    })
+
+    test('test indent rows', () => {
+      const editor = headless('First\n\nSecond\n', 'Second')
+      let view = renderMenu(editor)
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Indent' }))
+      view.unmount()
+      expect(serializeBody(editor)).toBe('<!-- indent -->\nFirst\n\nSecond\n<!-- /indent -->\n')
+      view = renderMenu(editor)
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Unindent' }))
+      view.unmount()
+      expect(serializeBody(editor)).toBe('First\n\nSecond\n')
+
+      // In a list, the item sinks and lifts.
+      const list = headless('- One\n- Two\n', 'Two')
+      view = renderMenu(list)
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Indent' }))
+      view.unmount()
+      expect(serializeBody(list)).toMatch(/^- One\n {2,4}- Two\n$/)
+      view = renderMenu(list)
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Unindent' }))
+      view.unmount()
+      expect(serializeBody(list)).toBe('- One\n- Two\n')
+    })
+
+    test('indent rows act on a block selection of non-list blocks', () => {
+      const editor = headless('First\n\nSecond\n\nThird\n', 'First')
+      const positions: number[] = []
+      editor.state.doc.forEach((_n, offset) => positions.push(offset))
+      selectBlocks(editor, positions[1], positions[2])
+      let view = renderMenu(editor)
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Indent' }))
+      view.unmount()
+      expect(serializeBody(editor)).toBe('<!-- indent -->\nFirst\n\nSecond\n\nThird\n<!-- /indent -->\n')
+      view = renderMenu(editor)
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Unindent' }))
+      view.unmount()
+      // The caret ended in "Third": it moves out, one blank line after the close line.
+      expect(serializeBody(editor)).toBe('<!-- indent -->\nFirst\n\nSecond\n<!-- /indent -->\n\nThird\n')
     })
   })
 })

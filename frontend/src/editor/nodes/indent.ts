@@ -9,8 +9,9 @@
  *
  * The first block inside is the parent, the rest are its indented children:
  * the toggle's shape without collapsing (M7's annotation grammar, a new
- * container name). Plain rendering here (the children padded in, with the
- * outliner line unless `hideOutlinerLines`); Task 26 draws the finer styles.
+ * container name). The children are padded in with M7's outliner line (the
+ * toggle's), hidden with the "Hide outliner lines" setting: a plugin marks the
+ * editor root `data-hide-outliner-lines` and `tokens/tokens.css` hides the line.
  *
  * Commands: `indentBlock()` nests the block at the cursor under the block
  * before it (into that block's `indent` container or toggle when it has one,
@@ -21,7 +22,9 @@
  */
 import { Node, mergeAttributes } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
-import { TextSelection, type Transaction } from '@tiptap/pm/state'
+import { Plugin, PluginKey, TextSelection, type Transaction } from '@tiptap/pm/state'
+import type { EditorView } from '@tiptap/pm/view'
+import { useSettings } from '@/settings/useSettings'
 import { containerSourceAttributes } from './containers'
 import { BLOCK_PARENTS, leafBlockAt } from './blockOptions'
 
@@ -48,6 +51,20 @@ function trailingAfter(n: PMNode, trailing: string | null): string | null {
   if (!trailing) return trailing
   const source = String(n.attrs.blockOrigin ?? '')
   const eol = /\r\n$/.exec(source)?.[0] ?? /\n$/.exec(source)?.[0] ?? /\r$/.exec(source)?.[0] ?? ''
+  if (!eol || !trailing.startsWith(eol)) return trailing
+  const rest = trailing.slice(eol.length)
+  return rest === '' ? null : rest
+}
+
+/**
+ * The blank lines a container keeps after its close line when it takes over a
+ * child's trailing: a close line read from the file keeps its own line end, so
+ * the trailing's first line end is dropped (the reverse of `trailingAfter`).
+ */
+function trailingAfterClose(container: PMNode, trailing: string | null): string | null {
+  if (!trailing) return trailing
+  const close = String(container.attrs.containerClose ?? '')
+  const eol = /\r\n$/.exec(close)?.[0] ?? /\n$/.exec(close)?.[0] ?? /\r$/.exec(close)?.[0] ?? ''
   if (!eol || !trailing.startsWith(eol)) return trailing
   const rest = trailing.slice(eol.length)
   return rest === '' ? null : rest
@@ -89,7 +106,7 @@ export function indentBlockIn(tr: Transaction): boolean {
     const last = children.length - 1
     children[last] = withTrailing(children[last], trailingAfter(children[last], trailingOf(prev)) ?? trailingOf(children[last]))
     children.push(withTrailing(node, null))
-    const container = prev.type.create({ ...prev.attrs, blockTrailing: trailingOf(node) }, children)
+    const container = prev.type.create({ ...prev.attrs, blockTrailing: trailingAfterClose(prev, trailingOf(node)) }, children)
     tr.replaceWith(prevPos, pos + node.nodeSize, container)
     const childPos = prevPos + 1 + children.slice(0, -1).reduce((n, c) => n + c.nodeSize, 0)
     restoreCursor(tr, childPos, offset)
@@ -121,7 +138,7 @@ export function unindentBlockIn(tr: Transaction): boolean {
   if (before.length === 1) out.push(before[0])
   else {
     before[before.length - 1] = withTrailing(lastBefore, null)
-    out.push(container.type.create({ ...container.attrs, blockTrailing: trailingOf(lastBefore) }, before))
+    out.push(container.type.create({ ...container.attrs, blockTrailing: trailingAfterClose(container, trailingOf(lastBefore)) }, before))
   }
 
   const containerTrailing = trailingOf(container)
@@ -159,6 +176,22 @@ export const Indent = Node.create({
 
   renderMarkdown(node: { content?: unknown[] }, h: { renderChildren: (c: unknown[], sep: string) => string }) {
     return node.content ? h.renderChildren(node.content, '\n\n') : ''
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey('indentOutline'),
+        view: (view: EditorView) => {
+          const apply = () => view.dom.toggleAttribute('data-hide-outliner-lines', useSettings.getState().settings.hideOutlinerLines)
+          apply()
+          const unsubscribe = useSettings.subscribe((s, prev) => {
+            if (s.settings.hideOutlinerLines !== prev.settings.hideOutlinerLines) apply()
+          })
+          return { destroy: unsubscribe }
+        },
+      }),
+    ]
   },
 
   addCommands() {
