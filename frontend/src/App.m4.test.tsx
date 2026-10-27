@@ -9,21 +9,15 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
-// The calendar page and its side panel are replaced by later tasks; stand-ins expose the props
-// App passes so this test checks App's wiring only.
+// The calendar page is replaced by a stand-in exposing the props App passes, so this test checks
+// App's wiring only. Since M7 the calendar sidebar lives inside the Calendar page, not in App.
 const calendarProps = vi.hoisted(() => ({ current: null as null | Record<string, unknown> }))
 vi.mock('@/calendar/CalendarPage', () => ({
-  CalendarPage: (props: { rightPanelOpen: boolean; onToggleRightPanel: () => void }) => {
-    calendarProps.current = props as unknown as Record<string, unknown>
-    return (
-      <div>
-        <span>calendar page, panel {props.rightPanelOpen ? 'open' : 'closed'}</span>
-        <button type="button" onClick={props.onToggleRightPanel}>
-          toggle calendar panel
-        </button>
-      </div>
-    )
+  CalendarPage: (props: Record<string, unknown>) => {
+    calendarProps.current = props
+    return <div>calendar page</div>
   },
+  toggleCalendarSidebar: () => Promise.resolve(),
 }))
 vi.mock('@/calendar/CalendarSidePanel', () => ({
   CalendarSidePanel: () => <div data-testid="calendar-side-panel">mini month</div>,
@@ -79,30 +73,59 @@ describe('M4 targets in the app', () => {
     expect(await screen.findByRole('heading', { name: 'Tasks' })).toBeInTheDocument()
   })
 
-  test('test right panel toggle', async () => {
+  test('test calendar page gets onOpenTarget only; the side panel never holds the calendar sidebar', async () => {
     const user = userEvent.setup()
     act(() => useTabs.getState().open({ kind: 'calendar' }))
     render(<App />)
-    expect(await screen.findByText('calendar page, panel closed')).toBeInTheDocument()
-    expect(typeof calendarProps.current?.onOpenTarget).toBe('function')
+    expect(await screen.findByText('calendar page')).toBeInTheDocument()
+    expect(Object.keys(calendarProps.current!)).toEqual(['onOpenTarget'])
     expect(screen.queryByTestId('calendar-side-panel')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'toggle calendar panel' }))
-    expect(screen.getByText('calendar page, panel open')).toBeInTheDocument()
-    const panel = screen.getByRole('complementary', { name: 'Right panel' })
-    expect(within(panel).getByTestId('calendar-side-panel')).toBeInTheDocument()
+    // The top-bar toggle shows the tab's side panel (an empty Explore entry), never the mini month.
+    await user.click(screen.getByRole('button', { name: 'Toggle right panel' }))
+    const panel = screen.getByRole('complementary', { name: 'Side panel' })
+    expect(within(panel).getByText('Explore')).toBeInTheDocument()
+    expect(screen.queryByTestId('calendar-side-panel')).toBeNull()
 
     // onOpenTarget opens a target in the tab.
     act(() => (calendarProps.current!.onOpenTarget as (t: unknown) => void)({ kind: 'tasks' }))
-    await waitFor(() => expect(screen.queryByText(/calendar page/)).toBeNull())
-    // The right panel stays open (App's state) but holds no calendar panel for other targets.
-    expect(screen.getByRole('complementary', { name: 'Right panel' })).toBeInTheDocument()
-    expect(screen.queryByTestId('calendar-side-panel')).toBeNull()
+    await waitFor(() => expect(screen.queryByText('calendar page')).toBeNull())
+    expect(screen.getByRole('complementary', { name: 'Side panel' })).toBeInTheDocument()
 
-    act(() => useTabs.getState().back())
-    expect(await screen.findByText('calendar page, panel open')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'toggle calendar panel' }))
-    expect(screen.queryByRole('complementary', { name: 'Right panel' })).toBeNull()
-    expect(screen.queryByTestId('calendar-side-panel')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Toggle right panel' }))
+    expect(screen.queryByRole('complementary', { name: 'Side panel' })).toBeNull()
+  })
+
+  test('test top bar toggle and shortcut hide and show the panel per tab', async () => {
+    const user = userEvent.setup()
+    act(() => useTabs.getState().open({ kind: 'tasks' }))
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Tasks' })
+    const toggle = screen.getByRole('button', { name: 'Toggle right panel' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(toggle)
+    expect(screen.getByRole('complementary', { name: 'Side panel' })).toBeInTheDocument()
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+
+    // A second tab has its own (hidden) panel; the first keeps its own.
+    const first = useTabs.getState().activeId!
+    act(() => useTabs.getState().open({ kind: 'calendar' }, { newTab: true }))
+    await screen.findByText('calendar page')
+    expect(screen.queryByRole('complementary', { name: 'Side panel' })).toBeNull()
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+
+    // The "Toggle right sidepanel" shortcut (provisional Mod-Shift-\\).
+    const shortcut = () =>
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: '|', code: 'Backslash', ctrlKey: true, shiftKey: true, bubbles: true }))
+      })
+    shortcut()
+    expect(screen.getByRole('complementary', { name: 'Side panel' })).toBeInTheDocument()
+    shortcut()
+    expect(screen.queryByRole('complementary', { name: 'Side panel' })).toBeNull()
+
+    act(() => useTabs.getState().activate(first))
+    expect(await screen.findByRole('complementary', { name: 'Side panel' })).toBeInTheDocument()
   })
 })

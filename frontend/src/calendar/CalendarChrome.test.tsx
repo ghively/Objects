@@ -11,6 +11,7 @@ vi.mock('@/api/client', async (orig) => ({
 import { api } from '@/api/client'
 import { useTabs } from '@/nav/tabs'
 import { resetPinned, useUiStore } from '@/shell/usePinned'
+import { CalendarChrome } from './CalendarChrome'
 import { CalendarPage } from './CalendarPage'
 import { useCalendar } from './useCalendar'
 
@@ -18,7 +19,7 @@ const mocked = vi.mocked(api)
 const TODAY = '2026-10-23'
 
 function renderPage(props: Partial<Parameters<typeof CalendarPage>[0]> = {}) {
-  const p = { rightPanelOpen: false, onToggleRightPanel: vi.fn(), onOpenTarget: vi.fn(), ...props }
+  const p = { onOpenTarget: vi.fn(), ...props }
   const r = render(<CalendarPage {...p} />)
   return { ...p, ...r }
 }
@@ -31,7 +32,9 @@ beforeEach(() => {
   vi.setSystemTime(new Date(2026, 9, 23, 10, 0))
   localStorage.clear()
   resetPinned()
-  useUiStore.setState({ loaded: true })
+  // M7: the calendar sidebar (a mini month with its own Month button) is hidden here; it has its
+  // own tests in CalendarPage.test.tsx.
+  useUiStore.setState((s) => ({ loaded: true, ui: { ...s.ui, calendar: { weekStart: 'sunday', daily: {}, hideCalendarSidebar: true } } }))
   useTabs.getState().reset()
   useTabs.getState().open({ kind: 'calendar' })
   useCalendar.setState({ view: 'day', anchor: TODAY })
@@ -96,7 +99,7 @@ describe('CalendarChrome', () => {
   })
 
   test('week start comes from ui.calendar.weekStart', () => {
-    useUiStore.setState((s) => ({ ui: { ...s.ui, calendar: { weekStart: 'monday', daily: {} } } }))
+    useUiStore.setState((s) => ({ ui: { ...s.ui, calendar: { weekStart: 'monday', daily: {}, hideCalendarSidebar: true } } }))
     useCalendar.setState({ view: 'week', anchor: '2026-10-25' })
     const { container } = renderPage()
     expect(container.querySelector('[data-view="week"]')).toHaveAttribute('data-from', '2026-10-19')
@@ -105,12 +108,17 @@ describe('CalendarChrome', () => {
 
   test('right panel toggle uses Task 7 props and the sidebar tooltips', async () => {
     const user = userEvent.setup()
-    const { onToggleRightPanel, rerender, onOpenTarget } = renderPage({ rightPanelOpen: false })
+    const onToggleRightPanel = vi.fn()
+    const onOpenTarget = vi.fn()
+    // M7: CalendarPage drives these props from `ui.calendar.hideCalendarSidebar` (CalendarPage.test.tsx).
+    const { rerender } = render(
+      <CalendarChrome weekStart="sunday" rightPanelOpen={false} onToggleRightPanel={onToggleRightPanel} onOpenTarget={onOpenTarget} />,
+    )
     const show = screen.getByRole('button', { name: 'Show calendar sidebar' })
     expect(show).toHaveAttribute('title', 'Show calendar sidebar')
     await user.click(show)
     expect(onToggleRightPanel).toHaveBeenCalledTimes(1)
-    rerender(<CalendarPage rightPanelOpen onToggleRightPanel={onToggleRightPanel} onOpenTarget={onOpenTarget} />)
+    rerender(<CalendarChrome weekStart="sunday" rightPanelOpen onToggleRightPanel={onToggleRightPanel} onOpenTarget={onOpenTarget} />)
     const hide = screen.getByRole('button', { name: 'Hide calendar sidebar' })
     expect(hide).toHaveAttribute('aria-pressed', 'true')
     await user.click(hide)

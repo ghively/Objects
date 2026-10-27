@@ -39,6 +39,7 @@ vi.mock('@/graph/LocalGraphPanel', () => ({
 }))
 vi.mock('@/calendar/CalendarPage', () => ({
   CalendarPage: () => <div>calendar page</div>,
+  toggleCalendarSidebar: () => Promise.resolve(),
 }))
 vi.mock('@/calendar/CalendarSidePanel', () => ({
   CalendarSidePanel: () => <div data-testid="calendar-side-panel">mini month</div>,
@@ -101,30 +102,31 @@ describe('M5 mounts in the app', () => {
     await waitFor(() => expect(useTabs.getState().tabs).toHaveLength(2))
   })
 
-  test('test right panel shows the local graph for an object target and the calendar panel for the calendar', async () => {
+  test('test Open graph view opens the local graph as a side panel entry that follows the tab', async () => {
     act(() => useTabs.getState().open({ kind: 'object', path: 'Pages/A.md' }))
     render(<App />)
     expect(await screen.findByText('object page Pages/A.md')).toBeInTheDocument()
-    expect(screen.queryByRole('complementary', { name: 'Right panel' })).toBeNull()
+    expect(screen.queryByRole('complementary', { name: 'Side panel' })).toBeNull()
 
     act(() => seen.palette!.onShowRightPanel())
-    const panel = await screen.findByRole('complementary', { name: 'Right panel' })
+    const panel = await screen.findByRole('complementary', { name: 'Side panel' })
     expect(within(panel).getByTestId('local-graph')).toHaveTextContent('local graph of Pages/A.md')
-    expect(within(panel).queryByTestId('calendar-side-panel')).toBeNull()
-    act(() => seen.palette!.onShowRightPanel()) // shows, never toggles
-    expect(screen.getByRole('complementary', { name: 'Right panel' })).toBeInTheDocument()
+    expect(within(panel).getByText('Graph View')).toBeInTheDocument()
+    act(() => seen.palette!.onShowRightPanel()) // reveals, never toggles or duplicates
+    expect(screen.getByRole('complementary', { name: 'Side panel' })).toBeInTheDocument()
+    expect(useTabs.getState().tabs[0].sidepanel).toHaveLength(1)
 
+    // The entry follows the tab's current object.
+    act(() => useTabs.getState().open({ kind: 'object', path: 'Pages/B.md' }))
+    expect(await within(panel).findByText('local graph of Pages/B.md')).toBeInTheDocument()
+
+    // Not on an object: the entry says so; the calendar sidebar is never in the side panel.
     act(() => useTabs.getState().open({ kind: 'calendar' }))
     await screen.findByText('calendar page')
-    const panel2 = screen.getByRole('complementary', { name: 'Right panel' })
-    expect(within(panel2).getByTestId('calendar-side-panel')).toBeInTheDocument()
+    const panel2 = screen.getByRole('complementary', { name: 'Side panel' })
     expect(within(panel2).queryByTestId('local-graph')).toBeNull()
-
-    act(() => useTabs.getState().open({ kind: 'tasks' }))
-    await waitFor(() => expect(screen.queryByText('calendar page')).toBeNull())
-    const panel3 = screen.getByRole('complementary', { name: 'Right panel' })
-    expect(within(panel3).queryByTestId('local-graph')).toBeNull()
-    expect(within(panel3).queryByTestId('calendar-side-panel')).toBeNull()
+    expect(within(panel2).getByText('Open an object to see its graph.')).toBeInTheDocument()
+    expect(screen.queryByTestId('calendar-side-panel')).toBeNull()
   })
 
   test('test command palette is mounted once with working callbacks', async () => {
@@ -138,9 +140,9 @@ describe('M5 mounts in the app', () => {
     expect(screen.getByRole('complementary', { name: 'Sidebar' })).toBeInTheDocument()
 
     act(() => seen.palette!.onToggleRightPanel())
-    expect(screen.getByRole('complementary', { name: 'Right panel' })).toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: 'Side panel' })).toBeInTheDocument()
     act(() => seen.palette!.onToggleRightPanel())
-    expect(screen.queryByRole('complementary', { name: 'Right panel' })).toBeNull()
+    expect(screen.queryByRole('complementary', { name: 'Side panel' })).toBeNull()
 
     act(() => seen.palette!.onOpenTarget({ kind: 'graph' }))
     expect(await screen.findByTestId('graph-page')).toBeInTheDocument()

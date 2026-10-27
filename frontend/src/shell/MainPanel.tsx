@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 
 /**
- * The inset content card: the only framed surface in the shell. The right
- * panel (`aside`), when open, lives inside the same card behind a 1px rule.
+ * The inset content card: the only framed surface in the shell. The side
+ * panel (`aside`, `shell/SidePanel.tsx`), when shown, lives inside the same
+ * card behind a 1px rule.
  */
 export function MainPanel({ children, aside }: { children?: ReactNode; aside?: ReactNode }) {
   return (

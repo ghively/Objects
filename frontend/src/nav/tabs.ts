@@ -5,6 +5,23 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { useRecent } from './recent'
+import {
+  activateEntry,
+  addEmptyEntry,
+  cleanEntries,
+  cleanLayout,
+  closeEntry,
+  entriesOf,
+  isSidepanelShown,
+  moveEntry,
+  navigateEntry,
+  openInArea,
+  retargetEntries,
+  stepEntry,
+  togglePersistentEntry,
+  visibleAreas,
+  type PanelArea,
+} from './sidepanel'
 import { switchStoreSpace } from './spaceStorage'
 
 export type Target =
@@ -38,7 +55,11 @@ export interface SidepanelEntry {
   target: SidepanelTarget | null
   isOpen: boolean
   panelArea: 'area1' | 'area2' | 'area3'
+  /** A persistent entry keeps its page: content opened into its area gets a new entry. */
   isPersistent?: boolean
+  /** The entry's own back/forward history (links followed inside it); `target` is `history[index]`. */
+  history?: SidepanelTarget[]
+  index?: number
 }
 
 /** The side panel's sizes (Object's `sidepanelLayout`): width in px, area sizes as fractions. */
@@ -105,6 +126,28 @@ export interface TabsState {
    * another tab), the crumb opens in place with the trail before it.
    */
   goToCrumb(k: number): void
+
+  // ---- the side panel (Task 15); every action works on the active tab ----
+  /**
+   * Show `target` in the side panel, area 1 unless `area` says otherwise: the area's open
+   * non-persistent entry shows it, else a new open entry is added. A hidden panel is shown.
+   */
+  openInSidepanel(target: SidepanelTarget, opts?: { area?: PanelArea }): void
+  /** "New Sidepanel Tab": an empty "Explore" entry in `area`. */
+  newSidepanelEntry(area: PanelArea): void
+  closeSidepanelEntry(id: string): void
+  activateSidepanelEntry(id: string): void
+  moveSidepanelEntry(id: string, area: PanelArea): void
+  /** The entry's target and the tab's current target exchange places (the main side gets a new history entry). */
+  swapWithMain(id: string): void
+  setSidepanelLayout(patch: SidepanelLayout): void
+  /** Hide the panel, or show it (with an empty entry when no area has one). */
+  toggleSidepanel(): void
+  /** A link followed inside entry `id` (the entry keeps its own history). */
+  navigateSidepanelEntry(id: string, target: SidepanelTarget | null): void
+  sidepanelBack(id: string): void
+  sidepanelForward(id: string): void
+  toggleSidepanelEntryPersistent(id: string): void
 }
 
 let seq = 0
@@ -163,6 +206,26 @@ function updateActive(s: TabsState, fn: (t: Tab) => Tab): Partial<TabsState> {
 
 function updateTab(s: TabsState, id: string, fn: (t: Tab) => Tab): Partial<TabsState> {
   return { tabs: s.tabs.map((t) => (t.id === id ? fn(t) : t)) }
+}
+
+/**
+ * Apply `fn` to the active tab. With `create`, a space with no tab gets an empty one first (the
+ * side panel can open before any page does).
+ */
+function withPanel(
+  set: (p: Partial<TabsState>) => void,
+  get: () => TabsState,
+  create: boolean,
+  fn: (t: Tab) => Tab,
+): void {
+  const s = get()
+  if (activeTab(s)) {
+    set(updateActive(s, fn))
+    return
+  }
+  if (!create) return
+  const t = fn(freshTab(null))
+  set({ tabs: sortPinned([...s.tabs, t]), activeId: t.id })
 }
 
 /** Pinned tabs first, each group keeping its order. */
@@ -234,6 +297,13 @@ function cleanTab(t: unknown): Tab | null {
   const tab: Tab = { ...(x as Tab), crumbs: alignCrumbs(x.crumbs, x.history.length) }
   if (typeof x.persistent !== 'boolean') delete tab.persistent
   if (typeof x.pinned !== 'boolean') delete tab.pinned
+  const sidepanel = cleanEntries(x.sidepanel)
+  if (sidepanel) tab.sidepanel = sidepanel
+  else delete tab.sidepanel
+  const layout = cleanLayout(x.sidepanelLayout)
+  if (layout) tab.sidepanelLayout = layout
+  else delete tab.sidepanelLayout
+  if (typeof x.hideSidepanel !== 'boolean') delete tab.hideSidepanel
   return tab
 }
 
@@ -306,12 +376,14 @@ export const useTabs = create<TabsState>()(
           const moved = (t: Target): Target => (t.kind === 'object' && t.path === oldPath ? { kind: 'object', path: newPath } : t)
           const s = get()
           const hit = (h: Target) => h.kind === 'object' && h.path === oldPath
-          if (s.tabs.some((t) => t.history.some(hit) || (t.crumbs ?? []).some((c) => c.some(hit)))) {
+          const panelHit = (t: Tab) => !!t.sidepanel && retargetEntries(t.sidepanel, oldPath, newPath) !== t.sidepanel
+          if (s.tabs.some((t) => t.history.some(hit) || (t.crumbs ?? []).some((c) => c.some(hit)) || panelHit(t))) {
             set({
               tabs: s.tabs.map((t) => ({
                 ...t,
                 history: t.history.map(moved),
                 crumbs: alignCrumbs(t.crumbs, t.history.length).map((c) => c.map(moved)),
+                ...(t.sidepanel ? { sidepanel: retargetEntries(t.sidepanel, oldPath, newPath) } : {}),
               })),
             })
           }
@@ -353,6 +425,76 @@ export const useTabs = create<TabsState>()(
         const s = get()
         if (!s.tabs.some((t) => t.id === id && t.pinned)) return
         set({ tabs: sortPinned(updateTab(s, id, (t) => ({ ...t, pinned: false })).tabs!) })
+      },
+
+      openInSidepanel(target, opts) {
+        if (target.kind === 'object') useRecent.getState().add(target.path)
+        withPanel(set, get, true, (t) => ({
+          ...t,
+          sidepanel: openInArea(entriesOf(t), target, opts?.area ?? 'area1', newId),
+          hideSidepanel: false,
+        }))
+      },
+
+      newSidepanelEntry(area) {
+        withPanel(set, get, true, (t) => ({ ...t, sidepanel: addEmptyEntry(entriesOf(t), area, newId), hideSidepanel: false }))
+      },
+
+      closeSidepanelEntry(id) {
+        withPanel(set, get, false, (t) => ({ ...t, sidepanel: closeEntry(entriesOf(t), id) }))
+      },
+
+      activateSidepanelEntry(id) {
+        withPanel(set, get, false, (t) => ({ ...t, sidepanel: activateEntry(entriesOf(t), id) }))
+      },
+
+      moveSidepanelEntry(id, area) {
+        withPanel(set, get, false, (t) => ({ ...t, sidepanel: moveEntry(entriesOf(t), id, area) }))
+      },
+
+      swapWithMain(id) {
+        withPanel(set, get, false, (t) => {
+          const entry = entriesOf(t).find((e) => e.id === id)
+          const side = entry?.target
+          if (!entry || !side || side.kind === 'localGraph') return t
+          const main = tabTarget(t)
+          if (side.kind === 'object') useRecent.getState().add(side.path)
+          const swapped = sameTarget(main, side) ? t : pushEntry(t, side, [])
+          return { ...swapped, sidepanel: navigateEntry(entriesOf(t), id, main) }
+        })
+      },
+
+      setSidepanelLayout(patch) {
+        withPanel(set, get, false, (t) => ({ ...t, sidepanelLayout: { ...t.sidepanelLayout, ...patch } }))
+      },
+
+      toggleSidepanel() {
+        withPanel(set, get, true, (t) => {
+          if (isSidepanelShown(t)) return { ...t, hideSidepanel: true }
+          const entries = entriesOf(t)
+          return {
+            ...t,
+            hideSidepanel: false,
+            sidepanel: visibleAreas(entries).length > 0 ? entries : addEmptyEntry(entries, 'area1', newId),
+          }
+        })
+      },
+
+      navigateSidepanelEntry(id, target) {
+        if (target?.kind === 'object') useRecent.getState().add(target.path)
+        withPanel(set, get, false, (t) => ({ ...t, sidepanel: navigateEntry(entriesOf(t), id, target) }))
+      },
+
+      sidepanelBack(id) {
+        withPanel(set, get, false, (t) => ({ ...t, sidepanel: stepEntry(entriesOf(t), id, -1) }))
+      },
+
+      sidepanelForward(id) {
+        withPanel(set, get, false, (t) => ({ ...t, sidepanel: stepEntry(entriesOf(t), id, 1) }))
+      },
+
+      toggleSidepanelEntryPersistent(id) {
+        withPanel(set, get, false, (t) => ({ ...t, sidepanel: togglePersistentEntry(entriesOf(t), id) }))
       },
     }),
     {

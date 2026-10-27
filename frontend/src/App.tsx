@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { SpaceInfo, TypeDef } from '@/api/types'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -7,7 +7,6 @@ import { createAndOpen } from '@/create/createAndOpen'
 import { NewObjectMenu } from '@/create/NewObjectMenu'
 import { AllNotesView } from '@/allnotes/AllNotesView'
 import { CalendarPage } from '@/calendar/CalendarPage'
-import { CalendarSidePanel } from '@/calendar/CalendarSidePanel'
 import { CollectionPage } from '@/collections/CollectionPage'
 import { QueriesPage } from '@/queries/QueriesPage'
 import { QueryPage } from '@/queries/QueryPage'
@@ -16,17 +15,29 @@ import { LocalGraphPanel } from '@/graph/LocalGraphPanel'
 import { LinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { setRecentSpace } from '@/nav/recent'
-import { canGoBack, canGoForward, currentTarget, setTabsSpace, usePeek, useTabs } from '@/nav/tabs'
+import { isSidepanelShown } from '@/nav/sidepanel'
+import {
+  activeTab,
+  canGoBack,
+  canGoForward,
+  currentTarget,
+  setTabsSpace,
+  usePeek,
+  useTabs,
+  type OpenOptions,
+  type SidepanelTarget,
+  type Target,
+} from '@/nav/tabs'
 import { useDeleteRequest } from '@/object/DeleteObjectDialog'
 import { ObjectPage } from '@/object/ObjectPage'
 import { ObjectPeek } from '@/object/ObjectPeek'
 import { CommandPalette } from '@/palette/CommandPalette'
 import { Breadcrumbs } from '@/shell/Breadcrumbs'
 import { MainPanel } from '@/shell/MainPanel'
-import { RightPanel } from '@/shell/RightPanel'
+import { SidePanel } from '@/shell/SidePanel'
 import { Sidebar } from '@/shell/Sidebar'
 import { TabStrip, useSpaceTypes } from '@/shell/TabStrip'
-import { useTabShortcuts } from '@/shell/shortcuts'
+import { usePanelShortcuts, useTabShortcuts } from '@/shell/shortcuts'
 import { isEditableTarget } from '@/lib/shortcuts'
 import { applyOpenOnStart } from '@/nav/startup'
 import { useSettings } from '@/settings/useSettings'
@@ -54,11 +65,55 @@ function currentTypeId(types: TypeDef[]): string {
   return types.find((t) => t.name.toLowerCase() === 'page')?.id ?? 'page'
 }
 
+interface PageCtx {
+  types: TypeDef[]
+  space: SpaceInfo | null
+  open: (t: Target, o?: OpenOptions) => void
+}
+
+/** The page a target shows, in the main panel or in a side-panel entry (`open` navigates that place). */
+function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
+  switch (target.kind) {
+    case 'object':
+      return <ObjectPage path={target.path} />
+    case 'type': {
+      const type = types.find((t) => t.id === target.typeId)
+      if (type) return <TypePage key={type.id} type={type} />
+      return space ? <Centered title="Unknown object type" subtitle={target.typeId} /> : null
+    }
+    case 'typeSettings':
+      return (
+        <TypeSettings
+          key={target.typeId}
+          typeId={target.typeId}
+          onOpenType={(typeId) => open({ kind: 'type', typeId })}
+          onOpenTemplate={(path) => open({ kind: 'object', path })}
+          onDeleted={() => open({ kind: 'trash' })}
+        />
+      )
+    case 'trash':
+      return <TrashView />
+    case 'collection':
+      return <CollectionPage key={target.id} id={target.id} />
+    case 'query':
+      return <QueryPage key={target.id} id={target.id} />
+    case 'queries':
+      return <QueriesPage />
+    case 'allNotes':
+      return <AllNotesView />
+    case 'calendar':
+      return <CalendarPage onOpenTarget={(t) => open(t)} />
+    case 'tasks':
+      return <TasksPage />
+    case 'graph':
+      return <GraphPage onOpenTarget={(t, o) => open(t, o)} />
+  }
+}
+
 export default function App() {
   const [space, setSpace] = useState<SpaceInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [rightOpen, setRightOpen] = useState(false)
   const [createTypeOpen, setCreateTypeOpen] = useState(false)
   const [deleting, setDeleting] = useState<TypeDef | null>(null)
   const [newMenuOpen, setNewMenuOpen] = useState(false)
@@ -67,6 +122,8 @@ export default function App() {
   const tabs = useTabs()
   const target = tabsReady ? currentTarget(tabs) : null
   useTabShortcuts()
+  usePanelShortcuts({ toggleLeftSidebar: () => setSidebarOpen((v) => !v) })
+  const sidepanelShown = tabsReady && isSidepanelShown(activeTab(tabs))
 
   useEffect(() => {
     let live = true
@@ -159,51 +216,26 @@ export default function App() {
 
   let content
   if (error) {
-    content = (
-      <Centered title="Can't reach the Object back end." subtitle={error} />
-    )
-  } else if (target?.kind === 'object') {
-    content = <ObjectPage path={target.path} />
-  } else if (target?.kind === 'type' && activeType) {
-    content = <TypePage key={activeType.id} type={activeType} />
-  } else if (target?.kind === 'type' && space) {
-    content = <Centered title="Unknown object type" subtitle={target.typeId} />
-  } else if (target?.kind === 'typeSettings') {
-    content = (
-      <TypeSettings
-        key={target.typeId}
-        typeId={target.typeId}
-        onOpenType={(typeId) => tabs.open({ kind: 'type', typeId })}
-        onOpenTemplate={(path) => tabs.open({ kind: 'object', path })}
-        onDeleted={() => tabs.open({ kind: 'trash' })}
-      />
-    )
-  } else if (target?.kind === 'trash') {
-    content = <TrashView />
-  } else if (target?.kind === 'collection') {
-    content = <CollectionPage key={target.id} id={target.id} />
-  } else if (target?.kind === 'query') {
-    content = <QueryPage key={target.id} id={target.id} />
-  } else if (target?.kind === 'queries') {
-    content = <QueriesPage />
-  } else if (target?.kind === 'allNotes') {
-    content = <AllNotesView />
-  } else if (target?.kind === 'calendar') {
-    content = (
-      <CalendarPage
-        rightPanelOpen={rightOpen}
-        onToggleRightPanel={() => setRightOpen((v) => !v)}
-        onOpenTarget={(t) => tabs.open(t)}
-      />
-    )
-  } else if (target?.kind === 'tasks') {
-    content = <TasksPage />
-  } else if (target?.kind === 'graph') {
-    content = <GraphPage onOpenTarget={(t, o) => tabs.open(t, o)} />
+    content = <Centered title="Can't reach the Object back end." subtitle={error} />
+  } else if (target) {
+    content = pageFor(target, { types, space, open: tabs.open })
   } else if (!tabsReady) {
     content = null
   } else {
     content = <Centered title="Pick an object type" subtitle="Choose a type in the sidebar to see its objects." />
+  }
+
+  // A side-panel entry: M5's local graph follows the tab's current object; links in a page open
+  // into the entry, and a new-tab open still makes a tab.
+  const renderSidepanel = (t: SidepanelTarget, nav: { open(t: Target, o?: OpenOptions): void }): ReactNode => {
+    if (t.kind === 'localGraph') {
+      return target?.kind === 'object' ? (
+        <LocalGraphPanel path={target.path} />
+      ) : (
+        <Centered title="Graph View" subtitle="Open an object to see its graph." />
+      )
+    }
+    return pageFor(t, { types, space, open: (x, o) => (o?.newTab ? tabs.open(x, o) : nav.open(x, o)) })
   }
 
   return (
@@ -212,8 +244,8 @@ export default function App() {
         <TopBar
           spaceName={space?.name ?? '…'}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
-          onToggleRightPanel={() => setRightOpen((v) => !v)}
-          rightPanelOpen={rightOpen}
+          onToggleRightPanel={tabs.toggleSidepanel}
+          rightPanelOpen={sidepanelShown}
           onBack={tabs.back}
           onForward={tabs.forward}
           canGoBack={canGoBack(tabs)}
@@ -244,14 +276,7 @@ export default function App() {
               />
             </ErrorBoundary>
           )}
-          <MainPanel
-            aside={
-              <RightPanel open={rightOpen}>
-                {target?.kind === 'calendar' && <CalendarSidePanel />}
-                {target?.kind === 'object' && <LocalGraphPanel path={target.path} />}
-              </RightPanel>
-            }
-          >
+          <MainPanel aside={tabsReady && <SidePanel space={space} renderTarget={renderSidepanel} />}>
             <div className="flex h-full min-h-0 flex-col">
               <Breadcrumbs space={space} />
               <div className="min-h-0 flex-1">
@@ -266,8 +291,8 @@ export default function App() {
         <CommandPalette
           onOpenTarget={(t, o) => tabs.open(t, o)}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
-          onToggleRightPanel={() => setRightOpen((v) => !v)}
-          onShowRightPanel={() => setRightOpen(true)}
+          onToggleRightPanel={tabs.toggleSidepanel}
+          onShowRightPanel={() => tabs.openInSidepanel({ kind: 'localGraph' })}
         />
         <LinkPicker />
         <NewObjectMenu open={newMenuOpen} onOpenChange={setNewMenuOpen} />
