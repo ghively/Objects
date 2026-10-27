@@ -20,4 +20,19 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
   openOnStart: {},
   startupSpace: 'lastOpened',
   startupSpacePath: null,
+  // M8
+  language: 'en',
+  decimalSeparator: 'automatic',
+  timeZone: null,
+  backlinkSectionsDefault: Object.freeze({ backlinks: 'open', relatedContent: 'open', unlinkedMentions: 'open' }),
+  backlinkContentView: 'embed',
+  relatedContentHiddenTypes: Object.freeze([]) as unknown as string[],
+  nestedBacklinkView: 'showBlockContainingBacklink',
+  presentation: Object.freeze({
+    hideCoverImage: false,
+    hideProgressIndicator: false,
+    hideTitle: false,
+    footerLeft: '',
+    footerRight: '',
+  }),
 }) as DeviceSettings

@@ -111,6 +111,9 @@ describe('Reminders on any date property', () => {
         }),
     )
     vi.stubGlobal('fetch', fetchMock)
+    // `api` is mocked here; run the real client's `setReminder` (M8 Task 3) so the route is checked.
+    const real = (await vi.importActual<typeof import('@/api/client')>('@/api/client')).api
+    vi.mocked(api).setReminder.mockImplementation(real.setReminder)
     const versionRef = { current: 'v1' }
     const adoptVersion = vi.fn((v: string) => {
       versionRef.current = v

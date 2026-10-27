@@ -31,6 +31,8 @@ import {
 import { useDeleteRequest } from '@/object/DeleteObjectDialog'
 import { ObjectPage } from '@/object/ObjectPage'
 import { ObjectPeek } from '@/object/ObjectPeek'
+import { BacklinksPanel } from '@/references/BacklinksPanel'
+import { SearchPage } from '@/search/SearchPage'
 import { CommandPalette } from '@/palette/CommandPalette'
 import { Breadcrumbs } from '@/shell/Breadcrumbs'
 import { MainPanel } from '@/shell/MainPanel'
@@ -107,6 +109,9 @@ function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
       return <TasksPage />
     case 'graph':
       return <GraphPage onOpenTarget={(t, o) => open(t, o)} />
+    case 'search':
+      // M8: the extended search page; a new query or toggle remounts it with what was typed.
+      return <SearchPage key={`${target.q ?? ''}|${target.textOnly ? 1 : 0}`} q={target.q} textOnly={target.textOnly} />
   }
 }
 
@@ -235,6 +240,8 @@ export default function App() {
         <Centered title="Graph View" subtitle="Open an object to see its graph." />
       )
     }
+    // M8: the backlinks entry follows the tab's current object.
+    if (t.kind === 'backlinks') return <BacklinksPanel path={target?.kind === 'object' ? target.path : null} />
     return pageFor(t, { types, space, open: (x, o) => (o?.newTab ? tabs.open(x, o) : nav.open(x, o)) })
   }
 

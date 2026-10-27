@@ -98,7 +98,7 @@ describe('shortcuts', () => {
     for (const d of [...M7_SHORTCUTS, ...EXISTING_SHORTCUTS]) expect(ids).toContain(d.id)
     expect(new Set(ids).size).toBe(ids.length)
     const groups = shortcutsByCategory()
-    expect(groups.get('text')?.map((d) => d.id)).toEqual(['bold', 'italic', 'underline', 'strikethrough', 'codeToken', 'mathToken'])
+    expect(groups.get('text')?.map((d) => d.id)).toEqual(['bold', 'italic', 'underline', 'strikethrough', 'codeToken', 'mathToken', 'highlightText'])
     expect(groups.get('navigation')?.map((d) => d.id)).toContain('closeTab')
     for (const cat of groups.keys()) expect(CATEGORY_LABELS[cat]).toBeTruthy()
     expect(keysFor('openSettings')).toEqual(['Mod-,'])

@@ -45,9 +45,14 @@ export type Target =
   | { kind: 'tasks' }
   /** The global graph (M5). */
   | { kind: 'graph' }
+  /** M8: the extended search page ("Search", `LocalSpaceQuery.heading`), with what was typed. */
+  | { kind: 'search'; q?: string; textOnly?: boolean }
 
-/** What a side-panel entry shows (Task 15): a page target, or M5's local graph of the tab's object. */
-export type SidepanelTarget = Target | { kind: 'localGraph' }
+/**
+ * What a side-panel entry shows (Task 15): a page target, M5's local graph of the tab's object, or
+ * (M8) the tab's object's backlinks.
+ */
+export type SidepanelTarget = Target | { kind: 'localGraph' } | { kind: 'backlinks' }
 
 /** One side-panel entry (Capacities' `SidepanelEntry`). `target: null` is the empty "Explore" entry. */
 export interface SidepanelEntry {
@@ -156,9 +161,17 @@ function newId(): string {
   return `t${Date.now().toString(36)}${seq.toString(36)}`
 }
 
-export function sameTarget(a: Target | null | undefined, b: Target | null | undefined): boolean {
+export function sameTarget(a: SidepanelTarget | null | undefined, b: SidepanelTarget | null | undefined): boolean {
   if (!a || !b || a.kind !== b.kind) return false
   switch (a.kind) {
+    case 'search': {
+      // Our choice: another query (or toggle) is another page, so opening it from the palette applies it.
+      const o = b as typeof a
+      return (a.q ?? '') === (o.q ?? '') && !!a.textOnly === !!o.textOnly
+    }
+    case 'localGraph':
+    case 'backlinks':
+      return true
     case 'type':
     case 'typeSettings':
       return a.typeId === (b as typeof a).typeId
@@ -456,7 +469,7 @@ export const useTabs = create<TabsState>()(
         withPanel(set, get, false, (t) => {
           const entry = entriesOf(t).find((e) => e.id === id)
           const side = entry?.target
-          if (!entry || !side || side.kind === 'localGraph') return t
+          if (!entry || !side || side.kind === 'localGraph' || side.kind === 'backlinks') return t
           const main = tabTarget(t)
           if (side.kind === 'object') useRecent.getState().add(side.path)
           const swapped = sameTarget(main, side) ? t : pushEntry(t, side, [])

@@ -9,6 +9,9 @@
  * `toggleShortcutsMenu` (also while typing: neither changes text).
  *
  * Task 18: mounts the "Create new space" dialog and the "Switching space…" overlay.
+ *
+ * M8 Task 3: mounts the Version History and Merge dialogs, focus mode, the presentation and the
+ * "Add to whiteboard" dialog (each filled by its owner task).
  */
 import { useEffect } from 'react'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
@@ -20,6 +23,11 @@ import { ShortcutsSheet } from '@/settings/ShortcutsSheet'
 import { useSettingsModal } from '@/settings/useSettingsModal'
 import { CreateSpaceDialog } from '@/spaces/CreateSpaceDialog'
 import { SpaceSwitchOverlay } from '@/spaces/SpacesMenu'
+import { VersionHistoryDialog } from '@/history/VersionHistoryDialog'
+import { MergeDialog } from '@/merge/MergeDialog'
+import { FocusMode } from '@/focus/FocusMode'
+import { Presentation } from '@/present/Presentation'
+import { AddToWhiteboardDialog } from '@/whiteboard/AddToWhiteboardDialog'
 
 function ThemeFollower() {
   const settings = useSettings((s) => s.settings)
@@ -52,6 +60,11 @@ export function GlobalOverlays() {
       <SettingsOverlays />
       <CreateSpaceDialog />
       <SpaceSwitchOverlay />
+      <VersionHistoryDialog />
+      <MergeDialog />
+      <FocusMode />
+      <Presentation />
+      <AddToWhiteboardDialog />
     </>
   )
 }

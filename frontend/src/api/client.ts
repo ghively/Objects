@@ -1,5 +1,15 @@
 import type {
   Attachment,
+  BlockInfo,
+  CatchUp,
+  MergeResult,
+  OccurrenceAction,
+  OverdueInfo,
+  RestoreVersionResult,
+  SpaceSetup,
+  TaskStats,
+  VersionContent,
+  VersionInfo,
   CalendarRange,
   CalendarUi,
   ChangeEvent,
@@ -126,7 +136,8 @@ export interface SearchOptions {
   excludeTypes?: string[]
   tag?: string
   limit?: number
-  mode?: 'auto' | 'title'
+  /** M8: `fullText` matches bodies only ("Text matches only"). */
+  mode?: 'auto' | 'title' | 'fullText'
   signal?: AbortSignal
 }
 
@@ -794,9 +805,14 @@ export const api = {
     return res?.spaces ?? []
   },
 
-  /** Create `<location>/<safe name>/` with `space.json` and register it. 409 (`ApiError`) when the folder exists. */
-  createSpace(name: string, location: string): Promise<{ path: string }> {
-    return request<{ path: string }>('/spaces', json('POST', { name, location }), spaceConflict)
+  /**
+   * Create `<location>/<safe name>/` with `space.json` and register it. 409 (`ApiError`) when the folder exists.
+   * M8: `setup` `'basic'` also writes the Person, Meeting, Project and Book types.
+   */
+  createSpace(name: string, location: string, setup?: SpaceSetup): Promise<{ path: string }> {
+    const body: Record<string, unknown> = { name, location }
+    if (setup !== undefined) body.setup = setup
+    return request<{ path: string }>('/spaces', json('POST', body), spaceConflict)
   },
 
   /** Register an existing folder as a space. 404 when it is not a folder. */
@@ -812,6 +828,112 @@ export const api = {
   /** Ask the launcher to restart on `path` (202). 404 not a folder; 503 without the launcher. */
   switchSpace(path: string): Promise<{ path: string }> {
     return request<{ path: string }>('/spaces/switch', json('POST', { path }))
+  },
+
+  // ---- M8: tasks, blocks, history, merge, spaces ----
+
+  /** A recurring by-due-date task's missed occurrences. 422 when it isn't one. */
+  overdue(path: string): Promise<OverdueInfo> {
+    return request<OverdueInfo>(`/tasks/overdue?path=${seg(path)}`)
+  },
+
+  /** Complete, skip or excuse the current occurrence (`catchUp` for overdue ones). 409 stale. */
+  async occurrence(
+    path: string,
+    action: OccurrenceAction,
+    opts: { catchUp?: CatchUp; baseVersion: string },
+  ): Promise<UpdateResult> {
+    const body: Record<string, unknown> = { path, action }
+    if (opts.catchUp) body.catchUp = opts.catchUp
+    Object.assign(body, { baseVersion: opts.baseVersion, clientId: CLIENT_ID })
+    const res = await request<UpdateResult>('/tasks/occurrence', json('POST', body))
+    if (res.version !== opts.baseVersion) emitLocal([changed(path, res.version)])
+    return res
+  },
+
+  /** A recurring task's streaks, completion rate and occurrence grid. */
+  taskStats(path: string): Promise<TaskStats> {
+    return request<TaskStats>(`/tasks/stats?path=${seg(path)}`)
+  },
+
+  /** Set (or clear with `null`) the reminder of date property `key`. 409 stale, 422. */
+  async setReminder(path: string, key: string, remind: string | null, opts: { baseVersion: string }): Promise<UpdateResult> {
+    const res = await request<UpdateResult>(
+      '/tasks/reminder',
+      json('PUT', { path, key, remind, baseVersion: opts.baseVersion, clientId: CLIENT_ID }),
+    )
+    if (res.version !== opts.baseVersion) emitLocal([changed(path, res.version)])
+    return res
+  },
+
+  /** One block of an object by its `^id`. 404 when the object or block is missing. */
+  block(path: string, id: string): Promise<BlockInfo> {
+    return request<BlockInfo>(`/block?path=${seg(path)}&id=${seg(id)}`)
+  },
+
+  /** The objects referencing block `id` of `path`, title then path. */
+  blockReferences(path: string, id: string): Promise<{ paths: string[] }> {
+    return request<{ paths: string[] }>(`/block/references?path=${seg(path)}&id=${seg(id)}`)
+  },
+
+  /** An object's (or board's) saved versions, newest first. */
+  async history(path: string): Promise<VersionInfo[]> {
+    const res = await request<{ versions: VersionInfo[] }>(`/history?path=${seg(path)}`)
+    return res?.versions ?? []
+  },
+
+  /** One version's content (`text` null for whiteboards). */
+  historyVersion(path: string, id: string): Promise<VersionContent> {
+    return request<VersionContent>(`/history/version?path=${seg(path)}&id=${seg(id)}`)
+  },
+
+  /** Restore a version (the current state is kept as a version first). 409 stale. */
+  async restoreVersion(path: string, id: string, opts: { baseVersion: string }): Promise<RestoreVersionResult> {
+    const res = await request<RestoreVersionResult>(
+      '/history/restore',
+      json('POST', { path, id, baseVersion: opts.baseVersion, clientId: CLIENT_ID }),
+    )
+    emitLocal([changed(path, res?.version ?? res?.revision ?? null)])
+    return res
+  },
+
+  /**
+   * Merge `source` into `target` ("Merge into object" / "Merge into tag"); the source goes to the
+   * Trash. Always sends `confirm: true` (the dialog is the confirmation). 409 stale, 413, 422.
+   */
+  async mergeObject(
+    source: string,
+    target: string,
+    opts: { sourceVersion: string; targetVersion: string },
+  ): Promise<MergeResult> {
+    const res = await request<MergeResult>(
+      '/object/merge',
+      json('POST', {
+        source,
+        target,
+        sourceVersion: opts.sourceVersion,
+        targetVersion: opts.targetVersion,
+        confirm: true,
+        clientId: CLIENT_ID,
+      }),
+    )
+    const target_ = res?.target ?? target
+    emitLocal([
+      changed(target_, res?.version ?? null),
+      ...(res?.relinked ?? []).filter((p) => p !== target_).map((p) => changed(p)),
+      { kind: 'deleted', path: source, version: null, origin: CLIENT_ID },
+    ])
+    return res
+  },
+
+  /**
+   * Delete a space folder that is not the current one: to the OS trash, or (`permanent`, after a
+   * 428 `ConfirmRequiredError` said the trash is unavailable) for good. 404, 409 the current space.
+   */
+  deleteSpace(path: string, opts: { permanent?: boolean } = {}): Promise<{ trashed: boolean }> {
+    const body: Record<string, unknown> = { path }
+    if (opts.permanent) body.permanent = true
+    return request<{ trashed: boolean }>('/spaces/delete', json('POST', body), spaceConflict)
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */
