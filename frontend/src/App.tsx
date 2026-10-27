@@ -21,6 +21,7 @@ import { useDeleteRequest } from '@/object/DeleteObjectDialog'
 import { ObjectPage } from '@/object/ObjectPage'
 import { ObjectPeek } from '@/object/ObjectPeek'
 import { CommandPalette } from '@/palette/CommandPalette'
+import { Breadcrumbs } from '@/shell/Breadcrumbs'
 import { MainPanel } from '@/shell/MainPanel'
 import { RightPanel } from '@/shell/RightPanel'
 import { Sidebar } from '@/shell/Sidebar'
@@ -251,9 +252,14 @@ export default function App() {
               </RightPanel>
             }
           >
-            <ErrorBoundary what="This page" resetKey={target ? JSON.stringify(target) : ''}>
-              {content}
-            </ErrorBoundary>
+            <div className="flex h-full min-h-0 flex-col">
+              <Breadcrumbs space={space} />
+              <div className="min-h-0 flex-1">
+                <ErrorBoundary what="This page" resetKey={target ? JSON.stringify(target) : ''}>
+                  {content}
+                </ErrorBoundary>
+              </div>
+            </div>
           </MainPanel>
         </div>
         <ObjectPeek />

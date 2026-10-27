@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { setRecentSpace, useRecent } from './recent'
-import { activeTab, currentTarget, HISTORY_LIMIT, setTabsSpace, usePeek, useTabs, type Target } from './tabs'
+import { activeTab, crumbIndex, currentTarget, HISTORY_LIMIT, setTabsSpace, usePeek, useTabs, type Target } from './tabs'
 
 const typeT = (typeId: string): Target => ({ kind: 'type', typeId })
 const objT = (path: string): Target => ({ kind: 'object', path })
@@ -190,5 +190,83 @@ describe('per-space storage', () => {
     await setRecentSpace('/spaces/b')
     expect(s().tabs).toEqual([])
     expect(useRecent.getState().paths).toEqual([])
+  })
+})
+
+describe('breadcrumb trails (Task 14)', () => {
+  const trail = () => activeTab(s())!.crumbs[activeTab(s())!.index]
+
+  test('test link navigation extends the trail and sidebar navigation resets it', () => {
+    s().open(typeT('page'))
+    s().open(objT('A.md'), { via: 'link' })
+    expect(trail()).toEqual([typeT('page')])
+    s().open(objT('B.md'), { via: 'link' })
+    expect(trail()).toEqual([typeT('page'), objT('A.md')])
+    // Back to a page already on the trail cuts it there.
+    s().open(objT('A.md'), { via: 'link' })
+    expect(trail()).toEqual([typeT('page')])
+    // Sidebar, palette, tab menu: the default 'nav' starts an empty trail.
+    s().open(objT('C.md'))
+    expect(trail()).toEqual([])
+    s().open(objT('D.md'), { via: 'nav' })
+    expect(trail()).toEqual([])
+    // A link opened in a new tab carries the trail into it.
+    s().open(objT('E.md'), { via: 'link', newTab: true })
+    expect(s().tabs).toHaveLength(2)
+    expect(activeTab(s())!.crumbs).toEqual([[objT('D.md')]])
+  })
+
+  test('test a link from a persistent tab carries the trail into the new tab', () => {
+    s().open(objT('A.md'))
+    s().togglePersistent(s().activeId!)
+    s().open(objT('B.md'), { via: 'link' })
+    expect(s().tabs).toHaveLength(2)
+    expect(activeTab(s())!.crumbs).toEqual([[objT('A.md')]])
+  })
+
+  test('test back and forward show each entry trail', () => {
+    s().open(objT('A.md'))
+    s().open(objT('B.md'), { via: 'link' })
+    s().open(objT('C.md'), { via: 'link' })
+    expect(trail()).toEqual([objT('A.md'), objT('B.md')])
+    s().back()
+    expect(trail()).toEqual([objT('A.md')])
+    s().back()
+    expect(trail()).toEqual([])
+    s().forward()
+    s().forward()
+    expect(trail()).toEqual([objT('A.md'), objT('B.md')])
+  })
+
+  test('test clicking a crumb goes back to it', () => {
+    s().open(objT('A.md'))
+    s().open(objT('B.md'), { via: 'link' })
+    s().open(objT('C.md'), { via: 'link' })
+    expect(crumbIndex(activeTab(s()), 0)).toBe(0)
+    expect(crumbIndex(activeTab(s()), 1)).toBe(1)
+    s().goToCrumb(0)
+    // The index moves; no new entry.
+    expect(activeTab(s())!.history).toEqual([objT('A.md'), objT('B.md'), objT('C.md')])
+    expect(activeTab(s())!.index).toBe(0)
+    expect(currentTarget(s())).toEqual(objT('A.md'))
+    // Forward still reaches C with its trail.
+    s().forward()
+    s().forward()
+    expect(trail()).toEqual([objT('A.md'), objT('B.md')])
+    // Out of range is a no-op.
+    s().goToCrumb(5)
+    expect(currentTarget(s())).toEqual(objT('C.md'))
+  })
+
+  test('test a crumb whose entry is gone opens in place with the trail before it', () => {
+    s().open(objT('A.md'))
+    s().open(objT('B.md'), { via: 'link' })
+    s().open(objT('C.md'), { via: 'link', newTab: true })
+    expect(trail()).toEqual([objT('A.md'), objT('B.md')])
+    s().goToCrumb(1)
+    const t = activeTab(s())!
+    expect(t.history).toEqual([objT('C.md'), objT('B.md')])
+    expect(t.crumbs).toEqual([[objT('A.md'), objT('B.md')], [objT('A.md')]])
+    expect(t.index).toBe(1)
   })
 })

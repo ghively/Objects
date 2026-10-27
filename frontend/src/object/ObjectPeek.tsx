@@ -59,7 +59,7 @@ export function ObjectPeek() {
               mode="peek"
               ink={inkPlugin}
               onExpand={() => {
-                useTabs.getState().open({ kind: 'object', path })
+                useTabs.getState().open({ kind: 'object', path }, { via: 'link' })
                 close()
               }}
               onDismiss={close}
@@ -71,7 +71,7 @@ export function ObjectPeek() {
               path={path}
               mode="peek"
               onExpand={() => {
-                useTabs.getState().open({ kind: 'object', path })
+                useTabs.getState().open({ kind: 'object', path }, { via: 'link' })
                 close()
               }}
               onDismiss={close}

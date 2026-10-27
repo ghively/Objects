@@ -39,7 +39,7 @@ export function openModeFor(mods: OpenMods = {}, typeId?: string | null): OpenMo
 export function openObject(path: string, mods: OpenMods = {}, typeId?: string | null): OpenMode {
   const mode = openModeFor(mods, typeId)
   if (mode === 'peek') usePeek.getState().peek(path)
-  else useTabs.getState().open({ kind: 'object', path }, { newTab: mode === 'newTab' })
+  else useTabs.getState().open({ kind: 'object', path }, { newTab: mode === 'newTab', via: mods.via })
   return mode
 }
 
