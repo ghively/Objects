@@ -78,9 +78,18 @@ Routes (all JSON):
   also renames it in every ``tags:`` list; those files are in ``relinked``.
 - ``GET /api/images`` -> ``{path}[]`` (image files outside dot-folders);
   ``POST /api/images?name=`` (raw bytes) -> ``201 {path}`` (``Attachments/<safe name>``),
-  ``415`` for a name without an image extension. ``GET /api/file?path=`` -> the image's
-  bytes; ``415`` for a non-image extension, ``404`` when missing, in a dot-folder or
-  outside the space.
+  ``415`` for a name without an image extension (kept for M2's cover-image picker).
+- M7 attachments: ``GET /api/attachments`` -> ``{path, kind, size}[]`` (files outside
+  dot-folders whose kind isn't ``file``, plus everything under ``Attachments/``; never
+  objects or whiteboard sidecars), sorted by path. ``POST /api/attachments?name=`` (raw
+  bytes) -> ``201 {path, kind}`` (``Attachments/<safe name>.<ext>``, `` (2)`` when taken,
+  never overwritten); ``413`` over 100 MiB, ``422`` empty or unusable name.
+  ``GET /api/file?path=`` -> the file's bytes with per-kind headers (images: CSP
+  ``sandbox``; pdf, audio, video: inline, ranges answered ``206``; any other file:
+  ``application/octet-stream`` as an attachment; ``nosniff`` on all); ``415`` for a ``.md``
+  file, ``404`` when missing, in a dot-folder, outside the space or a whiteboard sidecar.
+  ``POST /api/attachments/open`` ``{path}`` -> ``{ok}`` (opened with the OS default app);
+  ``404`` as above, ``415`` for an executable or script (or a ``.md``).
 - ``GET /api/resolve?link=&from=`` -> ``{path}`` or ``404``
 - ``POST /api/reveal`` ``{path}`` -> ``200 {ok}``: show the file in the OS file manager
 - ``GET /api/events`` -> Server-Sent Events; event ``change`` with a
@@ -120,7 +129,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
-from . import api_graph, api_references, api_search
+from . import api_graph, api_references, api_search, media
 from .apictx import ApiContext
 from .collections import CollectionDef
 from .jsonstore import (
@@ -129,7 +138,21 @@ from .jsonstore import (
     json_revision,
     normalize_views,
 )
-from .media import NotAnImage, image_media_type, image_path, import_image, list_images
+from .media import (
+    NotAnImage,
+    NotServed,
+    RefusedToOpen,
+    TooLarge,
+    attachment_media_type,
+    attachment_path,
+    import_attachment,
+    import_image,
+    kind_of,
+    list_attachments,
+    list_images,
+    open_with_system,
+    serve_headers,
+)
 from .notify import FileNotifier, system_notifier
 from .propvalues import InvalidValue
 from .queries import QueryDef
@@ -403,6 +426,10 @@ def _display_safe(value):
 
 
 class RevealRequest(BaseModel):
+    path: str
+
+
+class OpenAttachmentRequest(BaseModel):
     path: str
 
 
@@ -1281,20 +1308,61 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             return _error(415, "Only png, jpg, jpeg, gif, webp and svg images can be added")
         return JSONResponse({"path": path}, status_code=201)
 
+    @api.get("/attachments")
+    def get_attachments():
+        return _display_safe(list_attachments(space.root))
+
+    @api.post("/attachments", status_code=201)
+    async def post_attachment(request: Request, name: str = Query(default="")):
+        limit = media.MAX_ATTACHMENT_BYTES
+        too_large = _error(413, media.UPLOAD_LIMIT_DETAIL)
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > limit:
+            return too_large
+        chunks: list[bytes] = []
+        size = 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > limit:
+                return too_large
+            chunks.append(chunk)
+        data = b"".join(chunks)
+        try:
+            path, kind = await asyncio.to_thread(import_attachment, space.root, name, data)
+        except TooLarge:
+            return too_large
+        except ValueError as exc:
+            return _error(422, str(exc))
+        return JSONResponse({"path": path, "kind": kind}, status_code=201)
+
+    @api.post("/attachments/open")
+    def open_attachment(req: OpenAttachmentRequest):
+        try:
+            full = attachment_path(space.root, req.path)
+        except NotServed:
+            return _error(415, "Objects are opened in Object, not with another app.")
+        except (FileNotFoundError, OSError):
+            return _error(404, f"No file at {req.path!r}")
+        try:
+            open_with_system(full)
+        except RefusedToOpen:
+            return _error(415, media.REFUSED_OPEN_DETAIL)
+        return {"ok": True}
+
     @api.get("/file")
     def get_file(path: str):
         try:
-            full = image_path(space.root, path)
-        except NotAnImage:
-            return _error(415, "Only image files can be served")
+            full = attachment_path(space.root, path)
+        except NotServed:
+            return _error(415, "Objects are opened, not served.")
         except (FileNotFoundError, OSError):
-            return _error(404, f"No image at {path!r}")
-        # An SVG can carry script: never let a served image run anything.
-        headers = {
-            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
-            "X-Content-Type-Options": "nosniff",
-        }
-        return FileResponse(full, media_type=image_media_type(full.name), headers=headers)
+            return _error(404, f"No file at {path!r}")
+        kind = kind_of(full.name)
+        return FileResponse(
+            full,
+            media_type=attachment_media_type(full.name),
+            headers=serve_headers(kind, full.name),
+        )
 
     @api.get("/resolve")
     def resolve(link: str, from_: str | None = Query(default=None, alias="from")):

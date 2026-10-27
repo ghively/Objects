@@ -1,30 +1,51 @@
-"""Image files in a space: listing, importing (into ``Attachments/``) and serving.
+"""Attachments in a space: listing, importing (into ``Attachments/``), serving and opening.
 
-Only image files (`IMAGE_EXTENSIONS`) inside the space and outside dot-folders
-are listed or served; anything else is refused by the route (415 for another
-extension, 404 for a path outside the space or in a dot-folder). A whiteboard's
-ink file (``<stem>.ink.svg`` beside ``<stem>.md``, M6) is not an image: it is
-neither listed nor served.
+M2's image functions (`list_images`, `image_path`, `import_image`) serve the cover-image
+picker unchanged. M7 adds attachments of every kind (`kind_of`): `list_attachments`,
+`attachment_path`, `import_attachment`, `serve_headers` and `open_with_system`.
+
+Only files inside the space and outside dot-folders are listed or served (404 for a path
+outside the space or in a dot-folder; 415 for an object's ``.md``). A whiteboard's sidecar
+files (``<stem>.ink.svg`` and ``<stem>.whiteboard.json`` beside ``<stem>.md``, M6) are
+neither listed nor served: the whiteboard routes own them.
 """
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path, PurePosixPath
+from typing import Literal, TypedDict
+from urllib.parse import quote
 
 from .space import safe_filename
 from .textfile import create_new
-from .whiteboardfile import INK_SUFFIX
+from .whiteboardfile import INK_SUFFIX, sidecar_owner
 
 __all__ = [
     "ATTACHMENTS",
     "IMAGE_EXTENSIONS",
+    "MAX_ATTACHMENT_BYTES",
+    "Attachment",
+    "AttachmentKind",
     "NotAnImage",
+    "NotServed",
+    "RefusedToOpen",
+    "TooLarge",
+    "attachment_media_type",
+    "attachment_path",
     "image_media_type",
     "image_path",
+    "import_attachment",
     "import_image",
     "is_image_name",
+    "kind_of",
+    "list_attachments",
     "list_images",
+    "open_with_system",
+    "serve_headers",
 ]
 
 ATTACHMENTS = "Attachments"
@@ -141,3 +162,236 @@ def import_image(root: Path, name: str, data: bytes) -> str:
             else:
                 return f"{ATTACHMENTS}/{file_name}"
         n += 1
+
+
+# --- M7: attachments of every kind ---------------------------------------------------------
+
+AttachmentKind = Literal["image", "pdf", "audio", "video", "file"]
+
+
+class Attachment(TypedDict):
+    path: str
+    kind: AttachmentKind
+    size: int
+
+
+MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024
+"""Object's upload limit (``EntityPicker.uploadLimitSize``: 100 MiB)."""
+
+UPLOAD_LIMIT_DETAIL = (
+    "You can only upload files up to 100 MiB in size. "
+    "If your file is bigger than that, it will fail."
+)
+
+PDF_MEDIA_TYPES = {".pdf": "application/pdf"}
+AUDIO_MEDIA_TYPES = {
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".m4a": "audio/mp4",
+    ".ogg": "audio/ogg",
+    ".oga": "audio/ogg",
+    ".flac": "audio/flac",
+    ".aac": "audio/aac",
+    ".opus": "audio/opus",
+}
+VIDEO_MEDIA_TYPES = {
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+    ".m4v": "video/x-m4v",
+    ".ogv": "video/ogg",
+}
+
+# Extensions `open_with_system` refuses: programs and scripts the OS would run.
+REFUSED_OPEN_EXTENSIONS = frozenset({
+    "exe", "bat", "cmd", "com", "ps1", "psm1", "vbs", "vbe", "js", "jse", "wsf", "wsh",
+    "msi", "msp", "scr", "lnk", "url", "hta", "cpl", "reg", "jar", "sh", "bash", "zsh",
+    "app", "command",
+})
+REFUSED_OPEN_DETAIL = "Open it from the file manager instead."  # our string
+
+_IMAGE_SANDBOX_CSP = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+_EXT_RE = re.compile(r"[a-z0-9]{1,10}")
+
+
+class NotServed(ValueError):
+    """An object's ``.md`` file: objects are opened, not served (415)."""
+
+
+class TooLarge(ValueError):
+    """An upload over `MAX_ATTACHMENT_BYTES` (413)."""
+
+
+class RefusedToOpen(ValueError):
+    """An executable or script the app won't hand to the OS (415)."""
+
+
+def kind_of(name: str) -> AttachmentKind:
+    """The attachment kind of a file name, by its (case-insensitive) extension."""
+    ext = PurePosixPath(str(name or "")).suffix.lower()
+    if ext in IMAGE_EXTENSIONS:
+        return "image"
+    if ext in PDF_MEDIA_TYPES:
+        return "pdf"
+    if ext in AUDIO_MEDIA_TYPES:
+        return "audio"
+    if ext in VIDEO_MEDIA_TYPES:
+        return "video"
+    return "file"
+
+
+def attachment_media_type(name: str) -> str:
+    """The ``Content-Type`` a file is served with (``application/octet-stream`` for a `file`)."""
+    ext = PurePosixPath(name).suffix.lower()
+    for table in (IMAGE_EXTENSIONS, PDF_MEDIA_TYPES, AUDIO_MEDIA_TYPES, VIDEO_MEDIA_TYPES):
+        if ext in table:
+            return table[ext]
+    return "application/octet-stream"
+
+
+def _is_sidecar(root: Path, rel: str) -> bool:
+    """True for a whiteboard sidecar (``.ink.svg`` / ``.whiteboard.json``) whose ``.md`` exists."""
+    owner = sidecar_owner(rel)
+    if owner is None:
+        return False
+    try:
+        return (Path(root) / owner).is_file()
+    except OSError:
+        return False
+
+
+def attachment_path(root: Path, path: str) -> Path:
+    """The file an attachment request names, checked to be inside the space.
+
+    Raises `FileNotFoundError` for a path that is empty, absolute, has a drive letter or
+    ``..``, lies in a dot-folder or outside the space, is missing, or is a whiteboard
+    sidecar; raises `NotServed` for a ``.md`` file.
+    """
+    root = Path(root).resolve()
+    text = str(path or "").replace("\\", "/")
+    rel = PurePosixPath(text)
+    if not text or rel.is_absolute() or ".." in rel.parts or re.match(r"^[A-Za-z]:", text):
+        raise FileNotFoundError(path)
+    if _hidden(rel.parts):
+        raise FileNotFoundError(path)
+    full = (root / rel).resolve()
+    if not full.is_relative_to(root) or not full.is_file():
+        raise FileNotFoundError(path)
+    real_rel = full.relative_to(root)
+    if _hidden(real_rel.parts) or _is_sidecar(root, real_rel.as_posix()):
+        raise FileNotFoundError(path)
+    if full.suffix.lower() == ".md":
+        raise NotServed(path)
+    return full
+
+
+def list_attachments(root: Path) -> list[Attachment]:
+    """Every attachment in the space, sorted by path.
+
+    A file outside dot-folders whose kind isn't ``file``, plus every file under
+    ``Attachments/``. Objects (``.md``) and whiteboard sidecars are never listed; a file
+    that can't be read (stat fails) is skipped.
+    """
+    root = Path(root)
+    out: list[Attachment] = []
+    for p in root.rglob("*"):
+        try:
+            rel = p.relative_to(root)
+        except ValueError:
+            continue
+        if _hidden(rel.parts):
+            continue
+        rel_text = rel.as_posix()
+        kind = kind_of(p.name)
+        if kind == "file" and rel.parts[0] != ATTACHMENTS:
+            continue
+        if p.suffix.lower() == ".md" or _is_sidecar(root, rel_text):
+            continue
+        try:
+            if not p.is_file():
+                continue
+            size = p.stat().st_size
+        except OSError:
+            continue
+        out.append({"path": rel_text, "kind": kind, "size": size})
+    out.sort(key=lambda a: a["path"])
+    return out
+
+
+def _safe_attachment_name(name: str) -> tuple[str, str]:
+    """(stem, extension with its dot or ``""``) of an uploaded file name, made safe."""
+    base = re.split(r"[\\/]", str(name or ""))[-1]
+    p = PurePosixPath(base)
+    suffix = p.suffix
+    ext = suffix[1:].lower()
+    if suffix and not _EXT_RE.fullmatch(ext):
+        # Not a usable extension: the whole name is the stem and none is added.
+        suffix, ext = "", ""
+    stem_text = base[: -len(suffix)] if suffix else base
+    if not stem_text.strip(" ."):
+        raise ValueError(f"No usable file name in {name!r}")
+    return safe_filename(stem_text), (f".{ext}" if ext else "")
+
+
+def import_attachment(root: Path, name: str, data: bytes) -> tuple[str, AttachmentKind]:
+    """Write ``data`` to ``Attachments/<safe name>.<ext>`` (`` (2)``... when taken).
+
+    Never overwrites (case-insensitive name check, then an atomic create). Returns
+    ``(path, kind)``. Raises `TooLarge` over `MAX_ATTACHMENT_BYTES` and `ValueError` for
+    an empty upload or a name with no usable stem.
+    """
+    if len(data) > MAX_ATTACHMENT_BYTES:
+        raise TooLarge(name)
+    if not data:
+        raise ValueError("The file is empty")
+    stem, ext = _safe_attachment_name(name)
+    folder = Path(root) / ATTACHMENTS
+    folder.mkdir(parents=True, exist_ok=True)
+    n = 1
+    while True:
+        file_name = f"{stem}{ext}" if n == 1 else f"{stem} ({n}){ext}"
+        taken = {p.name.lower() for p in folder.iterdir()}
+        if file_name.lower() not in taken:
+            try:
+                create_new(folder / file_name, data)
+            except FileExistsError:
+                pass
+            else:
+                return f"{ATTACHMENTS}/{file_name}", kind_of(file_name)
+        n += 1
+
+
+def serve_headers(kind: AttachmentKind, name: str = "") -> dict[str, str]:
+    """The response headers for serving a file of ``kind`` (``name`` names a download)."""
+    headers = {"X-Content-Type-Options": "nosniff"}
+    if kind == "image":
+        # An SVG can carry script: never let a served image run anything.
+        headers["Content-Security-Policy"] = _IMAGE_SANDBOX_CSP
+    elif kind in ("pdf", "audio", "video"):
+        headers["Content-Disposition"] = "inline"
+    else:
+        filename = quote(name or "download", safe="")
+        headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{filename}"
+    return headers
+
+
+def open_with_system(full: Path) -> None:
+    """Open ``full`` with the OS default app (a list of arguments, never a shell).
+
+    Raises `RefusedToOpen` for executables and scripts. With ``OBJECT_FAKE_OPEN_FILE``
+    set (a test hook) the absolute path is appended to that file instead.
+    """
+    full = Path(full)
+    if full.suffix.lower().lstrip(".") in REFUSED_OPEN_EXTENSIONS:
+        raise RefusedToOpen(str(full))
+    fake = os.environ.get("OBJECT_FAKE_OPEN_FILE")
+    if fake:
+        with open(fake, "a", encoding="utf-8") as f:
+            f.write(f"{full.resolve()}\n")
+        return
+    if sys.platform == "win32":
+        os.startfile(os.path.normpath(full))  # type: ignore[attr-defined]
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(full)])
+    else:
+        subprocess.Popen(["xdg-open", str(full)])

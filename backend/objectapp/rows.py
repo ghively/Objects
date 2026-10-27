@@ -37,6 +37,10 @@ class Row:
 
 _FENCE_RE = re.compile(r"^\s*(```|~~~)")
 _TAG_RE = re.compile(r"<[^>\n]*>")
+# A line that is only an HTML comment (M7's block annotations among them) and a math
+# block's ``$$`` fence line: neither contributes text to a preview or the search index.
+_COMMENT_LINE_RE = re.compile(r"^ {0,3}<!--.*-->[ \t]*$")
+_MATH_FENCE_RE = re.compile(r"^ {0,3}\$\$[ \t]*$")
 _HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+")
 _H1_RE = re.compile(r"^\s{0,3}#\s+\S")
 _QUOTE_RE = re.compile(r"^\s*(?:>\s?)+")
@@ -74,6 +78,8 @@ def body_preview(body: str, limit: int = 280) -> str:
             fenced = not fenced
             continue
         if fenced or line.lstrip().startswith("|") or _RULE_RE.match(line):
+            continue
+        if _COMMENT_LINE_RE.match(line) or _MATH_FENCE_RE.match(line):
             continue
         line = _HEADING_RE.sub("", line)
         line = _QUOTE_RE.sub("", line)
