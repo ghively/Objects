@@ -113,6 +113,11 @@ Routes (all JSON):
   board's ``.md`` path. ``PUT /api/ui`` accepts ``whiteboard`` (the canvas display settings).
   Deleting, restoring, purging and renaming a whiteboard carry its sidecar files; a rename
   relinks board files too (their sidecar paths are in ``relinked``, announced ``whiteboard``).
+- M8 (plan Task 2): ``POST /api/spaces`` also takes ``setup: 'blank' | 'basic'``; the
+  ``timeZone`` device setting sets ``space.tz`` at start-up and after every successful
+  ``PUT /api/settings`` (null: the device's zone). The M8 routers (`api_tasks`,
+  `api_history`, `api_blocks`, `api_merge`, `api_spaces_m8`) are mounted on ``/api``;
+  each module's docstring lists its routes and owner task.
 
 Errors: a path outside the space or not an object is ``400``; a missing object is ``404``;
 a file the OS refused to write (locked by another program, say) is ``503 {detail}``.
@@ -130,16 +135,26 @@ import threading
 from collections.abc import AsyncIterator, Callable
 from dataclasses import asdict
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, FastAPI, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
-from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
+from starlette.background import BackgroundTask
 
-from . import api_graph, api_references, api_search, media
+from . import (
+    api_blocks,
+    api_graph,
+    api_history,
+    api_merge,
+    api_references,
+    api_search,
+    api_spaces_m8,
+    api_tasks,
+    media,
+)
 from .apictx import ApiContext
 from .appstate import state_dir
 from .collections import CollectionDef
@@ -169,7 +184,7 @@ from .propvalues import InvalidValue
 from .queries import QueryDef
 from .reminders import ReminderScheduler, file_clock
 from .searchindex import SearchIndex
-from .settings import SettingsProblem
+from .settings import SettingsProblem, time_zone
 from .settings import patch as patch_settings
 from .settings import read as read_settings
 from .space import (
@@ -431,6 +446,7 @@ class PatchSettingsRequest(BaseModel):
 class CreateSpaceRequest(BaseModel):
     name: str = ""
     location: str = ""
+    setup: Literal["blank", "basic"] = "blank"
 
 
 class SpacePathRequest(BaseModel):
@@ -625,6 +641,17 @@ def create_app(
     scheduler = ReminderScheduler(space, notifier)
     search = SearchIndex(space)
 
+    # M8: the Time zone setting drives `space.tz`; null means the device's zone,
+    # which is whatever `space.tz` was when the app was made (tests inject one).
+    device_tz = space.tz
+
+    def settings_changed(merged: dict[str, Any]) -> None:
+        zone = time_zone(merged)
+        space.tz = zone if zone is not None else device_tz
+
+    with contextlib.suppress(ReadOnly):
+        settings_changed(read_settings()[0])
+
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI):
         hub.loop = asyncio.get_running_loop()
@@ -724,6 +751,7 @@ def create_app(
             return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        settings_changed(data)
         return {"settings": data, "revision": revision}
 
     # -- spaces (M7): the registry in the state dir; folders are never deleted --
@@ -740,13 +768,15 @@ def create_app(
         if not req.location.strip():
             return _error(404, "Choose a folder for the new space.")
         try:
-            path = create_space(req.name, req.location)
+            path = create_space(req.name, req.location, setup=req.setup)
         except SpaceNameProblem as exc:
             return _error(422, exc.message)
         except (NotADirectoryError, FileNotFoundError):
             return _error(404, f"Not a folder: {req.location}")
         except FileExistsError:
             return _error(409, "A folder with that name already exists here.")
+        except NotImplementedError as exc:  # M8 Task 2: `basic` until Task 8 fills it
+            return _error(501, str(exc))
         registry().register(path, touch=False)
         return JSONResponse({"path": str(path)}, status_code=201)
 
@@ -1550,10 +1580,13 @@ def create_app(
                 ]
             }
 
-    ctx = ApiContext(space, announce, search)
+    ctx = ApiContext(space, announce, search, settings_changed)
     api.include_router(api_search.router(ctx))
     api.include_router(api_references.router(ctx))
     api.include_router(api_graph.router(ctx))
+    # M8: each router is filled by its own task (see the plan's "Shared files").
+    for module in (api_tasks, api_history, api_blocks, api_merge, api_spaces_m8):
+        api.include_router(module.router(ctx))
     app.include_router(api)
     # M6: the whiteboard routes carry their own /api prefix.
     app.include_router(whiteboard_router(space, announce_whiteboard))

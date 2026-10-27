@@ -1,6 +1,7 @@
 """Device settings: ``<state dir>/settings.json`` (outside every space).
 
-The keys are the M7 contract's ``DeviceSettings``; `read` merges the file over
+The keys are the M7 contract's ``DeviceSettings`` plus M8's (language, decimal
+separator, time zone, backlink defaults, presentation); `read` merges the file over
 `DEFAULTS` (a missing file reads as the defaults, revision ``''``, and is not
 created). `patch` checks each key's shape, replaces the patched top-level keys,
 keeps unknown keys already in the file, and writes atomically against the
@@ -13,6 +14,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import threading
+import zoneinfo
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +23,15 @@ from .jsonstore import dump_json, parse_json_object
 from .textfile import atomic_write
 from .typemodel import RevisionConflict
 
-__all__ = ["DEFAULTS", "SettingsProblem", "patch", "read", "settings_path"]
+__all__ = [
+    "DEFAULTS",
+    "SettingsProblem",
+    "patch",
+    "read",
+    "settings_path",
+    "time_zone",
+    "valid_time_zone",
+]
 
 DEFAULTS: dict[str, Any] = {
     "themeMode": "dark",
@@ -41,6 +51,25 @@ DEFAULTS: dict[str, Any] = {
     "openOnStart": {},
     "startupSpace": "lastOpened",
     "startupSpacePath": None,
+    # M8 (plan Task 2): formatting locale, numbers, time zone, references, presentation.
+    "language": "en",
+    "decimalSeparator": "automatic",
+    "timeZone": None,
+    "backlinkSectionsDefault": {
+        "backlinks": "open",
+        "relatedContent": "open",
+        "unlinkedMentions": "open",
+    },
+    "backlinkContentView": "embed",
+    "relatedContentHiddenTypes": [],
+    "nestedBacklinkView": "showBlockContainingBacklink",
+    "presentation": {
+        "hideCoverImage": False,
+        "hideProgressIndicator": False,
+        "hideTitle": False,
+        "footerLeft": "",
+        "footerRight": "",
+    },
 }
 
 _CHOICES: dict[str, tuple[str, ...]] = {
@@ -51,9 +80,16 @@ _CHOICES: dict[str, tuple[str, ...]] = {
     "toggleStyle": ("toggle", "bullet"),
     "dateFormatting": ("localized", "DMY", "MDY", "YMD"),
     "startupSpace": ("lastOpened", "specific"),
+    "language": ("en", "en-gb", "de", "fr", "es", "it", "nl", "pt-br", "hu"),
+    "decimalSeparator": ("automatic", "dot", "comma"),
+    "backlinkContentView": ("inline", "smallCard", "wideCard", "embed"),
+    "nestedBacklinkView": ("showBlockContainingBacklink", "showFullPathAbove"),
 }
 _BOOLS = frozenset(k for k, v in DEFAULTS.items() if isinstance(v, bool))
 _OPEN_ON_START_MODES = ("lastOpenedPage", "today", "calendar", "specificObject")
+_TRI = ("open", "closed", "hidden")
+_PRESENTATION_BOOLS = ("hideCoverImage", "hideProgressIndicator", "hideTitle")
+_PRESENTATION_TEXTS = ("footerLeft", "footerRight")
 
 _lock = threading.RLock()
 
@@ -69,6 +105,17 @@ class SettingsProblem(ValueError):
 
 def settings_path() -> Path:
     return state_dir() / "settings.json"
+
+
+def valid_time_zone(name: Any) -> bool:
+    """True for an IANA zone name `zoneinfo` can load (the bundled `tzdata` on Windows)."""
+    if not isinstance(name, str) or not name.strip() or name != name.strip():
+        return False
+    try:
+        zoneinfo.ZoneInfo(name)
+    except (zoneinfo.ZoneInfoNotFoundError, ValueError, OSError):
+        return False
+    return True
 
 
 def _valid(key: str, value: Any) -> bool:
@@ -89,6 +136,23 @@ def _valid(key: str, value: Any) -> bool:
             if "path" in entry and not isinstance(entry["path"], str):
                 return False
         return True
+    if key == "timeZone":
+        return value is None or valid_time_zone(value)
+    if key == "backlinkSectionsDefault":
+        return (
+            isinstance(value, dict)
+            and set(value) == set(DEFAULTS[key])
+            and all(isinstance(v, str) and v in _TRI for v in value.values())
+        )
+    if key == "relatedContentHiddenTypes":
+        return isinstance(value, list) and all(isinstance(v, str) for v in value)
+    if key == "presentation":
+        return (
+            isinstance(value, dict)
+            and set(value) == set(DEFAULTS[key])
+            and all(isinstance(value[k], bool) for k in _PRESENTATION_BOOLS)
+            and all(isinstance(value[k], str) for k in _PRESENTATION_TEXTS)
+        )
     return False
 
 
@@ -151,3 +215,9 @@ def patch(patch: dict[str, Any], base_revision: str | None) -> tuple[dict[str, A
         path.parent.mkdir(parents=True, exist_ok=True)
         atomic_write(path, payload)
         return _merged(data), hashlib.sha256(payload).hexdigest()
+
+
+def time_zone(merged: dict[str, Any]) -> zoneinfo.ZoneInfo | None:
+    """The ``timeZone`` setting as a zone; None for the device's zone (or a bad name)."""
+    name = merged.get("timeZone")
+    return zoneinfo.ZoneInfo(name) if valid_time_zone(name) else None

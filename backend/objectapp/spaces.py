@@ -183,13 +183,21 @@ class Registry:
             self._save(data)
 
 
-def create_space(name: str, location: Path | str) -> Path:
+def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
     """Create ``<location>/<safe_filename(name)>`` holding only ``.object/space.json``.
+
+    `setup` is M8's "Start with basic setup": ``'blank'`` is the behaviour above;
+    ``'basic'`` (plan Task 8) also writes the Person, Meeting, Project and Book types and
+    raises `NotImplementedError` until that task lands (checked before anything is made).
 
     Raises `SpaceNameProblem` (422) for an empty or over-long name,
     `NotADirectoryError` (404) when `location` is not an existing folder and
     `FileExistsError` (409) when the target already exists (it is not touched).
     """
+    if setup != "blank":
+        if setup == "basic":
+            raise NotImplementedError("Start with basic setup arrives with M8 Task 8.")
+        raise ValueError(f"Unknown space setup: {setup!r}")
     if not isinstance(name, str) or not name.strip():
         raise SpaceNameProblem("A space needs a name.")
     name = name.strip()
