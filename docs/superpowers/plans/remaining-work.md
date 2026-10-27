@@ -121,6 +121,18 @@ Task 19 found no contract gaps (every M7 route has a client method with a caller
 - **Light mode** (tokens from the shipped CSS), **settings modal** completeness for local options, **spaces** (create, switch, rename).
 - **Final side-by-side fidelity pass** against Object on every screen.
 
+### M8: deferred Object features (planned 2026-10-27; not built)
+
+Gene asked on 2026-10-27 for every Object feature that M4–M7 deferred, local only. Plan: `2026-10-27-m8-deferred-features.md` (31 tasks in five lanes: A foundation and app, T tasks and calendar, S search and references, W whiteboard, E editor blocks, then integrate). New dependencies, installed by its Task 1 only: `highlight.js` 11.11.1, `html-to-image` 1.11.11, `tzdata` 2026.5, `send2trash` 2.1.0. Its "Coverage" section maps every deferred item to a task or to a spec §2 exclusion.
+
+- **Tasks and calendar:** recurrence occurrence log, Skip and Excuse, Task Stats, custom recurrence rules ("On" weekdays, Nth or last weekday or day), the overdue catch-up dialog, reminders on any date property, the Day view's Backlinks, Date references and Timeline, date tokens and typed dates in the `/` menu.
+- **Search and references:** extended search with "Text matches only" and Save as Query; the palette's clipboard actions and its extended search, settings, open space and focus mode actions; nested backlink modes and backlink section defaults; the backlinks side-panel entry and drag-to-swap; graph PNG export; find in raw mode; merge into object or tag.
+- **Whiteboards:** media and web-link nodes (no fetching), connector-drop quick-create, the entity View menu, keyboard resize, node lock, clipboard copy/paste, PNG export, Turn into / Add to whiteboard, the Floating Inspector with reading order, board Notes, presentation; ink select/move/resize, partial erase, pen tilt.
+- **Editor:** block references and Copy block reference, inline text colour and highlight in a tokens menu, indenting any block, per-list-item styles, table formulas, sorting and CSV export, Turn into object/task, code syntax highlighting, Mermaid PNG/SVG export, live collection and query embeds, audio recording (no transcription).
+- **App:** version history for objects and whiteboards, focus mode and its timer, object presentation mode, deleting a space folder (OS trash or confirmed delete), "Start with basic setup", and working Language (formatting locale; strings stay English), Decimal separator and Time zone settings.
+- **Still out (spec §2):** AI (semantic related content, AI chat, Mermaid AI, transcription), anything that needs the network at runtime (calendar feeds and task integrations, Readwise, web-embed and bookmark metadata fetching, help and feedback actions), accounts/sync/sharing and the account onboarding tour, mobile, telemetry.
+- Gene's hand-checks for M8 will be in `m8-acceptance.md` (written by the plan's Task 31), unchecked.
+
 ## Out of scope (by design)
 
 Accounts, login, billing, sync, sharing/publishing, mobile, integrations (Readwise, Kindle, calendar feeds, messaging), AI features (a Claude Code agent comes later), telemetry, importing Object data, migrating `C:\Git\wiki` (a separate later project).
