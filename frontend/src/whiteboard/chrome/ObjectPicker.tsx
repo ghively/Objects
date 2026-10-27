@@ -2,7 +2,8 @@
  * The picker the "Existing object" and "New object" tools open. "Existing object": a command
  * list over `host.objects()` filtered by title ("Search objects", our string); Enter or a click
  * picks. "New object": the space's types ("Pick a type", our string); picking one creates an
- * object of that type through `host.createObject` and picks it. Escape closes.
+ * object of that type through `host.createObject` and picks it. Escape closes. With `typeId`
+ * (M8, the quick-create menu's "Link {name}") only objects of that type are listed.
  */
 import { useEffect, useMemo, useState } from 'react'
 import type { ObjectSummary, TypeDef } from '@/api/types'
@@ -20,7 +21,7 @@ export const NOTHING_FOUND = 'Nothing found'
 
 const byPluralName = (a: TypeDef, b: TypeDef) => a.pluralName.localeCompare(b.pluralName, undefined, { sensitivity: 'base' })
 
-export function ObjectPicker({ mode, host, onPick, onClose }: ObjectPickerProps) {
+export function ObjectPicker({ mode, typeId, host, onPick, onClose }: ObjectPickerProps) {
   const types = useLinkIndex((s) => s.types)
   const [query, setQuery] = useState('')
   const [objects, setObjects] = useState<ObjectSummary[] | null>(null)
@@ -43,10 +44,11 @@ export function ObjectPicker({ mode, host, onPick, onClose }: ObjectPickerProps)
   const foundObjects = useMemo(() => {
     if (!objects) return []
     return objects
+      .filter((o) => !typeId || o.type === typeId)
       .filter((o) => !needle || o.title.toLowerCase().includes(needle))
       .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }))
       .slice(0, PICKER_LIMIT)
-  }, [objects, needle])
+  }, [objects, needle, typeId])
   const foundTypes = useMemo(
     () =>
       [...types]

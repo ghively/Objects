@@ -799,3 +799,163 @@ export function wrapInFrame(board: WhiteboardData, ids: Iterable<string>, opts: 
   }
   return addNode(board, frame)
 }
+
+// ---- M8: node lock, keyboard resize, entity views, quick-create on connector drop ----
+
+/**
+ * Locks or unlocks nodes (Object's per-node `locked`, independent of the board's lock). A
+ * locked node can't be moved, resized or deleted until it is unlocked. Unlocking removes the key.
+ */
+export function setNodesLocked(board: WhiteboardData, ids: Iterable<string>, locked: boolean): WhiteboardData {
+  let nodes: Record<string, WhiteboardNode> | null = null
+  for (const id of idSet(ids)) {
+    const n = (nodes ?? board.nodes)[id]
+    if (!n) continue
+    if (locked ? n.locked === true : !('locked' in n)) continue
+    const next: WhiteboardNode = { ...n }
+    if (locked) next.locked = true
+    else delete next.locked
+    nodes ??= { ...board.nodes }
+    nodes[id] = next
+  }
+  return nodes ? withNodes(board, nodes) : board
+}
+
+/** Keyboard resize step (`whiteboardResize`): one grid cell; with Shift (`whiteboardResizeLarge`) five. */
+export const RESIZE_STEP = GRID
+export const RESIZE_STEP_LARGE = GRID * 5
+
+/**
+ * "Resize selection": grows or shrinks each node from its right or bottom edge by `(dw, dh)`
+ * ("Grows or shrinks from the right or bottom edge"), never below its kind's floor (an embedded
+ * object stays at least 360 wide). Points and locked nodes stay. `measured` gives the rendered
+ * size of nodes that still size themselves, so the first step starts from what is on screen.
+ */
+export function resizeBy(
+  board: WhiteboardData,
+  ids: Iterable<string>,
+  dw: number,
+  dh: number,
+  measured: Record<string, { width: number; height: number }> = {},
+): WhiteboardData {
+  if ((!dw && !dh) || !Number.isFinite(dw) || !Number.isFinite(dh)) return board
+  let nodes: Record<string, WhiteboardNode> | null = null
+  for (const id of idSet(ids)) {
+    const n = board.nodes[id]
+    if (!n || n.locked || n.kind === 'point') continue
+    const box = nodeBox(n)
+    const m = measured[id]
+    const w0 = typeof n.width === 'number' ? n.width : (m?.width ?? box.width)
+    const h0 = typeof n.height === 'number' ? n.height : (m?.height ?? box.height)
+    const min = minSizeFor(n.kind)
+    const entity = n.kind === 'block' && n.blockId !== undefined && board.blocks[n.blockId]?.type === 'entity'
+    const minW = entity ? Math.max(min.width, LINK_BLOCK_MIN_WIDTH) : min.width
+    const width = Math.max(minW, w0 + dw)
+    const height = Math.max(min.height, h0 + dh)
+    if (width === n.width && height === n.height) continue
+    nodes ??= { ...board.nodes }
+    nodes[id] = { ...n, width, height }
+  }
+  return nodes ? withNodes(board, nodes) : board
+}
+
+/** The entity node "View" menu: sets (or with `null` clears) the entity block's `view` (our key). */
+export function setEntityView(
+  board: WhiteboardData,
+  nodeId: string,
+  view: 'inline' | 'smallCard' | 'wideCard' | 'embed' | null,
+): WhiteboardData {
+  const n = board.nodes[nodeId]
+  const block = n?.blockId !== undefined ? board.blocks[n.blockId] : undefined
+  if (!n || n.blockId === undefined || !block || block.type !== 'entity') return board
+  if ((block.view ?? null) === view) return board
+  const next = { ...block } as Record<string, unknown>
+  if (view === null) delete next.view
+  else next.view = view
+  return { ...board, blocks: { ...board.blocks, [n.blockId]: next as WhiteboardBlock } }
+}
+
+/** The side of `box` that faces `from` (where a quick-created node's connector arrives). */
+export function facingHandle(box: Box, from: WhiteboardPosition): 'top' | 'right' | 'bottom' | 'left' {
+  const cx = box.x + box.width / 2
+  const cy = box.y + box.height / 2
+  const dx = from.x - cx
+  const dy = from.y - cy
+  if (Math.abs(dx) * Math.max(1, box.height) >= Math.abs(dy) * Math.max(1, box.width)) return dx >= 0 ? 'right' : 'left'
+  return dy >= 0 ? 'bottom' : 'top'
+}
+
+/** A connector dropped on empty canvas: where it started and where it was let go. */
+export interface ConnectorDrop {
+  /** The node the connector was dragged from. */
+  nodeId: string
+  /** Its handle (`top`/`right`/`bottom`/`left`). */
+  handleId?: string | null
+  /** The drag started on a target handle: the new node becomes the connector's source. */
+  fromTarget?: boolean
+  /** The drop point, in board coordinates. */
+  at: WhiteboardPosition
+}
+
+/**
+ * Connects the dropped connector's node with `newId` (a node already on `board`), from the
+ * handle it was dragged from to the new node's side facing it. A point end takes no handle.
+ */
+export function connectDrop(
+  board: WhiteboardData,
+  drop: ConnectorDrop,
+  newNodeId: string,
+  style: EdgeStyle = {},
+  edgeId: string = newId(),
+): WhiteboardData {
+  const from = board.nodes[drop.nodeId]
+  const to = board.nodes[newNodeId]
+  if (!from || !to || from.id === to.id || !isConnectable(from)) return board
+  const fromBox = nodeBox(from)
+  const facing =
+    to.kind === 'point' ? undefined : facingHandle(nodeBox(to), { x: fromBox.x + fromBox.width / 2, y: fromBox.y + fromBox.height / 2 })
+  const own = drop.handleId ?? undefined
+  const edge: WhiteboardEdge = drop.fromTarget
+    ? { id: edgeId, source: newNodeId, target: drop.nodeId }
+    : { id: edgeId, source: drop.nodeId, target: newNodeId }
+  const sourceHandle = drop.fromTarget ? facing : own
+  const targetHandle = drop.fromTarget ? own : facing
+  if (sourceHandle) edge.sourceHandle = sourceHandle
+  if (targetHandle) edge.targetHandle = targetHandle
+  for (const [k, v] of Object.entries(style)) if (v !== undefined) edge[k] = v
+  return { ...board, edges: { ...board.edges, [edgeId]: edge } }
+}
+
+/** What the quick-create menu places at the drop point. */
+export type QuickCreateChoice =
+  | { kind: 'none' }
+  | { kind: 'shape'; shape: WhiteboardTool }
+  | { kind: 'entity'; link: string }
+
+/**
+ * Quick-create on a connector drop, as one step: "Nothing" keeps a point end at the drop point;
+ * a shape or an object is placed centred on the drop point (snapped when `snap`) and connected.
+ * "Remove" places nothing (the caller simply doesn't call this). `ids.node` is the placed node.
+ */
+export function quickCreate(
+  board: WhiteboardData,
+  drop: ConnectorDrop,
+  choice: QuickCreateChoice,
+  opts: { snap?: boolean; style?: EdgeStyle; ids?: { node?: string; edge?: string } } = {},
+): WhiteboardData {
+  if (!board.nodes[drop.nodeId]) return board
+  const nodeId = opts.ids?.node ?? newId()
+  const snap = opts.snap !== false
+  let next: WhiteboardData
+  if (choice.kind === 'none') {
+    const position = snap ? snapPosition(drop.at) : { x: drop.at.x, y: drop.at.y }
+    next = addNode(board, { id: nodeId, kind: 'point', position })
+  } else if (choice.kind === 'shape') {
+    next = createFromTool(board, choice.shape, drop.at, { id: nodeId, snap })
+  } else {
+    next = createEntity(board, choice.link, drop.at, { id: nodeId, snap })
+  }
+  if (!next.nodes[nodeId]) return board
+  const linked = connectDrop(next, drop, nodeId, opts.style, opts.ids?.edge)
+  return linked === next ? board : linked
+}

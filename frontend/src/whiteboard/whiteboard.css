@@ -390,3 +390,33 @@
     transparent 78%
   );
 }
+
+/* ---- M8: the per-node lock icon, shown on hover (our placement and size) ---- */
+
+.whiteboard-canvas .whiteboard-node-lock {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--color-bg-front);
+  color: var(--color-fg-muted);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.whiteboard-canvas .react-flow__node:hover .whiteboard-node-lock,
+.whiteboard-canvas .react-flow__node.selected .whiteboard-node-lock {
+  opacity: 1;
+}
+
+/* The quick-create menu's shape grid buttons get the menu's focus ring. */
+.whiteboard-canvas [data-whiteboard-quick-create] [role='menuitem']:focus-visible {
+  outline: 2px solid var(--color-border-block-selection);
+  outline-offset: -2px;
+}

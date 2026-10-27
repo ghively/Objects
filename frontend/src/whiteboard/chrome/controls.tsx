@@ -39,6 +39,8 @@ export const KEY_HINT = {
   flipY: 'Shift+V',
   wrap: 'Ctrl+Alt+G',
   delete: 'Delete',
+  resize: 'Ctrl+Alt+Arrow',
+  resizeLarge: 'Ctrl+Alt+Shift+Arrow',
 } as const
 
 /** "Name (Key)" for a tooltip. */

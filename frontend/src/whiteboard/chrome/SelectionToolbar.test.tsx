@@ -38,11 +38,11 @@ describe('SelectionToolbar', () => {
   test('test selection toolbar shows the controls that apply to the selection', () => {
     const cases: [string[], string[]][] = [
       // Text only: colour, text alignment, order, duplicate, wrap, delete. No fill, flip or align.
-      [['t'], ['Color', 'Text alignment', ORDER_LABEL, 'Duplicate', 'Wrap in new frame', 'Delete']],
-      [['s'], ['Color', 'Fill', 'Text alignment', 'Flip', ORDER_LABEL, 'Duplicate', 'Wrap in new frame', 'Delete']],
-      [['f'], ['Color', 'Fill', ORDER_LABEL, 'Duplicate', 'Wrap in new frame', 'Remove frame title', 'Delete']],
-      [['t', 's', 'f'], ['Color', 'Fill', 'Text alignment', 'Flip', 'Align', ORDER_LABEL, 'Duplicate', 'Wrap in new frame', 'Delete']],
-      [['l'], ['Duplicate']],
+      [['t'], ['Color', 'Text alignment', ORDER_LABEL, 'Duplicate', 'Wrap in new frame', 'Lock', 'Delete']],
+      [['s'], ['Color', 'Fill', 'Text alignment', 'Flip', ORDER_LABEL, 'Duplicate', 'Wrap in new frame', 'Lock', 'Delete']],
+      [['f'], ['Color', 'Fill', ORDER_LABEL, 'Duplicate', 'Wrap in new frame', 'Remove frame title', 'Lock', 'Delete']],
+      [['t', 's', 'f'], ['Color', 'Fill', 'Text alignment', 'Flip', 'Align', ORDER_LABEL, 'Duplicate', 'Wrap in new frame', 'Lock', 'Delete']],
+      [['l'], ['Duplicate', 'Unlock']],
     ]
     for (const [sel, expected] of cases) {
       const { unmount } = renderOnly(B, sel)
@@ -53,12 +53,12 @@ describe('SelectionToolbar', () => {
 
   test('shape selection adds fill and flip', () => {
     setup(B, ['s'])
-    expect(controls()).toEqual(['Color', 'Fill', 'Text alignment', 'Flip', ORDER_LABEL, 'Duplicate', 'Wrap in new frame', 'Delete'])
+    expect(controls()).toEqual(['Color', 'Fill', 'Text alignment', 'Flip', ORDER_LABEL, 'Duplicate', 'Wrap in new frame', 'Lock', 'Delete'])
   })
 
   test('one frame: fill and the frame title control', () => {
     setup(B, ['f'])
-    expect(controls()).toEqual(['Color', 'Fill', ORDER_LABEL, 'Duplicate', 'Wrap in new frame', 'Remove frame title', 'Delete'])
+    expect(controls()).toEqual(['Color', 'Fill', ORDER_LABEL, 'Duplicate', 'Wrap in new frame', 'Remove frame title', 'Lock', 'Delete'])
   })
 
   test('one untitled frame offers Add frame title', async () => {
@@ -89,9 +89,9 @@ describe('SelectionToolbar', () => {
     expect(actions.place).toHaveBeenCalledWith('grid', ['t', 's', 'f'])
   })
 
-  test('a locked node only offers Duplicate; locked nodes are left out of edits', async () => {
+  test('a locked node only offers Duplicate and Unlock; locked nodes are left out of edits', async () => {
     setup(B, ['l'])
-    expect(controls()).toEqual(['Duplicate'])
+    expect(controls()).toEqual(['Duplicate', 'Unlock'])
   })
 
   test('locked nodes are left out of a mixed selection', async () => {

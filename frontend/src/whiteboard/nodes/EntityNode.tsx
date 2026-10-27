@@ -4,6 +4,8 @@
  * `--whiteboard-embed-caption-height`/`-gap`), and the object as M3's small card. At least 360
  * wide. Double-click opens the object in the peek; Ctrl/Cmd+double-click in a new tab (our
  * choice, through the host). A link that resolves to nothing shows its text in the dangling style.
+ * M8: the block's optional `view` (the selection toolbar's "View" menu) draws the object as M7's
+ * "Link block", "Small card" (the default), "Wide card" or "Embed" through M3's `ObjectCard`.
  */
 import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import type { Row } from '@/api/types'
@@ -11,8 +13,10 @@ import type { WhiteboardEntityBlock } from '@/api/whiteboardTypes'
 import { IconOrEmoji } from '@/components/Icon'
 import { typeOf } from '@/links/linkIndex'
 import { cardProperties, type CardProperty } from '@/views/cards/cardConfig'
+import { ObjectCard } from '@/views/cards/ObjectCard'
 import { SmallCard } from '@/views/cards/SmallCard'
 import type { WhiteboardNodeProps } from '../canvasTypes'
+import { entityViewOf } from '../chrome/EntityViewMenu'
 import { borderStyle } from '../colors'
 import { useWhiteboardHost, type WhiteboardHost } from '../host'
 import { LINK_BLOCK_MIN_WIDTH } from '../model'
@@ -81,6 +85,7 @@ export function EntityNode({ data, selected }: WhiteboardNodeProps) {
   const host = useWhiteboardHost()
   const embedded = useEmbedded(host, block.link)
   const text = wikilinkText(block.link)
+  const view = entityViewOf(block)
 
   const path = embedded.state === 'ok' ? embedded.path : null
   const row = embedded.state === 'ok' ? embedded.row : null
@@ -101,6 +106,7 @@ export function EntityNode({ data, selected }: WhiteboardNodeProps) {
         data-testid="whiteboard-entity-node"
         data-path={path ?? undefined}
         data-dangling={embedded.state === 'dangling' ? '' : undefined}
+        data-view={view}
         onDoubleClick={onDoubleClick}
       >
         <div className="whiteboard-embed-caption flex items-center gap-1.5 truncate px-1 text-[14px] text-fg-muted" data-testid="whiteboard-embed-caption">
@@ -115,7 +121,11 @@ export function EntityNode({ data, selected }: WhiteboardNodeProps) {
           className="whiteboard-node-frame box-border h-full w-full overflow-hidden"
           style={{ background: 'var(--color-bg-base)', ...borderStyle(node.borderColor) }}
         >
-          {row ? (
+          {row && view !== 'smallCard' ? (
+            <div className="pointer-events-none h-full w-full overflow-hidden" data-testid="whiteboard-entity-view">
+              <ObjectCard row={row} type={type} view={view} props={type ? cardProperties(type) : TITLE_ONLY} />
+            </div>
+          ) : row ? (
             <SmallCard
               row={row}
               type={type}
