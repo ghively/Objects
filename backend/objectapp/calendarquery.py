@@ -16,6 +16,15 @@ the API contract's ``CalendarRange``:
   the Task ``date``/``deadline``.
 - ``created`` / ``updated``: objects (not templates, not daily notes) created
   / last updated on the day; ``updated`` leaves out objects created that day.
+- M8 ``backlinks``: objects linking ``[[YYYY-MM-DD]]`` to the day, whether or
+  not its daily note exists (our choice), plus the daily note's own backlinks;
+  the day's daily notes are left out. Sorted by title then path.
+- M8 ``references``: objects holding date tokens (``<time datetime="…">``) for
+  the day, with the count, sorted by title then path.
+- M8 ``timeline``: the day's timed items sorted by time: creations
+  (``created``, the ``createdAt`` instant), time-resolution date values
+  (``dated``, with ``key``) and time-resolution Task dates (``task``), each on
+  the local day it starts (our reading of "Timeline").
 
 Instants (``createdAt``, ``lastUpdated``, time-resolution dates) become local
 days per instant through ``Space.tz``; day-resolution dates are days as written.
@@ -78,11 +87,15 @@ class _Query:
                 "dated": [],
                 "created": [],
                 "updated": [],
+                "backlinks": [],
+                "references": [],
+                "timeline": [],
             }
             d += _ONE_DAY
         self.mentioned: set[str] = set()
         self._instant_days: dict[str, date | None] = {}
         self._day_offsets: dict[date, timedelta | None] = {}
+        self._timeline: list[tuple[datetime, int, str, str, dict[str, Any]]] = []
 
     # -- day arithmetic ----------------------------------------------------------
 
@@ -204,7 +217,26 @@ class _Query:
                 self.mentioned.update(paths)
         return warnings
 
+    def timed(self, path: str, kind: str, start: Any, key: str | None = None) -> None:
+        """Put an instant on the timeline of the local day it falls on (when in range)."""
+        dt = _instant(start)
+        if dt is None:
+            return
+        d = self._local_day(dt)
+        if not self.in_range(d):
+            return
+        entry: dict[str, Any] = {"path": path, "at": _utc_text(dt), "kind": kind}
+        if key is not None:
+            entry["key"] = key
+        self._timeline.append((dt, _KIND_ORDER[kind], path, key or "", entry))
+        self.mentioned.add(path)
+
+    def finish_timeline(self) -> None:
+        for dt, _k, _p, _key, entry in sorted(self._timeline, key=lambda t: t[:4]):
+            self.add(self._local_day(dt), "timeline", entry)
+
     def stamps(self, path: str, fm: dict[str, Any]) -> None:
+        self.timed(path, "created", fm.get("createdAt"))
         created = self.instant_day(fm.get("createdAt"))
         updated = self.instant_day(fm.get("lastUpdated"))
         if created is not None and self.in_range(created):
@@ -234,6 +266,8 @@ class _Query:
             if "end" in value:
                 entry["end"] = value["end"]
             entry["resolution"] = value["resolution"]
+            if value["resolution"] != "day":
+                self.timed(path, "dated", value["start"], pdef.key)
             for d in days:
                 self.add(d, "dated", dict(entry))
             self.mentioned.add(path)
@@ -250,6 +284,8 @@ class _Query:
         if value and isinstance(value.get("start"), str):
             first, last = self.span(value)
             if first is not None:
+                if value.get("resolution") != "day":
+                    self.timed(path, "task", value["start"])
                 real_days = set()
                 for d in self.covered(value):
                     self.add(d, "tasks", _task_entry(path, "date", d, done))
@@ -299,6 +335,60 @@ class _Query:
             self.add(d, "tasks", _task_entry(path, "occurrence", d, False))
             added = True
         return added
+
+
+_KIND_ORDER = {"created": 0, "dated": 1, "task": 2}
+
+
+def _instant(text: Any) -> datetime | None:
+    """A stamp (``…Z`` or with an offset) as an aware instant; a bare day is not one."""
+    if isinstance(text, datetime):
+        return text if text.tzinfo is not None else text.replace(tzinfo=UTC)
+    if not isinstance(text, str) or parse_day(text) is not None:
+        return None
+    try:
+        dt = datetime.fromisoformat(text.strip())
+    except ValueError:
+        return None
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+
+
+def _utc_text(dt: datetime) -> str:
+    utc = dt.astimezone(UTC)
+    if utc.microsecond:
+        return utc.strftime("%Y-%m-%dT%H:%M:%S.") + f"{utc.microsecond // 1000:03d}Z"
+    return utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _day_links(q: _Query, space: Space) -> None:
+    """Fill each day's ``backlinks`` and ``references`` from the link index."""
+    links = space.links
+    index, duplicates = space.daily_notes()
+    notes: dict[str, set[str]] = {}
+    for day, path in index.items():
+        notes.setdefault(day, set()).add(path)
+    for day, paths in duplicates:
+        notes.setdefault(day, set()).update(paths)
+    summaries = space._summaries
+
+    def order(p: str) -> tuple[str, str, str]:
+        s = summaries.get(p)
+        title = s.title if s is not None else p
+        return (title.casefold(), title, p)
+
+    for day, entry in q.days.items():
+        own = notes.get(day, set())
+        sources = links.day_link_sources(day)
+        if day in index:
+            sources.update(links.backlinks(index[day]))
+        backlinks = sorted((p for p in sources - own if p in summaries), key=order)
+        entry["backlinks"] = backlinks
+        refs = links.date_references(day)
+        entry["references"] = [
+            {"path": p, "count": refs[p]} for p in sorted(refs, key=order) if p in summaries
+        ]
+        q.mentioned.update(backlinks)
+        q.mentioned.update(r["path"] for r in entry["references"])
 
 
 def _summary_dict(summary: Any) -> dict[str, Any]:
@@ -360,6 +450,8 @@ def calendar_range(space: Space, from_day: Any, to_day: Any) -> dict[str, Any]:
             q.dated(path, dated_props[summary.type], fm)
             if is_task_type(t):
                 q.task(path, t, fm)
+        q.finish_timeline()
+        _day_links(q, space)
         summaries = {
             p: _summary_dict(space._summaries[p])
             for p in sorted(q.mentioned)
