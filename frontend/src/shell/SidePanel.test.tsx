@@ -75,6 +75,10 @@ describe('SidePanel', () => {
     expect(within(area(2)).getByText('page A2.md')).toBeInTheDocument()
     expect(panel().style.width).toBe('500px')
     expect(screen.getByTestId('sidepanel-area2').style.flex).toBe('0 0 33.33%')
+    // It gives way to the main column's minimum width, down to its own 320 px.
+    expect(panel().style.minWidth).toBe('320px')
+    expect(panel().className).toMatch(/(^| )shrink( |$)/)
+    expect(panel().className).not.toContain('shrink-0')
 
     // Width: drag the left edge 100 px to the left; written on pointer up.
     const edge = screen.getByRole('separator', { name: 'Resize side panel' })

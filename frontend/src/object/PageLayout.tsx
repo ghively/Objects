@@ -10,8 +10,16 @@
  * - `font` sets the title and body font family.
  * - The cover image: `wideCoverImage` spans the whole panel, `cropCoverImage` fixes its height.
  * The page and the peek share this layout; the peek is narrower, so its gutters are too.
+ *
+ * Narrow widths (Standard only): the content column keeps `MIN_CONTENT_WIDTH`; when the layout
+ * is narrower than the property panel plus that, the panel moves inline under the header (drawn
+ * as the `card` variant). The shell gives the main column `PROPERTIES_BESIDE_WIDTH` while a panel
+ * is open, shrinking the side panel to its minimum first (`index.css`, `[data-main-column]`). The
+ * reference only shows the panel beside the content (`docs/ui-reference/05`) and stacks property
+ * rows in its narrowest containers (`.xxs-container .properties-property-outer`); the widths and
+ * the inline fallback are our choice.
  */
-import type { CSSProperties, ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import { api } from '@/api/client'
 import type { ObjectSummary, TypeDef, TypeFont } from '@/api/types'
 import { IconOrEmoji } from '@/components/Icon'
@@ -23,6 +31,37 @@ export type PageDesign = 'standard' | 'indexCard' | 'profile' | 'encyclopedia'
 
 /** Where the property panel sits, and so how it is drawn. */
 export type PanelVariant = 'side' | 'card' | 'column' | 'infobox'
+
+/** The Standard left property panel's width (`PropertyPanel`'s `side` variant). */
+export const PROPERTY_PANEL_WIDTH = 370
+/** The narrowest the content column gets beside the property panel (our choice: no reference value). */
+export const MIN_CONTENT_WIDTH = 480
+/** The layout width from which the Standard property panel sits beside the content. */
+export const PROPERTIES_BESIDE_WIDTH = PROPERTY_PANEL_WIDTH + MIN_CONTENT_WIDTH
+
+/** Whether a Standard layout `width` px wide (null: not measured yet) has the panel beside the content. */
+export function propertiesBeside(width: number | null): boolean {
+  return width === null || width >= PROPERTIES_BESIDE_WIDTH
+}
+
+/** The layout's width, measured before paint and on every resize (null where it cannot be). */
+function useWidth(ref: RefObject<HTMLElement | null>): number | null {
+  const [width, setWidth] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => {
+      const w = el.getBoundingClientRect().width
+      setWidth(w > 0 ? w : null)
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return width
+}
 
 export function pageDesign(type: TypeDef | undefined): PageDesign {
   return type?.viewDesign ?? 'standard'
@@ -56,8 +95,11 @@ export interface PageLayoutProps {
   summary: ObjectSummary
   /** The object header (type chip, icon, title, description, aliases, tags). */
   header: ReactNode
-  /** The property panel (drawn for `panelVariant(pageDesign(type))`), or null when hidden. */
-  properties: ReactNode
+  /**
+   * The property panel, or null when hidden. As a function it is drawn for the variant given:
+   * `panelVariant(pageDesign(type))`, or `card` when a narrow Standard layout puts it inline.
+   */
+  properties: ReactNode | ((variant: PanelVariant) => ReactNode)
   /** The body editor, with any notices above it. */
   body: ReactNode
   mode?: 'page' | 'peek'
@@ -97,6 +139,12 @@ export function PageLayout({
   children,
 }: PageLayoutProps) {
   const design = pageDesign(type)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const width = useWidth(rootRef)
+  const open = properties !== null && properties !== undefined && properties !== false
+  const inline = design === 'standard' && open && !propertiesBeside(width)
+  const propertiesEl =
+    typeof properties === 'function' ? properties(inline ? 'card' : panelVariant(design)) : properties
   const wide = design === 'standard' && !!type?.wideLayoutMode
   const font = fontStyle(type?.font)
   const cover = design !== 'profile' ? summary.coverImage : null
@@ -121,7 +169,7 @@ export function PageLayout({
       content = (
         <>
           {headerEl}
-          {properties && <div data-index-card="">{properties}</div>}
+          {propertiesEl && <div data-index-card="">{propertiesEl}</div>}
           {bodyEl}
         </>
       )
@@ -131,7 +179,7 @@ export function PageLayout({
         <div className="flex gap-10">
           <div data-profile-column="" className="flex w-[var(--profile-column-width)] shrink-0 flex-col gap-6">
             <ProfileImage summary={summary} type={type} />
-            {properties}
+            {propertiesEl}
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
             {headerEl}
@@ -146,7 +194,7 @@ export function PageLayout({
           {headerEl}
           <div className="flex items-start gap-10">
             {bodyEl}
-            {properties}
+            {propertiesEl}
           </div>
         </>
       )
@@ -155,14 +203,21 @@ export function PageLayout({
       content = (
         <>
           {headerEl}
+          {inline && <div data-properties-inline="">{propertiesEl}</div>}
           {bodyEl}
         </>
       )
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full" data-page-layout={design} data-font={type?.font ?? 'sans-serif'}>
-      {design === 'standard' && properties}
+    <div
+      ref={rootRef}
+      className="flex h-full min-h-0 w-full"
+      data-page-layout={design}
+      data-font={type?.font ?? 'sans-serif'}
+      data-properties={design === 'standard' && open ? (inline ? 'inline' : 'beside') : undefined}
+    >
+      {design === 'standard' && !inline && propertiesEl}
       <div className="relative flex min-w-0 flex-1 flex-col">
         {toolbar}
         <div className="min-h-0 flex-1 overflow-auto">
