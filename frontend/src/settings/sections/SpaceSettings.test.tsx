@@ -72,3 +72,14 @@ describe('SpaceSettingsSection', () => {
     expect(iconToSpaceIcon(null)).toBeNull()
   })
 })
+
+describe('SpaceSettingsSection: delete space (M8)', () => {
+  test('test current space cannot be deleted', async () => {
+    render(<SpaceSettingsSection />)
+    const section = await screen.findByRole('region', { name: 'Delete space' })
+    expect(section).toHaveTextContent('Switch to another space to delete this one.')
+    const button = screen.getByRole('button', { name: 'Delete space' })
+    expect(button).toBeDisabled()
+    expect(mocked.deleteSpace).not.toHaveBeenCalled()
+  })
+})

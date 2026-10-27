@@ -1,8 +1,9 @@
 /**
  * The top bar's space switcher ("Spaces"): one row per registered space (icon, name, a check on
  * the current one, muted when its folder is gone). Clicking another space switches to it; each
- * row's "…" has "Rename" (the current space only: writes `space.json`'s name) and "Remove" (never
- * the current space: Object forgets it, the folder stays). Below the list: "Space settings",
+ * row's "…" has "Rename" (the current space only: writes `space.json`'s name), "Remove" (never
+ * the current space: Object forgets it, the folder stays) and, M8, "Delete space" (never the
+ * current space: the folder goes to the OS trash, see `DeleteSpaceDialog`). Below the list: "Space settings",
  * "Add space" (the create dialog) and "Open folder…" (registers an existing folder).
  *
  * `SpaceSwitchOverlay` covers the app while a switch waits for the server to come back on the new
@@ -33,6 +34,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useSettingsModal } from '@/settings/useSettingsModal'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { useCreateSpaceDialog } from './CreateSpaceDialog'
+import { DELETE_SPACE_TEXT, DeleteSpaceDialog } from './DeleteSpaceDialog'
 import { SWITCH_TEXT, switchSpace, useSpaceSwitch } from './switchSpace'
 
 export const SPACES_MENU_TEXT = {
@@ -64,6 +66,7 @@ function SpaceRow({
   onSwitch,
   onRename,
   onRemove,
+  onDelete,
   onRenameDone,
 }: {
   entry: SpaceEntry
@@ -71,6 +74,7 @@ function SpaceRow({
   onSwitch(): void
   onRename(): void
   onRemove(): void
+  onDelete(): void
   onRenameDone(name: string | null): void
 }) {
   const [draft, setDraft] = useState(entry.name)
@@ -151,10 +155,18 @@ function SpaceRow({
               {T.rename}
             </DropdownMenuItem>
           ) : (
-            <DropdownMenuItem onSelect={onRemove}>
-              <Icon name="ph-x" size={15} />
-              {T.remove}
-            </DropdownMenuItem>
+            <>
+              <DropdownMenuItem onSelect={onRemove}>
+                <Icon name="ph-x" size={15} />
+                {T.remove}
+              </DropdownMenuItem>
+              {!entry.missing && (
+                <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+                  <Icon name="ph-trash" size={15} />
+                  {DELETE_SPACE_TEXT.menuItem}
+                </DropdownMenuItem>
+              )}
+            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -186,9 +198,10 @@ export function SpacesMenu({ children }: SpacesMenuProps) {
   const [error, setError] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [removing, setRemoving] = useState<SpaceEntry | null>(null)
-  // The remove confirmation takes focus; the menu stays open behind it.
+  const [deleting, setDeleting] = useState<SpaceEntry | null>(null)
+  // The remove and delete confirmations take focus; the menu stays open behind them.
   const confirming = useRef(false)
-  confirming.current = removing !== null
+  confirming.current = removing !== null || deleting !== null
   const [folderOpen, setFolderOpen] = useState(false)
   const [folder, setFolder] = useState('')
 
@@ -288,6 +301,10 @@ export function SpacesMenu({ children }: SpacesMenuProps) {
                   confirming.current = true
                   setRemoving(entry)
                 }}
+                onDelete={() => {
+                  confirming.current = true
+                  setDeleting(entry)
+                }}
                 onRenameDone={(name) => void renameDone(name)}
               />
             ))}
@@ -353,6 +370,14 @@ export function SpacesMenu({ children }: SpacesMenuProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <DeleteSpaceDialog
+        entry={deleting}
+        onClose={() => setDeleting(null)}
+        onDeleted={(path) => {
+          setSpaces((list) => list.filter((s) => s.path !== path))
+          void reload()
+        }}
+      />
     </>
   )
 }

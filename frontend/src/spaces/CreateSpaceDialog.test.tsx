@@ -79,13 +79,13 @@ describe('CreateSpaceDialog', () => {
     expect(create).toBeEnabled()
     await user.click(create)
     expect(await screen.findByRole('alert')).toHaveTextContent('A folder with that name already exists here.')
-    expect(mocked.createSpace).toHaveBeenCalledWith('Research', '/home/gene/Spaces')
+    expect(mocked.createSpace).toHaveBeenCalledWith('Research', '/home/gene/Spaces', 'blank')
 
     // A free name: created, then offered a switch.
     await user.clear(name)
     await user.type(name, '  Reading list ')
     await user.click(create)
-    await waitFor(() => expect(mocked.createSpace).toHaveBeenLastCalledWith('Reading list', '/home/gene/Spaces'))
+    await waitFor(() => expect(mocked.createSpace).toHaveBeenLastCalledWith('Reading list', '/home/gene/Spaces', 'blank'))
     expect(await screen.findByText(CREATE_SPACE_TEXT.created)).toBeInTheDocument()
     expect(switchSpace).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Switch space' }))
@@ -113,6 +113,29 @@ describe('CreateSpaceDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(mocked.createSpace).not.toHaveBeenCalled()
     expect(useCreateSpaceDialog.getState().isOpen).toBe(false)
+  })
+
+  test('test create dialog offers basic setup', async () => {
+    const user = await openDialog()
+    expect(screen.getByText('How do you want to start?')).toBeInTheDocument()
+    expect(screen.getByText('Includes people, meetings, projects, and books.')).toBeInTheDocument()
+    expect(screen.getByText('Add object types when you need them.')).toBeInTheDocument()
+    const basic = screen.getByRole('radio', { name: 'Start with basic setup' })
+    const blank = screen.getByRole('radio', { name: 'Start with a blank space' })
+    expect(blank).toBeChecked()
+    expect(basic).not.toBeChecked()
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Location' })).toHaveValue('/home/gene/Spaces'))
+    await user.type(screen.getByPlaceholderText('Name'), 'Starter')
+    await user.click(screen.getByText('Start with basic setup'))
+    expect(basic).toBeChecked()
+    await user.click(screen.getByRole('button', { name: 'Create space' }))
+    await waitFor(() => expect(mocked.createSpace).toHaveBeenCalledWith('Starter', '/home/gene/Spaces', 'basic'))
+    expect(await screen.findByText(CREATE_SPACE_TEXT.created)).toBeInTheDocument()
+
+    // Reopening starts from a blank space again.
+    act(() => useCreateSpaceDialog.getState().close())
+    act(() => useCreateSpaceDialog.getState().open())
+    expect(await screen.findByRole('radio', { name: 'Start with a blank space' })).toBeChecked()
   })
 
   test('test parent folder of posix and windows roots', () => {

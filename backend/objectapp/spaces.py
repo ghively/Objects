@@ -8,32 +8,48 @@ were first registered, with when each was last opened::
 It holds no user content: an unreadable file reads as empty and is replaced on
 the next write. Reading never writes. Removing a space only drops it from the
 list; its folder is never touched. `create_space` makes a new folder holding only
-``.capacities/space.json`` and refuses a folder that already exists.
+``.capacities/space.json`` (plus, for M8's basic setup, four type files) and refuses
+a folder that already exists.
+
+M8 `delete_space` deletes a space folder that is not the current one: to the OS
+trash through `send2trash` (``OBJECT_FAKE_TRASH_FILE`` replaces the trash in
+tests), or, after the trash proved unavailable (428) and the user confirmed,
+permanently, re-checking first that it is still the same folder. Either way the
+entry leaves the registry; nothing in the state dir is deleted.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .appstate import state_dir
 from .jsonstore import dump_json
 from .space import safe_filename
 from .spaceconfig import MAX_NAME_LENGTH, space_fields
 from .textfile import atomic_write
 
 __all__ = [
+    "FAKE_TRASH_ENV",
     "REGISTRY_FILE",
     "Registry",
     "SpaceEntry",
+    "SpaceIsCurrent",
     "SpaceNameProblem",
+    "SpaceNotFound",
+    "TrashUnavailable",
     "create_space",
+    "delete_space",
     "normalize",
 ]
+
+FAKE_TRASH_ENV = "OBJECT_FAKE_TRASH_FILE"
 
 REGISTRY_FILE = "spaces.json"
 
@@ -186,17 +202,16 @@ class Registry:
 def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
     """Create ``<location>/<safe_filename(name)>`` holding only ``.capacities/space.json``.
 
-    `setup` is M8's "Start with basic setup": ``'blank'`` is the behaviour above;
-    ``'basic'`` (plan Task 8) also writes the Person, Meeting, Project and Book types and
-    raises `NotImplementedError` until that task lands (checked before anything is made).
+    `setup` is M8's "How do you want to start?": ``'blank'`` is the behaviour above;
+    ``'basic'`` also writes the Person, Meeting, Project and Book types
+    (``.capacities/types/{person,meeting,project,book}.json``, see `basicsetup`).
 
     Raises `SpaceNameProblem` (422) for an empty or over-long name,
-    `NotADirectoryError` (404) when `location` is not an existing folder and
-    `FileExistsError` (409) when the target already exists (it is not touched).
+    `NotADirectoryError` (404) when `location` is not an existing folder,
+    `FileExistsError` (409) when the target already exists (it is not touched) and
+    `ValueError` for an unknown `setup` (checked before anything is made).
     """
-    if setup != "blank":
-        if setup == "basic":
-            raise NotImplementedError("Start with basic setup arrives with M8 Task 8.")
+    if setup not in ("blank", "basic"):
         raise ValueError(f"Unknown space setup: {setup!r}")
     if not isinstance(name, str) or not name.strip():
         raise SpaceNameProblem("A space needs a name.")
@@ -210,4 +225,126 @@ def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
     target.mkdir()  # FileExistsError when anything is already there
     (target / ".capacities").mkdir()
     atomic_write(target / ".capacities" / "space.json", dump_json({"name": name}))
+    if setup == "basic":
+        from .basicsetup import write_basic_types
+
+        write_basic_types(target)
     return target
+
+
+# -- deleting a space folder (M8) ---------------------------------------------------
+
+
+class SpaceNotFound(LookupError):
+    """Not a registered space folder holding ``.capacities/`` (404)."""
+
+
+class SpaceIsCurrent(Exception):
+    """The folder is (or holds, or lies inside) the space that is open (409)."""
+
+
+class TrashUnavailable(Exception):
+    """The OS trash could not take the folder (428: offer the permanent delete)."""
+
+
+def _identity(path: Path) -> tuple[int, int]:
+    st = os.stat(path, follow_symlinks=False)
+    return (st.st_dev, st.st_ino)
+
+
+def _is_space_folder(path: Path) -> bool:
+    return (
+        path.is_dir()
+        and not path.is_symlink()
+        and (path / ".capacities").is_dir()
+        and not (path / ".capacities").is_symlink()
+    )
+
+
+def _within(child: Path, parent: Path) -> bool:
+    c, p = _key(child), _key(parent)
+    return c == p or c.startswith(p.rstrip(os.sep) + os.sep)
+
+
+def _move_to_trash(path: Path) -> None:
+    """Send `path` to the OS trash; `TrashUnavailable` when that is not possible.
+
+    With ``OBJECT_FAKE_TRASH_FILE`` set (tests), the path is appended to that file
+    and the folder moved into ``<state dir>/fake-trash/`` instead; the value
+    ``unavailable`` behaves as an unavailable trash.
+    """
+    fake = os.environ.get(FAKE_TRASH_ENV)
+    if fake:
+        if fake == "unavailable":
+            raise TrashUnavailable("The trash is not available.")
+        bin_dir = state_dir() / "fake-trash"
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        dest, n = bin_dir / path.name, 2
+        while dest.exists():
+            dest, n = bin_dir / f"{path.name}-{n}", n + 1
+        shutil.move(str(path), str(dest))
+        with open(fake, "a", encoding="utf-8") as fh:
+            fh.write(str(path) + "\n")
+        return
+    from send2trash import send2trash
+    from send2trash.exceptions import TrashPermissionError
+
+    try:
+        send2trash(str(path))
+    except TrashPermissionError as exc:
+        raise TrashUnavailable(str(exc) or "The trash is not available.") from exc
+    except FileNotFoundError:
+        raise
+    except OSError as exc:
+        if path.exists():  # nothing (or only part) was moved: the trash can't take it
+            raise TrashUnavailable(str(exc) or "The trash is not available.") from exc
+        raise
+
+
+def _before_permanent_delete(path: Path) -> None:
+    """Test seam: runs between the first check and the re-check of a permanent delete."""
+
+
+def delete_space(
+    path: Path | str,
+    permanent: bool = False,
+    *,
+    current: Path | str | None = None,
+    registry: Registry | None = None,
+) -> bool:
+    """Delete the registered space folder `path`. Returns True when it went to the trash.
+
+    Refuses (`SpaceIsCurrent`, 409) the `current` space, a folder holding it and a
+    folder inside it; refuses (`SpaceNotFound`, 404) a folder that is not in the
+    registry or does not hold ``.capacities/``. By default the folder goes to the OS
+    trash (`TrashUnavailable`, 428, when it can't, and nothing changes). With
+    `permanent` it is removed for good after re-checking that it is still the same
+    folder (device and inode/file id) and still holds ``.capacities/``. The entry
+    then leaves the registry; nothing in the state dir is deleted.
+    """
+    reg = registry or Registry(state_dir())
+    if not isinstance(path, (str, Path)) or not str(path).strip():
+        raise SpaceNotFound("No space given.")
+    target = normalize(path)
+    if current is not None:
+        cur = normalize(current)
+        if _within(cur, target) or _within(target, cur):
+            raise SpaceIsCurrent("This space is open. Switch to another space first.")
+    registered = {_key(i["path"]) for i in reg._load()["spaces"]}
+    if _key(target) not in registered or not _is_space_folder(target):
+        raise SpaceNotFound(f"Not a space folder: {target}")
+    if not permanent:
+        _move_to_trash(target)
+        reg.remove(target)
+        return True
+    before = _identity(target)
+    _before_permanent_delete(target)
+    try:
+        same = _is_space_folder(target) and _identity(target) == before
+    except OSError:
+        same = False
+    if not same:
+        raise SpaceNotFound(f"The folder changed; nothing was deleted: {target}")
+    shutil.rmtree(target)
+    reg.remove(target)
+    return False
