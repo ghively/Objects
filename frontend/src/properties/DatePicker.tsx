@@ -1,7 +1,9 @@
 // The date picker of datetime properties: a natural-language input per point, Object's
 // suggestion lists, "Include Time" and "Range" toggles that honour the property's constraints,
 // and "Remove date". The Task `date` (M4) adds the schedule suggestions, a "Repeat" row and a
-// "Reminder" row; there every change carries `{date, repeat, remind}` together.
+// "Reminder" row; there every change carries `{date, repeat, remind}` together. Any other date
+// property with `supportsReminders` (M8) shows the same "Reminder" row, written on its own through
+// `PUT /api/tasks/reminder` (the owner's `reminder.onChange`).
 import { useEffect, useId, useMemo, useState } from 'react'
 import type { DateConstraints, DateValue, Resolution } from '@/api/types'
 import { Switch } from '@/components/ui/switch'
@@ -190,6 +192,11 @@ export interface DatePickerProps {
    */
   task?: { repeat: string | null; remind: string | null; occurrenceLog?: string | null }
   onTaskChange?(next: TaskDateChange): void
+  /**
+   * M8: the reminder of a date property other than the Task `date` (its `reminders` entry). Shown
+   * when `constraints.supportsReminders`; a pick on an empty date first sets the shown date.
+   */
+  reminder?: { value: string | null; onChange(remind: string | null): void }
 }
 
 /** The value the picker shows when the property is empty: the defaults when set, else now. */
@@ -319,7 +326,7 @@ function Toggle({
  * - `endTimeSettings: 'notAllowed'` hides "Range"; `'required'` keeps it on.
  * - `hideDeleteOption` hides "Remove date".
  */
-export function DatePicker({ value, constraints, onChange, now: nowProp, task, onTaskChange }: DatePickerProps) {
+export function DatePicker({ value, constraints, onChange, now: nowProp, task, onTaskChange, reminder }: DatePickerProps) {
   const c = useMemo(() => constraints ?? {}, [constraints])
   const now = useMemo(() => nowProp ?? new Date(), [nowProp])
   const current = useMemo(() => value ?? initialValue(c, now), [value, c, now])
@@ -332,6 +339,8 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
   const isRange = rangeAllowed && (!!end || rangeRequired)
   const taskMode = !!task && !!onTaskChange
   const reminders = taskMode && !!c.supportsReminders
+  /** M8: a non-Task date property's own Reminder row. */
+  const propReminder = !taskMode && !!reminder && !!c.supportsReminders
   const [customOpen, setCustomOpen] = useState(false)
   const [dropped, setDropped] = useState(false)
 
@@ -423,6 +432,11 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
 
   const remindHint =
     taskMode && (dropped || (task!.remind && parseRemind(task!.remind) && !parseRemind(task!.remind, resolution)))
+      ? REMINDER_MISFIT_HINT
+      : null
+  // A property reminder is kept when the date's resolution changes; the row says it no longer fits.
+  const propRemindHint =
+    propReminder && reminder!.value && parseRemind(reminder!.value) && !parseRemind(reminder!.value, resolution)
       ? REMINDER_MISFIT_HINT
       : null
 
@@ -521,10 +535,29 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
         </div>
       )}
 
+      {propReminder && (
+        <div className="border-t border-line pt-1">
+          <ReminderMenu
+            value={reminder!.value}
+            resolution={resolution}
+            hint={propRemindHint}
+            onChange={(remind) => {
+              if (!value && remind !== null) onChange(shownDate())
+              reminder!.onChange(remind)
+            }}
+          />
+        </div>
+      )}
+
       {!c.hideDeleteOption && (
         <button
           type="button"
-          onClick={() => (taskMode ? onTaskChange!({ date: null, repeat: null, remind: null }) : onChange(null))}
+          onClick={() => {
+            if (taskMode) return onTaskChange!({ date: null, repeat: null, remind: null })
+            onChange(null)
+            // Our choice: a reminder on a removed date goes with it.
+            if (propReminder && reminder!.value) reminder!.onChange(null)
+          }}
           className="rounded-md px-2 py-1 text-left text-[14px] text-[var(--danger)] hover:bg-hover"
         >
           Remove date

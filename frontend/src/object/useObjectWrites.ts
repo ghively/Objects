@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type MutableRefObject } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { RenameResult, UpdateResult } from '@/api/types'
+import { taskClient } from '@/tasks/taskContract'
 
 export interface BodyControl {
   /** Save pending body edits and wait for every save in flight; `ok: false` after a conflict. */
@@ -44,6 +45,8 @@ export interface ObjectWritesOptions {
 export interface ObjectWrites {
   /** Set (or clear with `null`) properties; `remove` deletes keys. Resolves null when it failed. */
   updateProperties(updates: Record<string, unknown>, remove?: string[]): Promise<UpdateResult | null>
+  /** M8: set (or clear with `null`) the reminder of date property `key` (`PUT /api/tasks/reminder`). */
+  setReminder(key: string, remind: string | null): Promise<UpdateResult | null>
   /** Retitle the object (renames its file and relinks). Resolves null when it failed. */
   rename(title: string): Promise<RenameResult | null>
   /** The conflict that stopped the queue is resolved: send the queued writes again. */
@@ -134,6 +137,20 @@ export function useObjectWrites(opts: ObjectWritesOptions): ObjectWrites {
     [enqueue],
   )
 
+  const setReminder = useCallback(
+    (key: string, remind: string | null) =>
+      enqueue(async (path, baseVersion) => {
+        const res = await taskClient.setReminder(path, key, remind, { baseVersion })
+        const o = optsRef.current
+        o.adoptVersion(res.version)
+        void o.bodyControl.resume(res.version)
+        // The result carries the whole frontmatter: no `reminders` means the last entry went.
+        o.onUpdated?.(res, {}, res.frontmatter && !('reminders' in res.frontmatter) ? ['reminders'] : [])
+        return res
+      }),
+    [enqueue],
+  )
+
   const rename = useCallback(
     (title: string) =>
       enqueue(async (path, baseVersion) => {
@@ -157,5 +174,5 @@ export function useObjectWrites(opts: ObjectWritesOptions): ObjectWrites {
 
   const pending = useCallback(() => opsRef.current.length, [])
 
-  return { updateProperties, rename, replay, pending }
+  return { updateProperties, setReminder, rename, replay, pending }
 }

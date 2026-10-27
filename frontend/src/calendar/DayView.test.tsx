@@ -47,7 +47,17 @@ describe('DayView', () => {
     await screen.findByText('Objects with this date')
     expect(tabLabels()).toEqual(['All', 'Daily note', 'Tasks', 'Dates', 'Created Today', 'Updated Today'])
     expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true')
-    expect(sectionOrder()).toEqual(['daily-note-slot', 'section-tasks', 'section-dated', 'section-created', 'section-updated'])
+    // M8: Backlinks, Date references and Timeline follow M4's sections (under All only).
+    expect(sectionOrder()).toEqual([
+      'daily-note-slot',
+      'section-tasks',
+      'section-dated',
+      'section-created',
+      'section-updated',
+      'section-backlinks',
+      'section-references',
+      'section-timeline',
+    ])
     // A tab shows its section alone.
     await user.click(screen.getByRole('tab', { name: 'Tasks' }))
     expect(sectionOrder()).toEqual(['section-tasks'])

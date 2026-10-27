@@ -1,6 +1,6 @@
 // The M8 task contract (the plan's "API contract (M8)") as the task UI uses it, with the client
 // calls it needs. Task 3 owns `api/types.ts` and `api/client.ts` and adds the same types and
-// `api.overdue`, `api.occurrence`, `api.taskStats`; until it lands they are declared here (the
+// `api.overdue`, `api.occurrence`, `api.taskStats`, `api.setReminder`; until it lands they are declared here (the
 // shapes are the contract's, so they stay assignable both ways) and the calls prefer `api`'s
 // methods when present, else call the contract routes directly.
 import { api, CLIENT_ID, ConflictError, ApiError } from '@/api/client'
@@ -42,6 +42,8 @@ export interface TaskClient {
   overdue(path: string): Promise<OverdueInfo>
   occurrence(path: string, action: OccurrenceAction, opts: { catchUp?: CatchUp; baseVersion: string }): Promise<UpdateResult>
   taskStats(path: string): Promise<TaskStats>
+  /** `PUT /api/tasks/reminder` (M8 Task 12): set or clear (`null`) the reminder of date property `key`. */
+  setReminder(path: string, key: string, remind: string | null, opts: { baseVersion: string }): Promise<UpdateResult>
 }
 
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
@@ -74,4 +76,12 @@ export const taskClient: TaskClient = {
           body: JSON.stringify({ path, action, ...(opts.catchUp ? { catchUp: opts.catchUp } : {}), baseVersion: opts.baseVersion, clientId: CLIENT_ID }),
         }),
   taskStats: (path) => (real.taskStats ? real.taskStats(path) : call(`/tasks/stats?path=${encodeURIComponent(path)}`)),
+  setReminder: (path, key, remind, opts) =>
+    real.setReminder
+      ? real.setReminder(path, key, remind, opts)
+      : call('/tasks/reminder', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path, key, remind, baseVersion: opts.baseVersion, clientId: CLIENT_ID }),
+        }),
 }

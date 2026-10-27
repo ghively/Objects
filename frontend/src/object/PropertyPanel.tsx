@@ -217,6 +217,8 @@ export interface PropertyPanelProps {
   onChange?(key: string, value: unknown): void
   /** A cell committed several keys at once (one write; `remove` deletes keys). Passed to every cell. */
   onChangeMany?(updates: Record<string, unknown>, remove?: string[]): void
+  /** M8: a date property's reminder (`PUT /api/tasks/reminder`). */
+  onSetReminder?(key: string, remind: string | null): void
   /** Save the type (a label option set changed); awaited before the cell's value is applied. */
   onTypeChange?(next: TypeDef): Promise<unknown> | void
   onOpenTag?(name: string): void
@@ -288,6 +290,7 @@ export function PropertyPanel({
   readOnly,
   onChange,
   onChangeMany,
+  onSetReminder,
   onTypeChange,
   onOpenTag,
   onOpenObject,
@@ -360,6 +363,7 @@ export function PropertyPanel({
             onChange={(next: unknown) => onChange?.(def.key, next)}
             frontmatter={frontmatter}
             onChangeMany={ro ? undefined : onChangeMany}
+            onSetReminder={ro ? undefined : onSetReminder}
             onDefChange={onDefChange}
             onOpenTag={onOpenTag}
             onOpenObject={onOpenObject}

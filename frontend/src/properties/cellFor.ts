@@ -44,6 +44,11 @@ export interface CellExtras {
    * panel provides it; table cells don't, so they write their own key only.
    */
   onChangeMany?(updates: Record<string, unknown>, remove?: string[]): void
+  /**
+   * M8: set (or clear with `null`) the reminder of date property `key` through
+   * `PUT /api/tasks/reminder`. Only the property panel provides it, like `onChangeMany`.
+   */
+  onSetReminder?(key: string, remind: string | null): void
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each cell takes its own value type

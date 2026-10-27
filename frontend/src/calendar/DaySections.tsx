@@ -1,7 +1,8 @@
 // The Day view's sections under the filter tabs: Daily note, Tasks, Objects with this date,
 // Created and Updated (Updated is our addition), each a compact `DataView` with its own saved view
-// (`ui.calendar.daily.*View`). Rows for every path of the range come from ONE `api.rows` call per
-// range load (`useCalendarRows`), never one call per section.
+// (`ui.calendar.daily.*View`); then (M8) Backlinks, Date references and Timeline, shown under
+// "All" only (the filter tabs gain none). Rows for every path of the range come from ONE `api.rows`
+// call per range load (`useCalendarRows`), never one call per section.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { CalendarDay, CalendarRange, DateValue, Layout, Row, TypeDef, ViewState } from '@/api/types'
@@ -25,7 +26,10 @@ import { applyFilters } from '@/views/filter'
 import { groupRows } from '@/views/group'
 import { emptyFilterGroup } from '@/views/model'
 import { applySorts } from '@/views/sort'
+import { InlineToken } from '@/views/cards/InlineToken'
 import { useViewState } from '@/views/useViewState'
+import { usePeek } from '@/nav/tabs'
+import { useSettings } from '@/settings/useSettings'
 import { saveCalendarDaily, useCalendarDaily, type CalendarDaily } from './calendarUi'
 import { DailyNoteSlot, SectionHeading } from './DailyNoteSlot'
 import { addDays, parseYmd, todayYmd, ymd, type Day } from './dates'
@@ -64,6 +68,18 @@ export const SECTIONS_TEXT = {
   pickDate: 'Pick a date',
   /** Our string. */
   add: 'Add to tasks',
+  /** `CalendarDaily.backlinksToThisDay.*` (M8) */
+  backlinks: 'Backlinks',
+  noBacklinks: 'No backlinks',
+  /** `CalendarDaily.references.*` */
+  references: 'Date references',
+  noReferences: 'No references',
+  /** `CalendarDaily.timeline.*` */
+  timeline: 'Timeline',
+  timelineCreated: 'Created',
+  noTimeline: 'No date references.',
+  /** Our string: the tooltip of a date reference's count. */
+  referenceCount: (n: number) => `${n} ${n === 1 ? 'reference' : 'references'}`,
   /** Our string. */
   moveConflict: (n: number) => `${n} ${n === 1 ? 'task' : 'tasks'} changed elsewhere and ${n === 1 ? 'was' : 'were'} not moved.`,
 }
@@ -80,6 +96,45 @@ export function updatedLabel(day: Day, today: Day): string {
   if (day === today) return 'Updated Today'
   if (day === addDays(today, -1)) return 'Updated Yesterday'
   return 'Updated on This Day'
+}
+
+/** One Timeline item (M8 contract): `at` a UTC instant; `key` the date property of `dated`. */
+export interface TimelineItem {
+  path: string
+  at: string
+  kind: 'created' | 'dated' | 'task'
+  key?: string
+}
+
+/**
+ * A calendar day with M8's three optional fields. A server before Task 15 omits them; read them
+ * through `dayExtras` (`?? []`). Task 3 adds the same fields to `CalendarDay` in `api/types.ts`.
+ */
+export type CalendarDayM8 = CalendarDay & {
+  backlinks?: string[]
+  references?: { path: string; count: number }[]
+  timeline?: TimelineItem[]
+}
+
+/** The day's backlinks, date references and timeline (sorted by time), empty when absent. */
+export function dayExtras(cd: CalendarDay | null | undefined): {
+  backlinks: string[]
+  references: { path: string; count: number }[]
+  timeline: TimelineItem[]
+} {
+  const m = (cd ?? {}) as Partial<CalendarDayM8>
+  const timeline = [...(m.timeline ?? [])].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+  return { backlinks: m.backlinks ?? [], references: m.references ?? [], timeline }
+}
+
+const TIME_12 = new Intl.DateTimeFormat('en-US', { timeStyle: 'short' })
+const TIME_24 = new Intl.DateTimeFormat('en-US', { timeStyle: 'short', hourCycle: 'h23' })
+
+/** A Timeline item's time of day, in the device's zone, honouring the 24-hour setting. */
+export function timelineTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return (useSettings.getState().settings.twentyFourHourTime ? TIME_24 : TIME_12).format(d)
 }
 
 export type DayFilter = 'all' | 'dailyNote' | 'tasks' | 'dated' | 'created' | 'updated'
@@ -137,6 +192,10 @@ export function rangePaths(data: CalendarRange | null): string[] {
     for (const d of cd.dated) out.add(d.path)
     for (const p of cd.created) out.add(p)
     for (const p of cd.updated) out.add(p)
+    const extra = dayExtras(cd)
+    for (const p of extra.backlinks) out.add(p)
+    for (const r of extra.references) out.add(r.path)
+    for (const t of extra.timeline) out.add(t.path)
   }
   return [...out].sort()
 }
@@ -259,17 +318,19 @@ function SectionShell({
   testId,
   hideKey,
   collapsed,
+  onToggle,
   children,
 }: {
   label: string
   testId: string
-  hideKey: keyof CalendarDaily
+  /** The saved `ui.calendar.daily` flag; without it `onToggle` decides. */
+  hideKey?: keyof CalendarDaily
   collapsed: boolean
+  onToggle?(): void
   children: (heading: ReactNode) => ReactNode
 }) {
-  const heading = (
-    <SectionHeading label={label} collapsed={collapsed} onToggle={() => void saveCalendarDaily({ [hideKey]: !collapsed })} />
-  )
+  const toggle = hideKey ? () => void saveCalendarDaily({ [hideKey]: !collapsed }) : onToggle
+  const heading = <SectionHeading label={label} collapsed={collapsed} onToggle={toggle} />
   return (
     <section data-testid={testId} aria-label={label} className="flex flex-col gap-2">
       {collapsed ? <div className="flex h-10 items-center">{heading}</div> : children(heading)}
@@ -321,6 +382,16 @@ export function DaySections({ day, today, calendarDay, rows, filter = 'all', onC
   const datedRows = useMemo(() => pick((calendarDay?.dated ?? []).map((d) => d.path)), [pick, calendarDay])
   const createdRows = useMemo(() => pick(calendarDay?.created ?? []), [pick, calendarDay])
   const updatedRows = useMemo(() => pick(calendarDay?.updated ?? []), [pick, calendarDay])
+  const extras = useMemo(() => dayExtras(calendarDay), [calendarDay])
+  const backlinkRows = useMemo(() => pick(extras.backlinks), [pick, extras])
+  const referenceRows = useMemo(() => pick(extras.references.map((r) => r.path)), [pick, extras])
+  const referenceCounts = useMemo(() => new Map(extras.references.map((r) => [r.path, r.count])), [extras])
+  // The three M8 sections keep their view and collapsed state for the session only (our choice:
+  // `ui.calendar.daily` has no keys for them).
+  const [backlinksView, setBacklinksView] = useState<ViewState>(() => viewOf('wall'))
+  const [referencesView, setReferencesView] = useState<ViewState>(() => viewOf('wall'))
+  const [closed, setClosed] = useState<Record<string, boolean>>({})
+  const toggleClosed = (k: string) => setClosed((c) => ({ ...c, [k]: !c[k] }))
 
   const onResult = useCallback(
     (outcome: TaskOutcome) => {
@@ -387,6 +458,19 @@ export function DaySections({ day, today, calendarDay, rows, filter = 'all', onC
     </div>
   )
   const common = { types, layouts: SECTION_LAYOUTS, compact: true, embedded: true, patchRow: rows.patchRow, loading: rows.loading }
+  const emptyLine = (text: string) => <p className="py-2 text-[14px] text-fg-muted">{text}</p>
+  const referenceExtras = (row: Row) => {
+    const n = referenceCounts.get(row.summary.path) ?? 0
+    return n > 1
+      ? {
+          trailing: (
+            <span data-testid="reference-count" title={SECTIONS_TEXT.referenceCount(n)} className="text-[13px] text-fg-muted">
+              {n}
+            </span>
+          ),
+        }
+      : {}
+  }
 
   return (
     <div data-testid="day-sections" className="flex flex-col gap-8">
@@ -456,7 +540,112 @@ export function DaySections({ day, today, calendarDay, rows, filter = 'all', onC
           {(heading) => <DataView {...common} rows={updatedRows} state={updatedView} onState={setUpdatedView} heading={heading} />}
         </SectionShell>
       )}
+      {filter === 'all' && (
+        <SectionShell
+          label={SECTIONS_TEXT.backlinks}
+          testId="section-backlinks"
+          collapsed={!!closed.backlinks}
+          onToggle={() => toggleClosed('backlinks')}
+        >
+          {(heading) => (
+            <DataView
+              {...common}
+              rows={backlinkRows}
+              state={backlinksView}
+              onState={setBacklinksView}
+              heading={heading}
+              emptyState={emptyLine(SECTIONS_TEXT.noBacklinks)}
+            />
+          )}
+        </SectionShell>
+      )}
+      {filter === 'all' && (
+        <SectionShell
+          label={SECTIONS_TEXT.references}
+          testId="section-references"
+          collapsed={!!closed.references}
+          onToggle={() => toggleClosed('references')}
+        >
+          {(heading) => (
+            <DataView
+              {...common}
+              rows={referenceRows}
+              state={referencesView}
+              onState={setReferencesView}
+              heading={heading}
+              rowExtras={referenceExtras}
+              emptyState={emptyLine(SECTIONS_TEXT.noReferences)}
+            />
+          )}
+        </SectionShell>
+      )}
+      {filter === 'all' && (
+        <SectionShell
+          label={SECTIONS_TEXT.timeline}
+          testId="section-timeline"
+          collapsed={!!closed.timeline}
+          onToggle={() => toggleClosed('timeline')}
+        >
+          {(heading) => (
+            <>
+              {heading}
+              <Timeline items={extras.timeline} rows={rows.byPath} typesById={typesById} empty={emptyLine(SECTIONS_TEXT.noTimeline)} />
+            </>
+          )}
+        </SectionShell>
+      )}
     </div>
+  )
+}
+
+/** The Timeline's label for an item: "Created", else the date property's name (our reading). */
+function timelineLabel(item: TimelineItem, row: Row | undefined, typesById: Record<string, TypeDef>): string {
+  if (item.kind === 'created') return SECTIONS_TEXT.timelineCreated
+  const key = item.kind === 'task' ? 'date' : (item.key ?? '')
+  const def = row ? typesById[row.summary.type]?.propertyDefinitions.find((d) => d.key === key) : undefined
+  return def?.name ?? key
+}
+
+/** The day's timed items, oldest first: the time, what it is, the object (opens in the peek). */
+function Timeline({
+  items,
+  rows,
+  typesById,
+  empty,
+}: {
+  items: TimelineItem[]
+  rows: Map<string, Row>
+  typesById: Record<string, TypeDef>
+  empty: ReactNode
+}) {
+  const shown = items.filter((i) => rows.has(i.path))
+  if (shown.length === 0) return <>{empty}</>
+  const paths = shown.map((i) => i.path)
+  return (
+    <ol data-testid="timeline" className="flex flex-col">
+      {shown.map((item, i) => {
+        const row = rows.get(item.path)!
+        return (
+          <li
+            key={`${item.path}|${item.kind}|${item.key ?? ''}|${item.at}|${i}`}
+            data-kind={item.kind}
+            className="flex min-h-10 items-center gap-3"
+          >
+            <time dateTime={item.at} className="w-20 shrink-0 text-right text-[13px] tabular-nums text-fg-muted">
+              {timelineTime(item.at)}
+            </time>
+            <span className="w-24 shrink-0 truncate text-[13px] text-fg-muted">{timelineLabel(item, row, typesById)}</span>
+            <button
+              type="button"
+              onClick={() => usePeek.getState().peek(item.path, paths)}
+              className="flex min-h-10 min-w-0 flex-1 items-center rounded-md px-2 text-left hover:bg-hover"
+            >
+              <InlineToken row={row} type={typesById[row.summary.type]} showType={false} />
+            </button>
+          </li>
+        )
+      })}
+    </ol>
   )
 }
 
