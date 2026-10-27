@@ -184,10 +184,12 @@ export interface NodeChromeProps {
   entity?: boolean
   /** While the node's text is being edited the resizer and knob step aside. */
   editing?: boolean
+  /** Resize keeps the width-to-height ratio (M8: image and video media nodes). */
+  keepAspectRatio?: boolean
   children: ReactNode
 }
 
-export function NodeChrome({ node, selected, entity, editing, children }: NodeChromeProps) {
+export function NodeChrome({ node, selected, entity, editing, keepAspectRatio, children }: NodeChromeProps) {
   const editable = useNodeEditable(node)
   const point = node.kind === 'point'
   const floor = resizeFloor(node.kind, entity)
@@ -198,6 +200,7 @@ export function NodeChrome({ node, selected, entity, editing, children }: NodeCh
         <NodeResizer
           minWidth={floor.width}
           minHeight={floor.height}
+          keepAspectRatio={keepAspectRatio}
           isVisible
           color="var(--color-border-block-selection)"
           handleStyle={{

@@ -17,5 +17,7 @@ export const nodeTypes: NodeTypes = {
 
 export { BlockNode, FrameNode, PointNode, ShapeNode }
 export { EntityNode } from './EntityNode'
+export { MediaNode } from './MediaNode'
+export { WeblinkNode } from './WeblinkNode'
 export { NodeChrome } from './NodeChrome'
 export { MarkdownView, TextBlockEditor } from './TextBlockEditor'

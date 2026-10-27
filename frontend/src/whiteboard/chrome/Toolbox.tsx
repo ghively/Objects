@@ -1,22 +1,26 @@
 /**
  * The toolbox (bottom centre; the position is our choice, the trimmed reference has no
  * screenshot). Tools in Capacities' `whiteboardTools` order: Move/Hand (one button re-arming the
- * last pointer tool, with a caret for both), Text, Existing object, New object, Shapes (re-arms
+ * last pointer tool, with a caret for both), Text, Existing object, New object, Media (M8: re-arms
+ * the last of Image, PDF, Audio, File and Web link, else Image; `resolveWhiteboardMediaTool`), Shapes (re-arms
  * the last shape-menu tool, else Rectangle), Gates (Engineering mode; the last gate, else NAND),
  * Frame, then the ink plugin's pen group, Undo/Redo, Lock and "More options" → "Canvas display".
  */
 import type { ReactNode } from 'react'
-import type { WhiteboardTool } from '@/api/whiteboardTypes'
+import type { WhiteboardMediaTool, WhiteboardTool } from '@/api/whiteboardTypes'
 import { Icon } from '@/components/Icon'
 import type { ToolboxProps } from '../canvasTypes'
 import {
   isCircuitLabel,
+  isMediaTool,
   isPointerTool,
   isShapeMenuTool,
+  MEDIA_TOOLS,
   POINTER_TOOLS,
   resolveCircuitTool,
   resolvePointerTool,
   resolveShapeMenuTool,
+  resolveWhiteboardMediaTool,
 } from '../model'
 import { WB } from '../strings'
 import { ChromeButton, hint, KEY_HINT, MenuRow, PopoverMenu, ShapeIcon, toolLabel } from './controls'
@@ -29,6 +33,16 @@ export const TOOLBOX_TEXT = {
   choosePointer: 'Choose pointer tool',
   chooseShape: 'Choose shape',
   chooseGate: 'Choose gate',
+  chooseMedia: 'Choose media',
+}
+
+/** The media tools' icons (Phosphor; our choice). */
+export const MEDIA_ICON: Record<WhiteboardMediaTool, string> = {
+  image: 'ph-image',
+  pdf: 'ph-file-pdf',
+  audio: 'ph-speaker-high',
+  file: 'ph-file',
+  weblink: 'ph-globe',
 }
 
 const POINTER_ICON: Record<'select' | 'hand', string> = { select: 'ph-cursor', hand: 'ph-hand' }
@@ -77,6 +91,7 @@ export function Toolbox({
     ? tool
     : resolveShapeMenuTool(memory.lastShapeTool, memory.lastUsedTool, memory.lastShape)
   const gateTool = isCircuitLabel(tool) ? tool : resolveCircuitTool(memory.lastCircuitTool, memory.lastUsedTool)
+  const mediaTool = isMediaTool(tool) ? tool : resolveWhiteboardMediaTool(memory.lastMediaTool, memory.lastUsedTool)
   const engineering = settings.isEngineeringMode
 
   const toolButton = (t: WhiteboardTool, icon: string, tip?: string) => (
@@ -127,6 +142,32 @@ export function Toolbox({
       {toolButton('text', 'ph-text-t', hint(WB.shortcutText.text, KEY_HINT.text))}
       {toolButton('link', 'ph-cube')}
       {toolButton('create', 'ph-plus-square')}
+      <ChromeButton
+        label={WB.toolMedia.text}
+        tip={toolLabel(mediaTool)}
+        pressed={isMediaTool(tool)}
+        disabled={!editable}
+        onClick={() => onTool(mediaTool)}
+        data-armed={mediaTool}
+      >
+        <Icon name={MEDIA_ICON[mediaTool]} size={18} />
+      </ChromeButton>
+      <Caret label={TOOLBOX_TEXT.chooseMedia} disabled={!editable}>
+        {(close) =>
+          MEDIA_TOOLS.map((t) => (
+            <MenuRow
+              key={t}
+              label={toolLabel(t)}
+              icon={<Icon name={MEDIA_ICON[t]} size={14} />}
+              selected={tool === t}
+              onSelect={() => {
+                onTool(t)
+                close()
+              }}
+            />
+          ))
+        }
+      </Caret>
       <ChromeButton
         label={WB.toolShapes.text}
         tip={hint(toolLabel(shapeTool), SHAPE_KEYS[shapeTool])}

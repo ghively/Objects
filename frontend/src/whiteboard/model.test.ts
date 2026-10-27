@@ -60,14 +60,16 @@ describe('whiteboard model', () => {
     expect([...M.LINES]).toEqual(refList('whiteboardEdgeLines'))
     expect([...M.POINTER_TOOLS]).toEqual(refList('whiteboardPointerTools'))
 
-    // Tools: the reference order with the media tools taken out.
+    // Tools: the reference order, media tools included (M8).
     const media = refList('whiteboardMediaTools')
+    expect([...M.MEDIA_TOOLS]).toEqual(media)
+    expect(media).toEqual(['image', 'pdf', 'audio', 'file', 'weblink'])
     expect([...M.TOOLS]).toEqual([
-      'select', 'hand', 'text', 'link', 'create', 'line', 'arrow', ...refList('whiteboardShapes'),
+      'select', 'hand', 'text', 'link', 'create', ...media, 'line', 'arrow', ...refList('whiteboardShapes'),
       ...refList('whiteboardCircuitLabels'), 'frame',
     ])
-    expect(M.TOOLS.some((t) => media.includes(t))).toBe(false)
-    expect([...M.ONE_SHOT_TOOLS]).toEqual(['text', ...M.SHAPES, ...M.CIRCUIT_LABELS, 'frame', 'line', 'arrow', 'link', 'create'])
+    expect([...M.PICKER_TOOLS]).toEqual(['link', 'create', ...media])
+    expect([...M.ONE_SHOT_TOOLS]).toEqual(['text', ...M.SHAPES, ...M.CIRCUIT_LABELS, 'frame', 'line', 'arrow', 'link', 'create', ...media])
     expect(M.isOneShotTool('select')).toBe(false)
     expect(M.isOneShotTool('hand')).toBe(false)
 
@@ -176,7 +178,8 @@ describe('whiteboard model', () => {
     expect(M.resolveLastUsedTool('frame')).toBe('frame')
     expect(M.resolveLastUsedTool('nand', false)).toBe('select')
     expect(M.resolveLastUsedTool('nand', true)).toBe('nand')
-    expect(M.resolveLastUsedTool('image')).toBe('select')
+    expect(M.resolveLastUsedTool('image')).toBe('image')
+    expect(M.resolveLastUsedTool('weblink')).toBe('weblink')
     expect(M.resolveLastUsedTool('nonsense')).toBe('select')
   })
 

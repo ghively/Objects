@@ -461,13 +461,27 @@ def board_links(board: dict[str, Any]) -> list[str]:
     return out
 
 
+def _block_text(block: dict[str, Any]) -> str | None:
+    kind = block.get("type")
+    if kind == "text":
+        md = block.get("markdown")
+        return md if isinstance(md, str) else None
+    if kind == "weblink":
+        # M8: a web link's title (when set) and its URL; media blocks add no text.
+        url = block.get("url")
+        title = block.get("title")
+        lines = [v for v in (title, url) if isinstance(v, str) and v.strip()]
+        return "\n".join(lines) if lines else None
+    return None
+
+
 def board_text(board: dict[str, Any]) -> str:
-    """The Markdown of the board's text blocks in reading order, separated by blank lines."""
-    parts = [
-        block["markdown"]
-        for block in _ordered_blocks(board)
-        if block.get("type") == "text" and isinstance(block.get("markdown"), str)
-    ]
+    """The searchable text of the board in reading order, separated by blank lines.
+
+    Text blocks give their Markdown; web-link blocks (M8) their title and URL. Entity and
+    media blocks give nothing (a media path is neither text nor a link).
+    """
+    parts = [t for block in _ordered_blocks(board) if (t := _block_text(block)) is not None]
     return "\n\n".join(p for p in parts if p.strip())
 
 

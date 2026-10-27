@@ -70,8 +70,11 @@ export type WhiteboardConnectorTool = 'line' | 'arrow'
 export type WhiteboardPointerTool = 'select' | 'hand'
 export type WhiteboardShapeMenuTool = WhiteboardConnectorTool | WhiteboardPickerShape
 
+/** The media tools (`whiteboardMediaTools`, M8): pick a file (or type a URL) and place it. */
+export type WhiteboardMediaTool = 'image' | 'pdf' | 'audio' | 'file' | 'weblink'
+
 /**
- * The canvas tools (`whiteboardTools` without the media tools, which M6 doesn't offer).
+ * The canvas tools (`whiteboardTools`, in its order).
  * The pen group (pen, highlighter, eraser) belongs to the ink plugin, not to this union.
  */
 export type WhiteboardTool =
@@ -79,6 +82,7 @@ export type WhiteboardTool =
   | 'text'
   | 'link'
   | 'create'
+  | WhiteboardMediaTool
   | WhiteboardConnectorTool
   | WhiteboardShape
   | WhiteboardCircuitLabel
@@ -134,14 +138,36 @@ export interface WhiteboardTextBlock {
   [unknown: string]: unknown
 }
 
+/** M7's four object views; an entity block's optional `view` (M8, our key; the View menu). */
+export type WhiteboardEntityView = 'inline' | 'smallCard' | 'wideCard' | 'embed'
+
 export interface WhiteboardEntityBlock {
   type: 'entity'
   /** A wikilink, `[[Title]]`. */
   link: string
+  view?: WhiteboardEntityView
   [unknown: string]: unknown
 }
 
-export type WhiteboardBlock = WhiteboardTextBlock | WhiteboardEntityBlock
+/**
+ * An uploaded file on the board (M8, our format): a relative space path, usually
+ * `Attachments/<file>`; the kind (image, PDF, audio, video, file) comes from the extension.
+ */
+export interface WhiteboardMediaBlock {
+  type: 'media'
+  path: string
+  [unknown: string]: unknown
+}
+
+/** A web link on the board (M8): only what the user typed; nothing is ever fetched. */
+export interface WhiteboardWeblinkBlock {
+  type: 'weblink'
+  url: string
+  title?: string
+  [unknown: string]: unknown
+}
+
+export type WhiteboardBlock = WhiteboardTextBlock | WhiteboardEntityBlock | WhiteboardMediaBlock | WhiteboardWeblinkBlock
 
 export interface WhiteboardViewport {
   x: number
@@ -194,6 +220,7 @@ export interface WhiteboardBoardToolMemory {
   lastPointerTool?: WhiteboardPointerTool
   lastShape?: WhiteboardShape
   lastShapeTool?: WhiteboardTool
+  lastMediaTool?: WhiteboardTool
   lastFillColor?: WhiteboardFillColor
   lastBorderColor?: WhiteboardThemeColor
   lastEdgeConnection?: WhiteboardEdgeConnection

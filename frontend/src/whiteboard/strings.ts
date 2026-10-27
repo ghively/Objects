@@ -20,6 +20,12 @@ export const WB = {
   toolText: s('Text', 'Whiteboard.tools.text'),
   toolLink: s('Existing object', 'Whiteboard.tools.link'),
   toolCreate: s('New object', 'Whiteboard.tools.create'),
+  toolImage: s('Image', 'Whiteboard.tools.image'),
+  toolPdf: s('PDF', 'Whiteboard.tools.pdf'),
+  toolAudio: s('Audio', 'Whiteboard.tools.audio'),
+  toolFile: s('File', 'Whiteboard.tools.file'),
+  toolWeblink: s('Web link', 'Whiteboard.tools.weblink'),
+  toolMedia: s('Media', 'general.media'),
   toolShapes: s('Shapes', 'Whiteboard.tools.shapes'),
   toolCircuit: s('Gates', 'Whiteboard.tools.circuit'),
   toolIo: s('I/O', 'Whiteboard.tools.io'),
@@ -110,6 +116,13 @@ export const WB = {
   edgeLineDashed: s('Dashed', 'Whiteboard.edgeLine.dashed'),
   edgeLineDotted: s('Dotted', 'Whiteboard.edgeLine.dotted'),
 
+  // The web link input (M8)
+  weblinkHeading: s('Add link', 'URLCell.edit.headingAdd'),
+  weblinkPlaceholder: s('Paste URL', 'EntityPicker.link.placeholder'),
+  weblinkTitle: s('Title', 'general.title'),
+  weblinkAdd: s('Add', 'general.add'),
+  weblinkInvalid: s('Invalid URL format', 'WeblinkAnalysis.invalidUrl'),
+
   // Empty and lost states
   emptyStateDescription: s('You can change this by creating a new node.', 'Whiteboard.emptyState.description'),
   lostTitle: s('Nothing in this view', 'Whiteboard.lost.title'),
@@ -196,6 +209,11 @@ export const TOOL_LABEL = {
   text: WB.toolText,
   link: WB.toolLink,
   create: WB.toolCreate,
+  image: WB.toolImage,
+  pdf: WB.toolPdf,
+  audio: WB.toolAudio,
+  file: WB.toolFile,
+  weblink: WB.toolWeblink,
   line: WB.toolLine,
   arrow: WB.toolArrow,
   rectangle: WB.toolRectangle,
