@@ -221,9 +221,10 @@ def test_create_space_setup_parameter(state: Path, tmp_path: Path):
     assert sorted(p.relative_to(made).as_posix() for p in made.rglob("*")) == [
         ".object", ".object/space.json",
     ]
-    with pytest.raises(NotImplementedError):
-        create_space("Basic", parent, setup="basic")
-    assert not (parent / "Basic").exists()
+    # M8 Task 8 filled `basic` (see test_basicsetup.py); an unknown setup makes nothing.
+    with pytest.raises(ValueError):
+        create_space("Fancy", parent, setup="fancy")
+    assert not (parent / "Fancy").exists()
 
     with TestClient(create_app(_space(tmp_path, "current"), watch=False)) as client:
         r = client.post("/api/spaces", json={"name": "Via route", "location": str(parent), "setup": "blank"})

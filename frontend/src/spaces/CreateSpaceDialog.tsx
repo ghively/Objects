@@ -1,12 +1,15 @@
 /**
  * "Create new space": a name and a location (the current space's parent folder by default), then
  * "Create space" makes `<location>/<safe name>/.object/space.json` through `POST /api/spaces`
- * and offers to switch to it. Nothing else is created and an existing folder is never touched
- * (the server answers 409, shown as "A folder with that name already exists here.").
+ * and offers to switch to it. An existing folder is never touched (the server answers 409, shown
+ * as "A folder with that name already exists here."). M8: "How do you want to start?" picks
+ * "Start with basic setup" (the server also writes the Person, Meeting, Project and Book types)
+ * or "Start with a blank space" (nothing else is created; the default, our choice).
  */
 import { useEffect, useState, type FormEvent } from 'react'
 import { create } from 'zustand'
 import { api, ApiError } from '@/api/client'
+import type { SpaceSetup } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -26,9 +29,19 @@ export const CREATE_SPACE_TEXT = {
   created: 'Space created. Switch to it now?', // our string
   switchNow: 'Switch space', // our string
   later: 'Later', // our string
+  howToStart: 'How do you want to start?', // OnboardingSpace.howToStart.heading
+  basicLabel: 'Start with basic setup', // OnboardingSpace.howToStart.basicSetup.label
+  basicDescription: 'Includes people, meetings, projects, and books.', // OnboardingSpace.howToStart.basicSetup.description
+  blankLabel: 'Start with a blank space', // OnboardingSpace.howToStart.blankSpace.label
+  blankDescription: 'Add object types when you need them.', // OnboardingSpace.howToStart.blankSpace.description
 } as const
 
 const T = CREATE_SPACE_TEXT
+
+const SETUPS: { value: SpaceSetup; icon: string; label: string; description: string }[] = [
+  { value: 'basic', icon: 'ph-shapes', label: T.basicLabel, description: T.basicDescription },
+  { value: 'blank', icon: 'ph-file-dashed', label: T.blankLabel, description: T.blankDescription },
+]
 
 /** The longest name `space.json` accepts (the server's rule). */
 const MAX_NAME = 120
@@ -63,6 +76,7 @@ export function CreateSpaceDialog() {
   const root = useSpaceInfo((s) => s.space?.root ?? null)
   const [name, setName] = useState('')
   const [location, setLocation] = useState('')
+  const [setup, setSetup] = useState<SpaceSetup>('blank')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [created, setCreated] = useState<string | null>(null)
@@ -71,6 +85,7 @@ export function CreateSpaceDialog() {
     if (!isOpen) return
     void useSpaceInfo.getState().ensure()
     setName('')
+    setSetup('blank')
     setError(null)
     setCreated(null)
     setBusy(false)
@@ -90,7 +105,7 @@ export function CreateSpaceDialog() {
     setBusy(true)
     setError(null)
     try {
-      const res = await api.createSpace(trimmed, location.trim())
+      const res = await api.createSpace(trimmed, location.trim(), setup)
       setCreated(res.path)
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) setError(T.exists)
@@ -149,6 +164,34 @@ export function CreateSpaceDialog() {
                 className="h-9 rounded-md border border-line bg-transparent px-2 font-mono text-[13px] font-normal outline-none focus:border-fg-muted"
               />
             </label>
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="mb-1.5 text-[13px] font-semibold">{T.howToStart}</legend>
+              {SETUPS.map((o) => (
+                <label
+                  key={o.value}
+                  data-selected={setup === o.value || undefined}
+                  className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line p-2.5 hover:bg-hover data-[selected]:border-fg-muted data-[selected]:bg-hover/60"
+                >
+                  <input
+                    type="radio"
+                    name="space-setup"
+                    value={o.value}
+                    checked={setup === o.value}
+                    onChange={() => setSetup(o.value)}
+                    className="sr-only"
+                    aria-label={o.label}
+                    aria-describedby={`space-setup-${o.value}`}
+                  />
+                  <Icon name={o.icon} size={18} className="mt-0.5 shrink-0 text-fg-muted" />
+                  <span className="min-w-0">
+                    <span className="block text-[14px] font-semibold">{o.label}</span>
+                    <span id={`space-setup-${o.value}`} className="block text-[13px] text-fg-muted">
+                      {o.description}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
             <aside aria-label={T.explainHeading} className="flex gap-2 rounded-lg bg-hover/60 p-3 text-[13px]">
               <Icon name="ph-lightbulb" size={16} />
               <div>

@@ -1,10 +1,13 @@
 // "Space Settings": the space's name, icon and description, written to `.object/space.json`
-// through `PUT /api/space` (nothing else changes: no folder rename).
+// through `PUT /api/space` (nothing else changes: no folder rename). M8: a "Delete space" row,
+// always disabled here because this is the open space (delete other spaces from the spaces menu).
 import { useEffect, useState } from 'react'
 import type { Icon as IconValue } from '@/api/types'
 import { IconOrEmoji, isIconifyId } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
+import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { DELETE_SPACE_TEXT } from '@/spaces/DeleteSpaceDialog'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { SaveError, SectionHeader, SettingGroup, errorText } from '../controls'
 
@@ -134,6 +137,13 @@ export function SpaceSettingsSection() {
           onBlur={commitDescription}
           className="w-full max-w-[520px] resize-y rounded-md border border-line bg-raised px-2 py-1.5 text-[15px] text-fg outline-none focus:border-fg-muted"
         />
+      </SettingGroup>
+      <SettingGroup title={DELETE_SPACE_TEXT.menuItem} help={DELETE_SPACE_TEXT.currentHint}>
+        <div>
+          <Button type="button" variant="destructive" size="sm" disabled title={DELETE_SPACE_TEXT.currentHint}>
+            {DELETE_SPACE_TEXT.confirm}
+          </Button>
+        </div>
       </SettingGroup>
       <SaveError error={error} />
     </div>
