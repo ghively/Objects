@@ -6,8 +6,13 @@
  * M8: the search view's "Open in extended search" row and Ctrl/Cmd+Shift+Enter (our key; plain
  * Shift+Enter stays M7's "open in the side panel") close the palette and open the extended search
  * page with what was typed.
+ *
+ * M8 (Task 17): the action palette adds "Open extended search", "Open settings", "Toggle focus
+ * mode", "Open space "…"" for each other registered space, and the clipboard group (`paste.ts`).
  */
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { api } from '@/api/client'
+import type { SpaceEntry } from '@/api/types'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Icon } from '@/components/Icon'
 import { useCalendar } from '@/calendar/useCalendar'
@@ -20,6 +25,29 @@ import { openExtendedSearch } from '@/search/openSearch'
 import { PALETTE_TEXT } from './searchOptions'
 import { SearchView } from './SearchView'
 import { usePalette, type PaletteMode } from './usePalette'
+import { useSettingsModal } from '@/settings/useSettingsModal'
+import { switchSpace } from '@/spaces/switchSpace'
+
+interface FocusStore {
+  getState(): { toggle(): void }
+}
+
+/** `focus/useFocusMode.ts` (Tasks 3 and 9), when it exists; "Toggle focus mode" needs it. */
+const focusModules = import.meta.glob<{ useFocusMode?: FocusStore }>('../focus/useFocusMode.ts', { eager: true })
+
+let focusToggleOverride: (() => void) | null | undefined
+
+/** Tests: use `fn` as the focus-mode toggle (`undefined` restores the module's). */
+export function setFocusToggleForTests(fn: (() => void) | null | undefined): void {
+  focusToggleOverride = fn
+}
+
+/** The focus-mode toggle, or null while focus mode isn't built. */
+export function focusModeToggle(): (() => void) | null {
+  if (focusToggleOverride !== undefined) return focusToggleOverride
+  const store = Object.values(focusModules)[0]?.useFocusMode
+  return store ? () => store.getState().toggle() : null
+}
 
 export interface CommandPaletteProps {
   onOpenTarget: (target: Target, opts?: OpenOptions) => void
@@ -50,6 +78,20 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
   const mode = usePalette((s) => s.mode)
   const types = useLinkIndex((s) => s.types)
   const hasObjectOpen = useTabs((s) => currentTarget(s)?.kind === 'object')
+  const [spaces, setSpaces] = useState<SpaceEntry[]>([])
+
+  // The registry, read each time the action palette opens ("Open space …").
+  useEffect(() => {
+    if (!open || mode !== 'actions') return
+    let live = true
+    api.spaces().then(
+      (list) => live && setSpaces(list ?? []),
+      () => live && setSpaces([]),
+    )
+    return () => {
+      live = false
+    }
+  }, [open, mode])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -89,8 +131,15 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
       openGraphView: onShowRightPanel,
       toggleSidebar: onToggleSidebar,
       toggleRightPanel: onToggleRightPanel,
+      openExtendedSearch: () => openExtendedSearch(),
+      openSettings: () => useSettingsModal.getState().open(),
+      toggleFocusMode: focusModeToggle(),
+      spaces,
+      openSpace: (path) => {
+        void switchSpace(path)
+      },
     }),
-    [types, hasObjectOpen, onOpenTarget, onShowRightPanel, onToggleSidebar, onToggleRightPanel],
+    [types, hasObjectOpen, onOpenTarget, onShowRightPanel, onToggleSidebar, onToggleRightPanel, spaces],
   )
 
   const other: PaletteMode = mode === 'search' ? 'actions' : 'search'

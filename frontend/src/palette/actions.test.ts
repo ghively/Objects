@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { typeDef } from '@/test/mockApi'
+import { spaceEntry, typeDef } from '@/test/mockApi'
 import { buildActions, type ActionContext } from './actions'
 
 function ctx(partial: Partial<ActionContext> = {}): ActionContext {
@@ -50,5 +50,48 @@ describe('buildActions', () => {
     for (const f of [c.openCalendar, c.openToday, c.openGlobalGraph, c.openGraphView, c.toggleSidebar, c.toggleRightPanel]) {
       expect(f).toHaveBeenCalledTimes(1)
     }
+  })
+
+  test('m8 actions: extended search, settings, focus mode and other spaces', () => {
+    const c = ctx({
+      hasObjectOpen: true,
+      openExtendedSearch: vi.fn(),
+      openSettings: vi.fn(),
+      toggleFocusMode: vi.fn(),
+      openSpace: vi.fn(),
+      spaces: [
+        spaceEntry({ path: '/s/Home', name: 'Home', current: true }),
+        spaceEntry({ path: '/s/Work', name: 'Work' }),
+        spaceEntry({ path: '/s/Old', name: 'Old', missing: true }),
+      ],
+    })
+    const actions = buildActions(c)
+    expect(actions.map((a) => a.label)).toEqual([
+      'Create Page',
+      'Create Person',
+      'Open calendar',
+      'Open today',
+      'Open extended search',
+      'Open global graph',
+      'Open graph view',
+      'Open settings',
+      'Toggle focus mode',
+      'Toggle left sidebar',
+      'Toggle right sidepanel',
+      'Open space "Work"',
+    ])
+    const byId = Object.fromEntries(actions.map((a) => [a.id, a]))
+    byId.openEmptyLocalSpaceQuery.run()
+    byId.openSettings.run()
+    byId.toggleFocusMode.run()
+    byId['openSpace:/s/Work'].run()
+    expect(c.openExtendedSearch).toHaveBeenCalledTimes(1)
+    expect(c.openSettings).toHaveBeenCalledTimes(1)
+    expect(c.toggleFocusMode).toHaveBeenCalledTimes(1)
+    expect(c.openSpace).toHaveBeenCalledWith('/s/Work')
+  })
+
+  test('no focus mode action without a toggle', () => {
+    expect(buildActions(ctx({ toggleFocusMode: null })).some((a) => a.id === 'toggleFocusMode')).toBe(false)
   })
 })

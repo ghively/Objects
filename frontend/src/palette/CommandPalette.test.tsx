@@ -346,7 +346,9 @@ describe('action mode', () => {
       'Create Task',
       'Open calendar',
       'Open today',
+      'Open extended search',
       'Open global graph',
+      'Open settings',
       'Toggle left sidebar',
       'Toggle right sidepanel',
     ])
