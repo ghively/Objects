@@ -1,6 +1,7 @@
 import { EditorContent, useEditor } from '@tiptap/react'
 import { useEffect, useImperativeHandle, useRef, type Ref } from 'react'
 import { editorExtensions, loadBody, serializeBody } from './document'
+import { createFindControl, FindInPage } from './extensions/findInPage'
 import { useAutosave, type BodyEditorHandle } from './useAutosave'
 import './editor.css'
 
@@ -23,7 +24,7 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict, con
   const autosaveRef = useRef<ReturnType<typeof useAutosave> | null>(null)
 
   const editor = useEditor({
-    extensions: editorExtensions(),
+    extensions: [...editorExtensions(), FindInPage],
     editable: !readOnly,
     immediatelyRender: true,
     shouldRerenderOnTransaction: false,
@@ -80,6 +81,7 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict, con
         autosave.markLoaded(text, v)
         loadedRef.current = { path, body: text }
       },
+      find: editor ? createFindControl(editor) : undefined,
     }),
     [editor, autosave, path],
   )
