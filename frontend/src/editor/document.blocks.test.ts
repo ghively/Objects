@@ -507,8 +507,9 @@ describe('M7 document model', () => {
     para.commands.setTextSelection(blockWith(para, 'Sum').node.nodeSize - 1)
     para.commands.insertInlineMath('x+y')
     expect(serializeBody(para)).toBe('Sum: $x+y$\n')
-    // The pickers belong to Task 11.
-    expect(para.commands.pickMedia('image')).toBe(false)
+    // Task 11: pickMedia opens the file dialog (a hidden input); pickObjectEmbed needs an installed picker.
+    expect(para.commands.pickMedia('image')).toBe(true)
+    document.querySelector('input[data-media-picker]')?.remove()
     expect(para.commands.pickObjectEmbed()).toBe(false)
   })
 })

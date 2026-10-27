@@ -6,9 +6,11 @@
  *   [Proxmox docs](https://pve.proxmox.com/wiki)
  *
  * Loaded only with the `bookmark` option and a one-link paragraph. Nothing is
- * fetched. Rendering is minimal here; Task 11 adds the card.
+ * fetched. Drawn as a card by `media/MediaView.tsx`'s `BookmarkView` (Task 11).
  */
 import { Node, mergeAttributes } from '@tiptap/core'
+import { ReactNodeViewRenderer } from '@tiptap/react'
+import { BookmarkView } from '../media/MediaView'
 import { makeOption } from '../annotations'
 import { insertBlockNode } from './containers'
 import './bookmark.css'
@@ -58,6 +60,10 @@ export const Bookmark = Node.create({
       mergeAttributes(HTMLAttributes, { 'data-bookmark': '', class: 'bookmark-block' }),
       node.attrs.title || node.attrs.href || '',
     ]
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(BookmarkView)
   },
 
   renderText({ node }) {

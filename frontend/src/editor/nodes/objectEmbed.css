@@ -1,1 +1,13 @@
-/* Task 7: plain rendering; styled by the task that owns this node's view. */
+/* Embedded objects (Task 11). Capacities' `.EntityBlock.block-outer.{inline,
+   smallCard,wideCard,embed}` sit `--ep-stack` (.2em) below the block before. */
+.object-editor .object-embed {
+  margin-block-start: 0.2em;
+  position: relative;
+}
+.object-editor .object-embed[data-view='smallCard'] .resizable-embed-frame:not([data-width]),
+.object-editor .object-embed[data-view='inline'] .resizable-embed-frame:not([data-width]) {
+  width: auto;
+}
+.object-editor .object-embed-body { min-width: 0; cursor: default; }
+.object-editor .object-embed-loading { height: 32px; }
+.object-editor .object-embed-unresolved { display: inline-block; }
