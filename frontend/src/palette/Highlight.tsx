@@ -4,6 +4,7 @@
  * snippet is ever parsed.
  */
 import { Fragment } from 'react'
+import { cpToUtf16 } from '@/lib/codepoints'
 
 const START = '\u0002'
 const END = '\u0003'
@@ -45,9 +46,10 @@ export function Highlight({ text, className }: { text: string; className?: strin
   )
 }
 
-/** Split `title` by `[start, end)` spans (clamped, overlaps merged). */
+/** Split `title` by `[start, end)` code-point spans from the backend (clamped, overlaps merged). */
 export function splitTitle(title: string, matches: readonly (readonly [number, number])[]): HighlightPart[] {
   const spans = matches
+    .map(([s, e]) => [cpToUtf16(title, s), cpToUtf16(title, e)] as const)
     .map(([s, e]) => [Math.max(0, Math.min(s, title.length)), Math.max(0, Math.min(e, title.length))] as const)
     .filter(([s, e]) => e > s)
     .sort((a, b) => a[0] - b[0])

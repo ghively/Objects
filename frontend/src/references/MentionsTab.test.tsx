@@ -74,6 +74,28 @@ describe('MentionsTab', () => {
     expect(screen.getAllByRole('button', { name: 'Link' })).toHaveLength(3)
   })
 
+  test('an emoji before the match does not shift the highlight; link offsets are sent unchanged', async () => {
+    mocked.references.mockResolvedValue(
+      references({
+        tabs: ['all', 'backlinks', 'related', 'mentions'],
+        mentions: [
+          {
+            path: 'Pages/Notes.md',
+            version: 'v7',
+            occurrences: [{ start: 12, end: 15, text: 'Ada', context: '🚀 with Ada.', contextStart: 5 }],
+          },
+        ],
+        summaries: { 'Pages/Notes.md': objectSummary({ path: 'Pages/Notes.md', title: 'Notes' }) },
+      }),
+    )
+    const user = await setup()
+    const occ = document.querySelector('[data-mention="Pages/Notes.md"] [data-occurrence]')!
+    expect(occ.querySelector('b')?.textContent).toBe('Ada')
+    expect(occ.querySelector('.search-highlights')?.textContent).toBe('🚀 with Ada.')
+    await user.click(screen.getByRole('button', { name: 'Link' }))
+    expect(mocked.linkMention).toHaveBeenCalledWith(expect.objectContaining({ start: 12, end: 15 }))
+  })
+
   test('link a mention sends version and reloads', async () => {
     const user = await setup()
     await user.click(screen.getAllByRole('button', { name: 'Link' })[1])

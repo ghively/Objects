@@ -40,4 +40,11 @@ describe('MatchedTitle', () => {
     expect(container.querySelector('b')?.textContent).toBe('Alp')
     expect(container.textContent).toBe('Alpha')
   })
+
+  test('backend spans count code points, so an emoji before the match does not shift it', () => {
+    // fuzzy.score('launch', '🚀 Launch plan') returns [(2, 8)] in Python.
+    const { container } = render(<MatchedTitle title="🚀 Launch plan" matches={[[2, 8]]} />)
+    expect(container.querySelector('b')?.textContent).toBe('Launch')
+    expect(container.textContent).toBe('🚀 Launch plan')
+  })
 })
