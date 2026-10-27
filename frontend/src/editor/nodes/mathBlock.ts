@@ -7,9 +7,12 @@
  *   $$
  *
  * Loaded from the `math` source block (rule 6); an edited block is written in
- * the form `$$⏎text⏎$$`. Rendering is plain text here; Task 9 adds KaTeX.
+ * the form `$$⏎text⏎$$`. Rendered with KaTeX by `math/MathBlockView.tsx`
+ * (Task 9); `renderHTML` stays the plain form for copy and HTML export.
  */
 import { Node, mergeAttributes } from '@tiptap/core'
+import { ReactNodeViewRenderer } from '@tiptap/react'
+import { MathBlockView } from '../math/MathBlockView'
 import { insertBlockNode } from './containers'
 import './mathBlock.css'
 
@@ -58,6 +61,10 @@ export const MathBlock = Node.create({
 
   renderHTML({ node, HTMLAttributes }) {
     return ['div', mergeAttributes(HTMLAttributes, { 'data-math-block': '', class: 'math-block' }), node.attrs.text || '']
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(MathBlockView)
   },
 
   renderText({ node }) {

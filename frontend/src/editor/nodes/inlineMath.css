@@ -1,1 +1,30 @@
-/* Task 7: plain rendering; styled by the task that owns this node's view. */
+/* Inline formula (Task 9): KaTeX inline, an input below it while editing. */
+.object-editor .inline-math { position: relative; display: inline; }
+.object-editor .inline-math-render { cursor: pointer; border-radius: 3px; padding: 0 1px; }
+.object-editor .inline-math-render:hover,
+.object-editor .inline-math.is-selected .inline-math-render { background: var(--bg-hover-2); }
+.object-editor .inline-math-empty { color: var(--text-muted); }
+.object-editor .inline-math-editor {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 20;
+  margin-top: 4px;
+  padding: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  box-shadow: var(--card-shadow);
+}
+.object-editor .inline-math-input {
+  width: 16rem;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--code-border);
+  border-radius: 4px;
+  background: var(--code-bg);
+  color: var(--code-text);
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 0.8125rem;
+  outline: none;
+}
