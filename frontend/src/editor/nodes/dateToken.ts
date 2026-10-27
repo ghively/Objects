@@ -7,10 +7,12 @@
  * file reads cleanly; any text found inside on read is kept (`text`) and
  * written back as it was.
  *
- * Plain rendering here: the element's text. Task 26 adds the chip (the day in
- * the user's date format; a click opens that daily note).
+ * `renderHTML` gives the element's text (copy/paste, headless HTML); in the
+ * editor the node view draws the chip (`DateTokenView`: the day in the user's
+ * date format; a click opens that daily note).
  */
 import { Node, mergeAttributes, type MarkdownToken } from '@tiptap/core'
+import { DateTokenView } from './DateTokenView'
 
 const TIME_RE = /^<time datetime="(\d{4}-\d{2}-\d{2})">([^<\r\n]*)<\/time>/
 
@@ -66,6 +68,10 @@ export const DateToken = Node.create({
       mergeAttributes(HTMLAttributes, { class: 'date-token', 'data-date-token': '' }),
       (node.attrs.text as string | null) ?? node.attrs.date,
     ]
+  },
+
+  addNodeView() {
+    return ({ node }) => new DateTokenView(node)
   },
 
   renderText({ node }) {

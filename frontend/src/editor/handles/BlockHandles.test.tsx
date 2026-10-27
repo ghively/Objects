@@ -124,6 +124,8 @@ describe('<BlockHandles>', () => {
       'Quote',
       'Color',
       'Icon',
+      'Indent',
+      'Unindent',
       'Insert block above',
       'Insert block below',
       'Move up',

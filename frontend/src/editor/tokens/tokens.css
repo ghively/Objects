@@ -1,0 +1,214 @@
+/* The tokens menu (text-selection toolbar), its colour panel, the date token
+   chip, and the M8 indent / list-item styles (Task 26). The trimmed reference
+   has no CSS for these: the values are our choice, built on the app's tokens
+   and M7's menu look. */
+
+.tokens-menu {
+  position: fixed;
+  z-index: 50;
+  transform: translateY(calc(-100% - 8px));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.tokens-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+}
+
+.tokens-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 4px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+}
+.tokens-button svg {
+  width: 16px;
+  height: 16px;
+}
+.tokens-button:hover,
+.tokens-button[data-active] {
+  background: var(--bg-hover);
+}
+.tokens-button-wide {
+  padding: 0 8px;
+}
+.tokens-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: var(--border-subtle);
+}
+
+.tokens-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: 360px;
+  overflow: auto;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+}
+
+.tokens-input {
+  height: 32px;
+  width: 100%;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  font-size: 14px;
+  outline: none;
+}
+
+.tokens-list {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tokens-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 14px;
+}
+.tokens-list-row:hover,
+.tokens-list-row.is-active {
+  background: var(--bg-hover);
+}
+.tokens-list-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tokens-list-meta {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.tokens-empty {
+  padding: 6px 8px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* "Highlight text": two sections of 18 swatches (6 per row). */
+.tokens-color-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tokens-color-title {
+  padding: 2px 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.tokens-color-row {
+  width: 100%;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 13px;
+}
+.tokens-color-row:hover {
+  background: var(--bg-hover);
+}
+.tokens-color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 28px);
+  gap: 4px;
+  padding: 2px 6px;
+}
+.tokens-color-cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+.tokens-color-cell:hover {
+  background: var(--bg-hover);
+}
+.tokens-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.tokens-color-check {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+}
+
+/* The date token chip: the day in the user's date format; a click opens its daily note. */
+.object-editor .date-token-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  padding: 0 0.35em;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.object-editor .date-token-chip:hover {
+  text-decoration: underline;
+}
+.object-editor .date-token-chip .date-token-icon {
+  width: 0.9em;
+  height: 0.9em;
+  opacity: 0.7;
+}
+.object-editor .date-token-chip.ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+}
+
+/* Indented blocks: "Hide outliner lines" also hides the indent's line. */
+.object-editor[data-hide-outliner-lines] .block-indent::after {
+  display: none;
+}
+
+/* Per-item colours: the bullet or number takes the item's colour. */
+.object-editor li[data-item-color]::marker {
+  color: inherit;
+}
+.object-editor .item-icon {
+  display: inline-block;
+  margin-right: 0.3em;
+  vertical-align: -0.1em;
+}
