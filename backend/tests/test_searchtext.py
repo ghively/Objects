@@ -80,3 +80,20 @@ def test_property_text_skips_not_searchable_and_dates(links_space_dir: Path):
     for raw_key in ("date", "deadline", "completed"):
         assert f"{raw_key}:" not in task.lower()
     assert property_text(None, {}, lambda t: t) == ""
+
+
+def test_search_text_skips_annotations_and_math_fences():
+    body = (
+        "<!--block:color=bg-red-->\r\n"
+        "Red paragraph.\r\n"
+        "<!-- columns widths=40,60 -->\r\n"
+        "Left.\r\n"
+        "<!-- column -->\r\n"
+        "Right.\r\n"
+        "<!-- /columns -->\r\n"
+        "<!-- block: caption=\"x > y\" -->\r\n"
+        "  $$\r\n"
+        "a^2 + b^2 = c^2\r\n"
+        "$$  \r\n"
+    )
+    assert plain_body(body) == "Red paragraph.\nLeft.\nRight.\na^2 + b^2 = c^2"

@@ -14,11 +14,13 @@ from typing import TYPE_CHECKING, Any
 
 from .propvalues import decode_value
 from .rows import (
+    _COMMENT_LINE_RE,
     _EM_STAR_RE,
     _EM_UNDER_RE,
     _FENCE_RE,
     _HEADING_RE,
     _LIST_RE,
+    _MATH_FENCE_RE,
     _QUOTE_RE,
     _STRIKE_RE,
     _STRONG_RE,
@@ -90,6 +92,8 @@ def plain_body(body: str) -> str:
                 out.append(line.strip())
             continue
         if _RULE_RE.match(line) or _TABLE_SEP_RE.match(line) and "|" in line:
+            continue
+        if _COMMENT_LINE_RE.match(line) or _MATH_FENCE_RE.match(line):
             continue
         stripped = line.strip()
         if stripped.startswith("|"):

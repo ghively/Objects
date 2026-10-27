@@ -181,3 +181,19 @@ def test_rows_carry_backlinks(links_space_dir):
     assert diff["values"]["backlinks"] == [
         {"target": "Draft outline", "path": "Tasks/Draft outline.md"}
     ]
+
+
+def test_preview_skips_annotations_and_math_fences():
+    body = (
+        "<!-- block: color=bg-blue align=center -->\n"
+        "## Rollout notes\n"
+        "<!--   TOGGLE   open-->\n"
+        "Inside the toggle.\n"
+        "<!-- /toggle -->\n"
+        "<!-- block: caption=\"a > b\" -->\n"
+        "$$\n"
+        "E = mc^2\n"
+        "$$\n"
+        "Price $5 and $6.\n"
+    )
+    assert body_preview(body) == "Rollout notes Inside the toggle. E = mc^2 Price $5 and $6."
