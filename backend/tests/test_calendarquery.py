@@ -71,7 +71,9 @@ def test_range_covers_each_day(calendar_space_dir: Path):
     for key in ("dated", "created", "updated"):
         assert empty[key] == []
     assert all(e["kind"] == "occurrence" for e in empty["tasks"])  # only recurring series reach December
-    assert set(empty) == {"dailyNote", "tasks", "dated", "created", "updated"}
+    assert set(empty) == {
+        "dailyNote", "tasks", "dated", "created", "updated", "backlinks", "references", "timeline"
+    }
 
 
 def test_daily_note_in_day(calendar_space_dir: Path):

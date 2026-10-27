@@ -6,7 +6,12 @@ code (``![[…]]`` included), an ``entity`` property value of A, or a
 M2's `relink_frontmatter` rewrites), whose target resolves to B by
 `Space.resolve` from A. Unresolved targets, self links and templates (as
 source or target) don't count; ``tags:`` membership is kept separately
-(`tags_of`, `tagged`).
+(`tags_of`, `tagged`). M8: a data-view embed (``![[collection:…]]``,
+``![[query:…]]``) is not a link; a block reference (``[[T#^id]]``,
+``![[T#^id]]``) is a link to ``T``. Link targets written as a day
+(``[[YYYY-MM-DD]]``) are also kept unresolved (`day_backlinks`), and each
+object's date tokens (``<time datetime="YYYY-MM-DD">``, outside code) are
+counted (`date_tokens`, `date_references`).
 
 The index stores each source's link *targets* (`_extract`, one method, the hook
 point for other kinds of objects) and resolves them on read. `on_change` only
@@ -18,17 +23,40 @@ relations), and re-resolves every stored target when the set of names changed
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from .dailynotes import parse_day
 from .propvalues import decode_value
-from .relink import wikilink_spans, wikilink_targets
+from .relink import code_ranges, wikilink_spans, wikilink_targets
 
 if TYPE_CHECKING:
     from .space import Space, SpaceChange
 
-__all__ = ["LinkIndex"]
+__all__ = ["LinkIndex", "count_date_tokens"]
+
+_DATA_VIEW_PREFIXES = ("collection:", "query:")
+_TIME_RE = re.compile(
+    r"<time\b[^>]*?\bdatetime\s*=\s*([\"'])(\d{4}-\d{2}-\d{2})\1[^>]*>", re.IGNORECASE
+)
+
+
+def count_date_tokens(body: str) -> dict[str, int]:
+    """``{day: count}`` of the date tokens ``<time datetime="YYYY-MM-DD">`` outside code."""
+    out: dict[str, int] = {}
+    if "<" not in body:
+        return out
+    ranges = code_ranges(body)
+    for m in _TIME_RE.finditer(body):
+        pos = m.start()
+        if any(s <= pos < e for s, e in ranges):
+            continue
+        day = parse_day(m.group(2))
+        if day is not None and day == m.group(2):
+            out[day] = out.get(day, 0) + 1
+    return out
 
 
 @dataclass
@@ -38,6 +66,10 @@ class _Extracted:
     props: dict[str, list[str]] = field(default_factory=dict)
     """Frontmatter key -> link targets (entity values and wikilinks in other values)."""
     tags: list[str] = field(default_factory=list)
+    days: frozenset[str] = frozenset()
+    """The days (``YYYY-MM-DD``) written as link targets, resolved or not."""
+    tokens: dict[str, int] = field(default_factory=dict)
+    """Day -> the number of date tokens for it in the body (outside code)."""
 
 
 @dataclass
@@ -72,6 +104,10 @@ class LinkIndex:
         self._in: dict[str, set[str]] = {}
         self._tagged: dict[str, set[str]] = {}
         self._backlinks_cache: dict[str, list[str]] = {}
+        self._sources_rev = 0
+        self._days_rev = -1
+        self._day_sources: dict[str, set[str]] = {}
+        self._token_sources: dict[str, dict[str, int]] = {}
         self.revision = 0
         """Bumped on every change that alters a link, a backlink or a tag membership."""
 
@@ -94,6 +130,7 @@ class LinkIndex:
         space = self._space
         with space._lock:
             pending, self._pending = self._pending, []
+            self._sources_rev += 1
             full = not self._built or any(c.kind == "types" for c in pending)
             dirty: set[str] = set()
             if full:
@@ -150,7 +187,12 @@ class LinkIndex:
         ex = _Extracted(tags=list(summary.tags))
         body = raw.of.body
         if "[[" in body:
-            ex.body = [t for t, _s, _e in wikilink_spans(body)]
+            ex.body = [
+                t
+                for t, s, _e in wikilink_spans(body)
+                if not (body.startswith("!", s) and t.lstrip().startswith(_DATA_VIEW_PREFIXES))
+            ]
+        ex.tokens = count_date_tokens(body)
         # M6: a whiteboard's board links count as body links (imported here: no import cycle).
         from .whiteboardindex import board_for_index
         from .whiteboardtrash import board_links
@@ -175,6 +217,10 @@ class LinkIndex:
                         targets.extend(sorted(wikilink_targets(s)))
             if targets:
                 ex.props[key] = targets
+        days = {d for t in ex.body if (d := parse_day(t)) is not None}
+        for targets in ex.props.values():
+            days.update(d for t in targets if isinstance(t, str) and (d := parse_day(t)) is not None)
+        ex.days = frozenset(days)
         return ex
 
     # -- resolution -----------------------------------------------------------
@@ -308,6 +354,38 @@ class LinkIndex:
         self._ensure()
         r = self._resolved.get(path)
         return list(r.tags) if r else []
+
+    def _ensure_days(self) -> None:
+        self._ensure()
+        if self._days_rev == self._sources_rev:
+            return
+        with self._space._lock:
+            day_sources: dict[str, set[str]] = {}
+            token_sources: dict[str, dict[str, int]] = {}
+            for src, ex in self._sources.items():
+                for d in ex.days:
+                    day_sources.setdefault(d, set()).add(src)
+                for d, n in ex.tokens.items():
+                    token_sources.setdefault(d, {})[src] = n
+            self._day_sources = day_sources
+            self._token_sources = token_sources
+            self._days_rev = self._sources_rev
+
+    def day_link_sources(self, day: str) -> set[str]:
+        """The objects whose links are written ``[[day]]`` (resolved or not)."""
+        self._ensure_days()
+        return set(self._day_sources.get(day, ()))
+
+    def date_tokens(self, path: str) -> dict[str, int]:
+        """``{day: count}`` of the date tokens in ``path``'s body (outside code)."""
+        self._ensure()
+        ex = self._sources.get(path)
+        return dict(ex.tokens) if ex is not None else {}
+
+    def date_references(self, day: str) -> dict[str, int]:
+        """``{path: count}`` of the objects holding date tokens for ``day``."""
+        self._ensure_days()
+        return dict(self._token_sources.get(day, {}))
 
     def tagged(self, tag_path: str) -> set[str]:
         """The objects carrying the Tag object ``tag_path``."""
