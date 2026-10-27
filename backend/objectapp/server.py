@@ -90,6 +90,15 @@ Routes (all JSON):
   file, ``404`` when missing, in a dot-folder, outside the space or a whiteboard sidecar.
   ``POST /api/attachments/open`` ``{path}`` -> ``{ok}`` (opened with the OS default app);
   ``404`` as above, ``415`` for an executable or script (or a ``.md``).
+- M7 spaces (the registry is ``<state dir>/spaces.json``; no folder is ever deleted):
+  ``GET /api/spaces`` -> ``{spaces: {path, name, icon, current, missing, lastOpened}[]}``
+  (registry order, the current space always listed; never writes). ``POST /api/spaces``
+  ``{name, location}`` -> ``201 {path}`` (a new folder holding only ``.object/space.json``,
+  registered); ``409`` the folder exists, ``422`` bad name, ``404`` not a folder.
+  ``POST /api/spaces/open`` ``{path}`` -> ``{path}`` (registers an existing folder; ``404``).
+  ``DELETE /api/spaces?path=`` -> ``{ok}`` (registry only; ``409`` for the current space).
+  ``POST /api/spaces/switch`` ``{path}`` -> ``202 {path}``, then the launcher restarts the
+  server on that folder on the same port; ``404`` not a folder, ``503`` without the launcher.
 - ``GET /api/resolve?link=&from=`` -> ``{path}`` or ``404``
 - ``POST /api/reveal`` ``{path}`` -> ``200 {ok}``: show the file in the OS file manager
 - ``GET /api/events`` -> Server-Sent Events; event ``change`` with a
@@ -118,19 +127,21 @@ import os
 import subprocess
 import sys
 import threading
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import asdict
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from . import api_graph, api_references, api_search, media
 from .apictx import ApiContext
+from .appstate import state_dir
 from .collections import CollectionDef
 from .jsonstore import (
     DefinitionUnreadable,
@@ -171,6 +182,7 @@ from .space import (
 )
 from .spaceconfig import SpaceConfigProblem, space_fields
 from .spaceconfig import patch as patch_space_config
+from .spaces import Registry, SpaceNameProblem, create_space, normalize
 from .typedefs import has_undecodable
 from .typemodel import (
     RevisionConflict,
@@ -416,6 +428,15 @@ class PatchSettingsRequest(BaseModel):
     baseRevision: str = ""
 
 
+class CreateSpaceRequest(BaseModel):
+    name: str = ""
+    location: str = ""
+
+
+class SpacePathRequest(BaseModel):
+    path: str = ""
+
+
 class EnsureTagRequest(BaseModel):
     name: str = ""
     clientId: str | None = None
@@ -577,8 +598,17 @@ def _tasks_ui_problem(tasks: Any) -> str | None:
     return None
 
 
-def create_app(space: Space, static_dir: Path | None = None, watch: bool = True) -> FastAPI:
+def create_app(
+    space: Space,
+    static_dir: Path | None = None,
+    watch: bool = True,
+    on_switch: Callable[[Path], None] | None = None,
+) -> FastAPI:
     """The app for `space`. With `watch`, a `SpaceWatcher` runs for the app's lifespan.
+
+    `on_switch` is the launcher's ``SpaceHost.request_switch``: ``POST
+    /api/spaces/switch`` calls it with the new space's folder once the response is
+    sent. Without it that route answers 503.
 
     The reminder scheduler runs for the app's lifespan either way. Test hooks,
     ignored unless set: ``OBJECT_CLOCK_FILE`` (a file holding an ISO UTC instant
@@ -695,6 +725,65 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
         return {"settings": data, "revision": revision}
+
+    # -- spaces (M7): the registry in the state dir; folders are never deleted --
+
+    def registry() -> Registry:
+        return Registry(state_dir())
+
+    @api.get("/spaces")
+    def list_spaces():
+        return {"spaces": [asdict(e) for e in registry().list(current=space.root)]}
+
+    @api.post("/spaces", status_code=201)
+    def post_space(req: CreateSpaceRequest):
+        if not req.location.strip():
+            return _error(404, "Choose a folder for the new space.")
+        try:
+            path = create_space(req.name, req.location)
+        except SpaceNameProblem as exc:
+            return _error(422, exc.message)
+        except (NotADirectoryError, FileNotFoundError):
+            return _error(404, f"Not a folder: {req.location}")
+        except FileExistsError:
+            return _error(409, "A folder with that name already exists here.")
+        registry().register(path)
+        return JSONResponse({"path": str(path)}, status_code=201)
+
+    def _folder(raw: str) -> Path | None:
+        if not raw.strip():
+            return None
+        path = normalize(raw)
+        return path if path.is_dir() else None
+
+    @api.post("/spaces/open")
+    def open_space(req: SpacePathRequest):
+        path = _folder(req.path)
+        if path is None:
+            return _error(404, f"Not a folder: {req.path}")
+        registry().register(path)
+        return {"path": str(path)}
+
+    @api.delete("/spaces")
+    def remove_space(path: str = Query(default="")):
+        if not path.strip():
+            return _error(404, "No space given.")
+        target = normalize(path)
+        if os.path.normcase(str(target)) == os.path.normcase(str(space.root)):
+            return _error(409, "This space is open. Switch to another space first.")
+        registry().remove(target)
+        return {"ok": True}
+
+    @api.post("/spaces/switch", status_code=202)
+    def switch_space(req: SpacePathRequest):
+        if on_switch is None:
+            return _error(503, "Switching spaces needs the Object launcher.")
+        path = _folder(req.path)
+        if path is None:
+            return _error(404, f"Not a folder: {req.path}")
+        return JSONResponse(
+            {"path": str(path)}, status_code=202, background=BackgroundTask(on_switch, path)
+        )
 
     @api.get("/objects")
     def list_objects(type: str | None = Query(default=None)):
