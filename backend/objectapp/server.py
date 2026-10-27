@@ -85,6 +85,16 @@ Routes (all JSON):
 - ``POST /api/reveal`` ``{path}`` -> ``200 {ok}``: show the file in the OS file manager
 - ``GET /api/events`` -> Server-Sent Events; event ``change`` with a
   `ChangeEvent` as JSON data (``{kind, path, version, origin}``)
+- M6 whiteboards (`whiteboardapi.whiteboard_router`): ``GET /api/whiteboard?path=`` ->
+  ``{path, board, revision, readOnlyReason?}``; ``PUT /api/whiteboard``
+  ``{path, board, baseRevision, clientId?}`` -> ``{revision}`` (``409 {currentRevision}``,
+  ``422``, ``423``); ``GET /api/whiteboard/ink?path=`` -> ``{path, strokes, revision,
+  readOnlyReason?}``; ``PUT /api/whiteboard/ink`` ``{path, strokes, baseRevision, clientId?}``
+  -> ``{revision}``; ``POST /api/whiteboards`` ``{title?, clientId?}`` ->
+  ``201 {path, version, typeIds}``. Board and ink saves announce ``whiteboard`` with the
+  board's ``.md`` path. ``PUT /api/ui`` accepts ``whiteboard`` (the canvas display settings).
+  Deleting, restoring, purging and renaming a whiteboard carry its sidecar files; a rename
+  relinks board files too (their sidecar paths are in ``relinked``, announced ``whiteboard``).
 
 Errors: a path outside the space or not an object is ``400``; a missing object is ``404``;
 a file the OS refused to write (locked by another program, say) is ``503 {detail}``.
@@ -113,14 +123,26 @@ from sse_starlette import EventSourceResponse, ServerSentEvent
 from . import api_graph, api_references, api_search
 from .apictx import ApiContext
 from .collections import CollectionDef
-from .jsonstore import DefinitionUnreadable, default_views, json_revision, normalize_views
+from .jsonstore import (
+    DefinitionUnreadable,
+    default_views,
+    json_revision,
+    normalize_views,
+)
 from .media import NotAnImage, image_media_type, image_path, import_image, list_images
-from .propvalues import InvalidValue
 from .notify import FileNotifier, system_notifier
+from .propvalues import InvalidValue
 from .queries import QueryDef
 from .reminders import ReminderScheduler, file_clock
 from .searchindex import SearchIndex
-from .space import ConfirmRequired, Conflict, DailyNoteExists, ReadOnly, RestoreConflict, Space
+from .space import (
+    ConfirmRequired,
+    Conflict,
+    DailyNoteExists,
+    ReadOnly,
+    RestoreConflict,
+    Space,
+)
 from .typedefs import has_undecodable
 from .typemodel import (
     RevisionConflict,
@@ -131,6 +153,9 @@ from .typemodel import (
 )
 from .uistate import patch_ui, read_ui, ui_read_only_reason, ui_with_defaults
 from .watcher import ChangeEvent, SpaceWatcher
+from .whiteboardapi import whiteboard_router
+from .whiteboardfile import sidecar_owner
+from .whiteboardstore import whiteboard_ui_problem
 
 __all__ = ["EventHub", "create_app"]
 
@@ -312,7 +337,7 @@ class SaveQueryRequest(BaseModel):
 
 
 _UI_PATCH_KEYS = frozenset(
-    {"pinned", "sections", "allNotesLayout", "calendar", "tasks", "reminders", "graph"}
+    {"pinned", "sections", "allNotesLayout", "calendar", "tasks", "reminders", "graph", "whiteboard"}
 )
 # RootSpace.model.ts `GraphViewCustomization`, verbatim.
 _GRAPH_LIST_KEYS = ("filterStructureIds", "excludeStructureIds")
@@ -446,6 +471,10 @@ def _ui_problem(patch: dict[str, Any]) -> str | None:
             return "reminders must be {enabled: true|false}."
     if "graph" in patch:
         problem = _graph_ui_problem(patch["graph"])
+        if problem:
+            return problem
+    if "whiteboard" in patch:
+        problem = whiteboard_ui_problem(patch["whiteboard"])
         if problem:
             return problem
     return None
@@ -618,6 +647,22 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         if loop is not None and loop.is_running() and not hub.closed:
             loop.call_soon_threadsafe(hub.publish, event)
 
+    def announce_relinked(paths: list[str], client_id: str | None) -> None:
+        """``changed`` per relinked object; ``whiteboard`` (its .md) per relinked board file."""
+        for path in paths:
+            owner = sidecar_owner(path)
+            if owner is not None:
+                announce(ChangeEvent("whiteboard", owner, None, origin=client_id))
+            else:
+                announce(ChangeEvent("changed", path, space.cached_version(path), origin=client_id))
+
+    def announce_whiteboard(event: ChangeEvent) -> None:
+        """The whiteboard routes' announce: a board save also refreshes the board's links and
+        search text (the link index and the search index re-read it on this rescan)."""
+        if event.kind == "whiteboard":
+            space.rescan_file(event.path)
+        announce(event)
+
     @api.put("/object/body")
     def put_body(req: SaveBodyRequest):
         try:
@@ -711,10 +756,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             announce(renamed)
         elif result.version != req.baseVersion:
             announce(ChangeEvent("changed", rel, result.version, origin=req.clientId))
-        for path in result.relinked:
-            announce(
-                ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId)
-            )
+        announce_relinked(result.relinked, req.clientId)
         return _display_safe(result.to_api())
 
     @api.get("/object/change-type")
@@ -754,10 +796,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             )
         elif result.version != req.baseVersion:
             announce(ChangeEvent("changed", rel, result.version, origin=req.clientId))
-        for path in result.relinked:
-            announce(
-                ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId)
-            )
+        announce_relinked(result.relinked, req.clientId)
         return _display_safe(result.to_api())
 
     def announce_template_ids(before: dict[str, str], client_id: str | None) -> None:
@@ -1301,6 +1340,8 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
     api.include_router(api_references.router(ctx))
     api.include_router(api_graph.router(ctx))
     app.include_router(api)
+    # M6: the whiteboard routes carry their own /api prefix.
+    app.include_router(whiteboard_router(space, announce_whiteboard))
 
     if static_dir is not None and Path(static_dir).is_dir():
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")

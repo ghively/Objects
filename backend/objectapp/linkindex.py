@@ -140,7 +140,10 @@ class LinkIndex:
         return self._extract(path)
 
     def _extract(self, path: str) -> _Extracted:
-        """The link targets one object holds (body, relation values, frontmatter wikilinks)."""
+        """The link targets one object holds (body, relation values, frontmatter wikilinks).
+
+        A whiteboard's board links (entity blocks, wikilinks in text blocks) join its body links.
+        """
         space = self._space
         raw = space._raw[path]
         summary = space._summaries[path]
@@ -148,6 +151,13 @@ class LinkIndex:
         body = raw.of.body
         if "[[" in body:
             ex.body = [t for t, _s, _e in wikilink_spans(body)]
+        # M6: a whiteboard's board links count as body links (imported here: no import cycle).
+        from .whiteboardindex import board_for_index
+        from .whiteboardtrash import board_links
+
+        board, _revision = board_for_index(space, path)
+        if board is not None:
+            ex.body.extend(board_links(board))
         t = space.type_by_id(summary.type)
         defs = {p.key: p for p in t.propertyDefinitions} if t is not None else {}
         for key, value in raw.fm.items():

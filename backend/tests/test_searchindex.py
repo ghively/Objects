@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import hashlib
 import os
 import shutil
@@ -632,11 +633,17 @@ def test_search_p95_under_50ms_at_5000(big_index):
     for q in queries[:3]:
         idx.search(q)  # warm up
     times = []
-    for q in queries:
-        t0 = time.perf_counter()
-        res = idx.search(q)
-        times.append(time.perf_counter() - t0)
-        assert res["partial"] is False
+    # Time the search, not a full garbage collection of everything earlier tests left behind.
+    gc.collect()
+    gc.disable()
+    try:
+        for q in queries:
+            t0 = time.perf_counter()
+            res = idx.search(q)
+            times.append(time.perf_counter() - t0)
+            assert res["partial"] is False
+    finally:
+        gc.enable()
     p95 = statistics.quantiles(times, n=20)[-1]
     assert p95 < 0.05 * SLACK, f"search p95 {p95 * 1000:.1f} ms"
     assert idx.search("Object 00042")["results"][0]["title"] == "Object 00042"

@@ -24,7 +24,10 @@ def _reference_list(name: str) -> set[str]:
     src = BACKBONE.read_text("utf-8")
     m = re.search(rf"\n  {name}: \([^)]*\) => \{{(.*?)\n  \}},", src, re.DOTALL)
     assert m, name
-    return set(re.findall(r"'([A-Za-z]+)'", m.group(1)))
+    names = set(re.findall(r"'([A-Za-z]+)'", m.group(1)))
+    if "...whiteboard(config)" in m.group(1):
+        names.add("RootWhiteboard")  # the whiteboard rollout flag's spread (M6)
+    return names
 
 
 def _type(name: str, basic: bool = True) -> TypeDefinition:
@@ -35,23 +38,23 @@ def test_role_lists_match_reference():
     assert ROLES == {
         "RootPage", "RootTag", "RootTask", "RootDailyNote", "RootEntity",
         "MediaWebResource", "MediaFile", "MediaImage", "MediaPDF", "MediaAudio",
-        "MediaVideo", "MediaTweet",
+        "MediaVideo", "MediaTweet", "RootWhiteboard",
     }  # fmt: skip
     assert HAS_REFERENCES_SECTION == {
         "RootPage", "RootEntity", "MediaImage", "MediaPDF", "MediaAudio",
-        "MediaWebResource", "MediaFile", "MediaTweet", "RootTask",
+        "MediaWebResource", "MediaFile", "MediaTweet", "RootTask", "RootWhiteboard",
     }  # fmt: skip
     assert HAS_UNLINKED_MENTIONS == {
         "RootPage", "RootEntity", "MediaImage", "MediaPDF", "MediaAudio",
-        "MediaWebResource", "MediaFile", "MediaTweet", "RootTag", "RootTask",
+        "MediaWebResource", "MediaFile", "MediaTweet", "RootTag", "RootTask", "RootWhiteboard",
     }  # fmt: skip
     assert CAN_BE_UNLINKED_MENTION == {
         "RootPage", "RootEntity", "MediaImage", "MediaPDF", "MediaAudio",
-        "MediaWebResource", "MediaFile", "MediaTweet", "RootDailyNote", "RootTask",
+        "MediaWebResource", "MediaFile", "MediaTweet", "RootDailyNote", "RootTask", "RootWhiteboard",
     }  # fmt: skip
     assert CAN_HAVE_BACKLINKS == {
         "RootPage", "RootEntity", "MediaImage", "MediaPDF", "MediaAudio",
-        "MediaWebResource", "MediaFile", "MediaTweet", "RootTag", "RootTask",
+        "MediaWebResource", "MediaFile", "MediaTweet", "RootTag", "RootTask", "RootWhiteboard",
     }  # fmt: skip
     assert NO_GRAPH_SUPPORT == set()
     # The same lists, read from the reference and restricted to our roles.
@@ -72,6 +75,7 @@ def test_role_of_basic_media_and_custom_types():
     assert role_of(_type("Tag")) == "RootTag"
     assert role_of(_type("Task")) == "RootTask"
     assert role_of(_type("DailyNote")) == "RootDailyNote"
+    assert role_of(_type("Whiteboard")) == "RootWhiteboard"
     assert role_of(_type("Weblink")) == "MediaWebResource"
     assert role_of(_type("File")) == "MediaFile"
     assert role_of(_type("Image")) == "MediaImage"

@@ -78,7 +78,9 @@ The whole-milestone review and fix pass are still to come. Gene's checks, includ
 - **Local graph** in the right panel (1–2 hops).
 - Smooth at 5,000 objects / 50,000 links.
 
-### M6: whiteboards and pen
+### M6: whiteboards and pen (built 2026-10-27; Gene's hand checks pending)
+
+Built by plan `2026-10-26-m6-whiteboards-pen.md` (lane commits `ebcdcc8`..`182a20f`, then Task 13's integrate commit). Acceptance: `m6-acceptance.md`. `scripts/m6_acceptance.py` passes on `space-whiteboard`, `space-sample` and `space-v1`; the suites are green (852 back-end tests, 1003 front-end tests); `m1`–`m5` acceptance still pass on `space-sample`. Task 13 wired the router, the `whiteboard` change kind and ui key, sidecars through delete/restore/purge/rename (and board relinks on rename), change type refused, the basic Whiteboard type and `RootWhiteboard` role, boards in backlinks and search, ink files kept out of images, whiteboards opening as `WhiteboardPage` (page and peek, with the ink plugin), "Whiteboard" in "+ New", and pinned/search drags onto a board; it also made a placed text block open for typing. The whole-milestone review and fix pass are still to come. The Wacom pressure check has not run on real hardware; Gene's checks and the decisions made without a reference are unchecked in `m6-acceptance.md`.
 
 - A whiteboard is an object (`Whiteboards/<Title>.md` + a board data file).
 - **Canvas:** 30 px grid, pan and zoom, multi-select, snap.

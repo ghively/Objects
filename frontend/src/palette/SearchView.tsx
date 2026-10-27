@@ -5,6 +5,9 @@
  *
  * Keys on a result (our bindings): Enter the current tab, Ctrl/Cmd+Enter a new tab, Shift+Enter
  * the peek, all through `openObject`, so a Task opens in the peek on plain Enter as elsewhere.
+ *
+ * A result (or recent) row can be dragged onto a whiteboard (M6): it carries the object's path;
+ * the palette closes as the drag starts so the board under it takes the drop.
  */
 import { Command as CommandPrimitive } from 'cmdk'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
@@ -16,6 +19,7 @@ import { createAndOpen, openObject, type OpenMods } from '@/create/createAndOpen
 import { ensureLinkIndex, typeOf, useLinkIndex } from '@/links/linkIndex'
 import { useRecent } from '@/nav/recent'
 import { isTagType } from '@/object/ObjectHeader'
+import { setObjectDragData } from '@/shell/objectDrag'
 import { TypeChip } from '@/shell/Sidebar'
 import { Highlight, MatchedTitle } from './Highlight'
 import {
@@ -186,6 +190,13 @@ export function SearchView({ onDone, footer }: SearchViewProps) {
     }
   }
 
+  /** Drag an object out (onto a whiteboard): carry its path, then close the palette so the
+   *  board under it gets the drop (after the drag has started, so the drag survives). */
+  const startDrag = (e: React.DragEvent, path: string, title: string) => {
+    setObjectDragData(e.dataTransfer, path, title)
+    setTimeout(onDone, 0)
+  }
+
   const removeLastFilter = () => {
     setFilters((f) => {
       if (f.tag !== null) return { ...f, tag: null }
@@ -287,6 +298,8 @@ export function SearchView({ onDone, footer }: SearchViewProps) {
                 <CommandItem
                   key={o.path}
                   value={`recent:${o.path}`}
+                  draggable
+                  onDragStart={(e) => startDrag(e, o.path, o.title)}
                   onSelect={() => pick({ value: `recent:${o.path}`, kind: 'recent', path: o.path, typeId: o.type })}
                   className="menu-row gap-2 rounded-lg text-[15px]"
                 >
@@ -314,6 +327,8 @@ export function SearchView({ onDone, footer }: SearchViewProps) {
                   key={r.path}
                   value={`result:${r.path}`}
                   data-search-result={r.path}
+                  draggable
+                  onDragStart={(e) => startDrag(e, r.path, r.title)}
                   onSelect={() => pick({ value: `result:${r.path}`, kind: 'result', path: r.path, typeId: r.type })}
                   className="menu-row items-start gap-2 rounded-lg text-[15px]"
                 >
