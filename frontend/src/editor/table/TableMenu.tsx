@@ -4,11 +4,13 @@
  * - "Edit table" (`blocks.simpleTable.optionsMenu.label`): the "Header row" and
  *   "Header column" switches (`showHeaderRow`, `showHeaderColumn`), "Clear cell
  *   contents" (`clearCellContents`, for the cell holding the cursor) and
- *   "Delete table" (`deleteTable`);
+ *   "Export as CSV" (`export`, `csv.ts`) and "Delete table" (`deleteTable`);
  * - "Edit row" (`rowMenu.label`): "Insert row above", "Insert row below",
  *   "Delete row", "Clear row";
  * - "Edit column" (`colMenu.label`): "Insert column before", "Insert column
- *   after", "Delete column", "Clear column".
+ *   after", "Delete column", "Clear column", then "Sort column ascending" and
+ *   "Sort column descending" (`sortColumnAscending`, `sortColumnDescending`;
+ *   their place in the menu is our choice).
  * The row and column menus act on the cell holding the cursor.
  *
  * `TableUi` puts the bar in front of each table as a widget decoration (its
@@ -17,6 +19,7 @@
  * differs from their Markdown role: with `no-header-row` the first row shows
  * as ordinary cells, with `header-column` the first column shows as header
  * cells (`data-cell-header`). The file's header and separator lines never change.
+ * It also carries the formula-cell plugin (`FormulaCell.tsx`).
  */
 import { Extension, type Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
@@ -50,8 +53,11 @@ import {
   selectedCell,
   setHeaderColumn,
   setHeaderRow,
+  sortColumn,
   tableAt,
 } from './tableCommands'
+import { exportTableCsv } from './csv'
+import { formulaCellsPlugin } from './FormulaCell'
 import './table.css'
 
 /** Re-render on every editor transaction (selection moves included). */
@@ -130,6 +136,13 @@ export function TableMenu({ editor, getPos }: TableMenuProps) {
           <DropdownMenuItem onSelect={() => cell && insertColumnAfter(editor, at(), cell.col)}>Insert column after</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => cell && deleteColumn(editor, at(), cell.col)}>Delete column</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => cell && clearColumn(editor, at(), cell.col)}>Clear column</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => cell && sortColumn(editor, at(), cell.col, 'asc')}>
+            Sort column ascending
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => cell && sortColumn(editor, at(), cell.col, 'desc')}>
+            Sort column descending
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <DropdownMenu modal={false}>
@@ -146,6 +159,7 @@ export function TableMenu({ editor, getPos }: TableMenuProps) {
           <DropdownMenuItem disabled={!cell} onSelect={() => cell && clearCell(editor, at(), cell)}>
             Clear cell contents
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => exportTableCsv(editor, at())}>Export as CSV</DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onSelect={() => deleteTable(editor, at())}>
             Delete table
           </DropdownMenuItem>
@@ -286,6 +300,7 @@ export const TableUi = Extension.create({
           return { update: sync, destroy: () => (active = null) }
         },
       }),
+      formulaCellsPlugin(editor),
     ]
   },
 })

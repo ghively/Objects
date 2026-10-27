@@ -2,7 +2,7 @@ import { Editor as TiptapEditor } from '@tiptap/core'
 import { EditorContent } from '@tiptap/react'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { TableMenu } from './TableMenu'
 import { tableAt } from './tableCommands'
@@ -10,6 +10,7 @@ import { tableAt } from './tableCommands'
 const editors: TiptapEditor[] = []
 afterEach(() => {
   while (editors.length) editors.pop()!.destroy()
+  vi.restoreAllMocks()
 })
 
 const TABLE = ['| Host  | Role |', '| :---- | ---: |', '| alpha | db   |', '| beta  | web  |'].join('\n')
@@ -169,5 +170,44 @@ describe('TableMenu', () => {
       cell.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
     expect(await screen.findByRole('button', { name: 'Edit table' })).toBeInTheDocument()
+  })
+
+  test('column sort items and Export as CSV', async () => {
+    const user = userEvent.setup()
+    const editor = await mount(BODY)
+    await cursorIn(editor, 'db')
+    await user.click(await screen.findByRole('button', { name: 'Edit column' }))
+    const items = within(await screen.findByRole('menu'))
+      .getAllByRole('menuitem')
+      .map((i) => i.textContent)
+    expect(items).toEqual([
+      'Insert column before',
+      'Insert column after',
+      'Delete column',
+      'Clear column',
+      'Sort column ascending',
+      'Sort column descending',
+    ])
+    await user.keyboard('{Escape}')
+
+    await cursorIn(editor, 'db')
+    await pick(user, 'Edit column', 'Sort column descending')
+    let table = tableAt(editor.state.doc, tablePos(editor))!
+    expect([0, 1, 2].map((r) => table.child(r).textContent)).toEqual(['HostRole', 'betaweb', 'alphadb'])
+    await cursorIn(editor, 'db')
+    await pick(user, 'Edit column', 'Sort column ascending')
+    table = tableAt(editor.state.doc, tablePos(editor))!
+    expect([0, 1, 2].map((r) => table.child(r).textContent)).toEqual(['HostRole', 'alphadb', 'betaweb'])
+    expect(serializeBody(editor)).toBe(BODY)
+
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:csv')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    let downloaded = ''
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      downloaded = this.download
+    })
+    await cursorIn(editor, 'db')
+    await pick(user, 'Edit table', 'Export as CSV')
+    expect(downloaded).toBe('Table.csv') // no object title in this editor
   })
 })
