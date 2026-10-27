@@ -3,7 +3,7 @@
  * three areas stacked top to bottom; each area holds entries (its "sidepanel tabs"), one of them
  * open. `nav/tabs.ts` applies these to the active tab.
  */
-import { sameTarget, type SidepanelEntry, type SidepanelLayout, type SidepanelTarget, type Tab } from './tabs'
+import { sameTarget, type SidepanelEntry, type SidepanelLayout, type SidepanelTarget, type Tab, type Target } from './tabs'
 
 export type PanelArea = SidepanelEntry['panelArea']
 
@@ -23,10 +23,30 @@ export function isPanelArea(v: unknown): v is PanelArea {
   return v === 'area1' || v === 'area2' || v === 'area3'
 }
 
+/**
+ * M8's backlinks entry (contract `SidepanelTarget` `{kind: 'backlinks'}`): the tab's main object's
+ * backlinks. Until `nav/tabs.ts`'s union carries the kind it is cast here.
+ */
+export const BACKLINKS_TARGET = { kind: 'backlinks' } as unknown as SidepanelTarget
+
+export function isBacklinksTarget(t: SidepanelTarget | null | undefined): boolean {
+  return (t as { kind?: string } | null | undefined)?.kind === 'backlinks'
+}
+
+/** Targets that follow the tab's main object rather than naming one: the local graph and backlinks. */
+export function followsMain(t: SidepanelTarget | null | undefined): boolean {
+  return t?.kind === 'localGraph' || isBacklinksTarget(t)
+}
+
+/** Whether the target can swap with the main view or open as a page (not a target that follows it). */
+export function isPageTarget(t: SidepanelTarget | null | undefined): t is Target {
+  return !!t && !followsMain(t)
+}
+
 export function sameSidepanelTarget(a: SidepanelTarget | null | undefined, b: SidepanelTarget | null | undefined): boolean {
   if (!a || !b) return false
-  if (a.kind === 'localGraph' || b.kind === 'localGraph') return a.kind === b.kind
-  return sameTarget(a, b)
+  if (followsMain(a) || followsMain(b)) return a.kind === b.kind
+  return sameTarget(a as Target, b as Target)
 }
 
 /** The entries of `tab` (none when it has no side panel yet). */
@@ -84,13 +104,14 @@ function pushTarget(e: SidepanelEntry, target: SidepanelTarget | null): Sidepane
 }
 
 /**
- * Open `target` in `area`: an entry already showing M5's local graph is revealed; otherwise the
+ * Open `target` in `area`: an entry already showing M5's local graph (or M8's backlinks) is revealed; otherwise the
  * area's open non-persistent entry shows the target, else a new open entry is added.
  */
 export function openInArea(entries: SidepanelEntry[], target: SidepanelTarget, area: PanelArea, newId: () => string): SidepanelEntry[] {
-  if (target.kind === 'localGraph') {
-    const graph = entries.find((e) => e.target?.kind === 'localGraph')
-    if (graph) return openOnly(entries, graph.id)
+  if (followsMain(target)) {
+    // One local graph and one backlinks entry per tab: an existing one is revealed.
+    const shown = entries.find((e) => e.target?.kind === target.kind)
+    if (shown) return openOnly(entries, shown.id)
   }
   const open = openEntryIn(entries, area)
   if (open && sameSidepanelTarget(open.target, target)) return entries

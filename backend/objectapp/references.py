@@ -12,7 +12,10 @@ its link index (`Space.links`) and the search index; nothing is written except b
 - **Backlinks**: per distinct linking object, every body link to this object with
   its block (the source line, list/heading markers and emphasis stripped, links
   shown by their label, at most `CONTEXT_MAX` characters around the link) and the
-  link label's span inside it, plus the property keys that link.
+  link label's span inside it, plus the property keys that link. A context
+  inside nested blocks also carries ``ancestors`` (M8): the cleaned first lines
+  of the enclosing toggle titles, ``indent`` parents and list items, outermost
+  first; the key is absent for a top-level block.
 - **Unlinked mentions**: the object's title or aliases (each at least
   `MIN_NAME_LENGTH` characters) in the body of another object whose role can be an
   unlinked mention, case-insensitive, on Unicode word boundaries, longest name
@@ -78,6 +81,13 @@ _EMPHASIS_RE = re.compile(
 )
 """Emphasis delimiters: bold, strike, highlight, and single ``*``/``_`` at word edges."""
 _LINK_BREAKING = re.compile(r"[\[\]\n]")
+_CONTAINER_RE = re.compile(r"[ \t]*<!--\s*(/?)(toggle|group|columns|indent)\b[^>]*?-->[ \t]*\r?$")
+"""An M7/M8 container comment line (``<!-- toggle open -->``, ``<!-- /indent -->``)."""
+_ANNOTATION_RE = re.compile(r"[ \t]*<!--\s*(?:block:|column\b)[^>]*-->[ \t]*\r?$")
+"""A block-options or column-break comment line: never a block's first line."""
+_LIST_ITEM_RE = re.compile(r"([ \t]*)(?:>\s*)*(?:[-*+]|\d+[.)])(?:\s|$)")
+_HAS_FIRST_LINE = ("toggle", "indent")
+"""Containers whose first block is the parent of the rest (toggle title, indent parent)."""
 
 
 # -- helpers -------------------------------------------------------------------
@@ -221,6 +231,110 @@ def _backlink_context(
     return {"context": ctx, "start": start, "end": end}
 
 
+def _clean_line(body: str, ls: int, le: int) -> str:
+    """The line ``body[ls:le]`` as a backlink shows it: markers, emphasis and link syntax gone."""
+    prefix = _PREFIX_RE.match(body, ls, le)
+    pos = prefix.end() if prefix else ls
+    line = body[pos:le].rstrip("\r")
+
+    def label(m: re.Match[str]) -> str:
+        suffix = m.group(2)
+        if "|" in suffix:
+            return suffix.split("|", 1)[1]
+        return m.group(1) + suffix
+
+    text = _EMPHASIS_RE.sub("", _LINK_RE.sub(label, line)).strip()
+    if text.startswith("!"):
+        text = text[1:]
+    ctx, _s, _e, _o = _window(text, 0, 0)
+    return ctx
+
+
+def _indent_width(prefix: str) -> int:
+    return len(prefix.expandtabs(4))
+
+
+def _ancestors(body: str, offset: int) -> list[str]:
+    """The first lines of the blocks enclosing the line at ``offset``, outermost first.
+
+    Enclosing blocks are open ``toggle`` and ``indent`` containers (their first
+    block is the parent; a ``group`` or ``columns`` is no parent) and, inside the
+    innermost container, the list items with less indentation above the line.
+    Container comments inside code are ignored.
+    """
+    code = code_ranges(body)
+    link_ls = body.rfind("\n", 0, offset) + 1
+    # (name, first line bounds or None, region start) of each open container.
+    stack: list[list[Any]] = []
+    region = 0
+    pos = 0
+    while pos < link_ls:
+        le = body.find("\n", pos)
+        le = len(body) if le == -1 else le
+        if not _in_any(pos, le, code):
+            m = _CONTAINER_RE.match(body, pos, le)
+            if m is not None:
+                closing, name = m.group(1) == "/", m.group(2)
+                if closing:
+                    for i in range(len(stack) - 1, -1, -1):
+                        if stack[i][0] == name:
+                            del stack[i:]
+                            break
+                else:
+                    stack.append([name, None])
+                region = le + 1
+                pos = le + 1
+                continue
+            if (
+                stack
+                and stack[-1][0] in _HAS_FIRST_LINE
+                and stack[-1][1] is None
+                and body[pos:le].strip()
+                and not _ANNOTATION_RE.match(body, pos, le)
+            ):
+                stack[-1][1] = (pos, le)
+                # The first block's own children begin after it.
+                region = le + 1
+        pos = le + 1
+    out = [
+        _clean_line(body, *entry[1])
+        for entry in stack
+        if entry[0] in _HAS_FIRST_LINE and entry[1] is not None
+    ]
+    out = [t for t in out if t]
+    # List parents: items above the line, inside its container, with less indentation.
+    link_le = body.find("\n", link_ls)
+    link_le = len(body) if link_le == -1 else link_le
+    lead = re.match(r"[ \t]*", body[link_ls:link_le])
+    width = _indent_width(lead.group(0) if lead else "")
+    lists: list[str] = []
+    lines: list[tuple[int, int]] = []
+    pos = region
+    while pos < link_ls:
+        le = body.find("\n", pos)
+        le = len(body) if le == -1 else le
+        lines.append((pos, le))
+        pos = le + 1
+    for ls, le in reversed(lines):
+        if width == 0:
+            break
+        line = body[ls:le]
+        if not line.strip() or _in_any(ls, le, code):
+            continue
+        if _CONTAINER_RE.match(line) or _ANNOTATION_RE.match(line):
+            break
+        item = _LIST_ITEM_RE.match(line)
+        if item is not None:
+            w = _indent_width(item.group(1))
+            if w < width:
+                lists.append(_clean_line(body, ls, le))
+                width = w
+        elif _indent_width(re.match(r"[ \t]*", line).group(0)) == 0:
+            break
+    out.extend(t for t in reversed(lists) if t)
+    return out
+
+
 def backlink_entries(space: Space, path: str) -> list[dict[str, Any]]:
     """``BacklinkEntry`` per distinct linking object (title then path)."""
     entries: list[dict[str, Any]] = []
@@ -236,7 +350,11 @@ def backlink_entries(space: Space, path: str) -> list[dict[str, Any]]:
                 spans = wikilink_spans(body)
                 for i, (target, _s, _e) in enumerate(spans):
                     if resolve(target, src) == path:
-                        contexts.append(_backlink_context(body, spans, i))
+                        ctx = _backlink_context(body, spans, i)
+                        ancestors = _ancestors(body, spans[i][1])
+                        if ancestors:
+                            ctx["ancestors"] = ancestors
+                        contexts.append(ctx)
         entries.append({"path": src, "contexts": contexts, "properties": keys})
     return entries
 

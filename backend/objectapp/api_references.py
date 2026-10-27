@@ -1,6 +1,7 @@
 """The references routes (M5).
 
-- ``GET /api/references?path=&relatedLimit=`` -> ``References`` (``relatedLimit``
+- ``GET /api/references?path=&relatedLimit=`` -> ``References`` (backlink contexts carry
+  ``ancestors`` inside nested blocks, M8; ``relatedLimit``
   default 20, 1..200); 400 for a bad path, 404 when there is no object. Reads only.
 - ``POST /api/references/link`` ``{path, target, start, end, text, baseVersion, clientId?}``
   -> ``{version}``: links one unlinked mention of ``target`` in ``path``'s body
