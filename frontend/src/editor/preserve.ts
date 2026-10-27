@@ -386,10 +386,12 @@ function preserveLines(origLines: string[], regenLines: string[], baseline?: str
  * or dropped: when two content blocks meet without one, a blank line is
  * inserted unless both came from the source and the first already ends with
  * a line break (they were adjacent in the original, e.g. a heading then a
- * paragraph).
+ * paragraph). `docEol` is the document's line ending when the caller knows it
+ * (M7: a container's children, where no block may carry a line break of its
+ * own); otherwise it is taken from the first `raw` holding a CRLF.
  */
-export function serializeWithPreservation(blocks: EditorBlock[]): string {
-  const eol = blocks.find((b) => b.raw?.includes('\r\n')) ? '\r\n' : '\n'
+export function serializeWithPreservation(blocks: EditorBlock[], docEol?: string): string {
+  const eol = docEol ?? (blocks.find((b) => b.raw?.includes('\r\n')) ? '\r\n' : '\n')
   let out = ''
   let prev: EditorBlock | null = null
   for (const block of blocks) {
@@ -400,7 +402,8 @@ export function serializeWithPreservation(blocks: EditorBlock[]): string {
 
     if (prev && prev.kind !== 'space' && block.kind !== 'space' && out !== '') {
       const endsBreak = /(\r?\n|\r)$/.test(out)
-      const endsBlank = /(\r?\n|\r)[ \t]*(\r?\n|\r)$/.test(out)
+      // On LF-normalised text: a lone CRLF is one line break, not a blank line.
+      const endsBlank = /\n[ \t]*\n$/.test(toLF(out.slice(-256)))
       if (!endsBreak) out += eol + eol
       else if (!endsBlank && (prev.raw === undefined || block.raw === undefined)) out += eol
     }

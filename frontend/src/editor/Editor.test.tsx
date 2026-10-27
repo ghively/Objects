@@ -121,8 +121,8 @@ describe('document model', () => {
     const types: string[] = []
     editor.state.doc.forEach((n) => types.push(n.type.name))
     expect(types).toContain('rawBlock')
-    // The Field:: block, the HTML and the Mermaid block are raw blocks.
-    expect(types.filter((t) => t === 'rawBlock')).toHaveLength(3)
+    // The Field:: block and the HTML are raw blocks (M7: a Mermaid fence is a code block).
+    expect(types.filter((t) => t === 'rawBlock')).toHaveLength(2)
     // Edit every other paragraph: the Field:: lines stay byte-identical.
     for (let i = 0; i < 3; i++) editor.commands.insertContentAt(endOfNth(editor, 'paragraph', i), ' x')
     const out = serializeBody(editor)
