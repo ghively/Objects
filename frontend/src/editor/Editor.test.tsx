@@ -396,3 +396,211 @@ describe('<RawMode>', () => {
     expect(onSaved).toHaveBeenCalledWith('v2')
   })
 })
+
+describe('<Editor> find in page', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    saveBody.mockReset()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const FIND_BODY = [
+    '# Alpha notes',
+    '',
+    'one alpha two Alpha three.',
+    '',
+    'Untouched   __strong__ line',
+    '',
+    'See [[Alpha Server]] and alpha.',
+    '',
+    'Status:: alpha',
+    '',
+  ].join('\n')
+
+  function mountFind(body = FIND_BODY, overrides: Partial<Parameters<typeof Editor>[0]> = {}) {
+    const ref = { current: null as BodyEditorHandle | null }
+    const utils = render(
+      <Editor
+        path="Pages/Find.md"
+        body={body}
+        version="v1"
+        readOnly={false}
+        onSaved={() => {}}
+        onConflict={() => {}}
+        controlRef={ref}
+        {...overrides}
+      />,
+    )
+    const find = ref.current!.find!
+    return { ...utils, ref, find, editor: pmEditor(utils.container) }
+  }
+
+  const marks = (c: HTMLElement) => [...c.querySelectorAll('.find-match')].map((e) => e.textContent)
+  const current = (c: HTMLElement) => [...c.querySelectorAll('.find-match-current')].map((e) => e.textContent)
+
+  test('decorations mark every match and the current one; next and previous wrap', () => {
+    const { container, find } = mountFind('one alpha two Alpha three alpha\n')
+    let count = 0
+    act(() => {
+      count = find.set('alpha')
+    })
+    expect(count).toBe(3)
+    expect(marks(container)).toEqual(['alpha', 'Alpha', 'alpha'])
+    expect(current(container)).toEqual(['alpha'])
+    expect(find.status()).toEqual({ index: 0, count: 3 })
+    act(() => {
+      expect(find.next()).toBe(1)
+    })
+    expect(current(container)).toEqual(['Alpha'])
+    act(() => {
+      find.next()
+    })
+    act(() => {
+      expect(find.next()).toBe(0) // wraps forward
+    })
+    act(() => {
+      expect(find.previous()).toBe(2) // wraps back
+    })
+    // Match case narrows; whole word excludes partial words.
+    act(() => {
+      count = find.set('Alpha', { matchCase: true })
+    })
+    expect(count).toBe(1)
+    act(() => {
+      count = find.set('alph', { matchCase: false, wholeWord: true })
+    })
+    expect(count).toBe(0)
+    expect(marks(container)).toEqual([])
+    // Clearing removes every decoration.
+    act(() => {
+      find.set('alpha', { wholeWord: false })
+    })
+    expect(marks(container)).toHaveLength(3)
+    act(() => {
+      find.clear()
+    })
+    expect(marks(container)).toEqual([])
+    expect(find.status()).toEqual({ index: -1, count: 0 })
+  })
+
+  test('matches follow edits', () => {
+    const { find, editor } = mountFind('alpha\n')
+    act(() => {
+      find.set('alpha')
+    })
+    expect(find.status().count).toBe(1)
+    act(() => {
+      editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), ' alpha')
+    })
+    expect(find.status().count).toBe(2)
+  })
+
+  test('replace changes only the current match and autosaves with the version', async () => {
+    saveBody.mockResolvedValue({ version: 'v2' })
+    const body = 'one alpha two alpha three alpha\n\nUntouched   __strong__ line\n'
+    const { find } = mountFind(body)
+    act(() => {
+      find.set('alpha')
+    })
+    act(() => {
+      find.next()
+    })
+    act(() => {
+      find.replace('omega')
+    })
+    // The match after the replaced one becomes current.
+    expect(find.status()).toEqual({ index: 1, count: 2 })
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    expect(saveBody).toHaveBeenCalledWith(
+      'Pages/Find.md',
+      'one alpha two omega three alpha\n\nUntouched   __strong__ line\n',
+      'v1',
+    )
+  })
+
+  test('replace all saves once through autosave and changes only matches', async () => {
+    saveBody.mockResolvedValue({ version: 'v2' })
+    const { find } = mountFind()
+    let count = 0
+    act(() => {
+      count = find.set('alpha')
+    })
+    expect(count).toBe(6) // the wikilink's label is a match too
+    let replaced = 0
+    act(() => {
+      replaced = find.replaceAll('omega')
+    })
+    expect(replaced).toBe(5) // ... but replace never edits inside it
+    await act(async () => vi.advanceTimersByTimeAsync(3000))
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    const saved = saveBody.mock.calls[0][1]
+    expect(saved).toBe(
+      [
+        '# omega notes',
+        '',
+        'one omega two omega three.',
+        '',
+        'Untouched   __strong__ line',
+        '',
+        'See [[Alpha Server]] and omega.',
+        '',
+        'Status:: omega',
+        '',
+      ].join('\n'),
+    )
+    expect(saveBody.mock.calls[0][2]).toBe('v1')
+    // Per `preserve`: only the lines holding a replaced match differ.
+    expect(changedLines(FIND_BODY, saved)).toEqual([0, 2, 6, 8])
+  })
+
+  test('wikilink labels are matched but never split by replace', async () => {
+    saveBody.mockResolvedValue({ version: 'v2' })
+    const body = 'See [[Alpha Server|the server]] here.\n'
+    const { container, find } = mountFind(body)
+    let count = 0
+    act(() => {
+      count = find.set('server')
+    })
+    expect(count).toBe(1)
+    const chip = container.querySelector('.wikilink')!
+    expect(chip.classList.contains('find-match-current')).toBe(true)
+    // The target that isn't shown is not matched.
+    act(() => {
+      count = find.set('Alpha')
+    })
+    expect(count).toBe(0)
+    // A match running from text into the label covers the chip, and is skipped by replace.
+    act(() => {
+      count = find.set('see the')
+    })
+    expect(count).toBe(1)
+    act(() => {
+      find.replace('x')
+      expect(find.replaceAll('x')).toBe(0)
+    })
+    await act(async () => vi.advanceTimersByTimeAsync(3000))
+    expect(saveBody).not.toHaveBeenCalled()
+  })
+
+  test('read-only editor finds but never replaces', async () => {
+    const { find } = mountFind('alpha alpha\n', { readOnly: true })
+    act(() => {
+      expect(find.set('alpha')).toBe(2)
+      find.replace('x')
+      expect(find.replaceAll('x')).toBe(0)
+    })
+    await act(async () => vi.advanceTimersByTimeAsync(3000))
+    expect(saveBody).not.toHaveBeenCalled()
+    expect(find.status().count).toBe(2)
+  })
+
+  test('raw mode offers no find control', () => {
+    const ref = { current: null as BodyEditorHandle | null }
+    render(<RawMode path="Pages/Find.md" text="alpha" version="v1" onSaved={() => {}} controlRef={ref} />)
+    expect(ref.current).not.toBeNull()
+    expect(ref.current!.find).toBeUndefined()
+  })
+})
