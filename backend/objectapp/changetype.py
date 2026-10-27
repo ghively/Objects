@@ -104,10 +104,10 @@ class MappingRow:
 
 
 def type_category(t: TypeDefinition) -> str:
-    """``page``, ``tag``, ``task``, ``dailynote``, ``media`` or ``custom``."""
+    """``page``, ``tag``, ``task``, ``dailynote``, ``whiteboard``, ``media`` or ``custom``."""
     if t.basic:
         low = t.name.lower()
-        if low in ("page", "tag", "task", "dailynote"):
+        if low in ("page", "tag", "task", "dailynote", "whiteboard"):
             return low
         if any(low == m.lower() for m in BASIC_MEDIA_TYPES):
             return "media"

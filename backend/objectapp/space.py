@@ -1929,7 +1929,11 @@ class Space:
         parent = PurePosixPath(rel).parent.as_posix()
         folder = "" if parent == "." else parent
         stem = safe_filename(new_title)
-        new_rel = unique_path(self.root, folder, stem, same_as=rel)
+        free = unique_path
+        if self._is_whiteboard(rel):
+            # A whiteboard's stem must be free for its .md and both sidecars (M6).
+            from .whiteboardtrash import free_whiteboard_stem as free
+        new_rel = free(self.root, folder, stem, same_as=rel)
         dest = self.root / new_rel
         if new_rel == rel or not dest.exists():
             return new_rel
@@ -1938,7 +1942,42 @@ class Space:
         except OSError:
             same = False
         # On a case-sensitive file system both spellings can exist: then pick a free name.
-        return new_rel if same else unique_path(self.root, folder, stem)
+        return new_rel if same else free(self.root, folder, stem)
+
+    def _board_referrers(self, rel: str, old_title: str) -> dict[str, set[str]]:
+        """Whiteboards whose board file links to ``rel`` by its old name: board .md -> targets.
+
+        The same rule as `_referrers`, over each board's entity blocks and text-block links
+        (read only; an unreadable or missing board adds nothing).
+        """
+        from .whiteboardfile import board_rel, load_board
+        from .whiteboardstore import whiteboard_type
+        from .whiteboardtrash import board_links
+
+        t = whiteboard_type(self)
+        if t is None:
+            return {}
+        names = {_fold(old_title), _fold(PurePosixPath(rel).stem), _fold(rel[:-3])}
+        with self._lock:
+            boards = [p for p, s in self._summaries.items() if s.type == t.id]
+        out: dict[str, set[str]] = {}
+        for md in boards:
+            with self._lock:
+                try:
+                    data = (self.root / board_rel(md)).read_bytes()
+                except OSError:
+                    continue
+            board, reason = load_board(data)
+            if reason:
+                continue
+            found = {
+                target
+                for target in board_links(board)
+                if _fold(target) in names and self.resolve(target, md) == rel
+            }
+            if found:
+                out[md] = found
+        return out
 
     def rename_object(self, path: str, new_title: str, base_version: str) -> RenameResult:
         """Set an object's title, rename its file to match, and relink references to it.
@@ -1970,6 +2009,8 @@ class Space:
             return RenameResult(rel, version, [], [])
 
         referrers = self._referrers(rel, old_title)
+        board_referrers = self._board_referrers(rel, old_title)
+        whiteboard = self._is_whiteboard(rel)
 
         def edit(of: ObjectFile, _fm: dict) -> ObjectFile | None:
             src = set_keys(of.frontmatter_src or "", {"title": new_title})
@@ -1990,6 +2031,9 @@ class Space:
                     # The title change stands; the file just keeps its old name
                     # (locked by another program, or the name was taken meanwhile).
                     new_rel = rel
+                else:
+                    if whiteboard:
+                        new_rel = self._move_board_files(rel, new_rel, version)
 
         relinked: list[str] = []
         skipped: list[Skip] = []
@@ -2012,9 +2056,39 @@ class Space:
                 skipped.append(result)
             elif wrote and wrote[-1]:
                 relinked.append(ref)
+        if board_referrers:
+            from .whiteboardtrash import relink_board_file
+
+            for md in sorted(board_referrers):
+                at = new_rel if md == rel else md
+                written = relink_board_file(
+                    self, at, board_referrers[md], self._link_text(new_rel, at)
+                )
+                if written is not None:
+                    relinked.append(written)
+                    self.rescan_file(at)  # the link index and search re-read the board
         if summary.type == "tag":
             self._rename_tag_lists(old_title, new_title, new_rel, relinked, skipped)
         return RenameResult(new_rel, version, relinked, skipped)
+
+    def _move_board_files(self, rel: str, new_rel: str, version: str) -> str:
+        """Move a renamed whiteboard's sidecars after its .md; return where the .md ends up.
+
+        If the sidecars can't follow (both or neither move), the .md goes back to ``rel``
+        and the board keeps its old file name; the title change stands.
+        """
+        from .whiteboardtrash import move_sidecars
+
+        try:
+            move_sidecars(self, rel, new_rel)
+        except OSError:
+            try:
+                self._move_file(new_rel, rel, version)
+            except OSError:
+                _log.exception("Could not move %s back after its sidecars failed", new_rel)
+                return new_rel
+            return rel
+        return new_rel
 
     def _rename_tag_lists(
         self, old: str, new: str, tag_rel: str, relinked: list[str], skipped: list[Skip]
@@ -2543,6 +2617,12 @@ class Space:
         self.own_writes.pop(rel, None)
         self.rescan_file(rel)
 
+    def _is_whiteboard(self, rel: str) -> bool:
+        """True when ``rel`` is an object of the Whiteboard type (M6: it has sidecar files)."""
+        from .whiteboardstore import is_whiteboard
+
+        return is_whiteboard(self, rel)
+
     def delete_object(
         self,
         path: str,
@@ -2588,11 +2668,26 @@ class Space:
                 meta.pop("collectionTrashId")
             meta_file = self.trash.object_meta_file(item.id)
             self.trash.write_json(meta_file, meta)
+            whiteboard = self._is_whiteboard(rel)
             try:
                 self._move_out(rel, self.trash.object_file(item.id))
             except BaseException:
                 meta_file.unlink(missing_ok=True)
                 raise
+            if whiteboard:
+                from .whiteboardtrash import trash_sidecars
+
+                try:
+                    trash_sidecars(self, item.id, rel)
+                except BaseException:
+                    # The sidecars stayed (or went back): put the .md back beside them.
+                    stored = self.trash.object_file(item.id)
+                    self.own_writes[rel] = version_of(stored.read_bytes())
+                    move_no_overwrite(stored, full)
+                    self.own_deletes.pop(rel, None)
+                    meta_file.unlink(missing_ok=True)
+                    self.rescan_file(rel)
+                    raise
             if summary is not None and summary.template and summary.id and type_trash_id is None:
                 self.unregister_template(summary.type, summary.id)
             return item
@@ -3001,10 +3096,41 @@ class Space:
         return paths, type_ids
 
     def _restore_object_entry(self, trash_id: str, meta: dict) -> str:
+        from .whiteboardtrash import sidecar_trash_dir
+
         data = self.trash.object_file(trash_id).read_bytes()
-        path = self._restore_file(str(meta.get("originalPath", "")), data)
+        original = str(meta.get("originalPath", ""))
+        if sidecar_trash_dir(self, trash_id).is_dir():
+            path = self._restore_whiteboard(trash_id, original, data)
+        else:
+            path = self._restore_file(original, data)
         self.trash.remove_object(trash_id)
         return path
+
+    def _restore_whiteboard(self, trash_id: str, original: str, data: bytes) -> str:
+        """Put a trashed whiteboard's ``.md`` and its sidecars back under one free stem."""
+        from .whiteboardtrash import free_whiteboard_stem, restore_sidecars
+
+        rel = self._rel(original)
+        parent = PurePosixPath(rel).parent.as_posix()
+        folder = "" if parent == "." else parent
+        stem = PurePosixPath(rel).stem
+        for _attempt in range(100):
+            target = free_whiteboard_stem(self.root, folder, stem)
+            if self._place(target, data):
+                break
+        else:
+            raise OSError(f"Could not find a free file name for {stem!r}")
+        try:
+            restore_sidecars(self, trash_id, target)
+        except BaseException:
+            # Leave the entry whole in the trash: take the .md back out.
+            self.own_deletes[target] = version_of(data)
+            (self.root / target).unlink(missing_ok=True)
+            self.own_writes.pop(target, None)
+            self.rescan_file(target)
+            raise
+        return target
 
     def restore(self, trash_id: str) -> dict[str, list[str]]:
         """Restore a trash entry; return ``{paths, typeIds}`` of what came back.
@@ -3051,7 +3177,7 @@ class Space:
         """Delete a trash entry for good (a type with its objects); return how many entries went."""
         with self._lock:
             if self.trash.object_meta(trash_id) is not None:
-                self.trash.remove_object(trash_id)
+                self._remove_trashed_object(trash_id)
                 return 1
             manifest = self.trash.manifest(trash_id)
             if manifest is None:
@@ -3064,17 +3190,24 @@ class Space:
                 count = 1
                 for oid in collection.get("objectTrashIds") or []:
                     if self.trash.object_meta(oid) is not None:
-                        self.trash.remove_object(oid)
+                        self._remove_trashed_object(oid)
                         count += 1
                 self.trash.remove_collection(trash_id)
                 return count
             count = 1
             for oid in manifest.get("objectTrashIds") or []:
                 if self.trash.object_meta(oid) is not None:
-                    self.trash.remove_object(oid)
+                    self._remove_trashed_object(oid)
                     count += 1
             self.trash.remove_type(trash_id)
             return count
+
+    def _remove_trashed_object(self, trash_id: str) -> None:
+        """Delete an object trash entry for good, with a whiteboard's sidecars."""
+        from .whiteboardtrash import purge_sidecars
+
+        self.trash.remove_object(trash_id)
+        purge_sidecars(self, trash_id)
 
     def empty_trash(self) -> int:
         """Delete every trash entry for good; return how many there were."""

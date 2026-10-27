@@ -32,6 +32,7 @@ import type {
   UpdateResult,
   Views,
 } from './types'
+import type { WhiteboardSettings } from './whiteboardTypes'
 
 /** Any non-2xx response that is not a conflict or a read-only refusal. */
 export class ApiError extends Error {
@@ -102,13 +103,15 @@ export class DailyNoteExistsError extends ApiError {
   }
 }
 
-/** The keys `PUT /api/ui` accepts (M3's, plus M4's `calendar`, `tasks` and `reminders`, and M5's `graph`). */
+/** The keys `PUT /api/ui` accepts (M3's, plus M4's `calendar`, `tasks` and `reminders`, M5's `graph` and M6's `whiteboard`). */
 export type UiPatch = Partial<Pick<UiState, 'pinned' | 'sections' | 'allNotesLayout'>> & {
   calendar?: CalendarUi
   tasks?: TasksUi
   reminders?: { enabled: boolean }
   /** Replaces the whole `graph` value. */
   graph?: GraphCustomization
+  /** Replaces the whole `whiteboard` value (the canvas display settings). */
+  whiteboard?: WhiteboardSettings
 }
 
 /** `api.search` options; `types`/`excludeTypes` are type ids, `tag` a tag name. */

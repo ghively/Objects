@@ -17,6 +17,11 @@ The JSON definitions ``.object/{collections,queries,views}/<id>.json`` and
 ``.object/ui.json`` are watched too (kinds ``collections``, ``queries``, ``views``,
 ``ui``); every other file under a dot-folder stays ignored.
 
+A whiteboard's sidecars (``<stem>.whiteboard.json``, ``<stem>.ink.svg``, M6) are watched as
+well: a change made outside the app announces ``whiteboard`` with the board's ``.md`` path
+(only when that ``.md`` is a whiteboard), and re-scans the ``.md`` so the link index and
+search re-read the board. The app's own sidecar writes and moves stay quiet.
+
 Files are only opened (read, or resolved) while holding the space's lock, so a
 read never overlaps one of the app's own replaces (Windows refuses to replace a
 file another handle has open).
@@ -36,6 +41,7 @@ from watchdog.observers import Observer
 
 from .space import Space, version_of
 from .typedefs import is_ignored
+from .whiteboardfile import sidecar_owner
 
 __all__ = ["DEBOUNCE_SECONDS", "ChangeEvent", "SpaceWatcher"]
 
@@ -46,11 +52,21 @@ _DEFINITION_FOLDERS = ("collections", "queries", "views")
 @dataclass(frozen=True)
 class ChangeEvent:
     kind: Literal[
-        "created", "changed", "deleted", "renamed", "types", "collections", "queries", "views", "ui"
+        "created",
+        "changed",
+        "deleted",
+        "renamed",
+        "types",
+        "collections",
+        "queries",
+        "views",
+        "ui",
+        "whiteboard",
     ]
     path: str
     """Space-relative POSIX path of the object file (for ``types``: the type id; for
-    ``collections``, ``queries`` and ``views``: the definition id; for ``ui``: ``ui.json``)."""
+    ``collections``, ``queries`` and ``views``: the definition id; for ``ui``: ``ui.json``;
+    for ``whiteboard``: the board's ``.md``, whose canvas or ink file changed)."""
     version: str | None
     """The new file version (sha256 of its bytes); ``None`` when deleted."""
     origin: str | None = None
@@ -148,7 +164,8 @@ class SpaceWatcher:
         if not rel.parts or is_ignored(rel) or rel.name.startswith("."):
             return None
         if rel.suffix.lower() != ".md":
-            return None
+            # A whiteboard sidecar is reported under its own path (see `_refresh_sidecar`).
+            return rel.as_posix() if sidecar_owner(rel.as_posix()) else None
         return rel.as_posix()
 
     def _definition_rel(self, path: str) -> str | None:
@@ -242,9 +259,38 @@ class SpaceWatcher:
             return ChangeEvent(kind="ui", path="ui.json", version=version)
         return ChangeEvent(kind=parts[1], path=PurePosixPath(rel).stem, version=version)
 
+    def _refresh_sidecar(self, rel: str, owner: str) -> ChangeEvent | None:
+        """A whiteboard sidecar changed: ``whiteboard`` for its board unless the app did it."""
+        from .whiteboardtrash import sidecar_event_owner
+
+        space = self.space
+        try:
+            data = (space.root / rel).read_bytes()
+        except OSError:
+            data = None
+        version = None if data is None else version_of(data)
+        if data is None:
+            if space.own_deletes.pop(rel, None) is not None:
+                space.own_writes.pop(rel, None)
+                return None
+        else:
+            space.own_deletes.pop(rel, None)
+            own = space.own_writes.get(rel)
+            if own is not None:
+                if own == version:
+                    return None
+                space.own_writes.pop(rel, None)
+        if sidecar_event_owner(space, rel) != owner:
+            return None
+        space.rescan_file(owner)  # writes nothing; the indexes re-read the board
+        return ChangeEvent(kind="whiteboard", path=owner, version=version)
+
     def _refresh(self, rel: str) -> ChangeEvent | None:
         if rel.startswith(".object/"):
             return self._refresh_definition(rel)
+        owner = sidecar_owner(rel)
+        if owner is not None:
+            return self._refresh_sidecar(rel, owner)
         space = self.space
         full = space.root / rel
         known = space.cached_version(rel)

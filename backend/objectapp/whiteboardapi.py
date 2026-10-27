@@ -108,8 +108,7 @@ def whiteboard_router(
     api = APIRouter(prefix="/api")
 
     def announce_saved(md_rel: str, revision: str, client_id: str | None) -> None:
-        # 'whiteboard' joins the ChangeEvent.kind Literal in Task 13.
-        announce(ChangeEvent("whiteboard", md_rel, revision, origin=client_id))  # type: ignore[arg-type]
+        announce(ChangeEvent("whiteboard", md_rel, revision, origin=client_id))
 
     @api.get("/whiteboard")
     def get_board(path: str):

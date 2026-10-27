@@ -32,6 +32,8 @@ from .searchtext import display_safe, plain_body, property_text
 from .space import SpaceChange, version_of
 from .textfile import atomic_write
 from .typemodel import Icon
+from .whiteboardindex import board_for_index
+from .whiteboardtrash import board_text
 
 if TYPE_CHECKING:
     from .space import Space
@@ -391,7 +393,8 @@ class SearchIndex:
     def _document(self, path: str) -> dict[str, str] | None:
         """The indexed columns of one object, or None when it isn't indexed (gone, template).
 
-        The one place a document is built (M6 adds its board text here).
+        The one place a document is built. A whiteboard's body column also holds its board's
+        text blocks (M6).
         """
         sp = self.space
         with sp._lock:
@@ -414,9 +417,25 @@ class SearchIndex:
             "aliases": display_safe("\n".join(summary.aliases)),
             "description": display_safe(summary.description or ""),
             "props": property_text(t, raw.fm, link_title),
-            "body": plain_body(raw.of.body),
+            "body": self._body_text(path, raw.of.body),
             "tags": display_safe("\n".join(summary.tags)),
         }
+
+    def _body_text(self, path: str, body: str) -> str:
+        text = plain_body(body)
+        board, _revision = board_for_index(self.space, path)
+        if board is not None:
+            extra = plain_body(board_text(board))
+            if extra:
+                text = f"{text}\n\n{extra}" if text else extra
+        return text
+
+    def _version(self, path: str, raw) -> str:
+        """The stored version of an object: its file's, plus its board file's for a whiteboard
+        (so a board edit re-indexes the board without touching the ``.md``)."""
+        version = version_of(raw.data)
+        _board, board_revision = board_for_index(self.space, path)
+        return f"{version}+{board_revision}" if board_revision else version
 
     def _types_fingerprint(self) -> str:
         shape = sorted(
@@ -492,7 +511,7 @@ class SearchIndex:
         changed = [
             p
             for p, (raw, _s) in current.items()
-            if stored.get(p) != version_of(raw.data)
+            if stored.get(p) != self._version(p, raw)
         ]
         if stored_types != fingerprint and stored:
             # Property definitions changed while we were away: every props column may differ.
@@ -522,7 +541,7 @@ class SearchIndex:
                     raw = self.space._raw.get(p)
                 doc = self._document(p) if raw is not None else None
                 batch.append(
-                    (p, version_of(raw.data) if raw is not None else None, doc)
+                    (p, self._version(p, raw) if raw is not None else None, doc)
                 )
 
             def apply(conn: sqlite3.Connection, batch=batch) -> None:
@@ -544,7 +563,7 @@ class SearchIndex:
             if raw is None or summary is None or summary.template is not None:
                 if p in stored:
                     todo.append(p)
-            elif stored.get(p) != version_of(raw.data):
+            elif stored.get(p) != self._version(p, raw):
                 todo.append(p)
         if todo:
             self._index(todo)

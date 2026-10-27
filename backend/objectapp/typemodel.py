@@ -122,7 +122,7 @@ _OPTIONAL_SYSTEM_DEFS = {
     "color": ("color", "color", "Color", ""),
 }
 
-BASIC_TYPE_NAMES = ("Page", "Tag", "Task", "DailyNote")
+BASIC_TYPE_NAMES = ("Page", "Tag", "Task", "DailyNote", "Whiteboard")
 
 # Object's media types: their fields become read-only system definitions.
 BASIC_MEDIA_TYPES: dict[str, dict[str, str]] = {
@@ -152,6 +152,7 @@ _TYPE_ICONS = {
     "Tag": "ph-tag",
     "Task": "ph-check-circle",
     "DailyNote": "ph-calendar-blank",
+    "Whiteboard": "ph-presentation",
     "Person": "ph-user",
     "Server": "ph-hard-drives",
     "Weblink": "ph-globe-hemisphere-west",

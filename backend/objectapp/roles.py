@@ -5,7 +5,7 @@ whether an object has a references section, unlinked mentions, backlinks or a
 graph view (``structureHeuristicsBackbone.ts``). Our basic types map onto those
 roles; every other type is a ``RootEntity`` (Object's custom object types).
 The lists below are the reference lists restricted to the roles we have
-(M6's integrate adds ``RootWhiteboard`` here).
+(``RootWhiteboard`` is the reference's ``...whiteboard(config)`` entry, M6).
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ _BASIC_ROLES = {
     "Tag": "RootTag",
     "Task": "RootTask",
     "DailyNote": "RootDailyNote",
+    "Whiteboard": "RootWhiteboard",
     "Weblink": "MediaWebResource",
     "File": "MediaFile",
     "Image": "MediaImage",
@@ -50,6 +51,7 @@ HAS_REFERENCES_SECTION = frozenset(
         "MediaFile",
         "MediaTweet",
         "RootTask",
+        "RootWhiteboard",
     }
 )
 """``canHaveBacklinksSection``."""
@@ -66,6 +68,7 @@ HAS_UNLINKED_MENTIONS = frozenset(
         "MediaTweet",
         "RootTag",
         "RootTask",
+        "RootWhiteboard",
     }
 )
 """``hasUnlinkedMentions``."""
@@ -82,6 +85,7 @@ CAN_BE_UNLINKED_MENTION = frozenset(
         "MediaTweet",
         "RootDailyNote",
         "RootTask",
+        "RootWhiteboard",
     }
 )
 """``canBeUnlinkedMention``."""
@@ -98,6 +102,7 @@ CAN_HAVE_BACKLINKS = frozenset(
         "MediaTweet",
         "RootTag",
         "RootTask",
+        "RootWhiteboard",
     }
 )
 """``canHaveBacklinks``."""

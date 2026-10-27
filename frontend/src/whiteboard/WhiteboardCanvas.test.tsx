@@ -177,6 +177,22 @@ describe('WhiteboardCanvas', () => {
     ])
   })
 
+  test('a text block placed with the Text tool opens for typing', async () => {
+    const { store } = renderCanvas()
+    await act(async () => {})
+    act(() => store.getState().actions.setTool('text'))
+    click(placementLayer(), 300, 300)
+    const nodes = Object.values(store.getState().doc.board.nodes)
+    expect(nodes).toHaveLength(1)
+    expect(store.getState().editingId).toBe(nodes[0].id)
+    expect(store.getState().tool).toBe('select')
+    // Other tools place without editing.
+    act(() => store.getState().actions.endEdit())
+    act(() => store.getState().actions.setTool('rectangle'))
+    click(placementLayer(), 600, 300)
+    expect(store.getState().editingId).toBeNull()
+  })
+
   test('dropping an object path creates an entity node at the drop point', async () => {
     const { store, wrapper, host } = renderCanvas({ settings: { isSnappingToGrid: false } })
     await act(async () => {})

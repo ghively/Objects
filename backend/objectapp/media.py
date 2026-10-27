@@ -2,7 +2,9 @@
 
 Only image files (`IMAGE_EXTENSIONS`) inside the space and outside dot-folders
 are listed or served; anything else is refused by the route (415 for another
-extension, 404 for a path outside the space or in a dot-folder).
+extension, 404 for a path outside the space or in a dot-folder). A whiteboard's
+ink file (``<stem>.ink.svg`` beside ``<stem>.md``, M6) is not an image: it is
+neither listed nor served.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ from pathlib import Path, PurePosixPath
 
 from .space import safe_filename
 from .textfile import create_new
+from .whiteboardfile import INK_SUFFIX
 
 __all__ = [
     "ATTACHMENTS",
@@ -52,6 +55,19 @@ def _hidden(parts: tuple[str, ...]) -> bool:
     return any(p.startswith(".") for p in parts)
 
 
+def _is_ink_sidecar(root: Path, rel: str) -> bool:
+    """True for ``<stem>.ink.svg`` with a ``<stem>.md`` beside it (a whiteboard's ink)."""
+    if not rel.lower().endswith(INK_SUFFIX):
+        return False
+    stem = rel[: -len(INK_SUFFIX)]
+    if not stem or stem.endswith("/"):
+        return False
+    try:
+        return (Path(root) / f"{stem}.md").is_file()
+    except OSError:
+        return False
+
+
 def list_images(root: Path) -> list[dict[str, str]]:
     """``[{path}]`` for every image file in the space outside dot-folders, sorted by path."""
     root = Path(root)
@@ -59,6 +75,8 @@ def list_images(root: Path) -> list[dict[str, str]]:
     for p in root.rglob("*"):
         rel = p.relative_to(root)
         if _hidden(rel.parts) or not is_image_name(p.name):
+            continue
+        if _is_ink_sidecar(root, rel.as_posix()):
             continue
         try:
             if p.is_file():
@@ -85,6 +103,8 @@ def image_path(root: Path, path: str) -> Path:
         raise NotAnImage(path)
     full = (root / rel).resolve()
     if not full.is_relative_to(root) or not full.is_file():
+        raise FileNotFoundError(path)
+    if _is_ink_sidecar(root, full.relative_to(root).as_posix()):
         raise FileNotFoundError(path)
     return full
 

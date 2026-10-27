@@ -1,3 +1,5 @@
+import type { WhiteboardSettings } from './whiteboardTypes'
+
 // TS mirrors of the back end's JSON: the M2 API contract
 // (docs/superpowers/plans/2026-10-23-m2-types-properties.md, "API contract").
 // Field names match the Python side exactly.
@@ -366,6 +368,8 @@ export type ChangeKind =
   | 'queries'
   | 'views'
   | 'ui'
+  /** M6: a whiteboard's canvas or ink file changed; `path` is the board's `.md`. */
+  | 'whiteboard'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {
@@ -609,6 +613,8 @@ export interface UiState {
   reminders?: { enabled: boolean }
   /** M5: the graph's filters (`GraphViewCustomization`). */
   graph?: GraphCustomization
+  /** M6: the whiteboard "Canvas display" settings (Object's user-level names). */
+  whiteboard?: WhiteboardSettings
   [extra: string]: unknown
 }
 

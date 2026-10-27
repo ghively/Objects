@@ -299,7 +299,9 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome 
         setPicker({ mode: t, at: point })
         return
       }
-      actions.createFromTool(t, at, { snap })
+      const id = actions.createFromTool(t, at, { snap })
+      // A text block placed with the Text tool opens for typing at once (our choice).
+      if (id && t === 'text') actions.beginEdit(id)
     },
     [actions, store],
   )
