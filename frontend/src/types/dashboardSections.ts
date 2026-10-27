@@ -5,10 +5,19 @@ import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { queryTitle, type TitleCtx } from '@/queries/autoTitle'
 
 /**
- * The built-in sections a type page can show (`noBacklinks` comes with M5, `pinned` is a collection's).
- * `unreviewed` exists only on the basic DailyNote type (and not while it hides reviewing).
+ * The built-in sections a type page can show (`pinned` is a collection's). `unreviewed` exists
+ * only on the basic DailyNote type (and not while it hides reviewing); `noBacklinks` only on types
+ * whose objects can have backlinks, and is offered in "Add a section", never in the default set.
  */
-export const BUILTIN_KEYS = ['recentlyAccessed', 'collections', 'queries', 'inNoCollection', 'notTagged', 'unreviewed'] as const
+export const BUILTIN_KEYS = [
+  'recentlyAccessed',
+  'collections',
+  'queries',
+  'inNoCollection',
+  'notTagged',
+  'noBacklinks',
+  'unreviewed',
+] as const
 export type BuiltinKey = (typeof BUILTIN_KEYS)[number]
 
 export const SECTION_TEXT = {
@@ -27,6 +36,8 @@ export const SECTION_TEXT = {
   createQuery: 'Create query',
   inNoCollection: 'Not in any collection',
   notTagged: 'Not tagged',
+  noBacklinks: 'No backlinks',
+  noBacklinksDescription: 'All objects that are not linked in any other content.',
   unreviewed: 'Unreviewed',
   unreviewedDescription: 'Daily notes that have not been marked as reviewed.',
   openAll: 'Open all',
@@ -39,13 +50,14 @@ export const SECTION_TEXT = {
   sectionEmpty: 'No content for this section available.',
 }
 
-const BUILTIN_META: Record<BuiltinKey, { label: string; icon: string; inFullView: boolean }> = {
+const BUILTIN_META: Record<BuiltinKey, { label: string; icon: string; inFullView: boolean; description?: string }> = {
   recentlyAccessed: { label: SECTION_TEXT.recentlyAccessed, icon: 'ph-clock-clockwise', inFullView: false },
   collections: { label: SECTION_TEXT.collections, icon: COLLECTION_ICON, inFullView: false },
   queries: { label: SECTION_TEXT.queries, icon: QUERY_ICON, inFullView: false },
   inNoCollection: { label: SECTION_TEXT.inNoCollection, icon: 'ph-placeholder', inFullView: true },
   notTagged: { label: SECTION_TEXT.notTagged, icon: 'ph-tag', inFullView: true },
-  unreviewed: { label: SECTION_TEXT.unreviewed, icon: 'ph-check-circle', inFullView: false },
+  noBacklinks: { label: SECTION_TEXT.noBacklinks, icon: 'ph-line-segment', inFullView: true, description: SECTION_TEXT.noBacklinksDescription },
+  unreviewed: { label: SECTION_TEXT.unreviewed, icon: 'ph-check-circle', inFullView: false, description: SECTION_TEXT.unreviewedDescription },
 }
 
 export const isBuiltin = (key: string): key is BuiltinKey => key in BUILTIN_META
@@ -88,6 +100,32 @@ export function unreviewedRows(rows: Row[]): Row[] {
 export const typeHasTags = (type: Pick<TypeDef, 'propertyDefinitions'>): boolean =>
   type.propertyDefinitions.some((d) => d.key === 'tags' || d.type === 'entity_tags')
 
+/**
+ * Whether objects of the type can have backlinks: every role but RootDailyNote and MediaVideo
+ * (`canHaveBacklinks` in `structureHeuristicsBackbone.ts`, as `roles.py` has it), i.e. not the
+ * basic DailyNote and Video types.
+ */
+export function canHaveBacklinks(type: Pick<TypeDef, 'basic' | 'name'>): boolean {
+  if (!type.basic) return true
+  const name = type.name.replace(/\s+/g, '').toLowerCase()
+  return name !== 'dailynote' && name !== 'video'
+}
+
+/**
+ * Whether the type's rows carry the live backlinks: the server sends them (`Row.values.backlinks`)
+ * only for a type that has the backlinks definition.
+ */
+export const typeHasBacklinks = (type: Pick<TypeDef, 'propertyDefinitions'>): boolean =>
+  type.propertyDefinitions.some((d) => d.type === 'entity_backlinks')
+
+/** "No backlinks": rows whose backlinks value is empty (no object links to them). */
+export function noBacklinksRows(rows: Row[]): Row[] {
+  return rows.filter((r) => {
+    const v = r.values.backlinks
+    return !Array.isArray(v) || v.length === 0
+  })
+}
+
 export interface SectionCtx {
   collections: Collection[]
   queries: Query[]
@@ -115,6 +153,8 @@ export interface RenderedSection {
   hidden: boolean
   /** The id of the collection or query behind a `collection:` or `query:` key. */
   refId?: string
+  /** A built-in section's description (`DatabaseDashboard.sections.*.description`), when it has one. */
+  description?: string
 }
 
 type Described = Omit<RenderedSection, 'collapsed' | 'hidden' | 'viewDefinition' | 'title' | 'label'>
@@ -124,8 +164,11 @@ function describe(type: TypeDef, key: string, ctx: SectionCtx): Described | null
   if (isBuiltin(key)) {
     if (key === 'notTagged' && !typeHasTags(type)) return null
     if (key === 'unreviewed' && !hasUnreviewed(type)) return null
+    if (key === 'noBacklinks' && !(canHaveBacklinks(type) && typeHasBacklinks(type))) return null
     const m = BUILTIN_META[key]
-    return { key, defaultLabel: m.label, icon: m.icon, ownIcon: null, inFullView: m.inFullView }
+    const d: Described = { key, defaultLabel: m.label, icon: m.icon, ownIcon: null, inFullView: m.inFullView }
+    if (m.description) d.description = m.description
+    return d
   }
   if (isCollectionKey(key)) {
     const c = ctx.collections.find((x) => x.id === keyId(key))
@@ -143,8 +186,10 @@ function describe(type: TypeDef, key: string, ctx: SectionCtx): Described | null
 /**
  * Every section of the Overview in the saved order, then the removed ones (`hidden: true`).
  * A `collection:<id>` for each collection holding the type that is neither saved nor removed is
- * appended, and so is `unreviewed` on the basic DailyNote type (same rule). Keys that no longer name anything (a deleted query, a collection of another type,
- * `notTagged` on a type without tags, `noBacklinks`, `pinned`) are dropped.
+ * appended, and so is `unreviewed` on the basic DailyNote type (same rule). Keys that no longer
+ * name anything (a deleted query, a collection of another type, `notTagged` on a type without
+ * tags, `noBacklinks` on a type whose objects can't have backlinks or whose rows carry none,
+ * `pinned`) are dropped. `noBacklinks` is never added by default: "Add a section" offers it.
  */
 export function buildSections(type: TypeDef, views: Views, ctx: SectionCtx): RenderedSection[] {
   const removed = new Set(views.dashboard.removedSections)
@@ -181,7 +226,7 @@ export const hiddenSections = (all: RenderedSection[]): RenderedSection[] => all
 export const tabSections = (all: RenderedSection[]): RenderedSection[] =>
   all.filter((s) => !s.hidden && s.inFullView)
 
-/** What "Add a section" offers: removed built-ins, then the type's collections and queries not shown. */
+/** What "Add a section" offers: removed built-ins, "No backlinks" when not shown, then the type's collections and queries not shown. */
 export function addableSections(type: TypeDef, all: RenderedSection[], ctx: SectionCtx): RenderedSection[] {
   const present = new Set(all.filter((s) => !s.hidden).map((s) => s.key))
   const out: RenderedSection[] = []
@@ -191,6 +236,7 @@ export function addableSections(type: TypeDef, all: RenderedSection[], ctx: Sect
     if (d) out.push({ ...d, label: d.defaultLabel, collapsed: false, hidden: false })
   }
   for (const s of all) if (s.hidden && isBuiltin(s.key)) offer(s.key)
+  offer('noBacklinks')
   for (const c of ctx.collections) if (c.typeIds.includes(type.id)) offer(`collection:${c.id}`)
   for (const q of ctx.queries) if (q.definition.structures.some((st) => st.id === type.id)) offer(`query:${q.id}`)
   return out

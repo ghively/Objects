@@ -5,10 +5,13 @@ import {
   addableSections,
   appendSection,
   buildSections,
+  canHaveBacklinks,
   hiddenSections,
   moveSection,
+  noBacklinksRows,
   removeSection,
   sectionInFullView,
+  SECTION_TEXT,
   showSection,
   tabSections,
   unreviewedRows,
@@ -204,5 +207,56 @@ describe('DailyNote Unreviewed section', () => {
       'DailyNotes/2026-10-21.md',
       'DailyNotes/2026-10-20.md',
     ])
+  })
+})
+
+describe('No backlinks section (M5)', () => {
+  const BL = propertyDef({ id: 'backlinks', key: 'backlinks', name: 'Backlinks', type: 'entity_backlinks' })
+  const PERSON = typeDef({ id: 'person', name: 'Person', propertyDefinitions: [TAGS, BL] })
+
+  test('test no backlinks section addable, lists unlinked objects, title and description match reference', () => {
+    // Not in the default set; offered in "Add a section".
+    const all = buildSections(PERSON, views(), ctx())
+    expect(all.map((s) => s.key)).toEqual([...DEFAULTS])
+    const add = addableSections(PERSON, all, ctx())
+    expect(add.map((s) => s.key)).toEqual(['noBacklinks'])
+    expect(add[0]).toMatchObject({
+      label: 'No backlinks',
+      icon: 'ph-line-segment',
+      inFullView: true,
+      description: 'All objects that are not linked in any other content.',
+    })
+    expect(SECTION_TEXT.noBacklinks).toBe('No backlinks')
+    expect(SECTION_TEXT.noBacklinksDescription).toBe('All objects that are not linked in any other content.')
+
+    // Added: a visible section and a header tab; buildSections keeps it.
+    const v = showSection(views(), all, add[0])
+    const after = buildSections(PERSON, v, ctx())
+    expect(visibleSections(after).map((s) => s.key).at(-1)).toBe('noBacklinks')
+    expect(tabSections(after).map((s) => s.key)).toContain('noBacklinks')
+    expect(addableSections(PERSON, after, ctx())).toEqual([])
+    // Removed: hidden, and offered again.
+    const removed = removeSection(v, after, 'noBacklinks')
+    const hid = buildSections(PERSON, removed, ctx())
+    expect(hiddenSections(hid).map((s) => s.key)).toEqual(['noBacklinks'])
+    expect(addableSections(PERSON, hid, ctx()).map((s) => s.key)).toEqual(['noBacklinks'])
+
+    // Roles that can't have backlinks (DailyNote, Video) never get it, even when saved.
+    const DAILY = typeDef({ id: 'dailynote', name: 'DailyNote', basic: true, propertyDefinitions: [BL] })
+    const VIDEO = typeDef({ id: 'video', name: 'Video', basic: true, propertyDefinitions: [BL] })
+    expect(canHaveBacklinks(DAILY)).toBe(false)
+    expect(canHaveBacklinks(VIDEO)).toBe(false)
+    expect(canHaveBacklinks(typeDef({ id: 'page', name: 'Page', basic: true }))).toBe(true)
+    expect(canHaveBacklinks(typeDef({ id: 'video2', name: 'Video' }))).toBe(true)
+    expect(buildSections(VIDEO, views(['noBacklinks']), ctx())).toEqual([])
+    expect(addableSections(VIDEO, buildSections(VIDEO, views([]), ctx()), ctx())).toEqual([])
+    // A type whose rows carry no backlinks (no backlinks definition) can't list them.
+    expect(buildSections(NOTE, views(['noBacklinks']), ctx())).toEqual([])
+
+    // The rows: those no object links to.
+    const P = (path: string, backlinks?: unknown) =>
+      row({ summary: objectSummary({ path, type: 'person' }), values: backlinks === undefined ? {} : { backlinks } })
+    const rows = [P('a', [{ target: 'B', path: 'b' }]), P('b', []), P('c', null), P('d')]
+    expect(noBacklinksRows(rows).map((r) => r.summary.path)).toEqual(['b', 'c', 'd'])
   })
 })

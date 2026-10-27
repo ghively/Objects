@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import type { Row } from '@/api/types'
 import { FULL_VIEW_LAYOUTS } from '@/views/model'
 import { TASK_SECTIONS, TASK_SECTION_KEYS, sectionRows } from './taskSections'
+import { groupRows } from '@/views/group'
 import { TASK_TYPE, taskRow } from './taskFixtures'
 
 // Monday 2026-10-26, noon local.
@@ -38,6 +39,7 @@ describe('taskSections', () => {
       recurring: ['Recurring', 'All open tasks that repeat on a schedule, grouped by date'],
       reminders: ['Reminders', 'All open tasks with an active reminder, grouped by date'],
       tags: ['Tags', 'All tasks grouped by their tags'],
+      source: ['Context', 'Tasks organized by the objects they are mentioned in.'],
       completed: ['Completed', 'All tasks marked as done'],
     }
     expect(TASK_SECTION_KEYS).toEqual(Object.keys(want))
@@ -49,9 +51,34 @@ describe('taskSections', () => {
     }
   })
 
-  test('test no Context section', () => {
-    expect(Object.keys(TASK_SECTIONS)).not.toContain('source')
-    expect(Object.values(TASK_SECTIONS).map((s) => s.title)).not.toContain('Context')
+  test('test Context section groups open tasks by linking objects', () => {
+    // Open tasks only, in a list grouped by the backlinks property.
+    expect(paths('source')).toEqual(paths('open'))
+    const preset = TASK_SECTIONS.source.preset(NOW)
+    expect(preset.viewDefinition.dataViewLayout).toBe('list')
+    expect(preset.groupBy).toEqual({ groups: [{ propertyId: 'backlinks', option: 'default' }] })
+    // The grouping: one group per linking object, "Other" for tasks nothing links to.
+    const withLinks = [
+      taskRow('Tasks/A.md', { status: ['Not Started'], backlinks: [{ target: 'Plan', path: 'Pages/Plan.md' }] }),
+      taskRow('Tasks/B.md', {
+        status: ['In Progress'],
+        backlinks: [
+          { target: 'Plan', path: 'Pages/Plan.md' },
+          { target: 'Ada', path: 'People/Ada.md' },
+        ],
+      }),
+      taskRow('Tasks/C.md', { status: ['Not Started'], backlinks: [] }),
+      taskRow('Tasks/D.md', { status: ['Done'], backlinks: [{ target: 'Plan', path: 'Pages/Plan.md' }] }),
+    ]
+    const shown = sectionRows('source', withLinks, TASK_TYPE, NOW)
+    expect(shown.map((r) => r.summary.path)).toEqual(['Tasks/A.md', 'Tasks/B.md', 'Tasks/C.md'])
+    const ctx = { types: [TASK_TYPE], collections: [], tagIdsToTitles: {}, now: NOW, entityTitles: { 'Pages/Plan.md': 'Plan' } }
+    const { groups } = groupRows(shown, preset.groupBy, undefined, ctx)
+    expect(groups.map((g) => [g.label, g.rows.map((r) => r.summary.path.slice(6, -3))])).toEqual([
+      ['Ada', ['B']],
+      ['Plan', ['A', 'B']],
+      ['Other', ['C']],
+    ])
   })
 
   test('test status preset groups by category and defaults to kanban; the rest default to list', () => {

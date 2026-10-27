@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { Collection, Filter, FilterGroup, PropertyDef, Row, TypeDef } from '@/api/types'
 import { collection, objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
-import { FILTER_OPTIONS, filterIsValid, filterOptionsFor, matchFilter, matchGroup, applyFilters, type FilterCtx } from './filter'
+import { FILTER_OPTIONS, filterIsValid, filterOptionsFor, matchFilter, matchGroup, applyFilters, rowValue, type FilterCtx } from './filter'
 import { resolveRelative } from './dates'
 
 const now = new Date(2026, 9, 23, 12, 0)
@@ -357,5 +357,35 @@ describe('task date filters (M4)', () => {
     expect(matchFilter(other, f('date', 'isNotRecurring'), tctx())).toBe(true)
     expect(matchFilter(other, f('date', 'hasReminder'), tctx())).toBe(false)
     expect(matchFilter(other, f('date', 'hasNoReminder'), tctx())).toBe(true)
+  })
+})
+
+describe('backlinks filter (M5)', () => {
+  const bl = propertyDef({ id: 'backlinks', name: 'Backlinks', type: 'entity_backlinks' })
+  const person = typeDef({ id: 'person', propertyDefinitions: [propertyDef({ id: 'title', type: 'entity_title' }), bl] })
+  const bctx = ctx({ types: [person], pathsById: { ada: 'People/Ada.md', bob: 'People/Bob.md' } })
+  const P = (path: string, backlinks: { target: string; path: string | null }[]) =>
+    row({ summary: objectSummary({ path, type: 'person' }), values: { backlinks } })
+  const rows = [
+    P('a', [{ target: 'Ada', path: 'People/Ada.md' }]),
+    P('b', [
+      { target: 'Bob', path: 'People/Bob.md' },
+      { target: 'Ada', path: 'People/Ada.md' },
+    ]),
+    P('c', []),
+  ]
+
+  test('test backlinks filter contains and not contains by object', () => {
+    expect(FILTER_OPTIONS.entity_backlinks.map((o) => o.key)).toEqual(['contains'])
+    expect(rowValue(rows[0], 'backlinks')).toEqual([{ target: 'Ada', path: 'People/Ada.md' }])
+    expect(paths(applyFilters(rows, group('and', f('backlinks', 'contains', ['ada'])), bctx))).toEqual(['a', 'b'])
+    expect(paths(applyFilters(rows, group('and', f('backlinks', 'contains', ['bob'])), bctx))).toEqual(['b'])
+    // A saved "does not include" is evaluated (not offered, not ignored).
+    expect(filterIsValid(f('backlinks', 'notContains', ['ada']), { person })).toBe(true)
+    expect(paths(applyFilters(rows, group('and', f('backlinks', 'notContains', ['ada'])), bctx))).toEqual(['c'])
+    // An empty reference passes every row.
+    expect(paths(applyFilters(rows, group('and', f('backlinks', 'contains', [])), bctx))).toEqual(['a', 'b', 'c'])
+    // Unknown operators stay invalid.
+    expect(filterIsValid(f('backlinks', 'is', 'x'), { person })).toBe(false)
   })
 })

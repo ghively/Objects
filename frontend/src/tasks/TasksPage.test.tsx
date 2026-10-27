@@ -87,7 +87,7 @@ describe('TasksPage', () => {
     expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['task'] })
     expect(tab('Status')).toHaveAttribute('aria-selected', 'true')
     const names = screen.getAllByRole('tab').map((t) => t.textContent)
-    expect(names).toEqual(['Status', 'Today', 'Inbox', 'Open', 'Deadline', 'Scheduled', 'Recurring', 'Reminders', 'Tags', 'Completed'])
+    expect(names).toEqual(['Status', 'Today', 'Inbox', 'Open', 'Deadline', 'Scheduled', 'Recurring', 'Reminders', 'Tags', 'Context', 'Completed'])
     await screen.findAllByTestId('kanban-column')
     const cols = screen.getAllByTestId('kanban-column')
     expect(cols.map((c) => c.getAttribute('data-group'))).toEqual(['not-started', 'in-progress', 'blocked', 'done'])

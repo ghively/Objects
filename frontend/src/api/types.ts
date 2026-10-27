@@ -730,6 +730,7 @@ export type TaskSectionKey =
   | 'recurring'
   | 'reminders'
   | 'tags'
+  | 'source'
   | 'completed'
 
 export interface TasksUi {

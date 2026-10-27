@@ -191,7 +191,14 @@ export function CustomizeOverview({
           <div>
             {addable.length === 0 && <p className="px-2 py-1 text-[13px] text-fg-muted">{SECTION_TEXT.sectionEmpty}</p>}
             {otherItems.map((s) => (
-              <button key={s.key} type="button" aria-label={`Add ${s.label}`} onClick={() => update((v) => showSection(v, sections, s))} className={item}>
+              <button
+                key={s.key}
+                type="button"
+                aria-label={`Add ${s.label}`}
+                title={s.description}
+                onClick={() => update((v) => showSection(v, sections, s))}
+                className={item}
+              >
                 <IconOrEmoji icon={s.ownIcon} fallback={s.icon} size={14} />
                 <span className="truncate">{`${s.label}${s.inFullView ? '' : SECTION_TEXT.dashboardOnly}`}</span>
               </button>
@@ -236,7 +243,9 @@ function SectionHeading({
       >
         <Icon name={section.collapsed ? 'ph-caret-right' : 'ph-caret-down'} size={13} />
         <IconOrEmoji icon={section.ownIcon} fallback={section.icon} size={16} />
-        <span className="truncate">{section.label}</span>
+        <span className="truncate" title={section.description}>
+          {section.label}
+        </span>
       </button>
       <button
         type="button"

@@ -10,6 +10,10 @@ import { UrlCell } from './UrlCell'
 import { DateCell } from './DateCell'
 import { ReadOnlyDateCell } from './ReadOnlyDateCell'
 import { renderInline, TextBlockCell } from './TextBlockCell'
+import { BacklinksCell } from './SystemFieldCell'
+import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { usePeek, useTabs } from '@/nav/tabs'
+import { objectSummary } from '@/test/mockApi'
 
 function def(type: PropertyType, extra: Partial<PropertyDef> = {}): PropertyDef {
   return {
@@ -413,5 +417,52 @@ describe('DateCell: the Task date', () => {
     expect(updates.date.resolution).toBe('time')
     expect(updates).not.toHaveProperty('remind')
     expect(remove).toEqual(['remind'])
+  })
+})
+
+// M5 Task 10: the backlinks property is live.
+describe('BacklinksCell', () => {
+  afterEach(() => {
+    usePeek.getState().close()
+    resetLinkIndex()
+  })
+
+  it('test backlinks cell shows chips and peeks; empty', async () => {
+    useLinkIndex.setState({
+      objects: [objectSummary({ path: 'People/Ada.md', title: 'Ada Lovelace', type: 'person' })],
+      types: [],
+      revision: 1,
+    })
+    const open = vi.spyOn(useTabs.getState(), 'open').mockImplementation(() => {})
+    const onChange = vi.fn()
+    const refs = [
+      { target: 'Ada', path: 'People/Ada.md' },
+      { target: 'Bob', path: 'People/Bob.md' },
+    ]
+    const d = def('entity_backlinks', { name: 'Backlinks' })
+    const { unmount } = render(<BacklinksCell def={d} value={refs} onChange={onChange} />)
+    // The summary's title when known, else the link target.
+    expect(screen.getAllByTestId('backlink-chip').map((c) => c.textContent)).toEqual(['Ada Lovelace', 'Bob'])
+    await userEvent.click(screen.getByText('Bob'))
+    expect(usePeek.getState().path).toBe('People/Bob.md')
+    expect(usePeek.getState().list).toEqual(['People/Ada.md', 'People/Bob.md'])
+    fireEvent.click(screen.getByText('Ada Lovelace'), { ctrlKey: true })
+    expect(open).toHaveBeenCalledWith({ kind: 'object', path: 'People/Ada.md' })
+    expect(onChange).not.toHaveBeenCalled()
+    unmount()
+    // One-line table cell: the count.
+    const table = render(<BacklinksCell def={d} value={refs} density="table" inTable onChange={onChange} />)
+    expect(table.container.textContent).toBe('2')
+    table.unmount()
+    // Empty: "Empty" in the panel, blank in a table.
+    const empty = render(<BacklinksCell def={d} value={[]} onChange={onChange} />)
+    expect(screen.getByText('Empty')).toBeInTheDocument()
+    empty.unmount()
+    const emptyTable = render(<BacklinksCell def={d} value={[]} density="table" inTable onChange={onChange} />)
+    expect(emptyTable.container.textContent).toBe('')
+    emptyTable.unmount()
+    render(<BacklinksCell def={d} value={undefined} onChange={onChange} />)
+    expect(screen.getByText('Empty')).toBeInTheDocument()
+    open.mockRestore()
   })
 })

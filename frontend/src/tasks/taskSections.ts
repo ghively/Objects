@@ -1,6 +1,5 @@
 // The Tasks page sections (Capacities' `DatabaseDashboard.sections.tasks.*`): titles and
 // descriptions verbatim, which tasks each section holds, and the view each one starts from.
-// "Context" (`sections.tasks.source`) needs backlinks and waits for M5.
 //
 // A section's membership (`match`) is fixed, like Capacities' built-in task sections; its
 // `preset` is only the starting view (layout, sorts, grouping) that the user can change and that
@@ -32,6 +31,7 @@ export const TASK_SECTION_KEYS: readonly TaskSectionKey[] = [
   'recurring',
   'reminders',
   'tags',
+  'source',
   'completed',
 ]
 
@@ -134,6 +134,14 @@ export const TASK_SECTIONS: Record<TaskSectionKey, TaskSection> = {
     icon: 'ph-hash',
     preset: () => view('list', { groupBy: { groups: [{ propertyId: 'tags', option: 'default' }] } }),
     match: () => true,
+  },
+  source: {
+    title: 'Context',
+    description: 'Tasks organized by the objects they are mentioned in.',
+    icon: 'ph-line-segment',
+    // Grouped by the live backlinks: one group per object linking to the task, "Other" for none.
+    preset: () => view('list', { groupBy: { groups: [{ propertyId: 'backlinks', option: 'default' }] } }),
+    match: (row, type) => isOpen(row, type),
   },
   completed: {
     title: 'Completed',
