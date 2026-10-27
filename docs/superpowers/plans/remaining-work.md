@@ -62,10 +62,16 @@ Built (Tasks 1–15), and the Task 16 acceptance passed on 2026-10-26; see `m4-a
 - **Tasks view:** all task-role objects grouped by status category (not-started / in-progress / blocked / done); list and kanban; filters; drag between columns changes status.
 - **Task fields:** priority, due date, **recurrence** (every N day/week/month/year, by due date or completion date), **reminders** (local OS notifications only).
 
-### M5: search, command palette, backlinks, graph
+### M5: search, command palette, backlinks, graph (built 2026-10-27; Gene's hand checks pending)
+
+Built by plan `2026-10-26-m5-search-palette-backlinks-graph.md`. Acceptance: `m5-acceptance.md`. `scripts/m5_acceptance.py` passes on `space-links`, `space-sample`, `space-v1` and `space-calendar`, and with `--big`. The suites are green: 836 back-end tests and 998 front-end tests. Task 13 made two wiring fixes:
+- rows carry `values.backlinks` on every type, so the Task "Context" section and "No backlinks" work on Page and Task;
+- reindex reopens a cache file deleted while running.
+
+The whole-milestone review and fix pass are still to come. Gene's checks, including the list of decisions made without a reference, are unchecked in `m5-acceptance.md`.
 
 - SQLite FTS5 index in `.object-cache/`, rebuilt from files and kept current by the watcher.
-- **Ctrl+K command palette:** fuzzy titles + full text, filter by type, commands (new object of type, go to calendar/graph, switch space, toggle panels).
+- **Ctrl+K command palette:** fuzzy titles + full text, filter by type, commands (new object of type, go to calendar/graph, toggle panels; switching spaces moved to M7).
 - Find in page (Ctrl+F) beyond the editor's own.
 - **References section** on objects: tabs All / Backlinks / Related / Mentions / Related tags; unlinked mentions; the backlinks system property becomes live.
 - **Global graph:** nodes coloured by type, sized by links; filters for type include/exclude, show completed tasks, minimal nodes, hide large nodes, hide dates, hide indirect links, tag network; click to peek.

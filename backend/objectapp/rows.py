@@ -212,6 +212,12 @@ def _row(space: Space, raw: RawObject, summary: ObjectSummary) -> Row:
         elif p.type == "entity_title" and value is None:
             value = summary.title
         values[p.key] = value
+    if "backlinks" not in values:
+        # Backlinks are a system property of every object (`systemPropertyTypeToIdMap`:
+        # entity_backlinks -> 'backlinks'), so rows carry them under that id even when the
+        # type hasn't added the definition: the "No backlinks" section, the Task "Context"
+        # section and backlinks filters/groups read them (M5 Task 13).
+        values["backlinks"] = space.backlinks(summary.path)
     return Row(
         summary=summary,
         version=version_of(raw.data),

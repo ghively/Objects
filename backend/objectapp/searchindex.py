@@ -572,6 +572,18 @@ class SearchIndex:
         self._write(lambda conn: self._put_types_key(conn, fingerprint))
 
     def _rebuild(self) -> None:
+        if not self.in_memory:
+            # Reopen the file first: the cache may have been deleted while the app ran (the
+            # old connection then points at an unlinked file SQLite can no longer write).
+            with self._db_lock:
+                old, self._conn = self._conn, None
+            if old is not None:
+                try:
+                    old.close()
+                except sqlite3.Error:
+                    pass
+            self._open()
+
         def drop(conn: sqlite3.Connection) -> None:
             for table in _TABLES:
                 conn.execute(f"DROP TABLE IF EXISTS {table}")

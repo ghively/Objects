@@ -111,13 +111,6 @@ export function canHaveBacklinks(type: Pick<TypeDef, 'basic' | 'name'>): boolean
   return name !== 'dailynote' && name !== 'video'
 }
 
-/**
- * Whether the type's rows carry the live backlinks: the server sends them (`Row.values.backlinks`)
- * only for a type that has the backlinks definition.
- */
-export const typeHasBacklinks = (type: Pick<TypeDef, 'propertyDefinitions'>): boolean =>
-  type.propertyDefinitions.some((d) => d.type === 'entity_backlinks')
-
 /** "No backlinks": rows whose backlinks value is empty (no object links to them). */
 export function noBacklinksRows(rows: Row[]): Row[] {
   return rows.filter((r) => {
@@ -164,7 +157,7 @@ function describe(type: TypeDef, key: string, ctx: SectionCtx): Described | null
   if (isBuiltin(key)) {
     if (key === 'notTagged' && !typeHasTags(type)) return null
     if (key === 'unreviewed' && !hasUnreviewed(type)) return null
-    if (key === 'noBacklinks' && !(canHaveBacklinks(type) && typeHasBacklinks(type))) return null
+    if (key === 'noBacklinks' && !canHaveBacklinks(type)) return null
     const m = BUILTIN_META[key]
     const d: Described = { key, defaultLabel: m.label, icon: m.icon, ownIcon: null, inFullView: m.inFullView }
     if (m.description) d.description = m.description
@@ -188,7 +181,8 @@ function describe(type: TypeDef, key: string, ctx: SectionCtx): Described | null
  * A `collection:<id>` for each collection holding the type that is neither saved nor removed is
  * appended, and so is `unreviewed` on the basic DailyNote type (same rule). Keys that no longer
  * name anything (a deleted query, a collection of another type, `notTagged` on a type without
- * tags, `noBacklinks` on a type whose objects can't have backlinks or whose rows carry none,
+ * tags, `noBacklinks` on a type whose objects can't have backlinks (every row carries
+ * `values.backlinks`, M5 Task 13),
  * `pinned`) are dropped. `noBacklinks` is never added by default: "Add a section" offers it.
  */
 export function buildSections(type: TypeDef, views: Views, ctx: SectionCtx): RenderedSection[] {
