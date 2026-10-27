@@ -40,12 +40,23 @@ export function DateCell({
   typeId,
   frontmatter,
   onChangeMany,
+  onSetReminder,
 }: CellProps<DateValue | null> & CellExtras) {
   const [open, setOpen] = useState(false)
   const task = !!onChangeMany && isTaskDate(def, typeId)
   const repeat = textOf(frontmatter?.repeat)
   const remind = textOf(frontmatter?.remind)
   const [draft, setDraft] = useState<TaskDateChange | null>(null)
+  // M8: any other date property with `supportsReminders` keeps its reminder in the `reminders` map.
+  const reminders = frontmatter?.reminders
+  const ownReminder =
+    reminders && typeof reminders === 'object' && !Array.isArray(reminders)
+      ? textOf((reminders as Record<string, unknown>)[def.key])
+      : null
+  const reminder =
+    !task && onSetReminder && def.options.constraints?.supportsReminders
+      ? { value: ownReminder, onChange: (remind: string | null) => remind !== ownReminder && onSetReminder(def.key, remind) }
+      : undefined
 
   /** Write a Task draft as one call: the changed keys, with cleared texts removed. */
   const commit = (d: TaskDateChange) => {
@@ -128,6 +139,7 @@ export function DateCell({
           <DatePicker
             value={value}
             constraints={def.options.constraints}
+            reminder={reminder}
             onChange={(next) => {
               onChange(next)
               if (next === null) setOpen(false)

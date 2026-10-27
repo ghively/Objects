@@ -514,6 +514,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         readOnly={propsReadOnly}
         onChange={(key, value) => writeProperties({ [key]: value })}
         onChangeMany={(u, r) => void writes.updateProperties(u, r)}
+        onSetReminder={(key, remind) => void writes.setReminder(key, remind)}
         onTypeChange={onTypeChange}
         onOpenTag={onOpenTag}
         onOpenObject={onOpenObject}
