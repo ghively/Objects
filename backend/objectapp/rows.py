@@ -200,6 +200,9 @@ def _row(space: Space, raw: RawObject, summary: ObjectSummary) -> Row:
         if p.type == "entity_collections":
             values[p.key] = list(summary.collections)
             continue
+        if p.type == "entity_backlinks":
+            values[p.key] = space.backlinks(summary.path)
+            continue
         value = decode_value(p, raw.fm.get(p.key), raw.fm)
         if p.type == "entity":
             paths = [space.resolve(r["target"], summary.path) for r in value]

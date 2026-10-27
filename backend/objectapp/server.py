@@ -110,6 +110,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
+from . import api_graph, api_references, api_search
+from .apictx import ApiContext
 from .collections import CollectionDef
 from .jsonstore import DefinitionUnreadable, default_views, json_revision, normalize_views
 from .media import NotAnImage, image_media_type, image_path, import_image, list_images
@@ -117,6 +119,7 @@ from .propvalues import InvalidValue
 from .notify import FileNotifier, system_notifier
 from .queries import QueryDef
 from .reminders import ReminderScheduler, file_clock
+from .searchindex import SearchIndex
 from .space import ConfirmRequired, Conflict, DailyNoteExists, ReadOnly, RestoreConflict, Space
 from .typedefs import has_undecodable
 from .typemodel import (
@@ -309,7 +312,18 @@ class SaveQueryRequest(BaseModel):
 
 
 _UI_PATCH_KEYS = frozenset(
-    {"pinned", "sections", "allNotesLayout", "calendar", "tasks", "reminders"}
+    {"pinned", "sections", "allNotesLayout", "calendar", "tasks", "reminders", "graph"}
+)
+# RootSpace.model.ts `GraphViewCustomization`, verbatim.
+_GRAPH_LIST_KEYS = ("filterStructureIds", "excludeStructureIds")
+_GRAPH_BOOL_KEYS = (
+    "showCompletedTasks",
+    "showMinimalNodes",
+    "hideLargeNodes",
+    "hideDates",
+    "hideIndirectLinks",
+    "showTagsNetwork",
+    "showSpaceTagsNetwork",
 )
 _WEEK_STARTS = ("sunday", "monday")
 _CALENDAR_HIDE_KEYS = (
@@ -333,6 +347,7 @@ _TASK_SECTION_KEYS = frozenset(
         "reminders",
         "tags",
         "completed",
+        "source",
     }
 )
 
@@ -429,6 +444,28 @@ def _ui_problem(patch: dict[str, Any]) -> str | None:
         reminders = patch["reminders"]
         if not isinstance(reminders, dict) or not isinstance(reminders.get("enabled"), bool):
             return "reminders must be {enabled: true|false}."
+    if "graph" in patch:
+        problem = _graph_ui_problem(patch["graph"])
+        if problem:
+            return problem
+    return None
+
+
+def _graph_ui_problem(graph: Any) -> str | None:
+    """Why a ``graph`` ui patch is not a ``GraphViewCustomization``, else None."""
+    if not isinstance(graph, dict):
+        return "graph must be an object."
+    unknown = sorted(set(graph) - set(_GRAPH_LIST_KEYS) - set(_GRAPH_BOOL_KEYS))
+    if unknown:
+        return f"Cannot patch: {', '.join(f'graph.{k}' for k in unknown)}"
+    for key in _GRAPH_LIST_KEYS:
+        if key in graph and not (
+            isinstance(graph[key], list) and all(isinstance(x, str) for x in graph[key])
+        ):
+            return f"graph.{key} must be a list of type ids."
+    for key in _GRAPH_BOOL_KEYS:
+        if key in graph and not isinstance(graph[key], bool):
+            return f"graph.{key} must be true or false."
     return None
 
 
@@ -482,17 +519,20 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
     fake_notify = os.environ.get("OBJECT_FAKE_NOTIFY_FILE")
     notifier = FileNotifier(Path(fake_notify)) if fake_notify else system_notifier()
     scheduler = ReminderScheduler(space, notifier)
+    search = SearchIndex(space)
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI):
         hub.loop = asyncio.get_running_loop()
         hub.closed = False
         scheduler.start()
+        search.start()
         if not watch:
             try:
                 yield
             finally:
                 hub.close()
+                await asyncio.to_thread(search.stop)
                 await asyncio.to_thread(scheduler.stop)
             return
         watcher = SpaceWatcher(space, hub.loop)
@@ -511,6 +551,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             with contextlib.suppress(asyncio.CancelledError):
                 await task
             await asyncio.to_thread(watcher.stop)
+            await asyncio.to_thread(search.stop)
             await asyncio.to_thread(scheduler.stop)
 
     app = FastAPI(
@@ -519,6 +560,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
     app.state.space = space
     app.state.hub = hub
     app.state.reminders = scheduler
+    app.state.search = search
 
     @app.exception_handler(OSError)
     async def os_error(_request: Request, exc: OSError) -> JSONResponse:
@@ -566,6 +608,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
                 "body": of.body,
                 "version": version,
                 "links": space.links_of(path, fm),
+                "backlinks": space.backlinks(summary.path),
             }
         )
 
@@ -1253,6 +1296,10 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
                 ]
             }
 
+    ctx = ApiContext(space, announce, search)
+    api.include_router(api_search.router(ctx))
+    api.include_router(api_references.router(ctx))
+    api.include_router(api_graph.router(ctx))
     app.include_router(api)
 
     if static_dir is not None and Path(static_dir).is_dir():
