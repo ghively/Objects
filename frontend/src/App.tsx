@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import type { SpaceInfo, TypeDef } from '@/api/types'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { Icon, IconOrEmoji } from '@/components/Icon'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { createAndOpen } from '@/create/createAndOpen'
 import { NewObjectMenu } from '@/create/NewObjectMenu'
@@ -11,41 +10,37 @@ import { CalendarPage } from '@/calendar/CalendarPage'
 import { CalendarSidePanel } from '@/calendar/CalendarSidePanel'
 import { CollectionPage } from '@/collections/CollectionPage'
 import { QueriesPage } from '@/queries/QueriesPage'
-import { QueryPage, useTitleCtx } from '@/queries/QueryPage'
+import { QueryPage } from '@/queries/QueryPage'
 import { GraphPage } from '@/graph/GraphPage'
 import { LocalGraphPanel } from '@/graph/LocalGraphPanel'
 import { LinkPicker } from '@/links/LinkPicker'
-import { invalidateLinkIndex, stemOf, useLinkIndex } from '@/links/linkIndex'
-import { canGoBack, canGoForward, currentTarget, tabTarget, usePeek, useTabs, type Tab } from '@/nav/tabs'
+import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { setRecentSpace } from '@/nav/recent'
+import { canGoBack, canGoForward, currentTarget, setTabsSpace, usePeek, useTabs } from '@/nav/tabs'
 import { useDeleteRequest } from '@/object/DeleteObjectDialog'
 import { ObjectPage } from '@/object/ObjectPage'
-import { ObjectIcon } from '@/object/ObjectHeader'
 import { ObjectPeek } from '@/object/ObjectPeek'
 import { CommandPalette } from '@/palette/CommandPalette'
 import { MainPanel } from '@/shell/MainPanel'
 import { RightPanel } from '@/shell/RightPanel'
-import { Sidebar, TypeChip } from '@/shell/Sidebar'
+import { Sidebar } from '@/shell/Sidebar'
+import { TabStrip, useSpaceTypes } from '@/shell/TabStrip'
+import { useTabShortcuts } from '@/shell/shortcuts'
+import { isEditableTarget } from '@/lib/shortcuts'
+import { applyOpenOnStart } from '@/nav/startup'
+import { useSettings } from '@/settings/useSettings'
 import { TopBar } from '@/shell/TopBar'
-import { cn } from '@/lib/utils'
 import { TasksPage } from '@/tasks/TasksPage'
 import { TrashView } from '@/trash/TrashView'
 import { CreateTypeDialog } from '@/types/CreateTypeDialog'
 import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
 import { TypePage } from '@/types/TypePage'
 import { TypeSettings } from '@/types/TypeSettings'
-import { useDefinitions } from '@/types/useDefinitions'
-import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
-import { queryTitle } from '@/queries/autoTitle'
 
 const REFRESH_DELAY_MS = 150
 
 /** Inputs, text areas, selects, contenteditable (the body editor) and CodeMirror (raw mode). */
-export function isEditableTarget(el: EventTarget | null): boolean {
-  if (!(el instanceof Element)) return false
-  if (el.closest('input, textarea, select, .cm-editor')) return true
-  const ce = el.closest('[contenteditable]')
-  return !!ce && ce.getAttribute('contenteditable') !== 'false'
-}
+export { isEditableTarget }
 
 /** The type Ctrl+N creates: the open type, else the open object's type, else Page. */
 function currentTypeId(types: TypeDef[]): string {
@@ -58,141 +53,6 @@ function currentTypeId(types: TypeDef[]): string {
   return types.find((t) => t.name.toLowerCase() === 'page')?.id ?? 'page'
 }
 
-/** The space's types: the link index's (reloaded as files bring new types), else the initial fetch's. */
-function useSpaceTypes(space: SpaceInfo | null): TypeDef[] {
-  const indexTypes = useLinkIndex((s) => s.types)
-  return indexTypes.length > 0 ? indexTypes : (space?.types ?? [])
-}
-
-function TabLabel({ tab, space }: { tab: Tab; space: SpaceInfo | null }) {
-  const target = tabTarget(tab)
-  const objects = useLinkIndex((s) => s.objects)
-  const types = useSpaceTypes(space)
-  const { collections, queries } = useDefinitions()
-  const titleCtx = useTitleCtx(types)
-  if (!target) return <span className="truncate">New tab</span>
-  if (target.kind === 'collection') {
-    const c = collections.find((x) => x.id === target.id)
-    return (
-      <>
-        <IconOrEmoji icon={c?.icon} size={15} fallback={COLLECTION_ICON} />
-        <span className="truncate">{c?.name ?? target.id}</span>
-      </>
-    )
-  }
-  if (target.kind === 'query') {
-    const q = queries.find((x) => x.id === target.id)
-    return (
-      <>
-        <IconOrEmoji icon={q?.icon} size={15} fallback={QUERY_ICON} />
-        <span className="truncate">{(q && queryTitle(q, titleCtx)) || 'Query'}</span>
-      </>
-    )
-  }
-  if (target.kind === 'queries') {
-    return (
-      <>
-        <Icon name={QUERY_ICON} size={15} />
-        <span className="truncate">Queries</span>
-      </>
-    )
-  }
-  if (target.kind === 'allNotes') {
-    return (
-      <>
-        <Icon name="ph-note" size={15} />
-        <span className="truncate">All notes</span>
-      </>
-    )
-  }
-  if (target.kind === 'calendar') {
-    return (
-      <>
-        <Icon name="ph-calendar-blank" size={15} />
-        <span className="truncate">Calendar</span>
-      </>
-    )
-  }
-  if (target.kind === 'tasks') {
-    return (
-      <>
-        <Icon name="ph-check-circle" size={15} />
-        <span className="truncate">Tasks</span>
-      </>
-    )
-  }
-  if (target.kind === 'graph') {
-    return (
-      <>
-        <Icon name="ph-graph" size={15} />
-        <span className="truncate">Graph</span>
-      </>
-    )
-  }
-  if (target.kind === 'trash') {
-    return (
-      <>
-        <Icon name="ph-trash" size={15} />
-        <span className="truncate">Trash</span>
-      </>
-    )
-  }
-  if (target.kind === 'type' || target.kind === 'typeSettings') {
-    const type = types.find((t) => t.id === target.typeId)
-    const label = type ? (target.kind === 'type' ? type.pluralName : `${type.name} settings`) : target.typeId
-    return (
-      <>
-        {type && <TypeChip type={type} size={22} />}
-        <span className="truncate">{label}</span>
-      </>
-    )
-  }
-  const summary = objects.find((o) => o.path === target.path)
-  const type = types.find((t) => t.id === summary?.type)
-  return (
-    <>
-      {summary?.icon ? <ObjectIcon icon={summary.icon} size={15} /> : type && <TypeChip type={type} size={22} />}
-      <span className="truncate">{summary?.title ?? stemOf(target.path)}</span>
-    </>
-  )
-}
-
-function TabStrip({ space }: { space: SpaceInfo | null }) {
-  const { tabs, activeId, activate, close } = useTabs()
-  return (
-    <div role="tablist" aria-label="Tabs" className="flex min-w-0 items-center gap-1 overflow-hidden">
-      {tabs.map((tab) => (
-        <div
-          key={tab.id}
-          role="tab"
-          aria-selected={tab.id === activeId}
-          tabIndex={0}
-          onClick={() => activate(tab.id)}
-          onAuxClick={(e) => e.button === 1 && close(tab.id)}
-          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && activate(tab.id)}
-          className={cn(
-            'group flex h-8 max-w-[220px] min-w-0 cursor-default items-center gap-1.5 rounded-lg pr-1 pl-2 text-[15px] font-medium',
-            tab.id === activeId ? 'text-fg' : 'text-fg-muted hover:bg-hover',
-          )}
-        >
-          <TabLabel tab={tab} space={space} />
-          <button
-            type="button"
-            aria-label="Close tab"
-            onClick={(e) => {
-              e.stopPropagation()
-              close(tab.id)
-            }}
-            className="flex size-5 shrink-0 items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-hover-2"
-          >
-            <Icon name="ph-x" size={12} />
-          </button>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 export default function App() {
   const [space, setSpace] = useState<SpaceInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -201,18 +61,33 @@ export default function App() {
   const [createTypeOpen, setCreateTypeOpen] = useState(false)
   const [deleting, setDeleting] = useState<TypeDef | null>(null)
   const [newMenuOpen, setNewMenuOpen] = useState(false)
+  // Tabs and recent items are stored per space: content waits until this space's tabs are loaded.
+  const [tabsReady, setTabsReady] = useState(false)
   const tabs = useTabs()
-  const target = currentTarget(tabs)
+  const target = tabsReady ? currentTarget(tabs) : null
+  useTabShortcuts()
 
   useEffect(() => {
+    let live = true
     api
       .space()
-      .then((s) => {
+      .then(async (s) => {
+        await Promise.all([setTabsSpace(s.root), setRecentSpace(s.root)])
+        if (!live) return
+        // "When this space opens" (per space, on this device). A settings failure keeps the tabs.
+        const settings = useSettings.getState()
+        if (!settings.loaded) await settings.load().catch(() => undefined)
+        if (!live) return
+        applyOpenOnStart(useSettings.getState().settings.openOnStart?.[s.root])
         setSpace(s)
+        setTabsReady(true)
         document.title = `${s.name} · Object`
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => live && setError(e instanceof Error ? e.message : String(e)))
     void useLinkIndex.getState().load()
+    return () => {
+      live = false
+    }
   }, [])
 
   // Objects created, changed (a title edit) or deleted, on disk or by our own
@@ -324,6 +199,8 @@ export default function App() {
     content = <TasksPage />
   } else if (target?.kind === 'graph') {
     content = <GraphPage onOpenTarget={(t, o) => tabs.open(t, o)} />
+  } else if (!tabsReady) {
+    content = null
   } else {
     content = <Centered title="Pick an object type" subtitle="Choose a type in the sidebar to see its objects." />
   }
