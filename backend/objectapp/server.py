@@ -747,7 +747,7 @@ def create_app(
             return _error(404, f"Not a folder: {req.location}")
         except FileExistsError:
             return _error(409, "A folder with that name already exists here.")
-        registry().register(path)
+        registry().register(path, touch=False)
         return JSONResponse({"path": str(path)}, status_code=201)
 
     def _folder(raw: str) -> Path | None:
@@ -761,7 +761,7 @@ def create_app(
         path = _folder(req.path)
         if path is None:
             return _error(404, f"Not a folder: {req.path}")
-        registry().register(path)
+        registry().register(path, touch=False)
         return {"path": str(path)}
 
     @api.delete("/spaces")

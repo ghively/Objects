@@ -206,11 +206,33 @@ def test_open_space_registers_existing_folder(tmp_path: Path, state: Path):
         "missing": False,
         "lastOpened": entry["lastOpened"],
     }
-    assert isinstance(entry["lastOpened"], str)
+    assert entry["lastOpened"] is None  # listed, but never opened
     assert next(s for s in spaces if s["path"] == str(cur.resolve()))["current"] is True
     assert _tree(other) == before
     missing = client.post("/api/spaces/open", json={"path": str(tmp_path / "nope")})
     assert missing.status_code == 404
+
+
+def test_open_and_create_routes_leave_last_opened(tmp_path: Path, state: Path):
+    cur = _folder(tmp_path, "cur")
+    other = _folder(tmp_path, "other", "Other space")
+    loc = _folder(tmp_path, "loc")
+    Registry(state).register(cur, datetime(2026, 10, 1, 9, 0, tzinfo=UTC))
+    before = Registry(state)._load()
+    client = _client(cur)
+    assert client.post("/api/spaces/open", json={"path": str(other)}).status_code == 200
+    assert client.post("/api/spaces", json={"name": "New", "location": str(loc)}).status_code == 201
+    reg = Registry(state)
+    assert reg.last_opened() == cur.resolve()
+    after = reg._load()
+    assert after["lastOpened"] == before["lastOpened"]
+    stamps = {i["path"]: i["lastOpened"] for i in after["spaces"]}
+    assert stamps[str(cur.resolve())] == before["spaces"][0]["lastOpened"]
+    assert stamps[str(other.resolve())] is None
+    assert stamps[str((loc / "New").resolve())] is None
+    # Opening an already-listed space again changes nothing either.
+    assert client.post("/api/spaces/open", json={"path": str(cur)}).status_code == 200
+    assert Registry(state)._load() == after
 
 
 def test_switch_rejects_non_folder(tmp_path: Path, state: Path):
