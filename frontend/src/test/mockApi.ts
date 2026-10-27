@@ -13,12 +13,15 @@ import type {
   CalendarDay,
   CalendarRange,
   Collection,
+  GraphData,
   Layout,
   ObjectDetail,
   ObjectSummary,
   PropertyDef,
   Query,
+  References,
   Row,
+  SearchResult,
   TaskEntry,
   TypeDef,
   ViewState,
@@ -96,8 +99,42 @@ export function objectDetail(partial: Partial<ObjectDetail> & { summary: ObjectS
     body: '',
     version: 'v1',
     links: {},
+    backlinks: [],
     ...partial,
   }
+}
+
+/** A search result with every contract field; `partial` overrides. */
+export function searchResult(partial: Partial<SearchResult> & Pick<SearchResult, 'path'>): SearchResult {
+  const stem = partial.path.replace(/^.*\//, '').replace(/\.md$/i, '')
+  return {
+    title: stem,
+    type: 'page',
+    icon: null,
+    tags: [],
+    score: 0,
+    titleMatches: [],
+    highlights: [],
+    ...partial,
+  }
+}
+
+/** A references payload with every contract field; `partial` overrides. */
+export function references(partial: Partial<References> = {}): References {
+  return {
+    tabs: ['all', 'backlinks', 'related', 'mentions'],
+    backlinks: [],
+    mentions: [],
+    related: [],
+    relatedTags: [],
+    summaries: {},
+    ...partial,
+  }
+}
+
+/** Graph data with every contract field; `partial` overrides. */
+export function graphData(partial: Partial<GraphData> = {}): GraphData {
+  return { nodes: [], links: [], tagged: [], ...partial }
 }
 
 const emptyGroup = () => ({ type: 'filterGroup' as const, operator: 'and' as const, elements: [] })
@@ -263,6 +300,11 @@ function defaults(): Api {
       ui: { pinned: [], sections: [], allNotesLayout: 'list' as const, ...patch },
       revision: 'r1',
     }),
+    search: async () => ({ results: [], partial: false }),
+    reindex: async () => ({ started: true }),
+    references: async () => references(),
+    linkMention: async (input: { baseVersion: string }) => ({ version: `${input.baseVersion}+1` }),
+    graph: async () => graphData(),
     onChange: () => () => undefined,
   } as unknown as Api
 }

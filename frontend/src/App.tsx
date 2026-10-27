@@ -12,6 +12,8 @@ import { CalendarSidePanel } from '@/calendar/CalendarSidePanel'
 import { CollectionPage } from '@/collections/CollectionPage'
 import { QueriesPage } from '@/queries/QueriesPage'
 import { QueryPage, useTitleCtx } from '@/queries/QueryPage'
+import { GraphPage } from '@/graph/GraphPage'
+import { LocalGraphPanel } from '@/graph/LocalGraphPanel'
 import { LinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, stemOf, useLinkIndex } from '@/links/linkIndex'
 import { canGoBack, canGoForward, currentTarget, tabTarget, usePeek, useTabs, type Tab } from '@/nav/tabs'
@@ -19,6 +21,7 @@ import { useDeleteRequest } from '@/object/DeleteObjectDialog'
 import { ObjectPage } from '@/object/ObjectPage'
 import { ObjectIcon } from '@/object/ObjectHeader'
 import { ObjectPeek } from '@/object/ObjectPeek'
+import { CommandPalette } from '@/palette/CommandPalette'
 import { MainPanel } from '@/shell/MainPanel'
 import { RightPanel } from '@/shell/RightPanel'
 import { Sidebar, TypeChip } from '@/shell/Sidebar'
@@ -115,6 +118,14 @@ function TabLabel({ tab, space }: { tab: Tab; space: SpaceInfo | null }) {
       <>
         <Icon name="ph-check-circle" size={15} />
         <span className="truncate">Tasks</span>
+      </>
+    )
+  }
+  if (target.kind === 'graph') {
+    return (
+      <>
+        <Icon name="ph-graph" size={15} />
+        <span className="truncate">Graph</span>
       </>
     )
   }
@@ -311,6 +322,8 @@ export default function App() {
     )
   } else if (target?.kind === 'tasks') {
     content = <TasksPage />
+  } else if (target?.kind === 'graph') {
+    content = <GraphPage onOpenTarget={(t, o) => tabs.open(t, o)} />
   } else {
     content = <Centered title="Pick an object type" subtitle="Choose a type in the sidebar to see its objects." />
   }
@@ -349,11 +362,17 @@ export default function App() {
                 allNotesActive={target?.kind === 'allNotes'}
                 calendarActive={target?.kind === 'calendar'}
                 tasksActive={target?.kind === 'tasks'}
+                graphActive={target?.kind === 'graph'}
               />
             </ErrorBoundary>
           )}
           <MainPanel
-            aside={<RightPanel open={rightOpen}>{target?.kind === 'calendar' && <CalendarSidePanel />}</RightPanel>}
+            aside={
+              <RightPanel open={rightOpen}>
+                {target?.kind === 'calendar' && <CalendarSidePanel />}
+                {target?.kind === 'object' && <LocalGraphPanel path={target.path} />}
+              </RightPanel>
+            }
           >
             <ErrorBoundary what="This page" resetKey={target ? JSON.stringify(target) : ''}>
               {content}
@@ -361,6 +380,12 @@ export default function App() {
           </MainPanel>
         </div>
         <ObjectPeek />
+        <CommandPalette
+          onOpenTarget={(t, o) => tabs.open(t, o)}
+          onToggleSidebar={() => setSidebarOpen((v) => !v)}
+          onToggleRightPanel={() => setRightOpen((v) => !v)}
+          onShowRightPanel={() => setRightOpen(true)}
+        />
         <LinkPicker />
         <NewObjectMenu open={newMenuOpen} onOpenChange={setNewMenuOpen} />
         <CreateTypeDialog

@@ -25,6 +25,8 @@ export type Target =
   | { kind: 'calendar' }
   /** The Tasks page (M4). */
   | { kind: 'tasks' }
+  /** The global graph (M5). */
+  | { kind: 'graph' }
 
 export interface Tab {
   id: string
@@ -77,6 +79,7 @@ export function sameTarget(a: Target | null | undefined, b: Target | null | unde
     case 'allNotes':
     case 'calendar':
     case 'tasks':
+    case 'graph':
       return true
   }
 }

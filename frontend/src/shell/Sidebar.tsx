@@ -7,7 +7,6 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { TypeDef } from '@/api/types'
 import type { Target } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
@@ -15,6 +14,7 @@ import { PinnedSection } from './PinnedSection'
 import { AddSection, SidebarSections } from './SidebarSections'
 import { chipStyle } from './typeColor'
 import { QUERY_ICON } from '@/lib/defIcons'
+import { usePalette } from '@/palette/usePalette'
 
 export interface SidebarProps {
   types: TypeDef[]
@@ -44,7 +44,12 @@ export interface SidebarProps {
   calendarActive?: boolean
   /** Highlights the "Tasks" entry. */
   tasksActive?: boolean
+  /** Highlights the "Graph" entry. */
+  graphActive?: boolean
 }
+
+/** The square search button's tooltip (`shortcuts.openSearchPalette.name`). */
+export const SEARCH_THIS_SPACE = 'Search this space'
 
 /** The sidebar entry for the All notes view. */
 export const ALL_NOTES_LABEL = 'All notes'
@@ -98,29 +103,7 @@ function SectionHeader({
   )
 }
 
-function NavItem({ icon, label, hint }: { icon: string; label: string; hint: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        {/* span wrapper so the tooltip still works over a disabled button */}
-        <span className="block">
-          <button
-            type="button"
-            disabled
-            aria-label={label}
-            className="flex h-[38px] w-full items-center gap-2 rounded-lg px-2 text-left text-[15px] font-medium text-fg disabled:cursor-default disabled:opacity-50"
-          >
-            <Icon name={icon} size={16} />
-            <span>{label}</span>
-          </button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="right">{hint}</TooltipContent>
-    </Tooltip>
-  )
-}
-
-/** A live entry of the main nav (All notes, Calendar, Tasks); Ctrl+click opens a new tab. */
+/** A live entry of the main nav (All notes, Calendar, Tasks, Graph); Ctrl+click opens a new tab. */
 function MainNavButton({
   icon,
   label,
@@ -164,6 +147,7 @@ export function Sidebar({
   allNotesActive,
   calendarActive,
   tasksActive,
+  graphActive,
 }: SidebarProps) {
   // "Queries" sits among the types where a type of that name would be, in the by-name order.
   type Entry = { kind: 'type'; type: TypeDef } | { kind: 'queries' }
@@ -187,15 +171,15 @@ export function Sidebar({
         </button>
         <button
           type="button"
-          aria-label="Search"
-          title="Search (M5)"
+          aria-label={SEARCH_THIS_SPACE}
+          title={SEARCH_THIS_SPACE}
+          onClick={() => usePalette.getState().show('search')}
           className="flex size-[42px] items-center justify-center rounded-xl border border-[#2a292d] bg-raised hover:bg-hover"
         >
           <Icon name="ph-magnifying-glass" size={18} />
         </button>
       </div>
 
-      <TooltipProvider>
       <nav aria-label="Main" className="flex flex-col gap-0.5">
         <MainNavButton
           icon="ph-note"
@@ -215,9 +199,13 @@ export function Sidebar({
           active={tasksActive}
           onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
         />
-        <NavItem icon="ph-graph" label="Graph" hint="Graph arrives in M5" />
+        <MainNavButton
+          icon="ph-graph"
+          label="Graph"
+          active={graphActive}
+          onClick={(e) => onOpenTarget?.({ kind: 'graph' }, { newTab: e.ctrlKey || e.metaKey })}
+        />
       </nav>
-      </TooltipProvider>
 
       <ScrollArea className="min-h-0 flex-1">
         <SidebarSections onOpenTarget={onOpenTarget} />
