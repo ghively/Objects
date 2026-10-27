@@ -1,6 +1,16 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { act } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/api/client', async (orig) => ({
+  ...(await orig()),
+  api: (await import('@/test/mockApi')).mockApi(),
+}))
+
+import { api } from '@/api/client'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
+import { GlobalOverlays } from './GlobalOverlays'
 import type { TypeDef } from '@/api/types'
 import { typeDef as makeType } from '@/test/mockApi'
 import { usePalette } from '@/palette/usePalette'
@@ -174,5 +184,59 @@ describe('Sidebar', () => {
     expect(chip.dataset.color).toBe('blue')
     expect(chip.dataset.icon).toBe('ph-check-circle')
     expect(chip.style.getPropertyValue('--chip-fg')).not.toBe('')
+  })
+})
+
+describe('Sidebar theme button (M7)', () => {
+  it('test sidebar sun button toggles the mode with reference tooltips', async () => {
+    useSettings.setState({ settings: settingsDefaults, revision: '', loaded: true })
+    vi.mocked(api.patchSettings).mockClear()
+    const user = userEvent.setup()
+    render(<Sidebar types={TYPES} />)
+    // Dark now: the button offers light mode (SpaceOverview.setLightMode).
+    const btn = screen.getByRole('button', { name: 'Light mode' })
+    expect(btn).toBeEnabled()
+    expect(btn).toHaveAttribute('title', 'Light mode')
+    await user.click(btn)
+    expect(useSettings.getState().settings.themeMode).toBe('light')
+    expect(api.patchSettings).toHaveBeenCalledWith({ themeMode: 'light' }, expect.anything())
+    // Light now: it offers dark mode (SpaceOverview.setDarkMode).
+    await user.click(screen.getByRole('button', { name: 'Dark mode' }))
+    expect(useSettings.getState().settings.themeMode).toBe('dark')
+    expect(screen.getByRole('button', { name: 'Light mode' })).toBeInTheDocument()
+  })
+
+  it('test toggle dark mode shortcut', async () => {
+    useSettings.setState({ settings: settingsDefaults, revision: '', loaded: true })
+    const ui = render(<GlobalOverlays />)
+    // Loaded settings are applied to <html>.
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+    // Mod-Shift-d (Ctrl on Windows/Linux): Toggle dark mode.
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true, bubbles: true }))
+    })
+    expect(useSettings.getState().settings.themeMode).toBe('light')
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true, bubbles: true }))
+    })
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    ui.unmount()
+    localStorage.clear()
+  })
+
+  it('test overlays leave the cached first-paint theme until settings load', () => {
+    document.documentElement.setAttribute('data-theme', 'lightDimmed')
+    useSettings.setState({ settings: settingsDefaults, revision: '', loaded: false })
+    const ui = render(<GlobalOverlays />)
+    expect(document.documentElement.getAttribute('data-theme')).toBe('lightDimmed')
+    act(() => useSettings.setState({ settings: { ...settingsDefaults, themeMode: 'light' }, loaded: true }))
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+    ui.unmount()
+    document.documentElement.removeAttribute('data-theme')
+    document.documentElement.classList.add('dark')
+    localStorage.clear()
   })
 })

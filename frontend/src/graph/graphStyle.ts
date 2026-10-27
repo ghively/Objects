@@ -1,3 +1,4 @@
+// colour-literals: content palette
 // How graph nodes and edges look. Sizes, the indirect-edge styling and the tag colouring are our
 // values (no Object screenshot of the graph exists); colours come from M2's theme palette.
 import type { GraphNode, TypeDef } from '@/api/types'

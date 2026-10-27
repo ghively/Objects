@@ -163,7 +163,7 @@ export function FindBar({ path, editorRef }: FindBarProps) {
       role="search"
       aria-label="Find in page"
       data-testid="find-bar"
-      className="find-in-page-chrome self-start rounded-xl border border-[#232226] bg-[#18181b] p-1 text-[13px]"
+      className="find-in-page-chrome self-start rounded-xl border border-[var(--float-border)] bg-[var(--float-bg)] p-1 text-[13px]"
     >
       <div className="flex h-8 items-center gap-0.5">
         <BarButton

@@ -1,7 +1,8 @@
+// colour-literals: content palette
 /**
  * Shape fill and border colours. Values from Object's `colorThemes.ts` `colorValues`:
- * `bgDark`/`borderDark` in dark mode, `bgLight`/`borderLight` in light mode. The app is dark
- * until M7 adds light mode; `isDarkMode()` reads the `dark` class on `<html>`.
+ * `bgDark`/`borderDark` in dark mode, `bgLight`/`borderLight` in light mode. `isDarkMode()` reads
+ * the `dark` class on `<html>`, which `theme/applyTheme.ts` sets for the Dark and Dark Dimmed themes.
  */
 import type { CSSProperties } from 'react'
 import type { WhiteboardFillColor, WhiteboardThemeColor } from '@/api/whiteboardTypes'

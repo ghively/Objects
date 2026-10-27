@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "./theme/tokens.css";
+@import "./theme/themes.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -40,41 +41,9 @@
 }
 
 :root {
+    /* shadcn's neutrals read our tokens in every theme (dark, light, light dimmed, dark dimmed):
+       themes.css overrides the tokens, so one mapping serves them all. */
     --radius: 8px;
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
     --background: var(--bg-app);
     --foreground: var(--text);
     --card: var(--bg-raised);
@@ -82,7 +51,7 @@
     --popover: var(--bg-raised);
     --popover-foreground: var(--text);
     --primary: var(--primary-btn);
-    --primary-foreground: #151418;
+    --primary-foreground: var(--bg-panel);
     --secondary: var(--bg-raised);
     --secondary-foreground: var(--text);
     --muted: var(--bg-hover);
@@ -92,20 +61,21 @@
     --destructive: var(--danger);
     --border: var(--border-subtle);
     --input: var(--border-subtle);
-    --ring: #5a5960;
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
+    --ring: var(--focus-ring);
+    /* Charts are unused; they follow the type palette's line colours. */
+    --chart-1: var(--line-blue);
+    --chart-2: var(--line-green);
+    --chart-3: var(--line-orange);
+    --chart-4: var(--line-purple);
+    --chart-5: var(--line-pink);
     --sidebar: var(--bg-app);
     --sidebar-foreground: var(--text);
     --sidebar-primary: var(--primary-btn);
-    --sidebar-primary-foreground: #151418;
+    --sidebar-primary-foreground: var(--bg-panel);
     --sidebar-accent: var(--bg-hover);
     --sidebar-accent-foreground: var(--text);
     --sidebar-border: var(--border-subtle);
-    --sidebar-ring: #5a5960;
+    --sidebar-ring: var(--focus-ring);
 }
 
 @layer base {
@@ -118,13 +88,8 @@
 }
 /* ---- M5: search highlights, find in page, command palette, graph ---- */
 
-:root {
-  /* Our values (the reference's are not in the trimmed set): the yellow type ink at 30 % alpha
-     for matches, 55 % for the current find match; listed for Gene's check. */
-  --bg-search-highlight: rgb(255 240 168 / 0.3);
-  --bg-search-highlight-current: rgb(255 240 168 / 0.55);
-  --text-search-highlight: var(--text);
-}
+/* The highlight tokens (--bg-search-highlight, -current, --text-search-highlight) are in
+   theme/tokens.css and theme/themes.css. */
 
 /* Search snippets: U+0002/U+0003 rendered as <b> (reference `.search-highlights b`). */
 .search-highlights b {

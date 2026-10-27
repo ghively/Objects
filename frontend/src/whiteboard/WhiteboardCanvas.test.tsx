@@ -324,3 +324,39 @@ describe('WhiteboardCanvas', () => {
     expect(screen.getByTestId('whiteboard-canvas').dataset.tool).toBe('locked')
   })
 })
+
+describe('WhiteboardCanvas theme (M7)', () => {
+  // index.html's default: class="dark", no data-theme.
+  beforeEach(() => document.documentElement.classList.add('dark'))
+  afterEach(() => {
+    document.documentElement.removeAttribute('data-theme')
+    document.documentElement.classList.add('dark')
+  })
+
+  test('test graph and whiteboard canvases follow a theme change (whiteboard)', async () => {
+    const n = node({ id: 'n-blue', width: 200, height: 80, fillColor: 'bg-blue' })
+    const { container } = renderCanvas({ doc: { board: board([n], [], {}), strokes: [] } })
+    const flowRoot = () => container.querySelector('.react-flow') as HTMLElement
+    const fill = () => (screen.getByTestId('whiteboard-text-node') as HTMLElement).style.backgroundColor
+    // Dark: React Flow's dark colours and colors.ts' bgDark (#263956).
+    expect(flowRoot().classList.contains('dark')).toBe(true)
+    expect(fill()).toBe('rgb(38, 57, 86)')
+
+    await act(async () => {
+      document.documentElement.setAttribute('data-theme', 'light')
+      document.documentElement.classList.remove('dark')
+      await Promise.resolve()
+    })
+    // Light: React Flow's light colours and bgLight (#E4EFFE), without a remount.
+    expect(flowRoot().classList.contains('light')).toBe(true)
+    expect(fill()).toBe('rgb(228, 239, 254)')
+
+    await act(async () => {
+      document.documentElement.setAttribute('data-theme', 'darkDimmed')
+      document.documentElement.classList.add('dark')
+      await Promise.resolve()
+    })
+    expect(flowRoot().classList.contains('dark')).toBe(true)
+    expect(fill()).toBe('rgb(38, 57, 86)')
+  })
+})

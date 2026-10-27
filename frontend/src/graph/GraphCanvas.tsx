@@ -1,3 +1,4 @@
+// colour-literals: content palette
 // The WebGL graph: one sigma instance per mount (killed on unmount) over a graphology graph that
 // is rebuilt from the visible nodes and edges, laid out by ForceAtlas2 in a worker. Hovering a
 // node keeps it and its neighbours bright and dims the rest; `showMinimalNodes` hides labels.
@@ -8,6 +9,8 @@ import type Sigma from 'sigma'
 import type { GraphCustomization, GraphData } from '@/api/types'
 import { useLinkIndex } from '@/links/linkIndex'
 import type { VisibleGraph } from './filterGraph'
+import { useThemeName } from '@/theme/applyTheme'
+import type { ThemeColor } from '@/theme/palette'
 import { canvasColors, colorValue, edgeStyle, nodeColor, nodeSize, type EdgeKind } from './graphStyle'
 import { runLayout } from './layout'
 
@@ -31,6 +34,8 @@ interface NodeAttrs {
   label: string
   size: number
   color: string
+  /** The theme colour behind `color`, re-read on a theme change. */
+  themeColor: ThemeColor
   x: number
   y: number
   highlighted?: boolean
@@ -57,6 +62,10 @@ export function GraphCanvas({ data, visible, custom, onNodeClick, focusPath, fit
   clickRef.current = onNodeClick
   layoutRef.current = onLayout
   highlight.current = highlightPath ?? null
+  // Colours sigma draws with: concrete values read from the theme's tokens, refreshed on a theme change.
+  const themeName = useThemeName()
+  const colorsRef = useRef<ReturnType<typeof canvasColors> | null>(null)
+  if (!colorsRef.current) colorsRef.current = canvasColors()
 
   const types = useLinkIndex((s) => s.types)
   const objects = useLinkIndex((s) => s.objects)
@@ -93,6 +102,7 @@ export function GraphCanvas({ data, visible, custom, onNodeClick, focusPath, fit
 
   function start(SigmaClass: typeof Sigma, el: HTMLElement): Sigma<NodeAttrs, EdgeAttrs> | null {
     const colors = canvasColors()
+    colorsRef.current = colors
     let sigma: Sigma<NodeAttrs, EdgeAttrs>
     try {
       sigma = new SigmaClass<NodeAttrs, EdgeAttrs>(graph, el, {
@@ -111,7 +121,7 @@ export function GraphCanvas({ data, visible, custom, onNodeClick, focusPath, fit
               res.forceLabel = true
               res.zIndex = 1
             } else {
-              res.color = colors.dim
+              res.color = colorsRef.current?.dim ?? colors.dim
               res.label = ''
               res.zIndex = 0
             }
@@ -160,11 +170,13 @@ export function GraphCanvas({ data, visible, custom, onNodeClick, focusPath, fit
       if (!node) continue
       const key = String(i)
       keys.set(node.path, key)
+      const themeColor = nodeColor(node, typesById, tagColors[node.path])
       graph.addNode(key, {
         path: node.path,
         label: node.title || node.path,
         size: nodeSize(node.degree),
-        color: colorValue(nodeColor(node, typesById, tagColors[node.path])),
+        color: colorValue(themeColor),
+        themeColor,
         x: 0,
         y: 0,
       })
@@ -205,6 +217,21 @@ export function GraphCanvas({ data, visible, custom, onNodeClick, focusPath, fit
   useEffect(() => {
     sigmaRef.current?.refresh()
   }, [highlightPath])
+
+  // A theme change (Light, Dark, …): re-read the token colours and repaint, keeping the layout.
+  const firstTheme = useRef(themeName)
+  useEffect(() => {
+    if (themeName === firstTheme.current) return
+    firstTheme.current = themeName
+    const colors = canvasColors()
+    colorsRef.current = colors
+    graph.forEachNode((key, attrs) => graph.setNodeAttribute(key, 'color', colorValue(attrs.themeColor)))
+    const sigma = sigmaRef.current
+    if (!sigma) return
+    sigma.setSetting('labelColor', { color: colors.label })
+    sigma.setSetting('defaultEdgeColor', colors.edge)
+    sigma.refresh()
+  }, [themeName, graph])
 
   useEffect(() => {
     const sigma = sigmaRef.current

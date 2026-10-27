@@ -248,7 +248,7 @@ export function PinnedSection({ headingId = 'sb-pinned', onOpenTarget }: { headi
   const { pinned } = usePinned()
   return (
     <section aria-labelledby={headingId}>
-      <h2 id={headingId} className="flex items-center gap-1.5 px-2 pt-5 pb-2 text-[14px] font-semibold text-[#a7a2a1]">
+      <h2 id={headingId} className="flex items-center gap-1.5 px-2 pt-5 pb-2 text-[14px] font-semibold text-[var(--text-section)]">
         {PINNED_TEXT.heading}
       </h2>
       <PinList items={pinned} sectionId={null} unpinLabel={PINNED_TEXT.unpinFromSpace} onOpenTarget={onOpenTarget} />
