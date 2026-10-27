@@ -138,13 +138,39 @@ describe('<FindBar>', () => {
     expect(screen.getByRole('button', { name: FIND_TEXT.replaceAll })).toBeTruthy()
   })
 
-  test('raw mode shows the disabled bar', () => {
-    mount(true)
+  test('raw mode gets the same bar, and switching modes re-binds it', () => {
+    const ref = { current: null as BodyEditorHandle | null }
+    const view = (raw: boolean) => (
+      <div>
+        <FindBar path={PATH} editorRef={ref} />
+        {raw ? (
+          <RawMode path={PATH} text={BODY} version="v1" onSaved={() => {}} controlRef={ref} />
+        ) : (
+          <Editor path={PATH} body={BODY} version="v1" readOnly={false} onSaved={() => {}} onConflict={() => {}} controlRef={ref} />
+        )}
+      </div>
+    )
+    const { container, rerender } = render(view(false))
+    act(() => useFind.getState().open(PATH))
+    fireEvent.change(findInput(), { target: { value: 'alpha' } })
+    expect(marks(container)).toBe(2)
+
+    rerender(view(true))
+    expect(findInput().disabled).toBe(false)
+    expect(container.querySelectorAll('.cm-content .find-match')).toHaveLength(2)
+    expect(screen.getByTestId('find-count').textContent).toBe('1/2')
+
+    rerender(view(false))
+    expect(marks(container)).toBe(2)
+  })
+
+  test('no editor yet: the bar opens disabled and still closes', () => {
+    const ref = { current: null as BodyEditorHandle | null }
+    render(<FindBar path={PATH} editorRef={ref} />)
     act(() => useFind.getState().open(PATH))
     expect(findInput().disabled).toBe(true)
-    expect(screen.getByRole('status').textContent).toBe(FIND_TEXT.rawMode)
+    expect(screen.getByRole('status').textContent).toBe(FIND_TEXT.unavailable)
     expect((screen.getByRole('button', { name: FIND_TEXT.next }) as HTMLButtonElement).disabled).toBe(true)
-    // It still closes.
     fireEvent.click(screen.getByRole('button', { name: FIND_TEXT.close }))
     expect(screen.queryByRole('search')).toBeNull()
   })

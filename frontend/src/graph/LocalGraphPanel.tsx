@@ -10,6 +10,7 @@ import { GraphCustomization } from './GraphCustomization'
 import { GraphLoading } from './GraphLoading'
 import { GraphEmpty, openGraphNode } from './GraphPage'
 import { GraphToolbar } from './GraphToolbar'
+import { exportGraphPng, type GraphRenderer } from './exportPng'
 import { bestMatch, filterGraph } from './filterGraph'
 import { useGraphData } from './useGraphData'
 import { useGraphUi } from './useGraphUi'
@@ -72,6 +73,7 @@ export function LocalGraphPanel({ path }: LocalGraphPanelProps) {
   const [layout, setLayout] = useState<{ running: boolean; progress: number }>({ running: false, progress: 0 })
   const [focusPath, setFocusPath] = useState<string | null>(null)
   const [fitSignal, setFitSignal] = useState(0)
+  const rendererRef = useRef<GraphRenderer | null>(null)
 
   // Re-centre on a new active object: forget the search focus and reset the camera.
   const lastPath = useRef(path)
@@ -121,6 +123,7 @@ export function LocalGraphPanel({ path }: LocalGraphPanelProps) {
         compact
         onSearch={onSearch}
         onFit={() => setFitSignal((n) => n + 1)}
+        onExport={() => exportGraphPng(rendererRef.current).catch((e: unknown) => console.warn('Could not export the graph:', e))}
         customize={
           <GraphCustomization
             custom={custom}
@@ -141,6 +144,7 @@ export function LocalGraphPanel({ path }: LocalGraphPanelProps) {
             fitSignal={fitSignal}
             highlightPath={path}
             onLayout={setLayout}
+            rendererRef={rendererRef}
           />
         )}
         {empty && <GraphEmpty filtered={false} />}

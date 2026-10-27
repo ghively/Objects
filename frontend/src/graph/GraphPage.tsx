@@ -1,7 +1,7 @@
 // The global graph page: header "Graph", the toolbar (search in the graph, fit, Customize), the
 // sigma canvas over every visible object, and Capacities' empty states. A click peeks the node
 // with the visible nodes as the pager list; Ctrl/Cmd+click opens it in a new tab.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { useLinkIndex } from '@/links/linkIndex'
 import { usePeek, type OpenOptions, type Target } from '@/nav/tabs'
@@ -9,6 +9,7 @@ import { GraphCanvas } from './GraphCanvas'
 import { GraphCustomization } from './GraphCustomization'
 import { GraphLoading } from './GraphLoading'
 import { GraphToolbar } from './GraphToolbar'
+import { exportGraphPng, type GraphRenderer } from './exportPng'
 import { bestMatch, filterGraph } from './filterGraph'
 import { useGraphData } from './useGraphData'
 import { useGraphUi } from './useGraphUi'
@@ -62,6 +63,7 @@ export function GraphPage({ onOpenTarget }: GraphPageProps) {
   const [layout, setLayout] = useState<{ running: boolean; progress: number }>({ running: false, progress: 0 })
   const [focusPath, setFocusPath] = useState<string | null>(null)
   const [fitSignal, setFitSignal] = useState(0)
+  const rendererRef = useRef<GraphRenderer | null>(null)
 
   const onNodeClick = useCallback(
     (path: string, event: MouseEvent | TouchEvent | undefined) => openGraphNode(path, event, visiblePaths, onOpenTarget),
@@ -88,6 +90,7 @@ export function GraphPage({ onOpenTarget }: GraphPageProps) {
         <GraphToolbar
           onSearch={onSearch}
           onFit={() => setFitSignal((n) => n + 1)}
+        onExport={() => exportGraphPng(rendererRef.current).catch((e: unknown) => console.warn('Could not export the graph:', e))}
           customize={<GraphCustomization custom={custom} onPatch={patch} types={types} tagsNetworkKey="showSpaceTagsNetwork" />}
         />
       </header>
@@ -101,6 +104,7 @@ export function GraphPage({ onOpenTarget }: GraphPageProps) {
             focusPath={focusPath}
             fitSignal={fitSignal}
             onLayout={setLayout}
+            rendererRef={rendererRef}
           />
         )}
         {empty && <GraphEmpty filtered={false} />}

@@ -8,6 +8,10 @@ export interface FakeSigma {
   handlers: Record<string, (payload: unknown) => void>
   camera: { animate: ReturnType<typeof vi.fn>; animatedReset: ReturnType<typeof vi.fn> }
   killed: boolean
+  /** Times `refresh()` ran. */
+  refreshes: number
+  /** The layer canvases `getCanvases()` returns (sized like sigma's, at a pixel ratio of 2). */
+  canvases: Record<string, HTMLCanvasElement>
   /** Fire a sigma event, as a click or hover on the canvas would. */
   emit(event: string, payload: unknown): void
 }
@@ -21,6 +25,16 @@ export function sigmaModule() {
     handlers: Record<string, (payload: unknown) => void> = {}
     camera = { animate: vi.fn(async () => undefined), animatedReset: vi.fn(async () => undefined) }
     killed = false
+    refreshes = 0
+    canvases: Record<string, HTMLCanvasElement> = Object.fromEntries(
+      ['edges', 'nodes', 'labels', 'hovers', 'hoverNodes', 'mouse'].map((name) => {
+        const c = document.createElement('canvas')
+        c.width = 800
+        c.height = 600
+        c.className = `sigma-${name}`
+        return [name, c]
+      }),
+    )
     constructor(graph: FakeSigma['graph'], _container: HTMLElement, settings: Record<string, unknown>) {
       this.graph = graph
       this.settings = { ...settings }
@@ -36,7 +50,12 @@ export function sigmaModule() {
     setSetting(key: string, value: unknown) {
       this.settings[key] = value
     }
-    refresh() {}
+    refresh() {
+      this.refreshes++
+    }
+    getCanvases() {
+      return this.canvases
+    }
     kill() {
       this.killed = true
     }
