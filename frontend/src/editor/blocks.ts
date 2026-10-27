@@ -5,9 +5,114 @@
  * Invariant: `joinBlocks(splitBlocks(body)) === body` for every input,
  * including CRLF / lone-CR line endings, a BOM and a missing final newline.
  */
-import { marked } from 'marked'
+import { Marked, type TokenizerExtension } from 'marked'
 
 export type SourceBlock = { kind: string; raw: string }
+
+// ---------------------------------------------------------------------------
+// Math blocks (M7 rule 6): a line that begins with `$$` (up to 3 spaces of
+// indent) starts a math block, which ends at the next line that ends with `$$`
+// (trailing blanks allowed); blank lines inside belong to it. `$$x$$` alone on
+// a line is a one-line block. Without a closing line it is not a math block.
+
+const MATH_OPEN = /^ {0,3}\$\$/
+const MATH_CLOSE = /\$\$[ \t]*$/
+
+/** Length of the math block at the start of `src` (no final line break), or 0. */
+function matchMath(src: string): number {
+  if (!MATH_OPEN.test(src)) return 0
+  let eol = src.indexOf('\n')
+  if (eol < 0) eol = src.length
+  const first = src.slice(0, eol).replace(/^ +/, '').replace(/[ \t]+$/, '')
+  if (first.length >= 4 && first.endsWith('$$')) return eol
+  let start = eol + 1
+  while (start <= src.length && eol < src.length) {
+    eol = src.indexOf('\n', start)
+    if (eol < 0) eol = src.length
+    if (MATH_CLOSE.test(src.slice(start, eol))) return eol
+    start = eol + 1
+  }
+  return 0
+}
+
+/**
+ * Math starts in the text being split, found in one pass so that the
+ * extension's `start` hook (asked before every paragraph) stays O(log n).
+ */
+type MathIndex = { text: string; starts: number[]; ends: Map<number, number> }
+let mathIndex: MathIndex | null = null
+
+function indexMath(text: string): MathIndex {
+  const starts: number[] = []
+  const ends = new Map<number, number>()
+  if (text.includes('$$')) {
+    // Every line start that opens a math block with a closing line after it.
+    const opens: number[] = []
+    const closes: number[] = [] // line ends of lines that end with `$$`
+    let start = 0
+    while (start <= text.length) {
+      let eol = text.indexOf('\n', start)
+      if (eol < 0) eol = text.length
+      const line = text.slice(start, eol)
+      if (MATH_OPEN.test(line)) opens.push(start)
+      if (MATH_CLOSE.test(line)) closes.push(eol)
+      if (eol >= text.length) break
+      start = eol + 1
+    }
+    let c = 0
+    for (const open of opens) {
+      let eol = text.indexOf('\n', open)
+      if (eol < 0) eol = text.length
+      const first = text.slice(open, eol).replace(/^ +/, '').replace(/[ \t]+$/, '')
+      let end = -1
+      if (first.length >= 4 && first.endsWith('$$')) end = eol
+      else {
+        while (c < closes.length && closes[c] <= eol) c++
+        if (c < closes.length) end = closes[c]
+      }
+      if (end >= 0) {
+        starts.push(open)
+        ends.set(open, end)
+      }
+    }
+  }
+  return { text, starts, ends }
+}
+
+const mathExtension: TokenizerExtension = {
+  name: 'math',
+  level: 'block',
+  start(src: string) {
+    const index = mathIndex
+    if (!index || index.starts.length === 0) return undefined
+    // `src` is the rest of the text being lexed (nested lexing passes other
+    // strings; a stray answer there only cuts a nested paragraph, which never
+    // changes a top-level block's raw).
+    const abs = index.text.length - src.length
+    let lo = 0
+    let hi = index.starts.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (index.starts[mid] < abs) lo = mid + 1
+      else hi = mid
+    }
+    return lo < index.starts.length ? index.starts[lo] - abs : undefined
+  },
+  tokenizer(src: string) {
+    const index = mathIndex
+    let len = 0
+    const abs = index ? index.text.length - src.length : -1
+    const end = index?.ends.get(abs)
+    if (index && end !== undefined && abs >= 0 && src.startsWith(index.text.slice(abs, end))) len = end - abs
+    else len = matchMath(src)
+    if (!len) return undefined
+    const raw = src.slice(0, len)
+    return { type: 'math', raw, text: raw }
+  },
+}
+
+/** A local instance so the app-wide `marked` stays untouched. */
+const lexerInstance = new Marked({ gfm: true, extensions: [mathExtension] })
 
 /**
  * `marked` normalises `\r\n` and `\r` to `\n` before lexing, so token `.raw`
@@ -27,9 +132,12 @@ export function splitBlocks(body: string): SourceBlock[] {
   let pos = 0
   let tokens: { type: string; raw: string }[]
   try {
-    tokens = marked.lexer(normalized, { gfm: true })
+    mathIndex = indexMath(normalized)
+    tokens = lexerInstance.lexer(normalized)
   } catch {
     tokens = []
+  } finally {
+    mathIndex = null
   }
 
   for (const token of tokens) {
