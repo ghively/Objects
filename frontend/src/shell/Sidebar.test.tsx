@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { act } from 'react'
 import { describe, expect, it, vi } from 'vitest'
@@ -15,6 +15,8 @@ import type { TypeDef } from '@/api/types'
 import { typeDef as makeType } from '@/test/mockApi'
 import { usePalette } from '@/palette/usePalette'
 import { Sidebar } from './Sidebar'
+import { resetSettingsModal, useSettingsModal } from '@/settings/useSettingsModal'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 
 function typeDef(name: string, pluralName: string, icon: string, color: string): TypeDef {
   const id = name.toLowerCase()
@@ -238,5 +240,37 @@ describe('Sidebar theme button (M7)', () => {
     document.documentElement.removeAttribute('data-theme')
     document.documentElement.classList.add('dark')
     localStorage.clear()
+  })
+
+  it('test hide task management hides the Tasks sidebar item', async () => {
+    resetSpaceInfo()
+    vi.mocked(api.space).mockResolvedValueOnce({
+      name: 'space',
+      root: '/space',
+      types: [],
+      icon: null,
+      description: null,
+      hideTaskManagement: true,
+      revision: 's1',
+    })
+    render(<Sidebar types={TYPES} />)
+    const nav = screen.getByRole('navigation', { name: 'Main' })
+    await waitFor(() => expect(within(nav).queryByRole('button', { name: 'Tasks' })).toBeNull())
+    expect(within(nav).getByRole('button', { name: 'Calendar' })).toBeInTheDocument()
+    // Showing it again (the Settings modal's switch) brings the entry back.
+    act(() => useSpaceInfo.setState((st) => ({ space: st.space && { ...st.space, hideTaskManagement: false } })))
+    expect(within(nav).getByRole('button', { name: 'Tasks' })).toBeInTheDocument()
+    resetSpaceInfo()
+  })
+
+  it('test sidebar gear opens the settings modal', async () => {
+    resetSettingsModal()
+    render(<Sidebar types={TYPES} />)
+    const gear = screen.getByRole('button', { name: 'Settings' })
+    expect(gear).toBeEnabled()
+    expect(gear).toHaveAttribute('title', 'Settings')
+    await userEvent.click(gear)
+    expect(useSettingsModal.getState().isOpen).toBe(true)
+    resetSettingsModal()
   })
 })

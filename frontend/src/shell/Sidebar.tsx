@@ -1,4 +1,4 @@
-import type { MouseEvent, ReactNode } from 'react'
+import { useEffect, type MouseEvent, type ReactNode } from 'react'
 import { Icon, IconOrEmoji, iconName } from '@/components/Icon'
 import {
   ContextMenu,
@@ -17,6 +17,8 @@ import { QUERY_ICON } from '@/lib/defIcons'
 import { usePalette } from '@/palette/usePalette'
 import { useSettings } from '@/settings/useSettings'
 import { toggleDarkMode } from '@/theme/shortcuts'
+import { useSettingsModal } from '@/settings/useSettingsModal'
+import { useSpaceInfo } from '@/settings/useSpaceInfo'
 
 export interface SidebarProps {
   types: TypeDef[]
@@ -73,6 +75,9 @@ function ThemeButton() {
     </button>
   )
 }
+
+/** The footer gear's tooltip (`SpaceOverview.settings.tooltip`). */
+export const SETTINGS_TOOLTIP = 'Settings'
 
 /** The square search button's tooltip (`shortcuts.openSearchPalette.name`). */
 export const SEARCH_THIS_SPACE = 'Search this space'
@@ -175,6 +180,11 @@ export function Sidebar({
   tasksActive,
   graphActive,
 }: SidebarProps) {
+  // "Tasks" is hidden while the space hides task management (`space.json` `hideTaskManagement`).
+  const hideTasks = useSpaceInfo((s) => s.space?.hideTaskManagement ?? false)
+  useEffect(() => {
+    void useSpaceInfo.getState().ensure()
+  }, [])
   // "Queries" sits among the types where a type of that name would be, in the by-name order.
   type Entry = { kind: 'type'; type: TypeDef } | { kind: 'queries' }
   const entries: Entry[] = [
@@ -219,12 +229,14 @@ export function Sidebar({
           active={calendarActive}
           onClick={(e) => onOpenTarget?.({ kind: 'calendar' }, { newTab: e.ctrlKey || e.metaKey })}
         />
-        <MainNavButton
-          icon="ph-check-circle"
-          label="Tasks"
-          active={tasksActive}
-          onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
-        />
+        {!hideTasks && (
+          <MainNavButton
+            icon="ph-check-circle"
+            label="Tasks"
+            active={tasksActive}
+            onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
+          />
+        )}
         <MainNavButton
           icon="ph-graph"
           label="Graph"
@@ -335,7 +347,13 @@ export function Sidebar({
         <button type="button" disabled aria-label="Profile" className="flex size-8 items-center justify-center rounded-md disabled:opacity-60">
           <Icon name="ph-user" size={17} />
         </button>
-        <button type="button" disabled aria-label="Settings" className="flex size-8 items-center justify-center rounded-md disabled:opacity-60">
+        <button
+          type="button"
+          aria-label={SETTINGS_TOOLTIP}
+          title={SETTINGS_TOOLTIP}
+          onClick={() => useSettingsModal.getState().open()}
+          className="flex size-8 items-center justify-center rounded-md hover:bg-hover hover:text-fg"
+        >
           <Icon name="ph-gear" size={17} />
         </button>
         <ThemeButton />

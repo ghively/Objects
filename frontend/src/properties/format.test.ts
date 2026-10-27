@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { NumberFormat } from '@/api/types'
 import { propertyDef } from '@/test/mockApi'
 import { CURRENCIES } from './currencies'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import {
   formatDate,
   formatNumber,
@@ -79,6 +80,39 @@ describe('formatDate', () => {
     const local2 = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(t2))
     expect(formatDate({ start: t, end: t2, resolution: 'time' })).toBe(`${local} → ${local2}`)
     expect(formatDate(null)).toBe('')
+  })
+
+  it('test date and time formats follow settings; localized output unchanged', () => {
+    const t = '2026-10-30T14:05:00.000Z'
+    const d = new Date(t)
+    const local = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(d)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const hh = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+    try {
+      // Localized (the default) keeps today's output byte for byte.
+      useSettings.setState({ settings: settingsDefaults })
+      expect(formatDate({ start: '2026-10-30', resolution: 'day' })).toBe('Oct 30, 2026')
+      expect(formatDate({ start: t, resolution: 'time' })).toBe(local)
+
+      // 24-hour time changes only the time.
+      useSettings.setState({ settings: { ...settingsDefaults, twentyFourHourTime: true } })
+      expect(formatDate({ start: '2026-10-30', resolution: 'day' })).toBe('Oct 30, 2026')
+      const local24 = formatDate({ start: t, resolution: 'time' })
+      expect(local24).toContain(hh)
+      expect(local24).not.toMatch(/AM|PM/)
+
+      // Numeric orders, by the option labels' separators.
+      useSettings.setState({ settings: { ...settingsDefaults, dateFormatting: 'DMY' } })
+      expect(formatDate({ start: '2026-10-03', resolution: 'day' })).toBe('03-10-2026')
+      useSettings.setState({ settings: { ...settingsDefaults, dateFormatting: 'MDY' } })
+      expect(formatDate({ start: '2026-10-03', end: '2026-11-02', resolution: 'day' })).toBe('10/03/2026 → 11/02/2026')
+      useSettings.setState({ settings: { ...settingsDefaults, dateFormatting: 'YMD', twentyFourHourTime: true } })
+      expect(formatDate({ start: '2026-10-03', resolution: 'day' })).toBe('2026-10-03')
+      const ymd = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+      expect(formatDate({ start: t, resolution: 'time' })).toBe(`${ymd}, ${hh}`)
+    } finally {
+      useSettings.setState({ settings: settingsDefaults })
+    }
   })
 })
 
