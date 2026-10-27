@@ -251,6 +251,8 @@ export interface ObjectDetail {
   version: string
   /** Each entity property's values resolved from this file (`null` when a link doesn't resolve). */
   links: Record<string, (string | null)[]>
+  /** M5: the distinct objects linking to this one, by title then path. */
+  backlinks: EntityRef[]
 }
 
 /** PUT /api/object/body → 200 */
@@ -605,6 +607,8 @@ export interface UiState {
   tasks?: TasksUi
   /** M4: the reminder scheduler switch (default on). */
   reminders?: { enabled: boolean }
+  /** M5: the graph's filters (`GraphViewCustomization`). */
+  graph?: GraphCustomization
   [extra: string]: unknown
 }
 
@@ -739,4 +743,118 @@ export interface CreatedDailyNote {
   version: string
   /** The inferred DailyNote type when this write saved its JSON first. */
   typeIds: string[]
+}
+
+// ---- M5: search, references, graph ----
+
+/** Where a search hit matched; each snippet wraps its matches in U+0002 … U+0003. */
+export interface SearchHighlight {
+  field: 'title' | 'aliases' | 'description' | 'properties' | 'blocksContent' | 'tags'
+  snippets: string[]
+}
+
+export interface SearchResult {
+  path: string
+  title: string
+  /** The type id. */
+  type: string
+  icon: Icon | null
+  tags: string[]
+  score: number
+  /** `[start, end)` spans of the title the query matched. */
+  titleMatches: [number, number][]
+  highlights: SearchHighlight[]
+}
+
+/** GET /api/search → 200. `partial` until the start-up sync has finished. */
+export interface SearchResponse {
+  results: SearchResult[]
+  partial: boolean
+}
+
+/** A block of text around a link; `start`/`end` are the link's span inside `context`. */
+export interface BodyContext {
+  context: string
+  start: number
+  end: number
+}
+
+export interface BacklinkEntry {
+  path: string
+  contexts: BodyContext[]
+  /** The keys of the properties that link. */
+  properties: string[]
+}
+
+/** An unlinked mention: `start`/`end` are offsets in the mentioning object's body. */
+export interface Occurrence {
+  start: number
+  end: number
+  text: string
+  context: string
+  /** Offset of `context` in the body. */
+  contextStart: number
+}
+
+export interface MentionEntry {
+  path: string
+  version: string
+  occurrences: Occurrence[]
+}
+
+export interface RelatedEntry {
+  path: string
+  score: number
+}
+
+export interface RelatedTagEntry {
+  name: string
+  path: string | null
+  count: number
+}
+
+/** `ReferencesSectionTab` ids, in order. */
+export type ReferencesTab = 'all' | 'backlinks' | 'related' | 'mentions' | 'relatedTags'
+
+/** GET /api/references → 200 */
+export interface References {
+  tabs: ReferencesTab[]
+  backlinks: BacklinkEntry[]
+  mentions: MentionEntry[]
+  related: RelatedEntry[]
+  relatedTags: RelatedTagEntry[]
+  summaries: Record<string, ObjectSummary>
+}
+
+export interface GraphNode {
+  path: string
+  title: string
+  type: string
+  icon: Icon | null
+  degree: number
+  tag: boolean
+  daily: boolean
+  done: boolean
+}
+
+/** GET /api/graph → 200. `links` and `tagged` are flat pairs of node indexes. */
+export interface GraphData {
+  nodes: GraphNode[]
+  /** `[a0, b0, a1, b1, …]`, a < b, each pair once. */
+  links: number[]
+  /** `[object0, tag0, …]`. */
+  tagged: number[]
+}
+
+/** `GraphViewCustomization` (RootSpace.model.ts), keys verbatim. */
+export interface GraphCustomization {
+  filterStructureIds?: string[]
+  excludeStructureIds?: string[]
+  showCompletedTasks?: boolean
+  showMinimalNodes?: boolean
+  hideLargeNodes?: boolean
+  hideDates?: boolean
+  hideIndirectLinks?: boolean
+  showTagsNetwork?: boolean
+  showSpaceTagsNetwork?: boolean
 }

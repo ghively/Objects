@@ -10,9 +10,22 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
+// The M5 find bar and references section are replaced by later tasks; stand-ins show their props.
+vi.mock('@/find/FindBar', () => ({
+  FindBar: ({ path, editorRef }: { path: string; editorRef: { current: unknown } }) => (
+    <div data-testid="find-bar" data-path={path} data-has-ref={editorRef && 'current' in editorRef ? 'yes' : 'no'} />
+  ),
+}))
+vi.mock('@/references/ReferencesSection', () => ({
+  ReferencesSection: ({ path, summary, type }: { path: string; summary: { title: string }; type?: { id: string } }) => (
+    <div data-testid="references" data-path={path} data-title={summary.title} data-type={type?.id ?? ''} />
+  ),
+}))
+
 import { api, ConflictError } from '@/api/client'
 import { serializeBody } from '@/editor/document'
 import { resetLinkIndex } from '@/links/linkIndex'
+import { useFind } from '@/find/useFind'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPage } from './ObjectPage'
 import { ObjectView } from './ObjectView'
@@ -62,6 +75,7 @@ beforeEach(() => {
   useTabs.getState().reset()
   usePeek.getState().close()
   resetLinkIndex()
+  useFind.getState().close()
   listeners = []
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockReset()
   onDisk = detail(ORIGINAL, 'v1')
@@ -291,5 +305,88 @@ describe('inline mode', () => {
     // The body still autosaves on the object's version, and external changes reload it.
     const mine = typeInBody(editor, ' inline')
     await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(PATH, mine, 'v1'), { timeout: 3000 })
+  })
+})
+
+describe('M5 mounts', () => {
+  test('test object view mounts references and find bar in page and peek, not inline', async () => {
+    const page = render(<ObjectView path={PATH} mode="page" />)
+    await screen.findByRole('heading', { level: 1, name: 'Notes' })
+    await waitFor(() => pmEditor(page.container))
+    const refs = await screen.findByTestId('references')
+    expect(refs).toHaveAttribute('data-path', PATH)
+    expect(refs).toHaveAttribute('data-title', 'Notes')
+    await waitFor(() => expect(screen.getByTestId('references')).toHaveAttribute('data-type', 'project'))
+    // Below the editor, inside the body.
+    const pm = page.container.querySelector('.ProseMirror')!
+    expect(pm.compareDocumentPosition(refs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByTestId('find-bar')).toHaveAttribute('data-path', PATH)
+    expect(screen.getByTestId('find-bar')).toHaveAttribute('data-has-ref', 'yes')
+    page.unmount()
+
+    const peek = render(<ObjectView path={PATH} mode="peek" onDismiss={vi.fn()} />)
+    await screen.findByRole('heading', { level: 1, name: 'Notes' })
+    expect(await screen.findByTestId('references')).toHaveAttribute('data-path', PATH)
+    expect(screen.getByTestId('find-bar')).toHaveAttribute('data-path', PATH)
+    peek.unmount()
+
+    const inline = render(<ObjectView path={PATH} mode="inline" />)
+    await waitFor(() => pmEditor(inline.container))
+    expect(screen.queryByTestId('references')).toBeNull()
+    expect(screen.queryByTestId('find-bar')).toBeNull()
+  })
+
+  test('test Find in page menu item and Ctrl+F open the find bar for the active view only', async () => {
+    const user = userEvent.setup()
+    const { editor, container } = await openPage()
+
+    // The `…` menu item, with its shortcut hint.
+    await user.click(screen.getByRole('button', { name: 'More' }))
+    const item = await screen.findByRole('menuitem', { name: /Find in page/ })
+    expect(item).toHaveTextContent('Ctrl F')
+    await user.click(item)
+    expect(useFind.getState().path).toBe(PATH)
+    act(() => useFind.getState().close())
+
+    // Ctrl+F with the caret in the editor: the page is the active view; the browser's find is stopped.
+    act(() => editor.commands.focus())
+    const pm = container.querySelector('.ProseMirror') as HTMLElement
+    const ev = new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, bubbles: true, cancelable: true })
+    act(() => {
+      pm.dispatchEvent(ev)
+    })
+    expect(ev.defaultPrevented).toBe(true)
+    expect(useFind.getState().path).toBe(PATH)
+    act(() => useFind.getState().close())
+
+    // Plain F, Ctrl+Shift+F: nothing.
+    fireEvent.keyDown(window, { key: 'f' })
+    fireEvent.keyDown(window, { key: 'F', ctrlKey: true, shiftKey: true })
+    expect(useFind.getState().path).toBeNull()
+
+    // A peek is open: the page is no longer the active view, the peek is.
+    const OTHER = 'Projects/Other.md'
+    act(() => usePeek.getState().peek(OTHER))
+    render(<ObjectView path={OTHER} mode="peek" onDismiss={vi.fn()} />)
+    await waitFor(() => expect(screen.getAllByTestId('find-bar')).toHaveLength(2))
+    fireEvent.keyDown(window, { key: 'f', ctrlKey: true })
+    expect(useFind.getState().path).toBe(OTHER)
+    act(() => useFind.getState().close())
+
+    // The peek closes: the page is active again.
+    act(() => usePeek.getState().close())
+    fireEvent.keyDown(window, { key: 'f', metaKey: true })
+    expect(useFind.getState().path).toBe(PATH)
+  })
+
+  test('test inline view ignores Ctrl+F', async () => {
+    const inline = render(<ObjectView path={PATH} mode="inline" />)
+    await waitFor(() => pmEditor(inline.container))
+    const ev = new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, bubbles: true, cancelable: true })
+    act(() => {
+      window.dispatchEvent(ev)
+    })
+    expect(ev.defaultPrevented).toBe(false)
+    expect(useFind.getState().path).toBeNull()
   })
 })

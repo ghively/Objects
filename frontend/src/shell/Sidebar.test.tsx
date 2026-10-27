@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { TypeDef } from '@/api/types'
 import { typeDef as makeType } from '@/test/mockApi'
+import { usePalette } from '@/palette/usePalette'
 import { Sidebar } from './Sidebar'
 
 function typeDef(name: string, pluralName: string, icon: string, color: string): TypeDef {
@@ -66,10 +67,48 @@ describe('Sidebar', () => {
     expect(onOpenTypeSettings).toHaveBeenCalledWith(expect.objectContaining({ id: 'page' }))
   })
 
-  it('renders a disabled Graph placeholder', () => {
+  it('test sidebar search button opens the search palette with its tooltip', async () => {
+    const user = userEvent.setup()
+    usePalette.setState({ open: false, mode: 'actions' })
+    render(<Sidebar types={TYPES} />)
+    const btn = screen.getByRole('button', { name: 'Search this space' })
+    expect(btn).toHaveAttribute('title', 'Search this space')
+    expect(screen.queryByTitle(/M5/)).toBeNull()
+    await user.click(btn)
+    expect(usePalette.getState()).toMatchObject({ open: true, mode: 'search' })
+  })
+
+  it('test sidebar Graph item opens the graph target and shows active state', async () => {
+    const user = userEvent.setup()
+    const onOpenTarget = vi.fn()
+    const { rerender } = render(<Sidebar types={TYPES} onOpenTarget={onOpenTarget} />)
+    const nav = screen.getByRole('navigation', { name: /main/i })
+    const graph = within(nav).getByRole('button', { name: 'Graph' })
+    expect(graph).toBeEnabled()
+    expect(graph.querySelector('[data-icon="ph-graph"]')).not.toBeNull()
+    expect(graph).not.toHaveAttribute('aria-current')
+    await user.click(graph)
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'graph' }, { newTab: false })
+    fireEvent.click(graph, { ctrlKey: true })
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'graph' }, { newTab: true })
+    await user.hover(graph)
+    expect(screen.queryByText(/arrives in M5/)).toBeNull()
+    rerender(<Sidebar types={TYPES} onOpenTarget={onOpenTarget} graphActive />)
+    expect(within(nav).getByRole('button', { name: 'Graph' })).toHaveAttribute('aria-current', 'page')
+    expect(within(nav).getByRole('button', { name: 'Calendar' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('test M3 and M4 sidebar items still present', () => {
+    // Regression guard (green from the start).
     render(<Sidebar types={TYPES} />)
     const nav = screen.getByRole('navigation', { name: /main/i })
-    expect(within(nav).getByRole('button', { name: 'Graph' })).toBeDisabled()
+    for (const name of ['All notes', 'Calendar', 'Tasks']) {
+      expect(within(nav).getByRole('button', { name })).toBeEnabled()
+    }
+    expect(screen.getByRole('button', { name: 'Queries' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Pinned' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Trash' })).toBeInTheDocument()
   })
 
   it('test sidebar Calendar and Tasks items open targets and show active state', async () => {

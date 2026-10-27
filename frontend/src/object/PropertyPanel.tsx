@@ -157,6 +157,8 @@ export function cellValue(
   frontmatter: Record<string, unknown>,
   links: Record<string, (string | null)[]> = {},
   summary?: ObjectSummary,
+  /** M5: the objects linking to this one (`GET /api/object`'s `backlinks`). */
+  backlinks?: EntityRef[],
 ): unknown {
   const raw = frontmatter[def.key]
   switch (def.type) {
@@ -165,7 +167,7 @@ export function cellValue(
     case 'entity_icon':
       return decodeIcon(raw, frontmatter.iconColor)
     case 'entity_backlinks':
-      return null
+      return backlinks ?? null
     case 'number': {
       if (typeof raw === 'number') return raw
       const s = scalarText(raw)
@@ -208,6 +210,8 @@ export interface PropertyPanelProps {
   /** Each entity value resolved from this file (`GET /api/object`'s `links`). */
   links?: Record<string, (string | null)[]>
   summary?: ObjectSummary
+  /** M5: the objects linking to this one, shown by the backlinks property. */
+  backlinks?: EntityRef[]
   readOnly?: boolean
   /** A cell committed `value` for the frontmatter `key`. */
   onChange?(key: string, value: unknown): void
@@ -280,6 +284,7 @@ export function PropertyPanel({
   frontmatter,
   links,
   summary,
+  backlinks,
   readOnly,
   onChange,
   onChangeMany,
@@ -305,7 +310,7 @@ export function PropertyPanel({
   const hidden: PropertyDef[] = []
   for (const d of rows) {
     if (d.visibility === 'hidden') hidden.push(d)
-    else if (d.visibility === 'hideWhenEmpty' && propertyIsEmpty(d, cellValue(d, frontmatter, links, summary))) continue
+    else if (d.visibility === 'hideWhenEmpty' && propertyIsEmpty(d, cellValue(d, frontmatter, links, summary, backlinks))) continue
     else visible.push(d)
   }
   const external = externalKeys(type, frontmatter)
@@ -320,7 +325,7 @@ export function PropertyPanel({
 
   const renderRow = (def: PropertyDef) => {
     const Cell = cellForDef(def)
-    const value = cellValue(def, frontmatter, links, summary)
+    const value = cellValue(def, frontmatter, links, summary, backlinks)
     // Without a type definition (M1 inference) the row is a plain read-only value.
     const ro = !!readOnly || !typed || !onChange
     const menu =

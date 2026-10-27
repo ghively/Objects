@@ -15,6 +15,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -23,11 +24,14 @@ import {
 import { Editor } from '@/editor/Editor'
 import { RawMode } from '@/editor/RawMode'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
+import { FindBar } from '@/find/FindBar'
+import { useFind } from '@/find/useFind'
 import { installLinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, typeOf, useLinkIndex, ensureLinkIndex } from '@/links/linkIndex'
 import { installWikilinkPresenter } from '@/links/wikilinkPresenter'
 import { cn } from '@/lib/utils'
-import { canGoBack, useTabs, type Target } from '@/nav/tabs'
+import { canGoBack, usePeek, useTabs, type Target } from '@/nav/tabs'
+import { ReferencesSection } from '@/references/ReferencesSection'
 import { byPluralName, TypeChip } from '@/shell/Sidebar'
 import { templatesAllowed } from '@/types/TemplateManager'
 import { ChangeTypeDialog } from './ChangeTypeDialog'
@@ -79,6 +83,9 @@ export function patchSummary(summary: ObjectSummary, fm: Record<string, unknown>
   if ('color' in fm) next.color = str(fm.color)
   return next
 }
+
+/** The `…` menu item (`FindInPage.menuItem`). */
+export const FIND_IN_PAGE_MENU_ITEM = 'Find in page'
 
 function ToolButton({ label, icon, onClick }: { label: string; icon: string; onClick?: () => void }) {
   return (
@@ -455,6 +462,21 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     }
   }, [deleteRequest, path, mode])
 
+  // Ctrl+F opens Find in page for the active view: the peek, or the page while no peek is open.
+  // Capture phase, so it works with the caret in the editor; preventDefault stops the browser's find.
+  useEffect(() => {
+    if (mode === 'inline') return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'f') return
+      const peekPath = usePeek.getState().path
+      if (mode === 'page' ? peekPath !== null : peekPath !== path) return
+      e.preventDefault()
+      useFind.getState().open(path)
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [mode, path])
+
   const summary = detail?.summary
   const typeEditor = useTypeEditor(summary?.type)
   const type = typeEditor.type ?? typeOf(summary?.type)
@@ -485,6 +507,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         frontmatter={detail.frontmatter}
         links={detail.links}
         summary={detail.summary}
+        backlinks={detail.backlinks ?? []}
         readOnly={propsReadOnly}
         onChange={(key, value) => writeProperties({ [key]: value })}
         onChangeMany={(u, r) => void writes.updateProperties(u, r)}
@@ -514,7 +537,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
           <Icon name="ph-sidebar-simple" size={17} />
         </span>
       </button>
-      <div className="flex h-10 items-center gap-0.5 rounded-xl border border-[#232226] bg-[#18181b] px-1">
+      <div className="flex min-w-0 items-center gap-2">
+      <FindBar path={path} editorRef={editorRef} />
+      <div className="flex h-10 shrink-0 items-center gap-0.5 rounded-xl border border-[#232226] bg-[#18181b] px-1">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -539,6 +564,11 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
             <DropdownMenuItem onSelect={() => void api.reveal(path).catch(() => undefined)}>
               <Icon name="ph-folder-open" size={14} />
               Reveal in Explorer
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => useFind.getState().open(path)}>
+              <Icon name="ph-magnifying-glass" size={14} />
+              {FIND_IN_PAGE_MENU_ITEM}
+              <DropdownMenuShortcut>Ctrl F</DropdownMenuShortcut>
             </DropdownMenuItem>
             <PinMenuItems pin={{ kind: 'object', path, id: summary?.id }} />
             <DropdownMenuSeparator />
@@ -602,6 +632,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
           </DropdownMenuContent>
         </DropdownMenu>
         {onExpand && <ToolButton label="Open as page" icon="ph-arrows-out-simple" onClick={onExpand} />}
+      </div>
       </div>
     </div>
   )
@@ -821,6 +852,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
                 />
               )}
             </div>
+            <ReferencesSection path={path} summary={summary} type={type} />
           </>
         }
       >

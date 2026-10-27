@@ -187,6 +187,27 @@ describe('calendar and tasks targets', () => {
   })
 })
 
+describe('graph target', () => {
+  test('test graph target opens, goes back, dedupes; tab label Graph', () => {
+    // The tab label itself is App's (`App.m5.test.tsx`); here the target's navigation.
+    const s = useTabs.getState
+    s().open({ kind: 'allNotes' })
+    s().open({ kind: 'graph' })
+    expect(currentTarget(s())).toEqual({ kind: 'graph' })
+    s().open({ kind: 'graph' })
+    expect(activeTab(s())?.history).toHaveLength(2)
+    s().back()
+    expect(currentTarget(s())).toEqual({ kind: 'allNotes' })
+    s().forward()
+    expect(currentTarget(s())).toEqual({ kind: 'graph' })
+    s().open({ kind: 'graph' }, { newTab: true })
+    expect(s().tabs).toHaveLength(2)
+    expect(sameTarget({ kind: 'graph' }, { kind: 'graph' })).toBe(true)
+    expect(sameTarget({ kind: 'graph' }, { kind: 'calendar' })).toBe(false)
+    expect(useRecent.getState().paths).toEqual([])
+  })
+})
+
 describe('useRecent', () => {
   test('objects opened in a tab or the peek are recorded, newest first, without duplicates', () => {
     useTabs.getState().open(objT('Tasks/A.md'))

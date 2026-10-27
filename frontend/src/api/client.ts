@@ -5,6 +5,8 @@ import type {
   ChangeKindResult,
   Collection,
   CreatedDailyNote,
+  GraphCustomization,
+  GraphData,
   CreatedFile,
   DeleteCollectionResult,
   Icon,
@@ -12,6 +14,7 @@ import type {
   ObjectDetail,
   ObjectSummary,
   Query,
+  References,
   RenameResult,
   RestoreResult,
   Row,
@@ -19,6 +22,7 @@ import type {
   SaveCollectionResult,
   SaveResult,
   SaveTypeResult,
+  SearchResponse,
   SpaceInfo,
   SyncResult,
   TasksUi,
@@ -98,11 +102,35 @@ export class DailyNoteExistsError extends ApiError {
   }
 }
 
-/** The keys `PUT /api/ui` accepts (M3's, plus M4's `calendar`, `tasks` and `reminders`). */
+/** The keys `PUT /api/ui` accepts (M3's, plus M4's `calendar`, `tasks` and `reminders`, and M5's `graph`). */
 export type UiPatch = Partial<Pick<UiState, 'pinned' | 'sections' | 'allNotesLayout'>> & {
   calendar?: CalendarUi
   tasks?: TasksUi
   reminders?: { enabled: boolean }
+  /** Replaces the whole `graph` value. */
+  graph?: GraphCustomization
+}
+
+/** `api.search` options; `types`/`excludeTypes` are type ids, `tag` a tag name. */
+export interface SearchOptions {
+  types?: string[]
+  excludeTypes?: string[]
+  tag?: string
+  limit?: number
+  mode?: 'auto' | 'title'
+  signal?: AbortSignal
+}
+
+/** `api.linkMention` input: link the mention `text` at `[start, end)` of `path`'s body to `target`. */
+export interface LinkMentionInput {
+  /** The mentioning object. */
+  path: string
+  /** The mentioned object. */
+  target: string
+  start: number
+  end: number
+  text: string
+  baseVersion: string
 }
 
 const BASE = '/api'
@@ -663,6 +691,46 @@ export const api = {
     )
     emitLocal([defEvent('ui', 'ui.json', res.revision ?? null)])
     return res
+  },
+
+  // ---- M5: search, references, graph ----
+
+  /** Search titles, aliases and full text. Repeats `type`/`excludeType` once per id. */
+  search(q: string, opts: SearchOptions = {}): Promise<SearchResponse> {
+    const sp = new URLSearchParams()
+    sp.append('q', q)
+    for (const t of opts.types ?? []) sp.append('type', t)
+    for (const t of opts.excludeTypes ?? []) sp.append('excludeType', t)
+    if (opts.tag) sp.append('tag', opts.tag)
+    if (opts.limit !== undefined) sp.append('limit', String(opts.limit))
+    if (opts.mode) sp.append('mode', opts.mode)
+    return request<SearchResponse>(`/search?${sp.toString()}`, opts.signal ? { signal: opts.signal } : undefined)
+  },
+
+  /** Drop and rebuild the search index in the background (`partial` until done). */
+  reindex(): Promise<{ started: boolean }> {
+    return request<{ started: boolean }>('/search/reindex', json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** An object's references section: tabs, backlinks in context, mentions, related content and tags. */
+  references(path: string, opts: { relatedLimit?: number } = {}): Promise<References> {
+    const relatedLimit = opts.relatedLimit !== undefined ? String(opts.relatedLimit) : undefined
+    return request<References>(`/references${qs({ path, relatedLimit })}`)
+  },
+
+  /**
+   * Turn an unlinked mention into a link (one write to the mentioning object `path`).
+   * Rejects with `ConflictError` (409) when `baseVersion` is stale; announces `changed` for `path`.
+   */
+  async linkMention(input: LinkMentionInput): Promise<{ version: string }> {
+    const res = await request<{ version: string }>('/references/link', json('POST', { ...input, clientId: CLIENT_ID }))
+    if (res && res.version !== input.baseVersion) emitLocal([changed(input.path, res.version)])
+    return res
+  },
+
+  /** Every object as a graph node, with link and tag pairs. */
+  graph(): Promise<GraphData> {
+    return request<GraphData>('/graph')
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */
