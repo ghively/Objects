@@ -5,10 +5,13 @@
  * (`showDataViewDetails`). Attributes `kind`, `id` and `label` (an optional
  * `|label`, kept as written).
  *
- * Plain rendering here (a muted line naming what it embeds); Task 30 draws the
- * live view.
+ * `renderHTML` is the plain form (a muted line naming what it embeds, for
+ * copy and HTML export); the editor draws the live view with
+ * `embed/DataViewEmbedView.tsx` (Task 30).
  */
 import { Node, mergeAttributes } from '@tiptap/core'
+import { ReactNodeViewRenderer } from '@tiptap/react'
+import { DataViewEmbedView } from '../embed/DataViewEmbedView'
 import type { DataViewKind } from '../annotations'
 import { insertBlockNode } from './containers'
 
@@ -62,6 +65,10 @@ export const DataViewEmbed = Node.create({
       mergeAttributes(HTMLAttributes, { 'data-data-view': '', class: 'data-view-embed', contenteditable: 'false' }),
       node.attrs.label || `${node.attrs.kind}: ${node.attrs.id}`,
     ]
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(DataViewEmbedView)
   },
 
   renderText({ node }) {
