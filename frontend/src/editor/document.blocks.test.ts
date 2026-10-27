@@ -584,4 +584,66 @@ describe('M7 review fixes', () => {
     const reloaded = headless(out)
     expect(blockWith(reloaded, 'after').node.textContent).toBe('after')
   })
+  // Known issue 6: a lazy continuation line (CommonMark) after a to-do loaded as one raw block.
+  describe('lazy continuation lines', () => {
+    const TOGGLE =
+      '<!-- toggle open -->\n### Server checklist\n- [ ] Patch the hosts\nDetails in [[Embedded target]].\n<!-- /toggle -->\n\nAfter.\n'
+
+    test('a to-do with a lazy line inside an open toggle loads as a to-do, and round trips', () => {
+      for (const body of [TOGGLE, EVERY]) {
+        const editor = headless(body)
+        expect(all(editor, 'rawBlock').map((r) => r.node.textContent)).not.toContainEqual(
+          expect.stringContaining('Patch the hosts'),
+        )
+        const toggle = all(editor, 'toggle').find((t) => t.node.textContent.includes('Patch the hosts'))!
+        expect(toggle.node.childCount).toBe(2)
+        const list = toggle.node.child(1)
+        expect(list.type.name).toBe('taskList')
+        expect(list.childCount).toBe(1)
+        const item = list.firstChild!
+        expect(item.attrs.checked).toBe(false)
+        expect(item.childCount).toBe(1)
+        expect(item.firstChild!.type.name).toBe('paragraph')
+        expect(item.firstChild!.textContent).toMatch(/^Patch the hosts\nDetails in /)
+        expect(serializeBody(editor)).toBe(body)
+      }
+      const editor = headless(TOGGLE)
+      expect(all(editor, 'wikilink').map((w) => w.node.attrs.target)).toEqual(['Embedded target'])
+    })
+
+    test('the lazy line is part of the paragraph in a to-do, a list and a quote at the top level', () => {
+      const cases: [string, string][] = [
+        ['- [x] Done item\nlazy line.\n', 'taskList'],
+        ['- [ ] One\n- [ ] Two\nlazy two.\n', 'taskList'],
+        ['- Bullet item\nlazy line.\n', 'bulletList'],
+        ['1. Numbered item\nlazy line.\n', 'orderedList'],
+        ['> Quoted text\nlazy line.\n', 'blockquote'],
+      ]
+      for (const [body, type] of cases) {
+        const editor = headless(body)
+        expect(editor.state.doc.firstChild!.type.name, body).toBe(type)
+        expect(all(editor, 'rawBlock'), body).toHaveLength(0)
+        expect(all(editor, 'paragraph').some((p) => p.node.textContent.endsWith('\nlazy line.') || p.node.textContent.endsWith('\nlazy two.')), body).toBe(true)
+        expect(serializeBody(editor), body).toBe(body)
+      }
+    })
+
+    test('a to-do keeps its nested content and the blank line after it', () => {
+      const body = '- [ ] Parent\n  continued\n  - [x] Child\n- [ ] Sibling\n\nAfter.\n'
+      const editor = headless(body)
+      const list = editor.state.doc.firstChild!
+      expect(list.type.name).toBe('taskList')
+      expect(list.childCount).toBe(2)
+      expect(list.firstChild!.firstChild!.textContent).toBe('Parent\ncontinued')
+      expect(list.firstChild!.child(1).type.name).toBe('taskList')
+      expect(list.firstChild!.child(1).firstChild!.attrs.checked).toBe(true)
+      expect(serializeBody(editor)).toBe(body)
+    })
+
+    test('editing elsewhere leaves the toggle with the lazy line byte-identical', () => {
+      const editor = headless(TOGGLE)
+      typeAtEndOf(editor, 'After', ' More')
+      expect(serializeBody(editor)).toBe(TOGGLE.replace('After.', 'After. More'))
+    })
+  })
 })
