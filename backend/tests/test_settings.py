@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from test_settings_m8 import M8_DEFAULTS
+
 from objectapp import settings
 from objectapp.server import create_app
 from objectapp.space import ReadOnly, Space
@@ -31,6 +33,8 @@ CONTRACT_DEFAULTS = {
     "openOnStart": {},
     "startupSpace": "lastOpened",
     "startupSpacePath": None,
+    # M8 Task 2 added its keys; `test_settings_m8.py` checks them.
+    **M8_DEFAULTS,
 }
 
 
@@ -113,7 +117,7 @@ def test_settings_patch_route_round_trip(state: Path, blocks_space_dir: Path):
         {"openOnStart": {"/a": {"mode": "tomorrow"}}},
         {"openOnStart": {"/a": {"mode": "specificObject", "path": 3}}},
         {"openOnStart": {"/a": {"mode": "today", "extra": True}}},
-        {"language": "de"},
+        {"spellcheckLanguage": "de"},  # an unknown key (M8 made "language" a real one)
     ],
 )
 def test_settings_bad_shape_422(state: Path, blocks_space_dir: Path, patch):

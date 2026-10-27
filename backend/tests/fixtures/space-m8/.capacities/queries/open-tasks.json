@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "open-tasks",
+  "name": "Open tasks",
+  "titleIsCustom": true,
+  "icon": null,
+  "description": "",
+  "definition": {
+    "structures": [
+      {
+        "id": "task"
+      }
+    ],
+    "filterGroup": {
+      "type": "filterGroup",
+      "operator": "and",
+      "elements": []
+    },
+    "sorts": [],
+    "groupBy": null
+  },
+  "view": {
+    "viewDefinition": {
+      "dataViewLayout": "list"
+    }
+  }
+}

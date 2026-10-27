@@ -63,6 +63,14 @@ def blocks_space_dir(tmp_path: Path) -> Path:
     return dest
 
 
+@pytest.fixture
+def m8_space_dir(tmp_path: Path) -> Path:
+    """A fresh copy of the synthetic M8 `space-m8` space (custom repeats, logs, new syntax, media board)."""
+    dest = tmp_path / "space-m8"
+    shutil.copytree(FIXTURES / "space-m8", dest)
+    return dest
+
+
 @pytest.fixture(scope="session")
 def _big_space(tmp_path_factory):
     from bigspace import make_big_space
