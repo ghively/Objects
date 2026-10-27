@@ -2,6 +2,10 @@
  * The command palette: Ctrl+K "Search this space" and Ctrl+P "Open action palette". Both
  * shortcuts are caught on the window in the capture phase, so they work with the caret in the
  * editor, while no other modal dialog is open (the object peek excepted). Esc closes.
+ *
+ * M8: the search view's "Open in extended search" row and Ctrl/Cmd+Shift+Enter (our key; plain
+ * Shift+Enter stays M7's "open in the side panel") close the palette and open the extended search
+ * page with what was typed.
  */
 import { useCallback, useEffect, useMemo } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -12,6 +16,7 @@ import { useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs, type OpenOptions, type Target } from '@/nav/tabs'
 import type { ActionContext } from './actions'
 import { ActionsView } from './ActionsView'
+import { openExtendedSearch } from '@/search/openSearch'
 import { PALETTE_TEXT } from './searchOptions'
 import { SearchView } from './SearchView'
 import { usePalette, type PaletteMode } from './usePalette'
@@ -60,6 +65,10 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
   }, [])
 
   const hide = useCallback(() => usePalette.getState().hide(), [])
+  const toExtendedSearch = useCallback((q: string) => {
+    usePalette.getState().hide()
+    openExtendedSearch(q)
+  }, [])
 
   const context: ActionContext = useMemo(
     () => ({
@@ -110,7 +119,7 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
           {mode === 'search' ? PALETTE_TEXT.placeholderSearch : PALETTE_TEXT.placeholderActions}
         </DialogDescription>
         {mode === 'search' ? (
-          <SearchView key="search" onDone={hide} footer={footer} />
+          <SearchView key="search" onDone={hide} footer={footer} onOpenExtendedSearch={toExtendedSearch} />
         ) : (
           <ActionsView key="actions" context={context} onDone={hide} footer={footer} />
         )}

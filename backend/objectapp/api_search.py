@@ -24,7 +24,7 @@ from .searchindex import MAX_LIMIT
 __all__ = ["MAX_QUERY_LENGTH", "MODES", "router"]
 
 MAX_QUERY_LENGTH = 200
-MODES = ("auto", "title")
+MODES = ("auto", "title", "fullText")
 
 
 def _error(message: str) -> JSONResponse:
@@ -45,7 +45,7 @@ def router(ctx: ApiContext) -> APIRouter:
         mode: str = Query(default="auto"),
     ):
         if mode not in MODES:
-            return _error("mode must be auto or title.")
+            return _error("mode must be auto, title or fullText.")
         if len(q) > MAX_QUERY_LENGTH:
             return _error(f"q must be at most {MAX_QUERY_LENGTH} characters.")
         n = 50

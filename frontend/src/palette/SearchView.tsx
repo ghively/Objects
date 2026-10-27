@@ -6,6 +6,9 @@
  * Keys on a result (our bindings): Enter the current tab, Ctrl/Cmd+Enter a new tab, Shift+Enter
  * the peek, all through `openObject`, so a Task opens in the peek on plain Enter as elsewhere.
  *
+ * M8: with a query, a last row "Open in extended search" opens the extended search page with the
+ * query (and its filters' words dropped); Ctrl/Cmd+Shift+Enter does the same from any row (our key).
+ *
  * A result (or recent) row can be dragged onto a whiteboard (M6): it carries the object's path;
  * the palette closes as the drag starts so the board under it takes the drop.
  */
@@ -43,11 +46,17 @@ export interface SearchViewProps {
   onDone(): void
   /** The footer: the mode switch. */
   footer?: React.ReactNode
+  /** M8: open the extended search page with `q` (the palette closes itself). */
+  onOpenExtendedSearch?(q: string): void
 }
+
+/** `CommandPalette.options.LocalSpaceQuery`, verbatim. */
+export const OPEN_IN_EXTENDED_SEARCH = 'Open in extended search'
+const EXTENDED_VALUE = 'extended-search'
 
 interface Row {
   value: string
-  kind: 'recent' | 'result' | 'option'
+  kind: 'recent' | 'result' | 'option' | 'extended'
   path?: string
   typeId?: string
   option?: SearchOption
@@ -69,7 +78,7 @@ function snippetsOf(r: SearchResult): string[] {
   return out
 }
 
-export function SearchView({ onDone, footer }: SearchViewProps) {
+export function SearchView({ onDone, footer, onOpenExtendedSearch }: SearchViewProps) {
   const types = useLinkIndex((s) => s.types)
   const objects = useLinkIndex((s) => s.objects)
   const recentPaths = useRecent((s) => s.paths)
@@ -150,8 +159,9 @@ export function SearchView({ onDone, footer }: SearchViewProps) {
     for (const o of recents) out.push({ value: `recent:${o.path}`, kind: 'recent', path: o.path, typeId: o.type })
     for (const r of results ?? []) out.push({ value: `result:${r.path}`, kind: 'result', path: r.path, typeId: r.type })
     options.forEach((o, i) => out.push({ value: `option:${i}:${o.label}`, kind: 'option', option: o }))
+    if (q && onOpenExtendedSearch) out.push({ value: EXTENDED_VALUE, kind: 'extended' })
     return out
-  }, [recents, results, options])
+  }, [recents, results, options, q, onOpenExtendedSearch])
 
   // Keep the first row selected whenever the rows change.
   const firstValue = rows[0]?.value ?? ''
@@ -180,6 +190,10 @@ export function SearchView({ onDone, footer }: SearchViewProps) {
   const pick = (row: Row) => {
     const m = mods.current
     mods.current = {}
+    if (row.kind === 'extended') {
+      if (q) onOpenExtendedSearch?.(q)
+      return
+    }
     if (row.kind === 'option' && row.option) {
       void pickOption(row.option, m)
       return
@@ -207,6 +221,13 @@ export function SearchView({ onDone, footer }: SearchViewProps) {
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && e.shiftKey && q && onOpenExtendedSearch) {
+      e.preventDefault()
+      e.stopPropagation()
+      mods.current = {}
+      onOpenExtendedSearch(q)
+      return
+    }
     if (e.key === 'Enter') mods.current = modsOf(e)
     else if (e.key === 'Backspace' && !query && hasFilters(filters)) removeLastFilter()
   }
@@ -376,6 +397,19 @@ export function SearchView({ onDone, footer }: SearchViewProps) {
                 <span className="min-w-0 flex-1 truncate">{o.label}</span>
               </CommandItem>
             ))}
+          </CommandGroup>
+        )}
+        {q && onOpenExtendedSearch && (
+          <CommandGroup>
+            <CommandItem
+              value={EXTENDED_VALUE}
+              data-open-extended-search=""
+              onSelect={() => pick({ value: EXTENDED_VALUE, kind: 'extended' })}
+              className="menu-row gap-2 rounded-lg text-[15px]"
+            >
+              <Icon name="ph-magnifying-glass-plus" size={16} className="shrink-0 text-fg-muted" />
+              <span className="min-w-0 flex-1 truncate">{OPEN_IN_EXTENDED_SEARCH}</span>
+            </CommandItem>
           </CommandGroup>
         )}
       </CommandList>
