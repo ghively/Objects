@@ -4,7 +4,10 @@
 - ``POST /api/tasks/occurrence`` ``{path, action, catchUp?, baseVersion, clientId?}``
   -> M2's ``UpdateResult`` shape with ``task`` set (Task 11)
 - ``GET /api/tasks/stats?path=`` -> ``TaskStats`` (reads only; Task 11)
-- ``PUT /api/tasks/reminder`` ``{path, key, remind, baseVersion, clientId?}`` -> ``UpdateResult`` (Task 12)
+- ``PUT /api/tasks/reminder`` ``{path, key, remind, baseVersion, clientId?}`` -> ``UpdateResult`` (Task 12):
+  the Task ``date`` keeps M4's ``remind`` key; any other date property with
+  ``supportsReminders`` gets one line in the frontmatter map ``reminders``
+  (removing the last entry removes the key)
 
 The rules are the plan's Global Constraints "Occurrence actions" and "Task
 Stats". An action is one `Space.update_properties` call that writes ``date``,
@@ -24,9 +27,20 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from .apictx import ApiContext
+from .frontmatter import (
+    FrontmatterError,
+    _key_spans,
+    _lines,
+    _load_rt,
+    _render,
+    delete_keys,
+    parse_fm,
+    set_keys,
+)
 from .localtime import to_local
 from .propvalues import InvalidValue, decode_value
 from .recurrence import next_date, scheduled_between, step, week_start_of
+from .reminders import REMINDERS_KEY, supports_reminders
 from .taskhook import (
     DONE,
     TaskResult,
@@ -46,11 +60,11 @@ from .tasklog import (
     log_value,
     parse_log,
 )
-from .taskmodel import RepeatRule, parse_repeat
+from .taskmodel import RepeatRule, format_remind, parse_remind, parse_repeat
 from .typemodel import PropertyDefinition, TypeDefinition, is_task_type
 from .watcher import ChangeEvent
 
-__all__ = ["OVERDUE_CAP", "overdue_info", "router", "task_stats"]
+__all__ = ["OVERDUE_CAP", "overdue_info", "router", "set_map_entry", "task_stats"]
 
 OVERDUE_CAP = 99
 GRID_PAST = 26
@@ -322,6 +336,69 @@ def task_stats(
     }
 
 
+# -- reminders on other date properties --------------------------------------------------
+
+
+def set_map_entry(src: str, map_key: str, entry: str, value: str | None) -> str:
+    """Frontmatter ``src`` with one entry of the block map ``map_key`` set or removed.
+
+    Only that entry's line changes (a new entry is one line after the last one,
+    at the entries' indent); removing the last entry removes ``map_key``; a
+    missing map is appended as ``map_key:`` plus the entry. A flow-style or
+    non-map value is rewritten whole as a block map (our choice). Raises
+    `FrontmatterError` for frontmatter that isn't a YAML mapping.
+    """
+    fm = parse_fm(src) if src.strip() else {}
+    current = fm.get(map_key)
+    if not isinstance(current, dict):
+        if value is None:
+            return src
+        return set_keys(src, {map_key: {entry: value}})
+    if value is None and entry not in current:
+        return src
+    if value is None and len(current) == 1:
+        return delete_keys(src, [map_key])
+    data = _load_rt(src)
+    node = data.get(map_key) if data is not None else None
+    if data is None or data.fa.flow_style() or node is None or node.fa.flow_style():
+        merged = {str(k): v for k, v in current.items()}
+        if value is None:
+            merged.pop(entry, None)
+        else:
+            merged[entry] = value
+        return set_keys(src, {map_key: merged})
+    lines = _lines(src)
+    _start, end = _key_spans(data, lines)[map_key]
+    rows = sorted((node.lc.key(k)[0], node.lc.key(k)[1], str(k)) for k in node)
+    indent = " " * rows[0][1]
+    new = [indent + line for line in _render(entry, value)] if value is not None else []
+    for i, (row, _col, k) in enumerate(rows):
+        if k != entry:
+            continue
+        stop = rows[i + 1][0] if i + 1 < len(rows) else end
+        while stop > row + 1 and lines[stop - 1].strip() == "":
+            stop -= 1
+        return "".join([*lines[:row], *new, *lines[stop:]])
+    return "".join([*lines[:end], *new, *lines[end:]])
+
+
+class ReminderRequest(BaseModel):
+    path: str
+    key: str
+    remind: str | None = None
+    baseVersion: str
+    clientId: str | None = None
+
+
+def _resolution(pdef: PropertyDefinition, fm: dict) -> str:
+    """The date's resolution; with no date, the definition's ``resolutionPreference`` (our choice)."""
+    value = decode_value(pdef, fm.get(pdef.key), fm)
+    if isinstance(value, dict) and value.get("resolution") in ("day", "time"):
+        return value["resolution"]
+    constraints = pdef.options.get("constraints") or {}
+    return "time" if constraints.get("resolutionPreference") == "time" else "day"
+
+
 # -- the router ------------------------------------------------------------------------
 
 
@@ -430,6 +507,76 @@ def router(ctx: ApiContext) -> APIRouter:
                 "synced": result.synced,
                 "skipped": [asdict(s) for s in result.skipped],
                 "task": task.to_api(),
+            }
+        )
+
+    @r.put("/tasks/reminder")
+    def put_reminder(req: ReminderRequest):
+        from .server import _display_safe  # lazy: server.py imports this module
+        from .space import Conflict, ReadOnly
+
+        rel = _norm(req.path)
+        try:
+            _of, fm, version = space.read(rel)
+        except (KeyError, FileNotFoundError, IsADirectoryError, NotADirectoryError):
+            return JSONResponse({"detail": f"No object at {req.path!r}"}, status_code=404)
+        t = space._type_of(rel)
+        pdef = t.prop(req.key) if t is not None else None
+        if pdef is None or not supports_reminders(pdef):
+            return JSONResponse(
+                {"detail": f"{req.key!r} is not a date property that supports reminders"},
+                status_code=422,
+            )
+        if version != req.baseVersion:
+            return JSONResponse({"currentVersion": version}, status_code=409)
+        text: str | None = None
+        if req.remind is not None and req.remind.strip():
+            resolution = _resolution(pdef, fm)
+            rule = parse_remind(req.remind, resolution)  # type: ignore[arg-type]
+            if rule is None:
+                return JSONResponse(
+                    {"detail": f"{req.remind!r} doesn't fit a {resolution} date"}, status_code=422
+                )
+            text = format_remind(rule, resolution)  # type: ignore[arg-type]
+        try:
+            if is_task_type(t) and req.key == "date":  # M4's `remind` key
+                if text is None:
+                    result = space.update_properties(rel, {}, req.baseVersion, remove=["remind"])
+                else:
+                    result = space.update_properties(rel, {"remind": text}, req.baseVersion)
+                new_version, out_fm = result.version, result.frontmatter
+                links, synced = result.links, result.synced
+                skipped = [asdict(s) for s in result.skipped]
+            else:
+                key = req.key
+
+                def edit(src: str, _fm: dict) -> str:
+                    return set_map_entry(src, REMINDERS_KEY, key, text)
+
+                new_version = space._write(rel, req.baseVersion, space._fm_edit(edit))
+                _of, out_fm, _v = space.read(rel)
+                links, synced, skipped = space.links_of(rel, out_fm), [], []
+        except Conflict as exc:
+            return JSONResponse({"currentVersion": exc.current_version}, status_code=409)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except FrontmatterError as exc:
+            return JSONResponse({"reason": str(exc), "detail": str(exc)}, status_code=423)
+        except InvalidValue as exc:
+            return JSONResponse({"detail": str(exc)}, status_code=422)
+        except (KeyError, FileNotFoundError):
+            return JSONResponse({"detail": f"No object at {req.path!r}"}, status_code=404)
+        if new_version != req.baseVersion:
+            ctx.announce(ChangeEvent("changed", rel, new_version, origin=req.clientId))
+        for path in synced:
+            ctx.announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
+        return _display_safe(
+            {
+                "version": new_version,
+                "frontmatter": out_fm,
+                "links": links,
+                "synced": synced,
+                "skipped": skipped,
             }
         )
 

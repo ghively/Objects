@@ -1,7 +1,10 @@
-"""Local Task reminders: a small scheduler thread and its fired-reminder ledger.
+"""Local reminders: a small scheduler thread and its fired-reminder ledger.
 
 A reminder belongs to a Task's ``date`` and its ``remind`` text (see
-`taskmodel.parse_remind`). The scheduler checks every 30 s and fires one OS
+`taskmodel.parse_remind`), or (M8) to any date property whose definition has
+``options.constraints.supportsReminders``, on an object of any type, with its
+text in the frontmatter map ``reminders`` under the property's key. A done
+status suppresses reminders only on Task objects. The scheduler checks every 30 s and fires one OS
 notification (through an injected `notify.Notifier`) for each trigger time in
 ``(last check, now]``.
 
@@ -45,6 +48,7 @@ from .uistate import load_ui
 __all__ = [
     "CATCH_UP_FALLBACK",
     "LEDGER_RETENTION",
+    "REMINDERS_KEY",
     "Due",
     "Ledger",
     "ReminderScheduler",
@@ -53,6 +57,8 @@ __all__ = [
     "file_clock",
     "ledger_path_for",
     "reminders_enabled",
+    "reminders_map",
+    "supports_reminders",
     "task_infos",
     "trigger_time",
 ]
@@ -93,11 +99,41 @@ class TaskInfo:
     done: bool
     remind: str | None
     lastUpdated: datetime | None
+    key: str = "date"
+    """The date property the reminder belongs to (M8); M4's Task ``date`` is ``"date"``."""
+    legacy: bool = True
+    """True for M4's Task ``date`` + ``remind`` (its ledger key has no property part)."""
 
     @property
     def key_id(self) -> str:
         """The frontmatter ``id`` (so rename and move don't re-fire), else the path."""
         return self.id or self.path
+
+    def ledger_key(self, trigger: datetime) -> str:
+        """``<id>|<date>|<trigger>`` (M4, the Task ``date``) or ``<id>|<key>|<date>|<trigger>``."""
+        start = (self.date or {}).get("start")
+        if self.legacy:
+            return f"{self.key_id}|{start}|{_stamp(trigger)}"
+        return f"{self.key_id}|{self.key}|{start}|{_stamp(trigger)}"
+
+
+REMINDERS_KEY = "reminders"
+
+
+def supports_reminders(pdef: Any) -> bool:
+    """A date property whose definition has ``options.constraints.supportsReminders``."""
+    if pdef is None or pdef.type not in ("datetime", "datetimeSimple"):
+        return False
+    constraints = (pdef.options or {}).get("constraints")
+    return isinstance(constraints, dict) and constraints.get("supportsReminders") is True
+
+
+def reminders_map(fm: Mapping[str, Any]) -> dict[str, str]:
+    """The frontmatter ``reminders`` map's text entries (anything else is ignored)."""
+    raw = fm.get(REMINDERS_KEY)
+    if not isinstance(raw, Mapping):
+        return {}
+    return {str(k): v for k, v in raw.items() if isinstance(v, str) and v.strip()}
 
 
 def trigger_time(task: TaskInfo, rule: str | ReminderRule | None, tz: tzinfo) -> datetime | None:
@@ -148,7 +184,12 @@ def _status_done(t, fm: Mapping[str, Any]) -> bool:
 
 
 def task_infos(space) -> list[TaskInfo]:
-    """Every basic-Task object (not templates) that has a ``remind`` text."""
+    """One entry per reminder: every non-template object and date property with a reminder.
+
+    A basic Task's ``date`` uses M4's ``remind`` text; every other date property
+    with ``supportsReminders`` (on any type, the Task's ``deadline`` included)
+    uses its entry in the ``reminders`` map. Only Task objects are done.
+    """
     out: list[TaskInfo] = []
     with space._lock:
         items = [(rel, raw, space._summaries.get(rel)) for rel, raw in space._raw.items()]
@@ -157,24 +198,43 @@ def task_infos(space) -> list[TaskInfo]:
             continue
         fm = raw.fm or {}
         remind = fm.get("remind")
-        if not isinstance(remind, str) or not remind.strip():
+        entries = reminders_map(fm)
+        has_remind = isinstance(remind, str) and bool(remind.strip())
+        if not has_remind and not entries:
             continue
         t = space.type_by_id(summary.type)
-        if not is_task_type(t):
+        if t is None:
             continue
-        date_def = t.prop("date")
-        value = decode_value(date_def, fm.get("date"), fm) if date_def is not None else None
-        out.append(
-            TaskInfo(
-                path=rel,
-                id=str(fm["id"]) if fm.get("id") else None,
-                title=summary.title,
-                date=value if isinstance(value, dict) else None,
-                done=_status_done(t, fm),
-                remind=remind,
-                lastUpdated=_parse_instant(fm.get("lastUpdated")),
+        task = is_task_type(t)
+        wanted: list[tuple[str, str, bool]] = []
+        if task and has_remind:
+            wanted.append(("date", remind, True))
+        for key, text in entries.items():
+            if task and key == "date":
+                continue  # the Task `date` keeps M4's `remind` key
+            if supports_reminders(t.prop(key)):
+                wanted.append((key, text, False))
+        if not wanted:
+            continue
+        done = _status_done(t, fm) if task else False
+        oid = str(fm["id"]) if fm.get("id") else None
+        updated = _parse_instant(fm.get("lastUpdated"))
+        for key, text, legacy in wanted:
+            pdef = t.prop(key)
+            value = decode_value(pdef, fm.get(key), fm) if pdef is not None else None
+            out.append(
+                TaskInfo(
+                    path=rel,
+                    id=oid,
+                    title=summary.title,
+                    date=value if isinstance(value, dict) else None,
+                    done=done,
+                    remind=text,
+                    lastUpdated=updated,
+                    key=key,
+                    legacy=legacy,
+                )
             )
-        )
     return out
 
 
@@ -182,7 +242,7 @@ def task_infos(space) -> list[TaskInfo]:
 class Due:
     path: str
     key: str
-    """``<object id>|<date>|<trigger>``: the ledger key."""
+    """``<object id>|<date>|<trigger>`` (Task ``date``) or ``<object id>|<key>|<date>|<trigger>``."""
     title: str
     body: str
     trigger: datetime
@@ -220,7 +280,7 @@ def due(space, since: datetime | None, now: datetime, ledger: Ledger) -> list[Du
             continue
         if task.lastUpdated is not None and trig <= task.lastUpdated:
             continue
-        key = f"{task.key_id}|{task.date['start']}|{_stamp(trig)}"  # type: ignore[index]
+        key = task.ledger_key(trig)
         if key in ledger.fired:
             continue
         out.append(Due(task.path, key, task.title, _body(task, now, space.tz), trig))
