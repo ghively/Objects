@@ -73,6 +73,7 @@ def snapshot(root: Path) -> dict[str, bytes]:
         p.relative_to(root).as_posix(): p.read_bytes()
         for p in root.rglob("*")
         if p.is_file() and ".git" not in p.relative_to(root).parts
+        and p.relative_to(root).parts[0] != ".capacities-cache"  # derived search cache (M5), like .git
     }
 
 

@@ -162,10 +162,18 @@ def test_rows_carry_backlinks(links_space_dir):
     assert rows["People/Charles Babbage.md"].values["backlinks"] == space.backlinks(
         "People/Charles Babbage.md"
     )
-    # Page has no backlinks definition: its values are unchanged.
+    # Page has no backlinks definition: its rows still carry the system id `backlinks`
+    # (M5 Task 13), so "No backlinks" and the Task "Context" section work on every type.
     page_type = space.type_by_id("page")
     assert not any(p.type == "entity_backlinks" for p in page_type.propertyDefinitions)
-    assert "backlinks" not in rows["Pages/Analytical Engine.md"].values
+    engine = "Pages/Analytical Engine.md"
+    assert rows[engine].values["backlinks"] == space.backlinks(engine)
+    assert rows[engine].values["backlinks"]
+    task_type = space.type_by_id("task")
+    assert not any(p.type == "entity_backlinks" for p in task_type.propertyDefinitions)
+    assert rows["Tasks/Draft outline.md"].values["backlinks"] == space.backlinks(
+        "Tasks/Draft outline.md"
+    )
     # Through the route too.
     client = TestClient(create_app(space, watch=False))
     res = client.post("/api/rows", json={"typeIds": ["project"]})

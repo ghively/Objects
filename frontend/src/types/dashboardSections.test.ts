@@ -86,8 +86,8 @@ describe('buildSections', () => {
       ['inNoCollection', false],
       ['collection:c1', true],
     ])
-    // pinned, noBacklinks and a deleted query have nothing to show
-    expect(buildSections(NOTE, views(['pinned', 'noBacklinks', 'query:gone']), ctx()).map((s) => s.key)).toEqual([])
+    // pinned and a deleted query have nothing to show
+    expect(buildSections(NOTE, views(['pinned', 'query:gone']), ctx()).map((s) => s.key)).toEqual([])
   })
 
   test('a section title replaces the label', () => {
@@ -147,8 +147,8 @@ describe('section edits', () => {
     const v = views(['inNoCollection'], ['collections'])
     const c2 = ctx({ collections: [c], queries: [q1, q2] })
     const built = buildSections(NOTE, v, c2)
-    // the collection is already a visible section (auto-appended), the query is not
-    expect(addableSections(NOTE, built, c2).map((s) => s.key)).toEqual(['collections', 'query:q1'])
+    // the collection is already a visible section (auto-appended), the query is not; "No backlinks" is always offered
+    expect(addableSections(NOTE, built, c2).map((s) => s.key)).toEqual(['collections', 'noBacklinks', 'query:q1'])
   })
 })
 
@@ -250,8 +250,8 @@ describe('No backlinks section (M5)', () => {
     expect(canHaveBacklinks(typeDef({ id: 'video2', name: 'Video' }))).toBe(true)
     expect(buildSections(VIDEO, views(['noBacklinks']), ctx())).toEqual([])
     expect(addableSections(VIDEO, buildSections(VIDEO, views([]), ctx()), ctx())).toEqual([])
-    // A type whose rows carry no backlinks (no backlinks definition) can't list them.
-    expect(buildSections(NOTE, views(['noBacklinks']), ctx())).toEqual([])
+    // Every row carries its backlinks (M5 Task 13), so a type without the backlinks definition lists them too.
+    expect(buildSections(NOTE, views(['noBacklinks']), ctx()).map((s) => s.key)).toEqual(['noBacklinks'])
 
     // The rows: those no object links to.
     const P = (path: string, backlinks?: unknown) =>

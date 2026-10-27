@@ -123,7 +123,7 @@ def snapshot(root: Path, skip_trash: bool = False) -> dict[str, bytes]:
     out = {}
     for p in root.rglob("*"):
         rel = p.relative_to(root)
-        if not p.is_file() or rel.parts[0] == ".git":
+        if not p.is_file() or rel.parts[0] in (".git", ".capacities-cache"):  # the cache is derived data (M5)
             continue
         if skip_trash and rel.as_posix().startswith(".capacities/trash/"):
             continue

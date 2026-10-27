@@ -526,6 +526,20 @@ def test_reindex_rebuilds(links):
     assert _wait(lambda: ADA in _paths(idx.search("Countess")))
 
 
+def test_reindex_recreates_deleted_cache_file(links_space_dir: Path, tmp_path: Path):
+    """M5 Task 13: deleting search.sqlite while running, then reindex, rebuilds the file."""
+    cache = tmp_path / "cache"
+    _space, idx = _start(links_space_dir, cache)
+    try:
+        (cache / "search.sqlite").unlink()
+        idx.reindex()
+        assert _wait(lambda: idx.ready.is_set() and ADA in _paths(idx.search("Countess")), 10)
+        assert idx.in_memory is False
+        assert (cache / "search.sqlite").read_bytes()[:16] == b"SQLite format 3\x00"
+    finally:
+        idx.stop()
+
+
 # -- references helpers ------------------------------------------------------------
 
 
