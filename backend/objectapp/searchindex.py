@@ -639,7 +639,9 @@ class SearchIndex:
 
         Title and alias matches come first (fuzzy score), then full-text hits by
         ``bm25``; an object found both ways keeps its title rank and gains its
-        snippets. ``partial`` is true until the start-up sync has finished.
+        snippets. ``mode == 'fullText'`` ("Text matches only", M8) skips the title
+        and alias ranking and matches the body (blocks content) column only.
+        ``partial`` is true until the start-up sync has finished.
         """
         partial = not self.ready.is_set()
         q = (q or "").strip()
@@ -664,7 +666,7 @@ class SearchIndex:
         candidates = {s.path: s for s in summaries if allowed(s)}
 
         titled: list[tuple[int, str, str, list[tuple[int, int]]]] = []
-        for s in candidates.values():
+        for s in candidates.values() if mode != "fullText" else ():
             best: tuple[int, list[tuple[int, int]]] | None = fuzzy.score(q, s.title)
             for alias in s.aliases:
                 hit = fuzzy.score(q, alias)
@@ -678,6 +680,8 @@ class SearchIndex:
         titled.sort(key=lambda r: (-r[0], r[1], r[2]))
 
         match = build_match(q) if mode != "title" else None
+        if match is not None and mode == "fullText":
+            match = f"body : ({match})"
         fts_order: list[tuple[str, float]] = []
         if match is not None and len(titled) < limit:
             fts_order = self._fts_rank(match, candidates, type_set, limit)

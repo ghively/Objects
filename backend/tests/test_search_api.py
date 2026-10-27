@@ -109,10 +109,7 @@ def test_search_route_filters_and_mode(links_space_dir: Path):
 def test_search_route_422s(links_space_dir: Path):
     _space, _app, c = _client(links_space_dir)
     with c:
-        assert (
-            c.get("/api/search", params={"q": "x", "mode": "fullText"}).status_code
-            == 422
-        )
+        # M8 Task 16 made `fullText` a valid mode (test_search_m8.py).
         assert (
             c.get("/api/search", params={"q": "x", "mode": "semantic"}).status_code
             == 422
