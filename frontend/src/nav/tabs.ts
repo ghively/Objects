@@ -72,6 +72,12 @@ export interface Tab {
 
 export interface OpenOptions {
   newTab?: boolean
+  /**
+   * How the open was asked for. `'link'` (a wikilink, an embedded object, the peek's "Open as
+   * page") extends the breadcrumb trail with the current page; `'nav'` (the default: sidebar, tab
+   * menu, palette, start-up, calendar) starts an empty trail.
+   */
+  via?: 'link' | 'nav'
 }
 
 export interface TabsState {
@@ -93,6 +99,12 @@ export interface TabsState {
   togglePersistent(id: string): void
   pin(id: string): void
   unpin(id: string): void
+  /**
+   * Click on crumb `k` of the active entry's trail: go back to the history entry it stands for (the
+   * tab's index moves, no new entry). When that entry is gone (trimmed, or the trail came from
+   * another tab), the crumb opens in place with the trail before it.
+   */
+  goToCrumb(k: number): void
 }
 
 let seq = 0
@@ -159,16 +171,59 @@ export function sortPinned(tabs: Tab[]): Tab[] {
   return [...tabs.filter((t) => t.pinned), ...tabs.filter((t) => !t.pinned)]
 }
 
-function freshTab(target: Target | null): Tab {
+function freshTab(target: Target | null, trail: Target[] = []): Tab {
   return target
-    ? { id: newId(), history: [target], index: 0, crumbs: [[]] }
+    ? { id: newId(), history: [target], index: 0, crumbs: [trail] }
     : { id: newId(), history: [], index: -1, crumbs: [] }
+}
+
+/** The active entry's breadcrumb trail (empty when it has none). */
+export function tabCrumbs(tab: Tab | null | undefined): Target[] {
+  if (!tab || tab.index < 0) return []
+  return tab.crumbs?.[tab.index] ?? []
+}
+
+/** The trail a new page gets when opened from `tab` by `via`. */
+function trailFrom(tab: Tab | null | undefined, target: Target, via: OpenOptions['via']): Target[] {
+  const from = tabTarget(tab)
+  if (via !== 'link' || !from) return []
+  const trail = [...tabCrumbs(tab), from]
+  // Back to a page already on the trail: cut the trail there (A › B › A reads as just A).
+  const j = trail.findIndex((t) => sameTarget(t, target))
+  return j >= 0 ? trail.slice(0, j) : trail
+}
+
+function sameTrail(a: Target[] | undefined, b: Target[]): boolean {
+  return !!a && a.length === b.length && a.every((t, i) => sameTarget(t, b[i]))
+}
+
+/**
+ * The history index crumb `k` of the active entry stands for: the latest earlier entry showing that
+ * target with the trail before it, or -1.
+ */
+export function crumbIndex(tab: Tab | null | undefined, k: number): number {
+  const trail = tabCrumbs(tab)
+  if (!tab || k < 0 || k >= trail.length) return -1
+  const before = trail.slice(0, k)
+  for (let i = tab.index - 1; i >= 0; i--) {
+    if (sameTarget(tab.history[i], trail[k]) && sameTrail(tab.crumbs?.[i], before)) return i
+  }
+  return -1
 }
 
 /** A trail per history entry: pad or cut `crumbs` to the length of `history`. */
 function alignCrumbs(crumbs: unknown, length: number): Target[][] {
   const list = Array.isArray(crumbs) ? crumbs : []
   return Array.from({ length }, (_, i) => (Array.isArray(list[i]) ? (list[i] as Target[]) : []))
+}
+
+/** `target` becomes the tab's new current entry (forward history dropped, oldest trimmed). */
+function pushEntry(t: Tab, target: Target, trail: Target[]): Tab {
+  const crumbs = alignCrumbs(t.crumbs, t.history.length)
+  const history = [...t.history.slice(0, t.index + 1), target]
+  const trails = [...crumbs.slice(0, t.index + 1), trail]
+  const cut = Math.max(0, history.length - HISTORY_LIMIT)
+  return { ...t, history: history.slice(cut), crumbs: trails.slice(cut), index: history.length - 1 - cut }
 }
 
 /** Clean one persisted tab, or null when it is unusable. */
@@ -192,28 +247,21 @@ export const useTabs = create<TabsState>()(
         if (target.kind === 'object') useRecent.getState().add(target.path)
         const s = get()
         const tab = activeTab(s)
+        const trail = trailFrom(tab, target, opts?.via)
         if (opts?.newTab || !tab) {
-          const t = freshTab(target)
+          const t = freshTab(target, trail)
           set({ tabs: sortPinned([...s.tabs, t]), activeId: t.id })
           return
         }
         if (sameTarget(tabTarget(tab), target)) return
         if (tab.persistent && tab.index >= 0) {
           // A persistent tab keeps its page: the new page opens in a new tab right after it.
-          const t = freshTab(target)
+          const t = freshTab(target, trail)
           const i = s.tabs.findIndex((x) => x.id === tab.id)
           set({ tabs: sortPinned([...s.tabs.slice(0, i + 1), t, ...s.tabs.slice(i + 1)]), activeId: t.id })
           return
         }
-        set(
-          updateActive(s, (t) => {
-            const crumbs = alignCrumbs(t.crumbs, t.history.length)
-            const history = [...t.history.slice(0, t.index + 1), target]
-            const trails = [...crumbs.slice(0, t.index + 1), []]
-            const cut = Math.max(0, history.length - HISTORY_LIMIT)
-            return { ...t, history: history.slice(cut), crumbs: trails.slice(cut), index: history.length - 1 - cut }
-          }),
-        )
+        set(updateActive(s, (t) => pushEntry(t, target, trail)))
       },
 
       back() {
@@ -284,6 +332,21 @@ export const useTabs = create<TabsState>()(
         const rest = s.tabs.filter((t) => t.id !== id)
         const n = rest.filter((t) => t.pinned).length
         set({ tabs: [...rest.slice(0, n), tab, ...rest.slice(n)] })
+      },
+
+      goToCrumb(k) {
+        const s = get()
+        const tab = activeTab(s)
+        const trail = tabCrumbs(tab)
+        if (!tab || k < 0 || k >= trail.length) return
+        const i = crumbIndex(tab, k)
+        if (i >= 0) {
+          set(updateActive(s, (t) => ({ ...t, index: i })))
+          return
+        }
+        const target = trail[k]
+        if (target.kind === 'object') useRecent.getState().add(target.path)
+        set(updateActive(s, (t) => pushEntry(t, target, trail.slice(0, k))))
       },
 
       unpin(id) {
