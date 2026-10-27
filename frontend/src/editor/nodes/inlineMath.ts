@@ -1,9 +1,11 @@
 /**
  * `inlineMath`: an inline formula, `$…$` with Pandoc's dollar rules (rule 6,
- * `findInlineMath`). Rendering is plain text here; Task 9 adds KaTeX.
+ * `findInlineMath`). Rendered with KaTeX by `math/InlineMathView.tsx` (Task 9).
  */
 import { Node, mergeAttributes, type MarkdownToken } from '@tiptap/core'
+import { ReactNodeViewRenderer } from '@tiptap/react'
 import { findInlineMath } from '../annotations'
+import { InlineMathView } from '../math/InlineMathView'
 import './inlineMath.css'
 
 declare module '@tiptap/core' {
@@ -42,6 +44,10 @@ export const InlineMath = Node.create({
 
   renderHTML({ node, HTMLAttributes }) {
     return ['span', mergeAttributes(HTMLAttributes, { 'data-inline-math': '', class: 'inline-math' }), node.attrs.text || '']
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(InlineMathView, { as: 'span' })
   },
 
   renderText({ node }) {
