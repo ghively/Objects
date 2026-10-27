@@ -10,7 +10,7 @@
  * is emitted as its whole region.
  */
 import { getExtensionField, type AnyExtension, type Editor, type JSONContent } from '@tiptap/core'
-import { OrderedList, TaskItem, TaskList } from '@tiptap/extension-list'
+import { OrderedList, TaskItem } from '@tiptap/extension-list'
 import { TableKit } from '@tiptap/extension-table'
 import { Markdown } from '@tiptap/markdown'
 import type { Node as PMNode } from '@tiptap/pm/model'
@@ -36,6 +36,7 @@ import { BlockSelection } from './extensions/blockSelection'
 import { FileDrop } from './extensions/fileDrop'
 import { RawBlock } from './extensions/rawBlock'
 import { SlashMenu } from './extensions/slashMenu'
+import { TaskListCommonMark } from './extensions/taskListMarkdown'
 import { Wikilink } from './extensions/wikilink'
 import { BlockOptions, optionApplies } from './nodes/blockOptions'
 import { Bookmark, bookmarkMarkdown } from './nodes/bookmark'
@@ -108,7 +109,7 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
     }),
     numbered ? OrderedList : OrderedList.extend({ addInputRules: () => [] }),
     withoutRegistryKeys(CodeBlock),
-    withoutRegistryKeys(TaskList),
+    withoutRegistryKeys(TaskListCommonMark),
     withoutRegistryKeys(TaskItem.configure({ nested: true })),
     TableKit.configure({ table: { resizable: false } }),
     Markdown,
@@ -168,6 +169,7 @@ const NODE_KIND: Record<string, string> = {
 function contentKey(md: string): string {
   return md
     .replace(/\r\n?/g, '\n')
+    .replace(/^[ \t]*(?:>[ \t]?)+/gm, '')
     .replace(/^[ \t]*(?:[*+-]|\d{1,9}[.)])[ \t]+/gm, '')
     .replace(/[\s*_`~\\#=+-]/g, '')
 }
