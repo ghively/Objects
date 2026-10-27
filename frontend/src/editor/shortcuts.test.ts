@@ -126,4 +126,66 @@ describe('editor shortcuts', () => {
     expect(map.Backspace()).toBe(false)
     expect(calls).toEqual(['delete'])
   })
+  // Known issue 3: StarterKit's (and the list and code block extensions') own keys fired beside the
+  // registry, so a changed registry key left the old built-in key working.
+  type Combo = [string, { ctrl?: boolean; shift?: boolean; alt?: boolean }]
+  const rebinds: { id: string; body: string; old: Combo; before: string }[] = [
+    { id: 'heading1', body: 'Hello\n\nWorld\n', old: ['1', { ctrl: true, alt: true }], before: '# Hello\n\nWorld\n' },
+    { id: 'heading4', body: 'Hello\n\nWorld\n', old: ['4', { ctrl: true, alt: true }], before: '#### Hello\n\nWorld\n' },
+    { id: 'bold', body: 'Hello\n\nWorld\n', old: ['b', { ctrl: true }], before: '' },
+    { id: 'italic', body: 'Hello\n\nWorld\n', old: ['i', { ctrl: true }], before: '' },
+    { id: 'underline', body: 'Hello\n\nWorld\n', old: ['u', { ctrl: true }], before: '' },
+    { id: 'strikethrough', body: 'Hello\n\nWorld\n', old: ['s', { ctrl: true, shift: true }], before: '' },
+    { id: 'codeToken', body: 'Hello\n\nWorld\n', old: ['e', { ctrl: true }], before: '' },
+    { id: 'toggleCodeBlock', body: 'Hello\n\nWorld\n', old: ['c', { ctrl: true, alt: true }], before: '' },
+  ]
+  for (const { id, body, old } of rebinds) {
+    test(`a changed ${id} key leaves no built-in key behind`, () => {
+      const original = allShortcuts().find((d) => d.id === id)!
+      try {
+        registerShortcuts([{ ...original, keys: ['Mod-Alt-F9'] }])
+        const editor = headless(body)
+        // Select the first word so the mark keys have something to act on.
+        editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 1, 6)))
+        const before = editor.getJSON()
+        press(editor, ...old)
+        expect(editor.getJSON()).toEqual(before)
+        expect(serializeBody(editor)).toBe(body)
+        expect(press(editor, 'F9', { ctrl: true, alt: true })).toBe(true)
+        expect(serializeBody(editor)).not.toBe(body)
+      } finally {
+        registerShortcuts([original])
+      }
+    })
+  }
+
+  test('only the registry key turns a block into a to-do (no Mod-Shift-9)', () => {
+    const editor = headless('Hello\n\nWorld\n')
+    press(editor, '9', { ctrl: true, shift: true })
+    expect(serializeBody(editor)).toBe('Hello\n\nWorld\n')
+  })
+
+  test('Tab in a list item indents through the registry key, and a changed key leaves Tab inert', () => {
+    const body = '- one\n- two\n'
+    let editor = headless(body)
+    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.near(editor.state.doc.resolve(body.indexOf('two') + 4))))
+    expect(editor.state.selection.$from.parent.textContent).toBe('two')
+    expect(press(editor, 'Tab')).toBe(true)
+    expect(serializeBody(editor)).toBe('- one\n  - two\n')
+    expect(press(editor, 'Tab', { shift: true })).toBe(true)
+    expect(serializeBody(editor)).toBe('- one\n- two\n')
+
+    const ind = allShortcuts().find((d) => d.id === 'indentBlocks')!
+    try {
+      registerShortcuts([{ ...ind, keys: ['Mod-Alt-F9'] }])
+      editor = headless(body)
+      editor.view.dispatch(editor.state.tr.setSelection(TextSelection.near(editor.state.doc.resolve(body.indexOf('two') + 4))))
+      press(editor, 'Tab')
+      expect(serializeBody(editor)).toBe(body)
+      expect(press(editor, 'F9', { ctrl: true, alt: true })).toBe(true)
+      expect(serializeBody(editor)).toBe('- one\n  - two\n')
+    } finally {
+      registerShortcuts([ind])
+    }
+  })
 })

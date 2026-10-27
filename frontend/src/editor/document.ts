@@ -9,7 +9,7 @@
  * its own source. Serializing recurses into containers; an unedited container
  * is emitted as its whole region.
  */
-import type { AnyExtension, Editor, JSONContent } from '@tiptap/core'
+import { getExtensionField, type AnyExtension, type Editor, type JSONContent } from '@tiptap/core'
 import { OrderedList, TaskItem, TaskList } from '@tiptap/extension-list'
 import { TableKit } from '@tiptap/extension-table'
 import { Markdown } from '@tiptap/markdown'
@@ -53,19 +53,63 @@ export type EditorExtensionOptions = {
   numberedListInputRule?: boolean
 }
 
+/**
+ * Built-in Tiptap keys whose action the shortcut registry owns (`lib/shortcuts.ts`, bound in
+ * `extensions/blockSelection.ts`): they are taken out of the built-in key maps so that only the
+ * registry's keys trigger those actions, and a key corrected in the registry leaves no old key
+ * behind. Other built-in keys (Enter, Backspace, Mod-z, Mod-Shift-8, …) stay.
+ */
+const REGISTRY_OWNED_KEYS: Record<string, (key: string) => boolean> = {
+  bold: (k) => k === 'Mod-b' || k === 'Mod-B',
+  italic: (k) => k === 'Mod-i' || k === 'Mod-I',
+  underline: (k) => k === 'Mod-u' || k === 'Mod-U',
+  strike: (k) => k === 'Mod-Shift-s' || k === 'Mod-Shift-S',
+  code: (k) => k === 'Mod-e' || k === 'Mod-E',
+  heading: (k) => /^Mod-Alt-\d$/.test(k),
+  codeBlock: (k) => k === 'Mod-Alt-c',
+  taskList: (k) => k === 'Mod-Shift-9',
+  listItem: (k) => k === 'Tab' || k === 'Shift-Tab',
+  taskItem: (k) => k === 'Tab' || k === 'Shift-Tab',
+}
+
+/** `ext` without the built-in keys the registry owns (unchanged when it has none). */
+export function withoutRegistryKeys<T extends AnyExtension>(ext: T): T {
+  const owned = REGISTRY_OWNED_KEYS[ext.name]
+  if (!owned) return ext
+  const stripped = ext.extend({
+    addKeyboardShortcuts() {
+      const { parent: _parent, ...context } = this
+      const keys = getExtensionField<() => Record<string, unknown>>(ext, 'addKeyboardShortcuts', context)
+      const all = (typeof keys === 'function' ? keys() : {}) ?? {}
+      return Object.fromEntries(Object.entries(all).filter(([key]) => !owned(key)))
+    },
+  }) as T
+  // As `configure` does: the copied config's other fields keep `ext`'s parent chain (with `ext`
+  // as the parent they would run twice, e.g. a keyed plugin added twice).
+  stripped.parent = ext.parent
+  return stripped
+}
+
+/** StarterKit with the registry-owned keys taken out of each of its extensions. */
+const RegistryStarterKit = StarterKit.extend({
+  addExtensions() {
+    return (this.parent?.() ?? []).map(withoutRegistryKeys)
+  },
+})
+
 export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtension[] {
   const numbered = opts.numberedListInputRule ?? true
   return [
-    StarterKit.configure({
+    RegistryStarterKit.configure({
       heading: { levels: [1, 2, 3, 4] },
       link: { openOnClick: false },
       codeBlock: false,
       orderedList: false,
     }),
     numbered ? OrderedList : OrderedList.extend({ addInputRules: () => [] }),
-    CodeBlock,
-    TaskList,
-    TaskItem.configure({ nested: true }),
+    withoutRegistryKeys(CodeBlock),
+    withoutRegistryKeys(TaskList),
+    withoutRegistryKeys(TaskItem.configure({ nested: true })),
     TableKit.configure({ table: { resizable: false } }),
     Markdown,
     BlockSource,
