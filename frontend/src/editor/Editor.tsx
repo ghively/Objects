@@ -8,6 +8,8 @@ import { useSettings } from '@/settings/useSettings'
 import { editorExtensions, loadBody, serializeBody } from './document'
 import { createFindControl, FindInPage } from './extensions/findInPage'
 import { BlockHandles } from './handles/BlockHandles'
+import { setEditorObject } from './nodes/blockRef'
+import { TokensMenu } from './tokens/TokensMenu'
 import { SlashMenu } from './slash/SlashMenu'
 import { useAutosave, type BodyEditorHandle } from './useAutosave'
 import './editor.css'
@@ -95,6 +97,13 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict, con
     editor?.setEditable(!readOnly, false)
   }, [editor, readOnly])
 
+  // The object this editor shows, for the block references it copies (M8).
+  useEffect(() => {
+    if (!editor) return
+    setEditorObject(editor, { path })
+    return () => setEditorObject(editor, null)
+  }, [editor, path])
+
   // A space switch flushes every open editor's pending save first (read-only ones resolve at once).
   const settleRef = useRef(autosave.settle)
   settleRef.current = autosave.settle
@@ -153,6 +162,7 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict, con
       <EditorContent editor={editor} className="object-editor-root" data-readonly={readOnly || undefined} />
       {editor && !readOnly && <BlockHandles editor={editor} />}
       {editor && !readOnly && <SlashMenu editor={editor} />}
+      {editor && !readOnly && <TokensMenu editor={editor} path={path} />}
     </>
   )
 }

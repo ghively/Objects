@@ -44,11 +44,15 @@ export const BLOCK_OPTION_TYPES = [
   'toggle',
   'group',
   'columns',
+  // M8
+  'blockRef',
+  'dataViewEmbed',
+  'indent',
 ]
 
 /** Parents whose children are blocks that serialize on their own (with an annotation). */
-export const BLOCK_PARENTS = new Set(['doc', 'toggle', 'group', 'column'])
-const CONTAINER_NODES = new Set(['toggle', 'group', 'columns'])
+export const BLOCK_PARENTS = new Set(['doc', 'toggle', 'group', 'column', 'indent'])
+const CONTAINER_NODES = new Set(['toggle', 'group', 'columns', 'indent'])
 
 /** What a node is, for the option table's "Applies to" column. */
 export function nodeTargets(node: PMNode): OptionTarget[] {
@@ -82,6 +86,12 @@ export function nodeTargets(node: PMNode): OptionTarget[] {
       return ['group']
     case 'columns':
       return ['columns']
+    case 'indent':
+      return ['indent']
+    case 'blockRef':
+      return ['blockRef']
+    case 'dataViewEmbed':
+      return ['dataView']
     default:
       return []
   }

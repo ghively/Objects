@@ -1,7 +1,8 @@
 /**
  * Group M1's flat source blocks into a tree: leaf annotations attach to the
  * block below them, and container lines (toggle, group, columns) pair up
- * around their children (plan rules 4, 5 and 7).
+ * around their children (plan rules 4, 5 and 7). M8 adds the `indent`
+ * container (`<!-- indent -->` … `<!-- /indent -->`), which pairs like the others.
  *
  * Invariant: `joinBlocks(flattenTree(buildTree(splitBlocks(body)))) === body`
  * for every input. Anything that does not pair or apply stays a plain leaf,
@@ -46,6 +47,8 @@ export function blockTargets(block: SourceBlock): OptionTarget[] {
       if (embed?.kind === 'image') return ['image']
       if (embed?.kind === 'media') return [embed.mediaKind]
       if (embed?.kind === 'objectEmbed') return ['objectEmbed']
+      if (embed?.kind === 'blockRef') return ['blockRef']
+      if (embed?.kind === 'dataView') return ['dataView']
       return singleLink(block.raw) ? ['paragraph', 'bookmark'] : ['paragraph']
     }
     case 'heading':

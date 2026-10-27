@@ -13,7 +13,7 @@
  */
 import { THEME_COLORS } from '@/theme/palette'
 
-export type ContainerName = 'toggle' | 'group' | 'columns'
+export type ContainerName = 'toggle' | 'group' | 'columns' | 'indent'
 
 export type Option = { key: string; value: string | true; raw: string }
 
@@ -43,6 +43,9 @@ export type OptionTarget =
   | 'toggle'
   | 'group'
   | 'columns'
+  | 'indent'
+  | 'blockRef'
+  | 'dataView'
 
 export type KnownOption = {
   key: string
@@ -87,6 +90,8 @@ export const KNOWN_OPTIONS: readonly KnownOption[] = (
     { key: 'open', value: 'flag', appliesTo: ['toggle'] },
     { key: 'widths', value: /^\d+(?:,\d+)*$/, appliesTo: ['columns'] },
     { key: 'layout', value: /^grid$/, appliesTo: ['columns'] },
+    // M8: "Show details" on an embedded collection or query (`showDataViewDetails`).
+    { key: 'details', value: 'flag', appliesTo: ['dataView'] },
   ] as Omit<KnownOption, 'order'>[]
 ).map((o, order) => ({ ...o, order }))
 
@@ -112,7 +117,7 @@ const LINE = /^ {0,3}<!--((?:(?!-->)[^\r\n])*)-->[ \t]*(?:\r\n|\n|\r)?$/
 const KEY = /[a-z][a-zA-Z0-9-]*/y
 const BARE = /[A-Za-z0-9_.,:#/+-]+/y
 const BLANK = /[ \t]+/y
-const CONTAINERS: readonly ContainerName[] = ['toggle', 'group', 'columns']
+const CONTAINERS: readonly ContainerName[] = ['toggle', 'group', 'columns', 'indent']
 
 function parseOptions(text: string): Option[] | null {
   const options: Option[] = []
@@ -330,6 +335,16 @@ export type EmbedLine =
   | { kind: 'image'; alt: string; src: string }
   | { kind: 'media'; mediaKind: AttachmentKind; target: string; label: string | null }
   | { kind: 'objectEmbed'; target: string; label: string | null }
+  | { kind: 'blockRef'; target: string; id: string; label: string | null }
+  | { kind: 'dataView'; dataKind: DataViewKind; id: string; label: string | null }
+
+/** What an embedded live view shows (M8: `![[collection:<id>]]`, `![[query:<id>]]`). */
+export type DataViewKind = 'collection' | 'query'
+
+/** A block id (M8): six characters `[a-z0-9]`, the Obsidian convention. */
+export const BLOCK_ID_PATTERN = '[a-z0-9]{6}'
+const BLOCK_REF_TARGET = new RegExp(`^(.+?)#\\^(${BLOCK_ID_PATTERN})$`)
+const DATA_VIEW_TARGET = /^(collection|query):([^\s\]|#]+)$/
 
 const MD_IMAGE = /^!\[([^\]\r\n]*)\]\((\S+?)(?:[ \t]+"[^"\r\n]*")?\)$/
 const WIKI_EMBED = /^!\[\[([^\]|\r\n]+)(?:\|([^\]\r\n]*))?\]\]$/
@@ -344,6 +359,9 @@ function lineText(raw: string): string | null {
  * Rule 7: a paragraph whose whole text is one `![alt](src)` is an image block;
  * one `![[target]]` (or `![[target|label]]`) is a media block when the target
  * has an extension other than `.md`, otherwise an object embed. `null` otherwise.
+ * M8: `![[Title#^id]]` is a block reference and `![[collection:<id>]]` /
+ * `![[query:<id>]]` a live collection or query view (an empty id, as in
+ * `![[collection:]]`, stays an object embed and round-trips as written).
  */
 export function classifyEmbedLine(raw: string): EmbedLine | null {
   const text = lineText(raw)
@@ -354,6 +372,10 @@ export function classifyEmbedLine(raw: string): EmbedLine | null {
   if (!wiki) return null
   const target = wiki[1]
   const label = wiki[2] ?? null
+  const ref = BLOCK_REF_TARGET.exec(target)
+  if (ref) return { kind: 'blockRef', target: ref[1], id: ref[2], label }
+  const view = DATA_VIEW_TARGET.exec(target)
+  if (view) return { kind: 'dataView', dataKind: view[1] as DataViewKind, id: view[2], label }
   const ext = FILE_EXT.exec(target)?.[1]?.toLowerCase()
   if (ext && ext !== 'md') return { kind: 'media', mediaKind: attachmentKind(target), target, label }
   return { kind: 'objectEmbed', target, label }
@@ -366,4 +388,32 @@ export function singleLink(raw: string): { title: string; href: string } | null 
   const text = lineText(raw)
   const m = text === null ? null : ONE_LINK.exec(text)
   return m ? { title: m[1], href: m[2] } : null
+}
+
+// ---------------------------------------------------------------------------
+// M8: per-list-item options, an inline comment at the end of the item's first
+// line: `- Buy milk <!-- item: color=text-red -->` (before a block id when both
+// are present). Options are a paragraph's leaf options (`small`, `color`,
+// `align`, `icon`); unknown ones are kept with their exact text.
+
+/** The options a list item can carry, in canonical order. */
+export const ITEM_OPTION_KEYS = ['small', 'color', 'align', 'icon'] as const
+
+/** `<!-- item: … -->` at the start of `text` (no line break), or `null`. */
+const ITEM_COMMENT = /^<!--[ \t]*item:((?:(?!-->)[^\r\n])*)-->/i
+
+/** Parse an item comment at the start of `text`: its options and the exact matched text. */
+export function parseItemComment(text: string): { options: Option[]; raw: string } | null {
+  const m = ITEM_COMMENT.exec(text)
+  if (!m) return null
+  const options = parseOptions(m[1].replace(/[ \t]+$/, ''))
+  if (!options) return null
+  return { options, raw: m[0] }
+}
+
+/** The canonical item comment for `options` (`''` for none). */
+export function formatItemComment(options: readonly Option[]): string {
+  if (options.length === 0) return ''
+  const opts = canonicalOrder(options).map((o) => (KNOWN_BY_KEY.has(o.key) ? formatOption(o) : o.raw))
+  return `<!-- item:${opts.map((o) => ` ${o}`).join('')} -->`
 }

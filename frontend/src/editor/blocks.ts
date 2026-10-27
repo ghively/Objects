@@ -169,3 +169,45 @@ function buildOffsetMap(body: string, normalizedLength: number): Uint32Array {
   map[n] = body.length
   return map
 }
+
+// ---------------------------------------------------------------------------
+// M8 block ids: ` ^<id>` at the end of a block's last line, `<id>` six
+// characters `[a-z0-9]` (the Obsidian convention). A block reference is a line
+// that is exactly `![[<Title>#^<id>]]` (optionally `|label`); the splitter needs
+// nothing new for either (an id is ordinary text, a reference is a one-line
+// paragraph that `classifyEmbedLine` recognises).
+
+/** A trailing block id on a line (without its line end): the space, `^` and the id. */
+export const BLOCK_ID_SUFFIX = / \^([a-z0-9]{6})$/
+
+/** The block id at the end of `text`'s last line (trailing line breaks and blanks ignored), or `null`. */
+export function blockIdOf(text: string): string | null {
+  const last = text.replace(/[ \t]*(?:\r\n|\n|\r)*$/, '')
+  return BLOCK_ID_SUFFIX.exec(last)?.[1] ?? null
+}
+
+/** Every block id in a body (in order, each once). */
+export function blockIdsIn(body: string): string[] {
+  const out = new Set<string>()
+  for (const m of body.matchAll(/ \^([a-z0-9]{6})[ \t]*(?=\r\n|\n|\r|$)/g)) out.add(m[1])
+  return [...out]
+}
+
+const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
+
+/** A fresh six-character id not in `taken` (`random` is injectable for tests). */
+export function newBlockId(taken: Iterable<string> = [], random: () => number = Math.random): string {
+  const used = new Set(taken)
+  for (let attempt = 0; ; attempt++) {
+    // A source that keeps repeating a taken id (a stubbed one) falls back to Math.random.
+    const rnd = attempt < 64 ? random : Math.random
+    let id = ''
+    for (let i = 0; i < 6; i++) id += ID_CHARS[Math.floor(rnd() * ID_CHARS.length) % ID_CHARS.length]
+    if (!used.has(id)) return id
+  }
+}
+
+/** The line of a block reference to `title`'s block `id`. */
+export function blockRefMarkdown(title: string, id: string, label?: string | null): string {
+  return label ? `![[${title}#^${id}|${label}]]` : `![[${title}#^${id}]]`
+}
