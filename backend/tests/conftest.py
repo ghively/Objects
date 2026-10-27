@@ -41,6 +41,45 @@ def calendar_space_dir(tmp_path: Path) -> Path:
     return dest
 
 
+@pytest.fixture
+def links_space_dir(tmp_path: Path) -> Path:
+    """A fresh copy of the synthetic M5 `space-links` space (links, mentions, resolution order)."""
+    dest = tmp_path / "space-links"
+    shutil.copytree(FIXTURES / "space-links", dest)
+    return dest
+
+
+@pytest.fixture(scope="session")
+def _big_space(tmp_path_factory):
+    from bigspace import make_big_space
+
+    root = tmp_path_factory.mktemp("big-space") / "space-big"
+    stats = make_big_space(root)
+    return root, stats
+
+
+@pytest.fixture(scope="session")
+def big_space_dir(_big_space) -> Path:
+    """The generated 5,000-object / 50,000-link space, built once per session. Read it only."""
+    return _big_space[0]
+
+
+@pytest.fixture(scope="session")
+def big_space_stats(_big_space):
+    """The `BigStats` of `big_space_dir`."""
+    return _big_space[1]
+
+
+@pytest.fixture(autouse=True)
+def _search_cache_stays_in_the_sandbox(tmp_path_factory, monkeypatch):
+    """M5: the search index lives in `.capacities-cache/` by default.
+
+    Point `OBJECT_CACHE_DIR` at a per-test temporary folder so no test's space
+    tree ever gains a cache (tests that check the default location unset it).
+    """
+    monkeypatch.setenv("OBJECT_CACHE_DIR", str(tmp_path_factory.mktemp("object-cache")))
+
+
 @pytest.fixture(autouse=True)
 def _reminders_stay_in_the_sandbox(tmp_path_factory, monkeypatch):
     """M4 Task 6: every app lifespan runs the reminder scheduler.
