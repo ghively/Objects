@@ -1,5 +1,5 @@
 import { Editor as TiptapEditor } from '@tiptap/core'
-import { act, render } from '@testing-library/react'
+import { act, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ConflictError } from '@/api/client'
 import { Editor } from './Editor'
@@ -13,6 +13,9 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
+import { flushAll } from '@/lib/flush'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
+import { EDITOR_PLACEHOLDER } from './Editor'
 const saveBody = vi.mocked(api).saveBody
 
 const fixtures = import.meta.glob('./__fixtures__/*.md', {
@@ -602,5 +605,91 @@ describe('<Editor> find in page', () => {
     render(<RawMode path="Pages/Find.md" text="alpha" version="v1" onSaved={() => {}} controlRef={ref} />)
     expect(ref.current).not.toBeNull()
     expect(ref.current!.find).toBeUndefined()
+  })
+})
+
+describe('<Editor> M7 settings, flusher and chrome', () => {
+  afterEach(() => {
+    useSettings.setState({ settings: settingsDefaults })
+    saveBody.mockReset()
+  })
+
+  function mountWith(body: string, props: Partial<Parameters<typeof Editor>[0]> = {}) {
+    const utils = render(
+      <Editor path="Pages/M7.md" body={body} version="v1" readOnly={false} onSaved={() => {}} onConflict={() => {}} {...props} />,
+    )
+    return { ...utils, editor: pmEditor(utils.container) }
+  }
+
+  /** Type `text` at the end of the first block through the input rules. */
+  function typeAtEnd(editor: TiptapEditor, text: string) {
+    const end = editor.state.doc.child(0).nodeSize - 1
+    act(() => {
+      editor.commands.setTextSelection(end)
+      const handled = editor.view.someProp('handleTextInput', (f) => f(editor.view, end, end, text, () => editor.state.tr))
+      if (!handled) editor.view.dispatch(editor.state.tr.insertText(text, end))
+    })
+  }
+
+  test('spellcheck and numbered list detection follow settings', () => {
+    const on = mountWith('')
+    expect(on.editor.view.dom.getAttribute('spellcheck')).toBe('true')
+    for (const ch of ['1', '.', ' ']) typeAtEnd(on.editor, ch)
+    expect(on.editor.state.doc.child(0).type.name).toBe('orderedList')
+    on.unmount()
+
+    useSettings.setState({ settings: { ...settingsDefaults, disableSpellcheck: true, disableNumberedListTransformation: true } })
+    const off = mountWith('')
+    expect(off.editor.view.dom.getAttribute('spellcheck')).toBe('false')
+    for (const ch of ['1', '.', ' ']) typeAtEnd(off.editor, ch)
+    expect(off.editor.state.doc.child(0).type.name).toBe('paragraph')
+    expect(off.editor.state.doc.child(0).textContent).toBe('1. ')
+    // The spellcheck setting follows changes while the editor is open.
+    act(() => {
+      useSettings.setState({ settings: { ...settingsDefaults, disableSpellcheck: false } })
+    })
+    expect(off.editor.view.dom.getAttribute('spellcheck')).toBe('true')
+  })
+
+  test('editor registers its flusher and unregisters on unmount', async () => {
+    saveBody.mockResolvedValue({ version: 'v2' })
+    const { editor, unmount } = mountWith('Hello\n')
+    act(() => {
+      editor.commands.insertContentAt(6, ' world')
+    })
+    await act(async () => flushAll())
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    expect(saveBody).toHaveBeenCalledWith('Pages/M7.md', 'Hello world\n', 'v1')
+
+    unmount()
+    saveBody.mockClear()
+    await act(async () => flushAll())
+    expect(saveBody).not.toHaveBeenCalled()
+
+    // A read-only editor's flusher resolves at once.
+    const ro = mountWith('Hello\n', { readOnly: true })
+    await act(async () => flushAll())
+    expect(saveBody).not.toHaveBeenCalled()
+    ro.unmount()
+  })
+
+  test('empty body shows the placeholder; read-only editors have no handles or slash menu', () => {
+    const { editor, unmount } = mountWith('')
+    const first = editor.view.dom.firstElementChild!
+    expect(first.classList.contains('is-editor-empty')).toBe(true)
+    expect(first.getAttribute('data-placeholder')).toBe(EDITOR_PLACEHOLDER)
+    expect(EDITOR_PLACEHOLDER).toBe('Write your text or search for blocks...')
+    act(() => {
+      fireEvent.mouseOver(first)
+    })
+    expect(document.querySelector('[data-block-handles]')).not.toBeNull()
+    unmount()
+
+    const ro = mountWith('Hello\n', { readOnly: true })
+    act(() => {
+      fireEvent.mouseOver(ro.editor.view.dom.firstElementChild!)
+    })
+    expect(document.querySelector('[data-block-handles]')).toBeNull()
+    expect(ro.editor.view.dom.querySelector('.is-editor-empty')).toBeNull()
   })
 })
