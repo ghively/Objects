@@ -130,7 +130,11 @@ describe('block references (M8 Task 27)', () => {
     editor.commands.setTextSelection(3)
     render(<BlockMenu editor={editor} open onOpenChange={() => {}} anchor={{ left: 0, top: 0, width: 10, height: 10 }} />)
     const menu = await screen.findByRole('menu')
-    fireEvent.click(within(menu).getByRole('menuitem', { name: /^Copy block reference/ }))
+    // Capacities: "Copy" ▸ "Copy block reference".
+    const copy = within(menu).getByRole('menuitem', { name: /^Copy$/ })
+    fireEvent.click(copy)
+    const sub = await screen.findByRole('menu', { name: (_, el) => el.id === copy.getAttribute('aria-controls') })
+    fireEvent.click(within(sub).getByRole('menuitem', { name: /^Copy block reference/ }))
     const body = serializeBody(editor)
     const id = /Hello world \^([a-z0-9]{6})\n/.exec(body)?.[1]
     expect(id).toBeTruthy()

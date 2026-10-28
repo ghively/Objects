@@ -1,12 +1,17 @@
 /**
- * Table formulas (Capacities' `SimpleTableBlock` formulas). A cell whose text
- * starts with `=` is a formula; the text stays in the file as written, and the
- * editor shows the value it computes (`FormulaCell.tsx`).
+ * Table formulas (Capacities' `SimpleTableBlock` formulas). A cell is a formula
+ * when its text starts with `=` and holds no other `=` (Capacities' rule); the
+ * text stays in the file as written, and the editor shows the value it
+ * computes (`FormulaCell.tsx`).
  *
  * The language: numbers, `+ - * / ^` (with `^` binding tightest and right to
  * left), unary `+`/`-`, parentheses, cell references (`A1`: columns lettered,
- * rows counted from 1 at the table's first row, the header row included; our
- * choice), ranges (`A1:B3`, only as function arguments) and Capacities' 20
+ * rows counted from 1 at the table's first row, the header row included, as
+ * Capacities counts them), `$` absolute references (`$A$1`, `A$1`, `$A1`: the
+ * `$` only matters when a formula is copied, so here it reads as `A1`), ranges
+ * (`A1:B3`, only as function arguments) including whole columns (`A:A`, `A:B`:
+ * rows 1 to the last row; `A2:B` / `A:B3` fill in the missing row the same
+ * way; reference check 2026-10-28, section 4) and Capacities' 20
  * statements (`blocks.simpleTable.formulas.statements.*`). Function names and
  * references are case-insensitive and arguments are separated by `,` or `;`
  * (our choices). A constant can be written bare (`PI`) or called (`PI()`).
@@ -99,15 +104,19 @@ function raise(kind: FormulaErrorKind, message: FormulaMessage): never {
   throw new FormulaFailure(fail(kind, message) as Extract<FormulaResult, { ok: false }>)
 }
 
-/** Whether a cell's text is a formula (starts with `=`, leading spaces allowed). */
+/**
+ * Whether a cell's text is a formula: it starts with `=` (leading spaces
+ * allowed, our choice) and holds no other `=` (Capacities' check: exactly one
+ * `=`). A bare `=` is a formula being typed (its error is "The formula
+ * expression is empty.").
+ */
 export function isFormula(text: string): boolean {
-  return /^\s*=/.test(text)
+  return /^\s*=[^=]*$/.test(text)
 }
 
 /** The expression after the `=`, or null when `text` is not a formula. */
 export function formulaExpression(text: string): string | null {
-  const m = /^\s*=/.exec(text)
-  return m ? text.slice(m[0].length) : null
+  return isFormula(text) ? text.slice(text.indexOf('=') + 1) : null
 }
 
 /** `0` → `A`, `25` → `Z`, `26` → `AA`. */
@@ -122,15 +131,27 @@ export function columnLetter(index: number): string {
   return out
 }
 
-/** `A1` → `{ row: 0, col: 0 }`; null when it is not a cell reference. */
-export function parseCellRef(ref: string): CellAt | null {
-  const m = /^([A-Za-z]+)(\d+)$/.exec(ref)
-  if (!m) return null
+function columnIndex(letters: string): number {
   let col = 0
-  for (const ch of m[1].toUpperCase()) col = col * 26 + (ch.charCodeAt(0) - 64)
+  for (const ch of letters.toUpperCase()) col = col * 26 + (ch.charCodeAt(0) - 64)
+  return col - 1
+}
+
+/** `A1` (or `$A$1`, `A$1`, `$A1`) → `{ row: 0, col: 0 }`; null when it is not a cell reference. */
+export function parseCellRef(ref: string): CellAt | null {
+  const m = /^\$?([A-Za-z]+)\$?(\d+)$/.exec(ref)
+  if (!m) return null
   const row = Number(m[2])
   if (row < 1) return null
-  return { row: row - 1, col: col - 1 }
+  return { row: row - 1, col: columnIndex(m[1]) }
+}
+
+/** A range end: a cell (`B3`) or a whole column (`B`, `$B`, `row: null`); null for anything else. */
+function parseRangeEnd(ref: string): { row: number | null; col: number } | null {
+  const cell = parseCellRef(ref)
+  if (cell) return cell
+  const m = /^\$?([A-Za-z]+)$/.exec(ref)
+  return m ? { row: null, col: columnIndex(m[1]) } : null
 }
 
 /** A cell's text as a number: digits with an optional sign, `.` decimals, `,` groups and exponent; else null. */
@@ -163,7 +184,8 @@ function tokenize(src: string): Token[] {
       i += num[0].length
       continue
     }
-    const id = /^[A-Za-z_][A-Za-z0-9_]*/.exec(src.slice(i))
+    // A name, or a reference with `$` marks (`$A$1`, `A$1`, `$A`).
+    const id = /^\$?[A-Za-z_][A-Za-z0-9_]*(?:\$\d+)?/.exec(src.slice(i))
     if (id) {
       out.push({ t: 'id', v: id[0] })
       i += id[0].length
@@ -392,15 +414,19 @@ function parse(ctx: Context, tokens: Token[]): Value {
         expect(')')
         return callStatement(ctx, upper, args)
       }
-      if (FORMULA_CONSTANTS.has(upper)) return callStatement(ctx, upper, [])
-      const from = reference(tok.v)
       if (isOp(':')) {
+        // A range; a whole-column end covers rows 1 to the last (Capacities: `A:B` is `A1:B<rows>`).
         i++
         const next = peek()
-        if (next?.t !== 'id' || !parseCellRef(next.v)) raise('reference', 'invalidRangeReference')
+        const start = parseRangeEnd(tok.v)
+        const end = next?.t === 'id' ? parseRangeEnd(next.v) : null
+        if (!start || !end) raise('reference', 'invalidRangeReference')
         i++
-        return range(from, parseCellRef(next.v)!)
+        const last = ctx.grid.length - 1
+        return range({ row: start.row ?? 0, col: start.col }, { row: end.row ?? last, col: end.col })
       }
+      if (FORMULA_CONSTANTS.has(upper)) return callStatement(ctx, upper, [])
+      const from = reference(tok.v)
       if (!inGrid(ctx.grid, from)) raise('reference', 'invalidCellReference')
       const v = cellValue(ctx, from)
       if (v.kind === 'text') raise('value', 'valueNotANumber')

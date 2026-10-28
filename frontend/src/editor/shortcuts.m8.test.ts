@@ -133,11 +133,11 @@ describe('m8 editor shortcuts', () => {
     expect(writeText).toHaveBeenLastCalledWith(`![[Notes#^${id}]]`)
     expect(serializeBody(editor).match(/\^[a-z0-9]{6}/g)).toHaveLength(1)
 
-    // Highlight: the default toggles a yellow highlight; an installed handler wins.
+    // Highlight: the default toggles the last-used colour, bg-amber at first (Capacities); an installed handler wins.
     const ed2 = headless('Mark this word\n')
     ed2.view.dispatch(ed2.state.tr.setSelection(TextSelection.create(ed2.state.doc, 6, 10)))
     expect(press(ed2, keysFor('highlightText')[0])).toBe(true)
-    expect(serializeBody(ed2)).toBe('Mark <mark data-color="bg-yellow">this</mark> word\n')
+    expect(serializeBody(ed2)).toBe('Mark <mark data-color="bg-amber">this</mark> word\n')
     press(ed2, keysFor('highlightText')[0])
     expect(serializeBody(ed2)).toBe('Mark this word\n')
     const handler = vi.fn(() => true)

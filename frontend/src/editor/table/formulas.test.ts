@@ -10,6 +10,7 @@ import {
   evaluateFormula,
   evaluateGrid,
   formatFormulaValue,
+  isFormula,
   parseCellRef,
   shownText,
   type FormulaResult,
@@ -164,5 +165,28 @@ describe('formulas', () => {
     // An error spreads to the formulas that read it.
     const results = evaluateGrid([['=1/0', '=A1+1']])
     expect(results[0][1] && value(results[0][1])).toBe('Value')
+  })
+
+  test('absolute references, whole-column ranges and the one-= rule (Capacities reference)', () => {
+    // $ marks read as the plain reference.
+    expect(calc('=$B$2+B$3+$B4')).toBe(60)
+    expect(calc('=SUM($B$2:$B$4)')).toBe(60)
+    expect(parseCellRef('$C$12')).toEqual({ row: 11, col: 2 })
+    // A whole column is rows 1 to the last; text and empty cells are skipped as in any range.
+    expect(calc('=SUM(B:B)')).toBe(60)
+    expect(calc('=SUM(B:C)')).toBe(63.5)
+    expect(calc('=COUNT($B:$B)')).toBe(3)
+    expect(calc('=SUM(B3:B)')).toBe(50)
+    expect(calc('=SUM(B:B2)')).toBe(10)
+    // E is a column here, not the constant.
+    expect(calc('=SUM(E:E)')).toBe('Reference')
+    expect(calc('=E')).toBeCloseTo(Math.E)
+    // A formula has exactly one `=`.
+    expect(isFormula('=B2')).toBe(true)
+    expect(isFormula('=')).toBe(true)
+    expect(isFormula('=B2=B3')).toBe(false)
+    expect(isFormula('==B2')).toBe(false)
+    expect(shownText('=B2=B3', null)).toBe('=B2=B3')
+    expect(evaluateGrid([['=1=1', '=1+1']])[0]).toEqual([null, { ok: true, value: 2 }])
   })
 })

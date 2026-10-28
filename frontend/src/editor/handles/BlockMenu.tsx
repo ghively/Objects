@@ -1,18 +1,29 @@
 /**
  * The block menu (Task 12), opened by clicking a block's drag handle (the
- * block is then the block selection): "Turn Into", Task 8's "Hierarchy",
- * "List", "Quote", "Color" and "Icon" menus, M8's "Copy block reference",
- * "Turn into object" (pick a type), "Turn into task object" (to-dos only) and
- * "Turn into whiteboard", "Insert block above/below", "Move up/down",
- * "Duplicate", "Remove style" and "Delete". Each row shows its shortcut keys
- * from the registry. Strings are Capacities' (keys beside them).
+ * block is then the block selection). Capacities' BlockMenu sections, in its
+ * order (reference check 2026-10-28, 2e; labels from the English strings):
+ *
+ * 1. "Hierarchy (<current>)" ▸, "List" ▸, "To-do", "Icon" ▸, "Quote",
+ *    "Toggle", "Group" (`BlockStyleMenu`);
+ * 2. "Insert block above", "Insert block below";
+ * 3. (Capacities' "Launch AI assistant with block selection": no AI in Object)
+ * 4. "Turn into..." ▸ (the types, a to-do's "Turn into task object", "Turn into
+ *    whiteboard"), "Copy" ▸ ("Copy blocks", "Copy as Markdown", "Copy block
+ *    reference" for one block), "Duplicate", "Remove" (red trash).
+ *
+ * A last section holds Object's own rows that nothing else reaches
+ * (`BlockStyleExtras`: Color, Standout, Indent, Unindent). Several selected
+ * blocks show "<n> selected" on top. Rows show their shortcut keys from the
+ * registry.
  */
 import type { Editor } from '@tiptap/core'
 import type { ReactNode } from 'react'
+import { Icon } from '@/components/Icon'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuSub,
@@ -25,31 +36,32 @@ import { useLinkIndex } from '@/links/linkIndex'
 import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
 import { formatKeys, keysFor } from '@/lib/shortcuts'
 import { TypeChip } from '@/shell/Sidebar'
+import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 import {
+  blockSelectionRange,
+  copyBlocksAsMarkdown,
   deleteBlocks,
   duplicateBlocks,
   insertBlock,
-  moveBlocks,
-  removeStyle,
-  turnInto,
+  targetRange,
   type TurnIntoKind,
 } from '../extensions/blockSelection'
 import { showToast } from '../media/upload'
-import { BlockStyleMenu } from '../menus/BlockStyleMenu'
+import { BlockStyleExtras, BlockStyleMenu } from '../menus/BlockStyleMenu'
 import { copyBlockReference } from '../nodes/blockRef'
 import { hasTodoAt, turnIntoObject, turnIntoWhiteboard, turnTodoIntoTask } from '../turnInto'
 
 export const BLOCK_MENU_TEXT = {
-  turnInto: 'Turn Into', // tokensMenu.turnInto.name
   insertAbove: 'Insert block above', // BlockMenu.insertAbove
   insertBelow: 'Insert block below', // BlockMenu.insertBelow
-  moveUp: 'Move up', // tokensMenu.moveUp.shortName
-  moveDown: 'Move down', // tokensMenu.moveDown.shortName
-  duplicate: 'Duplicate', // EntityMenu.duplicateObject.text
-  removeStyle: 'Remove style', // blocksMenu.operations.removeStyle
-  delete: 'Delete', // general.delete
-  copyBlockReference: 'Copy block reference', // BlockMenu.copyBlockReference.text
-  turnIntoObject: 'Turn into object', // HighlightMenu.turnIntoObject.label
+  turnInto: 'Turn into...', // ActionItems.turnBlocksInto.title
+  copy: 'Copy', // ActionItems.copy.title
+  copyBlocks: 'Copy blocks', // ActionItems.copyBlocks.title
+  copyAsMarkdown: 'Copy as Markdown', // ActionItems.copyBlocksAsMarkdown.title
+  copyBlockReference: 'Copy block reference', // ActionItems.copyBlockReference.title
+  duplicate: 'Duplicate', // ActionItems.duplicateBlocks.title
+  remove: 'Remove', // ActionItems.deleteBlocks.title
+  selected: (n: number) => `${n} selected`, // blocksMenu.blocksSelected
   turnIntoTaskObject: 'Turn into task object', // components.RootTask.turnBlockIntoTaskObject
   turnIntoWhiteboard: 'Turn into whiteboard', // Whiteboard.turnInto.action
 }
@@ -61,7 +73,7 @@ function run(action: () => Promise<boolean>): void {
   })
 }
 
-/** "Turn Into" items: name (Capacities' key), kind, and the shortcut id whose keys the row shows. */
+/** The tokens menu's "Turn Into" items: name (Capacities' key), kind, and the shortcut id whose keys the row shows. */
 export const TURN_INTO_ITEMS: readonly { kind: TurnIntoKind; name: string; shortcut?: string }[] = [
   { kind: 'text', name: 'Text' }, // blocks.TextBlock.name
   { kind: 'H1', name: 'Heading 1', shortcut: 'heading1' }, // ControlDropdown.custom.block_H1.name
@@ -86,10 +98,23 @@ export function shortcutHint(id: string | undefined): string {
   return keys.length ? formatKeys(keys[0]) : ''
 }
 
-function Row({ onSelect, shortcut, children }: { onSelect: () => void; shortcut?: string; children: ReactNode }) {
+function Row({
+  onSelect,
+  shortcut,
+  icon,
+  variant,
+  children,
+}: {
+  onSelect: () => void
+  shortcut?: string
+  icon?: string
+  variant?: 'destructive'
+  children: ReactNode
+}) {
   const hint = shortcutHint(shortcut)
   return (
-    <DropdownMenuItem onSelect={onSelect}>
+    <DropdownMenuItem onSelect={onSelect} variant={variant}>
+      {icon && <Icon name={icon} size={16} />}
       {children}
       {hint && <DropdownMenuShortcut>{hint}</DropdownMenuShortcut>}
     </DropdownMenuItem>
@@ -108,6 +133,8 @@ export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps
   const close = () => onOpenChange(false)
   const types = useLinkIndex((s) => s.types).filter((t: TypeDef) => !t.readOnlyReason)
   const todo = open && hasTodoAt(editor)
+  const selected = open ? (blockSelectionRange(editor.state)?.blocks.length ?? 0) : 0
+  const targetCount = open ? (targetRange(editor.state)?.blocks.length ?? 0) : 0
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange} modal={false}>
       <DropdownMenuTrigger asChild>
@@ -125,62 +152,70 @@ export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="bottom" className="min-w-[220px]" onCloseAutoFocus={(e) => e.preventDefault()}>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>{BLOCK_MENU_TEXT.turnInto}</DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="max-h-[420px] overflow-auto">
-            {TURN_INTO_ITEMS.map((t) => (
-              <Row key={t.kind} shortcut={t.shortcut} onSelect={() => turnInto(editor, t.kind)}>
-                {t.name}
-              </Row>
-            ))}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+        {selected > 1 && <DropdownMenuLabel className="text-muted-foreground">{BLOCK_MENU_TEXT.selected(selected)}</DropdownMenuLabel>}
         <BlockStyleMenu editor={editor} onDone={close} />
         <DropdownMenuSeparator />
-        <Row shortcut="copyBlockReference" onSelect={() => copyBlockReference(editor)}>
-          {BLOCK_MENU_TEXT.copyBlockReference}
+        <Row icon="ph-rows-plus-top" shortcut="insertBlockAbove" onSelect={() => insertBlock(editor, 'above')}>
+          {BLOCK_MENU_TEXT.insertAbove}
         </Row>
+        <Row icon="ph-rows-plus-bottom" shortcut="insertBlockBelow" onSelect={() => insertBlock(editor, 'below')}>
+          {BLOCK_MENU_TEXT.insertBelow}
+        </Row>
+        <DropdownMenuSeparator />
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            {BLOCK_MENU_TEXT.turnIntoObject}
+            <Icon name="ph-arrow-u-down-right" size={16} />
+            {BLOCK_MENU_TEXT.turnInto}
             {shortcutHint('turnIntoObject') && <DropdownMenuShortcut>{shortcutHint('turnIntoObject')}</DropdownMenuShortcut>}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="max-h-[420px] overflow-auto">
             {types.map((t) => (
-              <DropdownMenuItem key={t.id} onSelect={() => run(() => turnIntoObject(editor, t.id))}>
+              <DropdownMenuItem
+                key={t.id}
+                onSelect={() => run(() => (isWhiteboardType(t) ? turnIntoWhiteboard(editor) : turnIntoObject(editor, t.id)))}
+              >
                 <TypeChip type={t} size={18} />
                 {t.name}
               </DropdownMenuItem>
             ))}
+            {!types.some(isWhiteboardType) && (
+              <Row onSelect={() => run(() => turnIntoWhiteboard(editor))}>{BLOCK_MENU_TEXT.turnIntoWhiteboard}</Row>
+            )}
+            {todo && (
+              <Row shortcut="turnBlockIntoTaskObject" onSelect={() => run(() => turnTodoIntoTask(editor))}>
+                {BLOCK_MENU_TEXT.turnIntoTaskObject}
+              </Row>
+            )}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
-        {todo && (
-          <Row shortcut="turnBlockIntoTaskObject" onSelect={() => run(() => turnTodoIntoTask(editor))}>
-            {BLOCK_MENU_TEXT.turnIntoTaskObject}
-          </Row>
-        )}
-        <Row onSelect={() => run(() => turnIntoWhiteboard(editor))}>{BLOCK_MENU_TEXT.turnIntoWhiteboard}</Row>
-        <DropdownMenuSeparator />
-        <Row shortcut="insertBlockAbove" onSelect={() => insertBlock(editor, 'above')}>
-          {BLOCK_MENU_TEXT.insertAbove}
-        </Row>
-        <Row shortcut="insertBlockBelow" onSelect={() => insertBlock(editor, 'below')}>
-          {BLOCK_MENU_TEXT.insertBelow}
-        </Row>
-        <Row shortcut="moveSelectedBlocksUp" onSelect={() => moveBlocks(editor, -1)}>
-          {BLOCK_MENU_TEXT.moveUp}
-        </Row>
-        <Row shortcut="moveSelectedBlocksDown" onSelect={() => moveBlocks(editor, 1)}>
-          {BLOCK_MENU_TEXT.moveDown}
-        </Row>
-        <Row shortcut="duplicateBlocks" onSelect={() => duplicateBlocks(editor)}>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Icon name="ph-copy" size={16} />
+            {BLOCK_MENU_TEXT.copy}
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {/* Object's block clipboard is the blocks' Markdown source, so both rows copy it. */}
+            <Row icon="ph-copy" onSelect={() => copyBlocksAsMarkdown(editor)}>
+              {BLOCK_MENU_TEXT.copyBlocks}
+            </Row>
+            <Row icon="ph-copy" shortcut="copyBlocksAsMarkdown" onSelect={() => copyBlocksAsMarkdown(editor)}>
+              {BLOCK_MENU_TEXT.copyAsMarkdown}
+            </Row>
+            {targetCount === 1 && (
+              <Row icon="ph-copy" shortcut="copyBlockReference" onSelect={() => copyBlockReference(editor)}>
+                {BLOCK_MENU_TEXT.copyBlockReference}
+              </Row>
+            )}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <Row icon="ph-copy" shortcut="duplicateBlocks" onSelect={() => duplicateBlocks(editor)}>
           {BLOCK_MENU_TEXT.duplicate}
         </Row>
-        <DropdownMenuSeparator />
-        <Row onSelect={() => removeStyle(editor)}>{BLOCK_MENU_TEXT.removeStyle}</Row>
-        <Row shortcut="deleteBlocks" onSelect={() => deleteBlocks(editor)}>
-          {BLOCK_MENU_TEXT.delete}
+        <Row icon="ph-trash" variant="destructive" shortcut="deleteBlocks" onSelect={() => deleteBlocks(editor)}>
+          {BLOCK_MENU_TEXT.remove}
         </Row>
+        <DropdownMenuSeparator />
+        <BlockStyleExtras editor={editor} />
       </DropdownMenuContent>
     </DropdownMenu>
   )

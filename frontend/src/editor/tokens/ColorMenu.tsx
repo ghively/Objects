@@ -7,12 +7,14 @@
  * A text colour is the `textColor` mark (`<span data-color="text-<c>">`), a
  * background colour the `highlight` mark (`<mark data-color="bg-<c>">`). The
  * swatch names are Capacities' `colorThemes.theme-text-<c>` /
- * `colorThemes.theme-bg-<c>` ("Blue text", "Blue background").
+ * `colorThemes.theme-bg-<c>` ("Blue text", "Blue background"). A chosen colour
+ * becomes the highlight shortcut's last-used colour (`textHighlightColorLastUsed`).
  */
 import type { Editor } from '@tiptap/core'
 import { CheckIcon } from 'lucide-react'
 import { THEME_COLORS, type ThemeColor } from '@/theme/palette'
 import { bgColorToken, bgTextToken, colorMenuName, textColorToken, type ColorKind } from '../menus/colors'
+import { setLastUsedHighlightColor } from '../nodes/textStyle'
 
 export const COLOR_MENU_TEXT = {
   title: 'Highlight text', // tokensMenu.color.name
@@ -21,13 +23,15 @@ export const COLOR_MENU_TEXT = {
   without: 'No color', // tokensMenu.color.without
 }
 
-/** Colour the selected text, or with `null` remove its text colour. */
+/** Colour the selected text, or with `null` remove its text colour. A colour becomes the last-used one. */
 export function applyTextColor(editor: Editor, color: ThemeColor | null): boolean {
+  if (color) setLastUsedHighlightColor(`text-${color}`)
   return editor.chain().focus().setTextColor(color).run()
 }
 
-/** Give the selected text a background colour, or with `null` remove it. */
+/** Give the selected text a background colour, or with `null` remove it. A colour becomes the last-used one. */
 export function applyHighlight(editor: Editor, color: ThemeColor | null): boolean {
+  if (color) setLastUsedHighlightColor(`bg-${color}`)
   return editor.chain().focus().setHighlight(color).run()
 }
 

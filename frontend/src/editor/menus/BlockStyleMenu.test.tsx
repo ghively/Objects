@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/compon
 import { THEME_COLORS } from '@/theme/palette'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { blockSelectionRange, selectBlocks } from '../extensions/blockSelection'
-import { BlockStyleMenu, currentBlockStyle } from './BlockStyleMenu'
+import { BlockStyleExtras, BlockStyleMenu, currentBlockStyle } from './BlockStyleMenu'
 import { colorMenuName } from './colors'
 
 const editors: TiptapEditor[] = []
@@ -33,35 +33,54 @@ function renderMenu(editor: TiptapEditor) {
       <DropdownMenuTrigger>Block</DropdownMenuTrigger>
       <DropdownMenuContent>
         <BlockStyleMenu editor={editor} />
+        <BlockStyleExtras editor={editor} />
       </DropdownMenuContent>
     </DropdownMenu>,
   )
 }
 
+/** A row's text without its shortcut hint. */
+const label = (el: Element) =>
+  Array.from(el.childNodes)
+    .filter((n) => !(n instanceof Element && (n.getAttribute('aria-hidden') === 'true' || n.getAttribute('data-slot') === 'dropdown-menu-shortcut')))
+    .map((n) => n.textContent ?? '')
+    .join('')
+
 // Plain clicks throughout: a pointer path between Radix sub-menus closes them in jsdom.
-async function openSub(name: string): Promise<HTMLElement> {
+async function openSub(name: string | RegExp): Promise<HTMLElement> {
   fireEvent.click(screen.getByRole('menuitem', { name }))
   const trigger = screen.getByRole('menuitem', { name })
   const id = trigger.getAttribute('aria-controls')!
   return await screen.findByRole('menu', { name: (_, el) => el.id === id })
 }
 
-async function pick(sub: string, item: string, editor: TiptapEditor) {
+async function pick(sub: string | RegExp, item: string, editor: TiptapEditor) {
   const view = renderMenu(editor)
   const menu = await openSub(sub)
-  fireEvent.click(within(menu).getByRole('menuitem', { name: item }))
+  fireEvent.click(within(menu).getByRole('menuitem', { name: new RegExp(`^${item}`) }))
+  view.unmount()
+}
+
+/** Click a top-level row. */
+async function click(item: string, editor: TiptapEditor) {
+  const view = renderMenu(editor)
+  fireEvent.click(screen.getByRole('menuitem', { name: new RegExp(`^${item}`) }))
   view.unmount()
 }
 
 describe('BlockStyleMenu', () => {
-  test('lists the five sub-menus and the indent rows with reference names', () => {
+  test("lists Capacities' first block-menu section, then our kept rows", () => {
     renderMenu(headless('Hello world\n', 'Hello'))
-    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual([
-      'Hierarchy',
+    expect(screen.getAllByRole('menuitem').map(label)).toEqual([
+      'Hierarchy (Standard)', // blocksMenu.hierarchy.title (+ the current level)
       'List',
-      'Quote',
-      'Color',
+      'To-do',
       'Icon',
+      'Quote', // ActionItems.setBlockQuoteInterface.title
+      'Toggle',
+      'Group', // ActionItems.groupBlocks.title
+      'Color',
+      'Standout',
       'Indent', // tokensMenu.indent.shortName
       'Unindent', // tokensMenu.unindent.shortName
     ])
@@ -114,28 +133,32 @@ describe('BlockStyleMenu', () => {
   test('hierarchy, list and quote menus apply to the current block', async () => {
     const editor = headless('Hello world\n\nAfter.\n', 'Hello')
       let view = renderMenu(editor)
-    let menu = await openSub('Hierarchy')
-    expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent)).toEqual([
+    let menu = await openSub(/^Hierarchy/)
+    // Capacities' order: Standard, Small, Heading 1–4.
+    expect(within(menu).getAllByRole('menuitem').map(label)).toEqual([
       'Standard',
+      'Small',
       'Heading 1',
       'Heading 2',
       'Heading 3',
       'Heading 4',
-      'Small',
     ])
     view.unmount()
 
-    await pick('Hierarchy', 'Heading 2', editor)
+    await pick(/^Hierarchy/, 'Heading 2', editor)
     expect(serializeBody(editor)).toBe('## Hello world\n\nAfter.\n')
     expect(currentBlockStyle(editor).hierarchy).toBe('H2')
-    await pick('Hierarchy', 'Small', editor)
+    view = renderMenu(editor)
+    expect(screen.getByRole('menuitem', { name: /^Hierarchy/ })).toHaveTextContent('Hierarchy (Heading 2)')
+    view.unmount()
+    await pick(/^Hierarchy/, 'Small', editor)
     expect(serializeBody(editor)).toBe('<!-- block: small -->\nHello world\n\nAfter.\n')
-    await pick('Hierarchy', 'Standard', editor)
+    await pick(/^Hierarchy/, 'Standard', editor)
     expect(serializeBody(editor)).toBe('Hello world\n\nAfter.\n')
 
     view = renderMenu(editor)
     menu = await openSub('List')
-    expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent)).toEqual([
+    expect(within(menu).getAllByRole('menuitem').map(label)).toEqual([
       'No listing',
       'Bulleted',
       'Numbered',
@@ -151,16 +174,24 @@ describe('BlockStyleMenu', () => {
     await pick('List', 'No listing', editor)
     expect(serializeBody(editor)).toBe('Hello world\n\nAfter.\n')
 
-    view = renderMenu(editor)
-    menu = await openSub('Quote')
-    expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Quote block', 'Standout'])
-    view.unmount()
-    await pick('Quote', 'Standout', editor)
+    await click('Standout', editor)
     expect(serializeBody(editor)).toBe('<!-- block: quote=standout -->\n> Hello world\n\nAfter.\n')
     expect(currentBlockStyle(editor)).toMatchObject({ quote: true, standout: true })
-    await pick('Quote', 'Standout', editor)
+    await click('Standout', editor)
     expect(serializeBody(editor)).toBe('> Hello world\n\nAfter.\n')
-    await pick('Quote', 'Quote block', editor)
+    await click('Quote', editor)
+    expect(serializeBody(editor)).toBe('Hello world\n\nAfter.\n')
+
+    // To-do and Toggle are toggles too.
+    await click('To-do', editor)
+    expect(serializeBody(editor)).toBe('- [ ] Hello world\n\nAfter.\n')
+    await click('To-do', editor)
+    expect(serializeBody(editor)).toBe('Hello world\n\nAfter.\n')
+    await click('Toggle', editor)
+    expect(serializeBody(editor)).toBe('<!-- toggle open -->\nHello world\n<!-- /toggle -->\n\nAfter.\n')
+    editor.commands.setTextSelection(3) // into the toggle's line
+    expect(currentBlockStyle(editor).toggle).toBe(true)
+    await click('Toggle', editor)
     expect(serializeBody(editor)).toBe('Hello world\n\nAfter.\n')
   })
 
@@ -186,14 +217,14 @@ describe('BlockStyleMenu', () => {
     test('hierarchy applies to every selected block and keeps the selection', async () => {
       const editor = headless(body)
       selectFirstThree(editor)
-      await pick('Hierarchy', 'Heading 2', editor)
+      await pick(/^Hierarchy/, 'Heading 2', editor)
       expect(serializeBody(editor)).toBe('## One\n\n## Two\n\n## Three\n\nAfter.\n')
       expect(blockSelectionRange(editor.state)?.blocks).toHaveLength(3)
-      await pick('Hierarchy', 'Small', editor)
+      await pick(/^Hierarchy/, 'Small', editor)
       expect(serializeBody(editor)).toBe(
         '<!-- block: small -->\nOne\n\n<!-- block: small -->\nTwo\n\n<!-- block: small -->\nThree\n\nAfter.\n',
       )
-      await pick('Hierarchy', 'Standard', editor)
+      await pick(/^Hierarchy/, 'Standard', editor)
       expect(serializeBody(editor)).toBe(body)
     })
 
@@ -224,15 +255,15 @@ describe('BlockStyleMenu', () => {
     test('quote and standout apply to every selected block', async () => {
       const editor = headless(body)
       selectFirstThree(editor)
-      await pick('Quote', 'Quote block', editor)
+      await click('Quote', editor)
       expect(serializeBody(editor)).toBe('> One\n\n> Two\n\n> Three\n\nAfter.\n')
-      await pick('Quote', 'Standout', editor)
+      await click('Standout', editor)
       expect(serializeBody(editor)).toBe(
         '<!-- block: quote=standout -->\n> One\n\n<!-- block: quote=standout -->\n> Two\n\n<!-- block: quote=standout -->\n> Three\n\nAfter.\n',
       )
-      await pick('Quote', 'Standout', editor)
+      await click('Standout', editor)
       expect(serializeBody(editor)).toBe('> One\n\n> Two\n\n> Three\n\nAfter.\n')
-      await pick('Quote', 'Quote block', editor)
+      await click('Quote', editor)
       expect(serializeBody(editor)).toBe(body)
     })
 
@@ -262,7 +293,7 @@ describe('BlockStyleMenu', () => {
       expect(serializeBody(editor)).toBe('- Buy milk\n- Call Ada <!-- item: color=text-red -->\n- Book trip\n')
       expect(currentBlockStyle(editor).color).toBe('text-red')
 
-      await pick('Hierarchy', 'Small', editor)
+      await pick(/^Hierarchy/, 'Small', editor)
       expect(serializeBody(editor)).toBe('- Buy milk\n- Call Ada <!-- item: small color=text-red -->\n- Book trip\n')
       expect(currentBlockStyle(editor).hierarchy).toBe('S')
 
@@ -273,7 +304,7 @@ describe('BlockStyleMenu', () => {
       fireEvent.click(within(t2).getByRole('menuitem', { name: 'Remove text color' }))
       v2.unmount()
       expect(serializeBody(editor)).toBe('- Buy milk\n- Call Ada <!-- item: small -->\n- Book trip\n')
-      await pick('Hierarchy', 'Standard', editor)
+      await pick(/^Hierarchy/, 'Standard', editor)
       expect(serializeBody(editor)).toBe(LIST)
     })
 

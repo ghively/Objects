@@ -189,14 +189,15 @@ describe('m8 round trip', () => {
     expect(serializeBody(editor)).toBe(MALFORMED.replace('^TOOLONG1', '^TOOLONG1!'))
   })
 
-  test('bare mark loads as yellow and is kept as written', () => {
+  test('bare mark loads as amber and is kept as written', () => {
     const editor = headless(BLOCKS)
     const b = blockWith(editor, 'A bare highlight')
     const marks: { color: string; bare: boolean }[] = []
     b.node.descendants((n) => {
       for (const m of n.marks) if (m.type.name === 'highlight') marks.push(m.attrs as { color: string; bare: boolean })
     })
-    expect(marks).toEqual([{ color: 'yellow', bare: true }])
+    // Capacities' FALLBACK_HIGHLIGHT_COLOR is bg-amber.
+    expect(marks).toEqual([{ color: 'amber', bare: true }])
     typeAtEndOf(editor, 'A bare highlight', ' Really.')
     expect(serializeBody(editor)).toBe(
       BLOCKS.replace('A bare <mark>highlight</mark> stays bare.', 'A bare <mark>highlight</mark> stays bare. Really.'),
