@@ -242,6 +242,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
         if (c.type === 'dimensions' && c.dimensions && !c.resizing && !c.setAttributes) {
           sizes[c.id] = c.dimensions
           measuredAny = true
+          if (c.resizing === false) edits.push(c) // a resize ended: its undo step is complete
         } else if (c.type === 'position' && c.position) edits.push(c)
         else if (c.type === 'dimensions' && (c.resizing || c.setAttributes)) edits.push(c)
       }
