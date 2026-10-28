@@ -285,6 +285,25 @@ describe('search mode', () => {
     expect(document.querySelectorAll('[data-filter-chip]')).toHaveLength(2)
   })
 
+  test('clearing a filter chip drops the filtered results until the unfiltered answer arrives', async () => {
+    const unfiltered = deferred<SearchResponse>()
+    mocked.search.mockImplementation(async (_q, opts) =>
+      opts?.types?.includes('person')
+        ? { results: [searchResult({ path: 'People/Bea.md', title: 'Bea', type: 'person' })], partial: false }
+        : unfiltered.promise,
+    )
+    const { user } = setup()
+    const input = await openSearch(user)
+    await user.type(input, 'alpha peo')
+    await user.click(await screen.findByText('Only search for type "Person"'))
+    await screen.findByText('Bea')
+    await user.click(screen.getByRole('button', { name: 'Clear filter' }))
+    await waitFor(() => expect(mocked.search).toHaveBeenLastCalledWith('alpha', expect.objectContaining({ types: [] })))
+    expect(screen.queryByText('Bea')).toBeNull()
+    await act(async () => unfiltered.resolve({ results: [searchResult({ path: 'Pages/Alpha.md', title: 'Alpha' })], partial: false }))
+    expect(await screen.findByText('Alpha')).toBeInTheDocument()
+  })
+
   test('create new with title creates once and opens', async () => {
     mocked.search.mockResolvedValue({ results: [], partial: false })
     const { user } = setup()

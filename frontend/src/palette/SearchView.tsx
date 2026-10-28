@@ -84,7 +84,8 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch }: SearchViewP
   const recentPaths = useRecent((s) => s.paths)
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState<SearchFilters>(NO_FILTERS)
-  const [response, setResponse] = useState<{ q: string; res: SearchResponse } | null>(null)
+  // An answer belongs to its query and filters: a change to either hides it until the next answer.
+  const [response, setResponse] = useState<{ q: string; filters: SearchFilters; res: SearchResponse } | null>(null)
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const mods = useRef<OpenMods>({})
@@ -111,7 +112,7 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch }: SearchViewP
           signal: ctrl.signal,
         })
         .then((res) => {
-          if (mine === seq.current) setResponse({ q, res })
+          if (mine === seq.current) setResponse({ q, filters, res })
         })
         .catch(() => {
           // Aborted or failed: keep what is shown.
@@ -151,8 +152,9 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch }: SearchViewP
     return out
   }, [q, recentPaths, objects, filters])
 
-  const results = response && response.q === q ? response.res.results : null
-  const partial = !!(response && response.q === q && response.res.partial)
+  const current = response && response.q === q && response.filters === filters ? response : null
+  const results = current ? current.res.results : null
+  const partial = !!current?.res.partial
 
   const rows: Row[] = useMemo(() => {
     const out: Row[] = []
