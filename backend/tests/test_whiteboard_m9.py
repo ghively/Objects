@@ -11,7 +11,7 @@ stamp started from) only when the stamp wrote the disk.
 from __future__ import annotations
 
 import hashlib
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -215,3 +215,38 @@ def test_throttled_stamp_with_stale_cache_announces_nothing(ctx):
     assert r.status_code == 200, r.text
     assert "mdVersion" not in r.json()
     assert [e.kind for e in events] == ["whiteboard"]
+
+
+def _set_last_updated(space: Space, root: Path, value: str) -> None:
+    md = root / NETWORK
+    md.write_bytes(
+        md.read_bytes().replace(
+            b"lastUpdated: 2026-10-20T09:00:00.000Z\n", f"lastUpdated: {value}\n".encode()
+        )
+    )
+    space.rescan_file(NETWORK)
+
+
+def test_naive_last_updated_is_local_time(ctx):
+    # East of UTC: a time-zone-less stamp an hour ago (local time) must not read as an hour ahead.
+    space, c, _events, root, _clock = ctx
+    space.tz = timezone(timedelta(hours=10))
+    _set_last_updated(space, root, "2026-10-28T21:00:00")  # 11:00Z, an hour before T0
+    assert put_board(c, root, NETWORK).status_code == 200
+    assert f"lastUpdated: {stamp(T0)}\n".encode() in (root / NETWORK).read_bytes()
+
+
+def test_naive_last_updated_recent_is_throttled(ctx):
+    space, c, _events, root, _clock = ctx
+    space.tz = timezone(timedelta(hours=10))
+    _set_last_updated(space, root, "2026-10-28T21:59:30")  # 11:59:30Z, 30 s before T0
+    before = (root / NETWORK).read_bytes()
+    assert put_board(c, root, NETWORK).status_code == 200
+    assert (root / NETWORK).read_bytes() == before
+
+
+def test_last_updated_in_the_future_is_replaced(ctx):
+    space, c, _events, root, _clock = ctx
+    _set_last_updated(space, root, "2026-10-28T12:00:30.000Z")  # 30 s after T0
+    assert put_board(c, root, NETWORK).status_code == 200
+    assert f"lastUpdated: {stamp(T0)}\n".encode() in (root / NETWORK).read_bytes()
