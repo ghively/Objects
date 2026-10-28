@@ -40,7 +40,8 @@ export function useAutosave(opts: AutosaveOptions) {
   const savedBodyRef = useRef<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inFlightRef = useRef(false)
-  const againRef = useRef(false)
+  /** A save asked for while one was in flight: its path and the text at that moment. */
+  const queuedRef = useRef<{ path: string; body: string | null } | null>(null)
   const pausedRef = useRef(false)
   /** The save running now (including any save queued behind it), if any. */
   const runningRef = useRef<Promise<void> | null>(null)
@@ -71,63 +72,89 @@ export function useAutosave(opts: AutosaveOptions) {
     }
   }, [])
 
-  /** Save now. `pathOverride` saves under a previous path (the editor is switching objects). */
-  const flush = useCallback(async (pathOverride?: string): Promise<void> => {
-    cancel()
-    const o = optsRef.current
-    if (o.readOnly || pausedRef.current) return
-    if (inFlightRef.current) {
-      againRef.current = true
-      return
-    }
-    const body = o.getBody()
-    if (body === null || body === savedBodyRef.current) return
-
-    const path = pathOverride ?? o.path
-    inFlightRef.current = true
-    const run = (async () => {
-      try {
-        const res = await api.saveBody(path, body, versionRef.current)
-        if (optsRef.current.path !== path) return
-        versionRef.current = res.version
-        savedBodyRef.current = body
-        retryDelayRef.current = AUTOSAVE_RETRY_MS
-        setSaveError(null)
-        optsRef.current.onSaved(res.version)
-      } catch (err) {
-        if (err instanceof ConflictError) {
-          pausedRef.current = true
-          setSaveError(null)
-          optsRef.current.onConflict?.(err.currentVersion)
-        } else if (err instanceof ReadOnlyError) {
-          pausedRef.current = true
-          setSaveError(null)
-        } else {
-          console.error('autosave failed', err)
-          setSaveError(AUTOSAVE_ERROR_TEXT)
-          clearRetry()
-          const delay = retryDelayRef.current
-          retryDelayRef.current = Math.min(delay * 2, AUTOSAVE_RETRY_MAX_MS)
-          retryTimerRef.current = setTimeout(() => {
-            retryTimerRef.current = null
-            if (optsRef.current.path === path) void flushRef.current()
-          }, delay)
+  /** Save `body` to `path` against `version`, then any save queued meanwhile. */
+  const start = useCallback(
+    async (path: string, body: string, version: string): Promise<void> => {
+      inFlightRef.current = true
+      const run = (async () => {
+        let savedVersion: string | null = null
+        try {
+          const res = await api.saveBody(path, body, version)
+          savedVersion = res.version
+          if (optsRef.current.path === path) {
+            versionRef.current = res.version
+            savedBodyRef.current = body
+            retryDelayRef.current = AUTOSAVE_RETRY_MS
+            setSaveError(null)
+            optsRef.current.onSaved(res.version)
+          }
+        } catch (err) {
+          if (err instanceof ConflictError) {
+            pausedRef.current = true
+            setSaveError(null)
+            optsRef.current.onConflict?.(err.currentVersion)
+          } else if (err instanceof ReadOnlyError) {
+            pausedRef.current = true
+            setSaveError(null)
+          } else {
+            console.error('autosave failed', err)
+            setSaveError(AUTOSAVE_ERROR_TEXT)
+            clearRetry()
+            const delay = retryDelayRef.current
+            retryDelayRef.current = Math.min(delay * 2, AUTOSAVE_RETRY_MAX_MS)
+            retryTimerRef.current = setTimeout(() => {
+              retryTimerRef.current = null
+              if (optsRef.current.path === path) void flushRef.current()
+            }, delay)
+          }
+        } finally {
+          inFlightRef.current = false
         }
+        // A save asked for while this one ran. On the object still shown, save
+        // its latest text; on one the editor has left (or after it was
+        // destroyed), the text it had when the save was asked for.
+        const queued = queuedRef.current
+        queuedRef.current = null
+        if (!queued) return
+        const o = optsRef.current
+        if (queued.path === o.path) {
+          if (o.readOnly || pausedRef.current) return
+          const latest = o.getBody() ?? queued.body
+          if (latest === null || latest === savedBodyRef.current) return
+          await startRef.current(queued.path, latest, versionRef.current)
+        } else if (savedVersion !== null && queued.path === path && queued.body !== null && queued.body !== body) {
+          await startRef.current(queued.path, queued.body, savedVersion)
+        }
+      })()
+      runningRef.current = run
+      try {
+        await run
       } finally {
-        inFlightRef.current = false
+        if (runningRef.current === run) runningRef.current = null
       }
-      if (againRef.current) {
-        againRef.current = false
-        await flushRef.current()
+    },
+    [clearRetry],
+  )
+  const startRef = useRef(start)
+  startRef.current = start
+
+  /** Save now. `pathOverride` saves under a previous path (the editor is switching objects). */
+  const flush = useCallback(
+    async (pathOverride?: string): Promise<void> => {
+      cancel()
+      const o = optsRef.current
+      if (o.readOnly || pausedRef.current) return
+      const path = pathOverride ?? o.path
+      if (inFlightRef.current) {
+        queuedRef.current = { path, body: o.getBody() }
+        return
       }
-    })()
-    runningRef.current = run
-    try {
-      await run
-    } finally {
-      if (runningRef.current === run) runningRef.current = null
-    }
-  }, [cancel, clearRetry])
+      const body = o.getBody()
+      if (body === null || body === savedBodyRef.current) return
+      await start(path, body, versionRef.current)
+    },
+    [cancel, start],
+  )
 
   /**
    * Save now and resolve only once nothing is left to save: any save already in
