@@ -8,9 +8,9 @@ Plan: `2026-10-28-m9-completeness-gaps.md`, Task 22. Date: 2026-10-28. Built on 
 |---|---|---|
 | Baseline before M9 | the gate below, at `a6bf658` | pytest 1203 passed, 1 skipped; vitest 1829 passed, 1 skipped; `tsc` clean; build ok |
 | Gate after the merge (before the fix pass) | the gate below, at `c138f1d` | pytest 1230 passed, 1 skipped, 1 load-sensitive failure (`test_graph_5000_objects_under_300ms`, run alongside vitest; passed alone); vitest 1949 passed, 1 skipped; `tsc` clean; lint 0 errors; build ok |
-| Final gate (after the fix pass) | `uv run pytest backend/tests -q`; `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run lint && npm run build` | GATE_FINAL |
-| M9 acceptance | `uv run python scripts/m9_acceptance.py backend/tests/fixtures/<space>` on `space-m8`, `space-blocks`, `space-sample`, `space-v1`, `space-whiteboard` | PASS 23/23 on each, the editor round trip included |
-| Earlier milestones | `m1_roundtrip.py`, `m2_acceptance.py` … `m8_acceptance.py` on `space-sample` and `space-v1` | PASS (m2 52 and 50, m3 14, m4 24, m5 18, m6 19, m7 23, m8 26) |
+| Final gate (after the fix pass) | `uv run pytest backend/tests -q`; `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run lint && npm run build` | pytest 1238 passed, 1 skipped (needs a non-root user); vitest 1966 passed, 1 skipped (needs `OBJECT_ROUNDTRIP_SPACE`); `tsc` clean; lint 0 errors; build ok. Run one after the other on a quiet machine, at `d17bd90` |
+| M9 acceptance | `uv run python scripts/m9_acceptance.py backend/tests/fixtures/<space>` on `space-m8`, `space-blocks`, `space-sample`, `space-v1`, `space-whiteboard` | PASS 23/23 on each, the editor round trip included; rerun after the fix pass: PASS on each |
+| Earlier milestones | `m1_roundtrip.py`, `m2_acceptance.py` … `m8_acceptance.py` on `space-sample` and `space-v1` | PASS before and after the fix pass (m2 52 and 50, m3 14, m4 24, m5 18, m6 19, m7 23, m8 26) |
 
 ### `scripts/m9_acceptance.py`
 
@@ -58,7 +58,25 @@ On a scratch copy of `space-m8` (`uv run objectapp --space <copy> --browser`), e
 
 One review in two halves (back end and file safety; front end and fidelity), plus the walkthrough's findings, then one fix pass, one finding per commit with a failing-first test:
 
-FIXES_LIST
+Back end and whiteboard:
+- **Notes base version** (`d475c67`): a board save returns `mdVersion` and `mdBaseVersion` only when its `lastUpdated` stamp actually wrote, and the Notes adopt it only when they hold `mdBaseVersion`. Before, a body change from another window could be overwritten. This changes the plan's contract ("else its current version").
+- **Ink saves** (`daf639a`) hand the stamp to the Notes the same guarded way.
+- **The saving window** (`5b69828`) now sees its own `.md` stamp (`announceLocalChange`).
+- **Export with media** (`90a0bd1`) includes short-name embeds (`![[photo.png]]`), resolved as the editor does: exact, case-insensitive, then by file name.
+- **Time-zone-less `lastUpdated`** (`f1cdb4b`) is read in the space's time zone by the stamp throttle; a stamp in the future no longer blocks the bump.
+- **Basic Project Status** (`a16e652`) is a plain label in new spaces: Capacities sets `isStatus` only on the Task status. Existing type JSON is not rewritten. New Project types lose "By category" grouping, as in Capacities.
+- **`defaultPageViewId`** (`86a9c7d`, `a6a7efb`) is never inferred or shown as a property.
+
+Front end:
+- **Shift-click in a grouped view** (`3d46450`) selects the on-screen range only.
+- **Import CSV:** blank lines are not imported (`6b88504`); the drop zone accepts a dropped file (`9728d26`).
+- **Sidebar:** a section added after the order was saved appears above Pinned (`cc941e1`); the reorder handle is inside the sidebar's visible area and keyboard reorder moves past the tall Object Types block (`16125b5`).
+- **Bulk delete dialog** (`e83e32a`): Capacities' "Delete?" and "Review the items below, then confirm.", with the selected titles listed.
+- **Stats and Text Stats** refresh "Last updated" after a property write (`f717d36`).
+- **The page inspector** sits below a shown cover, clear of its buttons (`4b5c2e0`).
+- **`[[` picker** (`669cafa`): characters typed after `[[` before the picker takes focus become its query (body and property cells). Not reproduced in jsdom; fixed from the code and covered by a simulation.
+- **Content and Text cells** know their object (`91e9a6e`), so block-reference copying works there.
+- **No-network test** covers the M9 sources (`d17bd90`).
 
 ## Rules the build chose, for Gene to confirm
 

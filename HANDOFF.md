@@ -4,13 +4,13 @@ Updated 2026-10-28. You are continuing "Object", a local, Markdown-backed recrea
 
 ## Where things stand
 
-**All eight milestones are built, reviewed, fixed and through their final gates.** Nothing is waiting on a build.
+**All nine milestones are built, reviewed, fixed and through their final gates.** Nothing is waiting on a build. M9 (the audit's completeness gaps) was built 2026-10-28 on a Linux cloud container on branch `ccr-bcf6e946-bf8moc`; results, open questions and Gene's hand-checks are in `docs/superpowers/plans/m9-acceptance.md`.
 
 **The 2026-10-28 audit is fixed** (on Gene's Windows PC, same day): every bug in `docs/superpowers/plans/audit-2026-10-28.md` and every real "unconfirmed" item, one per commit with a failing-first test. **The guessed values were checked against the full Capacities app** (`docs/superpowers/plans/reference-check-2026-10-28.md`) and applied. Status and the gate numbers: `docs/superpowers/plans/remaining-work.md`.
 
-**Next:** Gene's hands-on checks. **M9** (the approved completeness gaps, plan `docs/superpowers/plans/2026-10-28-m9-completeness-gaps.md`) is **on hold until Gene says to start it.**
+**Next:** Gene answers M9's open questions (encyclopedia title placement, the `…` menu order, duplicate and synced relations), then his hands-on checks, M1–M9.
 
-**Branch:** everything is on `master`.
+**Branch:** GitHub `master` is at the M3–M8 merge (`04e9d07`). The audit fixes, the reference corrections and M9 are on `ccr-bcf6e946-bf8moc` until it is merged.
 
 | Milestone | Scope | Plan |
 |---|---|---|
@@ -22,27 +22,28 @@ Updated 2026-10-28. You are continuing "Object", a local, Markdown-backed recrea
 | M6 | whiteboards and pressure ink | `2026-10-26-m6-whiteboards-pen.md` |
 | M7 | remaining blocks, light mode, settings, spaces, tabs, side panel | `2026-10-26-m7-blocks-lightmode-polish.md` |
 | M8 | every Capacities feature M4–M7 deferred, local only | `2026-10-27-m8-deferred-features.md` |
+| M9 | the audit's completeness gaps | `2026-10-28-m9-completeness-gaps.md` |
 
-Last full verification, 2026-10-28 at `9383a9b`, on Linux:
-- 1122 back-end tests passed (1 skipped: it needs a non-root user).
-- 1678 front-end tests passed (1 skipped: it needs `OBJECT_ROUNDTRIP_SPACE`).
-- `tsc -b --noEmit` clean; `npm run build` ok.
-- `m1_roundtrip.py` and `m2`–`m8_acceptance.py` PASS on `space-sample` and `space-v1`.
-- The app was started with `uv run objectapp --browser` and driven in headless Chromium with 0 console errors.
+Last full verification, 2026-10-28 after M9 (`d17bd90`), on Linux:
+- 1238 back-end tests passed (1 skipped: it needs a non-root user).
+- 1966 front-end tests passed (1 skipped: it needs `OBJECT_ROUNDTRIP_SPACE`).
+- `tsc -b --noEmit` clean; lint 0 errors; `npm run build` ok.
+- `m9_acceptance.py` PASS on `space-m8`, `space-blocks`, `space-sample`, `space-v1`, `space-whiteboard`; `m1_roundtrip.py` and `m2`–`m8_acceptance.py` PASS on `space-sample` and `space-v1`.
+- The app was started with `uv run objectapp --browser` and driven in headless Chromium through every M9 feature with 0 console errors.
 
 ## What to do first
 
 1. Set up: install `uv` and Node 22+; run `uv sync`, then `cd frontend && npm ci`. Use `npm ci`, not `npm install`: a newer npm rewrites `package-lock.json`.
 2. Run the baseline: `uv run pytest backend/tests -q`, then `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build`. Report any failure before changing code.
-3. **The audit list is done** (2026-10-28). Don't redo it; `remaining-work.md` lists what landed. **M9** (completeness gaps) waits for Gene's go-ahead; when he gives it, build it from `docs/superpowers/plans/2026-10-28-m9-completeness-gaps.md` (its "Gene's answers" section overrides the recommendations).
-4. Pick up Gene's findings from his hand-checks (`docs/superpowers/plans/m1-acceptance.md` to `m8-acceptance.md`, 237 unchecked items) and fix them the same way. After each batch, rerun the full gate and every acceptance script on fixture copies.
+3. **The audit list and M9 are done** (2026-10-28). Don't redo them; `remaining-work.md` and `m9-acceptance.md` list what landed.
+4. Pick up Gene's findings from his hand-checks (`docs/superpowers/plans/m1-acceptance.md` to `m9-acceptance.md`, 256 unchecked items) and fix them the same way. After each batch, rerun the full gate and every acceptance script on fixture copies.
 5. Keep `remaining-work.md`, `CONTINUE.md` and this file current, commit, and push.
 
 ## Open items
 
-- **The 2026-10-28 audit list:** see above. Gene decides on the completeness gaps; everything else is a plain bug to fix.
+- **M9's open questions for Gene:** see `m9-acceptance.md`, "Rules the build chose".
 
-- **Gene's hands-on checks, M1–M8.** Run them on a copy of the CPI export outside the repo, with `git init` there. Some things can only be checked on his Windows machine:
+- **Gene's hands-on checks, M1–M9.** Run them on a copy of the CPI export outside the repo, with `git init` there. Some things can only be checked on his Windows machine:
   - the pywebview window
   - Windows toast reminders
   - Wacom pressure and tilt
