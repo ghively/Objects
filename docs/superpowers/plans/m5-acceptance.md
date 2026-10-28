@@ -121,7 +121,7 @@ Run `npm run build`, then `uv run objectapp --space <copy of backend/tests/fixtu
 Note what Capacities does differently, so a fix pass can follow.
 
 - [ ] Key bindings: Ctrl+K and Ctrl+P (both also work while the peek is open), the Enter / Ctrl+Enter / Shift+Enter variants, Ctrl+Enter in Replace doing "Replace all", and Esc in the find bar.
-- [ ] Search highlight colour: `--bg-search-highlight` is the yellow type colour at 30% alpha, 55% for the current find match, with text `var(--text)`. Weight 500 and radius 1px come from the reference CSS.
+- [ ] Search highlight colour, now from the reference (`index36682.css`, `storing36682.js`; see `reference-check-2026-10-28.md` §3a): light themes `#fef08a4b` with yellow 900 text, dark themes `#fddf472c` with yellow 100 text; find in page `#facc1573` for every match and `#f97316b3` for the current one, text colour inherited; palette result titles in the 600-weight `search-highlights-bold` variant. Weight 500 and radius 1px come from the reference CSS.
 - [ ] Graph:
   - node sizes (`3 + 2·sqrt(degree)`, capped at 18) and colours (type colour; tags in their tag colour)
   - indirect links drawn thin (0.6) at about 22% alpha, not dashed (sigma 3 has no dashed edges)

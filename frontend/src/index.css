@@ -88,8 +88,8 @@
 }
 /* ---- M5: search highlights, find in page, command palette, graph ---- */
 
-/* The highlight tokens (--bg-search-highlight, -current, --text-search-highlight) are in
-   theme/tokens.css and theme/themes.css. */
+/* The highlight tokens (--bg-search-highlight, --text-search-highlight, --bg-find-match,
+   --bg-find-match-current) are in theme/tokens.css and theme/themes.css. */
 
 /* Search snippets: U+0002/U+0003 rendered as <b> (reference `.search-highlights b`). */
 .search-highlights b {
@@ -98,14 +98,21 @@
   font-weight: 500;
   border-radius: 1px;
 }
+/* Command-palette result titles (reference `.search-highlights-bold b`, font-weight-semibold). */
+.search-highlights-bold b {
+  font-weight: 600;
+}
 
-/* Find in page: editor decorations for every match and the current one. */
+/* Find in page: editor decorations for every match and the current one (reference
+   `::highlight(find-in-page)` / `find-in-page-active`: text colour inherited). */
 .find-match {
-  background-color: var(--bg-search-highlight);
+  background-color: var(--bg-find-match);
+  color: inherit;
   border-radius: 1px;
 }
 .find-match-current {
-  background-color: var(--bg-search-highlight-current);
+  background-color: var(--bg-find-match-current);
+  color: inherit;
   border-radius: 1px;
 }
 
