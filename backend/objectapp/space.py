@@ -242,6 +242,14 @@ def unique_path(root: Path, folder: str, stem: str, same_as: str | None = None) 
         n += 1
 
 
+def _same_file(a: Path, b: Path) -> bool:
+    """Whether ``a`` and ``b`` name one file (e.g. two spellings on a case-insensitive disk)."""
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
 class Conflict(Exception):
     """The file changed on disk since the version the caller edited."""
 
@@ -1928,7 +1936,9 @@ class Space:
         src = self.root / rel
         dest = self.root / new_rel
         case_only = rel.lower() == new_rel.lower()
-        if not case_only and dest.exists():
+        if dest.exists() and not (case_only and _same_file(src, dest)):
+            # A case-only spelling that names another file (case-sensitive
+            # folder) is taken too: never overwrite it.
             raise FileExistsError(new_rel)
         self.own_deletes[rel] = version
         self.own_writes[new_rel] = version
@@ -1968,16 +1978,18 @@ class Space:
         if self._is_whiteboard(rel):
             # A whiteboard's stem must be free for its .md and both sidecars (M6).
             from .whiteboardtrash import free_whiteboard_stem as free
+        return self._free_target(rel, folder, stem, free)
+
+    def _free_target(
+        self, rel: str, folder: str, stem: str, free: Callable[..., str] = unique_path
+    ) -> str:
+        """Where ``rel`` can move to as ``<folder>/<stem>.md``: its own spelling or a free name."""
         new_rel = free(self.root, folder, stem, same_as=rel)
         dest = self.root / new_rel
         if new_rel == rel or not dest.exists():
             return new_rel
-        try:
-            same = os.path.samefile(self.root / rel, dest)
-        except OSError:
-            same = False
         # On a case-sensitive file system both spellings can exist: then pick a free name.
-        return new_rel if same else free(self.root, folder, stem)
+        return new_rel if _same_file(self.root / rel, dest) else free(self.root, folder, stem)
 
     def _board_referrers(self, rel: str, old_title: str) -> dict[str, set[str]]:
         """Whiteboards whose board file links to ``rel`` by its old name: board .md -> targets.
@@ -2349,7 +2361,7 @@ class Space:
                     self._commit_type(dst_edit, dst_revision)
                     type_written = True
             folder = dst.folder.strip("/")
-            new_rel = unique_path(self.root, folder, safe_filename(title), same_as=rel)
+            new_rel = self._free_target(rel, folder, safe_filename(title))
             if new_rel != rel:
                 (self.root / folder).mkdir(parents=True, exist_ok=True)
                 self._move_file(rel, new_rel, version)
