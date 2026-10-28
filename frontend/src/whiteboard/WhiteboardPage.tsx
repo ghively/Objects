@@ -100,7 +100,9 @@ export function WhiteboardPage({
   const exportRef = useRef<BoardExporter | null>(null)
   const settingsState = useWhiteboardSettings(client)
   const useInk = ink?.useInkDoc ?? useNoInkDoc
-  const inkDoc = useInk(path)
+  // An ink save stamps the .md too: the same guarded adopt as a board save's.
+  const onInkStamp = useCallback((res: MdStamp) => mdVersionRef.current(res), [])
+  const inkDoc = useInk(path, onInkStamp)
   const inkRef = useRef(inkDoc)
   useEffect(() => {
     inkRef.current = inkDoc

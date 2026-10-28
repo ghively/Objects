@@ -290,4 +290,18 @@ describe('useInkDoc', () => {
     expect(client.load).toHaveBeenCalledTimes(2)
     expect(result.current.strokes!.map((x) => x.id)).toEqual(['a', 'x', 'y'])
   })
+
+  test('a landed ink save hands the board .md stamp to onMdStamp', async () => {
+    const client = {
+      load: vi.fn(async (): Promise<InkResponse> => ({ path: PATH, strokes: [], revision: 'r1' })),
+      save: vi.fn(async () => ({ revision: 'r2', mdVersion: 'v2', mdBaseVersion: 'v1' })),
+    }
+    const onMdStamp = vi.fn()
+    const { result } = renderHook(() => useInkDoc(PATH, client, onMdStamp))
+    await settle()
+    act(() => result.current.save([s('a')]))
+    await advance(400)
+    await settle()
+    expect(onMdStamp).toHaveBeenCalledWith({ revision: 'r2', mdVersion: 'v2', mdBaseVersion: 'v1' })
+  })
 })

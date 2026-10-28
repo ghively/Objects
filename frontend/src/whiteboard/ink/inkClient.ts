@@ -1,4 +1,5 @@
 import { ApiError, CLIENT_ID, ReadOnlyError, RevisionConflictError } from '@/api/client'
+import type { WhiteboardSaveResult } from '@/api/whiteboardTypes'
 import type { InkResponse, InkStroke } from './types'
 
 const BASE = '/api'
@@ -45,8 +46,9 @@ export const inkClient = {
   load(path: string): Promise<InkResponse> {
     return request<InkResponse>(`${BASE}/whiteboard/ink?path=${encodeURIComponent(path)}`)
   },
-  save(path: string, strokes: InkStroke[], baseRevision: string): Promise<{ revision: string }> {
-    return request<{ revision: string }>(`${BASE}/whiteboard/ink`, {
+  /** M9: the result also carries the board `.md`'s stamp (`mdVersion`, `mdBaseVersion`). */
+  save(path: string, strokes: InkStroke[], baseRevision: string): Promise<WhiteboardSaveResult> {
+    return request<WhiteboardSaveResult>(`${BASE}/whiteboard/ink`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path, strokes, baseRevision, clientId: CLIENT_ID }),
