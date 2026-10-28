@@ -60,6 +60,7 @@ import { ListItemOptions } from './nodes/listItemOptions'
 import { Highlight, TextColor } from './nodes/textStyle'
 import { blockRefMarkdown } from './blocks'
 import { M8Keys } from './shortcuts'
+import { withTextEscapes } from './textEscapes'
 import { RecordAudio } from './media/recordAudio'
 
 export type EditorExtensionOptions = {
@@ -104,10 +105,13 @@ export function withoutRegistryKeys<T extends AnyExtension>(ext: T): T {
   return stripped
 }
 
-/** StarterKit with the registry-owned keys taken out of each of its extensions. */
+/**
+ * StarterKit with the registry-owned keys taken out of each of its extensions,
+ * and paragraphs and headings escaping text that would read as other Markdown.
+ */
 const RegistryStarterKit = StarterKit.extend({
   addExtensions() {
-    return (this.parent?.() ?? []).map(withoutRegistryKeys)
+    return (this.parent?.() ?? []).map(withoutRegistryKeys).map(withTextEscapes)
   },
 })
 

@@ -111,3 +111,62 @@ describe('code blocks', () => {
     expect(saved).toBe('`````js\na\n````\nb\n`````\n')
   })
 })
+
+/** Replace the whole document with one paragraph of `text` (lines joined by hard breaks). */
+function setParagraph(editor: TiptapEditor, text: string): void {
+  const { schema } = editor
+  const content = text
+    .split('\n')
+    .flatMap((line, i) => [...(i ? [schema.nodes.hardBreak.create()] : []), ...(line ? [schema.text(line)] : [])])
+  const para = schema.nodes.paragraph.create(null, content)
+  editor.view.dispatch(editor.state.tr.replaceWith(0, editor.state.doc.content.size, para))
+}
+
+describe('plain text that looks like Markdown', () => {
+  test.each([
+    ['# x', '\\# x'],
+    ['- x', '\\- x'],
+    ['+ x', '\\+ x'],
+    ['1. x', '1\\. x'],
+    ['2024. was good', '2024\\. was good'],
+    ['1) a', '1\\) a'],
+    ['---', '\\---'],
+    ['$b$', '\\$b$'],
+    ['a $x$ b', 'a \\$x$ b'],
+    ['$$x$$', '\\$\\$x$$'],
+  ])('%s stays a paragraph', (text, saved) => {
+    const editor = headless('P\n')
+    setParagraph(editor, text)
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved + '\n')
+    expect(out.reloaded).toEqual([['paragraph', text]])
+  })
+
+  test.each([
+    ['a\n# b', 'a  \n\\# b'],
+    ['a\n- b', 'a  \n\\- b'],
+    ['a\n---', 'a  \n\\---'],
+    ['a\n===', 'a  \n\\==='],
+  ])('a hard break before %j keeps one paragraph', (text, saved) => {
+    const editor = headless('P\n')
+    setParagraph(editor, text)
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved + '\n')
+    expect(out.reloaded).toEqual([['paragraph', text.replace('\n', '')]])
+  })
+
+  test.each(['#hashtag', 'a # b', 'x - y', '-x', '1.5 is a number', '$5 and $6', '=====', '-- x'])(
+    '%s is not escaped',
+    (text) => {
+      const editor = headless('P\n')
+      setParagraph(editor, text)
+      expect(serializeBody(editor)).toBe(text + '\n')
+    },
+  )
+
+  test('typing into a paragraph that starts with an escape keeps it', () => {
+    const editor = headless('\\# not a heading\n\nP\n')
+    append(editor, 'heading', '!')
+    expect(serializeBody(editor)).toBe('\\# not a heading!\n\nP\n')
+  })
+})
