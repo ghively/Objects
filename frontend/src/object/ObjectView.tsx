@@ -41,7 +41,7 @@ import { PinMenuItems } from '@/shell/PinToMenu'
 import { DeletedBanner } from './DeletedBanner'
 import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
-import { ensureNewTags, isTagType, ObjectHeader, openTag } from './ObjectHeader'
+import { ensureNewTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
 import { PageLayout, type PanelVariant } from './PageLayout'
 import { PropertyPanel } from './PropertyPanel'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
@@ -507,6 +507,11 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [mode, path])
 
+  // M9: the page inspector reads the editor's current Markdown (the loaded body before it mounts).
+  const loadedBodyRef = useRef('')
+  loadedBodyRef.current = detail?.body ?? ''
+  const getMarkdown = useCallback(() => editorRef.current?.getBody() ?? loadedBodyRef.current, [])
+
   const summary = detail?.summary
   const typeEditor = useTypeEditor(summary?.type)
   const type = typeEditor.type ?? typeOf(summary?.type)
@@ -886,6 +891,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         toolbar={toolbar}
         properties={properties}
         onCoverChange={propsReadOnly ? undefined : (next) => writeProperties({ coverImage: next })}
+        inspector={mode === 'page' ? { getMarkdown, dailyNote: isDailyNoteType(type, summary.type) } : undefined}
         header={
           <ObjectHeader
             summary={summary}
