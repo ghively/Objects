@@ -58,7 +58,15 @@ from pathlib import Path
 from typing import Any
 
 from m2_acceptance import (
-    Http, Run, _def, changed_paths, check_migration, commit, free_port, git, remove_tree, snapshot,  # noqa: F401
+    Http,
+    Run,
+    _def,
+    changed_paths,
+    check_migration,
+    commit,
+    git,
+    remove_tree,
+    snapshot,
 )
 from m7_acceptance import PNG, raw
 from m8_acceptance import Served, diff_keys, extra_state, fm_of, set_clock, state_files
@@ -103,11 +111,11 @@ def seed_files() -> dict[str, bytes]:
         IMG: PNG,
         IMG2: PNG + b"\x00",
         EXPORT_PAGE: (
-            "---\nid: 01JC9M9ACCEPTANCE000000001\ntype: 'Page'\ntitle: M9 export\n"
-            "createdAt: 2026-10-01T08:00:00.000Z\nlastUpdated: 2026-10-01T08:00:00.000Z\n---\n"
-            "# M9 export\n\nA page with an image.\n\n![pixel](Attachments/m9%20pixel.png)\n\n"
-            "Closing paragraph.\n"
-        ).encode(),
+            b"---\nid: 01JC9M9ACCEPTANCE000000001\ntype: 'Page'\ntitle: M9 export\n"
+            b"createdAt: 2026-10-01T08:00:00.000Z\nlastUpdated: 2026-10-01T08:00:00.000Z\n---\n"
+            b"# M9 export\n\nA page with an image.\n\n![pixel](Attachments/m9%20pixel.png)\n\n"
+            b"Closing paragraph.\n"
+        ),
         EMBED_PAGE: (
             "---\nid: 01JC9M9ACCEPTANCE000000002\ntype: 'Page'\ntitle: M9 embed\n"
             "createdAt: 2026-10-01T08:00:00.000Z\nlastUpdated: 2026-10-01T08:00:00.000Z\n---\n"
@@ -143,7 +151,7 @@ def seed(root: Path) -> list[str]:
 def git_diff_lines(root: Path, a: str, b: str) -> list[str]:
     """The changed lines (``-``/``+``, no headers) of ``git diff --no-index -U0 a b``."""
     proc = subprocess.run(["git", "-c", "core.autocrlf=false", "diff", "--no-index", "-U0", "--no-color", a, b],
-                          cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace")
+                          cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
     out = []
     for ln in proc.stdout.splitlines():
         if ln.startswith(("---", "+++", "@@", "diff ", "index ")):
@@ -324,7 +332,7 @@ class M9:
         layout_keys = {"wideLayoutMode", "wideCoverImage", "coverImageOffset", "lastUpdated"}
         before = (self.root / rel).read_bytes()
         snap = snapshot(self.root)
-        code, res = self.put_props(rel, {"wideLayoutMode": True, "wideCoverImage": False, "coverImageOffset": 37.5})
+        code, _res = self.put_props(rel, {"wideLayoutMode": True, "wideCoverImage": False, "coverImageOffset": 37.5})
         after = (self.root / rel).read_bytes()
         removed, added = diff_keys(before, after)
         fm = fm_of(self.root, rel)
@@ -362,7 +370,7 @@ class M9:
         commit(self.root, "cover changed")
 
         before = (self.root / rel).read_bytes()
-        code, res = self.put_props(rel, {"wideLayoutMode": None})
+        code, _res = self.put_props(rel, {"wideLayoutMode": None})
         removed, added = diff_keys(before, (self.root / rel).read_bytes())
         self.run.report(code == 200 and "wideLayoutMode" not in fm_of(self.root, rel)
                         and removed <= {"wideLayoutMode", "lastUpdated"} and added <= {"lastUpdated"},
@@ -431,7 +439,7 @@ class M9:
                         f"second save 30 s later {code}: .md unchanged {same}; mdVersion is its current version")
         commit(self.root, "board saved again")
         o = self.run.obj(rel)
-        code, res = self.http("PUT", "/object/body", {"path": rel, "body": o["body"].rstrip("\n") + "\n\nM9 board notes.\n",
+        code, _res = self.http("PUT", "/object/body", {"path": rel, "body": o["body"].rstrip("\n") + "\n\nM9 board notes.\n",
                                                      "baseVersion": saved2["mdVersion"], "clientId": "m9"})
         self.run.report(code == 200, f"Notes body save on mdVersion: {code}")
         commit(self.root, "board notes")
@@ -443,7 +451,7 @@ class M9:
         _, cur = self.http("GET", "/ui")
         order = ["pinned", "objects", "m9-section"]
         snap = snapshot(self.root)
-        code, res = self.http("PUT", "/ui", {"patch": {"workspaceOrder": order}, "baseRevision": cur["revision"]})
+        code, _res = self.http("PUT", "/ui", {"patch": {"workspaceOrder": order}, "baseRevision": cur["revision"]})
         _, got = self.http("GET", "/ui")
         changed = changed_paths(snap, snapshot(self.root))
         code2, _ = self.http("PUT", "/ui", {"patch": {"workspaceOrder": ["objects", "objects"]},
@@ -481,7 +489,7 @@ class M9:
         proc = subprocess.run(
             [npx, "vitest", "run", "src/editor/roundtrip.space.test.ts"],
             cwd=FRONTEND, env={**os.environ, "OBJECT_ROUNDTRIP_SPACE": str(self.root)},
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
         )
         out = proc.stdout + proc.stderr
         tail = [ln for ln in out.splitlines() if "Tests" in ln or "differ" in ln or "FAIL" in ln][-8:]
