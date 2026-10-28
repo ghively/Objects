@@ -72,6 +72,20 @@ export function escapeHeadingEnd(md: string): string {
   return md.replace(/(^|[ \t])(#+[ \t]*)$/, '$1\\$2')
 }
 
+/**
+ * A heading is one line in Markdown: a line break in it (from a multi-line
+ * paragraph turned into a heading, or Shift-Enter) would end the heading and
+ * start a paragraph on reload, so it is saved as a space.
+ */
+function oneLine(content: JSONContent[] | undefined): JSONContent[] | undefined {
+  if (!content) return content
+  return content.map((n) => {
+    if (n.type === 'hardBreak') return { type: 'text', text: ' ', marks: n.marks }
+    if (n.type === 'text' && n.text?.includes('\n')) return { ...n, text: n.text.replace(/[ \t]*\n[ \t]*/g, ' ') }
+    return n
+  })
+}
+
 type Render = (node: JSONContent, h: unknown, ctx: unknown) => string
 
 /** `ext` (StarterKit's paragraph or heading) with these escapes in its Markdown. */
@@ -87,7 +101,7 @@ export function withTextEscapes<T extends AnyExtension>(ext: T): T {
   if (ext.name === 'heading') {
     return ext.extend({
       renderMarkdown(this: { parent: Render | null }, node: JSONContent, h: unknown, ctx: unknown) {
-        const md = this.parent?.({ ...node, content: markDollars(node.content) }, h, ctx) ?? ''
+        const md = this.parent?.({ ...node, content: markDollars(oneLine(node.content)) }, h, ctx) ?? ''
         if (!node.content?.length) return restoreDollars(md)
         const prefix = /^#+ /.exec(md)?.[0] ?? ''
         return prefix + restoreDollars(escapeHeadingEnd(md.slice(prefix.length)))
