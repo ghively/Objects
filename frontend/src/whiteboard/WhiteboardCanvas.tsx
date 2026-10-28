@@ -242,10 +242,14 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
         if (c.type === 'dimensions' && c.dimensions && !c.resizing && !c.setAttributes) {
           sizes[c.id] = c.dimensions
           measuredAny = true
+          if (c.resizing === false) edits.push(c) // a resize ended: its undo step is complete
         } else if (c.type === 'position' && c.position) edits.push(c)
         else if (c.type === 'dimensions' && (c.resizing || c.setAttributes)) edits.push(c)
       }
-      if (measuredAny) setMeasured((m) => ({ ...m, ...sizes }))
+      if (measuredAny) {
+        setMeasured((m) => ({ ...m, ...sizes }))
+        canvas.measure(sizes)
+      }
       if (!edits.length) return
       const st = store.getState()
       // Snap to nodes: one node dragged, lined up with the others' edges and centres.
@@ -254,10 +258,10 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
         const c = moves[0] as Extract<NodeChange, { type: 'position' }>
         const n = st.doc.board.nodes[c.id]
         if (n && c.position) {
-          const box = { ...nodeBox(n), x: c.position.x, y: c.position.y }
+          const box = { ...nodeBox(n, measured), x: c.position.x, y: c.position.y }
           const others = Object.values(st.doc.board.nodes)
             .filter((o) => o.id !== n.id && o.kind !== 'point')
-            .map(nodeBox)
+            .map((o) => nodeBox(o, measured))
           const snap = snapToNodes(box, others)
           c.position = { x: c.position.x + snap.dx, y: c.position.y + snap.dy }
           setGuides(snap.guides)
@@ -265,7 +269,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
       }
       canvas.applyFlowChanges(edits)
     },
-    [applySelect, canvas, store, settings.isSnappingToNodes, ctrlHeld],
+    [applySelect, canvas, store, settings.isSnappingToNodes, ctrlHeld, measured],
   )
 
   const onEdgesChange = useCallback((changes: EdgeChange<FlowEdge>[]) => applySelect(changes), [applySelect])
@@ -375,7 +379,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
     (only?: Set<string>): Box[] =>
       Object.values(store.getState().doc.board.nodes)
         .filter((n) => !only || only.has(n.id))
-        .map(nodeBox),
+        .map((n) => nodeBox(n)),
     [store],
   )
 
@@ -403,7 +407,10 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
       if (typeof cmd === 'number') setCamera(about(cmd))
       else if (cmd === 'in' || cmd === 'out') setCamera(about(zoomStep(vp.zoom, cmd)))
       else if (cmd === 'reset') setCamera(about(1))
-      else if (cmd === 'fit') setCamera(fitBox(allBoxes(), pane, FIT_PADDING))
+      else if (cmd === 'fit') {
+        const ink = strokeBoxes(store.getState().doc.strokes as InkStroke[])
+        setCamera(fitBox([...allBoxes(), ...ink], pane, FIT_PADDING))
+      }
       else if (cmd === 'selection') {
         const sel = new Set(store.getState().selection)
         const boxes = allBoxes(sel)
@@ -1020,7 +1027,7 @@ function CameraInit({
     else if (board.viewport && Number.isFinite(board.viewport.zoom) && board.viewport.zoom > 0) {
       vp = { x: board.viewport.x, y: board.viewport.y, zoom: board.viewport.zoom }
     } else {
-      const boxes = Object.values(board.nodes).map(nodeBox)
+      const boxes = Object.values(board.nodes).map((n) => nodeBox(n))
       vp = fitBox(boxes, paneSize(), FIT_PADDING)
     }
     void rf.setViewport(vp)
@@ -1052,15 +1059,19 @@ function Guides({ guides }: { guides: SnapGuide[] }) {
   )
 }
 
-/** "Nothing in this view": the board has content but none of it is on screen. */
+/**
+ * "Nothing in this view": the board has content (nodes or ink) but none of it is on screen. Only
+ * its card takes pointer input, so drawing, marquee and panning still work around it.
+ */
 function LostState({ onBack, paneSize }: { onBack(): void; paneSize(): { width: number; height: number } }) {
   const { x, y, zoom } = useViewport()
   const board = useBoardState((s) => s.doc.board)
+  const strokes = useBoardState((s) => s.doc.strokes) as InkStroke[]
   const flowW = useFlowStore((s) => s.width)
   const flowH = useFlowStore((s) => s.height)
   const pane = flowW > 0 && flowH > 0 ? { width: flowW, height: flowH } : paneSize()
   const view: Box = { x: -x / zoom, y: -y / zoom, width: pane.width / zoom, height: pane.height / zoom }
-  const boxes = Object.values(board.nodes).map(nodeBox)
+  const boxes = [...Object.values(board.nodes).map((n) => nodeBox(n)), ...strokeBoxes(strokes)]
   const bounds = boundsOf(boxes)
   if (!bounds) return null
   const visible = boxes.some(
@@ -1072,8 +1083,8 @@ function LostState({ onBack, paneSize }: { onBack(): void; paneSize(): { width: 
   )
   if (visible) return null
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center" data-whiteboard-lost="">
-      <div className="flex flex-col items-center gap-2 rounded-xl border border-line bg-raised px-6 py-5 text-center">
+    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center" data-whiteboard-lost="">
+      <div className="pointer-events-auto flex flex-col items-center gap-2 rounded-xl border border-line bg-raised px-6 py-5 text-center">
         <p className="text-[15px] font-semibold">{WB.lostTitle.text}</p>
         <p className="text-[13px] text-fg-muted">{WB.lostDescription.text}</p>
         <button

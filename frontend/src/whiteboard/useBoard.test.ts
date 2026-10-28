@@ -1,10 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { api, ReadOnlyError, RevisionConflictError } from '@/api/client'
+import { api, ApiError, ReadOnlyError, RevisionConflictError } from '@/api/client'
 import type { ChangeEvent } from '@/api/types'
 import { board, node, textBlock } from './test/boards'
 import { mockWhiteboardApi } from './test/mockWhiteboardApi'
-import { SAVE_DELAY_MS, useBoard } from './useBoard'
+import { SAVE_DELAY_MS, SAVE_RETRY_LIMIT, useBoard } from './useBoard'
 
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig()),
@@ -143,6 +143,28 @@ describe('useBoard', () => {
     warn.mockRestore()
   })
 
+  test('a failing save backs off, stops after a few retries, and shows a toast', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { client, store, hook } = await setup()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    client.saveBoard.mockRejectedValue(new ApiError(500, 'boom'))
+    act(() => store.getState().actions.nudge(30, 0, ['a']))
+    await advance(SAVE_DELAY_MS + 600)
+    expect(client.saveBoard).toHaveBeenCalledTimes(1)
+    expect(hook.result.current.toast).toBe('Could not save the whiteboard. boom')
+    await advance(10 * 60_000)
+    const calls = client.saveBoard.mock.calls.length
+    expect(calls).toBeGreaterThan(1)
+    expect(calls).toBeLessThanOrEqual(1 + SAVE_RETRY_LIMIT)
+    // The next edit tries again, and a success ends the failure streak.
+    client.saveBoard.mockResolvedValue({ revision: 'rev-ok' })
+    act(() => store.getState().actions.nudge(30, 0, ['a']))
+    await advance(SAVE_DELAY_MS + 10)
+    expect(client.saveBoard).toHaveBeenCalledTimes(calls + 1)
+    hook.unmount()
+    warn.mockRestore()
+  })
+
   test('second 409 reloads with the toast', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const client = mockWhiteboardApi(board([node({ id: 'a' })]), 'rev-1')
@@ -200,6 +222,27 @@ describe('useBoard', () => {
     // Another board's event is ignored.
     await act(async () => emit({ kind: 'whiteboard' as ChangeEvent['kind'], path: 'Whiteboards/Other.md', version: 'x' }))
     expect(client.board).not.toHaveBeenCalled()
+  })
+
+  test('the same board open twice in this window (page and peek) sees its own saves', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const client = mockWhiteboardApi(board([node({ id: 'a', position: { x: 0, y: 0 } })]), 'rev-1')
+    const page = renderHook(() => useBoard(PATH, client))
+    const peek = renderHook(() => useBoard(PATH, client))
+    await waitFor(() => expect(page.result.current.status).toBe('ready'))
+    await waitFor(() => expect(peek.result.current.status).toBe('ready'))
+    let saved = board([node({ id: 'a', position: { x: 0, y: 0 } })])
+    client.saveBoard.mockImplementation(async (_p, b) => {
+      saved = structuredClone(b)
+      return { revision: 'rev-2' }
+    })
+    client.board.mockImplementation(async (path) => ({ path, board: structuredClone(saved), revision: 'rev-2' }))
+    act(() => page.result.current.store.getState().actions.nudge(30, 0, ['a']))
+    await act(async () => page.result.current.flush())
+    await advance(10)
+    await waitFor(() => expect(peek.result.current.store.getState().doc.board.nodes.a.position.x).toBe(30))
+    page.unmount()
+    peek.unmount()
   })
 
   test('undo after save saves the earlier state', async () => {

@@ -109,6 +109,22 @@ describe('InkLayer', () => {
     expect(s.d.startsWith('M ')).toBe(true)
   })
 
+  test('a stroke longer than the file allows is saved as several strokes', () => {
+    const { capture, onStrokesChange } = setup()
+    const el = capture()!
+    fire(el, 'pointerdown', { pointerType: 'pen', x: 0, y: 0, pressure: 0.5 })
+    const coalesced = Array.from({ length: 25_000 }, (_, i) => ({ x: (i + 1) / 10, y: (i % 7) / 10, pressure: 0.5 }))
+    fire(el, 'pointermove', { pointerType: 'pen', x: 2500, y: 0, pressure: 0.5, coalesced })
+    fire(el, 'pointerup', { pointerType: 'pen', x: 2500, y: 0, pressure: 0 })
+    const next = onStrokesChange.mock.calls[0][0] as InkStroke[]
+    expect(next.length).toBeGreaterThan(1)
+    expect(next.every((s) => s.points.length <= 20_000)).toBe(true)
+    expect(new Set(next.map((s) => s.id)).size).toBe(next.length)
+    // Consecutive pieces share their joining sample, so the line stays unbroken.
+    expect(next[1].points[0]).toEqual(next[0].points.at(-1))
+    expect(next.reduce((n, s) => n + s.points.length, 0)).toBe(25_001 + next.length - 1)
+  })
+
   test('mouse stroke uses simulated pressure', () => {
     const { capture, onStrokesChange } = setup()
     const el = capture()!
@@ -188,6 +204,35 @@ describe('InkLayer', () => {
     const s = onStrokesChange.mock.calls[0][0][0] as InkStroke
     expect(s.points.every(([x, y]) => x <= 30 && y === 0)).toBe(true)
     expect(container.querySelector('[data-ink-live]')).toBeNull()
+  })
+
+  test('a palm already down does not block the pen: the pen draws and the palm is dropped', () => {
+    const { capture, onStrokesChange } = setup()
+    const el = capture()!
+    fire(el, 'pointerdown', { pointerType: 'touch', pointerId: 2, x: 300, y: 300 })
+    fire(el, 'pointermove', { pointerType: 'touch', pointerId: 2, x: 320, y: 320 })
+    fire(el, 'pointerdown', { pointerType: 'pen', pointerId: 1, x: 0, y: 0, pressure: 0.5 })
+    fire(el, 'pointermove', { pointerType: 'pen', pointerId: 1, x: 30, y: 0, pressure: 0.5 })
+    fire(el, 'pointerup', { pointerType: 'pen', pointerId: 1, x: 30, y: 0 })
+    fire(el, 'pointerup', { pointerType: 'touch', pointerId: 2, x: 320, y: 320 })
+    expect(onStrokesChange).toHaveBeenCalledTimes(1)
+    const next = onStrokesChange.mock.calls[0][0] as InkStroke[]
+    expect(next).toHaveLength(1)
+    expect(next[0].points.every(([x, y]) => x <= 30 && y === 0)).toBe(true)
+  })
+
+  test('a lost pointer capture ends the gesture, so the next stroke still draws', () => {
+    const { capture, onStrokesChange, container } = setup()
+    const el = capture()!
+    fire(el, 'pointerdown', { pointerType: 'pen', pointerId: 1, x: 0, y: 0, pressure: 0.5 })
+    fire(el, 'pointermove', { pointerType: 'pen', pointerId: 1, x: 30, y: 0, pressure: 0.5 })
+    fire(el, 'lostpointercapture', { pointerType: 'pen', pointerId: 1, x: 30, y: 0 })
+    expect(container.querySelector('[data-ink-live]')).toBeNull()
+    fire(el, 'pointerdown', { pointerType: 'pen', pointerId: 3, x: 0, y: 50, pressure: 0.5 })
+    fire(el, 'pointermove', { pointerType: 'pen', pointerId: 3, x: 30, y: 50, pressure: 0.5 })
+    fire(el, 'pointerup', { pointerType: 'pen', pointerId: 3, x: 30, y: 50 })
+    expect(onStrokesChange).toHaveBeenCalledTimes(1)
+    expect((onStrokesChange.mock.calls[0][0] as InkStroke[])[0].points.every(([, y]) => y === 50)).toBe(true)
   })
 
   test('no capture overlay without a tool, when read-only or while panning', () => {

@@ -21,6 +21,8 @@ export const INK_STRINGS = {
   width: 'Width',
   /** our string */
   inkColour: 'Ink colour',
+  /** our string: a failed ink save (the server's reason follows) */
+  saveFailed: 'Could not save the ink.',
   /** our string: the pen group's tooltip when the ink file is read-only */
   readOnly: "This ink file has content Object didn't write, so it opens read-only.",
 } as const

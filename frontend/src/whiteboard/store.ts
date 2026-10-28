@@ -43,9 +43,14 @@ export interface CanvasActions {
   setInkTool(tool: InkToolState | null): void
   /** A node drag starts: frames take the nodes wholly inside them (containment at drag start). */
   beginDrag(ids: string[], opts?: { duplicate?: boolean }): void
-  /** React Flow position/size changes during a drag or resize (one coalesced step per gesture). */
+  /**
+   * React Flow position/size changes during a drag or resize (one coalesced step per gesture; a
+   * resize's step ends at its `resizing: false` change).
+   */
   applyFlowChanges(changes: NodeChange[]): void
   endDrag(): void
+  /** Rendered sizes of nodes (auto-sized blocks): used for frame containment and wrapping. */
+  measure(sizes: A.MeasuredSizes): void
 }
 
 export interface BoardState {
@@ -88,7 +93,9 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
   const initial: BoardDoc = opts.doc ?? { board: emptyBoard(), strokes: [] }
   const history = new History<BoardDoc>(initial)
   let gesture = 0
-  let drag: { key: string; contents: Set<string> } | null = null
+  let measured: Record<string, { width: number; height: number }> = {}
+  /** `contents`: each dragged frame's followers; a node inside several dragged frames follows one. */
+  let drag: { key: string; contents: Map<string, string[]> } | null = null
 
   return createStore<BoardState>()((set, get) => {
     const sync = () => ({ canUndo: history.canUndo, canRedo: history.canRedo })
@@ -243,7 +250,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       },
       nudge(dx, dy, given) {
         const sel = ids(given)
-        edit('move', (b) => A.nudge(b, sel, dx, dy))
+        edit('move', (b) => A.nudge(b, sel, dx, dy, measured))
       },
       order(mode, given) {
         const sel = ids(given)
@@ -259,7 +266,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       },
       wrapInFrame(given) {
         const sel = ids(given)
-        created('wrap', (b, nid) => A.wrapInFrame(b, sel, { id: nid }))
+        created('wrap', (b, nid) => A.wrapInFrame(b, sel, { id: nid, measured }))
       },
       clearBoard() {
         const s = get()
@@ -328,22 +335,28 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
         if (!isEditable(get())) return
         gesture++
         const key = `drag:${gesture}`
+        // Containment is read before an Alt+drag copy exists, so a frame's copy doesn't follow it.
+        const board = get().doc.board
         if (o.duplicate) {
           // Alt+drag: copies stay where the originals were; the originals move (one step).
           edit('duplicate', (b) => A.duplicateSelection(b, dragIds, 0).board, key)
         }
-        const board = get().doc.board
-        const contents = new Set<string>()
+        const contents = new Map<string, string[]>()
+        const claimed = new Set<string>(dragIds)
         for (const id of dragIds) {
-          if (board.nodes[id]?.kind === 'frame') for (const c of A.frameContents(board, id)) contents.add(c)
+          if (board.nodes[id]?.kind !== 'frame') continue
+          const followers = A.frameContents(board, id, measured).filter((c) => !claimed.has(c))
+          for (const c of followers) claimed.add(c)
+          contents.set(id, followers)
         }
-        for (const id of dragIds) contents.delete(id)
         drag = { key, contents }
         set({ dragging: true })
       },
       applyFlowChanges(changes) {
         const s = get()
         if (!isEditable(s)) return
+        // React Flow ends a resize with `resizing: false`: the gesture's step is complete.
+        if (!drag && changes.some((c) => c.type === 'dimensions' && c.resizing === false)) history.seal()
         const relevant = changes.filter(
           (c) => (c.type === 'position' && c.position) || (c.type === 'dimensions' && (c.resizing || c.setAttributes)),
         )
@@ -361,7 +374,9 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
                 if (!before || before.kind !== 'frame') continue
                 const dx = c.position.x - before.position.x
                 const dy = c.position.y - before.position.y
-                const followers = [...drag.contents].filter((id) => !relevant.some((r) => 'id' in r && r.id === id))
+                const followers = (drag.contents.get(c.id) ?? []).filter(
+                  (id) => !relevant.some((r) => 'id' in r && r.id === id),
+                )
                 next = moveBy(next, followers, dx, dy)
               }
             }
@@ -374,6 +389,9 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
         drag = null
         history.seal()
         set({ dragging: false })
+      },
+      measure(sizes) {
+        measured = { ...measured, ...sizes }
       },
     }
 
