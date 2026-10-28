@@ -67,7 +67,10 @@ export interface SidepanelEntry {
   index?: number
 }
 
-/** The side panel's sizes (Capacities' `sidepanelLayout`): width in px, area sizes as fractions. */
+/**
+ * The side panel's sizes (Capacities' `sidepanelLayout`): area 2 and 3 heights in px, and the width
+ * as a share (0.1 to 0.9) of the main column plus the panel (Capacities' `sidepanelWidth`).
+ */
 export interface SidepanelLayout {
   width?: number
   area2Size?: number

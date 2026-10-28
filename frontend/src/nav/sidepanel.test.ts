@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import {
   addEmptyEntry,
-  areaFractions,
-  clampWidth,
+  areaSizes,
+  clampWidthFraction,
   cleanEntries,
+  cleanLayout,
   closeEntry,
   isSidepanelShown,
   moveEntry,
@@ -12,6 +13,7 @@ import {
   openEntryIn,
   stepEntry,
   visibleAreas,
+  widthFraction,
 } from './sidepanel'
 import { activeTab, currentTarget, useTabs, type SidepanelEntry, type Target } from './tabs'
 
@@ -97,13 +99,18 @@ describe('side panel entries', () => {
     expect(entries[0].history).toEqual([obj('A.md'), obj('B.md'), obj('D.md')])
   })
 
-  test('test layout helpers clamp width and split areas', () => {
-    expect(clampWidth(100, 2000)).toBe(320)
-    expect(clampWidth(1500, 2000)).toBe(1200)
-    expect(clampWidth(500, 2000)).toBe(500)
-    expect(areaFractions(undefined, ['area1', 'area2', 'area3'])).toEqual({ area2: 1 / 3, area3: 1 / 3 })
-    expect(areaFractions({ area2Size: 0.25 }, ['area1', 'area2'])).toEqual({ area2: 0.25 })
-    expect(areaFractions({ area3Size: 5 }, ['area2', 'area3'])).toEqual({ area3: 0.9 })
+  test('test layout helpers: width share 10 to 90 %, areas 220 px by default and 120 px at least (reference)', () => {
+    expect(clampWidthFraction(0.05)).toBe(0.1)
+    expect(clampWidthFraction(0.95)).toBe(0.9)
+    expect(clampWidthFraction(0.3)).toBe(0.3)
+    expect(widthFraction(undefined)).toBe(0.45)
+    expect(widthFraction({ width: 2 })).toBe(0.9)
+    expect(areaSizes(undefined, ['area1', 'area2', 'area3'])).toEqual({ area2: 220, area3: 220 })
+    expect(areaSizes({ area2Size: 300 }, ['area1', 'area2'])).toEqual({ area2: 300 })
+    expect(areaSizes({ area3Size: 50 }, ['area2', 'area3'])).toEqual({ area3: 120 })
+    // Saved before the reference values (px width, fractional heights): dropped.
+    expect(cleanLayout({ width: 500, area2Size: 0.4, area3Size: 260 })).toEqual({ area3Size: 260 })
+    expect(cleanLayout({ width: 0.3 })).toEqual({ width: 0.3 })
   })
 
   test('test persisted entries are cleaned', () => {
@@ -171,12 +178,12 @@ describe('side panel actions on the tabs store', () => {
   test('test side panel state persists with the tab', async () => {
     s().open(obj('A.md'))
     s().openInSidepanel(obj('B.md'))
-    s().setSidepanelLayout({ width: 640, area2Size: 0.4 })
+    s().setSidepanelLayout({ width: 0.4, area2Size: 300 })
     const saved = JSON.parse(localStorage.getItem('object.tabs')!)
     s().reset()
     localStorage.setItem('object.tabs', JSON.stringify(saved))
     await useTabs.persist.rehydrate()
-    expect(tab().sidepanelLayout).toEqual({ width: 640, area2Size: 0.4 })
+    expect(tab().sidepanelLayout).toEqual({ width: 0.4, area2Size: 300 })
     expect(open('area1')!.target).toEqual(obj('B.md'))
   })
 })

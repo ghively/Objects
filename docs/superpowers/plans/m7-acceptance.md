@@ -118,7 +118,7 @@ The lane agents chose these where the reference was silent:
 - **Side panel:**
   - A plain click on a resolved wikilink inside an entry navigates the entry.
   - Swap works by click only; dragging an entry onto the main view is not built.
-  - The calendar sidebar is 300 px wide.
+  - The calendar sidebar is 26rem wide (reference: `calendarSidebarWidth` default `26rem`, reference-check 2a). The side panel is 45 % of the main column plus the panel, dragged between 10 % and 90 %, back to 45 % on a double click; areas 2 and 3 are 220 px high by default and every area at least 120 px (reference-check 2a).
 - **Blocks:**
   - "Standout" is our label.
   - Small text is 0.9em.
