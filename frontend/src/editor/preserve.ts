@@ -16,6 +16,8 @@
  * - The original's line ending (LF/CRLF) and trailing newlines are kept.
  */
 
+import { splitBlocks } from './blocks'
+
 export type EditorBlock = {
   raw?: string
   markdown: string
@@ -46,6 +48,16 @@ function genericNorm(s: string): string {
     .map((l) => l.trimEnd())
     .join('\n')
     .replace(/^\n+|\n+$/g, '')
+}
+
+/**
+ * LF line ends, no leading or trailing line breaks, and no trailing blanks on
+ * the last line (they mean nothing there); every other blank kept.
+ */
+function exactNorm(s: string): string {
+  return toLF(s)
+    .replace(/^\n+|\n+$/g, '')
+    .replace(/[ \t]+$/, '')
 }
 
 // ---------------------------------------------------------------- tables
@@ -155,7 +167,8 @@ function parseList(lines: string[]): (ListLine | null)[] {
 function listKey(line: string, parsed: ListLine | null): string {
   if (!parsed) return 'C\0' + line.trim()
   const ordered = /\d/.test(parsed.marker) ? 'o' : 'b'
-  return `I\0${parsed.depth}\0${ordered}\0${parsed.content.trimEnd()}`
+  // A hard break may be written `\` or as trailing blanks: the same line.
+  return `I\0${parsed.depth}\0${ordered}\0${parsed.content.replace(/\\$/, '').trimEnd()}`
 }
 
 function preserveList(origLines: string[], regenLines: string[]): string[] {
@@ -180,7 +193,7 @@ function preserveList(origLines: string[], regenLines: string[]): string[] {
 
   const restyle = (line: string, i: number): string => {
     const p = regenParsed[i]
-    if (!p) return line
+    if (!p) return continuation(line, i)
     const indent = indentByDepth.get(p.depth) ?? unit.repeat(p.depth)
     const ordered = /\d/.test(p.marker)
     let marker = p.marker
@@ -190,11 +203,80 @@ function preserveList(origLines: string[], regenLines: string[]): string[] {
     return indent + marker + gap + p.content
   }
 
+  // A continuation line of an item (after a hard break) keeps the indent of
+  // the original continuation line it replaces (none on a lazy one); a new one
+  // is indented to its item's text as written in the output (the serializer
+  // leaves it short).
+  const continuation = (line: string, i: number): string => {
+    if (line.trim() === '') return line
+    const replaced = replacedOriginal(i)
+    if (replaced !== null && !origParsed[replaced])
+      return /^[ \t]*/.exec(origLines[replaced])![0] + line.trimStart()
+    let k = i - 1
+    while (k >= 0 && !regenParsed[k]) k--
+    if (k < 0) return line
+    const q = regenParsed[k]!
+    const item = LIST_ITEM.exec(match[k] >= 0 ? origLines[match[k]] : restyle(regenLines[k], k))
+    if (!item) return line
+    const col = item[1].length + item[2].length + item[3].length
+    const regenCol = q.indent.length + q.marker.length + q.gap.length
+    const own = /^[ \t]*/.exec(line)![0].length
+    return ' '.repeat(col + Math.max(0, own - regenCol)) + line.trimStart()
+  }
+
+  /** The original line regenerated line `i` replaces, as `weaveBlankLines` pairs them, or null. */
+  const replacedOriginal = (i: number): number | null => {
+    let p = i - 1
+    while (p >= 0 && match[p] < 0) p--
+    let o = p >= 0 ? match[p] : -1
+    for (let n = p + 1; n <= i; n++) {
+      o++
+      while (o < origLines.length && isBlank(origLines[o])) o++
+    }
+    let next = i + 1
+    while (next < regenLines.length && match[next] < 0) next++
+    const limit = next < regenLines.length ? match[next] : origLines.length
+    return o < limit ? o : null
+  }
+
   const match = alignMatch(
     origLines.map((l, i) => listKey(l, origParsed[i])),
     regenLines.map((l, i) => listKey(l, regenParsed[i])),
   )
-  return weaveBlankLines(origLines, regenLines, match, restyle)
+  return keepListStarts(weaveBlankLines(origLines, regenLines, match, restyle), regenParsed)
+}
+
+/** Line index and number of the first item of each ordered list (CommonMark: its start). */
+function orderedStarts(parsed: (ListLine | null)[]): [number, string][] {
+  const out: [number, string][] = []
+  const kindAt: boolean[] = [] // per depth: was the last item there ordered?
+  parsed.forEach((p, i) => {
+    if (!p) return
+    kindAt.length = p.depth + 1
+    const ordered = /\d/.test(p.marker)
+    if (ordered && kindAt[p.depth] !== true) out.push([i, p.marker.slice(0, -1)])
+    kindAt[p.depth] = ordered
+  })
+  return out
+}
+
+/**
+ * A kept original line can become the first item of an ordered list (the item
+ * before it was deleted): its number is the list's start, so it takes the
+ * number the editor shows (the regenerated one) instead of its old one.
+ */
+function keepListStarts(out: string[], regenParsed: (ListLine | null)[]): string[] {
+  const want = orderedStarts(regenParsed)
+  const have = orderedStarts(parseList(out))
+  if (want.length !== have.length) return out
+  const fixed = out.slice()
+  have.forEach(([i, num], k) => {
+    const start = want[k][1]
+    if (num === start) return
+    const m = LIST_ITEM.exec(fixed[i])!
+    fixed[i] = m[1] + start + m[2].slice(-1) + fixed[i].slice(m[1].length + m[2].length)
+  })
+  return fixed
 }
 
 const isBlank = (line: string) => line.trim() === ''
@@ -311,7 +393,10 @@ function alignMatch(origKeys: string[], regenKeys: string[]): Int32Array {
 function blockKeysEqual(original: string, regenerated: string, kind: string): boolean {
   const o = genericNorm(original)
   const r = genericNorm(regenerated)
-  if (o === r) return true
+  // Outside tables and lists trailing blanks count (except on the last line):
+  // an edit may add only those (spaces in a code line, a hard break where a
+  // line break was).
+  if (o === r) return kind === 'table' || kind === 'list' || exactNorm(original) === exactNorm(regenerated)
   if (kind === 'table') {
     const ol = o.split('\n')
     const rl = r.split('\n')
@@ -367,13 +452,29 @@ export function preserveBlock(
  * lines that come back identical are kept. The key is the exact serialized
  * line, so an edit that only adds or removes markup still counts as an edit.
  */
+const QUOTE_PREFIX = /^(?:[ \t]{0,3}>[ \t]?)*/
+
 function preserveLines(origLines: string[], regenLines: string[], baseline?: string): string[] {
   const baseLines = baseline === undefined ? null : splitTail(toLF(baseline))[0].split('\n')
-  const origKeys = baseLines && baseLines.length === origLines.length ? baseLines : origLines
+  // Against the baseline (the serializer's own output) lines compare exactly,
+  // so an edit adding only trailing blanks or a hard break counts; against
+  // the original, its trailing blanks are ignored.
+  if (baseLines && baseLines.length === origLines.length) {
+    // An edited line keeps its original's quote markers (none on a lazy
+    // continuation line, `>` without the space, ...) in place of the baseline's.
+    const sameCount = regenLines.length === origLines.length
+    const restyle = (line: string, j: number) => {
+      if (!sameCount) return line
+      const base = QUOTE_PREFIX.exec(baseLines[j])![0]
+      if (base === '' || !line.startsWith(base)) return line
+      return QUOTE_PREFIX.exec(origLines[j])![0] + line.slice(base.length)
+    }
+    return alignLines(origLines, regenLines, baseLines, regenLines, restyle)
+  }
   return alignLines(
     origLines,
     regenLines,
-    origKeys.map((l) => l.trimEnd()),
+    origLines.map((l) => l.trimEnd()),
     regenLines.map((l) => l.trimEnd()),
     (line) => line,
   )
@@ -394,6 +495,7 @@ export function serializeWithPreservation(blocks: EditorBlock[], docEol?: string
   const eol = docEol ?? (blocks.find((b) => b.raw?.includes('\r\n')) ? '\r\n' : '\n')
   let out = ''
   let prev: EditorBlock | null = null
+  let prevText = ''
   for (const block of blocks) {
     let text: string
     if (block.raw !== undefined) text = preserveBlock(block.raw, block.markdown, block.kind, eol, block.baseline)
@@ -405,10 +507,28 @@ export function serializeWithPreservation(blocks: EditorBlock[], docEol?: string
       // On LF-normalised text: a lone CRLF is one line break, not a blank line.
       const endsBlank = /\n[ \t]*\n$/.test(toLF(out.slice(-256)))
       if (!endsBreak) out += eol + eol
-      else if (!endsBlank && (prev.raw === undefined || block.raw === undefined)) out += eol
+      else if (!endsBlank && (prev.raw === undefined || block.raw === undefined || !staysApart(prevText, text)))
+        out += eol
     }
     out += text
     prev = block
+    prevText = text
   }
   return out
+}
+
+/**
+ * True when `a` directly followed by `b` (no blank line) still reads as the
+ * two blocks, e.g. a heading then a paragraph. Two source blocks that were
+ * adjacent in the original pass; blocks brought together by a move (two
+ * paragraphs) do not, and get a blank line between them.
+ */
+function staysApart(a: string, b: string): boolean {
+  let at = 0
+  for (const block of splitBlocks(a + b)) {
+    at += block.raw.length
+    if (at === a.length) return true
+    if (at > a.length) return false
+  }
+  return false
 }

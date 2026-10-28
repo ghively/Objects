@@ -60,6 +60,8 @@ import { ListItemOptions } from './nodes/listItemOptions'
 import { Highlight, TextColor } from './nodes/textStyle'
 import { blockRefMarkdown } from './blocks'
 import { M8Keys } from './shortcuts'
+import { withTextEscapes } from './textEscapes'
+import { NbspEntity, withLinkForms } from './extensions/linkForms'
 import { RecordAudio } from './media/recordAudio'
 
 export type EditorExtensionOptions = {
@@ -104,10 +106,13 @@ export function withoutRegistryKeys<T extends AnyExtension>(ext: T): T {
   return stripped
 }
 
-/** StarterKit with the registry-owned keys taken out of each of its extensions. */
+/**
+ * StarterKit with the registry-owned keys taken out of each of its extensions,
+ * and paragraphs and headings escaping text that would read as other Markdown.
+ */
 const RegistryStarterKit = StarterKit.extend({
   addExtensions() {
-    return (this.parent?.() ?? []).map(withoutRegistryKeys)
+    return (this.parent?.() ?? []).map(withoutRegistryKeys).map(withTextEscapes).map(withLinkForms)
   },
 })
 
@@ -131,6 +136,7 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
     RawBlock,
     Wikilink,
     InlineMath,
+    NbspEntity,
     MathBlock,
     Media,
     ObjectEmbed,
@@ -162,7 +168,11 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
 type Edges = { leading: string; trailing: string; eol: string; final: string }
 const edges = new WeakMap<Editor, Edges>()
 
-const FIELD_LINE = /^[^\s:][^:\n]*::/m
+/**
+ * A `Key:: value` field line (kept raw). The `::` is followed by a blank or the
+ * line end, so `std::vector` or `a::b` in text is not one.
+ */
+const FIELD_LINE = /^[^\s:][^:\n]*::(?:[ \t]|$)/m
 const RAW_KINDS = new Set(['html', 'def', 'raw', 'text'])
 const CONTAINERS = new Set(['toggle', 'group', 'columns', 'indent'])
 /** Leaf types whose Markdown this module writes itself (`customMarkdown`). */
