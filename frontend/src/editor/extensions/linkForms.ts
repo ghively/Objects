@@ -45,6 +45,21 @@ export function protectLinkText(content: JSONContent[] | undefined): JSONContent
   })
 }
 
+/** A full or collapsed reference link (`[a][r]`, `[a][]`) or a footnote reference (`[^1]`). */
+const REFERENCE = /\[\^[^\]\s]+\]|\[[^[\]\n]+\]\[[^[\]\n]*\]/g
+
+/**
+ * `text` with the brackets of reference links and footnote references
+ * protected from escaping: their definitions live in other blocks, and
+ * escaped brackets would turn them into plain text for other Markdown readers.
+ */
+export function protectReferences(text: string): string {
+  if (!text.includes('[')) return text
+  const open = STAND_IN[ESCAPED.indexOf('[')]
+  const close = STAND_IN[ESCAPED.indexOf(']')]
+  return text.replace(REFERENCE, (m) => m.replaceAll('[', open).replaceAll(']', close))
+}
+
 export function restoreLinkText(md: string): string {
   return md.replace(STAND_IN_RE, (ch) => ESCAPED[STAND_IN.indexOf(ch)])
 }

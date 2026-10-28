@@ -11,7 +11,7 @@
  */
 import type { AnyExtension, JSONContent } from '@tiptap/core'
 import { findInlineMath } from './annotations'
-import { NO_BREAK, protectLinkText, restoreLinkText } from './extensions/linkForms'
+import { NO_BREAK, protectLinkText, protectReferences, restoreLinkText } from './extensions/linkForms'
 
 /** Stands for a `$` typed in text while a block is rendered (private use). */
 const DOLLAR = String.fromCharCode(0xe0f0)
@@ -22,15 +22,16 @@ const CODE_MARKS = new Set(['code'])
 
 /**
  * `content` ready to render: short-form link text protected, and in other
- * plain (non-code) text every `$` replaced by `DOLLAR` and every non-breaking
- * space by `NBSP` (`finish` puts them back).
+ * plain (non-code) text the brackets of reference links protected, every `$`
+ * replaced by `DOLLAR` and every non-breaking space by `NBSP` (`finish` puts
+ * them back).
  */
 function prepare(content: JSONContent[] | undefined): JSONContent[] | undefined {
   if (!content) return content
   return protectLinkText(content)!.map((n) => {
-    if (n.type !== 'text' || !n.text || !(n.text.includes('$') || n.text.includes(NO_BREAK))) return n
+    if (n.type !== 'text' || !n.text || !/[$[]/.test(n.text) && !n.text.includes(NO_BREAK)) return n
     if ((n.marks ?? []).some((m) => CODE_MARKS.has(m.type))) return n
-    return { ...n, text: n.text.replaceAll('$', DOLLAR).replaceAll(NO_BREAK, NBSP) }
+    return { ...n, text: protectReferences(n.text).replaceAll('$', DOLLAR).replaceAll(NO_BREAK, NBSP) }
   })
 }
 
