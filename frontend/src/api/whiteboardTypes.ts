@@ -197,6 +197,16 @@ export interface BoardResponse {
   readOnlyReason?: string
 }
 
+/**
+ * `PUT /api/whiteboard` and `PUT /api/whiteboard/ink`. M9: a save also stamps the board `.md`'s
+ * `lastUpdated` (at most once a minute); `mdVersion` is the `.md`'s version after that, so the
+ * board's Notes save on top of it.
+ */
+export interface WhiteboardSaveResult {
+  revision: string
+  mdVersion?: string
+}
+
 /** `POST /api/whiteboards` (as `POST /api/objects`). */
 export interface CreatedWhiteboard {
   path: string

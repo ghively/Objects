@@ -30,7 +30,7 @@ import shutil
 import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, tzinfo
+from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -83,6 +83,7 @@ from .taskhook import TaskResult, on_status_change
 from .linkindex import LinkIndex
 from .relink import relink_frontmatter, replace_wikilinks, rewrite_tag_lists, wikilink_targets
 from .resolver import Resolver, link_candidates
+from .roles import role_of
 from .templates import TemplateError, creation_variable, expand_title, resolve_date_variable
 from .textfile import atomic_write, create_new, encode_like, move_no_overwrite, retry_os
 from .trash import Trash, TrashItem
@@ -150,8 +151,64 @@ _NOT_COPIED_KINDS = frozenset(
     {"entity_title", "entity_type", "entity_createdAt", "entity_lastUpdated",
      "entity_collections", "entity_backlinks"}
 )  # fmt: skip
+# M9 duplicate: the roles of `structureHeuristicsBackbone.ts` `cannotBeDuplicatedInUI` that
+# our types can have (see `roles.py`), and the refusal (our string).
+_NOT_DUPLICATED_ROLES = frozenset(
+    {"MediaImage", "MediaWebResource", "MediaPDF", "MediaAudio", "MediaFile", "MediaTweet",
+     "RootDailyNote"}
+)  # fmt: skip
+_CANNOT_DUPLICATE = "This object can't be duplicated."
+# M9 per-object layout keys (`ComponentData.wideLayoutMode`, `entity.data.wideCoverImage`,
+# `coverImageOffset`'s `offset`): absent means the type's default (offset 50); `None` removes.
+_COVER_OFFSET = "coverImageOffset"
+_LAYOUT_BOOL_KEYS = frozenset({"wideLayoutMode", "wideCoverImage"})
+_LAYOUT_KEYS = _LAYOUT_BOOL_KEYS | {_COVER_OFFSET}
+# `DATE_TEMPLATE_VARIABLES` (date.model.ts); `DatetimeProperty.variable` is "Set only on templates".
+_CREATION_VARIABLES = ("day", "week", "month", "year")
+# M9: how often a whiteboard save may re-stamp its `.md` (`Space.touch`; our choice).
+_TOUCH_INTERVAL = timedelta(seconds=60)
 # A body that is empty or only a `# Title` heading (a template's body replaces it).
 _TITLE_ONLY_RE = re.compile(r"\s*(?:#[ \t][^\n]*)?\s*")
+
+
+def _check_layout_value(key: str, value: Any) -> None:
+    """Raise `InvalidValue` unless ``value`` fits the layout key (None always does)."""
+    if value is None:
+        return
+    if key in _LAYOUT_BOOL_KEYS:
+        if not isinstance(value, bool):
+            raise InvalidValue(f"{key} must be true, false or null")
+        return
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not 0 <= value <= 100  # NaN fails this too
+    ):
+        raise InvalidValue(f"{key} must be a number from 0 to 100, or null")
+
+
+def _creation_value(value: str, fm: dict) -> SingleQuotedScalarString:
+    """The frontmatter value for a ``{creation:<var>}`` update of a ``datetime`` property.
+
+    Raises `InvalidValue` for an unknown variable, or on a file that isn't a template.
+    """
+    var = creation_variable(value)
+    if var not in _CREATION_VARIABLES:
+        raise InvalidValue(f"Unknown date variable {value.strip()!r}")
+    if not _str_or_none(fm.get("template")):
+        raise InvalidValue("Date variables can only be set on a template")
+    return SingleQuotedScalarString(f"{{creation:{var}}}")
+
+
+def _instant_or_none(value: Any) -> datetime | None:
+    """A stamp such as ``lastUpdated`` as an aware instant, else None."""
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+    try:
+        dt = datetime.fromisoformat(str(value or "").strip())
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def _parse_created(value: Any) -> datetime:
@@ -1479,6 +1536,7 @@ class Space:
         edit: Edit,
         stamp: bool = True,
         now: datetime | None = None,
+        history: bool = True,
     ) -> str:
         """Apply `edit` to an object file safely; return its (new) version.
 
@@ -1489,6 +1547,7 @@ class Space:
         without frontmatter gets a new fence block. Line endings, BOM and every
         untouched line's bytes are kept; the replace re-checks the version.
         ``now`` is the write's instant for the stamp (default: `Space.clock`).
+        Without ``history`` the write takes no version-history snapshot (`before_write`).
         """
         rel = self._rel(rel)
         full = self.root / rel
@@ -1526,7 +1585,8 @@ class Space:
                 if now != current:
                     raise Conflict(now)
 
-            self._call_before_write(rel, raw.data)
+            if history:
+                self._call_before_write(rel, raw.data)
             self.own_writes[rel] = new_version
             try:
                 atomic_write(full, data, check=unchanged_on_disk)
@@ -1536,6 +1596,28 @@ class Space:
                 raise
             self.rescan_file(rel)
             return new_version
+
+    def touch(self, path: str, now: datetime | None = None) -> str:
+        """Set only the object's ``lastUpdated`` to ``now``; return its (new) version.
+
+        M9: a whiteboard's canvas or ink save stamps its ``.md`` (``lastUpdated`` is
+        component-level in Capacities). A stamp under `_TOUCH_INTERVAL` old is left as it
+        is (our choice), as is a read-only file; the write takes no version-history
+        snapshot (our choice). Raises `KeyError`, `ValueError` and `Conflict` (an
+        external write during the stamp).
+        """
+        instant = now or self.clock()
+
+        def apply(src: str, fm: dict) -> str:
+            last = _instant_or_none(fm.get("lastUpdated"))
+            if last is not None and instant - last < _TOUCH_INTERVAL:
+                return src
+            return set_keys(src, {"lastUpdated": now_stamp(instant)})
+
+        try:
+            return self._write(path, None, self._fm_edit(apply), stamp=False, history=False)
+        except ReadOnly:
+            return version_of((self.root / self._rel(path)).read_bytes())
 
     def _rewrite_other(self, rel: str, edit: Edit, stamp: bool = False) -> str | Skip:
         """Rewrite another file on the user's behalf (unstamped unless asked).
@@ -1755,11 +1837,29 @@ class Space:
         removals)`` (the Task status hook, `update_properties` only) may edit
         what is written before it is; a ``date`` it rewrites keeps its line's
         quotes and trailing comment.
+
+        M9: the layout keys (``wideLayoutMode``, ``wideCoverImage``, ``coverImageOffset``)
+        take their own shapes and ``None`` removes them; a changed ``coverImage`` drops
+        ``coverImageOffset``; a ``datetime`` takes ``{creation:<var>}`` on a template only.
         """
         sets: dict[str, Any] = {}
         removals: list[str] = []
+        unquote: list[str] = []
         for key, value in updates.items():
+            if key in _LAYOUT_KEYS:
+                _check_layout_value(key, value)
+                if value is None:
+                    removals.append(key)
+                else:
+                    sets[key] = value
+                continue
             pdef = self._pdef(t, key)
+            if pdef is not None and pdef.type == "datetime":
+                if isinstance(value, str) and value.strip().startswith("{creation:"):
+                    sets[key] = _creation_value(value, fm)
+                    continue
+                if creation_variable(fm.get(key)) is not None:
+                    unquote.append(key)  # a date replacing a variable drops its quotes
             if pdef is None:
                 encoded = _json_scalar(key, value)
                 if encoded is not None or key in fm:
@@ -1776,6 +1876,12 @@ class Space:
             sets.update(u)
             removals.extend(r)
         removals.extend(k for k in remove if k in fm)
+        if _COVER_OFFSET not in sets and (
+            ("coverImage" in sets and sets["coverImage"] != fm.get("coverImage"))
+            or "coverImage" in removals
+        ):
+            # A new cover image drops the old one's position (Capacities' `referenceImageId`).
+            removals.append(_COVER_OFFSET)
         in_place: dict[str, str] = {}
         if hook is not None:
             explicit_date = "date" in sets
@@ -1783,6 +1889,9 @@ class Space:
             new_date = sets.get("date")
             if not explicit_date and isinstance(new_date, str) and isinstance(fm.get("date"), str):
                 in_place["date"] = sets.pop("date")
+        unquote = [k for k in unquote if k in sets and k in fm]
+        if unquote:
+            src = set_keys(src, dict.fromkeys(unquote))
         out = set_keys(src, sets) if sets else src
         for key, value in in_place.items():
             out = replace_in_value(out, key, lambda _old, value=value: value)
@@ -2558,6 +2667,61 @@ class Space:
                 rel = free(self.root, folder, stem)
                 if self._place(rel, data):
                     return rel, version
+        raise OSError(f"Could not find a free file name for {stem!r}")
+
+    def duplicate_object(self, path: str, now: datetime | None = None) -> tuple[str, str]:
+        """Copy an object as ``<Title> (Copy)`` in its own folder; return (path, version).
+
+        The copy is the source's bytes (line endings and BOM included) except for a
+        new ``id``, ``title: <Title> (Copy)``, fresh ``createdAt`` and ``lastUpdated``
+        (``now``, default `Space.clock`) and a first ``# <Title>`` heading, which
+        becomes ``# <Title> (Copy)``. The title rule is Capacities'
+        (``${title || 'Untitled'} (Copy)``). Writes only the new file.
+
+        Raises `KeyError` (no such file), `ValueError` (not an object path) and
+        `InvalidValue` for what Capacities doesn't duplicate (daily notes and media,
+        its ``cannotBeDuplicatedInUI``), templates, whiteboards (their sidecars would
+        need copying too; our choice) and read-only files.
+        """
+        rel = self._rel(path)
+        full = self.root / rel
+        instant = now or self.clock()
+        with self._lock:
+            if not full.is_file():
+                raise KeyError(rel)
+            raw = read_raw(self.root, rel)
+            t = self.type_by_id(self._type_id(raw.typeName))
+            if (
+                raw.readOnly
+                or _str_or_none(raw.fm.get("template"))
+                or role_of(t) in _NOT_DUPLICATED_ROLES
+                or self._is_whiteboard(rel)
+            ):
+                raise InvalidValue(_CANNOT_DUPLICATE)
+            title = _title_of(raw)
+            new_title = f"{title or 'Untitled'} (Copy)"
+            stamp = now_stamp(instant)
+            fm_src = set_keys(
+                raw.of.frontmatter_src or "",
+                {"title": new_title, "createdAt": stamp, "lastUpdated": stamp},
+                insert_first={"id": new_ulid()},
+            )
+            body = raw.of.body
+            lines = body.split("\n")
+            first = next((i for i, line in enumerate(lines) if line.strip()), None)
+            if first is not None and lines[first].rstrip() == f"# {title}":
+                lines[first] = f"# {new_title}"
+                body = "\n".join(lines)
+            of = replace(raw.of, frontmatter_src=fm_src, body=body, fm_ok=True, fm_error=None)
+            data = encode_like(raw.data, join_object(of))
+            version = version_of(data)
+            folder = PurePosixPath(rel).parent.as_posix()
+            folder = "" if folder == "." else folder
+            stem = safe_filename(new_title)
+            for _attempt in range(100):
+                new_rel = unique_path(self.root, folder, stem)
+                if self._place(new_rel, data):
+                    return new_rel, version
         raise OSError(f"Could not find a free file name for {stem!r}")
 
     def _place(self, rel: str, data: bytes) -> bool:
