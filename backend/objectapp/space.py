@@ -200,15 +200,24 @@ def _creation_value(value: str, fm: dict) -> SingleQuotedScalarString:
     return SingleQuotedScalarString(f"{{creation:{var}}}")
 
 
-def _instant_or_none(value: Any) -> datetime | None:
-    """A stamp such as ``lastUpdated`` as an aware instant, else None."""
+def _instant_or_none(value: Any, tz: tzinfo) -> datetime | None:
+    """A stamp such as ``lastUpdated`` as an aware instant, else None.
+
+    A value without a time zone is local time in ``tz`` (as `_parse_created` reads one).
+    """
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=UTC)
+        dt = value
+    else:
+        try:
+            dt = datetime.fromisoformat(str(value or "").strip())
+        except ValueError:
+            return None
+    if dt.tzinfo:
+        return dt
     try:
-        dt = datetime.fromisoformat(str(value or "").strip())
-    except ValueError:
+        return from_local(dt, tz)
+    except OverflowError:
         return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def _parse_created(value: Any) -> datetime:
@@ -1611,8 +1620,9 @@ class Space:
         instant = now or self.clock()
 
         def apply(src: str, fm: dict) -> str:
-            last = _instant_or_none(fm.get("lastUpdated"))
-            if last is not None and instant - last < _TOUCH_INTERVAL:
+            last = _instant_or_none(fm.get("lastUpdated"), self.tz)
+            # A stamp after now (a skewed clock, another machine) is replaced too.
+            if last is not None and timedelta(0) <= instant - last < _TOUCH_INTERVAL:
                 return src
             return set_keys(src, {"lastUpdated": now_stamp(instant)})
 
