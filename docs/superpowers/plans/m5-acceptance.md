@@ -120,7 +120,7 @@ Run `npm run build`, then `uv run objectapp --space <copy of backend/tests/fixtu
 
 Note what Object does differently, so a fix pass can follow.
 
-- [ ] Key bindings: Ctrl+K and Ctrl+P (both also work while the peek is open), the Enter / Ctrl+Enter / Shift+Enter variants, Ctrl+Enter in Replace doing "Replace all", and Esc in the find bar.
+- [ ] Key bindings: Ctrl+P or Ctrl+K opens search, as in Object (`reference-check-2026-10-28.md` §1; both also work while the peek is open). Object lists no key for the action palette, so it opens from the palette's switch button. Also the Enter / Ctrl+Enter / Shift+Enter variants, Ctrl+Enter in Replace doing "Replace all", and Esc in the find bar.
 - [ ] Search highlight colour: `--bg-search-highlight` is the yellow type colour at 30% alpha, 55% for the current find match, with text `var(--text)`. Weight 500 and radius 1px come from the reference CSS.
 - [ ] Graph:
   - node sizes (`3 + 2·sqrt(degree)`, capped at 18) and colours (type colour; tags in their tag colour)
