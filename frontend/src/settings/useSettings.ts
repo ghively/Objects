@@ -22,6 +22,8 @@ function merged(s: Partial<DeviceSettings> | null | undefined): DeviceSettings {
 }
 
 let queue: Promise<void> = Promise.resolve()
+/** Patches made while a load is in flight: its answer predates them, so they go back on top. */
+let patchedDuringLoad: Partial<DeviceSettings> | null = null
 
 export const useSettings = create<SettingsState>((set, get) => ({
   settings: settingsDefaults,
@@ -29,12 +31,18 @@ export const useSettings = create<SettingsState>((set, get) => ({
   loaded: false,
 
   async load() {
-    const res = await api.settings()
-    set({ settings: merged(res?.settings), revision: res?.revision ?? '', loaded: true })
+    const mine: Partial<DeviceSettings> = (patchedDuringLoad ??= {})
+    try {
+      const res = await api.settings()
+      set({ settings: { ...merged(res?.settings), ...mine }, revision: res?.revision ?? '', loaded: true })
+    } finally {
+      if (patchedDuringLoad === mine) patchedDuringLoad = null
+    }
   },
 
   patch(partial) {
     set({ settings: { ...get().settings, ...partial } })
+    if (patchedDuringLoad) Object.assign(patchedDuringLoad, partial)
     const send = async () => {
       try {
         const res = await api.patchSettings(partial, { baseRevision: get().revision })

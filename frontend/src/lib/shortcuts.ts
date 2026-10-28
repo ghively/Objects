@@ -135,7 +135,13 @@ const PUNCTUATION_CODES: Record<string, string> = {
 
 function keyMatches(e: Pick<KeyboardEvent, 'key' | 'code'>, key: string): boolean {
   const code = e.code ?? ''
-  if (/^[a-z]$/i.test(key)) return (e.key ?? '').toLowerCase() === key.toLowerCase() || code === `Key${key.toUpperCase()}`
+  if (/^[a-z]$/i.test(key)) {
+    // The character typed decides (AZERTY's Ctrl+Z is Undo, not Ctrl+W); the physical key only
+    // when the layout gives no Latin letter (Cyrillic, Greek, macOS Option characters).
+    const typed = e.key ?? ''
+    if (/^[a-z]$/i.test(typed)) return typed.toLowerCase() === key.toLowerCase()
+    return code === `Key${key.toUpperCase()}`
+  }
   if (/^[0-9]$/.test(key)) return e.key === key || code === `Digit${key}` || code === `Numpad${key}`
   if (key === 'Space') return e.key === ' ' || code === 'Space'
   if (key in PUNCTUATION_CODES) return e.key === key || code === PUNCTUATION_CODES[key]

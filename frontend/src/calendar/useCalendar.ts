@@ -3,6 +3,8 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
+import { zonedToday } from '@/lib/zonedTime'
+import { useSettings } from '@/settings/useSettings'
 import { reloadUi, useUiStore } from '@/shell/usePinned'
 import { addDays, addMonths, addYears, todayYmd, type CalendarView, type Day, type WeekStart } from './dates'
 
@@ -90,6 +92,14 @@ export const useCalendar = create<CalendarState>()(
     },
   ),
 )
+
+// The store opens on today before the settings load; when the Time zone setting arrives or changes,
+// an anchor still on today in the old zone moves to today in the new one.
+useSettings.subscribe((s, prev) => {
+  if (s.settings.timeZone === prev.settings.timeZone) return
+  const was = zonedToday(prev.settings.timeZone ?? null)
+  if (useCalendar.getState().anchor === was) useCalendar.setState({ anchor: todayYmd() })
+})
 
 let uiRequested = false
 

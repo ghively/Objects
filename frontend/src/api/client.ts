@@ -212,9 +212,26 @@ async function request<T>(path: string, init?: RequestInit, on409?: (d: Record<s
     throw new ConfirmRequiredError(message, Number(d.affected ?? 0), typeof d.folder === 'string' ? d.folder : null)
   }
   const detail = data && typeof data === 'object' ? (data as Record<string, unknown>).detail : undefined
-  // 400/404 carry the server's message as {detail: "..."}.
-  const message = typeof detail === 'string' ? detail : typeof data === 'string' ? data : res.statusText
+  // 400/404 carry the server's message as {detail: "..."}; a request validation 422 a list of
+  // {loc, msg}.
+  const message =
+    typeof detail === 'string'
+      ? detail
+      : Array.isArray(detail) && detail.length > 0
+        ? detail.map(validationMessage).join('; ')
+        : typeof data === 'string'
+          ? data
+          : res.statusText
   throw new ApiError(res.status, message)
+}
+
+/** One FastAPI validation error, `field: message`. */
+function validationMessage(e: unknown): string {
+  if (!e || typeof e !== 'object') return String(e)
+  const { loc, msg } = e as { loc?: unknown; msg?: unknown }
+  const field = Array.isArray(loc) && loc.length > 0 ? String(loc[loc.length - 1]) : ''
+  const text = typeof msg === 'string' ? msg : JSON.stringify(e)
+  return field ? `${field}: ${text}` : text
 }
 
 type ChangeListener = (e: ChangeEvent) => void

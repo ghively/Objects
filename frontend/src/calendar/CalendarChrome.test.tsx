@@ -9,6 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useTabs } from '@/nav/tabs'
 import { resetPinned, useUiStore } from '@/shell/usePinned'
 import { CalendarChrome } from './CalendarChrome'
@@ -194,6 +195,27 @@ describe('CalendarChrome', () => {
     expect(anchor()).toBe(TODAY)
     input.remove()
     editable.remove()
+  })
+
+  test('view and arrow keys do nothing behind an open modal (the peek, settings)', () => {
+    renderPage()
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Peek</DialogTitle>
+          <DialogDescription>Object preview</DialogDescription>
+          <button type="button">Inside</button>
+        </DialogContent>
+      </Dialog>,
+    )
+    const inside = screen.getByRole('button', { name: 'Inside' })
+    inside.focus()
+    fireEvent.keyDown(inside, { key: 'm' })
+    fireEvent.keyDown(inside, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'w' })
+    fireEvent.keyDown(window, { key: 't' })
+    expect(view()).toBe('day')
+    expect(anchor()).toBe(TODAY)
   })
 
   test('view shortcuts switch views only when calendar is active and not typing', () => {

@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
+import { formatInZone } from '@/lib/zonedTime'
 import { invalidateLinkIndex } from '@/links/linkIndex'
 
 export const TRASH_TEXT = {
@@ -53,7 +54,7 @@ function entryCount(i: TrashItem): number {
 
 function formatDeletedAt(iso: string): string {
   const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+  return Number.isNaN(d.getTime()) ? iso : formatInZone(d, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 export function TrashView() {

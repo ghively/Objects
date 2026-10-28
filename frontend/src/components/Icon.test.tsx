@@ -1,5 +1,6 @@
 /// <reference types="node" />
 import { render, waitFor } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
 import { describe, expect, test, vi } from 'vitest'
 import { Icon, iconName } from './Icon'
 
@@ -53,6 +54,15 @@ describe('Icon', () => {
     } finally {
       globalThis.fetch = realFetch
     }
+  }, 20000)
+
+  test('a loaded icon draws on its first render, never as a bare span', async () => {
+    await svgOf(render(<Icon name="ph-graph" />).container)
+    // The first render (no effects run) already carries the icon; Iconify's default first render
+    // is an empty <span>, which left a tab's icon briefly without data-icon or size.
+    const html = renderToString(<Icon name="ph-graph" />)
+    expect(html).toContain('<svg')
+    expect(html).toContain('data-icon="ph-graph"')
   }, 20000)
 
   test('iconName reads an Icon, a string or nothing', () => {

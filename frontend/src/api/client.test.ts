@@ -41,6 +41,17 @@ describe('api client', () => {
     expect((err as ApiError).status).toBe(404)
     expect((err as ApiError).message).toBe("No object at 'X.md'")
   })
+
+  test("a request the server's validation rejects (422) carries its messages", async () => {
+    vi.stubGlobal(
+      'fetch',
+      respond(422, { detail: [{ loc: ['body', 'path'], msg: 'Field required', type: 'missing' }, { loc: ['query', 'limit'], msg: 'Input should be a valid integer', type: 'int_parsing' }] }),
+    )
+    const err = await api.object('X.md').catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as ApiError).status).toBe(422)
+    expect((err as ApiError).message).toBe('path: Field required; limit: Input should be a valid integer')
+  })
 })
 
 function bodyOf(fetchMock: ReturnType<typeof vi.fn>, call = 0): Record<string, unknown> {

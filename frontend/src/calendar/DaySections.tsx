@@ -32,8 +32,9 @@ import { usePeek } from '@/nav/tabs'
 import { useSettings } from '@/settings/useSettings'
 import { saveCalendarDaily, useCalendarDaily, type CalendarDaily } from './calendarUi'
 import { DailyNoteSlot, SectionHeading } from './DailyNoteSlot'
-import { addDays, parseYmd, todayYmd, ymd, type Day } from './dates'
-import { formatInZone } from '@/lib/zonedTime'
+import { addDays, parseYmd, todayYmd, type Day } from './dates'
+import { formatInZone, zonedParts } from '@/lib/zonedTime'
+import { zonedWallToInstant } from '@/lib/zonedShell'
 
 export const SECTIONS_TEXT = {
   /** `CalendarDaily.all.heading` */
@@ -281,12 +282,12 @@ export function moveDate(v: DateValue | null | undefined, to: Day): DateValue {
   const start = new Date(v.start)
   const target = parseYmd(to)
   if (Number.isNaN(start.getTime()) || !target) return { start: to, resolution: 'day' }
-  const fromDay = parseYmd(ymd(start))!
+  // Days and wall clock in the Time zone setting, as the calendar shows them.
+  const fromDay = parseYmd(zonedParts(start).date)!
   const delta = Math.round((target.getTime() - fromDay.getTime()) / 86_400_000)
   const shift = (d: Date) => {
-    const n = new Date(d)
-    n.setDate(n.getDate() + delta) // local wall clock: 09:00 stays 09:00 across DST
-    return n.toISOString()
+    const p = zonedParts(d) // wall clock: 09:00 stays 09:00 across DST
+    return zonedWallToInstant(addDays(p.date, delta), p.hour, p.minute, p.second, d.getUTCMilliseconds()).toISOString()
   }
   const end = v.end ? new Date(v.end) : null
   return end && !Number.isNaN(end.getTime())

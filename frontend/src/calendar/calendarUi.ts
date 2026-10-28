@@ -4,7 +4,7 @@
 // state is fetched and the same edit is re-applied to it once (never a blind overwrite).
 import { api, ConflictError } from '@/api/client'
 import type { CalendarUi, UiState } from '@/api/types'
-import { useUiStore } from '@/shell/usePinned'
+import { enqueueUiSave, pendingUiSaves, useUiStore } from '@/shell/usePinned'
 
 export type CalendarDaily = CalendarUi['daily']
 
@@ -26,8 +26,6 @@ export function useCalendarDaily(): CalendarDaily {
   return useUiStore((s) => s.ui.calendar?.daily) ?? EMPTY_DAILY
 }
 
-let queue: Promise<void> = Promise.resolve()
-
 async function save(edit: CalendarEdit): Promise<void> {
   const base = useUiStore.getState()
   const next = edit(calendarOf(base.ui))
@@ -39,7 +37,9 @@ async function save(edit: CalendarEdit): Promise<void> {
     const fresh = await api.ui()
     const again = edit(calendarOf(fresh?.ui))
     const res = await api.patchUi({ calendar: again }, { baseRevision: fresh?.revision ?? '' })
-    const ui = { ...(fresh?.ui ?? useUiStore.getState().ui), calendar: again }
+    // Another writer's unsaved edits are in the local ui, not in `fresh`: keep them.
+    const rest = pendingUiSaves() === 1 && fresh?.ui ? fresh.ui : useUiStore.getState().ui
+    const ui = { ...rest, calendar: again }
     useUiStore.setState({ ui, revision: res?.revision ?? fresh?.revision ?? '' })
   }
 }
@@ -48,13 +48,11 @@ async function save(edit: CalendarEdit): Promise<void> {
 function enqueue(edit: CalendarEdit): Promise<void> {
   const cur = useUiStore.getState().ui
   useUiStore.setState({ ui: { ...cur, calendar: edit(calendarOf(cur)) } })
-  const done = queue.then(() =>
+  return enqueueUiSave(() =>
     save(edit).catch((e: unknown) => {
       console.warn('Could not save the calendar settings:', e)
     }),
   )
-  queue = done
-  return done
 }
 
 /** Merge `patch` into `ui.calendar.daily` now and save it after the edits before it. */
