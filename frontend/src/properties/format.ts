@@ -56,20 +56,22 @@ export function usesRadixComma(fmt?: NumberFormat | null): boolean {
 }
 
 function numberParts(v: number, fmt: NumberFormat): Intl.NumberFormatPart[] {
-  const digits = {
-    minimumFractionDigits: fmt.options.decimals?.min,
-    maximumFractionDigits: fmt.options.decimals?.max ?? 20,
-  }
+  // Intl throws on digits outside 0–20 or a minimum above the maximum: clamp, the minimum winning.
+  const clamp = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? Math.min(20, Math.max(0, Math.round(n))) : undefined)
+  const min = clamp(fmt.options.decimals?.min)
+  const max = Math.max(clamp(fmt.options.decimals?.max) ?? 20, min ?? 0)
+  const digits = { minimumFractionDigits: min, maximumFractionDigits: max }
   switch (fmt.type) {
     case 'number':
     case 'progress':
       return new Intl.NumberFormat(LOCALE, { style: 'decimal', ...digits }).formatToParts(v)
-    case 'currency':
+    case 'currency': {
       if (!fmt.options.currency) return []
-      return [
-        { type: 'currency', value: currencySymbol(fmt.options.currency) },
-        ...new Intl.NumberFormat(LOCALE, { style: 'decimal', ...digits }).formatToParts(v),
-      ]
+      // The sign leads, as Intl's currency style writes it: -$5, not $-5.
+      const parts = new Intl.NumberFormat(LOCALE, { style: 'decimal', ...digits }).formatToParts(v)
+      const sign = parts[0]?.type === 'minusSign' ? [parts.shift()!] : []
+      return [...sign, { type: 'currency', value: currencySymbol(fmt.options.currency) }, ...parts]
+    }
     case 'percentage':
       return new Intl.NumberFormat(LOCALE, { style: 'percent', ...digits }).formatToParts(v)
     default:
@@ -118,9 +120,17 @@ export function parseNumberInput(s: string, fmt?: NumberFormat | null): number |
   if (usesRadixComma(fmt)) t = t.replace(/\./g, '').replace(/,/g, '.')
   else t = t.replace(/,/g, '')
   t = t.replace(/\s+/g, '')
-  if (t === '') return undefined
+  // A trailing "%": a percentage cell is edited in percent already; elsewhere it is the fraction.
+  const percent = t.endsWith('%')
+  if (percent) t = t.slice(0, -1)
+  // Plain decimals only: not "Infinity", "0x10" or "0b11", which `Number` would read.
+  if (!/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(t)) return undefined
   const n = Number(t)
-  return Number.isNaN(n) ? undefined : n
+  if (!Number.isFinite(n)) return undefined
+  if (!percent || fmt?.type === 'percentage') return n
+  // Shift in decimal (14.3 → 0.143, not 14.3 / 100).
+  const [mantissa, exp] = String(n).split('e')
+  return Number(`${mantissa}e${Number(exp ?? 0) - 2}`)
 }
 
 const formatters = new Map<string, Intl.DateTimeFormat>()

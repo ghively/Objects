@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
+import { wallClock, zonedInstant } from '@/lib/zonedTime'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useTypeEditor, type TypeEditor } from '@/object/useTypeEditor'
 import { CURRENCIES } from './currencies'
@@ -268,11 +269,17 @@ function withConstraints(def: PropertyDef, patch: Partial<DateConstraints>): Pro
   return { ...def, options: { ...def.options, constraints: c as DateConstraints } }
 }
 
-/** `2026-10-30T14:00:00.000Z` → the local `datetime-local` value. */
+/** A `datetime-local` value read in the "Time zone" setting's zone; an invalid one is NaN. */
+function fromLocalInput(s: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(s)
+  return m ? zonedInstant(+m[1], +m[2], +m[3], +m[4], +m[5]) : new Date(NaN)
+}
+
+/** `2026-10-30T14:00:00.000Z` → the `datetime-local` value in the "Time zone" setting's zone. */
 function toLocalInput(iso: string | null | undefined): string {
   if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
+  if (Number.isNaN(new Date(iso).getTime())) return ''
+  const d = wallClock(iso)
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
@@ -356,7 +363,7 @@ function DateSection({ def, save, taskDate }: { def: PropertyDef; save(next: Pro
                 aria-label="Default start"
                 defaultValue={toLocalInput(c.startTimeDefault)}
                 onBlur={(e) => {
-                  const d = new Date(e.target.value)
+                  const d = fromLocalInput(e.target.value)
                   if (!Number.isNaN(d.getTime())) save(withConstraints(def, { startTimeDefault: d.toISOString() }))
                 }}
                 className="rounded border border-line bg-transparent px-2 py-0.5"
@@ -370,7 +377,7 @@ function DateSection({ def, save, taskDate }: { def: PropertyDef; save(next: Pro
                   aria-label="Default end"
                   defaultValue={toLocalInput(c.endTimeDefault)}
                   onBlur={(e) => {
-                    const d = new Date(e.target.value)
+                    const d = fromLocalInput(e.target.value)
                     save(withConstraints(def, { endTimeDefault: Number.isNaN(d.getTime()) ? undefined : d.toISOString() }))
                   }}
                   className="rounded border border-line bg-transparent px-2 py-0.5"

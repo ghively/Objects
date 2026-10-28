@@ -15,7 +15,8 @@ import type {
 } from '@/api/types'
 import { formatNumber } from '@/properties/format'
 import { STATUS_CATEGORIES, optionCategory } from '@/tasks/statusCategory'
-import { dateSpan, startOfDay } from './dates'
+import { wallClock } from '@/lib/zonedTime'
+import { dateSpan } from './dates'
 import { displayTitle, findDef, rowValue, type FilterCtx } from './filter'
 
 export interface GroupOption {
@@ -138,7 +139,9 @@ const RELATIVE_ORDER = [
 const pad = (n: number, w = 2) => String(n).padStart(w, '0')
 const dayId = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 const DAY_MS = 86400000
-const daysBetween = (a: Date, b: Date) => Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / DAY_MS)
+// On wall-clock carriers (`lib/zonedTime` `wallClock`): the time-zone setting's days.
+const localDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+const daysBetween = (a: Date, b: Date) => Math.round((localDay(b).getTime() - localDay(a).getTime()) / DAY_MS)
 const mondayOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7))
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -287,18 +290,22 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
       const step = cfg.step && cfg.step > 0 ? cfg.step : 1
       const min = cfg.min ?? 0
       if (v < min || (cfg.max !== undefined && v > cfg.max)) return null
-      let i = Math.floor((v - min) / step)
+      // Decimal steps (0.1) don't divide exactly in binary: round away the float noise first.
+      const clean = (x: number) => Number(x.toPrecision(12))
+      const q = clean((v - min) / step)
+      let i = Math.floor(q)
       // The top of the range belongs to the last group.
-      if (cfg.max !== undefined && v === cfg.max && i > 0 && (v - min) % step === 0) i -= 1
-      const lo = min + i * step
-      return [{ id: `${lo}-${lo + step}`, label: `${lo}–${lo + step}`, sort: lo }]
+      if (cfg.max !== undefined && v === cfg.max && i > 0 && q === i) i -= 1
+      const lo = clean(min + i * step)
+      const hi = clean(min + (i + 1) * step)
+      return [{ id: `${lo}-${hi}`, label: `${lo}–${hi}`, sort: lo }]
     }
     case 'datetime':
     case 'datetimeSimple':
     case 'entity_createdAt':
     case 'entity_lastUpdated': {
       const span = dateSpan(dateOf(row, entry.propertyId))
-      return span ? [dateBucket(span.start, entry.option, ctx.now)] : []
+      return span ? [dateBucket(wallClock(span.start), entry.option, wallClock(ctx.now))] : []
     }
     case 'entity_title':
       return textBucket(displayTitle(row))
@@ -337,7 +344,7 @@ export function groupRows(
   ctx: GroupCtx,
 ): { groups: Group[]; hidden: Group[] } {
   const entry = groupBy?.groups?.[0]
-  const def = entry ? findDef(ctx.types, entry.propertyId, entry.structureId) : undefined
+  const def = entry ? findDef(ctx.types, entry.propertyId, entry.structureId, ctx.viewTypeIds) : undefined
   if (!entry || !def) return { groups: [{ id: OTHER_ID, label: 'Objects', rows }], hidden: [] }
   const isStatus = isStatusLabel(def)
   const byCategory = isStatus && entry.option === STATUS_CATEGORY_OPTION
@@ -426,18 +433,39 @@ export function groupRows(
   return { groups, hidden }
 }
 
+/** A kanban drag: the row being moved and the column it left. */
+export interface GroupMove {
+  row: Row
+  from?: Group | null
+}
+
+const sameText = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
+
+/** A multi-value list with the source column's item removed and `add` appended (once). */
+function swapText(current: unknown, fromLabel: string | null, add: string, same: (a: string, b: string) => boolean): string[] {
+  const items = (Array.isArray(current) ? (current as unknown[]) : []).filter(
+    (x): x is string => typeof x === 'string' && !(fromLabel !== null && same(x, fromLabel)),
+  )
+  if (!items.some((x) => same(x, add))) items.push(add)
+  return items
+}
+
 /**
  * The update that moves a row into `group`, or null where a drag can't (created, updated, type,
- * backlinks, number ranges and date periods).
+ * backlinks, number ranges and date periods). With `move`, a multi-value property keeps its other
+ * values: the source column's value is removed and the target's added.
  */
 export function valueForGroup(
   groupBy: GroupBy | GroupByEntry,
   group: Group,
   def: Pick<PropertyDef, 'type' | 'options'>,
+  move?: GroupMove,
 ): { key: string; value: unknown } | null {
   const entry: GroupByEntry | undefined = 'groups' in groupBy ? groupBy.groups[0] : groupBy
   if (!entry) return null
   const key = entry.propertyId
+  const current = move ? rowValue(move.row, key) : undefined
+  const from = move?.from && !move.from.isOther ? move.from : null
   switch (def.type) {
     case 'entity_createdAt':
     case 'entity_lastUpdated':
@@ -458,16 +486,31 @@ export function valueForGroup(
         const first = (def.options.set ?? []).find((s) => optionCategory(s) === group.id)
         return first ? { key, value: [first.text] } : null
       }
+      if (move && def.options.isArray && !group.isOther) {
+        return { key, value: swapText(current, from?.label ?? null, group.label, (a, b) => a === b) }
+      }
       return { key, value: group.isOther ? [] : [group.label] }
     case 'entity_tags':
     case 'entity_collections':
     case 'entity_aliases':
+      if (move && !group.isOther) return { key, value: swapText(current, from?.label ?? null, group.label, sameText) }
       return { key, value: group.isOther ? [] : [group.label] }
     case 'entity': {
       if (group.isOther) return { key, value: [] }
       const unresolved = group.id.startsWith('target:')
       const ref: EntityRef = { target: unresolved ? group.id.slice(7) : group.label, path: unresolved ? null : group.id }
-      return { key, value: [ref] }
+      if (!move || def.options.isArray === false) return { key, value: [ref] }
+      // Keep the other links; a link's group id is its resolved path, else its target.
+      const links = move.row.links[key] ?? []
+      const refs = Array.isArray(current) ? (current as (EntityRef | null)[]) : []
+      const idOf = (r: EntityRef, i: number) => {
+        const path = r.path ?? links[i] ?? null
+        return path ?? `target:${r.target}`
+      }
+      const kept = refs.flatMap((r, i) => (r && idOf(r, i) !== from?.id ? [{ r, id: idOf(r, i) }] : []))
+      const value = kept.map((x) => x.r)
+      if (!kept.some((x) => x.id === group.id)) value.push(ref)
+      return { key, value }
     }
     case 'textBlock':
       return entry.option === 'entity' ? null : { key, value: group.isOther ? '' : group.label }

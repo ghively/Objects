@@ -28,6 +28,10 @@ export interface FilterCtx {
   now: Date
   /** Object id → path, to compare entity filters' object ids with the resolved links. */
   pathsById?: Record<string, string>
+  /** Object path → title, for relations (groups and sorts read the linked object's title). */
+  entityTitles?: Record<string, string>
+  /** The types the view shows: a key two types share resolves against these first. */
+  viewTypeIds?: string[]
 }
 
 const o = (key: string, label: string): FilterOption => ({ key, label })
@@ -192,10 +196,14 @@ function defIn(type: TypeDef | undefined, propertyId: string): DefLike | undefin
   return kind ? { type: kind, options: {} } : undefined
 }
 
-/** The definition a filter or sort reads for `propertyId`, in `typeId`'s type or, without one, any type. */
-export function findDef(types: TypeDef[], propertyId: string, typeId?: string): DefLike | undefined {
+/**
+ * The definition a filter or sort reads for `propertyId`, in `typeId`'s type or, without one, the
+ * first of the view's types (`prefer`) that has it, else any type.
+ */
+export function findDef(types: TypeDef[], propertyId: string, typeId?: string, prefer?: string[]): DefLike | undefined {
   if (typeId) return defIn(types.find((x) => x.id === typeId), propertyId)
-  for (const t of types) {
+  const ordered = prefer?.length ? [...types.filter((t) => prefer.includes(t.id)), ...types.filter((t) => !prefer.includes(t.id))] : types
+  for (const t of ordered) {
     const d = defIn(t, propertyId)
     if (d) return d
   }
@@ -210,9 +218,9 @@ export function findDef(types: TypeDef[], propertyId: string, typeId?: string): 
 const ACCEPTED_EXTRA: Partial<Record<PropertyType, string[]>> = { entity_backlinks: ['notContains'] }
 
 /** Whether the filter names a property and an operator that still exist; an invalid one is ignored. */
-export function filterIsValid(filter: Filter, typesById: Record<string, TypeDef>): boolean {
+export function filterIsValid(filter: Filter, typesById: Record<string, TypeDef>, viewTypeIds?: string[]): boolean {
   if (filter.structureId && !typesById[filter.structureId]) return false
-  const def = findDef(Object.values(typesById), filter.propertyId, filter.structureId)
+  const def = findDef(Object.values(typesById), filter.propertyId, filter.structureId, viewTypeIds)
   if (!def) return false
   return filterOptionsFor(def).some((x) => x.key === filter.option) || !!ACCEPTED_EXTRA[def.type]?.includes(filter.option)
 }
@@ -253,9 +261,10 @@ function matchText(kind: PropertyType, value: unknown, f: Filter, title?: string
 
 function matchNumber(value: unknown, f: Filter): boolean {
   const n = typeof value === 'number' && !Number.isNaN(value) ? value : undefined
-  const ref = typeof f.referenceValue === 'number' ? f.referenceValue : undefined
+  const ref = typeof f.referenceValue === 'number' && !Number.isNaN(f.referenceValue) ? f.referenceValue : undefined
+  // A filter with no value yet is inactive, as an empty text filter is.
+  if (ref === undefined) return true
   if (n === undefined) return f.option === 'notEqual'
-  if (ref === undefined) return false
   switch (f.option) {
     case 'equal':
       return n === ref
@@ -395,10 +404,10 @@ function matchTaskDate(row: Row, f: Filter, has: boolean): boolean {
 /** Whether a row passes one filter. An invalid filter passes; so does a row of another type than `structureId`. */
 export function matchFilter(row: Row, f: Filter, ctx: FilterCtx): boolean {
   const byId = typeMap(ctx.types)
-  if (!filterIsValid(f, byId)) return true
+  if (!filterIsValid(f, byId, ctx.viewTypeIds)) return true
   if (f.structureId && row.summary.type !== f.structureId) return true
   const own = defIn(byId[row.summary.type], f.propertyId)
-  const def = own ?? findDef(ctx.types, f.propertyId, f.structureId)
+  const def = own ?? findDef(ctx.types, f.propertyId, f.structureId, ctx.viewTypeIds)
   if (!def) return true
   const kind = def.type
   const has = !!own
@@ -471,15 +480,15 @@ export function matchFilter(row: Row, f: Filter, ctx: FilterCtx): boolean {
   }
 }
 
-function isEffective(el: Filter | FilterGroup, byId: Record<string, TypeDef>): boolean {
-  if (el.type === 'filter') return filterIsValid(el, byId)
-  return el.elements.some((e) => isEffective(e, byId))
+function isEffective(el: Filter | FilterGroup, byId: Record<string, TypeDef>, viewTypeIds?: string[]): boolean {
+  if (el.type === 'filter') return filterIsValid(el, byId, viewTypeIds)
+  return el.elements.some((e) => isEffective(e, byId, viewTypeIds))
 }
 
 /** Whether a row passes a group. Invalid filters and groups without any are skipped; none left passes. */
 export function matchGroup(row: Row, group: FilterGroup, ctx: FilterCtx): boolean {
   const byId = typeMap(ctx.types)
-  const els = group.elements.filter((e) => isEffective(e, byId))
+  const els = group.elements.filter((e) => isEffective(e, byId, ctx.viewTypeIds))
   if (els.length === 0) return true
   const test = (e: Filter | FilterGroup) => (e.type === 'filter' ? matchFilter(row, e, ctx) : matchGroup(row, e, ctx))
   return group.operator === 'or' ? els.some(test) : els.every(test)

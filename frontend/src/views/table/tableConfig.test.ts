@@ -95,6 +95,22 @@ describe('normalizeTableConfig', () => {
 describe('edits', () => {
   const base = () => normalizeTableConfig(T)
 
+  test('hiding, showing or moving another column keeps the pinned columns', () => {
+    // Pinned through `qty`: title, note, qty.
+    let c = setPinnedThrough(base(), 'qty')
+    const pinned = (x: TableViewConfig) => visibleColumns(x).slice(0, (x.pinnedColumnIndex ?? -1) + 1).map((col) => col.id)
+    expect(pinned(c)).toEqual(['title', 'note', 'qty'])
+    c = setHidden(c, 'note', true)
+    expect(pinned(c)).toEqual(['title', 'qty'])
+    c = setHidden(c, 'note', false)
+    expect(pinned(c)).toEqual(['title', 'note', 'qty'])
+    // A column moved into the pinned part is pinned; the pin still ends at `qty`.
+    c = moveColumn(c, 'wide', 'note')
+    expect(pinned(c)).toEqual(['title', 'wide', 'note', 'qty'])
+    c = moveColumn(c, 'wide', 'qty')
+    expect(pinned(c)).toEqual(['title', 'note', 'qty'])
+  })
+
   test('hide keeps title and fixes the pin', () => {
     let c = setPinnedThrough(base(), 'wide')
     expect(c.pinnedColumnIndex).toBe(3)

@@ -1,7 +1,9 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { DatePicker, parseDateInput } from './DatePicker'
+import { formatDate } from './format'
 
 // Wednesday 21 Oct 2026, 10:30 local time.
 const NOW = new Date(2026, 9, 21, 10, 30)
@@ -142,6 +144,63 @@ describe('parseDateInput', () => {
     })
     expect(parseDateInput('not a date', NOW)).toBeNull()
     expect(parseDateInput('', NOW)).toBeNull()
+  })
+})
+
+describe('parseDateInput reads the shown text', () => {
+  const at = (y: number, m: number, d: number, h: number, min: number) => ({
+    start: new Date(y, m - 1, d, h, min).toISOString(),
+    resolution: 'time',
+  })
+  afterEach(() => useSettings.setState({ settings: settingsDefaults }))
+
+  it('reads what formatDate shows in every date format', () => {
+    expect(parseDateInput('Oct 30, 2026, 2:00 PM', NOW)).toEqual(at(2026, 10, 30, 14, 0))
+    // ICU writes a narrow no-break space before AM/PM.
+    expect(parseDateInput('Oct 30, 2026, 2:00 PM', NOW)).toEqual(at(2026, 10, 30, 14, 0))
+    expect(parseDateInput('Oct 30, 2026, 14:00', NOW)).toEqual(at(2026, 10, 30, 14, 0))
+    expect(parseDateInput('30-10-2026', NOW)).toEqual({ start: '2026-10-30', resolution: 'day' })
+    expect(parseDateInput('10/30/2026', NOW)).toEqual({ start: '2026-10-30', resolution: 'day' })
+    expect(parseDateInput('30-10-2026, 2:00 PM', NOW)).toEqual(at(2026, 10, 30, 14, 0))
+    expect(parseDateInput('2026-10-30, 14:00', NOW)).toEqual(at(2026, 10, 30, 14, 0))
+    expect(parseDateInput('31-02-2026', NOW)).toBeNull()
+    expect(parseDateInput('30 Oct 2026, 14:00', NOW)).toEqual(at(2026, 10, 30, 14, 0))
+    for (const dateFormatting of ['localized', 'DMY', 'MDY', 'YMD'] as const) {
+      for (const twentyFourHourTime of [false, true]) {
+        useSettings.setState({ settings: { ...settingsDefaults, dateFormatting, twentyFourHourTime } })
+        const v = { start: new Date(2026, 9, 30, 14, 5).toISOString(), resolution: 'time' as const }
+        expect(parseDateInput(formatDate(v), NOW)).toEqual(v)
+        expect(parseDateInput(formatDate({ start: '2026-10-03', resolution: 'day' }), NOW)).toEqual({ start: '2026-10-03', resolution: 'day' })
+      }
+    }
+  })
+})
+
+describe('DatePicker: the Time zone setting', () => {
+  // A zone other than the device's: Tokyo, or New York on a machine that is in Tokyo.
+  const device = new Intl.DateTimeFormat().resolvedOptions().timeZone
+  const zone = device === 'Asia/Tokyo' ? 'America/New_York' : 'Asia/Tokyo'
+  const tokyo = zone === 'Asia/Tokyo'
+  // 16:00Z on 21 Oct 2026: 01:00 on the 22nd in Tokyo, 12:00 on the 21st in New York.
+  const AT = new Date('2026-10-21T16:00:00Z')
+  const today = tokyo ? '2026-10-22' : '2026-10-21'
+  // 9:00 on that day in the zone.
+  const nine = tokyo ? '2026-10-22T00:00:00.000Z' : '2026-10-21T13:00:00.000Z'
+  beforeEach(() => useSettings.setState({ settings: { ...settingsDefaults, timeZone: zone } }))
+  afterEach(() => useSettings.setState({ settings: settingsDefaults }))
+
+  it('typing a day and a time reads them in the zone', () => {
+    expect(parseDateInput('today', AT)).toEqual({ start: today, resolution: 'day' })
+    expect(parseDateInput('today at 9:00', AT)).toEqual({ start: nine, resolution: 'time' })
+  })
+
+  it('the time input shows and sets the time in the zone', async () => {
+    const onChange = vi.fn()
+    render(<DatePicker value={{ start: nine, resolution: 'time' }} onChange={onChange} now={AT} />)
+    const time = screen.getByLabelText('Start time')
+    expect(time).toHaveValue('09:00')
+    fireEvent.change(time, { target: { value: '10:30' } })
+    expect(onChange.mock.calls.at(-1)![0].start).toBe(new Date(new Date(nine).getTime() + 90 * 60000).toISOString())
   })
 })
 

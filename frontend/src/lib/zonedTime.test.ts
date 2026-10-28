@@ -1,7 +1,7 @@
 // M8 Task 3: wall-clock time in the time-zone setting.
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
-import { formatInZone, zonedParts, zonedToday } from './zonedTime'
+import { formatInZone, fromWallClock, wallClock, zonedInstant, zoneOffsetMs, zonedParts, zonedStartOfDay, zonedToday } from './zonedTime'
 
 const NOW = new Date('2026-10-27T23:30:00Z')
 
@@ -42,5 +42,20 @@ describe('zonedTime', () => {
     // An explicit zone overrides the setting.
     expect(zonedParts('2026-10-27T13:30:00Z', 'UTC').hour).toBe(13)
     expect(formatInZone(NOW, { dateStyle: 'medium' }, 'en-US', 'UTC')).toBe('Oct 27, 2026')
+  })
+
+  test('wall-clock times become instants in the zone', () => {
+    setZone('Asia/Tokyo')
+    expect(zonedInstant(2026, 10, 22, 9, 0).toISOString()).toBe('2026-10-22T00:00:00.000Z')
+    expect(zoneOffsetMs(NOW)).toBe(9 * 3600000)
+    expect(zonedStartOfDay(NOW).toISOString()).toBe('2026-10-27T15:00:00.000Z')
+    // A carrier reads the zone's clock and turns back into the same instant.
+    const w = wallClock('2026-10-21T16:00:00.123Z')
+    expect([w.getDate(), w.getHours(), w.getMilliseconds()]).toEqual([22, 1, 123])
+    expect(fromWallClock(w).toISOString()).toBe('2026-10-21T16:00:00.123Z')
+    // Fields roll over; a skipped time reads with the offset before it; a repeated one is its first.
+    expect(zonedInstant(2026, 2, 29, 0, 0, 0, 0, 'UTC').toISOString()).toBe('2026-03-01T00:00:00.000Z')
+    expect(zonedInstant(2026, 3, 8, 2, 30, 0, 0, 'America/New_York').toISOString()).toBe('2026-03-08T07:30:00.000Z')
+    expect(zonedInstant(2026, 11, 1, 1, 30, 0, 0, 'America/New_York').toISOString()).toBe('2026-11-01T05:30:00.000Z')
   })
 })

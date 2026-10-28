@@ -2,6 +2,7 @@
 // labels, and the calculation itself over a set of rows.
 import type { CalcKind, DateValue, EntityRef, PropertyType, Row } from '@/api/types'
 import { formatDate, formatNumber } from '@/properties/format'
+import { wallClock } from '@/lib/zonedTime'
 import { dateSpan } from './dates'
 import { displayTitle, findDef, rowValue, type FilterCtx } from './filter'
 
@@ -166,7 +167,7 @@ export function calculate(rows: Row[], propertyId: string, kind: CalcKind, ctx: 
   const total = rows.length
   const none: CalcResult = { value: null, display: '' }
   if (kind === 'countAll') return { value: total, display: String(total) }
-  const def = findDef(ctx.types, propertyId)
+  const def = findDef(ctx.types, propertyId, undefined, ctx.viewTypeIds)
   if (!def) return none
   const cells = rows.map((r) => cellOf(r, propertyId, def.type))
   const filled = cells.filter((c) => c.keys.length > 0).length
@@ -232,7 +233,7 @@ export function calculate(rows: Row[], propertyId: string, kind: CalcKind, ctx: 
 }
 
 function formatLocalDay(ms: number): string {
-  const d = new Date(ms)
+  const d = wallClock(ms)
   const p = (n: number) => String(n).padStart(2, '0')
   return formatDate({ start: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`, resolution: 'day' })
 }

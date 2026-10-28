@@ -2,6 +2,7 @@
 // filtered view it was created from.
 import type { Collection, DateValue, EntityRef, Filter, FilterGroup, TypeDef } from '@/api/types'
 import { useLinkIndex } from '@/links/linkIndex'
+import { wallClock } from '@/lib/zonedTime'
 import { parseDay } from './dates'
 
 const keyOf = (f: Filter) => f.propertyId
@@ -21,7 +22,8 @@ function dayValue(f: Filter): DateValue | null {
   if (!ref || typeof ref !== 'object' || Array.isArray(ref)) return null
   let day = ref.exactDate ?? null
   if (!day && ref.relative && ['today', 'yesterday', 'tomorrow'].includes(ref.relative)) {
-    const d = new Date()
+    // Today in the time-zone setting, as the filter reads it.
+    const d = wallClock(new Date())
     d.setDate(d.getDate() + (ref.relative === 'yesterday' ? -1 : ref.relative === 'tomorrow' ? 1 : 0))
     day = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
   }

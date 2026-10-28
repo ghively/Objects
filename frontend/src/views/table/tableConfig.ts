@@ -80,11 +80,11 @@ export const setColWidth = (cfg: TableViewConfig, id: string, rem: number): Tabl
 export const setHidden = (cfg: TableViewConfig, id: string, isHidden: boolean): TableViewConfig => {
   const c = cfg.properties.find((x) => x.id === id)
   if (!c || c.type === 'entity_title') return cfg
-  return fixPin(patchCol(cfg, id, { isHidden }))
+  return fixPin(cfg, patchCol(cfg, id, { isHidden }))
 }
 
 export const setAllHidden = (cfg: TableViewConfig, isHidden: boolean): TableViewConfig =>
-  fixPin({ ...cfg, properties: cfg.properties.map((c) => (c.type === 'entity_title' ? c : { ...c, isHidden })) })
+  fixPin(cfg, { ...cfg, properties: cfg.properties.map((c) => (c.type === 'entity_title' ? c : { ...c, isHidden })) })
 
 /** Whether a column wraps: all of them while `wrapAllContent`, else the column's own flag. */
 export const isWrapped = (cfg: TableViewConfig, id: string): boolean =>
@@ -114,12 +114,18 @@ export function setPinnedThrough(cfg: TableViewConfig, id: string | null): Table
   return at < 0 ? rest : { ...rest, pinnedColumnIndex: at }
 }
 
-/** Keep the pin inside the visible columns. */
-function fixPin(cfg: TableViewConfig): TableViewConfig {
-  if (typeof cfg.pinnedColumnIndex !== 'number') return cfg
-  const n = visibleColumns(cfg).length
-  if (cfg.pinnedColumnIndex < n) return cfg
-  return setPinnedThrough(cfg, null)
+/**
+ * The pin after an edit: it is an index into the visible columns, so it follows the column it
+ * ended at (hiding, showing or moving another column keeps that one the last pinned). When that
+ * column is hidden the pin goes; when it is the one moved, the pinned count stays.
+ */
+function fixPin(before: TableViewConfig, after: TableViewConfig, moved?: string): TableViewConfig {
+  if (typeof before.pinnedColumnIndex !== 'number') return after
+  const through = visibleColumns(before)[before.pinnedColumnIndex]?.id
+  const vis = visibleColumns(after)
+  if (through === undefined) return setPinnedThrough(after, null)
+  if (through === moved) return { ...after, pinnedColumnIndex: Math.min(before.pinnedColumnIndex, vis.length - 1) }
+  return setPinnedThrough(after, vis.some((c) => c.id === through) ? through : null)
 }
 
 /** Move column `id` to where column `overId` is; the title column never moves and nothing goes before it. */
@@ -131,7 +137,7 @@ export function moveColumn(cfg: TableViewConfig, id: string, overId: string): Ta
   if (to === 0) to = 1
   const [moved] = cols.splice(from, 1)
   cols.splice(to, 0, moved)
-  return { ...cfg, properties: cols }
+  return fixPin(cfg, { ...cfg, properties: cols }, id)
 }
 
 /** Rem offsets of each visible column's left edge, for sticky pinning. */
