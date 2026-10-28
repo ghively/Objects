@@ -150,6 +150,32 @@ describe('themes', () => {
     expect(strip(tokensCss)).toMatch(/body \{[^}]*font-family: var\(--app-font\);/)
   })
 
+  test('test search and find-in-page highlights follow Object in all four themes', () => {
+    // storing36682.js: light bg #fef08a4b + yellow 900 text; dark bg #fddf472c + yellow 100 text.
+    // design.css ::highlight(find-in-page) #facc1573, find-in-page-active #f97316b3.
+    const yellow900 = 'oklch(0.3495 0.0387 62.84)'
+    const yellow100 = 'oklch(0.9729 0.0693 103.22)'
+    const expected = {
+      dark: ['#fddf472c', yellow100],
+      darkDimmed: ['#fddf472c', yellow100],
+      light: ['#fef08a4b', yellow900],
+      lightDimmed: ['#fef08a4b', yellow900],
+    } as const
+    const blocks = { dark, light: theme('light'), lightDimmed: theme('lightDimmed'), darkDimmed: theme('darkDimmed') }
+    for (const [name, [bg, text]] of Object.entries(expected)) {
+      const b = blocks[name as keyof typeof blocks]
+      expect(b.get('--bg-search-highlight'), name).toBe(bg)
+      expect(b.get('--text-search-highlight'), name).toBe(text)
+      expect(b.get('--bg-find-match'), name).toBe('#facc1573')
+      expect(b.get('--bg-find-match-current'), name).toBe('#f97316b3')
+      expect(b.has('--bg-search-highlight-current'), name).toBe(false)
+    }
+    const index = readFileSync(`${process.cwd()}/src/index.css`, 'utf8')
+    expect(index).toMatch(/\.search-highlights-bold b \{\s*font-weight: 600;/)
+    expect(index).toMatch(/\.find-match \{\s*background-color: var\(--bg-find-match\);\s*color: inherit;/)
+    expect(index).toMatch(/\.find-match-current \{\s*background-color: var\(--bg-find-match-current\);\s*color: inherit;/)
+  })
+
   test('test existing dark token values are unchanged', () => {
     // Regression guard (green from the start): tokens.css's :root as it was before Task 16.
     const BASELINE = `

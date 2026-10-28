@@ -18,8 +18,9 @@
  *   --label-bg/-text/-border-<c>, --line-<c> blockBg/tokenText/typeLabelBorder/bulletColor
  *   (the grayToneMappings for gray, colorToneMappings for the 17 colours).
  * --focus-ring (shadcn's ring; ours) is border-el-hover. --danger and --accent-today are the same in
- * every theme. Search highlights: light bg-search-highlight (#fef08a4b); the current match at a
- * higher alpha is ours; Dark Dimmed keeps the dark theme's (our M5) values.
+ * every theme. Search highlights (design.css + storing36682.js): light bg #fef08a4b with
+ * yellow 900 text, dark bg #fddf472c with yellow 100 text (Dark Dimmed uses the dark set). Find in
+ * page (::highlight(find-in-page) / find-in-page-active): #facc1573, current #f97316b3, every theme.
  * Computed once with a throwaway script outside the repo; only this CSS is committed.
  */
 
@@ -59,8 +60,9 @@ html[data-theme='light'] {
   --border-chrome: color-mix(in srgb, oklch(0.9163 0.0017 67.07) 80%, oklch(0.9856 0.0016 67.00));
   --focus-ring: oklch(0.7161 0.0060 30.59);
   --bg-search-highlight: #fef08a4b;
-  --bg-search-highlight-current: #fef08a99;
-  --text-search-highlight: var(--text);
+  --text-search-highlight: oklch(0.3495 0.0387 62.84);
+  --bg-find-match: #facc1573;
+  --bg-find-match-current: #f97316b3;
   --type-gray-fg: oklch(0.3887 0.0052 301.05);
   --type-gray-bg: oklch(0.9856 0.0016 67.00);
   --type-rose-fg: oklch(0.5096 0.1640 12.19);
@@ -244,8 +246,9 @@ html[data-theme='lightDimmed'] {
   --border-chrome: color-mix(in srgb, oklch(0.9163 0.0017 67.07) 80%, oklch(0.9676 0.0016 67.02));
   --focus-ring: oklch(0.7161 0.0060 30.59);
   --bg-search-highlight: #fef08a4b;
-  --bg-search-highlight-current: #fef08a99;
-  --text-search-highlight: var(--text);
+  --text-search-highlight: oklch(0.3495 0.0387 62.84);
+  --bg-find-match: #facc1573;
+  --bg-find-match-current: #f97316b3;
   --type-gray-fg: oklch(0.3887 0.0052 301.05);
   --type-gray-bg: oklch(0.9856 0.0016 67.00);
   --type-rose-fg: oklch(0.5096 0.1640 12.19);
@@ -428,9 +431,10 @@ html[data-theme='darkDimmed'] {
   --code-text: oklch(0.9163 0.0017 67.07);
   --border-chrome: color-mix(in srgb, oklch(0.3688 0.0051 286.01) 80%, oklch(0.2191 0.0058 285.84));
   --focus-ring: oklch(0.5197 0.0041 39.02);
-  --bg-search-highlight: rgb(255 240 168 / 0.3);
-  --bg-search-highlight-current: rgb(255 240 168 / 0.55);
-  --text-search-highlight: var(--text);
+  --bg-search-highlight: #fddf472c;
+  --text-search-highlight: oklch(0.9729 0.0693 103.22);
+  --bg-find-match: #facc1573;
+  --bg-find-match-current: #f97316b3;
   --type-gray-fg: oklch(0.9163 0.0017 67.07);
   --type-gray-bg: oklch(0.3226 0.0070 285.92);
   --type-rose-fg: oklch(0.8925 0.0559 9.93);

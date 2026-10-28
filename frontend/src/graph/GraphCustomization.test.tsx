@@ -55,7 +55,7 @@ describe('GraphCustomization', () => {
     ]
     for (const s of plain) expect(inReference(s), s).toBe(true)
     expect(inReference('Nodes with more than {limit} links are hidden')).toBe(true)
-    expect(CUSTOMIZATION_TEXT.hideLargeNodesTooltip(LARGE_NODE_LIMIT)).toBe('Nodes with more than 100 links are hidden')
+    expect(CUSTOMIZATION_TEXT.hideLargeNodesTooltip(LARGE_NODE_LIMIT)).toBe('Nodes with more than 20 links are hidden')
 
     const user = userEvent.setup()
     render(<GraphCustomization custom={{}} onPatch={vi.fn()} types={TYPES} tagsNetworkKey="showSpaceTagsNetwork" />)
@@ -68,7 +68,7 @@ describe('GraphCustomization', () => {
     }
     expect(within(pop).getByRole('switch', { name: 'Hide objects with many links' }).closest('label')).toHaveAttribute(
       'title',
-      'Nodes with more than 100 links are hidden',
+      'Nodes with more than 20 links are hidden',
     )
     expect(within(pop).getByRole('switch', { name: 'Hide indirect links' }).closest('label')).toHaveAttribute(
       'title',

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { colorValue, edgeStyle, nodeColor, nodeSize, NODE_MAX_SIZE } from './graphStyle'
+import { colorValue, edgeStyle, nodeColor, nodeSize, NODE_MAX_SIZE, REDUCED_NODE_COLOR, REDUCED_NODE_SIZE } from './graphStyle'
 
 describe('graphStyle', () => {
   test('node size and colour by degree and type', () => {
@@ -21,11 +21,12 @@ describe('graphStyle', () => {
     expect(colorValue('teal')).toBe('#1dad9d')
   })
 
-  test('indirect edges are fainter and thinner than links', () => {
-    const link = edgeStyle('link')
-    const indirect = edgeStyle('indirect')
-    expect(indirect.dashed).toBe(true)
-    expect(link.dashed).toBe(false)
-    expect(indirect.size).toBeLessThan(link.size)
+  test('edge kinds are links and tag edges only (no synthesized indirect edges)', () => {
+    expect(edgeStyle('tag').size).toBeLessThan(edgeStyle('link').size)
+  })
+
+  test('reduced nodes are drawn at the smallest size in gray', () => {
+    expect(REDUCED_NODE_SIZE).toBe(nodeSize(0))
+    expect(REDUCED_NODE_COLOR).toBe('gray')
   })
 })
