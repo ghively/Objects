@@ -154,7 +154,13 @@ def trigger_time(task: TaskInfo, rule: str | ReminderRule | None, tz: tzinfo) ->
         parsed = parse_remind(rule, resolution)
     if parsed is None:
         return None
-    start = task.date["start"]
+    try:
+        return _trigger(task.date["start"], resolution, parsed, tz)
+    except (OverflowError, OSError):  # e.g. "99999999 days before", or 9999-12-31
+        return None
+
+
+def _trigger(start: str, resolution: str, parsed: ReminderRule, tz: tzinfo) -> datetime | None:
     if resolution == "time":
         at = _parse_instant(start)
         if at is None:
@@ -283,7 +289,11 @@ def due(space, since: datetime | None, now: datetime, ledger: Ledger) -> list[Du
         key = task.ledger_key(trig)
         if key in ledger.fired:
             continue
-        out.append(Due(task.path, key, task.title, _body(task, now, space.tz), trig))
+        try:
+            body = _body(task, now, space.tz)
+        except (OverflowError, OSError, ValueError):
+            body = f"Due {task.date['start'] if task.date else ''}".rstrip()
+        out.append(Due(task.path, key, task.title, body, trig))
     out.sort(key=lambda d: (d.trigger, d.path))
     return out
 
