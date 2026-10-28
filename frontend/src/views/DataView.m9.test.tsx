@@ -14,7 +14,7 @@ vi.mock('@/api/client', async (orig) => ({
 import { api } from '@/api/client'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
-import { DataView } from './DataView'
+import { DataView, type Pipeline } from './DataView'
 import { emptyFilterGroup } from './model'
 
 const mocked = vi.mocked(api)
@@ -27,7 +27,7 @@ const mk = (title: string, createdAt: string) =>
 // No sort: newest first, so the view order is A, B, C, D.
 const ROWS = [mk('A', '2026-10-04T00:00:00Z'), mk('B', '2026-10-03T00:00:00Z'), mk('C', '2026-10-02T00:00:00Z'), mk('D', '2026-10-01T00:00:00Z')]
 
-function Harness({ layout = 'list', rows = ROWS }: { layout?: Layout; rows?: Row[] }) {
+function Harness({ layout = 'list', rows = ROWS, pipeline }: { layout?: Layout; rows?: Row[]; pipeline?: Pipeline }) {
   const [state, setState] = useState<ViewState>({
     viewDefinition: { dataViewLayout: layout },
     filterGroup: emptyFilterGroup(),
@@ -35,7 +35,7 @@ function Harness({ layout = 'list', rows = ROWS }: { layout?: Layout; rows?: Row
     groupBy: null,
   })
   return (
-    <DataView rows={rows} types={[PAGE, BOOK]} scope={{ typeIds: ['page'] }} state={state} onState={setState} layouts={['list', 'grid', 'table']} rowActions />
+    <DataView rows={rows} types={[PAGE, BOOK]} scope={{ typeIds: ['page'] }} state={state} onState={setState} layouts={['list', 'grid', 'table']} rowActions pipeline={pipeline} />
   )
 }
 
@@ -82,6 +82,24 @@ describe('DataView multi-select (Task 18)', () => {
     await user.click(screen.getByText('C'))
     await user.keyboard('{/Shift}')
     expect(selectedTitles()).toEqual(['A', 'B', 'C'])
+  })
+
+  test('test shift click in a grouped view selects the on-screen range', async () => {
+    // Two groups whose on-screen order (A, C | B, D) differs from the flat order (A, B, C, D).
+    const pipeline: Pipeline = (rows) => ({
+      rows,
+      groups: [
+        { id: 'g1', label: 'One', rows: [rows[0], rows[2]] },
+        { id: 'g2', label: 'Two', rows: [rows[1], rows[3]] },
+      ],
+    })
+    const user = userEvent.setup()
+    render(<Harness pipeline={pipeline} />)
+    await startSelecting(user, 'A')
+    await user.keyboard('{Shift>}')
+    await user.click(screen.getByText('C'))
+    await user.keyboard('{/Shift}')
+    expect(selectedTitles().sort()).toEqual(['A', 'C'])
   })
 
   test('test bar shows count', async () => {

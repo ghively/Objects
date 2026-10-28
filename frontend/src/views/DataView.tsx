@@ -298,7 +298,10 @@ export function DataView(props: DataViewProps) {
     const path = row.summary.path
     if (selected) {
       // Shift: the range from the last clicked row, added; else toggle this row.
-      const order = flat.map((r) => r.summary.path)
+      // The on-screen order: grouped views show each open group's rows in turn.
+      const order = grouped
+        ? [...new Set(result.groups.flatMap((g) => (closed(g) ? [] : g.rows)).map((r) => r.summary.path))]
+        : flat.map((r) => r.summary.path)
       const from = anchor.current ? order.indexOf(anchor.current) : -1
       const to = order.indexOf(path)
       if (e.shiftKey && from >= 0 && to >= 0) {
