@@ -39,10 +39,13 @@ import { ConflictDialog } from './ConflictDialog'
 import { DeleteObjectDialog, DELETE_OBJECT_TEXT, useDeleteRequest } from './DeleteObjectDialog'
 import { PinMenuItems } from '@/shell/PinToMenu'
 import { DeletedBanner } from './DeletedBanner'
+import { ExportDialog } from './ExportDialog'
+import { TextStatsMenu } from './TextStatsMenu'
+import { showToast } from '@/editor/media/upload'
 import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
-import { ensureNewTags, isTagType, ObjectHeader, openTag } from './ObjectHeader'
-import { PageLayout, type PanelVariant } from './PageLayout'
+import { ensureNewTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
+import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type PanelVariant } from './PageLayout'
 import { PropertyPanel } from './PropertyPanel'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
 import { useTypeEditor } from './useTypeEditor'
@@ -55,6 +58,7 @@ import { usePresentation } from '@/present/usePresentation'
 import { CompletionLog } from '@/tasks/CompletionLog'
 import { TaskStatsSection } from '@/tasks/TaskStatsSection'
 import { useAddToWhiteboard } from '@/whiteboard/AddToWhiteboardDialog'
+import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 
 installWikilinkPresenter()
 installLinkPicker()
@@ -116,6 +120,20 @@ export const OBJECT_M8_TEXT = {
   leaveFocusMode: 'Leave Focus Mode',
 } as const
 
+/** M9 menu items (reference strings). */
+export const OBJECT_M9_TEXT = {
+  /** `components.RootPagePage.enterWideMode` */
+  wideLayout: 'Wide layout',
+  /** `components.RootPagePage.leaveWideMode` */
+  normalLayout: 'Normal layout',
+  /** `EntityMenu.textStats.text` */
+  textStats: 'Text Stats',
+  /** `EntityMenu.openExportMenu.text` */
+  export: 'Export',
+  /** `EntityMenu.duplicateObject.text` */
+  duplicate: 'Duplicate',
+} as const
+
 function ToolButton({ label, icon, onClick, pressed }: { label: string; icon: string; onClick?: () => void; pressed?: boolean }) {
   return (
     <button
@@ -144,6 +162,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   const [collectionsOpen, setCollectionsOpen] = useState(false)
   const [undoError, setUndoError] = useState<string | null>(null)
   const [changeTo, setChangeTo] = useState<TypeDef | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
   /** Mirrors `deleted` for the change listener (which must not wait for a render). */
   const deletedRef = useRef(false)
   const markDeleted = useCallback((v: boolean) => {
@@ -483,6 +502,18 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     onDismiss?.()
   }
 
+  /** M9 "Duplicate": save pending edits, copy the file as "<Title> (Copy)", open the copy. */
+  const duplicate = async () => {
+    try {
+      await settle()
+      const res = await api.duplicateObject(path)
+      void invalidateLinkIndex()
+      openTarget({ kind: 'object', path: res.path })
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   // Ctrl+Backspace (handled by the app) asks the view showing this object to confirm a delete.
   const deleteRequest = useDeleteRequest((s) => s.request)
   useEffect(() => {
@@ -506,6 +537,11 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [mode, path])
+
+  // M9: the page inspector reads the editor's current Markdown (the loaded body before it mounts).
+  const loadedBodyRef = useRef('')
+  loadedBodyRef.current = detail?.body ?? ''
+  const getMarkdown = useCallback(() => editorRef.current?.getBody() ?? loadedBodyRef.current, [])
 
   const summary = detail?.summary
   const typeEditor = useTypeEditor(summary?.type)
@@ -531,6 +567,14 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   const isTag = !!summary && isTagType(type, summary.type)
   const isTask = !!summary && !isTemplate && isTaskRoleType(type, summary.type)
   const focusOn = useFocusMode((s) => s.on)
+  // M9: the object's own layout keys override the type's.
+  const layout = detail ? frontmatterLayout(detail.frontmatter) : undefined
+  const wideOn = objectWideLayout(type, layout)
+  /** Object hides "Wide layout" for whiteboards and the index card design. */
+  const canWide = !!summary && pageDesign(type) !== 'indexCard' && !isWhiteboardType(type)
+  const dailyNote = !!summary && isDailyNoteType(type, summary.type)
+  /** Object offers no Duplicate for daily notes and templates; whiteboards are ours to refuse. */
+  const canDuplicate = !!summary && !isTemplate && !dailyNote && !isWhiteboardType(type)
 
   // A render function: the layout picks the variant (inline as a card when the page is narrow).
   const properties =
@@ -644,6 +688,15 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
               <Icon name="ph-clock-counter-clockwise" size={14} />
               {OBJECT_M8_TEXT.versionHistory}
             </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={!summary}>
+                <Icon name="ph-chart-bar" size={14} />
+                {OBJECT_M9_TEXT.textStats}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="border-line bg-raised">
+                {summary && <TextStatsMenu getMarkdown={getMarkdown} summary={summary} dailyNote={dailyNote} />}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuItem
               disabled={!summary}
               onSelect={() => {
@@ -653,6 +706,10 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
             >
               <Icon name="ph-presentation" size={14} />
               {OBJECT_M8_TEXT.present}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!summary} onSelect={() => setExportOpen(true)}>
+              <Icon name="ph-export" size={14} />
+              {OBJECT_M9_TEXT.export}
             </DropdownMenuItem>
             <DropdownMenuItem disabled={!summary || isTemplate} onSelect={() => useAddToWhiteboard.getState().open(path)}>
               <Icon name="ph-chalkboard-simple" size={14} />
@@ -697,6 +754,12 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
               <Icon name={COLLECTION_ICON} size={14} />
               Edit Collections
             </DropdownMenuItem>
+            {canDuplicate && (
+              <DropdownMenuItem disabled={propsReadOnly} onSelect={() => void duplicate()}>
+                <Icon name="ph-copy" size={14} />
+                {OBJECT_M9_TEXT.duplicate}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               disabled={propsReadOnly || !summary || isTemplate}
               onSelect={() => useMerge.getState().open(path)}
@@ -711,6 +774,15 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
+            {canWide && (
+              <DropdownMenuItem
+                disabled={propsReadOnly}
+                onSelect={() => writeProperties({ wideLayoutMode: !wideOn })}
+              >
+                <Icon name={wideOn ? 'ph-arrows-in-simple' : 'ph-arrows-out-simple'} size={14} />
+                {wideOn ? OBJECT_M9_TEXT.normalLayout : OBJECT_M9_TEXT.wideLayout}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuCheckboxItem checked={raw} onCheckedChange={() => void toggleRaw()}>
               Raw Markdown
             </DropdownMenuCheckboxItem>
@@ -762,6 +834,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
       />
       {typeEditor.dialog}
       <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} />
+      {exportOpen && <ExportDialog open onOpenChange={setExportOpen} path={path} prepare={settle} />}
       {summary && (
         <Dialog open={collectionsOpen} onOpenChange={setCollectionsOpen}>
           <DialogContent className="w-auto border-line bg-raised p-0 text-fg sm:max-w-none">
@@ -885,7 +958,20 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         mode={mode}
         toolbar={toolbar}
         properties={properties}
-        onCoverChange={propsReadOnly ? undefined : (next) => writeProperties({ coverImage: next })}
+        onCoverChange={
+          propsReadOnly
+            ? undefined
+            : (next) =>
+                // A new image drops the old one's position (Object's `referenceImageId` rule).
+                writeProperties(
+                  'coverImageOffset' in detail.frontmatter
+                    ? { coverImage: next, coverImageOffset: null }
+                    : { coverImage: next },
+                )
+        }
+        layout={layout}
+        onLayoutChange={propsReadOnly ? undefined : (patch) => writeProperties({ ...patch })}
+        inspector={mode === 'page' ? { getMarkdown, dailyNote } : undefined}
         header={
           <ObjectHeader
             summary={summary}
