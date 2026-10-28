@@ -250,7 +250,8 @@ def check_attachments(run: Run, base: str, fake_open: Path) -> None:
                f"Range on the WAV: {code}, {h.get('content-range')}, {len(body)} bytes")
 
     page = b"<!doctype html><script>document.title='ran'</script><p>synthetic</p>"
-    code, _h, body = raw(base, "POST", "/attachments", page, name="m7 page.html")
+    code, _h, body = raw(base, "POST", "/attachments", page, {"Content-Type": "application/octet-stream"},
+                         name="m7 page.html")
     html_path = json.loads(body).get("path") if code == 201 else ""
     code2, h, served = raw(base, "GET", "/file", path=html_path)
     run.report(code == 201 and code2 == 200 and h.get("content-type", "").startswith("application/octet-stream")
@@ -264,7 +265,8 @@ def check_attachments(run: Run, base: str, fake_open: Path) -> None:
     want = str((run.root / "Attachments/m7 report.pdf").resolve())
     run.report(code == 200 and res == {"ok": True} and opened == [want],
                f"open the PDF: {code} {res}; fake opener recorded {opened}")
-    code, _h, body = raw(base, "POST", "/attachments", b"MZ synthetic", name="tool.exe")
+    code, _h, body = raw(base, "POST", "/attachments", b"MZ synthetic",
+                         {"Content-Type": "application/octet-stream"}, name="tool.exe")
     exe = json.loads(body).get("path") if code == 201 else "Attachments/tool.exe"
     code2, res2 = run.http("POST", "/attachments/open", {"path": exe})
     after = fake_open.read_text("utf-8").splitlines() if fake_open.is_file() else []
