@@ -15,7 +15,7 @@ import { api } from '@/api/client'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { RESERVED_KEYS } from '@/properties/typeEdits'
-import { ObjectView } from './ObjectView'
+import { ObjectView, patchSummary } from './ObjectView'
 
 const mocked = vi.mocked(api)
 const PATH = 'Pages/Notes.md'
@@ -175,5 +175,15 @@ describe('ObjectView per-object layout (M9)', () => {
       for (const k of Object.keys(fm)) expect(screen.queryByText(k)).toBeNull()
       r.unmount()
     }
+  })
+})
+
+describe('patchSummary', () => {
+  test('a property write refreshes "Last updated" from the written frontmatter', () => {
+    const before = objectSummary({ path: 'Pages/A.md', lastUpdated: '2026-01-01T00:00:00Z' })
+    const after = patchSummary(before, { wideLayoutMode: true, lastUpdated: '2026-10-28T09:30:00Z' })
+    expect(after.lastUpdated).toBe('2026-10-28T09:30:00Z')
+    // A write that didn't stamp it (no key) keeps the old value.
+    expect(patchSummary(before, { wideLayoutMode: true }).lastUpdated).toBe('2026-01-01T00:00:00Z')
   })
 })

@@ -93,6 +93,7 @@ export function patchSummary(summary: ObjectSummary, fm: Record<string, unknown>
   if ('tags' in fm) next.tags = list(fm.tags)
   if ('coverImage' in fm) next.coverImage = str(fm.coverImage)
   if ('color' in fm) next.color = str(fm.color)
+  if ('lastUpdated' in fm) next.lastUpdated = str(fm.lastUpdated) ?? summary.lastUpdated
   return next
 }
 
