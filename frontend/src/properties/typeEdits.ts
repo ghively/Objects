@@ -42,7 +42,14 @@ export const RESERVED_KEYS: ReadonlySet<string> = new Set([
   // DailyNote
   'date',
   'reviewed',
+  // M9: the per-object layout keys
+  'wideLayoutMode',
+  'wideCoverImage',
+  'coverImageOffset',
 ])
+
+/** M9: the per-object layout keys (`ObjectFrontmatterLayout`); never shown as properties. */
+export const LAYOUT_KEYS: readonly string[] = ['wideLayoutMode', 'wideCoverImage', 'coverImageOffset']
 
 /** System kinds and the key (which is also the id) of their system property. */
 export const SYSTEM_KEYS: Readonly<Partial<Record<PropertyType, string>>> = {
