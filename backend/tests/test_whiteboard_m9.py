@@ -4,7 +4,8 @@
 component data, so a board or ink save also stamps the board's ``.md`` (Gene's choice,
 reversing M6). Only the ``lastUpdated`` line changes, at most once a minute (our choice),
 and the stamp takes no version-history snapshot (our choice). The save answers
-``mdVersion``: the ``.md``'s version after the bump, else its current version.
+``mdVersion`` (the ``.md``'s version after the bump) and ``mdBaseVersion`` (the version the
+stamp started from) only when the stamp wrote the disk.
 """
 
 from __future__ import annotations
@@ -143,23 +144,24 @@ def test_bump_takes_no_history_version(ctx):
 
 def test_save_returns_md_version(ctx):
     space, c, events, root, clock = ctx
+    md_before = sha((root / NETWORK).read_bytes())
     r = put_board(c, root, NETWORK)
     assert r.status_code == 200
     md_version = sha((root / NETWORK).read_bytes())
     sidecar = sha((root / board_rel(NETWORK)).read_bytes())
-    assert r.json() == {"revision": sidecar, "mdVersion": md_version}
+    assert r.json() == {"revision": sidecar, "mdVersion": md_version, "mdBaseVersion": md_before}
     assert space.cached_version(NETWORK) == md_version
     assert [(e.kind, e.path, e.version, e.origin) for e in events] == [
         ("whiteboard", NETWORK, sidecar, "w1"),
         ("changed", NETWORK, md_version, "w1"),
     ]
-    # Throttled: the .md is unchanged, mdVersion is its current version, no `changed`.
+    # Throttled: the .md is unchanged, no mdVersion, no `changed`.
     events.clear()
     clock.now = T0 + timedelta(seconds=10)
     r = c.put("/api/whiteboard/ink", json={"path": NETWORK, "strokes": [stroke()],
                                            "baseRevision": sha((root / "Whiteboards/Network map.ink.svg").read_bytes())})
     assert r.status_code == 200, r.text
-    assert r.json()["mdVersion"] == md_version
+    assert "mdVersion" not in r.json() and "mdBaseVersion" not in r.json()
     assert [e.kind for e in events] == ["whiteboard"]
 
 
@@ -182,4 +184,34 @@ def test_read_only_md_still_saves_board(ctx):
     r = put_board(c, root, EMPTY)
     assert r.status_code == 200, r.text
     assert md.read_bytes() == before
-    assert r.json()["mdVersion"] == sha(before)
+    assert "mdVersion" not in r.json()
+
+
+def test_md_base_version_is_the_disk_version_the_stamp_started_from(ctx):
+    # Another window or editor changed the body; this window hasn't loaded it. The save
+    # reports that disk version as the stamp's base, so a client holding an older version
+    # does not adopt mdVersion (its next Notes save meets a 409 instead of overwriting).
+    _space, c, _events, root, _clock = ctx
+    md = root / NETWORK
+    md.write_bytes(md.read_bytes() + b"\nAn external paragraph.\n")
+    external = sha(md.read_bytes())
+    r = put_board(c, root, NETWORK)
+    assert r.status_code == 200, r.text
+    assert r.json()["mdBaseVersion"] == external
+    assert r.json()["mdVersion"] == sha(md.read_bytes())
+    assert b"An external paragraph." in md.read_bytes()
+
+
+def test_throttled_stamp_with_stale_cache_announces_nothing(ctx):
+    # The cached version is stale (an external write not yet rescanned) and the stamp is
+    # throttled: nothing was written, so no `changed` and no mdVersion.
+    _space, c, events, root, clock = ctx
+    assert put_board(c, root, NETWORK, "one").status_code == 200
+    md = root / NETWORK
+    md.write_bytes(md.read_bytes() + b"\nAn external paragraph.\n")
+    events.clear()
+    clock.now = T0 + timedelta(seconds=5)
+    r = put_board(c, root, NETWORK, "two")
+    assert r.status_code == 200, r.text
+    assert "mdVersion" not in r.json()
+    assert [e.kind for e in events] == ["whiteboard"]

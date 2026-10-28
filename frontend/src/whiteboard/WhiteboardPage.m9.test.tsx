@@ -61,7 +61,7 @@ beforeEach(() => {
 describe('whiteboard lastUpdated bump', () => {
   test('test notes save after a board save uses the new md version', async () => {
     const client = mockWhiteboardApi(board(), 'rev-1')
-    client.saveBoard.mockImplementation(async () => ({ revision: 'rev-2', mdVersion: 'v2' }) as WhiteboardSaveResult & { revision: string })
+    client.saveBoard.mockImplementation(async () => ({ revision: 'rev-2', mdVersion: 'v2', mdBaseVersion: 'v1' }) as WhiteboardSaveResult & { revision: string })
     render(
       <div style={{ width: 1280, height: 800 }}>
         <WhiteboardPage path={PATH} mode="page" host={fakeHost()} client={client} />
@@ -102,6 +102,34 @@ describe('whiteboard lastUpdated bump', () => {
     await waitFor(() => expect(screen.getByTestId('whiteboard-notes-editor')).toHaveTextContent('First note line.'))
     drop('Pages/Router A.md')
     await waitFor(() => expect(client.saveBoard).toHaveBeenCalledTimes(1))
+    const editor = pmEditor()
+    act(() => {
+      editor.commands.insertContentAt(editor.state.doc.content.size - 1, ' More.')
+    })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(api.saveBody).toHaveBeenCalledTimes(1))
+    expect(api.saveBody).toHaveBeenCalledWith(PATH, 'First note line. More.\n', 'v1')
+  })
+
+  test('test a stamp from a version the notes do not hold is not adopted', async () => {
+    // Another window changed the body (v1 -> vX); the stamp started from vX. Adopting v2 would
+    // make the next Notes save overwrite that change; it must keep v1 and meet the 409.
+    const client = mockWhiteboardApi(board(), 'rev-1')
+    client.saveBoard.mockImplementation(async () => ({ revision: 'rev-2', mdVersion: 'v2', mdBaseVersion: 'vX' }) as WhiteboardSaveResult & { revision: string })
+    render(
+      <div style={{ width: 1280, height: 800 }}>
+        <WhiteboardPage path={PATH} mode="page" host={fakeHost()} client={client} />
+      </div>,
+    )
+    await waitFor(() => expect(screen.getByTestId('whiteboard-canvas')).toBeInTheDocument())
+    const toggle = within(await screen.findByTestId('whiteboard-notes')).getByRole('button', { name: 'Notes' })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(screen.getByTestId('whiteboard-notes-editor')).toHaveTextContent('First note line.'))
+    drop('Pages/Router A.md')
+    await waitFor(() => expect(client.saveBoard).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      await Promise.resolve()
+    })
     const editor = pmEditor()
     act(() => {
       editor.commands.insertContentAt(editor.state.doc.content.size - 1, ' More.')
