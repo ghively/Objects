@@ -38,7 +38,23 @@ def test_file_with_nul_is_refused(client: TestClient, path: str):
     assert client.get("/api/file", params={"path": path}).status_code // 100 == 4
 
 
-@pytest.mark.parametrize("defs", [1, 0, False, "x", "", {"a": 1}, True, 1.5])
+def test_file_with_nul_is_refused_where_the_os_raises(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    # Linux's realpath raises ValueError ("embedded null byte"); Windows' doesn't.
+    import os.path
+
+    real = os.path.realpath
+
+    def strict(path, *args, **kwargs):
+        if "\x00" in os.fspath(path):
+            raise ValueError("embedded null byte")
+        return real(path, *args, **kwargs)
+
+    monkeypatch.setattr(os.path, "realpath", strict)
+    assert client.get("/api/file", params={"path": "a\x00b.md"}).status_code == 404
+    assert client.post("/api/attachments/open", json={"path": "a\x00b.pdf"}).status_code == 404
+
+
+@pytest.mark.parametrize("defs",[1, 0, False, "x", "", {"a": 1}, True, 1.5])
 def test_type_save_refuses_non_list_property_definitions(client: TestClient, m8_space_dir: Path, defs: object):
     task = next(t for t in client.get("/api/space").json()["types"] if t["id"] == "task")
     before = (m8_space_dir / ".object" / "types" / "task.json").read_bytes()

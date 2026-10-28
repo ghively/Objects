@@ -118,7 +118,9 @@ def image_path(root: Path, path: str) -> Path:
     root = Path(root).resolve()
     text = str(path or "").replace("\\", "/")
     rel = PurePosixPath(text)
-    if not text or rel.is_absolute() or ".." in rel.parts or re.match(r"^[A-Za-z]:", text):
+    if not text or "\x00" in text or rel.is_absolute() or ".." in rel.parts:
+        raise FileNotFoundError(path)
+    if re.match(r"^[A-Za-z]:", text):
         raise FileNotFoundError(path)
     if _hidden(rel.parts):
         raise FileNotFoundError(path)
@@ -280,7 +282,9 @@ def attachment_path(root: Path, path: str) -> Path:
     root = Path(root).resolve()
     text = str(path or "").replace("\\", "/")
     rel = PurePosixPath(text)
-    if not text or rel.is_absolute() or ".." in rel.parts or re.match(r"^[A-Za-z]:", text):
+    if not text or "\x00" in text or rel.is_absolute() or ".." in rel.parts:
+        raise FileNotFoundError(path)
+    if re.match(r"^[A-Za-z]:", text):
         raise FileNotFoundError(path)
     if _hidden(rel.parts):
         raise FileNotFoundError(path)
