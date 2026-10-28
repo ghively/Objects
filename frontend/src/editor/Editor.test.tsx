@@ -18,6 +18,9 @@ import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { EDITOR_PLACEHOLDER } from './Editor'
 const saveBody = vi.mocked(api).saveBody
 
+// The first editor mount loads every extension and takes 7–14 s on a busy machine.
+vi.setConfig({ testTimeout: 30_000 })
+
 const fixtures = import.meta.glob('./__fixtures__/*.md', {
   query: '?raw',
   import: 'default',
