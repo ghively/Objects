@@ -357,3 +357,22 @@ def test_watcher_reports_an_external_edit_back_to_an_earlier_own_write(space_dir
         assert version_of(target.read_bytes()) == mine
     finally:
         loop.close()
+
+
+# -- CJK-only type names don't all share the id `type` ------------------------------------
+
+
+def test_cjk_type_names_get_distinct_ids(space_dir: Path):
+    from objectapp.typedefs import slug
+
+    assert slug("Page Notes") == "page-notes"  # ASCII names keep their ids
+    assert slug("日本語") != slug("中文")
+    assert slug("!!!") == "type"
+    (space_dir / "JP").mkdir()
+    (space_dir / "CN").mkdir()
+    _write(space_dir / "JP" / "a.md", "---\ntype: '日本語'\ntitle: a\n---\n")
+    _write(space_dir / "CN" / "b.md", "---\ntype: '中文'\ntitle: b\n---\n")
+    space = Space(space_dir)
+    ids = {t.name: t.id for t in space.types}
+    assert ids["日本語"] != ids["中文"]
+    assert space.get("JP/a.md").type != space.get("CN/b.md").type
