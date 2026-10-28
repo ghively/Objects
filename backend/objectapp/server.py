@@ -16,6 +16,9 @@ Routes (all JSON):
   ``423 {reason}``, ``422 {detail}``, ``404``. Announces ``changed`` for the
   object (when written) and for each synced object.
 - ``POST /api/object/ensure-id`` ``{path, clientId?}`` -> ``{id, version}``; ``423``, ``404``.
+- M9 ``POST /api/object/duplicate`` ``{path, clientId?}`` -> ``201 {path, version, summary}``
+  (``<Title> (Copy)`` beside the source); ``422`` for a daily note, media, template,
+  whiteboard or read-only file, ``404``, ``400``. Announces ``created``.
 - ``POST /api/object/rename`` ``{path, title, baseVersion, clientId?}`` ->
   ``{path, version, relinked, skipped}``; ``409 {currentVersion}``, ``423``, ``422 {detail}``
   (empty title, daily note), ``404``. Announces ``renamed`` (with ``oldPath``) when the
@@ -276,6 +279,11 @@ class UpdatePropertiesRequest(BaseModel):
 
 
 class EnsureIdRequest(BaseModel):
+    path: str
+    clientId: str | None = None
+
+
+class DuplicateRequest(BaseModel):
     path: str
     clientId: str | None = None
 
@@ -1005,6 +1013,23 @@ def create_app(
         if version != before:
             announce(ChangeEvent("changed", _norm(req.path), version, origin=req.clientId))
         return {"id": object_id, "version": version}
+
+    @api.post("/object/duplicate", status_code=201)
+    def duplicate_object(req: DuplicateRequest):
+        try:
+            path, version = space.duplicate_object(req.path)
+            summary = space.get(path)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {req.path!r}")
+        announce(ChangeEvent("created", path, version, origin=req.clientId))
+        return JSONResponse(
+            _display_safe({"path": path, "version": version, "summary": asdict(summary)}),
+            status_code=201,
+        )
 
     @api.post("/object/rename")
     def rename_object(req: RenameRequest):

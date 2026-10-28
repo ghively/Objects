@@ -83,6 +83,7 @@ from .taskhook import TaskResult, on_status_change
 from .linkindex import LinkIndex
 from .relink import relink_frontmatter, replace_wikilinks, rewrite_tag_lists, wikilink_targets
 from .resolver import Resolver, link_candidates
+from .roles import role_of
 from .templates import TemplateError, creation_variable, expand_title, resolve_date_variable
 from .textfile import atomic_write, create_new, encode_like, move_no_overwrite, retry_os
 from .trash import Trash, TrashItem
@@ -150,6 +151,13 @@ _NOT_COPIED_KINDS = frozenset(
     {"entity_title", "entity_type", "entity_createdAt", "entity_lastUpdated",
      "entity_collections", "entity_backlinks"}
 )  # fmt: skip
+# M9 duplicate: the roles of `structureHeuristicsBackbone.ts` `cannotBeDuplicatedInUI` that
+# our types can have (see `roles.py`), and the refusal (our string).
+_NOT_DUPLICATED_ROLES = frozenset(
+    {"MediaImage", "MediaWebResource", "MediaPDF", "MediaAudio", "MediaFile", "MediaTweet",
+     "RootDailyNote"}
+)  # fmt: skip
+_CANNOT_DUPLICATE = "This object can't be duplicated."
 # A body that is empty or only a `# Title` heading (a template's body replaces it).
 _TITLE_ONLY_RE = re.compile(r"\s*(?:#[ \t][^\n]*)?\s*")
 
@@ -2558,6 +2566,61 @@ class Space:
                 rel = free(self.root, folder, stem)
                 if self._place(rel, data):
                     return rel, version
+        raise OSError(f"Could not find a free file name for {stem!r}")
+
+    def duplicate_object(self, path: str, now: datetime | None = None) -> tuple[str, str]:
+        """Copy an object as ``<Title> (Copy)`` in its own folder; return (path, version).
+
+        The copy is the source's bytes (line endings and BOM included) except for a
+        new ``id``, ``title: <Title> (Copy)``, fresh ``createdAt`` and ``lastUpdated``
+        (``now``, default `Space.clock`) and a first ``# <Title>`` heading, which
+        becomes ``# <Title> (Copy)``. The title rule is Object's
+        (``${title || 'Untitled'} (Copy)``). Writes only the new file.
+
+        Raises `KeyError` (no such file), `ValueError` (not an object path) and
+        `InvalidValue` for what Object doesn't duplicate (daily notes and media,
+        its ``cannotBeDuplicatedInUI``), templates, whiteboards (their sidecars would
+        need copying too; our choice) and read-only files.
+        """
+        rel = self._rel(path)
+        full = self.root / rel
+        instant = now or self.clock()
+        with self._lock:
+            if not full.is_file():
+                raise KeyError(rel)
+            raw = read_raw(self.root, rel)
+            t = self.type_by_id(self._type_id(raw.typeName))
+            if (
+                raw.readOnly
+                or _str_or_none(raw.fm.get("template"))
+                or role_of(t) in _NOT_DUPLICATED_ROLES
+                or self._is_whiteboard(rel)
+            ):
+                raise InvalidValue(_CANNOT_DUPLICATE)
+            title = _title_of(raw)
+            new_title = f"{title or 'Untitled'} (Copy)"
+            stamp = now_stamp(instant)
+            fm_src = set_keys(
+                raw.of.frontmatter_src or "",
+                {"title": new_title, "createdAt": stamp, "lastUpdated": stamp},
+                insert_first={"id": new_ulid()},
+            )
+            body = raw.of.body
+            lines = body.split("\n")
+            first = next((i for i, line in enumerate(lines) if line.strip()), None)
+            if first is not None and lines[first].rstrip() == f"# {title}":
+                lines[first] = f"# {new_title}"
+                body = "\n".join(lines)
+            of = replace(raw.of, frontmatter_src=fm_src, body=body, fm_ok=True, fm_error=None)
+            data = encode_like(raw.data, join_object(of))
+            version = version_of(data)
+            folder = PurePosixPath(rel).parent.as_posix()
+            folder = "" if folder == "." else folder
+            stem = safe_filename(new_title)
+            for _attempt in range(100):
+                new_rel = unique_path(self.root, folder, stem)
+                if self._place(new_rel, data):
+                    return new_rel, version
         raise OSError(f"Could not find a free file name for {stem!r}")
 
     def _place(self, rel: str, data: bytes) -> bool:
