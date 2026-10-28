@@ -121,6 +121,10 @@ describe('DataView multi-select (Task 18)', () => {
     await user.click(screen.getByText('B'))
     await user.click(screen.getByRole('button', { name: 'Delete objects' }))
     const dialog = await screen.findByRole('alertdialog')
+    // Capacities' `DeleteHandler.fallback` heading and description.
+    expect(within(dialog).getByRole('heading', { name: 'Delete?' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Review the items below, then confirm.')).toBeInTheDocument()
+    expect(within(within(dialog).getByRole('list', { name: 'Items' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['A', 'B'])
     await user.click(within(dialog).getByRole('button', { name: 'Delete 2 objects' }))
     await waitFor(() => expect(mocked.deleteObject).toHaveBeenCalledTimes(2))
     expect(mocked.deleteObject).toHaveBeenCalledWith('Pages/A.md', { baseVersion: 'v-A' })
