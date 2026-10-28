@@ -194,6 +194,33 @@ describe('edits that only add whitespace or a hard break', () => {
   })
 })
 
+describe('paragraphs with URLs and entities', () => {
+  test.each([
+    ['see https://a.b/c_d_e x', 'x'],
+    ['https://example.com and more', 'more'],
+    ['see <https://a.b> x', 'x'],
+    ['mail me@example.com now', 'now'],
+    ['www.example.com here', 'here'],
+    ['a&nbsp;b x', 'x'],
+  ])('%s loads as a paragraph and saves as written', (line, last) => {
+    const editor = headless(line + '\n')
+    expect(shape(editor).map(([type]) => type)).toEqual(['paragraph'])
+    append(editor, last, 'Y')
+    expect(serializeBody(editor)).toBe(line + 'Y\n')
+  })
+
+  test('&nbsp; shows as a non-breaking space', () => {
+    expect(shape(headless('a&nbsp;b\n'))).toEqual([['paragraph', 'a' + String.fromCharCode(0xa0) + 'b']])
+  })
+
+  test('a link whose text was changed is written in full', () => {
+    const editor = headless('see <https://a.b> x\n')
+    const f = find(editor, 'see')
+    editor.view.dispatch(editor.state.tr.insertText('Site', f.pos + 1 + 4, f.pos + 1 + 4 + 'https://a.b'.length))
+    expect(serializeBody(editor)).toBe('see [Site](https://a.b) x\n')
+  })
+})
+
 describe('headings', () => {
   test.each([
     [' #', '## Title \\#'],
