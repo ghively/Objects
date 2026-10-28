@@ -43,6 +43,11 @@ describe('formatNumber', () => {
     expect(formatNumber(1.5, fmt('number', { decimals: { min: -1, max: 99 } }))).toBe('1.5')
   })
 
+  it('a negative currency puts the sign before the symbol', () => {
+    expect(formatNumber(-5, fmt('currency', { currency: 'USD' }))).toBe('-$5')
+    expect(formatNumber(-1234.5, fmt('currency', { currency: 'EUR', decimals: { min: 2, max: 2 } }))).toBe('-€1,234.50')
+  })
+
   it('test no format and null', () => {
     expect(formatNumber(1234.5)).toBe('1234.5')
     expect(formatNumber(null)).toBe('')
