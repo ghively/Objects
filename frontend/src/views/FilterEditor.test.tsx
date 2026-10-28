@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, test, vi } from 'vitest'
@@ -121,6 +121,24 @@ describe('FilterEditor', () => {
     expect(screen.getByRole('button', { name: 'Date' })).toHaveTextContent('Select date')
     await user.click(screen.getByRole('button', { name: 'Date' }))
     expect(await screen.findByRole('menu', { name: 'Date' })).toBeInTheDocument()
+  })
+
+  test('a percentage filter value is typed in percent and stored as the fraction', () => {
+    const T = typeDef({
+      id: 'deal',
+      propertyDefinitions: [propertyDef({ id: 'odds', type: 'number', name: 'Odds', options: { numberFormat: { type: 'percentage', options: {} } } })],
+    })
+    const onChange = vi.fn()
+    const init: FilterGroup = {
+      type: 'filterGroup',
+      operator: 'and',
+      elements: [{ type: 'filter', propertyId: 'odds', option: 'greater', referenceValue: 0.143 }],
+    }
+    render(<FilterEditor group={init} onChange={onChange} choices={propertyChoices([T])} types={[T]} collections={[]} />)
+    const value = screen.getByRole('spinbutton', { name: 'Value' })
+    expect(value).toHaveValue(14.3)
+    fireEvent.change(value, { target: { value: '25' } })
+    expect((onChange.mock.calls.at(-1)![0] as FilterGroup).elements[0]).toMatchObject({ referenceValue: 0.25 })
   })
 
   test('shows "No eligible properties available" without properties', () => {
