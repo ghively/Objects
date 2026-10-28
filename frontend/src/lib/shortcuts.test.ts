@@ -129,3 +129,15 @@ describe('shortcuts', () => {
     }
   })
 })
+
+describe('letter shortcuts and keyboard layouts', () => {
+  test('a letter matches the character typed; the physical key only when it is not a Latin letter', () => {
+    setPlatform('Win32')
+    // AZERTY: the key labelled Z sits where QWERTY has W.
+    expect(matches(key({ key: 'z', code: 'KeyW', ctrlKey: true }), ['Mod-w'])).toBe(false)
+    expect(matches(key({ key: 'z', code: 'KeyW', ctrlKey: true }), ['Mod-z'])).toBe(true)
+    expect(matches(key({ key: 'Q', code: 'KeyA', ctrlKey: true, shiftKey: true }), ['Mod-Shift-a'])).toBe(false)
+    // Cyrillic: no Latin character, so the physical key decides.
+    expect(matches(key({ key: 'я', code: 'KeyZ', ctrlKey: true }), ['Mod-z'])).toBe(true)
+  })
+})
