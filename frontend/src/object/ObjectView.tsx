@@ -39,6 +39,9 @@ import { ConflictDialog } from './ConflictDialog'
 import { DeleteObjectDialog, DELETE_OBJECT_TEXT, useDeleteRequest } from './DeleteObjectDialog'
 import { PinMenuItems } from '@/shell/PinToMenu'
 import { DeletedBanner } from './DeletedBanner'
+import { ExportDialog } from './ExportDialog'
+import { TextStatsMenu } from './TextStatsMenu'
+import { showToast } from '@/editor/media/upload'
 import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
 import { ensureNewTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
@@ -123,6 +126,12 @@ export const OBJECT_M9_TEXT = {
   wideLayout: 'Wide layout',
   /** `components.RootPagePage.leaveWideMode` */
   normalLayout: 'Normal layout',
+  /** `EntityMenu.textStats.text` */
+  textStats: 'Text Stats',
+  /** `EntityMenu.openExportMenu.text` */
+  export: 'Export',
+  /** `EntityMenu.duplicateObject.text` */
+  duplicate: 'Duplicate',
 } as const
 
 function ToolButton({ label, icon, onClick, pressed }: { label: string; icon: string; onClick?: () => void; pressed?: boolean }) {
@@ -153,6 +162,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   const [collectionsOpen, setCollectionsOpen] = useState(false)
   const [undoError, setUndoError] = useState<string | null>(null)
   const [changeTo, setChangeTo] = useState<TypeDef | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
   /** Mirrors `deleted` for the change listener (which must not wait for a render). */
   const deletedRef = useRef(false)
   const markDeleted = useCallback((v: boolean) => {
@@ -492,6 +502,18 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     onDismiss?.()
   }
 
+  /** M9 "Duplicate": save pending edits, copy the file as "<Title> (Copy)", open the copy. */
+  const duplicate = async () => {
+    try {
+      await settle()
+      const res = await api.duplicateObject(path)
+      void invalidateLinkIndex()
+      openTarget({ kind: 'object', path: res.path })
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   // Ctrl+Backspace (handled by the app) asks the view showing this object to confirm a delete.
   const deleteRequest = useDeleteRequest((s) => s.request)
   useEffect(() => {
@@ -550,6 +572,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   const wideOn = objectWideLayout(type, layout)
   /** Object hides "Wide layout" for whiteboards and the index card design. */
   const canWide = !!summary && pageDesign(type) !== 'indexCard' && !isWhiteboardType(type)
+  const dailyNote = !!summary && isDailyNoteType(type, summary.type)
+  /** Object offers no Duplicate for daily notes and templates; whiteboards are ours to refuse. */
+  const canDuplicate = !!summary && !isTemplate && !dailyNote && !isWhiteboardType(type)
 
   // A render function: the layout picks the variant (inline as a card when the page is narrow).
   const properties =
@@ -663,6 +688,15 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
               <Icon name="ph-clock-counter-clockwise" size={14} />
               {OBJECT_M8_TEXT.versionHistory}
             </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={!summary}>
+                <Icon name="ph-chart-bar" size={14} />
+                {OBJECT_M9_TEXT.textStats}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="border-line bg-raised">
+                {summary && <TextStatsMenu getMarkdown={getMarkdown} summary={summary} dailyNote={dailyNote} />}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuItem
               disabled={!summary}
               onSelect={() => {
@@ -672,6 +706,10 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
             >
               <Icon name="ph-presentation" size={14} />
               {OBJECT_M8_TEXT.present}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!summary} onSelect={() => setExportOpen(true)}>
+              <Icon name="ph-export" size={14} />
+              {OBJECT_M9_TEXT.export}
             </DropdownMenuItem>
             <DropdownMenuItem disabled={!summary || isTemplate} onSelect={() => useAddToWhiteboard.getState().open(path)}>
               <Icon name="ph-chalkboard-simple" size={14} />
@@ -716,6 +754,12 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
               <Icon name={COLLECTION_ICON} size={14} />
               Edit Collections
             </DropdownMenuItem>
+            {canDuplicate && (
+              <DropdownMenuItem disabled={propsReadOnly} onSelect={() => void duplicate()}>
+                <Icon name="ph-copy" size={14} />
+                {OBJECT_M9_TEXT.duplicate}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               disabled={propsReadOnly || !summary || isTemplate}
               onSelect={() => useMerge.getState().open(path)}
@@ -790,6 +834,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
       />
       {typeEditor.dialog}
       <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} />
+      {exportOpen && <ExportDialog open onOpenChange={setExportOpen} path={path} prepare={settle} />}
       {summary && (
         <Dialog open={collectionsOpen} onOpenChange={setCollectionsOpen}>
           <DialogContent className="w-auto border-line bg-raised p-0 text-fg sm:max-w-none">
@@ -926,7 +971,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         }
         layout={layout}
         onLayoutChange={propsReadOnly ? undefined : (patch) => writeProperties({ ...patch })}
-        inspector={mode === 'page' ? { getMarkdown, dailyNote: isDailyNoteType(type, summary.type) } : undefined}
+        inspector={mode === 'page' ? { getMarkdown, dailyNote } : undefined}
         header={
           <ObjectHeader
             summary={summary}
