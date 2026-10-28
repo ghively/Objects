@@ -65,12 +65,13 @@ function numberParts(v: number, fmt: NumberFormat): Intl.NumberFormatPart[] {
     case 'number':
     case 'progress':
       return new Intl.NumberFormat(LOCALE, { style: 'decimal', ...digits }).formatToParts(v)
-    case 'currency':
+    case 'currency': {
       if (!fmt.options.currency) return []
-      return [
-        { type: 'currency', value: currencySymbol(fmt.options.currency) },
-        ...new Intl.NumberFormat(LOCALE, { style: 'decimal', ...digits }).formatToParts(v),
-      ]
+      // The sign leads, as Intl's currency style writes it: -$5, not $-5.
+      const parts = new Intl.NumberFormat(LOCALE, { style: 'decimal', ...digits }).formatToParts(v)
+      const sign = parts[0]?.type === 'minusSign' ? [parts.shift()!] : []
+      return [...sign, { type: 'currency', value: currencySymbol(fmt.options.currency) }, ...parts]
+    }
     case 'percentage':
       return new Intl.NumberFormat(LOCALE, { style: 'percent', ...digits }).formatToParts(v)
     default:
