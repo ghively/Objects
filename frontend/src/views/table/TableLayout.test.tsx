@@ -194,6 +194,25 @@ describe('TableLayout', () => {
     expect(next.values.note).toBe('changed')
   })
 
+  test('a second edit to the same row carries the first write version (audit #14)', async () => {
+    const user = userEvent.setup()
+    const patchRow = vi.fn()
+    render(<Harness patchRow={patchRow} />)
+    const note = screen.getAllByLabelText('Note')[0]
+    await user.clear(note)
+    await user.type(note, 'changed')
+    await user.tab()
+    await waitFor(() => expect(patchRow).toHaveBeenCalledTimes(1))
+    const again = screen.getAllByLabelText('Note')[0]
+    await user.clear(again)
+    await user.type(again, 'twice')
+    await user.tab()
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(2))
+    expect(mocked.updateProperties).toHaveBeenLastCalledWith('Pages/Alpha.md', { note: 'twice' }, 'v7+1')
+    await waitFor(() => expect(patchRow).toHaveBeenCalledTimes(2))
+    expect((patchRow.mock.calls[1] as [string, Row])[1].version).toBe('v7+1+1')
+  })
+
   test('409 on cell edit reloads row without retry', async () => {
     const user = userEvent.setup()
     const patchRow = vi.fn()

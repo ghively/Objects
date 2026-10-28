@@ -15,6 +15,7 @@ import { kindIcon } from '@/properties/kinds'
 import { PropertySettings } from '@/properties/PropertySettings'
 import { cn } from '@/lib/utils'
 import type { LayoutProps } from '../DataView'
+import { createRowWrites } from '../rowWrites'
 import { CalcFooter } from './CalcFooter'
 import { ColumnMenu } from './ColumnMenu'
 import {
@@ -169,6 +170,7 @@ export function TableLayout(props: TableLayoutProps) {
   const [notice, setNotice] = useState<string | null>(null)
   const [live, setLive] = useState<{ id: string; rem: number } | null>(null)
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const writes = useMemo(() => createRowWrites(), [])
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   useEffect(
@@ -240,7 +242,10 @@ export function TableLayout(props: TableLayoutProps) {
   const reloadRow = async (row: Row) => {
     try {
       const [fresh] = await api.rows({ paths: [row.summary.path] })
-      if (fresh) patchRow?.(row.summary.path, fresh)
+      if (fresh) {
+        writes.seen(fresh, row)
+        patchRow?.(row.summary.path, fresh)
+      }
     } catch (err) {
       console.warn('Could not reload row:', err)
     }
@@ -257,13 +262,19 @@ export function TableLayout(props: TableLayoutProps) {
 
   const commit = async (row: Row, def: PropertyDef, next: unknown) => {
     try {
-      const res = await api.updateProperties(row.summary.path, { [def.key]: next }, row.version)
-      const nextLinks = res.links?.[def.key]
-      patchRow?.(row.summary.path, {
-        ...row,
-        version: res.version,
-        values: { ...row.values, [def.key]: cellValue(def, res.frontmatter ?? { [def.key]: next }, res.links ?? {}, row.summary) },
-        links: nextLinks ? { ...row.links, [def.key]: nextLinks } : row.links,
+      // Writes to one row run in turn, each from the newest version (the rows may lag behind).
+      await writes.run(row, async (version, cur) => {
+        const res = await api.updateProperties(row.summary.path, { [def.key]: next }, version)
+        const nextLinks = res.links?.[def.key]
+        const patched: Row = {
+          ...cur,
+          version: res.version,
+          values: { ...cur.values, [def.key]: cellValue(def, res.frontmatter ?? { [def.key]: next }, res.links ?? {}, cur.summary) },
+          links: nextLinks ? { ...cur.links, [def.key]: nextLinks } : cur.links,
+        }
+        writes.seen(patched)
+        patchRow?.(row.summary.path, patched)
+        return res
       })
     } catch (err) {
       await fail(row, err)
@@ -272,7 +283,7 @@ export function TableLayout(props: TableLayoutProps) {
 
   const rename = async (row: Row, title: string) => {
     try {
-      await api.renameObject(row.summary.path, title, row.version)
+      await writes.run(row, (version) => api.renameObject(row.summary.path, title, version))
     } catch (err) {
       await fail(row, err)
     }
