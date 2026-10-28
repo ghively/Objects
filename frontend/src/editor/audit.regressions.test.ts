@@ -239,6 +239,20 @@ describe('reference links and footnotes', () => {
   })
 })
 
+describe('minor drift on edited lines', () => {
+  test('an edited lazy blockquote line stays lazy', () => {
+    const editor = headless('> a\nlazy\n')
+    append(editor, 'lazy', 'X')
+    expect(serializeBody(editor)).toBe('> a\nlazyX\n')
+  })
+
+  test('an edited blockquote line keeps its marker', () => {
+    const editor = headless('> a\n> b\n')
+    append(editor, 'b', 'X')
+    expect(serializeBody(editor)).toBe('> a\n> bX\n')
+  })
+})
+
 describe('lines with ::', () => {
   test.each([
     ['Use std::vector here', 'paragraph'],

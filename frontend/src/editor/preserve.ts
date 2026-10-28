@@ -415,13 +415,25 @@ export function preserveBlock(
  * lines that come back identical are kept. The key is the exact serialized
  * line, so an edit that only adds or removes markup still counts as an edit.
  */
+const QUOTE_PREFIX = /^(?:[ \t]{0,3}>[ \t]?)*/
+
 function preserveLines(origLines: string[], regenLines: string[], baseline?: string): string[] {
   const baseLines = baseline === undefined ? null : splitTail(toLF(baseline))[0].split('\n')
   // Against the baseline (the serializer's own output) lines compare exactly,
   // so an edit adding only trailing blanks or a hard break counts; against
   // the original, its trailing blanks are ignored.
-  if (baseLines && baseLines.length === origLines.length)
-    return alignLines(origLines, regenLines, baseLines, regenLines, (line) => line)
+  if (baseLines && baseLines.length === origLines.length) {
+    // An edited line keeps its original's quote markers (none on a lazy
+    // continuation line, `>` without the space, ...) in place of the baseline's.
+    const sameCount = regenLines.length === origLines.length
+    const restyle = (line: string, j: number) => {
+      if (!sameCount) return line
+      const base = QUOTE_PREFIX.exec(baseLines[j])![0]
+      if (base === '' || !line.startsWith(base)) return line
+      return QUOTE_PREFIX.exec(origLines[j])![0] + line.slice(base.length)
+    }
+    return alignLines(origLines, regenLines, baseLines, regenLines, restyle)
+  }
   return alignLines(
     origLines,
     regenLines,
