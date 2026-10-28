@@ -82,17 +82,44 @@ describe('LocalGraphPanel', () => {
     await waitFor(() => expect(latestPaths().sort()).toEqual(['Ada.md', 'Charles.md', 'Engine.md', 'Note.md']))
     expect(screen.getByTestId('local-graph-hops')).toHaveTextContent('2')
     expect(localStorage.getItem(HOPS_KEY)).toBe('2')
-    expect(screen.getByRole('button', { name: 'Show less' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-disabled', 'false')
     unmount()
 
     // Remembered on the next mount.
     render(<LocalGraphPanel path="Charles.md" />)
-    expect(await screen.findByRole('button', { name: 'Show less' })).toBeInTheDocument()
     await sigmaReady()
     await waitFor(() => expect(latestPaths()).toHaveLength(4))
+    expect(screen.getByTestId('local-graph-hops')).toHaveTextContent('2')
     await user.click(screen.getByRole('button', { name: 'Show less' }))
     await waitFor(() => expect(latestPaths()).toHaveLength(3))
     expect(localStorage.getItem(HOPS_KEY)).toBe('1')
+  })
+
+  test('maximum distance runs 1–5 one step at a time, default 1 (Capacities hops)', async () => {
+    const user = userEvent.setup()
+    render(<LocalGraphPanel path="Charles.md" />)
+    await sigmaReady()
+    const hops = screen.getByTestId('local-graph-hops')
+    const less = screen.getByRole('button', { name: 'Show less' })
+    const more = screen.getByRole('button', { name: 'Show more' })
+    expect(hops).toHaveTextContent('1')
+    expect(less).toHaveAttribute('aria-disabled', 'true')
+    for (let n = 2; n <= 5; n++) {
+      await user.click(more)
+      expect(hops).toHaveTextContent(String(n))
+    }
+    expect(more).toHaveAttribute('aria-disabled', 'true')
+    expect(localStorage.getItem(HOPS_KEY)).toBe('5')
+    await user.click(less)
+    expect(hops).toHaveTextContent('4')
+    expect(more).toHaveAttribute('aria-disabled', 'false')
+  })
+
+  test('an out-of-range remembered distance falls back to 1', async () => {
+    localStorage.setItem(HOPS_KEY, '9')
+    render(<LocalGraphPanel path="Charles.md" />)
+    await sigmaReady()
+    expect(screen.getByTestId('local-graph-hops')).toHaveTextContent('1')
   })
 
   test('centre stays visible under filters that would hide it', async () => {

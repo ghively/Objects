@@ -71,6 +71,25 @@ def test_links_are_distinct_undirected_pairs(links_space_dir: Path):
     assert as_paths == set(space.links.edges())
 
 
+def test_link_dirs_give_each_pairs_direction(links_space_dir: Path):
+    """``linkDirs[k]`` is 1 when a links to b, 2 when b links to a, 3 for both (Capacities
+    draws a node's own links and its backlinks separately; see filterGraph.ts)."""
+    space = Space(links_space_dir)
+    data = graph_data(space)
+    nodes = data["nodes"]
+    pairs = _pairs(data)
+    assert len(data["linkDirs"]) == len(pairs)
+    for (a, b), d in zip(pairs, data["linkDirs"], strict=True):
+        pa, pb = nodes[a]["path"], nodes[b]["path"]
+        want = (1 if pb in space.links.outgoing(pa) else 0) | (2 if pa in space.links.outgoing(pb) else 0)
+        assert d == want != 0, (pa, pb)
+    idx = _by_path(data)
+    # Analytical Engine links Ada; Ada's body doesn't link the engine back.
+    k = pairs.index(tuple(sorted((idx[ADA], idx[ENGINE]))))
+    engine_side = 1 if idx[ENGINE] < idx[ADA] else 2
+    assert data["linkDirs"][k] & engine_side
+
+
 def test_degree_counts_distinct_neighbours(links_space_dir: Path):
     space = Space(links_space_dir)
     data = graph_data(space)
@@ -136,7 +155,7 @@ def test_graph_get_writes_nothing(links_space_dir: Path):
         assert r.status_code == 200
         body = r.json()
         assert body == graph_data(space)
-        assert set(body) == {"nodes", "links", "tagged"}
+        assert set(body) == {"nodes", "links", "linkDirs", "tagged"}
     assert _snapshot(links_space_dir) == before
 
 

@@ -3,7 +3,10 @@
 Nodes are every non-template object whose role has graph support (all of ours,
 see `roles.NO_GRAPH_SUPPORT`), in path order. ``links`` holds the distinct
 undirected pairs of the link index as node indexes (flat ``[a0, b0, …]``,
-``a < b``); ``tagged`` holds ``(object, tag)`` pairs the same way. Each node
+``a < b``); ``linkDirs`` gives each pair's direction (1: a links to b, 2: b
+links to a, 3: both), which Capacities' graph rules need to tell a node's own
+links from its backlinks; ``tagged`` holds ``(object, tag)`` pairs the same
+way. Each node
 carries its ``degree`` (distinct linked neighbours) and the flags the client's
 filters need: ``tag`` (role ``RootTag``), ``daily`` (role ``RootDailyNote``) and
 ``done`` (a Task whose status is in the ``done`` category). Everything is
@@ -85,15 +88,24 @@ def graph_data(space: Space) -> dict[str, Any]:
         )
 
     flat: list[int] = []
+    dirs: list[int] = []
+    outgoing: dict[str, set[str]] = {}
     for a, b in edges:
         ia = index.get(a)
         ib = index.get(b)
         if ia is None or ib is None or ia == ib:
             continue
+        if a not in outgoing:
+            outgoing[a] = links.outgoing(a)
+        if b not in outgoing:
+            outgoing[b] = links.outgoing(b)
+        d = (1 if b in outgoing[a] else 0) | (2 if a in outgoing[b] else 0)
         if ia > ib:
             ia, ib = ib, ia
+            d = ((d & 1) << 1) | ((d & 2) >> 1)
         flat.append(ia)
         flat.append(ib)
+        dirs.append(d)
         nodes[ia]["degree"] += 1
         nodes[ib]["degree"] += 1
 
@@ -105,4 +117,4 @@ def graph_data(space: Space) -> dict[str, Any]:
                 tagged.append(i)
                 tagged.append(j)
 
-    return {"nodes": nodes, "links": flat, "tagged": tagged}
+    return {"nodes": nodes, "links": flat, "linkDirs": dirs, "tagged": tagged}

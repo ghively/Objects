@@ -41,6 +41,11 @@ describe('MatchedTitle', () => {
     expect(container.textContent).toBe('Alpha')
   })
 
+  test('uses the semibold search-highlight variant (Capacities `search-highlights-bold`)', () => {
+    const { container } = render(<MatchedTitle title="Alpha" matches={[[0, 3]]} />)
+    expect(container.querySelector('.search-highlights.search-highlights-bold > b')?.textContent).toBe('Alp')
+  })
+
   test('backend spans count code points, so an emoji before the match does not shift it', () => {
     // fuzzy.score('launch', '🚀 Launch plan') returns [(2, 8)] in Python.
     const { container } = render(<MatchedTitle title="🚀 Launch plan" matches={[[2, 8]]} />)

@@ -68,11 +68,12 @@ export function splitTitle(title: string, matches: readonly (readonly [number, n
   return out
 }
 
-/** A result title with the query's matches in bold. */
+/** A result title with the query's matches highlighted, in the 600-weight variant Capacities'
+ * command palette uses for titles (`search-highlights search-highlights-bold`). */
 export function MatchedTitle({ title, matches }: { title: string; matches: readonly (readonly [number, number])[] }) {
   return (
-    <>
+    <span className="search-highlights search-highlights-bold">
       {splitTitle(title, matches).map((p, i) => (p.hit ? <b key={i}>{p.text}</b> : <Fragment key={i}>{p.text}</Fragment>))}
-    </>
+    </span>
   )
 }
