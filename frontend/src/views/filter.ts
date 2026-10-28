@@ -28,6 +28,8 @@ export interface FilterCtx {
   now: Date
   /** Object id → path, to compare entity filters' object ids with the resolved links. */
   pathsById?: Record<string, string>
+  /** Object path → title, for relations (groups and sorts read the linked object's title). */
+  entityTitles?: Record<string, string>
   /** The types the view shows: a key two types share resolves against these first. */
   viewTypeIds?: string[]
 }

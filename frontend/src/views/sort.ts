@@ -63,8 +63,10 @@ function sortKey(row: Row, sort: Sort, ctx: FilterCtx): Key {
       return order.length ? { empty: false, value: 0, labelOrder: order } : EMPTY_KEY
     }
     case 'entity': {
+      // The linked object's title (as its group shows), else the link text.
       const first = Array.isArray(v) ? (v as EntityRef[])[0] : undefined
-      return text(first?.target ?? '')
+      const path = first ? (first.path ?? row.links[sort.propertyId]?.[0] ?? null) : null
+      return text((path && ctx.entityTitles?.[path]) || first?.target || '')
     }
     case 'entity_tags':
       return text(row.summary.tags?.[0] ?? '')
