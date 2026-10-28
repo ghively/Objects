@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+import { useSettings } from '@/settings/useSettings'
 import { DeadlineLabel, deadlineText } from './DeadlineLabel'
 
 const day = (s: string) => ({ start: s, resolution: 'day' as const })
@@ -27,5 +28,22 @@ describe('DeadlineLabel', () => {
   test('renders nothing without a deadline', () => {
     const { container } = render(<DeadlineLabel deadline={null} today={TODAY} />)
     expect(container).toBeEmptyDOMElement()
+  })
+})
+
+describe('DeadlineLabel in the Time zone setting', () => {
+  test('counts days from today in the Time zone setting', () => {
+    const settings = useSettings.getState().settings
+    useSettings.setState({ settings: { ...settings, timeZone: 'Pacific/Auckland' } })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    // 2026-10-29T01:00Z is 29 Oct 14:00 in Auckland (still the 28th west of UTC).
+    vi.setSystemTime(new Date('2026-10-29T01:00:00Z'))
+    try {
+      expect(deadlineText(day('2026-10-29'))).toBe('0 days left')
+      expect(deadlineText(day('2026-10-28'))).toBe('Missed')
+    } finally {
+      vi.useRealTimers()
+      useSettings.setState({ settings })
+    }
   })
 })

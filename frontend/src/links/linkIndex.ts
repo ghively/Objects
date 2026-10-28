@@ -18,26 +18,37 @@ export interface LinkIndexState {
 }
 
 let loading: Promise<void> | null = null
+/** Bumped by each fetch and by a reset: only the latest fetch's answer is applied. */
+let generation = 0
 const resolutions = new Map<string, Promise<string | null>>()
 
-export const useLinkIndex = create<LinkIndexState>()((set, get) => ({
+/** A fresh fetch of types and summaries; a superseded one waits for the newer fetch instead. */
+function fetchIndex(): Promise<void> {
+  const gen = ++generation
+  const p: Promise<void> = Promise.all([api.space(), api.objects()])
+    .then(([space, objects]): Promise<void> | void => {
+      if (gen !== generation) return loading ?? undefined
+      resolutions.clear()
+      const s = useLinkIndex.getState()
+      useLinkIndex.setState({ types: space.types, objects, loaded: true, revision: s.revision + 1 })
+    })
+    .catch(() => {
+      // Leave the index empty; links render unresolved and the next load retries.
+    })
+    .finally(() => {
+      if (loading === p) loading = null
+    })
+  loading = p
+  return p
+}
+
+export const useLinkIndex = create<LinkIndexState>()(() => ({
   types: [],
   objects: [],
   revision: 0,
   loaded: false,
   load() {
-    loading ??= Promise.all([api.space(), api.objects()])
-      .then(([space, objects]) => {
-        resolutions.clear()
-        set({ types: space.types, objects, loaded: true, revision: get().revision + 1 })
-      })
-      .catch(() => {
-        // Leave the index empty; links render unresolved and the next load retries.
-      })
-      .finally(() => {
-        loading = null
-      })
-    return loading
+    return loading ?? fetchIndex()
   },
 }))
 
@@ -45,6 +56,7 @@ export const useLinkIndex = create<LinkIndexState>()((set, get) => ({
 export function resetLinkIndex(): void {
   resolutions.clear()
   loading = null
+  generation++
   useLinkIndex.setState({ types: [], objects: [], loaded: false, revision: 0 })
 }
 
@@ -52,7 +64,8 @@ export function resetLinkIndex(): void {
 export function invalidateLinkIndex(): Promise<void> {
   resolutions.clear()
   useLinkIndex.setState((s) => ({ loaded: false, revision: s.revision + 1 }))
-  return useLinkIndex.getState().load()
+  // A load already in flight may predate the change: fetch again rather than join it.
+  return fetchIndex()
 }
 
 export async function ensureLinkIndex(): Promise<void> {

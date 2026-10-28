@@ -81,6 +81,8 @@ export function CalendarChrome({ weekStart, rightPanelOpen, onToggleRightPanel, 
       if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return
       if (currentTarget(useTabs.getState())?.kind !== 'calendar') return
       if (isEditable(e.target) || isEditable(document.activeElement)) return
+      // A modal (the peek, settings, a dialog or popover) has the keyboard.
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return
       if (ARROWS.has(e.key)) {
         if (e.shiftKey) return
         e.preventDefault()

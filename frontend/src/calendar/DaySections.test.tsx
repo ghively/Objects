@@ -9,6 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { ConflictError } from '@/api/client'
 import type { Row, ViewState } from '@/api/types'
+import { useSettings } from '@/settings/useSettings'
 import { useUiStore } from '@/shell/usePinned'
 import { taskRow } from '@/tasks/taskFixtures'
 import { taskEntry } from '@/test/mockApi'
@@ -247,5 +248,17 @@ describe('DaySections', () => {
     expect(moved.resolution).toBe('time')
     const d = new Date(moved.start)
     expect([d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes()]).toEqual([2026, 9, 24, 9, 0])
+  })
+
+  test('moveDate moves a timed item by days in the Time zone setting, keeping its wall time there', () => {
+    const settings = useSettings.getState().settings
+    useSettings.setState({ settings: { ...settings, timeZone: 'Pacific/Auckland' } })
+    try {
+      // 2026-10-28T22:00Z is 29 Oct 11:00 in Auckland; dropped on the 30th it stays at 11:00 there.
+      const moved = moveDate({ start: '2026-10-28T22:00:00.000Z', resolution: 'time' }, '2026-10-30')
+      expect(moved).toEqual({ start: '2026-10-29T22:00:00.000Z', resolution: 'time' })
+    } finally {
+      useSettings.setState({ settings })
+    }
   })
 })

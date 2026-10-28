@@ -5,6 +5,7 @@
 // `preset` is only the starting view (layout, sorts, grouping) that the user can change and that
 // is saved per section in `ui.tasks.views`. Icons are ours: the reference names none.
 import type { DateValue, Row, TaskSectionKey, TypeDef, ViewState } from '@/api/types'
+import { zonedDayDate } from '@/lib/zonedShell'
 import { emptyFilterGroup } from '@/views/model'
 import { isOpen, statusText } from './statusCategory'
 import { parseRemind } from './remind'
@@ -43,7 +44,6 @@ export const isTaskSectionKey = (k: unknown): k is TaskSectionKey =>
 const asDate = (v: unknown): DateValue | null =>
   v && typeof v === 'object' && typeof (v as DateValue).start === 'string' && (v as DateValue).start ? (v as DateValue) : null
 
-const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
 
 /** The local day the row's `date` starts on, or null. */
 function dateDay(row: Row): Date | null {
@@ -83,7 +83,7 @@ export const TASK_SECTIONS: Record<TaskSectionKey, TaskSection> = {
     preset: () => view('list', { sorts: [{ propertyId: 'date', option: 'ascending' }] }),
     match: (row, type, now) => {
       const d = dateDay(row)
-      return isOpen(row, type) && !!d && d.getTime() <= startOfDay(now).getTime()
+      return isOpen(row, type) && !!d && d.getTime() <= zonedDayDate(now).getTime()
     },
   },
   inbox: {

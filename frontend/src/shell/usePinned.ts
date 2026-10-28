@@ -81,6 +81,26 @@ async function save(patch: UiPatch, op: Op): Promise<void> {
   }
 }
 
+/**
+ * Run `save` after every `ui.json` save queued before it (the sidebar's, the calendar's, the Tasks
+ * page's), so each sends the revision the one before it returned. While more than one edit is
+ * unsaved (`pendingUiSaves`), no answer may replace the whole local `ui`.
+ */
+export function enqueueUiSave<T>(save: () => Promise<T>): Promise<T> {
+  pending += 1
+  const done = queue.then(save).finally(() => {
+    pending -= 1
+  })
+  queue = done.then(
+    () => undefined,
+    () => undefined,
+  )
+  return done
+}
+
+/** Unsaved `ui.json` edits, the one being saved included. */
+export const pendingUiSaves = (): number => pending
+
 /** Apply `op` now and save it after the edits before it. */
 function run(op: Op): Promise<void> {
   const cur = useUiStore.getState().ui
