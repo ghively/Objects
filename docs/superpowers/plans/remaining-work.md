@@ -1,6 +1,8 @@
 # Object: remaining work
 
-Status as of 2026-10-28. **All eight milestones are built, reviewed, fixed and gated.** What remains is Gene's hands-on checking and the fixes it produces.
+Status as of 2026-10-28. **All eight milestones are built, reviewed, fixed and gated.** What remains:
+1. the 2026-10-28 audit list (`audit-2026-10-28.md` in this folder: about 65 reproduced bugs and 14 completeness gaps, none fixed yet)
+2. Gene's hands-on checking, and the fixes both produce
 
 Spec: `docs/superpowers/specs/2026-10-23-object-design.md`. How to resume: `HANDOFF.md`, `CONTINUE.md`. Rules: `CLAUDE.md`. Process: `docs/superpowers/build-process.md`.
 
@@ -43,6 +45,10 @@ The synthetic fixture spaces are `space-sample`, `space-v1`, `space-calendar`, `
 
 ## What is left
 
+0. **Fix the audit list.**
+   - The list is `audit-2026-10-28.md`. Start with its "Fix first" section, items 1–17: security, data loss and breakage.
+   - One finding per commit, each with a regression test. The repro scripts are in `scripts/audit-2026-10-28/`.
+   - Gene decides which completeness gaps are in scope. The M8 Coverage table missed the M2/M3 deferrals, and the audit lists them.
 1. **Gene's hands-on checks, M1–M8:** 237 unchecked items. Run them on a copy of the CPI export kept outside the repo, with `git init` there: `npm run build` in `frontend/`, then `uv run objectapp --space <copy>`. These can only be checked on his Windows machine:
    - the pywebview window
    - Windows toast reminders
