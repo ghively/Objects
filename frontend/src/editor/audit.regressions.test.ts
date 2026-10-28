@@ -112,6 +112,52 @@ describe('code blocks', () => {
   })
 })
 
+/** Delete the first node of `type` whose text is exactly `text`. */
+function deleteNode(editor: TiptapEditor, text: string, type: string): void {
+  let at = -1
+  let size = 0
+  editor.state.doc.descendants((n, pos) => {
+    if (at < 0 && n.type.name === type && n.textContent === text) {
+      at = pos
+      size = n.nodeSize
+    }
+    return at < 0
+  })
+  if (at < 0) throw new Error(`no ${type} ${text}`)
+  editor.view.dispatch(editor.state.tr.delete(at, at + size))
+}
+
+/** The `start` of every ordered list, in document order. */
+function listStarts(editor: TiptapEditor): number[] {
+  const out: number[] = []
+  editor.state.doc.descendants((n) => {
+    if (n.type.name === 'orderedList') out.push(n.attrs.start as number)
+  })
+  return out
+}
+
+describe('numbered lists', () => {
+  test('deleting the first item keeps the list starting at 1', () => {
+    const editor = headless('1. a\n2. b\n3. c\n')
+    deleteNode(editor, 'a', 'listItem')
+    const saved = serializeBody(editor)
+    expect(saved).toBe('1. b\n3. c\n')
+    expect(listStarts(headless(saved))).toEqual([1])
+  })
+
+  test('deleting the first item of a list starting at 5 keeps 5', () => {
+    const editor = headless('5. a\n6. b\n')
+    deleteNode(editor, 'a', 'listItem')
+    expect(serializeBody(editor)).toBe('5. b\n')
+  })
+
+  test('deleting the first item of a nested list keeps it starting at 1', () => {
+    const editor = headless('- x\n    1. alpha\n    2. beta\n- y\n')
+    deleteNode(editor, 'alpha', 'listItem')
+    expect(serializeBody(editor)).toBe('- x\n    1. beta\n- y\n')
+  })
+})
+
 describe('headings', () => {
   test.each([
     [' #', '## Title \\#'],

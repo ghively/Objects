@@ -196,7 +196,40 @@ function preserveList(origLines: string[], regenLines: string[]): string[] {
     origLines.map((l, i) => listKey(l, origParsed[i])),
     regenLines.map((l, i) => listKey(l, regenParsed[i])),
   )
-  return weaveBlankLines(origLines, regenLines, match, restyle)
+  return keepListStarts(weaveBlankLines(origLines, regenLines, match, restyle), regenParsed)
+}
+
+/** Line index and number of the first item of each ordered list (CommonMark: its start). */
+function orderedStarts(parsed: (ListLine | null)[]): [number, string][] {
+  const out: [number, string][] = []
+  const kindAt: boolean[] = [] // per depth: was the last item there ordered?
+  parsed.forEach((p, i) => {
+    if (!p) return
+    kindAt.length = p.depth + 1
+    const ordered = /\d/.test(p.marker)
+    if (ordered && kindAt[p.depth] !== true) out.push([i, p.marker.slice(0, -1)])
+    kindAt[p.depth] = ordered
+  })
+  return out
+}
+
+/**
+ * A kept original line can become the first item of an ordered list (the item
+ * before it was deleted): its number is the list's start, so it takes the
+ * number the editor shows (the regenerated one) instead of its old one.
+ */
+function keepListStarts(out: string[], regenParsed: (ListLine | null)[]): string[] {
+  const want = orderedStarts(regenParsed)
+  const have = orderedStarts(parseList(out))
+  if (want.length !== have.length) return out
+  const fixed = out.slice()
+  have.forEach(([i, num], k) => {
+    const start = want[k][1]
+    if (num === start) return
+    const m = LIST_ITEM.exec(fixed[i])!
+    fixed[i] = m[1] + start + m[2].slice(-1) + fixed[i].slice(m[1].length + m[2].length)
+  })
+  return fixed
 }
 
 const isBlank = (line: string) => line.trim() === ''
