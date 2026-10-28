@@ -78,10 +78,21 @@ export const DEFAULT_ENTITY_HEIGHT = GRID * 4
 /** A click with the Line or Arrow tool draws this long a horizontal connector (our choice). */
 export const DEFAULT_CONNECTOR_LENGTH = GRID * 4
 
-/** A node's box; a missing size falls back to its kind's default (points are size 0). */
-export function nodeBox(n: WhiteboardNode): Box {
+/** Rendered sizes of nodes, by id, as React Flow measured them (auto-sized blocks have no stored size). */
+export type MeasuredSizes = Readonly<Record<string, { width: number; height: number }>>
+
+/**
+ * A node's box; a missing size is taken from `measured` (the rendered size), else its kind's
+ * default (points are size 0).
+ */
+export function nodeBox(n: WhiteboardNode, measured?: MeasuredSizes): Box {
   let w = n.width
   let h = n.height
+  const m = measured?.[n.id]
+  if (m) {
+    if (typeof w !== 'number') w = m.width
+    if (typeof h !== 'number') h = m.height
+  }
   if (typeof w !== 'number' || typeof h !== 'number') {
     const d =
       n.kind === 'point'
@@ -609,28 +620,34 @@ export function duplicate(board: WhiteboardData, ids: Iterable<string>, offset =
 }
 
 /** Ids of the nodes wholly inside a frame (computed from geometry; the schema has no parent). */
-export function frameContents(board: WhiteboardData, frameId: string): string[] {
+export function frameContents(board: WhiteboardData, frameId: string, measured?: MeasuredSizes): string[] {
   const f = board.nodes[frameId]
   if (!f || f.kind !== 'frame') return []
-  const fb = nodeBox(f)
+  const fb = nodeBox(f, measured)
   const out: string[] = []
   for (const n of Object.values(board.nodes)) {
     if (n.id === frameId) continue
-    const b = nodeBox(n)
+    const b = nodeBox(n, measured)
     if (b.x >= fb.x && b.y >= fb.y && b.x + b.width <= fb.x + fb.width && b.y + b.height <= fb.y + fb.height) out.push(n.id)
   }
   return out
 }
 
 /** Moves nodes by `(dx, dy)`; a moved frame takes the nodes inside it along. Locked nodes stay. */
-export function nudge(board: WhiteboardData, ids: Iterable<string>, dx: number, dy: number): WhiteboardData {
+export function nudge(
+  board: WhiteboardData,
+  ids: Iterable<string>,
+  dx: number,
+  dy: number,
+  measured?: MeasuredSizes,
+): WhiteboardData {
   if ((!dx && !dy) || !Number.isFinite(dx) || !Number.isFinite(dy)) return board
   const moving = new Set<string>()
   for (const id of idSet(ids)) {
     const n = board.nodes[id]
     if (!n) continue
     moving.add(id)
-    if (n.kind === 'frame') for (const c of frameContents(board, id)) moving.add(c)
+    if (n.kind === 'frame') for (const c of frameContents(board, id, measured)) moving.add(c)
   }
   let nodes: Record<string, WhiteboardNode> | null = null
   for (const id of moving) {
@@ -791,10 +808,14 @@ export function flip(board: WhiteboardData, ids: Iterable<string>, axis: 'x' | '
 }
 
 /** "Wrap in new frame": a frame around the selection, one grid cell of padding, snapped outward, titled "Frame N". */
-export function wrapInFrame(board: WhiteboardData, ids: Iterable<string>, opts: { id?: string } = {}): WhiteboardData {
+export function wrapInFrame(
+  board: WhiteboardData,
+  ids: Iterable<string>,
+  opts: { id?: string; measured?: MeasuredSizes } = {},
+): WhiteboardData {
   const sel = idSet(ids)
   const items = Object.values(board.nodes).filter((n) => sel.has(n.id))
-  const b = boundsOf(items.map(nodeBox))
+  const b = boundsOf(items.map((n) => nodeBox(n, opts.measured)))
   if (!b) return board
   const x = Math.floor((b.x - GRID) / GRID) * GRID
   const y = Math.floor((b.y - GRID) / GRID) * GRID
@@ -984,7 +1005,7 @@ export const ADD_TO_BOARD_GAP = GRID * 2
  * empty board.
  */
 export function rightOfContent(board: WhiteboardData): WhiteboardPosition {
-  const b = boundsOf(Object.values(board.nodes).map(nodeBox))
+  const b = boundsOf(Object.values(board.nodes).map((n) => nodeBox(n)))
   if (!b) return { x: 0, y: 0 }
   return snapPosition({ x: b.x + b.width + ADD_TO_BOARD_GAP, y: b.y })
 }

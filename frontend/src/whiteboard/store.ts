@@ -49,6 +49,8 @@ export interface CanvasActions {
    */
   applyFlowChanges(changes: NodeChange[]): void
   endDrag(): void
+  /** Rendered sizes of nodes (auto-sized blocks): used for frame containment and wrapping. */
+  measure(sizes: A.MeasuredSizes): void
 }
 
 export interface BoardState {
@@ -91,6 +93,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
   const initial: BoardDoc = opts.doc ?? { board: emptyBoard(), strokes: [] }
   const history = new History<BoardDoc>(initial)
   let gesture = 0
+  let measured: Record<string, { width: number; height: number }> = {}
   /** `contents`: each dragged frame's followers; a node inside several dragged frames follows one. */
   let drag: { key: string; contents: Map<string, string[]> } | null = null
 
@@ -247,7 +250,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       },
       nudge(dx, dy, given) {
         const sel = ids(given)
-        edit('move', (b) => A.nudge(b, sel, dx, dy))
+        edit('move', (b) => A.nudge(b, sel, dx, dy, measured))
       },
       order(mode, given) {
         const sel = ids(given)
@@ -263,7 +266,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       },
       wrapInFrame(given) {
         const sel = ids(given)
-        created('wrap', (b, nid) => A.wrapInFrame(b, sel, { id: nid }))
+        created('wrap', (b, nid) => A.wrapInFrame(b, sel, { id: nid, measured }))
       },
       clearBoard() {
         const s = get()
@@ -342,7 +345,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
         const claimed = new Set<string>(dragIds)
         for (const id of dragIds) {
           if (board.nodes[id]?.kind !== 'frame') continue
-          const followers = A.frameContents(board, id).filter((c) => !claimed.has(c))
+          const followers = A.frameContents(board, id, measured).filter((c) => !claimed.has(c))
           for (const c of followers) claimed.add(c)
           contents.set(id, followers)
         }
@@ -386,6 +389,9 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
         drag = null
         history.seal()
         set({ dragging: false })
+      },
+      measure(sizes) {
+        measured = { ...measured, ...sizes }
       },
     }
 

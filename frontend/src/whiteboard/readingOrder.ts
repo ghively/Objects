@@ -191,7 +191,7 @@ export function presentationSlides(board: WhiteboardData): Slide[] {
   if (frames.length) return frames.map((f) => ({ frameId: f.id, label: frameLabel(f), box: nodeBox(f) }))
   const nodes = Object.values(board.nodes)
   if (!nodes.length) return []
-  const boxes = nodes.map(nodeBox)
+  const boxes = nodes.map((n) => nodeBox(n))
   const minX = Math.min(...boxes.map((b) => b.x))
   const minY = Math.min(...boxes.map((b) => b.y))
   const maxX = Math.max(...boxes.map((b) => b.x + b.width))
