@@ -25,6 +25,7 @@ import { useDefinitions } from './useDefinitions'
 import {
   SECTION_TEXT,
   addableSections,
+  canRemoveSection,
   hiddenSections,
   isQueryKey,
   moveSection,
@@ -103,15 +104,17 @@ function SortableEntry({ section, onHide }: { section: RenderedSection; onHide()
     >
       <Icon name="ph-dots-six-vertical" size={13} />
       <span className="min-w-0 flex-1 truncate">{`${section.label}${section.inFullView ? '' : SECTION_TEXT.dashboardOnly}`}</span>
-      <button
-        type="button"
-        aria-label={`Hide ${section.label}`}
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={onHide}
-        className="text-fg-muted hover:text-fg"
-      >
-        <Icon name="ph-eye-slash" size={14} />
-      </button>
+      {canRemoveSection(section.key) && (
+        <button
+          type="button"
+          aria-label={`Hide ${section.label}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={onHide}
+          className="text-fg-muted hover:text-fg"
+        >
+          <Icon name="ph-eye-slash" size={14} />
+        </button>
+      )}
     </div>
   )
 }

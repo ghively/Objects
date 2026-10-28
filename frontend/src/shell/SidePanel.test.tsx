@@ -62,58 +62,75 @@ describe('SidePanel', () => {
   })
 
   test('test areas stack, resize and persist per tab', () => {
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 1000, width: 500 } as DOMRect)
+    // The card (main column plus panel) is 1000 px wide; the panel 1000 px high.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 1000, width: 1000 } as DOMRect)
     s().open(obj('One.md'))
     s().openInSidepanel(obj('A1.md'))
     s().openInSidepanel(obj('A2.md'), { area: 'area2' })
     s().openInSidepanel(obj('A3.md'), { area: 'area3' })
-    render(<SidePanel space={null} renderTarget={renderTarget} />)
+    render(
+      <div>
+        <SidePanel space={null} renderTarget={renderTarget} />
+      </div>,
+    )
 
     // Stacked top to bottom: area 1, area 2, area 3.
     const regions = within(panel()).getAllByRole('region')
     expect(regions.map((r) => r.getAttribute('aria-label'))).toEqual(['Side panel area 1', 'Side panel area 2', 'Side panel area 3'])
     expect(within(area(2)).getByText('page A2.md')).toBeInTheDocument()
-    expect(panel().style.width).toBe('500px')
-    expect(screen.getByTestId('sidepanel-area2').style.flex).toBe('0 0 33.33%')
-    // It gives way to the main column's minimum width, down to its own 320 px.
-    expect(panel().style.minWidth).toBe('320px')
-    expect(panel().className).toMatch(/(^| )shrink( |$)/)
-    expect(panel().className).not.toContain('shrink-0')
+    // Capacities: 45 % of the main column plus the panel; areas 2 and 3 are 220 px, area 1 the rest (120 px at least).
+    expect(panel().style.width).toBe('45%')
+    expect(panel().className).toContain('shrink-0')
+    expect(screen.getByTestId('sidepanel-area2').style.flex).toBe('0 0 220px')
+    expect(screen.getByTestId('sidepanel-area3').style.flex).toBe('0 0 220px')
+    expect(screen.getByTestId('sidepanel-area1').style.minHeight).toBe('120px')
 
-    // Width: drag the left edge 100 px to the left; written on pointer up.
+    // Width: drag the left edge 100 px (10 % of 1000) to the left; written on pointer up.
     const edge = screen.getByRole('separator', { name: 'Resize side panel' })
     pointer(edge, 'pointerdown', 1000, 0)
     pointer(edge, 'pointermove', 950, 0)
-    expect(panel().style.width).toBe('550px')
+    expect(panel().style.width).toBe('50%')
     expect(tab().sidepanelLayout?.width).toBeUndefined()
     pointer(edge, 'pointermove', 900, 0)
     pointer(edge, 'pointerup', 900, 0)
-    expect(tab().sidepanelLayout?.width).toBe(600)
-    expect(panel().style.width).toBe('600px')
-    // Never past 60 % of the window, never under 320 px.
+    expect(tab().sidepanelLayout?.width).toBeCloseTo(0.55)
+    expect(panel().style.width).toBe('55%')
+    // Never past 90 %, never under 10 %.
     pointer(edge, 'pointerdown', 1000, 0)
     pointer(edge, 'pointerup', 0, 0)
-    expect(tab().sidepanelLayout?.width).toBe(960)
+    expect(tab().sidepanelLayout?.width).toBe(0.9)
     pointer(edge, 'pointerdown', 0, 0)
     pointer(edge, 'pointerup', 2000, 0)
-    expect(tab().sidepanelLayout?.width).toBe(320)
+    expect(tab().sidepanelLayout?.width).toBe(0.1)
+    // A double click goes back to 45 %.
+    fireEvent.doubleClick(edge)
+    expect(tab().sidepanelLayout?.width).toBe(0.45)
+    expect(panel().style.width).toBe('45%')
 
-    // Area 2's height: dragging its top edge down 100 px of a 1000 px panel shrinks it by 0.1.
+    // Area 2's height: dragging its top edge down 100 px takes it from 220 to 120 px, and no lower.
     const bar = screen.getByRole('separator', { name: 'Resize side panel area 2' })
     pointer(bar, 'pointerdown', 0, 400)
     pointer(bar, 'pointerup', 0, 500)
-    expect(tab().sidepanelLayout?.area2Size).toBeCloseTo(1 / 3 - 0.1)
+    expect(tab().sidepanelLayout?.area2Size).toBe(120)
+    pointer(bar, 'pointerdown', 0, 400)
+    pointer(bar, 'pointerup', 0, 500)
+    expect(tab().sidepanelLayout?.area2Size).toBe(120)
+    // Dragged up, area 1 keeps its 120 px: 1000 - 120 - area 3's 220.
+    pointer(bar, 'pointerdown', 0, 400)
+    pointer(bar, 'pointerup', 0, -800)
+    expect(tab().sidepanelLayout?.area2Size).toBe(660)
 
     // Another tab has its own panel (none yet); switching back shows this one's layout again.
     const first = tab().id
+    act(() => s().setSidepanelLayout({ width: 0.3 }))
     act(() => s().open(obj('Two.md'), { newTab: true }))
     expect(screen.queryByRole('complementary', { name: 'Side panel' })).toBeNull()
     act(() => s().openInSidepanel(obj('B1.md')))
     expect(within(panel()).getAllByRole('region')).toHaveLength(1)
-    expect(panel().style.width).toBe('500px')
+    expect(panel().style.width).toBe('45%')
     act(() => s().activate(first))
     expect(within(panel()).getAllByRole('region')).toHaveLength(3)
-    expect(panel().style.width).toBe('320px')
+    expect(panel().style.width).toBe('30%')
   })
 
   test('test new sidepanel tab shows the Explore empty state', async () => {

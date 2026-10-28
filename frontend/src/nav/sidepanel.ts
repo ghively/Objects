@@ -9,13 +9,17 @@ export type PanelArea = SidepanelEntry['panelArea']
 
 export const AREAS: readonly PanelArea[] = ['area1', 'area2', 'area3']
 
-/** M1's right panel width. */
-export const DEFAULT_SIDEPANEL_WIDTH = 500
-export const MIN_SIDEPANEL_WIDTH = 320
-/** The panel never takes more than this share of the window. */
-export const MAX_SIDEPANEL_FRACTION = 0.6
-/** An area never shrinks below (or grows above) this share of the panel height. */
-export const MIN_AREA_FRACTION = 0.1
+/**
+ * The panel's width as a share of the main column plus the panel (Capacities' `sidepanelWidth`,
+ * default `45%`, dragged between 10 % and 90 %, back to 45 % on a double click on the resizer).
+ */
+export const DEFAULT_SIDEPANEL_FRACTION = 0.45
+export const MIN_SIDEPANEL_FRACTION = 0.1
+export const MAX_SIDEPANEL_FRACTION = 0.9
+/** Areas 2 and 3 are this many px high by default (Capacities' `area2Size || 220`). */
+export const DEFAULT_AREA_SIZE = 220
+/** No area, area 1 included, gets lower than this (Capacities' `nV = 120`). */
+export const MIN_AREA_SIZE = 120
 /** How many targets an entry remembers for its own back and forward. */
 export const ENTRY_HISTORY_LIMIT = 30
 
@@ -188,26 +192,26 @@ export function retargetEntries(entries: SidepanelEntry[], oldPath: string, newP
   }))
 }
 
-/** The panel width, kept between the minimum and the window share. */
-export function clampWidth(width: number, windowWidth: number): number {
-  const max = Math.max(MIN_SIDEPANEL_WIDTH, Math.floor(windowWidth * MAX_SIDEPANEL_FRACTION))
-  return Math.round(Math.min(max, Math.max(MIN_SIDEPANEL_WIDTH, width)))
+/** The panel's share of the main column plus the panel, kept between 10 % and 90 %. */
+export function clampWidthFraction(f: number): number {
+  return Math.min(MAX_SIDEPANEL_FRACTION, Math.max(MIN_SIDEPANEL_FRACTION, f))
 }
 
-export function clampFraction(f: number): number {
-  return Math.min(1 - MIN_AREA_FRACTION, Math.max(MIN_AREA_FRACTION, f))
+/** The tab's panel width as a share (the default 45 % when none is saved). */
+export function widthFraction(layout: SidepanelLayout | undefined): number {
+  const w = layout?.width
+  return typeof w === 'number' && Number.isFinite(w) ? clampWidthFraction(w) : DEFAULT_SIDEPANEL_FRACTION
 }
 
 /**
- * The height share of each visible area after the first (the first takes the rest): `area2Size` and
- * `area3Size` from the layout, else an even split.
+ * The height in px of each visible area after the first (the first takes the rest, at least
+ * `MIN_AREA_SIZE`): `area2Size` and `area3Size` from the layout, else `DEFAULT_AREA_SIZE`.
  */
-export function areaFractions(layout: SidepanelLayout | undefined, visible: PanelArea[]): Partial<Record<PanelArea, number>> {
+export function areaSizes(layout: SidepanelLayout | undefined, visible: PanelArea[]): Partial<Record<PanelArea, number>> {
   const out: Partial<Record<PanelArea, number>> = {}
-  const even = 1 / Math.max(1, visible.length)
   for (const a of visible.slice(1)) {
     const v = a === 'area2' ? layout?.area2Size : a === 'area3' ? layout?.area3Size : undefined
-    out[a] = typeof v === 'number' && Number.isFinite(v) ? clampFraction(v) : even
+    out[a] = typeof v === 'number' && Number.isFinite(v) ? Math.max(MIN_AREA_SIZE, Math.round(v)) : DEFAULT_AREA_SIZE
   }
   return out
 }
@@ -249,8 +253,13 @@ export function cleanLayout(v: unknown): SidepanelLayout | undefined {
   if (!v || typeof v !== 'object') return undefined
   const l = v as Record<string, unknown>
   const out: SidepanelLayout = {}
-  for (const k of ['width', 'area2Size', 'area3Size'] as const) {
-    if (typeof l[k] === 'number' && Number.isFinite(l[k])) out[k] = l[k] as number
+  const num = (k: keyof SidepanelLayout) => (typeof l[k] === 'number' && Number.isFinite(l[k]) ? (l[k] as number) : undefined)
+  // Before the reference values the width was px and the area sizes fractions: those are dropped.
+  const width = num('width')
+  if (width !== undefined && width > 0 && width <= 1) out.width = width
+  for (const k of ['area2Size', 'area3Size'] as const) {
+    const v = num(k)
+    if (v !== undefined && v > 1) out[k] = v
   }
   return out
 }

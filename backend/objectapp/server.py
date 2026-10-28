@@ -429,6 +429,7 @@ _TASK_SECTION_KEYS = frozenset(
         "tags",
         "completed",
         "source",
+        "all",
     }
 )
 

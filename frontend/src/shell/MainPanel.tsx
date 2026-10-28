@@ -3,8 +3,8 @@ import type { ReactNode } from 'react'
 /**
  * The inset content card: the only framed surface in the shell. The side
  * panel (`aside`, `shell/SidePanel.tsx`), when shown, lives inside the same
- * card behind a 1px rule. The main column keeps a minimum width beside it (the side panel
- * shrinks to its own minimum first): `[data-main-column]` in `index.css`.
+ * card behind a 1px rule, as a share of the card's width (Capacities' `sidepanelWidth`); the main
+ * column takes the rest and has no minimum width of its own (none in the reference).
  */
 export function MainPanel({ children, aside }: { children?: ReactNode; aside?: ReactNode }) {
   return (

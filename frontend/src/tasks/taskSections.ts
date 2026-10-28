@@ -21,22 +21,27 @@ export interface TaskSection {
   match(row: Row, type: TypeDef | undefined, now: Date): boolean
 }
 
-/** Tab order; `status` is the default tab. */
+/**
+ * Tab order and default tab, from the reference (RootTask's `builtInDashboardSections`): the task
+ * sections in this order, then "All" (`allContent`, sorted last for tasks); `inbox` is the
+ * default (`defaultSection: 'tasksInbox'`).
+ */
 export const TASK_SECTION_KEYS: readonly TaskSectionKey[] = [
-  'status',
-  'today',
   'inbox',
+  'today',
+  'scheduled',
+  'status',
+  'source',
+  'tags',
   'open',
   'deadline',
-  'scheduled',
   'recurring',
   'reminders',
-  'tags',
-  'source',
   'completed',
+  'all',
 ]
 
-export const DEFAULT_TASK_SECTION: TaskSectionKey = 'status'
+export const DEFAULT_TASK_SECTION: TaskSectionKey = 'inbox'
 
 export const isTaskSectionKey = (k: unknown): k is TaskSectionKey =>
   typeof k === 'string' && (TASK_SECTION_KEYS as readonly string[]).includes(k)
@@ -149,6 +154,14 @@ export const TASK_SECTIONS: Record<TaskSectionKey, TaskSection> = {
     icon: 'ph-check-circle',
     preset: () => view('list', { sorts: [{ propertyId: 'completed', option: 'descending' }] }),
     match: (row, type) => !isOpen(row, type),
+  },
+  all: {
+    // `DatabaseDashboard.sections.all`
+    title: 'All',
+    description: 'All objects of this object type with filter and sort options.',
+    icon: 'ph-list-bullets',
+    preset: () => view('list'),
+    match: () => true,
   },
 }
 
