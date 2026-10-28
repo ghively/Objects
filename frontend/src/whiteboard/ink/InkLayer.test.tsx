@@ -221,6 +221,20 @@ describe('InkLayer', () => {
     expect(next[0].points.every(([x, y]) => x <= 30 && y === 0)).toBe(true)
   })
 
+  test('a lost pointer capture ends the gesture, so the next stroke still draws', () => {
+    const { capture, onStrokesChange, container } = setup()
+    const el = capture()!
+    fire(el, 'pointerdown', { pointerType: 'pen', pointerId: 1, x: 0, y: 0, pressure: 0.5 })
+    fire(el, 'pointermove', { pointerType: 'pen', pointerId: 1, x: 30, y: 0, pressure: 0.5 })
+    fire(el, 'lostpointercapture', { pointerType: 'pen', pointerId: 1, x: 30, y: 0 })
+    expect(container.querySelector('[data-ink-live]')).toBeNull()
+    fire(el, 'pointerdown', { pointerType: 'pen', pointerId: 3, x: 0, y: 50, pressure: 0.5 })
+    fire(el, 'pointermove', { pointerType: 'pen', pointerId: 3, x: 30, y: 50, pressure: 0.5 })
+    fire(el, 'pointerup', { pointerType: 'pen', pointerId: 3, x: 30, y: 50 })
+    expect(onStrokesChange).toHaveBeenCalledTimes(1)
+    expect((onStrokesChange.mock.calls[0][0] as InkStroke[])[0].points.every(([, y]) => y === 50)).toBe(true)
+  })
+
   test('no capture overlay without a tool, when read-only or while panning', () => {
     expect(setup({ tool: null }).capture()).toBeNull()
     expect(setup({ readOnly: true }).capture()).toBeNull()
