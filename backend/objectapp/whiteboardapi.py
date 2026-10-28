@@ -2,16 +2,20 @@
 
 - ``GET /api/whiteboard?path=`` -> ``BoardResponse`` ``{path, board, revision, readOnlyReason?}``
   (the empty board and ``revision: ''`` when the file is missing; nothing is written).
-- ``PUT /api/whiteboard`` ``{path, board, baseRevision, clientId?}`` -> ``{revision}``;
+- ``PUT /api/whiteboard`` ``{path, board, baseRevision, clientId?}`` -> ``{revision, mdVersion}``;
   ``409 {currentRevision}``, ``422 {detail}``, ``423 {reason, detail}``, ``404``, ``400``.
 - ``GET /api/whiteboard/ink?path=`` -> ``InkResponse`` ``{path, strokes, revision, readOnlyReason?}``.
-- ``PUT /api/whiteboard/ink`` ``{path, strokes, baseRevision, clientId?}`` -> ``{revision}``;
-  the same errors.
+- ``PUT /api/whiteboard/ink`` ``{path, strokes, baseRevision, clientId?}`` ->
+  ``{revision, mdVersion}``; the same errors.
+
+M9: a save also stamps the board ``.md``'s ``lastUpdated`` (see `whiteboardstore`);
+``mdVersion`` is the ``.md``'s version after that, so the Notes editor saves on top of it.
 - ``POST /api/whiteboards`` ``{title?, clientId?}`` -> ``201 {path, version, typeIds}``;
   announces ``types`` (when the Whiteboard type's JSON was written now) and ``created``.
 
 Board and ink saves announce ``ChangeEvent(kind='whiteboard', path=<the .md>, version=<the new
-revision>, origin=clientId)``. A path outside the space or not an object path is 400, an
+revision>, origin=clientId)``, plus ``changed`` with the ``.md``'s new version when its
+``lastUpdated`` was bumped. A path outside the space or not an object path is 400, an
 unknown object 404, an object of another type 422.
 """
 
@@ -32,6 +36,7 @@ from .whiteboardstore import (
     BoardReadOnly,
     InkInvalid,
     NotAWhiteboard,
+    Saved,
     create_whiteboard,
     read_board,
     read_ink,
@@ -107,8 +112,12 @@ def whiteboard_router(
     """The four whiteboard routes for ``space``; ``announce`` publishes a `ChangeEvent`."""
     api = APIRouter(prefix="/api")
 
-    def announce_saved(md_rel: str, revision: str, client_id: str | None) -> None:
-        announce(ChangeEvent("whiteboard", md_rel, revision, origin=client_id))
+    def announce_saved(md_rel: str, saved: Saved, client_id: str | None) -> dict[str, str]:
+        """Announce a save (and the ``.md``'s ``lastUpdated`` bump); return the response."""
+        announce(ChangeEvent("whiteboard", md_rel, saved.revision, origin=client_id))
+        if saved.md_bumped:
+            announce(ChangeEvent("changed", md_rel, saved.md_version, origin=client_id))
+        return {"revision": saved.revision, "mdVersion": saved.md_version}
 
     @api.get("/whiteboard")
     def get_board(path: str):
@@ -120,11 +129,10 @@ def whiteboard_router(
     @api.put("/whiteboard")
     def put_board(req: SaveBoardRequest):
         try:
-            revision = save_board(space, req.path, req.board, req.baseRevision)
+            saved = save_board(space, req.path, req.board, req.baseRevision)
         except _HANDLED as exc:
             return _failure(exc, req.path)
-        announce_saved(space._rel(req.path), revision, req.clientId)
-        return {"revision": revision}
+        return announce_saved(space._rel(req.path), saved, req.clientId)
 
     @api.get("/whiteboard/ink")
     def get_ink(path: str):
@@ -136,11 +144,10 @@ def whiteboard_router(
     @api.put("/whiteboard/ink")
     def put_ink(req: SaveInkRequest):
         try:
-            revision = save_ink(space, req.path, req.strokes, req.baseRevision)
+            saved = save_ink(space, req.path, req.strokes, req.baseRevision)
         except _HANDLED as exc:
             return _failure(exc, req.path)
-        announce_saved(space._rel(req.path), revision, req.clientId)
-        return {"revision": revision}
+        return announce_saved(space._rel(req.path), saved, req.clientId)
 
     @api.post("/whiteboards", status_code=201)
     def post_whiteboard(req: CreateWhiteboardRequest):
