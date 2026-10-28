@@ -169,6 +169,20 @@ function round(n: number, places: number): number {
   return Object.is(r, -0) ? 0 : r
 }
 
+/** The file's point limit per stroke (`whiteboardink.MAX_POINTS`); one save over it fails. */
+export const MAX_STROKE_POINTS = 20_000
+
+/**
+ * A drawn path cut into pieces of at most `max` points, each starting at the previous piece's
+ * last point so the line stays unbroken.
+ */
+export function splitPoints<T>(points: readonly T[], max = MAX_STROKE_POINTS): T[][] {
+  if (points.length <= max) return [points.slice()]
+  const out: T[][] = []
+  for (let start = 0; start < points.length - 1; start += max - 1) out.push(points.slice(start, start + max))
+  return out
+}
+
 /** A finished stroke: points rounded as the file stores them, outline computed with `last`. */
 export function finishStroke(
   id: string,

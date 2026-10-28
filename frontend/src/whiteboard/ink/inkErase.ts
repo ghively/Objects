@@ -1,8 +1,14 @@
-import { finishStroke, newStrokeId, pointSegDist2, segSegDist2, segments, strokeBounds, strokePointerType } from './inkModel'
+import {
+  finishStroke,
+  MAX_STROKE_POINTS as MAX_POINTS,
+  newStrokeId,
+  pointSegDist2,
+  segSegDist2,
+  segments,
+  strokeBounds,
+  strokePointerType,
+} from './inkModel'
 import type { InkStroke } from './types'
-
-/** The file's point limit per stroke (`whiteboardink.MAX_POINTS`). */
-const MAX_POINTS = 20_000
 
 type P = [number, number, number]
 
