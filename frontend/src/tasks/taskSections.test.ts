@@ -3,6 +3,7 @@ import type { Row } from '@/api/types'
 import { FULL_VIEW_LAYOUTS } from '@/views/model'
 import { TASK_SECTIONS, TASK_SECTION_KEYS, sectionRows } from './taskSections'
 import { groupRows } from '@/views/group'
+import { useSettings } from '@/settings/useSettings'
 import { TASK_TYPE, taskRow } from './taskFixtures'
 
 // Monday 2026-10-26, noon local.
@@ -137,5 +138,20 @@ describe('taskSections', () => {
   test('test completed preset: done, newest completion first', () => {
     expect(paths('completed')).toEqual(['DoneToday', 'DoneOld', 'DeadlineDone'])
     expect(TASK_SECTIONS.completed.preset(NOW).sorts).toEqual([{ propertyId: 'completed', option: 'descending' }])
+  })
+})
+
+describe('taskSections in the Time zone setting', () => {
+  test('Today holds the tasks of today in the Time zone setting', () => {
+    const settings = useSettings.getState().settings
+    useSettings.setState({ settings: { ...settings, timeZone: 'Pacific/Auckland' } })
+    try {
+      // 2026-10-29T01:00Z is 29 Oct 14:00 in Auckland (still the 28th west of UTC).
+      const now = new Date('2026-10-29T01:00:00Z')
+      const rows = [taskRow('Tasks/Due.md', { status: ['Not Started'], date: day('2026-10-29') })]
+      expect(sectionRows('today', rows, TASK_TYPE, now).map((r) => r.summary.path)).toEqual(['Tasks/Due.md'])
+    } finally {
+      useSettings.setState({ settings })
+    }
   })
 })
