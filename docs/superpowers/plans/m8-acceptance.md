@@ -12,6 +12,7 @@ Plan: `2026-10-27-m8-deferred-features.md`, Task 31. Date: 2026-10-27/28. This w
 | Lint | `cd frontend && npm run lint` | not run: there is no `eslint.config` in `frontend/` (Task 3 reported the same) |
 | Build | `cd frontend && npm run build` | built (`dist/`); one INEFFECTIVE_DYNAMIC_IMPORT notice for `whiteboard/turnInto.ts` |
 | M8 acceptance | `uv run python scripts/m8_acceptance.py backend/tests/fixtures/<space>` on `space-m8`, `space-blocks`, `space-sample`, `space-v1`, `space-calendar`, `space-links`, `space-whiteboard` | PASS on each, the editor round trip included |
+| Gate after the 2026-10-28 fixes | the same commands | back end 1122 passed, 1 skipped (the first full run had 1 failure in the load-sensitive `test_search_p95_under_50ms_at_5000`, which passed alone and in the rerun of the full suite); front end 1678 passed, 1 skipped, green in two full runs in a row; `tsc` clean; build ok; `m8_acceptance.py` PASS on `space-sample` |
 | Earlier milestones | `m1_roundtrip.py`, `m2_acceptance.py` … `m7_acceptance.py` on `space-sample` and `space-v1` | PASS (after `m4_acceptance.py` was updated; see below) |
 
 Step 1's stub check: `NotBuiltYet` is used outside `lib/notBuilt.ts` and tests only as a guard in the editor (`editor/turnInto.ts` throws it if `whiteboard/turnInto.ts` were missing; the menus catch it). Every Task 3 stub has been filled, so the guard never fires.
@@ -87,6 +88,19 @@ These are the gaps the lanes reported. Each is fixed and tested.
 - **A stale test.** `editor/Editor.test.tsx` still asserted that raw mode has no find control. It now checks the M8 behaviour: raw mode has find, with 2 matches.
 - **`scripts/m4_acceptance.py`.** The recurring-completion diff may now include `occurrenceLog`, by M8 design (Task 11). The script did not allow that key before.
 - **New test.** `frontend/src/noNetwork.m8.test.ts` adds `test no network calls in m8 sources`. No `fetch`, `import()`, `EventSource`, `WebSocket` or `sendBeacon` call targets an `http(s)://` or `//` URL. There is no `XMLHttpRequest`, `WebSocket` or `sendBeacon` outside `api/`. Every `fetch` outside `api/` goes to a same-origin `/api` path.
+
+### Review findings fixed (2026-10-28)
+
+Each fix has a test that failed before it and passes after.
+
+- **Remove date lost a recurring task's history (fixed 2026-10-28).** "Remove date" removed `occurrenceLog` in the same write without asking. With a non-empty log it now asks first: "Remove date?", "This recurring task already has completed or skipped occurrences. Removing the date will discard its history.", "Keep date" / "Remove date". All four strings are the reference's own `DatePicker.dateRemoveConfirm.*`, so no "our choice" is needed (the dialog has the same shape as Repeat's "Remove recurrence?"). Test: `DatePicker.test.tsx` "test remove date asks first when the recurring task has history".
+- **The permanent space delete's re-check was ineffective (fixed 2026-10-28).** It compared the folder's identity within one request. The 428 now returns the folder's identity token (`folder`: `st_dev:st_ino`). `DeleteSpaceDialog` sends it back with `permanent: true`, and the route answers 409, deleting nothing, when the folder at the path is another one. The in-request re-check stays. Tests: `test_spaces_m8.py` `test_permanent_delete_refuses_folder_replaced_after_428` and `test_permanent_delete_with_matching_token_deletes`, plus `DeleteSpaceDialog.test.tsx` and `client.m8.test.ts`.
+- **Checkbox menu label (fixed 2026-10-28).** The recurring task's checkbox menu says "Excuse" (`RootTaskCheckbox.menu.excuseRecurrence`) with its tooltip. "Excuse for {date}" stays only on the overdue dialog's button.
+- **Completion Log UI (fixed 2026-10-28).** "Completion Log" (`components.RootTask.occurrenceLog.heading`) now sits under Task Stats and lists the entries newest first: the scheduled date and Completed, Skipped or Excused, with the action time as the tooltip. Each entry has a delete button. It asks "Delete completion log entry" / "This log entry will be permanently removed from the completion history.", with "Cancel" / "Delete" (`general.*`; the reference gives no buttons for this dialog). It then writes the remaining lines through `updateProperties`. Unparseable lines are kept. Deleting the last line removes the key. On the back end, a text value written over a literal block (`|-`) now keeps the block style, so the file changes only by that entry's line, plus the `lastUpdated` stamp every property edit writes. Tests: `test_tasks_api.py` `test_delete_log_entry_changes_only_its_line` (CRLF file, byte diff), `CompletionLog.test.tsx`, `ObjectView.m8.test.tsx`.
+- **The overdue check used the device's zone (fixed 2026-10-28).** `maybeOverdue` now takes today from `zonedToday()` and a time date's day in the setting's zone, as `calendar/dates.ts` `todayYmd` does. Test: `taskActions.test.ts` "test maybe overdue uses the time zone setting" (Los Angeles and Kiritimati on different days at the same instant).
+- **Red test: the palette's actions list (fixed 2026-10-28).** The 12th action, "Toggle focus mode", came with `957f5ac` (feat(palette)). It belongs: Task 17 lists it and the reference has `CommandPalette.actions.options.toggleFocusMode`. The test now expects it and checks what it does.
+- **Flaky test: the search page results (fixed 2026-10-28).** The test waited for the debounced search and the chained row load with the testing library's 1 s default, then read the rows synchronously. It now waits for each step (up to 5 s) and checks rows, order and snippet in one `waitFor`. The checks are unchanged. With the row load delayed by 1.2 s, the old test fails and the new one passes.
+- **Timing noise: the 1MB split (fixed 2026-10-28).** The test now does one full warm-up run, then asserts that the best of 5 timed runs is under 300 ms. The threshold is unchanged.
 
 ### Headless walkthrough (Step 4)
 
@@ -287,6 +301,7 @@ Run these on his CPI copy outside the repo, with `git init` and a first commit d
 ### Interactions the headless walkthrough did not drive
 
 - [ ] Skip and Excuse from the checkbox menu, the overdue dialog (all choices), the custom repeat "On" row, and a reminder on a deadline.
+- [ ] The Completion Log under Task Stats (deleting one entry changes only its line), and "Remove date" on a recurring task with history asking first.
 - [ ] Save as Query, the palette's paste and space actions, backlink modes and the backlinks side panel (drag to swap), graph PNG export, and find and replace in raw mode.
 - [ ] The merge dialog (object and tag), and version history with preview and restore.
 - [ ] Whiteboards:
