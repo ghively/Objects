@@ -73,6 +73,48 @@ describe('DatePicker', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Remove date' }))
     expect(onChange).toHaveBeenCalledWith(null)
   })
+
+  it('test remove date asks first when the recurring task has history', async () => {
+    const onTaskChange = vi.fn()
+    const value = { start: '2026-10-30', resolution: 'day' as const }
+    const { unmount } = render(
+      <DatePicker
+        value={value}
+        onChange={() => {}}
+        now={NOW}
+        task={{ repeat: 'every day', remind: null, occurrenceLog: '2026-10-24 completed 2026-10-24T07:55:10Z' }}
+        onTaskChange={onTaskChange}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Remove date' }))
+    expect(onTaskChange).not.toHaveBeenCalled()
+    const confirm = screen.getByRole('alertdialog', { name: 'Remove date?' })
+    expect(confirm).toHaveTextContent(
+      'This recurring task already has completed or skipped occurrences. Removing the date will discard its history.',
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Keep date' }))
+    expect(onTaskChange).not.toHaveBeenCalled()
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove date' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove date' }))
+    expect(onTaskChange).toHaveBeenCalledWith({ date: null, repeat: null, remind: null })
+    unmount()
+
+    // Without history it removes at once.
+    onTaskChange.mockClear()
+    render(
+      <DatePicker
+        value={value}
+        onChange={() => {}}
+        now={NOW}
+        task={{ repeat: 'every day', remind: null, occurrenceLog: null }}
+        onTaskChange={onTaskChange}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Remove date' }))
+    expect(onTaskChange).toHaveBeenCalledWith({ date: null, repeat: null, remind: null })
+  })
 })
 
 describe('parseDateInput', () => {
