@@ -121,7 +121,7 @@ Task 19 found no contract gaps (every M7 route has a client method with a caller
 - **Light mode** (tokens from the shipped CSS), **settings modal** completeness for local options, **spaces** (create, switch, rename).
 - **Final side-by-side fidelity pass** against Object on every screen.
 
-### M8: deferred Object features (planned 2026-10-27; not built)
+### M8: deferred Object features (built 2026-10-27/28; awaiting Gene's hands-on check)
 
 Gene asked on 2026-10-27 for every Object feature that M4–M7 deferred, local only. Plan: `2026-10-27-m8-deferred-features.md` (31 tasks in five lanes: A foundation and app, T tasks and calendar, S search and references, W whiteboard, E editor blocks, then integrate). New dependencies, installed by its Task 1 only: `highlight.js` 11.11.1, `html-to-image` 1.11.11, `tzdata` 2026.5, `send2trash` 2.1.0. Its "Coverage" section maps every deferred item to a task or to a spec §2 exclusion.
 
@@ -131,7 +131,16 @@ Gene asked on 2026-10-27 for every Object feature that M4–M7 deferred, local o
 - **Editor:** block references and Copy block reference, inline text colour and highlight in a tokens menu, indenting any block, per-list-item styles, table formulas, sorting and CSV export, Turn into object/task, code syntax highlighting, Mermaid PNG/SVG export, live collection and query embeds, audio recording (no transcription).
 - **App:** version history for objects and whiteboards, focus mode and its timer, object presentation mode, deleting a space folder (OS trash or confirmed delete), "Start with basic setup", and working Language (formatting locale; strings stay English), Decimal separator and Time zone settings.
 - **Still out (spec §2):** AI (semantic related content, AI chat, Mermaid AI, transcription), anything that needs the network at runtime (calendar feeds and task integrations, Readwise, web-embed and bookmark metadata fetching, help and feedback actions), accounts/sync/sharing and the account onboarding tour, mobile, telemetry.
-- Gene's hand-checks for M8 will be in `m8-acceptance.md` (written by the plan's Task 31), unchecked.
+- **Built.** All 31 tasks are committed. Task 31 checked the milestone with `scripts/m8_acceptance.py`, which passes on all seven fixture spaces, editor round trip included. `m1`–`m7` also pass on `space-sample` and `space-v1`. The full back-end and front-end suites, `tsc` and the build are green.
+- Task 31 finished the wiring the lanes left open:
+  - the week start now reaches recurrence in the completion hook and the calendar
+  - board relinks are versioned
+  - recordings are saved as `.weba`, so they play back as audio
+  - the client fallbacks are gone
+  - the slash dates and the Timeline follow the time zone setting
+  - Task Stats shows only on recurring tasks
+  - raw colour literals were replaced with tokens
+- Results, the "our choice" list and Gene's unchecked hand-checks are in `m8-acceptance.md`.
 
 ## Out of scope (by design)
 

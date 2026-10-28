@@ -14,8 +14,8 @@ const CELL_STYLE: Record<CellState, { background?: string; border?: string }> = 
   excused: { background: lineColor('blue') },
   skipped: { background: lineColor('yellow') },
   missed: { background: lineColor('red') },
-  future: { border: '1.5px dashed var(--fg-muted, currentColor)' },
-  none: { background: 'var(--hover, rgba(127,127,127,0.15))' },
+  future: { border: '1.5px dashed var(--text-muted)' },
+  none: { background: 'var(--bg-hover)' },
 }
 
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {

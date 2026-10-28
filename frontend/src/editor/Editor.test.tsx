@@ -600,11 +600,14 @@ describe('<Editor> find in page', () => {
     expect(find.status().count).toBe(2)
   })
 
-  test('raw mode offers no find control', () => {
+  test('raw mode offers a find control (M8)', () => {
     const ref = { current: null as BodyEditorHandle | null }
-    render(<RawMode path="Pages/Find.md" text="alpha" version="v1" onSaved={() => {}} controlRef={ref} />)
+    render(<RawMode path="Pages/Find.md" text="alpha beta alpha" version="v1" onSaved={() => {}} controlRef={ref} />)
     expect(ref.current).not.toBeNull()
-    expect(ref.current!.find).toBeUndefined()
+    const find = ref.current!.find
+    expect(find).toBeDefined()
+    find!.set('alpha')
+    expect(find!.status().count).toBe(2)
   })
 })
 

@@ -367,6 +367,7 @@ def relink_board_file(
             if _version(full) != base:
                 raise _Changed
 
+        space._call_before_write(rel, data)  # M8 version history (never raises)
         previous = space.own_writes.get(rel)
         space.own_writes[rel] = new_version
         try:

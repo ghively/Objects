@@ -5,7 +5,7 @@
  * `recordAudio(editor)` asks for the microphone (`getUserMedia({audio: true})`),
  * shows the recorder chip (`AudioRecorder`: elapsed time, pause, stop, cancel)
  * by the cursor, and resolves when the recording ends:
- * - Stop: the audio is uploaded as `Attachments/Recording <YYYY-MM-DD HH-MM>.webm`
+ * - Stop: the audio is uploaded as `Attachments/Recording <YYYY-MM-DD HH-MM>.weba`
  *   (the local start time; the server never overwrites, so a second recording
  *   in the same minute gets its own name) and a media block for it is inserted
  *   below the block the cursor was in when recording started (the position is
@@ -27,9 +27,9 @@ export { RECORD_TEXT, elapsedText, type RecordingControls } from './AudioRecorde
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
-/** The attachment name for a recording started at `d` (local time): `Recording YYYY-MM-DD HH-MM.webm`. */
+/** The attachment name for a recording started at `d` (local time): `Recording YYYY-MM-DD HH-MM.weba` (WebM audio; `.webm` would read back as video). */
 export function recordingFileName(d: Date): string {
-  return `Recording ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}-${pad(d.getMinutes())}.webm`
+  return `Recording ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}-${pad(d.getMinutes())}.weba`
 }
 
 let active: Promise<void> | null = null

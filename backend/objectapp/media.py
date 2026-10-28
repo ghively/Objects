@@ -193,6 +193,7 @@ AUDIO_MEDIA_TYPES = {
     ".flac": "audio/flac",
     ".aac": "audio/aac",
     ".opus": "audio/opus",
+    ".weba": "audio/webm",  # M8: audio recordings (WebM audio)
 }
 VIDEO_MEDIA_TYPES = {
     ".mp4": "video/mp4",

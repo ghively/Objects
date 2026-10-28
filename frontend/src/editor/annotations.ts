@@ -319,7 +319,7 @@ const KIND_BY_EXT: Record<string, AttachmentKind> = {}
 for (const [kind, exts] of [
   ['image', 'png jpg jpeg gif webp svg'],
   ['pdf', 'pdf'],
-  ['audio', 'mp3 wav m4a ogg oga flac aac opus'],
+  ['audio', 'mp3 wav m4a ogg oga flac aac opus weba'],
   ['video', 'mp4 webm mov m4v ogv'],
 ] as const) {
   for (const ext of exts.split(' ')) KIND_BY_EXT[ext] = kind

@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING, Any
 from .dailynotes import parse_day
 from .localtime import to_local
 from .propvalues import InvalidValue, decode_value
-from .recurrence import occurrences
+from .recurrence import occurrences, week_start_of
 from .taskhook import DONE, _category, status_key_of
 from .taskmodel import parse_repeat
 from .typemodel import PropertyDefinition, TypeDefinition, is_task_type
@@ -78,6 +78,7 @@ class _Query:
         self.end = end
         self.tz = space.tz
         self.today = to_local(space.clock(), space.tz).date()
+        self.week_start = week_start_of(space.root)
         self.days: dict[str, dict[str, Any]] = {}
         d = start
         while d <= end:
@@ -328,7 +329,7 @@ class _Query:
             if current.tzinfo is None:
                 current = current.replace(tzinfo=UTC)
         added = False
-        for occ in occurrences(rule, current, lo, self.end, self.tz):
+        for occ in occurrences(rule, current, lo, self.end, self.tz, week_start=self.week_start):
             d = self._local_day(occ) if isinstance(occ, datetime) else occ
             if first <= d <= last:
                 continue  # never duplicate the real date

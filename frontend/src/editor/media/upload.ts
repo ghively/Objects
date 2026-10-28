@@ -25,7 +25,7 @@ export const UPLOAD_LIMIT_MESSAGE =
 export const ACCEPT: Record<AttachmentKind, string> = {
   image: 'image/*,.png,.jpg,.jpeg,.gif,.webp,.svg',
   pdf: 'application/pdf,.pdf',
-  audio: 'audio/*,.mp3,.wav,.m4a,.ogg,.oga,.flac,.aac,.opus',
+  audio: 'audio/*,.mp3,.wav,.m4a,.ogg,.oga,.flac,.aac,.opus,.weba',
   video: 'video/*,.mp4,.webm,.mov,.m4v,.ogv',
   file: '',
 }

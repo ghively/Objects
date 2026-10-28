@@ -11,6 +11,8 @@ import { api } from '@/api/client'
 import type { AttachmentKind, Collection, Query, TypeDef } from '@/api/types'
 import { useDefs } from '@/types/useDefinitions'
 import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
+import { zonedToday } from '@/lib/zonedTime'
+import { addDays as addDayStr } from '@/calendar/dates'
 import { recordAudio } from '../media/recordAudio'
 import { showToast } from '../media/upload'
 import { couldBeDate, parseDate } from './parseDate'
@@ -194,12 +196,6 @@ export function typedDateItems(query: string, today: string): SlashItem[] {
   ]
 }
 
-function addDays(d: Date, n: number): Date {
-  const out = new Date(d)
-  out.setDate(out.getDate() + n)
-  return out
-}
-
 /** The types offered in "Create an object" (whiteboards are created from "+ New"). */
 export function creatableTypes(types: TypeDef[]): TypeDef[] {
   return types.filter((t) => !isWhiteboardType(t))
@@ -215,6 +211,8 @@ async function createAndLink(e: Editor, type: TypeDef, title: string): Promise<v
 /** Every section for `ctx`, unfiltered. */
 export function slashSections(ctx: SlashContext): SlashSection[] {
   const now = () => ctx.now ?? new Date()
+  // Today in the Time zone setting (M8); a test's fixed `now` is read as a local date.
+  const today = () => (ctx.now ? dailyNoteTitle(ctx.now) : zonedToday())
   const title = ctx.query.trim()
   const defs = useDefs.getState()
   const collections = ctx.collections ?? defs.collections ?? []
@@ -235,17 +233,17 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
       id: 'dates',
       label: SLASH_TEXT.dates,
       items: [
-        ...typedDateItems(ctx.query, dailyNoteTitle(now())),
+        ...typedDateItems(ctx.query, today()),
         // ControlDropdown.custom.entity_dailyNote_*, token_date, token_time
-        block('today', 'Today', "Add a link to today's daily note", 'ph-calendar-blank', (e) => insertLink(e, dailyNoteTitle(now()))),
+        block('today', 'Today', "Add a link to today's daily note", 'ph-calendar-blank', (e) => insertLink(e, today())),
         block('tomorrow', 'Tomorrow', "Add a link to tomorrow's daily note", 'ph-calendar-plus', (e) =>
-          insertLink(e, dailyNoteTitle(addDays(now(), 1))),
+          insertLink(e, addDayStr(today(), 1)),
         ),
         block('yesterday', 'Yesterday', "Add a link to yesterday's daily note", 'ph-calendar-minus', (e) =>
-          insertLink(e, dailyNoteTitle(addDays(now(), -1))),
+          insertLink(e, addDayStr(today(), -1)),
         ),
         block('dateLink', 'Today - date link', "Add a link to today's date.", 'ph-calendar-check', (e) =>
-          insertDateToken(e, dailyNoteTitle(now())),
+          insertDateToken(e, today()),
         ),
         block('timestamp', 'Now – timestamp', 'Add a timestamp with the current time', 'ph-clock', (e) => {
           e.chain().focus().insertContent(timestampText(now(), ctx.twentyFourHourTime)).run()

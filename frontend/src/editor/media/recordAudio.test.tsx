@@ -73,7 +73,7 @@ function mount(body: string): TiptapEditor {
 
 describe('recordAudio', () => {
   test('test recording file name and elapsed text', () => {
-    expect(recordingFileName(new Date(2026, 9, 27, 9, 5))).toBe('Recording 2026-10-27 09-05.webm')
+    expect(recordingFileName(new Date(2026, 9, 27, 9, 5))).toBe('Recording 2026-10-27 09-05.weba')
     expect(elapsedText(0)).toBe('0:00')
     expect(elapsedText(65_400)).toBe('1:05')
     expect(elapsedText(3_725_000)).toBe('1:02:05')
@@ -109,10 +109,10 @@ describe('recordAudio', () => {
     })
     expect(mocked.uploadAttachment).toHaveBeenCalledTimes(1)
     const [blob, name] = mocked.uploadAttachment.mock.calls[0]
-    expect(name).toBe('Recording 2026-10-27 14-03.webm')
+    expect(name).toBe('Recording 2026-10-27 14-03.weba')
     expect((blob as Blob).size).toBe(3)
     expect((blob as Blob).type).toBe('audio/webm')
-    expect(serializeBody(editor)).toBe('Zero First\n\n![[Attachments/Recording 2026-10-27 14-03.webm]]\n\nSecond\n')
+    expect(serializeBody(editor)).toBe('Zero First\n\n![[Attachments/Recording 2026-10-27 14-03.weba]]\n\nSecond\n')
     expect(trackStop).toHaveBeenCalled()
     expect(isRecording()).toBe(false)
     await waitFor(() => expect(screen.queryByTestId('audio-recorder')).toBeNull())
