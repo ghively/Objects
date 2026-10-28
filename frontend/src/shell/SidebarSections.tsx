@@ -1,16 +1,21 @@
 // Custom sidebar sections (such as "In Progress"): rendered above Pinned, each with its icon and
 // name as heading, the same items as Pinned, "Edit Section" / "Delete Section" on the heading and
-// an "Add Section" control.
-import { useEffect, useState } from 'react'
+// an "Add Section" control. M9: the top-level blocks (these sections, Pinned, the object types)
+// follow `ui.workspaceOrder` and are reordered by dragging.
+import { useEffect, useState, type ReactNode } from 'react'
+import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { api, ConflictError } from '@/api/client'
 import type { Icon as IconValue, SidebarSection } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
 import { Button } from '@/components/ui/button'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { PinList, type OpenTarget } from './PinnedSection'
+import { cn } from '@/lib/utils'
+import { PinList, PinnedSection, type OpenTarget } from './PinnedSection'
 import { PINNED_TEXT } from './pinText'
-import { usePinned } from './usePinned'
+import { enqueueUiSave, pendingUiSaves, usePinned, useUiStore } from './usePinned'
 
 export const SECTION_TEXT = {
   add: 'Add Section',
@@ -134,6 +139,121 @@ export function SidebarSections({ onOpenTarget }: { onOpenTarget?: OpenTarget })
         <Section key={s.id} section={s} onOpenTarget={onOpenTarget} />
       ))}
     </>
+  )
+}
+
+// ---- workspaceOrder (M9) ----
+
+/** `RootSpace.workspaceOrder`'s ids of the two fixed blocks; the others are custom section ids. */
+export const WORKSPACE_OBJECTS = 'objects'
+export const WORKSPACE_PINNED = 'pinned'
+
+/** Our string: the drag handle's name (Object drags the heading itself). */
+export const REORDER_HANDLE = (name: string) => `Reorder ${name}`
+
+/**
+ * The sidebar's top-level blocks in order: the ids `workspaceOrder` lists (unknown ids ignored),
+ * then the missing ones in their default place: the custom sections, Pinned, the object types.
+ */
+export function workspaceBlocks(order: unknown, sectionIds: string[]): string[] {
+  const known = [...sectionIds, WORKSPACE_PINNED, WORKSPACE_OBJECTS]
+  const listed = Array.isArray(order) ? order.filter((id): id is string => typeof id === 'string' && known.includes(id)) : []
+  const head = [...new Set(listed)]
+  return [...head, ...known.filter((id) => !head.includes(id))]
+}
+
+/** Save `workspaceOrder` (optimistic, after the `ui.json` saves before it; a 409 re-applies it once to the fresh state). */
+export function saveWorkspaceOrder(order: string[]): Promise<void> {
+  const cur = useUiStore.getState().ui
+  useUiStore.setState({ ui: { ...cur, workspaceOrder: order } })
+  return enqueueUiSave(async () => {
+    try {
+      const base = useUiStore.getState()
+      try {
+        const res = await api.patchUi({ workspaceOrder: order }, { baseRevision: base.revision })
+        useUiStore.setState({ revision: res?.revision ?? useUiStore.getState().revision })
+      } catch (e) {
+        if (!(e instanceof ConflictError)) throw e
+        const fresh = await api.ui()
+        const res = await api.patchUi({ workspaceOrder: order }, { baseRevision: fresh?.revision ?? '' })
+        // Another writer's unsaved edits are in the local ui, not in `fresh`: keep them.
+        const rest = pendingUiSaves() === 1 && fresh?.ui ? fresh.ui : useUiStore.getState().ui
+        useUiStore.setState({ ui: { ...rest, workspaceOrder: order }, revision: res?.revision ?? fresh?.revision ?? '' })
+      }
+    } catch (e) {
+      console.warn('Could not save the sidebar order:', e)
+    }
+  })
+}
+
+/** One block with a drag handle that shows on hover, at its heading's left. */
+function SortableBlock({ id, label, children }: { id: string; label: string; children: ReactNode }) {
+  const s = useSortable({ id })
+  return (
+    <div
+      ref={s.setNodeRef}
+      data-workspace-block={id}
+      style={{ transform: s.transform ? `translate3d(0, ${Math.round(s.transform.y)}px, 0)` : undefined, transition: s.transition }}
+      className={cn('group/wb relative', s.isDragging && 'z-10 opacity-80')}
+    >
+      <button
+        type="button"
+        {...s.attributes}
+        {...s.listeners}
+        aria-label={REORDER_HANDLE(label)}
+        title={REORDER_HANDLE(label)}
+        className="absolute top-5 -left-2.5 flex h-5 w-3 cursor-grab items-center justify-center rounded text-fg-muted opacity-0 group-hover/wb:opacity-100 focus-visible:opacity-100"
+      >
+        <Icon name="ph-dots-six-vertical" size={12} />
+      </button>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * The sidebar's top-level blocks (custom sections, Pinned with "Add Section", the object types)
+ * in `ui.workspaceOrder`, each draggable by its handle; a drop saves the new order.
+ */
+export function WorkspaceSections({ onOpenTarget, objects }: { onOpenTarget?: OpenTarget; objects: ReactNode }) {
+  const { sections } = usePinned()
+  const order = useUiStore((st) => st.ui.workspaceOrder)
+  const blocks = workspaceBlocks(order, sections.map((x) => x.id))
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  const onDragEnd = (e: DragEndEvent) => {
+    const from = blocks.indexOf(String(e.active.id))
+    const to = e.over ? blocks.indexOf(String(e.over.id)) : -1
+    if (from < 0 || to < 0 || from === to) return
+    void saveWorkspaceOrder(arrayMove(blocks, from, to))
+  }
+  const render = (id: string) => {
+    if (id === WORKSPACE_OBJECTS) return objects
+    if (id === WORKSPACE_PINNED) {
+      return (
+        <>
+          <PinnedSection onOpenTarget={onOpenTarget} />
+          <AddSection />
+        </>
+      )
+    }
+    const section = sections.find((x) => x.id === id)
+    return section ? <Section section={section} onOpenTarget={onOpenTarget} /> : null
+  }
+  const label = (id: string) =>
+    id === WORKSPACE_OBJECTS ? 'Object Types' : id === WORKSPACE_PINNED ? PINNED_TEXT.heading : (sections.find((x) => x.id === id)?.name ?? id)
+  return (
+    <DndContext id="workspace-order" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <SortableContext items={blocks} strategy={verticalListSortingStrategy}>
+        {blocks.map((id) => (
+          <SortableBlock key={id} id={id} label={label(id)}>
+            {render(id)}
+          </SortableBlock>
+        ))}
+      </SortableContext>
+    </DndContext>
   )
 }
 

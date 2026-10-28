@@ -3,6 +3,7 @@ import type { Row } from '@/api/types'
 import type { LayoutProps } from '../DataView'
 import { cardProperties } from '../cards/cardConfig'
 import { SmallCard } from '../cards/SmallCard'
+import { cn } from '@/lib/utils'
 
 export function CardItem({ layout, row, hide, className }: { layout: LayoutProps; row: Row; hide?: string[]; className?: string }) {
   const type = layout.typesById[row.summary.type]
@@ -10,16 +11,25 @@ export function CardItem({ layout, row, hide, className }: { layout: LayoutProps
     ? cardProperties(type, layout.state.viewDefinition)
     : [{ propertyType: 'entity_title', propertyId: 'title' }]
   const extras = layout.rowExtras?.(row)
-  return (
+  const selected = layout.isSelected?.(row.summary.path) ?? false
+  const card = (
     <SmallCard
       row={row}
       type={type}
       props={props}
       hide={hide}
       onOpen={layout.onOpen}
-      className={className}
+      className={cn(className, selected && 'bg-[var(--block-selection-bg)]')}
       leading={extras?.leading}
       trailing={extras?.trailing}
     />
+  )
+  // M9: a selected card ("Select multiple") is marked by a box-less wrapper, so the grid is unchanged.
+  return selected ? (
+    <div data-selected="" className="contents">
+      {card}
+    </div>
+  ) : (
+    card
   )
 }
