@@ -158,6 +158,41 @@ describe('numbered lists', () => {
   })
 })
 
+describe('edits that only add whitespace or a hard break', () => {
+  test('trailing spaces typed in a code block are saved', () => {
+    const editor = headless('```\nfoo\n```\n')
+    append(editor, 'foo', '   ')
+    expect(serializeBody(editor)).toBe('```\nfoo   \n```\n')
+  })
+
+  test('indenting an empty line in a code block is saved', () => {
+    const editor = headless('```\nfoo\n\nbar\n```\n')
+    const f = find(editor, 'foo', 'codeBlock')
+    editor.view.dispatch(editor.state.tr.insertText('    ', f.pos + 1 + 'foo\n'.length))
+    expect(serializeBody(editor)).toBe('```\nfoo\n    \nbar\n```\n')
+  })
+
+  test('turning a line break into a hard break (Shift-Enter) is saved', () => {
+    const editor = headless('a\nb\n')
+    const f = find(editor, 'a')
+    const at = f.pos + 1 + f.node.textContent.indexOf('\n')
+    editor.view.dispatch(editor.state.tr.replaceWith(at, at + 1, editor.schema.nodes.hardBreak.create()))
+    const saved = serializeBody(editor)
+    expect(saved).toBe('a  \nb\n')
+    let breaks = 0
+    headless(saved).state.doc.descendants((n) => {
+      if (n.type.name === 'hardBreak') breaks++
+    })
+    expect(breaks).toBe(1)
+  })
+
+  test('an edit on one line keeps the other lines exactly, trailing spaces included', () => {
+    const editor = headless('one   \ntwo\n')
+    append(editor, 'two', 'X')
+    expect(serializeBody(editor)).toBe('one   \ntwoX\n')
+  })
+})
+
 describe('headings', () => {
   test.each([
     [' #', '## Title \\#'],
