@@ -4,8 +4,8 @@
  * `@tiptap/markdown` backslash-escapes inline delimiters (`*`, `_`, `` ` ``,
  * `[`, `~`) in text, but not what only means something at the start of a line
  * or in a heading: `# x`, `- x`, `1. x`, `2024. was good`, `---`, a `===` line
- * after a hard break, `$$` (a math block) and a `$b$` pair (inline math).
- * Text typed or pasted with any
+ * after a hard break, `$$` (a math block), a `$b$` pair (inline math) and a
+ * heading's trailing ` #` (a closing sequence). Text typed or pasted with any
  * of those came back as another block. These escapes are added to paragraphs
  * and headings, and only where the text would otherwise be read differently.
  */
@@ -13,7 +13,7 @@ import type { AnyExtension, JSONContent } from '@tiptap/core'
 import { findInlineMath } from './annotations'
 
 /** Stands for a `$` typed in text while a block is rendered (private use). */
-const DOLLAR = ''
+const DOLLAR = String.fromCharCode(0xe000)
 
 const CODE_MARKS = new Set(['code'])
 
@@ -67,6 +67,11 @@ export function escapeLineStarts(md: string): string {
     .join('\n')
 }
 
+/** A heading's trailing `#` run reads as a closing sequence: escape its first `#`. */
+export function escapeHeadingEnd(md: string): string {
+  return md.replace(/(^|[ \t])(#+[ \t]*)$/, '$1\\$2')
+}
+
 type Render = (node: JSONContent, h: unknown, ctx: unknown) => string
 
 /** `ext` (StarterKit's paragraph or heading) with these escapes in its Markdown. */
@@ -83,7 +88,9 @@ export function withTextEscapes<T extends AnyExtension>(ext: T): T {
     return ext.extend({
       renderMarkdown(this: { parent: Render | null }, node: JSONContent, h: unknown, ctx: unknown) {
         const md = this.parent?.({ ...node, content: markDollars(node.content) }, h, ctx) ?? ''
-        return restoreDollars(md)
+        if (!node.content?.length) return restoreDollars(md)
+        const prefix = /^#+ /.exec(md)?.[0] ?? ''
+        return prefix + restoreDollars(escapeHeadingEnd(md.slice(prefix.length)))
       },
     }) as unknown as T
   }
