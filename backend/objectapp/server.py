@@ -405,8 +405,11 @@ class SaveQueryRequest(BaseModel):
 
 
 _UI_PATCH_KEYS = frozenset(
-    {"pinned", "sections", "allNotesLayout", "calendar", "tasks", "reminders", "graph", "whiteboard"}
-)
+    {
+        "pinned", "sections", "allNotesLayout", "calendar", "tasks", "reminders", "graph",
+        "whiteboard", "workspaceOrder",
+    }
+)  # fmt: skip
 # RootSpace.model.ts `GraphViewCustomization`, verbatim.
 _GRAPH_LIST_KEYS = ("filterStructureIds", "excludeStructureIds")
 _GRAPH_BOOL_KEYS = (
@@ -636,6 +639,12 @@ def _ui_problem(patch: dict[str, Any]) -> str | None:
         problem = whiteboard_ui_problem(patch["whiteboard"])
         if problem:
             return problem
+    if "workspaceOrder" in patch:
+        order = patch["workspaceOrder"]
+        if not isinstance(order, list) or not all(isinstance(x, str) for x in order):
+            return "workspaceOrder must be a list of section ids."
+        if len(set(order)) != len(order):
+            return "workspaceOrder lists a section twice."
     return None
 
 
