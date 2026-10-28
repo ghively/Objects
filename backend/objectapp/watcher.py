@@ -321,9 +321,9 @@ class SpaceWatcher:
         version = version_of(data)
         # The file is back (restored or re-created): a pending own delete is stale.
         space.own_deletes.pop(rel, None)
-        own = space.own_writes.get(rel)
-        if own is not None and own != version:
-            space.own_writes.pop(rel, None)
+        # An own write is matched once, then forgotten (`known` keeps a repeat event
+        # for it quiet): a later external edit back to the same bytes is news.
+        own = space.own_writes.pop(rel, None)
         if version == known or version == own:
             if version != known:
                 space.rescan_file(rel)

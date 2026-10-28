@@ -328,3 +328,32 @@ def test_property_edit_in_a_mostly_lf_file_adds_lf_lines(space_dir: Path):
     space.update_properties("Pages/Alpha.md", {"description": "x"}, _version(space, "Pages/Alpha.md"))
     after = path.read_bytes()
     assert after.count(b"\r\n") == 1
+
+
+# -- the watcher forgets an own write once it has seen it -----------------------------------
+
+
+def test_watcher_reports_an_external_edit_back_to_an_earlier_own_write(space_dir: Path):
+    import asyncio
+
+    from objectapp.space import version_of
+    from objectapp.watcher import SpaceWatcher
+
+    rel = "Tasks/Fix printer.md"
+    target = space_dir / rel
+    space = Space(space_dir)
+    loop = asyncio.new_event_loop()
+    try:
+        watcher = SpaceWatcher(space, loop)  # not started: events are driven by hand
+        of, _fm, version = space.read(rel)
+        mine = space.save_body(rel, of.body + "Mine.\n", version)
+        assert watcher._refresh(rel) is None  # the app's own write: quiet
+        own_bytes = target.read_bytes()
+        target.write_bytes(own_bytes + b"external\n")
+        space.rescan_file(rel)  # the app picked the edit up before the watcher fired
+        target.write_bytes(own_bytes)  # ...and then it is undone externally
+        event = watcher._refresh(rel)
+        assert event is not None and (event.kind, event.version) == ("changed", mine)
+        assert version_of(target.read_bytes()) == mine
+    finally:
+        loop.close()
