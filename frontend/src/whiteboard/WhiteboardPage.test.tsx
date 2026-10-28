@@ -158,6 +158,13 @@ describe('WhiteboardPage', () => {
     expect(client.saveBoard.mock.calls[0][1].locked).toBeUndefined()
   })
 
+  test('a failed ink save shows a toast', async () => {
+    const { plugin } = fakeInk()
+    plugin.useInkDoc = () => ({ strokes: [], readOnlyReason: null, saveError: 'Could not save the ink. down', save: vi.fn(), flush: vi.fn(async () => {}) })
+    await renderPage({ ink: plugin })
+    expect(await screen.findByRole('status')).toHaveTextContent('Could not save the ink. down')
+  })
+
   test('clear whiteboard clears board and ink in one undo step', async () => {
     const { plugin, doc } = fakeInk([stroke('s1')])
     const b = board([node({ id: 'a' })])

@@ -48,6 +48,8 @@ export interface InkDoc {
   /** `null` while loading. */
   strokes: InkStroke[] | null
   readOnlyReason: string | null
+  /** The last save's failure ("Could not save the ink. …"), `null` once a save lands. */
+  saveError?: string | null
   /** Debounced 400 ms; merges by stroke id on 409. */
   save(next: InkStroke[]): void
   flush(): Promise<void>

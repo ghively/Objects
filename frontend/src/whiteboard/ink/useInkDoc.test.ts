@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { api, RevisionConflictError } from '@/api/client'
+import { api, ApiError, RevisionConflictError } from '@/api/client'
 import type { ChangeEvent } from '@/api/types'
 import { useInkDoc } from './useInkDoc'
 import type { InkResponse, InkStroke } from './types'
@@ -159,6 +159,50 @@ describe('useInkDoc', () => {
     await advance(400)
     await settle()
     expect(client.save.mock.calls[2][2]).toBe('r6')
+  })
+
+  test('a failed ink save reports it, keeps the strokes and retries with a growing delay', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const client = fakeClient({ path: PATH, strokes: [], revision: 'r1' })
+    const { result } = renderHook(() => useInkDoc(PATH, client))
+    await settle()
+    client.save.mockRejectedValue(new ApiError(500, 'down'))
+    act(() => result.current.save([s('a')]))
+    await advance(400)
+    await settle()
+    expect(client.save).toHaveBeenCalledTimes(1)
+    expect(result.current.saveError).toBe('Could not save the ink. down')
+    expect(result.current.strokes).toEqual([s('a')])
+    // Retries back off and stop; flush gives up instead of spinning.
+    await advance(10 * 60_000)
+    const calls = client.save.mock.calls.length
+    expect(calls).toBeGreaterThan(1)
+    expect(calls).toBeLessThanOrEqual(6)
+    await act(async () => {
+      await result.current.flush()
+    })
+    // Once the server is back, the next save carries the strokes that failed.
+    client.save.mockResolvedValue({ revision: 'r2' })
+    act(() => result.current.save([s('a'), s('b')]))
+    await advance(400)
+    await settle()
+    expect(client.save.mock.calls.at(-1)![1]).toEqual([s('a'), s('b')])
+    expect(result.current.saveError).toBeNull()
+  })
+
+  test('a failed ink save is retried with the same strokes', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const client = fakeClient({ path: PATH, strokes: [], revision: 'r1' })
+    const { result } = renderHook(() => useInkDoc(PATH, client))
+    await settle()
+    client.save.mockRejectedValueOnce(new ApiError(500, 'down'))
+    act(() => result.current.save([s('a')]))
+    await advance(400)
+    await settle()
+    await advance(60_000)
+    await settle()
+    expect(client.save).toHaveBeenCalledTimes(2)
+    expect(client.save.mock.calls[1]).toEqual([PATH, [s('a')], 'r1'])
   })
 
   test('a second 409 reloads and keeps the server copy', async () => {
