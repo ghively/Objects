@@ -113,6 +113,20 @@ describe('KanbanLayout', () => {
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/T1.md', { status: ['Done'] }, 'v7'))
   })
 
+  test('a second drop of the same card sends the first write version (audit #14)', async () => {
+    mocked.rows.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    render(<Harness patchRow={vi.fn()} />)
+    const [notStarted, done] = columns().map((c) => c.getAttribute('data-group'))
+    dragEnd?.({ active: { id: 'Tasks/T1.md' }, over: { id: `col:${done}` } })
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mocked.rows).toHaveBeenCalledTimes(1))
+    // The rows never caught up (no patch landed): the card is still in its old column.
+    dragEnd?.({ active: { id: 'Tasks/T1.md' }, over: { id: `col:${done}` } })
+    expect(notStarted).toBeTruthy()
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(2))
+    expect(mocked.updateProperties).toHaveBeenLastCalledWith('Tasks/T1.md', { status: ['Done'] }, 'v7+1')
+  })
+
   test('test kanban drop calls onWritten with the update result', async () => {
     const patch = vi.fn()
     const onWritten = vi.fn()

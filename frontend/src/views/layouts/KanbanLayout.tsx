@@ -12,6 +12,7 @@ import type { LayoutProps } from '../DataView'
 import { groupRows, valueForGroup, type Group } from '../group'
 import { matchingValues } from '../matching'
 import { propertyChoices } from '../properties'
+import { createRowWrites } from '../rowWrites'
 import { CardItem } from './CardItem'
 
 /** The grouping a kanban uses: the view's own, else the first label property of its types. */
@@ -91,6 +92,7 @@ export function KanbanLayout(props: LayoutProps) {
   const { flat, state, ctx, viewTypes, typesById, collections, patchRow, onWritten } = props
   const [notice, setNotice] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const writes = useMemo(() => createRowWrites(), [])
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   useEffect(
     () => () => {
@@ -119,7 +121,10 @@ export function KanbanLayout(props: LayoutProps) {
   const reload = async (row: Row) => {
     try {
       const [fresh] = await api.rows({ paths: [row.summary.path] })
-      if (fresh) patchRow?.(row.summary.path, fresh)
+      if (fresh) {
+        writes.seen(fresh, row)
+        patchRow?.(row.summary.path, fresh)
+      }
     } catch (err) {
       console.warn('Could not reload row:', err)
     }
@@ -136,7 +141,11 @@ export function KanbanLayout(props: LayoutProps) {
     const change = groupBy && groupDef ? valueForGroup(groupBy, target, groupDef, { row, from }) : null
     if (!change) return
     try {
-      const result = await api.updateProperties(row.summary.path, { [change.key]: change.value }, row.version)
+      // Writes to one row run in turn, each from the newest version (the rows may lag behind).
+      const result = await writes.run(row, (version, cur) => {
+        const c = (groupBy && groupDef && valueForGroup(groupBy, target, groupDef, { row: cur, from })) || change
+        return api.updateProperties(row.summary.path, { [c.key]: c.value }, version)
+      })
       await reload(row)
       onWritten?.(row, result)
     } catch (err) {
