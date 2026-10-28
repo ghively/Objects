@@ -306,8 +306,9 @@ export function TableLayout(props: TableLayoutProps) {
       key={row.summary.path}
       role="row"
       data-path={row.summary.path}
+      data-selected={props.isSelected?.(row.summary.path) || undefined}
       style={{ minHeight: TABLE_ROW_HEIGHT }}
-      className="flex border-b border-line hover:bg-hover/40"
+      className={cn('flex border-b border-line hover:bg-hover/40', props.isSelected?.(row.summary.path) && 'bg-[var(--block-selection-bg)]')}
     >
       {columns.map((c) => {
         const def = defs[c.id]

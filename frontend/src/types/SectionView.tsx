@@ -111,6 +111,7 @@ function RowsSection(p: RowsSectionProps) {
       heading={p.heading}
       pipeline={p.pipeline}
       patchRow={patchRow}
+      rowActions
     />
   )
 }
@@ -312,7 +313,8 @@ export function SectionView({ type, section, search, heading, onCreateCollection
         const ids = q.definition.structures.map((s) => s.id)
         return (
           <RowsSection
-            key={q.id}
+            // An edit of the query (its tab's "Edit query") starts the section over from it.
+            key={`${q.id}:${JSON.stringify(q.definition)}`}
             type={type}
             scope={{ typeIds: ids }}
             base={stateWith(q.view.viewDefinition, {
