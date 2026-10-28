@@ -1,6 +1,6 @@
 # Object: design
 
-Status: for Gene's approval · 2026-10-23 (third revision)
+Status: approved and implemented (M1–M8 built by 2026-10-28) · written 2026-10-23 (third revision), amended per milestone where marked
 Working name: **Object**.
 
 ## 1. What we're building

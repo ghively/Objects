@@ -1,7 +1,23 @@
 import type {
+  Attachment,
+  BlockInfo,
+  CatchUp,
+  MergeResult,
+  OccurrenceAction,
+  OverdueInfo,
+  RestoreVersionResult,
+  SpaceSetup,
+  TaskStats,
+  VersionContent,
+  VersionInfo,
+  CalendarRange,
+  CalendarUi,
   ChangeEvent,
   ChangeKindResult,
   Collection,
+  CreatedDailyNote,
+  GraphCustomization,
+  GraphData,
   CreatedFile,
   DeleteCollectionResult,
   Icon,
@@ -9,6 +25,7 @@ import type {
   ObjectDetail,
   ObjectSummary,
   Query,
+  References,
   RenameResult,
   RestoreResult,
   Row,
@@ -16,14 +33,22 @@ import type {
   SaveCollectionResult,
   SaveResult,
   SaveTypeResult,
+  SearchResponse,
+  SettingsResponse,
+  DeviceSettings,
+  SpaceEntry,
   SpaceInfo,
+  SpacePatch,
   SyncResult,
+  TasksUi,
   TrashItem,
   TypeDef,
   UiState,
   UpdateResult,
+  UploadedAttachment,
   Views,
 } from './types'
+import type { WhiteboardSettings } from './whiteboardTypes'
 
 /** Any non-2xx response that is not a conflict or a read-only refusal. */
 export class ApiError extends Error {
@@ -62,10 +87,13 @@ export class RevisionConflictError extends ConflictError {
 /** 428: the write needs `confirm: true`; `affected` files would change. Nothing was written. */
 export class ConfirmRequiredError extends ApiError {
   readonly affected: number
-  constructor(message: string, affected: number) {
+  /** M8: the space folder's identity token (`POST /spaces/delete`), sent back with the confirm. */
+  readonly folder: string | null
+  constructor(message: string, affected: number, folder: string | null = null) {
     super(428, message)
     this.name = 'ConfirmRequiredError'
     this.affected = affected
+    this.folder = folder
   }
 }
 
@@ -79,7 +107,61 @@ export class ReadOnlyError extends ApiError {
   }
 }
 
+/**
+ * 409 on `POST /api/daily-notes`; nothing was written. `reason` `'exists'`: the day's note is
+ * at `path`. `'nameTaken'`: `path` is another file holding the note's name (not the day's note).
+ */
+export class DailyNoteExistsError extends ApiError {
+  readonly path: string
+  readonly reason: 'exists' | 'nameTaken'
+  constructor(message: string, path: string, reason: 'exists' | 'nameTaken' = 'exists') {
+    super(409, message)
+    this.name = 'DailyNoteExistsError'
+    this.path = path
+    this.reason = reason
+  }
+}
+
+/** The keys `PUT /api/ui` accepts (M3's, plus M4's `calendar`, `tasks` and `reminders`, M5's `graph` and M6's `whiteboard`). */
+export type UiPatch = Partial<Pick<UiState, 'pinned' | 'sections' | 'allNotesLayout'>> & {
+  calendar?: CalendarUi
+  tasks?: TasksUi
+  reminders?: { enabled: boolean }
+  /** Replaces the whole `graph` value. */
+  graph?: GraphCustomization
+  /** Replaces the whole `whiteboard` value (the canvas display settings). */
+  whiteboard?: WhiteboardSettings
+}
+
+/** `api.search` options; `types`/`excludeTypes` are type ids, `tag` a tag name. */
+export interface SearchOptions {
+  types?: string[]
+  excludeTypes?: string[]
+  tag?: string
+  limit?: number
+  /** M8: `fullText` matches bodies only ("Text matches only"). */
+  mode?: 'auto' | 'title' | 'fullText'
+  signal?: AbortSignal
+}
+
+/** `api.linkMention` input: link the mention `text` at `[start, end)` of `path`'s body to `target`. */
+export interface LinkMentionInput {
+  /** The mentioning object. */
+  path: string
+  /** The mentioned object. */
+  target: string
+  start: number
+  end: number
+  text: string
+  baseVersion: string
+}
+
 const BASE = '/api'
+
+/** A 409 from the spaces routes is not a revision conflict: keep the server's message. */
+function spaceConflict(d: Record<string, unknown>): Error {
+  return new ApiError(409, typeof d.detail === 'string' ? d.detail : 'conflict')
+}
 
 function qs(params: Record<string, string | null | undefined>): string {
   const sp = new URLSearchParams()
@@ -110,7 +192,7 @@ function detailOf(data: unknown): Record<string, unknown> {
   return {}
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, on409?: (d: Record<string, unknown>) => Error): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: { Accept: 'application/json', ...(init?.headers ?? {}) },
@@ -118,6 +200,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const data = await readJson(res)
   if (res.ok) return data as T
   const d = detailOf(data)
+  if (res.status === 409 && on409) throw on409(d)
   if (res.status === 409) {
     const current = String(d.currentVersion ?? d.currentRevision ?? '')
     if (path.startsWith('/types') || d.currentRevision !== undefined) throw new RevisionConflictError(current)
@@ -126,7 +209,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.status === 423) throw new ReadOnlyError(String(d.reason ?? (typeof d.detail === 'string' ? d.detail : 'read-only')))
   if (res.status === 428) {
     const message = typeof d.detail === 'string' ? d.detail : 'Confirmation required'
-    throw new ConfirmRequiredError(message, Number(d.affected ?? 0))
+    throw new ConfirmRequiredError(message, Number(d.affected ?? 0), typeof d.folder === 'string' ? d.folder : null)
   }
   const detail = data && typeof data === 'object' ? (data as Record<string, unknown>).detail : undefined
   // 400/404 carry the server's message as {detail: "..."}.
@@ -250,7 +333,8 @@ export const api = {
 
   /**
    * Set (or clear with `null`) frontmatter properties; `remove` deletes keys. Announces `changed`
-   * for the object and for each relation-synced object.
+   * for the object and for each relation-synced object. A Task `status` change that crosses a
+   * category also returns `task` (completed, reopened or advanced; M4).
    */
   async updateProperties(
     path: string,
@@ -318,6 +402,31 @@ export const api = {
     return { path: res.path, version: res.version }
   },
 
+  /**
+   * Create the daily note for `date` (YYYY-MM-DD). `templateId`: an id, `null` for the type's
+   * default, `"none"` for no template. A 409 throws `DailyNoteExistsError` carrying the path and
+   * whether it is the day's note (`reason: 'exists'`) or another file with its name (`'nameTaken'`).
+   */
+  async createDailyNote(date: string, opts: { templateId?: string | null } = {}): Promise<CreatedDailyNote> {
+    const body: Record<string, unknown> = { date }
+    if (opts.templateId !== undefined) body.templateId = opts.templateId
+    body.clientId = CLIENT_ID
+    const res = await request<CreatedDailyNote>('/daily-notes', json('POST', body), (d) =>
+      new DailyNoteExistsError(
+        typeof d.detail === 'string' ? d.detail : 'A daily note for this day exists',
+        String(d.path ?? ''),
+        d.reason === 'nameTaken' ? 'nameTaken' : 'exists',
+      ),
+    )
+    emitLocal([created(res.path, res.version), ...(res.typeIds ?? []).map((t) => typesEvent(t))])
+    return { path: res.path, version: res.version, typeIds: res.typeIds ?? [] }
+  },
+
+  /** The calendar's days from `from` to `to` (YYYY-MM-DD, inclusive; at most 100 days). */
+  calendar(from: string, to: string): Promise<CalendarRange> {
+    return request<CalendarRange>(`/calendar${qs({ from, to })}`)
+  },
+
   /** Move an object to the Trash. */
   async deleteObject(path: string, opts: { baseVersion?: string } = {}): Promise<{ trashId: string }> {
     const res = await request<{ trashId: string; typeIds?: string[] }>(
@@ -344,6 +453,8 @@ export const api = {
       ...(res.typeIds ?? []).map((t) => typesEvent(t)),
       ...(res.collectionIds ?? []).map((c) => defEvent('collections', c)),
       ...(res.queryIds ?? []).map((q) => defEvent('queries', q)),
+      // Members whose `collections:` item a collection restore wrote back.
+      ...(res.rewritten ?? []).map((p) => changed(p)),
     ])
     return res
   },
@@ -556,11 +667,12 @@ export const api = {
       `/collections/${seg(id)}${qs({ confirm: opts.confirm ? 'true' : undefined, clientId: CLIENT_ID })}`,
       { method: 'DELETE' },
     )
-    // Sole members went to the Trash and the others lost one `collections:` item; a collection
-    // event makes every open view reload its rows, which covers both.
+    // Sole members went to the Trash (`deleted`, so a view open on one holds its edits) and the
+    // others lost one `collections:` item (`changed`); the collection event reloads every view.
     const skipped = new Set((res.skipped ?? []).map((s) => s.path))
     emitLocal([
       defEvent('collections', id),
+      ...(res.deleted ?? []).map((p): ChangeEvent => ({ kind: 'deleted', path: p, version: null, origin: CLIENT_ID })),
       ...(res.removedFrom ?? []).filter((p) => !skipped.has(p)).map((p) => changed(p)),
     ])
     return res
@@ -591,14 +703,14 @@ export const api = {
     return res
   },
 
-  /** Pinned items, custom sidebar sections and the All notes layout. */
+  /** Pinned items, custom sidebar sections, the All notes layout and (M4) calendar, tasks and reminders. */
   ui(): Promise<{ ui: UiState; revision: string }> {
     return request<{ ui: UiState; revision: string }>('/ui')
   },
 
   /** Rejects with `ConflictError` (409, `currentRevision`) when `baseRevision` is stale. */
   async patchUi(
-    patch: Partial<Pick<UiState, 'pinned' | 'sections' | 'allNotesLayout'>>,
+    patch: UiPatch,
     opts: { baseRevision: string },
   ): Promise<{ ui: UiState; revision: string }> {
     const res = await request<{ ui: UiState; revision: string }>(
@@ -607,6 +719,234 @@ export const api = {
     )
     emitLocal([defEvent('ui', 'ui.json', res.revision ?? null)])
     return res
+  },
+
+  // ---- M5: search, references, graph ----
+
+  /** Search titles, aliases and full text. Repeats `type`/`excludeType` once per id. */
+  search(q: string, opts: SearchOptions = {}): Promise<SearchResponse> {
+    const sp = new URLSearchParams()
+    sp.append('q', q)
+    for (const t of opts.types ?? []) sp.append('type', t)
+    for (const t of opts.excludeTypes ?? []) sp.append('excludeType', t)
+    if (opts.tag) sp.append('tag', opts.tag)
+    if (opts.limit !== undefined) sp.append('limit', String(opts.limit))
+    if (opts.mode) sp.append('mode', opts.mode)
+    return request<SearchResponse>(`/search?${sp.toString()}`, opts.signal ? { signal: opts.signal } : undefined)
+  },
+
+  /** Drop and rebuild the search index in the background (`partial` until done). */
+  reindex(): Promise<{ started: boolean }> {
+    return request<{ started: boolean }>('/search/reindex', json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** An object's references section: tabs, backlinks in context, mentions, related content and tags. */
+  references(path: string, opts: { relatedLimit?: number } = {}): Promise<References> {
+    const relatedLimit = opts.relatedLimit !== undefined ? String(opts.relatedLimit) : undefined
+    return request<References>(`/references${qs({ path, relatedLimit })}`)
+  },
+
+  /**
+   * Turn an unlinked mention into a link (one write to the mentioning object `path`).
+   * Rejects with `ConflictError` (409) when `baseVersion` is stale; announces `changed` for `path`.
+   */
+  async linkMention(input: LinkMentionInput): Promise<{ version: string }> {
+    const res = await request<{ version: string }>('/references/link', json('POST', { ...input, clientId: CLIENT_ID }))
+    if (res && res.version !== input.baseVersion) emitLocal([changed(input.path, res.version)])
+    return res
+  },
+
+  /** Every object as a graph node, with link and tag pairs. */
+  graph(): Promise<GraphData> {
+    return request<GraphData>('/graph')
+  },
+
+  // ---- M7: attachments, space settings, device settings, spaces ----
+
+  /** Every attachment in the space (images, PDFs, audio, video, and any file under `Attachments/`). */
+  attachments(): Promise<Attachment[]> {
+    return request<Attachment[]>('/attachments')
+  },
+
+  /**
+   * Copy a file into `Attachments/` (never overwrites: `name (2).ext` when taken). Sends the raw
+   * bytes, as `importImage` does. 413 over 100 MiB, 422 for an empty or unusable name.
+   */
+  async uploadAttachment(blob: Blob | ArrayBuffer, name: string): Promise<UploadedAttachment> {
+    const res = await request<UploadedAttachment>(`/attachments${qs({ name })}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: blob,
+    })
+    emitLocal([created(res.path)])
+    return res
+  },
+
+  /** Open an attachment with the OS default app. 415 for executables and scripts. */
+  openAttachment(path: string): Promise<{ ok: true }> {
+    return request<{ ok: true }>('/attachments/open', json('POST', { path }))
+  },
+
+  /** Write `space.json`'s name, icon, description or hide-task-management. 409 stale, 422, 423. */
+  patchSpace(patch: SpacePatch, opts: { baseRevision: string }): Promise<SpaceInfo> {
+    return request<SpaceInfo>('/space', json('PUT', { patch, baseRevision: opts.baseRevision, clientId: CLIENT_ID }))
+  },
+
+  /** This device's settings, defaults merged (revision `''` when no file exists). */
+  settings(): Promise<SettingsResponse> {
+    return request<SettingsResponse>('/settings')
+  },
+
+  /** Patch device settings. Rejects with `ConflictError` (409) on a stale `baseRevision`. */
+  patchSettings(patch: Partial<DeviceSettings>, opts: { baseRevision: string }): Promise<SettingsResponse> {
+    return request<SettingsResponse>('/settings', json('PUT', { patch, baseRevision: opts.baseRevision }))
+  },
+
+  /** The spaces registry (unwrapped from `{spaces}`), in registry order. */
+  async spaces(): Promise<SpaceEntry[]> {
+    const res = await request<{ spaces: SpaceEntry[] }>('/spaces')
+    return res?.spaces ?? []
+  },
+
+  /**
+   * Create `<location>/<safe name>/` with `space.json` and register it. 409 (`ApiError`) when the folder exists.
+   * M8: `setup` `'basic'` also writes the Person, Meeting, Project and Book types.
+   */
+  createSpace(name: string, location: string, setup?: SpaceSetup): Promise<{ path: string }> {
+    const body: Record<string, unknown> = { name, location }
+    if (setup !== undefined) body.setup = setup
+    return request<{ path: string }>('/spaces', json('POST', body), spaceConflict)
+  },
+
+  /** Register an existing folder as a space. 404 when it is not a folder. */
+  openSpace(path: string): Promise<{ path: string }> {
+    return request<{ path: string }>('/spaces/open', json('POST', { path }))
+  },
+
+  /** Remove a space from the list (its folder is never touched). 409 (`ApiError`) for the current space. */
+  removeSpace(path: string): Promise<{ ok: true }> {
+    return request<{ ok: true }>(`/spaces${qs({ path })}`, { method: 'DELETE' }, spaceConflict)
+  },
+
+  /** Ask the launcher to restart on `path` (202). 404 not a folder; 503 without the launcher. */
+  switchSpace(path: string): Promise<{ path: string }> {
+    return request<{ path: string }>('/spaces/switch', json('POST', { path }))
+  },
+
+  // ---- M8: tasks, blocks, history, merge, spaces ----
+
+  /** A recurring by-due-date task's missed occurrences. 422 when it isn't one. */
+  overdue(path: string): Promise<OverdueInfo> {
+    return request<OverdueInfo>(`/tasks/overdue?path=${seg(path)}`)
+  },
+
+  /** Complete, skip or excuse the current occurrence (`catchUp` for overdue ones). 409 stale. */
+  async occurrence(
+    path: string,
+    action: OccurrenceAction,
+    opts: { catchUp?: CatchUp; baseVersion: string },
+  ): Promise<UpdateResult> {
+    const body: Record<string, unknown> = { path, action }
+    if (opts.catchUp) body.catchUp = opts.catchUp
+    Object.assign(body, { baseVersion: opts.baseVersion, clientId: CLIENT_ID })
+    const res = await request<UpdateResult>('/tasks/occurrence', json('POST', body))
+    if (res.version !== opts.baseVersion) emitLocal([changed(path, res.version)])
+    return res
+  },
+
+  /** A recurring task's streaks, completion rate and occurrence grid. */
+  taskStats(path: string): Promise<TaskStats> {
+    return request<TaskStats>(`/tasks/stats?path=${seg(path)}`)
+  },
+
+  /** Set (or clear with `null`) the reminder of date property `key`. 409 stale, 422. */
+  async setReminder(path: string, key: string, remind: string | null, opts: { baseVersion: string }): Promise<UpdateResult> {
+    const res = await request<UpdateResult>(
+      '/tasks/reminder',
+      json('PUT', { path, key, remind, baseVersion: opts.baseVersion, clientId: CLIENT_ID }),
+    )
+    if (res.version !== opts.baseVersion) emitLocal([changed(path, res.version)])
+    return res
+  },
+
+  /** One block of an object by its `^id`. 404 when the object or block is missing. */
+  block(path: string, id: string): Promise<BlockInfo> {
+    return request<BlockInfo>(`/block?path=${seg(path)}&id=${seg(id)}`)
+  },
+
+  /** The objects referencing block `id` of `path`, title then path. */
+  blockReferences(path: string, id: string): Promise<{ paths: string[] }> {
+    return request<{ paths: string[] }>(`/block/references?path=${seg(path)}&id=${seg(id)}`)
+  },
+
+  /** An object's (or board's) saved versions, newest first. */
+  async history(path: string): Promise<VersionInfo[]> {
+    const res = await request<{ versions: VersionInfo[] }>(`/history?path=${seg(path)}`)
+    return res?.versions ?? []
+  },
+
+  /** One version's content (`text` null for whiteboards). */
+  historyVersion(path: string, id: string): Promise<VersionContent> {
+    return request<VersionContent>(`/history/version?path=${seg(path)}&id=${seg(id)}`)
+  },
+
+  /** Restore a version (the current state is kept as a version first). 409 stale. */
+  async restoreVersion(path: string, id: string, opts: { baseVersion: string }): Promise<RestoreVersionResult> {
+    const res = await request<RestoreVersionResult>(
+      '/history/restore',
+      json('POST', { path, id, baseVersion: opts.baseVersion, clientId: CLIENT_ID }),
+    )
+    // A board's restore rewrites its sidecars: the canvas, ink layer and notes reload on the
+    // `whiteboard` event (the server's copy carries our origin and is dropped in `ensureSource`).
+    emitLocal([
+      ...(res?.revision !== undefined
+        ? [{ kind: 'whiteboard', path, version: res.revision || null, origin: CLIENT_ID } as ChangeEvent]
+        : []),
+      changed(path, res?.version ?? null),
+    ])
+    return res
+  },
+
+  /**
+   * Merge `source` into `target` ("Merge into object" / "Merge into tag"); the source goes to the
+   * Trash. Always sends `confirm: true` (the dialog is the confirmation). 409 stale, 413, 422.
+   */
+  async mergeObject(
+    source: string,
+    target: string,
+    opts: { sourceVersion: string; targetVersion: string },
+  ): Promise<MergeResult> {
+    const res = await request<MergeResult>(
+      '/object/merge',
+      json('POST', {
+        source,
+        target,
+        sourceVersion: opts.sourceVersion,
+        targetVersion: opts.targetVersion,
+        confirm: true,
+        clientId: CLIENT_ID,
+      }),
+    )
+    const target_ = res?.target ?? target
+    emitLocal([
+      changed(target_, res?.version ?? null),
+      ...(res?.relinked ?? []).filter((p) => p !== target_).map((p) => changed(p)),
+      { kind: 'deleted', path: source, version: null, origin: CLIENT_ID },
+    ])
+    return res
+  },
+
+  /**
+   * Delete a space folder that is not the current one: to the OS trash, or (`permanent`, after a
+   * 428 `ConfirmRequiredError` said the trash is unavailable) for good. Pass the 428's `folder`
+   * token back as `folder`: the server answers 409 when the folder was replaced in between.
+   * 404, 409 the current space.
+   */
+  deleteSpace(path: string, opts: { permanent?: boolean; folder?: string } = {}): Promise<{ trashed: boolean }> {
+    const body: Record<string, unknown> = { path }
+    if (opts.permanent) body.permanent = true
+    if (opts.folder) body.folder = opts.folder
+    return request<{ trashed: boolean }>('/spaces/delete', json('POST', body), spaceConflict)
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */

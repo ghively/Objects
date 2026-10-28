@@ -30,6 +30,7 @@ from ruamel.yaml.constructor import SafeConstructor
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.scalarstring import (
     DoubleQuotedScalarString,
+    LiteralScalarString,
     ScalarString,
     SingleQuotedScalarString,
 )
@@ -143,6 +144,8 @@ def _styled_like(old: Any, new: Any) -> Any:
     such as a literal block) keeps it.
     """
     if isinstance(new, str) and not isinstance(new, ScalarString):
+        if isinstance(old, LiteralScalarString) and _literal_safe(new):
+            return LiteralScalarString(new)
         if isinstance(old, SingleQuotedScalarString):
             return SingleQuotedScalarString(new)
         if isinstance(old, DoubleQuotedScalarString):
@@ -157,6 +160,17 @@ def _styled_like(old: Any, new: Any) -> Any:
             seq.fa.set_flow_style()
         return seq
     return new
+
+
+def _literal_safe(text: str) -> bool:
+    """Whether ``text`` round-trips as a literal block (``|-``) unchanged.
+
+    A literal block can't hold a carriage return, a line ending in whitespace,
+    a leading blank or indented first line, or a trailing newline under ``|-``.
+    """
+    if not text or "\r" in text or text.endswith("\n") or text[0] in " \t\n":
+        return False
+    return all(line == line.rstrip(" \t") for line in text.split("\n"))
 
 
 def _render(key: Any, value: Any) -> list[str]:

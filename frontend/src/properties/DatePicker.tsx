@@ -1,9 +1,17 @@
 // The date picker of datetime properties: a natural-language input per point, Capacities'
 // suggestion lists, "Include Time" and "Range" toggles that honour the property's constraints,
-// and "Remove date".
+// and "Remove date". The Task `date` (M4) adds the schedule suggestions, a "Repeat" row and a
+// "Reminder" row; there every change carries `{date, repeat, remind}` together. Any other date
+// property with `supportsReminders` (M8) shows the same "Reminder" row, written on its own through
+// `PUT /api/tasks/reminder` (the owner's `reminder.onChange`).
 import { useEffect, useId, useMemo, useState } from 'react'
 import type { DateConstraints, DateValue, Resolution } from '@/api/types'
 import { Switch } from '@/components/ui/switch'
+import { CustomRepeatDialog } from '@/tasks/CustomRepeatDialog'
+import { REMINDER_MISFIT_HINT, ReminderMenu } from '@/tasks/ReminderMenu'
+import { RepeatMenu } from '@/tasks/RepeatMenu'
+import { formatRepeat, parseRepeat } from '@/tasks/repeat'
+import { parseRemind } from '@/tasks/remind'
 import { formatDate } from './format'
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
@@ -140,6 +148,20 @@ const START_SUGGESTIONS: { label: string; days: number }[] = [
   { label: 'In 2 weeks', days: 14 },
 ]
 
+/** The Task date's quick suggestions (`DatePicker.suggestions.schedule.*`). */
+const SCHEDULE_SUGGESTIONS: { label: string; tooltip: string; pick(today: Date): Date }[] = [
+  { label: 'Today', tooltip: 'Schedule task for today', pick: (t) => t },
+  { label: 'Tomorrow', tooltip: 'Schedule task for tomorrow', pick: (t) => addDays(t, 1) },
+  { label: 'Next week', tooltip: 'Schedule task for the next week', pick: (t) => addDays(t, 7) },
+  { label: 'Next month', tooltip: 'Schedule task for the next month', pick: addMonth },
+]
+
+/** The same day next month, clamped to the month's last day. */
+function addMonth(d: Date): Date {
+  const last = new Date(d.getFullYear(), d.getMonth() + 2, 0).getDate()
+  return new Date(d.getFullYear(), d.getMonth() + 1, Math.min(d.getDate(), last))
+}
+
 const END_SUGGESTIONS: { label: string; days: number }[] = [
   { label: 'Same day', days: 0 },
   { label: '1 day', days: 1 },
@@ -148,12 +170,34 @@ const END_SUGGESTIONS: { label: string; days: number }[] = [
   { label: '2 weeks', days: 14 },
 ]
 
+/** The Task date picker's one change: the date with its `repeat` and `remind` texts (null: none). */
+export interface TaskDateChange {
+  date: DateValue | null
+  repeat: string | null
+  remind: string | null
+}
+
 export interface DatePickerProps {
   value: DateValue | null
   constraints?: DateConstraints | null
   onChange(next: DateValue | null): void
   /** The current time (tests). */
   now?: Date
+  /**
+   * The Task `date` (M4): its current `repeat` and `remind` texts. Given with `onTaskChange`, the
+   * picker shows the schedule suggestions and the Repeat row (and the Reminder row when
+   * `constraints.supportsReminders`), and every change goes to `onTaskChange` instead of `onChange`.
+   * A non-empty `occurrenceLog` (M8) makes "Remove recurrence" and "Remove date" ask first
+   * (`DatePicker.recurrenceRemoveConfirm.*`, `DatePicker.dateRemoveConfirm.*`); the owner removes
+   * the log with `repeat`.
+   */
+  task?: { repeat: string | null; remind: string | null; occurrenceLog?: string | null }
+  onTaskChange?(next: TaskDateChange): void
+  /**
+   * M8: the reminder of a date property other than the Task `date` (its `reminders` entry). Shown
+   * when `constraints.supportsReminders`; a pick on an empty date first sets the shown date.
+   */
+  reminder?: { value: string | null; onChange(remind: string | null): void }
 }
 
 /** The value the picker shows when the property is empty: the defaults when set, else now. */
@@ -283,7 +327,7 @@ function Toggle({
  * - `endTimeSettings: 'notAllowed'` hides "Range"; `'required'` keeps it on.
  * - `hideDeleteOption` hides "Remove date".
  */
-export function DatePicker({ value, constraints, onChange, now: nowProp }: DatePickerProps) {
+export function DatePicker({ value, constraints, onChange, now: nowProp, task, onTaskChange, reminder }: DatePickerProps) {
   const c = useMemo(() => constraints ?? {}, [constraints])
   const now = useMemo(() => nowProp ?? new Date(), [nowProp])
   const current = useMemo(() => value ?? initialValue(c, now), [value, c, now])
@@ -294,6 +338,25 @@ export function DatePicker({ value, constraints, onChange, now: nowProp }: DateP
   const rangeAllowed = c.endTimeSettings !== 'notAllowed'
   const rangeRequired = c.endTimeSettings === 'required'
   const isRange = rangeAllowed && (!!end || rangeRequired)
+  const taskMode = !!task && !!onTaskChange
+  const reminders = taskMode && !!c.supportsReminders
+  /** M8: a non-Task date property's own Reminder row. */
+  const propReminder = !taskMode && !!reminder && !!c.supportsReminders
+  const [customOpen, setCustomOpen] = useState(false)
+  const [dropped, setDropped] = useState(false)
+  /** M8: "Remove date" on a recurring task with history asks first (`DatePicker.dateRemoveConfirm`). */
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const hasHistory = taskMode && !!task!.occurrenceLog?.trim()
+
+  /** The Task change for `date` with these texts; a reminder that fit and no longer does is dropped. */
+  const emitTask = (date: DateValue | null, repeat: string | null, remind: string | null) => {
+    let r = remind
+    if (date && r && parseRemind(r, resolution) && !parseRemind(r, date.resolution)) {
+      r = null
+      setDropped(true)
+    }
+    onTaskChange?.({ date, repeat, remind: r })
+  }
 
   const emit = (next: { start: string; end?: string | null; resolution: Resolution }) => {
     const res = forced ?? next.resolution
@@ -302,8 +365,13 @@ export function DatePicker({ value, constraints, onChange, now: nowProp }: DateP
     if (!rangeAllowed) e = null
     else if (rangeRequired && !e) e = s
     if (e && pointDate(e, res) < pointDate(s, res)) e = s
-    onChange(e ? { start: s, end: e, resolution: res } : { start: s, resolution: res })
+    const v: DateValue = e ? { start: s, end: e, resolution: res } : { start: s, resolution: res }
+    if (taskMode) emitTask(v, task!.repeat, task!.remind)
+    else onChange(v)
   }
+
+  /** The date the picker shows, as a value (what a Repeat or Reminder pick on an empty date sets). */
+  const shownDate = (): DateValue => (end ? { start, end, resolution } : { start, resolution })
 
   const setResolution = (toTime: boolean) => {
     const to: Resolution = toTime ? 'time' : 'day'
@@ -338,11 +406,71 @@ export function DatePicker({ value, constraints, onChange, now: nowProp }: DateP
     emit({ start: atDay(addDays(today, days), resolution, keep), end, resolution })
   }
 
+  const pickSchedule = (pick: (today: Date) => Date) => {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const keep = resolution === 'time' ? new Date(start) : null
+    emit({ start: atDay(pick(today), resolution, keep), end, resolution })
+  }
+
   const pickEnd = (days: number) => {
     const base = pointDate(start, resolution)
     const keep = resolution === 'time' ? new Date(end ?? start) : null
     emit({ start, end: atDay(addDays(base, days), resolution, keep), resolution })
   }
+
+  if (taskMode && confirmingRemove) {
+    return (
+      <div className="flex w-72 flex-col gap-2 p-2 text-fg" data-testid="date-picker">
+        <div role="alertdialog" aria-label="Remove date?" className="flex flex-col gap-2 px-2 py-1">
+          <h2 className="text-[15px] font-semibold">Remove date?</h2>
+          <p className="text-[13px] text-fg-muted">
+            This recurring task already has completed or skipped occurrences. Removing the date will discard its history.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setConfirmingRemove(false)} className="rounded-md px-3 py-1 text-[14px] hover:bg-hover">
+              Keep date
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmingRemove(false)
+                onTaskChange!({ date: null, repeat: null, remind: null })
+              }}
+              className="rounded-md bg-[var(--danger)] px-3 py-1 text-[14px] font-medium text-white hover:opacity-90"
+            >
+              Remove date
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (taskMode && customOpen) {
+    return (
+      <div className="flex w-72 flex-col gap-2 p-2 text-fg" data-testid="date-picker">
+        <CustomRepeatDialog
+          initial={parseRepeat(task!.repeat)}
+          day={dayString(pointDate(start, resolution))}
+          onCancel={() => setCustomOpen(false)}
+          onSave={(rule) => {
+            setCustomOpen(false)
+            emitTask(shownDate(), formatRepeat(rule), task!.remind)
+          }}
+        />
+      </div>
+    )
+  }
+
+  const remindHint =
+    taskMode && (dropped || (task!.remind && parseRemind(task!.remind) && !parseRemind(task!.remind, resolution)))
+      ? REMINDER_MISFIT_HINT
+      : null
+  // A property reminder is kept when the date's resolution changes; the row says it no longer fits.
+  const propRemindHint =
+    propReminder && reminder!.value && parseRemind(reminder!.value) && !parseRemind(reminder!.value, resolution)
+      ? REMINDER_MISFIT_HINT
+      : null
 
   return (
     <div className="flex w-72 flex-col gap-2 p-2 text-fg" data-testid="date-picker">
@@ -361,7 +489,23 @@ export function DatePicker({ value, constraints, onChange, now: nowProp }: DateP
           )}
         </div>
         {resolution === 'day' && <div className="px-1 pt-1 text-[12px] text-fg-muted">All-day</div>}
-        <Suggestions items={START_SUGGESTIONS} onPick={pickStart} />
+        {taskMode ? (
+          <div className="mt-1 flex flex-col">
+            {SCHEDULE_SUGGESTIONS.map((s) => (
+              <button
+                key={s.label}
+                type="button"
+                title={s.tooltip}
+                onClick={() => pickSchedule(s.pick)}
+                className="rounded-md px-2 py-1 text-left text-[14px] text-fg hover:bg-hover"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <Suggestions items={START_SUGGESTIONS} onPick={pickStart} />
+        )}
       </div>
 
       {isRange && end && (
@@ -400,10 +544,53 @@ export function DatePicker({ value, constraints, onChange, now: nowProp }: DateP
         )}
       </div>
 
+      {taskMode && (
+        <div className="border-t border-line pt-1">
+          <RepeatMenu
+            value={task!.repeat}
+            date={start}
+            onChange={(repeat) => emitTask(shownDate(), repeat, task!.remind)}
+            onCustom={() => setCustomOpen(true)}
+            hasHistory={!!task!.occurrenceLog?.trim()}
+          />
+          {reminders && (
+            <ReminderMenu
+              value={task!.remind}
+              resolution={resolution}
+              hint={remindHint}
+              onChange={(remind) => {
+                setDropped(false)
+                emitTask(shownDate(), task!.repeat, remind)
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {propReminder && (
+        <div className="border-t border-line pt-1">
+          <ReminderMenu
+            value={reminder!.value}
+            resolution={resolution}
+            hint={propRemindHint}
+            onChange={(remind) => {
+              if (!value && remind !== null) onChange(shownDate())
+              reminder!.onChange(remind)
+            }}
+          />
+        </div>
+      )}
+
       {!c.hideDeleteOption && (
         <button
           type="button"
-          onClick={() => onChange(null)}
+          onClick={() => {
+            if (taskMode && hasHistory) return setConfirmingRemove(true)
+            if (taskMode) return onTaskChange!({ date: null, repeat: null, remind: null })
+            onChange(null)
+            // Our choice: a reminder on a removed date goes with it.
+            if (propReminder && reminder!.value) reminder!.onChange(null)
+          }}
           className="rounded-md px-2 py-1 text-left text-[14px] text-[var(--danger)] hover:bg-hover"
         >
           Remove date

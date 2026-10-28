@@ -18,7 +18,14 @@ from typing import Any
 
 from .frontmatter import replace_in_value
 
-__all__ = ["relink_frontmatter", "replace_wikilinks", "rewrite_tag_lists", "wikilink_targets"]
+__all__ = [
+    "code_ranges",
+    "relink_frontmatter",
+    "replace_wikilinks",
+    "rewrite_tag_lists",
+    "wikilink_spans",
+    "wikilink_targets",
+]
 
 # [[target]], [[target#heading]], [[target|alias]], [[target#heading|alias]]
 _LINK_RE = re.compile(r"\[\[([^\[\]|#\n]+)((?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?)\]\]")
@@ -82,6 +89,31 @@ def wikilink_targets(text: str) -> set[str]:
         if not code:
             out.update(m.group(1) for m in _LINK_RE.finditer(text, s, e))
     return out
+
+
+def wikilink_spans(text: str) -> list[tuple[str, int, int]]:
+    """``(target, start, end)`` of each link outside code, in order.
+
+    ``target`` is the text before any ``#`` or ``|``, as written; the span covers
+    the whole ``[[…]]``, or ``![[…]]`` for an embed.
+    """
+    out: list[tuple[str, int, int]] = []
+    if "[[" not in text:
+        return out
+    for s, e, code in _segments(text):
+        if code:
+            continue
+        for m in _LINK_RE.finditer(text, s, e):
+            start = m.start()
+            if start > s and text[start - 1] == "!":
+                start -= 1
+            out.append((m.group(1), start, m.end()))
+    return out
+
+
+def code_ranges(text: str) -> list[tuple[int, int]]:
+    """``(start, end)`` of each fenced code block and inline code span, in order."""
+    return [(s, e) for s, e, code in _segments(text) if code]
 
 
 def replace_wikilinks(text: str, should_rewrite: Callable[[str], bool], new_target: str) -> str:

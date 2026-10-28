@@ -1,0 +1,183 @@
+{
+  "schemaVersion": 2,
+  "id": "meeting",
+  "name": "Meeting",
+  "pluralName": "Meetings",
+  "folder": "Meetings",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-users-three"
+  },
+  "color": "violet",
+  "description": "",
+  "basic": false,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The title serves as the main identifier for any entry",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "Collections this content is included in",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "Additional information to further describe an item",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "Date and time of creation",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "Date and time of last edit",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "General tags of this content",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "A quick visual identifier",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Additional names for this content",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    },
+    {
+      "id": "when",
+      "key": "when",
+      "name": "When",
+      "type": "datetime",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "span",
+      "key": "span",
+      "name": "Span",
+      "type": "datetime",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "day"
+        }
+      }
+    },
+    {
+      "id": "internalStamp",
+      "key": "internalStamp",
+      "name": "Internal stamp",
+      "type": "datetime",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "hideCalendarEvents": true
+      }
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [],
+    "defaultTemplateId": null
+  }
+}

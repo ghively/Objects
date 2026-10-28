@@ -1,42 +1,60 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { SpaceInfo, TypeDef } from '@/api/types'
-import { Icon, IconOrEmoji } from '@/components/Icon'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { createAndOpen } from '@/create/createAndOpen'
 import { NewObjectMenu } from '@/create/NewObjectMenu'
 import { AllNotesView } from '@/allnotes/AllNotesView'
+import { CalendarPage } from '@/calendar/CalendarPage'
 import { CollectionPage } from '@/collections/CollectionPage'
 import { QueriesPage } from '@/queries/QueriesPage'
 import { QueryPage } from '@/queries/QueryPage'
+import { GraphPage } from '@/graph/GraphPage'
+import { LocalGraphPanel } from '@/graph/LocalGraphPanel'
 import { LinkPicker } from '@/links/LinkPicker'
-import { invalidateLinkIndex, stemOf, useLinkIndex } from '@/links/linkIndex'
-import { canGoBack, canGoForward, currentTarget, tabTarget, usePeek, useTabs, type Tab } from '@/nav/tabs'
+import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { setRecentSpace } from '@/nav/recent'
+import { isSidepanelShown } from '@/nav/sidepanel'
+import {
+  activeTab,
+  canGoBack,
+  canGoForward,
+  currentTarget,
+  setTabsSpace,
+  usePeek,
+  useTabs,
+  type OpenOptions,
+  type SidepanelTarget,
+  type Target,
+} from '@/nav/tabs'
 import { useDeleteRequest } from '@/object/DeleteObjectDialog'
 import { ObjectPage } from '@/object/ObjectPage'
-import { ObjectIcon } from '@/object/ObjectHeader'
 import { ObjectPeek } from '@/object/ObjectPeek'
+import { BacklinksPanel } from '@/references/BacklinksPanel'
+import { SearchPage } from '@/search/SearchPage'
+import { CommandPalette } from '@/palette/CommandPalette'
+import { Breadcrumbs } from '@/shell/Breadcrumbs'
 import { MainPanel } from '@/shell/MainPanel'
-import { RightPanel } from '@/shell/RightPanel'
-import { Sidebar, TypeChip } from '@/shell/Sidebar'
+import { SidePanel } from '@/shell/SidePanel'
+import { Sidebar } from '@/shell/Sidebar'
+import { TabStrip, useSpaceTypes } from '@/shell/TabStrip'
+import { usePanelShortcuts, useTabShortcuts } from '@/shell/shortcuts'
+import { isEditableTarget } from '@/lib/shortcuts'
+import { applyOpenOnStart } from '@/nav/startup'
+import { useSettings } from '@/settings/useSettings'
 import { TopBar } from '@/shell/TopBar'
-import { cn } from '@/lib/utils'
+import { TasksPage } from '@/tasks/TasksPage'
 import { TrashView } from '@/trash/TrashView'
 import { CreateTypeDialog } from '@/types/CreateTypeDialog'
 import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
 import { TypePage } from '@/types/TypePage'
 import { TypeSettings } from '@/types/TypeSettings'
-import { useDefinitions } from '@/types/useDefinitions'
 
 const REFRESH_DELAY_MS = 150
 
 /** Inputs, text areas, selects, contenteditable (the body editor) and CodeMirror (raw mode). */
-export function isEditableTarget(el: EventTarget | null): boolean {
-  if (!(el instanceof Element)) return false
-  if (el.closest('input, textarea, select, .cm-editor')) return true
-  const ce = el.closest('[contenteditable]')
-  return !!ce && ce.getAttribute('contenteditable') !== 'false'
-}
+export { isEditableTarget }
 
 /** The type Ctrl+N creates: the open type, else the open object's type, else Page. */
 function currentTypeId(types: TypeDef[]): string {
@@ -49,136 +67,90 @@ function currentTypeId(types: TypeDef[]): string {
   return types.find((t) => t.name.toLowerCase() === 'page')?.id ?? 'page'
 }
 
-/** The space's types: the link index's (reloaded as files bring new types), else the initial fetch's. */
-function useSpaceTypes(space: SpaceInfo | null): TypeDef[] {
-  const indexTypes = useLinkIndex((s) => s.types)
-  return indexTypes.length > 0 ? indexTypes : (space?.types ?? [])
+interface PageCtx {
+  types: TypeDef[]
+  space: SpaceInfo | null
+  open: (t: Target, o?: OpenOptions) => void
 }
 
-function TabLabel({ tab, space }: { tab: Tab; space: SpaceInfo | null }) {
-  const target = tabTarget(tab)
-  const objects = useLinkIndex((s) => s.objects)
-  const types = useSpaceTypes(space)
-  const { collections, queries } = useDefinitions()
-  if (!target) return <span className="truncate">New tab</span>
-  if (target.kind === 'collection') {
-    const c = collections.find((x) => x.id === target.id)
-    return (
-      <>
-        <IconOrEmoji icon={c?.icon} size={15} fallback="ph-stack" />
-        <span className="truncate">{c?.name ?? target.id}</span>
-      </>
-    )
+/** The page a target shows, in the main panel or in a side-panel entry (`open` navigates that place). */
+function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
+  switch (target.kind) {
+    case 'object':
+      return <ObjectPage path={target.path} />
+    case 'type': {
+      const type = types.find((t) => t.id === target.typeId)
+      if (type) return <TypePage key={type.id} type={type} />
+      return space ? <Centered title="Unknown object type" subtitle={target.typeId} /> : null
+    }
+    case 'typeSettings':
+      return (
+        <TypeSettings
+          key={target.typeId}
+          typeId={target.typeId}
+          onOpenType={(typeId) => open({ kind: 'type', typeId })}
+          onOpenTemplate={(path) => open({ kind: 'object', path })}
+          onDeleted={() => open({ kind: 'trash' })}
+        />
+      )
+    case 'trash':
+      return <TrashView />
+    case 'collection':
+      return <CollectionPage key={target.id} id={target.id} />
+    case 'query':
+      return <QueryPage key={target.id} id={target.id} />
+    case 'queries':
+      return <QueriesPage />
+    case 'allNotes':
+      return <AllNotesView />
+    case 'calendar':
+      return <CalendarPage onOpenTarget={(t) => open(t)} />
+    case 'tasks':
+      return <TasksPage />
+    case 'graph':
+      return <GraphPage onOpenTarget={(t, o) => open(t, o)} />
+    case 'search':
+      // M8: the extended search page; a new query or toggle remounts it with what was typed.
+      return <SearchPage key={`${target.q ?? ''}|${target.textOnly ? 1 : 0}`} q={target.q} textOnly={target.textOnly} />
   }
-  if (target.kind === 'query') {
-    const q = queries.find((x) => x.id === target.id)
-    return (
-      <>
-        <IconOrEmoji icon={q?.icon} size={15} fallback="ph-magnifying-glass" />
-        <span className="truncate">{q?.name || 'Query'}</span>
-      </>
-    )
-  }
-  if (target.kind === 'queries') {
-    return (
-      <>
-        <Icon name="ph-magnifying-glass" size={15} />
-        <span className="truncate">Queries</span>
-      </>
-    )
-  }
-  if (target.kind === 'allNotes') {
-    return (
-      <>
-        <Icon name="ph-note" size={15} />
-        <span className="truncate">All notes</span>
-      </>
-    )
-  }
-  if (target.kind === 'trash') {
-    return (
-      <>
-        <Icon name="ph-trash" size={15} />
-        <span className="truncate">Trash</span>
-      </>
-    )
-  }
-  if (target.kind === 'type' || target.kind === 'typeSettings') {
-    const type = types.find((t) => t.id === target.typeId)
-    const label = type ? (target.kind === 'type' ? type.pluralName : `${type.name} settings`) : target.typeId
-    return (
-      <>
-        {type && <TypeChip type={type} size={22} />}
-        <span className="truncate">{label}</span>
-      </>
-    )
-  }
-  const summary = objects.find((o) => o.path === target.path)
-  const type = types.find((t) => t.id === summary?.type)
-  return (
-    <>
-      {summary?.icon ? <ObjectIcon icon={summary.icon} size={15} /> : type && <TypeChip type={type} size={22} />}
-      <span className="truncate">{summary?.title ?? stemOf(target.path)}</span>
-    </>
-  )
-}
-
-function TabStrip({ space }: { space: SpaceInfo | null }) {
-  const { tabs, activeId, activate, close } = useTabs()
-  return (
-    <div role="tablist" aria-label="Tabs" className="flex min-w-0 items-center gap-1 overflow-hidden">
-      {tabs.map((tab) => (
-        <div
-          key={tab.id}
-          role="tab"
-          aria-selected={tab.id === activeId}
-          tabIndex={0}
-          onClick={() => activate(tab.id)}
-          onAuxClick={(e) => e.button === 1 && close(tab.id)}
-          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && activate(tab.id)}
-          className={cn(
-            'group flex h-8 max-w-[220px] min-w-0 cursor-default items-center gap-1.5 rounded-lg pr-1 pl-2 text-[15px] font-medium',
-            tab.id === activeId ? 'text-fg' : 'text-fg-muted hover:bg-hover',
-          )}
-        >
-          <TabLabel tab={tab} space={space} />
-          <button
-            type="button"
-            aria-label="Close tab"
-            onClick={(e) => {
-              e.stopPropagation()
-              close(tab.id)
-            }}
-            className="flex size-5 shrink-0 items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-hover-2"
-          >
-            <Icon name="ph-x" size={12} />
-          </button>
-        </div>
-      ))}
-    </div>
-  )
 }
 
 export default function App() {
   const [space, setSpace] = useState<SpaceInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [rightOpen, setRightOpen] = useState(false)
   const [createTypeOpen, setCreateTypeOpen] = useState(false)
   const [deleting, setDeleting] = useState<TypeDef | null>(null)
   const [newMenuOpen, setNewMenuOpen] = useState(false)
+  // Tabs and recent items are stored per space: content waits until this space's tabs are loaded.
+  const [tabsReady, setTabsReady] = useState(false)
   const tabs = useTabs()
-  const target = currentTarget(tabs)
+  const target = tabsReady ? currentTarget(tabs) : null
+  useTabShortcuts()
+  usePanelShortcuts({ toggleLeftSidebar: () => setSidebarOpen((v) => !v) })
+  const sidepanelShown = tabsReady && isSidepanelShown(activeTab(tabs))
 
   useEffect(() => {
+    let live = true
     api
       .space()
-      .then((s) => {
+      .then(async (s) => {
+        await Promise.all([setTabsSpace(s.root), setRecentSpace(s.root)])
+        if (!live) return
+        // "When this space opens" (per space, on this device). A settings failure keeps the tabs.
+        const settings = useSettings.getState()
+        if (!settings.loaded) await settings.load().catch(() => undefined)
+        if (!live) return
+        applyOpenOnStart(useSettings.getState().settings.openOnStart?.[s.root])
         setSpace(s)
+        setTabsReady(true)
         document.title = `${s.name} · Object`
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => live && setError(e instanceof Error ? e.message : String(e)))
     void useLinkIndex.getState().load()
+    return () => {
+      live = false
+    }
   }, [])
 
   // Objects created, changed (a title edit) or deleted, on disk or by our own
@@ -249,37 +221,28 @@ export default function App() {
 
   let content
   if (error) {
-    content = (
-      <Centered title="Can't reach the Object back end." subtitle={error} />
-    )
-  } else if (target?.kind === 'object') {
-    content = <ObjectPage path={target.path} />
-  } else if (target?.kind === 'type' && activeType) {
-    content = <TypePage key={activeType.id} type={activeType} />
-  } else if (target?.kind === 'type' && space) {
-    content = <Centered title="Unknown object type" subtitle={target.typeId} />
-  } else if (target?.kind === 'typeSettings') {
-    content = (
-      <TypeSettings
-        key={target.typeId}
-        typeId={target.typeId}
-        onOpenType={(typeId) => tabs.open({ kind: 'type', typeId })}
-        onOpenTemplate={(path) => tabs.open({ kind: 'object', path })}
-        onDeleted={() => tabs.open({ kind: 'trash' })}
-      />
-    )
-  } else if (target?.kind === 'trash') {
-    content = <TrashView />
-  } else if (target?.kind === 'collection') {
-    content = <CollectionPage key={target.id} id={target.id} />
-  } else if (target?.kind === 'query') {
-    content = <QueryPage key={target.id} id={target.id} />
-  } else if (target?.kind === 'queries') {
-    content = <QueriesPage />
-  } else if (target?.kind === 'allNotes') {
-    content = <AllNotesView />
+    content = <Centered title="Can't reach the Object back end." subtitle={error} />
+  } else if (target) {
+    content = pageFor(target, { types, space, open: tabs.open })
+  } else if (!tabsReady) {
+    content = null
   } else {
     content = <Centered title="Pick an object type" subtitle="Choose a type in the sidebar to see its objects." />
+  }
+
+  // A side-panel entry: M5's local graph follows the tab's current object; links in a page open
+  // into the entry, and a new-tab open still makes a tab.
+  const renderSidepanel = (t: SidepanelTarget, nav: { open(t: Target, o?: OpenOptions): void }): ReactNode => {
+    if (t.kind === 'localGraph') {
+      return target?.kind === 'object' ? (
+        <LocalGraphPanel path={target.path} />
+      ) : (
+        <Centered title="Graph View" subtitle="Open an object to see its graph." />
+      )
+    }
+    // M8: the backlinks entry follows the tab's current object.
+    if (t.kind === 'backlinks') return <BacklinksPanel path={target?.kind === 'object' ? target.path : null} />
+    return pageFor(t, { types, space, open: (x, o) => (o?.newTab ? tabs.open(x, o) : nav.open(x, o)) })
   }
 
   return (
@@ -288,8 +251,8 @@ export default function App() {
         <TopBar
           spaceName={space?.name ?? '…'}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
-          onToggleRightPanel={() => setRightOpen((v) => !v)}
-          rightPanelOpen={rightOpen}
+          onToggleRightPanel={tabs.toggleSidepanel}
+          rightPanelOpen={sidepanelShown}
           onBack={tabs.back}
           onForward={tabs.forward}
           canGoBack={canGoBack(tabs)}
@@ -299,25 +262,45 @@ export default function App() {
         />
         <div className="flex min-h-0 flex-1">
           {sidebarOpen && (
-            <Sidebar
-              types={types}
-              activeTypeId={activeType?.id}
-              onOpenType={(t) => tabs.open({ kind: 'type', typeId: t.id })}
-              counts={counts}
-              onNew={() => setNewMenuOpen(true)}
-              onCreateType={() => setCreateTypeOpen(true)}
-              onOpenTypeSettings={(t) => tabs.open({ kind: 'typeSettings', typeId: t.id })}
-              onDeleteType={setDeleting}
-              onOpenTrash={() => tabs.open({ kind: 'trash' })}
-              trashActive={target?.kind === 'trash'}
-              onOpenTarget={(t, o) => tabs.open(t, o)}
-              queriesActive={target?.kind === 'queries'}
-              allNotesActive={target?.kind === 'allNotes'}
-            />
+            <ErrorBoundary what="The sidebar">
+              <Sidebar
+                types={types}
+                activeTypeId={activeType?.id}
+                onOpenType={(t) => tabs.open({ kind: 'type', typeId: t.id })}
+                counts={counts}
+                onNew={() => setNewMenuOpen(true)}
+                onCreateType={() => setCreateTypeOpen(true)}
+                onOpenTypeSettings={(t) => tabs.open({ kind: 'typeSettings', typeId: t.id })}
+                onDeleteType={setDeleting}
+                onOpenTrash={() => tabs.open({ kind: 'trash' })}
+                trashActive={target?.kind === 'trash'}
+                onOpenTarget={(t, o) => tabs.open(t, o)}
+                queriesActive={target?.kind === 'queries'}
+                allNotesActive={target?.kind === 'allNotes'}
+                calendarActive={target?.kind === 'calendar'}
+                tasksActive={target?.kind === 'tasks'}
+                graphActive={target?.kind === 'graph'}
+              />
+            </ErrorBoundary>
           )}
-          <MainPanel aside={<RightPanel open={rightOpen} />}>{content}</MainPanel>
+          <MainPanel aside={tabsReady && <SidePanel space={space} renderTarget={renderSidepanel} />}>
+            <div className="flex h-full min-h-0 flex-col">
+              <Breadcrumbs space={space} />
+              <div className="min-h-0 flex-1">
+                <ErrorBoundary what="This page" resetKey={target ? JSON.stringify(target) : ''}>
+                  {content}
+                </ErrorBoundary>
+              </div>
+            </div>
+          </MainPanel>
         </div>
         <ObjectPeek />
+        <CommandPalette
+          onOpenTarget={(t, o) => tabs.open(t, o)}
+          onToggleSidebar={() => setSidebarOpen((v) => !v)}
+          onToggleRightPanel={tabs.toggleSidepanel}
+          onShowRightPanel={() => tabs.openInSidepanel({ kind: 'localGraph' })}
+        />
         <LinkPicker />
         <NewObjectMenu open={newMenuOpen} onOpenChange={setNewMenuOpen} />
         <CreateTypeDialog

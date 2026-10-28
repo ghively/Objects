@@ -1,6 +1,7 @@
 /**
  * An object's full view, shared by the page and the peek: property panel,
- * header and body editor (formatted or raw), with the `…` menu.
+ * header and body editor (formatted or raw), with the `…` menu. `mode='inline'` (M4: the
+ * calendar's daily note) renders only the body editor and its autosave.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { api, ConflictError } from '@/api/client'
@@ -14,6 +15,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -22,11 +24,14 @@ import {
 import { Editor } from '@/editor/Editor'
 import { RawMode } from '@/editor/RawMode'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
+import { FindBar } from '@/find/FindBar'
+import { useFind } from '@/find/useFind'
 import { installLinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, typeOf, useLinkIndex, ensureLinkIndex } from '@/links/linkIndex'
 import { installWikilinkPresenter } from '@/links/wikilinkPresenter'
 import { cn } from '@/lib/utils'
-import { canGoBack, useTabs, type Target } from '@/nav/tabs'
+import { canGoBack, usePeek, useTabs, type Target } from '@/nav/tabs'
+import { ReferencesSection } from '@/references/ReferencesSection'
 import { byPluralName, TypeChip } from '@/shell/Sidebar'
 import { templatesAllowed } from '@/types/TemplateManager'
 import { ChangeTypeDialog } from './ChangeTypeDialog'
@@ -36,18 +41,33 @@ import { PinMenuItems } from '@/shell/PinToMenu'
 import { DeletedBanner } from './DeletedBanner'
 import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
-import { ensureNewTags, ObjectHeader, openTag } from './ObjectHeader'
-import { PageLayout, pageDesign, panelVariant } from './PageLayout'
+import { ensureNewTags, isTagType, ObjectHeader, openTag } from './ObjectHeader'
+import { PageLayout, type PanelVariant } from './PageLayout'
 import { PropertyPanel } from './PropertyPanel'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
 import { useTypeEditor } from './useTypeEditor'
+import { COLLECTION_ICON } from '@/lib/defIcons'
+import { isTaskRoleType } from '@/editor/embed/ObjectEmbedView'
+import { useFocusMode } from '@/focus/useFocusMode'
+import { useVersionHistory } from '@/history/useVersionHistory'
+import { useMerge } from '@/merge/useMerge'
+import { usePresentation } from '@/present/usePresentation'
+import { CompletionLog } from '@/tasks/CompletionLog'
+import { TaskStatsSection } from '@/tasks/TaskStatsSection'
+import { useAddToWhiteboard } from '@/whiteboard/AddToWhiteboardDialog'
 
 installWikilinkPresenter()
 installLinkPicker()
 
 export interface ObjectViewProps {
   path: string
-  mode: 'page' | 'peek'
+  mode: 'page' | 'peek' | 'inline'
+  /** Inline only: muted text shown while the body is empty. */
+  placeholder?: string
+  /** Inline only: focus the editor once the object has loaded. */
+  autoFocus?: boolean
+  /** Called with each version this view adopts (load, saves, reloads). */
+  onVersion?: (version: string) => void
   /** Peek only: open the object as a page in the current tab. */
   onExpand?: () => void
   /** Called after an action that should dismiss the peek (e.g. open in new tab). */
@@ -72,12 +92,37 @@ export function patchSummary(summary: ObjectSummary, fm: Record<string, unknown>
   return next
 }
 
-function ToolButton({ label, icon, onClick }: { label: string; icon: string; onClick?: () => void }) {
+/** The `…` menu item (`EntityMenu.openInSidepanel`). */
+export const OPEN_IN_SIDEPANEL_MENU_ITEM = 'Open in side panel'
+
+/** The `…` menu item (`FindInPage.menuItem`). */
+export const FIND_IN_PAGE_MENU_ITEM = 'Find in page'
+
+/** M8 menu items and the focus-mode button (reference strings). */
+export const OBJECT_M8_TEXT = {
+  /** `EntityMenu.versionHistory.text` */
+  versionHistory: 'Version History',
+  /** `EntityMenu.mergeObject.text` */
+  mergeObject: 'Merge into object',
+  /** `EntityMenu.mergeTag.text` */
+  mergeTag: 'Merge into tag',
+  /** `EntityMenu.presentationMode.text` */
+  present: 'Present',
+  /** `Whiteboard.addTo.action` */
+  addToWhiteboard: 'Add to whiteboard',
+  /** `ComponentHeader.focusMode.enterLabel` */
+  enterFocusMode: 'Enter Focus Mode',
+  /** `ComponentHeader.focusMode.leaveLabel` */
+  leaveFocusMode: 'Leave Focus Mode',
+} as const
+
+function ToolButton({ label, icon, onClick, pressed }: { label: string; icon: string; onClick?: () => void; pressed?: boolean }) {
   return (
     <button
       type="button"
       aria-label={label}
       title={label}
+      aria-pressed={pressed}
       onClick={onClick}
       className="flex size-8 items-center justify-center rounded-md text-fg hover:bg-hover"
     >
@@ -86,7 +131,7 @@ function ToolButton({ label, icon, onClick }: { label: string; icon: string; onC
   )
 }
 
-export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectViewProps) {
+export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholder, autoFocus, onVersion }: ObjectViewProps) {
   const [detail, setDetail] = useState<ObjectDetail | null>(null)
   const [version, setVersion] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -113,9 +158,12 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
   const editorRef = useRef<BodyEditorHandle | null>(null)
   /** The version the editor's next save is based on (mirrors `version` without waiting for a render). */
   const versionRef = useRef('')
+  const onVersionRef = useRef(onVersion)
+  onVersionRef.current = onVersion
   const adoptVersion = useCallback((v: string) => {
     versionRef.current = v
     setVersion(v)
+    onVersionRef.current?.(v)
   }, [])
 
   /**
@@ -444,6 +492,21 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
     }
   }, [deleteRequest, path, mode])
 
+  // Ctrl+F opens Find in page for the active view: the peek, or the page while no peek is open.
+  // Capture phase, so it works with the caret in the editor; preventDefault stops the browser's find.
+  useEffect(() => {
+    if (mode === 'inline') return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'f') return
+      const peekPath = usePeek.getState().path
+      if (mode === 'page' ? peekPath !== null : peekPath !== path) return
+      e.preventDefault()
+      useFind.getState().open(path)
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [mode, path])
+
   const summary = detail?.summary
   const typeEditor = useTypeEditor(summary?.type)
   const type = typeEditor.type ?? typeOf(summary?.type)
@@ -465,22 +528,46 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
   const otherTypes = allTypes.filter((t) => t.id !== summary?.type).sort(byPluralName)
   const isTemplate = summary?.template != null
   const canTemplate = !!type && !isTemplate && templatesAllowed(type)
+  const isTag = !!summary && isTagType(type, summary.type)
+  const isTask = !!summary && !isTemplate && isTaskRoleType(type, summary.type)
+  const focusOn = useFocusMode((s) => s.on)
 
-  const design = pageDesign(type)
+  // A render function: the layout picks the variant (inline as a card when the page is narrow).
   const properties =
-    detail && panelOpen ? (
+    detail && panelOpen ? (variant: PanelVariant) => (
+      <>
       <PropertyPanel
         type={type}
         frontmatter={detail.frontmatter}
         links={detail.links}
         summary={detail.summary}
+        backlinks={detail.backlinks ?? []}
         readOnly={propsReadOnly}
         onChange={(key, value) => writeProperties({ [key]: value })}
+        onChangeMany={(u, r) => void writes.updateProperties(u, r)}
+        onSetReminder={(key, remind) => void writes.setReminder(key, remind)}
         onTypeChange={onTypeChange}
         onOpenTag={onOpenTag}
         onOpenObject={onOpenObject}
-        variant={panelVariant(design)}
+        variant={variant}
       />
+      {/* M8: "Task Stats" under the property panel of a recurring task-role object. */}
+      {isTask && typeof detail.frontmatter.repeat === 'string' && detail.frontmatter.repeat.trim() !== '' && (
+        <>
+          <TaskStatsSection path={path} version={version} />
+          {/* "Completion Log": deleting an entry writes only the log's remaining lines. */}
+          <CompletionLog
+            log={typeof detail.frontmatter.occurrenceLog === 'string' ? detail.frontmatter.occurrenceLog : null}
+            readOnly={propsReadOnly}
+            onChange={(next) =>
+              void (next === null
+                ? writes.updateProperties({}, ['occurrenceLog'])
+                : writes.updateProperties({ occurrenceLog: next }))
+            }
+          />
+        </>
+      )}
+      </>
     ) : null
 
   const toolbar = (
@@ -491,7 +578,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
         title={panelOpen ? 'Hide properties' : 'Show properties'}
         aria-pressed={panelOpen}
         onClick={() => setPanelOpen((v) => !v)}
-        className="flex size-10 items-center justify-center rounded-[11px] border border-[#29282d] bg-[#18181b] p-[3px] text-fg"
+        className="flex size-10 items-center justify-center rounded-[11px] border border-[var(--float-btn-border)] bg-[var(--float-bg)] p-[3px] text-fg"
       >
         <span
           className={cn(
@@ -502,7 +589,17 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
           <Icon name="ph-sidebar-simple" size={17} />
         </span>
       </button>
-      <div className="flex h-10 items-center gap-0.5 rounded-xl border border-[#232226] bg-[#18181b] px-1">
+      <div className="flex min-w-0 items-center gap-2">
+      <FindBar path={path} editorRef={editorRef} />
+      <div className="flex h-10 shrink-0 items-center gap-0.5 rounded-xl border border-[var(--float-border)] bg-[var(--float-bg)] px-1">
+        {mode === 'page' && (
+          <ToolButton
+            label={focusOn ? OBJECT_M8_TEXT.leaveFocusMode : OBJECT_M8_TEXT.enterFocusMode}
+            icon={focusOn ? 'ph-arrows-in-simple' : 'ph-frame-corners'}
+            pressed={focusOn}
+            onClick={() => useFocusMode.getState().toggle()}
+          />
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -524,11 +621,43 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
               <Icon name="ph-arrow-square-out" size={14} />
               Open in new tab
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => {
+                useTabs.getState().openInSidepanel({ kind: 'object', path })
+                onDismiss?.()
+              }}
+            >
+              <Icon name="ph-square-split-horizontal" size={14} />
+              {OPEN_IN_SIDEPANEL_MENU_ITEM}
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void api.reveal(path).catch(() => undefined)}>
               <Icon name="ph-folder-open" size={14} />
               Reveal in Explorer
             </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => useFind.getState().open(path)}>
+              <Icon name="ph-magnifying-glass" size={14} />
+              {FIND_IN_PAGE_MENU_ITEM}
+              <DropdownMenuShortcut>Ctrl F</DropdownMenuShortcut>
+            </DropdownMenuItem>
             <PinMenuItems pin={{ kind: 'object', path, id: summary?.id }} />
+            <DropdownMenuItem disabled={!summary} onSelect={() => useVersionHistory.getState().open(path)}>
+              <Icon name="ph-clock-counter-clockwise" size={14} />
+              {OBJECT_M8_TEXT.versionHistory}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!summary}
+              onSelect={() => {
+                usePresentation.getState().start(path)
+                onDismiss?.()
+              }}
+            >
+              <Icon name="ph-presentation" size={14} />
+              {OBJECT_M8_TEXT.present}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!summary || isTemplate} onSelect={() => useAddToWhiteboard.getState().open(path)}>
+              <Icon name="ph-chalkboard-simple" size={14} />
+              {OBJECT_M8_TEXT.addToWhiteboard}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuSub>
               <DropdownMenuSubTrigger disabled={propsReadOnly || !summary || isTemplate}>
@@ -565,8 +694,15 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
               disabled={propsReadOnly || !summary || isTemplate}
               onSelect={() => setCollectionsOpen(true)}
             >
-              <Icon name="ph-stack" size={14} />
+              <Icon name={COLLECTION_ICON} size={14} />
               Edit Collections
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={propsReadOnly || !summary || isTemplate}
+              onSelect={() => useMerge.getState().open(path)}
+            >
+              <Icon name="ph-git-merge" size={14} />
+              {isTag ? OBJECT_M8_TEXT.mergeTag : OBJECT_M8_TEXT.mergeObject}
             </DropdownMenuItem>
             {type && (
               <DropdownMenuItem onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>
@@ -591,8 +727,27 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
         </DropdownMenu>
         {onExpand && <ToolButton label="Open as page" icon="ph-arrows-out-simple" onClick={onExpand} />}
       </div>
+      </div>
     </div>
   )
+
+  // Inline mode: the placeholder while the body is empty, and focus once loaded.
+  const inlineRef = useRef<HTMLDivElement | null>(null)
+  const [bodyEmpty, setBodyEmpty] = useState(true)
+  const loadedBody = detail?.body
+  useEffect(() => {
+    if (loadedBody !== undefined) setBodyEmpty(loadedBody.trim() === '')
+  }, [loadedBody])
+  const focusedRef = useRef(false)
+  const hasDetail = detail !== null
+  useEffect(() => {
+    if (mode !== 'inline' || !autoFocus || !hasDetail || focusedRef.current) return
+    const el = inlineRef.current?.querySelector<HTMLElement>('.ProseMirror')
+    if (el) {
+      focusedRef.current = true
+      el.focus()
+    }
+  }, [mode, autoFocus, hasDetail])
 
   const overlays = (
     <>
@@ -648,6 +803,56 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
       )}
     </>
   )
+
+  if (mode === 'inline') {
+    const checkEmpty = () => {
+      const b = editorRef.current?.getBody()
+      if (b != null) setBodyEmpty(b.trim() === '')
+    }
+    return (
+      <div className="relative w-full" data-object-view="inline" data-object-path={path} ref={inlineRef}>
+        {!detail || !summary ? (
+          error ? (
+            <p className="text-[14px] text-fg-muted">{`Couldn't open this object. ${error}`}</p>
+          ) : (
+            <p className="text-[14px] text-fg-muted">Loading…</p>
+          )
+        ) : (
+          <>
+            {deleted && (
+              <div role="alert" className="mb-3 rounded-lg border border-danger/60 bg-raised px-3 py-2 text-[14px]">
+                This object's file was deleted or moved on disk. Edits here aren't saved.
+              </div>
+            )}
+            <div className="relative text-[17px]" onInput={checkEmpty} onKeyUp={checkEmpty} onBlur={checkEmpty}>
+              {placeholder && bodyEmpty && (
+                <div aria-hidden data-testid="inline-placeholder" className="pointer-events-none absolute top-0 left-0 text-fg-muted">
+                  {placeholder}
+                </div>
+              )}
+              <Editor
+                path={path}
+                body={detail.body}
+                version={version}
+                readOnly={readOnly || deleted}
+                onSaved={adoptVersion}
+                onConflict={onConflict}
+                controlRef={editorRef}
+              />
+            </div>
+          </>
+        )}
+        <ConflictDialog
+          open={pending !== null}
+          path={path}
+          mine={pending?.mine ?? ''}
+          theirs={pending?.theirs.body ?? ''}
+          onKeepMine={keepMine}
+          onTakeTheirs={takeTheirs}
+        />
+      </div>
+    )
+  }
 
   if (!detail || !summary) {
     return (
@@ -741,6 +946,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer }: ObjectVi
                 />
               )}
             </div>
+            <ReferencesSection path={path} summary={summary} type={type} />
           </>
         }
       >

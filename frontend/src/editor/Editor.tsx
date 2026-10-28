@@ -1,8 +1,47 @@
+import { Extension } from '@tiptap/core'
+import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { EditorContent, useEditor } from '@tiptap/react'
-import { useEffect, useImperativeHandle, useRef, type Ref } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
+import { registerFlusher } from '@/lib/flush'
+import { useSettings } from '@/settings/useSettings'
 import { editorExtensions, loadBody, serializeBody } from './document'
+import { createFindControl, FindInPage } from './extensions/findInPage'
+import { BlockHandles } from './handles/BlockHandles'
+import { setEditorObject } from './nodes/blockRef'
+import { TokensMenu } from './tokens/TokensMenu'
+import { SlashMenu } from './slash/SlashMenu'
 import { useAutosave, type BodyEditorHandle } from './useAutosave'
 import './editor.css'
+import './handles/handles.css'
+
+/** The empty-body placeholder (`components.RootSpace.text.main.placeholder`). */
+export const EDITOR_PLACEHOLDER = 'Write your text or search for blocks...'
+
+/** Shows the placeholder on an editable body that is one empty paragraph. */
+const EmptyPlaceholder = Extension.create({
+  name: 'emptyPlaceholder',
+  addProseMirrorPlugins() {
+    const editor = this.editor
+    return [
+      new Plugin({
+        key: new PluginKey('emptyPlaceholder'),
+        props: {
+          decorations: (state) => {
+            const { doc } = state
+            const first = doc.firstChild
+            if (!editor.isEditable || doc.childCount !== 1 || !first || first.type.name !== 'paragraph' || first.content.size > 0) {
+              return null
+            }
+            return DecorationSet.create(doc, [
+              Decoration.node(0, first.nodeSize, { class: 'is-editor-empty', 'data-placeholder': EDITOR_PLACEHOLDER }),
+            ])
+          },
+        },
+      }),
+    ]
+  },
+})
 
 export type EditorProps = {
   path: string
@@ -21,13 +60,21 @@ export type EditorProps = {
  */
 export function Editor({ path, body, version, readOnly, onSaved, onConflict, controlRef }: EditorProps) {
   const autosaveRef = useRef<ReturnType<typeof useAutosave> | null>(null)
+  const disableSpellcheck = useSettings((s) => s.settings.disableSpellcheck)
+  const disableNumbered = useSettings((s) => s.settings.disableNumberedListTransformation)
+  // The extensions are built once per editor: the numbered-list setting applies to editors opened after it changes.
+  const [extensions] = useState(() => [
+    ...editorExtensions({ numberedListInputRule: !disableNumbered }),
+    FindInPage,
+    EmptyPlaceholder,
+  ])
 
   const editor = useEditor({
-    extensions: editorExtensions(),
+    extensions,
     editable: !readOnly,
     immediatelyRender: true,
     shouldRerenderOnTransaction: false,
-    editorProps: { attributes: { class: 'object-editor', spellcheck: 'true' } },
+    editorProps: { attributes: { class: 'object-editor', spellcheck: disableSpellcheck ? 'false' : 'true' } },
     onUpdate: ({ transaction }) => {
       if (transaction.docChanged) autosaveRef.current?.schedule()
     },
@@ -49,6 +96,18 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict, con
   useEffect(() => {
     editor?.setEditable(!readOnly, false)
   }, [editor, readOnly])
+
+  // The object this editor shows, for the block references it copies (M8).
+  useEffect(() => {
+    if (!editor) return
+    setEditorObject(editor, { path })
+    return () => setEditorObject(editor, null)
+  }, [editor, path])
+
+  // A space switch flushes every open editor's pending save first (read-only ones resolve at once).
+  const settleRef = useRef(autosave.settle)
+  settleRef.current = autosave.settle
+  useEffect(() => registerFlusher(() => settleRef.current()), [])
 
   // Load the body when the object or its on-disk text changes. A body equal to
   // what this editor just saved is our own write echoing back: keep the doc.
@@ -80,6 +139,7 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict, con
         autosave.markLoaded(text, v)
         loadedRef.current = { path, body: text }
       },
+      find: editor ? createFindControl(editor) : undefined,
     }),
     [editor, autosave, path],
   )
@@ -100,6 +160,9 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict, con
         </div>
       )}
       <EditorContent editor={editor} className="object-editor-root" data-readonly={readOnly || undefined} />
+      {editor && !readOnly && <BlockHandles editor={editor} />}
+      {editor && !readOnly && <SlashMenu editor={editor} />}
+      {editor && !readOnly && <TokensMenu editor={editor} path={path} />}
     </>
   )
 }

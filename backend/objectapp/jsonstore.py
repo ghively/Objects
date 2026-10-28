@@ -10,6 +10,7 @@ recorded in ``own_writes`` so the watcher stays silent about them.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import re
@@ -28,6 +29,7 @@ __all__ = [
     "default_views",
     "dump_json",
     "json_revision",
+    "normalize_views",
 ]
 
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -211,3 +213,59 @@ def default_views(t: TypeDefinition) -> dict[str, Any]:
             "removedSections": [],
         },
     }
+
+
+def _view_of(stored: Any, default: dict[str, Any]) -> dict[str, Any]:
+    """One stored view (``all`` or a section) over its default; unknown keys kept."""
+    out = {**copy.deepcopy(default), **stored} if isinstance(stored, dict) else copy.deepcopy(default)
+    vd = out.get("viewDefinition")
+    out["viewDefinition"] = (
+        {**default["viewDefinition"], **vd} if isinstance(vd, dict) else copy.deepcopy(default["viewDefinition"])
+    )
+    if not isinstance(out.get("filterGroup"), dict) or not isinstance(
+        out["filterGroup"].get("elements"), list
+    ):
+        out["filterGroup"] = _empty_filter_group()
+    if not isinstance(out.get("sorts"), list):
+        out["sorts"] = []
+    if "groupBy" in out and out["groupBy"] is not None and not isinstance(out["groupBy"], dict):
+        out["groupBy"] = None
+    return out
+
+
+def _is_section(s: Any) -> bool:
+    return isinstance(s, dict) and isinstance(s.get("key"), str) and bool(s["key"])
+
+
+def _section_of(s: dict[str, Any]) -> dict[str, Any]:
+    out = {**s, "collapsed": bool(s.get("collapsed", False))}
+    if "viewDefinition" in out and not isinstance(out["viewDefinition"], dict):
+        del out["viewDefinition"]
+    return out
+
+
+def normalize_views(stored: Any, defaults: dict[str, Any]) -> dict[str, Any]:
+    """Stored Views deep-merged over ``defaults`` so every key the UI reads is there.
+
+    Fills ``activeTab``, ``all`` (with ``viewDefinition``, ``filterGroup``, ``sorts``)
+    and ``dashboard`` (``sections``, ``removedSections``); drops sections that aren't
+    objects with a string ``key``. Unknown keys are kept. Read-only: the file is not
+    rewritten.
+    """
+    if not isinstance(stored, dict):
+        return copy.deepcopy(defaults)
+    out = {**copy.deepcopy(defaults), **copy.deepcopy(stored)}
+    if not isinstance(out.get("activeTab"), str) or not out["activeTab"]:
+        out["activeTab"] = defaults["activeTab"]
+    out["all"] = _view_of(stored.get("all"), defaults["all"])
+    dash = stored.get("dashboard")
+    dash = dict(dash) if isinstance(dash, dict) else {}
+    sections = dash.get("sections")
+    if isinstance(sections, list):
+        dash["sections"] = [_section_of(s) for s in sections if _is_section(s)]
+    else:
+        dash["sections"] = copy.deepcopy(defaults["dashboard"]["sections"])
+    removed = dash.get("removedSections")
+    dash["removedSections"] = [r for r in removed if isinstance(r, str)] if isinstance(removed, list) else []
+    out["dashboard"] = dash
+    return out

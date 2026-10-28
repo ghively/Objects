@@ -1,5 +1,5 @@
 // One section's content: a DataView over the section's rows (recently opened, not in any
-// collection, not tagged, a pinned query, a collection) or a grid of cards (collections, queries).
+// collection, not tagged, no backlinks, a pinned query, a collection) or a grid of cards (collections, queries).
 // Used for Overview sections and, full width, for the section header tabs. Filters, sorts and
 // grouping are session-only; only the view definition (layout, table and card settings) is saved
 // with the section, through `onViewDefinition`.
@@ -15,8 +15,11 @@ import { applyFilters } from '@/views/filter'
 import { FULL_VIEW_LAYOUTS, defaultViewState, emptyFilterGroup } from '@/views/model'
 import { useRows } from '@/views/useRows'
 import { createAndOpen } from '@/create/createAndOpen'
-import { SECTION_TEXT, keyId, type RenderedSection } from './dashboardSections'
+import { SECTION_TEXT, keyId, noBacklinksRows, type RenderedSection } from './dashboardSections'
 import { useDefinitions } from './useDefinitions'
+import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
+import { queryTitle } from '@/queries/autoTitle'
+import { useTitleCtx } from '@/queries/QueryPage'
 
 /** How many recent objects the "Recently Opened" strip shows. */
 export const RECENT_SHOWN = 10
@@ -36,7 +39,7 @@ export function inNoCollection(row: Row, collections: Collection[]): boolean {
   return !names.some((n) => collections.some((c) => c.name.toLowerCase() === n || c.formerNames.some((f) => f.toLowerCase() === n)))
 }
 
-type RowFilter = 'none' | 'noCollection' | 'notTagged'
+type RowFilter = 'none' | 'noCollection' | 'notTagged' | 'noBacklinks'
 
 function EmptyBlock({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return (
@@ -80,6 +83,7 @@ function RowsSection(p: RowsSectionProps) {
   const kept = useMemo(() => {
     if (p.rowFilter === 'noCollection') return rows.filter((r) => inNoCollection(r, collections))
     if (p.rowFilter === 'notTagged') return rows.filter((r) => (r.summary.tags ?? []).length === 0)
+    if (p.rowFilter === 'noBacklinks') return noBacklinksRows(rows)
     return rows
   }, [rows, p.rowFilter, collections])
   const shown = useMemo(() => searchRows(kept, p.search), [kept, p.search])
@@ -168,6 +172,7 @@ export function SectionView({ type, section, search, heading, onCreateCollection
   const { collections, queries } = useDefinitions()
   const recent = useRecent((s) => s.paths)
   const objects = useLinkIndex((s) => s.objects)
+  const titleCtx = useTitleCtx(useLinkIndex((s) => s.types))
   const open = (target: Parameters<ReturnType<typeof useTabs.getState>['open']>[0]) => useTabs.getState().open(target)
 
   const recentPaths = useMemo(() => {
@@ -238,7 +243,7 @@ export function SectionView({ type, section, search, heading, onCreateCollection
                 <DefinitionCard
                   key={c.id}
                   icon={c.icon}
-                  fallback="ph-stack"
+                  fallback={COLLECTION_ICON}
                   name={c.name}
                   description={c.description}
                   onClick={() => open({ kind: 'collection', id: c.id })}
@@ -274,8 +279,8 @@ export function SectionView({ type, section, search, heading, onCreateCollection
                 <DefinitionCard
                   key={q.id}
                   icon={q.icon}
-                  fallback="ph-magnifying-glass"
-                  name={q.name || 'Query'}
+                  fallback={QUERY_ICON}
+                  name={queryTitle(q, titleCtx) || 'Query'}
                   description={q.description}
                   onClick={() => open({ kind: 'query', id: q.id })}
                 />
@@ -287,12 +292,13 @@ export function SectionView({ type, section, search, heading, onCreateCollection
     }
     case 'inNoCollection':
     case 'notTagged':
+    case 'noBacklinks':
       return (
         <RowsSection
           type={type}
           scope={typeScope}
-          base={stateWith(defaultViewState(type).viewDefinition)}
-          rowFilter={section.key === 'inNoCollection' ? 'noCollection' : 'notTagged'}
+          base={stateWith(section.key === 'noBacklinks' ? { dataViewLayout: 'list' } : defaultViewState(type).viewDefinition)}
+          rowFilter={section.key === 'inNoCollection' ? 'noCollection' : section.key === 'notTagged' ? 'notTagged' : 'noBacklinks'}
           layouts={FULL_VIEW_LAYOUTS}
           heading={head}
           search={search}

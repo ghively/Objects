@@ -1,5 +1,5 @@
 import { Editor as TiptapEditor } from '@tiptap/core'
-import { act, render } from '@testing-library/react'
+import { act, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ConflictError } from '@/api/client'
 import { Editor } from './Editor'
@@ -13,6 +13,9 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
+import { flushAll } from '@/lib/flush'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
+import { EDITOR_PLACEHOLDER } from './Editor'
 const saveBody = vi.mocked(api).saveBody
 
 const fixtures = import.meta.glob('./__fixtures__/*.md', {
@@ -121,8 +124,8 @@ describe('document model', () => {
     const types: string[] = []
     editor.state.doc.forEach((n) => types.push(n.type.name))
     expect(types).toContain('rawBlock')
-    // The Field:: block, the HTML and the Mermaid block are raw blocks.
-    expect(types.filter((t) => t === 'rawBlock')).toHaveLength(3)
+    // The Field:: block and the HTML are raw blocks (M7: a Mermaid fence is a code block).
+    expect(types.filter((t) => t === 'rawBlock')).toHaveLength(2)
     // Edit every other paragraph: the Field:: lines stay byte-identical.
     for (let i = 0; i < 3; i++) editor.commands.insertContentAt(endOfNth(editor, 'paragraph', i), ' x')
     const out = serializeBody(editor)
@@ -212,7 +215,7 @@ describe('document model', () => {
   test('a new paragraph is separated by a blank line', () => {
     const editor = headless('# Title\nIntro\n')
     editor.commands.insertContentAt(editor.state.doc.content.size, { type: 'paragraph', content: [{ type: 'text', text: 'New' }] })
-    expect(serializeBody(editor)).toBe('# Title\nIntro\n\nNew')
+    expect(serializeBody(editor)).toBe('# Title\nIntro\n\nNew\n')
     editor.destroy()
   })
 })
@@ -394,5 +397,302 @@ describe('<RawMode>', () => {
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     expect(saveBody).toHaveBeenCalledWith('Tasks/Fix printer.md', 'aX\r\nb\r\n', 'v1')
     expect(onSaved).toHaveBeenCalledWith('v2')
+  })
+})
+
+describe('<Editor> find in page', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    saveBody.mockReset()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const FIND_BODY = [
+    '# Alpha notes',
+    '',
+    'one alpha two Alpha three.',
+    '',
+    'Untouched   __strong__ line',
+    '',
+    'See [[Alpha Server]] and alpha.',
+    '',
+    'Status:: alpha',
+    '',
+  ].join('\n')
+
+  function mountFind(body = FIND_BODY, overrides: Partial<Parameters<typeof Editor>[0]> = {}) {
+    const ref = { current: null as BodyEditorHandle | null }
+    const utils = render(
+      <Editor
+        path="Pages/Find.md"
+        body={body}
+        version="v1"
+        readOnly={false}
+        onSaved={() => {}}
+        onConflict={() => {}}
+        controlRef={ref}
+        {...overrides}
+      />,
+    )
+    const find = ref.current!.find!
+    return { ...utils, ref, find, editor: pmEditor(utils.container) }
+  }
+
+  const marks = (c: HTMLElement) => [...c.querySelectorAll('.find-match')].map((e) => e.textContent)
+  const current = (c: HTMLElement) => [...c.querySelectorAll('.find-match-current')].map((e) => e.textContent)
+
+  test('decorations mark every match and the current one; next and previous wrap', () => {
+    const { container, find } = mountFind('one alpha two Alpha three alpha\n')
+    let count = 0
+    act(() => {
+      count = find.set('alpha')
+    })
+    expect(count).toBe(3)
+    expect(marks(container)).toEqual(['alpha', 'Alpha', 'alpha'])
+    expect(current(container)).toEqual(['alpha'])
+    expect(find.status()).toEqual({ index: 0, count: 3 })
+    act(() => {
+      expect(find.next()).toBe(1)
+    })
+    expect(current(container)).toEqual(['Alpha'])
+    act(() => {
+      find.next()
+    })
+    act(() => {
+      expect(find.next()).toBe(0) // wraps forward
+    })
+    act(() => {
+      expect(find.previous()).toBe(2) // wraps back
+    })
+    // Match case narrows; whole word excludes partial words.
+    act(() => {
+      count = find.set('Alpha', { matchCase: true })
+    })
+    expect(count).toBe(1)
+    act(() => {
+      count = find.set('alph', { matchCase: false, wholeWord: true })
+    })
+    expect(count).toBe(0)
+    expect(marks(container)).toEqual([])
+    // Clearing removes every decoration.
+    act(() => {
+      find.set('alpha', { wholeWord: false })
+    })
+    expect(marks(container)).toHaveLength(3)
+    act(() => {
+      find.clear()
+    })
+    expect(marks(container)).toEqual([])
+    expect(find.status()).toEqual({ index: -1, count: 0 })
+  })
+
+  test('matches follow edits', () => {
+    const { find, editor } = mountFind('alpha\n')
+    act(() => {
+      find.set('alpha')
+    })
+    expect(find.status().count).toBe(1)
+    act(() => {
+      editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), ' alpha')
+    })
+    expect(find.status().count).toBe(2)
+  })
+
+  test('replace changes only the current match and autosaves with the version', async () => {
+    saveBody.mockResolvedValue({ version: 'v2' })
+    const body = 'one alpha two alpha three alpha\n\nUntouched   __strong__ line\n'
+    const { find } = mountFind(body)
+    act(() => {
+      find.set('alpha')
+    })
+    act(() => {
+      find.next()
+    })
+    act(() => {
+      find.replace('omega')
+    })
+    // The match after the replaced one becomes current.
+    expect(find.status()).toEqual({ index: 1, count: 2 })
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    expect(saveBody).toHaveBeenCalledWith(
+      'Pages/Find.md',
+      'one alpha two omega three alpha\n\nUntouched   __strong__ line\n',
+      'v1',
+    )
+  })
+
+  test('replace all saves once through autosave and changes only matches', async () => {
+    saveBody.mockResolvedValue({ version: 'v2' })
+    const { find } = mountFind()
+    let count = 0
+    act(() => {
+      count = find.set('alpha')
+    })
+    expect(count).toBe(6) // the wikilink's label is a match too
+    let replaced = 0
+    act(() => {
+      replaced = find.replaceAll('omega')
+    })
+    expect(replaced).toBe(5) // ... but replace never edits inside it
+    await act(async () => vi.advanceTimersByTimeAsync(3000))
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    const saved = saveBody.mock.calls[0][1]
+    expect(saved).toBe(
+      [
+        '# omega notes',
+        '',
+        'one omega two omega three.',
+        '',
+        'Untouched   __strong__ line',
+        '',
+        'See [[Alpha Server]] and omega.',
+        '',
+        'Status:: omega',
+        '',
+      ].join('\n'),
+    )
+    expect(saveBody.mock.calls[0][2]).toBe('v1')
+    // Per `preserve`: only the lines holding a replaced match differ.
+    expect(changedLines(FIND_BODY, saved)).toEqual([0, 2, 6, 8])
+  })
+
+  test('wikilink labels are matched but never split by replace', async () => {
+    saveBody.mockResolvedValue({ version: 'v2' })
+    const body = 'See [[Alpha Server|the server]] here.\n'
+    const { container, find } = mountFind(body)
+    let count = 0
+    act(() => {
+      count = find.set('server')
+    })
+    expect(count).toBe(1)
+    const chip = container.querySelector('.wikilink')!
+    expect(chip.classList.contains('find-match-current')).toBe(true)
+    // The target that isn't shown is not matched.
+    act(() => {
+      count = find.set('Alpha')
+    })
+    expect(count).toBe(0)
+    // A match running from text into the label covers the chip, and is skipped by replace.
+    act(() => {
+      count = find.set('see the')
+    })
+    expect(count).toBe(1)
+    act(() => {
+      find.replace('x')
+      expect(find.replaceAll('x')).toBe(0)
+    })
+    await act(async () => vi.advanceTimersByTimeAsync(3000))
+    expect(saveBody).not.toHaveBeenCalled()
+  })
+
+  test('read-only editor finds but never replaces', async () => {
+    const { find } = mountFind('alpha alpha\n', { readOnly: true })
+    act(() => {
+      expect(find.set('alpha')).toBe(2)
+      find.replace('x')
+      expect(find.replaceAll('x')).toBe(0)
+    })
+    await act(async () => vi.advanceTimersByTimeAsync(3000))
+    expect(saveBody).not.toHaveBeenCalled()
+    expect(find.status().count).toBe(2)
+  })
+
+  test('raw mode offers a find control (M8)', () => {
+    const ref = { current: null as BodyEditorHandle | null }
+    render(<RawMode path="Pages/Find.md" text="alpha beta alpha" version="v1" onSaved={() => {}} controlRef={ref} />)
+    expect(ref.current).not.toBeNull()
+    const find = ref.current!.find
+    expect(find).toBeDefined()
+    find!.set('alpha')
+    expect(find!.status().count).toBe(2)
+  })
+})
+
+describe('<Editor> M7 settings, flusher and chrome', () => {
+  afterEach(() => {
+    useSettings.setState({ settings: settingsDefaults })
+    saveBody.mockReset()
+  })
+
+  function mountWith(body: string, props: Partial<Parameters<typeof Editor>[0]> = {}) {
+    const utils = render(
+      <Editor path="Pages/M7.md" body={body} version="v1" readOnly={false} onSaved={() => {}} onConflict={() => {}} {...props} />,
+    )
+    return { ...utils, editor: pmEditor(utils.container) }
+  }
+
+  /** Type `text` at the end of the first block through the input rules. */
+  function typeAtEnd(editor: TiptapEditor, text: string) {
+    const end = editor.state.doc.child(0).nodeSize - 1
+    act(() => {
+      editor.commands.setTextSelection(end)
+      const handled = editor.view.someProp('handleTextInput', (f) => f(editor.view, end, end, text, () => editor.state.tr))
+      if (!handled) editor.view.dispatch(editor.state.tr.insertText(text, end))
+    })
+  }
+
+  test('spellcheck and numbered list detection follow settings', () => {
+    const on = mountWith('')
+    expect(on.editor.view.dom.getAttribute('spellcheck')).toBe('true')
+    for (const ch of ['1', '.', ' ']) typeAtEnd(on.editor, ch)
+    expect(on.editor.state.doc.child(0).type.name).toBe('orderedList')
+    on.unmount()
+
+    useSettings.setState({ settings: { ...settingsDefaults, disableSpellcheck: true, disableNumberedListTransformation: true } })
+    const off = mountWith('')
+    expect(off.editor.view.dom.getAttribute('spellcheck')).toBe('false')
+    for (const ch of ['1', '.', ' ']) typeAtEnd(off.editor, ch)
+    expect(off.editor.state.doc.child(0).type.name).toBe('paragraph')
+    expect(off.editor.state.doc.child(0).textContent).toBe('1. ')
+    // The spellcheck setting follows changes while the editor is open.
+    act(() => {
+      useSettings.setState({ settings: { ...settingsDefaults, disableSpellcheck: false } })
+    })
+    expect(off.editor.view.dom.getAttribute('spellcheck')).toBe('true')
+  })
+
+  test('editor registers its flusher and unregisters on unmount', async () => {
+    saveBody.mockResolvedValue({ version: 'v2' })
+    const { editor, unmount } = mountWith('Hello\n')
+    act(() => {
+      editor.commands.insertContentAt(6, ' world')
+    })
+    await act(async () => flushAll())
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    expect(saveBody).toHaveBeenCalledWith('Pages/M7.md', 'Hello world\n', 'v1')
+
+    unmount()
+    saveBody.mockClear()
+    await act(async () => flushAll())
+    expect(saveBody).not.toHaveBeenCalled()
+
+    // A read-only editor's flusher resolves at once.
+    const ro = mountWith('Hello\n', { readOnly: true })
+    await act(async () => flushAll())
+    expect(saveBody).not.toHaveBeenCalled()
+    ro.unmount()
+  })
+
+  test('empty body shows the placeholder; read-only editors have no handles or slash menu', () => {
+    const { editor, unmount } = mountWith('')
+    const first = editor.view.dom.firstElementChild!
+    expect(first.classList.contains('is-editor-empty')).toBe(true)
+    expect(first.getAttribute('data-placeholder')).toBe(EDITOR_PLACEHOLDER)
+    expect(EDITOR_PLACEHOLDER).toBe('Write your text or search for blocks...')
+    act(() => {
+      fireEvent.mouseOver(first)
+    })
+    expect(document.querySelector('[data-block-handles]')).not.toBeNull()
+    unmount()
+
+    const ro = mountWith('Hello\n', { readOnly: true })
+    act(() => {
+      fireEvent.mouseOver(ro.editor.view.dom.firstElementChild!)
+    })
+    expect(document.querySelector('[data-block-handles]')).toBeNull()
+    expect(ro.editor.view.dom.querySelector('.is-editor-empty')).toBeNull()
   })
 })

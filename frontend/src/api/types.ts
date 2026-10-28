@@ -1,3 +1,5 @@
+import type { WhiteboardSettings } from './whiteboardTypes'
+
 // TS mirrors of the back end's JSON: the M2 API contract
 // (docs/superpowers/plans/2026-10-23-m2-types-properties.md, "API contract").
 // Field names match the Python side exactly.
@@ -120,6 +122,8 @@ export interface DateConstraints {
   /** ISO timestamp. */
   endTimeDefault?: string | null
   hideDeleteOption?: boolean
+  /** The Task `date`: reminders may be set on it (M4). */
+  supportsReminders?: boolean
 }
 
 export type StatusCategory = 'not-started' | 'in-progress' | 'blocked' | 'done'
@@ -196,6 +200,12 @@ export interface TypeDef {
   structureViews?: Record<string, unknown>
   defaultViewType?: 'inline' | 'smallCard' | 'wideCard' | 'embed'
   smallCardViewConfig?: SmallCardViewConfig
+  /** M4: absent = offered in the calendar's quick-create chips; `createOnce` = once per day. */
+  createInCalendarOption?: 'disabled' | 'createOnce'
+  /** M4: this type's objects stay out of the calendar's "objects with this date". */
+  hideFromCalendarSidebar?: boolean
+  /** M4, our key on the DailyNote type: hide the Reviewed flag. */
+  hideReviewing?: boolean
   /** API only: set when the type file can't be read. */
   readOnlyReason: string | null
   /** API only: sha256 of the type file, `''` if unsaved. */
@@ -230,9 +240,113 @@ export interface ObjectSummary {
 
 /** GET /api/space */
 export interface SpaceInfo {
+  /** `.capacities/space.json`'s `name`, else the folder name. */
   name: string
   root: string
   types: TypeDef[]
+  /**
+   * M7: `space.json` keys (null / false when absent). The server always sends these four;
+   * they are optional here only so M1–M6 test fixtures that build a three-field `SpaceInfo`
+   * still type-check. Read them as `icon ?? null`, `hideTaskManagement ?? false`, `revision ?? ''`.
+   */
+  icon?: string | null
+  description?: string | null
+  hideTaskManagement?: boolean
+  /** M7: the revision of `space.json` (`''` when the file is absent). */
+  revision?: string
+}
+
+/** M7 `PUT /api/space` patch: only these keys are written to `space.json`. */
+export interface SpacePatch {
+  name?: string
+  icon?: string | null
+  description?: string | null
+  hideTaskManagement?: boolean
+}
+
+/** M7: the kind of an attachment file (Task 2's `media.py` kinds). */
+export type AttachmentKind = 'image' | 'pdf' | 'audio' | 'video' | 'file'
+
+/** M7 `GET /api/attachments` entry. */
+export interface Attachment {
+  path: string
+  kind: AttachmentKind
+  size: number
+}
+
+/** M7 `POST /api/attachments` → 201. */
+export interface UploadedAttachment {
+  path: string
+  kind: AttachmentKind
+}
+
+export type OpenOnStartMode = 'lastOpenedPage' | 'today' | 'calendar' | 'specificObject'
+
+/** M7: per-device settings (`<state dir>/settings.json`, defaults merged by the server). */
+export interface DeviceSettings {
+  themeMode: 'light' | 'dark'
+  lightTheme: 'light' | 'lightDimmed'
+  darkTheme: 'dark' | 'darkDimmed'
+  font: 'sans-serif' | 'serif' | 'monospace'
+  monochromeTags: boolean
+  monochromeTypeLabels: boolean
+  toggleStyle: 'toggle' | 'bullet'
+  disableNumberedListTransformation: boolean
+  disableSpellcheck: boolean
+  alwaysOpenAsFullPage: boolean
+  hideEntityIconsOnInlineLinks: boolean
+  hideOutlinerLines: boolean
+  twentyFourHourTime: boolean
+  dateFormatting: 'localized' | 'DMY' | 'MDY' | 'YMD'
+  /** Keyed by space root; a missing entry means `lastOpenedPage`. */
+  openOnStart: { [spaceRoot: string]: { mode: OpenOnStartMode; path?: string } }
+  startupSpace: 'lastOpened' | 'specific'
+  startupSpacePath: string | null
+  // ---- M8 (plan "API contract (M8)") ----
+  /** Sets the formatting locale only; the interface stays English. */
+  language: SettingsLanguage
+  /** `automatic` follows the language. */
+  decimalSeparator: 'automatic' | 'dot' | 'comma'
+  /** IANA zone name; `null` = the device's zone. */
+  timeZone: string | null
+  backlinkSectionsDefault: { backlinks: Tri; relatedContent: Tri; unlinkedMentions: Tri }
+  backlinkContentView: 'inline' | 'smallCard' | 'wideCard' | 'embed'
+  /** Type ids whose objects related content leaves out. */
+  relatedContentHiddenTypes: string[]
+  nestedBacklinkView: 'showBlockContainingBacklink' | 'showFullPathAbove'
+  presentation: PresentationSettings
+}
+
+/** M8 `DeviceSettings.language`. */
+export type SettingsLanguage = 'en' | 'en-gb' | 'de' | 'fr' | 'es' | 'it' | 'nl' | 'pt-br' | 'hu'
+
+/** M8 backlink section default: open, closed or hidden. */
+export type Tri = 'open' | 'closed' | 'hidden'
+
+/** M8 `DeviceSettings.presentation`. */
+export interface PresentationSettings {
+  hideCoverImage: boolean
+  hideProgressIndicator: boolean
+  hideTitle: boolean
+  footerLeft: string
+  footerRight: string
+}
+
+/** M7 `GET`/`PUT /api/settings` → 200. */
+export interface SettingsResponse {
+  settings: DeviceSettings
+  revision: string
+}
+
+/** M7 `GET /api/spaces` entry (registry order; the current space is always listed). */
+export interface SpaceEntry {
+  path: string
+  name: string
+  icon: string | null
+  current: boolean
+  /** The folder no longer exists. */
+  missing: boolean
+  lastOpened: string | null
 }
 
 /** GET /api/object?path= */
@@ -243,6 +357,8 @@ export interface ObjectDetail {
   version: string
   /** Each entity property's values resolved from this file (`null` when a link doesn't resolve). */
   links: Record<string, (string | null)[]>
+  /** M5: the distinct objects linking to this one, by title then path. */
+  backlinks: EntityRef[]
 }
 
 /** PUT /api/object/body → 200 */
@@ -276,6 +392,8 @@ export interface UpdateResult {
   links: Record<string, (string | null)[]>
   synced: string[]
   skipped: SkippedFile[]
+  /** M4: present only when a Task's status changed category (the status hook ran). */
+  task?: TaskResult | null
 }
 
 /** POST /api/object/rename and POST /api/object/change-type */
@@ -323,6 +441,8 @@ export interface RestoreResult {
   collectionIds?: string[]
   queryIds?: string[]
   skipped?: SkippedFile[]
+  /** Other files the restore wrote back (a collection's members); announced as `changed`. */
+  rewritten?: string[]
 }
 
 export interface SaveTypeResult {
@@ -352,6 +472,8 @@ export type ChangeKind =
   | 'queries'
   | 'views'
   | 'ui'
+  /** M6: a whiteboard's canvas or ink file changed; `path` is the board's `.md`. */
+  | 'whiteboard'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {
@@ -500,6 +622,7 @@ export type DashboardSectionKey =
   | 'notTagged'
   | 'noBacklinks'
   | 'pinned'
+  | 'unreviewed'
   | `query:${string}`
   | `collection:${string}`
 
@@ -586,6 +709,16 @@ export interface UiState {
   pinned: PinRef[]
   sections: SidebarSection[]
   allNotesLayout: 'list' | 'grid' | 'wall' | 'embed'
+  /** M4: Calendar preferences. */
+  calendar?: CalendarUi
+  /** M4: the Tasks page's tab and views. */
+  tasks?: TasksUi
+  /** M4: the reminder scheduler switch (default on). */
+  reminders?: { enabled: boolean }
+  /** M5: the graph's filters (`GraphViewCustomization`). */
+  graph?: GraphCustomization
+  /** M6: the whiteboard "Canvas display" settings (Capacities' user-level names). */
+  whiteboard?: WhiteboardSettings
   [extra: string]: unknown
 }
 
@@ -601,6 +734,8 @@ export interface DeleteCollectionResult {
   trashId: string
   removedFrom: string[]
   skipped: SkippedFile[]
+  /** The sole members moved to the Trash. */
+  deleted: string[]
 }
 
 export interface SaveCollectionResult {
@@ -608,3 +743,338 @@ export interface SaveCollectionResult {
   rewritten: string[]
   skipped: SkippedFile[]
 }
+
+// ---------------------------------------------------------------------------------------------
+// M4: calendar, daily notes, tasks (docs/superpowers/plans/2026-10-26-m4-calendar-daily-tasks.md,
+// "API contract (M4)").
+
+/** The parsed `repeat` text form. */
+export interface RepeatRule {
+  every: number
+  unit: 'day' | 'week' | 'weekday' | 'month' | 'year'
+  mode: 'dueDate' | 'completionDate'
+  /** YYYY-MM-DD */
+  until?: string
+  /** M8: a custom rule's anchor (by due date only). */
+  on?: RepeatOn
+}
+
+/** M8 weekday names in the `repeat` text form. */
+export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
+
+/** M8: the `on` part of a custom repeat rule. */
+export type RepeatOn =
+  | { weekdays?: Weekday[] }
+  | { monthDay: number | 'last'; month?: number }
+  | { weekdayPos: 1 | 2 | 3 | 4 | 'last'; weekday: Weekday; month?: number }
+
+/** The parsed `remind` text form. */
+export interface ReminderRule {
+  minutesBefore: number
+  daysBefore: number
+  /** HH:mm */
+  timeOfDay?: string
+}
+
+/** One task on a calendar day. `day` is the date this entry stands for. */
+export interface TaskEntry {
+  path: string
+  kind: 'date' | 'deadline' | 'occurrence' | 'overdue'
+  /** YYYY-MM-DD */
+  day: string
+  done: boolean
+}
+
+/** An object whose date property covers a calendar day. */
+export interface DatedEntry {
+  path: string
+  /** The date property's key. */
+  key: string
+  start: string
+  end?: string | null
+  resolution: Resolution
+}
+
+export interface CalendarDay {
+  dailyNote: { path: string; reviewed: boolean } | null
+  tasks: TaskEntry[]
+  dated: DatedEntry[]
+  created: string[]
+  updated: string[]
+  /** M8 (Task 15): objects linking to the day. Optional: read with `?? []`. */
+  backlinks?: string[]
+  /** M8 (Task 15): objects holding date tokens for the day. */
+  references?: { path: string; count: number }[]
+  /** M8 (Task 15): the day's timed items. */
+  timeline?: CalendarTimelineItem[]
+}
+
+/** M8: one Timeline item; `at` a UTC instant, `key` the date property of a `dated` item. */
+export interface CalendarTimelineItem {
+  path: string
+  at: string
+  kind: 'created' | 'dated' | 'task'
+  key?: string
+}
+
+/** GET /api/calendar?from=&to= (at most 100 days). */
+export interface CalendarRange {
+  /** YYYY-MM-DD, inclusive. */
+  from: string
+  /** YYYY-MM-DD, inclusive. */
+  to: string
+  /** The server's local day. */
+  today: string
+  days: Record<string, CalendarDay>
+  summaries: Record<string, ObjectSummary>
+  /** Days claimed by more than one daily note: the first by path wins, the others are listed. */
+  warnings: { day: string; paths: string[] }[]
+}
+
+/** On `UpdateResult`, only when a Task's status changed category. */
+export interface TaskResult {
+  completed: boolean
+  advanced: boolean
+  /** The new date after a recurring advance. */
+  date?: DateValue
+}
+
+export interface CalendarUi {
+  weekStart: 'sunday' | 'monday'
+  /** M7: the calendar's right sidebar is closed (Capacities' `RootSpaceData.calendar` key). */
+  hideCalendarSidebar?: boolean
+  daily: {
+    hideDailyNote?: boolean
+    hideTasks?: boolean
+    hideDated?: boolean
+    hideCreatedOnDay?: boolean
+    hideUpdated?: boolean
+    hideCreateObjects?: boolean
+    tasksView?: ViewState
+    createdView?: ViewState
+    updatedView?: ViewState
+    datedView?: ViewState
+  }
+}
+
+export type TaskSectionKey =
+  | 'status'
+  | 'today'
+  | 'inbox'
+  | 'open'
+  | 'deadline'
+  | 'scheduled'
+  | 'recurring'
+  | 'reminders'
+  | 'tags'
+  | 'source'
+  | 'completed'
+
+export interface TasksUi {
+  activeTab: TaskSectionKey
+  views: Partial<Record<TaskSectionKey, ViewState>>
+}
+
+/** POST /api/daily-notes → 201 */
+export interface CreatedDailyNote {
+  path: string
+  version: string
+  /** The inferred DailyNote type when this write saved its JSON first. */
+  typeIds: string[]
+}
+
+// ---- M5: search, references, graph ----
+
+/** Where a search hit matched; each snippet wraps its matches in U+0002 … U+0003. */
+export interface SearchHighlight {
+  field: 'title' | 'aliases' | 'description' | 'properties' | 'blocksContent' | 'tags'
+  snippets: string[]
+}
+
+export interface SearchResult {
+  path: string
+  title: string
+  /** The type id. */
+  type: string
+  icon: Icon | null
+  tags: string[]
+  score: number
+  /** `[start, end)` spans of the title the query matched. */
+  titleMatches: [number, number][]
+  highlights: SearchHighlight[]
+}
+
+/** GET /api/search → 200. `partial` until the start-up sync has finished. */
+export interface SearchResponse {
+  results: SearchResult[]
+  partial: boolean
+}
+
+/** A block of text around a link; `start`/`end` are the link's span inside `context`. */
+export interface BodyContext {
+  context: string
+  start: number
+  end: number
+  /** M8 (Task 18): the parent blocks' first lines, outermost first. */
+  ancestors?: string[]
+}
+
+export interface BacklinkEntry {
+  path: string
+  contexts: BodyContext[]
+  /** The keys of the properties that link. */
+  properties: string[]
+}
+
+/** An unlinked mention: `start`/`end` are offsets in the mentioning object's body. */
+export interface Occurrence {
+  start: number
+  end: number
+  text: string
+  context: string
+  /** Offset of `context` in the body. */
+  contextStart: number
+}
+
+export interface MentionEntry {
+  path: string
+  version: string
+  occurrences: Occurrence[]
+}
+
+export interface RelatedEntry {
+  path: string
+  score: number
+}
+
+export interface RelatedTagEntry {
+  name: string
+  path: string | null
+  count: number
+}
+
+/** `ReferencesSectionTab` ids, in order. */
+export type ReferencesTab = 'all' | 'backlinks' | 'related' | 'mentions' | 'relatedTags'
+
+/** GET /api/references → 200 */
+export interface References {
+  tabs: ReferencesTab[]
+  backlinks: BacklinkEntry[]
+  mentions: MentionEntry[]
+  related: RelatedEntry[]
+  relatedTags: RelatedTagEntry[]
+  summaries: Record<string, ObjectSummary>
+}
+
+export interface GraphNode {
+  path: string
+  title: string
+  type: string
+  icon: Icon | null
+  degree: number
+  tag: boolean
+  daily: boolean
+  done: boolean
+}
+
+/** GET /api/graph → 200. `links` and `tagged` are flat pairs of node indexes. */
+export interface GraphData {
+  nodes: GraphNode[]
+  /** `[a0, b0, a1, b1, …]`, a < b, each pair once. */
+  links: number[]
+  /** `[object0, tag0, …]`. */
+  tagged: number[]
+}
+
+/** `GraphViewCustomization` (RootSpace.model.ts), keys verbatim. */
+export interface GraphCustomization {
+  filterStructureIds?: string[]
+  excludeStructureIds?: string[]
+  showCompletedTasks?: boolean
+  showMinimalNodes?: boolean
+  hideLargeNodes?: boolean
+  hideDates?: boolean
+  hideIndirectLinks?: boolean
+  showTagsNetwork?: boolean
+  showSpaceTagsNetwork?: boolean
+}
+
+// ---------------------------------------------------------------------------------------------
+// M8: deferred features (docs/superpowers/plans/2026-10-27-m8-deferred-features.md,
+// "API contract (M8)").
+
+export type OccurrenceAction = 'complete' | 'skip' | 'excuse'
+export type CatchUp = 'advanceOne' | 'catchUpBeforeNow' | 'catchUpThroughNow'
+
+export interface OccurrenceLogEntry {
+  scheduled: DateValue
+  action: 'completed' | 'skipped' | 'excused'
+  /** UTC ISO instant. */
+  at: string
+}
+
+/** GET /api/tasks/overdue */
+export interface OverdueInfo {
+  count: number
+  capped: boolean
+  /** Scheduled days or instants, oldest first, at most 99. */
+  missed: string[]
+  current: DateValue | null
+  today: string
+}
+
+export type TaskStatsCellState = 'completed' | 'excused' | 'skipped' | 'missed' | 'future' | 'none'
+
+/** GET /api/tasks/stats */
+export interface TaskStats {
+  unit: 'day' | 'week' | 'month' | 'year'
+  currentStreak: number
+  bestStreak: number
+  completions: number
+  completionRate: number | null
+  atRisk: boolean
+  cells: { scheduled: string; state: TaskStatsCellState }[]
+}
+
+/** GET /api/block */
+export interface BlockInfo {
+  path: string
+  id: string
+  markdown: string
+  version: string
+}
+
+/** GET /api/history entry. */
+export interface VersionInfo {
+  id: string
+  number: number
+  at: string
+  size: number
+  kind: 'object' | 'whiteboard'
+  title: string | null
+}
+
+/** GET /api/history/version */
+export interface VersionContent {
+  id: string
+  /** null for whiteboards. */
+  text: string | null
+}
+
+/** POST /api/history/restore: `version` for objects, `revision` for boards. */
+export interface RestoreVersionResult {
+  version?: string
+  revision?: string
+}
+
+/** POST /api/object/merge */
+export interface MergeResult {
+  target: string
+  version: string
+  relinked: string[]
+  skipped: SkippedFile[]
+  dropped: string[]
+  trashId: string
+}
+
+export type SpaceSetup = 'blank' | 'basic'

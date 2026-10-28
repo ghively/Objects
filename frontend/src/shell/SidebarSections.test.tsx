@@ -60,14 +60,25 @@ beforeEach(() => {
     objects: [objectSummary({ path: 'Servers/Atlas.md', id: 'OBJ1', title: 'Atlas', type: 'server' })],
     loaded: true,
   })
-  useDefs.setState({
-    collections: [collection({ id: 'tooling', name: 'Tooling', typeIds: ['server'] })],
-    queries: [query({ id: 'open', name: 'Open servers' })],
-    loaded: true,
-  })
+  const collections = [collection({ id: 'tooling', name: 'Tooling', typeIds: ['server'] })]
+  const queries = [query({ id: 'open', name: 'Open servers' })]
+  mocked.collections.mockResolvedValue(collections)
+  mocked.queries.mockResolvedValue(queries)
+  useDefs.setState({ collections, queries, loaded: true })
 })
 
 describe('SidebarSections', () => {
+  test('test a section without items and malformed pins in ui.json still render', async () => {
+    stored = {
+      pinned: 'x',
+      sections: [{ id: 'x', name: 'Broken' }, { id: 'y', name: 'Mixed', items: [{ kind: 'query' }, { kind: 'query', id: 'open' }] }],
+      allNotesLayout: 'list',
+    } as unknown as UiState
+    render(<Sidebar types={[SERVER]} />)
+    await screen.findByText('Open servers')
+    expect(screen.getByRole('heading', { name: 'Broken' })).toBeInTheDocument()
+  })
+
   test('test custom sections render above Pinned with No pinned content when empty', async () => {
     stored.sections.push({ id: 'S2', name: 'Later', icon: null, items: [] })
     render(<Sidebar types={[SERVER]} />)

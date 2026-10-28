@@ -1,2 +1,9 @@
 # Fixture files are byte-exact test inputs (CRLF, no trailing newline...).
 * -text
+# space-calendar: the status hook byte cases (already covered by the rule above).
+space-calendar/Tasks/crlf?bom?task.md -text
+space-calendar/Tasks/no?trailing?newline.md -text
+# space-blocks: the M7 attachments are binary (images, PDF, WAV, placeholders).
+space-blocks/Attachments/* binary
+# space-m8: the M8 attachments are binary (image, PDF, WAV).
+space-m8/Attachments/* binary

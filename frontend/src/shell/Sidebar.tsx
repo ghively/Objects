@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, type MouseEvent, type ReactNode } from 'react'
 import { Icon, IconOrEmoji, iconName } from '@/components/Icon'
 import {
   ContextMenu,
@@ -7,13 +7,18 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { TypeDef } from '@/api/types'
 import type { Target } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
 import { PinnedSection } from './PinnedSection'
 import { AddSection, SidebarSections } from './SidebarSections'
 import { chipStyle } from './typeColor'
+import { QUERY_ICON } from '@/lib/defIcons'
+import { usePalette } from '@/palette/usePalette'
+import { useSettings } from '@/settings/useSettings'
+import { toggleDarkMode } from '@/theme/shortcuts'
+import { useSettingsModal } from '@/settings/useSettingsModal'
+import { useSpaceInfo } from '@/settings/useSpaceInfo'
 
 export interface SidebarProps {
   types: TypeDef[]
@@ -39,7 +44,43 @@ export interface SidebarProps {
   queriesActive?: boolean
   /** Highlights the "All notes" entry. */
   allNotesActive?: boolean
+  /** Highlights the "Calendar" entry. */
+  calendarActive?: boolean
+  /** Highlights the "Tasks" entry. */
+  tasksActive?: boolean
+  /** Highlights the "Graph" entry. */
+  graphActive?: boolean
 }
+
+/** The footer theme button's tooltips: the mode it switches to (`SpaceOverview.setDarkMode`, `.setLightMode`). */
+export const SET_DARK_MODE = 'Dark mode'
+export const SET_LIGHT_MODE = 'Light mode'
+
+/** The footer's sun button: switches between the light and the dark theme. */
+function ThemeButton() {
+  const light = useSettings((s) => s.settings.themeMode === 'light')
+  const label = light ? SET_DARK_MODE : SET_LIGHT_MODE
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      data-theme-toggle=""
+      onClick={() => {
+        toggleDarkMode().catch(() => undefined)
+      }}
+      className="flex size-8 items-center justify-center rounded-md hover:bg-hover hover:text-fg"
+    >
+      <Icon name="ph-sun" size={17} />
+    </button>
+  )
+}
+
+/** The footer gear's tooltip (`SpaceOverview.settings.tooltip`). */
+export const SETTINGS_TOOLTIP = 'Settings'
+
+/** The square search button's tooltip (`shortcuts.openSearchPalette.name`). */
+export const SEARCH_THIS_SPACE = 'Search this space'
 
 /** The sidebar entry for the All notes view. */
 export const ALL_NOTES_LABEL = 'All notes'
@@ -50,6 +91,9 @@ export const QUERIES_LABEL = 'Queries'
 export function byPluralName(a: TypeDef, b: TypeDef): number {
   return a.pluralName.localeCompare(b.pluralName, undefined, { sensitivity: 'base' })
 }
+
+/** The sidebar "Queries" entry's tile: RootQuery's icon in a type-chip tile (green, as in the reference). */
+const QUERIES_CHIP: Pick<TypeDef, 'icon' | 'color'> = { icon: { type: 'iconify', val: QUERY_ICON }, color: 'green' }
 
 export function TypeChip({ type, size = 22 }: { type: Pick<TypeDef, 'icon' | 'color'>; size?: number }) {
   return (
@@ -80,7 +124,7 @@ function SectionHeader({
     <div className="group/sh flex items-center pr-1">
       <h2
         id={id}
-        className="flex flex-1 items-center gap-1.5 px-2 pt-5 pb-2 text-[14px] font-semibold text-[#a7a2a1]"
+        className="flex flex-1 items-center gap-1.5 px-2 pt-5 pb-2 text-[14px] font-semibold text-[var(--text-section)]"
       >
         {icon && <Icon name={icon} size={14} />}
         {children}
@@ -90,25 +134,31 @@ function SectionHeader({
   )
 }
 
-function NavItem({ icon, label, hint }: { icon: string; label: string; hint: string }) {
+/** A live entry of the main nav (All notes, Calendar, Tasks, Graph); Ctrl+click opens a new tab. */
+function MainNavButton({
+  icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: string
+  label: string
+  active?: boolean
+  onClick: (e: MouseEvent<HTMLButtonElement>) => void
+}) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        {/* span wrapper so the tooltip still works over a disabled button */}
-        <span className="block">
-          <button
-            type="button"
-            disabled
-            aria-label={label}
-            className="flex h-[38px] w-full items-center gap-2 rounded-lg px-2 text-left text-[15px] font-medium text-fg disabled:cursor-default disabled:opacity-50"
-          >
-            <Icon name={icon} size={16} />
-            <span>{label}</span>
-          </button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="right">{hint}</TooltipContent>
-    </Tooltip>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'flex h-[38px] w-full items-center gap-2 rounded-lg px-2 text-left text-[15px] font-medium text-fg hover:bg-hover',
+        active && 'bg-hover',
+      )}
+    >
+      <Icon name={icon} size={16} />
+      <span>{label}</span>
+    </button>
   )
 }
 
@@ -126,7 +176,15 @@ export function Sidebar({
   onOpenTarget,
   queriesActive,
   allNotesActive,
+  calendarActive,
+  tasksActive,
+  graphActive,
 }: SidebarProps) {
+  // "Tasks" is hidden while the space hides task management (`space.json` `hideTaskManagement`).
+  const hideTasks = useSpaceInfo((s) => s.space?.hideTaskManagement ?? false)
+  useEffect(() => {
+    void useSpaceInfo.getState().ensure()
+  }, [])
   // "Queries" sits among the types where a type of that name would be, in the by-name order.
   type Entry = { kind: 'type'; type: TypeDef } | { kind: 'queries' }
   const entries: Entry[] = [
@@ -142,40 +200,50 @@ export function Sidebar({
         <button
           type="button"
           onClick={() => onNew?.()}
-          className="flex h-[42px] flex-1 items-center gap-2 rounded-xl border border-[#2a292d] bg-raised px-3 text-[15px] font-medium hover:bg-hover"
+          className="flex h-[42px] flex-1 items-center gap-2 rounded-xl border border-[var(--chrome-btn-border)] bg-raised px-3 text-[15px] font-medium hover:bg-hover"
         >
           <Icon name="ph-plus" size={16} />
           New
         </button>
         <button
           type="button"
-          aria-label="Search"
-          title="Search (M5)"
-          className="flex size-[42px] items-center justify-center rounded-xl border border-[#2a292d] bg-raised hover:bg-hover"
+          aria-label={SEARCH_THIS_SPACE}
+          title={SEARCH_THIS_SPACE}
+          onClick={() => usePalette.getState().show('search')}
+          className="flex size-[42px] items-center justify-center rounded-xl border border-[var(--chrome-btn-border)] bg-raised hover:bg-hover"
         >
           <Icon name="ph-magnifying-glass" size={18} />
         </button>
       </div>
 
-      <TooltipProvider>
       <nav aria-label="Main" className="flex flex-col gap-0.5">
-        <button
-          type="button"
+        <MainNavButton
+          icon="ph-note"
+          label={ALL_NOTES_LABEL}
+          active={allNotesActive}
           onClick={(e) => onOpenTarget?.({ kind: 'allNotes' }, { newTab: e.ctrlKey || e.metaKey })}
-          aria-current={allNotesActive ? 'page' : undefined}
-          className={cn(
-            'flex h-[38px] w-full items-center gap-2 rounded-lg px-2 text-left text-[15px] font-medium text-fg hover:bg-hover',
-            allNotesActive && 'bg-hover',
-          )}
-        >
-          <Icon name="ph-note" size={16} />
-          <span>{ALL_NOTES_LABEL}</span>
-        </button>
-        <NavItem icon="ph-calendar-blank" label="Calendar" hint="Calendar arrives in M4" />
-        <NavItem icon="ph-check-circle" label="Tasks" hint="Tasks arrive in M4" />
-        <NavItem icon="ph-graph" label="Graph" hint="Graph arrives in M5" />
+        />
+        <MainNavButton
+          icon="ph-calendar-blank"
+          label="Calendar"
+          active={calendarActive}
+          onClick={(e) => onOpenTarget?.({ kind: 'calendar' }, { newTab: e.ctrlKey || e.metaKey })}
+        />
+        {!hideTasks && (
+          <MainNavButton
+            icon="ph-check-circle"
+            label="Tasks"
+            active={tasksActive}
+            onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
+          />
+        )}
+        <MainNavButton
+          icon="ph-graph"
+          label="Graph"
+          active={graphActive}
+          onClick={(e) => onOpenTarget?.({ kind: 'graph' }, { newTab: e.ctrlKey || e.metaKey })}
+        />
       </nav>
-      </TooltipProvider>
 
       <ScrollArea className="min-h-0 flex-1">
         <SidebarSections onOpenTarget={onOpenTarget} />
@@ -213,9 +281,7 @@ export function Sidebar({
                         queriesActive && 'bg-hover',
                       )}
                     >
-                      <span className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-line bg-raised text-fg-muted">
-                        <Icon name="ph-magnifying-glass" size={15} />
-                      </span>
+                      <TypeChip type={QUERIES_CHIP} size={22} />
                       <span className="min-w-0 flex-1 truncate">{QUERIES_LABEL}</span>
                     </button>
                   </li>
@@ -281,12 +347,16 @@ export function Sidebar({
         <button type="button" disabled aria-label="Profile" className="flex size-8 items-center justify-center rounded-md disabled:opacity-60">
           <Icon name="ph-user" size={17} />
         </button>
-        <button type="button" disabled aria-label="Settings" className="flex size-8 items-center justify-center rounded-md disabled:opacity-60">
+        <button
+          type="button"
+          aria-label={SETTINGS_TOOLTIP}
+          title={SETTINGS_TOOLTIP}
+          onClick={() => useSettingsModal.getState().open()}
+          className="flex size-8 items-center justify-center rounded-md hover:bg-hover hover:text-fg"
+        >
           <Icon name="ph-gear" size={17} />
         </button>
-        <button type="button" disabled aria-label="Theme" className="flex size-8 items-center justify-center rounded-md disabled:opacity-60">
-          <Icon name="ph-sun" size={17} />
-        </button>
+        <ThemeButton />
         <button type="button" disabled aria-label="Share" className="ml-auto flex size-8 items-center justify-center rounded-md disabled:opacity-60">
           <Icon name="ph-share-fat" size={17} />
         </button>

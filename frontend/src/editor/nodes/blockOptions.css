@@ -1,0 +1,61 @@
+/* Block options (M7 annotation syntax). Values from Capacities' index36682.css
+   where it has them: a coloured text block (.TextBlock>.block-middle with a
+   .theme-option-bg-*) has padding-block 3px, margin-block 1.5px and
+   --border-radius-base (.5rem, themes.ts borderRadius.base); a quote block is
+   padding-block 6px, padding-left 1.125rem. The colour itself is painted inline
+   from the option (menus/colors.ts: --label-text-<c>, --label-bg-<c>). */
+
+/* "Small" (hierarchy S): Capacities' font-size-sm over font-size-base
+   (.84375rem / .9375rem). */
+.object-editor [data-block-small] {
+  font-size: 0.9em;
+}
+
+/* A background colour: Capacities' block padding and radius. */
+.object-editor [data-block-color^='bg-'] {
+  border-radius: 0.5rem;
+  padding: 3px 0.375rem;
+  margin-inline: -0.375rem;
+}
+.object-editor blockquote[data-block-color^='bg-'] {
+  padding: 6px 0.375rem 6px 1.5rem;
+}
+.object-editor :is(ul, ol)[data-block-color^='bg-'] {
+  padding-left: calc(1.5em + 0.375rem);
+}
+
+/* Alignment (left is the default and is never written). */
+.object-editor [data-block-align='center'] {
+  text-align: center;
+}
+.object-editor [data-block-align='right'] {
+  text-align: right;
+}
+
+/* A block icon sits before the block's text. */
+.object-editor .block-icon {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: -0.15em;
+  margin-right: 0.4em;
+  line-height: 1;
+  user-select: none;
+}
+
+/* The standout quote: larger text, no rail (Capacities' quote.layout standout). */
+.object-editor blockquote[data-block-quote='standout'] {
+  border-left: none;
+  padding-left: 0;
+  font-size: 1.25em;
+  line-height: 1.5;
+}
+
+/* List types: the whole list block, nested items included. */
+.object-editor ol[data-block-list='alphabetical'],
+.object-editor ol[data-block-list='alphabetical'] ol {
+  list-style-type: lower-alpha;
+}
+.object-editor ol[data-block-list='roman'],
+.object-editor ol[data-block-list='roman'] ol {
+  list-style-type: lower-roman;
+}

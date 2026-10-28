@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "nodes": {
+    "n-frame-1": {
+      "id": "n-frame-1",
+      "kind": "frame",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 600,
+      "height": 400,
+      "z": -3,
+      "title": "Frame 1"
+    },
+    "n-frame-2": {
+      "id": "n-frame-2",
+      "kind": "frame",
+      "position": {
+        "x": 700,
+        "y": 0
+      },
+      "width": 600,
+      "height": 400,
+      "z": -2,
+      "title": "Frame 2"
+    },
+    "n-frame-3": {
+      "id": "n-frame-3",
+      "kind": "frame",
+      "position": {
+        "x": 1400,
+        "y": 0
+      },
+      "width": 600,
+      "height": 400,
+      "z": -1,
+      "title": "Frame 3"
+    },
+    "n-image": {
+      "id": "n-image",
+      "kind": "block",
+      "position": {
+        "x": 40,
+        "y": 40
+      },
+      "width": 200,
+      "height": 200,
+      "z": 1,
+      "blockId": "b-image"
+    },
+    "n-pdf": {
+      "id": "n-pdf",
+      "kind": "block",
+      "position": {
+        "x": 740,
+        "y": 40
+      },
+      "width": 300,
+      "height": 360,
+      "z": 2,
+      "blockId": "b-pdf"
+    },
+    "n-link": {
+      "id": "n-link",
+      "kind": "block",
+      "position": {
+        "x": 1440,
+        "y": 40
+      },
+      "width": 360,
+      "height": 120,
+      "z": 3,
+      "blockId": "b-link"
+    },
+    "n-note": {
+      "id": "n-note",
+      "kind": "block",
+      "position": {
+        "x": 40,
+        "y": 300
+      },
+      "width": 300,
+      "height": 60,
+      "z": 4,
+      "blockId": "b-note",
+      "locked": true
+    }
+  },
+  "edges": {},
+  "blocks": {
+    "b-image": {
+      "type": "media",
+      "path": "Attachments/pixel.png",
+      "x-future": 1
+    },
+    "b-pdf": {
+      "type": "media",
+      "path": "Attachments/report.pdf"
+    },
+    "b-link": {
+      "type": "weblink",
+      "url": "https://example.com/guide",
+      "title": "Example guide"
+    },
+    "b-note": {
+      "type": "text",
+      "markdown": "A locked note."
+    }
+  },
+  "readingOrder": [
+    "n-frame-1",
+    "n-frame-2",
+    "n-frame-3"
+  ]
+}

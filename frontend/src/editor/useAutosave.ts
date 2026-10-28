@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api, ConflictError, ReadOnlyError } from '@/api/client'
+import type { FindControl } from './extensions/findInPage'
 
 export const AUTOSAVE_DELAY_MS = 1000
 /** First retry delay after a failed save; it doubles up to `AUTOSAVE_RETRY_MAX_MS`. */
@@ -238,4 +239,6 @@ export interface BodyEditorHandle {
   resume(version: string, saveNow?: boolean): Promise<void>
   /** Replace the content with `body` (discarding local edits) and mark it saved at `version`. */
   reload(body: string, version: string): void
+  /** Find in page; only the formatted editor offers it (raw mode leaves it unset). */
+  find?: FindControl
 }

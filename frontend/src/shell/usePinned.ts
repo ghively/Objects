@@ -20,11 +20,21 @@ export const useUiStore = create<UiStore>()(() => ({ ui: EMPTY, revision: '', lo
 type UiPatch = Partial<Pick<UiState, 'pinned' | 'sections' | 'allNotesLayout'>>
 type Op = (ui: UiState) => UiPatch | null
 
+/** Only well-formed `{kind, id}` refs: a hand-edited ui.json must not break the sidebar. */
+const pinRefs = (v: unknown): PinRef[] =>
+  Array.isArray(v)
+    ? v.filter((r): r is PinRef => !!r && typeof r === 'object' && typeof (r as PinRef).kind === 'string' && typeof (r as PinRef).id === 'string')
+    : []
+
 const norm = (ui: Partial<UiState> | undefined | null): UiState => ({
   ...EMPTY,
   ...(ui ?? {}),
-  pinned: Array.isArray(ui?.pinned) ? ui.pinned : [],
-  sections: Array.isArray(ui?.sections) ? ui.sections : [],
+  pinned: pinRefs(ui?.pinned),
+  sections: Array.isArray(ui?.sections)
+    ? ui.sections
+        .filter((s) => !!s && typeof s === 'object')
+        .map((s) => ({ ...s, name: typeof s.name === 'string' ? s.name : '', icon: s.icon ?? null, items: pinRefs(s.items) }))
+    : [],
 })
 
 const same = (a: PinRef, b: PinRef) => a.kind === b.kind && a.id === b.id

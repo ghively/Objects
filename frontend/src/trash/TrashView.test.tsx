@@ -43,6 +43,48 @@ beforeEach(() => {
 })
 
 describe('TrashView', () => {
+  test('test collection and query entries: own icon and subtitle, sole members hidden, counted in Empty Trash', async () => {
+    const COLL: TrashItem = {
+      id: 'c1',
+      kind: 'collection',
+      originalPath: '.capacities/collections/tooling.json',
+      title: 'Tooling',
+      type: '',
+      deletedAt: '2026-10-22T10:00:00.000Z',
+      objectCount: 2,
+      collectionId: 'tooling',
+      name: 'Tooling',
+    }
+    const MEMBER: TrashItem = { ...NOTE, id: 'o3', title: 'Atlas', originalPath: 'Servers/Atlas.md', collectionTrashId: 'c1' }
+    const QUERY: TrashItem = {
+      id: 'q1',
+      kind: 'query',
+      originalPath: '.capacities/queries/open.json',
+      title: 'Open',
+      type: '',
+      deletedAt: '2026-10-23T10:00:00.000Z',
+      queryId: 'open',
+      name: 'Open',
+    }
+    entries = [COLL, MEMBER, QUERY]
+    const user = userEvent.setup()
+    render(<TrashView />)
+    const list = await screen.findByRole('list', { name: 'Trash' })
+    expect(within(list).getAllByRole('listitem').map((li) => li.getAttribute('aria-label'))).toEqual(['Tooling', 'Open'])
+    const coll = within(list).getByRole('listitem', { name: 'Tooling' })
+    expect(coll).toHaveTextContent('Collection · 2 objects')
+    expect(coll).not.toHaveTextContent('.capacities')
+    // Icons render once their bundled set has loaded.
+    await waitFor(() => expect(coll.querySelector('[data-icon="ph-cards-three"]')).not.toBeNull())
+    await waitFor(() =>
+      expect(within(list).getByRole('listitem', { name: 'Open' }).querySelector('[data-icon="ph-list-magnifying-glass"]')).not.toBeNull(),
+    )
+    expect(within(list).getByRole('listitem', { name: 'Open' })).toHaveTextContent(/^OpenQuery · /)
+    await user.click(screen.getByRole('button', { name: 'Empty Trash' }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('all 4 object(s)')
+  })
+
   test('lists objects and types (a type with its object count), with the 30-day info', async () => {
     render(<TrashView />)
     const list = await screen.findByRole('list', { name: 'Trash' })

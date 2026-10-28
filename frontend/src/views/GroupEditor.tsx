@@ -1,5 +1,6 @@
 import type { GroupBy, GroupByEntry, GroupSortOption } from '@/api/types'
 import { cn } from '@/lib/utils'
+import { MenuSelect, propertyOptions } from './MenuSelect'
 import { GROUP_OPTIONS, GROUP_SORT_OPTIONS, isGroupable } from './group'
 import { choiceFor, type PropChoice } from './properties'
 
@@ -14,7 +15,7 @@ export interface GroupEditorProps {
 export function GroupEditor({ groupBy, onChange, choices }: GroupEditorProps) {
   const entry = groupBy?.groups?.[0]
   const choice = entry ? choiceFor(choices, entry.propertyId) : undefined
-  const options = choice ? GROUP_OPTIONS(choice.kind) : []
+  const options = choice ? GROUP_OPTIONS(choice.kind, choice.def) : []
   const sortOptions = choice ? GROUP_SORT_OPTIONS(choice.kind) : []
 
   const setEntry = (next: GroupByEntry) => onChange({ ...(groupBy ?? {}), groups: [next] })
@@ -31,48 +32,37 @@ export function GroupEditor({ groupBy, onChange, choices }: GroupEditorProps) {
     <div className="flex w-72 max-w-full flex-col gap-2 p-2 text-[13px]">
       <label className="flex flex-col gap-1">
         <span className="text-fg-muted">Group by</span>
-        <select
-          aria-label="Group property"
+        <MenuSelect
+          label="Group property"
           value={entry && choice ? entry.propertyId : ''}
-          onChange={(e) => {
-            const c = choiceFor(choices, e.target.value)
+          onChange={(v) => {
+            const c = choiceFor(choices, v)
             if (!c) return onChange(null)
             // A new property starts with its default option and group order.
             onChange({
               groups: [
                 {
                   propertyId: c.key,
-                  option: GROUP_OPTIONS(c.kind)[0]?.key ?? 'default',
+                  option: GROUP_OPTIONS(c.kind, c.def)[0]?.key ?? 'default',
                   ...(c.structureId ? { structureId: c.structureId } : {}),
                 },
               ],
             })
           }}
-          className={cn(SELECT, 'w-full')}
-        >
-          <option value="">None</option>
-          {choices
-            .filter((c) => isGroupable(c.kind))
-            .map((c) => (
-              <option key={c.key} value={c.key}>
-                {c.name}
-              </option>
-            ))}
-        </select>
+          options={[{ value: '', label: 'None', icon: 'ph-prohibit' }, ...propertyOptions(choices.filter((c) => isGroupable(c.kind)))]}
+          className="w-full"
+          menuClassName="min-w-64"
+        />
       </label>
       {entry && choice && options.length > 1 && (
-        <select
-          aria-label="Group option"
+        <MenuSelect
+          label="Group option"
           value={entry.option}
-          onChange={(e) => setEntry({ ...entry, option: e.target.value })}
-          className={cn(SELECT, 'w-full')}
-        >
-          {options.map((o) => (
-            <option key={o.key} value={o.key}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setEntry({ ...entry, option: v })}
+          options={options.map((o) => ({ value: o.key, label: o.label }))}
+          className="w-full"
+          menuClassName="min-w-64"
+        />
       )}
       {entry && choice?.kind === 'number' && entry.option === 'range' && (
         <fieldset className="flex flex-col gap-1">
@@ -100,18 +90,14 @@ export function GroupEditor({ groupBy, onChange, choices }: GroupEditorProps) {
       {entry && choice && (
         <label className="flex flex-col gap-1">
           <span className="text-fg-muted">Sort groups by</span>
-          <select
-            aria-label="Sort groups by"
+          <MenuSelect
+            label="Sort groups by"
             value={groupBy?.sortOption ?? sortOptions[0]?.key ?? 'default'}
-            onChange={(e) => onChange({ groups: groupBy!.groups, sortOption: e.target.value as GroupSortOption })}
-            className={cn(SELECT, 'w-full')}
-          >
-            {sortOptions.map((o) => (
-              <option key={o.key} value={o.key}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onChange({ groups: groupBy!.groups, sortOption: v as GroupSortOption })}
+            options={sortOptions.map((o) => ({ value: o.key, label: o.label }))}
+            className="w-full"
+            menuClassName="min-w-64"
+          />
         </label>
       )}
     </div>

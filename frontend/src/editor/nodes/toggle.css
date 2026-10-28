@@ -1,0 +1,73 @@
+/* Toggle block. Colours: content.toggleColor, toggleColorEmpty and
+   toggleOutlineColor (--editor-toggle, --editor-toggle-empty,
+   --editor-toggle-outline); the list/todo/toggle row padding is Capacities'
+   .block-outer.toggle>.block-middle (padding-block 4px). */
+.object-editor .block-toggle {
+  position: relative;
+  padding-left: 1.5em;
+}
+.object-editor .block-toggle > .toggle-content > * + * {
+  margin-top: calc(0.44em + 9px);
+}
+.object-editor .block-toggle > .toggle-content > :first-child {
+  padding-block: 4px;
+}
+.object-editor .block-toggle > .toggle-caret {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 1.5em;
+  height: 1.647em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.object-editor .block-toggle > .toggle-caret:hover {
+  background: var(--bg-hover);
+}
+.object-editor .block-toggle > .toggle-caret .toggle-caret-icon {
+  transition: transform 0.15s;
+}
+.object-editor .block-toggle[data-open='true'] > .toggle-caret .toggle-caret-icon {
+  transform: rotate(90deg);
+}
+.object-editor .block-toggle > .toggle-caret .toggle-bullet {
+  display: none;
+  width: 0.36em;
+  height: 0.36em;
+  border-radius: 50%;
+  background: var(--editor-bullet);
+}
+/* Bullet style: a bullet that turns into the caret on hover. */
+.object-editor .block-toggle[data-toggle-style='bullet'] > .toggle-caret .toggle-bullet {
+  display: block;
+}
+.object-editor .block-toggle[data-toggle-style='bullet'] > .toggle-caret .toggle-caret-icon {
+  display: none;
+}
+.object-editor .block-toggle[data-toggle-style='bullet'] > .toggle-caret:hover .toggle-bullet {
+  display: none;
+}
+.object-editor .block-toggle[data-toggle-style='bullet'] > .toggle-caret:hover .toggle-caret-icon {
+  display: block;
+}
+/* The outliner line along the children. */
+.object-editor .block-toggle > .toggle-outline {
+  position: absolute;
+  left: 0.75em;
+  top: calc(1.647em + 10px);
+  bottom: 0;
+  border-left: 1px solid var(--editor-toggle-outline);
+  pointer-events: none;
+}
+.object-editor .block-toggle > .toggle-outline[hidden] {
+  display: none;
+}
+.object-editor [data-toggle-hidden] {
+  display: none;
+}

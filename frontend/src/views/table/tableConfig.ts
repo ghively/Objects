@@ -27,9 +27,8 @@ export function defaultWidth(def: Pick<PropertyDef, 'type'> & { tableColWidth?: 
   return DEFAULT_COL_WIDTH[def.type] ?? FALLBACK_COL_WIDTH
 }
 
-/** The properties a table can show: every definition but the backlinks (computed in M5). */
-export const tableDefs = (type: Pick<TypeDef, 'propertyDefinitions'>): PropertyDef[] =>
-  type.propertyDefinitions.filter((d) => d.type !== 'entity_backlinks')
+/** The properties a table can show: every definition (the backlinks as a read-only column). */
+export const tableDefs = (type: Pick<TypeDef, 'propertyDefinitions'>): PropertyDef[] => type.propertyDefinitions
 
 /**
  * The config a table renders: `wrapAllContent` defaults to true, new properties are appended,

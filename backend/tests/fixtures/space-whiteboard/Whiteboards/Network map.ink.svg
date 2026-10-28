@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" data-object-ink="1" viewBox="45 45 330 150">
+  <path id="s-ink01" data-tool="pen" data-color="blue" data-width="4" data-points="60,60,0.2 90,70,0.35 120,80,0.5" fill="#3f80eb" d="M 60 59 L 120 78 L 120 82 L 60 61 Z"/>
+  <path id="s-ink02" data-tool="pen" data-color="gray" data-width="2" data-points="60,120,0.6 100,125,0.65 140,130,0.7" fill="#5c5959" d="M 60 119 L 140 129 L 140 131 L 60 121 Z"/>
+  <path id="s-ink03" data-tool="pen" data-color="red" data-width="8" data-points="200,60,0.8 230,90,0.9 260,120,1" fill="#e54a4a" d="M 198 60 L 258 120 L 262 120 L 202 60 Z"/>
+  <path id="s-ink04" data-tool="highlighter" data-color="yellow" data-width="16" data-points="200,180,0.5 360,180,0.5" fill="#daaa14" fill-opacity="0.35" d="M 200 172 L 360 172 L 360 188 L 200 188 Z"/>
+</svg>

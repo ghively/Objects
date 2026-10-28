@@ -8,6 +8,17 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
+// A probe cell for the `probe` key: shows what the panel hands a cell (frontmatter, onChangeMany).
+vi.mock('@/properties/cellFor', async (orig) => {
+  const real = await orig<typeof import('@/properties/cellFor')>()
+  const Probe = (p: { value?: unknown; frontmatter?: Record<string, unknown>; onChangeMany?(u: Record<string, unknown>, r?: string[]): void }) => (
+    <button type="button" data-fm={JSON.stringify(p.frontmatter ?? null)} data-value={JSON.stringify(p.value ?? null)} onClick={() => p.onChangeMany?.({ probe: 'x', sibling: 'y' }, ['gone'])}>
+      probe
+    </button>
+  )
+  return { ...real, cellForDef: (def: { key: string }) => (def.key === 'probe' ? Probe : real.cellForDef(def as never)) }
+})
+
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { cellValue, decodeDate, PropertyPanel } from './PropertyPanel'
 
@@ -146,5 +157,41 @@ describe('PropertyPanel definition editing', () => {
       />,
     )
     expect(screen.getByRole('button', { name: 'Add Property' })).toBeDisabled()
+  })
+})
+
+describe('multi-key cell writes', () => {
+  test('test property panel passes frontmatter and onChangeMany', async () => {
+    const user = userEvent.setup()
+    const PROBE = propertyDef({ id: 'p-probe', key: 'probe', name: 'Probe', type: 'text' })
+    const T = typeDef({ id: 'project', name: 'Project', propertyDefinitions: [PROBE] })
+    const onChangeMany = vi.fn()
+    const fm = { probe: 'a', sibling: 'b' }
+    render(<PropertyPanel type={T} frontmatter={fm} onChange={vi.fn()} onChangeMany={onChangeMany} />)
+    const probe = screen.getByRole('button', { name: 'probe' })
+    expect(JSON.parse(probe.getAttribute('data-fm')!)).toEqual(fm)
+    await user.click(probe)
+    expect(onChangeMany).toHaveBeenCalledWith({ probe: 'x', sibling: 'y' }, ['gone'])
+  })
+})
+
+describe('M5 backlinks', () => {
+  test('test property panel passes backlinks to the backlinks cell', () => {
+    const refs = [
+      { target: 'Alpha', path: 'Pages/Alpha.md' },
+      { target: 'Beta', path: 'Pages/Beta.md' },
+    ]
+    const BACKLINKS = propertyDef({ id: 'p-bl', key: 'backlinks', name: 'Backlinks', type: 'entity_backlinks' })
+    expect(cellValue(BACKLINKS, {}, {}, undefined, refs)).toEqual(refs)
+    expect(cellValue(BACKLINKS, {})).toBeNull()
+
+    // The probe cell (key `probe`) shows the value the panel hands the backlinks cell.
+    const PROBE = propertyDef({ id: 'p-probe', key: 'probe', name: 'Backlinks', type: 'entity_backlinks' })
+    const type = typeDef({ id: 'project', name: 'Project', propertyDefinitions: [PROBE] })
+    const summary = objectSummary({ path: 'Projects/X.md' })
+    const { rerender } = render(<PropertyPanel type={type} frontmatter={{}} summary={summary} backlinks={refs} onChange={vi.fn()} />)
+    expect(JSON.parse(screen.getByRole('button', { name: 'probe' }).dataset.value!)).toEqual(refs)
+    rerender(<PropertyPanel type={type} frontmatter={{}} summary={summary} backlinks={[]} onChange={vi.fn()} />)
+    expect(JSON.parse(screen.getByRole('button', { name: 'probe' }).dataset.value!)).toEqual([])
   })
 })

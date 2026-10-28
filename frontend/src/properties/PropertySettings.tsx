@@ -4,6 +4,7 @@ import type { DateConstraints, PropertyDef, PropertyOptions, PropertyType, TypeD
 import { ColorPicker } from '@/components/ColorPicker'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useTypeEditor, type TypeEditor } from '@/object/useTypeEditor'
@@ -51,6 +52,13 @@ const TEXT = {
   rangePreferenceDescription: 'Choose if you want your date to be initialized as a range.',
   defaultDescription: 'Choose a default start date for the date and time picker.',
   descriptionPlaceholder: 'Give others an idea of what this property means',
+  // Our strings: the reference's `hideCalendarEvents` flag has no property-settings label.
+  /** Our string (M8): the switch that sets `options.constraints.supportsReminders`. */
+  reminders: 'Reminders',
+  /** Our string. */
+  remindersDescription: 'Allow a reminder on values of this property.',
+  hideInCalendar: 'Hide in calendar',
+  hideInCalendarDescription: "Values of this property don't show on their days in the calendar.",
 }
 
 export interface PropertySettingsProps {
@@ -269,7 +277,11 @@ function toLocalInput(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
-function DateSection({ def, save }: { def: PropertyDef; save(next: PropertyDef): void }) {
+/**
+ * The Date section. `taskDate`: the basic Task's `date`, whose reminders M4 keeps on (its picker's
+ * Repeat and Reminder rows depend on the constraint), so it shows no Reminders switch (our choice).
+ */
+function DateSection({ def, save, taskDate }: { def: PropertyDef; save(next: PropertyDef): void; taskDate?: boolean }) {
   const c = def.options.constraints ?? {}
   const time: Rule = c.resolutionConstraint === 'time' ? 'required' : c.resolutionConstraint === 'day' ? 'disallowed' : 'optional'
   const range: Rule = c.endTimeSettings === 'required' ? 'required' : c.endTimeSettings === 'notAllowed' ? 'disallowed' : 'optional'
@@ -367,6 +379,22 @@ function DateSection({ def, save }: { def: PropertyDef; save(next: PropertyDef):
             )}
           </div>
         )}
+      </Section>
+      {!taskDate && (
+        <Section title={TEXT.reminders} description={TEXT.remindersDescription}>
+          <Switch
+            aria-label={TEXT.reminders}
+            checked={!!c.supportsReminders}
+            onCheckedChange={(v) => save(withConstraints(def, { supportsReminders: v || undefined }))}
+          />
+        </Section>
+      )}
+      <Section title={TEXT.hideInCalendar} description={TEXT.hideInCalendarDescription}>
+        <Switch
+          aria-label={TEXT.hideInCalendar}
+          checked={!!def.options.hideCalendarEvents}
+          onCheckedChange={(v) => save({ ...def, options: { ...def.options, hideCalendarEvents: v } })}
+        />
       </Section>
     </>
   )
@@ -752,7 +780,13 @@ export function PropertySettings({ typeId, propertyId, open, onOpenChange, onOpe
               />
             </label>
             {def.type === 'number' && <NumberSection def={def} save={save} />}
-            {(def.type === 'datetime' || def.type === 'datetimeSimple') && <DateSection def={def} save={save} />}
+            {(def.type === 'datetime' || def.type === 'datetimeSimple') && (
+              <DateSection
+                def={def}
+                save={save}
+                taskDate={def.key === 'date' && type.basic && type.name.toLowerCase() === 'task'}
+              />
+            )}
             {def.type === 'entity' && !type.basic && <RelationSection type={type} def={def} editor={ed} />}
             {def.type === 'label' && <LabelSection type={type} def={def} save={save} />}
             {canChangeVisibility(def) && (

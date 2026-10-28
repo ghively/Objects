@@ -37,6 +37,18 @@ export interface CellExtras {
   onOpenSettings?(): void
   /** CollectionsCell: the object's type id (the picker lists collections that hold it). */
   typeId?: string
+  /** The object's raw frontmatter, for a cell that reads a sibling key (the Task date reads `repeat`, `remind`). */
+  frontmatter?: Record<string, unknown>
+  /**
+   * Write several keys in one `updateProperties` call (`remove` deletes keys). Only the property
+   * panel provides it; table cells don't, so they write their own key only.
+   */
+  onChangeMany?(updates: Record<string, unknown>, remove?: string[]): void
+  /**
+   * M8: set (or clear with `null`) the reminder of date property `key` through
+   * `PUT /api/tasks/reminder`. Only the property panel provides it, like `onChangeMany`.
+   */
+  onSetReminder?(key: string, remind: string | null): void
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each cell takes its own value type
