@@ -374,5 +374,25 @@ def test_cjk_type_names_get_distinct_ids(space_dir: Path):
     _write(space_dir / "CN" / "b.md", "---\ntype: '中文'\ntitle: b\n---\n")
     space = Space(space_dir)
     ids = {t.name: t.id for t in space.types}
-    assert ids["日本語"] != ids["中文"]
+    assert ids["\u65e5\u672c\u8a9e"] != ids["\u4e2d\u6587"]
     assert space.get("JP/a.md").type != space.get("CN/b.md").type
+
+
+# -- a corrupt spaces.json is kept, not overwritten ----------------------------------------
+
+
+def test_registry_keeps_a_corrupt_file_before_saving(tmp_path: Path):
+    from objectapp.spaces import Registry
+
+    state = tmp_path / "state"
+    state.mkdir()
+    corrupt = b'{"spaces": [{"path": "C:/my/space"}],,}'
+    (state / "spaces.json").write_bytes(corrupt)
+    root = tmp_path / "s"
+    (root / ".object").mkdir(parents=True)
+    reg = Registry(state)
+    reg.register(root)
+    reg.register(root)  # a second save keeps the one copy
+    kept = sorted(p for p in state.iterdir() if p.name != "spaces.json")
+    assert [p.read_bytes() for p in kept] == [corrupt]
+    assert [e.path for e in reg.list()] == [str(root.resolve())]
