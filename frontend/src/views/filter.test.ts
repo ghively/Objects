@@ -189,6 +189,13 @@ describe('filter engine', () => {
     expect(paths(applyFilters(rows, group('and', f('qty', 'contains', ['q1'])), c))).toEqual(['a'])
   })
 
+  test('a number filter with no value yet is inactive', () => {
+    const rows = [R('a', { qty: 3 }), R('b', {})]
+    for (const option of ['equal', 'notEqual', 'greater', 'smaller']) {
+      expect(paths(applyFilters(rows, group('and', f('qty', option)), ctx()))).toEqual(['a', 'b'])
+    }
+  })
+
   test('structureId scopes filter to one type', () => {
     const rows = [R('a', { qty: 1 }), R('t1', { prio: 1 }, {}, 'task'), R('t2', { prio: 5 }, {}, 'task')]
     const g = group('and', f('prio', 'greater', 3, 'task'))
