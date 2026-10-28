@@ -195,11 +195,14 @@ def _empty_filter_group() -> dict[str, Any]:
 
 
 def default_views(t: TypeDefinition) -> dict[str, Any]:
-    """The Views of a type page that has none saved yet."""
+    """The Views of a type page that has none saved yet.
+
+    Capacities' initial built-in sections (``builtInDashboardSections``): Recently Opened,
+    Collections and Queries, with the "All" tab. "Not in any collection" and "Not tagged" are
+    not initial; "Add a section" offers them. Saved views are never rewritten to match.
+    """
     layout = "grid" if t.basic and t.name.lower() in _MEDIA_GRID_TYPES else "list"
-    keys = ["recentlyAccessed", "collections", "queries", "inNoCollection"]
-    if any(p.key == "tags" for p in t.propertyDefinitions):
-        keys.append("notTagged")
+    keys = ["recentlyAccessed", "collections", "queries"]
     return {
         "activeTab": "all",
         "all": {

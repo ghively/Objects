@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from objectapp.jsonstore import JsonStore, default_views, json_revision
+from objectapp.jsonstore import JsonStore, default_views, json_revision, normalize_views
 from objectapp.server import create_app
 from objectapp.space import ReadOnly, Space
 from objectapp.typemodel import RevisionConflict
@@ -96,7 +96,8 @@ def test_get_views_defaults_without_writing(space_dir: Path):
         body = c.get("/api/views/task").json()
     assert body["revision"] == ""
     keys = [s["key"] for s in body["views"]["dashboard"]["sections"]]
-    assert keys == ["recentlyAccessed", "collections", "queries", "inNoCollection", "notTagged"]
+    # Capacities' initial sections; "Not in any collection" and "Not tagged" come from "Add a section".
+    assert keys == ["recentlyAccessed", "collections", "queries"]
     assert body["views"]["activeTab"] == "all"
     assert body["views"]["all"]["viewDefinition"] == {"dataViewLayout": "list"}
     assert not (space_dir / ".capacities" / "views").exists()
@@ -114,6 +115,14 @@ def test_default_views_layout_and_tag_section(space_dir: Path):
     tagless = type(tagless).from_json({**tagless.to_json(), "propertyDefinitions": []}, fallback_id="x")
     keys = [s["key"] for s in default_views(tagless)["dashboard"]["sections"]]
     assert "notTagged" not in keys
+
+
+def test_saved_sections_are_kept_over_the_new_defaults(space_dir: Path):
+    """Views saved with the old default sections read back unchanged (never rewritten to match)."""
+    old = ["recentlyAccessed", "collections", "queries", "inNoCollection", "notTagged"]
+    stored = {"dashboard": {"sections": [{"key": k, "collapsed": False} for k in old], "removedSections": []}}
+    out = normalize_views(stored, default_views(Space(space_dir).type_by_id("page")))
+    assert [s["key"] for s in out["dashboard"]["sections"]] == old
 
 
 def test_views_write_only_views_file(space_dir: Path):

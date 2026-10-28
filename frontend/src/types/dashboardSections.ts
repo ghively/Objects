@@ -5,9 +5,12 @@ import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { queryTitle, type TitleCtx } from '@/queries/autoTitle'
 
 /**
- * The built-in sections a type page can show (`pinned` is a collection's). `unreviewed` exists
- * only on the basic DailyNote type (and not while it hides reviewing); `noBacklinks` only on types
- * whose objects can have backlinks, and is offered in "Add a section", never in the default set.
+ * The built-in sections a type page can show (`pinned` is a collection's). Capacities'
+ * `builtInDashboardSections`: Recently Opened, Collections and Queries are the initial set (the
+ * server's `default_views`); "Not in any collection", "Not tagged" (types with tags) and "No
+ * backlinks" (types whose objects can have backlinks) are offered in "Add a section", never in the
+ * default set. `unreviewed` exists only on the basic DailyNote type (and not while it hides
+ * reviewing).
  */
 export const BUILTIN_KEYS = [
   'recentlyAccessed',
@@ -61,6 +64,10 @@ const BUILTIN_META: Record<BuiltinKey, { label: string; icon: string; inFullView
 }
 
 export const isBuiltin = (key: string): key is BuiltinKey => key in BUILTIN_META
+
+/** Sections that can't be removed (Capacities' `canBeRemoved: false`): Collections and Queries. */
+const NOT_REMOVABLE: ReadonlySet<string> = new Set(['collections', 'queries'])
+export const canRemoveSection = (key: string): boolean => !NOT_REMOVABLE.has(key)
 export const isQueryKey = (key: string): key is `query:${string}` => key.startsWith('query:')
 export const isCollectionKey = (key: string): key is `collection:${string}` => key.startsWith('collection:')
 export const keyId = (key: string): string => key.slice(key.indexOf(':') + 1)
@@ -220,7 +227,10 @@ export const hiddenSections = (all: RenderedSection[]): RenderedSection[] => all
 export const tabSections = (all: RenderedSection[]): RenderedSection[] =>
   all.filter((s) => !s.hidden && s.inFullView)
 
-/** What "Add a section" offers: removed built-ins, "No backlinks" when not shown, then the type's collections and queries not shown. */
+/**
+ * What "Add a section" offers: removed built-ins; "Not in any collection", "Not tagged" and "No
+ * backlinks" when not shown; then the type's collections and queries not shown.
+ */
 export function addableSections(type: TypeDef, all: RenderedSection[], ctx: SectionCtx): RenderedSection[] {
   const present = new Set(all.filter((s) => !s.hidden).map((s) => s.key))
   const out: RenderedSection[] = []
@@ -230,6 +240,8 @@ export function addableSections(type: TypeDef, all: RenderedSection[], ctx: Sect
     if (d) out.push({ ...d, label: d.defaultLabel, collapsed: false, hidden: false })
   }
   for (const s of all) if (s.hidden && isBuiltin(s.key)) offer(s.key)
+  offer('inNoCollection')
+  offer('notTagged')
   offer('noBacklinks')
   for (const c of ctx.collections) if (c.typeIds.includes(type.id)) offer(`collection:${c.id}`)
   for (const q of ctx.queries) if (q.definition.structures.some((st) => st.id === type.id)) offer(`query:${q.id}`)
@@ -249,8 +261,9 @@ export function withSections(views: Views, visible: RenderedSection[], removed: 
   return { ...views, dashboard: { ...views.dashboard, sections: visible.map(toSaved), removedSections: removed } }
 }
 
-/** Move a section to the removed list: no Overview section and no tab. */
+/** Move a section to the removed list: no Overview section and no tab. Collections and Queries can't be removed. */
 export function removeSection(views: Views, all: RenderedSection[], key: string): Views {
+  if (!canRemoveSection(key)) return views
   const visible = visibleSections(all).filter((s) => s.key !== key)
   const removed = [...views.dashboard.removedSections.filter((k) => k !== key), key]
   return withSections(views, visible, removed)
