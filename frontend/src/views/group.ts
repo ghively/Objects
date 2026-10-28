@@ -15,7 +15,8 @@ import type {
 } from '@/api/types'
 import { formatNumber } from '@/properties/format'
 import { STATUS_CATEGORIES, optionCategory } from '@/tasks/statusCategory'
-import { dateSpan, startOfDay } from './dates'
+import { wallClock } from '@/lib/zonedTime'
+import { dateSpan } from './dates'
 import { displayTitle, findDef, rowValue, type FilterCtx } from './filter'
 
 export interface GroupOption {
@@ -138,7 +139,9 @@ const RELATIVE_ORDER = [
 const pad = (n: number, w = 2) => String(n).padStart(w, '0')
 const dayId = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 const DAY_MS = 86400000
-const daysBetween = (a: Date, b: Date) => Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / DAY_MS)
+// On wall-clock carriers (`lib/zonedTime` `wallClock`): the time-zone setting's days.
+const localDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+const daysBetween = (a: Date, b: Date) => Math.round((localDay(b).getTime() - localDay(a).getTime()) / DAY_MS)
 const mondayOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7))
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -298,7 +301,7 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
     case 'entity_createdAt':
     case 'entity_lastUpdated': {
       const span = dateSpan(dateOf(row, entry.propertyId))
-      return span ? [dateBucket(span.start, entry.option, ctx.now)] : []
+      return span ? [dateBucket(wallClock(span.start), entry.option, wallClock(ctx.now))] : []
     }
     case 'entity_title':
       return textBucket(displayTitle(row))

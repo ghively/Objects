@@ -1,6 +1,7 @@
 // Date helpers for filters and sorts: relative ranges against an injected `now`, and the
 // day-level interval of a date value. Pure functions; weeks run Monday to Sunday.
 import type { DateRelative, DateValue } from '@/api/types'
+import { fromWallClock, wallClock, zonedInstant, zonedStartOfDay } from '@/lib/zonedTime'
 
 /** The relative options in the reference's order, with its labels ("Specific date" is the exact-date pick). */
 export const DATE_RELATIVE_OPTIONS: { key: DateRelative | 'exactDate'; label: string }[] = [
@@ -18,8 +19,17 @@ export const DATE_RELATIVE_OPTIONS: { key: DateRelative | 'exactDate'; label: st
   { key: 'exactDate', label: 'Specific date' },
 ]
 
-export const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
-export const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
+// Days are the "Time zone" setting's days (`lib/zonedTime`): calendar arithmetic runs on
+// wall-clock carriers and every boundary is turned back into an instant in that zone.
+
+/** The first instant of `d`'s day in the time-zone setting. */
+export const startOfDay = (d: Date) => zonedStartOfDay(d)
+/** The last millisecond of `d`'s day in the time-zone setting. */
+export const endOfDay = (d: Date) => {
+  const w = wallClock(d)
+  return new Date(fromWallClock(new Date(w.getFullYear(), w.getMonth(), w.getDate() + 1)).getTime() - 1)
+}
+// On carriers: a day `n` days on, at midnight.
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)
 
 /** Calendar-month arithmetic that clamps the day (Mar 31 minus one month is Feb 28). */
@@ -29,15 +39,19 @@ function addMonths(d: Date, n: number): Date {
   return new Date(first.getFullYear(), first.getMonth(), Math.min(d.getDate(), last))
 }
 
-/** The local day a `YYYY-MM-DD` string names. */
+/** The start of the day a `YYYY-MM-DD` string names, in the time-zone setting. */
 export function parseDay(s: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
-  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null
+  return m ? zonedInstant(+m[1], +m[2], +m[3]) : null
 }
 
-/** An inclusive local range. `overdue` starts at the earliest representable date. */
+/** An inclusive range of the time-zone setting's days. `overdue` starts at the earliest representable date. */
 export function resolveRelative(rel: DateRelative, now: Date): { start: Date; end: Date } {
-  const today = startOfDay(now)
+  const w = wallClock(now)
+  // Carrier days in, instants out.
+  const startOfDay = (c: Date) => fromWallClock(new Date(c.getFullYear(), c.getMonth(), c.getDate()))
+  const endOfDay = (c: Date) => new Date(startOfDay(addDays(c, 1)).getTime() - 1)
+  const today = new Date(w.getFullYear(), w.getMonth(), w.getDate())
   const day = (d: Date) => ({ start: startOfDay(d), end: endOfDay(d) })
   switch (rel) {
     case 'overdue':
@@ -50,16 +64,16 @@ export function resolveRelative(rel: DateRelative, now: Date): { start: Date; en
       return day(addDays(today, 1))
     case 'thisWeek': {
       const monday = addDays(today, -((today.getDay() + 6) % 7))
-      return { start: monday, end: endOfDay(addDays(monday, 6)) }
+      return { start: startOfDay(monday), end: endOfDay(addDays(monday, 6)) }
     }
     case 'thisMonth':
       return {
-        start: new Date(today.getFullYear(), today.getMonth(), 1),
+        start: startOfDay(new Date(today.getFullYear(), today.getMonth(), 1)),
         end: endOfDay(new Date(today.getFullYear(), today.getMonth() + 1, 0)),
       }
     case 'thisYear':
       return {
-        start: new Date(today.getFullYear(), 0, 1),
+        start: startOfDay(new Date(today.getFullYear(), 0, 1)),
         end: endOfDay(new Date(today.getFullYear(), 11, 31)),
       }
     case 'oneWeekAgo':
@@ -74,9 +88,9 @@ export function resolveRelative(rel: DateRelative, now: Date): { start: Date; en
 }
 
 export interface DateSpan {
-  /** The start, local. */
+  /** The start (a day: its first instant in the time-zone setting). */
   start: Date
-  /** The end, local; null when the value has none. */
+  /** The end; null when the value has none. */
   end: Date | null
   resolution: 'day' | 'time'
 }
@@ -88,7 +102,7 @@ function parsePoint(iso: string | null | undefined, resolution: 'day' | 'time'):
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-/** A date value as local dates; null when it has no usable start. */
+/** A date value as instants; null when it has no usable start. */
 export function dateSpan(v: DateValue | null | undefined): DateSpan | null {
   if (!v || typeof v !== 'object') return null
   const resolution = v.resolution === 'time' ? 'time' : 'day'
