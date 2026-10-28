@@ -1,8 +1,10 @@
 """Read and write text files without disturbing their bytes.
 
 `read_text` normalises line endings to ``\n`` and strips a UTF-8 BOM, recording
-both so that `encode` can reproduce the original bytes exactly. Whether the file
-ends with a newline is carried by the text itself.
+both (the ending is the file's majority one) so that `encode` can reproduce the
+original bytes of a file with one kind of ending exactly; `encode_like` keeps a
+mixed file's per-line endings. Whether the file ends with a newline is carried
+by the text itself.
 """
 
 from __future__ import annotations
@@ -35,9 +37,10 @@ def decode(data: bytes) -> TextFile:
     if bom:
         data = data[len(BOM) :]
     text = data.decode("utf-8", errors=_ERRORS)
-    eol: Eol = "\r\n" if "\r\n" in text else "\n"
-    if eol == "\r\n":
-        text = text.replace("\r\n", "\n")
+    # The majority ending wins: one stray CRLF line doesn't make a file CRLF.
+    crlf = text.count("\r\n")
+    eol: Eol = "\r\n" if crlf and crlf >= text.count("\n") - crlf else "\n"
+    text = text.replace("\r\n", "\n")
     return TextFile(text=text, eol=eol, bom=bom)
 
 
@@ -71,9 +74,7 @@ def encode_like(original: bytes, new_text: str) -> bytes:
     tf = decode(original)
     body = original[len(BOM) :] if tf.bom else original
     old_raw = _raw_lines(body)
-    old_norm = [line.decode("utf-8", errors=_ERRORS) for line in old_raw]
-    if tf.eol == "\r\n":
-        old_norm = [line.replace("\r\n", "\n") for line in old_norm]
+    old_norm = [line.decode("utf-8", errors=_ERRORS).replace("\r\n", "\n") for line in old_raw]
     # Split on \n only (str.splitlines would also break on \r,   and others).
     new_lines = [p + "\n" for p in new_text.split("\n")[:-1]]
     tail = new_text.split("\n")[-1]
@@ -111,6 +112,23 @@ def retry_os(fn: Callable[[], None]) -> None:
     fn()
 
 
+# A file name may be 255 bytes (Linux, macOS) or 255 UTF-16 units (Windows); a temp
+# name adds a dot, a dot, 8 random characters and ".tmp" to the file's own name.
+_TEMP_NAME_ROOM = 200
+
+
+def _temp_prefix(path: Path) -> str:
+    """``.<name>.``, with ``name`` shortened so the temp name stays a legal length.
+
+    UTF-8 bytes bound UTF-16 units too, so one byte cap serves every platform.
+    """
+    name = path.name
+    raw = name.encode("utf-8", errors=_ERRORS)
+    if len(raw) > _TEMP_NAME_ROOM:
+        name = raw[:_TEMP_NAME_ROOM].decode("utf-8", errors="ignore")
+    return f".{name}."
+
+
 def atomic_write(path: Path, data: bytes, check: Callable[[], None] | None = None) -> None:
     """Write `data` to `path` via a temp file in the same folder and `os.replace`.
 
@@ -118,7 +136,7 @@ def atomic_write(path: Path, data: bytes, check: Callable[[], None] | None = Non
     file is removed, `path` is left as it was and the exception propagates.
     """
     path = Path(path)
-    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    fd, tmp_name = tempfile.mkstemp(prefix=_temp_prefix(path), suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(data)
@@ -136,7 +154,7 @@ def atomic_write(path: Path, data: bytes, check: Callable[[], None] | None = Non
 
 
 def _write_temp(path: Path, data: bytes) -> str:
-    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    fd, tmp_name = tempfile.mkstemp(prefix=_temp_prefix(path), suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(data)

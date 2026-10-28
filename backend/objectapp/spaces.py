@@ -129,7 +129,31 @@ class Registry:
 
     def _save(self, data: dict[str, Any]) -> None:
         self.state_dir.mkdir(parents=True, exist_ok=True)
+        self._keep_unreadable()
         atomic_write(self.path, dump_json(data))
+
+    def _keep_unreadable(self) -> None:
+        """Copy a registry file `_load` couldn't parse aside, so a save never loses it.
+
+        It may be a hand edit gone wrong; the user's list of spaces is in it.
+        A file that can't even be opened (locked) raises instead of being replaced.
+        """
+        try:
+            raw = self.path.read_bytes()
+        except FileNotFoundError:
+            return
+        try:
+            if isinstance(json.loads(raw.decode("utf-8")), dict):
+                return
+        except (ValueError, UnicodeDecodeError):
+            pass
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+        aside = self.state_dir / f"spaces.unreadable-{stamp}.json"
+        n = 2
+        while aside.exists():
+            aside = self.state_dir / f"spaces.unreadable-{stamp}-{n}.json"
+            n += 1
+        atomic_write(aside, raw)
 
     def list(self, current: Path | str | None = None) -> list[SpaceEntry]:
         """Every registered space in registry order, `current` flagged (and listed even if unregistered)."""

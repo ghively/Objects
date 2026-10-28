@@ -26,6 +26,7 @@ import logging
 import os
 import random
 import re
+import shutil
 import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
@@ -175,6 +176,9 @@ _UNTITLED_STEM_RE = re.compile(r"^Untitled(?: \(\d+\))?$")
 # Characters Windows doesn't allow in a file name (and control characters).
 _ILLEGAL_FILENAME_RE = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 _MAX_FILENAME = 120
+# Bytes, too: a name may be 255 bytes on Linux and macOS, and " (2)", a whiteboard
+# sidecar suffix or a temp name add to the stem.
+_MAX_FILENAME_BYTES = 200
 # Device names Windows reserves (a file `CON.md` can't be created there).
 _RESERVED_STEMS = frozenset(
     {
@@ -194,15 +198,20 @@ def safe_filename(title: str) -> str:
     """The file stem for a title, as Object's export names files.
 
     The title up to its first character that is illegal in a Windows file name,
-    with whitespace collapsed and trailing dots and spaces stripped, capped at
-    120 characters. If that is empty, the illegal characters are dropped
-    instead; if still empty, ``Untitled``. (A Windows device name such as
-    ``CON`` gets a trailing ``_``.) ``[``, ``]`` and ``#`` are dropped first.
+    with whitespace collapsed and leading and trailing dots and spaces stripped
+    (a leading dot would make a hidden dotfile), capped at 120 characters and
+    200 UTF-8 bytes. If that is empty, the illegal characters are dropped
+    instead; if still empty,
+    ``Untitled``. (A Windows device name such as ``CON`` gets a trailing
+    ``_``.) ``[``, ``]`` and ``#`` are dropped first.
     """
 
     def clean(text: str) -> str:
-        text = " ".join(text.split()).rstrip(". ")
-        return text[:_MAX_FILENAME].rstrip(". ")
+        text = " ".join(text.split()).strip(". ")[:_MAX_FILENAME]
+        raw = text.encode("utf-8", errors="surrogatepass")
+        if len(raw) > _MAX_FILENAME_BYTES:
+            text = raw[:_MAX_FILENAME_BYTES].decode("utf-8", errors="ignore")
+        return text.rstrip(". ")
 
     # `[`, `]` and `#` are legal in file names but end a wikilink's target, so
     # the path form of a link (see `Space._link_text`) must never contain them.
@@ -240,6 +249,14 @@ def unique_path(root: Path, folder: str, stem: str, same_as: str | None = None) 
         if name.lower() not in taken or name.lower() == own:
             return f"{folder}/{name}" if folder else name
         n += 1
+
+
+def _same_file(a: Path, b: Path) -> bool:
+    """Whether ``a`` and ``b`` name one file (e.g. two spellings on a case-insensitive disk)."""
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
 
 
 class Conflict(Exception):
@@ -1538,6 +1555,10 @@ class Space:
                 return Skip(rel, "The file no longer exists")
             except PermissionError as exc:  # e.g. locked by another program
                 return Skip(rel, f"The file could not be written: {exc.strerror or exc}")
+            except FrontmatterError:
+                # One file the edit can't rewrite must not stop the caller's
+                # loop over the others (a rename would stop halfway).
+                return Skip(rel, "The file's frontmatter could not be rewritten")
         raise AssertionError("unreachable")
 
     @staticmethod
@@ -1895,6 +1916,32 @@ class Space:
                 out[raw.path] = found
         return out
 
+    def _bystanders(self, rel: str, new_title: str) -> dict[str, dict[str, str]]:
+        """Links that reach another object by ``new_title``: path -> {target: where it resolves}.
+
+        Renaming ``rel`` to that name could make them resolve to it instead
+        (an exact title or the linking folder wins), so the rename rewrites the
+        ones that change to their old object's unambiguous link text.
+        """
+        names = {_fold(new_title), _fold(safe_filename(new_title))}
+        with self._lock:
+            raws = list(self._raw.values())
+        out: dict[str, dict[str, str]] = {}
+        for raw in raws:
+            text = (raw.of.frontmatter_src or "") + raw.of.body
+            if "[[" not in text:
+                continue
+            found: dict[str, str] = {}
+            for t in wikilink_targets(text):
+                if _fold(t) not in names:
+                    continue
+                was = self.resolve(t, raw.path)
+                if was is not None and was != rel:
+                    found[t] = was
+            if found:
+                out[raw.path] = found
+        return out
+
     @staticmethod
     def _relink_edit(targets: set[str], new_text: str) -> Edit:
         """Rewrite the links whose target is one of ``targets`` (exactly) to ``new_text``."""
@@ -1924,7 +1971,9 @@ class Space:
         src = self.root / rel
         dest = self.root / new_rel
         case_only = rel.lower() == new_rel.lower()
-        if not case_only and dest.exists():
+        if dest.exists() and not (case_only and _same_file(src, dest)):
+            # A case-only spelling that names another file (case-sensitive
+            # folder) is taken too: never overwrite it.
             raise FileExistsError(new_rel)
         self.own_deletes[rel] = version
         self.own_writes[new_rel] = version
@@ -1964,16 +2013,18 @@ class Space:
         if self._is_whiteboard(rel):
             # A whiteboard's stem must be free for its .md and both sidecars (M6).
             from .whiteboardtrash import free_whiteboard_stem as free
+        return self._free_target(rel, folder, stem, free)
+
+    def _free_target(
+        self, rel: str, folder: str, stem: str, free: Callable[..., str] = unique_path
+    ) -> str:
+        """Where ``rel`` can move to as ``<folder>/<stem>.md``: its own spelling or a free name."""
         new_rel = free(self.root, folder, stem, same_as=rel)
         dest = self.root / new_rel
         if new_rel == rel or not dest.exists():
             return new_rel
-        try:
-            same = os.path.samefile(self.root / rel, dest)
-        except OSError:
-            same = False
         # On a case-sensitive file system both spellings can exist: then pick a free name.
-        return new_rel if same else free(self.root, folder, stem)
+        return new_rel if _same_file(self.root / rel, dest) else free(self.root, folder, stem)
 
     def _board_referrers(self, rel: str, old_title: str) -> dict[str, set[str]]:
         """Whiteboards whose board file links to ``rel`` by its old name: board .md -> targets.
@@ -2041,6 +2092,7 @@ class Space:
 
         referrers = self._referrers(rel, old_title)
         board_referrers = self._board_referrers(rel, old_title)
+        bystanders = self._bystanders(rel, new_title)
         whiteboard = self._is_whiteboard(rel)
 
         def edit(of: ObjectFile, _fm: dict) -> ObjectFile | None:
@@ -2098,6 +2150,21 @@ class Space:
                 if written is not None:
                     relinked.append(written)
                     self.rescan_file(at)  # the link index and search re-read the board
+        for ref in sorted(bystanders):
+            # Links that reached another object by the new name keep reaching it.
+            at = new_rel if ref == rel else ref
+            for target, was in sorted(bystanders[ref].items()):
+                if self.resolve(target, at) == was:
+                    continue
+                result = self._rewrite_other(
+                    at, self._relink_edit({target}, self._link_text(was, at))
+                )
+                if isinstance(result, Skip):
+                    skipped.append(result)
+                elif ref != rel and ref not in relinked:
+                    relinked.append(ref)
+                elif ref == rel:
+                    version = result
         if summary.type == "tag":
             self._rename_tag_lists(old_title, new_title, new_rel, relinked, skipped)
         return RenameResult(new_rel, version, relinked, skipped)
@@ -2345,7 +2412,7 @@ class Space:
                     self._commit_type(dst_edit, dst_revision)
                     type_written = True
             folder = dst.folder.strip("/")
-            new_rel = unique_path(self.root, folder, safe_filename(title), same_as=rel)
+            new_rel = self._free_target(rel, folder, safe_filename(title))
             if new_rel != rel:
                 (self.root / folder).mkdir(parents=True, exist_ok=True)
                 self._move_file(rel, new_rel, version)
@@ -2966,60 +3033,36 @@ class Space:
             trash_id = new_ulid()
             folder = self.trash.type_dir(trash_id)
             folder.mkdir(parents=True, exist_ok=True)
-            type_file = self.root / ".object" / "types" / f"{type_def.id}.json"
-            if type_file.is_file():
-                os.replace(type_file, folder / "type.json")
-            else:
-                (folder / "type.json").write_bytes(
-                    (json.dumps(type_def.to_json(), indent=2, ensure_ascii=False) + "\n").encode()
-                )
-            views_file = self.root / ".object" / "views" / f"{type_def.id}.json"
-            if views_file.is_file():
-                self.own_writes[f".object/views/{type_def.id}.json"] = ""
-                os.replace(views_file, folder / "views.json")
             objects = [self._rel(p) for p in object_paths]
             templates = [p for p in self._templates_of(type_def.id) if p not in objects]
-            for rel in templates:
-                self._move_out(rel, folder / "templates" / rel)
-            object_ids = [
-                self.delete_object(rel, type_trash_id=trash_id).id
-                for rel in objects
-                if (self.root / rel).is_file()
-            ]
+            object_ids: list[str] = []
             refs: list[dict[str, str]] = []
-            for other in self.types:
-                if other.id == type_def.id or other.readOnlyReason:
-                    continue
-                touched = [
-                    p
-                    for p in other.propertyDefinitions
-                    if p.type == "entity" and type_def.id in (p.options.get("allowedTypes") or [])
-                ]
-                if not touched:
-                    continue
-                changed = copy.deepcopy(other)
-                for p in changed.propertyDefinitions:
-                    if p.id in {q.id for q in touched}:
-                        p.options["allowedTypes"] = [
-                            a for a in p.options["allowedTypes"] if a != type_def.id
-                        ]
-                if self._save_type(changed):
-                    other.propertyDefinitions = changed.propertyDefinitions
-                    refs.extend({"typeId": other.id, "propertyId": p.id} for p in touched)
             deleted_at = now_stamp()
-            self.trash.write_json(
-                folder / "manifest.json",
-                {
-                    "id": trash_id,
-                    "kind": "type",
-                    "typeId": type_def.id,
-                    "name": type_def.name,
-                    "deletedAt": deleted_at,
-                    "objectTrashIds": object_ids,
-                    "allowedTypesRefs": refs,
-                    "templates": templates,
-                },
-            )
+            manifest = {
+                "id": trash_id,
+                "kind": "type",
+                "typeId": type_def.id,
+                "name": type_def.name,
+                "deletedAt": deleted_at,
+                "objectTrashIds": object_ids,
+                "allowedTypesRefs": refs,
+                "templates": templates,
+            }
+            # The manifest goes first, so a failure partway (a locked file) never
+            # strands the type and its templates in the trash with no way back.
+            self.trash.write_json(folder / "manifest.json", manifest)
+            try:
+                self._trash_type_files(type_def, folder, trash_id, objects, templates, object_ids, refs)
+            except BaseException:
+                try:
+                    if not (folder / "type.json").exists():
+                        shutil.rmtree(folder)  # nothing was moved yet: no entry
+                    else:
+                        self.trash.write_json(folder / "manifest.json", manifest)
+                except OSError:
+                    _log.exception("Could not record a partial type trash %s", trash_id)
+                raise
+            self.trash.write_json(folder / "manifest.json", manifest)
             self.types = [t for t in self.types if t.id != type_def.id]
             self._types_changed(type_def.id)
             return TrashItem(
@@ -3031,6 +3074,53 @@ class Space:
                 deletedAt=deleted_at,
                 objectCount=len(object_ids),
             )
+
+    def _trash_type_files(
+        self,
+        type_def: TypeDefinition,
+        folder: Path,
+        trash_id: str,
+        objects: list[str],
+        templates: list[str],
+        object_ids: list[str],
+        refs: list[dict[str, str]],
+    ) -> None:
+        """`trash_type`'s moves, recording each object's trash id and each ref as it goes."""
+        type_file = self.root / ".object" / "types" / f"{type_def.id}.json"
+        if type_file.is_file():
+            os.replace(type_file, folder / "type.json")
+        else:
+            (folder / "type.json").write_bytes(
+                (json.dumps(type_def.to_json(), indent=2, ensure_ascii=False) + "\n").encode()
+            )
+        views_file = self.root / ".object" / "views" / f"{type_def.id}.json"
+        if views_file.is_file():
+            self.own_writes[f".object/views/{type_def.id}.json"] = ""
+            os.replace(views_file, folder / "views.json")
+        for rel in templates:
+            self._move_out(rel, folder / "templates" / rel)
+        for rel in objects:
+            if (self.root / rel).is_file():
+                object_ids.append(self.delete_object(rel, type_trash_id=trash_id).id)
+        for other in self.types:
+            if other.id == type_def.id or other.readOnlyReason:
+                continue
+            touched = [
+                p
+                for p in other.propertyDefinitions
+                if p.type == "entity" and type_def.id in (p.options.get("allowedTypes") or [])
+            ]
+            if not touched:
+                continue
+            changed = copy.deepcopy(other)
+            for p in changed.propertyDefinitions:
+                if p.id in {q.id for q in touched}:
+                    p.options["allowedTypes"] = [
+                        a for a in p.options["allowedTypes"] if a != type_def.id
+                    ]
+            if self._save_type(changed):
+                other.propertyDefinitions = changed.propertyDefinitions
+                refs.extend({"typeId": other.id, "propertyId": p.id} for p in touched)
 
     def list_trash(self) -> list[TrashItem]:
         """Every trash entry, newest first."""
