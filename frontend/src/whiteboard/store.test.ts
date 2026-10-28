@@ -112,6 +112,22 @@ describe('board store', () => {
     expect(Object.keys(s.getState().doc.board.nodes)).toEqual(['a'])
   })
 
+  test('alt-drag of a frame: the copy stays where the frame was', () => {
+    const s = storeWith(board([
+      node({ id: 'f', kind: 'frame', position: { x: 0, y: 0 }, width: 300, height: 300, z: 0 }),
+      node({ id: 'a', kind: 'shape', position: { x: 30, y: 30 }, width: 90, height: 90, z: 1 }),
+    ]))
+    const c = s.getState().canvas
+    c.beginDrag(['f'], { duplicate: true })
+    c.applyFlowChanges([pos('f', 600, 0)])
+    c.endDrag()
+    const nodes = s.getState().doc.board.nodes
+    const copy = Object.values(nodes).find((n) => n.kind === 'frame' && n.id !== 'f')!
+    expect(copy.position).toEqual({ x: 0, y: 0 })
+    expect(nodes.f.position).toEqual({ x: 600, y: 0 })
+    expect(nodes.a.position).toEqual({ x: 630, y: 30 })
+  })
+
   test('clear whiteboard clears board and ink in one undo step', () => {
     const b = board([node({ id: 'a', blockId: 'b1' })], [], { b1: textBlock('hi') }, { viewport: { x: 1, y: 2, zoom: 1 } })
     const s = createBoardStore({ doc: { board: b, strokes: [stroke('s1')] } })

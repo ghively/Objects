@@ -329,11 +329,12 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
         if (!isEditable(get())) return
         gesture++
         const key = `drag:${gesture}`
+        // Containment is read before an Alt+drag copy exists, so a frame's copy doesn't follow it.
+        const board = get().doc.board
         if (o.duplicate) {
           // Alt+drag: copies stay where the originals were; the originals move (one step).
           edit('duplicate', (b) => A.duplicateSelection(b, dragIds, 0).board, key)
         }
-        const board = get().doc.board
         const contents = new Map<string, string[]>()
         const claimed = new Set<string>(dragIds)
         for (const id of dragIds) {
