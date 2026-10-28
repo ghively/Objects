@@ -14,7 +14,10 @@ empty properties are filled from there. Content is added on." So `merge_objects`
    choice); the source body is appended after the target body with one blank line;
 3. relinks every link to the source (bodies, frontmatter values, board entity blocks and text
    links, and for a tag every ``tags:`` list) to the target with M2/M6's rename relinking;
-4. moves the source to the app's trash (restorable).
+4. adds ``[[Target]]`` to the synced property of each object newly related to the target
+   (two-way relations, after relinking so a counterpart that held ``[[Source]]`` gets no
+   second link); those files are reported in ``relinked`` too, so they are announced;
+5. moves the source to the app's trash (restorable).
 
 `Space` is used as built: `_write`, `_apply_values`, `_sync_relations`, `_referrers`,
 `_relink_edit`, `_rewrite_other`, `_board_referrers`, `relink_board_file`, `delete_object`.
@@ -299,8 +302,7 @@ def merge_objects(
         return replace(of, frontmatter_src=None if keep_none else fm_src, body=body)
 
     version = space._write(dst, target_version, edit, now=now)
-    _of, new_fm, _v = space.read(dst)
-    _synced, skipped = space._sync_relations(dst, t, before, new_fm)
+    skipped: list[Skip] = []
 
     # 2. Relink every link to the source (the target's copied content included).
     relinked: list[str] = []
@@ -337,7 +339,15 @@ def merge_objects(
             elif wrote and wrote[-1] and rel not in relinked:
                 relinked.append(rel)
 
-    # 4. The source goes to the trash.
+    # 4. Two-way relations: each newly related object gets ``[[Target]]`` in its synced
+    # property. This runs after relinking, so a counterpart that held ``[[Source]]`` already
+    # holds ``[[Target]]`` and is left alone (no duplicate link).
+    _of, new_fm, _v = space.read(dst)
+    synced, sync_skipped = space._sync_relations(dst, t, before, new_fm)
+    skipped.extend(sync_skipped)
+    relinked.extend(p for p in synced if p not in relinked)
+
+    # 5. The source goes to the trash.
     item = space.delete_object(src)
     final = space.cached_version(dst) or version
     return MergeResult(

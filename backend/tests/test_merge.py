@@ -235,3 +235,68 @@ def test_merge_announces_and_missing_404(client: TestClient, space: Space):
         },
     )
     assert r.status_code == 404
+
+
+def _synced_types(root: Path) -> None:
+    """Types A and B whose `rel` relations sync with each other (two-way)."""
+    types = root / ".object" / "types"
+    types.mkdir(parents=True, exist_ok=True)
+    for tid, name, other in (("a", "A", "b"), ("b", "B", "a")):
+        data = {
+            "schemaVersion": 2,
+            "id": tid,
+            "name": name,
+            "pluralName": name,
+            "folder": name,
+            "propertyDefinitions": [
+                {
+                    "id": f"rel-{tid}",
+                    "key": "rel",
+                    "name": "Rel",
+                    "type": "entity",
+                    "options": {
+                        "isArray": True,
+                        "allowedTypes": [other],
+                        "hasFixedSet": False,
+                        "fixedSet": [],
+                        "propertySyncing": {"propertyIds": [f"rel-{other}"]},
+                    },
+                }
+            ],
+        }
+        (types / f"{tid}.json").write_bytes((json.dumps(data, indent=2) + "\n").encode())
+    files = {
+        "A/Src.md": "rel:\n  - '[[X]]'\n  - '[[Y]]'\n",
+        "A/Dst.md": "",
+        "B/X.md": "rel:\n  - '[[Src]]'\n",
+        "B/Y.md": "",  # out of sync: Src names Y, Y doesn't name Src
+    }
+    for rel, extra in files.items():
+        folder, title = rel[:-3].split("/")
+        (root / folder).mkdir(exist_ok=True)
+        (root / rel).write_bytes(
+            f"---\ntype: '{folder}'\ntitle: {title}\n{extra}"
+            "lastUpdated: 2026-01-01T00:00:00.000Z\n---\n".encode()
+        )
+
+
+def test_merge_synced_relation_no_duplicate_and_announced(m8_space_dir: Path):
+    _synced_types(m8_space_dir)
+    space = Space(m8_space_dir)
+    app = create_app(space, watch=False)
+    space.clock = lambda: T0
+    space.tz = UTC
+    with TestClient(app) as c:
+        r = _merge(c, "A/Src.md", "A/Dst.md")
+    assert r.status_code == 200, r.text
+    data = r.json()
+
+    dst_fm, _ = _fm_body(m8_space_dir, "A/Dst.md")
+    assert dst_fm["rel"] == ["[[X]]", "[[Y]]"]
+    x_fm, _ = _fm_body(m8_space_dir, "B/X.md")
+    assert x_fm["rel"] == ["[[Dst]]"]  # relinked once, no second link from the sync
+    y_fm, _ = _fm_body(m8_space_dir, "B/Y.md")
+    assert y_fm["rel"] == ["[[Dst]]"]  # added by the sync
+    assert "B/X.md" in data["relinked"]
+    assert "B/Y.md" in data["relinked"]  # the synced file is reported (and announced)
+    assert data["skipped"] == []
