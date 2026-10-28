@@ -76,11 +76,10 @@ def test_basic_setup_writes_four_types(tmp_path: Path, state: Path):
     assert person.prop("projects").options["allowedTypes"] == ["project"]
     assert person.prop("organizations").options["allowedTypes"] == []
     status = loaded["project"].prop("status").options
-    assert status["isStatus"] is True
-    assert [(o["text"], o["statusCategory"]) for o in status["set"]] == [
-        ("Planned", "not-started"), ("In Progress", "in-progress"),
-        ("On Hold", "blocked"), ("Completed", "done"),
-    ]
+    # Object sets isStatus only on the basic Task status; Project's is a plain label.
+    assert "isStatus" not in status
+    assert [o["text"] for o in status["set"]] == ["Planned", "In Progress", "On Hold", "Completed"]
+    assert all("statusCategory" not in o for o in status["set"])
     rating = loaded["book"].prop("rating").options["numberFormat"]
     assert rating["type"] == "progress" and rating["options"]["progress"]["steps"] == 5
     assert loaded["project"].prop("timeframe").options["constraints"]["endTimePreference"] is True
