@@ -80,6 +80,7 @@ describe('BlockStyleMenu', () => {
       'Toggle',
       'Group', // ActionItems.groupBlocks.title
       'Color',
+      'Alignment', // M9: EditorPanel.shortLabels.alignment (a paragraph takes `align`)
       'Standout',
       'Indent', // tokensMenu.indent.shortName
       'Unindent', // tokensMenu.unindent.shortName

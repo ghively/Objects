@@ -139,6 +139,7 @@ describe('<BlockHandles>', () => {
       'Duplicate',
       'Remove',
       'Color',
+      'Alignment', // M9
       'Standout',
       'Indent',
       'Unindent',

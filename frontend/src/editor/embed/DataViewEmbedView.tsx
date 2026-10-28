@@ -8,13 +8,18 @@
  * collection or query (Ctrl/Cmd: in a new tab). "Show details" / "Hide
  * details" (the data view's own customize row, and the block's `…` menu) is the
  * block's `details` option, `<!-- block: details -->` (`showDataViewDetails`).
- * Other view changes made in the embed (layout, filters, sorts) last while the
- * note is open and are not saved to the collection or query (our choice).
+ *
+ * M9: the embed keeps its own view (`EntityBlock.localDataViewInfo`). Until the
+ * first view change it shows the source's view and writes nothing; that change
+ * copies the view, with the change, into the block's `localDataViewInfo` option
+ * (one line of JSON: layout, filters, sorts and group), which the embed uses from
+ * then on. Changes are saved after EMBED_VIEW_SAVE_MS (our choice); the collection
+ * or query itself is never changed.
  *
  * An unknown id shows "Collection not found." / "Query not found." (our strings).
  */
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
-import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Collection, Layout, Query, QueryDefinition, TypeDef, ViewState } from '@/api/types'
 import { IconOrEmoji } from '@/components/Icon'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
@@ -56,36 +61,99 @@ function fitLayout(state: ViewState, multiType: boolean): { state: ViewState; la
   return { state: shown, layouts }
 }
 
+/** How long after a view change in the embed its `localDataViewInfo` is written (our choice). */
+export const EMBED_VIEW_SAVE_MS = 300
+
+/** The view parts `localDataViewInfo` holds (`LocalDataViewInfo`). */
+type LocalViewInfo = Pick<ViewState, 'viewDefinition' | 'filterGroup' | 'sorts' | 'groupBy'>
+
+/** The block's `localDataViewInfo` text, or null when it has none. */
+export function localViewText(options: readonly Option[] | null | undefined): string | null {
+  const value = (options ?? []).find((o) => o.key === 'localDataViewInfo')?.value
+  return typeof value === 'string' ? value : null
+}
+
+/** The saved view, parsed; null when absent or unreadable (the embed then shows the source's view). */
+export function parseLocalView(text: string | null): Partial<LocalViewInfo> | null {
+  if (!text) return null
+  try {
+    const v: unknown = JSON.parse(text)
+    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Partial<LocalViewInfo>) : null
+  } catch {
+    return null
+  }
+}
+
+/** The JSON written for `state`: its layout, filters, sorts and group, not "Show details". */
+export function localViewJson(state: ViewState): string {
+  const info: LocalViewInfo = {
+    viewDefinition: state.viewDefinition,
+    filterGroup: state.filterGroup,
+    sorts: state.sorts,
+    groupBy: state.groupBy,
+  }
+  return JSON.stringify(info)
+}
+
+/** `source` with the saved view's parts in place of its own. */
+function withLocalView(source: ViewState, info: Partial<LocalViewInfo> | null): ViewState {
+  if (!info) return source
+  return {
+    ...source,
+    viewDefinition: info.viewDefinition ?? source.viewDefinition,
+    filterGroup: info.filterGroup ?? source.filterGroup,
+    sorts: info.sorts ?? source.sorts,
+    groupBy: info.groupBy !== undefined ? info.groupBy : source.groupBy,
+  }
+}
+
 interface EmbedBodyProps {
   details: boolean
   onDetails(on: boolean): void
+  /** The block's `localDataViewInfo` text (null until the first view change). */
+  savedView: string | null
+  onSaveView(json: string): void
   heading: ReactNode
   types: TypeDef[]
   collections: Collection[]
 }
 
-/** A view state kept locally from `base`, with "Show details" coming from the block. */
-function useEmbedState(base: ViewState, baseKey: unknown, details: boolean, onDetails: (on: boolean) => void) {
+/**
+ * The embed's view: the saved `localDataViewInfo` over the source's view, else the source's
+ * view; "Show details" comes from the block. A change to the view itself calls `onSaveView`.
+ */
+function useEmbedState(
+  source: ViewState,
+  savedView: string | null,
+  details: boolean,
+  onDetails: (on: boolean) => void,
+  onSaveView: (json: string) => void,
+) {
+  const base = useMemo(() => withLocalView(source, parseLocalView(savedView)), [source, savedView])
   const [local, setLocal] = useState<ViewState>(base)
+  const localRef = useRef(local)
+  localRef.current = local
   useEffect(() => {
+    // The source's view or the saved one changed (our own write lands here too, unchanged).
     setLocal(base)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the saved view changes
-  }, [baseKey])
+  }, [base])
   const state = useMemo(() => ({ ...local, showDataViewDetails: details }), [local, details])
   const onState = useCallback(
     (next: ViewState) => {
       if (!!next.showDataViewDetails !== details) onDetails(!!next.showDataViewDetails)
+      const json = localViewJson(next)
+      if (json !== localViewJson(localRef.current)) onSaveView(json)
       setLocal(next)
     },
-    [details, onDetails],
+    [details, onDetails, onSaveView],
   )
   return { state, onState }
 }
 
-function CollectionEmbed({ collection: c, details, onDetails, heading, types, collections }: EmbedBodyProps & { collection: Collection }) {
+function CollectionEmbed({ collection: c, details, onDetails, savedView, onSaveView, heading, types, collections }: EmbedBodyProps & { collection: Collection }) {
   const scope = useMemo(() => ({ collectionIds: [c.id] }), [c.id])
   const { rows, loading, patchRow } = useRows(scope)
-  const { state, onState } = useEmbedState(c.views.all, c.views.all, details, onDetails)
+  const { state, onState } = useEmbedState(c.views.all, savedView, details, onDetails, onSaveView)
   const fit = fitLayout(state, c.typeIds.length !== 1)
   return (
     <DataView
@@ -104,7 +172,7 @@ function CollectionEmbed({ collection: c, details, onDetails, heading, types, co
   )
 }
 
-function QueryEmbed({ query: q, details, onDetails, heading, types, collections }: EmbedBodyProps & { query: Query }) {
+function QueryEmbed({ query: q, details, onDetails, savedView, onSaveView, heading, types, collections }: EmbedBodyProps & { query: Query }) {
   const def = q.definition
   const allTypeIds = useMemo(() => types.map((t) => t.id), [types])
   const ready = isQueryReady(def)
@@ -120,7 +188,7 @@ function QueryEmbed({ query: q, details, onDetails, heading, types, collections 
     }),
     [q, def],
   )
-  const { state, onState } = useEmbedState(base, base, details, onDetails)
+  const { state, onState } = useEmbedState(base, savedView, details, onDetails, onSaveView)
   const pipeline = useCallback<Pipeline>(
     (rs, s, ctx) =>
       runQuery(
@@ -174,6 +242,32 @@ export function DataViewEmbedView({ node, editor, getPos, selected }: NodeViewPr
     },
     [editor, getPos],
   )
+  // A view change is written to the block after a short pause; leaving writes a pending one.
+  const savedView = localViewText(options)
+  const pending = useRef<{ json: string; timer: ReturnType<typeof setTimeout> } | null>(null)
+  const writeView = useCallback(() => {
+    const p = pending.current
+    pending.current = null
+    if (!p) return
+    clearTimeout(p.timer)
+    if (editor.isDestroyed || !editor.isEditable) return
+    const at = typeof getPos === 'function' ? getPos() : undefined
+    if (at == null) return
+    const current = editor.state.doc.nodeAt(at)
+    if (!current || current.type.name !== 'dataViewEmbed') return
+    if (localViewText(current.attrs.blockOptions as Option[] | null) === p.json) return
+    editor.commands.setBlockOption('localDataViewInfo', p.json, at)
+  }, [editor, getPos])
+  const onSaveView = useCallback(
+    (json: string) => {
+      if (!editor.isEditable) return // read-only: the change lasts while the note is open
+      if (pending.current) clearTimeout(pending.current.timer)
+      pending.current = { json, timer: setTimeout(writeView, EMBED_VIEW_SAVE_MS) }
+    },
+    [editor, writeView],
+  )
+  useEffect(() => () => writeView(), [writeView])
+
   const remove = () => {
     const at = pos()
     if (at == null) return
@@ -218,7 +312,7 @@ export function DataViewEmbedView({ node, editor, getPos, selected }: NodeViewPr
   )
 
   let body: ReactNode
-  const shared = { details, onDetails, heading, types, collections: defs.collections }
+  const shared = { details, onDetails, savedView, onSaveView, heading, types, collections: defs.collections }
   if (collection) body = <CollectionEmbed key={collection.id} collection={collection} {...shared} />
   else if (query) body = <QueryEmbed key={query.id} query={query} {...shared} />
   else if (!defs.loaded) body = <p className="py-2 text-[14px] text-fg-muted" aria-busy="true">{DATA_VIEW_EMBED_TEXT.loading}</p>

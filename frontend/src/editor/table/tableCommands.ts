@@ -230,6 +230,50 @@ function clearCells(editor: Editor, tablePos: number, cells: CellRef[]): boolean
     .run()
 }
 
+// ------------------------------------------------------------------ alignment (M9)
+
+export type CellAlign = 'left' | 'center' | 'right'
+
+/**
+ * A column's alignment, from its cells' `align` (the GFM separator line: `:-:` center,
+ * `-:` right); `left` when none is set.
+ */
+export function columnAlignment(doc: PMNode, tablePos: number, col: number): CellAlign {
+  const table = tableAt(doc, tablePos)
+  if (!table) return 'left'
+  const { rows } = tableSize(table)
+  for (let row = 0; row < rows; row++) {
+    const at = cellPos(doc, tablePos, { row, col })
+    const align = at == null ? null : doc.nodeAt(at)?.attrs.align
+    if (align === 'center' || align === 'right') return align
+  }
+  return 'left'
+}
+
+/**
+ * Capacities' table-cell "Alignment" (`textAlignment` on the cell's text). A GFM table aligns
+ * whole columns, so Object sets it on the column of the cell (our choice): every cell of the
+ * column gets `align`, which writes the separator line's marker. Left is the default and
+ * removes the marker. Only the separator line changes in the file.
+ */
+export function setColumnAlignment(editor: Editor, tablePos: number, col: number, align: CellAlign): boolean {
+  const table = tableAt(editor.state.doc, tablePos)
+  if (!table || col < 0 || col >= tableSize(table).cols) return false
+  if (columnAlignment(editor.state.doc, tablePos, col) === align) return true
+  const value = align === 'left' ? null : align
+  return editor
+    .chain()
+    .command(({ tr }) => {
+      const { rows } = tableSize(table)
+      for (let row = 0; row < rows; row++) {
+        const at = cellPos(tr.doc, tablePos, { row, col })
+        if (at != null) tr.setNodeAttribute(at, 'align', value)
+      }
+      return true
+    })
+    .run()
+}
+
 /** "Clear row". */
 export function clearRow(editor: Editor, tablePos: number, row: number): boolean {
   const table = tableAt(editor.state.doc, tablePos)
