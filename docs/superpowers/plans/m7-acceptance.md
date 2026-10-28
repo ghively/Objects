@@ -114,7 +114,7 @@ The lane agents chose these where the reference was silent:
 - **Breadcrumbs:**
   - Following a link back to a page already on the trail cuts the trail at that page.
   - A link opened in a new tab carries the trail with it.
-  - When the trail is longer than 3 crumbs it collapses behind a "…" button, labelled "Show hidden breadcrumbs" (our string).
+  - At most 3 crumbs show inline counting the current page; every earlier crumb goes into a menu (256 px wide) behind a leading dots icon button, most recent first; crumbs are separated by `/` and earlier ones are at 80 % opacity (reference: `RenderBreadcrumbs`, reference-check 2b). The button's aria-label "Show hidden breadcrumbs" is our string.
 - **Side panel:**
   - A plain click on a resolved wikilink inside an entry navigates the entry.
   - Swap works by click only; dragging an entry onto the main view is not built.
