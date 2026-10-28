@@ -7,7 +7,8 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api, ConflictError } from '@/api/client'
 import type { UpdateResult } from '@/api/types'
-import { completionToast, setStatus, toggleDone } from './taskActions'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
+import { completionToast, maybeOverdue, setStatus, toggleDone } from './taskActions'
 import { TASK_TYPE, taskRow } from './taskFixtures'
 
 const mocked = vi.mocked(api)
@@ -58,5 +59,26 @@ describe('taskActions', () => {
     )
     expect(completionToast({ result: { completed: true, advanced: false }, row: undefined, conflict: false })).toBeNull()
     expect(completionToast({ result: undefined, row: undefined, conflict: false })).toBeNull()
+  })
+
+  test('test maybe overdue uses the time zone setting', () => {
+    // 02:00 UTC on Oct 28: still Oct 27 in Los Angeles, already Oct 28 (16:00) on Kiritimati.
+    const now = new Date('2026-10-28T02:00:00Z')
+    const setZone = (timeZone: string | null) => useSettings.setState({ settings: { ...settingsDefaults, timeZone } })
+    const dayTask = taskRow('Tasks/W.md', { repeat: 'every day', date: { start: '2026-10-27', resolution: 'day' } })
+    const timeTask = taskRow('Tasks/T.md', { repeat: 'every day', date: { start: '2026-10-27T09:00:00Z', resolution: 'time' } })
+    try {
+      setZone('America/Los_Angeles')
+      expect(maybeOverdue(dayTask, now)).toBe(false) // today is the task's day
+      expect(maybeOverdue(timeTask, now)).toBe(false) // 02:00 on Oct 27 there
+      setZone('Pacific/Kiritimati')
+      expect(maybeOverdue(dayTask, now)).toBe(true)
+      expect(maybeOverdue(timeTask, now)).toBe(true) // 23:00 on Oct 27 there, today is Oct 28
+      // Not recurring, or by completion date: never.
+      expect(maybeOverdue(taskRow('Tasks/X.md', { date: { start: '2026-10-01', resolution: 'day' } }), now)).toBe(false)
+      expect(maybeOverdue(taskRow('Tasks/Y.md', { repeat: 'every day after completion', date: { start: '2026-10-01', resolution: 'day' } }), now)).toBe(false)
+    } finally {
+      setZone(null)
+    }
   })
 })
