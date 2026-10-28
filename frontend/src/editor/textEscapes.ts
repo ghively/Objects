@@ -11,20 +11,31 @@
  */
 import type { AnyExtension, JSONContent } from '@tiptap/core'
 import { findInlineMath } from './annotations'
+import { NO_BREAK, protectLinkText, restoreLinkText } from './extensions/linkForms'
 
 /** Stands for a `$` typed in text while a block is rendered (private use). */
-const DOLLAR = String.fromCharCode(0xe000)
+const DOLLAR = String.fromCharCode(0xe0f0)
+/** Stands for a non-breaking space typed in text, written as `&nbsp;`. */
+const NBSP = String.fromCharCode(0xe0f1)
 
 const CODE_MARKS = new Set(['code'])
 
-/** `content` with every `$` in plain (non-code) text replaced by `DOLLAR`. */
-function markDollars(content: JSONContent[] | undefined): JSONContent[] | undefined {
+/**
+ * `content` ready to render: short-form link text protected, and in other
+ * plain (non-code) text every `$` replaced by `DOLLAR` and every non-breaking
+ * space by `NBSP` (`finish` puts them back).
+ */
+function prepare(content: JSONContent[] | undefined): JSONContent[] | undefined {
   if (!content) return content
-  return content.map((n) => {
-    if (n.type !== 'text' || !n.text?.includes('$')) return n
+  return protectLinkText(content)!.map((n) => {
+    if (n.type !== 'text' || !n.text || !(n.text.includes('$') || n.text.includes(NO_BREAK))) return n
     if ((n.marks ?? []).some((m) => CODE_MARKS.has(m.type))) return n
-    return { ...n, text: n.text.replaceAll('$', DOLLAR) }
+    return { ...n, text: n.text.replaceAll('$', DOLLAR).replaceAll(NO_BREAK, NBSP) }
   })
+}
+
+function finish(md: string): string {
+  return restoreLinkText(restoreDollars(md).replaceAll(NBSP, '&nbsp;'))
 }
 
 /**
@@ -93,18 +104,18 @@ export function withTextEscapes<T extends AnyExtension>(ext: T): T {
   if (ext.name === 'paragraph') {
     return ext.extend({
       renderMarkdown(this: { parent: Render | null }, node: JSONContent, h: unknown, ctx: unknown) {
-        const md = this.parent?.({ ...node, content: markDollars(node.content) }, h, ctx) ?? ''
-        return restoreDollars(escapeLineStarts(md))
+        const md = this.parent?.({ ...node, content: prepare(node.content) }, h, ctx) ?? ''
+        return finish(escapeLineStarts(md))
       },
     }) as unknown as T
   }
   if (ext.name === 'heading') {
     return ext.extend({
       renderMarkdown(this: { parent: Render | null }, node: JSONContent, h: unknown, ctx: unknown) {
-        const md = this.parent?.({ ...node, content: markDollars(oneLine(node.content)) }, h, ctx) ?? ''
-        if (!node.content?.length) return restoreDollars(md)
+        const md = this.parent?.({ ...node, content: prepare(oneLine(node.content)) }, h, ctx) ?? ''
+        if (!node.content?.length) return finish(md)
         const prefix = /^#+ /.exec(md)?.[0] ?? ''
-        return prefix + restoreDollars(escapeHeadingEnd(md.slice(prefix.length)))
+        return prefix + finish(escapeHeadingEnd(md.slice(prefix.length)))
       },
     }) as unknown as T
   }

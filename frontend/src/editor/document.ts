@@ -61,6 +61,7 @@ import { Highlight, TextColor } from './nodes/textStyle'
 import { blockRefMarkdown } from './blocks'
 import { M8Keys } from './shortcuts'
 import { withTextEscapes } from './textEscapes'
+import { NbspEntity, withLinkForms } from './extensions/linkForms'
 import { RecordAudio } from './media/recordAudio'
 
 export type EditorExtensionOptions = {
@@ -111,7 +112,7 @@ export function withoutRegistryKeys<T extends AnyExtension>(ext: T): T {
  */
 const RegistryStarterKit = StarterKit.extend({
   addExtensions() {
-    return (this.parent?.() ?? []).map(withoutRegistryKeys).map(withTextEscapes)
+    return (this.parent?.() ?? []).map(withoutRegistryKeys).map(withTextEscapes).map(withLinkForms)
   },
 })
 
@@ -135,6 +136,7 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
     RawBlock,
     Wikilink,
     InlineMath,
+    NbspEntity,
     MathBlock,
     Media,
     ObjectEmbed,
