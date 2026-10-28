@@ -14,7 +14,8 @@ written on a clean `ReminderScheduler.stop` and whenever a reminder fires);
 with no ledger file the fallback is the last 12 hours, and a corrupt ledger
 means no catch-up for that start-up. A trigger must also be later than the
 task's ``lastUpdated``, so a reminder that was already in the past when it was
-set or moved never fires.
+set or moved never fires, unless the running scheduler saw it pending before
+its trigger (then an edit just after the trigger doesn't cancel it).
 
 The ledger lives outside the space (per-user app data, or ``OBJECT_STATE_DIR``)
 so a git-tracked or synced space is never dirtied. An entry is recorded before
@@ -269,24 +270,36 @@ def _body(task: TaskInfo, now: datetime, tz: tzinfo) -> str:
     return "Due today" if day == to_local(now, tz).date() else f"Due {text}"
 
 
-def due(space, since: datetime | None, now: datetime, ledger: Ledger) -> list[Due]:
+def due(
+    space, since: datetime | None, now: datetime, ledger: Ledger, armed: set[str] | None = None
+) -> list[Due]:
     """The reminders to fire now, oldest trigger first.
 
-    A trigger is due when it is in ``(floor, now]``, later than its task's
-    ``lastUpdated`` and not already in the ledger. ``floor`` is `since` (the
-    scheduler's last check); at start-up (``since`` None) it is the catch-up
-    floor: the ledger's ``lastRunning``, else 12 hours ago when there is no
-    ledger, else ``now`` (an unreadable ledger: no catch-up).
+    A trigger is due when it is in ``(floor, now]``, not already in the ledger,
+    and either in `armed` (seen pending by an earlier check, so an edit just
+    after the trigger doesn't cancel it) or later than its task's
+    ``lastUpdated`` (else it was in the past when set). ``floor`` is `since`
+    (the scheduler's last check); at start-up (``since`` None) it is the
+    catch-up floor: the ledger's ``lastRunning``, else 12 hours ago when there
+    is no ledger, else ``now`` (an unreadable ledger: no catch-up). `armed` is
+    then replaced by the keys of the triggers still after `now`.
     """
     floor = since if since is not None else ledger.catch_up_floor(now)
+    before = armed if armed is not None else set()
+    pending: set[str] = set()
     out: list[Due] = []
     for task in task_infos(space):
         trig = trigger_time(task, task.remind, space.tz)
-        if trig is None or not (floor < trig <= now):
-            continue
-        if task.lastUpdated is not None and trig <= task.lastUpdated:
+        if trig is None:
             continue
         key = task.ledger_key(trig)
+        if trig > now:
+            pending.add(key)
+            continue
+        if not floor < trig:
+            continue
+        if task.lastUpdated is not None and trig <= task.lastUpdated and key not in before:
+            continue
         if key in ledger.fired:
             continue
         try:
@@ -294,6 +307,9 @@ def due(space, since: datetime | None, now: datetime, ledger: Ledger) -> list[Du
         except (OverflowError, OSError, ValueError):
             body = f"Due {task.date['start'] if task.date else ''}".rstrip()
         out.append(Due(task.path, key, task.title, body, trig))
+    if armed is not None:
+        armed.clear()
+        armed.update(pending)
     out.sort(key=lambda d: (d.trigger, d.path))
     return out
 
@@ -418,6 +434,8 @@ class ReminderScheduler:
         self.interval = interval
         self.ledger = ledger if ledger is not None else Ledger.for_space(space.root)
         self._last_check: datetime | None = None
+        self._armed: set[str] = set()
+        """Ledger keys of triggers that were still ahead at the last check (see `due`)."""
         self._tick_lock = threading.Lock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -429,7 +447,7 @@ class ReminderScheduler:
             since, self._last_check = self._last_check, now
             if not reminders_enabled(self.space.root):
                 return []
-            fired = due(self.space, since, now, self.ledger)
+            fired = due(self.space, since, now, self.ledger, self._armed)
             for item in fired:
                 self.ledger.record(item.key, now)  # before sending: at most once
                 try:
