@@ -71,6 +71,7 @@ The synthetic fixture spaces are `space-sample`, `space-v1`, `space-calendar`, `
    - an installer (spec §6: "an installer comes later")
    - the in-app Claude Code agent (spec §2)
    - migrating `C:\Git\wiki` into Object's format (a separate project)
+   - **Object Team (next version, parked):** a team server, offline desktop sync with merge, user spaces and an MCP agent layer modelled on KiwiFS. Approved 2026-10-28 but not to be started until Gene expands to the team. Spec: `docs/superpowers/specs/2026-10-28-object-team-design.md`; KiwiFS evaluation: `docs/kiwifs-evaluation.md`.
 
 ## How we build
 
@@ -82,4 +83,4 @@ The synthetic fixture spaces are `space-sample`, `space-v1`, `space-calendar`, `
 
 ## Out of scope (by design)
 
-Accounts, login, billing, sync, sharing/publishing, mobile, integrations (Readwise, Kindle, calendar feeds, messaging), AI features (a Claude Code agent comes later), telemetry, importing Capacities data, migrating `C:\Git\wiki` (a separate later project).
+Accounts, login, billing, sync, sharing/publishing, mobile, integrations (Readwise, Kindle, calendar feeds, messaging), AI features (a Claude Code agent comes later), telemetry, importing Capacities data, migrating `C:\Git\wiki` (a separate later project). Accounts, sync, sharing and agent features return in the parked Object Team spec, not in this version.
