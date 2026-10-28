@@ -3,10 +3,14 @@
 import { createContext, useContext, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Collection, Layout, Row, RowsScope, TypeDef, UpdateResult, ViewState } from '@/api/types'
+import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
-import { useLinkIndex } from '@/links/linkIndex'
+import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
+import { ChangeTypeDialog } from '@/object/ChangeTypeDialog'
+import { DeleteObjectDialog } from '@/object/DeleteObjectDialog'
+import { TypeChip } from '@/shell/Sidebar'
 import type { CustomizePage } from './CustomizeMenu'
 import { applyFilters } from './filter'
 import { groupRows, type Group, type GroupCtx } from './group'
@@ -25,6 +29,9 @@ import { applySorts } from './sort'
 import { Toolbar } from './Toolbar'
 import { ViewSummary } from './ViewSummary'
 import { matchingValues } from './matching'
+import { commonRowMenu, type RowMenuCtx, type RowMenuItem } from './rowMenu'
+
+export type { RowMenuItem } from './rowMenu'
 
 /**
  * Where a full-page view's toolbar goes: a type page puts it in its tab row, right-aligned, as
@@ -103,6 +110,11 @@ export interface DataViewProps {
   patchRow?(path: string, row: Row): void
   /** Right-click menu of a row (list, card or table row): the items for that row, or none. */
   rowMenu?(row: Row): RowMenuItem[]
+  /**
+   * M9: the common row menu (`rowMenu.ts`: open, change type, copy reference, duplicate, delete)
+   * on right-click, before `rowMenu`'s own items. Type pages, their sections, queries and collections.
+   */
+  rowActions?: boolean
   /** Renders layouts other than the list (table, cards, kanban). */
   renderLayout?(layout: Layout, props: LayoutProps): ReactNode | null
   /** Per-row slots for list rows and cards (see `LayoutProps.rowExtras`); without it rows render as in M3. */
@@ -111,16 +123,9 @@ export interface DataViewProps {
   onWritten?(row: Row, result: UpdateResult): void
 }
 
-export interface RowMenuItem {
-  key: string
-  label: string
-  icon: string
-  destructive?: boolean
-  onSelect(): void
-}
-
 /** A small context menu at the pointer: closes on a click elsewhere, Escape or scroll. */
 function RowContextMenu({ x, y, items, onClose }: { x: number; y: number; items: RowMenuItem[]; onClose(): void }) {
+  const [sub, setSub] = useState<string | null>(null)
   useEffect(() => {
     const close = () => onClose()
     const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -140,22 +145,59 @@ function RowContextMenu({ x, y, items, onClose }: { x: number; y: number; items:
       style={{ left: x, top: y }}
       className="fixed z-50 min-w-48 rounded-lg border border-line bg-raised p-1 text-[14px] shadow-lg"
     >
-      {items.map((it) => (
-        <button
-          key={it.key}
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            onClose()
-            it.onSelect()
-          }}
-          className={cn('flex h-8 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-hover', it.destructive && 'text-red-400')}
-        >
-          <Icon name={it.icon} size={14} />
-          {it.label}
-        </button>
-      ))}
+      {items.map((it) =>
+        it.children ? (
+          <div key={it.key} className="relative" onMouseEnter={() => setSub(it.key)}>
+            <button
+              type="button"
+              role="menuitem"
+              aria-haspopup="menu"
+              aria-expanded={sub === it.key}
+              onClick={(e) => {
+                e.stopPropagation()
+                setSub(it.key)
+              }}
+              className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-hover"
+            >
+              <Icon name={it.icon} size={14} />
+              <span className="flex-1">{it.label}</span>
+              <Icon name="ph-caret-right" size={12} />
+            </button>
+            {sub === it.key && (
+              <div
+                role="menu"
+                aria-label={it.label}
+                className="absolute top-0 left-full z-50 max-h-[360px] min-w-44 overflow-auto rounded-lg border border-line bg-raised p-1 shadow-lg"
+              >
+                {it.children.map((c) => (
+                  <RowMenuButton key={c.key} item={c} onClose={onClose} />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <RowMenuButton key={it.key} item={it} onClose={onClose} onHover={() => setSub(null)} />
+        ),
+      )}
     </div>
+  )
+}
+
+function RowMenuButton({ item, onClose, onHover }: { item: RowMenuItem; onClose(): void; onHover?(): void }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onMouseEnter={onHover}
+      onClick={() => {
+        onClose()
+        item.onSelect()
+      }}
+      className={cn('flex h-8 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-hover', item.destructive && 'text-red-400')}
+    >
+      {item.chip ? <TypeChip type={item.chip} size={18} /> : <Icon name={item.icon} size={14} />}
+      {item.label}
+    </button>
   )
 }
 
@@ -171,6 +213,8 @@ export function DataView(props: DataViewProps) {
   const objects = useLinkIndex((s) => s.objects)
   const [visible, setVisible] = useState(LOAD_PAGE)
   const [menu, setMenu] = useState<{ x: number; y: number; items: RowMenuItem[] } | null>(null)
+  const [changing, setChanging] = useState<{ row: Row; to: TypeDef } | null>(null)
+  const [deleting, setDeleting] = useState<Row | null>(null)
 
   const typesById = useMemo(() => Object.fromEntries(types.map((t) => [t.id, t])), [types])
 
@@ -330,15 +374,26 @@ export function DataView(props: DataViewProps) {
     />
   )
 
+  const menuCtx: RowMenuCtx = {
+    types,
+    selectMultiple: () => undefined,
+    changeType: (row, to) => setChanging({ row, to }),
+    requestDelete: (row) => setDeleting(row),
+  }
+  const itemsFor = (row: Row): RowMenuItem[] => [
+    ...(props.rowActions ? commonRowMenu(row, menuCtx) : []),
+    ...(props.rowMenu?.(row) ?? []),
+  ]
+
   return (
     <section
       data-testid="data-view"
       onContextMenu={
-        props.rowMenu
+        props.rowMenu || props.rowActions
           ? (e) => {
               const path = (e.target as Element).closest('[data-path]')?.getAttribute('data-path')
               const row = path ? flat.find((r) => r.summary.path === path) : undefined
-              const items = row ? props.rowMenu?.(row) ?? [] : []
+              const items = row ? itemsFor(row) : []
               if (items.length === 0) return
               e.preventDefault()
               setMenu({ x: e.clientX, y: e.clientY, items })
@@ -402,6 +457,23 @@ export function DataView(props: DataViewProps) {
         </>
       )}
       {menu && <RowContextMenu {...menu} onClose={() => setMenu(null)} />}
+      {changing && (
+        <ChangeTypeDialog
+          open
+          onOpenChange={(o) => !o && setChanging(null)}
+          path={changing.row.summary.path}
+          toType={changing.to}
+          prepare={async () => changing.row.version}
+          onChanged={() => void invalidateLinkIndex()}
+        />
+      )}
+      <DeleteObjectDialog
+        open={deleting !== null}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        onConfirm={async () => {
+          if (deleting) await api.deleteObject(deleting.summary.path, { baseVersion: deleting.version })
+        }}
+      />
     </section>
   )
 }

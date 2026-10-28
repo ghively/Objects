@@ -87,6 +87,7 @@ function UnreviewedSection({
       heading={<div className="min-w-0">{heading}</div>}
       pipeline={unreviewedPipeline}
       patchRow={patchRow}
+      rowActions
     />
   )
 }

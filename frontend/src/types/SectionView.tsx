@@ -111,6 +111,7 @@ function RowsSection(p: RowsSectionProps) {
       heading={p.heading}
       pipeline={p.pipeline}
       patchRow={patchRow}
+      rowActions
     />
   )
 }

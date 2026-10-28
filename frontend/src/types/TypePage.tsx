@@ -305,6 +305,7 @@ function AllTab({
         void createAndOpen(typeId, { values }).catch((e: unknown) => console.warn('Could not create an object:', e))
       }
       patchRow={patchRow}
+      rowActions
     />
   )
 }
