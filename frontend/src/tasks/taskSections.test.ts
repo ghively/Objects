@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { Row } from '@/api/types'
 import { FULL_VIEW_LAYOUTS } from '@/views/model'
-import { TASK_SECTIONS, TASK_SECTION_KEYS, sectionRows } from './taskSections'
+import { DEFAULT_TASK_SECTION, TASK_SECTIONS, TASK_SECTION_KEYS, sectionRows } from './taskSections'
 import { groupRows } from '@/views/group'
 import { TASK_TYPE, taskRow } from './taskFixtures'
 
@@ -29,20 +29,24 @@ const paths = (key: keyof typeof TASK_SECTIONS) => sectionRows(key, ROWS, TASK_T
 
 describe('taskSections', () => {
   test('test sections titles and descriptions match reference', () => {
+    // In the reference's tab order: Inbox, Today, Scheduled, Status, Context, Tags, Open, Deadline,
+    // Recurring, Reminders, Completed, then All.
     const want: Record<string, [string, string]> = {
-      status: ['Status', 'All tasks grouped by their status'],
-      today: ['Today', 'All tasks relevant today'],
       inbox: ['Inbox', 'All tasks that have no status or have not been scheduled'],
+      today: ['Today', 'All tasks relevant today'],
+      scheduled: ['Scheduled', 'All upcoming tasks based on their date'],
+      status: ['Status', 'All tasks grouped by their status'],
+      source: ['Context', 'Tasks organized by the objects they are mentioned in.'],
+      tags: ['Tags', 'All tasks grouped by their tags'],
       open: ['Open', 'All tasks not done yet'],
       deadline: ['Deadline', 'All open tasks with a deadline, sorted by the nearest deadline first'],
-      scheduled: ['Scheduled', 'All upcoming tasks based on their date'],
       recurring: ['Recurring', 'All open tasks that repeat on a schedule, grouped by date'],
       reminders: ['Reminders', 'All open tasks with an active reminder, grouped by date'],
-      tags: ['Tags', 'All tasks grouped by their tags'],
-      source: ['Context', 'Tasks organized by the objects they are mentioned in.'],
       completed: ['Completed', 'All tasks marked as done'],
+      all: ['All', 'All objects of this object type with filter and sort options.'],
     }
     expect(TASK_SECTION_KEYS).toEqual(Object.keys(want))
+    expect(DEFAULT_TASK_SECTION).toBe('inbox')
     for (const [key, [title, description]] of Object.entries(want)) {
       const s = TASK_SECTIONS[key as keyof typeof TASK_SECTIONS]
       expect(s.title).toBe(title)
@@ -132,6 +136,10 @@ describe('taskSections', () => {
   test('test tags preset groups by tags', () => {
     expect(TASK_SECTIONS.tags.preset(NOW).groupBy).toEqual({ groups: [{ propertyId: 'tags', option: 'default' }] })
     expect(paths('tags')).toHaveLength(ROWS.length)
+  })
+
+  test('test all section: every task', () => {
+    expect(paths('all')).toHaveLength(ROWS.length)
   })
 
   test('test completed preset: done, newest completion first', () => {

@@ -72,7 +72,7 @@ Run `npm run build`, then `uv run objectapp --space <copy of backend/tests/fixtu
 
 ### Tasks
 
-- [ ] The Tasks page: the Status tab as list and kanban, a drag between categories, the Today, Inbox, Deadline, Scheduled, Recurring, Reminders and Completed tabs, quick add, the Task type page without an Overview tab.
+- [ ] The Tasks page: the Status tab as list and kanban, a drag between categories, the Today, Inbox, Deadline, Scheduled, Recurring, Reminders and Completed tabs, quick add, the Task type page without an Overview tab. The tabs run Inbox, Today, Scheduled, Status, Context, Tags, Open, Deadline, Recurring, Reminders, Completed, All, and Inbox is the default tab (reference: RootTask `builtInDashboardSections`, `defaultSection: 'tasksInbox'`, reference-check section 6).
 - [ ] A task with Repeat (daily, weekday, custom by completion, with an end date) completed twice.
 - [ ] A reminder set a minute ahead fires one Windows notification while the app is open, and none once the task is done.
 - [ ] A reminder set to a time already past stays silent, also across a restart.
