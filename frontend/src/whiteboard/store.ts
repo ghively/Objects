@@ -43,7 +43,10 @@ export interface CanvasActions {
   setInkTool(tool: InkToolState | null): void
   /** A node drag starts: frames take the nodes wholly inside them (containment at drag start). */
   beginDrag(ids: string[], opts?: { duplicate?: boolean }): void
-  /** React Flow position/size changes during a drag or resize (one coalesced step per gesture). */
+  /**
+   * React Flow position/size changes during a drag or resize (one coalesced step per gesture; a
+   * resize's step ends at its `resizing: false` change).
+   */
   applyFlowChanges(changes: NodeChange[]): void
   endDrag(): void
 }
@@ -349,6 +352,8 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       applyFlowChanges(changes) {
         const s = get()
         if (!isEditable(s)) return
+        // React Flow ends a resize with `resizing: false`: the gesture's step is complete.
+        if (!drag && changes.some((c) => c.type === 'dimensions' && c.resizing === false)) history.seal()
         const relevant = changes.filter(
           (c) => (c.type === 'position' && c.position) || (c.type === 'dimensions' && (c.resizing || c.setAttributes)),
         )

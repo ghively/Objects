@@ -128,6 +128,23 @@ describe('board store', () => {
     expect(nodes.a.position).toEqual({ x: 630, y: 30 })
   })
 
+  test('two resize gestures of the same node are two undo steps', () => {
+    const s = storeWith(board([node({ id: 'a', kind: 'shape', position: { x: 0, y: 0 }, width: 90, height: 90 })]))
+    const c = s.getState().canvas
+    const rs = (width: number, resizing = true) =>
+      c.applyFlowChanges([{ type: 'dimensions', id: 'a', dimensions: { width, height: 90 }, resizing }])
+    rs(120)
+    rs(150)
+    rs(150, false) // React Flow's resize end
+    rs(200)
+    rs(240)
+    rs(240, false)
+    s.getState().actions.undo()
+    expect(s.getState().doc.board.nodes.a.width).toBe(150)
+    s.getState().actions.undo()
+    expect(s.getState().doc.board.nodes.a.width).toBe(90)
+  })
+
   test('clear whiteboard clears board and ink in one undo step', () => {
     const b = board([node({ id: 'a', blockId: 'b1' })], [], { b1: textBlock('hi') }, { viewport: { x: 1, y: 2, zoom: 1 } })
     const s = createBoardStore({ doc: { board: b, strokes: [stroke('s1')] } })
