@@ -183,9 +183,10 @@ export function useInkDoc(path: string, client: Client = inkClient): InkDoc {
   const save = useCallback(
     (next: InkStroke[]) => {
       const st = s.current
-      if (!st.loaded || st.readOnly) return
+      if (st.readOnly) return
       st.pending = next
       show(next)
+      if (!st.loaded) return // saved once the file has loaded (merged onto it)
       if (st.timer) clearTimeout(st.timer)
       st.timer = setTimeout(() => {
         st.timer = null
@@ -217,6 +218,20 @@ export function useInkDoc(path: string, client: Client = inkClient): InkDoc {
     try {
       const res = await st.client.load(st.path)
       if (gen !== st.generation) return
+      // Strokes drawn before the file loaded: add them to it and save.
+      if (!st.loaded && st.pending && !res.readOnlyReason) {
+        const early = st.pending
+        applyLoad(res)
+        const merged = mergeStrokes([], early, res.strokes)
+        st.pending = merged
+        show(merged)
+        st.timer = setTimeout(() => {
+          st.timer = null
+          void run()
+        }, INK_SAVE_DELAY_MS)
+        return
+      }
+      if (!st.loaded) st.pending = null
       // A change made while loading wins; the next save sees the new revision.
       if (st.pending || st.inFlight || st.timer) {
         st.revision = res.revision
@@ -232,7 +247,7 @@ export function useInkDoc(path: string, client: Client = inkClient): InkDoc {
         setReadOnlyReason(err instanceof Error ? err.message : String(err))
       }
     }
-  }, [applyLoad])
+  }, [applyLoad, run, show])
 
   // Load once per path.
   useEffect(() => {
