@@ -7,7 +7,9 @@
  * - On a 409 the server copy is fetched and this window's changes since the last save are merged
  *   onto it key by key (`mergeBoards`), then saved once with the new revision; a second 409
  *   reloads the server copy with the toast "Changed elsewhere. Reloaded.".
- * - A 423 switches the board to read-only; any other failed save shows a toast.
+ * - A 423 switches the board to read-only; any other failed save shows a toast and is retried
+ *   after a growing delay (`SAVE_RETRY_MS`, doubling up to `SAVE_RETRY_MAX_MS`), at most
+ *   `SAVE_RETRY_LIMIT` times; the next edit tries again.
  * - An external `whiteboard` change for this board reloads it (clearing the history) when
  *   nothing is pending here.
  * - Pending changes are flushed on unmount and on `pagehide`.
@@ -21,6 +23,11 @@ import { createBoardStore, type BoardStore, type CreateBoardStoreOptions } from 
 import { WB } from './strings'
 
 export const SAVE_DELAY_MS = 400
+/** First retry delay after a failed save; it doubles up to `SAVE_RETRY_MAX_MS` (as the editor's autosave). */
+export const SAVE_RETRY_MS = 2000
+export const SAVE_RETRY_MAX_MS = 30000
+/** Automatic retries after a run of failed saves; then only the next edit (or a flush) tries again. */
+export const SAVE_RETRY_LIMIT = 5
 
 type BoardClient = Pick<WhiteboardApi, 'board' | 'saveBoard'>
 
@@ -45,6 +52,8 @@ class BoardSaver {
   timer: ReturnType<typeof setTimeout> | null = null
   inFlight: Promise<void> | null = null
   queued = false
+  /** Failed saves in a row (reset by a save that lands). */
+  failures = 0
   disposed = false
   readOnly = false
 
@@ -101,9 +110,21 @@ class BoardSaver {
       .catch((err: unknown) => this.failed(err, false))
       .finally(() => {
         this.inFlight = null
+        const landed = this.savedSeq >= seq
+        this.failures = landed ? 0 : this.failures + 1
         const again = this.queued || this.store.getState().boardSeq !== this.savedSeq
         this.queued = false
-        if (again && !this.disposed && !this.readOnly && !this.timer && !this.store.getState().dragging) void this.save()
+        if (!again || this.disposed || this.readOnly || this.timer || this.store.getState().dragging) return
+        if (landed) {
+          void this.save()
+          return
+        }
+        if (this.failures > SAVE_RETRY_LIMIT) return // the next edit tries again
+        const delay = Math.min(SAVE_RETRY_MS * 2 ** (this.failures - 1), SAVE_RETRY_MAX_MS)
+        this.timer = setTimeout(() => {
+          this.timer = null
+          if (!this.disposed) void this.save()
+        }, delay)
       })
     return this.inFlight
   }
