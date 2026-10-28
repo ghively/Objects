@@ -168,8 +168,13 @@ describe('test m8 client methods call the contract routes', () => {
     await api.deleteSpace('/spaces/Old', { permanent: true })
     expect(bodyOf(f, 1)).toEqual({ path: '/spaces/Old', permanent: true })
 
-    vi.stubGlobal('fetch', respond(428, { detail: 'The trash is unavailable' }))
-    await expect(api.deleteSpace('/spaces/Old')).rejects.toBeInstanceOf(ConfirmRequiredError)
+    await api.deleteSpace('/spaces/Old', { permanent: true, folder: '66:1234' })
+    expect(bodyOf(f, 2)).toEqual({ path: '/spaces/Old', permanent: true, folder: '66:1234' })
+
+    vi.stubGlobal('fetch', respond(428, { detail: 'The trash is unavailable', affected: 0, folder: '66:1234' }))
+    const unavailable = await api.deleteSpace('/spaces/Old').catch((e: unknown) => e)
+    expect(unavailable).toBeInstanceOf(ConfirmRequiredError)
+    expect((unavailable as ConfirmRequiredError).folder).toBe('66:1234')
     vi.stubGlobal('fetch', respond(409, { detail: 'This is the current space' }))
     const err = await api.deleteSpace('/spaces/Current').catch((e: unknown) => e)
     expect(err).toBeInstanceOf(ApiError)

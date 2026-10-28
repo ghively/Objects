@@ -101,7 +101,7 @@ describe('DeleteSpaceDialog', () => {
     const onClose = vi.fn()
     const onDeleted = vi.fn()
     mocked.deleteSpace
-      .mockRejectedValueOnce(new ConfirmRequiredError('The trash is not available', 0))
+      .mockRejectedValueOnce(new ConfirmRequiredError('The trash is not available', 0, '66:1234'))
       .mockResolvedValueOnce({ trashed: false })
     render(<DeleteSpaceDialog entry={{ path: '/spaces/Home', name: 'Home' }} onClose={onClose} onDeleted={onDeleted} />)
     const dialog = await screen.findByRole('alertdialog')
@@ -112,7 +112,9 @@ describe('DeleteSpaceDialog', () => {
     expect(onClose).not.toHaveBeenCalled()
 
     await user.click(within(dialog).getByRole('button', { name: 'Delete space' }))
-    await waitFor(() => expect(mocked.deleteSpace).toHaveBeenNthCalledWith(2, '/spaces/Home', { permanent: true }))
+    await waitFor(() =>
+      expect(mocked.deleteSpace).toHaveBeenNthCalledWith(2, '/spaces/Home', { permanent: true, folder: '66:1234' }),
+    )
     expect(onDeleted).toHaveBeenCalledWith('/spaces/Home', false)
     expect(onClose).toHaveBeenCalled()
   })

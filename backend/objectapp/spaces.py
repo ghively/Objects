@@ -40,12 +40,14 @@ __all__ = [
     "REGISTRY_FILE",
     "Registry",
     "SpaceEntry",
+    "SpaceFolderChanged",
     "SpaceIsCurrent",
     "SpaceNameProblem",
     "SpaceNotFound",
     "TrashUnavailable",
     "create_space",
     "delete_space",
+    "folder_token",
     "normalize",
 ]
 
@@ -244,12 +246,30 @@ class SpaceIsCurrent(Exception):
 
 
 class TrashUnavailable(Exception):
-    """The OS trash could not take the folder (428: offer the permanent delete)."""
+    """The OS trash could not take the folder (428: offer the permanent delete).
+
+    `folder` is the folder's identity token (`folder_token`), sent back with the
+    permanent delete so it can refuse a folder that was replaced in between.
+    """
+
+    def __init__(self, message: str = "", folder: str | None = None) -> None:
+        super().__init__(message)
+        self.folder = folder
+
+
+class SpaceFolderChanged(Exception):
+    """The folder is not the one the 428 described (another device/inode): 409."""
 
 
 def _identity(path: Path) -> tuple[int, int]:
     st = os.stat(path, follow_symlinks=False)
     return (st.st_dev, st.st_ino)
+
+
+def folder_token(path: Path) -> str:
+    """The folder's identity as a string token: ``<st_dev>:<st_ino>``."""
+    dev, ino = _identity(path)
+    return f"{dev}:{ino}"
 
 
 def _is_space_folder(path: Path) -> bool:
@@ -311,6 +331,7 @@ def delete_space(
     *,
     current: Path | str | None = None,
     registry: Registry | None = None,
+    folder: str | None = None,
 ) -> bool:
     """Delete the registered space folder `path`. Returns True when it went to the trash.
 
@@ -321,6 +342,10 @@ def delete_space(
     `permanent` it is removed for good after re-checking that it is still the same
     folder (device and inode/file id) and still holds ``.object/``. The entry
     then leaves the registry; nothing in the state dir is deleted.
+
+    The 428 carries the folder's identity token (`TrashUnavailable.folder`); a
+    permanent delete given that token (`folder`) refuses (`SpaceFolderChanged`, 409)
+    when the folder at `path` is no longer the one the 428 described.
     """
     reg = registry or Registry(state_dir())
     if not isinstance(path, (str, Path)) or not str(path).strip():
@@ -334,10 +359,21 @@ def delete_space(
     if _key(target) not in registered or not _is_space_folder(target):
         raise SpaceNotFound(f"Not a space folder: {target}")
     if not permanent:
-        _move_to_trash(target)
+        try:
+            _move_to_trash(target)
+        except TrashUnavailable as exc:
+            try:
+                exc.folder = folder_token(target)
+            except OSError:
+                exc.folder = None
+            raise
         reg.remove(target)
         return True
     before = _identity(target)
+    if folder is not None and folder != f"{before[0]}:{before[1]}":
+        raise SpaceFolderChanged(
+            f"The folder was replaced since the trash failed; nothing was deleted: {target}"
+        )
     _before_permanent_delete(target)
     try:
         same = _is_space_folder(target) and _identity(target) == before
