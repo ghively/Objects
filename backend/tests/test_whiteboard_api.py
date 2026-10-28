@@ -198,14 +198,18 @@ def test_save_board_writes_only_its_file(ctx):
     assert r.status_code == 200, r.text
     after = tree_hashes(root)
     changed = {k for k in before.keys() | after.keys() if before.get(k) != after.get(k)}
-    assert changed == {"Whiteboards/Network map.whiteboard.json"}
+    # M9 Task 5: the board's .md gets a new lastUpdated stamp (see test_whiteboard_m9).
+    assert changed == {"Whiteboards/Network map.whiteboard.json", NETWORK}
     data = board_file(root, NETWORK).read_bytes()
     assert data == dump_board(board)
-    assert r.json() == {"revision": version_of(data)}
+    assert r.json() == {"revision": version_of(data), "mdVersion": rev_of(root / NETWORK)}
 
 
 def test_md_bytes_never_change_on_board_save(ctx):
-    """Regression guard: green as soon as saving works; listed for the review."""
+    """Regression guard: green as soon as saving works; listed for the review.
+
+    M9 Task 5: only the .md's lastUpdated line changes, once within a minute.
+    """
     _space, client, _events, root = ctx
     md = (root / EMPTY).read_bytes()
     r = client.put(
@@ -224,7 +228,11 @@ def test_md_bytes_never_change_on_board_save(ctx):
         json={"path": EMPTY, "strokes": STROKES, "baseRevision": ""},
     )
     assert r.status_code == 200
-    assert (root / EMPTY).read_bytes() == md
+    old_lines = md.splitlines(keepends=True)
+    new_lines = (root / EMPTY).read_bytes().splitlines(keepends=True)
+    differ = [i for i, (a, b) in enumerate(zip(old_lines, new_lines, strict=True)) if a != b]
+    assert len(differ) == 1 and new_lines[differ[0]].startswith(b"lastUpdated: ")
+    assert r.json()["mdVersion"] == rev_of(root / EMPTY)
 
 
 def test_save_stale_revision_409_nothing_written(ctx):
@@ -380,8 +388,11 @@ def test_announces_whiteboard_event_with_origin(ctx):
         "/api/whiteboard/ink",
         json={"path": EMPTY, "strokes": STROKES, "baseRevision": "", "clientId": "c-2"},
     )
+    # M9 Task 5: the first save also stamps the .md (announced `changed`); the second,
+    # within a minute, leaves it alone.
     assert [(e.kind, e.path, e.version, e.origin) for e in events] == [
         ("whiteboard", EMPTY, r.json()["revision"], "c-1"),
+        ("changed", EMPTY, r.json()["mdVersion"], "c-1"),
         ("whiteboard", EMPTY, r2.json()["revision"], "c-2"),
     ]
 
@@ -616,7 +627,7 @@ def test_concurrent_saves_one_wins(ctx):
     assert board_file(root, NETWORK).read_bytes() == dump_board(boards[winner])
     loser = results[1 - winner]
     assert loser.json() == {"currentRevision": results[winner].json()["revision"]}
-    assert len(events) == 1
+    assert [e.kind for e in events] == ["whiteboard", "changed"]  # M9: the .md stamp
 
 
 def test_store_conflict_carries_current_revision(ctx):

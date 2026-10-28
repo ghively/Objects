@@ -46,6 +46,8 @@ SYSTEM_KEYS = frozenset(
         "height", "source",
         # DailyNote
         "date", "reviewed",
+        # M9 per-object layout (Object's wideLayoutMode, wideCoverImage, coverImageOffset)
+        "wideLayoutMode", "wideCoverImage", "coverImageOffset",
     }
 )
 
@@ -54,7 +56,7 @@ SYSTEM_KEYS = frozenset(
 # inferred, and the migration turns them into system definitions.)
 _UNINFERRED_KEYS = frozenset(
     {"id", "type", "template", "title", "icon", "iconColor", "description", "aliases",
-     "createdAt", "lastUpdated"}
+     "createdAt", "lastUpdated", "wideLayoutMode", "wideCoverImage", "coverImageOffset"}
 )
 
 _ICONS = {
