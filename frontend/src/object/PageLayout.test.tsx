@@ -153,6 +153,32 @@ describe('M9 page layout', () => {
     await user.click(within(inspector).getByRole('button', { name: 'Pin' }))
     expect(localStorage.getItem('object.page.inspectorPinned')).toBe('1')
   })
+
+  test('the inspector sits below a shown cover, clear of its controls', () => {
+    localStorage.clear()
+    // The cover ends 300 px below the content column's top.
+    const real = HTMLElement.prototype.getBoundingClientRect
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.hasAttribute('data-cover-image')) return { top: 60, bottom: 300, left: 0, right: 900, width: 900, height: 240 } as DOMRect
+      return real.call(this)
+    })
+    const type = typeDef({ id: 'page', wideLayoutMode: true, wideCoverImage: true })
+    const summary = objectSummary({ path: 'Pages/A.md', type: 'page', title: 'A', coverImage: 'Attachments/cover.png' })
+    render(
+      <PageLayout
+        type={type}
+        summary={summary}
+        header={<h1>A</h1>}
+        properties={null}
+        body={<p>Body</p>}
+        onCoverChange={vi.fn()}
+        inspector={{ getMarkdown: () => '', dailyNote: false }}
+      />,
+    )
+    const slot = screen.getByRole('button', { name: 'Inspector' }).parentElement as HTMLElement
+    expect(slot.style.top).toBe('308px')
+    spy.mockRestore()
+  })
 })
 
 describe('narrow layouts', () => {
