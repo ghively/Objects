@@ -141,3 +141,32 @@ def test_whiteboard_case_only_sidecar_move_does_not_replace_the_other_spelling(
         _move_one(folder / "b.board.json", folder / "B.board.json")
     assert (folder / "B.board.json").read_bytes() == b"other"
     assert (folder / "b.board.json").read_bytes() == b"mine"
+
+
+# -- #5: a leading dot never makes a dotfile ---------------------------------------------
+
+
+def test_safe_filename_strips_leading_dots():
+    from objectapp.space import safe_filename
+
+    assert safe_filename(".env") == "env"
+    assert safe_filename("..hidden notes") == "hidden notes"
+    assert safe_filename(". x") == "x"
+    assert safe_filename("...") == "Untitled"
+
+
+def test_object_titled_with_a_leading_dot_stays_listed(space_dir: Path):
+    space = Space(space_dir)
+    result = space.rename_object("Pages/Alpha.md", ".env", _version(space, "Pages/Alpha.md"))
+    assert result.path == "Pages/env.md"
+    assert space.get(result.path).title == ".env"
+    assert result.path in [s.path for s in Space(space_dir).list()]
+
+
+def test_attachment_named_like_a_dotfile_is_listed(space_dir: Path):
+    from objectapp.media import attachment_path, import_attachment, list_attachments
+
+    rel, _kind = import_attachment(space_dir, ".env", b"data")
+    assert not rel.split("/")[-1].startswith(".")
+    assert rel in [a["path"] for a in list_attachments(space_dir)]
+    attachment_path(space_dir, rel)

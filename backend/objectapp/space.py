@@ -194,14 +194,15 @@ def safe_filename(title: str) -> str:
     """The file stem for a title, as Object's export names files.
 
     The title up to its first character that is illegal in a Windows file name,
-    with whitespace collapsed and trailing dots and spaces stripped, capped at
-    120 characters. If that is empty, the illegal characters are dropped
-    instead; if still empty, ``Untitled``. (A Windows device name such as
-    ``CON`` gets a trailing ``_``.) ``[``, ``]`` and ``#`` are dropped first.
+    with whitespace collapsed and leading and trailing dots and spaces stripped
+    (a leading dot would make a hidden dotfile), capped at 120 characters. If
+    that is empty, the illegal characters are dropped instead; if still empty,
+    ``Untitled``. (A Windows device name such as ``CON`` gets a trailing
+    ``_``.) ``[``, ``]`` and ``#`` are dropped first.
     """
 
     def clean(text: str) -> str:
-        text = " ".join(text.split()).rstrip(". ")
+        text = " ".join(text.split()).strip(". ")
         return text[:_MAX_FILENAME].rstrip(". ")
 
     # `[`, `]` and `#` are legal in file names but end a wikilink's target, so
