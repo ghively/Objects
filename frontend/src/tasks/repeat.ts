@@ -8,6 +8,7 @@
 //     weeks:  on mon[, tue …]           (full names read too; written in week order)
 //     months: on the 15th | on the last day | on the 2nd tuesday | on the last friday
 //     years:  on march 15 | on the 2nd tuesday of march | on the last day of february
+import { zonedDayDate } from '@/lib/zonedShell'
 import type { RepeatOn, RepeatRule, Weekday } from './taskContract'
 
 export type { RepeatOn, RepeatRule, Weekday }
@@ -169,12 +170,15 @@ export const monthName = (m: number): string => MONTHS[m - 1]
 /** The weekday key of a local date. */
 export const weekdayOf = (d: Date): Weekday => WEEKDAY_KEYS[(d.getDay() + 6) % 7]
 
-/** The local calendar day of a date value's start (`YYYY-MM-DD` is a day as written). */
+/**
+ * The calendar day of a date value's start, as a local-midnight `Date`: `YYYY-MM-DD` is a day as
+ * written, an instant is on its day in the Time zone setting (`lib/zonedTime`).
+ */
 export function localDayOf(start: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(start)
   if (m) return new Date(+m[1], +m[2] - 1, +m[3])
   const d = new Date(start)
-  return Number.isNaN(d.getTime()) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  return Number.isNaN(d.getTime()) ? null : zonedDayDate(d)
 }
 
 /** The anchored `on` the presets write for `date`: "Weekly on {day}" → `on fri`, and so on. */
