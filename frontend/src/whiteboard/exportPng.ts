@@ -157,5 +157,5 @@ export function backgroundOf(el: Element | null): string {
     const c = getComputedStyle(cur).backgroundColor
     if (c && c !== 'transparent' && !/^rgba\(\s*0,\s*0,\s*0,\s*0\s*\)$/.test(c)) return c
   }
-  return '#ffffff'
+  return 'white' // no painted background found: export on white
 }

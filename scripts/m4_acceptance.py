@@ -281,7 +281,8 @@ class M4:
             expected += timedelta(days=7)
         task = (res or {}).get("task") if code == 200 else None
         new_date = fm_value(text, "date")
-        self.run.report(code == 200 and keys <= {"status", "date", "completed", "lastUpdated"}
+        # M8 (Task 11): a recurring completion also appends its `occurrenceLog` line.
+        self.run.report(code == 200 and keys <= {"status", "date", "completed", "lastUpdated", "occurrenceLog"}
                         and {"date", "completed"} <= added,
                         f"diff touches {sorted(keys)}", *([str(res)] if code != 200 else []))
         self.run.report(new_date == day_s(expected) and fm_value(text, "status") == open_

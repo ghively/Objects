@@ -27,7 +27,7 @@ export function isPanelArea(v: unknown): v is PanelArea {
  * M8's backlinks entry (contract `SidepanelTarget` `{kind: 'backlinks'}`): the tab's main object's
  * backlinks. Until `nav/tabs.ts`'s union carries the kind it is cast here.
  */
-export const BACKLINKS_TARGET = { kind: 'backlinks' } as unknown as SidepanelTarget
+export const BACKLINKS_TARGET: SidepanelTarget = { kind: 'backlinks' }
 
 export function isBacklinksTarget(t: SidepanelTarget | null | undefined): boolean {
   return (t as { kind?: string } | null | undefined)?.kind === 'backlinks'

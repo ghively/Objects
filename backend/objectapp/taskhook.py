@@ -110,6 +110,7 @@ def on_status_change(
     clock: Callable[[], datetime] | datetime,
     tz: tzinfo,
     explicit: frozenset[str] | set[str] = frozenset(),
+    week_start: str = "monday",
 ) -> TaskResult | None:
     """Complete, reopen or advance a Task whose status ``sets`` changes; edit ``sets``/``removals``.
 
@@ -117,7 +118,8 @@ def on_status_change(
     caller's update itself sets or removes (those keep the caller's value).
     ``clock`` is the write's instant (or a callable giving it). Returns None
     when the type is not the basic Task type, the status isn't in ``sets`` or
-    the change stays in the same done/not-done side.
+    the change stays in the same done/not-done side. ``week_start`` is
+    ``ui.json``'s ``calendar.weekStart`` (M8: weekly ``on`` rules count weeks from it).
     """
     if not is_task_type(t):
         return None
@@ -155,7 +157,7 @@ def on_status_change(
     reset = _first_not_started(sdef)
     if reset is None:
         return result
-    nxt = next_date(rule, current, now, to_local(now, tz).date(), tz)
+    nxt = next_date(rule, current, now, to_local(now, tz).date(), tz, week_start)
     if nxt is None:  # `until` ended the series: the task completes normally
         return result
     value = _date_api(nxt)

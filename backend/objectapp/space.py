@@ -77,6 +77,7 @@ from .propvalues import (
     encode_value,
 )
 from .spaceconfig import space_fields
+from .recurrence import week_start_of
 from .taskhook import TaskResult, on_status_change
 from .linkindex import LinkIndex
 from .relink import relink_frontmatter, replace_wikilinks, rewrite_tag_lists, wikilink_targets
@@ -1694,7 +1695,8 @@ class Space:
 
         def hook(fm: dict, sets: dict[str, Any], removals: list[str]) -> None:
             task[0] = on_status_change(
-                t, fm, sets, removals, now, self.tz, explicit={*updates, *remove}
+                t, fm, sets, removals, now, self.tz, explicit={*updates, *remove},
+                week_start=week_start_of(self.root),
             )
 
         def apply(src: str, fm: dict) -> str:

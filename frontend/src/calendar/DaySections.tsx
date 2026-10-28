@@ -33,6 +33,7 @@ import { useSettings } from '@/settings/useSettings'
 import { saveCalendarDaily, useCalendarDaily, type CalendarDaily } from './calendarUi'
 import { DailyNoteSlot, SectionHeading } from './DailyNoteSlot'
 import { addDays, parseYmd, todayYmd, ymd, type Day } from './dates'
+import { formatInZone } from '@/lib/zonedTime'
 
 export const SECTIONS_TEXT = {
   /** `CalendarDaily.all.heading` */
@@ -127,14 +128,12 @@ export function dayExtras(cd: CalendarDay | null | undefined): {
   return { backlinks: m.backlinks ?? [], references: m.references ?? [], timeline }
 }
 
-const TIME_12 = new Intl.DateTimeFormat('en-US', { timeStyle: 'short' })
-const TIME_24 = new Intl.DateTimeFormat('en-US', { timeStyle: 'short', hourCycle: 'h23' })
-
-/** A Timeline item's time of day, in the device's zone, honouring the 24-hour setting. */
+/** A Timeline item's time of day, in the Time zone setting's zone, honouring the 24-hour setting. */
 export function timelineTime(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
-  return (useSettings.getState().settings.twentyFourHourTime ? TIME_24 : TIME_12).format(d)
+  const h24 = useSettings.getState().settings.twentyFourHourTime
+  return formatInZone(d, h24 ? { timeStyle: 'short', hourCycle: 'h23' } : { timeStyle: 'short' })
 }
 
 export type DayFilter = 'all' | 'dailyNote' | 'tasks' | 'dated' | 'created' | 'updated'

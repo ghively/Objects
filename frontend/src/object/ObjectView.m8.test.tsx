@@ -129,12 +129,21 @@ describe('ObjectView M8', () => {
     expect(screen.queryByRole('button', { name: 'Enter Focus Mode' })).toBeNull()
   })
 
-  test('test task stats section mounts only for task objects', async () => {
-    serve(detailFor('Tasks/Water plants.md', 'task', 'Water plants'))
+  test('test task stats section mounts only for recurring task objects', async () => {
+    const recurring = detailFor('Tasks/Water plants.md', 'task', 'Water plants')
+    recurring.frontmatter.repeat = 'every day'
+    serve(recurring)
     const { unmount } = render(<ObjectView path="Tasks/Water plants.md" mode="page" />)
     await screen.findByText('Hello.')
     expect((await screen.findByTestId('task-stats')).textContent).toContain('Tasks/Water plants.md')
     unmount()
+
+    // A task without a recurrence has no stats (the route would answer 422).
+    serve(detailFor('Tasks/Submit report.md', 'task', 'Submit report'))
+    const second = render(<ObjectView path="Tasks/Submit report.md" mode="page" />)
+    await screen.findByText('Hello.')
+    expect(screen.queryByTestId('task-stats')).toBeNull()
+    second.unmount()
 
     serve(detailFor('Pages/Notes.md', 'page', 'Notes'))
     render(<ObjectView path="Pages/Notes.md" mode="page" />)

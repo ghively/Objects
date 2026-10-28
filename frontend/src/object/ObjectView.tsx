@@ -550,8 +550,10 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         onOpenObject={onOpenObject}
         variant={variant}
       />
-      {/* M8: "Task Stats" under the property panel of a task-role object (empty unless recurring). */}
-      {isTask && <TaskStatsSection path={path} version={version} />}
+      {/* M8: "Task Stats" under the property panel of a recurring task-role object. */}
+      {isTask && typeof detail.frontmatter.repeat === 'string' && detail.frontmatter.repeat.trim() !== '' && (
+        <TaskStatsSection path={path} version={version} />
+      )}
       </>
     ) : null
 

@@ -21,7 +21,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--bg-raised);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  box-shadow: var(--card-shadow);
 }
 
 .tokens-button {
@@ -64,7 +64,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--bg-raised);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  box-shadow: var(--card-shadow);
 }
 
 .tokens-input {

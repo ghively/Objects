@@ -1,11 +1,9 @@
 /**
  * Open the extended search page ("Open extended search", `LocalSpaceQuery.openSearch`) in the
  * current tab, carrying what was typed and the "Text matches only" toggle.
- *
- * Task 3 owns the `search` target in `nav/tabs.ts`; until its `Target` union carries
- * `{kind: 'search', q?, textOnly?}` the target is cast here.
+ * The `search` target is `nav/tabs.ts`' `{kind: 'search', q?, textOnly?}`.
  */
-import { useTabs, type Target } from '@/nav/tabs'
+import { useTabs } from '@/nav/tabs'
 
 export interface SearchTarget {
   kind: 'search'
@@ -15,5 +13,5 @@ export interface SearchTarget {
 
 export function openExtendedSearch(q?: string, textOnly?: boolean): void {
   const target: SearchTarget = { kind: 'search', q, textOnly }
-  useTabs.getState().open(target as unknown as Target)
+  useTabs.getState().open(target)
 }

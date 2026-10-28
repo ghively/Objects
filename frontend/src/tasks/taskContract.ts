@@ -1,9 +1,6 @@
-// The M8 task contract (the plan's "API contract (M8)") as the task UI uses it, with the client
-// calls it needs. Task 3 owns `api/types.ts` and `api/client.ts` and adds the same types and
-// `api.overdue`, `api.occurrence`, `api.taskStats`, `api.setReminder`; until it lands they are declared here (the
-// shapes are the contract's, so they stay assignable both ways) and the calls prefer `api`'s
-// methods when present, else call the contract routes directly.
-import { api, CLIENT_ID, ConflictError, ApiError } from '@/api/client'
+// The M8 task contract (the plan's "API contract (M8)") as the task UI uses it. The shapes match
+// `api/types.ts` (assignable both ways); the calls go through `api/client.ts`.
+import { api } from '@/api/client'
 import type { DateValue, RepeatRule as M4RepeatRule, UpdateResult } from '@/api/types'
 
 export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
@@ -46,42 +43,10 @@ export interface TaskClient {
   setReminder(path: string, key: string, remind: string | null, opts: { baseVersion: string }): Promise<UpdateResult>
 }
 
-async function call<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${url}`, { ...init, headers: { Accept: 'application/json', ...(init?.headers ?? {}) } })
-  const text = await res.text()
-  let data: unknown = null
-  try {
-    data = text ? JSON.parse(text) : null
-  } catch {
-    data = text
-  }
-  if (res.ok) return data as T
-  const detail = data && typeof data === 'object' ? (data as Record<string, unknown>).detail : undefined
-  const d = detail && typeof detail === 'object' ? (detail as Record<string, unknown>) : ((data ?? {}) as Record<string, unknown>)
-  if (res.status === 409) throw new ConflictError(String(d.currentVersion ?? ''))
-  throw new ApiError(res.status, typeof detail === 'string' ? detail : res.statusText)
-}
-
-const real = api as unknown as Partial<TaskClient>
-
-/** The task calls: `api`'s (Task 3) when present, else the contract routes. */
+/** The task calls, through `api` (read on each call, so test mocks apply). */
 export const taskClient: TaskClient = {
-  overdue: (path) => (real.overdue ? real.overdue(path) : call(`/tasks/overdue?path=${encodeURIComponent(path)}`)),
-  occurrence: (path, action, opts) =>
-    real.occurrence
-      ? real.occurrence(path, action, opts)
-      : call('/tasks/occurrence', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path, action, ...(opts.catchUp ? { catchUp: opts.catchUp } : {}), baseVersion: opts.baseVersion, clientId: CLIENT_ID }),
-        }),
-  taskStats: (path) => (real.taskStats ? real.taskStats(path) : call(`/tasks/stats?path=${encodeURIComponent(path)}`)),
-  setReminder: (path, key, remind, opts) =>
-    real.setReminder
-      ? real.setReminder(path, key, remind, opts)
-      : call('/tasks/reminder', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path, key, remind, baseVersion: opts.baseVersion, clientId: CLIENT_ID }),
-        }),
+  overdue: (path) => api.overdue(path),
+  occurrence: (path, action, opts) => api.occurrence(path, action, opts),
+  taskStats: (path) => api.taskStats(path),
+  setReminder: (path, key, remind, opts) => api.setReminder(path, key, remind, opts),
 }

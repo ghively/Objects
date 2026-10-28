@@ -107,7 +107,7 @@
   user-select: text;
 }
 .object-editor .formula-error {
-  color: var(--destructive, #dc2626);
+  color: var(--danger);
   cursor: help;
 }
 .object-editor .formula-placeholder {
@@ -132,7 +132,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: 0.5rem;
   background: var(--bg-raised);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.12);
+  box-shadow: var(--card-shadow);
   font-size: 0.875rem;
 }
 .object-editor .formula-menu-item {

@@ -115,7 +115,7 @@ export function SearchPage({ q: initialQ = '', textOnly: initialTextOnly = false
     const ctrl = new AbortController()
     const timer = setTimeout(() => {
       // `fullText` is M8's mode; Task 3 widens `SearchOptions['mode']` to carry it.
-      const mode = (textOnly ? 'fullText' : 'auto') as 'auto'
+      const mode = textOnly ? ('fullText' as const) : ('auto' as const)
       api
         .search(q, {
           types: filters.types,
