@@ -277,3 +277,26 @@ def test_rename_rewrites_unquoted_and_multiline_frontmatter_links(full_space_dir
     assert fm["owner"] == [["Ada: King"]]
     assert fm["note"] == "owned by see [[Ada: King]] here"
     assert fm["refs"] == [{"role": "[[Ada: King]]"}]
+
+
+# -- long names: capped in bytes, and an existing long name still saves --------------------
+
+
+def test_safe_filename_caps_the_stem_in_utf8_bytes():
+    from objectapp.space import safe_filename
+
+    for title in ["\U0001f600" * 70, "é" * 130, "漢" * 100]:
+        stem = safe_filename(title)
+        assert 0 < len(stem.encode("utf-8")) <= 200, title[:3]
+        assert title.startswith(stem)
+    assert safe_filename("a" * 130) == "a" * 120  # the character cap is unchanged
+
+
+def test_an_existing_249_byte_name_still_saves(space_dir: Path):
+    name = "a" * 246 + ".md"
+    rel = f"Pages/{name}"
+    _write(space_dir / "Pages" / name, "---\ntype: 'Page'\n---\nhi\n")
+    space = Space(space_dir)
+    space.save_body(rel, "changed\n", _version(space, rel))
+    assert (space_dir / "Pages" / name).read_bytes().endswith(b"changed\n")
+    assert sorted(p.name for p in (space_dir / "Pages").iterdir() if p.name.startswith(".")) == []

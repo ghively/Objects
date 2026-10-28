@@ -111,6 +111,23 @@ def retry_os(fn: Callable[[], None]) -> None:
     fn()
 
 
+# A file name may be 255 bytes (Linux, macOS) or 255 UTF-16 units (Windows); a temp
+# name adds a dot, a dot, 8 random characters and ".tmp" to the file's own name.
+_TEMP_NAME_ROOM = 200
+
+
+def _temp_prefix(path: Path) -> str:
+    """``.<name>.``, with ``name`` shortened so the temp name stays a legal length.
+
+    UTF-8 bytes bound UTF-16 units too, so one byte cap serves every platform.
+    """
+    name = path.name
+    raw = name.encode("utf-8", errors=_ERRORS)
+    if len(raw) > _TEMP_NAME_ROOM:
+        name = raw[:_TEMP_NAME_ROOM].decode("utf-8", errors="ignore")
+    return f".{name}."
+
+
 def atomic_write(path: Path, data: bytes, check: Callable[[], None] | None = None) -> None:
     """Write `data` to `path` via a temp file in the same folder and `os.replace`.
 
@@ -118,7 +135,7 @@ def atomic_write(path: Path, data: bytes, check: Callable[[], None] | None = Non
     file is removed, `path` is left as it was and the exception propagates.
     """
     path = Path(path)
-    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    fd, tmp_name = tempfile.mkstemp(prefix=_temp_prefix(path), suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(data)
@@ -136,7 +153,7 @@ def atomic_write(path: Path, data: bytes, check: Callable[[], None] | None = Non
 
 
 def _write_temp(path: Path, data: bytes) -> str:
-    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    fd, tmp_name = tempfile.mkstemp(prefix=_temp_prefix(path), suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(data)
