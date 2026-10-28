@@ -88,7 +88,8 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
   const initial: BoardDoc = opts.doc ?? { board: emptyBoard(), strokes: [] }
   const history = new History<BoardDoc>(initial)
   let gesture = 0
-  let drag: { key: string; contents: Set<string> } | null = null
+  /** `contents`: each dragged frame's followers; a node inside several dragged frames follows one. */
+  let drag: { key: string; contents: Map<string, string[]> } | null = null
 
   return createStore<BoardState>()((set, get) => {
     const sync = () => ({ canUndo: history.canUndo, canRedo: history.canRedo })
@@ -333,11 +334,14 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
           edit('duplicate', (b) => A.duplicateSelection(b, dragIds, 0).board, key)
         }
         const board = get().doc.board
-        const contents = new Set<string>()
+        const contents = new Map<string, string[]>()
+        const claimed = new Set<string>(dragIds)
         for (const id of dragIds) {
-          if (board.nodes[id]?.kind === 'frame') for (const c of A.frameContents(board, id)) contents.add(c)
+          if (board.nodes[id]?.kind !== 'frame') continue
+          const followers = A.frameContents(board, id).filter((c) => !claimed.has(c))
+          for (const c of followers) claimed.add(c)
+          contents.set(id, followers)
         }
-        for (const id of dragIds) contents.delete(id)
         drag = { key, contents }
         set({ dragging: true })
       },
@@ -361,7 +365,9 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
                 if (!before || before.kind !== 'frame') continue
                 const dx = c.position.x - before.position.x
                 const dy = c.position.y - before.position.y
-                const followers = [...drag.contents].filter((id) => !relevant.some((r) => 'id' in r && r.id === id))
+                const followers = (drag.contents.get(c.id) ?? []).filter(
+                  (id) => !relevant.some((r) => 'id' in r && r.id === id),
+                )
                 next = moveBy(next, followers, dx, dy)
               }
             }

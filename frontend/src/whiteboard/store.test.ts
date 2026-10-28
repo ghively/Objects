@@ -70,6 +70,35 @@ describe('board store', () => {
     expect(s.getState().doc.board.nodes.in.position).toEqual({ x: 30, y: 30 })
   })
 
+  test('dragging two frames moves the contents of each once', () => {
+    const s = storeWith(board([
+      node({ id: 'f1', kind: 'frame', position: { x: 0, y: 0 }, width: 300, height: 300, z: 0 }),
+      node({ id: 'f2', kind: 'frame', position: { x: 600, y: 0 }, width: 300, height: 300, z: -1 }),
+      node({ id: 'a', kind: 'shape', position: { x: 30, y: 30 }, width: 90, height: 90, z: 1 }),
+      node({ id: 'b', kind: 'shape', position: { x: 630, y: 30 }, width: 90, height: 90, z: 2 }),
+    ]))
+    const c = s.getState().canvas
+    c.beginDrag(['f1', 'f2'])
+    c.applyFlowChanges([pos('f1', 60, 0), pos('f2', 660, 0)])
+    c.endDrag()
+    const n = s.getState().doc.board.nodes
+    expect(n.a.position).toEqual({ x: 90, y: 30 })
+    expect(n.b.position).toEqual({ x: 690, y: 30 })
+  })
+
+  test('dragging a frame with a frame inside it moves the inner contents once', () => {
+    const s = storeWith(board([
+      node({ id: 'outer', kind: 'frame', position: { x: 0, y: 0 }, width: 600, height: 600, z: -2 }),
+      node({ id: 'inner', kind: 'frame', position: { x: 30, y: 30 }, width: 300, height: 300, z: -1 }),
+      node({ id: 'a', kind: 'shape', position: { x: 60, y: 60 }, width: 90, height: 90, z: 1 }),
+    ]))
+    const c = s.getState().canvas
+    c.beginDrag(['outer', 'inner'])
+    c.applyFlowChanges([pos('outer', 30, 0), pos('inner', 60, 30)])
+    c.endDrag()
+    expect(s.getState().doc.board.nodes.a.position).toEqual({ x: 90, y: 60 })
+  })
+
   test('alt-drag duplicates: copies stay, originals move, one step', () => {
     const s = storeWith(board([node({ id: 'a', kind: 'shape', shape: 'ellipse', position: { x: 0, y: 0 }, width: 90, height: 90, z: 1 })]))
     const c = s.getState().canvas
