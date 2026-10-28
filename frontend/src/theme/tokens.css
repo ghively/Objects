@@ -45,12 +45,13 @@
 
   /* M7 (Task 16): shadcn's focus ring (index.css's former literal; border-el-hover in the other
      themes), and M5's search highlights, moved here from index.css so every theme can set them.
-     Our values (the reference's are not in the trimmed set): the yellow type ink at 30 % alpha for
-     matches, 55 % for the current find match; listed for Gene's check. */
+     Object's dark values (storing36682.js): bg-search-highlight #fddf472c, text yellow 100;
+     find in page (design.css ::highlight): #facc1573, the current match #f97316b3. */
   --focus-ring: #5a5960;
-  --bg-search-highlight: rgb(255 240 168 / 0.3);
-  --bg-search-highlight-current: rgb(255 240 168 / 0.55);
-  --text-search-highlight: var(--text);
+  --bg-search-highlight: #fddf472c;
+  --text-search-highlight: oklch(0.9729 0.0693 103.22);
+  --bg-find-match: #facc1573;
+  --bg-find-match-current: #f97316b3;
 
   /* Card edge: color-mix(border-front 80%, bg-back), as Object's .app-window-chrome. */
   --border-chrome: #27262b;

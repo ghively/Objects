@@ -205,8 +205,10 @@ describe('search mode', () => {
       return el as HTMLElement
     })
     expect(row.querySelector('[data-result-title] b')?.textContent).toBe('Alp')
+    // Object: palette result titles use the 600-weight `search-highlights-bold` variant.
+    expect(row.querySelector('[data-result-title] .search-highlights.search-highlights-bold b')?.textContent).toBe('Alp')
     expect(row.querySelector('img')).toBeNull()
-    const snippets = row.querySelectorAll('.search-highlights')
+    const snippets = row.querySelectorAll('.search-highlights:not(.search-highlights-bold)')
     expect(snippets).toHaveLength(2)
     expect(snippets[0].textContent).toBe('one <img src=x> alpine')
     expect(snippets[0].querySelector('b')?.textContent).toBe('alp')
