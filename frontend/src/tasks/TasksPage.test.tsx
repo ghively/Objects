@@ -111,6 +111,21 @@ describe('TasksPage', () => {
     await waitFor(() => expect(titlesIn(view)).toEqual(['Overdue', 'Working']))
   })
 
+  test('the Today section moves on at midnight', async () => {
+    const now = new Date()
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    vi.setSystemTime(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 30))
+    mocked.ui.mockResolvedValue({ ui: { ...BASE_UI, tasks: { activeTab: 'today', views: {} } }, revision: 'u1' })
+    render(<TasksPage />)
+    await waitFor(() => expect(tab('Today')).toHaveAttribute('aria-selected', 'true'))
+    await waitFor(() => expect(titlesIn(screen.getByTestId('data-view'))).toEqual(['Overdue', 'Working']))
+    // Past midnight, tomorrow's Weekly is due today.
+    await act(async () => {
+      vi.advanceTimersByTime(90_000)
+    })
+    await waitFor(() => expect(titlesIn(screen.getByTestId('data-view'))).toEqual(['Overdue', 'Working', 'Weekly']))
+  })
+
   test('test section view changes saved to ui.tasks.views and active tab saved', async () => {
     const user = userEvent.setup()
     render(<TasksPage />)
