@@ -22,6 +22,9 @@ import { DataView, ToolbarSlot } from '@/views/DataView'
 import { CreateCollectionDialog, DeleteCollectionDialog } from '@/collections/CollectionDialogs'
 import { removeQuery } from '@/queries/useQueries'
 import { DeleteTypeDialog } from './DeleteTypeDialog'
+import { ImportCsvDialog, IMPORT_CSV_TEXT } from './ImportCsvDialog'
+import { isDailyNoteType } from '@/object/ObjectHeader'
+import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 import {
   SECTION_TEXT,
   buildSections,
@@ -321,6 +324,9 @@ export function TypePage({ type }: { type: TypeDef }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false)
   const [deletingCollection, setDeletingCollection] = useState<string | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  // Daily notes and whiteboards aren't created from a title, so they take no CSV (our choice).
+  const canImport = !type.readOnlyReason && !isDailyNoteType(type) && !isWhiteboardType(type)
 
   const titleCtx = useTitleCtx(indexTypes)
   const ctx = useMemo(
@@ -425,6 +431,12 @@ export function TypePage({ type }: { type: TypeDef }) {
               <Icon name={COLLECTION_ICON} size={14} />
               {SECTION_TEXT.createCollection}
             </DropdownMenuItem>
+            {canImport && (
+              <DropdownMenuItem onSelect={() => setImportOpen(true)}>
+                <Icon name="ph-file-csv" size={14} />
+                {IMPORT_CSV_TEXT.menu}
+              </DropdownMenuItem>
+            )}
             <PinMenuItems pin={{ kind: 'type', id: type.id }} />
             {tab === 'all' && (
               <DropdownMenuItem
@@ -519,6 +531,7 @@ export function TypePage({ type }: { type: TypeDef }) {
           onOpenChange={(o) => !o && setDeletingCollection(null)}
         />
       )}
+      {canImport && <ImportCsvDialog type={type} open={importOpen} onOpenChange={setImportOpen} />}
       {deleteOpen && (
         <DeleteTypeDialog
           type={type}
