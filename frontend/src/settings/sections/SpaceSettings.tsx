@@ -1,9 +1,12 @@
 // "Space Settings": the space's name, icon and description, written to `.capacities/space.json`
 // through `PUT /api/space` (nothing else changes: no folder rename). M8: a "Delete space" row,
 // always disabled here because this is the open space (delete other spaces from the spaces menu).
+// M9: a "Recalculate content index" row (`POST /api/search/reindex`). Capacities keeps it under
+// Offline & Sync › Offline; Object has no such section, so it lives here (our choice).
 import { useEffect, useState } from 'react'
+import { api } from '@/api/client'
 import type { Icon as IconValue } from '@/api/types'
-import { IconOrEmoji, isIconifyId } from '@/components/Icon'
+import { Icon, IconOrEmoji, isIconifyId } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -22,11 +25,77 @@ export const SPACE_SETTINGS_TEXT = {
   description_: 'Description', // SpaceDashboard.general.spaceDescription.label
   descriptionHeader: 'Describe the purpose of this space.', // SpaceDashboard.general.spaceDescription.header
   descriptionPlaceholder: 'Your description', // SpaceDashboard.general.spaceDescription.placeholder
+  reindexButton: 'Recalculate content index', // ContentLoadingStateIndicator.recomputeBacklinkIndex.button
+  reindexDescription:
+    'If some of your views are inconsistent or search results are not returning content, you can reindex your notes. This is usually not needed, only use it if you are having issues.', // ContentLoadingStateIndicator.recomputeBacklinkIndex.description
+  reindexingHeading: 'Content is being indexed', // ContentLoadingStateIndicator.recomputingBacklinkIndex.heading
+  reindexingDescription: 'Your notes are getting analyzed for search, backlinking, and your content views.', // ContentLoadingStateIndicator.recomputingBacklinkIndex.description
 } as const
 
 const T = SPACE_SETTINGS_TEXT
 
-export const SPACE_SETTINGS_SEARCH: string[] = [T.name, T.icon, T.description_]
+export const SPACE_SETTINGS_SEARCH: string[] = [T.name, T.icon, T.description_, T.reindexButton]
+
+/** How often the reindex row asks search whether the index is still `partial` (our choice). */
+export const REINDEX_POLL_MS = 1000
+
+/**
+ * "Recalculate content index": drops and rebuilds the search index in the background. While
+ * search reports `partial` (the rebuild, or the start-up sync) the row shows Capacities'
+ * "Content is being indexed" state and the button waits. It only reads and asks; it writes no file.
+ */
+function ReindexRow() {
+  const [indexing, setIndexing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Ask on open and after each start (the server clears `ready` before it answers), then keep
+  // asking while the index is partial.
+  useEffect(() => {
+    let alive = true
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const check = () => {
+      api
+        .search('', { limit: 1 })
+        .then((r) => {
+          if (!alive) return
+          setIndexing(r.partial)
+          if (r.partial) timer = setTimeout(check, REINDEX_POLL_MS)
+        })
+        .catch(() => alive && setIndexing(false))
+    }
+    check()
+    return () => {
+      alive = false
+      clearTimeout(timer)
+    }
+  }, [indexing])
+
+  const start = () => {
+    setError(null)
+    api
+      .reindex()
+      .then(() => setIndexing(true))
+      .catch((e: unknown) => setError(errorText(e)))
+  }
+
+  return (
+    <SettingGroup title={T.reindexButton} help={T.reindexDescription}>
+      <div>
+        <Button type="button" variant="outline" size="sm" disabled={indexing} onClick={start}>
+          <Icon name="ph-file-magnifying-glass" size={14} />
+          {T.reindexButton}
+        </Button>
+      </div>
+      {indexing && (
+        <div role="status" className="text-[13px]">
+          <p className="font-semibold text-fg">{T.reindexingHeading}</p>
+          <p className="text-fg-muted">{T.reindexingDescription}</p>
+        </div>
+      )}
+      <SaveError error={error} />
+    </SettingGroup>
+  )
+}
 
 /** Longest space name `space.json` accepts (the server's rule). */
 export const MAX_SPACE_NAME = 120
@@ -138,6 +207,7 @@ export function SpaceSettingsSection() {
           className="w-full max-w-[520px] resize-y rounded-md border border-line bg-raised px-2 py-1.5 text-[15px] text-fg outline-none focus:border-fg-muted"
         />
       </SettingGroup>
+      <ReindexRow />
       <SettingGroup title={DELETE_SPACE_TEXT.menuItem} help={DELETE_SPACE_TEXT.currentHint}>
         <div>
           <Button type="button" variant="destructive" size="sm" disabled title={DELETE_SPACE_TEXT.currentHint}>
