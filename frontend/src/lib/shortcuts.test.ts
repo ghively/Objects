@@ -63,13 +63,13 @@ describe('shortcuts', () => {
     setPlatform('Linux x86_64')
     const plain = vi.fn()
     const { getByLabelText, unmount } = render(createElement(Bind, { id: 'toggleDarkMode', fn: plain }))
-    window.dispatchEvent(key({ key: 'D', ctrlKey: true, shiftKey: true }))
+    window.dispatchEvent(key({ key: 'L', ctrlKey: true, shiftKey: true }))
     expect(plain).toHaveBeenCalledTimes(1)
     const field = getByLabelText('field')
-    field.dispatchEvent(key({ key: 'D', ctrlKey: true, shiftKey: true }))
+    field.dispatchEvent(key({ key: 'L', ctrlKey: true, shiftKey: true }))
     expect(plain).toHaveBeenCalledTimes(1)
     unmount()
-    window.dispatchEvent(key({ key: 'D', ctrlKey: true, shiftKey: true }))
+    window.dispatchEvent(key({ key: 'L', ctrlKey: true, shiftKey: true }))
     expect(plain).toHaveBeenCalledTimes(1)
 
     const allowed = vi.fn()
@@ -79,6 +79,44 @@ describe('shortcuts', () => {
     expect(allowed).toHaveBeenCalledTimes(1)
     expect(ev.defaultPrevented).toBe(true)
     r2.unmount()
+  })
+
+  test('AltCtrl is Alt on Windows/Linux and Ctrl on macOS; arrows show as glyphs', () => {
+    expect(parseKeys('Mod-AltCtrl-l', false)).toEqual({ ctrl: true, meta: false, alt: true, shift: false, key: 'l' })
+    expect(parseKeys('Mod-AltCtrl-l', true)).toEqual({ ctrl: true, meta: true, alt: false, shift: false, key: 'l' })
+    expect(formatKeys('Mod-AltCtrl-p', false)).toBe('Ctrl+Alt+P')
+    expect(formatKeys('Mod-AltCtrl-p', true)).toBe('⌃⌘P')
+    expect(formatKeys('Mod-Shift-ArrowLeft', false)).toBe('Ctrl+Shift+←')
+    expect(formatKeys('Alt-ArrowUp', true)).toBe('⌥↑')
+    setPlatform('Win32')
+    expect(matches(key({ key: 'p', ctrlKey: true, altKey: true }), ['Mod-AltCtrl-p'])).toBe(true)
+    setPlatform('MacIntel')
+    expect(matches(key({ key: 'p', ctrlKey: true, metaKey: true }), ['Mod-AltCtrl-p'])).toBe(true)
+    expect(matches(key({ key: 'p', metaKey: true, altKey: true }), ['Mod-AltCtrl-p'])).toBe(false)
+  })
+
+  // Object's shortcut table (shortcuts36682.js; reference-check-2026-10-28 §1), Windows column.
+  test("global and navigation keys are Object's own", () => {
+    const OBJECT: Record<string, string[]> = {
+      closeTab: ['Mod-w'],
+      openNewTab: ['Mod-t'],
+      navigateTabs: ['Ctrl-Tab'],
+      openTabList: ['Mod-Shift-ArrowUp'],
+      navigateBack: ['Mod-ArrowLeft', 'Mod-['],
+      navigateForward: ['Mod-ArrowRight', 'Mod-]'],
+      toggleSidepanel: ['Mod-Shift-ArrowRight'],
+      toggleLeftSidebar: ['Mod-Shift-ArrowLeft'],
+      toggleCalendarSidebar: ['Mod-Alt-s'],
+      toggleDarkMode: ['Mod-Shift-l'],
+      openSettings: ['Mod-,'],
+      toggleShortcutsMenu: ['Mod-Shift-b'],
+      openSearchPalette: ['Mod-p', 'Mod-k'],
+      openCommandPalette: [],
+      toggleFocusMode: ['Mod-Shift-m'],
+      openPresentationMode: ['Mod-AltCtrl-p'],
+    }
+    for (const [id, keys] of Object.entries(OBJECT)) expect(keysFor(id), id).toEqual(keys)
+    for (const id of Object.keys(OBJECT)) expect(allShortcuts().find((d) => d.id === id)?.provisional, id).toBe(false)
   })
 
   test('isEditableTarget follows App.tsx rule', () => {
@@ -104,7 +142,7 @@ describe('shortcuts', () => {
     expect(keysFor('openSettings')).toEqual(['Mod-,'])
     expect(keysFor('nope')).toEqual([])
     expect(allShortcuts().find((d) => d.id === 'openSettings')?.provisional).toBe(false)
-    expect(allShortcuts().find((d) => d.id === 'heading1')?.provisional).toBe(true)
+    expect(allShortcuts().find((d) => d.id === 'toggleDarkMode')?.provisional).toBe(false)
     expect(allShortcuts().find((d) => d.id === 'openSearchPalette')?.bound).toBe(false)
 
     registerShortcuts([{ id: 'testOnly', category: 'global', name: 'Test', keys: ['Mod-Alt-F9'], scope: 'global', provisional: true }])

@@ -89,11 +89,11 @@ describe('FocusMode', () => {
     expect(screen.getByRole('status').textContent).toBe(FOCUS_TEXT.unavailable)
   })
 
-  test('Mod-Shift-f toggles focus mode', () => {
+  test('Mod-Shift-m toggles focus mode', () => {
     useTabs.getState().open({ kind: 'object', path: 'Pages/Notes.md' })
     render(<FocusMode />)
     act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F', ctrlKey: true, shiftKey: true, bubbles: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'M', ctrlKey: true, shiftKey: true, bubbles: true }))
     })
     expect(useFocusMode.getState().on).toBe(true)
   })
