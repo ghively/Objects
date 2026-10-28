@@ -11,13 +11,15 @@
  *   after a growing delay (`SAVE_RETRY_MS`, doubling up to `SAVE_RETRY_MAX_MS`), at most
  *   `SAVE_RETRY_LIMIT` times; the next edit tries again.
  * - An external `whiteboard` change for this board reloads it (clearing the history) when
- *   nothing is pending here.
+ *   nothing is pending here; so does a save by another view of it in this window (a page and a
+ *   peek), which the server's echo filter would hide.
  * - Pending changes are flushed on unmount and on `pagehide`.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ConflictError, ReadOnlyError } from '@/api/client'
 import { whiteboardApi, type WhiteboardApi } from '@/api/whiteboardClient'
 import type { WhiteboardData } from '@/api/whiteboardTypes'
+import { announceSave, onLocalSave } from './localSaves'
 import { mergeBoards } from './merge'
 import { createBoardStore, type BoardStore, type CreateBoardStoreOptions } from './store'
 import { WB } from './strings'
@@ -106,6 +108,7 @@ class BoardSaver {
         this.base = board
         this.revision = res.revision
         this.savedSeq = Math.max(this.savedSeq, seq)
+        announceSave({ path: this.path, version: res.revision, source: this })
       })
       .catch((err: unknown) => this.failed(err, false))
       .finally(() => {
@@ -160,6 +163,7 @@ class BoardSaver {
       this.base = merged
       this.revision = res.revision
       this.savedSeq = Math.max(this.savedSeq, seq)
+      announceSave({ path: this.path, version: res.revision, source: this })
     } catch (e) {
       if (e instanceof ConflictError) await this.failed(e, true)
       else if (e instanceof ReadOnlyError) await this.failed(e, true)
@@ -237,9 +241,8 @@ export function useBoard(
       wasDragging = s.dragging
     })
 
-    const offChange = api.onChange((e) => {
-      if ((e.kind as string) !== 'whiteboard' || e.path !== path) return
-      if (e.version && e.version === saver.revision) return
+    const changedElsewhere = (version: string | null) => {
+      if (version && version === saver.revision) return
       if (saver.pending) return // our next save will meet the change (409) and merge
       void client
         .board(path)
@@ -249,6 +252,12 @@ export function useBoard(
           saver.reload(res.board, res.revision, res.readOnlyReason ?? null)
         })
         .catch(() => undefined)
+    }
+    const offChange = api.onChange((e) => {
+      if ((e.kind as string) === 'whiteboard' && e.path === path) changedElsewhere(e.version)
+    })
+    const offLocal = onLocalSave((e) => {
+      if (e.source !== saver && e.path === path) changedElsewhere(e.version)
     })
 
     const onPageHide = () => void saver.flush()
@@ -258,6 +267,7 @@ export function useBoard(
       alive = false
       unsubscribe()
       offChange()
+      offLocal()
       window.removeEventListener('pagehide', onPageHide)
       void saver.flush().finally(() => {
         saver.disposed = true

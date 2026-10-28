@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, ConflictError, ReadOnlyError } from '@/api/client'
+import { announceSave, onLocalSave } from '../localSaves'
 import { inkClient, type InkClient } from './inkClient'
 import { mergeStrokes } from './inkModel'
 import { INK_STRINGS } from './inkStrings'
@@ -109,6 +110,7 @@ export function useInkDoc(path: string, client: Client = inkClient): InkDoc {
         if (gen !== st.generation) return
         st.revision = r.revision
         st.lastSaved = local
+        announceSave({ path: p, version: r.revision, source: st })
         landed()
         return
       } catch (err) {
@@ -127,6 +129,7 @@ export function useInkDoc(path: string, client: Client = inkClient): InkDoc {
           if (gen !== st.generation) return
           st.revision = r.revision
           st.lastSaved = merged
+          announceSave({ path: p, version: r.revision, source: st })
           landed()
           if (st.pending) {
             st.pending = mergeStrokes(local, st.pending, merged)
@@ -271,15 +274,25 @@ export function useInkDoc(path: string, client: Client = inkClient): InkDoc {
     return () => void flush()
   }, [path, reload, flush])
 
-  // External changes to this board's files.
+  // External changes to this board's files, and saves by another view of it in this window.
   useEffect(() => {
-    return api.onChange((e) => {
+    const changed = (path: string, version: string | null) => {
       const st = s.current
-      if ((e.kind as string) !== 'whiteboard' || e.path !== st.path) return
+      if (path !== st.path) return
       if (!st.loaded || st.pending || st.inFlight || st.timer) return
-      if (e.version && e.version === st.revision) return
+      if (version && version === st.revision) return
       void reload()
+    }
+    const offChange = api.onChange((e) => {
+      if ((e.kind as string) === 'whiteboard') changed(e.path, e.version)
     })
+    const offLocal = onLocalSave((e) => {
+      if (e.source !== s.current) changed(e.path, e.version)
+    })
+    return () => {
+      offChange()
+      offLocal()
+    }
   }, [reload])
 
   // Flush on pagehide and unmount.

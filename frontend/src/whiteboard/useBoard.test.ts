@@ -224,6 +224,27 @@ describe('useBoard', () => {
     expect(client.board).not.toHaveBeenCalled()
   })
 
+  test('the same board open twice in this window (page and peek) sees its own saves', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const client = mockWhiteboardApi(board([node({ id: 'a', position: { x: 0, y: 0 } })]), 'rev-1')
+    const page = renderHook(() => useBoard(PATH, client))
+    const peek = renderHook(() => useBoard(PATH, client))
+    await waitFor(() => expect(page.result.current.status).toBe('ready'))
+    await waitFor(() => expect(peek.result.current.status).toBe('ready'))
+    let saved = board([node({ id: 'a', position: { x: 0, y: 0 } })])
+    client.saveBoard.mockImplementation(async (_p, b) => {
+      saved = structuredClone(b)
+      return { revision: 'rev-2' }
+    })
+    client.board.mockImplementation(async (path) => ({ path, board: structuredClone(saved), revision: 'rev-2' }))
+    act(() => page.result.current.store.getState().actions.nudge(30, 0, ['a']))
+    await act(async () => page.result.current.flush())
+    await advance(10)
+    await waitFor(() => expect(peek.result.current.store.getState().doc.board.nodes.a.position.x).toBe(30))
+    page.unmount()
+    peek.unmount()
+  })
+
   test('undo after save saves the earlier state', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const { client, store } = await setup()

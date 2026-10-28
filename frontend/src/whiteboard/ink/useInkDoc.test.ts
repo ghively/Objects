@@ -251,6 +251,20 @@ describe('useInkDoc', () => {
     expect(result.current.strokes).toBe(before)
   })
 
+  test('the same board open twice in this window sees its own ink saves', async () => {
+    const client = fakeClient({ path: PATH, strokes: [], revision: 'r1' })
+    const page = renderHook(() => useInkDoc(PATH, client))
+    const peek = renderHook(() => useInkDoc(PATH, client))
+    await settle()
+    client.save.mockResolvedValue({ revision: 'r2' })
+    client.load.mockImplementation(async () => ({ path: PATH, strokes: [s('a')], revision: 'r2' }))
+    act(() => page.result.current.save([s('a')]))
+    await act(async () => page.result.current.flush())
+    await advance(10)
+    await settle()
+    expect(peek.result.current.strokes).toEqual([s('a')])
+  })
+
   test('external whiteboard event reloads when nothing is pending', async () => {
     const client = fakeClient({ path: PATH, strokes: [s('a')], revision: 'r1' })
     const { result } = renderHook(() => useInkDoc(PATH, client))
