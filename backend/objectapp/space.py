@@ -176,6 +176,9 @@ _UNTITLED_STEM_RE = re.compile(r"^Untitled(?: \(\d+\))?$")
 # Characters Windows doesn't allow in a file name (and control characters).
 _ILLEGAL_FILENAME_RE = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 _MAX_FILENAME = 120
+# Bytes, too: a name may be 255 bytes on Linux and macOS, and " (2)", a whiteboard
+# sidecar suffix or a temp name add to the stem.
+_MAX_FILENAME_BYTES = 200
 # Device names Windows reserves (a file `CON.md` can't be created there).
 _RESERVED_STEMS = frozenset(
     {
@@ -196,15 +199,19 @@ def safe_filename(title: str) -> str:
 
     The title up to its first character that is illegal in a Windows file name,
     with whitespace collapsed and leading and trailing dots and spaces stripped
-    (a leading dot would make a hidden dotfile), capped at 120 characters. If
-    that is empty, the illegal characters are dropped instead; if still empty,
+    (a leading dot would make a hidden dotfile), capped at 120 characters and
+    200 UTF-8 bytes. If that is empty, the illegal characters are dropped
+    instead; if still empty,
     ``Untitled``. (A Windows device name such as ``CON`` gets a trailing
     ``_``.) ``[``, ``]`` and ``#`` are dropped first.
     """
 
     def clean(text: str) -> str:
-        text = " ".join(text.split()).strip(". ")
-        return text[:_MAX_FILENAME].rstrip(". ")
+        text = " ".join(text.split()).strip(". ")[:_MAX_FILENAME]
+        raw = text.encode("utf-8", errors="surrogatepass")
+        if len(raw) > _MAX_FILENAME_BYTES:
+            text = raw[:_MAX_FILENAME_BYTES].decode("utf-8", errors="ignore")
+        return text.rstrip(". ")
 
     # `[`, `]` and `#` are legal in file names but end a wikilink's target, so
     # the path form of a link (see `Space._link_text`) must never contain them.
