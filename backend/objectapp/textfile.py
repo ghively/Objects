@@ -1,8 +1,10 @@
 """Read and write text files without disturbing their bytes.
 
 `read_text` normalises line endings to ``\n`` and strips a UTF-8 BOM, recording
-both so that `encode` can reproduce the original bytes exactly. Whether the file
-ends with a newline is carried by the text itself.
+both (the ending is the file's majority one) so that `encode` can reproduce the
+original bytes of a file with one kind of ending exactly; `encode_like` keeps a
+mixed file's per-line endings. Whether the file ends with a newline is carried
+by the text itself.
 """
 
 from __future__ import annotations
@@ -35,9 +37,10 @@ def decode(data: bytes) -> TextFile:
     if bom:
         data = data[len(BOM) :]
     text = data.decode("utf-8", errors=_ERRORS)
-    eol: Eol = "\r\n" if "\r\n" in text else "\n"
-    if eol == "\r\n":
-        text = text.replace("\r\n", "\n")
+    # The majority ending wins: one stray CRLF line doesn't make a file CRLF.
+    crlf = text.count("\r\n")
+    eol: Eol = "\r\n" if crlf and crlf >= text.count("\n") - crlf else "\n"
+    text = text.replace("\r\n", "\n")
     return TextFile(text=text, eol=eol, bom=bom)
 
 
@@ -71,9 +74,7 @@ def encode_like(original: bytes, new_text: str) -> bytes:
     tf = decode(original)
     body = original[len(BOM) :] if tf.bom else original
     old_raw = _raw_lines(body)
-    old_norm = [line.decode("utf-8", errors=_ERRORS) for line in old_raw]
-    if tf.eol == "\r\n":
-        old_norm = [line.replace("\r\n", "\n") for line in old_norm]
+    old_norm = [line.decode("utf-8", errors=_ERRORS).replace("\r\n", "\n") for line in old_raw]
     # Split on \n only (str.splitlines would also break on \r,   and others).
     new_lines = [p + "\n" for p in new_text.split("\n")[:-1]]
     tail = new_text.split("\n")[-1]

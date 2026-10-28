@@ -300,3 +300,31 @@ def test_an_existing_249_byte_name_still_saves(space_dir: Path):
     space.save_body(rel, "changed\n", _version(space, rel))
     assert (space_dir / "Pages" / name).read_bytes().endswith(b"changed\n")
     assert sorted(p.name for p in (space_dir / "Pages").iterdir() if p.name.startswith(".")) == []
+
+
+# -- mixed line endings: new lines take the majority ending ---------------------------------
+
+
+def test_encode_like_uses_the_majority_line_ending():
+    from objectapp.textfile import decode, encode_like
+
+    original = b"a\nb\nc\r\nd\n"
+    assert decode(original).eol == "\n"
+    assert decode(original).text == "a\nb\nc\nd\n"
+    assert encode_like(original, "a\nb\nc\nnew\nd\n") == b"a\nb\nc\r\nnew\nd\n"
+    crlf = b"a\r\nb\r\nc\nd\r\n"
+    assert decode(crlf).eol == "\r\n"
+    assert encode_like(crlf, "a\nb\nc\nnew\nd\n") == b"a\r\nb\r\nc\nnew\r\nd\r\n"
+
+
+def test_property_edit_in_a_mostly_lf_file_adds_lf_lines(space_dir: Path):
+    path = space_dir / "Pages" / "Alpha.md"
+    data = path.read_bytes().replace(b"\r\n", b"\n")
+    assert data.count(b"\n") > 3
+    lines = data.split(b"\n")
+    lines[-2] += b"\r"  # one CRLF line near the end
+    path.write_bytes(b"\n".join(lines))
+    space = Space(space_dir)
+    space.update_properties("Pages/Alpha.md", {"description": "x"}, _version(space, "Pages/Alpha.md"))
+    after = path.read_bytes()
+    assert after.count(b"\r\n") == 1
