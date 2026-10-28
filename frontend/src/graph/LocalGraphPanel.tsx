@@ -1,8 +1,11 @@
 // The open object's local graph in the right panel ("Graph View"): the breadth-first neighbourhood
-// of the object, 1 hop by default and 2 at most ("Maximum distance", "Show more" / "Show less",
-// remembered in localStorage), the same filters as the global graph except that the centre is
-// never hidden, and the same clicks (peek with the visible nodes; Ctrl/Cmd+click opens a tab).
+// of the object, 1 hop by default and 1–5 one step at a time ("Maximum distance", with separate
+// "Show less" and "Show more" buttons as Object's `GraphViewHopChrome`; remembered in
+// localStorage), the same filters as the global graph except that the centre is never hidden,
+// and the same clicks (peek with the visible nodes; Ctrl/Cmd+click opens a tab).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Icon } from '@/components/Icon'
+import { cn } from '@/lib/utils'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useTabs, type OpenOptions, type Target } from '@/nav/tabs'
 import { GraphCanvas } from './GraphCanvas'
@@ -11,7 +14,7 @@ import { GraphLoading } from './GraphLoading'
 import { GraphEmpty, openGraphNode } from './GraphPage'
 import { GraphToolbar } from './GraphToolbar'
 import { exportGraphPng, type GraphRenderer } from './exportPng'
-import { bestMatch, filterGraph } from './filterGraph'
+import { bestMatch, DEFAULT_HOPS, filterGraph, MAX_HOPS, MIN_HOPS } from './filterGraph'
 import { useGraphData } from './useGraphData'
 import { useGraphUi } from './useGraphUi'
 
@@ -22,18 +25,19 @@ export const LOCAL_GRAPH_TEXT = {
   showLess: 'Show less',
 }
 
-/** localStorage key for the remembered hop count (1 or 2). */
+/** localStorage key for the remembered hop count (1–5). */
 export const HOPS_KEY = 'graph.localHops'
 
-function readHops(): 1 | 2 {
+function readHops(): number {
   try {
-    return localStorage.getItem(HOPS_KEY) === '2' ? 2 : 1
+    const n = Number(localStorage.getItem(HOPS_KEY))
+    return Number.isInteger(n) && n >= MIN_HOPS && n <= MAX_HOPS ? n : DEFAULT_HOPS
   } catch {
-    return 1
+    return DEFAULT_HOPS
   }
 }
 
-function writeHops(hops: 1 | 2): void {
+function writeHops(hops: number): void {
   try {
     localStorage.setItem(HOPS_KEY, String(hops))
   } catch {
@@ -56,11 +60,14 @@ export function LocalGraphPanel({ path }: LocalGraphPanelProps) {
     if (!loaded) void useLinkIndex.getState().load()
   }, [loaded])
 
-  const [hops, setHopsState] = useState<1 | 2>(readHops)
-  const setHops = (next: 1 | 2) => {
-    setHopsState(next)
-    writeHops(next)
+  const [hops, setHopsState] = useState<number>(readHops)
+  const setHops = (next: number) => {
+    const clamped = Math.min(MAX_HOPS, Math.max(MIN_HOPS, next))
+    setHopsState(clamped)
+    writeHops(clamped)
   }
+  const canShowLess = hops > MIN_HOPS
+  const canShowMore = hops < MAX_HOPS
 
   const center = useMemo(() => (data ? data.nodes.findIndex((n) => n.path === path) : -1), [data, path])
   const centerNode = data && center >= 0 ? data.nodes[center] : null
@@ -112,10 +119,29 @@ export function LocalGraphPanel({ path }: LocalGraphPanelProps) {
           </span>
           <button
             type="button"
-            onClick={() => setHops(hops === 1 ? 2 : 1)}
-            className="rounded-md px-1.5 py-0.5 text-fg-muted hover:bg-hover hover:text-fg"
+            title={t.showLess}
+            aria-disabled={!canShowLess}
+            onClick={() => canShowLess && setHops(hops - 1)}
+            className={cn(
+              'flex items-center gap-1 rounded-md px-1.5 py-0.5 text-fg-muted hover:bg-hover hover:text-fg',
+              !canShowLess && 'pointer-events-none opacity-50',
+            )}
           >
-            {hops === 1 ? t.showMore : t.showLess}
+            <Icon name="ph-line-segment-bold" size={14} />
+            <span>{t.showLess}</span>
+          </button>
+          <button
+            type="button"
+            title={t.showMore}
+            aria-disabled={!canShowMore}
+            onClick={() => canShowMore && setHops(hops + 1)}
+            className={cn(
+              'flex items-center gap-1 rounded-md px-1.5 py-0.5 text-fg-muted hover:bg-hover hover:text-fg',
+              !canShowMore && 'pointer-events-none opacity-50',
+            )}
+          >
+            <Icon name="ph-graph-bold" size={14} />
+            <span>{t.showMore}</span>
           </button>
         </div>
       </header>
