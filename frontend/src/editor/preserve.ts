@@ -16,6 +16,8 @@
  * - The original's line ending (LF/CRLF) and trailing newlines are kept.
  */
 
+import { splitBlocks } from './blocks'
+
 export type EditorBlock = {
   raw?: string
   markdown: string
@@ -394,6 +396,7 @@ export function serializeWithPreservation(blocks: EditorBlock[], docEol?: string
   const eol = docEol ?? (blocks.find((b) => b.raw?.includes('\r\n')) ? '\r\n' : '\n')
   let out = ''
   let prev: EditorBlock | null = null
+  let prevText = ''
   for (const block of blocks) {
     let text: string
     if (block.raw !== undefined) text = preserveBlock(block.raw, block.markdown, block.kind, eol, block.baseline)
@@ -405,10 +408,28 @@ export function serializeWithPreservation(blocks: EditorBlock[], docEol?: string
       // On LF-normalised text: a lone CRLF is one line break, not a blank line.
       const endsBlank = /\n[ \t]*\n$/.test(toLF(out.slice(-256)))
       if (!endsBreak) out += eol + eol
-      else if (!endsBlank && (prev.raw === undefined || block.raw === undefined)) out += eol
+      else if (!endsBlank && (prev.raw === undefined || block.raw === undefined || !staysApart(prevText, text)))
+        out += eol
     }
     out += text
     prev = block
+    prevText = text
   }
   return out
+}
+
+/**
+ * True when `a` directly followed by `b` (no blank line) still reads as the
+ * two blocks, e.g. a heading then a paragraph. Two source blocks that were
+ * adjacent in the original pass; blocks brought together by a move (two
+ * paragraphs) do not, and get a blank line between them.
+ */
+function staysApart(a: string, b: string): boolean {
+  let at = 0
+  for (const block of splitBlocks(a + b)) {
+    at += block.raw.length
+    if (at === a.length) return true
+    if (at > a.length) return false
+  }
+  return false
 }
