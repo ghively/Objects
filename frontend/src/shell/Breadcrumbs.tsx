@@ -1,11 +1,12 @@
 /**
  * The breadcrumb row at the top of the main panel content: the active entry's trail (the pages
  * followed by link to get here), each as its icon and title, then the current page, separated by
- * carets. A crumb goes back to its history entry; the current page is not clickable. Long trails
- * collapse the middle into "…" with a menu. Nothing renders when the trail is empty.
+ * `/`. A crumb goes back to its history entry; the current page is not clickable. Object's
+ * `RenderBreadcrumbs`: at most 3 crumbs inline counting the current page; every earlier crumb goes
+ * into a menu behind a leading dots button, most recent first. Earlier crumbs are at 80 % opacity
+ * (100 % on hover). Nothing renders when the trail is empty.
  *
- * Object has no reference screenshot for this row: its position and styling are ours, flagged
- * for Gene's hands-on check.
+ * The row's host element and position are not pinned in the reference: flagged for Gene's check.
  */
 import type { ReactNode } from 'react'
 import type { SpaceInfo } from '@/api/types'
@@ -19,19 +20,19 @@ import {
 import { activeTab, tabCrumbs, tabTarget, useTabs } from '@/nav/tabs'
 import { TargetLabel } from '@/shell/TabStrip'
 
-/** Trails longer than this show the first crumb, "…", and the last two. */
+/** Crumbs shown inline, the current page included (Object's `length > 3`). */
 export const MAX_VISIBLE_CRUMBS = 3
 
 function Separator() {
   return (
-    <span aria-hidden className="flex shrink-0 items-center text-fg-muted">
-      <Icon name="ph-caret-right" size={12} />
+    <span aria-hidden className="shrink-0 px-1 text-fg-muted select-none">
+      /
     </span>
   )
 }
 
 const crumbClass =
-  'flex h-7 min-w-0 max-w-[220px] shrink items-center gap-1.5 rounded-md px-1.5 text-[14px] [&_[data-type-chip]]:size-[18px]'
+  'flex h-7 min-w-0 max-w-full shrink items-center gap-1.5 rounded-md px-1 text-sm select-none [&_[data-type-chip]]:size-[18px]'
 
 export function Breadcrumbs({ space }: { space: SpaceInfo | null }) {
   const tab = useTabs(activeTab)
@@ -40,56 +41,54 @@ export function Breadcrumbs({ space }: { space: SpaceInfo | null }) {
   const current = tabTarget(tab)
   if (trail.length === 0 || !current) return null
 
-  const collapse = trail.length > MAX_VISIBLE_CRUMBS
-  const hidden = collapse ? trail.slice(1, trail.length - 2).map((t, i) => ({ t, k: i + 1 })) : []
-  const shown = trail.map((t, k) => ({ t, k })).filter(({ k }) => !collapse || k === 0 || k >= trail.length - 2)
-
-  const crumb = ({ t, k }: { t: (typeof trail)[number]; k: number }) => (
-    <button
-      key={`c${k}`}
-      type="button"
-      data-crumb={k}
-      onClick={() => goToCrumb(k)}
-      className={`${crumbClass} text-fg-muted hover:bg-hover hover:text-fg`}
-    >
-      <TargetLabel target={t} space={space} />
-    </button>
-  )
+  // The path is the trail plus the current page; all but its last 3 go into the menu.
+  const cut = Math.max(0, trail.length + 1 - MAX_VISIBLE_CRUMBS)
+  const hidden = trail
+    .slice(0, cut)
+    .map((t, k) => ({ t, k }))
+    .reverse()
+  const shown = trail.map((t, k) => ({ t, k })).slice(cut)
 
   const items: ReactNode[] = []
-  shown.forEach((c, i) => {
-    if (i > 0) items.push(<Separator key={`s${c.k}`} />)
-    items.push(crumb(c))
-    if (collapse && c.k === 0) {
-      items.push(<Separator key="s-more" />)
-      items.push(
-        <DropdownMenu key="more">
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label="Show hidden breadcrumbs"
-              className="flex h-7 shrink-0 items-center rounded-md px-1.5 text-[14px] text-fg-muted hover:bg-hover hover:text-fg"
-            >
-              …
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="border-line bg-raised text-fg">
-            {hidden.map(({ t, k }) => (
-              <DropdownMenuItem key={k} data-crumb={k} onSelect={() => goToCrumb(k)} className="max-w-[280px]">
-                <TargetLabel target={t} space={space} />
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>,
-      )
-    }
-  })
+  if (hidden.length > 0) {
+    items.push(
+      <DropdownMenu key="more">
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="Show hidden breadcrumbs"
+            className="flex size-7 shrink-0 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"
+          >
+            <Icon name="ph-dots-three-bold" size={16} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-64 border-line bg-raised text-fg">
+          {hidden.map(({ t, k }) => (
+            <DropdownMenuItem key={k} data-crumb={k} onSelect={() => goToCrumb(k)}>
+              <TargetLabel target={t} space={space} />
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>,
+    )
+  }
+  for (const { t, k } of shown) {
+    if (items.length > 0) items.push(<Separator key={`s${k}`} />)
+    items.push(
+      <button
+        key={`c${k}`}
+        type="button"
+        data-crumb={k}
+        onClick={() => goToCrumb(k)}
+        className={`${crumbClass} cursor-pointer text-fg opacity-80 hover:bg-hover hover:opacity-100`}
+      >
+        <TargetLabel target={t} space={space} />
+      </button>,
+    )
+  }
 
   return (
-    <nav
-      aria-label="Breadcrumbs"
-      className="flex h-10 shrink-0 items-center gap-0.5 overflow-hidden bg-panel px-3"
-    >
+    <nav aria-label="Breadcrumbs" className="flex h-10 shrink-0 items-center overflow-hidden bg-panel px-3">
       {items}
       <Separator />
       <span aria-current="page" className={`${crumbClass} text-fg`}>
