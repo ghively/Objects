@@ -12,6 +12,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import { useCalendar } from '@/calendar/useCalendar'
+import { useFocusMode } from '@/focus/useFocusMode'
 import { todayYmd } from '@/calendar/dates'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useRecent } from '@/nav/recent'
@@ -349,6 +350,7 @@ describe('action mode', () => {
       'Open extended search',
       'Open global graph',
       'Open settings',
+      'Toggle focus mode', // M8 Task 17 (CommandPalette.actions.options.toggleFocusMode)
       'Toggle left sidebar',
       'Toggle right sidepanel',
     ])
@@ -375,6 +377,13 @@ describe('action mode', () => {
     await openActions(user)
     await user.click(action('toggleSidepanel'))
     expect(p.onToggleRightPanel).toHaveBeenCalledTimes(1)
+
+    useFocusMode.setState({ on: false })
+    await openActions(user)
+    await user.click(action('toggleFocusMode'))
+    expect(usePalette.getState().open).toBe(false)
+    expect(useFocusMode.getState().on).toBe(true)
+    useFocusMode.getState().leave()
 
     await openActions(user)
     await user.click(action('create:person'))
