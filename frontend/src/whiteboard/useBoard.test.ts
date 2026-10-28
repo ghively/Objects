@@ -1,10 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { api, ReadOnlyError, RevisionConflictError } from '@/api/client'
+import { api, ApiError, ReadOnlyError, RevisionConflictError } from '@/api/client'
 import type { ChangeEvent } from '@/api/types'
 import { board, node, textBlock } from './test/boards'
 import { mockWhiteboardApi } from './test/mockWhiteboardApi'
-import { SAVE_DELAY_MS, useBoard } from './useBoard'
+import { SAVE_DELAY_MS, SAVE_RETRY_LIMIT, useBoard } from './useBoard'
 
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig()),
@@ -140,6 +140,28 @@ describe('useBoard', () => {
     await waitFor(() =>
       expect(hook.result.current.toast).toBe("Could not save the whiteboard. Block b has a link that isn't a [[wikilink]]."),
     )
+    warn.mockRestore()
+  })
+
+  test('a failing save backs off, stops after a few retries, and shows a toast', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { client, store, hook } = await setup()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    client.saveBoard.mockRejectedValue(new ApiError(500, 'boom'))
+    act(() => store.getState().actions.nudge(30, 0, ['a']))
+    await advance(SAVE_DELAY_MS + 600)
+    expect(client.saveBoard).toHaveBeenCalledTimes(1)
+    expect(hook.result.current.toast).toBe('Could not save the whiteboard. boom')
+    await advance(10 * 60_000)
+    const calls = client.saveBoard.mock.calls.length
+    expect(calls).toBeGreaterThan(1)
+    expect(calls).toBeLessThanOrEqual(1 + SAVE_RETRY_LIMIT)
+    // The next edit tries again, and a success ends the failure streak.
+    client.saveBoard.mockResolvedValue({ revision: 'rev-ok' })
+    act(() => store.getState().actions.nudge(30, 0, ['a']))
+    await advance(SAVE_DELAY_MS + 10)
+    expect(client.saveBoard).toHaveBeenCalledTimes(calls + 1)
+    hook.unmount()
     warn.mockRestore()
   })
 
