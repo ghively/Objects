@@ -9,7 +9,10 @@ the zip). Its other formats and options are not offered (our choice).
 A referenced file is one named by ``coverImage``, a Markdown image or link
 (``![alt](path)``, ``[text](path)``) or a wikilink (``![[path]]``) outside code. Each is
 checked with `media.attachment_path`: missing files, paths outside the space or in a
-dot-folder, whiteboard sidecars and ``.md`` objects are skipped. Exporting reads only; the
+dot-folder, whiteboard sidecars and ``.md`` objects are skipped. A path that isn't a file
+there is looked up as the editor does (`findAttachment` in ``editor/media/upload.ts``,
+Obsidian's short form): the attachment at that path ignoring case, else (a bare file name)
+the first attachment with that file name. Exporting reads only; the
 zip is built in memory.
 """
 
@@ -22,7 +25,7 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote
 
-from .media import NotServed, attachment_path
+from .media import Attachment, NotServed, attachment_path, list_attachments
 from .relink import code_ranges, wikilink_targets
 from .typedefs import read_raw
 
@@ -72,14 +75,39 @@ def _candidates(rel: str, fm: dict, body: str) -> list[str]:
     return found
 
 
+def _find_attachment(attachments: list[Attachment], path: str) -> str | None:
+    """The attachment ``path`` names, ignoring case, else by bare file name (as the editor)."""
+    lower = path.replace("\\", "/").lower()
+    for a in attachments:
+        if a["path"].lower() == lower:
+            return a["path"]
+    if "/" in lower:
+        return None
+    for a in attachments:
+        if a["path"].rsplit("/", 1)[-1].lower() == lower:
+            return a["path"]
+    return None
+
+
 def referenced_media(root: Path, rel: str, fm: dict, body: str) -> list[str]:
     """The existing, servable files ``rel`` references, as space-relative POSIX paths."""
     root = Path(root).resolve()
     out: list[str] = []
+    attachments: list[Attachment] | None = None
     for candidate in _candidates(rel, fm, body):
         try:
             full = attachment_path(root, candidate)
-        except (FileNotFoundError, NotServed, OSError, ValueError):
+        except FileNotFoundError:
+            if attachments is None:
+                attachments = list_attachments(root)
+            found = _find_attachment(attachments, candidate)
+            if found is None:
+                continue
+            try:
+                full = attachment_path(root, found)
+            except (FileNotFoundError, NotServed, OSError, ValueError):
+                continue
+        except (NotServed, OSError, ValueError):
             continue
         real = full.relative_to(root).as_posix()
         if real not in out:

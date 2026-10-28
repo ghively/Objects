@@ -142,3 +142,21 @@ def test_export_content_disposition_names(space_root: Path):
         f"filename*=UTF-8''{quote('Café notes.zip')}"
     )
     assert zipfile.ZipFile(io.BytesIO(uni_zip.content)).namelist() == ["Café notes.md"]
+
+
+def test_export_includes_short_name_embeds(space_root: Path):
+    # Obsidian's short form, as the editor resolves it (`findAttachment`): exact path, then
+    # the path ignoring case, then (a bare name) the attachment with that file name.
+    (space_root / "Attachments" / "photo.png").write_bytes(b"\x89PNG short")
+    (space_root / "Attachments" / "Diagram.PNG").write_bytes(b"\x89PNG case")
+    (space_root / "Pages" / "Short.md").write_bytes(
+        b"---\ntype: Page\ntitle: Short\n---\n# Short\n\n"
+        b"![[photo.png]]\n\n![x](attachments/diagram.png)\n\n![[nowhere.png]]\n\n"
+        b"![[secret.png]]\n"
+    )
+    c = _client(space_root)
+    with c:
+        r = _export(c, "Pages/Short.md", 1)
+    assert r.status_code == 200, r.text
+    names = zipfile.ZipFile(io.BytesIO(r.content)).namelist()
+    assert sorted(names) == ["Attachments/Diagram.PNG", "Attachments/photo.png", "Short.md"]
