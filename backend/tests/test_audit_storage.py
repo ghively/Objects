@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from objectapp.relink import wikilink_targets
 from objectapp.space import Space
 
 ADA = "People/Ada Lovelace.md"
@@ -205,3 +206,27 @@ def test_trash_type_failing_partway_leaves_a_restorable_entry(full_space_dir: Pa
         assert rel in restored["paths"]
         assert (full_space_dir / rel).is_file()
     assert any(p in members for p in restored["paths"])  # the one object that went
+
+
+# -- a rename never retargets other objects' links ----------------------------------------
+
+
+def test_rename_keeps_links_to_other_objects_with_the_new_name(space_dir: Path):
+    linker = "Pages/Linker.md"
+    _write(
+        space_dir / linker,
+        "---\ntype: 'Page'\ntitle: Linker\n---\nSee [[Notes]] and [[Ada Lovelace]].\n",
+    )
+    space = Space(space_dir)
+    assert space.resolve("Notes", linker) == "Pages/Notes.md"
+    assert space.resolve("Ada Lovelace", linker) == ADA
+
+    first = space.rename_object("Pages/Alpha.md", "Notes", _version(space, "Pages/Alpha.md"))
+    second = space.rename_object("Pages/What if.md", "Ada Lovelace", _version(space, "Pages/What if.md"))
+
+    assert first.path != "Pages/Notes.md" and second.path == "Pages/Ada Lovelace.md"
+    body = space.read(linker)[0].body
+    targets = wikilink_targets(body)
+    resolved = {space.resolve(t, linker) for t in targets}
+    assert resolved == {"Pages/Notes.md", ADA}
+    assert linker in first.relinked and linker in second.relinked
