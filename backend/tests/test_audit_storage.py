@@ -378,6 +378,21 @@ def test_cjk_type_names_get_distinct_ids(space_dir: Path):
     assert space.get("JP/a.md").type != space.get("CN/b.md").type
 
 
+def test_ids_from_very_long_names_are_capped_and_unique(space_dir: Path):
+    from objectapp.typedefs import slug
+
+    assert len(slug("a" * 100_000)) <= 64
+    assert len(slug("日" * 100_000)) <= 64
+    assert not slug("ab " * 40).endswith("-")
+    space = Space(space_dir)
+    store = space.store("collections")
+    first = store.new_id("x" * 100_000)
+    store.write(first, {"id": first, "name": "x" * 100_000}, "")
+    second = store.new_id("x" * 100_000)
+    assert second != first and len(second) <= 70
+    store.write(second, {"id": second, "name": "x" * 100_000}, "")
+
+
 # -- a corrupt spaces.json is kept, not overwritten ----------------------------------------
 
 
