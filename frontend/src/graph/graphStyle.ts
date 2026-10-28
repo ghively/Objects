@@ -1,6 +1,7 @@
 // colour-literals: content palette
-// How graph nodes and edges look. Sizes, the indirect-edge styling and the tag colouring are our
-// values (no Object screenshot of the graph exists); colours come from M2's theme palette.
+// How graph nodes and edges look. Sizes, the reduced-node styling and the tag colouring are our
+// values (the reference has no node size formula, colours or reduced-node drawing); colours come
+// from M2's theme palette.
 import type { GraphNode, TypeDef } from '@/api/types'
 import { themeColor, type ThemeColor } from '@/theme/palette'
 
@@ -11,6 +12,12 @@ export const NODE_MAX_SIZE = 18
 export function nodeSize(degree: number): number {
   return Math.min(NODE_MAX_SIZE, NODE_MIN_SIZE + 2 * Math.sqrt(Math.max(0, degree)))
 }
+
+/** A reduced node (an object a filter left in only to carry links, Object's `isReducedNode`)
+ *  is drawn de-emphasised: at the smallest size, in gray, unlabelled until hovered. Our choice:
+ *  the reference does not show how Object draws them. */
+export const REDUCED_NODE_SIZE = NODE_MIN_SIZE
+export const REDUCED_NODE_COLOR: ThemeColor = 'gray'
 
 /** A node's theme colour: its type's colour; a tag in its own tag colour when it has one. */
 export function nodeColor(
@@ -67,23 +74,18 @@ export function canvasColors(): { label: string; dim: string; edge: string } {
   }
 }
 
-export type EdgeKind = 'link' | 'indirect' | 'tag'
+export type EdgeKind = 'link' | 'tag'
 
 export interface EdgeStyle {
   color: string
   size: number
-  /** Indirect edges are meant dashed; sigma 3's built-in edge programs draw solid lines only,
-   *  so they are drawn thinner and at a lower alpha instead. */
-  dashed: boolean
 }
 
 export function edgeStyle(kind: EdgeKind): EdgeStyle {
   switch (kind) {
-    case 'indirect':
-      return { color: 'rgba(154, 154, 160, 0.22)', size: 0.6, dashed: true }
     case 'tag':
-      return { color: 'rgba(154, 154, 160, 0.4)', size: 0.8, dashed: false }
+      return { color: 'rgba(154, 154, 160, 0.4)', size: 0.8 }
     default:
-      return { color: 'rgba(154, 154, 160, 0.45)', size: 1, dashed: false }
+      return { color: 'rgba(154, 154, 160, 0.45)', size: 1 }
   }
 }

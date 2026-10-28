@@ -982,6 +982,8 @@ export interface GraphData {
   nodes: GraphNode[]
   /** `[a0, b0, a1, b1, …]`, a < b, each pair once. */
   links: number[]
+  /** One per `links` pair: 1 = a links to b, 2 = b links to a, 3 = both. Absent: both. */
+  linkDirs?: number[]
   /** `[object0, tag0, …]`. */
   tagged: number[]
 }
