@@ -83,7 +83,8 @@ Routes (all JSON):
   dot-folders whose kind isn't ``file``, plus everything under ``Attachments/``; never
   objects or whiteboard sidecars), sorted by path. ``POST /api/attachments?name=`` (raw
   bytes) -> ``201 {path, kind}`` (``Attachments/<safe name>.<ext>``, `` (2)`` when taken,
-  never overwritten); ``413`` over 100 MiB, ``422`` empty or unusable name.
+  never overwritten); ``413`` over 100 MiB, ``422`` empty or unusable name, ``415`` a
+  ``.md`` name (it would become an object).
   ``GET /api/file?path=`` -> the file's bytes with per-kind headers (images: CSP
   ``sandbox``; pdf, audio, video: inline, ranges answered ``206``; any other file:
   ``application/octet-stream`` as an attachment; ``nosniff`` on all); ``415`` for a ``.md``
@@ -1574,6 +1575,8 @@ def create_app(
             path, kind = await asyncio.to_thread(import_attachment, space.root, name, data)
         except TooLarge:
             return too_large
+        except media.MarkdownUpload:
+            return _error(415, media.MARKDOWN_UPLOAD_DETAIL)
         except ValueError as exc:
             return _error(422, str(exc))
         return JSONResponse({"path": path, "kind": kind}, status_code=201)
