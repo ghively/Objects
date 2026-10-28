@@ -107,6 +107,31 @@ describe('TextBlockCell (M9)', () => {
     expect(onChange).toHaveBeenLastCalledWith('See [[Ada Lovelace]]')
   })
 
+  test('text typed after [[ before the picker takes focus goes to the picker, not the cell', async () => {
+    const { onChange, dom, editor } = await startEditing('See ')
+    const view = editor.view
+    act(() => {
+      editor.commands.focus('end')
+      const end = editor.state.selection.from
+      editor.commands.insertContentAt(end, '[')
+      const at = end + 1
+      view.someProp('handleTextInput', (f) => f(view, at, at, '[', () => view.state.tr))
+      editor.commands.insertContentAt(at, '[')
+      // A fast typist: "Ada" lands in the cell before the trigger hands over to the picker.
+      editor.commands.insertContent('Ada')
+    })
+    const input = (await screen.findByRole('textbox', { name: 'Search objects' })) as HTMLInputElement
+    await waitFor(() => expect(input.value).toBe('Ada'))
+    act(() => {
+      fireEvent.blur(dom, { relatedTarget: input })
+    })
+    await screen.findByText('Ada Lovelace')
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(useLinkPicker.getState().range).toBeNull())
+    press(dom, 'Enter')
+    expect(onChange).toHaveBeenLastCalledWith('See [[Ada Lovelace]]')
+  })
+
   test('test enter commits single paragraph', async () => {
     const { onChange, dom, editor } = await startEditing('One')
     act(() => {
