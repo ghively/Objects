@@ -26,6 +26,7 @@ import logging
 import os
 import random
 import re
+import shutil
 import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
@@ -2983,60 +2984,36 @@ class Space:
             trash_id = new_ulid()
             folder = self.trash.type_dir(trash_id)
             folder.mkdir(parents=True, exist_ok=True)
-            type_file = self.root / ".object" / "types" / f"{type_def.id}.json"
-            if type_file.is_file():
-                os.replace(type_file, folder / "type.json")
-            else:
-                (folder / "type.json").write_bytes(
-                    (json.dumps(type_def.to_json(), indent=2, ensure_ascii=False) + "\n").encode()
-                )
-            views_file = self.root / ".object" / "views" / f"{type_def.id}.json"
-            if views_file.is_file():
-                self.own_writes[f".object/views/{type_def.id}.json"] = ""
-                os.replace(views_file, folder / "views.json")
             objects = [self._rel(p) for p in object_paths]
             templates = [p for p in self._templates_of(type_def.id) if p not in objects]
-            for rel in templates:
-                self._move_out(rel, folder / "templates" / rel)
-            object_ids = [
-                self.delete_object(rel, type_trash_id=trash_id).id
-                for rel in objects
-                if (self.root / rel).is_file()
-            ]
+            object_ids: list[str] = []
             refs: list[dict[str, str]] = []
-            for other in self.types:
-                if other.id == type_def.id or other.readOnlyReason:
-                    continue
-                touched = [
-                    p
-                    for p in other.propertyDefinitions
-                    if p.type == "entity" and type_def.id in (p.options.get("allowedTypes") or [])
-                ]
-                if not touched:
-                    continue
-                changed = copy.deepcopy(other)
-                for p in changed.propertyDefinitions:
-                    if p.id in {q.id for q in touched}:
-                        p.options["allowedTypes"] = [
-                            a for a in p.options["allowedTypes"] if a != type_def.id
-                        ]
-                if self._save_type(changed):
-                    other.propertyDefinitions = changed.propertyDefinitions
-                    refs.extend({"typeId": other.id, "propertyId": p.id} for p in touched)
             deleted_at = now_stamp()
-            self.trash.write_json(
-                folder / "manifest.json",
-                {
-                    "id": trash_id,
-                    "kind": "type",
-                    "typeId": type_def.id,
-                    "name": type_def.name,
-                    "deletedAt": deleted_at,
-                    "objectTrashIds": object_ids,
-                    "allowedTypesRefs": refs,
-                    "templates": templates,
-                },
-            )
+            manifest = {
+                "id": trash_id,
+                "kind": "type",
+                "typeId": type_def.id,
+                "name": type_def.name,
+                "deletedAt": deleted_at,
+                "objectTrashIds": object_ids,
+                "allowedTypesRefs": refs,
+                "templates": templates,
+            }
+            # The manifest goes first, so a failure partway (a locked file) never
+            # strands the type and its templates in the trash with no way back.
+            self.trash.write_json(folder / "manifest.json", manifest)
+            try:
+                self._trash_type_files(type_def, folder, trash_id, objects, templates, object_ids, refs)
+            except BaseException:
+                try:
+                    if not (folder / "type.json").exists():
+                        shutil.rmtree(folder)  # nothing was moved yet: no entry
+                    else:
+                        self.trash.write_json(folder / "manifest.json", manifest)
+                except OSError:
+                    _log.exception("Could not record a partial type trash %s", trash_id)
+                raise
+            self.trash.write_json(folder / "manifest.json", manifest)
             self.types = [t for t in self.types if t.id != type_def.id]
             self._types_changed(type_def.id)
             return TrashItem(
@@ -3048,6 +3025,53 @@ class Space:
                 deletedAt=deleted_at,
                 objectCount=len(object_ids),
             )
+
+    def _trash_type_files(
+        self,
+        type_def: TypeDefinition,
+        folder: Path,
+        trash_id: str,
+        objects: list[str],
+        templates: list[str],
+        object_ids: list[str],
+        refs: list[dict[str, str]],
+    ) -> None:
+        """`trash_type`'s moves, recording each object's trash id and each ref as it goes."""
+        type_file = self.root / ".object" / "types" / f"{type_def.id}.json"
+        if type_file.is_file():
+            os.replace(type_file, folder / "type.json")
+        else:
+            (folder / "type.json").write_bytes(
+                (json.dumps(type_def.to_json(), indent=2, ensure_ascii=False) + "\n").encode()
+            )
+        views_file = self.root / ".object" / "views" / f"{type_def.id}.json"
+        if views_file.is_file():
+            self.own_writes[f".object/views/{type_def.id}.json"] = ""
+            os.replace(views_file, folder / "views.json")
+        for rel in templates:
+            self._move_out(rel, folder / "templates" / rel)
+        for rel in objects:
+            if (self.root / rel).is_file():
+                object_ids.append(self.delete_object(rel, type_trash_id=trash_id).id)
+        for other in self.types:
+            if other.id == type_def.id or other.readOnlyReason:
+                continue
+            touched = [
+                p
+                for p in other.propertyDefinitions
+                if p.type == "entity" and type_def.id in (p.options.get("allowedTypes") or [])
+            ]
+            if not touched:
+                continue
+            changed = copy.deepcopy(other)
+            for p in changed.propertyDefinitions:
+                if p.id in {q.id for q in touched}:
+                    p.options["allowedTypes"] = [
+                        a for a in p.options["allowedTypes"] if a != type_def.id
+                    ]
+            if self._save_type(changed):
+                other.propertyDefinitions = changed.propertyDefinitions
+                refs.extend({"typeId": other.id, "propertyId": p.id} for p in touched)
 
     def list_trash(self) -> list[TrashItem]:
         """Every trash entry, newest first."""

@@ -170,3 +170,38 @@ def test_attachment_named_like_a_dotfile_is_listed(space_dir: Path):
     assert not rel.split("/")[-1].startswith(".")
     assert rel in [a["path"] for a in list_attachments(space_dir)]
     attachment_path(space_dir, rel)
+
+
+# -- #6: a failure partway through trash_type leaves a restorable entry ------------------
+
+
+def test_trash_type_failing_partway_leaves_a_restorable_entry(full_space_dir: Path):
+    import pytest
+
+    space = Space(full_space_dir)
+    task = next(t for t in space.types if t.name == "Task")
+    members = space._type_members(task.id, templates=False)
+    templates = space._templates_of(task.id)
+    assert len(members) >= 2 and templates
+    real = space.delete_object
+    calls = [0]
+
+    def flaky(rel, **kw):
+        calls[0] += 1
+        if calls[0] == 2:
+            raise PermissionError(13, "locked by another program")
+        return real(rel, **kw)
+
+    space.delete_object = flaky
+    with pytest.raises(PermissionError):
+        space.trash_type(task, members)
+    space.delete_object = real
+
+    entries = [i for i in space.list_trash() if i.kind == "type"]
+    assert [e.title for e in entries] == ["Task"]
+    restored = space.restore(entries[0].id)
+    assert (full_space_dir / ".object" / "types" / f"{task.id}.json").is_file()
+    for rel in templates:
+        assert rel in restored["paths"]
+        assert (full_space_dir / rel).is_file()
+    assert any(p in members for p in restored["paths"])  # the one object that went
