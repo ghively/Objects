@@ -71,3 +71,20 @@ describe('useSettings', () => {
     expect(useSettings.getState().settings).toMatchObject({ font: 'serif', hideOutlinerLines: true })
   })
 })
+
+describe('useSettings first load', () => {
+  test('a patch made before the first load answers is not reverted by it', async () => {
+    let answer!: () => void
+    mocked.settings.mockImplementationOnce(
+      () => new Promise((r) => (answer = () => r({ settings: deviceSettings({ themeMode: 'dark' }), revision: 'r1' }))),
+    )
+    mocked.patchSettings.mockResolvedValueOnce({ settings: deviceSettings({ themeMode: 'light' }), revision: 'r2' })
+    const load = useSettings.getState().load()
+    const patch = useSettings.getState().patch({ themeMode: 'light' })
+    answer()
+    await load
+    await patch
+    expect(useSettings.getState().settings.themeMode).toBe('light')
+    expect(useSettings.getState().loaded).toBe(true)
+  })
+})
