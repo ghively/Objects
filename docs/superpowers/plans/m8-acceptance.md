@@ -285,7 +285,7 @@ Run these on his CPI copy outside the repo, with `git init` and a first commit d
 - [ ] URLs pasted as bookmark pages.
 - [ ] The inspector's Stats.
 - [ ] Quick-create "Nothing".
-- [ ] The formula row numbering, and "Value" for an error.
+- [ ] The formula row numbering, and "Value" for an error. (Row numbering from 1 at the header row matches Capacities' `ZQ`; `$` absolute references, whole-column ranges `A:A` and the one-`=` rule now follow it too: reference check 2026-10-28, section 4.)
 - [ ] The Turn-into embed view.
 - [ ] The typed-date phrases.
 - [ ] Ink tilt and partial erase.
