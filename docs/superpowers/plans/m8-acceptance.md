@@ -157,7 +157,7 @@ These are the "our choice" items from the plan's Global Constraints and from eac
 - **Storage forms:**
   - the occurrence log (`occurrenceLog`, one `<scheduled> <action> <at>` line each; a garbage line is kept and ignored)
   - the `reminders` map
-  - inline HTML `<span data-color>` / `<mark data-color>` (a bare `<mark>` reads as yellow)
+  - inline HTML `<span data-color>` / `<mark data-color>` (a bare `<mark>` reads as `bg-amber`, Object's `FALLBACK_HIGHLIGHT_COLOR`; the highlight shortcut toggles the last-used colour: reference check 2026-10-28, section 4)
   - `<time datetime>` date tokens
   - `<!-- indent -->` containers
   - `<!-- item: … -->` item comments

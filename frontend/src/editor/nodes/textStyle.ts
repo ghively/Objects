@@ -3,7 +3,12 @@
  *
  *   <span data-color="text-red">…</span>     `textColor`, a text colour
  *   <mark data-color="bg-yellow">…</mark>    `highlight`, a background colour
- *   <mark>…</mark>                           read as `bg-yellow` and written back bare
+ *   <mark>…</mark>                           read as `bg-amber` and written back bare
+ *
+ * `bg-amber` is Object's `FALLBACK_HIGHLIGHT_COLOR` (`colorThemes.ts`).
+ * The `highlightText` shortcut does what Object's Mod-Shift-h does: a
+ * selection that has a colour loses it, otherwise it gets the last-used
+ * colour (`textHighlightColorLastUsed`, text or background), else `bg-amber`.
  *
  * `<c>` is one of the 18 theme colours (`THEME_COLORS`). Anything else (an
  * unknown colour, an unclosed or nested tag, other attributes) is not matched,
@@ -45,28 +50,78 @@ export function textColorOpen(color: string): string {
   return `<span data-color="text-${color}">`
 }
 
+/** Object's `FALLBACK_HIGHLIGHT_COLOR`: a bare `<mark>`, and the highlight shortcut's first colour. */
+export const FALLBACK_HIGHLIGHT_COLOR = 'bg-amber'
+/** The theme colour name of `FALLBACK_HIGHLIGHT_COLOR`. */
+export const FALLBACK_HIGHLIGHT = 'amber'
+
 export function highlightOpen(color: string, bare: boolean): string {
-  return bare && color === 'yellow' ? '<mark>' : `<mark data-color="bg-${color}">`
+  return bare && color === FALLBACK_HIGHLIGHT ? '<mark>' : `<mark data-color="bg-${color}">`
+}
+
+// ---- the last-used colour (`textHighlightColorLastUsed`) -------------------
+
+/** Where the last-used colour is kept on this device (not in the space: no `.md` changes). */
+const LAST_USED_KEY = 'object.textHighlightColorLastUsed'
+let lastUsed: string | null = null
+
+function validColor(value: string | null | undefined): string | null {
+  if (!value) return null
+  const m = /^(text|bg)-([a-z]+)$/.exec(value)
+  return m && KNOWN.has(m[2]) ? value : null
+}
+
+/** The last colour chosen for selected text (`text-<c>` or `bg-<c>`), or `bg-amber`. */
+export function lastUsedHighlightColor(): string {
+  if (lastUsed === null) {
+    try {
+      lastUsed = validColor(globalThis.localStorage?.getItem(LAST_USED_KEY))
+    } catch {
+      lastUsed = null
+    }
+  }
+  return lastUsed ?? FALLBACK_HIGHLIGHT_COLOR
+}
+
+/** Remember `value` (`text-<c>` / `bg-<c>`) as the last-used colour; `null` forgets it. */
+export function setLastUsedHighlightColor(value: string | null): void {
+  lastUsed = validColor(value)
+  try {
+    if (lastUsed) globalThis.localStorage?.setItem(LAST_USED_KEY, lastUsed)
+    else globalThis.localStorage?.removeItem(LAST_USED_KEY)
+  } catch {
+    // No storage (private window, tests): the value lives for this session only.
+  }
 }
 
 type HighlightHandler = (editor: Editor) => boolean
 let highlightHandler: HighlightHandler | null = null
 
-/**
- * The `highlightText` shortcut's action. The tokens menu (Task 26) installs its
- * own (opening "Highlight text"); without one the shortcut toggles a yellow
- * highlight on the selection (our choice).
- */
+/** Replace the `highlightText` shortcut's action (tests; `null` restores the default). */
 export function setHighlightTextHandler(fn: HighlightHandler | null): void {
   highlightHandler = fn
 }
 
+/**
+ * Object's Mod-Shift-h on a text selection: `color: current ? null :
+ * lastUsed || 'bg-amber'`. A run has one colour in Object, so a selection
+ * with a text colour or a highlight loses both; otherwise it gets the
+ * last-used colour.
+ */
+export function toggleLastUsedHighlight(editor: Editor): boolean {
+  if (editor.state.selection.empty) return false
+  if (editor.isActive('highlight') || editor.isActive('textColor')) {
+    return editor.chain().unsetHighlight().setTextColor(null).run()
+  }
+  const value = lastUsedHighlightColor()
+  return value.startsWith('text-')
+    ? editor.chain().setTextColor(value).run()
+    : editor.chain().setHighlight(value).run()
+}
+
 export function runHighlightText(editor: Editor): boolean {
   if (highlightHandler) return highlightHandler(editor)
-  const { empty } = editor.state.selection
-  if (empty) return false
-  if (editor.isActive('highlight')) return editor.chain().unsetHighlight().run()
-  return editor.chain().setHighlight('yellow').run()
+  return toggleLastUsedHighlight(editor)
 }
 
 declare module '@tiptap/core' {
@@ -76,7 +131,7 @@ declare module '@tiptap/core' {
       setTextColor: (color: string | null) => ReturnType
     }
     highlight: {
-      /** Highlight the selected text (`yellow`, or `bg-yellow`); `null` removes the highlight. */
+      /** Highlight the selected text (`amber`, or `bg-amber`); `null` removes the highlight. */
       setHighlight: (color: string | null) => ReturnType
       unsetHighlight: () => ReturnType
     }
@@ -153,8 +208,8 @@ export const Highlight = Mark.create({
   addAttributes() {
     return {
       color: {
-        default: 'yellow',
-        parseHTML: (el: HTMLElement) => themeColorOf(el.getAttribute('data-color')) ?? 'yellow',
+        default: FALLBACK_HIGHLIGHT,
+        parseHTML: (el: HTMLElement) => themeColorOf(el.getAttribute('data-color')) ?? FALLBACK_HIGHLIGHT,
         renderHTML: (attrs: { color: string }) => ({
           'data-color': `bg-${attrs.color}`,
           style: `background-color: ${bgColorToken(attrs.color as ThemeColor)}; color: ${bgTextToken(attrs.color as ThemeColor)};`,
@@ -191,7 +246,7 @@ export const Highlight = Mark.create({
       return {
         type: 'highlight',
         raw: m[0],
-        color: m[1] ?? 'yellow',
+        color: m[1] ?? FALLBACK_HIGHLIGHT,
         bare: m[1] === undefined,
         text: m[2],
         tokens: lexer.inlineTokens(m[2]),
@@ -202,13 +257,13 @@ export const Highlight = Mark.create({
   parseMarkdown(token: MarkdownToken, helpers) {
     const t = token as MarkdownToken & { color?: string; bare?: boolean }
     return helpers.applyMark('highlight', helpers.parseInline(token.tokens || []), {
-      color: t.color ?? 'yellow',
+      color: t.color ?? FALLBACK_HIGHLIGHT,
       bare: Boolean(t.bare),
     })
   },
 
   renderMarkdown(node, h) {
-    return `${highlightOpen(String(node.attrs?.color ?? 'yellow'), Boolean(node.attrs?.bare))}${h.renderChildren(node)}</mark>`
+    return `${highlightOpen(String(node.attrs?.color ?? FALLBACK_HIGHLIGHT), Boolean(node.attrs?.bare))}${h.renderChildren(node)}</mark>`
   },
 
   addCommands() {
