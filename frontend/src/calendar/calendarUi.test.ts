@@ -7,7 +7,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api, ConflictError } from '@/api/client'
 import type { UiState } from '@/api/types'
-import { useUiStore } from '@/shell/usePinned'
+import { pinnedActions, resetPinned, useUiStore } from '@/shell/usePinned'
 import { saveCalendarDaily, saveCalendarUi } from './calendarUi'
 
 const mocked = vi.mocked(api)
@@ -67,5 +67,34 @@ describe('calendarUi', () => {
     )
     expect(useUiStore.getState().ui.calendar).toEqual({ weekStart: 'monday', daily: { hideUpdated: true }, hideCalendarSidebar: true })
     expect(useUiStore.getState().revision).toBe('r10')
+  })
+})
+
+describe('calendarUi and the other ui.json writers', () => {
+  test('a calendar edit waits for a sidebar save in flight and survives its answer', async () => {
+    resetPinned()
+    useUiStore.setState({ ui: ui({ weekStart: 'sunday', daily: {} }), revision: 'r1', loaded: true })
+    let answerPin!: () => void
+    mocked.patchUi.mockImplementationOnce(
+      (patch) =>
+        new Promise((r) => {
+          // The server's ui after the pin: the calendar edit is not in it yet.
+          answerPin = () => r({ ui: { ...ui({ weekStart: 'sunday', daily: {} }), ...patch } as UiState, revision: 'r2' })
+        }),
+    )
+    mocked.patchUi.mockImplementationOnce(async (patch) => ({ ui: { ...ui({ weekStart: 'sunday', daily: {} }), ...patch } as UiState, revision: 'r3' }))
+    const pin = pinnedActions.pin({ kind: 'type', id: 'page' })
+    await vi.waitFor(() => expect(mocked.patchUi).toHaveBeenCalledTimes(1))
+    const week = saveCalendarUi({ weekStart: 'monday' })
+    await Promise.resolve()
+    // One queue: the calendar save is not sent alongside the sidebar's with the same revision.
+    expect(mocked.patchUi).toHaveBeenCalledTimes(1)
+    answerPin()
+    await pin
+    await week
+    expect(mocked.patchUi).toHaveBeenLastCalledWith({ calendar: { weekStart: 'monday', daily: {} } }, { baseRevision: 'r2' })
+    expect(useUiStore.getState().ui.calendar?.weekStart).toBe('monday')
+    expect(useUiStore.getState().ui.pinned).toEqual([{ kind: 'type', id: 'page' }])
+    expect(useUiStore.getState().revision).toBe('r3')
   })
 })

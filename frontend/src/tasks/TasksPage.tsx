@@ -10,7 +10,7 @@ import { Icon } from '@/components/Icon'
 import { createAndOpen } from '@/create/createAndOpen'
 import { cn } from '@/lib/utils'
 import { useLinkIndex } from '@/links/linkIndex'
-import { reloadUi, usePinned, useUiStore } from '@/shell/usePinned'
+import { enqueueUiSave, reloadUi, usePinned, useUiStore } from '@/shell/usePinned'
 import { useDefinitions } from '@/types/useDefinitions'
 import type { CustomizePage } from '@/views/CustomizeMenu'
 import { DataView } from '@/views/DataView'
@@ -49,17 +49,10 @@ function tasksOf(ui: { tasks?: unknown } | null | undefined): TasksUi {
   }
 }
 
-let queue: Promise<unknown> = Promise.resolve()
-/** Run saves one after another, so each one sends the revision the previous one returned. */
-function enqueue<T>(fn: () => Promise<T>): Promise<T> {
-  const next = queue.then(fn, fn)
-  queue = next.catch(() => undefined)
-  return next
-}
-
 /** Write `ui.tasks = edit(current)` with the stored revision; a 409 is thrown to the caller. */
 function saveTasks(edit: (cur: TasksUi) => TasksUi): Promise<void> {
-  return enqueue(async () => {
+  // In the one ui.json save queue, so each save sends the revision the previous one returned.
+  return enqueueUiSave(async () => {
     const { ui, revision } = useUiStore.getState()
     const next = edit(tasksOf(ui))
     const res = await api.patchUi({ tasks: next }, { baseRevision: revision })
