@@ -10,7 +10,7 @@
  * and an optional title and places a card, never fetching), and files dropped on the board
  * become media nodes the same way.
  * M8 (Task 21): a connector dropped on empty canvas opens the quick-create menu at the drop
- * point (`QuickCreateMenu`); Ctrl/Cmd+Alt+Arrow resizes the selection from its right or bottom
+ * point (`QuickCreateMenu`); Ctrl/Cmd+Arrow resizes the selection from its right or bottom
  * edge by a grid step (five with Shift); locked nodes stay put.
  * M8 (Task 22): Ctrl/Cmd+C, X and V copy, cut and paste the selection through the system
  * clipboard (`clipboard.ts`; pasted text, URLs and images become text blocks, web-link cards and
@@ -850,14 +850,17 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
   const onKeyDown = useCallback(
     (e: ReactKeyboardEvent<HTMLDivElement>) => {
       if (e.key === 'Control' || e.key === 'Meta') setCtrlHeld(true)
-      const cmd = keyToCommand(e.nativeEvent, { hasSelection: store.getState().selection.length > 0 })
+      const cmd = keyToCommand(e.nativeEvent, {
+        hasSelection: store.getState().selection.length > 0,
+        gridSnap: settings.isSnappingToGrid,
+      })
       if (!cmd) return
       if (run(cmd, e)) {
         e.preventDefault()
         e.stopPropagation()
       }
     },
-    [run, store],
+    [run, store, settings.isSnappingToGrid],
   )
 
   const onKeyUp = useCallback((e: ReactKeyboardEvent<HTMLDivElement>) => {

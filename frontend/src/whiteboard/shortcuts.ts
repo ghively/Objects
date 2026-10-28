@@ -1,7 +1,10 @@
 /**
- * Whiteboard shortcut keys (our choice of keys; the names are Capacities' `shortcuts.whiteboard*`,
- * see the plan's key table). Pure: `keyToCommand(e, ctx)` maps a key event to a command, or null.
- * Keys typed into an editor or input never reach the canvas.
+ * Whiteboard shortcut keys: Capacities' (its whiteboard shortcut table and canvas key handler;
+ * reference-check-2026-10-28 §1), the same as the `whiteboard*` entries of `lib/shortcuts.ts`.
+ * Pen (D), highlighter (Shift+D) and eraser (E) are Object's own tools and keys; they avoid
+ * Capacities' P (Triangle) and M (move menu). Pure: `keyToCommand(e, ctx)` maps a key event to a
+ * command, or null. Keys typed into an editor or input never reach the canvas. Letters match
+ * `event.key` (the typed letter, whatever the layout).
  */
 import type { WhiteboardTool } from '@/api/whiteboardTypes'
 import type { OrderMode } from './actions'
@@ -42,20 +45,21 @@ export interface KeyLike {
 export interface ShortcutContext {
   /** Something is selected (nudge, order, flip, duplicate, wrap and delete need it). */
   hasSelection?: boolean
+  /** Snap to grid is on: nudge and resize take the large step. */
+  gridSnap?: boolean
 }
 
-/** Nudge distances: one grid cell, five with Shift (our choice). */
-export const NUDGE = GRID
-export const NUDGE_FAR = GRID * 5
+/** Nudge distances (Capacities): 1 px, and 30 px (one grid cell) with Shift or while snap to grid is on. */
+export const NUDGE = 1
+export const NUDGE_FAR = GRID
 
 /**
- * Keyboard resize (M8, `whiteboardResize` / `whiteboardResizeLarge`, provisional keys
- * Mod-Alt-Arrow and Mod-Alt-Shift-Arrow): one grid step, five with Shift. Right and Down grow,
- * Left and Up shrink ("Grows or shrinks from the right or bottom edge"). Alt-Arrow alone stays
- * `navigateBack`/`navigateForward`.
+ * Keyboard resize (M8, `whiteboardResize` / `whiteboardResizeLarge`, Capacities' Mod-Arrow and
+ * Mod-Shift-Arrow): the nudge steps. Right and Down grow, Left and Up shrink ("Grows or shrinks
+ * from the right or bottom edge").
  */
-export const RESIZE = GRID
-export const RESIZE_FAR = GRID * 5
+export const RESIZE = NUDGE
+export const RESIZE_FAR = NUDGE_FAR
 
 /** Whether keys typed at `target` belong to an editor or input rather than the canvas. */
 export function isEditableTarget(target: EventTarget | null | undefined): boolean {
@@ -81,6 +85,7 @@ export function keyToCommand(e: KeyLike, ctx: ShortcutContext = {}): Command | n
   const lower = key.length === 1 ? key.toLowerCase() : key
   const code = e.code ?? ''
   const sel = !!ctx.hasSelection
+  const far = shift || !!ctx.gridSnap
 
   // Undo / redo
   if (mod && !alt && lower === 'z') return shift ? { type: 'redo' } : { type: 'undo' }
@@ -93,14 +98,14 @@ export function keyToCommand(e: KeyLike, ctx: ShortcutContext = {}): Command | n
   if (!mod && !alt && shift && (code === 'Digit1' || key === '1' || key === '!')) return { type: 'zoom', zoom: 'fit' }
   if (!mod && !alt && shift && (code === 'Digit2' || key === '2' || key === '@')) return { type: 'zoom', zoom: 'selection' }
 
-  // Order: Ctrl+] / Ctrl+[ (with Shift: to front / to back)
-  const bracketRight = code === 'BracketRight' || key === ']' || key === '}'
-  const bracketLeft = code === 'BracketLeft' || key === '[' || key === '{'
-  if (mod && !alt && bracketRight) return sel ? { type: 'order', mode: shift ? 'front' : 'forward' } : null
-  if (mod && !alt && bracketLeft) return sel ? { type: 'order', mode: shift ? 'back' : 'backward' } : null
+  // Order: Ctrl+] / Ctrl+[ one step; ] / [ alone to front / to back (below).
+  const bracketRight = key === ']' || (code === 'BracketRight' && !shift)
+  const bracketLeft = key === '[' || (code === 'BracketLeft' && !shift)
+  if (mod && !alt && !shift && bracketRight) return sel ? { type: 'order', mode: 'forward' } : null
+  if (mod && !alt && !shift && bracketLeft) return sel ? { type: 'order', mode: 'backward' } : null
 
-  // Wrap in frame: Ctrl+Alt+G
-  if (mod && alt && (lower === 'g' || code === 'KeyG')) return sel ? { type: 'wrap' } : null
+  // Wrap in frame: Ctrl+G
+  if (mod && !alt && !shift && lower === 'g') return sel ? { type: 'wrap' } : null
   // Duplicate: Ctrl+D
   if (mod && !alt && !shift && lower === 'd') return sel ? { type: 'duplicate' } : null
 
@@ -109,11 +114,12 @@ export function keyToCommand(e: KeyLike, ctx: ShortcutContext = {}): Command | n
   if (mod && !alt && !shift && (lower === 'x' || code === 'KeyX')) return sel ? { type: 'cut' } : null
   if (mod && !alt && !shift && (lower === 'v' || code === 'KeyV')) return { type: 'paste' }
 
-  // Resize selection: Ctrl+Alt+Arrow (with Shift: farther)
-  if (mod && alt && key in ARROWS) {
+  // Resize selection: Ctrl+Arrow (with Shift or snap to grid: farther). Without a selection
+  // Ctrl+Left/Right stay back and forward.
+  if (mod && !alt && key in ARROWS) {
     if (!sel) return null
     const [x, y] = ARROWS[key]
-    const step = shift ? RESIZE_FAR : RESIZE
+    const step = far ? RESIZE_FAR : RESIZE
     return { type: 'resize', dw: x * step, dh: y * step }
   }
 
@@ -122,16 +128,19 @@ export function keyToCommand(e: KeyLike, ctx: ShortcutContext = {}): Command | n
   if (key in ARROWS) {
     if (!sel) return null
     const [x, y] = ARROWS[key]
-    const step = shift ? NUDGE_FAR : NUDGE
+    const step = far ? NUDGE_FAR : NUDGE
     return { type: 'nudge', dx: x * step, dy: y * step }
   }
+  if (!shift && bracketRight) return sel ? { type: 'order', mode: 'front' } : null
+  if (!shift && bracketLeft) return sel ? { type: 'order', mode: 'back' } : null
   if (key === 'Delete' || key === 'Backspace') return sel ? { type: 'delete' } : null
   if (key === 'Escape') return { type: 'escape' }
   if (key === 'Tab') return { type: 'cycle', backward: shift }
   if (key === ' ' || code === 'Space') return { type: 'pan' }
 
   if (shift) {
-    if (lower === 'r') return { type: 'tool', tool: 'triangle' }
+    if (lower === 'l') return { type: 'tool', tool: 'arrow' }
+    if (lower === 'd') return { type: 'ink', tool: 'highlighter' }
     if (lower === 'h') return sel ? { type: 'flip', axis: 'x' } : null
     if (lower === 'v') return sel ? { type: 'flip', axis: 'y' } : null
     return null
@@ -146,18 +155,16 @@ export function keyToCommand(e: KeyLike, ctx: ShortcutContext = {}): Command | n
       return { type: 'tool', tool: 'text' }
     case 'r':
       return { type: 'tool', tool: 'rectangle' }
+    case 'p':
+      return { type: 'tool', tool: 'triangle' }
     case 'o':
       return { type: 'tool', tool: 'ellipse' }
     case 'l':
       return { type: 'tool', tool: 'line' }
-    case 'a':
-      return { type: 'tool', tool: 'arrow' }
     case 'f':
       return { type: 'tool', tool: 'frame' }
-    case 'p':
+    case 'd':
       return { type: 'ink', tool: 'pen' }
-    case 'm':
-      return { type: 'ink', tool: 'highlighter' }
     case 'e':
       return { type: 'ink', tool: 'eraser' }
   }
