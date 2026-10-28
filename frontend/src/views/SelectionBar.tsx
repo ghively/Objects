@@ -31,13 +31,15 @@ export const SELECTION_TEXT = {
   openInSidepanel: 'Open selected objects in side panel',
   /** `ActionItems.deleteEntities.title` */
   delete: 'Delete objects',
-  /** Our string (the one-object dialog's "Moves it to the Trash."). */
-  deleteDescription: 'Moves them to the Trash.',
+  /** `DeleteHandler.fallback.heading` (the variant with `fullDeleteButton`). */
+  deleteHeading: 'Delete?',
+  /** `DeleteHandler.fallback.description` */
+  deleteDescription: 'Review the items below, then confirm.',
   /** Our string. */
   clear: 'Clear selection',
 }
 
-/** `DeleteHandler.content.fullDeleteButton`: "Delete {count} object | Delete {count} objects". */
+/** `DeleteHandler.fallback.fullDeleteButton`: "Delete {count} object | Delete {count} objects". */
 export function deleteCountLabel(count: number): string {
   return count === 1 ? 'Delete 1 object' : `Delete ${count} objects`
 }
@@ -123,9 +125,17 @@ export function SelectionBar({ rows, types, onChangeType, onOpenInSidepanel, onD
       >
         <AlertDialogContent className="border-line bg-raised-2 text-fg">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[17px]">{SELECTION_TEXT.delete}</AlertDialogTitle>
+            <AlertDialogTitle className="text-[17px]">{SELECTION_TEXT.deleteHeading}</AlertDialogTitle>
             <AlertDialogDescription className="text-[14px] text-fg-muted">{SELECTION_TEXT.deleteDescription}</AlertDialogDescription>
           </AlertDialogHeader>
+          {/* "The items below": the selected objects, which go to the Trash. */}
+          <ul aria-label="Items" className="max-h-48 overflow-y-auto rounded-md border border-line px-3 py-1.5 text-[14px]">
+            {rows.map((r) => (
+              <li key={r.summary.path} className="truncate py-0.5">
+                {r.summary.title || 'Untitled'}
+              </li>
+            ))}
+          </ul>
           {error && (
             <p role="alert" className="text-[13px] text-red-400">
               {error}
