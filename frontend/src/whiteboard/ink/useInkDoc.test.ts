@@ -237,6 +237,20 @@ describe('useInkDoc', () => {
     expect(result.current.strokes).toEqual([s('z')])
   })
 
+  test("a board-only change (the ink file's revision unchanged) leaves the strokes as they are", async () => {
+    const client = fakeClient({ path: PATH, strokes: [s('a')], revision: 'r1' })
+    client.load.mockImplementation(async () => ({ path: PATH, strokes: [s('a')], revision: 'r1' }))
+    const { result } = renderHook(() => useInkDoc(PATH, client))
+    await settle()
+    const before = result.current.strokes
+    // The board's own save announces the same `whiteboard` event, with the board's revision.
+    await act(async () => listeners[0]({ kind: 'whiteboard' as ChangeEvent['kind'], path: PATH, version: 'board-7' }))
+    await settle()
+    expect(client.load).toHaveBeenCalledTimes(2)
+    // Same array: the page doesn't reload the strokes into the store, which would reset undo.
+    expect(result.current.strokes).toBe(before)
+  })
+
   test('external whiteboard event reloads when nothing is pending', async () => {
     const client = fakeClient({ path: PATH, strokes: [s('a')], revision: 'r1' })
     const { result } = renderHook(() => useInkDoc(PATH, client))
