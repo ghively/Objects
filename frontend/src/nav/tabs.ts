@@ -89,8 +89,10 @@ export interface Tab {
    * non-persistent tab (the default, shown in italic) navigates in place.
    */
   persistent?: boolean
-  /** Pinned tabs sort before the others and have no close button. */
+  /** Pinned tabs sort before the others and can never be closed (Object refuses on every path). */
   pinned?: boolean
+  /** When the tab was last made active (Object's `lastOpened`): closing the active tab activates the latest. */
+  lastOpened?: number
   /** The breadcrumb trail of each history entry, parallel to `history` (Object's `breadcrumbs`). */
   crumbs: Target[][]
   /** Side-panel entries of this tab (Task 15). */
@@ -250,10 +252,24 @@ export function sortPinned(tabs: Tab[]): Tab[] {
   return [...tabs.filter((t) => t.pinned), ...tabs.filter((t) => !t.pinned)]
 }
 
+let lastStamp = 0
+/** A `lastOpened` stamp, strictly increasing within the session. */
+function stamp(): number {
+  lastStamp = Math.max(Date.now(), lastStamp + 1)
+  return lastStamp
+}
+
 function freshTab(target: Target | null, trail: Target[] = []): Tab {
   return target
-    ? { id: newId(), history: [target], index: 0, crumbs: [trail] }
-    : { id: newId(), history: [], index: -1, crumbs: [] }
+    ? { id: newId(), history: [target], index: 0, crumbs: [trail], lastOpened: stamp() }
+    : { id: newId(), history: [], index: -1, crumbs: [], lastOpened: stamp() }
+}
+
+/** The tab to activate once `tabs` lost the active one: the most recently opened (Object's `Jk(tabs)[0]`). */
+export function mostRecentTab(tabs: Tab[]): Tab | null {
+  let best: Tab | null = null
+  for (const t of tabs) if (!best || (t.lastOpened ?? 0) > (best.lastOpened ?? 0)) best = t
+  return best
 }
 
 /** The active entry's breadcrumb trail (empty when it has none). */
@@ -313,6 +329,7 @@ function cleanTab(t: unknown): Tab | null {
   const tab: Tab = { ...(x as Tab), crumbs: alignCrumbs(x.crumbs, x.history.length) }
   if (typeof x.persistent !== 'boolean') delete tab.persistent
   if (typeof x.pinned !== 'boolean') delete tab.pinned
+  if (typeof x.lastOpened !== 'number' || !Number.isFinite(x.lastOpened)) delete tab.lastOpened
   const sidepanel = cleanEntries(x.sidepanel)
   if (sidepanel) tab.sidepanel = sidepanel
   else delete tab.sidepanel
@@ -364,16 +381,20 @@ export const useTabs = create<TabsState>()(
 
       close(id) {
         const s = get()
-        const i = s.tabs.findIndex((t) => t.id === id)
-        if (i < 0) return
+        const gone = s.tabs.find((t) => t.id === id)
+        // A pinned tab is never closed (Object's close returns false for it).
+        if (!gone || gone.pinned) return
         const tabs = s.tabs.filter((t) => t.id !== id)
         let activeId = s.activeId
-        if (activeId === id) activeId = (tabs[i] ?? tabs[i - 1])?.id ?? null
+        if (activeId === id) activeId = mostRecentTab(tabs)?.id ?? null
         set({ tabs, activeId })
       },
 
       activate(id) {
-        if (get().tabs.some((t) => t.id === id)) set({ activeId: id })
+        const s = get()
+        if (!s.tabs.some((t) => t.id === id)) return
+        if (s.activeId === id) return
+        set({ ...updateTab(s, id, (t) => ({ ...t, lastOpened: stamp() })), activeId: id })
       },
 
       newTab() {

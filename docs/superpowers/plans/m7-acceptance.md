@@ -108,7 +108,7 @@ These are known issues. Task 19 did not fix them, because they are in files othe
 The lane agents chose these where the reference was silent:
 
 - **Tabs:**
-  - Ctrl+W does not close a pinned tab, but the right-click "Close tab" does.
+  - A pinned tab can never be closed: no close button, no right-click "Close tab", and Ctrl+W and middle click do nothing. Closing the active tab activates the most recently opened tab. Tabs are 60 to 200 px wide with a 5 px gap (reference: `wA`, `Jk(tabs)[0]`, `oW`/`aW`/`sW`, reference-check 2c).
   - The "Calendar today" start-up option opens the Calendar's Day view on today.
   - `navigateTabs` only moves forward.
 - **Breadcrumbs:**
