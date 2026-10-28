@@ -42,7 +42,7 @@ import { DeletedBanner } from './DeletedBanner'
 import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
 import { ensureNewTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
-import { PageLayout, type PanelVariant } from './PageLayout'
+import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type PanelVariant } from './PageLayout'
 import { PropertyPanel } from './PropertyPanel'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
 import { useTypeEditor } from './useTypeEditor'
@@ -55,6 +55,7 @@ import { usePresentation } from '@/present/usePresentation'
 import { CompletionLog } from '@/tasks/CompletionLog'
 import { TaskStatsSection } from '@/tasks/TaskStatsSection'
 import { useAddToWhiteboard } from '@/whiteboard/AddToWhiteboardDialog'
+import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 
 installWikilinkPresenter()
 installLinkPicker()
@@ -114,6 +115,14 @@ export const OBJECT_M8_TEXT = {
   enterFocusMode: 'Enter Focus Mode',
   /** `ComponentHeader.focusMode.leaveLabel` */
   leaveFocusMode: 'Leave Focus Mode',
+} as const
+
+/** M9 menu items (reference strings). */
+export const OBJECT_M9_TEXT = {
+  /** `components.RootPagePage.enterWideMode` */
+  wideLayout: 'Wide layout',
+  /** `components.RootPagePage.leaveWideMode` */
+  normalLayout: 'Normal layout',
 } as const
 
 function ToolButton({ label, icon, onClick, pressed }: { label: string; icon: string; onClick?: () => void; pressed?: boolean }) {
@@ -536,6 +545,11 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   const isTag = !!summary && isTagType(type, summary.type)
   const isTask = !!summary && !isTemplate && isTaskRoleType(type, summary.type)
   const focusOn = useFocusMode((s) => s.on)
+  // M9: the object's own layout keys override the type's.
+  const layout = detail ? frontmatterLayout(detail.frontmatter) : undefined
+  const wideOn = objectWideLayout(type, layout)
+  /** Object hides "Wide layout" for whiteboards and the index card design. */
+  const canWide = !!summary && pageDesign(type) !== 'indexCard' && !isWhiteboardType(type)
 
   // A render function: the layout picks the variant (inline as a card when the page is narrow).
   const properties =
@@ -716,6 +730,15 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
+            {canWide && (
+              <DropdownMenuItem
+                disabled={propsReadOnly}
+                onSelect={() => writeProperties({ wideLayoutMode: !wideOn })}
+              >
+                <Icon name={wideOn ? 'ph-arrows-in-simple' : 'ph-arrows-out-simple'} size={14} />
+                {wideOn ? OBJECT_M9_TEXT.normalLayout : OBJECT_M9_TEXT.wideLayout}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuCheckboxItem checked={raw} onCheckedChange={() => void toggleRaw()}>
               Raw Markdown
             </DropdownMenuCheckboxItem>
@@ -890,7 +913,19 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         mode={mode}
         toolbar={toolbar}
         properties={properties}
-        onCoverChange={propsReadOnly ? undefined : (next) => writeProperties({ coverImage: next })}
+        onCoverChange={
+          propsReadOnly
+            ? undefined
+            : (next) =>
+                // A new image drops the old one's position (Object's `referenceImageId` rule).
+                writeProperties(
+                  'coverImageOffset' in detail.frontmatter
+                    ? { coverImage: next, coverImageOffset: null }
+                    : { coverImage: next },
+                )
+        }
+        layout={layout}
+        onLayoutChange={propsReadOnly ? undefined : (patch) => writeProperties({ ...patch })}
         inspector={mode === 'page' ? { getMarkdown, dailyNote: isDailyNoteType(type, summary.type) } : undefined}
         header={
           <ObjectHeader
