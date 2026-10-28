@@ -3,7 +3,17 @@
 // an "Add Section" control. M9: the top-level blocks (these sections, Pinned, the object types)
 // follow `ui.workspaceOrder` and are reordered by dragging.
 import { useEffect, useState, type ReactNode } from 'react'
-import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  pointerWithin,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+} from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { api, ConflictError } from '@/api/client'
 import type { Icon as IconValue, SidebarSection } from '@/api/types'
@@ -190,7 +200,23 @@ export function saveWorkspaceOrder(order: string[]): Promise<void> {
   })
 }
 
-/** One block with a drag handle that shows on hover, at its heading's left. */
+/**
+ * The blocks differ a lot in height (the object types are tall), so the centre of the dragged
+ * block says little: a pointer drag targets the block under the pointer; a keyboard move (which
+ * puts the block's top on its neighbour's) targets the nearest other block once it has moved.
+ */
+export const workspaceCollision: CollisionDetection = (args) => {
+  if (args.pointerCoordinates) {
+    const within = pointerWithin(args)
+    return within.length > 0 ? within : closestCenter(args)
+  }
+  const own = args.droppableRects.get(args.active.id)
+  const moved = !own || Math.abs(own.top - args.collisionRect.top) > 1 || Math.abs(own.left - args.collisionRect.left) > 1
+  if (!moved) return closestCenter(args)
+  return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => c.id !== args.active.id) })
+}
+
+/** One block with a drag handle that shows on hover, at its heading's left (inside the block's padding, so it isn't clipped). */
 function SortableBlock({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   const s = useSortable({ id })
   return (
@@ -206,7 +232,7 @@ function SortableBlock({ id, label, children }: { id: string; label: string; chi
         {...s.listeners}
         aria-label={REORDER_HANDLE(label)}
         title={REORDER_HANDLE(label)}
-        className="absolute top-5 -left-2.5 flex h-5 w-3 cursor-grab items-center justify-center rounded text-fg-muted opacity-0 group-hover/wb:opacity-100 focus-visible:opacity-100"
+        className="absolute top-5 left-0 flex h-5 w-2 cursor-grab items-center justify-center rounded text-fg-muted opacity-0 group-hover/wb:opacity-100 focus-visible:opacity-100"
       >
         <Icon name="ph-dots-six-vertical" size={12} />
       </button>
@@ -249,7 +275,7 @@ export function WorkspaceSections({ onOpenTarget, objects }: { onOpenTarget?: Op
   const label = (id: string) =>
     id === WORKSPACE_OBJECTS ? 'Object Types' : id === WORKSPACE_PINNED ? PINNED_TEXT.heading : (sections.find((x) => x.id === id)?.name ?? id)
   return (
-    <DndContext id="workspace-order" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+    <DndContext id="workspace-order" sensors={sensors} collisionDetection={workspaceCollision} onDragEnd={onDragEnd}>
       <SortableContext items={blocks} strategy={verticalListSortingStrategy}>
         {blocks.map((id) => (
           <SortableBlock key={id} id={id} label={label(id)}>

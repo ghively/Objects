@@ -1,6 +1,6 @@
 // M9 Task 21: the sidebar's top-level blocks follow `ui.workspaceOrder` and are reordered by dragging.
 import { act, render, screen, waitFor } from '@testing-library/react'
-import type { DragEndEvent } from '@dnd-kit/core'
+import type { ClientRect, DragEndEvent } from '@dnd-kit/core'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { UiState } from '@/api/types'
 import { typeDef } from '@/test/mockApi'
@@ -27,7 +27,7 @@ import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { useDefs } from '@/types/useDefinitions'
 import { Sidebar } from './Sidebar'
-import { workspaceBlocks } from './SidebarSections'
+import { workspaceBlocks, workspaceCollision } from './SidebarSections'
 import { resetPinned } from './usePinned'
 
 const mocked = vi.mocked(api)
@@ -104,5 +104,36 @@ describe('Sidebar workspaceOrder', () => {
     await waitFor(() => expect(mocked.patchUi).toHaveBeenCalledWith({ workspaceOrder: ['S1', 'S2', 'objects', 'pinned'] }, { baseRevision: 'u0' }))
     expect(blocks()).toEqual(['S1', 'S2', 'objects', 'pinned'])
     expect(stored.workspaceOrder).toEqual(['S1', 'S2', 'objects', 'pinned'])
+  })
+
+  test('the drag handle sits inside the block, not in the clipped gutter', async () => {
+    render(<Sidebar types={[SERVER]} />)
+    const handle = await screen.findByRole('button', { name: 'Reorder Object Types' })
+    expect(handle.className).not.toMatch(/(^|\s)-left-/)
+    expect(handle.className).toMatch(/(^|\s)left-0(\s|$)/)
+  })
+
+  test('collisions resolve to the neighbouring block, even for the tall object types', () => {
+    const rect = (top: number, height: number): ClientRect => ({ top, left: 10, width: 300, height, bottom: top + height, right: 310 })
+    // Pinned is short; Object Types below it is tall.
+    const rects = new Map<string, ClientRect>([
+      ['S1', rect(0, 60)],
+      ['pinned', rect(60, 80)],
+      ['objects', rect(140, 600)],
+    ])
+    const args = (collisionRect: ClientRect, pointerCoordinates: { x: number; y: number } | null = null) =>
+      ({
+        active: { id: 'objects' },
+        collisionRect,
+        droppableRects: rects,
+        droppableContainers: [...rects.keys()].map((id) => ({ id })),
+        pointerCoordinates,
+      }) as unknown as Parameters<typeof workspaceCollision>[0]
+    // Keyboard: lifted but not moved, it stays over itself (a drop changes nothing).
+    expect(workspaceCollision(args(rect(140, 600)))[0].id).toBe('objects')
+    // Keyboard ArrowUp moves its top onto Pinned's: Pinned is the target.
+    expect(workspaceCollision(args(rect(60, 600)))[0].id).toBe('pinned')
+    // Pointer: the block under the pointer.
+    expect(workspaceCollision(args(rect(40, 600), { x: 100, y: 90 }))[0].id).toBe('pinned')
   })
 })
