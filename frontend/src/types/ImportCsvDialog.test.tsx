@@ -108,4 +108,15 @@ describe('ImportCsvDialog', () => {
       await screen.findByText('Some issues were found while parsing your file. Make sure to use a valid CSV file to ensure the import you expect.'),
     ).toBeInTheDocument()
   })
+
+  test('blank lines do not become objects', async () => {
+    const user = userEvent.setup()
+    const onOpenChange = vi.fn()
+    render(<ImportCsvDialog type={BOOK} open onOpenChange={onOpenChange} />)
+    await upload(user, 'Name,Author\n\nDune,Herbert\n,\n\nEmma,Austen\n\n')
+    expect(await screen.findByText('Add 2 new Books to')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    expect(mocked.createObject.mock.calls.map((c) => c[1]?.title)).toEqual(['Dune', 'Emma'])
+  })
 })

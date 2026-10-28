@@ -194,7 +194,8 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
     const head = header ? file.rows[0] ?? [] : []
     return Array.from({ length: width }, (_, i) => head[i]?.trim() || IMPORT_CSV_TEXT.column(i + 1))
   }, [file, header, width])
-  const data = file ? (header ? file.rows.slice(1) : file.rows) : []
+  // A record whose fields are all empty (a blank line) is skipped, not imported as "Untitled".
+  const data = file ? (header ? file.rows.slice(1) : file.rows).filter((r) => r.some((f) => f.trim() !== '')) : []
   const tooMany = data.length > CSV_ROW_LIMIT
   const collectionName = file ? file.name.replace(/\.csv$/i, '') || 'Import' : ''
 
