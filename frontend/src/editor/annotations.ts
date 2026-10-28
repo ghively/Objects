@@ -148,7 +148,7 @@ function parseOptions(text: string): Option[] | null {
           }
           if (ch === '\\') {
             const next = text[i + 1]
-            if (next !== '"' && next !== '\\') return null
+            if (next !== '"' && next !== '\\' && next !== '>') return null
             v += next
             i += 2
             continue
@@ -206,10 +206,11 @@ export function parseAnnotation(line: string): Annotation | null {
 const BARE_WHOLE = /^[A-Za-z0-9_.,:#/+-]+$/
 
 function formatValue(value: string, quoted: boolean): string {
-  // A value never holds a line break, and never `-->`, which would end the comment early (our rule).
-  const v = value.replace(/\r\n?|\n/g, ' ').replace(/-->/g, '-- >')
+  // A value never holds a line break (our rule). A `-->` in it would end the
+  // comment early, so it is written `--\>` (quoted; read back as `-->`).
+  const v = value.replace(/\r\n?|\n/g, ' ')
   if (!quoted && BARE_WHOLE.test(v)) return v
-  return `"${v.replace(/[\\"]/g, (c) => `\\${c}`)}"`
+  return `"${v.replace(/[\\"]/g, (c) => `\\${c}`).replace(/-->/g, '--\\>')}"`
 }
 
 /** One option in canonical form. */

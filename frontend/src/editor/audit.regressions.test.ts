@@ -7,6 +7,7 @@
 import { Editor as TiptapEditor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { afterEach, describe, expect, test } from 'vitest'
+import { formatAnnotation, makeOption, parseAnnotation } from './annotations'
 import { editorExtensions, loadBody, serializeBody } from './document'
 import { turnInto } from './extensions/blockSelection'
 import { moveBlockTo } from './handles/dragMove'
@@ -260,6 +261,18 @@ describe('minor drift on edited lines', () => {
     const editor = headless('> a\n> b\n')
     append(editor, 'b', 'X')
     expect(serializeBody(editor)).toBe('> a\n> bX\n')
+  })
+})
+
+describe('annotation values', () => {
+  test.each(['a --> b', '-->', 'x--->y', 'quote " and \\ backslash -->'])('caption %j round-trips', (caption) => {
+    const line = formatAnnotation({ type: 'leaf', options: [makeOption('caption', caption)] })
+    expect(line).not.toMatch(/-->.*-->/)
+    expect(parseAnnotation(line)?.options).toEqual([expect.objectContaining({ key: 'caption', value: caption })])
+  })
+
+  test('a value with an old "-- >" still reads as written', () => {
+    expect(parseAnnotation('<!-- block: caption="a -- > b" -->')?.options[0].value).toBe('a -- > b')
   })
 })
 

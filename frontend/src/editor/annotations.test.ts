@@ -134,10 +134,10 @@ describe('annotation lines', () => {
     expect(formatAnnotation({ type: 'leaf', options: [makeOption('icon', 'ph-star')] })).toBe(
       '<!-- block: icon=ph-star -->',
     )
-    // A value can never hold a line break or end the comment early.
+    // A value can never hold a line break or end the comment early (`-->` is written `--\>`).
     const line = formatAnnotation({ type: 'leaf', options: [makeOption('caption', 'a\nb --> c')] })
-    expect(line).toBe('<!-- block: caption="a b -- > c" -->')
-    expect(parseAnnotation(line)?.options[0].value).toBe('a b -- > c')
+    expect(line).toBe('<!-- block: caption="a b --\\> c" -->')
+    expect(parseAnnotation(line)?.options[0].value).toBe('a b --> c')
     // Canonical output parses back to the same options.
     expect(optionsEqual(parseAnnotation(formatAnnotation(a))!.options, a.options)).toBe(true)
   })
