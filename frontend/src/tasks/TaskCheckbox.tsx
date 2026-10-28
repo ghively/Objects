@@ -1,16 +1,15 @@
 // The round task checkbox (`RootTaskCheckbox`): click toggles between "Open" and "Done";
 // Ctrl/Cmd-click or the caret opens "Status" with the options grouped by category. It owns no row
 // state: it calls `taskActions` and hands the outcome to the owner, which patches its list.
-// M8: a recurring task's menu adds "Skip" and "Excuse for {date}" (`RootTaskCheckbox.menu.*`); when
+// M8: a recurring task's menu adds "Skip" and "Excuse" (`RootTaskCheckbox.menu.*`); when
 // a recurring task by due date has two or more missed occurrences, the checkbox, Skip and Excuse
 // open the catch-up dialog (`RecurringOverdueDialog`); with one, the action runs at once.
 import { useState, type MouseEvent, type SyntheticEvent } from 'react'
-import type { DateValue, Row, StatusCategory, TypeDef } from '@/api/types'
+import type { Row, StatusCategory, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { LabelPill } from '@/properties/LabelMenu'
-import { formatDate } from '@/properties/format'
 import { useUiStore } from '@/shell/usePinned'
 import { lineColor } from '@/theme/palette'
 import { RecurringOverdueDialog } from './RecurringOverdueDialog'
@@ -21,11 +20,11 @@ import type { CatchUp, OccurrenceAction, OverdueInfo } from './taskContract'
 /** `RootTaskCheckbox.menuShortcutWindows`, as plain text. */
 const SHORTCUT_HINT = 'Click to toggle between "Open" and "Done".\n\nCtrl-click to open menu for all status options.'
 
-/** `RootTaskCheckbox.menu.*` (Skip, its tooltip, Excuse's tooltip) and the excuse label. */
+/** `RootTaskCheckbox.menu.*`: Skip and Excuse with their tooltips ("Excuse for {date}" is the overdue dialog's button). */
 export const RECURRENCE_MENU_TEXT = {
-  skip: 'Skip',
+  skip: 'Skip', // RootTaskCheckbox.menu.skipRecurrence
   skipTooltip: 'Move to the next occurrence without marking done. Resets your streak and counts as skipped in stats.',
-  excuse: 'Excuse for {date}',
+  excuse: 'Excuse', // RootTaskCheckbox.menu.excuseRecurrence
   excuseTooltip: "Move to the next occurrence without marking done. Keeps your streak; excused days don't affect completion rate.",
 }
 
@@ -116,7 +115,6 @@ export function TaskCheckbox({
 
   const openText = firstOptionOf(type, 'not-started')?.text
   const current = statusOption(row, type)?.text
-  const dateText = formatDate(row.values.date as DateValue | null | undefined)
 
   return (
     <>
@@ -210,7 +208,7 @@ export function TaskCheckbox({
                   className="flex h-8 items-center gap-2 rounded-md px-2 text-left text-[14px] hover:bg-hover"
                 >
                   <Icon name="ph-umbrella" size={14} />
-                  {RECURRENCE_MENU_TEXT.excuse.replace('{date}', dateText)}
+                  {RECURRENCE_MENU_TEXT.excuse}
                 </button>
               </div>
             )}

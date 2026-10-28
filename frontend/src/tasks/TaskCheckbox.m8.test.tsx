@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import type { Row, UpdateResult } from '@/api/types'
 import type { OverdueInfo } from './taskContract'
-import { formatDate } from '@/properties/format'
 import { TaskCheckbox } from './TaskCheckbox'
 import type { TaskApi } from './taskActions'
 import { TASK_TYPE, taskRow } from './taskFixtures'
@@ -58,7 +57,8 @@ describe('TaskCheckbox (M8 recurrence)', () => {
     expect(taskApi.overdue).not.toHaveBeenCalled() // not before today: no overdue check
 
     menu = await openMenu(user)
-    const excuse = within(menu).getByRole('menuitem', { name: `Excuse for ${formatDate({ start: today, resolution: 'day' })}` })
+    const excuse = within(menu).getByRole('menuitem', { name: 'Excuse' })
+    expect(within(menu).queryByRole('menuitem', { name: /Excuse for/ })).toBeNull()
     expect(excuse).toHaveAttribute('title', "Move to the next occurrence without marking done. Keeps your streak; excused days don't affect completion rate.")
     await user.click(excuse)
     await waitFor(() => expect(onResult).toHaveBeenCalledTimes(2))
@@ -108,7 +108,7 @@ describe('TaskCheckbox (M8 recurrence)', () => {
       if (action === 'complete') await user.click(screen.getByRole('checkbox'))
       else {
         const menu = await openMenu(user)
-        await user.click(within(menu).getByRole('menuitem', { name: action === 'skip' ? 'Skip' : /^Excuse for/ }))
+        await user.click(within(menu).getByRole('menuitem', { name: action === 'skip' ? 'Skip' : 'Excuse' }))
       }
       const dialog = await screen.findByRole('alertdialog')
       expect(onResult).not.toHaveBeenCalled()
