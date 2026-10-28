@@ -2,7 +2,7 @@
 
 Status as of 2026-10-28 (evening, Gene's Windows PC). **All eight milestones are built, reviewed, fixed and gated, the audit bugs are fixed, and the guessed values now follow the full Object reference.** What remains:
 1. **M9, the completeness gaps:** Gene approved all of them; the plan is `2026-10-28-m9-completeness-gaps.md` (with Gene's answers). **On hold: don't start it until Gene says so.**
-2. Gene's hands-on checking (M1–M8 acceptance docs), including whether Object's Standard design shows properties in a sidebar or inline (`reference-check-2026-10-28.md` §5), and the fixes it produces.
+2. Gene's hands-on checking (M1–M8 acceptance docs), and the fixes it produces. **Settled 2026-10-28:** Gene checked Object: the Standard design shows properties in the side column, so Object's Standard sidebar stays (`reference-check-2026-10-28.md` §5 was wrong there). They go inline below 768 px as in Object; no 'always inline' option for now.
 
 **Done on 2026-10-28, on Windows:**
 - **Audit bugs:** all ~65 in `audit-2026-10-28.md`, plus every "unconfirmed" item that proved real, fixed one per commit with a failing-first test, in six area branches merged into master (whiteboard, backend API, views and properties, shell, backend storage, editor).
