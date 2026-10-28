@@ -206,6 +206,21 @@ describe('InkLayer', () => {
     expect(container.querySelector('[data-ink-live]')).toBeNull()
   })
 
+  test('a palm already down does not block the pen: the pen draws and the palm is dropped', () => {
+    const { capture, onStrokesChange } = setup()
+    const el = capture()!
+    fire(el, 'pointerdown', { pointerType: 'touch', pointerId: 2, x: 300, y: 300 })
+    fire(el, 'pointermove', { pointerType: 'touch', pointerId: 2, x: 320, y: 320 })
+    fire(el, 'pointerdown', { pointerType: 'pen', pointerId: 1, x: 0, y: 0, pressure: 0.5 })
+    fire(el, 'pointermove', { pointerType: 'pen', pointerId: 1, x: 30, y: 0, pressure: 0.5 })
+    fire(el, 'pointerup', { pointerType: 'pen', pointerId: 1, x: 30, y: 0 })
+    fire(el, 'pointerup', { pointerType: 'touch', pointerId: 2, x: 320, y: 320 })
+    expect(onStrokesChange).toHaveBeenCalledTimes(1)
+    const next = onStrokesChange.mock.calls[0][0] as InkStroke[]
+    expect(next).toHaveLength(1)
+    expect(next[0].points.every(([x, y]) => x <= 30 && y === 0)).toBe(true)
+  })
+
   test('no capture overlay without a tool, when read-only or while panning', () => {
     expect(setup({ tool: null }).capture()).toBeNull()
     expect(setup({ readOnly: true }).capture()).toBeNull()
