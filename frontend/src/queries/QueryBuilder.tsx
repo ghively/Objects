@@ -42,6 +42,26 @@ export const BUILDER_TEXT = {
   limit: 'Limit',
   noLimit: 'No limit',
   paused: PAUSED_HINT,
+  /** `components.RootQuery.queryBuilder.releaseConstraintTooltip` */
+  releaseConstraintTooltip:
+    'Turn into a normal query and remove the single type constraint. Opens the query as a page and removes this tab from the type dashboard.',
+  /** Our string: the release button's accessible name (Capacities shows only the tooltip). */
+  releaseConstraint: 'Release type constraint',
+}
+
+/**
+ * A query shown as a tab on a type's dashboard whose only type is that type (Capacities'
+ * `singleStructureQueryInfo`, computed, never stored) is constrained to it: the type can't be
+ * changed there until it is released.
+ */
+export function isSingleTypeQuery(def: QueryDefinition, typeId: string): boolean {
+  return def.structures.length === 1 && def.structures[0].id === typeId
+}
+
+/** The lock of a constrained query: its type, and what "release" does (the type page's). */
+export interface QueryConstraint {
+  type: TypeDef
+  onRelease(): void
 }
 
 type SearchMode = NonNullable<QueryDefinition['search']>['searchMode']
@@ -150,6 +170,36 @@ function CollectionFilter({ s, type, collections, edit }: { s: Structure; type: 
         })}
       </PopoverContent>
     </Popover>
+  )
+}
+
+function ConstrainedTypes({ def, constraint, collections, onChange }: { def: QueryDefinition; constraint: QueryConstraint; collections: Collection[]; onChange(e: Edit): void }) {
+  const s = def.structures[0] ?? { id: constraint.type.id }
+  return (
+    <Section title={BUILDER_TEXT.types}>
+      <div data-testid="query-type-lock" className="flex flex-wrap items-center gap-1.5">
+        <Chip>
+          <Icon name="ph-lock-simple" size={12} />
+          <TypeChip type={constraint.type} size={18} />
+          <span>{constraint.type.name}</span>
+          <CollectionFilter
+            s={s}
+            type={constraint.type}
+            collections={collections}
+            edit={(next) => onChange((d) => ({ ...d, structures: [next] }))}
+          />
+        </Chip>
+        <button
+          type="button"
+          aria-label={BUILDER_TEXT.releaseConstraint}
+          title={BUILDER_TEXT.releaseConstraintTooltip}
+          onClick={constraint.onRelease}
+          className={BTN}
+        >
+          <Icon name="ph-lock-simple-open" size={13} />
+        </button>
+      </div>
+    </Section>
   )
 }
 
@@ -485,14 +535,20 @@ export interface QueryBuilderProps {
   types: TypeDef[]
   collections: Collection[]
   onChange(edit: Edit): void
+  /** Shown as a single-type tab on that type's dashboard: the type is locked (see `isSingleTypeQuery`). */
+  constraint?: QueryConstraint
 }
 
-export function QueryBuilder({ query, types, collections, onChange }: QueryBuilderProps) {
+export function QueryBuilder({ query, types, collections, onChange, constraint }: QueryBuilderProps) {
   const def = query.definition
   const sorted = useMemo(() => [...types].sort((a, b) => a.name.localeCompare(b.name)), [types])
   return (
     <div data-testid="query-builder" className="flex flex-col gap-4 rounded-xl border border-line bg-raised/40 p-3">
-      <TypesSection def={def} types={sorted} collections={collections} onChange={onChange} />
+      {constraint && isSingleTypeQuery(def, constraint.type.id) ? (
+        <ConstrainedTypes def={def} constraint={constraint} collections={collections} onChange={onChange} />
+      ) : (
+        <TypesSection def={def} types={sorted} collections={collections} onChange={onChange} />
+      )}
       <TagsSection def={def} onChange={onChange} />
       <SearchSection def={def} onChange={onChange} />
       <LimitSection def={def} onChange={onChange} />

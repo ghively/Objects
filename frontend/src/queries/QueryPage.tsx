@@ -56,6 +56,17 @@ export function useTitleCtx(types: TypeDef[]): TitleCtx {
   }, [types, objects])
 }
 
+/**
+ * Change a query's definition; while its title is automatic it follows. The query page and a
+ * query tab on a type's dashboard (M9) edit through this.
+ */
+export function editQueryDefinition(id: string, edit: (d: QueryDefinition) => QueryDefinition, titleCtx: TitleCtx): void {
+  editQuery(id, (x) => {
+    const next = edit(x.definition)
+    return { ...x, definition: next, ...(titleIsCustom(x) ? {} : { name: autoTitle(next, titleCtx) }) }
+  })
+}
+
 export function QueryPage({ id }: { id: string }) {
   const defs = useDefinitions()
   const allTypes = useLinkIndex((s) => s.types)
@@ -125,12 +136,7 @@ export function QueryPage({ id }: { id: string }) {
       ? { ...state, viewDefinition: { ...state.viewDefinition, dataViewLayout: 'list' as const } }
       : state
 
-  /** Change the definition; while the title is automatic it follows. */
-  const editDefinition = (edit: (d: QueryDefinition) => QueryDefinition) =>
-    editQuery(q.id, (x) => {
-      const next = edit(x.definition)
-      return { ...x, definition: next, ...(titleIsCustom(x) ? {} : { name: autoTitle(next, titleCtx) }) }
-    })
+  const editDefinition = (edit: (d: QueryDefinition) => QueryDefinition) => editQueryDefinition(q.id, edit, titleCtx)
 
   const commitTitle = () => {
     const next = (draft ?? '').trim()

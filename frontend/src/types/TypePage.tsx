@@ -42,7 +42,8 @@ import { TypeOverview } from './TypeOverview'
 import { useDefinitions } from './useDefinitions'
 import { useTypeViews, type ViewsEdit } from './useTypeViews'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
-import { useTitleCtx } from '@/queries/QueryPage'
+import { editQueryDefinition, QUERY_TEXT, useTitleCtx } from '@/queries/QueryPage'
+import { isSingleTypeQuery, QueryBuilder } from '@/queries/QueryBuilder'
 
 function mods(e: MouseEvent): OpenMods {
   return { ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey }
@@ -313,6 +314,45 @@ function AllTab({
   )
 }
 
+/**
+ * A query tab's "Edit query": the query builder over the tab's query. A query of this type
+ * alone is constrained to it there (the type is locked) until released.
+ */
+function QueryTabEditor({ type, queryId, onRelease }: { type: TypeDef; queryId: string; onRelease(): void }) {
+  const { queries, collections } = useDefinitions()
+  const indexTypes = useLinkIndex((s) => s.types)
+  const titleCtx = useTitleCtx(indexTypes)
+  const [editing, setEditing] = useState(false)
+  const q = queries.find((x) => x.id === queryId)
+  if (!q) return null
+  const readOnly = !!q.readOnlyReason
+  return (
+    <div className="mb-3 flex flex-col gap-3">
+      <div>
+        <button
+          type="button"
+          aria-pressed={editing}
+          disabled={readOnly}
+          onClick={() => setEditing((v) => !v)}
+          className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[14px] font-medium hover:bg-hover disabled:opacity-50"
+        >
+          <Icon name="ph-pencil-simple" size={14} />
+          {editing ? QUERY_TEXT.closeEditor : QUERY_TEXT.edit}
+        </button>
+      </div>
+      {editing && (
+        <QueryBuilder
+          query={q}
+          types={indexTypes.length > 0 ? indexTypes : [type]}
+          collections={collections}
+          onChange={(edit) => editQueryDefinition(q.id, edit, titleCtx)}
+          constraint={isSingleTypeQuery(q.definition, type.id) ? { type, onRelease } : undefined}
+        />
+      )}
+    </div>
+  )
+}
+
 /** The type page: header, the Overview / All / section tabs, and the active tab's view. */
 export function TypePage({ type }: { type: TypeDef }) {
   const { views, update } = useTypeViews(type.id)
@@ -366,6 +406,20 @@ export function TypePage({ type }: { type: TypeDef }) {
     }
     return undefined
   }, [views, tab, activeSection, indexTypes, type, defs.collections])
+
+  /** "Release" a constrained query tab: unpin it from this type's dashboard and open the query as a page. */
+  const releaseQueryTab = (key: string) => {
+    update((v) => ({
+      ...v,
+      activeTab: home,
+      dashboard: {
+        ...v.dashboard,
+        sections: v.dashboard.sections.filter((s) => s.key !== key),
+        removedSections: v.dashboard.removedSections.filter((k) => k !== key),
+      },
+    }))
+    useTabs.getState().open({ kind: 'query', id: keyId(key) })
+  }
 
   const saveAsQuery = async () => {
     if (!views) return
@@ -507,6 +561,14 @@ export function TypePage({ type }: { type: TypeDef }) {
         )}
         <ToolbarSlot.Provider value={toolbarSlot}>
           {views && tab === 'all' && <AllTab type={type} views={views} search={search} update={update} />}
+          {views && activeSection && isQueryKey(activeSection.key) && (
+            <QueryTabEditor
+              key={`editor:${activeSection.key}`}
+              type={type}
+              queryId={keyId(activeSection.key)}
+              onRelease={() => releaseQueryTab(activeSection.key)}
+            />
+          )}
           {views && activeSection && (
             <SectionView
               key={activeSection.key}
