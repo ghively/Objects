@@ -246,6 +246,16 @@ describe('minor drift on edited lines', () => {
     expect(serializeBody(editor)).toBe('> a\nlazyX\n')
   })
 
+  test.each([
+    ['- a\\\n  b\n', '- a\\\n  bX\n'],
+    ['- a  \n  b\n', '- a  \n  bX\n'],
+    ['1. a\\\n   b\n', '1. a\\\n   bX\n'],
+  ])('a list item continuation after a hard break keeps its indent (%j)', (body, saved) => {
+    const editor = headless(body)
+    append(editor, 'b', 'X')
+    expect(serializeBody(editor)).toBe(saved)
+  })
+
   test('an edited blockquote line keeps its marker', () => {
     const editor = headless('> a\n> b\n')
     append(editor, 'b', 'X')

@@ -167,7 +167,8 @@ function parseList(lines: string[]): (ListLine | null)[] {
 function listKey(line: string, parsed: ListLine | null): string {
   if (!parsed) return 'C\0' + line.trim()
   const ordered = /\d/.test(parsed.marker) ? 'o' : 'b'
-  return `I\0${parsed.depth}\0${ordered}\0${parsed.content.trimEnd()}`
+  // A hard break may be written `\` or as trailing blanks: the same line.
+  return `I\0${parsed.depth}\0${ordered}\0${parsed.content.replace(/\\$/, '').trimEnd()}`
 }
 
 function preserveList(origLines: string[], regenLines: string[]): string[] {
@@ -192,7 +193,7 @@ function preserveList(origLines: string[], regenLines: string[]): string[] {
 
   const restyle = (line: string, i: number): string => {
     const p = regenParsed[i]
-    if (!p) return line
+    if (!p) return continuation(line, i)
     const indent = indentByDepth.get(p.depth) ?? unit.repeat(p.depth)
     const ordered = /\d/.test(p.marker)
     let marker = p.marker
@@ -200,6 +201,42 @@ function preserveList(origLines: string[], regenLines: string[]): string[] {
     else if (!ordered && firstBullet) marker = firstBullet.marker
     const gap = p.content === '' ? '' : firstBullet && !ordered ? firstBullet.gap || ' ' : p.gap || ' '
     return indent + marker + gap + p.content
+  }
+
+  // A continuation line of an item (after a hard break) keeps the indent of
+  // the original continuation line it replaces (none on a lazy one); a new one
+  // is indented to its item's text as written in the output (the serializer
+  // leaves it short).
+  const continuation = (line: string, i: number): string => {
+    if (line.trim() === '') return line
+    const replaced = replacedOriginal(i)
+    if (replaced !== null && !origParsed[replaced])
+      return /^[ \t]*/.exec(origLines[replaced])![0] + line.trimStart()
+    let k = i - 1
+    while (k >= 0 && !regenParsed[k]) k--
+    if (k < 0) return line
+    const q = regenParsed[k]!
+    const item = LIST_ITEM.exec(match[k] >= 0 ? origLines[match[k]] : restyle(regenLines[k], k))
+    if (!item) return line
+    const col = item[1].length + item[2].length + item[3].length
+    const regenCol = q.indent.length + q.marker.length + q.gap.length
+    const own = /^[ \t]*/.exec(line)![0].length
+    return ' '.repeat(col + Math.max(0, own - regenCol)) + line.trimStart()
+  }
+
+  /** The original line regenerated line `i` replaces, as `weaveBlankLines` pairs them, or null. */
+  const replacedOriginal = (i: number): number | null => {
+    let p = i - 1
+    while (p >= 0 && match[p] < 0) p--
+    let o = p >= 0 ? match[p] : -1
+    for (let n = p + 1; n <= i; n++) {
+      o++
+      while (o < origLines.length && isBlank(origLines[o])) o++
+    }
+    let next = i + 1
+    while (next < regenLines.length && match[next] < 0) next++
+    const limit = next < regenLines.length ? match[next] : origLines.length
+    return o < limit ? o : null
   }
 
   const match = alignMatch(
