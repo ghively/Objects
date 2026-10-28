@@ -29,8 +29,9 @@ copy. Over HTTP it checks:
  5. template variable: ``{creation:week}`` on a ``datetime`` property is accepted on the
     template and refused on an object of the type; an object created from the template gets the week range;
  6. whiteboard: a board save changes only the ``.md``'s ``lastUpdated`` line (and the
-    sidecar); a second save inside 60 s leaves the ``.md`` alone; the Notes body save on the
-    returned ``mdVersion`` succeeds;
+    sidecar) and answers ``mdVersion`` with ``mdBaseVersion`` (the version it started from); a
+    second save inside 60 s leaves the ``.md`` alone and answers no ``mdVersion``; the Notes
+    body save on the first save's ``mdVersion`` succeeds;
  7. ``PUT /api/ui`` ``workspaceOrder`` round-trips (only ``.object/ui.json`` changes);
     duplicates are 422;
  8. reindex: ``POST /api/search/reindex`` gives 202 and search reports complete afterwards;
@@ -416,6 +417,7 @@ class M9:
         board["blocks"]["m9b"] = {"type": "text", "markdown": "M9 one"}
         board["nodes"]["m9n"] = {"id": "m9n", "kind": "block", "blockId": "m9b", "position": {"x": 10, "y": 20}}
         md_before = (self.root / rel).read_bytes()
+        base_version = self.version(rel)
         snap = snapshot(self.root)
         code, saved = self.http("PUT", "/whiteboard", {"path": rel, "board": board, "baseRevision": cur["revision"],
                                                       "clientId": "m9"})
@@ -425,7 +427,8 @@ class M9:
         stamp = fm_of(self.root, rel).get("lastUpdated")
         self.run.report(code == 200 and sorted(changed) == sorted([rel, sidecar]) and removed == {"lastUpdated"}
                         and added == {"lastUpdated"} and str(stamp).startswith("2026-10-28T12:05:00")
-                        and isinstance(saved, dict) and saved.get("mdVersion") == self.version(rel),
+                        and isinstance(saved, dict) and saved.get("mdVersion") == self.version(rel)
+                        and saved.get("mdBaseVersion") == base_version,
                         f"first save {code}: files {changed}; .md keys -{sorted(removed)} +{sorted(added)}; "
                         f"lastUpdated {stamp}; mdVersion matches {isinstance(saved, dict) and saved.get('mdVersion') == self.version(rel)}")
         commit(self.root, "board saved")
@@ -435,12 +438,12 @@ class M9:
         code, saved2 = self.http("PUT", "/whiteboard", {"path": rel, "board": board, "baseRevision": saved["revision"],
                                                        "clientId": "m9"})
         same = (self.root / rel).read_bytes() == md_before
-        self.run.report(code == 200 and same and saved2.get("mdVersion") == self.version(rel),
-                        f"second save 30 s later {code}: .md unchanged {same}; mdVersion is its current version")
+        self.run.report(code == 200 and same and "mdVersion" not in saved2,
+                        f"second save 30 s later {code}: .md unchanged {same}; no mdVersion")
         commit(self.root, "board saved again")
         o = self.run.obj(rel)
         code, _res = self.http("PUT", "/object/body", {"path": rel, "body": o["body"].rstrip("\n") + "\n\nM9 board notes.\n",
-                                                     "baseVersion": saved2["mdVersion"], "clientId": "m9"})
+                                                     "baseVersion": saved["mdVersion"], "clientId": "m9"})
         self.run.report(code == 200, f"Notes body save on mdVersion: {code}")
         commit(self.root, "board notes")
         set_clock(self.clock, NOW)
