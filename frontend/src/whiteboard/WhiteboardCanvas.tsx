@@ -404,7 +404,10 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
       if (typeof cmd === 'number') setCamera(about(cmd))
       else if (cmd === 'in' || cmd === 'out') setCamera(about(zoomStep(vp.zoom, cmd)))
       else if (cmd === 'reset') setCamera(about(1))
-      else if (cmd === 'fit') setCamera(fitBox(allBoxes(), pane, FIT_PADDING))
+      else if (cmd === 'fit') {
+        const ink = strokeBoxes(store.getState().doc.strokes as InkStroke[])
+        setCamera(fitBox([...allBoxes(), ...ink], pane, FIT_PADDING))
+      }
       else if (cmd === 'selection') {
         const sel = new Set(store.getState().selection)
         const boxes = allBoxes(sel)
@@ -1053,15 +1056,19 @@ function Guides({ guides }: { guides: SnapGuide[] }) {
   )
 }
 
-/** "Nothing in this view": the board has content but none of it is on screen. */
+/**
+ * "Nothing in this view": the board has content (nodes or ink) but none of it is on screen. Only
+ * its card takes pointer input, so drawing, marquee and panning still work around it.
+ */
 function LostState({ onBack, paneSize }: { onBack(): void; paneSize(): { width: number; height: number } }) {
   const { x, y, zoom } = useViewport()
   const board = useBoardState((s) => s.doc.board)
+  const strokes = useBoardState((s) => s.doc.strokes) as InkStroke[]
   const flowW = useFlowStore((s) => s.width)
   const flowH = useFlowStore((s) => s.height)
   const pane = flowW > 0 && flowH > 0 ? { width: flowW, height: flowH } : paneSize()
   const view: Box = { x: -x / zoom, y: -y / zoom, width: pane.width / zoom, height: pane.height / zoom }
-  const boxes = Object.values(board.nodes).map(nodeBox)
+  const boxes = [...Object.values(board.nodes).map(nodeBox), ...strokeBoxes(strokes)]
   const bounds = boundsOf(boxes)
   if (!bounds) return null
   const visible = boxes.some(
@@ -1073,8 +1080,8 @@ function LostState({ onBack, paneSize }: { onBack(): void; paneSize(): { width: 
   )
   if (visible) return null
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center" data-whiteboard-lost="">
-      <div className="flex flex-col items-center gap-2 rounded-xl border border-line bg-raised px-6 py-5 text-center">
+    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center" data-whiteboard-lost="">
+      <div className="pointer-events-auto flex flex-col items-center gap-2 rounded-xl border border-line bg-raised px-6 py-5 text-center">
         <p className="text-[15px] font-semibold">{WB.lostTitle.text}</p>
         <p className="text-[13px] text-fg-muted">{WB.lostDescription.text}</p>
         <button
