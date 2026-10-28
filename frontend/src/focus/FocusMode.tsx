@@ -5,7 +5,7 @@
  * and the main view's property panel; the page centres itself (the content column is `mx-auto`).
  * None of those parts' own state is touched, so leaving shows each exactly as it was before.
  * Off an object (any other tab target) focus mode leaves again with "Focus mode is not available
- * here" (our rule). Binds `toggleFocusMode` (Mod-Shift-f).
+ * here" (our rule). Binds `toggleFocusMode` (Mod-Shift-m).
  */
 import { useEffect } from 'react'
 import { useGlobalShortcut } from '@/lib/shortcuts'

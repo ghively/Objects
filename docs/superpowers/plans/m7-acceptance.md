@@ -155,7 +155,8 @@ Run these on his CPI copy outside the repo, with `git init` and a first commit d
 
 ### Shortcut keys
 
-- [ ] Compare each provisional key in Settings → Shortcuts with Object and list the ones that differ. The reconcile pass fixes them in `lib/shortcuts.ts` and the editor registry.
+- [x] The keys in Settings → Shortcuts were compared with Object's shortcut table (`reference-check-2026-10-28.md` §1) and corrected in `lib/shortcuts.ts`. Ids Object gives no key (headings, to-do, toggle, text alignment) have none and are left out of the sheet. "Unverified" now marks only Object's own keys (pen, highlighter, eraser).
+- [ ] Hand-check the changed keys: side panel Ctrl+Shift+→, left sidebar Ctrl+Shift+←, calendar sidebar Ctrl+Alt+S, dark mode Ctrl+Shift+L, shortcuts menu Ctrl+Shift+B, tab menu Ctrl+Shift+↑, back/forward Ctrl+←/→ or Ctrl+[/], math Ctrl+M, code/math block Ctrl+E/Ctrl+M with blocks selected, move blocks Alt+↑/↓.
 
 ### Unverified designs, each against Object
 

@@ -78,12 +78,23 @@ describe('block selection', () => {
     cursorIn(editor, 'C three')
     expect(getBlockSelection(editor.state)).toBeNull()
 
-    // Mod-Shift-Down moves the block with the cursor; with a selection, the selection.
+    // Alt-Down (Object) moves the selection; Alt-Shift-Down too (on the same level).
     selectBlocks(editor, blockPos(editor, 2))
-    press(editor, 'ArrowDown', { ctrl: true, shift: true })
+    press(editor, 'ArrowDown', { alt: true })
     expect(serializeBody(editor)).toBe('A *one*  \n\n<!-- block: small -->\nB _two_\n\nD four\n\nC three\n')
     expect(selectedTexts(editor)).toEqual(['C three'])
-    press(editor, 'ArrowUp', { ctrl: true, shift: true })
+    press(editor, 'ArrowUp', { alt: true, shift: true })
+    expect(serializeBody(editor)).toBe(BODY)
+    // With the cursor in a block, Alt-Up/Down move that block (`moveUpBlockWithCursor`).
+    cursorIn(editor, 'C three')
+    expect(press(editor, 'ArrowDown', { alt: true })).toBe(true)
+    expect(serializeBody(editor)).toBe('A *one*  \n\n<!-- block: small -->\nB _two_\n\nD four\n\nC three\n')
+    expect(editor.state.selection.$from.parent.textContent).toBe('C three')
+    press(editor, 'ArrowUp', { alt: true })
+    expect(serializeBody(editor)).toBe(BODY)
+    // Mod-Shift-Down no longer moves.
+    selectBlocks(editor, blockPos(editor, 2))
+    press(editor, 'ArrowDown', { ctrl: true, shift: true })
     expect(serializeBody(editor)).toBe(BODY)
 
     // Mod-d duplicates the selection (the copies become the selection).

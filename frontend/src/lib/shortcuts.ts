@@ -4,13 +4,16 @@
  * (`shortcuts.<id>.name`, verbatim unless marked "our string") and its keys.
  *
  * Keys are written `Mod-Shift-k`: modifiers `Mod` (Ctrl on Windows/Linux, Cmd on macOS), `Ctrl`,
- * `Meta`, `Alt`, `Shift`, then one key: a letter, a digit, a punctuation character, or a
+ * `Meta`, `Alt`, `AltCtrl` (Alt on Windows/Linux, Ctrl on macOS: Object's Ctrl+Alt+L / ⌃⌘L
+ * pattern), `Shift`, then one key: a letter, a digit, a punctuation character, or a
  * `KeyboardEvent.key` name (`Escape`, `ArrowUp`, `Enter`, `Tab`, `Backspace`, `Delete`, `Space`).
  *
- * `provisional: true` keys are not in the trimmed reference (the plan's key table); Gene confirms
- * them in the hand-check. `bound: false` entries are display-only: their handlers live elsewhere
- * (M1–M6 code), and they are registered so the Shortcuts sheet lists them and the collision test
- * sees them.
+ * The keys are Object's own (its shortcut table, `shortcuts36682.js` `var ex={…}`, checked in
+ * `docs/superpowers/plans/reference-check-2026-10-28.md` §1). An id Object lists no key for
+ * has `keys: []` and the Shortcuts sheet leaves it out. `provisional: true` marks a key that is
+ * ours (no Object key to check against). `bound: false` entries are display-only: their
+ * handlers live elsewhere (M1–M6 code), and they are registered so the Shortcuts sheet lists them
+ * and the collision test sees them.
  */
 import { useEffect, useRef } from 'react'
 
@@ -114,6 +117,10 @@ export function parseKeys(spec: string, mac = isMacPlatform()): Combo {
     } else if (m === 'Ctrl') c.ctrl = true
     else if (m === 'Meta' || m === 'Cmd') c.meta = true
     else if (m === 'Alt') c.alt = true
+    else if (m === 'AltCtrl') {
+      if (mac) c.ctrl = true
+      else c.alt = true
+    }
     else if (m === 'Shift') c.shift = true
   }
   return c
@@ -161,10 +168,12 @@ export function matches(e: KeyEventLike, keys: string[]): boolean {
   return false
 }
 
-/** How a key is shown in the Shortcuts sheet (`Ctrl+Shift+K`, or `⌘⇧K` on macOS). */
+const ARROW_GLYPHS: Record<string, string> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }
+
+/** How a key is shown in the Shortcuts sheet (`Ctrl+Shift+K`, or `⌘⇧K` on macOS; arrows as `↑`). */
 export function formatKeys(spec: string, mac = isMacPlatform()): string {
   const c = parseKeys(spec, mac)
-  const key = c.key === 'Space' ? 'Space' : c.key.length === 1 ? c.key.toUpperCase() : c.key
+  const key = ARROW_GLYPHS[c.key] ?? (c.key === 'Space' ? 'Space' : c.key.length === 1 ? c.key.toUpperCase() : c.key)
   if (mac) return `${c.ctrl ? '⌃' : ''}${c.alt ? '⌥' : ''}${c.shift ? '⇧' : ''}${c.meta ? '⌘' : ''}${key}`
   return [c.ctrl && 'Ctrl', c.meta && 'Meta', c.alt && 'Alt', c.shift && 'Shift', key].filter(Boolean).join('+')
 }
@@ -235,7 +244,10 @@ export function useGlobalShortcut(
 
 // ---- the registered shortcuts ----
 
-const P = true // provisional: keys from the plan's table, not in the trimmed reference
+/** Checked against Object's shortcut table (reference-check-2026-10-28 §1). */
+const V = false
+/** Object-only keys: Object has no such action to check against. */
+const OURS = true
 
 const def = (
   id: string,
@@ -247,63 +259,77 @@ const def = (
   bound?: boolean,
 ): ShortcutDef => (bound === undefined ? { id, category, name, keys, scope, provisional } : { id, category, name, keys, scope, provisional, bound })
 
-/** M7's shortcuts (the plan's "Shortcut keys" table). */
+/**
+ * M7's shortcuts (the plan's "Shortcut keys" table), with Object's keys. Ids Object lists
+ * no key for (`heading1`-`heading4`, `toDo`, `toggle`, `textAlign*`: markdown only) have none.
+ */
 export const M7_SHORTCUTS: ShortcutDef[] = [
-  def('bold', 'text', 'Format bold', ['Mod-b'], 'editor', P),
-  def('italic', 'text', 'Italicize', ['Mod-i'], 'editor', P),
-  def('underline', 'text', 'Underline', ['Mod-u'], 'editor', P),
-  def('strikethrough', 'text', 'Strikethrough', ['Mod-Shift-s'], 'editor', P),
-  def('codeToken', 'text', 'Format as code', ['Mod-e'], 'editor', P),
-  def('mathToken', 'text', 'Format as TeX-formula', ['Mod-Shift-m'], 'editor', P),
+  def('bold', 'text', 'Format bold', ['Mod-b'], 'editor', V),
+  def('italic', 'text', 'Italicize', ['Mod-i'], 'editor', V),
+  def('underline', 'text', 'Underline', ['Mod-u'], 'editor', V),
+  def('strikethrough', 'text', 'Strikethrough', ['Mod-Shift-s'], 'editor', V),
+  def('codeToken', 'text', 'Format as code', ['Mod-e'], 'editor', V),
+  def('mathToken', 'text', 'Format as TeX-formula', ['Mod-m'], 'editor', V),
 
-  def('heading1', 'block', 'Turn selected blocks into heading 1', ['Mod-Alt-1'], 'editor', P),
-  def('heading2', 'block', 'Turn selected blocks into heading 2', ['Mod-Alt-2'], 'editor', P),
-  def('heading3', 'block', 'Turn selected blocks into heading 3', ['Mod-Alt-3'], 'editor', P),
-  def('heading4', 'block', 'Turn selected blocks into heading 4', ['Mod-Alt-4'], 'editor', P),
-  def('toDo', 'block', 'Turn selected blocks into to-do', ['Mod-Alt-t'], 'editor', P),
-  def('toggle', 'block', 'Add/remove toggle style to/from selected blocks', ['Mod-Alt-g'], 'editor', P),
-  def('toggleCodeBlock', 'block', 'Turn block selection into code block', ['Mod-Alt-c'], 'editor', P),
-  def('toggleMathBlock', 'block', 'Turn block selection into math block', ['Mod-Alt-m'], 'editor', P),
-  def('textAlignLeft', 'block', 'Align text left', ['Mod-Shift-l'], 'editor', P),
-  def('textAlignCenter', 'block', 'Text align center', ['Mod-Shift-e'], 'editor', P),
-  def('textAlignRight', 'block', 'Text align right', ['Mod-Shift-r'], 'editor', P),
-  def('selectActiveBlock', 'block', 'Set active block as block selection', ['Escape'], 'editor', P),
-  def('expandBlockSelectionUpwards', 'block', 'Expand block selection upwards', ['Shift-ArrowUp'], 'editor', P),
-  def('expandBlockSelectionDownwards', 'block', 'Expand block selection downwards', ['Shift-ArrowDown'], 'editor', P),
-  def('selectAllBlocks', 'block', 'Select all blocks on current level or next higher level', ['Mod-a'], 'editor', P),
-  def('deleteBlocks', 'block', 'Delete selected blocks', ['Backspace', 'Delete'], 'editor', P),
-  def('duplicateBlocks', 'block', 'Duplicate selected blocks', ['Mod-d'], 'editor', P),
-  def('copyBlocksAsMarkdown', 'block', 'Copy selected blocks as markdown', ['Mod-Shift-c'], 'editor', P),
-  def('moveSelectedBlocksUp', 'block', 'Move selected blocks up', ['Mod-Shift-ArrowUp'], 'editor', P),
-  def('moveSelectedBlocksDown', 'block', 'Move selected blocks down', ['Mod-Shift-ArrowDown'], 'editor', P),
-  def('indentBlocks', 'block', 'Indent selected blocks', ['Tab'], 'editor', P),
-  def('unindentBlocks', 'block', 'Unindent selected blocks', ['Shift-Tab'], 'editor', P),
-  def('toggleTodoInBlockWithCursor', 'block', 'Check/uncheck to-do in active block', ['Mod-Enter'], 'editor', P),
+  def('heading1', 'block', 'Turn selected blocks into heading 1', [], 'editor', V),
+  def('heading2', 'block', 'Turn selected blocks into heading 2', [], 'editor', V),
+  def('heading3', 'block', 'Turn selected blocks into heading 3', [], 'editor', V),
+  def('heading4', 'block', 'Turn selected blocks into heading 4', [], 'editor', V),
+  def('toDo', 'block', 'Turn selected blocks into to-do', [], 'editor', V),
+  def('toggle', 'block', 'Add/remove toggle style to/from selected blocks', [], 'editor', V),
+  // With blocks selected (Mod-e / Mod-m on a text selection stay codeToken / mathToken).
+  def('toggleCodeBlock', 'block', 'Turn block selection into code block', ['Mod-e'], 'editor', V),
+  def('toggleMathBlock', 'block', 'Turn block selection into math block', ['Mod-m'], 'editor', V),
+  def('textAlignLeft', 'block', 'Align text left', [], 'editor', V),
+  def('textAlignCenter', 'block', 'Text align center', [], 'editor', V),
+  def('textAlignRight', 'block', 'Text align right', [], 'editor', V),
+  def('selectActiveBlock', 'block', 'Set active block as block selection', ['Escape'], 'editor', V),
+  def('expandBlockSelectionUpwards', 'block', 'Expand block selection upwards', ['Shift-ArrowUp'], 'editor', V),
+  def('expandBlockSelectionDownwards', 'block', 'Expand block selection downwards', ['Shift-ArrowDown'], 'editor', V),
+  def('selectAllBlocks', 'block', 'Select all blocks on current level or next higher level', ['Mod-a'], 'editor', V),
+  def('deleteBlocks', 'block', 'Delete selected blocks', ['Backspace', 'Delete'], 'editor', V),
+  def('duplicateBlocks', 'block', 'Duplicate selected blocks', ['Mod-d'], 'editor', V),
+  def('copyBlocksAsMarkdown', 'block', 'Copy selected blocks as markdown', ['Mod-Shift-c'], 'editor', V),
+  // Alt+Up/Down moves the selected blocks, or the block holding the cursor; with Shift, on the
+  // same level. Object's move always stays on the block's level, so both pairs do the same.
+  def('moveSelectedBlocksUp', 'block', 'Move selected blocks up', ['Alt-ArrowUp'], 'editor', V),
+  def('moveSelectedBlocksDown', 'block', 'Move selected blocks down', ['Alt-ArrowDown'], 'editor', V),
+  def('moveSelectedBlocksUpOnSameLevel', 'block', 'Move selected blocks up on same level', ['Alt-Shift-ArrowUp'], 'editor', V),
+  def('moveSelectedBlocksDownOnSameLevel', 'block', 'Move selected blocks down on same level', ['Alt-Shift-ArrowDown'], 'editor', V),
+  def('moveUpBlockWithCursor', 'block', 'Move active block up', ['Alt-ArrowUp'], 'editor', V),
+  def('moveDownBlockWithCursor', 'block', 'Move active block down', ['Alt-ArrowDown'], 'editor', V),
+  def('moveUpBlockWithCursorOnSameLevel', 'block', 'Move active block up on same level', ['Alt-Shift-ArrowUp'], 'editor', V),
+  def('moveDownBlockWithCursorOnSameLevel', 'block', 'Move active block down on same level', ['Alt-Shift-ArrowDown'], 'editor', V),
+  def('indentBlocks', 'block', 'Indent selected blocks', ['Tab'], 'editor', V),
+  def('unindentBlocks', 'block', 'Unindent selected blocks', ['Shift-Tab'], 'editor', V),
+  def('toggleTodoInBlockWithCursor', 'block', 'Check/uncheck to-do in active block', ['Mod-Enter'], 'editor', V),
   def(
     'toggleToggleInBlockWithCursor',
     'block',
     'Open/close toggle of active block. Inserts and focuses child block if no children are present. If to-do is present, use alternative with ⇧ key.',
-    ['Mod-Shift-Enter'],
+    ['Mod-Enter', 'Mod-Shift-Enter'],
     'editor',
-    P,
+    V,
   ),
-  def('insertBlockAbove', 'block', 'Insert block above and set cursor there', ['Alt-Shift-Enter'], 'editor', P),
-  def('insertBlockBelow', 'block', 'Insert block below and set cursor there', ['Alt-Enter'], 'editor', P),
+  def('insertBlockAbove', 'block', 'Insert block above and set cursor there', ['Alt-Shift-Enter'], 'editor', V),
+  def('insertBlockBelow', 'block', 'Insert block below and set cursor there', ['Alt-Enter'], 'editor', V),
 
-  def('closeTab', 'navigation', 'Close current tab', ['Mod-w'], 'global', P),
-  def('openNewTab', 'navigation', 'Open new tab', ['Mod-t'], 'global', P),
-  def('navigateTabs', 'navigation', 'Navigate tabs', ['Ctrl-Tab'], 'global', P),
-  def('openTabList', 'navigation', 'Toggle tab menu when multiple tabs are open', ['Mod-Shift-a'], 'global', P),
-  def('navigateBack', 'navigation', 'Navigate back', ['Alt-ArrowLeft'], 'global', P),
-  def('navigateForward', 'navigation', 'Navigate forward', ['Alt-ArrowRight'], 'global', P),
+  def('closeTab', 'navigation', 'Close current tab', ['Mod-w'], 'global', V),
+  def('openNewTab', 'navigation', 'Open new tab', ['Mod-t'], 'global', V),
+  def('navigateTabs', 'navigation', 'Navigate tabs', ['Ctrl-Tab'], 'global', V),
+  // Object's Ctrl+Shift+A is `toggleChecklistMenu`, not the tab menu.
+  def('openTabList', 'navigation', 'Toggle tab menu when multiple tabs are open', ['Mod-Shift-ArrowUp'], 'global', V),
+  def('navigateBack', 'navigation', 'Navigate back', ['Mod-ArrowLeft', 'Mod-['], 'global', V),
+  def('navigateForward', 'navigation', 'Navigate forward', ['Mod-ArrowRight', 'Mod-]'], 'global', V),
 
-  def('toggleSidepanel', 'global', 'Toggle right sidepanel', ['Mod-Shift-\\'], 'global', P),
-  def('toggleLeftSidebar', 'global', 'Toggle left sidebar', ['Mod-\\'], 'global', P),
-  def('toggleCalendarSidebar', 'global', 'Toggle calendar sidebar', ['Mod-Shift-y'], 'global', P),
-  def('toggleDarkMode', 'global', 'Toggle dark mode', ['Mod-Shift-d'], 'global', P),
-  // Verified: docs/design-notes binds Settings to CmdOrCtrl+,.
-  def('openSettings', 'global', 'Open settings', ['Mod-,'], 'global', false),
-  def('toggleShortcutsMenu', 'global', 'Show/hide shortcuts menu', ['Mod-/'], 'global', P),
+  def('toggleSidepanel', 'global', 'Toggle right sidepanel', ['Mod-Shift-ArrowRight'], 'global', V),
+  def('toggleLeftSidebar', 'global', 'Toggle left sidebar', ['Mod-Shift-ArrowLeft'], 'global', V),
+  // Object's Ctrl+Shift+Y is `openMinigame`.
+  def('toggleCalendarSidebar', 'global', 'Toggle calendar sidebar', ['Mod-Alt-s'], 'global', V),
+  def('toggleDarkMode', 'global', 'Toggle dark mode', ['Mod-Shift-l'], 'global', V),
+  // Also docs/design-notes binds Settings to CmdOrCtrl+,.
+  def('openSettings', 'global', 'Open settings', ['Mod-,'], 'global', V),
+  def('toggleShortcutsMenu', 'global', 'Show/hide shortcuts menu', ['Mod-Shift-b'], 'global', V),
 ]
 
 /**
@@ -311,9 +337,10 @@ export const M7_SHORTCUTS: ShortcutDef[] = [
  * the built ones (our choices where no reference exists, as each module notes).
  */
 export const EXISTING_SHORTCUTS: ShortcutDef[] = [
-  // M5, palette/CommandPalette.tsx
-  def('openSearchPalette', 'global', 'Search this space', ['Mod-k'], 'global', false, false),
-  def('openCommandPalette', 'global', 'Open action palette', ['Mod-p'], 'global', false, false),
+  // M5, palette/CommandPalette.tsx (it reads these keys). Object: search is Ctrl+P or Ctrl+K;
+  // it lists no key for the action palette (reached from the palette's switch button).
+  def('openSearchPalette', 'global', 'Search this space', ['Mod-p', 'Mod-k'], 'global', false, false),
+  def('openCommandPalette', 'global', 'Open action palette', [], 'global', false, false),
   // M5, object/ObjectView.tsx (no Object id: our id and our string)
   def('findInPage', 'page', 'Find in page', ['Mod-f'], 'global', false, false),
   // M1–M3, App.tsx (outside editable targets)
@@ -346,30 +373,31 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
     false,
     false,
   ),
-  // M6, whiteboard/shortcuts.ts keyToCommand
+  // M6, whiteboard/shortcuts.ts keyToCommand (Object's whiteboard table)
   def('whiteboardSelect', 'whiteboard', 'Select tool', ['v'], 'whiteboard', false, false),
   def('whiteboardHand', 'whiteboard', 'Hand tool', ['h'], 'whiteboard', false, false),
   def('whiteboardText', 'whiteboard', 'Text', ['t'], 'whiteboard', false, false),
   def('whiteboardRectangle', 'whiteboard', 'Rectangle', ['r'], 'whiteboard', false, false),
   def('whiteboardEllipse', 'whiteboard', 'Ellipse', ['o'], 'whiteboard', false, false),
-  def('whiteboardTriangle', 'whiteboard', 'Triangle', ['Shift-r'], 'whiteboard', false, false),
+  def('whiteboardTriangle', 'whiteboard', 'Triangle', ['p'], 'whiteboard', false, false),
   def('whiteboardLine', 'whiteboard', 'Line', ['l'], 'whiteboard', false, false),
-  def('whiteboardArrow', 'whiteboard', 'Arrow', ['a'], 'whiteboard', false, false),
+  def('whiteboardArrow', 'whiteboard', 'Arrow', ['Shift-l'], 'whiteboard', false, false),
   def('whiteboardFrame', 'whiteboard', 'Frame', ['f'], 'whiteboard', false, false),
-  // Pen, highlighter and eraser have no Object shortcut id: our ids, our strings.
-  def('whiteboardPen', 'whiteboard', 'Pen', ['p'], 'whiteboard', false, false),
-  def('whiteboardHighlighter', 'whiteboard', 'Highlighter', ['m'], 'whiteboard', false, false),
-  def('whiteboardEraser', 'whiteboard', 'Eraser', ['e'], 'whiteboard', false, false),
+  // Pen, highlighter and eraser are Object's own (no Object id): our ids, our strings, our
+  // keys. They avoid Object's letters (P is Triangle, M opens the move menu).
+  def('whiteboardPen', 'whiteboard', 'Pen', ['d'], 'whiteboard', OURS, false),
+  def('whiteboardHighlighter', 'whiteboard', 'Highlighter', ['Shift-d'], 'whiteboard', OURS, false),
+  def('whiteboardEraser', 'whiteboard', 'Eraser', ['e'], 'whiteboard', OURS, false),
   def('whiteboardZoomIn', 'whiteboard', 'Zoom in', ['Mod-='], 'whiteboard', false, false),
   def('whiteboardZoomOut', 'whiteboard', 'Zoom out', ['Mod--'], 'whiteboard', false, false),
   def('whiteboardZoomReset', 'whiteboard', 'Zoom to 100%', ['Mod-0'], 'whiteboard', false, false),
   def('whiteboardFitAll', 'whiteboard', 'Zoom to fit', ['Shift-1'], 'whiteboard', false, false),
   def('whiteboardFitSelection', 'whiteboard', 'Zoom to selection', ['Shift-2'], 'whiteboard', false, false),
   def('whiteboardBringForward', 'whiteboard', 'Bring forward', ['Mod-]'], 'whiteboard', false, false),
-  def('whiteboardBringToFront', 'whiteboard', 'Bring to front', ['Mod-Shift-]'], 'whiteboard', false, false),
+  def('whiteboardBringToFront', 'whiteboard', 'Bring to front', [']'], 'whiteboard', false, false),
   def('whiteboardSendBackward', 'whiteboard', 'Send backward', ['Mod-['], 'whiteboard', false, false),
-  def('whiteboardSendToBack', 'whiteboard', 'Send to back', ['Mod-Shift-['], 'whiteboard', false, false),
-  def('whiteboardWrapInFrame', 'whiteboard', 'Wrap in frame', ['Mod-Alt-g'], 'whiteboard', false, false),
+  def('whiteboardSendToBack', 'whiteboard', 'Send to back', ['['], 'whiteboard', false, false),
+  def('whiteboardWrapInFrame', 'whiteboard', 'Wrap in frame', ['Mod-g'], 'whiteboard', false, false),
   def('whiteboardDuplicate', 'whiteboard', 'Duplicate selection', ['Mod-d'], 'whiteboard', false, false),
   def('whiteboardNudge', 'whiteboard', 'Nudge selection', ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'], 'whiteboard', false, false),
   def(
@@ -399,35 +427,58 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
  * presentation view binds them, so they never fire otherwise).
  */
 export const M8_SHORTCUTS: ShortcutDef[] = [
-  def('copyBlockReference', 'block', 'Copy block reference', ['Mod-Alt-r'], 'editor', P, true),
-  def('turnIntoObject', 'block', 'Turn into object', ['Mod-Alt-o'], 'editor', P, true),
-  def('turnIntoTask', 'block', 'Turn into task', ['Mod-Alt-k'], 'editor', P, true),
-  def('turnBlockIntoTaskObject', 'block', 'Turn block into task object', ['Mod-Alt-Shift-k'], 'editor', P, true),
-  def('highlightText', 'text', 'Highlight text selection', ['Mod-Shift-h'], 'editor', P, true),
-  def('toggleFocusMode', 'global', 'Toggle focus mode', ['Mod-Shift-f'], 'global', P, true),
-  def('openPresentationMode', 'page', 'Start presentation mode', ['Mod-Alt-p'], 'global', P, true),
-  def('exitPresentationMode', 'page', 'Exit presentation mode', ['Escape'], 'global', P, true),
-  def('nextPresentationSlide', 'page', 'Next presentation slide', ['ArrowRight'], 'global', P, true),
-  def('previousPresentationSlide', 'page', 'Previous presentation slide', ['ArrowLeft'], 'global', P, true),
+  // Ctrl+Alt+L on Windows, ⌃⌘L on macOS.
+  def('copyBlockReference', 'block', 'Copy block reference', ['Mod-AltCtrl-l'], 'editor', V, true),
+  // `I` with blocks selected (typing `i` in text stays typing).
+  def('turnIntoObject', 'block', 'Turn into object', ['i'], 'editor', V, true),
+  // No key in Object: its only trigger is the markdown `()` + Space.
+  def('turnIntoTask', 'block', 'Turn into task', [], 'editor', V, true),
+  def('turnBlockIntoTaskObject', 'block', 'Turn block into task object', ['Mod-Shift-t'], 'editor', V, true),
+  def('highlightText', 'text', 'Highlight text selection', ['Mod-Shift-h'], 'editor', V, true),
+  def('toggleFocusMode', 'global', 'Toggle focus mode', ['Mod-Shift-m'], 'global', V, true),
+  // Ctrl+Alt+P on Windows, ⌃⌘P on macOS.
+  def('openPresentationMode', 'page', 'Start presentation mode', ['Mod-AltCtrl-p'], 'global', V, true),
+  def('exitPresentationMode', 'page', 'Exit presentation mode', ['Escape'], 'global', V, true),
+  def('nextPresentationSlide', 'page', 'Next presentation slide', ['ArrowRight'], 'global', V, true),
+  def('previousPresentationSlide', 'page', 'Previous presentation slide', ['ArrowLeft'], 'global', V, true),
   def(
     'whiteboardResize',
     'whiteboard',
     'Resize selection',
-    ['Mod-Alt-ArrowUp', 'Mod-Alt-ArrowDown', 'Mod-Alt-ArrowLeft', 'Mod-Alt-ArrowRight'],
+    ['Mod-ArrowUp', 'Mod-ArrowDown', 'Mod-ArrowLeft', 'Mod-ArrowRight'],
     'whiteboard',
-    P,
+    V,
     true,
   ),
   def(
     'whiteboardResizeLarge',
     'whiteboard',
     'Resize selection farther',
-    ['Mod-Alt-Shift-ArrowUp', 'Mod-Alt-Shift-ArrowDown', 'Mod-Alt-Shift-ArrowLeft', 'Mod-Alt-Shift-ArrowRight'],
+    ['Mod-Shift-ArrowUp', 'Mod-Shift-ArrowDown', 'Mod-Shift-ArrowLeft', 'Mod-Shift-ArrowRight'],
     'whiteboard',
-    P,
+    V,
     true,
   ),
 ]
+
+/**
+ * Ids that share a key by design, as in Object: the handlers tell them apart (a text
+ * selection or blocks selected; the cursor in a to-do or a toggle).
+ */
+export const SHARED_KEY_IDS: readonly (readonly string[])[] = [
+  ['codeToken', 'toggleCodeBlock'],
+  ['mathToken', 'toggleMathBlock'],
+  ['toggleTodoInBlockWithCursor', 'toggleToggleInBlockWithCursor'],
+  ['moveSelectedBlocksUp', 'moveUpBlockWithCursor'],
+  ['moveSelectedBlocksDown', 'moveDownBlockWithCursor'],
+  ['moveSelectedBlocksUpOnSameLevel', 'moveUpBlockWithCursorOnSameLevel'],
+  ['moveSelectedBlocksDownOnSameLevel', 'moveDownBlockWithCursorOnSameLevel'],
+]
+
+/** Whether `a` and `b` share their key by design (`SHARED_KEY_IDS`). */
+export function sharesKeyByDesign(a: string, b: string): boolean {
+  return SHARED_KEY_IDS.some((g) => g.includes(a) && g.includes(b))
+}
 
 /** The ids only bound while presenting (the plan: "the last three only while presenting"). */
 export const PRESENTATION_ONLY_IDS: readonly string[] = ['exitPresentationMode', 'nextPresentationSlide', 'previousPresentationSlide']

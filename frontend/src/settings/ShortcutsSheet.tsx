@@ -1,6 +1,7 @@
 // The Shortcuts sheet ("Shortcuts", `ShortcutsCheatSheet.tooltip`): every registered shortcut,
-// grouped by `shortcuts.categories.*`, with its name and keys. Provisional keys (not in the
-// trimmed reference) carry a small "unverified" tag until Gene confirms them.
+// grouped by `shortcuts.categories.*`, with its name and keys. An id with no key (Object
+// lists none) is left out, as Object's sheet only shows its table's rows. Provisional keys
+// (ours, with no Object key to check against) carry a small "unverified" tag.
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { CATEGORY_LABELS, formatKeys, shortcutsByCategory, type ShortcutDef } from '@/lib/shortcuts'
 import { useSettingsModal } from './useSettingsModal'
@@ -35,7 +36,9 @@ function Keys({ def }: { def: ShortcutDef }) {
 export function ShortcutsSheet() {
   const open = useSettingsModal((s) => s.shortcutsOpen)
   const close = useSettingsModal((s) => s.closeShortcuts)
-  const groups = open ? [...shortcutsByCategory()] : []
+  const groups = open
+    ? [...shortcutsByCategory()].map(([c, defs]) => [c, defs.filter((d) => d.keys.length > 0)] as const).filter(([, defs]) => defs.length > 0)
+    : []
   return (
     <Dialog open={open} onOpenChange={(o) => !o && close()}>
       <DialogContent className="flex max-h-[80vh] flex-col gap-3 border-line bg-panel text-fg sm:max-w-[640px]">

@@ -45,11 +45,11 @@ function cursorIn(editor: TiptapEditor, text: string): void {
   editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, pos)))
 }
 
-/** Press the registry's key for `spec` (`Mod-Alt-r`, `Shift-Tab`) as a browser sends it (not on macOS). */
+/** Press the registry's key for `spec` (`Mod-AltCtrl-l`, `Shift-Tab`) as a browser sends it (not on macOS). */
 function press(editor: TiptapEditor, spec: string): boolean {
   const parts = spec.split('-')
   const key = parts.pop()!
-  const mods = new Set(parts)
+  const mods = new Set(parts.map((m) => (m === 'AltCtrl' ? 'Alt' : m)))
   const letter = /^[a-z]$/i.test(key)
   const event = new KeyboardEvent('keydown', {
     key: letter && mods.has('Shift') ? key.toUpperCase() : key,
@@ -65,15 +65,22 @@ function press(editor: TiptapEditor, spec: string): boolean {
 }
 
 describe('m8 editor shortcuts', () => {
-  test('the new ids are registered with their reference names', () => {
+  test('the new ids are registered with their reference names and Object\' keys', () => {
     expect(M8_EDITOR_SHORTCUT_IDS).toEqual(['copyBlockReference', 'turnIntoObject', 'turnIntoTask', 'turnBlockIntoTaskObject', 'highlightText'])
     const registered = new Map(allShortcuts().map((d) => [d.id, d]))
     for (const def of M8_EDITOR_SHORTCUTS) {
       const r = registered.get(def.id)!
       expect(r, def.id).toBeDefined()
       expect(r.scope).toBe('editor')
-      expect(r.keys.length).toBeGreaterThan(0)
+      // The same entry as the registry's (no copy with its own keys).
+      expect(r.keys).toEqual(def.keys)
     }
+    // Object's shortcut table (reference-check-2026-10-28 §1).
+    expect(keysFor('copyBlockReference')).toEqual(['Mod-AltCtrl-l'])
+    expect(keysFor('turnIntoObject')).toEqual(['i'])
+    expect(keysFor('turnIntoTask')).toEqual([])
+    expect(keysFor('turnBlockIntoTaskObject')).toEqual(['Mod-Shift-t'])
+    expect(keysFor('highlightText')).toEqual(['Mod-Shift-h'])
     // shortcuts.<id>.name, verbatim
     expect(registered.get('copyBlockReference')!.name).toBe('Copy block reference')
     expect(registered.get('highlightText')!.name).toBe('Highlight text selection')
@@ -138,14 +145,24 @@ describe('m8 editor shortcuts', () => {
     press(ed2, keysFor('highlightText')[0])
     expect(handler).toHaveBeenCalledWith(ed2)
 
-    // Turn into: the Task 27 functions, with the editor.
-    press(editor, keysFor('turnIntoObject')[0])
-    press(editor, keysFor('turnIntoTask')[0])
+    // Turn into: the Task 27 functions, with the editor. `I` turns selected blocks into an object;
+    // with the cursor in text it is typed.
+    cursorIn(editor, 'A quotable line')
+    expect(press(editor, 'i')).toBe(false)
+    expect(turnIntoObject).not.toHaveBeenCalled()
+    press(editor, 'Escape')
+    expect(press(editor, 'i')).toBe(true)
     cursorIn(editor, 'A to-do')
     press(editor, keysFor('turnBlockIntoTaskObject')[0])
     await Promise.resolve()
     expect(turnIntoObject).toHaveBeenCalledWith(editor)
-    expect(turnIntoTask).toHaveBeenCalledWith(editor)
     expect(turnTodoIntoTask).toHaveBeenCalledWith(editor)
+    // Turn into task has no key (Object: the markdown `()` + Space only); the old one is inert.
+    press(editor, 'Mod-Alt-k')
+    press(editor, 'Mod-Alt-o')
+    press(editor, 'Mod-Alt-r')
+    await Promise.resolve()
+    expect(turnIntoTask).not.toHaveBeenCalled()
+    expect(turnIntoObject).toHaveBeenCalledTimes(1)
   })
 })

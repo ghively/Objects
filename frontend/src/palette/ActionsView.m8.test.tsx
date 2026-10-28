@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -51,8 +51,9 @@ function setup(clip: Partial<Clipboard> | undefined = { readText: async () => ''
   return user
 }
 
-async function openActions(user: ReturnType<typeof userEvent.setup>) {
-  await user.keyboard('{Control>}p{/Control}')
+// Object lists no key for the action palette: open it as its switch button does.
+async function openActions(_user: ReturnType<typeof userEvent.setup>) {
+  act(() => usePalette.getState().show('actions'))
   return screen.findByPlaceholderText(PALETTE_TEXT.placeholderActions)
 }
 
