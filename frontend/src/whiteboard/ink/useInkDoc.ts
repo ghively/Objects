@@ -237,6 +237,9 @@ export function useInkDoc(path: string, client: Client = inkClient): InkDoc {
         st.revision = res.revision
         return
       }
+      // Unchanged (e.g. the event was for a board-only save): keep the strokes, so the page
+      // doesn't reload them into the store, which would reset its undo history.
+      if (st.loaded && res.revision === st.revision) return
       applyLoad(res)
     } catch (err) {
       if (gen !== st.generation) return
