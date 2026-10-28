@@ -3,7 +3,8 @@
 // frontmatter is raw and can't patch a decoded `Row`. A 409 reloads only, never retries.
 import { api as realApi, ConflictError, type Api } from '@/api/client'
 import type { DateValue, Row, TaskResult, TypeDef } from '@/api/types'
-import { localDayOf, parseRepeat } from './repeat'
+import { zonedParts, zonedToday } from '@/lib/zonedTime'
+import { parseRepeat } from './repeat'
 import { firstOptionOf, isOpen, statusDef } from './statusCategory'
 import { taskClient, type CatchUp, type OccurrenceAction, type TaskClient } from './taskContract'
 
@@ -82,15 +83,28 @@ export async function occurrenceAction(
 /** The task's recurrence rule (`repeat`), or null. */
 export const repeatOf = (row: Row) => parseRepeat(row.values.repeat)
 
-/** A recurring task by due date whose date is before `now`'s day (it may have missed occurrences). */
-export function maybeOverdue(row: Row, now: Date = new Date()): boolean {
+/**
+ * A recurring task by due date whose date is before today (it may have missed occurrences). Both
+ * days are in the Time zone setting (`lib/zonedTime`), as the server's overdue count is: a day
+ * date is its own day, a time date is its instant's day in that zone. `now` is for tests.
+ */
+export function maybeOverdue(row: Row, now?: Date): boolean {
   const rule = repeatOf(row)
   const date = row.values.date as DateValue | null | undefined
   if (!rule || rule.mode !== 'dueDate' || !date?.start) return false
-  const day = localDayOf(date.start)
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const day = zonedDayOf(date.start)
+  const today = now ? zonedParts(now).date : zonedToday()
   return !!day && day < today
 }
+
+/** A date start's day in the Time zone setting: `YYYY-MM-DD` as is, an instant's zoned day; else null. */
+function zonedDayOf(start: string): string | null {
+  if (DAY_ONLY.test(start)) return start
+  const d = new Date(start)
+  return Number.isNaN(d.getTime()) ? null : zonedParts(d).date
+}
+
+const DAY_ONLY = /^\d{4}-\d{2}-\d{2}$/
 
 /** A date value as a short day (`2026-10-28`; a time date adds its local `HH:mm`). */
 export function shortDate(v: DateValue | null | undefined): string {
