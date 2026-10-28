@@ -264,7 +264,16 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
           <DialogTitle className="text-[17px]">{IMPORT_CSV_TEXT.heading}</DialogTitle>
           <DialogDescription className="text-[14px] text-fg-muted">{IMPORT_CSV_TEXT.description}</DialogDescription>
         </DialogHeader>
-        <label className="flex h-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line text-[14px] text-fg-muted hover:bg-hover">
+        <label
+          className="flex h-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line text-[14px] text-fg-muted hover:bg-hover"
+          onDragOver={(e) => {
+            if (!busy) e.preventDefault()
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            if (!busy) void read(e.dataTransfer.files[0])
+          }}
+        >
           <Icon name="ph-file-csv" size={20} />
           <span>{file ? file.name : IMPORT_CSV_TEXT.chooseFile}</span>
           <input

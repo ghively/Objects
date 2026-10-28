@@ -1,5 +1,5 @@
 // M9 Task 19: Import CSV into a type ("Batch import to collection").
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { collection, propertyDef, typeDef } from '@/test/mockApi'
@@ -118,5 +118,14 @@ describe('ImportCsvDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Import' }))
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
     expect(mocked.createObject.mock.calls.map((c) => c[1]?.title)).toEqual(['Dune', 'Emma'])
+  })
+
+  test('a file dropped on the drop zone is read', async () => {
+    render(<ImportCsvDialog type={BOOK} open onOpenChange={() => {}} />)
+    const zone = screen.getByText('Choose file or drop here.').closest('label')!
+    const dataTransfer = { files: [csvFile('Name\nDune\nEmma\n')], types: ['Files'] }
+    expect(fireEvent.dragOver(zone, { dataTransfer })).toBe(false)
+    fireEvent.drop(zone, { dataTransfer })
+    expect(await screen.findByText('Add 2 new Books to')).toBeInTheDocument()
   })
 })
