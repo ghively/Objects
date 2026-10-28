@@ -719,7 +719,28 @@ export interface UiState {
   graph?: GraphCustomization
   /** M6: the whiteboard "Canvas display" settings (Object's user-level names). */
   whiteboard?: WhiteboardSettings
+  /** M9: the sidebar's top-level section order (`RootSpace.workspaceOrder`): 'objects', 'pinned', section ids. */
+  workspaceOrder?: string[]
   [extra: string]: unknown
+}
+
+/**
+ * M9: the per-object layout keys in an object's frontmatter (Object's `wideLayoutMode`,
+ * `wideCoverImage`, `coverImageOffset`). Absent means the type's default (offset 50); `null`
+ * in a write removes the key.
+ */
+export interface ObjectFrontmatterLayout {
+  wideLayoutMode?: boolean | null
+  wideCoverImage?: boolean | null
+  /** The cover's y position in percent, 0–100. */
+  coverImageOffset?: number | null
+}
+
+/** M9: `POST /api/object/duplicate` response. */
+export interface DuplicatedObject {
+  path: string
+  version: string
+  summary: ObjectSummary
 }
 
 /** `POST /api/rows` request. */
