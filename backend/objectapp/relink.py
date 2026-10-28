@@ -149,6 +149,8 @@ def _has_link(value: Any, should_rewrite: Callable[[str], bool]) -> bool:
         return "[[" in value and any(should_rewrite(t) for t in wikilink_targets(value))
     if isinstance(value, list):
         return any(_has_link(v, should_rewrite) for v in value)
+    if isinstance(value, dict):
+        return any(_has_link(v, should_rewrite) for v in value.values())
     return False
 
 
@@ -164,10 +166,31 @@ def relink_frontmatter(
     """
     out = src
     for key, value in fm.items():
+        if _bare_links(value):
+            # An unquoted `key: [[Target]]` reads as a list holding a list: each
+            # inner item is a link target written without its brackets.
+            def unbracketed(s: str) -> str:
+                return replace_wikilinks(f"[[{s}]]", should_rewrite, new_target)[2:-2]
+
+            if any(unbracketed(item[0]) != item[0] for item in value):
+                out = replace_in_value(out, key, unbracketed)
+            continue
         if not _has_link(value, should_rewrite):
             continue
         out = replace_in_value(out, key, lambda s: replace_wikilinks(s, should_rewrite, new_target))
     return out
+
+
+def _bare_links(value: Any) -> bool:
+    """Whether ``value`` is what YAML makes of unquoted links: ``[[a]]`` -> ``[["a"]]``."""
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(
+            isinstance(item, list) and len(item) == 1 and isinstance(item[0], str)
+            for item in value
+        )
+    )
 
 
 def _fold(text: str) -> str:

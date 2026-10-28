@@ -220,9 +220,19 @@ def free_whiteboard_stem(
         n += 1
 
 
+def _same_file(a: Path, b: Path) -> bool:
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
 def _move_one(src: Path, dest: Path) -> None:
     """Move without overwriting; a case-only rename goes through a temporary dot name."""
-    if str(src).lower() == str(dest).lower() and src != dest:
+    if str(src).lower() == str(dest).lower() and str(src) != str(dest):
+        if dest.exists() and not _same_file(src, dest):
+            # Case-sensitive folder: the other spelling is another file.
+            raise FileExistsError(str(dest))
         tmp = src.with_name(f".rename-{os.getpid()}-{id(src)}.tmp")
         retry_os(lambda: os.rename(src, tmp))
         try:
