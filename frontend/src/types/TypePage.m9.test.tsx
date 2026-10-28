@@ -90,3 +90,24 @@ describe('TypePage row menu (Task 17)', () => {
     await waitFor(() => expect(mocked.suggestMapping).toHaveBeenCalledWith('Books/Alpha.md', 'page'))
   })
 })
+
+describe('TypePage Import CSV (Task 19)', () => {
+  test('test import csv sits after create collection in the more menu and opens the dialog', async () => {
+    const user = userEvent.setup()
+    render(<TypePage type={BOOK} />)
+    await user.click(await screen.findByRole('button', { name: 'More' }))
+    const items = (await screen.findAllByRole('menuitem')).map((m) => m.textContent)
+    expect(items.indexOf('Import CSV')).toBe(items.indexOf('Create collection') + 1)
+    await user.click(screen.getByRole('menuitem', { name: 'Import CSV' }))
+    expect(await screen.findByText('Batch import to collection')).toBeInTheDocument()
+  })
+
+  test('test no import csv for daily notes', async () => {
+    const user = userEvent.setup()
+    const daily = typeDef({ id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes', basic: true, revision: 'r1' })
+    render(<TypePage type={daily} />)
+    await user.click(await screen.findByRole('button', { name: 'More' }))
+    await screen.findAllByRole('menuitem')
+    expect(screen.queryByRole('menuitem', { name: 'Import CSV' })).toBeNull()
+  })
+})
