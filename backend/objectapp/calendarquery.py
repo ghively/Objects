@@ -32,6 +32,7 @@ days per instant through ``Space.tz``; day-resolution dates are days as written.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import fields
 from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -53,7 +54,14 @@ MAX_DAYS = 100
 _DATE_KINDS = frozenset({"datetime", "datetimeSimple"})
 _SYSTEM_DATE_KEYS = frozenset({"createdAt", "lastUpdated"})
 _TRUE_TEXTS = frozenset({"true", "yes", "1"})
+log = logging.getLogger(__name__)
+
 _ONE_DAY = timedelta(days=1)
+
+
+def _days(lo: date, hi: date) -> list[date]:
+    """Every day from `lo` through `hi` (no overflow at ``date.max``)."""
+    return [date.fromordinal(n) for n in range(lo.toordinal(), hi.toordinal() + 1)]
 
 
 def _parse_range(from_day: Any, to_day: Any) -> tuple[date, date]:
@@ -80,8 +88,7 @@ class _Query:
         self.today = to_local(space.clock(), space.tz).date()
         self.week_start = week_start_of(space.root)
         self.days: dict[str, dict[str, Any]] = {}
-        d = start
-        while d <= end:
+        for d in _days(start, end):
             self.days[d.isoformat()] = {
                 "dailyNote": None,
                 "tasks": [],
@@ -92,7 +99,6 @@ class _Query:
                 "references": [],
                 "timeline": [],
             }
-            d += _ONE_DAY
         self.mentioned: set[str] = set()
         self._instant_days: dict[str, date | None] = {}
         self._day_offsets: dict[date, timedelta | None] = {}
@@ -114,7 +120,10 @@ class _Query:
         if key not in self._day_offsets:
             midnight = datetime(key.year, key.month, key.day, tzinfo=UTC)
             a = to_local(midnight, self.tz).utcoffset()
-            b = to_local(midnight + _ONE_DAY, self.tz).utcoffset()
+            try:
+                b = to_local(midnight + _ONE_DAY, self.tz).utcoffset()
+            except OverflowError:  # the last representable day
+                b = a
             self._day_offsets[key] = a if a == b else None
         offset = self._day_offsets[key]
         if offset is None:
@@ -152,12 +161,7 @@ class _Query:
         if first is None:
             return []
         lo, hi = max(first, self.start), min(last or first, self.end)
-        out: list[date] = []
-        d = lo
-        while d <= hi:
-            out.append(d)
-            d += _ONE_DAY
-        return out
+        return list(_days(lo, hi))
 
     def span(self, value: dict[str, Any]) -> tuple[date | None, date | None]:
         """(first day, last day) of a decoded date value (the rules of "Calendar semantics")."""
@@ -313,7 +317,7 @@ class _Query:
     ) -> bool:
         repeat = fm.get("repeat")
         rule = parse_repeat(repeat) if isinstance(repeat, str) else None
-        if rule is None or rule.mode != "dueDate":
+        if rule is None or rule.mode != "dueDate" or last >= date.max:
             return False
         lo = max(self.start, self.today + _ONE_DAY, last + _ONE_DAY)
         if lo > self.end:
@@ -444,13 +448,18 @@ def calendar_range(space: Space, from_day: Any, to_day: Any) -> dict[str, Any]:
                 t = types[summary.type] = space.type_by_id(summary.type)
                 dated_props[summary.type] = q.dated_properties(t, daily) if t else []
             t = types[summary.type]
-            if not daily:
-                q.stamps(path, fm)
-            if t is None:
-                continue
-            q.dated(path, dated_props[summary.type], fm)
-            if is_task_type(t):
-                q.task(path, t, fm)
+            try:
+                if not daily:
+                    q.stamps(path, fm)
+                if t is None:
+                    continue
+                q.dated(path, dated_props[summary.type], fm)
+                if is_task_type(t):
+                    q.task(path, t, fm)
+            except (OverflowError, OSError, ValueError):
+                # A date at the edge of what datetime (or the OS's zone data) can
+                # hold: skip this object rather than fail the whole range.
+                log.warning("Calendar: skipped %s (a date out of range)", path)
         q.finish_timeline()
         _day_links(q, space)
         summaries = {

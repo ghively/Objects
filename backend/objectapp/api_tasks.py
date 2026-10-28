@@ -108,6 +108,8 @@ def load_task(space: Any, path: str) -> TaskState:
         _of, fm, version = space.read(rel)
     except (KeyError, FileNotFoundError, IsADirectoryError, NotADirectoryError):
         raise Problem(404, f"No object at {path!r}") from None
+    except ValueError as exc:  # outside the space, or not an object
+        raise Problem(400, str(exc)) from None
     t = space._type_of(rel)
     if not is_task_type(t):
         raise Problem(422, "Not a recurring task")
@@ -520,6 +522,8 @@ def router(ctx: ApiContext) -> APIRouter:
             _of, fm, version = space.read(rel)
         except (KeyError, FileNotFoundError, IsADirectoryError, NotADirectoryError):
             return JSONResponse({"detail": f"No object at {req.path!r}"}, status_code=404)
+        except ValueError as exc:  # outside the space, or not an object
+            return JSONResponse({"detail": str(exc)}, status_code=400)
         t = space._type_of(rel)
         pdef = t.prop(req.key) if t is not None else None
         if pdef is None or not supports_reminders(pdef):

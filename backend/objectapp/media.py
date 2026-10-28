@@ -28,8 +28,10 @@ __all__ = [
     "ATTACHMENTS",
     "IMAGE_EXTENSIONS",
     "MAX_ATTACHMENT_BYTES",
+    "MARKDOWN_UPLOAD_DETAIL",
     "Attachment",
     "AttachmentKind",
+    "MarkdownUpload",
     "NotAnImage",
     "NotServed",
     "RefusedToOpen",
@@ -116,7 +118,9 @@ def image_path(root: Path, path: str) -> Path:
     root = Path(root).resolve()
     text = str(path or "").replace("\\", "/")
     rel = PurePosixPath(text)
-    if not text or rel.is_absolute() or ".." in rel.parts or re.match(r"^[A-Za-z]:", text):
+    if not text or "\x00" in text or rel.is_absolute() or ".." in rel.parts:
+        raise FileNotFoundError(path)
+    if re.match(r"^[A-Za-z]:", text):
         raise FileNotFoundError(path)
     if _hidden(rel.parts):
         raise FileNotFoundError(path)
@@ -219,6 +223,13 @@ class NotServed(ValueError):
     """An object's ``.md`` file: objects are opened, not served (415)."""
 
 
+class MarkdownUpload(ValueError):
+    """An upload named ``*.md``: in the space it would be an object, not a file (415)."""
+
+
+MARKDOWN_UPLOAD_DETAIL = "A Markdown file can't be added as an attachment: it would become an object."
+
+
 class TooLarge(ValueError):
     """An upload over `MAX_ATTACHMENT_BYTES` (413)."""
 
@@ -271,7 +282,9 @@ def attachment_path(root: Path, path: str) -> Path:
     root = Path(root).resolve()
     text = str(path or "").replace("\\", "/")
     rel = PurePosixPath(text)
-    if not text or rel.is_absolute() or ".." in rel.parts or re.match(r"^[A-Za-z]:", text):
+    if not text or "\x00" in text or rel.is_absolute() or ".." in rel.parts:
+        raise FileNotFoundError(path)
+    if re.match(r"^[A-Za-z]:", text):
         raise FileNotFoundError(path)
     if _hidden(rel.parts):
         raise FileNotFoundError(path)
@@ -339,13 +352,15 @@ def import_attachment(root: Path, name: str, data: bytes) -> tuple[str, Attachme
 
     Never overwrites (case-insensitive name check, then an atomic create). Returns
     ``(path, kind)``. Raises `TooLarge` over `MAX_ATTACHMENT_BYTES` and `ValueError` for
-    an empty upload or a name with no usable stem.
+    an empty upload or a name with no usable stem, and `MarkdownUpload` for a ``.md`` name.
     """
     if len(data) > MAX_ATTACHMENT_BYTES:
         raise TooLarge(name)
     if not data:
         raise ValueError("The file is empty")
     stem, ext = _safe_attachment_name(name)
+    if f"{stem}{ext}".lower().endswith(".md"):
+        raise MarkdownUpload(name)
     folder = Path(root) / ATTACHMENTS
     folder.mkdir(parents=True, exist_ok=True)
     n = 1

@@ -13,6 +13,8 @@ from objectapp.media import kind_of, list_attachments
 from objectapp.server import create_app
 from objectapp.space import Space
 
+OCTET = {"content-type": "application/octet-stream"}
+
 
 @pytest.fixture
 def env(blocks_space_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -155,46 +157,46 @@ def test_upload_creates_attachment_and_never_overwrites(env):
     root, client, _ = env
     # The fixture already has report.pdf, so two "Report.PDF" uploads would start at (2);
     # "Summary.PDF" shows the plain case, then "REPORT.pdf" the case-insensitive check.
-    first = client.post("/api/attachments", params={"name": "Summary.PDF"}, content=b"%PDF-one")
+    first = client.post("/api/attachments", params={"name": "Summary.PDF"}, content=b"%PDF-one", headers=OCTET)
     assert first.status_code == 201
     assert first.json() == {"path": "Attachments/Summary.pdf", "kind": "pdf"}
-    second = client.post("/api/attachments", params={"name": "Summary.PDF"}, content=b"%PDF-two")
+    second = client.post("/api/attachments", params={"name": "Summary.PDF"}, content=b"%PDF-two", headers=OCTET)
     assert second.status_code == 201
     assert second.json() == {"path": "Attachments/Summary (2).pdf", "kind": "pdf"}
     assert (root / "Attachments/Summary.pdf").read_bytes() == b"%PDF-one"
     assert (root / "Attachments/Summary (2).pdf").read_bytes() == b"%PDF-two"
     original = (root / "Attachments/report.pdf").read_bytes()
-    third = client.post("/api/attachments", params={"name": "REPORT.pdf"}, content=b"%PDF-new")
+    third = client.post("/api/attachments", params={"name": "REPORT.pdf"}, content=b"%PDF-new", headers=OCTET)
     assert third.json() == {"path": "Attachments/REPORT (2).pdf", "kind": "pdf"}
     assert (root / "Attachments/report.pdf").read_bytes() == original
 
 
 def test_upload_name_sanitised(env):
     root, client, _ = env
-    res = client.post("/api/attachments", params={"name": "../../evil.sh"}, content=b"echo")
+    res = client.post("/api/attachments", params={"name": "../../evil.sh"}, content=b"echo", headers=OCTET)
     assert res.status_code == 201
     assert res.json() == {"path": "Attachments/evil.sh", "kind": "file"}
     assert not (root.parent / "evil.sh").exists()
-    con = client.post("/api/attachments", params={"name": "con.txt"}, content=b"x")
+    con = client.post("/api/attachments", params={"name": "con.txt"}, content=b"x", headers=OCTET)
     assert con.json()["path"] == "Attachments/con_.txt"
-    bad = client.post("/api/attachments", params={"name": "a<b>c.mp3"}, content=b"x")
+    bad = client.post("/api/attachments", params={"name": "a<b>c.mp3"}, content=b"x", headers=OCTET)
     assert bad.json() == {"path": "Attachments/a.mp3", "kind": "audio"}
-    odd_ext = client.post("/api/attachments", params={"name": "weird.ext with space"}, content=b"x")
+    odd_ext = client.post("/api/attachments", params={"name": "weird.ext with space"}, content=b"x", headers=OCTET)
     assert odd_ext.json()["path"] == "Attachments/weird.ext with space"
-    long_ext = client.post("/api/attachments", params={"name": "x.abcdefghijk"}, content=b"x")
+    long_ext = client.post("/api/attachments", params={"name": "x.abcdefghijk"}, content=b"x", headers=OCTET)
     assert long_ext.json()["path"] == "Attachments/x.abcdefghijk"
-    assert client.post("/api/attachments", params={"name": ""}, content=b"x").status_code == 422
-    assert client.post("/api/attachments", params={"name": "a.png"}, content=b"").status_code == 422
+    assert client.post("/api/attachments", params={"name": ""}, content=b"x", headers=OCTET).status_code == 422
+    assert client.post("/api/attachments", params={"name": "a.png"}, content=b"", headers=OCTET).status_code == 422
 
 
 def test_upload_over_limit_413(env, monkeypatch: pytest.MonkeyPatch):
     root, client, _ = env
     monkeypatch.setattr(media, "MAX_ATTACHMENT_BYTES", 8)
-    res = client.post("/api/attachments", params={"name": "big.bin"}, content=b"123456789")
+    res = client.post("/api/attachments", params={"name": "big.bin"}, content=b"123456789", headers=OCTET)
     assert res.status_code == 413
     assert "100 MiB" in res.json()["detail"]
     assert not (root / "Attachments/big.bin").exists()
-    ok = client.post("/api/attachments", params={"name": "small.bin"}, content=b"12345678")
+    ok = client.post("/api/attachments", params={"name": "small.bin"}, content=b"12345678", headers=OCTET)
     assert ok.status_code == 201
 
 

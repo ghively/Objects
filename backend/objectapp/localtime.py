@@ -10,6 +10,7 @@ clocks for any `tzinfo` (a `SystemTz`, a `zoneinfo.ZoneInfo`, a fixed
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta, tzinfo
 
@@ -19,9 +20,24 @@ _DAY = timedelta(days=1)
 
 
 def _os_offset_at(naive_local: datetime, fold: int) -> timedelta:
-    """The OS's UTC offset for a local wall-clock time (honours `fold`)."""
-    offset = naive_local.replace(tzinfo=None, fold=fold).astimezone().utcoffset()
+    """The OS's UTC offset for a local wall-clock time (honours `fold`).
+
+    A time the OS can't convert (before 1970 on Windows, near year 9999) gets the
+    offset of the same wall time in the nearest year the OS handles.
+    """
+    try:
+        offset = naive_local.replace(tzinfo=None, fold=fold).astimezone().utcoffset()
+    except (OverflowError, OSError, ValueError):
+        year = min(max(naive_local.year, _OS_FIRST_YEAR), _OS_LAST_YEAR)
+        if year == naive_local.year:
+            return timedelta(0)
+        day = min(naive_local.day, 28) if naive_local.month == 2 else naive_local.day
+        return _os_offset_at(naive_local.replace(year=year, day=day), fold)
     return offset if offset is not None else timedelta(0)
+
+
+# Years every OS's localtime() converts (Windows: 1970 through 3000).
+_OS_FIRST_YEAR, _OS_LAST_YEAR = 1971, 2999
 
 
 class SystemTz(tzinfo):
@@ -68,14 +84,20 @@ class SystemTz(tzinfo):
         if dt.tzinfo is not self:
             raise ValueError("fromutc: dt.tzinfo is not self")
         utc = dt.replace(tzinfo=None, fold=0)
-        candidates = sorted(
-            {self._offset(utc + shift, f) for shift in (-_DAY, timedelta(0), _DAY) for f in (0, 1)}
-        )
+        found: set[timedelta] = set()
+        for shift in (-_DAY, timedelta(0), _DAY):
+            with contextlib.suppress(OverflowError):  # the first or last representable day
+                near = utc + shift
+                found.update(self._offset(near, f) for f in (0, 1))
+        candidates = sorted(found)
         # fold=0 first: an ambiguous local time's first occurrence; fold=1 only
         # when no fold-0 reading maps back to this instant (the second one).
         for fold in (0, 1):
             for offset in candidates:
-                local = utc + offset
+                try:
+                    local = utc + offset
+                except OverflowError:
+                    continue
                 if self._offset(local, fold) == offset:
                     return local.replace(tzinfo=self, fold=fold)
         return (utc + self._offset(utc, 0)).replace(tzinfo=self)
@@ -101,18 +123,33 @@ def from_local(naive: datetime, tz: tzinfo) -> datetime:
     """A local wall-clock time in `tz` as an aware UTC instant.
 
     A nonexistent time (spring-forward gap) shifts forward by the gap; an
-    ambiguous one (fall-back) takes the first occurrence (fold=0).
+    ambiguous one (fall-back) takes the first occurrence (fold=0). Raises
+    `OverflowError` when the instant is outside what `datetime` can hold.
     """
     naive = naive.replace(tzinfo=None, fold=0)
     offsets: set[timedelta] = set()
     for shift in (timedelta(0), -_DAY, _DAY):
+        try:
+            shifted = naive + shift
+        except OverflowError:  # the first or last representable day
+            continue
         for fold in (0, 1):
-            offset = (naive + shift).replace(tzinfo=tz, fold=fold).utcoffset()
+            offset = shifted.replace(tzinfo=tz, fold=fold).utcoffset()
             if offset is not None:
                 offsets.add(offset)
-    instants = sorted({(naive - offset).replace(tzinfo=UTC) for offset in offsets})
+    found: set[datetime] = set()
+    for offset in offsets:
+        with contextlib.suppress(OverflowError):
+            found.add((naive - offset).replace(tzinfo=UTC))
+    instants = sorted(found)
+    if not instants:
+        raise OverflowError(f"{naive} is out of range in {tz!r}")
     for instant in instants:  # earliest valid instant = the first occurrence
-        if instant.astimezone(tz).replace(tzinfo=None, fold=0) == naive:
+        try:
+            back = instant.astimezone(tz).replace(tzinfo=None, fold=0)
+        except OverflowError:
+            continue
+        if back == naive:
             return instant
     # In a gap: the latest candidate reads the wall clock with the offset from
     # before the transition, which lands the gap's length later.

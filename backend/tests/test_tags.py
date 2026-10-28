@@ -19,6 +19,8 @@ DOCS_TAG = (
 )
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 
+OCTET = {"content-type": "application/octet-stream"}
+
 
 def _write(path: Path, text: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -211,7 +213,7 @@ def test_import_image_and_serve(space_dir: Path):
     assert import_image(space_dir, "../evil:name?.webp", PNG) == "Attachments/evil.webp"
 
     client = TestClient(create_app(Space(space_dir), watch=False))
-    res = client.post("/api/images", params={"name": "shot.png"}, content=PNG)
+    res = client.post("/api/images", params={"name": "shot.png"}, content=PNG, headers=OCTET)
     assert res.status_code == 201
     assert res.json() == {"path": "Attachments/shot.png"}
     listed = [i["path"] for i in client.get("/api/images").json()]
@@ -221,7 +223,7 @@ def test_import_image_and_serve(space_dir: Path):
     assert res.content == PNG
     assert res.headers["content-type"] == "image/png"
     assert client.get("/api/file", params={"path": "Attachments/none.png"}).status_code == 404
-    assert client.post("/api/images", params={"name": "a.exe"}, content=b"MZ").status_code == 415
+    assert client.post("/api/images", params={"name": "a.exe"}, content=b"MZ", headers=OCTET).status_code == 415
 
 
 def test_file_route_refuses_non_image_415(space_dir: Path):

@@ -83,7 +83,8 @@ Routes (all JSON):
   dot-folders whose kind isn't ``file``, plus everything under ``Attachments/``; never
   objects or whiteboard sidecars), sorted by path. ``POST /api/attachments?name=`` (raw
   bytes) -> ``201 {path, kind}`` (``Attachments/<safe name>.<ext>``, `` (2)`` when taken,
-  never overwritten); ``413`` over 100 MiB, ``422`` empty or unusable name.
+  never overwritten); ``413`` over 100 MiB, ``422`` empty or unusable name, ``415`` a
+  ``.md`` name (it would become an object).
   ``GET /api/file?path=`` -> the file's bytes with per-kind headers (images: CSP
   ``sandbox``; pdf, audio, video: inline, ranges answered ``206``; any other file:
   ``application/octet-stream`` as an attachment; ``nosniff`` on all); ``415`` for a ``.md``
@@ -500,6 +501,71 @@ def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse({"detail": message}, status_code=status)
 
 
+# The host names this app answers to. Any other ``Host`` is a DNS-rebinding page
+# (a foreign name resolved to 127.0.0.1), refused on every request. The port is not
+# checked: the Vite dev server proxies with its own port in ``Host``. Tests add
+# Starlette's ``testserver`` in conftest.
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+allowed_hosts: frozenset[str] = LOOPBACK_HOSTS
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+# Routes whose body is raw file bytes: they need ``application/octet-stream``, which a
+# cross-site page can only send after a CORS preflight this app never grants.
+_UPLOAD_ROUTES = frozenset({"/api/images", "/api/attachments"})
+
+
+def _host_name(host: str) -> str | None:
+    """The host name in a ``Host`` header (lower-case, IPv6 without brackets), else None."""
+    host = host.strip().lower()
+    if host.startswith("["):
+        end = host.find("]")
+        rest = host[end + 1 :]
+        if end < 0 or (rest and not (rest.startswith(":") and rest[1:].isdigit())):
+            return None
+        return host[1:end]
+    name, _sep, port = host.partition(":")
+    if port and not port.isdigit():
+        return None
+    return name or None
+
+
+def _local_only_problem(scope: dict[str, Any]) -> tuple[int, str] | None:
+    """Why `scope` must be refused (status, message), else None. See `LOOPBACK_HOSTS`."""
+    headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope["headers"]}
+    host = headers.get("host", "")
+    if _host_name(host) not in allowed_hosts:
+        return 403, "Object only answers on 127.0.0.1 or localhost."
+    method = scope.get("method", "GET") if scope["type"] == "http" else "GET"
+    origin = headers.get("origin")
+    if scope["type"] == "websocket" or method not in _SAFE_METHODS:
+        # Browsers send Origin on every cross-origin write; it must be this page's.
+        if origin is not None and origin.lower() != f"http://{host.strip().lower()}":
+            return 403, "Changes are only accepted from Object's own window."
+    if method == "POST" and scope.get("path") in _UPLOAD_ROUTES:
+        ctype = headers.get("content-type", "").split(";")[0].strip().lower()
+        if ctype != "application/octet-stream":
+            return 415, "Uploads must be sent as application/octet-stream."
+    return None
+
+
+class LocalOnlyMiddleware:
+    """Refuses DNS-rebinding hosts, cross-origin writes and "simple" uploads (pure ASGI,
+    so Server-Sent Events stream through untouched)."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] in ("http", "websocket"):
+            problem = _local_only_problem(scope)
+            if problem is not None:
+                if scope["type"] == "websocket":
+                    await send({"type": "websocket.close", "code": 1008})
+                    return
+                await _error(*problem)(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
 def _views_problem(views: dict[str, Any]) -> str | None:
     """Why a PUT /api/views body is not a Views object, else None."""
     if "activeTab" in views and not isinstance(views["activeTab"], str):
@@ -688,6 +754,7 @@ def create_app(
     app = FastAPI(
         title="Object", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
     )
+    app.add_middleware(LocalOnlyMiddleware)
     app.state.space = space
     app.state.hub = hub
     app.state.reminders = scheduler
@@ -1365,6 +1432,10 @@ def create_app(
             # `from_json` would fill these in; an edit that clears them is refused.
             if not isinstance(data.get(field), str) or not data[field].strip():
                 return _error(422, "An object type needs a name and a plural name")
+        if data.get("propertyDefinitions") is not None and not isinstance(
+            data["propertyDefinitions"], list
+        ):
+            return _error(422, "propertyDefinitions must be a list")
         for entry in data.get("propertyDefinitions") or []:
             if isinstance(entry, dict) and "options" in entry:
                 bad = option_shape_problems(entry["options"])
@@ -1508,6 +1579,8 @@ def create_app(
             path, kind = await asyncio.to_thread(import_attachment, space.root, name, data)
         except TooLarge:
             return too_large
+        except media.MarkdownUpload:
+            return _error(415, media.MARKDOWN_UPLOAD_DETAIL)
         except ValueError as exc:
             return _error(422, str(exc))
         return JSONResponse({"path": path, "kind": kind}, status_code=201)
