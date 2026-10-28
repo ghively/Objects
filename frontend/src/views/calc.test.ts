@@ -18,6 +18,12 @@ const ctx: FilterCtx = { types: [page], collections: [], tagIdsToTitles: {}, now
 const R = (values: Row['values']): Row => row({ summary: objectSummary({ path: 'x.md', type: 'page' }), values })
 
 describe('calculations', () => {
+  test("a key shared by two types calculates with the view's type's definition (audit #15)", () => {
+    const other = typeDef({ id: 'other', propertyDefinitions: [propertyDef({ id: 'qty', type: 'text' })] })
+    const c: FilterCtx = { ...ctx, types: [other, page], viewTypeIds: ['page'] }
+    expect(calculate([R({ qty: 2 }), R({ qty: 4 })], 'qty', 'sum', c).value).toBe(6)
+  })
+
   test('countValues sums multi-value cells', () => {
     const rows = [R({ flavor: ['A', 'B'] }), R({ flavor: ['A'] }), R({ flavor: [] })]
     expect(calculate(rows, 'flavor', 'countValues', ctx).value).toBe(3)

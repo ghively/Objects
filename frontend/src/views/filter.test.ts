@@ -178,6 +178,17 @@ describe('filter engine', () => {
     expect(paths(applyFilters(rows, group('or', gone, f('note', 'is', 'x')), ctx()))).toEqual(['a'])
   })
 
+  test("a key shared by two types is checked against the view's type's definition (audit #15)", () => {
+    // `qty` is a number on page (first) and a label on `stock`, the type the view shows.
+    const stock = typeDef({
+      id: 'stock',
+      propertyDefinitions: [propertyDef({ id: 'qty', type: 'label', options: { set: [{ id: 'q1', text: 'Low', color: null, icon: null }] } })],
+    })
+    const c = ctx({ types: [page, stock], viewTypeIds: ['stock'] })
+    const rows = [R('a', { qty: ['Low'] }, {}, 'stock'), R('b', { qty: [] }, {}, 'stock')]
+    expect(paths(applyFilters(rows, group('and', f('qty', 'contains', ['q1'])), c))).toEqual(['a'])
+  })
+
   test('structureId scopes filter to one type', () => {
     const rows = [R('a', { qty: 1 }), R('t1', { prio: 1 }, {}, 'task'), R('t2', { prio: 5 }, {}, 'task')]
     const g = group('and', f('prio', 'greater', 3, 'task'))

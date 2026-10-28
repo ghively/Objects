@@ -166,7 +166,7 @@ export function calculate(rows: Row[], propertyId: string, kind: CalcKind, ctx: 
   const total = rows.length
   const none: CalcResult = { value: null, display: '' }
   if (kind === 'countAll') return { value: total, display: String(total) }
-  const def = findDef(ctx.types, propertyId)
+  const def = findDef(ctx.types, propertyId, undefined, ctx.viewTypeIds)
   if (!def) return none
   const cells = rows.map((r) => cellOf(r, propertyId, def.type))
   const filled = cells.filter((c) => c.keys.length > 0).length
