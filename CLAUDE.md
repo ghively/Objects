@@ -21,7 +21,7 @@ Backend: Python, run with `uv` (`uv run pytest backend/tests -q`). Frontend: Typ
 ## Where things are
 
 - Spec: `docs/superpowers/specs/2026-10-23-object-design.md`
-- Plans, acceptance checklists and status: `docs/superpowers/plans/` (`remaining-work.md` lists M3–M7)
-- How milestones are built: `docs/superpowers/build-process.md`; the build workflow script: `scripts/workflows/object-milestone-build.js`
+- Plans, acceptance checklists and status: `docs/superpowers/plans/` (`remaining-work.md` is the status page; M1–M8 are built)
+- How milestones are built: `docs/superpowers/build-process.md`; the build workflow scripts: `scripts/workflows/` (see `CONTINUE.md` for which is which)
 - Visual reference: `docs/`; design notes: `docs/design-notes`
 - Object reference material (behaviour, labels, CSS values; never copy its code): `reference/` in this repo (a trimmed subset: models, English strings, CSS). On Gene's machine the full unpacked app is also in the git-ignored `.reference/`, and older plans and the build script's rules say `.reference/`; in a clone, read `reference/` instead.
