@@ -79,6 +79,17 @@ function parseDayPart(t: string, nowInstant: Date): Date | null {
   }
   m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t)
   if (m) return validDate(+m[1], +m[2] - 1, +m[3])
+  // The numeric orders the date shows in (`format.ts` `numericDate`): DMY `30-10-2026`, MDY
+  // `10/30/2026`; a dotted `30.10.2026` is day first.
+  m = /^(\d{1,2})([-./])(\d{1,2})\2(\d{4})$/.exec(t)
+  if (m) return m[2] === '/' ? validDate(+m[4], +m[1] - 1, +m[3]) : validDate(+m[4], +m[3] - 1, +m[1])
+  // Day first with a month name, as en-GB shows it ("30 oct 2026").
+  m = /^(\d{1,2}) ([a-z]+)\.?,? (\d{4})$/.exec(t)
+  if (m) {
+    const month = MONTHS.indexOf(m[2].slice(0, 3))
+    if (month < 0 || (m[2].length > 3 && !MONTH_NAMES[month].startsWith(m[2]))) return null
+    return validDate(+m[3], month, +m[1])
+  }
   m = /^([a-z]+)\.? (\d{1,2})(?:st|nd|rd|th)?(?:,? (\d{4}))?$/.exec(t)
   if (m) {
     const month = MONTHS.indexOf(m[1].slice(0, 3))
@@ -127,9 +138,14 @@ export function parseDateInput(s: string, now: Date = new Date()): DateValue | n
   }
   const t = raw.toLowerCase().replace(/\s+/g, ' ')
   const at = t.lastIndexOf(' at ')
+  // The shown text: a day, a comma, then the time ("oct 30, 2026, 2:00 pm", "30-10-2026, 14:00").
+  const shown = /^(.+), (\d{1,2}:\d{2}(?: ?(?:am|pm|a\.m\.|p\.m\.))?)$/.exec(t)
   let dayPart = t
   let timePart: string | null = null
-  if (at >= 0) {
+  if (shown && at < 0) {
+    dayPart = shown[1].trim()
+    timePart = shown[2]
+  } else if (at >= 0) {
     dayPart = t.slice(0, at).trim()
     timePart = t.slice(at + 4).trim()
   } else if (t.startsWith('at ')) {

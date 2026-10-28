@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { DatePicker, parseDateInput } from './DatePicker'
+import { formatDate } from './format'
 
 // Wednesday 21 Oct 2026, 10:30 local time.
 const NOW = new Date(2026, 9, 21, 10, 30)
@@ -143,6 +144,35 @@ describe('parseDateInput', () => {
     })
     expect(parseDateInput('not a date', NOW)).toBeNull()
     expect(parseDateInput('', NOW)).toBeNull()
+  })
+})
+
+describe('parseDateInput reads the shown text', () => {
+  const at = (y: number, m: number, d: number, h: number, min: number) => ({
+    start: new Date(y, m - 1, d, h, min).toISOString(),
+    resolution: 'time',
+  })
+  afterEach(() => useSettings.setState({ settings: settingsDefaults }))
+
+  it('reads what formatDate shows in every date format', () => {
+    expect(parseDateInput('Oct 30, 2026, 2:00 PM', NOW)).toEqual(at(2026, 10, 30, 14, 0))
+    // ICU writes a narrow no-break space before AM/PM.
+    expect(parseDateInput('Oct 30, 2026, 2:00 PM', NOW)).toEqual(at(2026, 10, 30, 14, 0))
+    expect(parseDateInput('Oct 30, 2026, 14:00', NOW)).toEqual(at(2026, 10, 30, 14, 0))
+    expect(parseDateInput('30-10-2026', NOW)).toEqual({ start: '2026-10-30', resolution: 'day' })
+    expect(parseDateInput('10/30/2026', NOW)).toEqual({ start: '2026-10-30', resolution: 'day' })
+    expect(parseDateInput('30-10-2026, 2:00 PM', NOW)).toEqual(at(2026, 10, 30, 14, 0))
+    expect(parseDateInput('2026-10-30, 14:00', NOW)).toEqual(at(2026, 10, 30, 14, 0))
+    expect(parseDateInput('31-02-2026', NOW)).toBeNull()
+    expect(parseDateInput('30 Oct 2026, 14:00', NOW)).toEqual(at(2026, 10, 30, 14, 0))
+    for (const dateFormatting of ['localized', 'DMY', 'MDY', 'YMD'] as const) {
+      for (const twentyFourHourTime of [false, true]) {
+        useSettings.setState({ settings: { ...settingsDefaults, dateFormatting, twentyFourHourTime } })
+        const v = { start: new Date(2026, 9, 30, 14, 5).toISOString(), resolution: 'time' as const }
+        expect(parseDateInput(formatDate(v), NOW)).toEqual(v)
+        expect(parseDateInput(formatDate({ start: '2026-10-03', resolution: 'day' }), NOW)).toEqual({ start: '2026-10-03', resolution: 'day' })
+      }
+    }
   })
 })
 
