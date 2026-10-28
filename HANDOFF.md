@@ -6,9 +6,11 @@ Updated 2026-10-28. You are continuing "Object", a local, Markdown-backed recrea
 
 **All eight milestones are built, reviewed, fixed and through their final gates.** Nothing is waiting on a build.
 
-**A full audit ran on 2026-10-28 at `04e9d07`.** It found about 65 reproduced bugs and 14 completeness gaps, none fixed yet. The list, ranked, is in `docs/superpowers/plans/audit-2026-10-28.md`; the repro scripts are in `scripts/audit-2026-10-28/`. Next comes fixing the audit list, then Gene's hands-on checks and the fixes they produce.
+**The 2026-10-28 audit is fixed** (on Gene's Windows PC, same day): every bug in `docs/superpowers/plans/audit-2026-10-28.md` and every real "unconfirmed" item, one per commit with a failing-first test. **The guessed values were checked against the full Capacities app** (`docs/superpowers/plans/reference-check-2026-10-28.md`) and applied. Status and the gate numbers: `docs/superpowers/plans/remaining-work.md`.
 
-**Branch:** this work is on `ccr-e702dd20-m7hpyc`, two docs-and-scripts commits ahead of `master` (no code changes). On a local PC, run `git fetch origin` then `git checkout ccr-e702dd20-m7hpyc`, or merge it into `master` first.
+**Next:** Gene's hands-on checks. **M9** (the approved completeness gaps, plan `docs/superpowers/plans/2026-10-28-m9-completeness-gaps.md`) is **on hold until Gene says to start it.**
+
+**Branch:** everything is on `master`.
 
 | Milestone | Scope | Plan |
 |---|---|---|
@@ -32,9 +34,7 @@ Last full verification, 2026-10-28 at `9383a9b`, on Linux:
 
 1. Set up: install `uv` and Node 22+; run `uv sync`, then `cd frontend && npm ci`. Use `npm ci`, not `npm install`: a newer npm rewrites `package-lock.json`.
 2. Run the baseline: `uv run pytest backend/tests -q`, then `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build`. Report any failure before changing code.
-3. **Fix the audit list** (`docs/superpowers/plans/audit-2026-10-28.md`), starting with "Fix first", items 1–17, top down. Do one finding per commit, each with a regression test that fails before the fix; the matching script in `scripts/audit-2026-10-28/` is the starting point. Then do the other bugs by area. The "Completeness gaps" table needs Gene's call, item by item, on whether each is in scope, before building anything.
-   - **Biggest first:** item 1, the API accepts any Origin and Host. This one is a security bug.
-   - **Several fixes at once:** the Time zone setting is ignored across views, tasks and calendar. One shared fix (build and split instants with `lib/zonedTime` everywhere) clears about ten findings.
+3. **The audit list is done** (2026-10-28). Don't redo it; `remaining-work.md` lists what landed. **M9** (completeness gaps) waits for Gene's go-ahead; when he gives it, build it from `docs/superpowers/plans/2026-10-28-m9-completeness-gaps.md` (its "Gene's answers" section overrides the recommendations).
 4. Pick up Gene's findings from his hand-checks (`docs/superpowers/plans/m1-acceptance.md` to `m8-acceptance.md`, 237 unchecked items) and fix them the same way. After each batch, rerun the full gate and every acceptance script on fixture copies.
 5. Keep `remaining-work.md`, `CONTINUE.md` and this file current, commit, and push.
 
