@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { describeRepeat, formatRepeat, nextDay, ordinal, parseRepeat, presetOn, stepAfter } from './repeat'
+import { useSettings } from '@/settings/useSettings'
+import { describeRepeat, formatRepeat, localDayOf, nextDay, ordinal, parseRepeat, presetOn, stepAfter } from './repeat'
 
 // The shared table from the M4 plan's Global Constraints, row for row (backend: test_taskmodel.py).
 const REPEAT_VALID: [string, object, string][] = [
@@ -110,5 +111,20 @@ describe('repeat (M8 custom rules)', () => {
     expect(formatRepeat({ every: 1, unit: 'week', mode: 'dueDate', on: presetOn('week', d) })).toBe('every week on fri')
     expect(formatRepeat({ every: 1, unit: 'month', mode: 'dueDate', on: presetOn('month', d) })).toBe('every month on the 30th')
     expect(formatRepeat({ every: 1, unit: 'year', mode: 'dueDate', on: presetOn('year', d) })).toBe('every year on october 30')
+  })
+})
+
+describe('repeat days in the Time zone setting', () => {
+  test('an instant is on its day in the Time zone setting', () => {
+    const settings = useSettings.getState().settings
+    useSettings.setState({ settings: { ...settings, timeZone: 'Pacific/Auckland' } })
+    try {
+      // 2026-10-28T22:00Z is 29 Oct 11:00 in Auckland.
+      const d = localDayOf('2026-10-28T22:00:00.000Z')!
+      expect([d.getFullYear(), d.getMonth() + 1, d.getDate()]).toEqual([2026, 10, 29])
+      expect(nextDay(parseRepeat('every day')!, '2026-10-28T22:00:00.000Z', '2026-10-29')).toBe('2026-10-30')
+    } finally {
+      useSettings.setState({ settings })
+    }
   })
 })
