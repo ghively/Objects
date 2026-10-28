@@ -1,6 +1,6 @@
 // The data view: toolbar, filter -> sort -> group pipeline and a layout, reused by type pages,
 // collections, queries and All notes. The caller owns the state (see `useViewState`).
-import { createContext, useContext, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Collection, Layout, Row, RowsScope, TypeDef, UpdateResult, ViewState } from '@/api/types'
 import { api } from '@/api/client'
@@ -30,6 +30,7 @@ import { Toolbar } from './Toolbar'
 import { ViewSummary } from './ViewSummary'
 import { matchingValues } from './matching'
 import { commonRowMenu, type RowMenuCtx, type RowMenuItem } from './rowMenu'
+import { SelectionBar } from './SelectionBar'
 
 export type { RowMenuItem } from './rowMenu'
 
@@ -77,6 +78,8 @@ export interface LayoutProps {
   rowExtras?(row: Row): RowExtras
   /** A layout wrote a row (the kanban drop) and reloaded it; `result` is the server's answer. */
   onWritten?(row: Row, result: UpdateResult): void
+  /** M9: whether the row is selected ("Select multiple"); selected rows carry `data-selected`. */
+  isSelected?(path: string): boolean
 }
 
 /** What an owner adds to one row: `leading` before its title, `trailing` after it. */
@@ -112,7 +115,8 @@ export interface DataViewProps {
   rowMenu?(row: Row): RowMenuItem[]
   /**
    * M9: the common row menu (`rowMenu.ts`: open, change type, copy reference, duplicate, delete)
-   * on right-click, before `rowMenu`'s own items. Type pages, their sections, queries and collections.
+   * on right-click, before `rowMenu`'s own items, and multi-select with its bulk actions ("Select
+   * multiple", then click or Shift-click; Escape clears). Type pages, their sections, queries and collections.
    */
   rowActions?: boolean
   /** Renders layouts other than the list (table, cards, kanban). */
@@ -213,8 +217,20 @@ export function DataView(props: DataViewProps) {
   const objects = useLinkIndex((s) => s.objects)
   const [visible, setVisible] = useState(LOAD_PAGE)
   const [menu, setMenu] = useState<{ x: number; y: number; items: RowMenuItem[] } | null>(null)
-  const [changing, setChanging] = useState<{ row: Row; to: TypeDef } | null>(null)
+  // One change-type dialog per row, in turn (the bulk action runs the one-object dialog per row).
+  const [changing, setChanging] = useState<{ rows: Row[]; to: TypeDef } | null>(null)
   const [deleting, setDeleting] = useState<Row | null>(null)
+  // The selected paths while selecting ("Select multiple"); null when not selecting.
+  const [selected, setSelected] = useState<string[] | null>(null)
+  const anchor = useRef<string | null>(null)
+  const selecting = selected !== null
+
+  useEffect(() => {
+    if (!selecting) return
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && setSelected(null)
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [selecting])
 
   const typesById = useMemo(() => Object.fromEntries(types.map((t) => [t.id, t])), [types])
 
@@ -274,7 +290,30 @@ export function DataView(props: DataViewProps) {
     onState({ ...state, viewDefinition: { ...state.viewDefinition, groupByConfig: { ...state.viewDefinition.groupByConfig, groups: next } } })
   }
 
+  const select = (paths: string[] | null, last: string | null) => {
+    anchor.current = last
+    setSelected(paths && paths.length > 0 ? paths : null)
+  }
   const onOpen = (row: Row, e: MouseEvent) => {
+    const path = row.summary.path
+    if (selected) {
+      // Shift: the range from the last clicked row, added; else toggle this row.
+      const order = flat.map((r) => r.summary.path)
+      const from = anchor.current ? order.indexOf(anchor.current) : -1
+      const to = order.indexOf(path)
+      if (e.shiftKey && from >= 0 && to >= 0) {
+        const range = order.slice(Math.min(from, to), Math.max(from, to) + 1)
+        select([...new Set([...selected, ...range])], path)
+      } else {
+        select(selected.includes(path) ? selected.filter((p) => p !== path) : [...selected, path], path)
+      }
+      return
+    }
+    // Shift-click starts selecting (our choice; Object enters it from "Select multiple").
+    if (e.shiftKey && props.rowActions) {
+      select([path], path)
+      return
+    }
     if (e.ctrlKey || e.metaKey) {
       useTabs.getState().open({ kind: 'object', path: row.summary.path }, { newTab: true })
       return
@@ -316,6 +355,7 @@ export function DataView(props: DataViewProps) {
     patchRow: props.patchRow,
     rowExtras: props.rowExtras,
     onWritten: props.onWritten,
+    isSelected: selected ? (path) => selected.includes(path) : undefined,
     groupCount: (g) => result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length,
   }
   const builtin = (): ReactNode => {
@@ -376,14 +416,15 @@ export function DataView(props: DataViewProps) {
 
   const menuCtx: RowMenuCtx = {
     types,
-    selectMultiple: () => undefined,
-    changeType: (row, to) => setChanging({ row, to }),
+    selectMultiple: (row) => select([row.summary.path], row.summary.path),
+    changeType: (row, to) => setChanging({ rows: [row], to }),
     requestDelete: (row) => setDeleting(row),
   }
   const itemsFor = (row: Row): RowMenuItem[] => [
     ...(props.rowActions ? commonRowMenu(row, menuCtx) : []),
     ...(props.rowMenu?.(row) ?? []),
   ]
+  const selectedRows = selected ? flat.filter((r) => selected.includes(r.summary.path)) : []
 
   return (
     <section
@@ -409,6 +450,26 @@ export function DataView(props: DataViewProps) {
         </div>
       )}
       {toolbarSlot && createPortal(toolbar, toolbarSlot)}
+      {selectedRows.length > 0 && (
+        <SelectionBar
+          rows={selectedRows}
+          types={types}
+          onChangeType={(to) => {
+            const rs = selectedRows.filter((r) => !r.summary.readOnly && r.summary.template == null && r.summary.type !== to.id)
+            if (rs.length > 0) setChanging({ rows: rs, to })
+          }}
+          onOpenInSidepanel={() => {
+            for (const r of selectedRows) useTabs.getState().openInSidepanel({ kind: 'object', path: r.summary.path })
+          }}
+          onDelete={async () => {
+            for (const r of selectedRows.filter((x) => !x.summary.readOnly)) {
+              await api.deleteObject(r.summary.path, { baseVersion: r.version })
+            }
+            select(null, null)
+          }}
+          onClear={() => select(null, null)}
+        />
+      )}
       {(state.showDataViewDetails || props.pausedHint) && (
         <ViewSummary state={state} choices={choices} pausedHint={props.pausedHint} />
       )}
@@ -439,7 +500,14 @@ export function DataView(props: DataViewProps) {
                 <div key={g.id} className="flex flex-col">
                   {grouped && header(g, result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length)}
                   {!(grouped && closed(g)) && (
-                    <ListLayout rows={g.rows} typesById={typesById} multiType={multiType} onOpen={onOpen} rowExtras={props.rowExtras} />
+                    <ListLayout
+                      rows={g.rows}
+                      typesById={typesById}
+                      multiType={multiType}
+                      onOpen={onOpen}
+                      rowExtras={props.rowExtras}
+                      isSelected={layoutProps.isSelected}
+                    />
                   )}
                 </div>
               ))}
@@ -459,12 +527,19 @@ export function DataView(props: DataViewProps) {
       {menu && <RowContextMenu {...menu} onClose={() => setMenu(null)} />}
       {changing && (
         <ChangeTypeDialog
+          key={changing.rows[0].summary.path}
           open
           onOpenChange={(o) => !o && setChanging(null)}
-          path={changing.row.summary.path}
+          path={changing.rows[0].summary.path}
           toType={changing.to}
-          prepare={async () => changing.row.version}
-          onChanged={() => void invalidateLinkIndex()}
+          prepare={async () => changing.rows[0].version}
+          onChanged={() => {
+            void invalidateLinkIndex()
+            // The dialog closes itself first; the next row's dialog follows.
+            const rest = changing.rows.slice(1)
+            setChanging(rest.length > 0 ? { rows: rest, to: changing.to } : null)
+            if (rest.length === 0 && changing.rows.length > 1) select(null, null)
+          }}
         />
       )}
       <DeleteObjectDialog
