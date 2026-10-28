@@ -3,7 +3,9 @@
  * does day arithmetic on `Date`s) and a wall-clock time in the zone back to an instant.
  * `zone` follows `zonedTime`: omitted = the Time zone setting, `null` = the device's zone.
  */
-import { zonedParts } from '@/lib/zonedTime'
+import { useEffect, useState } from 'react'
+import { zonedParts, zonedToday } from '@/lib/zonedTime'
+import { useSettings } from '@/settings/useSettings'
 
 type Instant = Date | string | number
 
@@ -30,4 +32,22 @@ export function zonedWallToInstant(day: string, h: number, m: number, s = 0, ms 
   const first = wall - offsetAt(wall, zone)
   const second = wall - offsetAt(first, zone)
   return new Date(second)
+}
+
+/** How often `useZonedToday` looks at the clock. */
+const TODAY_POLL_MS = 30_000
+
+/**
+ * Today (`YYYY-MM-DD`) in the Time zone setting, re-rendering when the day changes (midnight, or
+ * the setting) so a page left open shows the new day's "Today".
+ */
+export function useZonedToday(): string {
+  // Subscribing to the setting re-renders on a zone change; the clock check on a new day.
+  useSettings((s) => s.settings.timeZone)
+  const [, setSeen] = useState(() => zonedToday())
+  useEffect(() => {
+    const id = setInterval(() => setSeen(zonedToday()), TODAY_POLL_MS)
+    return () => clearInterval(id)
+  }, [])
+  return zonedToday()
 }

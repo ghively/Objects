@@ -9,6 +9,7 @@ import type { Row, TaskSectionKey, TasksUi, TypeDef, UpdateResult, ViewState } f
 import { Icon } from '@/components/Icon'
 import { createAndOpen } from '@/create/createAndOpen'
 import { cn } from '@/lib/utils'
+import { useZonedToday } from '@/lib/zonedShell'
 import { useLinkIndex } from '@/links/linkIndex'
 import { enqueueUiSave, reloadUi, usePinned, useUiStore } from '@/shell/usePinned'
 import { useDefinitions } from '@/types/useDefinitions'
@@ -118,7 +119,10 @@ function SectionView({
   }, [sectionKey, section])
   const [state, update] = useViewState<ViewState>(initial, save, refetch)
 
-  const shown = useMemo(() => sectionRows(sectionKey, rows, taskType, new Date()), [sectionKey, rows, taskType])
+  // `today` re-renders the sections when the day changes (midnight).
+  const today = useZonedToday()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `today` stands for `new Date()`'s day
+  const shown = useMemo(() => sectionRows(sectionKey, rows, taskType, new Date()), [sectionKey, rows, taskType, today])
   const typesById = useMemo(() => Object.fromEntries(types.map((t) => [t.id, t])), [types])
   const scope = useMemo(() => (taskType ? { typeIds: [taskType.id] } : undefined), [taskType])
 
