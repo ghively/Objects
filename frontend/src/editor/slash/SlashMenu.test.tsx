@@ -98,16 +98,22 @@ describe('<SlashMenu>', () => {
     expect(serializeBody(editor)).toBe('Hello/\n')
   })
 
-  test('colour items open the colour list and set the block colour', async () => {
+  test('colour items are listed while searching and set the block colour', async () => {
     const editor = mounted('Hello\n')
     const menu = await openMenu(editor)
-    type(editor, 'backgr')
-    fireEvent.click(await within(menu).findByRole('option', { name: /^Background/ }))
-    const list = await screen.findByRole('listbox', { name: 'Background color' })
-    expect(within(list).getAllByRole('option')).toHaveLength(19)
-    fireEvent.click(within(list).getByRole('option', { name: 'Blue background' }))
+    expect(within(menu).queryByRole('option', { name: /Blue background/ })).toBeNull()
+    type(editor, 'blue backgr')
+    fireEvent.click(await within(menu).findByRole('option', { name: /^Blue background/ }))
     expect(serializeBody(editor)).toBe('<!-- block: color=bg-blue -->\nHello\n')
-    expect(screen.queryByRole('listbox', { name: 'Background color' })).toBeNull()
+  })
+
+  test('a description is a hover tooltip on a right-hand icon, not a second line', async () => {
+    const editor = mounted('Hello\n')
+    const menu = await openMenu(editor)
+    const standard = within(menu).getAllByRole('option')[0]
+    expect(standard).toHaveTextContent(/^Standard$/)
+    const tip = standard.querySelector('.slash-menu-description')!
+    expect(tip.getAttribute('title')).toBe('Turn block into a standard text block')
   })
 
   test('create bookmark asks for the URL and inserts a web link block', async () => {
