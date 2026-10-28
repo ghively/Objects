@@ -310,6 +310,7 @@ export function QueryPage({ id }: { id: string }) {
               </div>
             }
             patchRow={patchRow}
+            rowActions
           />
         )}
       </div>
