@@ -1,5 +1,6 @@
 import { StringEditor } from '@/editor/StringEditor'
 import { placeholderFor } from '../format'
+import type { CellExtras } from '../cellFor'
 import type { CellProps } from './types'
 
 /**
@@ -8,11 +9,12 @@ import type { CellProps } from './types'
  * an unedited value is never rewritten. While it has focus, a new value from outside doesn't
  * replace what the user is typing.
  */
-export function BlocksCell({ def, value, readOnly, density, inTable, onChange }: CellProps<string | null>) {
+export function BlocksCell({ def, value, readOnly, density, inTable, onChange, path }: CellProps<string | null> & Pick<CellExtras, 'path'>) {
   return (
     <div className="blocks-cell min-h-[1.5em] text-[15px]">
       <StringEditor
         value={value ?? ''}
+        path={path}
         readOnly={readOnly}
         ariaLabel={def.name}
         placeholder={placeholderFor(def, inTable ? 'table' : density)}
