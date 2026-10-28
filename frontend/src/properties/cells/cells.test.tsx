@@ -84,6 +84,22 @@ describe('NumberCell', () => {
     render(<NumberCell def={d} value={1234.5} onChange={() => {}} />)
     expect(screen.getByRole('textbox')).toHaveValue('€1,234.50')
   })
+
+  it('focusing and leaving without an edit writes nothing', () => {
+    const pct = def('number', { options: { numberFormat: { type: 'percentage', options: {} } } })
+    for (const [d, v] of [
+      [pct, 1 / 3],
+      [def('number'), 1e-21],
+    ] as const) {
+      const onChange = vi.fn()
+      const { unmount } = render(<NumberCell def={d} value={v} onChange={onChange} />)
+      const input = screen.getByRole('textbox')
+      fireEvent.focus(input)
+      fireEvent.blur(input)
+      expect(onChange).not.toHaveBeenCalled()
+      unmount()
+    }
+  })
 })
 
 describe('CheckboxCell', () => {

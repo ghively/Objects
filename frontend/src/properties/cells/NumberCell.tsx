@@ -24,6 +24,8 @@ export function NumberCell({ def, value, readOnly, density, inTable, onChange }:
   const [text, setText] = useState('')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const last = useRef<number | null>(value)
+  // The text the field showed on focus: leaving it unchanged writes nothing.
+  const initial = useRef('')
   // The last value saved or received: a save of the same number is skipped.
   useEffect(() => {
     last.current = value
@@ -57,11 +59,11 @@ export function NumberCell({ def, value, readOnly, density, inTable, onChange }:
         placeholder={placeholderFor(def, inTable ? 'table' : density)}
         onFocus={() => {
           setFocused(true)
-          setText(
-            value === null || value === undefined
-              ? ''
-              : formatNumber(scale === 1 ? value : Number((value * scale).toPrecision(12)), editFmt),
-          )
+          // The last value saved or received (the row may not have caught up with a save yet).
+          const cur = last.current
+          initial.current =
+            cur === null || cur === undefined ? '' : formatNumber(scale === 1 ? cur : Number((cur * scale).toPrecision(12)), editFmt)
+          setText(initial.current)
         }}
         onChange={(e) => {
           const s = e.target.value
@@ -71,7 +73,9 @@ export function NumberCell({ def, value, readOnly, density, inTable, onChange }:
           timer.current = setTimeout(() => save(s), DEBOUNCE_MS)
         }}
         onBlur={() => {
-          if (!readOnly) save(text)
+          if (timer.current) clearTimeout(timer.current)
+          timer.current = null
+          if (!readOnly && text !== initial.current) save(text)
           setFocused(false)
         }}
         onKeyDown={(e) => {
