@@ -50,6 +50,16 @@ function genericNorm(s: string): string {
     .replace(/^\n+|\n+$/g, '')
 }
 
+/**
+ * LF line ends, no leading or trailing line breaks, and no trailing blanks on
+ * the last line (they mean nothing there); every other blank kept.
+ */
+function exactNorm(s: string): string {
+  return toLF(s)
+    .replace(/^\n+|\n+$/g, '')
+    .replace(/[ \t]+$/, '')
+}
+
 // ---------------------------------------------------------------- tables
 
 const PIPE_SPLIT = /(?<!\\)\|/
@@ -346,7 +356,10 @@ function alignMatch(origKeys: string[], regenKeys: string[]): Int32Array {
 function blockKeysEqual(original: string, regenerated: string, kind: string): boolean {
   const o = genericNorm(original)
   const r = genericNorm(regenerated)
-  if (o === r) return true
+  // Outside tables and lists trailing blanks count (except on the last line):
+  // an edit may add only those (spaces in a code line, a hard break where a
+  // line break was).
+  if (o === r) return kind === 'table' || kind === 'list' || exactNorm(original) === exactNorm(regenerated)
   if (kind === 'table') {
     const ol = o.split('\n')
     const rl = r.split('\n')
@@ -404,11 +417,15 @@ export function preserveBlock(
  */
 function preserveLines(origLines: string[], regenLines: string[], baseline?: string): string[] {
   const baseLines = baseline === undefined ? null : splitTail(toLF(baseline))[0].split('\n')
-  const origKeys = baseLines && baseLines.length === origLines.length ? baseLines : origLines
+  // Against the baseline (the serializer's own output) lines compare exactly,
+  // so an edit adding only trailing blanks or a hard break counts; against
+  // the original, its trailing blanks are ignored.
+  if (baseLines && baseLines.length === origLines.length)
+    return alignLines(origLines, regenLines, baseLines, regenLines, (line) => line)
   return alignLines(
     origLines,
     regenLines,
-    origKeys.map((l) => l.trimEnd()),
+    origLines.map((l) => l.trimEnd()),
     regenLines.map((l) => l.trimEnd()),
     (line) => line,
   )
