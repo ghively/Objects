@@ -271,6 +271,15 @@ function emitLocal(events: ChangeEvent[]) {
   }, 0)
 }
 
+/**
+ * Announce a `changed` for `path` that this window's own write caused but `api` didn't make: a
+ * whiteboard or ink save's stamp of the board `.md`'s `lastUpdated` (M9). The server's own
+ * `changed` for it carries our `CLIENT_ID` and is dropped as an echo.
+ */
+export function announceLocalChange(path: string, version: string | null): void {
+  emitLocal([changed(path, version)])
+}
+
 function changed(path: string, version: string | null = null): ChangeEvent {
   return { kind: 'changed', path, version, origin: CLIENT_ID }
 }

@@ -1,4 +1,4 @@
-import { ApiError, CLIENT_ID, ReadOnlyError, RevisionConflictError } from '@/api/client'
+import { announceLocalChange, ApiError, CLIENT_ID, ReadOnlyError, RevisionConflictError } from '@/api/client'
 import type { WhiteboardSaveResult } from '@/api/whiteboardTypes'
 import type { InkResponse, InkStroke } from './types'
 
@@ -46,13 +46,18 @@ export const inkClient = {
   load(path: string): Promise<InkResponse> {
     return request<InkResponse>(`${BASE}/whiteboard/ink?path=${encodeURIComponent(path)}`)
   },
-  /** M9: the result also carries the board `.md`'s stamp (`mdVersion`, `mdBaseVersion`). */
-  save(path: string, strokes: InkStroke[], baseRevision: string): Promise<WhiteboardSaveResult> {
-    return request<WhiteboardSaveResult>(`${BASE}/whiteboard/ink`, {
+  /**
+   * M9: the result also carries the board `.md`'s stamp (`mdVersion`, `mdBaseVersion`); when the
+   * save stamped it, this window hears a `changed` for it.
+   */
+  async save(path: string, strokes: InkStroke[], baseRevision: string): Promise<WhiteboardSaveResult> {
+    const res = await request<WhiteboardSaveResult>(`${BASE}/whiteboard/ink`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path, strokes, baseRevision, clientId: CLIENT_ID }),
     })
+    if (res?.mdVersion) announceLocalChange(path, res.mdVersion)
+    return res
   },
 }
 
