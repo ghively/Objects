@@ -171,7 +171,20 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
     const t = latest.current.tool
     if (!t) return
     if (ev.pointerType === 'touch' && pensDown.current.size > 0) return
-    if (gesture.current) return
+    const prior = gesture.current
+    if (prior) {
+      // A palm that touched down first gives way to the pen: its gesture is dropped, unsaved.
+      if (ev.pointerType !== 'pen' || prior.pointerType !== 'touch') return
+      gesture.current = null
+      setLive(null)
+      setLasso(null)
+      setPreview(null)
+      try {
+        e.currentTarget.releasePointerCapture?.(prior.pointerId)
+      } catch {
+        /* not captured */
+      }
+    }
     const eraserEnd = isEraserEnd(ev)
     if (!eraserEnd) {
       if (isBarrelButton(ev)) return
