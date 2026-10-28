@@ -160,6 +160,8 @@ export function Icon({ name, size = 16, className }: IconProps) {
   return (
     <IconifyIcon
       icon={r.data}
+      // The data is in hand: draw on the first render (Iconify otherwise renders a bare <span> first).
+      ssr
       width={size}
       height={size}
       className={className}
