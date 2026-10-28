@@ -145,6 +145,26 @@ describe('board store', () => {
     expect(s.getState().doc.board.nodes.a.width).toBe(90)
   })
 
+  test('auto-sized blocks use their measured size for frame containment and wrapping', () => {
+    const s = storeWith(board([
+      node({ id: 'f', kind: 'frame', position: { x: 0, y: 0 }, width: 300, height: 300, z: 0 }),
+      node({ id: 't', kind: 'block', position: { x: 30, y: 30 }, z: 1 }), // no width/height: auto-sized
+    ]))
+    const c = s.getState().canvas
+    c.measure({ t: { width: 200, height: 40 } })
+    c.beginDrag(['f'])
+    c.applyFlowChanges([pos('f', 60, 0)])
+    c.endDrag()
+    expect(s.getState().doc.board.nodes.t.position).toEqual({ x: 90, y: 30 })
+    s.getState().actions.nudge(-60, 0, ['f'])
+    expect(s.getState().doc.board.nodes.t.position).toEqual({ x: 30, y: 30 })
+
+    s.getState().actions.wrapInFrame(['t'])
+    const frame = Object.values(s.getState().doc.board.nodes).find((n) => n.kind === 'frame' && n.id !== 'f')!
+    expect(frame.position).toEqual({ x: 0, y: 0 })
+    expect({ w: frame.width, h: frame.height }).toEqual({ w: 270, h: 120 })
+  })
+
   test('clear whiteboard clears board and ink in one undo step', () => {
     const b = board([node({ id: 'a', blockId: 'b1' })], [], { b1: textBlock('hi') }, { viewport: { x: 1, y: 2, zoom: 1 } })
     const s = createBoardStore({ doc: { board: b, strokes: [stroke('s1')] } })

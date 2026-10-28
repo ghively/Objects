@@ -246,7 +246,10 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
         } else if (c.type === 'position' && c.position) edits.push(c)
         else if (c.type === 'dimensions' && (c.resizing || c.setAttributes)) edits.push(c)
       }
-      if (measuredAny) setMeasured((m) => ({ ...m, ...sizes }))
+      if (measuredAny) {
+        setMeasured((m) => ({ ...m, ...sizes }))
+        canvas.measure(sizes)
+      }
       if (!edits.length) return
       const st = store.getState()
       // Snap to nodes: one node dragged, lined up with the others' edges and centres.
@@ -255,10 +258,10 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
         const c = moves[0] as Extract<NodeChange, { type: 'position' }>
         const n = st.doc.board.nodes[c.id]
         if (n && c.position) {
-          const box = { ...nodeBox(n), x: c.position.x, y: c.position.y }
+          const box = { ...nodeBox(n, measured), x: c.position.x, y: c.position.y }
           const others = Object.values(st.doc.board.nodes)
             .filter((o) => o.id !== n.id && o.kind !== 'point')
-            .map(nodeBox)
+            .map((o) => nodeBox(o, measured))
           const snap = snapToNodes(box, others)
           c.position = { x: c.position.x + snap.dx, y: c.position.y + snap.dy }
           setGuides(snap.guides)
@@ -266,7 +269,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
       }
       canvas.applyFlowChanges(edits)
     },
-    [applySelect, canvas, store, settings.isSnappingToNodes, ctrlHeld],
+    [applySelect, canvas, store, settings.isSnappingToNodes, ctrlHeld, measured],
   )
 
   const onEdgesChange = useCallback((changes: EdgeChange<FlowEdge>[]) => applySelect(changes), [applySelect])
@@ -376,7 +379,7 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
     (only?: Set<string>): Box[] =>
       Object.values(store.getState().doc.board.nodes)
         .filter((n) => !only || only.has(n.id))
-        .map(nodeBox),
+        .map((n) => nodeBox(n)),
     [store],
   )
 
@@ -1024,7 +1027,7 @@ function CameraInit({
     else if (board.viewport && Number.isFinite(board.viewport.zoom) && board.viewport.zoom > 0) {
       vp = { x: board.viewport.x, y: board.viewport.y, zoom: board.viewport.zoom }
     } else {
-      const boxes = Object.values(board.nodes).map(nodeBox)
+      const boxes = Object.values(board.nodes).map((n) => nodeBox(n))
       vp = fitBox(boxes, paneSize(), FIT_PADDING)
     }
     void rf.setViewport(vp)
@@ -1068,7 +1071,7 @@ function LostState({ onBack, paneSize }: { onBack(): void; paneSize(): { width: 
   const flowH = useFlowStore((s) => s.height)
   const pane = flowW > 0 && flowH > 0 ? { width: flowW, height: flowH } : paneSize()
   const view: Box = { x: -x / zoom, y: -y / zoom, width: pane.width / zoom, height: pane.height / zoom }
-  const boxes = [...Object.values(board.nodes).map(nodeBox), ...strokeBoxes(strokes)]
+  const boxes = [...Object.values(board.nodes).map((n) => nodeBox(n)), ...strokeBoxes(strokes)]
   const bounds = boundsOf(boxes)
   if (!bounds) return null
   const visible = boxes.some(
