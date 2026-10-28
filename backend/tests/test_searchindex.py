@@ -528,11 +528,20 @@ def test_reindex_rebuilds(links):
 
 
 def test_reindex_recreates_deleted_cache_file(links_space_dir: Path, tmp_path: Path):
-    """M5 Task 13: deleting search.sqlite while running, then reindex, rebuilds the file."""
+    """M5 Task 13: deleting search.sqlite while running, then reindex, rebuilds the file.
+
+    Windows refuses to delete a file another handle has open, so there nobody can
+    delete the cache while the app runs: the delete is refused and reindex still
+    rebuilds the file in place.
+    """
     cache = tmp_path / "cache"
     _space, idx = _start(links_space_dir, cache)
     try:
-        (cache / "search.sqlite").unlink()
+        if sys.platform == "win32":
+            with pytest.raises(PermissionError):
+                (cache / "search.sqlite").unlink()
+        else:
+            (cache / "search.sqlite").unlink()
         idx.reindex()
         assert _wait(lambda: idx.ready.is_set() and ADA in _paths(idx.search("Countess")), 10)
         assert idx.in_memory is False

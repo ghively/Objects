@@ -22,16 +22,20 @@ def _write(root: Path, rel: str, fm: str, body: str = "") -> None:
     p.write_text(f"---\n{fm.strip()}\n---\n{body}", encoding="utf-8")
 
 
-def _page(root: Path, name: str, body: str, created: str = "2026-10-01T08:00:00.000Z") -> str:
+def _page(
+    root: Path, name: str, body: str, created: str = "2026-10-01T08:00:00.000Z", stem: str | None = None
+) -> str:
+    """A Page titled `name`, in ``Pages/<stem or name>.md``."""
     n = abs(hash(name)) % 10**8
+    rel = f"Pages/{stem or name}.md"
     _write(
         root,
-        f"Pages/{name}.md",
+        rel,
         f"id: 01JBQ4Z7S3N8V2K5D9X6{n:08d}\ntype: 'Page'\ntitle: {name}\n"
         f"createdAt: {created}\nlastUpdated: {created}",
         body,
     )
-    return f"Pages/{name}.md"
+    return rel
 
 
 def _space(root: Path) -> Space:
@@ -178,14 +182,17 @@ def test_calendar_m8_sections_write_nothing(calendar_space_dir: Path, monkeypatc
 
 def test_dataview_embeds_are_not_links(links_space_dir: Path):
     root = links_space_dir
-    _page(root, "collection:abc", "A page whose title looks like an embed.\n")
-    _page(root, "query:xyz", "Another.\n")
+    # ':' can't be in a Windows file name: the files are named apart from their titles,
+    # and the links resolve by title.
+    coll = _page(root, "collection:abc", "A page whose title looks like an embed.\n", stem="collection abc")
+    query = _page(root, "query:xyz", "Another.\n", stem="query xyz")
     src = _page(root, "Embeds", "![[collection:abc]]\n\n![[query:xyz]]\n\nPlain [[collection:abc]]\n")
     space = Space(root)
+    assert space.resolve("query:xyz", src) == query
     out = space.links.outgoing(src)
-    assert "Pages/query:xyz.md" not in out
+    assert query not in out
     # the plain (non-embed) link still counts
-    assert out == {"Pages/collection:abc.md"}
+    assert out == {coll}
 
 
 def test_block_reference_counts_as_link(links_space_dir: Path):
