@@ -38,6 +38,11 @@ describe('formatNumber', () => {
     ).toBe('1234,5')
   })
 
+  it('decimals with min above max (or out of range) format instead of throwing', () => {
+    expect(formatNumber(1.23456, fmt('number', { decimals: { min: 4, max: 2 } }))).toBe('1.2346')
+    expect(formatNumber(1.5, fmt('number', { decimals: { min: -1, max: 99 } }))).toBe('1.5')
+  })
+
   it('test no format and null', () => {
     expect(formatNumber(1234.5)).toBe('1234.5')
     expect(formatNumber(null)).toBe('')

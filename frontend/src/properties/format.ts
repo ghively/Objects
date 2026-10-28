@@ -56,10 +56,11 @@ export function usesRadixComma(fmt?: NumberFormat | null): boolean {
 }
 
 function numberParts(v: number, fmt: NumberFormat): Intl.NumberFormatPart[] {
-  const digits = {
-    minimumFractionDigits: fmt.options.decimals?.min,
-    maximumFractionDigits: fmt.options.decimals?.max ?? 20,
-  }
+  // Intl throws on digits outside 0–20 or a minimum above the maximum: clamp, the minimum winning.
+  const clamp = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? Math.min(20, Math.max(0, Math.round(n))) : undefined)
+  const min = clamp(fmt.options.decimals?.min)
+  const max = Math.max(clamp(fmt.options.decimals?.max) ?? 20, min ?? 0)
+  const digits = { minimumFractionDigits: min, maximumFractionDigits: max }
   switch (fmt.type) {
     case 'number':
     case 'progress':
