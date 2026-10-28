@@ -187,8 +187,9 @@ export interface DatePickerProps {
    * The Task `date` (M4): its current `repeat` and `remind` texts. Given with `onTaskChange`, the
    * picker shows the schedule suggestions and the Repeat row (and the Reminder row when
    * `constraints.supportsReminders`), and every change goes to `onTaskChange` instead of `onChange`.
-   * A non-empty `occurrenceLog` (M8) makes "Remove recurrence" ask first; the owner removes the log
-   * with `repeat`.
+   * A non-empty `occurrenceLog` (M8) makes "Remove recurrence" and "Remove date" ask first
+   * (`DatePicker.recurrenceRemoveConfirm.*`, `DatePicker.dateRemoveConfirm.*`); the owner removes
+   * the log with `repeat`.
    */
   task?: { repeat: string | null; remind: string | null; occurrenceLog?: string | null }
   onTaskChange?(next: TaskDateChange): void
@@ -343,6 +344,9 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
   const propReminder = !taskMode && !!reminder && !!c.supportsReminders
   const [customOpen, setCustomOpen] = useState(false)
   const [dropped, setDropped] = useState(false)
+  /** M8: "Remove date" on a recurring task with history asks first (`DatePicker.dateRemoveConfirm`). */
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const hasHistory = taskMode && !!task!.occurrenceLog?.trim()
 
   /** The Task change for `date` with these texts; a reminder that fit and no longer does is dropped. */
   const emitTask = (date: DateValue | null, repeat: string | null, remind: string | null) => {
@@ -412,6 +416,34 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
     const base = pointDate(start, resolution)
     const keep = resolution === 'time' ? new Date(end ?? start) : null
     emit({ start, end: atDay(addDays(base, days), resolution, keep), resolution })
+  }
+
+  if (taskMode && confirmingRemove) {
+    return (
+      <div className="flex w-72 flex-col gap-2 p-2 text-fg" data-testid="date-picker">
+        <div role="alertdialog" aria-label="Remove date?" className="flex flex-col gap-2 px-2 py-1">
+          <h2 className="text-[15px] font-semibold">Remove date?</h2>
+          <p className="text-[13px] text-fg-muted">
+            This recurring task already has completed or skipped occurrences. Removing the date will discard its history.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setConfirmingRemove(false)} className="rounded-md px-3 py-1 text-[14px] hover:bg-hover">
+              Keep date
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmingRemove(false)
+                onTaskChange!({ date: null, repeat: null, remind: null })
+              }}
+              className="rounded-md bg-[var(--danger)] px-3 py-1 text-[14px] font-medium text-white hover:opacity-90"
+            >
+              Remove date
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (taskMode && customOpen) {
@@ -553,6 +585,7 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
         <button
           type="button"
           onClick={() => {
+            if (taskMode && hasHistory) return setConfirmingRemove(true)
             if (taskMode) return onTaskChange!({ date: null, repeat: null, remind: null })
             onChange(null)
             // Our choice: a reminder on a removed date goes with it.
