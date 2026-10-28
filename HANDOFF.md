@@ -8,7 +8,7 @@ Updated 2026-10-28. You are continuing "Object", a local, Markdown-backed recrea
 
 **A full audit ran on 2026-10-28 at `04e9d07`.** It found about 65 reproduced bugs and 14 completeness gaps, none fixed yet. The list, ranked, is in `docs/superpowers/plans/audit-2026-10-28.md`; the repro scripts are in `scripts/audit-2026-10-28/`. Next comes fixing the audit list, then Gene's hands-on checks and the fixes they produce.
 
-**Branch:** this work is on `ccr-e702dd20-m7hpyc`, one docs-and-scripts commit ahead of `master`. On a local PC, run `git fetch origin` then `git checkout ccr-e702dd20-m7hpyc`, or merge it into `master` first.
+**Branch:** this work is on `ccr-e702dd20-m7hpyc`, two docs-and-scripts commits ahead of `master` (no code changes). On a local PC, run `git fetch origin` then `git checkout ccr-e702dd20-m7hpyc`, or merge it into `master` first.
 
 | Milestone | Scope | Plan |
 |---|---|---|
