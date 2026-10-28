@@ -7,6 +7,12 @@ import { CELL_TEXT, type CellProps } from './types'
 
 const DEBOUNCE_MS = 250
 
+/** A typed percent as its fraction, shifted in decimal (14.3 → 0.143, not 14.3 / 100 = 0.14300000000000002). */
+function fromPercent(n: number): number {
+  const [mantissa, exp] = String(n).split('e')
+  return Number(`${mantissa}e${Number(exp ?? 0) - 2}`)
+}
+
 /**
  * A number. While focused it edits the plain number and saves 250 ms after typing stops and on
  * blur; an empty input saves `null` and text that isn't a number is ignored. Unfocused it shows
@@ -39,7 +45,7 @@ export function NumberCell({ def, value, readOnly, density, inTable, onChange }:
     timer.current = null
     const typed = parseNumberInput(s, fmt)
     if (typed === undefined) return
-    const n = typed === null ? null : scale === 1 ? typed : typed / scale
+    const n = typed === null ? null : scale === 1 ? typed : fromPercent(typed)
     if (n === last.current) return
     last.current = n
     onChange(n)

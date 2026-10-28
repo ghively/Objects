@@ -85,6 +85,17 @@ describe('NumberCell', () => {
     expect(screen.getByRole('textbox')).toHaveValue('€1,234.50')
   })
 
+  it('a typed percentage stores the exact fraction', () => {
+    const onChange = vi.fn()
+    const pct = def('number', { options: { numberFormat: { type: 'percentage', options: {} } } })
+    render(<NumberCell def={pct} value={null} onChange={onChange} />)
+    const input = screen.getByRole('textbox')
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: '14.3' } })
+    fireEvent.blur(input)
+    expect(onChange).toHaveBeenLastCalledWith(0.143)
+  })
+
   it('focusing and leaving without an edit writes nothing', () => {
     const pct = def('number', { options: { numberFormat: { type: 'percentage', options: {} } } })
     for (const [d, v] of [
