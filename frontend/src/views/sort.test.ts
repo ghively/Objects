@@ -88,3 +88,17 @@ describe('sort engine', () => {
     expect(SORT_OPTIONS('entity_type')).toEqual([])
   })
 })
+
+describe('sorting by a relation', () => {
+  test("reads the linked object's title, not the link text", () => {
+    const t = typeDef({ id: 'page', propertyDefinitions: [propertyDef({ id: 'owner', type: 'entity' })] })
+    // Linked by alias: "Zed" is Ann Able, "Abe" is Zoe Zane.
+    const rows = [
+      R('x', { owner: [{ target: 'Zed', path: 'People/Ann.md' }] }, { type: 'page' }),
+      R('y', { owner: [{ target: 'Abe', path: null }] }, { type: 'page' }),
+    ]
+    rows[1].links = { owner: ['People/Zoe.md'] }
+    const c = { ...ctx, types: [t], entityTitles: { 'People/Ann.md': 'Ann Able', 'People/Zoe.md': 'Zoe Zane' } }
+    expect(order(applySorts(rows, [sort('owner', 'ascending')], c))).toEqual(['x', 'y'])
+  })
+})

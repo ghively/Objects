@@ -1,5 +1,45 @@
-import { describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import type { Filter } from '@/api/types'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
+import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
 import { DATE_RELATIVE_OPTIONS, dateSpan, resolveRelative } from './dates'
+import { matchFilter } from './filter'
+import { groupRows } from './group'
+
+describe('the Time zone setting', () => {
+  // A zone other than the device's: Tokyo, or New York on a machine that is in Tokyo.
+  const device = new Intl.DateTimeFormat().resolvedOptions().timeZone
+  const zone = device === 'Asia/Tokyo' ? 'America/New_York' : 'Asia/Tokyo'
+  const tokyo = zone === 'Asia/Tokyo'
+  // 16:00Z on Wed 21 Oct 2026: 01:00 on the 22nd in Tokyo, 12:00 on the 21st in New York.
+  const AT = new Date('2026-10-21T16:00:00Z')
+  const midnight = tokyo ? '2026-10-21T15:00:00.000Z' : '2026-10-21T04:00:00.000Z'
+  beforeEach(() => useSettings.setState({ settings: { ...settingsDefaults, timeZone: zone } }))
+  afterEach(() => useSettings.setState({ settings: settingsDefaults }))
+
+  test('relative ranges and days are the zone days', () => {
+    const today = resolveRelative('today', AT)
+    expect(today.start.toISOString()).toBe(midnight)
+    expect(today.end.getTime() - today.start.getTime()).toBe(86400000 - 1)
+    expect(dateSpan({ start: tokyo ? '2026-10-22' : '2026-10-21', resolution: 'day' })!.start.toISOString()).toBe(midnight)
+  })
+
+  test('filters and day groups read days in the zone', () => {
+    const page = typeDef({ id: 'page', propertyDefinitions: [propertyDef({ id: 'due', type: 'datetime' })] })
+    const ctx = { types: [page], collections: [], tagIdsToTitles: {}, now: AT }
+    // One minute into the zone's today.
+    const r = row({
+      summary: objectSummary({ path: 'a.md', type: 'page' }),
+      values: { due: { start: new Date(new Date(midnight).getTime() + 60000).toISOString(), resolution: 'time' } },
+    })
+    const isToday: Filter = { type: 'filter', propertyId: 'due', option: 'is', referenceValue: { relative: 'today' } }
+    expect(matchFilter(r, isToday, ctx)).toBe(true)
+    const { groups } = groupRows([r], { groups: [{ propertyId: 'due', option: 'day' }] }, undefined, ctx)
+    expect(groups.map((g) => g.label)).toEqual([tokyo ? 'Oct 22, 2026' : 'Oct 21, 2026'])
+    const rel = groupRows([r], { groups: [{ propertyId: 'due', option: 'relative' }] }, undefined, ctx)
+    expect(rel.groups.map((g) => g.label)).toEqual(['Today'])
+  })
+})
 
 const now = new Date(2026, 9, 23, 12, 0) // Friday
 

@@ -38,6 +38,16 @@ describe('formatNumber', () => {
     ).toBe('1234,5')
   })
 
+  it('decimals with min above max (or out of range) format instead of throwing', () => {
+    expect(formatNumber(1.23456, fmt('number', { decimals: { min: 4, max: 2 } }))).toBe('1.2346')
+    expect(formatNumber(1.5, fmt('number', { decimals: { min: -1, max: 99 } }))).toBe('1.5')
+  })
+
+  it('a negative currency puts the sign before the symbol', () => {
+    expect(formatNumber(-5, fmt('currency', { currency: 'USD' }))).toBe('-$5')
+    expect(formatNumber(-1234.5, fmt('currency', { currency: 'EUR', decimals: { min: 2, max: 2 } }))).toBe('-€1,234.50')
+  })
+
   it('test no format and null', () => {
     expect(formatNumber(1234.5)).toBe('1234.5')
     expect(formatNumber(null)).toBe('')
@@ -51,6 +61,20 @@ describe('progressFraction', () => {
     expect(progressFraction(14, p)).toBe(1)
     expect(progressFraction(-2, p)).toBe(0)
     expect(progressFraction(null, p)).toBe(0)
+  })
+})
+
+describe('parseNumberInput accepts decimals only', () => {
+  it('rejects Infinity and hex, reads a percent sign', () => {
+    expect(parseNumberInput('Infinity')).toBeUndefined()
+    expect(parseNumberInput('-Infinity')).toBeUndefined()
+    expect(parseNumberInput('0x10')).toBeUndefined()
+    expect(parseNumberInput('0b11')).toBeUndefined()
+    expect(parseNumberInput('1e3')).toBe(1000)
+    expect(parseNumberInput('.5')).toBe(0.5)
+    // A percentage cell is edited in percent; elsewhere "50%" is the fraction.
+    expect(parseNumberInput('50%', fmt('percentage'))).toBe(50)
+    expect(parseNumberInput('14.3 %')).toBe(0.143)
   })
 })
 

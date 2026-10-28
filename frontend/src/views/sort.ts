@@ -63,8 +63,10 @@ function sortKey(row: Row, sort: Sort, ctx: FilterCtx): Key {
       return order.length ? { empty: false, value: 0, labelOrder: order } : EMPTY_KEY
     }
     case 'entity': {
+      // The linked object's title (as its group shows), else the link text.
       const first = Array.isArray(v) ? (v as EntityRef[])[0] : undefined
-      return text(first?.target ?? '')
+      const path = first ? (first.path ?? row.links[sort.propertyId]?.[0] ?? null) : null
+      return text((path && ctx.entityTitles?.[path]) || first?.target || '')
     }
     case 'entity_tags':
       return text(row.summary.tags?.[0] ?? '')
@@ -105,7 +107,7 @@ function createdMs(row: Row): number | null {
  */
 export function applySorts(rows: Row[], sorts: Sort[], ctx: FilterCtx): Row[] {
   const active = sorts.filter((s) => {
-    const kind = findDef(ctx.types, s.propertyId, s.structureId)?.type
+    const kind = findDef(ctx.types, s.propertyId, s.structureId, ctx.viewTypeIds)?.type
     return !!kind && kind !== 'entity_type'
   })
   const keyed = rows.map((row, i) => ({ row, i, keys: active.map((s) => sortKey(row, s, ctx)) }))

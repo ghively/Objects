@@ -89,6 +89,16 @@ describe('groupRows', () => {
     expect(groups.flatMap((g) => paths(g.rows))).not.toContain('c')
   })
 
+  test('number ranges with a fractional step place values and label cleanly', () => {
+    const rows = [R('a', { qty: 0.3 }), R('b', { qty: 0.7 }), R('c', { qty: 1 })]
+    const { groups } = groupRows(rows, by('qty', 'range', { numberRangeConfig: { min: 0, max: 1, step: 0.1 } }), undefined, ctx())
+    expect(groups.map((g) => [g.label, paths(g.rows)])).toEqual([
+      ['0.3–0.4', ['a']],
+      ['0.7–0.8', ['b']],
+      ['0.9–1', ['c']],
+    ])
+  })
+
   test('date Relative buckets against fixed now', () => {
     const d = (day: number) => ({ start: `2026-10-${String(day).padStart(2, '0')}`, resolution: 'day' })
     const rows = [R('today', { due: d(23) }), R('yest', { due: d(22) }), R('tom', { due: d(24) }), R('lastw', { due: d(15) }), R('nextw', { due: d(28) }), R('old', { due: d(1) }), R('none', {})]
@@ -141,6 +151,49 @@ describe('valueForGroup', () => {
     const c = collection({ id: 'tools', name: 'Tooling' })
     const { groups } = groupRows([R('a', {}, { collections: ['tooling'] })], by('collections'), undefined, ctx({ collections: [c] }))
     expect(ids(groups)).toEqual(['tools'])
+  })
+
+  test("a key shared by two types groups by the view's type's definition (audit #15)", () => {
+    const other = typeDef({ id: 'other', propertyDefinitions: [propertyDef({ id: 'stage', type: 'label', options: { set: opts('X', 'Y') } })] })
+    const mine = typeDef({ id: 'mine', propertyDefinitions: [propertyDef({ id: 'stage', type: 'label', options: { set: opts('Draft', 'Live') } })] })
+    const c: GroupCtx = { types: [other, mine], viewTypeIds: ['mine'], collections: [], tagIdsToTitles: {}, now }
+    const r = R('a', { stage: ['Live'] }, { type: 'mine' })
+    expect(labels(groupRows([r], by('stage'), undefined, c).groups)).toEqual(['Draft', 'Live'])
+  })
+
+  test('a drag of a multi-value card swaps only the source column value (audit #13)', () => {
+    const labels = propertyDef({ id: 'labels', type: 'label', options: { isArray: true, set: opts('A', 'B', 'C') } })
+    const owners = propertyDef({ id: 'owner', type: 'entity', options: { isArray: true } })
+    const t = typeDef({ id: 'page', propertyDefinitions: [labels, owners] })
+    const c = (extra: Partial<GroupCtx> = {}): GroupCtx => ({ types: [t], collections: [], tagIdsToTitles: {}, now, ...extra })
+    const r = R('a', {
+      labels: ['A', 'C'],
+      owner: [
+        { target: 'Ann', path: 'People/Ann.md' },
+        { target: 'Cy', path: 'People/Cy.md' },
+      ],
+    }, { tags: ['x', 'z'] })
+    const lg = groupRows([r], by('labels'), undefined, c()).groups
+    const byLabel = (gs: { label: string }[], l: string) => gs.find((g) => g.label === l)! as (typeof lg)[number]
+    expect(valueForGroup(by('labels'), byLabel(lg, 'B'), labels, { row: r, from: byLabel(lg, 'A') })).toEqual({ key: 'labels', value: ['C', 'B'] })
+
+    const tg = groupRows([r, R('b', {}, { tags: ['y'] })], by('tags'), undefined, c()).groups
+    expect(valueForGroup(by('tags'), byLabel(tg, 'y'), { type: 'entity_tags', options: {} }, { row: r, from: byLabel(tg, 'x') })).toEqual({
+      key: 'tags',
+      value: ['z', 'y'],
+    })
+
+    const people = R('b', { owner: [{ target: 'Bo', path: 'People/Bo.md' }] })
+    const eg = groupRows([r, people], by('owner'), undefined, c()).groups
+    const bo = eg.find((g) => g.id === 'People/Bo.md')!
+    const ann = eg.find((g) => g.id === 'People/Ann.md')!
+    expect(valueForGroup(by('owner'), bo, owners, { row: r, from: ann })).toEqual({
+      key: 'owner',
+      value: [
+        { target: 'Cy', path: 'People/Cy.md' },
+        { target: 'Bo', path: 'People/Bo.md' },
+      ],
+    })
   })
 })
 

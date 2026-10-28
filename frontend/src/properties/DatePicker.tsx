@@ -12,6 +12,7 @@ import { REMINDER_MISFIT_HINT, ReminderMenu } from '@/tasks/ReminderMenu'
 import { RepeatMenu } from '@/tasks/RepeatMenu'
 import { formatRepeat, parseRepeat } from '@/tasks/repeat'
 import { parseRemind } from '@/tasks/remind'
+import { fromWallClock, wallClock } from '@/lib/zonedTime'
 import { formatDate } from './format'
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
@@ -34,22 +35,29 @@ function validDate(y: number, m: number, d: number): Date | null {
   return date.getFullYear() === y && date.getMonth() === m && date.getDate() === d ? date : null
 }
 
-/** A point of a DateValue as a local Date (a day is local midnight). */
+// The picker does its calendar arithmetic on wall-clock carriers (`lib/zonedTime` `wallClock`):
+// local Dates whose fields read the "Time zone" setting's clock. Instants go in through
+// `wallClock` and come out through `fromWallClock`.
+
+/** The wall clock of an instant (ISO string or Date) in the time-zone setting. */
+const wall = (instant: string | Date): Date => wallClock(instant)
+
+/** A point of a DateValue as a wall-clock carrier (a day is its midnight). */
 function pointDate(point: string, resolution: Resolution): Date {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(point)
   if (resolution === 'day' || m) {
     const mm = m ?? /^(\d{4})-(\d{2})-(\d{2})/.exec(point)
     if (mm) return new Date(+mm[1], +mm[2] - 1, +mm[3])
   }
-  return new Date(point)
+  return wall(point)
 }
 
-/** `base`'s calendar day at `resolution`; a time keeps the time of day of `keep` (else 09:00). */
+/** `base`'s calendar day at `resolution`; a time keeps the time of day of `keep` (else 09:00). Both are carriers. */
 function atDay(base: Date, resolution: Resolution, keep?: Date | null): string {
   if (resolution === 'day') return dayString(base)
   const h = keep ? keep.getHours() : DEFAULT_HOUR
   const min = keep ? keep.getMinutes() : 0
-  return new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, min).toISOString()
+  return fromWallClock(new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, min)).toISOString()
 }
 
 function convertPoint(point: string, from: Resolution, to: Resolution): string {
@@ -57,7 +65,8 @@ function convertPoint(point: string, from: Resolution, to: Resolution): string {
   return atDay(pointDate(point, from), to)
 }
 
-function parseDayPart(t: string, now: Date): Date | null {
+function parseDayPart(t: string, nowInstant: Date): Date | null {
+  const now = wall(nowInstant)
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   if (t === '' || t === 'today' || t === 'now') return today
   if (t === 'yesterday') return addDays(today, -1)
@@ -70,6 +79,17 @@ function parseDayPart(t: string, now: Date): Date | null {
   }
   m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t)
   if (m) return validDate(+m[1], +m[2] - 1, +m[3])
+  // The numeric orders the date shows in (`format.ts` `numericDate`): DMY `30-10-2026`, MDY
+  // `10/30/2026`; a dotted `30.10.2026` is day first.
+  m = /^(\d{1,2})([-./])(\d{1,2})\2(\d{4})$/.exec(t)
+  if (m) return m[2] === '/' ? validDate(+m[4], +m[1] - 1, +m[3]) : validDate(+m[4], +m[3] - 1, +m[1])
+  // Day first with a month name, as en-GB shows it ("30 oct 2026").
+  m = /^(\d{1,2}) ([a-z]+)\.?,? (\d{4})$/.exec(t)
+  if (m) {
+    const month = MONTHS.indexOf(m[2].slice(0, 3))
+    if (month < 0 || (m[2].length > 3 && !MONTH_NAMES[month].startsWith(m[2]))) return null
+    return validDate(+m[3], month, +m[1])
+  }
   m = /^([a-z]+)\.? (\d{1,2})(?:st|nd|rd|th)?(?:,? (\d{4}))?$/.exec(t)
   if (m) {
     const month = MONTHS.indexOf(m[1].slice(0, 3))
@@ -118,9 +138,14 @@ export function parseDateInput(s: string, now: Date = new Date()): DateValue | n
   }
   const t = raw.toLowerCase().replace(/\s+/g, ' ')
   const at = t.lastIndexOf(' at ')
+  // The shown text: a day, a comma, then the time ("oct 30, 2026, 2:00 pm", "30-10-2026, 14:00").
+  const shown = /^(.+), (\d{1,2}:\d{2}(?: ?(?:am|pm|a\.m\.|p\.m\.))?)$/.exec(t)
   let dayPart = t
   let timePart: string | null = null
-  if (at >= 0) {
+  if (shown && at < 0) {
+    dayPart = shown[1].trim()
+    timePart = shown[2]
+  } else if (at >= 0) {
     dayPart = t.slice(0, at).trim()
     timePart = t.slice(at + 4).trim()
   } else if (t.startsWith('at ')) {
@@ -136,7 +161,7 @@ export function parseDateInput(s: string, now: Date = new Date()): DateValue | n
   if (timePart === null) return { start: dayString(day), resolution: 'day' }
   const time = parseTimePart(timePart)
   if (!time) return null
-  const d = new Date(day.getFullYear(), day.getMonth(), day.getDate(), time.h, time.min)
+  const d = fromWallClock(new Date(day.getFullYear(), day.getMonth(), day.getDate(), time.h, time.min))
   return { start: d.toISOString(), resolution: 'time' }
 }
 
@@ -206,14 +231,14 @@ function initialValue(c: DateConstraints, now: Date): DateValue {
     c.resolutionConstraint ?? c.resolutionPreference ?? (c.startTimeDefault ? 'time' : 'day')
   const start = c.startTimeDefault ? new Date(c.startTimeDefault) : now
   const v: DateValue = {
-    start: resolution === 'day' ? dayString(start) : start.toISOString(),
+    start: resolution === 'day' ? dayString(wall(start)) : start.toISOString(),
     resolution,
   }
   const wantsEnd =
     c.endTimeSettings !== 'notAllowed' && (c.endTimeSettings === 'required' || c.endTimePreference === true)
   if (wantsEnd) {
     const end = c.endTimeDefault ? new Date(c.endTimeDefault) : start
-    v.end = resolution === 'day' ? dayString(end) : end.toISOString()
+    v.end = resolution === 'day' ? dayString(wall(end)) : end.toISOString()
   }
   return v
 }
@@ -258,8 +283,9 @@ function PointInput({
 }
 
 function TimeInput({ label, point, onChange }: { label: string; point: string; onChange(iso: string): void }) {
-  const d = new Date(point)
-  const value = Number.isNaN(d.getTime()) ? '' : `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const valid = !Number.isNaN(new Date(point).getTime())
+  const d = valid ? wall(point) : new Date(NaN)
+  const value = valid ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : ''
   return (
     <input
       type="time"
@@ -267,8 +293,8 @@ function TimeInput({ label, point, onChange }: { label: string; point: string; o
       value={value}
       onChange={(e) => {
         const m = /^(\d{2}):(\d{2})$/.exec(e.target.value)
-        if (!m || Number.isNaN(d.getTime())) return
-        onChange(new Date(d.getFullYear(), d.getMonth(), d.getDate(), +m[1], +m[2]).toISOString())
+        if (!m || !valid) return
+        onChange(fromWallClock(new Date(d.getFullYear(), d.getMonth(), d.getDate(), +m[1], +m[2])).toISOString())
       }}
       className="h-8 w-28 shrink-0 rounded-md border border-line bg-raised px-2 text-[14px] text-fg outline-none [color-scheme:dark]"
     />
@@ -391,7 +417,7 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
       res = 'time'
       point = parsed.start
     } else {
-      const keep = resolution === 'time' ? new Date(which === 'start' ? start : (end ?? start)) : null
+      const keep = resolution === 'time' ? wall(which === 'start' ? start : (end ?? start)) : null
       point = atDay(pointDate(parsed.start, parsed.resolution), res, keep)
     }
     const s = which === 'start' ? point : convertPoint(start, resolution, res)
@@ -400,21 +426,24 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
     return true
   }
 
+  const wallToday = () => {
+    const n = wall(now)
+    return new Date(n.getFullYear(), n.getMonth(), n.getDate())
+  }
+
   const pickStart = (days: number) => {
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const keep = resolution === 'time' ? new Date(start) : null
-    emit({ start: atDay(addDays(today, days), resolution, keep), end, resolution })
+    const keep = resolution === 'time' ? wall(start) : null
+    emit({ start: atDay(addDays(wallToday(), days), resolution, keep), end, resolution })
   }
 
   const pickSchedule = (pick: (today: Date) => Date) => {
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const keep = resolution === 'time' ? new Date(start) : null
-    emit({ start: atDay(pick(today), resolution, keep), end, resolution })
+    const keep = resolution === 'time' ? wall(start) : null
+    emit({ start: atDay(pick(wallToday()), resolution, keep), end, resolution })
   }
 
   const pickEnd = (days: number) => {
     const base = pointDate(start, resolution)
-    const keep = resolution === 'time' ? new Date(end ?? start) : null
+    const keep = resolution === 'time' ? wall(end ?? start) : null
     emit({ start, end: atDay(addDays(base, days), resolution, keep), resolution })
   }
 

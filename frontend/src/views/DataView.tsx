@@ -196,9 +196,10 @@ export function DataView(props: DataViewProps) {
       entityTitles[o.path] = o.title
       if (o.createdAt) entityCreated[o.path] = o.createdAt
     }
-    return { types, collections, tagIdsToTitles, pathsById, entityTitles, entityCreated, now: new Date() }
+    const viewTypeIds = viewTypes.map((t) => t.id)
+    return { types, viewTypeIds, collections, tagIdsToTitles, pathsById, entityTitles, entityCreated, now: new Date() }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` is fixed per data change
-  }, [types, collections, objects, rows])
+  }, [types, viewTypes, collections, objects, rows])
 
   const result = useMemo(() => (props.pipeline ?? defaultPipeline)(rows, state, ctx), [props.pipeline, rows, state, ctx])
   const flat = result.rows

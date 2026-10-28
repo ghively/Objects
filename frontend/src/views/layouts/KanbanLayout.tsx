@@ -12,6 +12,7 @@ import type { LayoutProps } from '../DataView'
 import { groupRows, valueForGroup, type Group } from '../group'
 import { matchingValues } from '../matching'
 import { propertyChoices } from '../properties'
+import { createRowWrites } from '../rowWrites'
 import { CardItem } from './CardItem'
 
 /** The grouping a kanban uses: the view's own, else the first label property of its types. */
@@ -22,8 +23,13 @@ export function kanbanGroupBy(groupBy: GroupBy | null, props: Pick<LayoutProps, 
   return label ? { groups: [{ propertyId: label.key, option: 'default', structureId: label.structureId }] } : null
 }
 
-function Card({ props, row, hide }: { props: LayoutProps; row: Row; hide: string[] }) {
-  const d = useDraggable({ id: row.summary.path, disabled: row.summary.readOnly })
+function Card({ props, row, hide, groupId }: { props: LayoutProps; row: Row; hide: string[]; groupId: string }) {
+  // A card with several values shows in several columns: the id names the column it is in.
+  const d = useDraggable({
+    id: `${groupId}\n${row.summary.path}`,
+    data: { path: row.summary.path, groupId },
+    disabled: row.summary.readOnly,
+  })
   return (
     <div
       ref={d.setNodeRef}
@@ -68,7 +74,7 @@ function Column({
         <span className="text-fg-muted">{group.rows.length}</span>
       </div>
       {group.rows.map((r) => (
-        <Card key={r.summary.path} props={props} row={r} hide={hide} />
+        <Card key={r.summary.path} props={props} row={r} hide={hide} groupId={group.id} />
       ))}
       <button
         type="button"
@@ -86,6 +92,7 @@ export function KanbanLayout(props: LayoutProps) {
   const { flat, state, ctx, viewTypes, typesById, collections, patchRow, onWritten } = props
   const [notice, setNotice] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const writes = useMemo(() => createRowWrites(), [])
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   useEffect(
     () => () => {
@@ -114,7 +121,10 @@ export function KanbanLayout(props: LayoutProps) {
   const reload = async (row: Row) => {
     try {
       const [fresh] = await api.rows({ paths: [row.summary.path] })
-      if (fresh) patchRow?.(row.summary.path, fresh)
+      if (fresh) {
+        writes.seen(fresh, row)
+        patchRow?.(row.summary.path, fresh)
+      }
     } catch (err) {
       console.warn('Could not reload row:', err)
     }
@@ -122,13 +132,20 @@ export function KanbanLayout(props: LayoutProps) {
 
   const onDragEnd = async (e: DragEndEvent) => {
     if (!e.over) return
-    const row = flat.find((r) => r.summary.path === e.active.id)
+    const data = e.active.data?.current as { path?: string; groupId?: string } | undefined
+    const path = data?.path ?? String(e.active.id)
+    const row = flat.find((r) => r.summary.path === path)
     const target = groups.find((g) => `col:${g.id}` === e.over?.id)
     if (!row || !target || target.rows.some((r) => r.summary.path === row.summary.path)) return
-    const change = update(target)
+    const from = groups.find((g) => g.id === data?.groupId) ?? groups.find((g) => g.rows.some((r) => r.summary.path === path))
+    const change = groupBy && groupDef ? valueForGroup(groupBy, target, groupDef, { row, from }) : null
     if (!change) return
     try {
-      const result = await api.updateProperties(row.summary.path, { [change.key]: change.value }, row.version)
+      // Writes to one row run in turn, each from the newest version (the rows may lag behind).
+      const result = await writes.run(row, (version, cur) => {
+        const c = (groupBy && groupDef && valueForGroup(groupBy, target, groupDef, { row: cur, from })) || change
+        return api.updateProperties(row.summary.path, { [c.key]: c.value }, version)
+      })
       await reload(row)
       onWritten?.(row, result)
     } catch (err) {
