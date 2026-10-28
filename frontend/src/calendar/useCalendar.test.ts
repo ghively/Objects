@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { useSettings } from '@/settings/useSettings'
 import { arrowStep, useCalendar } from './useCalendar'
 
 const set = (view: 'month' | 'week' | 'rolling' | 'day', anchor: string) => useCalendar.setState({ view, anchor })
@@ -83,5 +84,32 @@ describe('useCalendar', () => {
     })
     expect(() => useCalendar.getState().setView('week')).not.toThrow()
     spy.mockRestore()
+  })
+})
+
+describe('useCalendar opening day', () => {
+  test('opens on today in the Time zone setting once the settings load', () => {
+    const settings = useSettings.getState().settings
+    // 2026-10-28T12:00Z is 29 Oct 01:00 in Auckland and still the 28th from UTC westwards.
+    vi.setSystemTime(new Date('2026-10-28T12:00:00Z'))
+    useCalendar.getState().today()
+    try {
+      useSettings.setState({ settings: { ...settings, timeZone: 'Pacific/Auckland' } })
+      expect(useCalendar.getState().anchor).toBe('2026-10-29')
+    } finally {
+      useSettings.setState({ settings })
+    }
+  })
+
+  test('a day the viewer chose stays when the Time zone setting changes', () => {
+    const settings = useSettings.getState().settings
+    vi.setSystemTime(new Date('2026-10-28T12:00:00Z'))
+    useCalendar.getState().setAnchor('2026-10-01')
+    try {
+      useSettings.setState({ settings: { ...settings, timeZone: 'Pacific/Auckland' } })
+      expect(useCalendar.getState().anchor).toBe('2026-10-01')
+    } finally {
+      useSettings.setState({ settings })
+    }
   })
 })
