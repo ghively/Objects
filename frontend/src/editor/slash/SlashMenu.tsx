@@ -3,8 +3,12 @@
  * filtered by the query (`fuzzyScore` over each item's name and description),
  * the footer hint `press "/" to search`, and "No results" when nothing
  * matches. Arrow keys move, Enter runs, Escape closes; a space after a query
- * with no match closes it too. An item's sub-view (colour lists, icon picker,
- * the bookmark URL field) replaces the list.
+ * with no match closes it too. An item's sub-view (icon picker, the bookmark
+ * URL field) replaces the list.
+ *
+ * Object's CreateMenu: 22rem wide in the editor, the list at most 18rem
+ * (`max-h-72`) high; each icon in a bordered chip; a description is the
+ * hover tooltip of a right-hand `ph-text-align-justify` icon, not a second line.
  */
 import type { Editor } from '@tiptap/core'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
@@ -15,52 +19,14 @@ import { cn } from '@/lib/utils'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useSettings } from '@/settings/useSettings'
 import { closeSlashMenu, registerSlashKeyHandler, useSlashMenu } from '../extensions/slashMenu'
-import { T as STYLE_TEXT, setBlockColor } from '../menus/BlockStyleMenu'
-import { BLOCK_COLORS, bgColorToken, colorMenuName, textColorToken, type ColorKind } from '../menus/colors'
 import { filterSections, hasRealMatch, slashSections, SLASH_TEXT, type SlashItem, type SlashView } from './slashItems'
 import '../handles/handles.css'
 
 function position(rect: DOMRect | null): CSSProperties {
   if (!rect) return { position: 'fixed', left: 16, top: 16 }
   const top = rect.bottom + 4
-  const left = Math.max(8, Math.min(rect.left, (typeof window !== 'undefined' ? window.innerWidth : 1024) - 328))
+  const left = Math.max(8, Math.min(rect.left, (typeof window !== 'undefined' ? window.innerWidth : 1024) - 360))
   return { position: 'fixed', left, top }
-}
-
-function ColorView({ editor, kind, onDone }: { editor: Editor; kind: ColorKind; onDone: () => void }) {
-  return (
-    <div role="listbox" aria-label={kind === 'text' ? STYLE_TEXT.textColor : STYLE_TEXT.backgroundColor} className="slash-menu-list">
-      <button type="button" role="option" aria-selected={false} className="slash-menu-item" onMouseDown={(e) => e.preventDefault()} onClick={() => {
-        setBlockColor(editor, kind, null)
-        onDone()
-      }}>
-        <span className="slash-menu-name">{kind === 'text' ? STYLE_TEXT.removeText : STYLE_TEXT.removeBg}</span>
-      </button>
-      {BLOCK_COLORS.map((c) => (
-        <button
-          key={c}
-          type="button"
-          role="option"
-          aria-selected={false}
-          className="slash-menu-item"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            setBlockColor(editor, kind, c)
-            onDone()
-          }}
-        >
-          <span
-            aria-hidden
-            className="slash-menu-swatch"
-            style={kind === 'text' ? { color: textColorToken(c) } : { backgroundColor: bgColorToken(c) }}
-          >
-            {kind === 'text' ? 'A' : ''}
-          </span>
-          <span className="slash-menu-name">{colorMenuName(kind, c)}</span>
-        </button>
-      ))}
-    </div>
-  )
 }
 
 function BookmarkView({ editor, onDone }: { editor: Editor; onDone: () => void }) {
@@ -94,7 +60,6 @@ function BookmarkView({ editor, onDone }: { editor: Editor; onDone: () => void }
 }
 
 function SubView({ editor, view, onDone }: { editor: Editor; view: SlashView; onDone: () => void }) {
-  if (view === 'colorText' || view === 'colorBg') return <ColorView editor={editor} kind={view === 'colorText' ? 'text' : 'bg'} onDone={onDone} />
   if (view === 'bookmark') return <BookmarkView editor={editor} onDone={onDone} />
   return (
     <IconPicker
@@ -210,18 +175,21 @@ export function SlashMenu({ editor }: { editor: Editor }) {
                   type="button"
                   role="option"
                   aria-selected={i === active}
+                  aria-description={item.description}
                   data-item={item.id}
                   className={cn('slash-menu-item', i === active && 'is-active')}
                   onMouseEnter={() => setActive(i)}
                   onClick={() => run(item)}
                 >
-                  <span className="slash-menu-icon" aria-hidden>
+                  <span className="slash-menu-icon" aria-hidden style={item.iconColor ? { color: item.iconColor } : undefined}>
                     <Icon name={item.icon} size={18} />
                   </span>
-                  <span className="slash-menu-text">
-                    <span className="slash-menu-name">{item.name}</span>
-                    {item.description && <span className="slash-menu-description">{item.description}</span>}
-                  </span>
+                  <span className="slash-menu-name">{item.name}</span>
+                  {item.description && (
+                    <span className="slash-menu-description" title={item.description} data-tooltip={item.description} aria-hidden>
+                      <Icon name="ph-text-align-justify" size={16} />
+                    </span>
+                  )}
                 </button>
               )
             })}

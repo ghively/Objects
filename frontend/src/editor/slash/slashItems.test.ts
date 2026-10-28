@@ -1,6 +1,6 @@
 import { Editor as TiptapEditor } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
@@ -11,18 +11,14 @@ vi.mock('../media/recordAudio', async (orig) => ({
   ...(await orig<typeof import('../media/recordAudio')>()),
   recordAudio: vi.fn(async () => undefined),
 }))
-vi.mock('../media/upload', async (orig) => ({
-  ...(await orig<typeof import('../media/upload')>()),
-  pickAndInsert: vi.fn(),
-}))
 
 import { api } from '@/api/client'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { recordAudio } from '../media/recordAudio'
-import { pickAndInsert } from '../media/upload'
 import { setObjectEmbedPicker } from '../nodes/objectEmbed'
 import {
   BLOCK_ITEMS,
+  COLOR_ITEMS,
   dailyNoteTitle,
   dayLabel,
   filterSections,
@@ -53,37 +49,42 @@ describe('slash items', () => {
   test('slash menu sections and item names match reference', () => {
     const sections = slashSections(ctx())
     expect(sections.map((s) => s.label)).toEqual(['Create a block', 'Create an object', 'Link to a date', 'Reuse any content'])
+    // Object's CreateMenu order (reference check 2026-10-28, 2d).
     expect(sections[0].items.map((i) => [i.name, i.description ?? null])).toEqual([
-      ['Text', 'Just text'],
+      ['Standard', 'Turn block into a standard text block'], // ControlDropdown.custom.block_Base.*
+      ['Small', 'Turn block into a small text block'],
       ['Heading 1', 'Block with a heading level 1'],
       ['Heading 2', 'Block with a heading level 2'],
       ['Heading 3', 'Block with a heading level 3'],
       ['Heading 4', 'Block with a heading level 4'],
-      ['Small', 'Turn block into a small text block'],
       ['Bullet list', 'Add a bullet list to this block'],
-      ['Numbered list', 'Add a numbered list to this block'],
       ['Alphabetical list', 'Add an alphabetical list to this block'],
+      ['Numbered list', 'Add a numbered list to this block'],
       ['Roman list', 'Add a roman list to this block'],
+      ['Quote block', 'Turn block into a quote block'],
       ['To-do', 'Add a To-do box to this block'],
       ['Toggle', 'Add a toggle to this block'],
-      ['Quote block', 'Turn block into a quote block'],
-      ['Group', 'A layout element to group multiple blocks into one container'],
       ['Icon', 'Add an icon to this block'],
-      ['Text', 'Change the text color of this block'],
-      ['Background', 'Change the background color of this block'],
-      ['Two Columns', 'Multiple blocks groups next to each other'],
-      ['Horizontal line', 'A horizontal line to separate different sections'],
-      ['Code', 'A code block'],
-      ['Math', 'A display style math block'],
-      ['Table', 'A simple block for tabular content'],
-      ['Insert image', null],
-      ['Insert PDF', null],
-      ['Insert audio', null],
-      ['Insert video', null],
-      ['Insert file', null],
-      ['Create bookmark', null],
+      ['Group', 'A layout element to group multiple blocks into one container'],
       ['Record audio', 'Record audio and embed it at the cursor.'], // CreateDropdown.recordAudio.*
+      ['Math', 'A display style math block'],
+      ['Code', 'A code block'],
+      ['Horizontal line', 'A horizontal line to separate different sections'],
+      ['Two Columns', 'Multiple blocks groups next to each other'],
+      ['Table', 'A simple block for tabular content'],
+      ['Create bookmark', null], // ours: Object's only way to insert a bookmark
     ])
+    // Object's icons (`bke`, `Ze`).
+    expect(Object.fromEntries(sections[0].items.map((i) => [i.id, i.icon]))).toMatchObject({
+      Base: 'ph-text-t',
+      S: 'ph-text-aa',
+      H1: 'ph-text-h',
+      alphabetical: 'ph-list-numbers',
+      toggle: 'ph-caret-right-fill',
+      group: 'ph-rectangle',
+      math: 'ph-function',
+      columns: 'ph-columns',
+    })
     // One item per type (whiteboards are created from "+ New").
     expect(sections[1].items.map((i) => i.name)).toEqual(['Create Page', 'Create Person'])
     expect(slashSections(ctx('Q3 plan'))[1].items.map((i) => i.name)).toEqual([
@@ -117,38 +118,29 @@ describe('slash items', () => {
 })
 
 describe('each block item runs its command', () => {
-  beforeEach(() => vi.mocked(pickAndInsert).mockClear())
-
   const cases: [string, string | ((e: TiptapEditor, view: unknown) => void)][] = [
-    ['text', 'Hello\n\nWorld\n'],
+    ['Base', 'Hello\n\nWorld\n'],
+    ['S', '<!-- block: small -->\nHello\n\nWorld\n'],
     ['H1', '# Hello\n\nWorld\n'],
     ['H2', '## Hello\n\nWorld\n'],
     ['H3', '### Hello\n\nWorld\n'],
     ['H4', '#### Hello\n\nWorld\n'],
-    ['S', '<!-- block: small -->\nHello\n\nWorld\n'],
     ['bullet', '- Hello\n\nWorld\n'],
-    ['numerical', '1. Hello\n\nWorld\n'],
     ['alphabetical', '<!-- block: list=alphabetical -->\n1. Hello\n\nWorld\n'],
+    ['numerical', '1. Hello\n\nWorld\n'],
     ['roman', '<!-- block: list=roman -->\n1. Hello\n\nWorld\n'],
+    ['quote', '> Hello\n\nWorld\n'],
     ['todo', '- [ ] Hello\n\nWorld\n'],
     ['toggle', '<!-- toggle open -->\nHello\n<!-- /toggle -->\n\nWorld\n'],
-    ['quote', '> Hello\n\nWorld\n'],
-    ['group', '<!-- group -->\nHello\n<!-- /group -->\n\nWorld\n'],
     ['icon', (_e, view) => expect(view).toBe('icon')],
-    ['colorText', (_e, view) => expect(view).toBe('colorText')],
-    ['colorBg', (_e, view) => expect(view).toBe('colorBg')],
-    ['columns', (e) => expect(e.state.doc.child(1).type.name).toBe('columns')],
-    ['hr', (e) => expect(serializeBody(e)).toBe('Hello\n\n---\n\nWorld\n')],
-    ['code', '```\nHello\n```\n\nWorld\n'],
-    ['math', (e) => expect(e.state.doc.child(1).type.name).toBe('mathBlock')],
-    ['table', (e) => expect(e.state.doc.child(1).type.name).toBe('table')],
-    ['image', () => expect(pickAndInsert).toHaveBeenCalledWith(expect.anything(), 'image')],
-    ['pdf', () => expect(pickAndInsert).toHaveBeenCalledWith(expect.anything(), 'pdf')],
-    ['audio', () => expect(pickAndInsert).toHaveBeenCalledWith(expect.anything(), 'audio')],
-    ['video', () => expect(pickAndInsert).toHaveBeenCalledWith(expect.anything(), 'video')],
-    ['file', () => expect(pickAndInsert).toHaveBeenCalledWith(expect.anything(), 'file')],
-    ['bookmark', (_e, view) => expect(view).toBe('bookmark')],
+    ['group', '<!-- group -->\nHello\n<!-- /group -->\n\nWorld\n'],
     ['recordAudio', (e) => expect(recordAudio).toHaveBeenCalledWith(e)],
+    ['math', (e) => expect(e.state.doc.child(1).type.name).toBe('mathBlock')],
+    ['code', '```\nHello\n```\n\nWorld\n'],
+    ['hr', (e) => expect(serializeBody(e)).toBe('Hello\n\n---\n\nWorld\n')],
+    ['columns', (e) => expect(e.state.doc.child(1).type.name).toBe('columns')],
+    ['table', (e) => expect(e.state.doc.child(1).type.name).toBe('table')],
+    ['bookmark', (_e, view) => expect(view).toBe('bookmark')],
   ]
 
   test('every block item has a case', () => {
@@ -255,5 +247,36 @@ describe('m8 typed dates and reuse items', () => {
     reuse.items[1].run(editor)
     reuse.items[2].run(editor)
     expect(serializeBody(editor)).toBe('Hello\n\n![[collection:reading-list]]\n\n![[query:open-tasks]]\n')
+  })
+})
+
+describe('search-only items (Object reference)', () => {
+  test('colour items and Mermaid Diagram appear only while searching', () => {
+    const ids = (q: string) => slashSections(ctx(q))[0].items.map((i) => i.id)
+    expect(ids('')).not.toContain('mermaid')
+    expect(ids('').some((id) => id.startsWith('color:'))).toBe(false)
+    expect(ids('b')).toContain('mermaid')
+    // 18 backgrounds, then 18 text colours, named by colorThemes.theme-*.
+    expect(COLOR_ITEMS).toHaveLength(36)
+    expect(COLOR_ITEMS[0].name).toBe('Gray background')
+    expect(COLOR_ITEMS[18].name).toBe('Gray text')
+    expect(COLOR_ITEMS[7]).toMatchObject({ name: 'Blue background', icon: 'ph-stop' })
+    expect(COLOR_ITEMS[25]).toMatchObject({ name: 'Blue text', icon: 'ph-text-aa' })
+    const names = (q: string) => filterSections(slashSections(ctx(q, { types: [] })), q).flatMap((s) => s.items.map((i) => i.name))
+    expect(names('blue background')[0]).toBe('Blue background')
+    // Aliases: `mmd`, `h1`.
+    expect(names('mmd')[0]).toBe('Mermaid Diagram')
+    expect(names('h1')[0]).toBe('Heading 1')
+  })
+
+  test('a colour item sets the block colour; Mermaid Diagram makes a mermaid code block', () => {
+    const editor = headless('Hello\n\nWorld\n')
+    COLOR_ITEMS.find((i) => i.id === 'color:bg-blue')!.run(editor)
+    expect(serializeBody(editor)).toBe('<!-- block: color=bg-blue -->\nHello\n\nWorld\n')
+    const mermaid = slashSections(ctx('mmd'))[0].items.find((i) => i.id === 'mermaid')!
+    expect(mermaid).toMatchObject({ name: 'Mermaid Diagram', description: 'A code block', alias: 'mmd' })
+    const other = headless('graph TD\n')
+    mermaid.run(other)
+    expect(serializeBody(other)).toBe('```mermaid\ngraph TD\n```\n')
   })
 })

@@ -15,6 +15,7 @@ import { THEME_COLORS } from '@/theme/palette'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { keysFor } from '@/lib/shortcuts'
 import { COLOR_MENU_TEXT } from './ColorMenu'
+import { setLastUsedHighlightColor } from '../nodes/textStyle'
 import { TOKENS_MENU_ITEMS, TOKENS_MENU_TEXT, TokensMenu } from './TokensMenu'
 
 const mocked = vi.mocked(api)
@@ -203,17 +204,31 @@ describe('TokensMenu', () => {
     expect(screen.getByRole('toolbar')).toBeInTheDocument()
   })
 
-  test('the highlight shortcut opens the colour panel', () => {
+  test('the highlight shortcut toggles the last-used colour, bg-amber at first (Object reference)', () => {
+    setLastUsedHighlightColor(null)
     const editor = setup('Hello brave world\n', 'brave')
     const key = keysFor('highlightText')[0]
     const [mod, shift, letter] = key.split('-')
     expect([mod, shift]).toEqual(['Mod', 'Shift'])
-    act(() => {
-      editor.view.dom.dispatchEvent(
-        new KeyboardEvent('keydown', { key: letter, ctrlKey: true, metaKey: false, shiftKey: true, bubbles: true }),
-      )
-    })
-    expect(screen.getByRole('menu', { name: 'Highlight text' })).toBeInTheDocument()
+    const press = () =>
+      act(() => {
+        editor.view.dom.dispatchEvent(
+          new KeyboardEvent('keydown', { key: letter, ctrlKey: true, metaKey: false, shiftKey: true, bubbles: true }),
+        )
+      })
+    press()
+    expect(serializeBody(editor)).toBe('Hello <mark data-color="bg-amber">brave</mark> world\n')
+    expect(screen.queryByRole('menu', { name: 'Highlight text' })).toBeNull()
+    press()
     expect(serializeBody(editor)).toBe('Hello brave world\n')
+    // A colour picked in the panel becomes the last-used one, text colours too.
+    fireEvent.click(within(bar()).getByRole('button', { name: 'Highlight text' }))
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Highlight text' })).getByRole('menuitem', { name: 'Red text' }))
+    expect(serializeBody(editor)).toBe('Hello <span data-color="text-red">brave</span> world\n')
+    press()
+    expect(serializeBody(editor)).toBe('Hello brave world\n')
+    press()
+    expect(serializeBody(editor)).toBe('Hello <span data-color="text-red">brave</span> world\n')
+    setLastUsedHighlightColor(null)
   })
 })

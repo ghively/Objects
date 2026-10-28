@@ -157,7 +157,7 @@ These are the "our choice" items from the plan's Global Constraints and from eac
 - **Storage forms:**
   - the occurrence log (`occurrenceLog`, one `<scheduled> <action> <at>` line each; a garbage line is kept and ignored)
   - the `reminders` map
-  - inline HTML `<span data-color>` / `<mark data-color>` (a bare `<mark>` reads as yellow)
+  - inline HTML `<span data-color>` / `<mark data-color>` (a bare `<mark>` reads as `bg-amber`, Object's `FALLBACK_HIGHLIGHT_COLOR`; the highlight shortcut toggles the last-used colour: reference check 2026-10-28, section 4)
   - `<time datetime>` date tokens
   - `<!-- indent -->` containers
   - `<!-- item: … -->` item comments
@@ -284,7 +284,7 @@ Run these on his CPI copy outside the repo, with `git init` and a first commit d
 - [ ] URLs pasted as bookmark pages.
 - [ ] The inspector's Stats.
 - [ ] Quick-create "Nothing".
-- [ ] The formula row numbering, and "Value" for an error.
+- [ ] The formula row numbering, and "Value" for an error. (Row numbering from 1 at the header row matches Object's `ZQ`; `$` absolute references, whole-column ranges `A:A` and the one-`=` rule now follow it too: reference check 2026-10-28, section 4.)
 - [ ] The Turn-into embed view.
 - [ ] The typed-date phrases.
 - [ ] Ink tilt and partial erase.

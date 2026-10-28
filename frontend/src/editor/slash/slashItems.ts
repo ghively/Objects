@@ -1,14 +1,19 @@
 /**
- * The `/` menu's sections and items, in Object's order. Strings are
- * Object's own (keys beside each); icons are our choice (Phosphor).
+ * The `/` menu's sections and items, in Object's order. Strings and icons
+ * are Object's own (keys beside each; reference check 2026-10-28, 2d).
+ *
+ * Images, PDFs, audio, video and files are not slash items in Object, and
+ * not here: they are dropped or pasted into the editor (`extensions/fileDrop`).
+ * "Reuse any content" is ours (not one of CreateMenu's sections): it is the
+ * only way to insert an object, collection or query embed.
  *
  * Each item's `run` is called after the `/query` text has been removed. It may
- * return a sub-view for the menu to show next (the colour lists, the icon
- * picker, the bookmark URL field).
+ * return a sub-view for the menu to show next (the icon picker, the bookmark
+ * URL field).
  */
 import type { Editor } from '@tiptap/core'
 import { api } from '@/api/client'
-import type { AttachmentKind, Collection, Query, TypeDef } from '@/api/types'
+import type { Collection, Query, TypeDef } from '@/api/types'
 import { useDefs } from '@/types/useDefinitions'
 import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
 import { zonedToday } from '@/lib/zonedTime'
@@ -19,21 +24,26 @@ import { couldBeDate, parseDate } from './parseDate'
 import { fuzzyScore } from '@/links/LinkPicker'
 import { stemOf } from '@/links/linkIndex'
 import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
-import { setQuote } from '../menus/BlockStyleMenu'
+import { setBlockColor, setQuote } from '../menus/BlockStyleMenu'
+import { BLOCK_COLORS, bgColorToken, colorMenuName, textColorToken } from '../menus/colors'
 import type { Hierarchy, ListType } from '../nodes/blockOptions'
 import { insertBlockNode } from '../nodes/containers'
 
-export type SlashView = 'colorText' | 'colorBg' | 'icon' | 'bookmark'
+export type SlashView = 'icon' | 'bookmark'
 
 export type SectionId = 'blocks' | 'structure' | 'dates' | 'reuse'
 
 export interface SlashItem {
   id: string
   name: string
-  /** The row's second line. */
+  /** Shown as the tooltip of the row's right-hand `ph-text-align-justify` icon (on hover), not as a second line. */
   description?: string
-  /** A Phosphor icon id. */
+  /** Object's `aliases.alias`: a short word the search also matches (`h1`, `todo`, `mmd`). */
+  alias?: string
+  /** An Iconify id (Phosphor, or a VS Code file icon). */
   icon: string
+  /** The icon's colour (the colour items). */
+  iconColor?: string
   run: (editor: Editor) => void | SlashView | Promise<void>
   /** M8: kept by the filter and listed first (the typed-date items). */
   pinned?: boolean
@@ -72,8 +82,21 @@ export interface SlashContext {
   queries?: Pick<Query, 'id' | 'name'>[]
 }
 
-const block = (id: string, name: string, description: string | undefined, icon: string, run: SlashItem['run']): SlashItem =>
-  description === undefined ? { id, name, icon, run } : { id, name, description, icon, run }
+const block = (
+  id: string,
+  name: string,
+  description: string | undefined,
+  icon: string,
+  run: SlashItem['run'],
+  alias?: string,
+): SlashItem => ({
+  id,
+  name,
+  icon,
+  run,
+  ...(description === undefined ? {} : { description }),
+  ...(alias === undefined ? {} : { alias }),
+})
 
 const hierarchy = (level: Hierarchy) => (e: Editor) => {
   e.chain().focus().setHierarchy(level).run()
@@ -81,40 +104,49 @@ const hierarchy = (level: Hierarchy) => (e: Editor) => {
 const list = (type: ListType) => (e: Editor) => {
   e.chain().focus().setListType(type).run()
 }
-const media = (kind: AttachmentKind) => (e: Editor) => {
-  e.chain().focus().pickMedia(kind).run()
-}
 
-/** The "Create a block" items. */
+/**
+ * The "Create a block" items, in Object's order (CreateMenu's
+ * `[...operations, recordAudio, ...blocks]`): the `yke` operations without the
+ * colour and AI ones, then Record audio, then the `Dee` blocks. Names,
+ * descriptions, aliases and icons are Object's (`ControlDropdown.custom.*`,
+ * `blocks.*`, `bke`). "Create bookmark" is ours (Object has no slash item
+ * for it, and Object has no other way to insert one), last.
+ */
 export const BLOCK_ITEMS: readonly SlashItem[] = [
-  block('text', 'Text', 'Just text', 'ph-text-t', (e) => {
-    // blocks.TextBlock.*
-    e.chain().focus().setHierarchy('Base').run()
-  }),
-  block('H1', 'Heading 1', 'Block with a heading level 1', 'ph-text-h-one', hierarchy('H1')), // ControlDropdown.custom.block_H1.*
-  block('H2', 'Heading 2', 'Block with a heading level 2', 'ph-text-h-two', hierarchy('H2')),
-  block('H3', 'Heading 3', 'Block with a heading level 3', 'ph-text-h-three', hierarchy('H3')),
-  block('H4', 'Heading 4', 'Block with a heading level 4', 'ph-text-h-four', hierarchy('H4')),
-  block('S', 'Small', 'Turn block into a small text block', 'ph-text-aa', hierarchy('S')), // block_S
-  block('bullet', 'Bullet list', 'Add a bullet list to this block', 'ph-list-bullets', list('bullet')), // block_bullet
+  // ControlDropdown.custom.block_Base.*
+  block('Base', 'Standard', 'Turn block into a standard text block', 'ph-text-t', hierarchy('Base'), 'normal'),
+  block('S', 'Small', 'Turn block into a small text block', 'ph-text-aa', hierarchy('S'), 'small'), // block_S
+  block('H1', 'Heading 1', 'Block with a heading level 1', 'ph-text-h', hierarchy('H1'), 'h1'), // block_H1
+  block('H2', 'Heading 2', 'Block with a heading level 2', 'ph-text-h-two', hierarchy('H2'), 'h2'),
+  block('H3', 'Heading 3', 'Block with a heading level 3', 'ph-text-h-three', hierarchy('H3'), 'h3'),
+  block('H4', 'Heading 4', 'Block with a heading level 4', 'ph-text-h-four', hierarchy('H4'), 'h4'),
+  block('bullet', 'Bullet list', 'Add a bullet list to this block', 'ph-list-bullets', list('bullet'), 'list'), // block_bullet
+  block('alphabetical', 'Alphabetical list', 'Add an alphabetical list to this block', 'ph-list-numbers', list('alphabetical')),
   block('numerical', 'Numbered list', 'Add a numbered list to this block', 'ph-list-numbers', list('numerical')),
-  block('alphabetical', 'Alphabetical list', 'Add an alphabetical list to this block', 'ph-list-dashes', list('alphabetical')),
   block('roman', 'Roman list', 'Add a roman list to this block', 'ph-list-numbers', list('roman')),
-  block('todo', 'To-do', 'Add a To-do box to this block', 'ph-check-square', list('todo')), // block_todo
-  block('toggle', 'Toggle', 'Add a toggle to this block', 'ph-caret-right', (e) => {
-    e.chain().focus().wrapInToggle().run() // block_toggle
-  }),
   block('quote', 'Quote block', 'Turn block into a quote block', 'ph-quotes', (e) => {
     setQuote(e, true) // block_quote
   }),
-  block('group', 'Group', 'A layout element to group multiple blocks into one container', 'ph-bounding-box', (e) => {
+  block('todo', 'To-do', 'Add a To-do box to this block', 'ph-check-square', list('todo'), 'todo'), // block_todo
+  block('toggle', 'Toggle', 'Add a toggle to this block', 'ph-caret-right-fill', (e) => {
+    e.chain().focus().wrapInToggle().run() // block_toggle
+  }),
+  block('icon', 'Icon', 'Add an icon to this block', 'ph-smiley', () => 'icon', 'emoji'), // block_icon
+  block('group', 'Group', 'A layout element to group multiple blocks into one container', 'ph-rectangle', (e) => {
     e.chain().focus().wrapInGroup().run() // block_group
   }),
-  block('icon', 'Icon', 'Add an icon to this block', 'ph-smiley', () => 'icon'), // block_icon
-  block('colorText', 'Text', 'Change the text color of this block', 'ph-text-a-underline', () => 'colorText'), // block_color_text
-  block('colorBg', 'Background', 'Change the background color of this block', 'ph-paint-bucket', () => 'colorBg'), // block_color_bg
-  block('columns', 'Two Columns', 'Multiple blocks groups next to each other', 'ph-columns', (e) => {
-    e.chain().focus().insertColumns(2).run() // blocks.GridBlock.*
+  // CreateDropdown.recordAudio.*
+  block('recordAudio', 'Record audio', 'Record audio and embed it at the cursor.', 'ph-microphone', (e) => {
+    void recordAudio(e).catch((err) => {
+      if (err instanceof NotBuiltYet) showToast(NOT_AVAILABLE)
+    })
+  }),
+  block('math', 'Math', 'A display style math block', 'ph-function', (e) => {
+    e.chain().focus().insertMathBlock().run() // blocks.MathBlock.*
+  }),
+  block('code', 'Code', 'A code block', 'ph-code', (e) => {
+    e.chain().focus().setCodeBlock().run() // blocks.CodeBlock.*
   }),
   block('hr', 'Horizontal line', 'A horizontal line to separate different sections', 'ph-minus', (e) => {
     // blocks.HorizontalLineBlock.*: below the block (in place of it when empty).
@@ -126,28 +158,47 @@ export const BLOCK_ITEMS: readonly SlashItem[] = [
       })
       .run()
   }),
-  block('code', 'Code', 'A code block', 'ph-code', (e) => {
-    e.chain().focus().setCodeBlock().run() // blocks.CodeBlock.*
-  }),
-  block('math', 'Math', 'A display style math block', 'ph-function', (e) => {
-    e.chain().focus().insertMathBlock().run() // blocks.MathBlock.*
+  block('columns', 'Two Columns', 'Multiple blocks groups next to each other', 'ph-columns', (e) => {
+    e.chain().focus().insertColumns(2).run() // blocks.GridBlock.*
   }),
   block('table', 'Table', 'A simple block for tabular content', 'ph-table', (e) => {
     e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() // blocks.SimpleTableBlock.*
   }),
-  block('image', 'Insert image', undefined, 'ph-image', media('image')), // pasteInput.image_from_file
-  block('pdf', 'Insert PDF', undefined, 'ph-file-pdf', media('pdf')), // pasteInput.pdf_from_url
-  block('audio', 'Insert audio', undefined, 'ph-speaker-high', media('audio')), // pasteInput.audio_from_url
-  block('video', 'Insert video', undefined, 'ph-video-camera', media('video')), // pasteInput.video_from_url
-  block('file', 'Insert file', undefined, 'ph-file', media('file')), // pasteInput.file
-  block('bookmark', 'Create bookmark', undefined, 'ph-bookmark-simple', () => 'bookmark'), // pasteInput.bookmark
-  // CreateDropdown.recordAudio.*
-  block('recordAudio', 'Record audio', 'Record audio and embed it at the cursor.', 'ph-microphone', (e) => {
-    void recordAudio(e).catch((err) => {
-      if (err instanceof NotBuiltYet) showToast(NOT_AVAILABLE)
-    })
-  }),
+  block('bookmark', 'Create bookmark', undefined, 'ph-bookmark-simple', () => 'bookmark'), // pasteInput.bookmark (ours in this menu)
 ]
+
+/**
+ * The colour items, listed only while there is search text: the 18
+ * backgrounds, then the 18 text colours (Object's `[...bgThemes,
+ * ...textThemes]`), named `colorThemes.theme-<kind>-<c>` ("Blue background"),
+ * drawn with `block_color_bg`'s `ph-stop` / `block_color_text`'s `ph-text-aa`
+ * in the colour.
+ */
+export const COLOR_ITEMS: readonly SlashItem[] = (['bg', 'text'] as const).flatMap((kind) =>
+  BLOCK_COLORS.map(
+    (c): SlashItem => ({
+      id: `color:${kind}-${c}`,
+      name: colorMenuName(kind, c),
+      icon: kind === 'bg' ? 'ph-stop' : 'ph-text-aa',
+      iconColor: kind === 'bg' ? bgColorToken(c) : textColorToken(c),
+      run: (e) => {
+        setBlockColor(e, kind, c)
+      },
+    }),
+  ),
+)
+
+/** "Mermaid Diagram" (alias `mmd`), listed only while there is search text: a code block in Mermaid. */
+export const MERMAID_ITEM: SlashItem = block(
+  'mermaid',
+  'Mermaid Diagram',
+  'A code block', // blocks.CodeBlock.description
+  'vscode-icons-file-type-mermaid',
+  (e) => {
+    e.chain().focus().setCodeBlock({ language: 'mermaid' }).run()
+  },
+  'mmd',
+)
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -218,7 +269,8 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
   const collections = ctx.collections ?? defs.collections ?? []
   const queries = ctx.queries ?? defs.queries ?? []
   return [
-    { id: 'blocks', label: SLASH_TEXT.blocks, items: [...BLOCK_ITEMS] },
+    // The colour items and "Mermaid Diagram" only while searching (CreateMenu).
+    { id: 'blocks', label: SLASH_TEXT.blocks, items: title ? [...BLOCK_ITEMS, ...COLOR_ITEMS, MERMAID_ITEM] : [...BLOCK_ITEMS] },
     {
       id: 'structure',
       label: SLASH_TEXT.structure,
@@ -273,13 +325,12 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
   ]
 }
 
-/** How well `query` matches an item: its name or description, whichever scores higher; null for no match. */
+/** How well `query` matches an item: its name, alias or description, whichever scores highest; null for no match. */
 export function itemScore(query: string, item: SlashItem): number | null {
-  const a = fuzzyScore(query, item.name)
-  const b = item.description ? fuzzyScore(query, item.description) : null
-  if (a === null) return b
-  if (b === null) return a
-  return Math.max(a, b)
+  const scores = [item.name, item.alias, item.description]
+    .map((text) => (text ? fuzzyScore(query, text) : null))
+    .filter((x): x is number => x !== null)
+  return scores.length ? Math.max(...scores) : null
 }
 
 /**

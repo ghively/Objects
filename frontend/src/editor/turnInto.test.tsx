@@ -1,5 +1,5 @@
 import { Editor as TiptapEditor } from '@tiptap/core'
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { EditorContent } from '@tiptap/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { objectDetail, objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
@@ -141,15 +141,20 @@ describe('turn into (M8 Task 27)', () => {
   test('test block menu offers turn into task object for to-dos only', async () => {
     const editor = headless('- [ ] Buy milk\n\nText\n')
     selectBlocks(editor, 0)
+    // Object's "Turn into..." sub-menu holds the types; Object adds the to-do and whiteboard rows there.
+    const turnIntoNames = async () => {
+      const [menu] = await screen.findAllByRole('menu')
+      const trigger = within(menu).getByRole('menuitem', { name: /^Turn into\.\.\./ })
+      fireEvent.click(trigger)
+      const sub = await screen.findByRole('menu', { name: (_, el) => el.id === trigger.getAttribute('aria-controls') })
+      return within(sub).getAllByRole('menuitem').map((m) => m.textContent?.replace(/(Ctrl|Alt|Shift).*$/, ''))
+    }
     const view = render(<BlockMenu editor={editor} open onOpenChange={() => {}} anchor={{ left: 0, top: 0, width: 10, height: 10 }} />)
-    const names = () => within(screen.getByRole('menu')).getAllByRole('menuitem').map((m) => m.firstChild?.textContent)
-    await screen.findByRole('menu')
-    expect(names()).toEqual(expect.arrayContaining(['Copy block reference', 'Turn into object', 'Turn into task object', 'Turn into whiteboard']))
+    expect(await turnIntoNames()).toEqual(expect.arrayContaining(['Turn into task object', 'Turn into whiteboard']))
     view.unmount()
     selectBlocks(editor, editor.state.doc.child(0).nodeSize)
     render(<BlockMenu editor={editor} open onOpenChange={() => {}} anchor={{ left: 0, top: 0, width: 10, height: 10 }} />)
-    await screen.findByRole('menu')
-    expect(names()).not.toContain('Turn into task object')
+    expect(await turnIntoNames()).not.toContain('Turn into task object')
   })
 
   test('test turn into task from any block', async () => {
