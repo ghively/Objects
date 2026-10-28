@@ -70,3 +70,74 @@ def test_saving_an_object_titled_with_a_line_separator_keeps_created_at(space_di
     space.save_body(rel, "hello\n", version)
     _of, fm, _v = space.read(rel)
     assert "createdAt" in fm and fm["title"] == "Line sep"
+
+
+# -- #4: a case-only move never replaces another file ---------------------------------
+
+
+def _case_sensitive(folder: Path) -> None:
+    """Make ``folder`` case-sensitive (Windows: per-directory flag), or skip the test."""
+    import os
+    import shutil
+    import subprocess
+
+    import pytest
+
+    if os.name == "nt":
+        held = folder.with_name(folder.name + ".held")
+        folder.rename(held)
+        folder.mkdir()
+        ok = subprocess.run(
+            ["fsutil.exe", "file", "setCaseSensitiveInfo", str(folder), "enable"],
+            capture_output=True,
+        ).returncode == 0
+        for p in held.iterdir():
+            shutil.move(str(p), str(folder / p.name))
+        held.rmdir()
+        if not ok:
+            pytest.skip("cannot make a case-sensitive folder here")
+    (folder / "probe.x").write_bytes(b"a")
+    (folder / "PROBE.x").write_bytes(b"b")
+    distinct = (folder / "probe.x").read_bytes() == b"a"
+    for name in {p.name for p in folder.glob("*.x")}:
+        (folder / name).unlink()
+    if not distinct:
+        pytest.skip("the file system is case-insensitive")
+
+
+def test_change_type_case_only_move_does_not_replace_the_other_spelling(space_dir: Path):
+    _case_sensitive(space_dir / "Pages")
+    alpha = (space_dir / "Pages" / "Alpha.md").read_bytes()
+    _write(
+        space_dir / "Pages" / "alpha.md",
+        "---\ntype: 'Task'\ntitle: Alpha\nstatus: Not Started\n---\nthe task\n",
+    )
+    space = Space(space_dir)
+    page = next(t for t in space.types if t.name == "Page")
+    result = space.change_type("Pages/alpha.md", page.id, {}, _version(space, "Pages/alpha.md"))
+
+    assert (space_dir / "Pages" / "Alpha.md").read_bytes() == alpha
+    assert result.path not in ("Pages/Alpha.md", "Pages/alpha.md")
+    assert "the task" in (space_dir / result.path).read_text(encoding="utf-8")
+
+
+def test_whiteboard_case_only_sidecar_move_does_not_replace_the_other_spelling(
+    tmp_path: Path, monkeypatch
+):
+    import os
+
+    import pytest
+    from objectapp import whiteboardtrash
+    from objectapp.whiteboardtrash import _move_one
+
+    # POSIX rename semantics (replace the destination) everywhere, as on Linux/macOS.
+    monkeypatch.setattr(whiteboardtrash.os, "rename", os.replace)
+    folder = tmp_path / "Boards"
+    folder.mkdir()
+    _case_sensitive(folder)
+    (folder / "b.board.json").write_bytes(b"mine")
+    (folder / "B.board.json").write_bytes(b"other")
+    with pytest.raises(FileExistsError):
+        _move_one(folder / "b.board.json", folder / "B.board.json")
+    assert (folder / "B.board.json").read_bytes() == b"other"
+    assert (folder / "b.board.json").read_bytes() == b"mine"
