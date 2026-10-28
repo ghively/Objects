@@ -288,6 +288,13 @@ function defaults(): Api {
       path: `${typeId}/${opts.title || 'Untitled'}.md`,
       version: 'v1',
     }),
+    duplicateObject: async (path: string) => {
+      const copy = path.replace(/\.md$/, ' (Copy).md')
+      const title = copy.slice(copy.lastIndexOf('/') + 1).replace(/\.md$/, '')
+      return { path: copy, version: 'v1', summary: objectSummary({ path: copy, title }) }
+    },
+    exportObjectUrl: (path: string, opts: { media: boolean }) =>
+      `/api/object/export?path=${encodeURIComponent(path)}&media=${opts.media ? 1 : 0}`,
     createDailyNote: async (date: string) => ({ path: `DailyNotes/${date}.md`, version: 'v1', typeIds: [] }),
     calendar: async (from: string, to: string) => calendarRange({ from, to, today: from }),
     deleteObject: async () => ({ trashId: 'trash-1' }),
