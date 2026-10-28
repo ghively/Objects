@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { objectSummary, propertyDef, typeDef } from '@/test/mockApi'
@@ -19,6 +19,8 @@ vi.mock('@/properties/cellFor', async (orig) => {
   return { ...real, cellForDef: (def: { key: string }) => (def.key === 'probe' ? Probe : real.cellForDef(def as never)) }
 })
 
+import type { Editor as TiptapEditor } from '@tiptap/core'
+import { editorObjectTitle } from '@/editor/nodes/blockRef'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { cellValue, decodeDate, PropertyPanel } from './PropertyPanel'
 
@@ -193,5 +195,26 @@ describe('M5 backlinks', () => {
     expect(JSON.parse(screen.getByRole('button', { name: 'probe' }).dataset.value!)).toEqual(refs)
     rerender(<PropertyPanel type={type} frontmatter={{}} summary={summary} backlinks={[]} onChange={vi.fn()} />)
     expect(JSON.parse(screen.getByRole('button', { name: 'probe' }).dataset.value!)).toEqual([])
+  })
+
+  test('Content and Text cells know the object they belong to (for block references)', async () => {
+    const CONTENT = propertyDef({ id: 'p-content', key: 'content', name: 'Content', type: 'blocks' })
+    const TEXT = propertyDef({ id: 'p-text', key: 'summary', name: 'Summary', type: 'textBlock' })
+    const T = typeDef({ id: 'project', name: 'Project', propertyDefinitions: [CONTENT, TEXT] })
+    const { container } = render(
+      <PropertyPanel
+        type={T}
+        frontmatter={{ content: 'Some content', summary: 'A line' }}
+        summary={objectSummary({ path: 'Projects/Apollo.md', type: 'project' })}
+        onChange={vi.fn()}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Summary' }))
+    const editors = await waitFor(() => {
+      const els = [...container.querySelectorAll('.ProseMirror')] as (HTMLElement & { editor?: TiptapEditor })[]
+      expect(els).toHaveLength(2)
+      return els.map((el) => el.editor!)
+    })
+    for (const editor of editors) expect(editorObjectTitle(editor)).toBe('Apollo')
   })
 })

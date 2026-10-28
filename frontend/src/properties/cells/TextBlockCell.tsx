@@ -6,6 +6,7 @@ import { WIKILINK_RE } from '@/editor/extensions/wikilink'
 import { useLinkPicker } from '@/links/LinkPicker'
 import { presentWikilink } from '@/links/wikilinkPresenter'
 import { placeholderFor } from '../format'
+import type { CellExtras } from '../cellFor'
 import type { CellProps } from './types'
 
 function escapeHtml(s: string): string {
@@ -89,7 +90,7 @@ const onLink = (e: { target: EventTarget }) => e.target instanceof Element && e.
  * token menu). The edit saves on its way out; an unchanged value is never rewritten, and an
  * empty one saves `null`.
  */
-export function TextBlockCell({ def, value, readOnly, density, inTable, onChange }: CellProps<string | null>) {
+export function TextBlockCell({ def, value, readOnly, density, inTable, onChange, path }: CellProps<string | null> & Pick<CellExtras, 'path'>) {
   const [editing, setEditing] = useState(false)
   const html = useMemo(() => (value ? renderInline(value) : ''), [value])
   const textRef = useRef<HTMLSpanElement>(null)
@@ -147,6 +148,7 @@ export function TextBlockCell({ def, value, readOnly, density, inTable, onChange
     <div ref={boxRef} className="text-block-cell min-h-[1.5em] text-[15px] break-words text-fg">
       <StringEditor
         value={value ?? ''}
+        path={path}
         singleParagraph
         autofocus
         ariaLabel={def.name}

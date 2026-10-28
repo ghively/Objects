@@ -370,6 +370,7 @@ export function PropertyPanel({
             onOpenObject={onOpenObject}
             onChangeType={onChangeType}
             typeId={type?.id ?? summary?.type}
+            path={summary?.path}
             onOpenSettings={canEditType && typed && type ? () => setSettingsFor(def.id) : undefined}
           />
         ) : null}
