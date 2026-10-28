@@ -11,7 +11,8 @@
  * - Link existing: pick an object; the selection becomes a link to it, keeping
  *   the selected words as the label when they differ from the title (our choice).
  * - Search: opens the extended search page with the selected text.
- * - The `highlightText` shortcut opens the colour panel on the selection.
+ * - The `highlightText` shortcut is not the panel: as in Capacities it toggles
+ *   the last-used colour on the selection (`nodes/textStyle`).
  *
  * Mounted by `Editor.tsx` with this name and props (Task 25). Strings are
  * Capacities' unless marked "our string"; the trimmed reference has no CSS for
@@ -43,7 +44,6 @@ import { openExtendedSearch } from '@/search/openSearch'
 import { TypeChip } from '@/shell/Sidebar'
 import { blockSelectionRange, turnInto } from '../extensions/blockSelection'
 import { TURN_INTO_ITEMS } from '../handles/BlockMenu'
-import { setHighlightTextHandler } from '../nodes/textStyle'
 import { ColorMenu, COLOR_MENU_TEXT } from './ColorMenu'
 import './tokens.css'
 
@@ -154,22 +154,6 @@ export function selectionToFormula(editor: Editor): boolean {
   if (text === null) return false
   const { from, to } = editor.state.selection
   return editor.chain().focus().insertContentAt({ from, to }, [{ type: 'inlineMath', attrs: { text } }]).run()
-}
-
-// The highlight shortcut opens the colour panel of the editor it fires in.
-const colorOpeners = new Map<Editor, () => boolean>()
-let handlerInstalled = false
-function installHighlightHandler() {
-  if (handlerInstalled) return
-  handlerInstalled = true
-  setHighlightTextHandler((editor) => {
-    const open = colorOpeners.get(editor)
-    if (open) return open()
-    // No toolbar on this editor (read-only, a test): toggle a yellow highlight.
-    if (editor.state.selection.empty) return false
-    if (editor.isActive('highlight')) return editor.chain().unsetHighlight().run()
-    return editor.chain().setHighlight('yellow').run()
-  })
 }
 
 function mods(e: MouseEvent | KeyboardEvent): OpenMods {
@@ -394,22 +378,6 @@ export function TokensMenu({ editor }: TokensMenuProps) {
     }
   }, [editor, refresh])
 
-  // The highlight shortcut opens "Highlight text".
-  useEffect(() => {
-    if (!editor) return
-    installHighlightHandler()
-    colorOpeners.set(editor, () => {
-      if (selectionText(editor) === null) return false
-      panelRef.current = 'color'
-      setPanel('color')
-      refresh()
-      setVisible(true)
-      return true
-    })
-    return () => {
-      colorOpeners.delete(editor)
-    }
-  }, [editor, refresh])
 
   // A click outside the toolbar and the editor closes an open panel.
   useEffect(() => {
