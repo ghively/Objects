@@ -2,6 +2,7 @@
 // after deadline" when the task's date is after it.
 import type { DateValue } from '@/api/types'
 import { cn } from '@/lib/utils'
+import { zonedDayDate } from '@/lib/zonedShell'
 import { localDayOf } from './repeat'
 
 const DAY_MS = 86_400_000
@@ -18,8 +19,8 @@ function monthDiff(a: Date, b: Date): number {
   return m
 }
 
-/** The label for a deadline seen from `today`; null without a deadline. */
-export function deadlineText(deadline: DateValue | null | undefined, today: Date = new Date()): string | null {
+/** The label for a deadline seen from `today` (default: today in the Time zone setting); null without a deadline. */
+export function deadlineText(deadline: DateValue | null | undefined, today: Date = zonedDayDate()): string | null {
   const due = deadline?.start ? localDayOf(deadline.start) : null
   if (!due) return null
   const days = dayDiff(today, due)
