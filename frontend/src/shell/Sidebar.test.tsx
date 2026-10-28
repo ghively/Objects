@@ -213,15 +213,15 @@ describe('Sidebar theme button (M7)', () => {
     const ui = render(<GlobalOverlays />)
     // Loaded settings are applied to <html>.
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
-    // Mod-Shift-d (Ctrl on Windows/Linux): Toggle dark mode.
+    // Mod-Shift-l (Ctrl on Windows/Linux): Toggle dark mode (Capacities' key).
     act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true, bubbles: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'L', code: 'KeyL', ctrlKey: true, shiftKey: true, bubbles: true }))
     })
     expect(useSettings.getState().settings.themeMode).toBe('light')
     expect(document.documentElement.getAttribute('data-theme')).toBe('light')
     expect(document.documentElement.classList.contains('dark')).toBe(false)
     act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true, bubbles: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'L', code: 'KeyL', ctrlKey: true, shiftKey: true, bubbles: true }))
     })
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
     expect(document.documentElement.classList.contains('dark')).toBe(true)

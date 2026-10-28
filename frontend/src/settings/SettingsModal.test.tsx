@@ -150,10 +150,10 @@ describe('SettingsModal', () => {
     expect(sheet).toBeInTheDocument()
     expect(useSettingsModal.getState().isOpen).toBe(false)
 
-    // toggleShortcutsMenu: Mod-/ closes it, and opens it again.
-    await userEvent.keyboard('{Control>}/{/Control}')
+    // toggleShortcutsMenu: Mod-Shift-b closes it, and opens it again.
+    await userEvent.keyboard('{Control>}{Shift>}B{/Shift}{/Control}')
     expect(useSettingsModal.getState().shortcutsOpen).toBe(false)
-    await userEvent.keyboard('{Control>}/{/Control}')
+    await userEvent.keyboard('{Control>}{Shift>}B{/Shift}{/Control}')
     expect(await screen.findByRole('dialog', { name: 'Shortcuts' })).toBeInTheDocument()
 
     // Opening on a requested section (the spaces menu's "Space settings").

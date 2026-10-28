@@ -1,14 +1,12 @@
 /**
  * The theme's shortcut: `toggleDarkMode` ("Toggle dark mode", `shortcuts.toggleDarkMode.name`;
- * provisional key Mod-Shift-d, Gene confirms it in the hand-check). Toggling flips the device
- * setting `themeMode` through `useSettings().patch`; `GlobalOverlays` applies the result.
+ * Capacities' key Ctrl+Shift+L / ⇧⌘L, defined once in `lib/shortcuts.ts`). Toggling flips the
+ * device setting `themeMode` through `useSettings().patch`; `GlobalOverlays` applies the result.
  */
-import { registerShortcuts, useGlobalShortcut } from '@/lib/shortcuts'
+import { M7_SHORTCUTS, registerShortcuts, useGlobalShortcut } from '@/lib/shortcuts'
 import { useSettings } from '@/settings/useSettings'
 
-registerShortcuts([
-  { id: 'toggleDarkMode', category: 'global', name: 'Toggle dark mode', keys: ['Mod-Shift-d'], scope: 'global', provisional: true },
-])
+registerShortcuts(M7_SHORTCUTS.filter((d) => d.id === 'toggleDarkMode'))
 
 /** Switch between the light and the dark theme (each keeps its own Light/Dimmed choice). */
 export function toggleDarkMode(): Promise<void> {

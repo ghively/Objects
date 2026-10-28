@@ -115,10 +115,10 @@ describe('M4 targets in the app', () => {
     expect(screen.queryByRole('complementary', { name: 'Side panel' })).toBeNull()
     expect(toggle).toHaveAttribute('aria-pressed', 'false')
 
-    // The "Toggle right sidepanel" shortcut (provisional Mod-Shift-\\).
+    // The "Toggle right sidepanel" shortcut (Capacities' Mod-Shift-ArrowRight).
     const shortcut = () =>
       act(() => {
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: '|', code: 'Backslash', ctrlKey: true, shiftKey: true, bubbles: true }))
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', ctrlKey: true, shiftKey: true, bubbles: true }))
       })
     shortcut()
     expect(screen.getByRole('complementary', { name: 'Side panel' })).toBeInTheDocument()

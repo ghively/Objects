@@ -4,13 +4,16 @@
  * (`shortcuts.<id>.name`, verbatim unless marked "our string") and its keys.
  *
  * Keys are written `Mod-Shift-k`: modifiers `Mod` (Ctrl on Windows/Linux, Cmd on macOS), `Ctrl`,
- * `Meta`, `Alt`, `Shift`, then one key: a letter, a digit, a punctuation character, or a
+ * `Meta`, `Alt`, `AltCtrl` (Alt on Windows/Linux, Ctrl on macOS: Capacities' Ctrl+Alt+L / ⌃⌘L
+ * pattern), `Shift`, then one key: a letter, a digit, a punctuation character, or a
  * `KeyboardEvent.key` name (`Escape`, `ArrowUp`, `Enter`, `Tab`, `Backspace`, `Delete`, `Space`).
  *
- * `provisional: true` keys are not in the trimmed reference (the plan's key table); Gene confirms
- * them in the hand-check. `bound: false` entries are display-only: their handlers live elsewhere
- * (M1–M6 code), and they are registered so the Shortcuts sheet lists them and the collision test
- * sees them.
+ * The keys are Capacities' own (its shortcut table, `shortcuts36682.js` `var ex={…}`, checked in
+ * `docs/superpowers/plans/reference-check-2026-10-28.md` §1). An id Capacities lists no key for
+ * has `keys: []` and the Shortcuts sheet leaves it out. `provisional: true` marks a key that is
+ * ours (no Capacities key to check against). `bound: false` entries are display-only: their
+ * handlers live elsewhere (M1–M6 code), and they are registered so the Shortcuts sheet lists them
+ * and the collision test sees them.
  */
 import { useEffect, useRef } from 'react'
 
@@ -114,6 +117,10 @@ export function parseKeys(spec: string, mac = isMacPlatform()): Combo {
     } else if (m === 'Ctrl') c.ctrl = true
     else if (m === 'Meta' || m === 'Cmd') c.meta = true
     else if (m === 'Alt') c.alt = true
+    else if (m === 'AltCtrl') {
+      if (mac) c.ctrl = true
+      else c.alt = true
+    }
     else if (m === 'Shift') c.shift = true
   }
   return c
@@ -155,10 +162,12 @@ export function matches(e: KeyEventLike, keys: string[]): boolean {
   return false
 }
 
-/** How a key is shown in the Shortcuts sheet (`Ctrl+Shift+K`, or `⌘⇧K` on macOS). */
+const ARROW_GLYPHS: Record<string, string> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }
+
+/** How a key is shown in the Shortcuts sheet (`Ctrl+Shift+K`, or `⌘⇧K` on macOS; arrows as `↑`). */
 export function formatKeys(spec: string, mac = isMacPlatform()): string {
   const c = parseKeys(spec, mac)
-  const key = c.key === 'Space' ? 'Space' : c.key.length === 1 ? c.key.toUpperCase() : c.key
+  const key = ARROW_GLYPHS[c.key] ?? (c.key === 'Space' ? 'Space' : c.key.length === 1 ? c.key.toUpperCase() : c.key)
   if (mac) return `${c.ctrl ? '⌃' : ''}${c.alt ? '⌥' : ''}${c.shift ? '⇧' : ''}${c.meta ? '⌘' : ''}${key}`
   return [c.ctrl && 'Ctrl', c.meta && 'Meta', c.alt && 'Alt', c.shift && 'Shift', key].filter(Boolean).join('+')
 }
@@ -229,7 +238,9 @@ export function useGlobalShortcut(
 
 // ---- the registered shortcuts ----
 
-const P = true // provisional: keys from the plan's table, not in the trimmed reference
+/** Checked against Capacities' shortcut table (reference-check-2026-10-28 §1). */
+const V = false
+const P = true // provisional: keys from the plan's table, not yet checked
 
 const def = (
   id: string,
@@ -284,20 +295,22 @@ export const M7_SHORTCUTS: ShortcutDef[] = [
   def('insertBlockAbove', 'block', 'Insert block above and set cursor there', ['Alt-Shift-Enter'], 'editor', P),
   def('insertBlockBelow', 'block', 'Insert block below and set cursor there', ['Alt-Enter'], 'editor', P),
 
-  def('closeTab', 'navigation', 'Close current tab', ['Mod-w'], 'global', P),
-  def('openNewTab', 'navigation', 'Open new tab', ['Mod-t'], 'global', P),
-  def('navigateTabs', 'navigation', 'Navigate tabs', ['Ctrl-Tab'], 'global', P),
-  def('openTabList', 'navigation', 'Toggle tab menu when multiple tabs are open', ['Mod-Shift-a'], 'global', P),
-  def('navigateBack', 'navigation', 'Navigate back', ['Alt-ArrowLeft'], 'global', P),
-  def('navigateForward', 'navigation', 'Navigate forward', ['Alt-ArrowRight'], 'global', P),
+  def('closeTab', 'navigation', 'Close current tab', ['Mod-w'], 'global', V),
+  def('openNewTab', 'navigation', 'Open new tab', ['Mod-t'], 'global', V),
+  def('navigateTabs', 'navigation', 'Navigate tabs', ['Ctrl-Tab'], 'global', V),
+  // Capacities' Ctrl+Shift+A is `toggleChecklistMenu`, not the tab menu.
+  def('openTabList', 'navigation', 'Toggle tab menu when multiple tabs are open', ['Mod-Shift-ArrowUp'], 'global', V),
+  def('navigateBack', 'navigation', 'Navigate back', ['Mod-ArrowLeft', 'Mod-['], 'global', V),
+  def('navigateForward', 'navigation', 'Navigate forward', ['Mod-ArrowRight', 'Mod-]'], 'global', V),
 
-  def('toggleSidepanel', 'global', 'Toggle right sidepanel', ['Mod-Shift-\\'], 'global', P),
-  def('toggleLeftSidebar', 'global', 'Toggle left sidebar', ['Mod-\\'], 'global', P),
-  def('toggleCalendarSidebar', 'global', 'Toggle calendar sidebar', ['Mod-Shift-y'], 'global', P),
-  def('toggleDarkMode', 'global', 'Toggle dark mode', ['Mod-Shift-d'], 'global', P),
-  // Verified: reference/recovered-ts/src/electron/electron-menu.ts binds Settings to CmdOrCtrl+,.
-  def('openSettings', 'global', 'Open settings', ['Mod-,'], 'global', false),
-  def('toggleShortcutsMenu', 'global', 'Show/hide shortcuts menu', ['Mod-/'], 'global', P),
+  def('toggleSidepanel', 'global', 'Toggle right sidepanel', ['Mod-Shift-ArrowRight'], 'global', V),
+  def('toggleLeftSidebar', 'global', 'Toggle left sidebar', ['Mod-Shift-ArrowLeft'], 'global', V),
+  // Capacities' Ctrl+Shift+Y is `openMinigame`.
+  def('toggleCalendarSidebar', 'global', 'Toggle calendar sidebar', ['Mod-Alt-s'], 'global', V),
+  def('toggleDarkMode', 'global', 'Toggle dark mode', ['Mod-Shift-l'], 'global', V),
+  // Also reference/recovered-ts/src/electron/electron-menu.ts binds Settings to CmdOrCtrl+,.
+  def('openSettings', 'global', 'Open settings', ['Mod-,'], 'global', V),
+  def('toggleShortcutsMenu', 'global', 'Show/hide shortcuts menu', ['Mod-Shift-b'], 'global', V),
 ]
 
 /**
@@ -305,9 +318,10 @@ export const M7_SHORTCUTS: ShortcutDef[] = [
  * the built ones (our choices where no reference exists, as each module notes).
  */
 export const EXISTING_SHORTCUTS: ShortcutDef[] = [
-  // M5, palette/CommandPalette.tsx
-  def('openSearchPalette', 'global', 'Search this space', ['Mod-k'], 'global', false, false),
-  def('openCommandPalette', 'global', 'Open action palette', ['Mod-p'], 'global', false, false),
+  // M5, palette/CommandPalette.tsx (it reads these keys). Capacities: search is Ctrl+P or Ctrl+K;
+  // it lists no key for the action palette (reached from the palette's switch button).
+  def('openSearchPalette', 'global', 'Search this space', ['Mod-p', 'Mod-k'], 'global', false, false),
+  def('openCommandPalette', 'global', 'Open action palette', [], 'global', false, false),
   // M5, object/ObjectView.tsx (no Capacities id: our id and our string)
   def('findInPage', 'page', 'Find in page', ['Mod-f'], 'global', false, false),
   // M1–M3, App.tsx (outside editable targets)
@@ -398,11 +412,12 @@ export const M8_SHORTCUTS: ShortcutDef[] = [
   def('turnIntoTask', 'block', 'Turn into task', ['Mod-Alt-k'], 'editor', P, true),
   def('turnBlockIntoTaskObject', 'block', 'Turn block into task object', ['Mod-Alt-Shift-k'], 'editor', P, true),
   def('highlightText', 'text', 'Highlight text selection', ['Mod-Shift-h'], 'editor', P, true),
-  def('toggleFocusMode', 'global', 'Toggle focus mode', ['Mod-Shift-f'], 'global', P, true),
-  def('openPresentationMode', 'page', 'Start presentation mode', ['Mod-Alt-p'], 'global', P, true),
-  def('exitPresentationMode', 'page', 'Exit presentation mode', ['Escape'], 'global', P, true),
-  def('nextPresentationSlide', 'page', 'Next presentation slide', ['ArrowRight'], 'global', P, true),
-  def('previousPresentationSlide', 'page', 'Previous presentation slide', ['ArrowLeft'], 'global', P, true),
+  def('toggleFocusMode', 'global', 'Toggle focus mode', ['Mod-Shift-m'], 'global', V, true),
+  // Ctrl+Alt+P on Windows, ⌃⌘P on macOS.
+  def('openPresentationMode', 'page', 'Start presentation mode', ['Mod-AltCtrl-p'], 'global', V, true),
+  def('exitPresentationMode', 'page', 'Exit presentation mode', ['Escape'], 'global', V, true),
+  def('nextPresentationSlide', 'page', 'Next presentation slide', ['ArrowRight'], 'global', V, true),
+  def('previousPresentationSlide', 'page', 'Previous presentation slide', ['ArrowLeft'], 'global', V, true),
   def(
     'whiteboardResize',
     'whiteboard',

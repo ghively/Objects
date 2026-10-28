@@ -18,8 +18,8 @@ const TABLE: Record<string, [string, string, string, string[]]> = {
   turnIntoTask: ['block', 'editor', 'Turn into task', ['Mod-Alt-k']],
   turnBlockIntoTaskObject: ['block', 'editor', 'Turn block into task object', ['Mod-Alt-Shift-k']],
   highlightText: ['text', 'editor', 'Highlight text selection', ['Mod-Shift-h']],
-  toggleFocusMode: ['global', 'global', 'Toggle focus mode', ['Mod-Shift-f']],
-  openPresentationMode: ['page', 'global', 'Start presentation mode', ['Mod-Alt-p']],
+  toggleFocusMode: ['global', 'global', 'Toggle focus mode', ['Mod-Shift-m']],
+  openPresentationMode: ['page', 'global', 'Start presentation mode', ['Mod-AltCtrl-p']],
   exitPresentationMode: ['page', 'global', 'Exit presentation mode', ['Escape']],
   nextPresentationSlide: ['page', 'global', 'Next presentation slide', ['ArrowRight']],
   previousPresentationSlide: ['page', 'global', 'Previous presentation slide', ['ArrowLeft']],
@@ -37,6 +37,9 @@ const TABLE: Record<string, [string, string, string, string[]]> = {
   ],
 }
 
+// Checked against Capacities' shortcut table (reference-check-2026-10-28 §1).
+const VERIFIED = new Set(['toggleFocusMode', 'openPresentationMode', 'exitPresentationMode', 'nextPresentationSlide', 'previousPresentationSlide'])
+
 describe('M8 shortcuts', () => {
   test('test new shortcut ids exist with reference names and categories', () => {
     const registered = new Map(allShortcuts().map((d) => [d.id, d]))
@@ -47,7 +50,7 @@ describe('M8 shortcuts', () => {
       expect(d?.category, id).toBe(category)
       expect(d?.scope, id).toBe(scope)
       expect(d?.name, id).toBe(name)
-      expect(d?.provisional, id).toBe(true)
+      expect(d?.provisional, id).toBe(!VERIFIED.has(id))
       expect(d?.bound, id).toBe(true)
       expect(keysFor(id)).toEqual(keys)
       expect(CATEGORY_LABELS[category]).toBeTruthy()

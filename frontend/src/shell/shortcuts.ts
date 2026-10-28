@@ -1,8 +1,10 @@
 /**
  * The tab shortcuts (`shortcuts.categories.navigation`): close, open, cycle, the tab menu, back and
  * forward; and the panel shortcuts (`shortcuts.categories.global`): the side panel, the left
- * sidebar and the calendar sidebar. Their keys are provisional (the plan's table, in
- * `lib/shortcuts.ts`); `App` binds them with `useTabShortcuts()` and `usePanelShortcuts()`.
+ * sidebar and the calendar sidebar. Their keys are Capacities' (in `lib/shortcuts.ts`); `App`
+ * binds them with `useTabShortcuts()` and `usePanelShortcuts()`. Back/forward (Ctrl+←/→, Ctrl+[/])
+ * and the panel keys (Ctrl+Shift+←/→) stay out of text fields and editors, where those keys move
+ * and select by word.
  */
 import { toggleCalendarSidebar } from '@/calendar/CalendarPage'
 import { M7_SHORTCUTS, registerShortcuts, useGlobalShortcut } from '@/lib/shortcuts'
@@ -47,7 +49,7 @@ export function useTabShortcuts(): void {
 
 /** The side panel (per tab), the left sidebar (App's state) and the calendar sidebar (`ui.json`). */
 export function usePanelShortcuts({ toggleLeftSidebar }: { toggleLeftSidebar: () => void }): void {
-  useGlobalShortcut('toggleSidepanel', () => useTabs.getState().toggleSidepanel(), { allowInEditable: true })
-  useGlobalShortcut('toggleLeftSidebar', toggleLeftSidebar, { allowInEditable: true })
+  useGlobalShortcut('toggleSidepanel', () => useTabs.getState().toggleSidepanel())
+  useGlobalShortcut('toggleLeftSidebar', toggleLeftSidebar)
   useGlobalShortcut('toggleCalendarSidebar', () => void toggleCalendarSidebar())
 }
