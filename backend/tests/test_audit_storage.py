@@ -230,3 +230,50 @@ def test_rename_keeps_links_to_other_objects_with_the_new_name(space_dir: Path):
     resolved = {space.resolve(t, linker) for t in targets}
     assert resolved == {"Pages/Notes.md", ADA}
     assert linker in first.relinked and linker in second.relinked
+
+
+# -- frontmatter link rewrite keeps every YAML form's value and bytes ----------------------
+
+
+def _relink(src: str, new: str = "New Name: x") -> str:
+    from objectapp.frontmatter import parse_fm
+    from objectapp.relink import relink_frontmatter
+
+    return relink_frontmatter(src, parse_fm(src), lambda t: t == "Old", new)
+
+
+def test_relink_frontmatter_yaml_forms():
+    from objectapp.frontmatter import parse_fm
+
+    # A multi-line plain scalar: rewritten (no error), whatever the new name holds.
+    out = _relink("a: first line\n  see [[Old]] here\nb: 1\n")
+    assert parse_fm(out) == {"a": "first line see [[New Name: x]] here", "b": 1}
+    out = _relink("a: owned by\n  [[Old]] mostly\nb: 1\n", "Ada King")
+    assert out == "a: owned by\n  [[Ada King]] mostly\nb: 1\n"
+    # A block-list item that is a mapping stays a mapping.
+    out = _relink("a:\n  - '[[Old]]'\n  - role: '[[Old]]'\nb: 1\n")
+    assert out == "a:\n  - '[[New Name: x]]'\n  - role: '[[New Name: x]]'\nb: 1\n"
+    # Multi-line single-quoted: the folded value is kept, line break and all.
+    out = _relink("a: '[[Old]]\n  continued'\nb: 1\n")
+    assert out == "a: '[[New Name: x]]\n  continued'\nb: 1\n"
+    # Double-quoted escapes outside the link are kept as written.
+    out = _relink('dq: "\\u00e9 [[Old]]"\nb: 1\n')
+    assert out == 'dq: "\\u00e9 [[New Name: x]]"\nb: 1\n'
+    # An unquoted link (YAML reads it as a nested list) is rewritten too.
+    assert _relink("owner: [[Old]]\nb: 1\n", "Ada King") == "owner: [[Ada King]]\nb: 1\n"
+    assert parse_fm(_relink("owner: [[Old|al]]\n")) == {"owner": [["New Name: x|al"]]}
+
+
+def test_rename_rewrites_unquoted_and_multiline_frontmatter_links(full_space_dir: Path):
+    _write(
+        full_space_dir / "Pages" / "AAA.md",
+        "---\ntype: 'Page'\ntitle: AAA\nowner: [[Ada Lovelace]]\nnote: owned by\n"
+        "  see [[Ada Lovelace]] here\nrefs:\n  - role: '[[Ada Lovelace]]'\n---\nbody\n",
+    )
+    space = Space(full_space_dir)
+    result = space.rename_object(ADA, "Ada: King", _version(space, ADA))
+    assert "Pages/AAA.md" in result.relinked and not result.skipped
+    _of, fm, _v = space.read("Pages/AAA.md")
+    assert fm["owner"] == [["Ada: King"]]
+    assert fm["note"] == "owned by see [[Ada: King]] here"
+    assert fm["refs"] == [{"role": "[[Ada: King]]"}]

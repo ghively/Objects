@@ -476,9 +476,9 @@ def _scan_items(text: str, i: int) -> list[_ItemSpan]:
 
 
 def _decode_item(raw: str, style: str) -> str | None:
-    if style == "'":
+    if style == "'" and "\n" not in raw:
         return raw[1:-1].replace("''", "'")
-    if style == '"':
+    if style in ("'", '"'):  # a multi-line quoted scalar folds its line breaks
         try:
             value = parse_fm(f"x: {raw}\n").get("x")
         except FrontmatterError:
@@ -517,32 +517,81 @@ def replace_in_value(src: str, key: str, fn: Callable[[str], str]) -> str:
     """Apply ``fn`` to each scalar of one key's value, replacing only what changed.
 
     Works on a scalar, a flow list, a block list or a block scalar (each of its
-    lines). An item that ``fn`` changes is written in its own quote style,
-    escaped for it; a plain item that would now need quoting is single-quoted.
-    Every other character of ``src`` is kept. An absent key, or no change,
-    returns ``src`` itself. Raises `FrontmatterError` when ``src`` or the result
-    is not valid YAML.
+    lines). An item that ``fn`` changes is written in its own quote style:
+    ``fn`` is applied to the item's source text when that reads back right (so
+    escapes elsewhere in it are kept), else the new text is escaped for that
+    style; a plain item that would now need quoting is single-quoted.
+    Every other character of ``src`` is kept. A value that can't be edited in
+    place that way (a nested mapping, a multi-line plain scalar that would
+    need quoting...) is re-rendered whole, on the key's own lines only. An
+    absent key, or no change, returns ``src`` itself. Raises `FrontmatterError`
+    when ``src`` or the result is not valid YAML.
     """
     data = _load_rt(src)
     if data is None or key not in data:
         return src
-    if data.fa.flow_style():
-        old = data[key]
-        changed = False
-        if isinstance(old, str):
-            new = fn(str(old))
-            if new != old:
-                data[key] = _styled_like(old, new)
-                changed = True
-        elif isinstance(old, list):
-            for idx, item in enumerate(old):
-                if isinstance(item, str):
-                    new = fn(str(item))
-                    if new != item:
-                        old[idx] = _styled_like(item, new)
-                        changed = True
-        return _dump(data) if changed else src
+    before = parse_fm(src)
+    expected = _map_strings(before[key], fn)
+    if expected == before[key]:
+        return src
 
+    def reads_back(out: str) -> bool:
+        try:
+            after = parse_fm(out)
+        except FrontmatterError:
+            return False
+        return after.keys() == before.keys() and after[key] == expected
+
+    if not data.fa.flow_style():
+        out = _replace_in_place(src, data, key, fn)
+        if out is not None and reads_back(out):
+            return out
+    # Re-render the whole value from the round-trip tree, each scalar in its own style.
+    new_value = _map_rt(data[key], fn)
+    if data.fa.flow_style():
+        data[key] = new_value
+        out = _dump(data)
+    else:
+        out = set_keys(src, {key: new_value})
+    if not reads_back(out):
+        raise FrontmatterError(f"Rewriting {key!r} broke its value")
+    return out
+
+
+def _map_strings(value: Any, fn: Callable[[str], str]) -> Any:
+    """``value`` (plain) with ``fn`` applied to every string in it, keys aside."""
+    if isinstance(value, str):
+        return fn(value)
+    if isinstance(value, list):
+        return [_map_strings(v, fn) for v in value]
+    if isinstance(value, dict):
+        return {k: _map_strings(v, fn) for k, v in value.items()}
+    return value
+
+
+def _map_rt(value: Any, fn: Callable[[str], str]) -> Any:
+    """A round-trip value with ``fn`` applied to every string scalar, keeping styles (in place)."""
+    if isinstance(value, str):
+        new = fn(str(value))
+        return value if new == str(value) else _styled_like(value, new)
+    if isinstance(value, list):
+        for i, v in enumerate(value):
+            value[i] = _map_rt(v, fn)
+        return value
+    if isinstance(value, dict):
+        for k in list(value):
+            value[k] = _map_rt(value[k], fn)
+        return value
+    return value
+
+
+def _replace_in_place(
+    src: str, data: CommentedMap, key: str, fn: Callable[[str], str]
+) -> str | None:
+    """`replace_in_value`'s byte-level edit of each changed scalar, or None when nothing changed.
+
+    The caller checks that the result reads back as intended.
+    """
     lines = _lines(src)
     start, end = _key_spans(data, lines)[key]
     row, col = data.lc.key(key)
@@ -550,9 +599,27 @@ def replace_in_value(src: str, key: str, fn: Callable[[str], str]) -> str:
     text = "".join(lines[start:end])
     tail = "".join(lines[end:])
 
+    start_at = _value_start(lines, row, col)
+    items = _scan_items(text, start_at)
+    # A plain scalar running over several lines is edited line by line, each as it
+    # stands (a continuation line may start with `[`, and quoting one line alone
+    # would break the value).
+    multiline_plain = False
+    if isinstance(data[key], str) and not isinstance(data[key], ScalarString):
+        nl = text.find("\n", start_at)
+        if 0 <= nl < len(text.rstrip("\n")):
+            multiline_plain = True
+            s = start_at
+            while s < nl and text[s] in " \t":
+                s += 1
+            e = nl
+            while e > s and text[e - 1] in " \t\r":
+                e -= 1
+            items = ([(s, e, "plain")] if e > s else []) + _scan_block_scalar(text, start_at)
     changed = False
-    for s, e, style in reversed(_scan_items(text, _value_start(lines, row, col))):
-        old = _decode_item(text[s:e], style)
+    for s, e, style in reversed(items):
+        raw = text[s:e]
+        old = _decode_item(raw, style)
         if old is None:
             continue
         new = fn(old)
@@ -560,14 +627,17 @@ def replace_in_value(src: str, key: str, fn: Callable[[str], str]) -> str:
             continue
         line_start = text.rfind("\n", 0, s) + 1
         indent = re.match(r"[ \t]*", text[line_start:]).group(0)
-        text = text[:s] + _encode_item(new, style, indent) + text[e:]
+        if multiline_plain:
+            encoded = new
+        elif style in ("'", '"') and _decode_item(raw[0] + fn(raw[1:-1]) + raw[-1], style) == new:
+            encoded = raw[0] + fn(raw[1:-1]) + raw[-1]  # escapes elsewhere stay as written
+        else:
+            encoded = _encode_item(new, style, indent)
+        text = text[:s] + encoded + text[e:]
         changed = True
     if not changed:
-        return src
-    out = head + text + tail
-    if key not in parse_fm(out):
-        raise FrontmatterError(f"Rewriting {key!r} broke its value")
-    return out
+        return None
+    return head + text + tail
 
 
 def remove_items(src: str, key: str, drop: Callable[[str], bool]) -> str | None:
