@@ -6,10 +6,15 @@
  *   icon) as a large round image beside the title, the properties in a side column.
  *   `encyclopedia`: the properties in a right-hand infobox next to the body.
  * - `wideLayoutMode` removes the content max-width (Standard only: Capacities' setting "will not
- *   make any difference for encyclopedia, profile, or index card designs").
+ *   make any difference for encyclopedia, profile, or index card designs"). M9: the object's own
+ *   `wideLayoutMode` / `wideCoverImage` (frontmatter) override the type's; `coverImageOffset`
+ *   positions a cropped cover.
  * - `font` sets the title and body font family.
  * - The cover image: `wideCoverImage` spans the whole panel, `cropCoverImage` fixes its height.
  * The page and the peek share this layout; the peek is narrower, so its gutters are too.
+ * - M9: the floating inspector (Outline, Stats; `PageInspector`) top right over the content, when
+ *   `inspector` is given. Encyclopedia: a non-wide cover sits above the content column (title and
+ *   body), not above the infobox beside it (Capacities' `RootEntity` layout).
  *
  * Narrow widths: below the container's md breakpoint (`PROPERTIES_BESIDE_WIDTH`, 768 px) the
  * Standard, Profile and Encyclopedia properties move inline under the header (drawn as the `card`
@@ -17,12 +22,14 @@
  * (`PropertiesSidebar`, `isMd`). Whether Capacities' Standard design has a property sidebar at all
  * is open (reference-check section 5): Standard keeps its left panel here until Gene checks.
  */
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import { api } from '@/api/client'
-import type { ObjectSummary, TypeDef, TypeFont } from '@/api/types'
+import type { ObjectFrontmatterLayout, ObjectSummary, TypeDef, TypeFont } from '@/api/types'
 import { IconOrEmoji } from '@/components/Icon'
 import { cn } from '@/lib/utils'
 import { CoverImage } from './CoverImage'
+import { Icon } from '@/components/Icon'
+import { loadPageInspectorPinned, PageInspector, PAGE_INSPECTOR_TEXT, savePageInspectorPinned } from './PageInspector'
 import { decodeIcon } from './PropertyPanel'
 
 export type PageDesign = 'standard' | 'indexCard' | 'profile' | 'encyclopedia'
@@ -63,6 +70,25 @@ function useWidth(ref: RefObject<HTMLElement | null>): number | null {
     return () => ro.disconnect()
   }, [ref])
   return width
+}
+
+/** The object's wide layout: its own `wideLayoutMode`, else the type's (any design). */
+export function objectWideLayout(type: TypeDef | undefined, layout: ObjectFrontmatterLayout | undefined): boolean {
+  return layout?.wideLayoutMode ?? !!type?.wideLayoutMode
+}
+
+/** The object's wide cover: its own `wideCoverImage`, else the type's. */
+export function objectWideCover(type: TypeDef | undefined, layout: ObjectFrontmatterLayout | undefined): boolean {
+  return layout?.wideCoverImage ?? !!type?.wideCoverImage
+}
+
+/** The layout keys of a frontmatter, kept only when they have the right shape. */
+export function frontmatterLayout(fm: Record<string, unknown>): ObjectFrontmatterLayout {
+  const out: ObjectFrontmatterLayout = {}
+  if (typeof fm.wideLayoutMode === 'boolean') out.wideLayoutMode = fm.wideLayoutMode
+  if (typeof fm.wideCoverImage === 'boolean') out.wideCoverImage = fm.wideCoverImage
+  if (typeof fm.coverImageOffset === 'number' && Number.isFinite(fm.coverImageOffset)) out.coverImageOffset = fm.coverImageOffset
+  return out
 }
 
 export function pageDesign(type: TypeDef | undefined): PageDesign {
@@ -109,8 +135,58 @@ export interface PageLayoutProps {
   toolbar?: ReactNode
   /** Writes a new cover image (or `null` to remove it); without it the cover is read-only. */
   onCoverChange?(next: string | null): void
+  /** M9: the object's own layout keys (frontmatter), overriding the type's. */
+  layout?: ObjectFrontmatterLayout
+  /** M9: writes layout keys (wide cover toggle, cover offset); without it they are read-only. */
+  onLayoutChange?(patch: ObjectFrontmatterLayout): void
   /** Rendered over the content column (the peek's pager, dialogs). */
   children?: ReactNode
+  /** M9: show the floating page inspector, reading the page's current Markdown. */
+  inspector?: { getMarkdown(): string; dailyNote: boolean }
+}
+
+/** The inspector's toggle and the inspector itself (open with the page when pinned). */
+function InspectorSlot({
+  bodyRef,
+  summary,
+  getMarkdown,
+  dailyNote,
+}: {
+  bodyRef: RefObject<HTMLElement | null>
+  summary: ObjectSummary
+  getMarkdown(): string
+  dailyNote: boolean
+}) {
+  const [pinned, setPinned] = useState(loadPageInspectorPinned)
+  const [open, setOpen] = useState(pinned)
+  const pin = useCallback((next: boolean) => {
+    setPinned(next)
+    savePageInspectorPinned(next)
+  }, [])
+  return (
+    <div className="absolute top-16 right-3.5 z-10 flex flex-col items-end gap-2">
+      <button
+        type="button"
+        aria-label={PAGE_INSPECTOR_TEXT.inspector}
+        title={PAGE_INSPECTOR_TEXT.inspector}
+        aria-expanded={open}
+        className="flex size-8 items-center justify-center rounded-md border border-line bg-raised text-fg-muted shadow-sm hover:bg-hover hover:text-fg"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <Icon name="ph-list-bullets" size={16} />
+      </button>
+      {open && (
+        <PageInspector
+          bodyRef={bodyRef}
+          getMarkdown={getMarkdown}
+          summary={summary}
+          dailyNote={dailyNote}
+          pinned={pinned}
+          onPin={pin}
+        />
+      )}
+    </div>
+  )
 }
 
 function ProfileImage({ summary, type }: { summary: ObjectSummary; type?: TypeDef }) {
@@ -138,29 +214,48 @@ export function PageLayout({
   mode = 'page',
   toolbar,
   onCoverChange,
+  layout,
+  onLayoutChange,
   children,
+  inspector,
 }: PageLayoutProps) {
   const design = pageDesign(type)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
   const width = useWidth(rootRef)
   const open = properties !== null && properties !== undefined && properties !== false
   const inline = open && INLINE_WHEN_NARROW.includes(design) && !propertiesBeside(width)
   const propertiesEl =
     typeof properties === 'function' ? properties(inline ? 'card' : panelVariant(design)) : properties
-  const wide = design === 'standard' && !!type?.wideLayoutMode
+  const wide = design === 'standard' && objectWideLayout(type, layout)
   const font = fontStyle(type?.font)
   const cover = design !== 'profile' ? summary.coverImage : null
-  const wideCover = !!type?.wideCoverImage
+  const wideCover = objectWideCover(type, layout)
   const crop = type?.cropCoverImage ?? true
-  const coverEl = cover ? <CoverImage path={cover} wide={wideCover} crop={crop} onChange={onCoverChange} /> : null
+  const editLayout = onCoverChange ? onLayoutChange : undefined
+  const coverEl = cover ? (
+    <CoverImage
+      path={cover}
+      wide={wideCover}
+      crop={crop}
+      offset={layout?.coverImageOffset ?? undefined}
+      onChange={onCoverChange}
+      // No value: the opposite of the type's; a value: flipped. Both are `!wideCover`.
+      onToggleWide={editLayout && (() => editLayout({ wideCoverImage: !wideCover }))}
+      onOffsetChange={editLayout && ((n) => editLayout({ coverImageOffset: n }))}
+    />
+  ) : null
   const gutter = mode === 'peek' ? 'px-10' : 'px-12'
+  /** Encyclopedia beside its infobox: the non-wide cover goes in the content column instead. */
+  const coverInColumn = design === 'encyclopedia' && !inline && !!coverEl && !wideCover
+  const coverOnTop = !!coverEl && !wideCover && !coverInColumn
   const headerEl = (
     <div data-page-title="" style={font}>
       {header}
     </div>
   )
   const bodyEl = (
-    <div data-page-body="" className="min-w-0 flex-1" style={font}>
+    <div ref={bodyRef} data-page-body="" className="min-w-0 flex-1" style={font}>
       {body}
     </div>
   )
@@ -207,13 +302,14 @@ export function PageLayout({
           {bodyEl}
         </>
       ) : (
-        <>
-          {headerEl}
-          <div className="flex items-start gap-10">
+        <div className="flex items-start gap-10">
+          <div data-encyclopedia-main="" className="flex min-w-0 flex-1 flex-col">
+            {coverInColumn && <div className="mb-8">{coverEl}</div>}
+            {headerEl}
             {bodyEl}
-            {propertiesEl}
           </div>
-        </>
+          {propertiesEl}
+        </div>
       )
       break
     default:
@@ -250,11 +346,19 @@ export function PageLayout({
             )}
             data-object-path={summary.path}
           >
-            {coverEl && !wideCover && <div className="mb-8">{coverEl}</div>}
+            {coverOnTop && <div className="mb-8">{coverEl}</div>}
             {coverEl && wideCover && <div className="h-6" />}
             {content}
           </div>
         </div>
+        {inspector && (
+          <InspectorSlot
+            bodyRef={bodyRef}
+            summary={summary}
+            getMarkdown={inspector.getMarkdown}
+            dailyNote={inspector.dailyNote}
+          />
+        )}
         {children}
       </div>
     </div>
