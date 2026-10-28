@@ -109,7 +109,12 @@ def slug(name: str) -> str:
         # A name with no ASCII letters or digits (e.g. CJK) keeps its own letters,
         # so two such names don't both become `type`.
         s = "-".join("".join(c if c.isalnum() else " " for c in name.lower()).split())
+    # Ids name files (`<id>.json`): a very long name must not make one too long.
+    s = s[:_MAX_SLUG].rstrip("-")
     return s or "type"
+
+
+_MAX_SLUG = 64
 
 
 def is_ignored(rel: PurePosixPath) -> bool:
