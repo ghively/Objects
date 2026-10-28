@@ -28,24 +28,15 @@ const TABLE: Record<string, [string, string, string, string[]]> = {
     'whiteboard',
     'whiteboard',
     'Resize selection',
-    ['Mod-Alt-ArrowUp', 'Mod-Alt-ArrowDown', 'Mod-Alt-ArrowLeft', 'Mod-Alt-ArrowRight'],
+    ['Mod-ArrowUp', 'Mod-ArrowDown', 'Mod-ArrowLeft', 'Mod-ArrowRight'],
   ],
   whiteboardResizeLarge: [
     'whiteboard',
     'whiteboard',
     'Resize selection farther',
-    ['Mod-Alt-Shift-ArrowUp', 'Mod-Alt-Shift-ArrowDown', 'Mod-Alt-Shift-ArrowLeft', 'Mod-Alt-Shift-ArrowRight'],
+    ['Mod-Shift-ArrowUp', 'Mod-Shift-ArrowDown', 'Mod-Shift-ArrowLeft', 'Mod-Shift-ArrowRight'],
   ],
 }
-
-// Checked against Object's shortcut table (reference-check-2026-10-28 §1).
-const VERIFIED = new Set([
-  'copyBlockReference',
-  'turnIntoObject',
-  'turnIntoTask',
-  'turnBlockIntoTaskObject',
-  'highlightText',
-  'toggleFocusMode', 'openPresentationMode', 'exitPresentationMode', 'nextPresentationSlide', 'previousPresentationSlide'])
 
 describe('M8 shortcuts', () => {
   test('test new shortcut ids exist with reference names and categories', () => {
@@ -57,7 +48,8 @@ describe('M8 shortcuts', () => {
       expect(d?.category, id).toBe(category)
       expect(d?.scope, id).toBe(scope)
       expect(d?.name, id).toBe(name)
-      expect(d?.provisional, id).toBe(!VERIFIED.has(id))
+      // Every key is checked against Object's shortcut table (reference-check-2026-10-28 §1).
+      expect(d?.provisional, id).toBe(false)
       expect(d?.bound, id).toBe(true)
       expect(keysFor(id)).toEqual(keys)
       expect(CATEGORY_LABELS[category]).toBeTruthy()

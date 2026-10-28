@@ -278,11 +278,14 @@ describe('entity node View menu', () => {
 })
 
 describe('keyboard resize', () => {
-  test('test keyboard resize steps by grid', async () => {
-    expect(keyToCommand({ key: 'ArrowRight', ctrlKey: true, altKey: true }, { hasSelection: true })).toEqual({ type: 'resize', dw: GRID, dh: 0 })
-    expect(keyToCommand({ key: 'ArrowUp', metaKey: true, altKey: true, shiftKey: true }, { hasSelection: true })).toEqual({ type: 'resize', dw: 0, dh: -GRID * 5 })
-    expect(keyToCommand({ key: 'ArrowRight', ctrlKey: true, altKey: true }, { hasSelection: false })).toBeNull()
-    // Alt+Arrow alone stays navigation (not the canvas's).
+  test('test keyboard resize: Ctrl+Arrow, 1 px, 30 px with Shift or snap to grid (Object)', async () => {
+    expect(keyToCommand({ key: 'ArrowRight', ctrlKey: true }, { hasSelection: true })).toEqual({ type: 'resize', dw: 1, dh: 0 })
+    expect(keyToCommand({ key: 'ArrowRight', ctrlKey: true }, { hasSelection: true, gridSnap: true })).toEqual({ type: 'resize', dw: GRID, dh: 0 })
+    expect(keyToCommand({ key: 'ArrowUp', metaKey: true, shiftKey: true }, { hasSelection: true })).toEqual({ type: 'resize', dw: 0, dh: -GRID })
+    // Without a selection Ctrl+Arrow is not the canvas's (back / forward).
+    expect(keyToCommand({ key: 'ArrowRight', ctrlKey: true }, { hasSelection: false })).toBeNull()
+    // The old Ctrl+Alt+Arrow and Alt+Arrow do nothing on the canvas.
+    expect(keyToCommand({ key: 'ArrowRight', ctrlKey: true, altKey: true }, { hasSelection: true })).toBeNull()
     expect(keyToCommand({ key: 'ArrowLeft', altKey: true }, { hasSelection: true })).toBeNull()
 
     const b = board(
@@ -296,19 +299,21 @@ describe('keyboard resize', () => {
     const { store, wrapper } = renderCanvas(b)
     await act(async () => {})
     act(() => store.getState().actions.select(['r', 'en']))
-    fireEvent.keyDown(wrapper, { key: 'ArrowRight', ctrlKey: true, altKey: true })
+    // Snap to grid is on by default: 30 px steps.
+    fireEvent.keyDown(wrapper, { key: 'ArrowRight', ctrlKey: true })
     let r = store.getState().doc.board.nodes.r
     expect(r).toMatchObject({ position: { x: 30, y: 60 }, width: 150, height: 90 })
-    fireEvent.keyDown(wrapper, { key: 'ArrowDown', ctrlKey: true, altKey: true, shiftKey: true })
-    r = store.getState().doc.board.nodes.r
-    expect(r).toMatchObject({ width: 150, height: 240 })
-    // Shrinking stops at the floor: shapes 90, an embedded object 360 wide.
-    fireEvent.keyDown(wrapper, { key: 'ArrowLeft', ctrlKey: true, altKey: true, shiftKey: true })
-    expect(store.getState().doc.board.nodes.r.width).toBe(90)
-    expect(store.getState().doc.board.nodes.en.width).toBe(LINK_BLOCK_MIN_WIDTH)
     // Each press is one undo step.
     act(() => store.getState().actions.undo())
-    expect(store.getState().doc.board.nodes.r.width).toBe(150)
+    expect(store.getState().doc.board.nodes.r.width).toBe(120)
+    fireEvent.keyDown(wrapper, { key: 'ArrowRight', ctrlKey: true })
+    fireEvent.keyDown(wrapper, { key: 'ArrowDown', ctrlKey: true, shiftKey: true })
+    r = store.getState().doc.board.nodes.r
+    expect(r).toMatchObject({ width: 150, height: 120 })
+    // Shrinking stops at the floor: shapes 90, an embedded object 360 wide.
+    for (let i = 0; i < 3; i++) fireEvent.keyDown(wrapper, { key: 'ArrowLeft', ctrlKey: true, shiftKey: true })
+    expect(store.getState().doc.board.nodes.r.width).toBe(90)
+    expect(store.getState().doc.board.nodes.en.width).toBe(LINK_BLOCK_MIN_WIDTH)
   })
 })
 

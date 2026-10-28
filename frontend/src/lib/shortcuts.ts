@@ -240,7 +240,8 @@ export function useGlobalShortcut(
 
 /** Checked against Object's shortcut table (reference-check-2026-10-28 §1). */
 const V = false
-const P = true // provisional: keys from the plan's table, not yet checked
+/** Object-only keys: Object has no such action to check against. */
+const OURS = true
 
 const def = (
   id: string,
@@ -366,30 +367,31 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
     false,
     false,
   ),
-  // M6, whiteboard/shortcuts.ts keyToCommand
+  // M6, whiteboard/shortcuts.ts keyToCommand (Object's whiteboard table)
   def('whiteboardSelect', 'whiteboard', 'Select tool', ['v'], 'whiteboard', false, false),
   def('whiteboardHand', 'whiteboard', 'Hand tool', ['h'], 'whiteboard', false, false),
   def('whiteboardText', 'whiteboard', 'Text', ['t'], 'whiteboard', false, false),
   def('whiteboardRectangle', 'whiteboard', 'Rectangle', ['r'], 'whiteboard', false, false),
   def('whiteboardEllipse', 'whiteboard', 'Ellipse', ['o'], 'whiteboard', false, false),
-  def('whiteboardTriangle', 'whiteboard', 'Triangle', ['Shift-r'], 'whiteboard', false, false),
+  def('whiteboardTriangle', 'whiteboard', 'Triangle', ['p'], 'whiteboard', false, false),
   def('whiteboardLine', 'whiteboard', 'Line', ['l'], 'whiteboard', false, false),
-  def('whiteboardArrow', 'whiteboard', 'Arrow', ['a'], 'whiteboard', false, false),
+  def('whiteboardArrow', 'whiteboard', 'Arrow', ['Shift-l'], 'whiteboard', false, false),
   def('whiteboardFrame', 'whiteboard', 'Frame', ['f'], 'whiteboard', false, false),
-  // Pen, highlighter and eraser have no Object shortcut id: our ids, our strings.
-  def('whiteboardPen', 'whiteboard', 'Pen', ['p'], 'whiteboard', false, false),
-  def('whiteboardHighlighter', 'whiteboard', 'Highlighter', ['m'], 'whiteboard', false, false),
-  def('whiteboardEraser', 'whiteboard', 'Eraser', ['e'], 'whiteboard', false, false),
+  // Pen, highlighter and eraser are Object's own (no Object id): our ids, our strings, our
+  // keys. They avoid Object's letters (P is Triangle, M opens the move menu).
+  def('whiteboardPen', 'whiteboard', 'Pen', ['d'], 'whiteboard', OURS, false),
+  def('whiteboardHighlighter', 'whiteboard', 'Highlighter', ['Shift-d'], 'whiteboard', OURS, false),
+  def('whiteboardEraser', 'whiteboard', 'Eraser', ['e'], 'whiteboard', OURS, false),
   def('whiteboardZoomIn', 'whiteboard', 'Zoom in', ['Mod-='], 'whiteboard', false, false),
   def('whiteboardZoomOut', 'whiteboard', 'Zoom out', ['Mod--'], 'whiteboard', false, false),
   def('whiteboardZoomReset', 'whiteboard', 'Zoom to 100%', ['Mod-0'], 'whiteboard', false, false),
   def('whiteboardFitAll', 'whiteboard', 'Zoom to fit', ['Shift-1'], 'whiteboard', false, false),
   def('whiteboardFitSelection', 'whiteboard', 'Zoom to selection', ['Shift-2'], 'whiteboard', false, false),
   def('whiteboardBringForward', 'whiteboard', 'Bring forward', ['Mod-]'], 'whiteboard', false, false),
-  def('whiteboardBringToFront', 'whiteboard', 'Bring to front', ['Mod-Shift-]'], 'whiteboard', false, false),
+  def('whiteboardBringToFront', 'whiteboard', 'Bring to front', [']'], 'whiteboard', false, false),
   def('whiteboardSendBackward', 'whiteboard', 'Send backward', ['Mod-['], 'whiteboard', false, false),
-  def('whiteboardSendToBack', 'whiteboard', 'Send to back', ['Mod-Shift-['], 'whiteboard', false, false),
-  def('whiteboardWrapInFrame', 'whiteboard', 'Wrap in frame', ['Mod-Alt-g'], 'whiteboard', false, false),
+  def('whiteboardSendToBack', 'whiteboard', 'Send to back', ['['], 'whiteboard', false, false),
+  def('whiteboardWrapInFrame', 'whiteboard', 'Wrap in frame', ['Mod-g'], 'whiteboard', false, false),
   def('whiteboardDuplicate', 'whiteboard', 'Duplicate selection', ['Mod-d'], 'whiteboard', false, false),
   def('whiteboardNudge', 'whiteboard', 'Nudge selection', ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'], 'whiteboard', false, false),
   def(
@@ -437,18 +439,18 @@ export const M8_SHORTCUTS: ShortcutDef[] = [
     'whiteboardResize',
     'whiteboard',
     'Resize selection',
-    ['Mod-Alt-ArrowUp', 'Mod-Alt-ArrowDown', 'Mod-Alt-ArrowLeft', 'Mod-Alt-ArrowRight'],
+    ['Mod-ArrowUp', 'Mod-ArrowDown', 'Mod-ArrowLeft', 'Mod-ArrowRight'],
     'whiteboard',
-    P,
+    V,
     true,
   ),
   def(
     'whiteboardResizeLarge',
     'whiteboard',
     'Resize selection farther',
-    ['Mod-Alt-Shift-ArrowUp', 'Mod-Alt-Shift-ArrowDown', 'Mod-Alt-Shift-ArrowLeft', 'Mod-Alt-Shift-ArrowRight'],
+    ['Mod-Shift-ArrowUp', 'Mod-Shift-ArrowDown', 'Mod-Shift-ArrowLeft', 'Mod-Shift-ArrowRight'],
     'whiteboard',
-    P,
+    V,
     true,
   ),
 ]
