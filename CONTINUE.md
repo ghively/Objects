@@ -11,7 +11,10 @@ Take the current state from `docs/superpowers/plans/remaining-work.md` and `git 
 
 ## The next step, in order
 
-1. **Fix what Gene's hand-checks find.** Do one finding per commit, each with a regression test that fails before the fix.
+1. **Fix the 2026-10-28 audit list, then what Gene's hand-checks find.**
+   - The audit list is `docs/superpowers/plans/audit-2026-10-28.md`; work it top down. Its repro scripts are in `scripts/audit-2026-10-28/` (see the README there).
+   - Do one finding per commit, each with a regression test that fails before the fix.
+   - The completeness gaps need Gene's yes or no before any building.
 2. **Gate.** Run `uv run pytest backend/tests -q` and `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build`. Run `scripts/m1_roundtrip.py` on a copy of `backend/tests/fixtures/space-sample`, and `scripts/m2_acceptance.py` through `m8_acceptance.py` on `space-sample` and `space-v1` (they copy the space themselves). Then start the app on a scratch copy and look at what changed.
 3. **Write it down.** Update `remaining-work.md` and `HANDOFF.md`, commit and push.
 4. **Larger new work** (an installer, the in-app agent, the `C:\Git\wiki` migration): write a plan first, following the M7/M8 plan format, then build it as below.

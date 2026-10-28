@@ -4,7 +4,11 @@ Updated 2026-10-28. You are continuing "Object", a local, Markdown-backed recrea
 
 ## Where things stand
 
-**All eight milestones are built, reviewed, fixed and through their final gates.** Nothing is waiting on a build. What is left is Gene's hands-on checking, then fixing what he finds.
+**All eight milestones are built, reviewed, fixed and through their final gates.** Nothing is waiting on a build.
+
+**A full audit ran on 2026-10-28 at `04e9d07`.** It found about 65 reproduced bugs and 14 completeness gaps, none fixed yet. The list, ranked, is in `docs/superpowers/plans/audit-2026-10-28.md`; the repro scripts are in `scripts/audit-2026-10-28/`. Next comes fixing the audit list, then Gene's hands-on checks and the fixes they produce.
+
+**Branch:** this work is on `ccr-e702dd20-m7hpyc`, two docs-and-scripts commits ahead of `master` (no code changes). On a local PC, run `git fetch origin` then `git checkout ccr-e702dd20-m7hpyc`, or merge it into `master` first.
 
 | Milestone | Scope | Plan |
 |---|---|---|
@@ -28,10 +32,15 @@ Last full verification, 2026-10-28 at `9383a9b`, on Linux:
 
 1. Set up: install `uv` and Node 22+; run `uv sync`, then `cd frontend && npm ci`. Use `npm ci`, not `npm install`: a newer npm rewrites `package-lock.json`.
 2. Run the baseline: `uv run pytest backend/tests -q`, then `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build`. Report any failure before changing code.
-3. Pick up Gene's findings from his hand-checks (`docs/superpowers/plans/m1-acceptance.md` to `m8-acceptance.md`, 237 unchecked items) and fix them. Fix one finding per commit, each with a regression test, then rerun the full gate and every acceptance script on fixture copies.
-4. Keep `remaining-work.md`, `CONTINUE.md` and this file current, commit, and push.
+3. **Fix the audit list** (`docs/superpowers/plans/audit-2026-10-28.md`), starting with "Fix first", items 1–17, top down. Do one finding per commit, each with a regression test that fails before the fix; the matching script in `scripts/audit-2026-10-28/` is the starting point. Then do the other bugs by area. The "Completeness gaps" table needs Gene's call, item by item, on whether each is in scope, before building anything.
+   - **Biggest first:** item 1, the API accepts any Origin and Host. This one is a security bug.
+   - **Several fixes at once:** the Time zone setting is ignored across views, tasks and calendar. One shared fix (build and split instants with `lib/zonedTime` everywhere) clears about ten findings.
+4. Pick up Gene's findings from his hand-checks (`docs/superpowers/plans/m1-acceptance.md` to `m8-acceptance.md`, 237 unchecked items) and fix them the same way. After each batch, rerun the full gate and every acceptance script on fixture copies.
+5. Keep `remaining-work.md`, `CONTINUE.md` and this file current, commit, and push.
 
 ## Open items
+
+- **The 2026-10-28 audit list:** see above. Gene decides on the completeness gaps; everything else is a plain bug to fix.
 
 - **Gene's hands-on checks, M1–M8.** Run them on a copy of the CPI export outside the repo, with `git init` there. Some things can only be checked on his Windows machine:
   - the pywebview window
@@ -69,3 +78,12 @@ Last full verification, 2026-10-28 at `9383a9b`, on Linux:
 - Since M3 the code was built and tested in a Linux cloud container. Windows (Gene's platform) has not been re-run since M2, so expect small path, shell or notification fixes there.
 - Timing tests (`editor/preserve.test.ts` 1MB split, `test_search_p95_under_50ms_at_5000`) are sensitive to a busy machine. Rerun one alone before calling it a failure.
 - Gene's work-export copy and the full unpacked Object app (`.reference/`) stay on his machine.
+- Some audit findings show up on Windows but couldn't be tested in the container:
+  - reserved names (`con`, `aux`, `nul`) used as type or collection ids
+  - path-length limits
+  - the pywebview window
+  Re-check them on the PC.
+- **Audit gate at `04e9d07` (Linux):**
+  - pytest: 1122 passed.
+  - tsc: clean.
+  - vitest and build: passed on a clean rerun. In the first run, the 1MB timing test and `whiteboard/clipboard.test.tsx` failed only while seven audits were running alongside.
