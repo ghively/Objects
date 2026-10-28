@@ -537,13 +537,22 @@ export function removeSelection(board: WhiteboardData, ids: Iterable<string>): W
 
 // ---- duplicating and moving ----
 
-/** Duplicates nodes (and the edges between them, and their blocks); returns the new board and the new ids. */
+/**
+ * Duplicates nodes (and the edges between them, and their blocks); returns the new board and the
+ * new ids. A selected edge (a Line or Arrow) is copied with its point ends; an end on a node that
+ * isn't copied stays on that node.
+ */
 export function duplicateSelection(
   board: WhiteboardData,
   ids: Iterable<string>,
   offset = GRID,
 ): { board: WhiteboardData; ids: string[] } {
-  const sel = idSet(ids)
+  const sel = new Set(ids) // a copy: the ends of selected edges join it
+  for (const id of [...sel]) {
+    const e = board.edges[id]
+    if (!e) continue
+    for (const end of [e.source, e.target]) if (board.nodes[end]?.kind === 'point') sel.add(end)
+  }
   const nodes = { ...board.nodes }
   const edges = { ...board.edges }
   const blocks = { ...board.blocks }
@@ -574,8 +583,12 @@ export function duplicateSelection(
     created.push(copy.id)
   }
   for (const e of Object.values(board.edges)) {
-    const s = map.get(e.source)
-    const t = map.get(e.target)
+    let s = map.get(e.source)
+    let t = map.get(e.target)
+    if (sel.has(e.id) && (s || t)) {
+      s ??= e.source
+      t ??= e.target
+    }
     if (!s || !t) continue
     const copy: WhiteboardEdge = structuredClone(e)
     copy.id = newId()

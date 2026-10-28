@@ -351,6 +351,28 @@ describe('frames, duplicate, clear', () => {
     expect(A.duplicate(b, [])).toBe(b)
   })
 
+  test('duplicating a selected Line or Arrow copies it with its point ends', () => {
+    const b = A.createFromTool(board(), 'arrow', { x: 0, y: 0 }, { id: 'L' })
+    const { board: out, ids } = A.duplicateSelection(b, ['L'])
+    const copy = ids.find((id) => id in out.edges)!
+    expect(copy).toBeDefined()
+    expect(Object.keys(out.edges)).toHaveLength(2)
+    const e = out.edges[copy]
+    expect(e.markerEnd).toBe('arrow')
+    expect(e.source).not.toBe(b.edges.L.source)
+    expect(out.nodes[e.source].position).toEqual({
+      x: b.nodes[b.edges.L.source].position.x + 30,
+      y: b.nodes[b.edges.L.source].position.y + 30,
+    })
+    // A selected connector with one end on a node keeps that end where it is.
+    const withNode = { ...b, nodes: { ...b.nodes, n: node({ id: 'n', position: { x: 300, y: 0 } }) } }
+    withNode.edges = { L: { ...b.edges.L, target: 'n' } }
+    const r = A.duplicateSelection(withNode, ['L'])
+    const c2 = r.ids.find((id) => id in r.board.edges)!
+    expect(r.board.edges[c2].target).toBe('n')
+    expect(r.board.edges[c2].source).not.toBe(b.edges.L.source)
+  })
+
   test('clear board keeps viewport, readingOrder and unknown keys', () => {
     const b = board(
       [node({ id: 'a', blockId: 'ba' }), node({ id: 'b' })],
