@@ -52,6 +52,7 @@ import { useFocusMode } from '@/focus/useFocusMode'
 import { useVersionHistory } from '@/history/useVersionHistory'
 import { useMerge } from '@/merge/useMerge'
 import { usePresentation } from '@/present/usePresentation'
+import { CompletionLog } from '@/tasks/CompletionLog'
 import { TaskStatsSection } from '@/tasks/TaskStatsSection'
 import { useAddToWhiteboard } from '@/whiteboard/AddToWhiteboardDialog'
 
@@ -552,7 +553,19 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
       />
       {/* M8: "Task Stats" under the property panel of a recurring task-role object. */}
       {isTask && typeof detail.frontmatter.repeat === 'string' && detail.frontmatter.repeat.trim() !== '' && (
-        <TaskStatsSection path={path} version={version} />
+        <>
+          <TaskStatsSection path={path} version={version} />
+          {/* "Completion Log": deleting an entry writes only the log's remaining lines. */}
+          <CompletionLog
+            log={typeof detail.frontmatter.occurrenceLog === 'string' ? detail.frontmatter.occurrenceLog : null}
+            readOnly={propsReadOnly}
+            onChange={(next) =>
+              void (next === null
+                ? writes.updateProperties({}, ['occurrenceLog'])
+                : writes.updateProperties({ occurrenceLog: next }))
+            }
+          />
+        </>
       )}
       </>
     ) : null

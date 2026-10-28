@@ -150,4 +150,27 @@ describe('ObjectView M8', () => {
     await screen.findByText('Hello.')
     expect(screen.queryByTestId('task-stats')).toBeNull()
   })
+
+  test('test completion log delete writes only the occurrence log', async () => {
+    const user = userEvent.setup()
+    const recurring = detailFor('Tasks/Water plants.md', 'task', 'Water plants')
+    recurring.frontmatter.repeat = 'every day'
+    recurring.frontmatter.occurrenceLog =
+      '2026-10-21 completed 2026-10-21T07:55:10Z\n2026-10-22 skipped 2026-10-23T06:30:00Z'
+    serve(recurring)
+    mocked.updateProperties.mockResolvedValue({ version: 'v2', frontmatter: recurring.frontmatter, links: {} } as never)
+    render(<ObjectView path="Tasks/Water plants.md" mode="page" />)
+    const log = await screen.findByRole('region', { name: 'Completion Log' })
+    const newest = within(log).getAllByRole('listitem')[0]
+    expect(newest).toHaveTextContent('Skipped')
+    await user.click(within(newest).getByRole('button'))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
+    await vi.waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(1))
+    expect(mocked.updateProperties).toHaveBeenCalledWith(
+      'Tasks/Water plants.md',
+      { occurrenceLog: '2026-10-21 completed 2026-10-21T07:55:10Z' },
+      'v1',
+      undefined,
+    )
+  })
 })
