@@ -1,6 +1,11 @@
 /**
- * The block style sub-menus ("Hierarchy", "List", "Quote", "Color", "Icon"),
- * rendered inside a dropdown menu's content (Task 12's block menu). Each item
+ * The block menu's style rows, rendered inside a dropdown menu's content
+ * (Task 12's block menu). `BlockStyleMenu` is Object's first block-menu
+ * section, in its order (reference check 2026-10-28, 2e): "Hierarchy
+ * (<current>)" ▸ (Standard, Small, Heading 1–4), "List" ▸, "To-do", "Icon" ▸,
+ * "Quote", "Toggle", "Group". `BlockStyleExtras` holds the rows Object's
+ * block menu does not have but Object has no other way to reach: "Color" ▸,
+ * "Standout" (our string), "Indent" / "Unindent". Each item
  * applies to every target block (the block selection, else the block with the
  * cursor), as the block menu's other rows and the shortcuts do: per block
  * through `forEachTargetBlock` (hierarchy, quote, colour, icon), or over the
@@ -21,15 +26,19 @@ import type { Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
 import { CheckIcon } from 'lucide-react'
+import { Fragment } from 'react'
 import type { Icon as IconValue } from '@/api/types'
-import { isIconifyId } from '@/components/Icon'
+import { Icon, isIconifyId } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
 import {
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu'
+import { formatKeys, keysFor } from '@/lib/shortcuts'
 import type { Option } from '../annotations'
 import {
   blockSelectionRange,
@@ -53,7 +62,10 @@ import {
 export const T = {
   hierarchy: 'Hierarchy', // blocksMenu.hierarchy.title
   list: 'List', // blocksMenu.list.title
-  quote: 'Quote', // blocksMenu.quote.title
+  todo: 'To-do', // the block menu's own label
+  quote: 'Quote', // ActionItems.setBlockQuoteInterface.title
+  toggle: 'Toggle', // the block menu's own label
+  group: 'Group', // ActionItems.groupBlocks.title
   quoteBlock: 'Quote block', // ControlDropdown.custom.block_quote.name
   standout: 'Standout', // our string (Object's quote.layout "standout" has no label in the strings file)
   color: 'Color', // styles.color
@@ -76,26 +88,35 @@ function itemOption(editor: Editor, key: string): string | true | undefined {
   return currentItemOptions(editor.state.tr).find((o) => o.key === key)?.value
 }
 
-export const HIERARCHY_ITEMS: readonly { level: Hierarchy; name: string }[] = [
-  { level: 'Base', name: 'Standard' }, // blocksMenu.hierarchy.Base
-  { level: 'H1', name: 'Heading 1' },
-  { level: 'H2', name: 'Heading 2' },
-  { level: 'H3', name: 'Heading 3' },
-  { level: 'H4', name: 'Heading 4' },
-  { level: 'S', name: 'Small' }, // blocksMenu.hierarchy.S
+/** Object's Hierarchy sub-menu, in its order, with its icons. */
+export const HIERARCHY_ITEMS: readonly { level: Hierarchy; name: string; icon: string }[] = [
+  { level: 'Base', name: 'Standard', icon: 'ph-text-t' }, // blocksMenu.hierarchy.Base
+  { level: 'S', name: 'Small', icon: 'ph-text-aa' }, // blocksMenu.hierarchy.S
+  { level: 'H1', name: 'Heading 1', icon: 'ph-text-h-one' },
+  { level: 'H2', name: 'Heading 2', icon: 'ph-text-h-two' },
+  { level: 'H3', name: 'Heading 3', icon: 'ph-text-h-three' },
+  { level: 'H4', name: 'Heading 4', icon: 'ph-text-h-four' },
 ]
 
-export const LIST_ITEMS: readonly { type: ListType | null; name: string }[] = [
-  { type: null, name: 'No listing' }, // blocksMenu.list.none
-  { type: 'bullet', name: 'Bulleted' }, // blocksMenu.list.bullet
-  { type: 'numerical', name: 'Numbered' }, // blocksMenu.list.numerical
-  { type: 'alphabetical', name: 'Alphabetical' }, // blocksMenu.list.alphabetical
-  { type: 'roman', name: 'Roman' }, // blocksMenu.list.roman
+/** Object's List sub-menu: "No listing" in its own section, then the four list types (`a)` and `i)` are text icons). */
+export const LIST_ITEMS: readonly { type: ListType | null; name: string; icon: string | null; alt?: string }[] = [
+  { type: null, name: 'No listing', icon: 'ph-placeholder' }, // blocksMenu.list.none
+  { type: 'bullet', name: 'Bulleted', icon: 'ph-list-bullets' }, // blocksMenu.list.bullet
+  { type: 'numerical', name: 'Numbered', icon: 'ph-list-numbers' }, // blocksMenu.list.numerical
+  { type: 'alphabetical', name: 'Alphabetical', icon: null, alt: 'a)' }, // blocksMenu.list.alphabetical
+  { type: 'roman', name: 'Roman', icon: null, alt: 'i)' }, // blocksMenu.list.roman
 ]
+
+/** "Hierarchy (Standard)": the title with the current block's level, as Object labels the row. */
+export function hierarchyLabel(level: Hierarchy | null): string {
+  const name = HIERARCHY_ITEMS.find((h) => h.level === (level ?? 'Base'))?.name ?? 'Standard'
+  return `${T.hierarchy} (${name})`
+}
 
 export interface BlockStyle {
   hierarchy: Hierarchy | null
   list: ListType | 'none' | null
+  toggle: boolean
   quote: boolean
   standout: boolean
   color: string | null
@@ -110,12 +131,15 @@ function optionOf(node: PMNode, key: string): string | true | undefined {
 export function currentBlockStyle(editor: Editor): BlockStyle {
   const chain = blockChain(editor.state.tr)
   const leaf = chain[0]?.node
-  const style: BlockStyle = { hierarchy: null, list: 'none', quote: false, standout: false, color: null, icon: null }
+  const style: BlockStyle = { hierarchy: null, list: 'none', toggle: false, quote: false, standout: false, color: null, icon: null }
   if (!leaf) return style
   const name = leaf.type.name
   if (name === 'paragraph') style.hierarchy = optionOf(leaf, 'small') === true ? 'S' : 'Base'
   else if (name === 'heading') style.hierarchy = `H${leaf.attrs.level}` as Hierarchy
   const $from = editor.state.selection.$from
+  for (let d = $from.depth; d >= 1; d--) {
+    if ($from.node(d).type.name === 'toggle') style.toggle = true
+  }
   for (let d = $from.depth; d >= 1; d--) {
     const n = $from.node(d)
     if (n.type.name === 'bulletList') {
@@ -203,6 +227,23 @@ export function setBlocksHierarchy(editor: Editor, level: Hierarchy): boolean {
   return forEachTargetBlock(editor, (e) => e.commands.setHierarchy(level))
 }
 
+/** "To-do": make the target blocks to-dos, or take the to-do away (`on` false). */
+export function setTodo(editor: Editor, on: boolean): boolean {
+  return setBlocksListType(editor, on ? 'todo' : null)
+}
+
+/** "Toggle": add a toggle to the target blocks, or remove it (as the `toggle` shortcut does). */
+export function setToggle(editor: Editor, on: boolean): boolean {
+  editor.commands.focus()
+  return withTargetSelection(editor, (e) => (on ? e.commands.wrapInToggle() : e.commands.unwrapToggle()))
+}
+
+/** "Group": group the target blocks, or ungroup the group they are in (`ActionItems.groupBlocks.shortcut.title`). */
+export function toggleGroupBlocks(editor: Editor): boolean {
+  editor.commands.focus()
+  return withTargetSelection(editor, (e) => e.commands.toggleGroup())
+}
+
 /** Make the target blocks one list of `type`, or no list (`null`). */
 export function setBlocksListType(editor: Editor, type: ListType | null): boolean {
   editor.commands.focus()
@@ -269,6 +310,22 @@ function Check({ on }: { on: boolean }) {
   return <CheckIcon className="ml-auto size-4" style={{ visibility: on ? 'visible' : 'hidden' }} aria-hidden />
 }
 
+/** A row's left icon: a Phosphor icon, or Object's text icon (`a)`, `i)`). */
+function RowIcon({ icon, alt, color }: { icon: string | null; alt?: string; color?: string }) {
+  if (!icon) {
+    return (
+      <span aria-hidden className="inline-flex w-4 justify-center text-xs text-muted-foreground">
+        {alt}
+      </span>
+    )
+  }
+  return (
+    <span aria-hidden className="inline-flex" style={color ? { color } : undefined}>
+      <Icon name={icon} size={16} />
+    </span>
+  )
+}
+
 function Swatch({ kind, color }: { kind: ColorKind; color: (typeof BLOCK_COLORS)[number] }) {
   return kind === 'text' ? (
     <span
@@ -312,50 +369,110 @@ export interface BlockStyleMenuProps {
   onDone?: () => void
 }
 
-/** The sub-menus; render inside a `DropdownMenuContent`. */
+/** The registry's first key for `id`, formatted for display (empty when it has none). */
+function hint(id: string): string {
+  const keys = keysFor(id)
+  return keys.length ? formatKeys(keys[0]) : ''
+}
+
+function Shortcut({ id }: { id: string }) {
+  const text = hint(id)
+  return text ? <DropdownMenuShortcut>{text}</DropdownMenuShortcut> : null
+}
+
+/** Object's first block-menu section; render inside a `DropdownMenuContent`. */
 export function BlockStyleMenu({ editor, onDone }: BlockStyleMenuProps) {
   const style = currentBlockStyle(editor)
   const iconValue: IconValue | null = style.icon
     ? { type: isIconifyId(style.icon) ? 'iconify' : 'emoji', val: style.icon }
     : null
-  const subClass = 'max-h-[420px] overflow-auto'
+  const shortcutOf: Partial<Record<Hierarchy, string>> = { H1: 'heading1', H2: 'heading2', H3: 'heading3', H4: 'heading4' }
   return (
     <>
       <DropdownMenuSub>
-        <DropdownMenuSubTrigger>{T.hierarchy}</DropdownMenuSubTrigger>
+        <DropdownMenuSubTrigger>
+          <RowIcon icon="ph-text-h" />
+          {hierarchyLabel(style.hierarchy)}
+        </DropdownMenuSubTrigger>
         <DropdownMenuSubContent>
           {HIERARCHY_ITEMS.map((h) => (
             <DropdownMenuItem key={h.level} onSelect={() => setBlocksHierarchy(editor, h.level)}>
+              <RowIcon icon={h.icon} />
               {h.name}
+              {shortcutOf[h.level] && <Shortcut id={shortcutOf[h.level]!} />}
               <Check on={style.hierarchy === h.level} />
             </DropdownMenuItem>
           ))}
         </DropdownMenuSubContent>
       </DropdownMenuSub>
       <DropdownMenuSub>
-        <DropdownMenuSubTrigger>{T.list}</DropdownMenuSubTrigger>
+        <DropdownMenuSubTrigger>
+          <RowIcon icon="ph-list" />
+          {T.list}
+        </DropdownMenuSubTrigger>
         <DropdownMenuSubContent>
-          {LIST_ITEMS.map((l) => (
-            <DropdownMenuItem key={l.name} onSelect={() => setBlocksListType(editor, l.type)}>
-              {l.name}
-              <Check on={(l.type ?? 'none') === style.list} />
-            </DropdownMenuItem>
+          {LIST_ITEMS.map((l, i) => (
+            <Fragment key={l.name}>
+              {i === 1 && <DropdownMenuSeparator />}
+              <DropdownMenuItem onSelect={() => setBlocksListType(editor, l.type)}>
+                <RowIcon icon={l.icon} alt={l.alt} />
+                {l.name}
+                <Check on={(l.type ?? 'none') === style.list} />
+              </DropdownMenuItem>
+            </Fragment>
           ))}
         </DropdownMenuSubContent>
       </DropdownMenuSub>
+      <DropdownMenuItem onSelect={() => setTodo(editor, style.list !== 'todo')}>
+        <RowIcon icon="ph-check-square" />
+        {T.todo}
+        <Shortcut id="toDo" />
+        <Check on={style.list === 'todo'} />
+      </DropdownMenuItem>
       <DropdownMenuSub>
-        <DropdownMenuSubTrigger>{T.quote}</DropdownMenuSubTrigger>
-        <DropdownMenuSubContent>
-          <DropdownMenuItem onSelect={() => setQuote(editor, !style.quote)}>
-            {T.quoteBlock}
-            <Check on={style.quote} />
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setStandout(editor, !style.standout)}>
-            {T.standout}
-            <Check on={style.standout} />
-          </DropdownMenuItem>
+        <DropdownMenuSubTrigger>
+          <RowIcon icon="ph-smiley" />
+          {T.icon}
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent className="p-0">
+          <IconPicker
+            value={iconValue}
+            onChange={(next) => {
+              setBlocksIcon(editor, next ? next.val : null)
+              onDone?.()
+            }}
+          />
         </DropdownMenuSubContent>
       </DropdownMenuSub>
+      <DropdownMenuItem onSelect={() => setQuote(editor, !style.quote)}>
+        <RowIcon icon="ph-quotes" />
+        {T.quote}
+        <Check on={style.quote} />
+      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => setToggle(editor, !style.toggle)}>
+        <RowIcon icon="ph-caret-right-fill" />
+        {T.toggle}
+        <Shortcut id="toggle" />
+        <Check on={style.toggle} />
+      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => toggleGroupBlocks(editor)}>
+        <RowIcon icon="ph-arrows-in" />
+        {T.group}
+      </DropdownMenuItem>
+    </>
+  )
+}
+
+/**
+ * Object's own rows, kept because nothing else reaches them: block colour
+ * with its "Remove … color" items (the slash menu only sets a colour),
+ * the quote's standout layout, and indenting non-list blocks.
+ */
+export function BlockStyleExtras({ editor }: { editor: Editor }) {
+  const style = currentBlockStyle(editor)
+  const subClass = 'max-h-[420px] overflow-auto'
+  return (
+    <>
       <DropdownMenuSub>
         <DropdownMenuSubTrigger>{T.color}</DropdownMenuSubTrigger>
         <DropdownMenuSubContent>
@@ -373,18 +490,10 @@ export function BlockStyleMenu({ editor, onDone }: BlockStyleMenuProps) {
           </DropdownMenuSub>
         </DropdownMenuSubContent>
       </DropdownMenuSub>
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger>{T.icon}</DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className="p-0">
-          <IconPicker
-            value={iconValue}
-            onChange={(next) => {
-              setBlocksIcon(editor, next ? next.val : null)
-              onDone?.()
-            }}
-          />
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
+      <DropdownMenuItem onSelect={() => setStandout(editor, !style.standout)}>
+        {T.standout}
+        <Check on={style.standout} />
+      </DropdownMenuItem>
       <DropdownMenuItem onSelect={() => indentRow(editor, 1)}>{T.indent}</DropdownMenuItem>
       <DropdownMenuItem onSelect={() => indentRow(editor, -1)}>{T.unindent}</DropdownMenuItem>
     </>

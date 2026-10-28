@@ -166,7 +166,7 @@ Run these on his CPI copy outside the repo, with `git init` and a first commit d
 - [ ] the column add and remove controls
 - [ ] the PDF's default height
 - [ ] the slash menu's grouping and look (order, icons, search-only colour and Mermaid items, descriptions as hover tooltips and the 22rem width now follow Object's CreateMenu: reference check 2026-10-28, 2d; "Create bookmark" and "Reuse any content" are still ours)
-- [ ] the block menu's look
+- [ ] the block menu's look (sections, labels, icons and the Hierarchy order Standard, Small, Heading 1–4 now follow Object's BlockMenu: reference check 2026-10-28, 2e; no AI row; Color, Standout and Indent/Unindent are kept as ours in a last section because nothing else reaches them)
 - [ ] the rules listed under "Rules the build chose" above
 
 ### Interactions the headless walkthrough did not drive

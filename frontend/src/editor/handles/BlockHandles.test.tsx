@@ -117,40 +117,45 @@ describe('<BlockHandles>', () => {
     })
     expect(blockSelectionRange(editor.state)?.blocks.map((b) => b.node.textContent)).toEqual(['World'])
     const menu = await screen.findByRole('menu')
-    expect(within(menu).getAllByRole('menuitem').map((m) => m.firstChild?.textContent)).toEqual([
-      'Turn Into',
-      'Hierarchy',
+    // A row's label: its text without the shortcut hint.
+    const label = (m: Element) =>
+      Array.from(m.childNodes)
+        .filter((n) => !(n instanceof Element && n.getAttribute('data-slot') === 'dropdown-menu-shortcut'))
+        .map((n) => n.textContent ?? '')
+        .join('')
+    // Object's block menu (reference check 2026-10-28, 2e), then our kept rows.
+    expect(within(menu).getAllByRole('menuitem').map(label)).toEqual([
+      'Hierarchy (Standard)',
       'List',
-      'Quote',
-      'Color',
+      'To-do',
       'Icon',
-      'Indent',
-      'Unindent',
-      'Copy block reference',
-      'Turn into object',
-      'Turn into whiteboard',
+      'Quote',
+      'Toggle',
+      'Group',
       'Insert block above',
       'Insert block below',
-      'Move up',
-      'Move down',
+      'Turn into...',
+      'Copy',
       'Duplicate',
-      'Remove style',
-      'Delete',
+      'Remove',
+      'Color',
+      'Standout',
+      'Indent',
+      'Unindent',
     ])
     const hint = (name: string) =>
       within(menu)
         .getAllByRole('menuitem')
-        .find((m) => m.firstChild?.textContent === name)!
+        .find((m) => label(m) === name)!
         .querySelector('[data-slot="dropdown-menu-shortcut"]')?.textContent
     expect(hint('Insert block above')).toBe('Alt+Shift+Enter')
     expect(hint('Insert block below')).toBe('Alt+Enter')
-    expect(hint('Move up')).toBe('Ctrl+Shift+ArrowUp')
     expect(hint('Duplicate')).toBe('Ctrl+D')
-    expect(hint('Delete')).toBe('Backspace')
-    expect(hint('Remove style')).toBeUndefined()
+    expect(hint('Remove')).toBe('Backspace')
+    expect(hint('Group')).toBeUndefined()
 
-    fireEvent.click(within(menu).getByRole('menuitem', { name: /Move up/ }))
-    expect(serializeBody(editor)).toBe('World\n\nHello\n')
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /^Duplicate/ }))
+    expect(serializeBody(editor)).toBe('Hello\n\nWorld\n\nWorld\n')
     await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
   })
 
