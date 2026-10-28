@@ -8,14 +8,16 @@ import { resetSettingsModal, useSettingsModal } from './useSettingsModal'
 beforeEach(() => resetSettingsModal())
 
 describe('ShortcutsSheet', () => {
-  test('test shortcuts sheet lists every registered shortcut by category with unverified tags', async () => {
+  test('test shortcuts sheet lists every registered shortcut with a key, by category, with unverified tags', async () => {
     render(<ShortcutsSheet />)
     expect(screen.queryByRole('dialog')).toBeNull()
     act(() => useSettingsModal.getState().openShortcuts())
     const sheet = await screen.findByRole('dialog', { name: 'Shortcuts' })
 
-    const defs = allShortcuts()
+    const defs = allShortcuts().filter((d) => d.keys.length > 0)
     expect(defs.length).toBeGreaterThan(40)
+    // Ids Capacities lists no key for are left out, as in its sheet.
+    expect(sheet.querySelector('[data-shortcut="openCommandPalette"]')).toBeNull()
     const categories = [...new Set(defs.map((d) => d.category))]
     expect(within(sheet).getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(
       categories.map((c) => CATEGORY_LABELS[c] ?? c),
@@ -28,8 +30,9 @@ describe('ShortcutsSheet', () => {
       for (const k of d.keys) expect(row!.textContent).toContain(formatKeys(k))
       expect(!!row!.querySelector('[data-unverified]'), d.id).toBe(d.provisional)
     }
-    // openSettings (Mod-,) is verified; toggleDarkMode is provisional.
+    // openSettings and toggleDarkMode are Capacities' keys (verified).
     expect(sheet.querySelector('[data-shortcut="openSettings"] [data-unverified]')).toBeNull()
-    expect(sheet.querySelector('[data-shortcut="toggleDarkMode"] [data-unverified]')?.textContent).toBe('unverified')
+    expect(sheet.querySelector('[data-shortcut="toggleDarkMode"] [data-unverified]')).toBeNull()
+    expect(sheet.querySelector('[data-shortcut="toggleDarkMode"] [data-keys]')?.textContent).toBe('Ctrl+Shift+L')
   })
 })

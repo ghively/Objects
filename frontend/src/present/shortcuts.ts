@@ -1,5 +1,5 @@
 /**
- * Presentation shortcuts (`lib/shortcuts.ts` ids). `openPresentationMode` (Mod-Alt-p) is bound
+ * Presentation shortcuts (`lib/shortcuts.ts` ids). `openPresentationMode` (Ctrl+Alt+P, ⌃⌘P on macOS) is bound
  * whenever the app runs and presents the open tab's object; `exitPresentationMode` (Escape),
  * `nextPresentationSlide` (ArrowRight) and `previousPresentationSlide` (ArrowLeft) are bound only
  * while presenting (the hook is called by the mounted presentation view, which mounts last, so

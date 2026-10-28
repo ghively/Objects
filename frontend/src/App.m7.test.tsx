@@ -133,15 +133,22 @@ describe('App, M7 tabs', () => {
     key('Tab', { ctrlKey: true })
     expect(s().activeId).toBe(b)
 
-    // navigateBack / navigateForward (Alt+Left / Alt+Right) stay in the tab.
+    // navigateBack / navigateForward (Capacities: Mod+Left or Mod+[ / Mod+Right or Mod+]) stay in the tab.
     s().activate(a)
-    key('ArrowLeft', { altKey: true })
+    key('ArrowLeft', { ctrlKey: true })
     expect(currentTarget(s())).toEqual({ kind: 'trash' })
-    key('ArrowRight', { altKey: true })
+    key('ArrowRight', { ctrlKey: true })
+    expect(currentTarget(s())).toEqual({ kind: 'allNotes' })
+    key('[', { ctrlKey: true })
+    expect(currentTarget(s())).toEqual({ kind: 'trash' })
+    key(']', { ctrlKey: true })
+    expect(currentTarget(s())).toEqual({ kind: 'allNotes' })
+    // Alt+Left is no longer back.
+    key('ArrowLeft', { altKey: true })
     expect(currentTarget(s())).toEqual({ kind: 'allNotes' })
 
-    // openTabList (Mod+Shift+A) toggles the tab menu.
-    key('a', { ctrlKey: true, shiftKey: true })
+    // openTabList (Capacities: Mod+Shift+Up) toggles the tab menu.
+    key('ArrowUp', { ctrlKey: true, shiftKey: true })
     expect(useTabMenu.getState().open).toBe(true)
     expect(await screen.findByRole('textbox', { name: 'Search tabs' })).toBeInTheDocument()
     act(() => useTabMenu.getState().setOpen(false))

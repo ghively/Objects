@@ -279,7 +279,7 @@ describe('WhiteboardCanvas', () => {
     await act(async () => {})
     expect(screen.queryByTestId('ink-layer')).toBeNull()
     // Keys for the pen group do nothing without a plugin.
-    fireEvent.keyDown(without.wrapper, { key: 'p' })
+    fireEvent.keyDown(without.wrapper, { key: 'd' })
     expect(without.store.getState().inkTool).toBeNull()
     without.unmount()
 
@@ -289,7 +289,7 @@ describe('WhiteboardCanvas', () => {
     const layer = screen.getByTestId('ink-layer')
     expect(layer.dataset.strokes).toBe('2')
     expect(layer.dataset.tool).toBe('')
-    fireEvent.keyDown(wrapper, { key: 'p' })
+    fireEvent.keyDown(wrapper, { key: 'd' })
     expect(screen.getByTestId('ink-layer').dataset.tool).toBe('pen')
     expect(store.getState().inkTool).toEqual({ tool: 'pen', color: '#5c5959', width: 4 })
     const last = layerProps[layerProps.length - 1]

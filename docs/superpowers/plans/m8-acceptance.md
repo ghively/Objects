@@ -258,15 +258,14 @@ Run these on his CPI copy outside the repo, with `git init` and a first commit d
 
 ### Shortcut keys
 
-- [ ] Compare the provisional keys of the new ids with Capacities:
-  - `copyBlockReference` Mod-Alt-r
-  - `turnIntoObject` / `turnIntoTask` / `turnBlockIntoTaskObject` Mod-Alt-o / Mod-Alt-k / Mod-Alt-Shift-k
-  - `highlightText` Mod-Shift-h
-  - `toggleFocusMode` Mod-Shift-f
-  - `openPresentationMode` Mod-Alt-p
-  - `whiteboardResize*` Mod-Alt(-Shift)-Arrows
-  - Tab/Shift-Tab indent in any block
-  - extended search Ctrl/Cmd+Shift+Enter
+- [x] The new ids' keys were compared with Capacities' shortcut table (`reference-check-2026-10-28.md` §1) and corrected:
+  - `copyBlockReference` Ctrl+Alt+L (⌃⌘L on macOS)
+  - `turnIntoObject` I with blocks selected; `turnIntoTask` no key (Capacities: `()` + Space only); `turnBlockIntoTaskObject` Ctrl+Shift+T
+  - `highlightText` Ctrl+Shift+H (matched already)
+  - `toggleFocusMode` Ctrl+Shift+M
+  - `openPresentationMode` Ctrl+Alt+P (⌃⌘P on macOS)
+  - `whiteboardResize*` Ctrl(+Shift)+Arrows
+- [ ] Still ours, for Gene: Tab/Shift-Tab indent in any block, extended search Ctrl/Cmd+Shift+Enter.
 
 ### Every "our choice", against Capacities
 

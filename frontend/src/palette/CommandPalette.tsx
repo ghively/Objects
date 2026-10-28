@@ -1,7 +1,9 @@
 /**
- * The command palette: Ctrl+K "Search this space" and Ctrl+P "Open action palette". Both
- * shortcuts are caught on the window in the capture phase, so they work with the caret in the
- * editor, while no other modal dialog is open (the object peek excepted). Esc closes.
+ * The command palette: Ctrl+P or Ctrl+K "Search this space" (Capacities' `openSearchPalette`
+ * keys, read from `lib/shortcuts.ts`). Capacities lists no key for "Open action palette"; it is
+ * reached with the palette's switch button. The shortcut is caught on the window in the capture
+ * phase, so it works with the caret in the editor, while no other modal dialog is open (the
+ * object peek excepted). Esc closes.
  *
  * M8: the search view's "Open in extended search" row and Ctrl/Cmd+Shift+Enter (our key; plain
  * Shift+Enter stays M7's "open in the side panel") close the palette and open the extended search
@@ -18,6 +20,7 @@ import { Icon } from '@/components/Icon'
 import { useCalendar } from '@/calendar/useCalendar'
 import { createAndOpen } from '@/create/createAndOpen'
 import { useLinkIndex } from '@/links/linkIndex'
+import { keysFor, matches } from '@/lib/shortcuts'
 import { currentTarget, usePeek, useTabs, type OpenOptions, type Target } from '@/nav/tabs'
 import type { ActionContext } from './actions'
 import { ActionsView } from './ActionsView'
@@ -65,11 +68,10 @@ function otherModalOpen(): boolean {
   return open.length > allowed
 }
 
-function paletteShortcut(e: KeyboardEvent): PaletteMode | null {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return null
-  const key = e.key.toLowerCase()
-  if (key === 'k') return 'search'
-  if (key === 'p') return 'actions'
+/** The palette mode `e` opens: the registry's `openSearchPalette` / `openCommandPalette` keys. */
+export function paletteShortcut(e: KeyboardEvent): PaletteMode | null {
+  if (matches(e, keysFor('openSearchPalette'))) return 'search'
+  if (matches(e, keysFor('openCommandPalette'))) return 'actions'
   return null
 }
 

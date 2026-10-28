@@ -1,15 +1,16 @@
 import { useRef } from 'react'
 import { Icon } from '@/components/Icon'
 import { colorName } from '@/theme/palette'
+import { KEY_HINT } from '../chrome/controls'
 import { DEFAULT_INK, HIGHLIGHTER_WIDTHS, INK_COLORS, PEN_WIDTHS } from './inkModel'
 import { INK_STRINGS } from './inkStrings'
 import type { InkEraseMode, InkTool, InkToolbarProps, InkToolState } from './types'
 
 /** `key` is the canvas shortcut shown in the tooltip; Select ink has none (our choice). */
 const TOOLS: { tool: InkTool; icon: string; label: string; key?: string }[] = [
-  { tool: 'pen', icon: 'ph-pen-nib', label: INK_STRINGS.pen, key: 'P' },
-  { tool: 'highlighter', icon: 'ph-highlighter', label: INK_STRINGS.highlighter, key: 'M' },
-  { tool: 'eraser', icon: 'ph-eraser', label: INK_STRINGS.eraser, key: 'E' },
+  { tool: 'pen', icon: 'ph-pen-nib', label: INK_STRINGS.pen, key: KEY_HINT.pen },
+  { tool: 'highlighter', icon: 'ph-highlighter', label: INK_STRINGS.highlighter, key: KEY_HINT.highlighter },
+  { tool: 'eraser', icon: 'ph-eraser', label: INK_STRINGS.eraser, key: KEY_HINT.eraser },
   { tool: 'select', icon: 'ph-lasso', label: INK_STRINGS.selectInk },
 ]
 
@@ -51,7 +52,8 @@ const BUTTON =
 /**
  * The pen group of the whiteboard toolbox (Gene's addition; our strings): Pen, Highlighter and
  * Eraser toggles, and for the drawing tools a colour row and the width choices. Clicking the
- * active tool turns ink off. The keys P, M and E are handled by the canvas shortcuts.
+ * active tool turns ink off. The keys D, Shift+D and E (ours: P and M are Capacities' Triangle
+ * and move menu) are handled by the canvas shortcuts.
  */
 export function InkToolbar({ value, readOnly, onChange }: InkToolbarProps) {
   // Remember the colour and widths while ink is off, so turning it back on keeps them.

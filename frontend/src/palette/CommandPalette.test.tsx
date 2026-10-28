@@ -19,7 +19,7 @@ import { useRecent } from '@/nav/recent'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { objectSummary, searchResult, typeDef } from '@/test/mockApi'
 import { ACTION_TEXT } from './actions'
-import { CommandPalette } from './CommandPalette'
+import { CommandPalette, paletteShortcut } from './CommandPalette'
 import { PALETTE_TEXT } from './searchOptions'
 import { usePalette } from './usePalette'
 
@@ -79,7 +79,7 @@ beforeEach(() => {
 })
 
 describe('shortcuts', () => {
-  test('Ctrl+K opens search, Ctrl+P opens actions, also with focus in the editor; Esc closes', async () => {
+  test('Ctrl+K and Ctrl+P open search (Capacities), also with focus in the editor; no key opens actions; Esc closes', async () => {
     const { user } = setup()
     const editor = document.createElement('div')
     editor.setAttribute('contenteditable', 'true')
@@ -91,12 +91,8 @@ describe('shortcuts', () => {
     expect(await screen.findByPlaceholderText('Search content')).toBeInTheDocument()
     expect(usePalette.getState()).toMatchObject({ open: true, mode: 'search' })
 
-    await user.keyboard('{Control>}p{/Control}')
-    expect(await screen.findByPlaceholderText('Search for actions')).toBeInTheDocument()
-    expect(usePalette.getState().mode).toBe('actions')
-
     await user.keyboard('{Escape}')
-    await waitFor(() => expect(screen.queryByPlaceholderText('Search for actions')).toBeNull())
+    await waitFor(() => expect(screen.queryByPlaceholderText('Search content')).toBeNull())
     expect(usePalette.getState().open).toBe(false)
 
     // Ctrl+P with the caret in the editor too (and the browser's print is prevented).
@@ -106,7 +102,10 @@ describe('shortcuts', () => {
       editor.dispatchEvent(ev)
     })
     expect(ev.defaultPrevented).toBe(true)
-    expect(await screen.findByPlaceholderText('Search for actions')).toBeInTheDocument()
+    expect(await screen.findByPlaceholderText('Search content')).toBeInTheDocument()
+    expect(usePalette.getState()).toMatchObject({ open: true, mode: 'search' })
+    expect(paletteShortcut(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true, shiftKey: true }))).toBeNull()
+    expect(paletteShortcut(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true }))).toBe('search')
     editor.remove()
   })
 
@@ -343,8 +342,8 @@ describe('search mode', () => {
 })
 
 describe('action mode', () => {
-  async function openActions(user: ReturnType<typeof userEvent.setup>) {
-    await user.keyboard('{Control>}p{/Control}')
+  async function openActions(_user: ReturnType<typeof userEvent.setup>) {
+    act(() => usePalette.getState().show('actions'))
     return screen.findByPlaceholderText(PALETTE_TEXT.placeholderActions)
   }
 

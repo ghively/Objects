@@ -10,8 +10,8 @@ describe('InkToolbar', () => {
     const onChange = vi.fn()
     const { rerender } = render(<InkToolbar value={null} readOnly={false} onChange={onChange} />)
     const pen = screen.getByRole('button', { name: 'Pen' })
-    expect(pen).toHaveAttribute('title', 'Pen (P)')
-    expect(screen.getByRole('button', { name: 'Highlighter' })).toHaveAttribute('title', 'Highlighter (M)')
+    expect(pen).toHaveAttribute('title', 'Pen (D)')
+    expect(screen.getByRole('button', { name: 'Highlighter' })).toHaveAttribute('title', 'Highlighter (Shift+D)')
     expect(screen.getByRole('button', { name: 'Eraser' })).toHaveAttribute('title', 'Eraser (E)')
     // No colour or width row while ink is off.
     expect(screen.queryByRole('radiogroup')).toBeNull()

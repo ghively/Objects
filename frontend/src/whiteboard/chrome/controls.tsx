@@ -7,40 +7,48 @@ import { forwardRef, useState, type ButtonHTMLAttributes, type ReactNode } from 
 import type { WhiteboardShapeMenuTool, WhiteboardTool } from '@/api/whiteboardTypes'
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { formatKeys, keysFor } from '@/lib/shortcuts'
 import { cn } from '@/lib/utils'
 import { isShapeTool } from '../model'
 import { shapePath } from '../shapes'
 import { TOOL_LABEL } from '../strings'
 
-/** Our shortcut keys (the plan's key table), shown in tooltips next to Capacities' names. */
+/** The first registered key of shortcut `id`, as the Shortcuts sheet shows it. */
+function keyOf(id: string): string {
+  const k = keysFor(id)[0]
+  return k ? formatKeys(k) : ''
+}
+
+/** The canvas shortcut keys (Capacities', from `lib/shortcuts.ts`), shown in tooltips next to Capacities' names. */
 export const KEY_HINT = {
-  select: 'V',
-  hand: 'H',
-  text: 'T',
-  rectangle: 'R',
-  ellipse: 'O',
-  triangle: 'Shift+R',
-  line: 'L',
-  arrow: 'A',
-  frame: 'F',
-  zoomIn: 'Ctrl+=',
-  zoomOut: 'Ctrl+-',
-  zoomReset: 'Ctrl+0',
-  fitAll: 'Shift+1',
-  fitSelection: 'Shift+2',
-  undo: 'Ctrl+Z',
-  redo: 'Ctrl+Shift+Z',
-  duplicate: 'Ctrl+D',
-  front: 'Ctrl+Shift+]',
-  forward: 'Ctrl+]',
-  backward: 'Ctrl+[',
-  back: 'Ctrl+Shift+[',
-  flipX: 'Shift+H',
-  flipY: 'Shift+V',
-  wrap: 'Ctrl+Alt+G',
+  select: keyOf('whiteboardSelect'),
+  hand: keyOf('whiteboardHand'),
+  text: keyOf('whiteboardText'),
+  rectangle: keyOf('whiteboardRectangle'),
+  ellipse: keyOf('whiteboardEllipse'),
+  triangle: keyOf('whiteboardTriangle'),
+  line: keyOf('whiteboardLine'),
+  arrow: keyOf('whiteboardArrow'),
+  frame: keyOf('whiteboardFrame'),
+  zoomIn: keyOf('whiteboardZoomIn'),
+  zoomOut: keyOf('whiteboardZoomOut'),
+  zoomReset: keyOf('whiteboardZoomReset'),
+  fitAll: keyOf('whiteboardFitAll'),
+  fitSelection: keyOf('whiteboardFitSelection'),
+  undo: keyOf('undo'),
+  redo: keyOf('redo'),
+  duplicate: keyOf('whiteboardDuplicate'),
+  front: keyOf('whiteboardBringToFront'),
+  forward: keyOf('whiteboardBringForward'),
+  backward: keyOf('whiteboardSendBackward'),
+  back: keyOf('whiteboardSendToBack'),
+  flipX: keyOf('whiteboardFlipHorizontal'),
+  flipY: keyOf('whiteboardFlipVertical'),
+  wrap: keyOf('whiteboardWrapInFrame'),
   delete: 'Delete',
-  resize: 'Ctrl+Alt+Arrow',
-  resizeLarge: 'Ctrl+Alt+Shift+Arrow',
+  pen: keyOf('whiteboardPen'),
+  highlighter: keyOf('whiteboardHighlighter'),
+  eraser: keyOf('whiteboardEraser'),
 } as const
 
 /** "Name (Key)" for a tooltip. */

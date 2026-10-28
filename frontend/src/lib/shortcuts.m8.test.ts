@@ -9,17 +9,18 @@ import {
   allShortcuts,
   keysFor,
   parseKeys,
+  sharesKeyByDesign,
 } from './shortcuts'
 
 // id → [category, scope, `shortcuts.<id>.name` (verbatim from the reference strings), keys]
 const TABLE: Record<string, [string, string, string, string[]]> = {
-  copyBlockReference: ['block', 'editor', 'Copy block reference', ['Mod-Alt-r']],
-  turnIntoObject: ['block', 'editor', 'Turn into object', ['Mod-Alt-o']],
-  turnIntoTask: ['block', 'editor', 'Turn into task', ['Mod-Alt-k']],
-  turnBlockIntoTaskObject: ['block', 'editor', 'Turn block into task object', ['Mod-Alt-Shift-k']],
+  copyBlockReference: ['block', 'editor', 'Copy block reference', ['Mod-AltCtrl-l']],
+  turnIntoObject: ['block', 'editor', 'Turn into object', ['i']],
+  turnIntoTask: ['block', 'editor', 'Turn into task', []],
+  turnBlockIntoTaskObject: ['block', 'editor', 'Turn block into task object', ['Mod-Shift-t']],
   highlightText: ['text', 'editor', 'Highlight text selection', ['Mod-Shift-h']],
-  toggleFocusMode: ['global', 'global', 'Toggle focus mode', ['Mod-Shift-f']],
-  openPresentationMode: ['page', 'global', 'Start presentation mode', ['Mod-Alt-p']],
+  toggleFocusMode: ['global', 'global', 'Toggle focus mode', ['Mod-Shift-m']],
+  openPresentationMode: ['page', 'global', 'Start presentation mode', ['Mod-AltCtrl-p']],
   exitPresentationMode: ['page', 'global', 'Exit presentation mode', ['Escape']],
   nextPresentationSlide: ['page', 'global', 'Next presentation slide', ['ArrowRight']],
   previousPresentationSlide: ['page', 'global', 'Previous presentation slide', ['ArrowLeft']],
@@ -27,13 +28,13 @@ const TABLE: Record<string, [string, string, string, string[]]> = {
     'whiteboard',
     'whiteboard',
     'Resize selection',
-    ['Mod-Alt-ArrowUp', 'Mod-Alt-ArrowDown', 'Mod-Alt-ArrowLeft', 'Mod-Alt-ArrowRight'],
+    ['Mod-ArrowUp', 'Mod-ArrowDown', 'Mod-ArrowLeft', 'Mod-ArrowRight'],
   ],
   whiteboardResizeLarge: [
     'whiteboard',
     'whiteboard',
     'Resize selection farther',
-    ['Mod-Alt-Shift-ArrowUp', 'Mod-Alt-Shift-ArrowDown', 'Mod-Alt-Shift-ArrowLeft', 'Mod-Alt-Shift-ArrowRight'],
+    ['Mod-Shift-ArrowUp', 'Mod-Shift-ArrowDown', 'Mod-Shift-ArrowLeft', 'Mod-Shift-ArrowRight'],
   ],
 }
 
@@ -47,7 +48,8 @@ describe('M8 shortcuts', () => {
       expect(d?.category, id).toBe(category)
       expect(d?.scope, id).toBe(scope)
       expect(d?.name, id).toBe(name)
-      expect(d?.provisional, id).toBe(true)
+      // Every key is checked against Capacities' shortcut table (reference-check-2026-10-28 §1).
+      expect(d?.provisional, id).toBe(false)
       expect(d?.bound, id).toBe(true)
       expect(keysFor(id)).toEqual(keys)
       expect(CATEGORY_LABELS[category]).toBeTruthy()
@@ -69,6 +71,7 @@ describe('M8 shortcuts', () => {
           const c = parseKeys(k, mac)
           const sig = `${scopeOf(d.id, d.scope)}|${c.ctrl}|${c.meta}|${c.alt}|${c.shift}|${c.key.toLowerCase()}`
           const other = seen.get(sig)
+          if (other && sharesKeyByDesign(other, d.id)) continue
           expect(other, `${d.id} (${k}) collides with ${other} in scope ${d.scope}`).toBeUndefined()
           seen.set(sig, d.id)
         }
