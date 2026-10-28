@@ -337,7 +337,7 @@ export function groupRows(
   ctx: GroupCtx,
 ): { groups: Group[]; hidden: Group[] } {
   const entry = groupBy?.groups?.[0]
-  const def = entry ? findDef(ctx.types, entry.propertyId, entry.structureId) : undefined
+  const def = entry ? findDef(ctx.types, entry.propertyId, entry.structureId, ctx.viewTypeIds) : undefined
   if (!entry || !def) return { groups: [{ id: OTHER_ID, label: 'Objects', rows }], hidden: [] }
   const isStatus = isStatusLabel(def)
   const byCategory = isStatus && entry.option === STATUS_CATEGORY_OPTION

@@ -105,7 +105,7 @@ function createdMs(row: Row): number | null {
  */
 export function applySorts(rows: Row[], sorts: Sort[], ctx: FilterCtx): Row[] {
   const active = sorts.filter((s) => {
-    const kind = findDef(ctx.types, s.propertyId, s.structureId)?.type
+    const kind = findDef(ctx.types, s.propertyId, s.structureId, ctx.viewTypeIds)?.type
     return !!kind && kind !== 'entity_type'
   })
   const keyed = rows.map((row, i) => ({ row, i, keys: active.map((s) => sortKey(row, s, ctx)) }))

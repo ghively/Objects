@@ -143,6 +143,14 @@ describe('valueForGroup', () => {
     expect(ids(groups)).toEqual(['tools'])
   })
 
+  test("a key shared by two types groups by the view's type's definition (audit #15)", () => {
+    const other = typeDef({ id: 'other', propertyDefinitions: [propertyDef({ id: 'stage', type: 'label', options: { set: opts('X', 'Y') } })] })
+    const mine = typeDef({ id: 'mine', propertyDefinitions: [propertyDef({ id: 'stage', type: 'label', options: { set: opts('Draft', 'Live') } })] })
+    const c: GroupCtx = { types: [other, mine], viewTypeIds: ['mine'], collections: [], tagIdsToTitles: {}, now }
+    const r = R('a', { stage: ['Live'] }, { type: 'mine' })
+    expect(labels(groupRows([r], by('stage'), undefined, c).groups)).toEqual(['Draft', 'Live'])
+  })
+
   test('a drag of a multi-value card swaps only the source column value (audit #13)', () => {
     const labels = propertyDef({ id: 'labels', type: 'label', options: { isArray: true, set: opts('A', 'B', 'C') } })
     const owners = propertyDef({ id: 'owner', type: 'entity', options: { isArray: true } })
