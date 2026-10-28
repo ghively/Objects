@@ -8,6 +8,7 @@ import { Editor as TiptapEditor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { afterEach, describe, expect, test } from 'vitest'
 import { editorExtensions, loadBody, serializeBody } from './document'
+import { turnInto } from './extensions/blockSelection'
 import { moveBlockTo } from './handles/dragMove'
 
 const editors: TiptapEditor[] = []
@@ -203,6 +204,29 @@ describe('headings', () => {
     const out = saveAndReload(editor)
     expect(out.saved).toBe(saved + '\n\nP\n')
     expect(out.reloaded[0]).toEqual(['heading', 'Title' + typed])
+  })
+
+  test('turning a two-line paragraph into a heading keeps one heading', () => {
+    const editor = headless('a\nb\n\nP\n')
+    editor.commands.setTextSelection(find(editor, 'a').pos + 1)
+    turnInto(editor, 'H2')
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe('## a b\n\nP\n')
+    expect(out.reloaded).toEqual([
+      ['heading', 'a b'],
+      ['paragraph', 'P'],
+    ])
+  })
+
+  test('a hard break in a heading saves as a space', () => {
+    const editor = headless('## a\n')
+    const f = find(editor, 'a')
+    editor.view.dispatch(
+      editor.state.tr.insert(f.pos + 2, [editor.schema.nodes.hardBreak.create(), editor.schema.text('b')]),
+    )
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe('## a b\n')
+    expect(out.reloaded).toEqual([['heading', 'a b']])
   })
 
   test('a # inside a word is left alone', () => {
