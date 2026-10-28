@@ -158,8 +158,44 @@ _NOT_DUPLICATED_ROLES = frozenset(
      "RootDailyNote"}
 )  # fmt: skip
 _CANNOT_DUPLICATE = "This object can't be duplicated."
+# M9 per-object layout keys (`ComponentData.wideLayoutMode`, `entity.data.wideCoverImage`,
+# `coverImageOffset`'s `offset`): absent means the type's default (offset 50); `None` removes.
+_COVER_OFFSET = "coverImageOffset"
+_LAYOUT_BOOL_KEYS = frozenset({"wideLayoutMode", "wideCoverImage"})
+_LAYOUT_KEYS = _LAYOUT_BOOL_KEYS | {_COVER_OFFSET}
+# `DATE_TEMPLATE_VARIABLES` (date.model.ts); `DatetimeProperty.variable` is "Set only on templates".
+_CREATION_VARIABLES = ("day", "week", "month", "year")
 # A body that is empty or only a `# Title` heading (a template's body replaces it).
 _TITLE_ONLY_RE = re.compile(r"\s*(?:#[ \t][^\n]*)?\s*")
+
+
+def _check_layout_value(key: str, value: Any) -> None:
+    """Raise `InvalidValue` unless ``value`` fits the layout key (None always does)."""
+    if value is None:
+        return
+    if key in _LAYOUT_BOOL_KEYS:
+        if not isinstance(value, bool):
+            raise InvalidValue(f"{key} must be true, false or null")
+        return
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not 0 <= value <= 100  # NaN fails this too
+    ):
+        raise InvalidValue(f"{key} must be a number from 0 to 100, or null")
+
+
+def _creation_value(value: str, fm: dict) -> SingleQuotedScalarString:
+    """The frontmatter value for a ``{creation:<var>}`` update of a ``datetime`` property.
+
+    Raises `InvalidValue` for an unknown variable, or on a file that isn't a template.
+    """
+    var = creation_variable(value)
+    if var not in _CREATION_VARIABLES:
+        raise InvalidValue(f"Unknown date variable {value.strip()!r}")
+    if not _str_or_none(fm.get("template")):
+        raise InvalidValue("Date variables can only be set on a template")
+    return SingleQuotedScalarString(f"{{creation:{var}}}")
 
 
 def _parse_created(value: Any) -> datetime:
@@ -1763,11 +1799,29 @@ class Space:
         removals)`` (the Task status hook, `update_properties` only) may edit
         what is written before it is; a ``date`` it rewrites keeps its line's
         quotes and trailing comment.
+
+        M9: the layout keys (``wideLayoutMode``, ``wideCoverImage``, ``coverImageOffset``)
+        take their own shapes and ``None`` removes them; a changed ``coverImage`` drops
+        ``coverImageOffset``; a ``datetime`` takes ``{creation:<var>}`` on a template only.
         """
         sets: dict[str, Any] = {}
         removals: list[str] = []
+        unquote: list[str] = []
         for key, value in updates.items():
+            if key in _LAYOUT_KEYS:
+                _check_layout_value(key, value)
+                if value is None:
+                    removals.append(key)
+                else:
+                    sets[key] = value
+                continue
             pdef = self._pdef(t, key)
+            if pdef is not None and pdef.type == "datetime":
+                if isinstance(value, str) and value.strip().startswith("{creation:"):
+                    sets[key] = _creation_value(value, fm)
+                    continue
+                if creation_variable(fm.get(key)) is not None:
+                    unquote.append(key)  # a date replacing a variable drops its quotes
             if pdef is None:
                 encoded = _json_scalar(key, value)
                 if encoded is not None or key in fm:
@@ -1784,6 +1838,12 @@ class Space:
             sets.update(u)
             removals.extend(r)
         removals.extend(k for k in remove if k in fm)
+        if _COVER_OFFSET not in sets and (
+            ("coverImage" in sets and sets["coverImage"] != fm.get("coverImage"))
+            or "coverImage" in removals
+        ):
+            # A new cover image drops the old one's position (Object's `referenceImageId`).
+            removals.append(_COVER_OFFSET)
         in_place: dict[str, str] = {}
         if hook is not None:
             explicit_date = "date" in sets
@@ -1791,6 +1851,9 @@ class Space:
             new_date = sets.get("date")
             if not explicit_date and isinstance(new_date, str) and isinstance(fm.get("date"), str):
                 in_place["date"] = sets.pop("date")
+        unquote = [k for k in unquote if k in sets and k in fm]
+        if unquote:
+            src = set_keys(src, dict.fromkeys(unquote))
         out = set_keys(src, sets) if sets else src
         for key, value in in_place.items():
             out = replace_in_value(out, key, lambda _old, value=value: value)

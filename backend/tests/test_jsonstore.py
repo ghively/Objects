@@ -184,7 +184,7 @@ def test_ui_patch_keeps_other_keys(space_dir: Path):
 def test_ui_patch_unknown_key_422(space_dir: Path):
     _space, c, _pub = _client(space_dir)
     with c:
-        r = c.put("/api/ui", json={"patch": {"workspaceOrder": []}, "baseRevision": ""})
+        r = c.put("/api/ui", json={"patch": {"notAUiKey": []}, "baseRevision": ""})
     assert r.status_code == 422
     assert not (space_dir / ".object" / "ui.json").exists()
 
