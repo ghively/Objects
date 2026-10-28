@@ -239,6 +239,23 @@ def test_layout_keys_not_inferred_as_properties(tmp_path: Path):
     assert {"wideLayoutMode", "wideCoverImage", "coverImageOffset"} <= SYSTEM_KEYS
 
 
+def test_default_page_view_id_not_inferred_as_a_property(tmp_path: Path):
+    # Object's per-object ``defaultPageViewId`` (component.model.ts) round-trips as a key.
+    root = tmp_path / "space"
+    (root / "Gadgets").mkdir(parents=True)
+    (root / "Gadgets" / "One.md").write_text(
+        "---\ntype: 'Gadget'\ntitle: One\ndefaultPageViewId: view-1\nweight: 3\n---\n",
+        "utf-8",
+    )
+    t = Space(root).type_by_id("gadget")
+    assert t is not None
+    keys = {p.key for p in t.propertyDefinitions}
+    assert "weight" in keys and "defaultPageViewId" not in keys
+    from objectapp.typedefs import SYSTEM_KEYS
+
+    assert "defaultPageViewId" in SYSTEM_KEYS
+
+
 # --- workspaceOrder -----------------------------------------------------------------------
 
 
