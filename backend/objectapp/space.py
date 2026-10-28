@@ -30,7 +30,7 @@ import shutil
 import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, tzinfo
+from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -165,6 +165,8 @@ _LAYOUT_BOOL_KEYS = frozenset({"wideLayoutMode", "wideCoverImage"})
 _LAYOUT_KEYS = _LAYOUT_BOOL_KEYS | {_COVER_OFFSET}
 # `DATE_TEMPLATE_VARIABLES` (date.model.ts); `DatetimeProperty.variable` is "Set only on templates".
 _CREATION_VARIABLES = ("day", "week", "month", "year")
+# M9: how often a whiteboard save may re-stamp its `.md` (`Space.touch`; our choice).
+_TOUCH_INTERVAL = timedelta(seconds=60)
 # A body that is empty or only a `# Title` heading (a template's body replaces it).
 _TITLE_ONLY_RE = re.compile(r"\s*(?:#[ \t][^\n]*)?\s*")
 
@@ -196,6 +198,17 @@ def _creation_value(value: str, fm: dict) -> SingleQuotedScalarString:
     if not _str_or_none(fm.get("template")):
         raise InvalidValue("Date variables can only be set on a template")
     return SingleQuotedScalarString(f"{{creation:{var}}}")
+
+
+def _instant_or_none(value: Any) -> datetime | None:
+    """A stamp such as ``lastUpdated`` as an aware instant, else None."""
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+    try:
+        dt = datetime.fromisoformat(str(value or "").strip())
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def _parse_created(value: Any) -> datetime:
@@ -1523,6 +1536,7 @@ class Space:
         edit: Edit,
         stamp: bool = True,
         now: datetime | None = None,
+        history: bool = True,
     ) -> str:
         """Apply `edit` to an object file safely; return its (new) version.
 
@@ -1533,6 +1547,7 @@ class Space:
         without frontmatter gets a new fence block. Line endings, BOM and every
         untouched line's bytes are kept; the replace re-checks the version.
         ``now`` is the write's instant for the stamp (default: `Space.clock`).
+        Without ``history`` the write takes no version-history snapshot (`before_write`).
         """
         rel = self._rel(rel)
         full = self.root / rel
@@ -1570,7 +1585,8 @@ class Space:
                 if now != current:
                     raise Conflict(now)
 
-            self._call_before_write(rel, raw.data)
+            if history:
+                self._call_before_write(rel, raw.data)
             self.own_writes[rel] = new_version
             try:
                 atomic_write(full, data, check=unchanged_on_disk)
@@ -1580,6 +1596,28 @@ class Space:
                 raise
             self.rescan_file(rel)
             return new_version
+
+    def touch(self, path: str, now: datetime | None = None) -> str:
+        """Set only the object's ``lastUpdated`` to ``now``; return its (new) version.
+
+        M9: a whiteboard's canvas or ink save stamps its ``.md`` (``lastUpdated`` is
+        component-level in Object). A stamp under `_TOUCH_INTERVAL` old is left as it
+        is (our choice), as is a read-only file; the write takes no version-history
+        snapshot (our choice). Raises `KeyError`, `ValueError` and `Conflict` (an
+        external write during the stamp).
+        """
+        instant = now or self.clock()
+
+        def apply(src: str, fm: dict) -> str:
+            last = _instant_or_none(fm.get("lastUpdated"))
+            if last is not None and instant - last < _TOUCH_INTERVAL:
+                return src
+            return set_keys(src, {"lastUpdated": now_stamp(instant)})
+
+        try:
+            return self._write(path, None, self._fm_edit(apply), stamp=False, history=False)
+        except ReadOnly:
+            return version_of((self.root / self._rel(path)).read_bytes())
 
     def _rewrite_other(self, rel: str, edit: Edit, stamp: bool = False) -> str | Skip:
         """Rewrite another file on the user's behalf (unstamped unless asked).

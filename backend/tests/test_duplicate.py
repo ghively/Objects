@@ -50,7 +50,7 @@ def _lines(data: bytes) -> list[bytes]:
 
 
 def test_duplicate_copies_bytes_except_id_title_stamps(space_dir: Path):
-    space, c, _pub = _client(space_dir)
+    _space, c, _pub = _client(space_dir)
     src = space_dir / "Tasks" / "Write docs.md"
     original = src.read_bytes()
     with c:

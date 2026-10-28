@@ -112,12 +112,13 @@ Routes (all JSON):
   `ChangeEvent` as JSON data (``{kind, path, version, origin}``)
 - M6 whiteboards (`whiteboardapi.whiteboard_router`): ``GET /api/whiteboard?path=`` ->
   ``{path, board, revision, readOnlyReason?}``; ``PUT /api/whiteboard``
-  ``{path, board, baseRevision, clientId?}`` -> ``{revision}`` (``409 {currentRevision}``,
-  ``422``, ``423``); ``GET /api/whiteboard/ink?path=`` -> ``{path, strokes, revision,
-  readOnlyReason?}``; ``PUT /api/whiteboard/ink`` ``{path, strokes, baseRevision, clientId?}``
-  -> ``{revision}``; ``POST /api/whiteboards`` ``{title?, clientId?}`` ->
-  ``201 {path, version, typeIds}``. Board and ink saves announce ``whiteboard`` with the
-  board's ``.md`` path. ``PUT /api/ui`` accepts ``whiteboard`` (the canvas display settings).
+  ``{path, board, baseRevision, clientId?}`` -> ``{revision, mdVersion}`` (``409
+  {currentRevision}``, ``422``, ``423``); ``GET /api/whiteboard/ink?path=`` -> ``{path,
+  strokes, revision, readOnlyReason?}``; ``PUT /api/whiteboard/ink`` ``{path, strokes,
+  baseRevision, clientId?}`` -> ``{revision, mdVersion}``; ``POST /api/whiteboards``
+  ``{title?, clientId?}`` -> ``201 {path, version, typeIds}``. Board and ink saves announce
+  ``whiteboard`` with the board's ``.md`` path; M9: they also stamp the ``.md``'s
+  ``lastUpdated`` (at most once a minute), announced ``changed`` with ``mdVersion``. ``PUT /api/ui`` accepts ``whiteboard`` (the canvas display settings).
   Deleting, restoring, purging and renaming a whiteboard carry its sidecar files; a rename
   relinks board files too (their sidecar paths are in ``relinked``, announced ``whiteboard``).
 - M8 (plan Task 2): ``POST /api/spaces`` also takes ``setup: 'blank' | 'basic'``; the
