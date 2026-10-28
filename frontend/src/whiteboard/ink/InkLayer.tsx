@@ -384,6 +384,7 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
           onPointerMove={onPointerMove}
           onPointerUp={(e) => end(e, false)}
           onPointerCancel={(e) => end(e, true)}
+          onLostPointerCapture={(e) => end(e, true)}
           onContextMenu={(e) => e.preventDefault()}
         />
       )}
