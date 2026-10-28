@@ -141,6 +141,8 @@ Gene asked on 2026-10-27 for every Capacities feature that M4–M7 deferred, loc
   - Task Stats shows only on recurring tasks
   - raw colour literals were replaced with tokens
 - Results, the "our choice" list and Gene's unchecked hand-checks are in `m8-acceptance.md`.
+- **Final gate green 2026-10-28 at `0e7c748`** (after the review fixes `f404324`, `0e7c748`): 1119 back-end tests passed (1 skipped); 1672 front-end tests passed in 279 files (1 skipped; "1MB body splits under 300ms" missed its timing under full-suite load and passed when rerun alone); `tsc -b --noEmit` clean; `npm run build` ok. `m1_roundtrip.py` PASS on a copy of `space-sample`. On `space-sample` and `space-v1`: `m2` 52/52 and 50/50, `m3` 14/14, `m4` 24/24, `m5` 18/18, `m6` 19/19, `m7` 23/23, `m8` 26/26, all PASS.
+- **Left for Gene:** the hands-on checks in `m8-acceptance.md` (left unchecked) and the "our choice" list there, plus the earlier M1–M7 hand-checks.
 
 ## Out of scope (by design)
 
