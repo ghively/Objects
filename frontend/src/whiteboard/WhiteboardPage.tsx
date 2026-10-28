@@ -292,6 +292,18 @@ export function WhiteboardPage({
     return () => clearTimeout(t)
   }, [notesToast])
 
+  // A failed ink save is told like a failed board save.
+  const inkSaveError = inkDoc.saveError ?? null
+  const [inkToast, setInkToast] = useState<string | null>(null)
+  useEffect(() => {
+    if (inkSaveError) setInkToast(inkSaveError)
+  }, [inkSaveError])
+  useEffect(() => {
+    if (!inkToast) return
+    const t = setTimeout(() => setInkToast(null), TOAST_MS)
+    return () => clearTimeout(t)
+  }, [inkToast])
+
   return (
     <WhiteboardHostContext.Provider value={host}>
       <BoardStoreContext.Provider value={store}>
@@ -345,12 +357,12 @@ export function WhiteboardPage({
             }
           />
           <Banners deleted={deleted} trashId={trashId} undoError={undoError} onBack={goBack} onUndo={() => void undoDelete()} />
-          {(toast || notesToast) && (
+          {(toast || notesToast || inkToast) && (
             <div
               role="status"
               className="absolute top-16 left-1/2 z-30 -translate-x-1/2 rounded-lg border border-line bg-raised-2 px-3 py-2 text-[13px]"
             >
-              {toast || notesToast}
+              {toast || notesToast || inkToast}
             </div>
           )}
           {footer && <div className="absolute bottom-4 left-4 z-10">{footer}</div>}

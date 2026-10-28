@@ -257,6 +257,23 @@ describe('WhiteboardCanvas', () => {
     expect(screen.queryByText('Nothing in this view')).toBeNull()
   })
 
+  test('the lost state counts ink in view and lets pointer input through around its card', async () => {
+    const { plugin } = fakeInk()
+    const far = board([node({ id: 'far', position: { x: 50000, y: 50000 }, width: 420, height: 60 })], [], {}, { viewport: { x: 0, y: 0, zoom: 1 } })
+    const inView = { ...stroke('s1'), points: [[100, 100, 0.5], [300, 300, 0.5]] as [number, number, number][] }
+    const withInk = renderCanvas({ doc: { board: far, strokes: [inView] }, ink: plugin })
+    await act(async () => {})
+    expect(screen.queryByText('Nothing in this view')).toBeNull()
+    withInk.unmount()
+
+    renderCanvas({ doc: { board: far, strokes: [] } })
+    await act(async () => {})
+    const lost = document.querySelector('[data-whiteboard-lost]') as HTMLElement
+    expect(lost).not.toBeNull()
+    expect(lost.className).toContain('pointer-events-none')
+    expect(screen.getByRole('button', { name: 'Back to content' }).parentElement!.className).toContain('pointer-events-auto')
+  })
+
   test('ink layer rendered only with a plugin, with the store strokes and tool', async () => {
     const without = renderCanvas({ doc: { board: board(), strokes: [stroke('s1')] } })
     await act(async () => {})
