@@ -1909,6 +1909,32 @@ class Space:
                 out[raw.path] = found
         return out
 
+    def _bystanders(self, rel: str, new_title: str) -> dict[str, dict[str, str]]:
+        """Links that reach another object by ``new_title``: path -> {target: where it resolves}.
+
+        Renaming ``rel`` to that name could make them resolve to it instead
+        (an exact title or the linking folder wins), so the rename rewrites the
+        ones that change to their old object's unambiguous link text.
+        """
+        names = {_fold(new_title), _fold(safe_filename(new_title))}
+        with self._lock:
+            raws = list(self._raw.values())
+        out: dict[str, dict[str, str]] = {}
+        for raw in raws:
+            text = (raw.of.frontmatter_src or "") + raw.of.body
+            if "[[" not in text:
+                continue
+            found: dict[str, str] = {}
+            for t in wikilink_targets(text):
+                if _fold(t) not in names:
+                    continue
+                was = self.resolve(t, raw.path)
+                if was is not None and was != rel:
+                    found[t] = was
+            if found:
+                out[raw.path] = found
+        return out
+
     @staticmethod
     def _relink_edit(targets: set[str], new_text: str) -> Edit:
         """Rewrite the links whose target is one of ``targets`` (exactly) to ``new_text``."""
@@ -2059,6 +2085,7 @@ class Space:
 
         referrers = self._referrers(rel, old_title)
         board_referrers = self._board_referrers(rel, old_title)
+        bystanders = self._bystanders(rel, new_title)
         whiteboard = self._is_whiteboard(rel)
 
         def edit(of: ObjectFile, _fm: dict) -> ObjectFile | None:
@@ -2116,6 +2143,21 @@ class Space:
                 if written is not None:
                     relinked.append(written)
                     self.rescan_file(at)  # the link index and search re-read the board
+        for ref in sorted(bystanders):
+            # Links that reached another object by the new name keep reaching it.
+            at = new_rel if ref == rel else ref
+            for target, was in sorted(bystanders[ref].items()):
+                if self.resolve(target, at) == was:
+                    continue
+                result = self._rewrite_other(
+                    at, self._relink_edit({target}, self._link_text(was, at))
+                )
+                if isinstance(result, Skip):
+                    skipped.append(result)
+                elif ref != rel and ref not in relinked:
+                    relinked.append(ref)
+                elif ref == rel:
+                    version = result
         if summary.type == "tag":
             self._rename_tag_lists(old_title, new_title, new_rel, relinked, skipped)
         return RenameResult(new_rel, version, relinked, skipped)
