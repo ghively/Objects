@@ -64,7 +64,7 @@ export function CalendarPage({ onOpenTarget }: CalendarPageProps) {
         </div>
       </div>
       {sidebarOpen && (
-        <aside aria-label="Calendar sidebar" className="h-full w-[300px] shrink-0 overflow-auto border-l border-line">
+        <aside aria-label="Calendar sidebar" className="h-full w-[26rem] shrink-0 overflow-auto border-l border-line">
           <CalendarSidePanel />
         </aside>
       )}

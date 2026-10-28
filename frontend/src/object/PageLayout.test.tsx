@@ -15,7 +15,6 @@ import { api } from '@/api/client'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPage } from './ObjectPage'
-import { MIN_SIDEPANEL_WIDTH } from '@/nav/sidepanel'
 import { MIN_CONTENT_WIDTH, PageLayout, PROPERTIES_BESIDE_WIDTH, PROPERTY_PANEL_WIDTH, propertiesBeside, type PanelVariant } from './PageLayout'
 
 const mocked = vi.mocked(api)
@@ -176,17 +175,9 @@ describe('narrow layouts', () => {
     expect((container.querySelector('[data-page-layout]') as HTMLElement).dataset.properties).toBeUndefined()
   })
 
-  test('test the main column keeps its minimum width and leaves the side panel its minimum', () => {
-    // index.css carries the shell's rule; its numbers are these constants.
+  test('test the main column has no minimum width rule (the side panel is a share of the card)', () => {
     const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8')
-    const rule = (sel: string) => {
-      const at = css.indexOf(`\n${sel} {`)
-      return at < 0 ? '' : css.slice(at, css.indexOf('}', at))
-    }
-    expect(rule('[data-main-column]')).toContain(`min-width: min(${MIN_CONTENT_WIDTH}px, calc(100% - ${MIN_SIDEPANEL_WIDTH}px))`)
-    expect(rule('[data-main-column]:has([data-page-layout][data-properties])')).toContain(
-      `min-width: min(${PROPERTIES_BESIDE_WIDTH}px, calc(100% - ${MIN_SIDEPANEL_WIDTH}px))`,
-    )
+    expect(css).not.toMatch(/\[data-main-column\][^{]*\{[^}]*min-width/)
   })
 })
 

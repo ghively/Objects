@@ -128,18 +128,3 @@
   min-width: 0;
   min-height: 0;
 }
-
-/*
- * The main column beside the side panel (shell/MainPanel.tsx, shell/SidePanel.tsx): it keeps
- * 480 px (object/PageLayout.tsx MIN_CONTENT_WIDTH), or 850 px (PROPERTIES_BESIDE_WIDTH: the
- * 370 px property panel plus 480 px) while a Standard page shows its property panel, but never
- * more than leaves the side panel its 320 px minimum (nav/sidepanel.ts MIN_SIDEPANEL_WIDTH).
- * The side panel shrinks first; below that the page puts its properties inline. Our choice: the
- * reference has no such rule.
- */
-[data-main-column] {
-  min-width: min(480px, calc(100% - 320px));
-}
-[data-main-column]:has([data-page-layout][data-properties]) {
-  min-width: min(850px, calc(100% - 320px));
-}
