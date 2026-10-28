@@ -125,5 +125,12 @@ def patch(root: Path, patch: dict[str, Any], base_revision: str | None) -> tuple
         data = {**data, **changes}
         payload = dump_json(data)
         path.parent.mkdir(parents=True, exist_ok=True)
-        atomic_write(path, payload)
+
+        def unchanged() -> None:
+            # An external edit since the read above is a conflict, never overwritten.
+            now = read(root)[1]
+            if now != current:
+                raise RevisionConflict(now)
+
+        atomic_write(path, payload, check=unchanged)
         return data, hashlib.sha256(payload).hexdigest()

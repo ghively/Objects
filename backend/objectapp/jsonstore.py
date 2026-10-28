@@ -165,8 +165,16 @@ class JsonStore:
             path.parent.mkdir(parents=True, exist_ok=True)
             previous = self.own_writes.get(rel)
             self.own_writes[rel] = revision
+
+            def unchanged() -> None:
+                # Re-check right before the replace: an external edit since the
+                # read above is a conflict, never overwritten.
+                now = self._load(path)[1]
+                if now != current:
+                    raise RevisionConflict(now)
+
             try:
-                atomic_write(path, payload)
+                atomic_write(path, payload, check=unchanged)
             except BaseException:
                 if previous is None:
                     self.own_writes.pop(rel, None)

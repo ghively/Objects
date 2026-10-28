@@ -396,3 +396,47 @@ def test_registry_keeps_a_corrupt_file_before_saving(tmp_path: Path):
     kept = sorted(p for p in state.iterdir() if p.name != "spaces.json")
     assert [p.read_bytes() for p in kept] == [corrupt]
     assert [e.path for e in reg.list()] == [str(root.resolve())]
+
+
+# -- JSON definition writes re-check the file right before replacing it --------------------
+
+
+def _edit_during_write(monkeypatch, module, path: Path, external: bytes) -> None:
+    """Make ``module.atomic_write`` see an external edit land just before its replace."""
+    from objectapp import textfile
+
+    def racing(target, data, check=None):
+        if Path(target) == path:
+            path.write_bytes(external)
+        textfile.atomic_write(target, data, check=check)
+
+    monkeypatch.setattr(module, "atomic_write", racing)
+
+
+def test_jsonstore_write_does_not_overwrite_an_external_edit(space_dir: Path, monkeypatch):
+    import pytest
+    from objectapp import jsonstore
+    from objectapp.typemodel import RevisionConflict
+
+    space = Space(space_dir)
+    store = space.store("collections")
+    revision = store.write("x", {"id": "x", "name": "X"}, "")
+    external = b'{"id": "x", "name": "Edited elsewhere"}\n'
+    _edit_during_write(monkeypatch, jsonstore, store.path("x"), external)
+    with pytest.raises(RevisionConflict):
+        store.write("x", {"id": "x", "name": "Mine"}, revision)
+    assert store.path("x").read_bytes() == external
+
+
+def test_spaceconfig_patch_does_not_overwrite_an_external_edit(space_dir: Path, monkeypatch):
+    import pytest
+    from objectapp import spaceconfig
+    from objectapp.typemodel import RevisionConflict
+
+    _data, revision = spaceconfig.patch(space_dir, {"name": "One"}, None)
+    path = space_dir / ".object" / "space.json"
+    external = b'{"name": "Edited elsewhere"}\n'
+    _edit_during_write(monkeypatch, spaceconfig, path, external)
+    with pytest.raises(RevisionConflict):
+        spaceconfig.patch(space_dir, {"name": "Two"}, revision)
+    assert path.read_bytes() == external
