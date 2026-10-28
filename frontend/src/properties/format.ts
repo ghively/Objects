@@ -119,9 +119,17 @@ export function parseNumberInput(s: string, fmt?: NumberFormat | null): number |
   if (usesRadixComma(fmt)) t = t.replace(/\./g, '').replace(/,/g, '.')
   else t = t.replace(/,/g, '')
   t = t.replace(/\s+/g, '')
-  if (t === '') return undefined
+  // A trailing "%": a percentage cell is edited in percent already; elsewhere it is the fraction.
+  const percent = t.endsWith('%')
+  if (percent) t = t.slice(0, -1)
+  // Plain decimals only: not "Infinity", "0x10" or "0b11", which `Number` would read.
+  if (!/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(t)) return undefined
   const n = Number(t)
-  return Number.isNaN(n) ? undefined : n
+  if (!Number.isFinite(n)) return undefined
+  if (!percent || fmt?.type === 'percentage') return n
+  // Shift in decimal (14.3 → 0.143, not 14.3 / 100).
+  const [mantissa, exp] = String(n).split('e')
+  return Number(`${mantissa}e${Number(exp ?? 0) - 2}`)
 }
 
 const formatters = new Map<string, Intl.DateTimeFormat>()
