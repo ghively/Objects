@@ -141,6 +141,52 @@ def test_permanent_delete_needs_428_then_rechecks_folder(
     assert current.is_dir()
 
 
+def test_permanent_delete_refuses_folder_replaced_after_428(
+    tmp_path: Path, state: Path, monkeypatch
+):
+    """The 428 names the folder; a folder swapped in before the confirm is refused (409)."""
+    monkeypatch.setenv("OBJECT_FAKE_TRASH_FILE", "unavailable")
+    current = _space(tmp_path, "current")
+    other = _space(tmp_path, "other")
+    Registry(state).register(other, touch=False)
+    with _client(current) as client:
+        r = client.post("/api/spaces/delete", json={"path": str(other)})
+        assert r.status_code == 428, r.text
+        token = r.json()["folder"]
+        st = os.stat(other)
+        assert token == f"{st.st_dev}:{st.st_ino}"
+
+        # the user replaces the folder between the 428 and the confirm
+        shutil.move(str(other), str(tmp_path / "original"))
+        _space(tmp_path, "other")
+        (other / "Pages" / "Replacement.md").write_bytes(b"keep me\n")
+        assert os.stat(other).st_ino != st.st_ino
+
+        r = client.post(
+            "/api/spaces/delete", json={"path": str(other), "permanent": True, "folder": token}
+        )
+        assert r.status_code == 409, r.text
+    assert (other / "Pages" / "Replacement.md").read_bytes() == b"keep me\n"
+    assert (other / "Pages" / "Note.md").is_file()
+    assert (tmp_path / "original" / "Pages" / "Note.md").is_file()
+    assert str(other.resolve()) in _registered(state)
+
+
+def test_permanent_delete_with_matching_token_deletes(tmp_path: Path, state: Path, monkeypatch):
+    monkeypatch.setenv("OBJECT_FAKE_TRASH_FILE", "unavailable")
+    current = _space(tmp_path, "current")
+    other = _space(tmp_path, "other")
+    Registry(state).register(other, touch=False)
+    with _client(current) as client:
+        token = client.post("/api/spaces/delete", json={"path": str(other)}).json()["folder"]
+        r = client.post(
+            "/api/spaces/delete", json={"path": str(other), "permanent": True, "folder": token}
+        )
+        assert r.status_code == 200, r.text
+        assert r.json() == {"trashed": False}
+    assert not other.exists()
+
+
 def test_permanent_recheck_refuses_folder_that_lost_capacities(
     tmp_path: Path, state: Path, monkeypatch
 ):

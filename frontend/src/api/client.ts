@@ -87,10 +87,13 @@ export class RevisionConflictError extends ConflictError {
 /** 428: the write needs `confirm: true`; `affected` files would change. Nothing was written. */
 export class ConfirmRequiredError extends ApiError {
   readonly affected: number
-  constructor(message: string, affected: number) {
+  /** M8: the space folder's identity token (`POST /spaces/delete`), sent back with the confirm. */
+  readonly folder: string | null
+  constructor(message: string, affected: number, folder: string | null = null) {
     super(428, message)
     this.name = 'ConfirmRequiredError'
     this.affected = affected
+    this.folder = folder
   }
 }
 
@@ -206,7 +209,7 @@ async function request<T>(path: string, init?: RequestInit, on409?: (d: Record<s
   if (res.status === 423) throw new ReadOnlyError(String(d.reason ?? (typeof d.detail === 'string' ? d.detail : 'read-only')))
   if (res.status === 428) {
     const message = typeof d.detail === 'string' ? d.detail : 'Confirmation required'
-    throw new ConfirmRequiredError(message, Number(d.affected ?? 0))
+    throw new ConfirmRequiredError(message, Number(d.affected ?? 0), typeof d.folder === 'string' ? d.folder : null)
   }
   const detail = data && typeof data === 'object' ? (data as Record<string, unknown>).detail : undefined
   // 400/404 carry the server's message as {detail: "..."}.
@@ -935,11 +938,14 @@ export const api = {
 
   /**
    * Delete a space folder that is not the current one: to the OS trash, or (`permanent`, after a
-   * 428 `ConfirmRequiredError` said the trash is unavailable) for good. 404, 409 the current space.
+   * 428 `ConfirmRequiredError` said the trash is unavailable) for good. Pass the 428's `folder`
+   * token back as `folder`: the server answers 409 when the folder was replaced in between.
+   * 404, 409 the current space.
    */
-  deleteSpace(path: string, opts: { permanent?: boolean } = {}): Promise<{ trashed: boolean }> {
+  deleteSpace(path: string, opts: { permanent?: boolean; folder?: string } = {}): Promise<{ trashed: boolean }> {
     const body: Record<string, unknown> = { path }
     if (opts.permanent) body.permanent = true
+    if (opts.folder) body.folder = opts.folder
     return request<{ trashed: boolean }>('/spaces/delete', json('POST', body), spaceConflict)
   },
 

@@ -2,7 +2,8 @@
  * "Delete this space?": deletes a space folder that is not the current one through
  * `POST /api/spaces/delete`. The folder goes to the OS trash; when the trash is unavailable the
  * server answers 428 and the dialog's second step adds "This can't be undone." and sends
- * `permanent: true` (the server re-checks it is still the same folder). Either way the space
+ * `permanent: true` with the 428's folder identity token (the server refuses with 409 when the
+ * folder was replaced in between, and re-checks it is still the same folder). Either way the space
  * leaves the list. The current space is never offered (switch away from it first; our choice).
  */
 import { useEffect, useState } from 'react'
@@ -41,11 +42,14 @@ export interface DeleteSpaceDialogProps {
 
 export function DeleteSpaceDialog({ entry, onClose, onDeleted }: DeleteSpaceDialogProps) {
   const [permanent, setPermanent] = useState(false)
+  /** The 428's folder identity token, sent back with the permanent delete. */
+  const [folder, setFolder] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setPermanent(false)
+    setFolder(null)
     setBusy(false)
     setError(null)
   }, [entry?.path])
@@ -55,11 +59,17 @@ export function DeleteSpaceDialog({ entry, onClose, onDeleted }: DeleteSpaceDial
     setBusy(true)
     setError(null)
     try {
-      const res = await api.deleteSpace(entry.path, permanent ? { permanent: true } : {})
+      const res = await api.deleteSpace(
+        entry.path,
+        permanent ? (folder ? { permanent: true, folder } : { permanent: true }) : {},
+      )
       onDeleted(entry.path, res.trashed)
       onClose()
     } catch (e) {
-      if (e instanceof ConfirmRequiredError && !permanent) setPermanent(true)
+      if (e instanceof ConfirmRequiredError && !permanent) {
+        setFolder(e.folder)
+        setPermanent(true)
+      }
       else setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
