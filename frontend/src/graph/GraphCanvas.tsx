@@ -12,7 +12,16 @@ import type { VisibleGraph } from './filterGraph'
 import { useThemeName } from '@/theme/applyTheme'
 import type { ThemeColor } from '@/theme/palette'
 import type { GraphRenderer } from './exportPng'
-import { canvasColors, colorValue, edgeStyle, nodeColor, nodeSize, type EdgeKind } from './graphStyle'
+import {
+  canvasColors,
+  colorValue,
+  edgeStyle,
+  nodeColor,
+  nodeSize,
+  REDUCED_NODE_COLOR,
+  REDUCED_NODE_SIZE,
+  type EdgeKind,
+} from './graphStyle'
 import { runLayout } from './layout'
 
 export interface GraphCanvasProps {
@@ -44,6 +53,8 @@ interface NodeAttrs {
   highlighted?: boolean
   forceLabel?: boolean
   zIndex?: number
+  /** A reduced node (see `filterGraph`): labelled only around a hover. */
+  reduced?: boolean
 }
 
 interface EdgeAttrs {
@@ -149,6 +160,7 @@ export function GraphCanvas({
             res.forceLabel = true
             res.zIndex = 2
           }
+          if (attrs.reduced && !res.forceLabel) res.label = ''
           return res
         },
         edgeReducer: (edge, attrs) => {
@@ -199,6 +211,17 @@ export function GraphCanvas({
         y: 0,
       })
     }
+    // Reduced nodes (kept by a filter only to carry links): smallest size, gray, unlabelled.
+    for (const i of visible.reduced) {
+      const key = String(i)
+      if (!graph.hasNode(key)) continue
+      graph.mergeNodeAttributes(key, {
+        size: REDUCED_NODE_SIZE,
+        color: colorValue(REDUCED_NODE_COLOR),
+        themeColor: REDUCED_NODE_COLOR,
+        reduced: true,
+      })
+    }
     keyByPath.current = keys
     const add = (pairs: [number, number][], kind: EdgeKind) => {
       const style = edgeStyle(kind)
@@ -211,7 +234,6 @@ export function GraphCanvas({
     }
     add(visible.links, 'link')
     add(visible.tagLinks, 'tag')
-    add(visible.indirect, 'indirect')
 
     const ctrl = new AbortController()
     layoutRef.current?.({ running: true, progress: 0 })
@@ -276,7 +298,8 @@ export function GraphCanvas({
       className="graph-canvas"
       data-testid="graph-canvas"
       data-node-count={visible.nodes.length}
-      data-edge-count={visible.links.length + visible.indirect.length + visible.tagLinks.length}
+      data-edge-count={visible.links.length + visible.tagLinks.length}
+      data-reduced-count={visible.reduced.length}
       onMouseLeave={() => {
         if (hovered.current) {
           hovered.current = null

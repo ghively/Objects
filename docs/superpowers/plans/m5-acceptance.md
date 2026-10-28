@@ -106,7 +106,7 @@ Run `npm run build`, then `uv run objectapp --space <copy of backend/tests/fixtu
 - [ ] Find in page from the `…` menu and with Ctrl+F: match case, whole word, next and previous, replace, replace all, then `git diff`.
 - [ ] The references section on Ada Lovelace: all five tabs, hiding the section by clicking the active tab, linking a mention, then `git diff`.
 - [ ] The backlinks property in the panel, as a table column, as a backlinks filter and as a group; the "No backlinks" Overview section; the Tasks page Context tab with a task linked from a page.
-- [ ] The global graph: filters, tags network, search, fit and click to peek. The local graph: hops "Show more" / "Show less".
+- [ ] The global graph: filters, tags network, search, fit and click to peek. The local graph: "Maximum distance" 1 to 5 (default 1) with separate "Show less" / "Show more" buttons, as Capacities (`GraphViewHopChrome`, `hops` 1–5).
 - [ ] On the `--big` copy: the global graph's pan and zoom, and typing in the palette at 5,000 objects.
 
 ### On the CPI copy (outside the repo, `git init` done there)
@@ -124,9 +124,8 @@ Note what Capacities does differently, so a fix pass can follow.
 - [ ] Search highlight colour, now from the reference (`index36682.css`, `storing36682.js`; see `reference-check-2026-10-28.md` §3a): light themes `#fef08a4b` with yellow 900 text, dark themes `#fddf472c` with yellow 100 text; find in page `#facc1573` for every match and `#f97316b3` for the current one, text colour inherited; palette result titles in the 600-weight `search-highlights-bold` variant. Weight 500 and radius 1px come from the reference CSS.
 - [ ] Graph:
   - node sizes (`3 + 2·sqrt(degree)`, capped at 18) and colours (type colour; tags in their tag colour)
-  - indirect links drawn thin (0.6) at about 22% alpha, not dashed (sigma 3 has no dashed edges)
-  - the 10-neighbour cap
-  - `LARGE_NODE_LIMIT = 100`
+  - now from the reference (`reference-check-2026-10-28.md` §3b): no synthesized indirect links and no neighbour cap; filtered-out objects (type filter, exclude, "Hide dates") stay as reduced nodes, edges between two reduced nodes are dropped, reduced nodes with one neighbour or none are pruned, and "Hide indirect links" removes them all. How reduced nodes are drawn is still our choice: smallest size, gray, unlabelled until hovered.
+  - now from the reference: `LARGE_NODE_LIMIT = 20` (links + backlinks); a large node stays but draws none of its own edges, and the local graph doesn't walk on from it. A tag with 10 or more backlinks doesn't draw its backlink edges (the API's `linkDirs` tells links from backlinks).
   - "Show tags network" offered on a local graph only when the centre is a Tag
 - [ ] The palette's type and tag option matching (prefix, word-prefix, or substring of 3+ characters), the cap of 5 tag options and 10 Recently Opened, and the way picking an option removes the words that named it.
 - [ ] Find bar icons: an underlined "ab" for whole word, `ph-text-aa` for match case. The bar shows Replace even in read-only editors, where it does nothing.
