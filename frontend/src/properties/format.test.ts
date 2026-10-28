@@ -59,6 +59,20 @@ describe('progressFraction', () => {
   })
 })
 
+describe('parseNumberInput accepts decimals only', () => {
+  it('rejects Infinity and hex, reads a percent sign', () => {
+    expect(parseNumberInput('Infinity')).toBeUndefined()
+    expect(parseNumberInput('-Infinity')).toBeUndefined()
+    expect(parseNumberInput('0x10')).toBeUndefined()
+    expect(parseNumberInput('0b11')).toBeUndefined()
+    expect(parseNumberInput('1e3')).toBe(1000)
+    expect(parseNumberInput('.5')).toBe(0.5)
+    // A percentage cell is edited in percent; elsewhere "50%" is the fraction.
+    expect(parseNumberInput('50%', fmt('percentage'))).toBe(50)
+    expect(parseNumberInput('14.3 %')).toBe(0.143)
+  })
+})
+
 describe('parseNumberInput', () => {
   it('test parseNumberInput', () => {
     expect(parseNumberInput('')).toBeNull()
