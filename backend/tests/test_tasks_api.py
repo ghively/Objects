@@ -401,6 +401,36 @@ def test_remove_recurrence_removes_log(client: TestClient, m8_space_dir: Path):
     assert added == {"lastUpdated"}
 
 
+def test_delete_log_entry_changes_only_its_line(client: TestClient, m8_space_dir: Path):
+    """The Completion Log's delete writes the remaining lines: the block keeps its style."""
+    rel = "Tasks/Water plants.md"
+    path = m8_space_dir / rel
+    path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))  # CRLF is kept too
+    before = path.read_bytes()
+    lines = _log(m8_space_dir, rel)
+    assert len(lines) == 3
+    kept = [lines[0], lines[2]]
+    r = client.put(
+        "/api/object/properties",
+        json={"path": rel, "updates": {"occurrenceLog": "\n".join(kept)},
+              "baseVersion": _version(client, rel)},
+    )  # fmt: skip
+    assert r.status_code == 200, r.text
+    after = path.read_bytes()
+    a, b = before.split(b"\r\n"), after.split(b"\r\n")
+    changes = [
+        (op, a[i1:i2], b[j1:j2])
+        for op, i1, i2, j1, j2 in difflib.SequenceMatcher(a=a, b=b).get_opcodes()
+        if op != "equal"
+    ]
+    assert [c for c in changes if not c[1][0].startswith(b"lastUpdated:")] == [
+        ("delete", [b"  " + lines[1].encode()], [])
+    ]
+    assert after.count(b"\r\n") == before.count(b"\r\n") - 1
+    assert b"\n" not in after.replace(b"\r\n", b"")
+    assert _log(m8_space_dir, rel) == kept
+
+
 def test_topup_adds_occurrence_log_once(space: Space, m8_space_dir: Path):
     path = m8_space_dir / ".object" / "types" / "task.json"
     stored = path.read_bytes()
