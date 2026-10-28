@@ -221,6 +221,24 @@ describe('paragraphs with URLs and entities', () => {
   })
 })
 
+describe('reference links and footnotes', () => {
+  test.each([
+    ['see [a][r] x', '[r]: http://x'],
+    ['see [a][] x', '[a]: http://x'],
+    ['See[^1] x', '[^1]: note'],
+  ])('%j keeps its brackets when edited', (line, def) => {
+    const editor = headless(`${line}\n\n${def}\n`)
+    append(editor, 'x', 'Y')
+    expect(serializeBody(editor)).toBe(`${line}Y\n\n${def}\n`)
+  })
+
+  test('other brackets are still escaped', () => {
+    const editor = headless('P\n')
+    setParagraph(editor, 'a [b] c')
+    expect(serializeBody(editor)).toBe('a \\[b\\] c\n')
+  })
+})
+
 describe('lines with ::', () => {
   test.each([
     ['Use std::vector here', 'paragraph'],
