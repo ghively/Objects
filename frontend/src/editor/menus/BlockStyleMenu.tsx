@@ -45,9 +45,11 @@ import {
   clearBlockSelection,
   forEachTargetBlock,
   indentBlocks,
+  setOptionOnBlocks,
+  targetRange,
   withTargetSelection,
 } from '../extensions/blockSelection'
-import { blockChain, type Hierarchy, type ListType } from '../nodes/blockOptions'
+import { blockChain, optionApplies, type Hierarchy, type ListType } from '../nodes/blockOptions'
 import { currentItemOptions, listItemAt } from '../nodes/listItemOptions'
 import {
   BLOCK_COLORS,
@@ -76,7 +78,17 @@ export const T = {
   icon: 'Icon', // ControlDropdown.custom.block_icon.name
   indent: 'Indent', // tokensMenu.indent.shortName
   unindent: 'Unindent', // tokensMenu.unindent.shortName
+  alignment: 'Alignment', // EditorPanel.shortLabels.alignment
 }
+
+export type BlockAlign = 'left' | 'center' | 'right'
+
+/** Object's alignment items (`shortcuts.textAlign*.name`, icons `ph-text-align-*-bold`); left is the default, never written. */
+export const ALIGN_ITEMS: readonly { align: BlockAlign; name: string; icon: string }[] = [
+  { align: 'left', name: 'Align text left', icon: 'ph-text-align-left-bold' },
+  { align: 'center', name: 'Text align center', icon: 'ph-text-align-center-bold' },
+  { align: 'right', name: 'Text align right', icon: 'ph-text-align-right-bold' },
+]
 
 /** Whether the menu acts on one list item: the caret is in an item and there is no block selection. */
 export function inListItem(editor: Editor): boolean {
@@ -255,6 +267,26 @@ export function setBlocksIcon(editor: Editor, icon: string | null): boolean {
   editor.commands.focus()
   if (inListItem(editor)) return editor.commands.setListItemOptions({ icon })
   return forEachTargetBlock(editor, (e) => e.commands.setBlockOption('icon', icon))
+}
+
+/**
+ * The alignment the block menu offers for the target blocks: the first target block's
+ * (or the list item's) current alignment, or null when no target block takes `align`.
+ */
+export function currentAlignment(editor: Editor): BlockAlign | null {
+  const value = (v: string | true | undefined): BlockAlign => (v === 'center' || v === 'right' ? v : 'left')
+  if (inListItem(editor)) return value(itemOption(editor, 'align'))
+  const blocks = targetRange(editor.state)?.blocks ?? []
+  const first = blocks.find((b) => optionApplies('align', b.node))
+  return first ? value(optionOf(first.node, 'align')) : null
+}
+
+/** Align the target blocks that take `align` (a list item at the caret: that item); left removes the option. */
+export function setBlocksAlignment(editor: Editor, align: BlockAlign): boolean {
+  const value = align === 'left' ? null : align
+  editor.commands.focus()
+  if (inListItem(editor)) return editor.commands.setListItemOptions({ align: value })
+  return setOptionOnBlocks(editor, 'align', value)
 }
 
 /** Put the caret at the start of the child at `index` of the block parent whose content starts at `parentStart`. */
@@ -466,10 +498,13 @@ export function BlockStyleMenu({ editor, onDone }: BlockStyleMenuProps) {
 /**
  * Object's own rows, kept because nothing else reaches them: block colour
  * with its "Remove … color" items (the slash menu only sets a colour),
- * the quote's standout layout, and indenting non-list blocks.
+ * "Alignment" ▸ (M9; Object offers alignment only for table cells, and Object's
+ * block alignment has no keys, so this is its one entry point; shown only when a
+ * target block takes `align`), the quote's standout layout, and indenting non-list blocks.
  */
 export function BlockStyleExtras({ editor }: { editor: Editor }) {
   const style = currentBlockStyle(editor)
+  const align = currentAlignment(editor)
   const subClass = 'max-h-[420px] overflow-auto'
   return (
     <>
@@ -490,6 +525,20 @@ export function BlockStyleExtras({ editor }: { editor: Editor }) {
           </DropdownMenuSub>
         </DropdownMenuSubContent>
       </DropdownMenuSub>
+      {align && (
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>{T.alignment}</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {ALIGN_ITEMS.map((a) => (
+              <DropdownMenuItem key={a.align} onSelect={() => setBlocksAlignment(editor, a.align)}>
+                <RowIcon icon={a.icon} />
+                {a.name}
+                <Check on={align === a.align} />
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      )}
       <DropdownMenuItem onSelect={() => setStandout(editor, !style.standout)}>
         {T.standout}
         <Check on={style.standout} />
