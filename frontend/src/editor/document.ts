@@ -168,7 +168,11 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
 type Edges = { leading: string; trailing: string; eol: string; final: string }
 const edges = new WeakMap<Editor, Edges>()
 
-const FIELD_LINE = /^[^\s:][^:\n]*::/m
+/**
+ * A `Key:: value` field line (kept raw). The `::` is followed by a blank or the
+ * line end, so `std::vector` or `a::b` in text is not one.
+ */
+const FIELD_LINE = /^[^\s:][^:\n]*::(?:[ \t]|$)/m
 const RAW_KINDS = new Set(['html', 'def', 'raw', 'text'])
 const CONTAINERS = new Set(['toggle', 'group', 'columns', 'indent'])
 /** Leaf types whose Markdown this module writes itself (`customMarkdown`). */

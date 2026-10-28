@@ -221,6 +221,20 @@ describe('paragraphs with URLs and entities', () => {
   })
 })
 
+describe('lines with ::', () => {
+  test.each([
+    ['Use std::vector here', 'paragraph'],
+    ['- a::b\n- c', 'bulletList'],
+    ['| a | b |\n|---|---|\n| x::y | z |', 'table'],
+  ])('%j is not a field line', (body, type) => {
+    expect(shape(headless(body + '\n')).map(([t]) => t)).toEqual([type])
+  })
+
+  test.each(['Status:: Active', 'Owner:: [[Ada]]', 'Due date::'])('%j stays a raw field line', (line) => {
+    expect(shape(headless(line + '\n')).map(([t]) => t)).toEqual(['rawBlock'])
+  })
+})
+
 describe('headings', () => {
   test.each([
     [' #', '## Title \\#'],
