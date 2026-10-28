@@ -1538,6 +1538,10 @@ class Space:
                 return Skip(rel, "The file no longer exists")
             except PermissionError as exc:  # e.g. locked by another program
                 return Skip(rel, f"The file could not be written: {exc.strerror or exc}")
+            except FrontmatterError:
+                # One file the edit can't rewrite must not stop the caller's
+                # loop over the others (a rename would stop halfway).
+                return Skip(rel, "The file's frontmatter could not be rewritten")
         raise AssertionError("unreachable")
 
     @staticmethod
