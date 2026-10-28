@@ -165,7 +165,7 @@ Run these on his CPI copy outside the repo, with `git init` and a first commit d
 - [ ] the code preview's default ("Display")
 - [ ] the column add and remove controls
 - [ ] the PDF's default height
-- [ ] the slash menu's grouping and look
+- [ ] the slash menu's grouping and look (order, icons, search-only colour and Mermaid items, descriptions as hover tooltips and the 22rem width now follow Capacities' CreateMenu: reference check 2026-10-28, 2d; "Create bookmark" and "Reuse any content" are still ours)
 - [ ] the block menu's look
 - [ ] the rules listed under "Rules the build chose" above
 
