@@ -259,9 +259,10 @@ function matchText(kind: PropertyType, value: unknown, f: Filter, title?: string
 
 function matchNumber(value: unknown, f: Filter): boolean {
   const n = typeof value === 'number' && !Number.isNaN(value) ? value : undefined
-  const ref = typeof f.referenceValue === 'number' ? f.referenceValue : undefined
+  const ref = typeof f.referenceValue === 'number' && !Number.isNaN(f.referenceValue) ? f.referenceValue : undefined
+  // A filter with no value yet is inactive, as an empty text filter is.
+  if (ref === undefined) return true
   if (n === undefined) return f.option === 'notEqual'
-  if (ref === undefined) return false
   switch (f.option) {
     case 'equal':
       return n === ref
