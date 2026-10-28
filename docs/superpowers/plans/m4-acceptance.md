@@ -64,7 +64,7 @@ Run `npm run build`, then `uv run objectapp --space <copy of backend/tests/fixtu
 
 ### Calendar
 
-- [ ] All four views (Day, Three days, Week, Month); the pager, Today, Shift+Today and the arrow keys in each view (the shortcut keys are ours; see Task 12's deviations).
+- [ ] All four views (Day, Three days, Week, Month); the pager, Today, Shift+Today and the arrow keys in each view. M, W, R, D, T and ←/→ are Capacities' calendar keys (its shortcut table; `reference-check-2026-10-28.md` §1). ↑/↓ (previous/next higher unit) have no key in Capacities' table; they stay ours until Gene decides.
 - [ ] The mini month: month and year dropdowns, today, the daily-note dots; the Day header and week numbers around a Sunday and the year boundary.
 - [ ] "+ Daily Note", typing in the inline note, the Reviewed button, an external edit of the note in VS Code appearing in the page, a daily note template.
 - [ ] The Day sections and tabs, quick-create chips (including a `createOnce` type and a hidden type), a dated object with a range on each of its days, "Move all open tasks to".

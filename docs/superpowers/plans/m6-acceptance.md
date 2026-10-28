@@ -182,7 +182,7 @@ Run `npm run build`, then `uv run objectapp --space <copy of backend/tests/fixtu
 
 ### Decisions made without a reference
 
-- [ ] Our shortcut keys (the plan's table).
+- [ ] The shortcut keys are Capacities' own (its whiteboard table and canvas key handler; `reference-check-2026-10-28.md` §1): V, H, T, L, Shift+L (arrow), R, O, P (triangle), F, ] and [ (front and back), Ctrl+] and Ctrl+[, Ctrl+G (wrap in frame), Ctrl+Arrow (resize), and a nudge of 1 px, or 30 px with Shift or while snap to grid is on. Pen D, highlighter Shift+D and eraser E are ours: Object-only tools, kept off Capacities' P (triangle) and M (move menu).
 - [ ] Frames dragging their contents.
 - [ ] 9 of the 12 shapes in the picker.
 - [ ] Board edits don't bump `lastUpdated`.
