@@ -2,8 +2,14 @@ import shutil
 from pathlib import Path
 
 import pytest
+from objectapp import server as _server
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+# Starlette's TestClient sends ``Host: testserver``; the app answers only loopback hosts
+# (audit 2026-10-28 #1), so the test suite adds that name. `test_local_origin` checks the
+# production set with a 127.0.0.1 client.
+_server.allowed_hosts = _server.LOOPBACK_HOSTS | {"testserver"}
 
 # Folders added to `space-sample` for the M2 acceptance run (plan Task 20). The unit
 # tests were written against the M1 sample, which has none of them (several check

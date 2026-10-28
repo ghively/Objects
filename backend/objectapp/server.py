@@ -500,6 +500,71 @@ def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse({"detail": message}, status_code=status)
 
 
+# The host names this app answers to. Any other ``Host`` is a DNS-rebinding page
+# (a foreign name resolved to 127.0.0.1), refused on every request. The port is not
+# checked: the Vite dev server proxies with its own port in ``Host``. Tests add
+# Starlette's ``testserver`` in conftest.
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+allowed_hosts: frozenset[str] = LOOPBACK_HOSTS
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+# Routes whose body is raw file bytes: they need ``application/octet-stream``, which a
+# cross-site page can only send after a CORS preflight this app never grants.
+_UPLOAD_ROUTES = frozenset({"/api/images", "/api/attachments"})
+
+
+def _host_name(host: str) -> str | None:
+    """The host name in a ``Host`` header (lower-case, IPv6 without brackets), else None."""
+    host = host.strip().lower()
+    if host.startswith("["):
+        end = host.find("]")
+        rest = host[end + 1 :]
+        if end < 0 or (rest and not (rest.startswith(":") and rest[1:].isdigit())):
+            return None
+        return host[1:end]
+    name, _sep, port = host.partition(":")
+    if port and not port.isdigit():
+        return None
+    return name or None
+
+
+def _local_only_problem(scope: dict[str, Any]) -> tuple[int, str] | None:
+    """Why `scope` must be refused (status, message), else None. See `LOOPBACK_HOSTS`."""
+    headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope["headers"]}
+    host = headers.get("host", "")
+    if _host_name(host) not in allowed_hosts:
+        return 403, "Object only answers on 127.0.0.1 or localhost."
+    method = scope.get("method", "GET") if scope["type"] == "http" else "GET"
+    origin = headers.get("origin")
+    if scope["type"] == "websocket" or method not in _SAFE_METHODS:
+        # Browsers send Origin on every cross-origin write; it must be this page's.
+        if origin is not None and origin.lower() != f"http://{host.strip().lower()}":
+            return 403, "Changes are only accepted from Object's own window."
+    if method == "POST" and scope.get("path") in _UPLOAD_ROUTES:
+        ctype = headers.get("content-type", "").split(";")[0].strip().lower()
+        if ctype != "application/octet-stream":
+            return 415, "Uploads must be sent as application/octet-stream."
+    return None
+
+
+class LocalOnlyMiddleware:
+    """Refuses DNS-rebinding hosts, cross-origin writes and "simple" uploads (pure ASGI,
+    so Server-Sent Events stream through untouched)."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] in ("http", "websocket"):
+            problem = _local_only_problem(scope)
+            if problem is not None:
+                if scope["type"] == "websocket":
+                    await send({"type": "websocket.close", "code": 1008})
+                    return
+                await _error(*problem)(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
 def _views_problem(views: dict[str, Any]) -> str | None:
     """Why a PUT /api/views body is not a Views object, else None."""
     if "activeTab" in views and not isinstance(views["activeTab"], str):
@@ -688,6 +753,7 @@ def create_app(
     app = FastAPI(
         title="Object", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
     )
+    app.add_middleware(LocalOnlyMiddleware)
     app.state.space = space
     app.state.hub = hub
     app.state.reminders = scheduler
