@@ -355,12 +355,21 @@ function ValueEditor({
     )
   }
   if (kind === 'number') {
+    // A percentage stores the fraction (0.25): its filter value is typed and shown in percent (25).
+    const pct = (choice.def as PropertyDef).options?.numberFormat?.type === 'percentage'
+    const shift = (n: number, by: number) => {
+      const [mantissa, exp] = String(n).split('e')
+      return Number(`${mantissa}e${Number(exp ?? 0) + by}`)
+    }
     return (
       <input
         aria-label="Value"
         type="number"
-        value={typeof ref === 'number' ? ref : ''}
-        onChange={(e) => set(e.target.value === '' ? undefined : Number(e.target.value))}
+        value={typeof ref === 'number' ? (pct ? shift(ref, 2) : ref) : ''}
+        onChange={(e) => {
+          const n = e.target.value === '' ? undefined : Number(e.target.value)
+          set(n === undefined || Number.isNaN(n) ? undefined : pct ? shift(n, -2) : n)
+        }}
         className={cn(SELECT, 'w-28')}
       />
     )
