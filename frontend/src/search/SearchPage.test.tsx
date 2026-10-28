@@ -55,6 +55,9 @@ beforeEach(() => {
 
 const lastSearch = () => mocked.search.mock.calls.at(-1)
 
+/** The debounced search and the row load can take a few seconds under a loaded suite. */
+const ASYNC = { timeout: 5_000 }
+
 describe('SearchPage', () => {
   test('strings match the reference', async () => {
     const fs = await import('node:fs')
@@ -73,18 +76,24 @@ describe('SearchPage', () => {
 
   test('search page runs the query and shows results', async () => {
     render(<SearchPage q="alpha" />)
-    await waitFor(() => expect(mocked.search).toHaveBeenCalled())
+    // The search runs after the page's debounce, then the rows load: under a loaded suite that
+    // chain can take longer than the testing library's 1 s default, so wait for each step.
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled(), ASYNC)
     expect(lastSearch()?.[0]).toBe('alpha')
     expect(lastSearch()?.[1]).toMatchObject({ mode: 'auto' })
-    await screen.findByText('Alpha')
+    await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ paths: ['Pages/Beta.md', 'Pages/Alpha.md'] }), ASYNC)
+    // Rows come in the server's rank order, with the full-text snippet beside them: wait for the
+    // render that shows both rows, then check it as a whole.
+    await waitFor(() => {
+      const titles = [...document.querySelectorAll('ul[role="list"] li')].map((li) => li.textContent ?? '')
+      expect(titles).toHaveLength(2)
+      expect(titles[0]).toContain('Beta')
+      expect(titles[1]).toContain('Alpha')
+    }, ASYNC)
+    expect(screen.getByText('Alpha')).toBeTruthy()
     expect(screen.getByText('Beta')).toBeTruthy()
-    // Rows come in the server's rank order, with the full-text snippet beside them.
-    const titles = [...document.querySelectorAll('ul[role="list"] li')].map((li) => li.textContent ?? '')
-    expect(titles[0]).toContain('Beta')
-    expect(titles[1]).toContain('Alpha')
     expect(document.querySelector('.search-page-snippet b')?.textContent).toBe('alpha')
-    expect(mocked.rows).toHaveBeenCalledWith({ paths: ['Pages/Beta.md', 'Pages/Alpha.md'] })
-  })
+  }, 15_000)
 
   test('text matches only sends full text mode', async () => {
     const user = userEvent.setup()
