@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { Row, ViewState } from '@/api/types'
+import type { Row, UpdateResult, ViewState } from '@/api/types'
 import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
 
 let dragEnd: ((e: unknown) => void) | undefined
@@ -63,7 +63,15 @@ const kanban = (patch: Partial<ViewState> = {}): ViewState => ({
   ...patch,
 })
 
-function Harness({ init = kanban(), patchRow }: { init?: ViewState; patchRow?: (p: string, r: Row) => void }) {
+function Harness({
+  init = kanban(),
+  patchRow,
+  onWritten,
+}: {
+  init?: ViewState
+  patchRow?: (p: string, r: Row) => void
+  onWritten?: (r: Row, res: UpdateResult) => void
+}) {
   const [state, setState] = useState(init)
   return (
     <DataView
@@ -74,6 +82,7 @@ function Harness({ init = kanban(), patchRow }: { init?: ViewState; patchRow?: (
       onState={setState}
       layouts={['list', 'kanban']}
       patchRow={patchRow}
+      onWritten={onWritten}
     />
   )
 }
@@ -102,6 +111,26 @@ describe('KanbanLayout', () => {
     const done = columns()[1].getAttribute('data-group')
     dragEnd?.({ active: { id: 'Tasks/T1.md' }, over: { id: `col:${done}` } })
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/T1.md', { status: ['Done'] }, 'v7'))
+  })
+
+  test('test kanban drop calls onWritten with the update result', async () => {
+    const patch = vi.fn()
+    const onWritten = vi.fn()
+    const res: UpdateResult = { version: 'v8', frontmatter: {}, links: {}, synced: [], skipped: [], task: { completed: true, advanced: false } }
+    const fresh = mk(1, ['Done'], 'v8')
+    mocked.updateProperties.mockResolvedValueOnce(res)
+    mocked.rows.mockResolvedValueOnce([fresh])
+    render(<Harness patchRow={patch} onWritten={onWritten} />)
+    const done = columns()[1].getAttribute('data-group')
+    dragEnd?.({ active: { id: 'Tasks/T1.md' }, over: { id: `col:${done}` } })
+    await waitFor(() => expect(onWritten).toHaveBeenCalledTimes(1))
+    expect(mocked.updateProperties).toHaveBeenCalledTimes(1)
+    expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/T1.md', { status: ['Done'] }, 'v7')
+    expect(mocked.rows).toHaveBeenCalledTimes(1)
+    expect(mocked.rows).toHaveBeenCalledWith({ paths: ['Tasks/T1.md'] })
+    expect(patch).toHaveBeenCalledWith('Tasks/T1.md', fresh)
+    expect(onWritten.mock.calls[0][0].summary.path).toBe('Tasks/T1.md')
+    expect(onWritten.mock.calls[0][1]).toBe(res)
   })
 
   test('test kanban drop on createdAt grouping disabled', () => {

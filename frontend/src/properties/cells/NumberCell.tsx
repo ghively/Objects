@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { NumberFormat } from '@/api/types'
+import { useSettings } from '@/settings/useSettings'
 import { lineColor } from '@/theme/palette'
 import { formatNumber, parseNumberInput, placeholderFor, progressFraction } from '../format'
 import { CELL_TEXT, type CellProps } from './types'
@@ -9,10 +10,13 @@ const DEBOUNCE_MS = 250
 /**
  * A number. While focused it edits the plain number and saves 250 ms after typing stops and on
  * blur; an empty input saves `null` and text that isn't a number is ignored. Unfocused it shows
- * the number in its format, and a progress format also shows a bar of the steps done.
+ * the number in its format, and a progress format also shows a bar of the steps done. Shown and
+ * typed numbers follow the "Decimal separator" setting (`format.ts`'s `usesRadixComma`).
  */
-export function NumberCell({ def, value, readOnly, onChange }: CellProps<number | null>) {
+export function NumberCell({ def, value, readOnly, density, inTable, onChange }: CellProps<number | null>) {
   const fmt = def.options.numberFormat ?? null
+  // Re-render when the separator or the language (which `automatic` follows) changes.
+  useSettings((s) => `${s.settings.decimalSeparator}|${s.settings.language}`)
   // A percentage stores the fraction (0.25) and is edited as the percent (25).
   const scale = fmt?.type === 'percentage' ? 100 : 1
   const editFmt: NumberFormat = { type: 'number', options: { separators: fmt?.options.separators } }
@@ -50,7 +54,7 @@ export function NumberCell({ def, value, readOnly, onChange }: CellProps<number 
         inputMode="decimal"
         value={shown}
         readOnly={readOnly}
-        placeholder={placeholderFor(def)}
+        placeholder={placeholderFor(def, inTable ? 'table' : density)}
         onFocus={() => {
           setFocused(true)
           setText(

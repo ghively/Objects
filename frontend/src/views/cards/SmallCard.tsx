@@ -1,6 +1,6 @@
 // The small card (`.preview-card-base` + `.preview-card-core`): type label, cover, title and the
 // configured properties as compact read-only cells.
-import type { MouseEvent } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { PropertyDef, Row, TypeDef } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
@@ -9,6 +9,7 @@ import { cellForDef } from '@/properties/cellFor'
 import { chipStyle, tagStyle } from '@/theme/palette'
 import { displayTitle } from '../filter'
 import type { CardProperty } from './cardConfig'
+import { COLLECTION_ICON } from '@/lib/defIcons'
 
 /** The image shown on a card: the cover, else a media preview image kept in the space. */
 export function cardImage(row: Row): string | null {
@@ -22,7 +23,7 @@ export const isEmptyValue = (v: unknown): boolean =>
   v === null || v === undefined || v === '' || v === false || (Array.isArray(v) && v.length === 0)
 
 export const CARD_BASE =
-  'preview-card-base preview-card-core relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised text-left shadow-sm active:brightness-[1.02]'
+  'preview-card-base preview-card-core relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised text-left shadow-(--card-shadow) active:brightness-[1.02]'
 
 function TypeLabel({ type }: { type?: TypeDef }) {
   if (!type) return null
@@ -83,7 +84,7 @@ export function CardProperties({
             const names = row.summary.collections ?? []
             return (
               <span key={p.propertyId} data-testid="card-collections" className="flex items-center gap-1 text-[13px] text-fg-muted">
-                <Icon name="ph-stack" size={12} />
+                <Icon name={COLLECTION_ICON} size={12} />
                 <span className="truncate">{names.length ? names.join(', ') : 'Collections'}</span>
               </span>
             )
@@ -120,6 +121,8 @@ export function SmallCard({
   hide,
   onOpen,
   className,
+  leading,
+  trailing,
 }: {
   row: Row
   type?: TypeDef
@@ -127,6 +130,10 @@ export function SmallCard({
   hide?: string[]
   onOpen?(row: Row, e: MouseEvent): void
   className?: string
+  /** Beside the card's properties, on the left (a task's checkbox). */
+  leading?: ReactNode
+  /** Under the card's properties (a task's date, deadline and priority). */
+  trailing?: ReactNode
 }) {
   const image = cardImage(row)
   return (
@@ -142,9 +149,27 @@ export function SmallCard({
       className={cn(CARD_BASE, className)}
     >
       {image && <img src={api.fileUrl(image)} alt="" className="h-28 w-full object-cover" />}
-      <div className="flex min-w-0 flex-col gap-1.5 p-3">
-        <CardProperties row={row} type={type} props={props} hide={hide} />
-      </div>
+      {leading == null && trailing == null ? (
+        <div className="flex min-w-0 flex-col gap-1.5 p-3">
+          <CardProperties row={row} type={type} props={props} hide={hide} />
+        </div>
+      ) : (
+        <div className="flex min-w-0 items-start gap-2 p-3">
+          {leading != null && (
+            <span data-slot="leading" className="flex shrink-0 items-center pt-0.5">
+              {leading}
+            </span>
+          )}
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <CardProperties row={row} type={type} props={props} hide={hide} />
+            {trailing != null && (
+              <div data-slot="trailing" className="flex flex-wrap items-center gap-2">
+                {trailing}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -37,6 +37,10 @@ class Row:
 
 _FENCE_RE = re.compile(r"^\s*(```|~~~)")
 _TAG_RE = re.compile(r"<[^>\n]*>")
+# A line that is only an HTML comment (M7's block annotations among them) and a math
+# block's ``$$`` fence line: neither contributes text to a preview or the search index.
+_COMMENT_LINE_RE = re.compile(r"^ {0,3}<!--.*-->[ \t]*$")
+_MATH_FENCE_RE = re.compile(r"^ {0,3}\$\$[ \t]*$")
 _HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+")
 _H1_RE = re.compile(r"^\s{0,3}#\s+\S")
 _QUOTE_RE = re.compile(r"^\s*(?:>\s?)+")
@@ -52,6 +56,8 @@ _EM_UNDER_RE = re.compile(r"(?<!\w)_(.+?)_(?!\w)")
 _STRIKE_RE = re.compile(r"~~(.+?)~~")
 _CODE_RE = re.compile(r"`+([^`]*)`+")
 _SPACE_RE = re.compile(r"\s+")
+# M8: a block id (`` ^<id>``, six ``[a-z0-9]``) at the end of a line is not text.
+_BLOCK_ID_RE = re.compile(r" \^[a-z0-9]{6}[ \t]*$")
 
 
 def _wiki(m: re.Match[str]) -> str:
@@ -75,6 +81,9 @@ def body_preview(body: str, limit: int = 280) -> str:
             continue
         if fenced or line.lstrip().startswith("|") or _RULE_RE.match(line):
             continue
+        if _COMMENT_LINE_RE.match(line) or _MATH_FENCE_RE.match(line):
+            continue
+        line = _BLOCK_ID_RE.sub("", line)
         line = _HEADING_RE.sub("", line)
         line = _QUOTE_RE.sub("", line)
         line = _LIST_RE.sub("", line)
@@ -200,6 +209,9 @@ def _row(space: Space, raw: RawObject, summary: ObjectSummary) -> Row:
         if p.type == "entity_collections":
             values[p.key] = list(summary.collections)
             continue
+        if p.type == "entity_backlinks":
+            values[p.key] = space.backlinks(summary.path)
+            continue
         value = decode_value(p, raw.fm.get(p.key), raw.fm)
         if p.type == "entity":
             paths = [space.resolve(r["target"], summary.path) for r in value]
@@ -209,6 +221,12 @@ def _row(space: Space, raw: RawObject, summary: ObjectSummary) -> Row:
         elif p.type == "entity_title" and value is None:
             value = summary.title
         values[p.key] = value
+    if "backlinks" not in values:
+        # Backlinks are a system property of every object (`systemPropertyTypeToIdMap`:
+        # entity_backlinks -> 'backlinks'), so rows carry them under that id even when the
+        # type hasn't added the definition: the "No backlinks" section, the Task "Context"
+        # section and backlinks filters/groups read them (M5 Task 13).
+        values["backlinks"] = space.backlinks(summary.path)
     return Row(
         summary=summary,
         version=version_of(raw.data),

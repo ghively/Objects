@@ -1,0 +1,422 @@
+/*
+ * Whiteboard canvas styles. Values come from Object's shipped CSS
+ * (docs/design.css, `.whiteboard-canvas` and its Vue Flow rules);
+ * the selectors are ours, on React Flow's `react-flow__*` classes. Imported by
+ * WhiteboardCanvas.tsx together with `@xyflow/react/dist/base.css`.
+ */
+
+.whiteboard-canvas {
+  /*
+   * Object's theme tokens, which its CSS reads but sets at runtime (not in the trimmed
+   * reference), mapped onto ours (our choice): bg-back is the window background, bg-base the
+   * content panel, bg-front a raised card, border-base our subtle border. The selection colour
+   * and the strong line colour have no sampled value; flagged for Gene in m6-acceptance.md.
+   */
+  --color-bg-back: var(--bg-app);
+  --color-bg-base: var(--bg-panel);
+  --color-bg-front: var(--bg-raised);
+  --color-border-base: var(--border-subtle);
+  --color-border-front-strong: var(--text-muted);
+  --color-border-block-selection: var(--label-border-blue);
+  --color-bg-block-selection: color-mix(in srgb, var(--label-border-blue) 15%, transparent);
+  --type-label-border-green: var(--label-border-green);
+  --type-label-border-red: var(--label-border-red);
+  --radius-base: 8px;
+
+  /* Reference values. */
+  --whiteboard-auto-min-width: 420px;
+  --whiteboard-auto-max-width: 480px;
+  --whiteboard-auto-max-height: 420px;
+  --whiteboard-auto-text-min-height: 60px;
+  --whiteboard-block-pad-x: 15px;
+  --whiteboard-block-pad-y: 15px;
+  --whiteboard-node-ring: 3px;
+  --whiteboard-overlay-stroke: 1px;
+  --whiteboard-guide-stroke: 1px;
+  --whiteboard-chrome-stroke: 3px;
+  --whiteboard-resize-handle-size: 12px;
+  --whiteboard-resize-handle-hit: 24px;
+  --whiteboard-resize-handle-radius: 2px;
+  --whiteboard-resize-edge-hit: 24px;
+  --whiteboard-resize-edge-offset: -10px;
+  --whiteboard-rotate-hit: 32px;
+  --whiteboard-rotate-knob: 16px;
+  --whiteboard-handle-dot: 12px;
+  --whiteboard-handle-gap: 12px;
+  --whiteboard-handle-hit: 24px;
+  --whiteboard-handle-stroke: 3px;
+  --whiteboard-handle-inv-zoom: 1;
+  --whiteboard-embed-caption-gap: 6px;
+  --whiteboard-embed-caption-height: 30px;
+  --whiteboard-handle-outset: 21px;
+  --whiteboard-handle-pad: 11px;
+  --whiteboard-node-radius: 0.75rem;
+
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-bg-back);
+  overscroll-behavior: none;
+  touch-action: none;
+  outline: none;
+}
+
+.whiteboard-canvas:focus,
+.whiteboard-canvas:focus-visible,
+.whiteboard-canvas .react-flow__edges:focus,
+.whiteboard-canvas .react-flow__edge:focus,
+.whiteboard-canvas .react-flow__edge:focus-visible,
+.whiteboard-canvas .react-flow__nodesselection-rect:focus,
+.whiteboard-canvas .react-flow__nodesselection-rect:focus-visible {
+  outline: none;
+}
+
+.whiteboard-canvas[data-object-drag] iframe {
+  pointer-events: none;
+}
+
+.whiteboard-canvas .react-flow {
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: transparent;
+}
+
+/* The soft fade at the canvas edges. */
+.whiteboard-canvas .react-flow::after {
+  content: '';
+  z-index: 3;
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right, color-mix(in srgb, var(--color-bg-base) 28%, transparent), transparent 28px),
+    linear-gradient(to left, color-mix(in srgb, var(--color-bg-base) 28%, transparent), transparent 28px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--color-bg-base) 28%, transparent), transparent 28px),
+    linear-gradient(to top, color-mix(in srgb, var(--color-bg-base) 28%, transparent), transparent 28px);
+}
+
+/* Dots: 30px gap is set on <Background>; the colour is the border token. */
+.whiteboard-canvas .react-flow__background {
+  color: var(--color-border-base);
+}
+.whiteboard-canvas .react-flow__background-pattern {
+  color: var(--color-border-base);
+  fill: var(--color-border-base);
+}
+
+.whiteboard-canvas .react-flow__node {
+  overflow: visible !important;
+  outline: none;
+}
+.whiteboard-canvas .react-flow__node:focus,
+.whiteboard-canvas .react-flow__node:focus-visible {
+  outline: none;
+}
+
+.whiteboard-canvas .react-flow__edges.react-flow__connectionline {
+  z-index: 9;
+}
+.whiteboard-canvas .react-flow__edgelabel-renderer {
+  z-index: 1;
+}
+
+/* ---- cursors per tool (data-tool on the wrapper) ---- */
+
+.whiteboard-canvas .react-flow__pane {
+  cursor: default;
+}
+.whiteboard-canvas .react-flow__pane.dragging {
+  cursor: grabbing;
+}
+.whiteboard-canvas[data-tool='hand'] .react-flow__pane,
+.whiteboard-canvas[data-tool='hand'] .react-flow__node {
+  cursor: grab;
+}
+.whiteboard-canvas[data-tool='hand'] .react-flow__pane.dragging,
+.whiteboard-canvas[data-tool='hand'] .react-flow__node.dragging {
+  cursor: grabbing;
+}
+.whiteboard-canvas[data-space-pan='true'] .react-flow__pane,
+.whiteboard-canvas[data-space-pan='true'] .react-flow__node {
+  cursor: grab !important;
+}
+.whiteboard-canvas[data-space-pan='true'] .react-flow__pane.dragging,
+.whiteboard-canvas[data-space-pan='true'] .react-flow__node.dragging {
+  cursor: grabbing !important;
+}
+.whiteboard-canvas:not([data-tool='select']):not([data-tool='hand']):not([data-tool='locked']) .react-flow__pane {
+  cursor: crosshair;
+}
+.whiteboard-canvas[data-tool='select'] .react-flow__node:not(.react-flow__node-objectPoint):not(.react-flow__node-objectFrame:not(.selected)):not(:has([data-whiteboard-editing])) {
+  cursor: grab;
+}
+.whiteboard-canvas .react-flow__node.dragging {
+  cursor: grabbing;
+}
+.whiteboard-canvas[data-connecting='true'],
+.whiteboard-canvas[data-connecting='true'] .react-flow__pane,
+.whiteboard-canvas[data-connecting='true'] .react-flow__node,
+.whiteboard-canvas[data-connecting='true'] .react-flow__node * {
+  cursor: crosshair !important;
+}
+
+/* ---- selection marquee ---- */
+
+.whiteboard-canvas .react-flow__selection {
+  background-color: var(--color-bg-block-selection);
+  border: var(--whiteboard-overlay-stroke) solid var(--color-border-block-selection);
+  border-radius: 0;
+}
+.whiteboard-canvas .react-flow__nodesselection-rect {
+  box-shadow: none;
+  pointer-events: none;
+  background: transparent;
+  border: none;
+}
+
+/* ---- node rings ---- */
+
+.whiteboard-canvas .react-flow__node:not(.react-flow__node-objectPoint) .whiteboard-node-frame {
+  border-radius: var(--whiteboard-node-radius);
+  box-shadow: 0 0 0 var(--whiteboard-node-ring) var(--whiteboard-node-color-ring, var(--color-border-base));
+}
+.whiteboard-canvas .react-flow__node.selected:not(.react-flow__node-objectPoint) .whiteboard-node-frame {
+  box-shadow: 0 0 0 var(--whiteboard-node-ring) var(--color-border-block-selection);
+}
+.whiteboard-canvas .react-flow__node.selected:has([data-whiteboard-editing]) .whiteboard-node-frame {
+  box-shadow: 0 0 0 var(--whiteboard-node-ring) var(--whiteboard-node-color-ring, var(--color-border-base));
+}
+/* M8 media primitives (reference CSS `[data-whiteboard-media-primitive]`): no resting ring, the
+   selection ring only when selected; the image covers the frame. */
+.whiteboard-canvas .react-flow__node:not(.react-flow__node-objectPoint) .whiteboard-node-frame[data-whiteboard-media-primitive] {
+  box-shadow: none;
+}
+.whiteboard-canvas .react-flow__node.selected:not(.react-flow__node-objectPoint) .whiteboard-node-frame[data-whiteboard-media-primitive] {
+  box-shadow: 0 0 0 3px var(--color-border-block-selection);
+}
+.whiteboard-canvas .whiteboard-node-surface {
+  padding: var(--whiteboard-block-pad-y) var(--whiteboard-block-pad-x);
+}
+.whiteboard-canvas .react-flow__node:not(:has([data-whiteboard-editing])) .whiteboard-node-surface {
+  user-select: none;
+}
+
+/* Embedded object caption: 30px bar 6px above the node box. */
+.whiteboard-canvas .whiteboard-embed-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--whiteboard-embed-caption-height);
+  top: calc(-1 * (var(--whiteboard-embed-caption-height) + var(--whiteboard-embed-caption-gap)));
+}
+
+/* Shapes: the SVG outline takes the ring colour; selected shapes use the selection colour. */
+.whiteboard-canvas .react-flow__node-objectShape .whiteboard-shape-surface polygon,
+.whiteboard-canvas .react-flow__node-objectShape .whiteboard-shape-surface path {
+  stroke: var(--whiteboard-node-color-ring, var(--color-border-base));
+  stroke-width: var(--whiteboard-node-ring);
+}
+.whiteboard-canvas .react-flow__node-objectShape.selected .whiteboard-shape-surface polygon,
+.whiteboard-canvas .react-flow__node-objectShape.selected .whiteboard-shape-surface path {
+  stroke: var(--color-border-block-selection);
+}
+
+/* Frames: dashed 3px border. */
+.whiteboard-canvas .react-flow__node-objectFrame .whiteboard-shape-surface {
+  box-shadow: none;
+  border-width: var(--whiteboard-node-ring);
+  border-style: dashed;
+  border-color: var(--whiteboard-node-color-ring, var(--color-border-base));
+  border-radius: var(--whiteboard-node-radius);
+}
+.whiteboard-canvas .react-flow__node-objectFrame.selected .whiteboard-shape-surface {
+  border-color: var(--color-border-block-selection);
+}
+
+/* HIGH and LOW gates: the circuit ring. */
+.whiteboard-shape-surface[data-circuit-bit='1'] {
+  --whiteboard-circuit-ring: var(--type-label-border-green);
+}
+.whiteboard-shape-surface[data-circuit-bit='0'] {
+  --whiteboard-circuit-ring: var(--type-label-border-red);
+}
+.whiteboard-canvas .react-flow__node-objectShape .whiteboard-shape-surface[data-circuit-bit] polygon,
+.whiteboard-canvas .react-flow__node-objectShape .whiteboard-shape-surface[data-circuit-bit] path {
+  stroke: var(--whiteboard-circuit-ring) !important;
+}
+
+/* ---- handles ---- */
+
+.whiteboard-canvas .react-flow__handle {
+  z-index: 6;
+  width: var(--whiteboard-handle-hit);
+  height: var(--whiteboard-handle-hit);
+  min-width: 0;
+  min-height: 0;
+  opacity: 1;
+  pointer-events: auto;
+  cursor: crosshair;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+.whiteboard-canvas .react-flow__handle::after {
+  content: '';
+  box-sizing: border-box;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--whiteboard-handle-dot);
+  height: var(--whiteboard-handle-dot);
+  background-color: var(--color-bg-front);
+  border: var(--whiteboard-handle-stroke) solid var(--color-border-block-selection);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(var(--whiteboard-handle-inv-zoom, 1));
+  transform-origin: 50%;
+  pointer-events: none;
+  opacity: 0;
+}
+.whiteboard-canvas[data-tool='select'] .react-flow__node:hover .react-flow__handle::after,
+.whiteboard-canvas[data-connecting='true'] .react-flow__handle::after {
+  opacity: 1;
+}
+.whiteboard-canvas .react-flow__handle:hover::after {
+  background-color: var(--color-border-block-selection);
+}
+.whiteboard-canvas[data-multi-node-selection='true'] .react-flow__handle {
+  pointer-events: none;
+}
+.whiteboard-canvas[data-multi-node-selection='true'] .react-flow__handle::after {
+  opacity: 0;
+}
+.whiteboard-canvas .react-flow__handle-left,
+.whiteboard-canvas .react-flow__handle-right {
+  top: 50%;
+  bottom: auto;
+}
+.whiteboard-canvas .react-flow__handle-left {
+  left: 0;
+  transform: translate(calc(-50% - var(--whiteboard-handle-outset)), -50%);
+}
+.whiteboard-canvas .react-flow__handle-right {
+  left: auto;
+  right: 0;
+  transform: translate(calc(50% + var(--whiteboard-handle-outset)), -50%);
+}
+.whiteboard-canvas .react-flow__handle-top,
+.whiteboard-canvas .react-flow__handle-bottom {
+  left: 50%;
+  right: auto;
+}
+.whiteboard-canvas .react-flow__handle-top {
+  top: 0;
+  transform: translate(-50%, calc(-50% - var(--whiteboard-handle-outset)));
+}
+.whiteboard-canvas .react-flow__handle-bottom {
+  top: auto;
+  bottom: 0;
+  transform: translate(-50%, calc(50% + var(--whiteboard-handle-outset)));
+}
+
+/* ---- connectors ---- */
+
+.whiteboard-canvas .react-flow__edge {
+  color: var(--whiteboard-edge-color, var(--color-border-front-strong));
+}
+.whiteboard-canvas .react-flow__edge.selected {
+  color: var(--color-border-block-selection);
+  cursor: grab;
+}
+.whiteboard-canvas .react-flow__edge-path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.whiteboard-canvas .react-flow__connection,
+.whiteboard-canvas .react-flow__connectionline {
+  color: var(--whiteboard-connection-color, var(--color-border-front-strong));
+}
+.whiteboard-canvas .react-flow__connection-path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.whiteboard-canvas[data-connecting='true'] .react-flow__edges,
+.whiteboard-canvas[data-connecting='true'] .react-flow__edges *,
+.whiteboard-canvas[data-connecting='true'] .react-flow__edgelabel-renderer {
+  pointer-events: none !important;
+}
+
+/* Edge label box. */
+.whiteboard-canvas [data-whiteboard-edge-label] {
+  user-select: none;
+  cursor: default;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+  background-color: var(--color-bg-front);
+  box-shadow: none;
+  border: none;
+  border-radius: var(--radius-base);
+  transform-origin: 50%;
+  padding: 0.25rem 0.5rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  overflow: hidden;
+}
+.whiteboard-canvas [data-whiteboard-edge-label][data-whiteboard-edge-selected='true'] {
+  outline: calc(var(--whiteboard-chrome-stroke, 3px) / var(--whiteboard-label-scale, 1)) solid
+    var(--color-border-block-selection);
+  outline-offset: 0;
+}
+.whiteboard-canvas [data-whiteboard-edge-label][data-whiteboard-active] {
+  user-select: text;
+}
+
+/* ---- the title overlay, top left ---- */
+
+.whiteboard-title-fade {
+  background: radial-gradient(
+    ellipse 95% 90% at 0% 0%,
+    color-mix(in srgb, var(--color-bg-base, var(--bg-panel)) 96%, transparent) 0%,
+    color-mix(in srgb, var(--color-bg-base, var(--bg-panel)) 72%, transparent) 28%,
+    color-mix(in srgb, var(--color-bg-base, var(--bg-panel)) 32%, transparent) 54%,
+    transparent 78%
+  );
+}
+
+/* ---- M8: the per-node lock icon, shown on hover (our placement and size) ---- */
+
+.whiteboard-canvas .whiteboard-node-lock {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--color-bg-front);
+  color: var(--color-fg-muted);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.whiteboard-canvas .react-flow__node:hover .whiteboard-node-lock,
+.whiteboard-canvas .react-flow__node.selected .whiteboard-node-lock {
+  opacity: 1;
+}
+
+/* The quick-create menu's shape grid buttons get the menu's focus ring. */
+.whiteboard-canvas [data-whiteboard-quick-create] [role='menuitem']:focus-visible {
+  outline: 2px solid var(--color-border-block-selection);
+  outline-offset: -2px;
+}

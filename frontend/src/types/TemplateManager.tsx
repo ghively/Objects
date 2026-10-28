@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils'
 import { useLinkIndex } from '@/links/linkIndex'
 import { ObjectIcon } from '@/object/ObjectHeader'
 import { useTypeEditor, type TypeEditor } from '@/object/useTypeEditor'
+import { isBasicDailyNote } from './dashboardSections'
 
 export const TEMPLATE_TEXT = {
   explanation:
@@ -38,14 +39,19 @@ export const TEMPLATE_TEXT = {
   isDefault: 'Default',
   remove: 'Delete Template',
   create: 'New Template',
+  /** The DailyNote type's no-template choice (`components.RootDailyNote.templates.empty.label`). */
+  emptyNote: 'Empty Note',
 }
 
 const RELOAD_DELAY_MS = 150
 
-/** Page, Task and custom types have templates; Tag, DailyNote (M4) and media types don't. */
+/** Page, Task, DailyNote and custom types have templates; Tag and media types don't. */
 export function templatesAllowed(type: Pick<TypeDef, 'basic' | 'name'>): boolean {
-  return !type.basic || ['page', 'task'].includes(type.name.toLowerCase())
+  return !type.basic || ['page', 'task', 'dailynote'].includes(type.name.replace(/\s+/g, '').toLowerCase())
 }
+
+/** The DailyNote type lists "Empty Note" first: the default while no template is marked. */
+const hasEmptyNoteChoice = isBasicDailyNote
 
 /** A template's id as `templates.ids` holds it (the path when the file has no `id`). */
 export function templateKey(t: ObjectSummary): string {
@@ -181,6 +187,13 @@ export function TemplateManager({ typeId, onOpenTemplate, editor: given, disable
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={ordered.map(templateKey)} strategy={verticalListSortingStrategy}>
           <ul aria-label="Templates" className="flex flex-col gap-0.5">
+            {hasEmptyNoteChoice(type) && (
+              <EmptyNoteRow
+                isDefault={defaultId === null}
+                disabled={!!disabled}
+                onMarkDefault={() => void saveTemplates({ defaultTemplateId: null })}
+              />
+            )}
             {ordered.map((t) => (
               <TemplateRow
                 key={templateKey(t)}
@@ -256,6 +269,35 @@ function TemplateRow({
         )}
         <RowAction icon="ph-trash" label={TEMPLATE_TEXT.remove} onClick={onDelete} disabled={disabled} />
       </span>
+    </li>
+  )
+}
+
+function EmptyNoteRow({
+  isDefault,
+  disabled,
+  onMarkDefault,
+}: {
+  isDefault: boolean
+  disabled: boolean
+  onMarkDefault(): void
+}) {
+  return (
+    <li
+      aria-label={TEMPLATE_TEXT.emptyNote}
+      className="group/tpl flex h-10 items-center gap-2 rounded-lg px-1.5 hover:bg-hover"
+    >
+      <span className="w-4 shrink-0" />
+      <Icon name="ph-file" size={16} />
+      <span className="min-w-0 flex-1 truncate text-[15px]">{TEMPLATE_TEXT.emptyNote}</span>
+      {isDefault && (
+        <span className="rounded border border-line px-1.5 text-[12px] text-fg-muted">{TEMPLATE_TEXT.isDefault}</span>
+      )}
+      {!isDefault && (
+        <span className="flex shrink-0 items-center gap-0.5">
+          <RowAction icon="ph-star" label={TEMPLATE_TEXT.markDefault} onClick={onMarkDefault} disabled={disabled} />
+        </span>
+      )}
     </li>
   )
 }

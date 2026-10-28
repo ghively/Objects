@@ -2,15 +2,20 @@
  * "+ New" (and Ctrl+U): step 1 picks a type ("Search Object Types"), step 2 creates or finds an
  * object of it ("Search or Create"): "New '<q>'" (or "New Untitled") creates one, an existing
  * object opens. Modifier keys pick where it opens (see `createAndOpen`).
+ *
+ * M6: "Whiteboard" is always offered in step 1, also before the space has the type (its
+ * definition is written by the first create); a new whiteboard goes through `POST /api/whiteboards`.
  */
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import type { ObjectSummary, TypeDef } from '@/api/types'
+import { whiteboardApi } from '@/api/whiteboardClient'
 import { Icon } from '@/components/Icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { useLinkIndex } from '@/links/linkIndex'
+import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { ObjectIcon } from '@/object/ObjectHeader'
 import { byPluralName, TypeChip } from '@/shell/Sidebar'
+import { isWhiteboardType, WHITEBOARD_TYPE_NAME } from '@/whiteboard/isWhiteboard'
 import { createAndOpen, openObject, type OpenMods } from './createAndOpen'
 
 export const NEW_OBJECT_TEXT = {
@@ -21,6 +26,34 @@ export const NEW_OBJECT_TEXT = {
 }
 
 const MAX_RESULTS = 30
+
+/**
+ * The basic Whiteboard type as step 1 lists it while the space has none yet (`RootWhiteboard`
+ * in `basicStructures.ts`: "Whiteboard", "Whiteboards", `ph-presentation`; the server writes
+ * the full definition on the first create).
+ */
+export const PENDING_WHITEBOARD_TYPE: TypeDef = {
+  schemaVersion: 2,
+  id: 'whiteboard',
+  name: WHITEBOARD_TYPE_NAME,
+  pluralName: 'Whiteboards',
+  folder: 'Whiteboards',
+  formerNames: [],
+  icon: { type: 'iconify', val: 'ph-presentation' },
+  color: 'gray',
+  description: '',
+  basic: true,
+  propertyDefinitions: [],
+  collectionsPropertyPosition: 0,
+  viewDesign: null,
+  font: 'sans-serif',
+  wideLayoutMode: true,
+  wideCoverImage: false,
+  cropCoverImage: false,
+  templates: { ids: [], defaultTemplateId: null },
+  readOnlyReason: null,
+  revision: '',
+}
 
 export interface NewObjectMenuProps {
   open: boolean
@@ -39,13 +72,18 @@ function mods(e: MouseEvent | KeyboardEvent): OpenMods {
 }
 
 export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: NewObjectMenuProps) {
-  const types = useLinkIndex((s) => s.types)
+  const spaceTypes = useLinkIndex((s) => s.types)
+  const types = useMemo(
+    () => (spaceTypes.some(isWhiteboardType) ? spaceTypes : [...spaceTypes, PENDING_WHITEBOARD_TYPE]),
+    [spaceTypes],
+  )
   const objects = useLinkIndex((s) => s.objects)
   const [typeId, setTypeId] = useState<string | null>(initialTypeId ?? null)
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const busy = useRef(false)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (open) {
@@ -55,6 +93,13 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
       setError(null)
     }
   }, [open, initialTypeId])
+
+  // The search box keeps focus across the type step: a click on an option is not a focus
+  // change (see the options' onMouseDown), and moving to step 2 refocuses it, so typing and
+  // Enter go to "Search or Create" whichever way the type was picked.
+  useEffect(() => {
+    if (open) inputRef.current?.focus()
+  }, [open, typeId])
 
   const type = typeId ? types.find((t) => t.id === typeId) : undefined
   const q = query.trim()
@@ -91,7 +136,13 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
     if (!typeId || busy.current) return
     busy.current = true
     try {
-      await createAndOpen(typeId, q ? { title: q } : {}, m)
+      if (isWhiteboardType(type)) {
+        const res = await whiteboardApi.createWhiteboard(q || undefined)
+        openObject(res.path, m, typeId)
+        void invalidateLinkIndex()
+      } else {
+        await createAndOpen(typeId, q ? { title: q } : {}, m)
+      }
       onOpenChange(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -130,6 +181,7 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
         <div className="flex items-center gap-2 border-b border-line px-3">
           {type ? <TypeChip type={type} size={22} /> : <Icon name="ph-magnifying-glass" size={16} />}
           <input
+            ref={inputRef}
             autoFocus
             aria-label={typeId ? NEW_OBJECT_TEXT.searchOrCreate : NEW_OBJECT_TEXT.searchTypes}
             placeholder={typeId ? NEW_OBJECT_TEXT.searchOrCreate : NEW_OBJECT_TEXT.searchTypes}
@@ -154,6 +206,7 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
               role="option"
               aria-selected={i === active}
               onMouseEnter={() => setActive(i)}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => void pick(item, mods(e))}
               className={cn(
                 'flex h-9 cursor-default items-center gap-2 rounded-md px-2 text-[15px]',

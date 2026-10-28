@@ -4,7 +4,8 @@
  *
  * Every edit saves at once through `useTypeEditor` (text fields 400 ms after the last keystroke,
  * and on blur). A type whose file can't be read shows why and disables every control. The
- * "Calendar" group is store-only until M4 and not shown.
+ * "Calendar" group shows for types with a date property (not Task or DailyNote, whose dates have
+ * fixed roles); the DailyNote type gets "Reviewing" instead.
  */
 import {
   closestCenter,
@@ -27,6 +28,7 @@ import { ColorPicker } from '@/components/ColorPicker'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useTypeEditor } from '@/object/useTypeEditor'
@@ -36,6 +38,7 @@ import { PropertySettings } from '@/properties/PropertySettings'
 import { moveProperty } from '@/properties/typeEdits'
 import { TypeChip } from '@/shell/Sidebar'
 import { CardViewSettings } from './CardViewSettings'
+import { isBasicDailyNote } from './dashboardSections'
 import { DeleteTypeDialog } from './DeleteTypeDialog'
 import { PageLayoutCards } from './PageLayoutCards'
 import { TemplateManager, TEMPLATE_TEXT } from './TemplateManager'
@@ -69,6 +72,22 @@ export const TYPE_SETTINGS_TEXT = {
     'Choose whether cover images of objects of this type should be displayed as wide or small cover images by default. This setting only applies when the object type has a cover image property.',
   coverDisplay: 'Display of cover image',
   coverDisplayExplanation: 'Set how the cover image should be displayed.',
+  calendar: 'Calendar',
+  calendarSettings: 'Calendar Settings',
+  calendarExplanation:
+    'This object type has a date property. It is therefore integrated in the calendar. You can select your preferences here.',
+  createFromCalendar: 'Create object from calendar',
+  createFromCalendarExplanation:
+    'If selected, you will see a button in your calendar allowing you to quickly create an object of this type populated with the date of that day.',
+  createShow: 'Show',
+  createOnce: 'Show for one per day',
+  createHide: 'Hide',
+  hideFromSidebar: 'Hide object in calendar sidebar',
+  hideFromSidebarExplanation:
+    'The calendar sidebar shows objects and events on a day. You can choose to hide all objects of this type from the sidebar.',
+  reviewing: 'Reviewing',
+  reviewingExplanation: 'Daily notes can be marked as reviewed. Hide this if you do not use reviewing.',
+  hideReviewing: 'Hide reviewing',
   deleteHeading: 'Delete Object Type',
   deleteExplanation:
     'Moves the type, all its objects and its templates to the Trash. You can restore them from there for 30 days.',
@@ -194,6 +213,62 @@ function Choice<T extends string>({
         </option>
       ))}
     </select>
+  )
+}
+
+type CreateInCalendar = 'enabled' | 'createOnce' | 'disabled'
+
+const CREATE_IN_CALENDAR: readonly { value: CreateInCalendar; name: string }[] = [
+  { value: 'enabled', name: TYPE_SETTINGS_TEXT.createShow },
+  { value: 'createOnce', name: TYPE_SETTINGS_TEXT.createOnce },
+  { value: 'disabled', name: TYPE_SETTINGS_TEXT.createHide },
+]
+
+const isDateKind = (d: PropertyDef): boolean => d.type === 'datetime' || d.type === 'datetimeSimple'
+
+/** Whether the type gets the "Calendar" group: a date property, and not the basic Task or DailyNote type. */
+export function showsCalendarGroup(type: TypeDef): boolean {
+  if (type.basic && type.name.toLowerCase() === 'task') return false
+  if (isBasicDailyNote(type)) return false
+  return type.propertyDefinitions.some(isDateKind)
+}
+
+/** `type` with `createInCalendarOption` set; `enabled` is the key's absence. */
+export function withCreateInCalendar(type: TypeDef, value: CreateInCalendar): TypeDef {
+  const next: TypeDef = { ...type }
+  if (value === 'enabled') delete next.createInCalendarOption
+  else next.createInCalendarOption = value
+  return next
+}
+
+function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: T
+  options: readonly { value: T; name: string }[]
+  onChange(next: T): void
+}) {
+  return (
+    <div role="group" aria-label={label} className="inline-flex rounded-lg border border-line p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          aria-pressed={value === o.value}
+          onClick={() => value !== o.value && onChange(o.value)}
+          className={cn(
+            'rounded-md px-2.5 py-1 text-[14px]',
+            value === o.value ? 'bg-hover font-medium text-fg' : 'text-fg-muted hover:text-fg',
+          )}
+        >
+          {o.name}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -451,6 +526,42 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
             <div className="mt-6">
               <CardViewSettings typeId={type.id} editor={editor} disabled={readOnly} />
             </div>
+            {showsCalendarGroup(type) && (
+              <section aria-label={TYPE_SETTINGS_TEXT.calendar} className="mt-6">
+                <h3 className="mb-1 text-[15px] font-semibold text-fg-muted">{TYPE_SETTINGS_TEXT.calendar}</h3>
+                <div className="text-[15px] font-medium">{TYPE_SETTINGS_TEXT.calendarSettings}</div>
+                <p className="mt-0.5 mb-2 text-[13px] text-fg-muted">{TYPE_SETTINGS_TEXT.calendarExplanation}</p>
+                <Field label={TYPE_SETTINGS_TEXT.createFromCalendar} explanation={TYPE_SETTINGS_TEXT.createFromCalendarExplanation}>
+                  <Segmented
+                    label={TYPE_SETTINGS_TEXT.createFromCalendar}
+                    value={type.createInCalendarOption ?? 'enabled'}
+                    options={CREATE_IN_CALENDAR}
+                    onChange={(v) => void editor.save((latest) => withCreateInCalendar(latest, v))}
+                  />
+                </Field>
+                <Field label={TYPE_SETTINGS_TEXT.hideFromSidebar} explanation={TYPE_SETTINGS_TEXT.hideFromSidebarExplanation}>
+                  <Switch
+                    aria-label={TYPE_SETTINGS_TEXT.hideFromSidebar}
+                    checked={!!type.hideFromCalendarSidebar}
+                    disabled={readOnly}
+                    onCheckedChange={(v) => patch({ hideFromCalendarSidebar: v })}
+                  />
+                </Field>
+              </section>
+            )}
+            {isBasicDailyNote(type) && (
+              <section aria-label={TYPE_SETTINGS_TEXT.reviewing} className="mt-6">
+                <h3 className="mb-2 text-[15px] font-semibold text-fg-muted">{TYPE_SETTINGS_TEXT.reviewing}</h3>
+                <Field label={TYPE_SETTINGS_TEXT.hideReviewing} explanation={TYPE_SETTINGS_TEXT.reviewingExplanation}>
+                  <Switch
+                    aria-label={TYPE_SETTINGS_TEXT.hideReviewing}
+                    checked={!!type.hideReviewing}
+                    disabled={readOnly}
+                    onCheckedChange={(v) => patch({ hideReviewing: v })}
+                  />
+                </Field>
+              </section>
+            )}
           </Section>
 
           {!basic && (

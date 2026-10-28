@@ -21,7 +21,7 @@ const ICON_BTN =
  * A web URL (`url`): an external link that opens in a new window, with "Edit link" (a dialog
  * that replaces the link) and "Remove link". An empty cell offers "Add link".
  */
-export function UrlCell({ def, value, readOnly, onChange }: CellProps<string | null>) {
+export function UrlCell({ def, value, readOnly, density, inTable, onChange }: CellProps<string | null>) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
 
@@ -47,7 +47,7 @@ export function UrlCell({ def, value, readOnly, onChange }: CellProps<string | n
           {linkText(value)}
         </a>
       ) : (
-        <span className="text-[15px] text-fg-muted">{placeholderFor(def)}</span>
+        <span className="text-[15px] text-fg-muted">{placeholderFor(def, inTable ? 'table' : density)}</span>
       )}
       {!readOnly && (
         <>

@@ -1,0 +1,66 @@
+/* Math block (Task 9). Object's `.MathBlock.block-outer` (margin-block 1.5px,
+   padding-block 2px) and `.MathBlock>.block-middle` (radius-base). */
+.object-editor .math-block {
+  position: relative;
+  margin-block: 1.5px;
+  padding-block: 2px;
+}
+.object-editor .math-block-render {
+  border-radius: 6px;
+  padding: 0.25em 0.5em;
+  cursor: pointer;
+  text-align: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: normal;
+}
+.object-editor .math-block-render:hover,
+.object-editor .math-block.is-editing .math-block-render { background: var(--bg-hover); }
+.object-editor .math-block.is-selected .math-block-render { background: var(--block-selection-bg); }
+.object-editor .math-block-render .katex-display { margin: 0.25em 0; }
+.object-editor .math-block-empty { color: var(--text-muted); font-size: 0.875em; padding: 0.25em 0; }
+.object-editor .math-block-editor {
+  margin-top: 4px;
+  padding: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  white-space: normal;
+}
+.object-editor .math-block-input {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  padding: 6px 8px;
+  border: 1px solid var(--code-border);
+  border-radius: 5px;
+  background: var(--code-bg);
+  color: var(--code-text);
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  outline: none;
+}
+.object-editor .math-block-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.object-editor .math-block-hint kbd {
+  font-family: inherit;
+  padding: 0 4px;
+  margin-right: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+.object-editor .math-block-close {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 5px;
+  background: var(--primary-btn);
+  color: var(--primary-btn-text);
+  cursor: pointer;
+}

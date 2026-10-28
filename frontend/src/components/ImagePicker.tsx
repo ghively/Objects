@@ -77,7 +77,7 @@ export function ImagePicker({ value, onChange }: ImagePickerProps) {
           </button>
         )}
       </div>
-      {error && <p className="text-[13px] text-[var(--tag-text-red,#f05d5d)]">{error}</p>}
+      {error && <p className="text-[13px] text-[var(--tag-text-red)]">{error}</p>}
       <div className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto">
         {images?.map((path) => (
           <button

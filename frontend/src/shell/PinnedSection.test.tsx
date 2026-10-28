@@ -4,7 +4,14 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { UiState } from '@/api/types'
 import { collection, objectSummary, query, typeDef } from '@/test/mockApi'
 
-let dragEnd: ((e: { active: { id: string }; over: { id: string } | null }) => void) | undefined
+let dragEnd:
+  | ((e: {
+      active: { id: string }
+      over: { id: string } | null
+      activatorEvent?: { clientX: number; clientY: number }
+      delta?: { x: number; y: number }
+    }) => void)
+  | undefined
 vi.mock('@dnd-kit/core', async (orig) => {
   const real = await orig<typeof import('@dnd-kit/core')>()
   return {
@@ -16,6 +23,11 @@ vi.mock('@dnd-kit/core', async (orig) => {
   }
 })
 
+vi.mock('./objectDrag', async (orig) => {
+  const real = await orig<typeof import('./objectDrag')>()
+  return { ...real, dropObjectAt: vi.fn(() => true) }
+})
+
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig<typeof import('@/api/client')>()),
   api: (await import('@/test/mockApi')).mockApi(),
@@ -24,6 +36,8 @@ vi.mock('@/api/client', async (orig) => ({
 import { api, ConflictError } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { useDefs } from '@/types/useDefinitions'
+import { OBJECT_DRAG_MIME } from '@/whiteboard/dnd'
+import { dropObjectAt } from './objectDrag'
 import { PinnedSection } from './PinnedSection'
 import { resetPinned } from './usePinned'
 
@@ -54,11 +68,11 @@ beforeEach(() => {
     objects: [objectSummary({ path: 'Servers/Atlas.md', id: 'OBJ1', title: 'Atlas', type: 'server' })],
     loaded: true,
   })
-  useDefs.setState({
-    collections: [collection({ id: 'tooling', name: 'Tooling', typeIds: ['server'] })],
-    queries: [query({ id: 'open', name: 'Open servers' })],
-    loaded: true,
-  })
+  const collections = [collection({ id: 'tooling', name: 'Tooling', typeIds: ['server'] })]
+  const queries = [query({ id: 'open', name: 'Open servers' })]
+  mocked.collections.mockResolvedValue(collections)
+  mocked.queries.mockResolvedValue(queries)
+  useDefs.setState({ collections, queries, loaded: true })
 })
 
 const labels = () => screen.getAllByRole('listitem').map((li) => li.textContent)
@@ -68,6 +82,15 @@ describe('PinnedSection', () => {
     render(<PinnedSection />)
     await screen.findByText('Atlas')
     expect(labels()).toEqual(['Open servers', 'Atlas', 'Tooling', 'Servers'])
+  })
+
+  test('test collection and query pins load with no other definitions consumer', async () => {
+    useDefs.setState({ collections: [], queries: [], loaded: false })
+    render(<PinnedSection />)
+    await screen.findByText('Tooling')
+    expect(labels()).toEqual(['Open servers', 'Atlas', 'Tooling', 'Servers'])
+    expect(mocked.collections).toHaveBeenCalled()
+    expect(mocked.queries).toHaveBeenCalled()
   })
 
   test('test No pinned content when empty', async () => {
@@ -86,6 +109,45 @@ describe('PinnedSection', () => {
       { baseRevision: 'u1' },
     )
     expect(labels()).toEqual(['Atlas', 'Tooling', 'Servers', 'Open servers'])
+  })
+
+  test('test pinned object drag carries the object path; reordering still works', async () => {
+    render(<PinnedSection />)
+    const atlas = (await screen.findByText('Atlas')).closest('button')!
+    // A native drag of an object pin carries its path and a wikilink.
+    expect(atlas).toHaveAttribute('draggable', 'true')
+    const data: Record<string, string> = {}
+    fireEvent.dragStart(atlas, { dataTransfer: { setData: (k: string, v: string) => (data[k] = v), effectAllowed: '' } })
+    expect(data).toEqual({ [OBJECT_DRAG_MIME]: 'Servers/Atlas.md', 'text/plain': '[[Atlas]]' })
+    // Other kinds are not native-draggable.
+    expect(screen.getByText('Tooling').closest('button')).not.toHaveAttribute('draggable')
+
+    const list = atlas.closest('ul')!
+    vi.spyOn(list, 'getBoundingClientRect').mockReturnValue({
+      left: 0, right: 200, top: 0, bottom: 200, width: 200, height: 200, x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect)
+    // Released inside the list: an ordinary reorder.
+    act(() =>
+      dragEnd?.({
+        active: { id: 'object:OBJ1' },
+        over: { id: 'type:server' },
+        activatorEvent: { clientX: 20, clientY: 40 },
+        delta: { x: 0, y: 100 },
+      }),
+    )
+    await waitFor(() => expect(mocked.patchUi).toHaveBeenCalledTimes(1))
+    expect(dropObjectAt).not.toHaveBeenCalled()
+    // Released outside the list (over a board): no reorder; the object is dropped there.
+    act(() =>
+      dragEnd?.({
+        active: { id: 'object:OBJ1' },
+        over: { id: 'type:server' },
+        activatorEvent: { clientX: 20, clientY: 40 },
+        delta: { x: 500, y: 10 },
+      }),
+    )
+    expect(dropObjectAt).toHaveBeenCalledWith('Servers/Atlas.md', 'Atlas', 520, 50)
+    expect(mocked.patchUi).toHaveBeenCalledTimes(1)
   })
 
   test('test patchUi 409 refetches and reapplies the reorder once', async () => {

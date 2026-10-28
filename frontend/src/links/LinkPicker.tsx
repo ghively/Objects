@@ -1,37 +1,48 @@
 /**
  * The `[[` link picker: typing `[[` in the editor opens it; it fuzzy-matches
  * object titles and replaces the brackets with a `[[Title]]` wikilink.
+ *
+ * In `embed` mode (M7, the editor's `pickObjectEmbed()`) the chosen object is
+ * inserted as an embedded object block (`![[Title]]`) instead of a link.
  */
 import type { Editor } from '@tiptap/core'
+import { Selection } from '@tiptap/pm/state'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { create } from 'zustand'
 import type { ObjectSummary } from '@/api/types'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { setWikilinkTrigger } from '@/editor/extensions/wikilink'
+import { setObjectEmbedPicker } from '@/editor/nodes/objectEmbed'
 import { TypeChip } from '@/shell/Sidebar'
 import { cn } from '@/lib/utils'
 import { ensureLinkIndex, typeOf, useLinkIndex } from './linkIndex'
 
+export type LinkPickerMode = 'link' | 'embed'
+
 interface PickerState {
   editor: Editor | null
   range: { from: number; to: number } | null
-  show(editor: Editor, range: { from: number; to: number }): void
+  /** `link` inserts a wikilink (replacing the `[[`); `embed` inserts an object embed block. */
+  mode: LinkPickerMode
+  show(editor: Editor, range: { from: number; to: number }, mode?: LinkPickerMode): void
   hide(): void
 }
 
 export const useLinkPicker = create<PickerState>()((set) => ({
   editor: null,
   range: null,
-  show: (editor, range) => set({ editor, range }),
-  hide: () => set({ editor: null, range: null }),
+  mode: 'link',
+  show: (editor, range, mode = 'link') => set({ editor, range, mode }),
+  hide: () => set({ editor: null, range: null, mode: 'link' }),
 }))
 
 let installed = false
-/** Route the editor's `[[` trigger to the picker. */
+/** Route the editor's `[[` trigger, and its `pickObjectEmbed()`, to the picker. */
 export function installLinkPicker(): void {
   if (installed) return
   installed = true
   setWikilinkTrigger((editor, range) => useLinkPicker.getState().show(editor, range))
+  setObjectEmbedPicker((editor, range) => useLinkPicker.getState().show(editor, range, 'embed'))
 }
 
 /**
@@ -74,7 +85,7 @@ export function fuzzyMatch(query: string, objects: ObjectSummary[], limit = 8): 
 }
 
 export function LinkPicker() {
-  const { editor, range, hide } = useLinkPicker()
+  const { editor, range, mode, hide } = useLinkPicker()
   const objects = useLinkIndex((s) => s.objects)
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
@@ -92,7 +103,18 @@ export function LinkPicker() {
 
   const choose = (o: ObjectSummary | undefined) => {
     if (!editor || !range || editor.isDestroyed) return hide()
-    if (o) {
+    if (o && mode === 'embed') {
+      const at = Math.min(range.from, editor.state.doc.content.size)
+      editor
+        .chain()
+        .focus()
+        .command(({ tr }) => {
+          tr.setSelection(Selection.near(tr.doc.resolve(at)))
+          return true
+        })
+        .insertObjectEmbed(o.title)
+        .run()
+    } else if (o) {
       const text = editor.state.doc.textBetween(range.from, range.to, '\0', '\0')
       // Only replace the brackets if they are still where the trigger saw them.
       const at = text === '[[' ? range : { from: range.to, to: range.to }
@@ -117,11 +139,11 @@ export function LinkPicker() {
           inputRef.current?.focus()
         }}
       >
-        <DialogTitle className="sr-only">Link to an object</DialogTitle>
+        <DialogTitle className="sr-only">{mode === 'embed' ? 'Embed an object' : 'Link to an object'}</DialogTitle>
         <input
           ref={inputRef}
           aria-label="Search objects"
-          placeholder="Link to…"
+          placeholder={mode === 'embed' ? 'Embed…' : 'Link to…'}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)

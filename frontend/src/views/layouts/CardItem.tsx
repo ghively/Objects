@@ -9,5 +9,17 @@ export function CardItem({ layout, row, hide, className }: { layout: LayoutProps
   const props = type
     ? cardProperties(type, layout.state.viewDefinition)
     : [{ propertyType: 'entity_title', propertyId: 'title' }]
-  return <SmallCard row={row} type={type} props={props} hide={hide} onOpen={layout.onOpen} className={className} />
+  const extras = layout.rowExtras?.(row)
+  return (
+    <SmallCard
+      row={row}
+      type={type}
+      props={props}
+      hide={hide}
+      onOpen={layout.onOpen}
+      className={className}
+      leading={extras?.leading}
+      trailing={extras?.trailing}
+    />
+  )
 }

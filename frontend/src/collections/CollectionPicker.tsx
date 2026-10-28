@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { api } from '@/api/client'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { findByName, useCollections } from './useCollections'
+import { COLLECTION_ICON } from '@/lib/defIcons'
 
 export const COLLECTION_TEXT = {
   placeholder: 'Search collections or create one',
@@ -93,7 +94,7 @@ export function CollectionPicker({ value, typeId, onChange }: CollectionPickerPr
               onKeyDown={(e) => e.key === 'Enter' && toggle(c.name)}
               className="flex h-8 cursor-pointer items-center gap-2 rounded px-2 text-[14px] hover:bg-hover"
             >
-              <IconOrEmoji icon={c.icon} fallback="ph-stack" size={15} />
+              <IconOrEmoji icon={c.icon} fallback={COLLECTION_ICON} size={15} />
               <span className="min-w-0 flex-1 truncate">{c.name}</span>
               {on && <Icon name="ph-check" size={14} />}
             </div>

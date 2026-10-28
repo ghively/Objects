@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { invalidateLinkIndex } from '@/links/linkIndex'
 
 export const TRASH_TEXT = {
@@ -34,7 +35,20 @@ export const TRASH_TEXT = {
   typeToConfirm: 'Type "Delete" to confirm',
   confirmWord: 'Delete',
   objectType: 'Object type',
+  collection: 'Collection',
+  query: 'Query',
   objects: (n: number) => `${n} object${n === 1 ? '' : 's'}`,
+}
+
+const ENTRY_ICON: Partial<Record<TrashItem['kind'], string>> = {
+  type: 'ph-shapes',
+  collection: COLLECTION_ICON,
+  query: QUERY_ICON,
+}
+
+/** How many entries go with this one: a type or collection takes its objects with it. */
+function entryCount(i: TrashItem): number {
+  return i.kind === 'type' || i.kind === 'collection' ? 1 + (i.objectCount ?? 0) : 1
 }
 
 function formatDeletedAt(iso: string): string {
@@ -78,9 +92,9 @@ export function TrashView() {
     }
   }
 
-  /** Objects of a deleted type are restored with it, so they aren't listed on their own. */
-  const visible = (items ?? []).filter((i) => i.kind === 'type' || !i.typeTrashId)
-  const total = visible.reduce((n, i) => n + (i.kind === 'type' ? 1 + (i.objectCount ?? 0) : 1), 0)
+  /** Objects of a deleted type or collection are restored with it, so they aren't listed on their own. */
+  const visible = (items ?? []).filter((i) => i.kind !== 'object' || (!i.typeTrashId && !i.collectionTrashId))
+  const total = visible.reduce((n, i) => n + entryCount(i), 0)
 
   return (
     <div className="w-full">
@@ -116,13 +130,17 @@ export function TrashView() {
                 aria-label={item.title}
                 className="flex min-h-12 items-center gap-2.5 border-b border-line/60 px-2 py-1.5 last:border-b-0"
               >
-                <Icon name={item.kind === 'type' ? 'ph-shapes' : 'ph-file-text'} size={18} />
+                <Icon name={ENTRY_ICON[item.kind] ?? 'ph-file-text'} size={18} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[15px] font-medium">{item.title}</p>
                   <p className="truncate text-[13px] text-fg-muted">
                     {item.kind === 'type'
                       ? `${TRASH_TEXT.objectType} · ${TRASH_TEXT.objects(item.objectCount ?? 0)}`
-                      : `${item.type} · ${item.originalPath}`}
+                      : item.kind === 'collection'
+                        ? `${TRASH_TEXT.collection} · ${TRASH_TEXT.objects(item.objectCount ?? 0)}`
+                        : item.kind === 'query'
+                          ? TRASH_TEXT.query
+                          : `${item.type} · ${item.originalPath}`}
                     {' · '}
                     {formatDeletedAt(item.deletedAt)}
                   </p>
@@ -154,9 +172,7 @@ export function TrashView() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[17px]">{TRASH_TEXT.purgeConfirmTitle}</AlertDialogTitle>
             <AlertDialogDescription className="text-[14px] text-fg-muted">
-              {TRASH_TEXT.purgeConfirmDescription(
-                purging?.kind === 'type' ? 1 + (purging.objectCount ?? 0) : 1,
-              )}
+              {TRASH_TEXT.purgeConfirmDescription(purging ? entryCount(purging) : 1)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

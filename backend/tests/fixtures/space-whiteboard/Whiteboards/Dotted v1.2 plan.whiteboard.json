@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "nodes": {
+    "n-1": {
+      "id": "n-1",
+      "kind": "block",
+      "blockId": "b-1",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 420,
+      "height": 60,
+      "z": 1
+    }
+  },
+  "edges": {},
+  "blocks": {
+    "b-1": {
+      "type": "text",
+      "markdown": "Plan for v1.2"
+    }
+  }
+}

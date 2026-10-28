@@ -10,17 +10,27 @@
 import { vi } from 'vitest'
 import type { Api } from '@/api/client'
 import type {
+  Attachment,
+  CalendarDay,
+  CalendarRange,
   Collection,
+  DeviceSettings,
+  GraphData,
   Layout,
   ObjectDetail,
   ObjectSummary,
   PropertyDef,
   Query,
+  References,
   Row,
+  SearchResult,
+  SpaceEntry,
+  TaskEntry,
   TypeDef,
   ViewState,
   Views,
 } from '@/api/types'
+import { settingsDefaults } from '@/settings/defaults'
 
 /** A v2 type with every contract field; `partial` overrides. */
 export function typeDef(partial: Partial<TypeDef> & Pick<TypeDef, 'id'>): TypeDef {
@@ -93,8 +103,42 @@ export function objectDetail(partial: Partial<ObjectDetail> & { summary: ObjectS
     body: '',
     version: 'v1',
     links: {},
+    backlinks: [],
     ...partial,
   }
+}
+
+/** A search result with every contract field; `partial` overrides. */
+export function searchResult(partial: Partial<SearchResult> & Pick<SearchResult, 'path'>): SearchResult {
+  const stem = partial.path.replace(/^.*\//, '').replace(/\.md$/i, '')
+  return {
+    title: stem,
+    type: 'page',
+    icon: null,
+    tags: [],
+    score: 0,
+    titleMatches: [],
+    highlights: [],
+    ...partial,
+  }
+}
+
+/** A references payload with every contract field; `partial` overrides. */
+export function references(partial: Partial<References> = {}): References {
+  return {
+    tabs: ['all', 'backlinks', 'related', 'mentions'],
+    backlinks: [],
+    mentions: [],
+    related: [],
+    relatedTags: [],
+    summaries: {},
+    ...partial,
+  }
+}
+
+/** Graph data with every contract field; `partial` overrides. */
+export function graphData(partial: Partial<GraphData> = {}): GraphData {
+  return { nodes: [], links: [], tagged: [], ...partial }
 }
 
 const emptyGroup = () => ({ type: 'filterGroup' as const, operator: 'and' as const, elements: [] })
@@ -155,11 +199,67 @@ export function query(partial: Partial<Query> & Pick<Query, 'id'>): Query {
   }
 }
 
+/** A calendar day with every contract field; `partial` overrides. */
+export function calendarDay(partial: Partial<CalendarDay> = {}): CalendarDay {
+  return { dailyNote: null, tasks: [], dated: [], created: [], updated: [], ...partial }
+}
+
+/** A calendar range with every contract field; `partial` overrides. */
+export function calendarRange(partial: Partial<CalendarRange> = {}): CalendarRange {
+  const from = partial.from ?? '2026-10-01'
+  return {
+    from,
+    to: partial.to ?? from,
+    today: partial.today ?? from,
+    days: {},
+    summaries: {},
+    warnings: [],
+    ...partial,
+  }
+}
+
+/** A task entry with every contract field; `partial` overrides. */
+export function taskEntry(partial: Partial<TaskEntry> = {}): TaskEntry {
+  return { path: 'Tasks/Untitled.md', kind: 'date', day: '2026-10-01', done: false, ...partial }
+}
+
+/** Device settings: the contract defaults; `partial` overrides. */
+export function deviceSettings(partial: Partial<DeviceSettings> = {}): DeviceSettings {
+  return { ...settingsDefaults, openOnStart: {}, ...partial }
+}
+
+/** A spaces-registry entry with every contract field; `partial` overrides. */
+export function spaceEntry(partial: Partial<SpaceEntry> = {}): SpaceEntry {
+  const path = partial.path ?? '/spaces/Space'
+  return {
+    path,
+    name: path.replace(/[\\/]+$/, '').replace(/^.*[\\/]/, ''),
+    icon: null,
+    current: false,
+    missing: false,
+    lastOpened: null,
+    ...partial,
+  }
+}
+
+/** An attachment with every contract field; `partial` overrides. */
+export function attachment(partial: Partial<Attachment> = {}): Attachment {
+  return { path: 'Attachments/file.pdf', kind: 'pdf', size: 1024, ...partial }
+}
+
 type Fn =(...args: never[]) => unknown
 
 function defaults(): Api {
   return {
-    space: async () => ({ name: 'space', root: '/space', types: [] }),
+    space: async () => ({
+      name: 'space',
+      root: '/space',
+      types: [],
+      icon: null,
+      description: null,
+      hideTaskManagement: false,
+      revision: '',
+    }),
     objects: async () => [],
     object: async (path: string) => objectDetail({ summary: objectSummary({ path }) }),
     saveBody: async (_path: string, _body: string, baseVersion: string) => ({ version: `${baseVersion}+1` }),
@@ -188,6 +288,8 @@ function defaults(): Api {
       path: `${typeId}/${opts.title || 'Untitled'}.md`,
       version: 'v1',
     }),
+    createDailyNote: async (date: string) => ({ path: `DailyNotes/${date}.md`, version: 'v1', typeIds: [] }),
+    calendar: async (from: string, to: string) => calendarRange({ from, to, today: from }),
     deleteObject: async () => ({ trashId: 'trash-1' }),
     trash: async () => [],
     restore: async () => ({ paths: [], typeIds: [], collectionIds: [], queryIds: [], skipped: [] }),
@@ -234,6 +336,70 @@ function defaults(): Api {
       ui: { pinned: [], sections: [], allNotesLayout: 'list' as const, ...patch },
       revision: 'r1',
     }),
+    search: async () => ({ results: [], partial: false }),
+    reindex: async () => ({ started: true }),
+    references: async () => references(),
+    linkMention: async (input: { baseVersion: string }) => ({ version: `${input.baseVersion}+1` }),
+    graph: async () => graphData(),
+    attachments: async () => [],
+    uploadAttachment: async (_blob: Blob | ArrayBuffer, name: string) => ({ path: `Attachments/${name}`, kind: 'file' as const }),
+    openAttachment: async () => ({ ok: true as const }),
+    patchSpace: async (patch: Record<string, unknown>) => ({
+      name: 'space',
+      root: '/space',
+      types: [],
+      icon: null,
+      description: null,
+      hideTaskManagement: false,
+      ...patch,
+      revision: 'r1',
+    }),
+    settings: async () => ({ settings: deviceSettings(), revision: '' }),
+    patchSettings: async (patch: Partial<DeviceSettings>) => ({ settings: deviceSettings(patch), revision: 'r1' }),
+    spaces: async () => [spaceEntry({ path: '/space', name: 'space', current: true })],
+    createSpace: async (name: string, location: string) => ({ path: `${location.replace(/[\\/]+$/, '')}/${name}` }),
+    openSpace: async (path: string) => ({ path }),
+    removeSpace: async () => ({ ok: true as const }),
+    switchSpace: async (path: string) => ({ path }),
+    // M8
+    overdue: async () => ({ count: 0, capped: false, missed: [], current: null, today: '2026-10-27' }),
+    occurrence: async (_path: string, _action: string, opts: { baseVersion: string }) => ({
+      version: `${opts.baseVersion}+1`,
+      frontmatter: {},
+      links: {},
+      synced: [],
+      skipped: [],
+    }),
+    taskStats: async () => ({
+      unit: 'day' as const,
+      currentStreak: 0,
+      bestStreak: 0,
+      completions: 0,
+      completionRate: null,
+      atRisk: false,
+      cells: [],
+    }),
+    setReminder: async (_path: string, _key: string, _remind: string | null, opts: { baseVersion: string }) => ({
+      version: `${opts.baseVersion}+1`,
+      frontmatter: {},
+      links: {},
+      synced: [],
+      skipped: [],
+    }),
+    block: async (path: string, id: string) => ({ path, id, markdown: '', version: 'v1' }),
+    blockReferences: async () => ({ paths: [] }),
+    history: async () => [],
+    historyVersion: async (_path: string, id: string) => ({ id, text: '' }),
+    restoreVersion: async (_path: string, _id: string, opts: { baseVersion: string }) => ({ version: `${opts.baseVersion}+1` }),
+    mergeObject: async (_source: string, target: string, opts: { targetVersion: string }) => ({
+      target,
+      version: `${opts.targetVersion}+1`,
+      relinked: [],
+      skipped: [],
+      dropped: [],
+      trashId: 'trash-merge-1',
+    }),
+    deleteSpace: async () => ({ trashed: true }),
     onChange: () => () => undefined,
   } as unknown as Api
 }

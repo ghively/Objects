@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import type { TableViewConfig } from '@/api/types'
+import { cellFor } from '@/properties/cellFor'
+import { BacklinksCell } from '@/properties/cells/SystemFieldCell'
 import { propertyDef, typeDef } from '@/test/mockApi'
+import { propertyChoices } from '../properties'
 import {
   clampWidth,
   DEFAULT_COL_WIDTH,
@@ -10,6 +13,7 @@ import {
   setAllHidden,
   setColWidth,
   setHidden,
+  tableDefs,
   setPinnedThrough,
   setWrap,
   setWrapAll,
@@ -74,12 +78,17 @@ describe('normalizeTableConfig', () => {
     expect(cfg.properties.find((c) => c.id === 'note')?.colWidth).toBe(13)
   })
 
-  test('backlinks are not columns', () => {
+  test('test table and cards offer the backlinks field read-only', () => {
     const t = typeDef({
       id: 'p',
       propertyDefinitions: [propertyDef({ id: 'title', type: 'entity_title' }), propertyDef({ id: 'bl', type: 'entity_backlinks' })],
     })
-    expect(normalizeTableConfig(t).properties.map((c) => c.id)).toEqual(['title'])
+    // M5: the backlinks are a column (read-only: its cell never writes; see cells.test.tsx).
+    expect(normalizeTableConfig(t).properties.map((c) => c.id)).toEqual(['title', 'bl'])
+    expect(tableDefs(t).map((d) => d.key)).toEqual(['title', 'bl'])
+    expect(cellFor('entity_backlinks')).toBe(BacklinksCell)
+    // Filters, sorts and grouping see it too.
+    expect(propertyChoices([t]).find((c) => c.key === 'bl')?.kind).toBe('entity_backlinks')
   })
 })
 

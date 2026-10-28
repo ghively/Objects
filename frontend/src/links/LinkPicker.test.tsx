@@ -69,4 +69,24 @@ describe('[[ trigger', () => {
     expect(useLinkPicker.getState().range).toBeNull()
     expect(serializeBody(editor)).toBe('Hello [[Ada Lovelace]]\n')
   })
+
+  test('test link picker embed mode inserts an object embed', async () => {
+    // The editor's pickObjectEmbed() opens the picker in embed mode at the cursor.
+    loadBody(editor, 'First\n\nSecond\n')
+    editor.commands.setTextSelection(3)
+    expect(editor.commands.pickObjectEmbed()).toBe(true)
+    expect(useLinkPicker.getState().mode).toBe('embed')
+
+    render(<LinkPicker />)
+    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    expect(input).toHaveAttribute('placeholder', 'Embed…')
+    await screen.findByText('Ada Lovelace')
+    fireEvent.change(input, { target: { value: 'ada' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(useLinkPicker.getState().range).toBeNull()
+    expect(useLinkPicker.getState().mode).toBe('link')
+    expect(serializeBody(editor)).toBe('First\n\n![[Ada Lovelace]]\n\nSecond\n')
+    expect(editor.state.doc.child(1).type.name).toBe('objectEmbed')
+  })
 })

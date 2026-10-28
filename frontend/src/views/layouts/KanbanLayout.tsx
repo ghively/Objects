@@ -83,7 +83,7 @@ function Column({
 }
 
 export function KanbanLayout(props: LayoutProps) {
-  const { flat, state, ctx, viewTypes, typesById, collections, patchRow } = props
+  const { flat, state, ctx, viewTypes, typesById, collections, patchRow, onWritten } = props
   const [notice, setNotice] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
@@ -128,8 +128,9 @@ export function KanbanLayout(props: LayoutProps) {
     const change = update(target)
     if (!change) return
     try {
-      await api.updateProperties(row.summary.path, { [change.key]: change.value }, row.version)
+      const result = await api.updateProperties(row.summary.path, { [change.key]: change.value }, row.version)
       await reload(row)
+      onWritten?.(row, result)
     } catch (err) {
       if (err instanceof ConflictError) {
         await reload(row)

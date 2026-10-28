@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "reading-list",
+  "name": "Reading list",
+  "formerNames": [],
+  "icon": null,
+  "color": null,
+  "description": "Pages to read.",
+  "typeIds": [
+    "page"
+  ]
+}

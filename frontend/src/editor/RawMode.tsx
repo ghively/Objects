@@ -2,7 +2,8 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
-import { useEffect, useImperativeHandle, useRef, type Ref } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
+import { createRawFind } from '@/find/rawFind'
 import { useAutosave, type BodyEditorHandle } from './useAutosave'
 
 export type RawModeProps = {
@@ -30,12 +31,14 @@ const rawTheme = EditorView.theme(
 
 /**
  * Raw Markdown mode: CodeMirror 6 over the body text, saved through the same
- * debounced, conflict-safe `saveBody` as the formatted editor.
+ * debounced, conflict-safe `saveBody` as the formatted editor. Find in page works here too:
+ * the handle's `find` is a CodeMirror adapter (`find/rawFind.ts`) the find bar drives.
  */
 export function RawMode({ path, text, version, onSaved, onConflict, readOnly = false, controlRef }: RawModeProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const loadedRef = useRef<{ path: string; text: string } | null>(null)
+  const [rawFind] = useState(() => createRawFind(() => viewRef.current))
 
   const autosave = useAutosave({
     path,
@@ -78,6 +81,7 @@ export function RawMode({ path, text, version, onSaved, onConflict, readOnly = f
           EditorState.readOnly.of(readOnly),
           EditorView.editable.of(!readOnly),
           rawTheme,
+          rawFind.extension,
           EditorView.updateListener.of((u) => {
             if (u.docChanged) autosaveRef.current.schedule()
             if (u.focusChanged && !u.view.hasFocus) void autosaveRef.current.flush()
@@ -87,6 +91,8 @@ export function RawMode({ path, text, version, onSaved, onConflict, readOnly = f
     )
     autosave.markLoaded(body, v)
     loadedRef.current = { path, text: body }
+    // A fresh state has no find state: keep an open find bar's matches.
+    rawFind.reapply()
   }
 
   useEffect(() => {
@@ -108,6 +114,7 @@ export function RawMode({ path, text, version, onSaved, onConflict, readOnly = f
     reload: (body: string, v: string) => {
       if (viewRef.current) load(viewRef.current, body, v)
     },
+    find: rawFind.control,
   }))
 
   return (

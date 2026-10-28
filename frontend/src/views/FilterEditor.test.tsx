@@ -46,11 +46,11 @@ describe('FilterEditor', () => {
     render(<Harness onChange={onChange} />)
     await user.click(screen.getByRole('button', { name: '+ Filter' }))
     expect(screen.getByText('where')).toBeInTheDocument()
-    expect(screen.queryByRole('combobox', { name: 'Group operator' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Group operator' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '+ Filter' }))
     await user.click(screen.getByRole('button', { name: '+ Filter' }))
-    const select = screen.getByRole('combobox', { name: 'Group operator' })
-    await user.selectOptions(select, 'or')
+    await user.click(screen.getByRole('button', { name: 'Group operator' }))
+    await user.click(await screen.findByRole('menuitemradio', { name: 'or' }))
     expect((onChange.mock.calls.at(-1)![0] as FilterGroup).operator).toBe('or')
     // The third row shows a static chip with the operator.
     expect(screen.getByTestId('group-operator')).toHaveTextContent('or')
@@ -95,6 +95,32 @@ describe('FilterEditor', () => {
     )
     expect(screen.getByText('Will be ignored')).toBeInTheDocument()
     expect(screen.getAllByText('Invalid').length).toBeGreaterThan(0)
+  })
+
+  test('test property and operator are menus: icon + name rows, a check on the current one', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<Harness onChange={onChange} />)
+    await user.click(screen.getByRole('button', { name: '+ Filter' }))
+    expect(document.querySelector('select')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Property' }))
+    const menu = await screen.findByRole('menu', { name: 'Property' })
+    const title = within(menu).getByRole('menuitemradio', { name: 'Title' })
+    expect(title).toHaveAttribute('aria-checked', 'true')
+    expect(title.querySelector('[data-icon]')).not.toBeNull()
+    await user.click(within(menu).getByRole('menuitemradio', { name: 'Note' }))
+    expect((onChange.mock.calls.at(-1)![0] as FilterGroup).elements[0]).toMatchObject({ propertyId: 'note' })
+    expect(screen.getByRole('button', { name: 'Property' })).toHaveTextContent('Note')
+  })
+
+  test('test date filter says Select date until a date is chosen', async () => {
+    const user = userEvent.setup()
+    const T = typeDef({ id: 'task', propertyDefinitions: [propertyDef({ id: 'due', type: 'datetime', name: 'Due' })] })
+    const init: FilterGroup = { type: 'filterGroup', operator: 'and', elements: [{ type: 'filter', propertyId: 'due', option: 'isBefore' }] }
+    render(<FilterEditor group={init} onChange={() => undefined} choices={propertyChoices([T])} types={[T]} collections={[]} />)
+    expect(screen.getByRole('button', { name: 'Date' })).toHaveTextContent('Select date')
+    await user.click(screen.getByRole('button', { name: 'Date' }))
+    expect(await screen.findByRole('menu', { name: 'Date' })).toBeInTheDocument()
   })
 
   test('shows "No eligible properties available" without properties', () => {

@@ -1,7 +1,8 @@
 // The data view: toolbar, filter -> sort -> group pipeline and a layout, reused by type pages,
 // collections, queries and All notes. The caller owns the state (see `useViewState`).
-import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
-import type { Collection, Layout, Row, RowsScope, TypeDef, ViewState } from '@/api/types'
+import { createContext, useContext, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import type { Collection, Layout, Row, RowsScope, TypeDef, UpdateResult, ViewState } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
@@ -24,6 +25,12 @@ import { applySorts } from './sort'
 import { Toolbar } from './Toolbar'
 import { ViewSummary } from './ViewSummary'
 import { matchingValues } from './matching'
+
+/**
+ * Where a full-page view's toolbar goes: a type page puts it in its tab row, right-aligned, as
+ * Object does. Null (the default): the toolbar sits in the view's own heading row.
+ */
+export const ToolbarSlot = createContext<HTMLElement | null>(null)
 
 export interface PipelineResult {
   /** Every row that survives, in view order. */
@@ -59,6 +66,16 @@ export interface LayoutProps {
   patchRow?(path: string, row: Row): void
   /** A group's size before paging (for its header). */
   groupCount(group: Group): number
+  /** Per-row slots: list rows and cards render them (M4: a task's checkbox, dates and priority). */
+  rowExtras?(row: Row): RowExtras
+  /** A layout wrote a row (the kanban drop) and reloaded it; `result` is the server's answer. */
+  onWritten?(row: Row, result: UpdateResult): void
+}
+
+/** What an owner adds to one row: `leading` before its title, `trailing` after it. */
+export interface RowExtras {
+  leading?: ReactNode
+  trailing?: ReactNode
 }
 
 export interface DataViewProps {
@@ -88,6 +105,10 @@ export interface DataViewProps {
   rowMenu?(row: Row): RowMenuItem[]
   /** Renders layouts other than the list (table, cards, kanban). */
   renderLayout?(layout: Layout, props: LayoutProps): ReactNode | null
+  /** Per-row slots for list rows and cards (see `LayoutProps.rowExtras`); without it rows render as in M3. */
+  rowExtras?(row: Row): RowExtras
+  /** Called after a layout's own write (the kanban drop) with the row and the update result. */
+  onWritten?(row: Row, result: UpdateResult): void
 }
 
 export interface RowMenuItem {
@@ -248,6 +269,8 @@ export function DataView(props: DataViewProps) {
     closed,
     flat,
     patchRow: props.patchRow,
+    rowExtras: props.rowExtras,
+    onWritten: props.onWritten,
     groupCount: (g) => result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length,
   }
   const builtin = (): ReactNode => {
@@ -285,6 +308,27 @@ export function DataView(props: DataViewProps) {
   const createType = viewTypes[0]
   const createName = viewTypes.length === 1 ? viewTypes[0].name : 'object'
 
+  const toolbarSlot = useContext(ToolbarSlot)
+  const toolbar = (
+    <Toolbar
+      count={total}
+      state={state}
+      onState={(s) => {
+        setVisible(LOAD_PAGE)
+        onState(s)
+      }}
+      layouts={layouts}
+      choices={choices}
+      types={viewTypes}
+      collections={collections}
+      groups={result.groups}
+      hidden={result.hidden ?? []}
+      pausedHint={props.pausedHint}
+      extraPages={customizePages}
+      structureId={viewTypes.length === 1 ? viewTypes[0].id : undefined}
+    />
+  )
+
   return (
     <section
       data-testid="data-view"
@@ -302,26 +346,13 @@ export function DataView(props: DataViewProps) {
       }
       className={cn('mx-auto flex w-full flex-col gap-2', props.embedded ? 'max-w-[50rem]' : 'max-w-5xl', props.compact && 'gap-1')}
     >
-      <div className="flex items-center justify-between gap-2">
-        {props.heading ? <div className="min-w-0 flex-1">{props.heading}</div> : <span className="flex-1" />}
-        <Toolbar
-          count={total}
-          state={state}
-          onState={(s) => {
-            setVisible(LOAD_PAGE)
-            onState(s)
-          }}
-          layouts={layouts}
-          choices={choices}
-          types={viewTypes}
-          collections={collections}
-          groups={result.groups}
-          hidden={result.hidden ?? []}
-          pausedHint={props.pausedHint}
-          extraPages={customizePages}
-          structureId={viewTypes.length === 1 ? viewTypes[0].id : undefined}
-        />
-      </div>
+      {(props.heading || !toolbarSlot) && (
+        <div data-toolbar-row="" className="flex items-center justify-between gap-2">
+          {props.heading ? <div className="min-w-0 flex-1">{props.heading}</div> : <span className="flex-1" />}
+          {!toolbarSlot && toolbar}
+        </div>
+      )}
+      {toolbarSlot && createPortal(toolbar, toolbarSlot)}
       {(state.showDataViewDetails || props.pausedHint) && (
         <ViewSummary state={state} choices={choices} pausedHint={props.pausedHint} />
       )}
@@ -352,7 +383,7 @@ export function DataView(props: DataViewProps) {
                 <div key={g.id} className="flex flex-col">
                   {grouped && header(g, result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length)}
                   {!(grouped && closed(g)) && (
-                    <ListLayout rows={g.rows} typesById={typesById} multiType={multiType} onOpen={onOpen} />
+                    <ListLayout rows={g.rows} typesById={typesById} multiType={multiType} onOpen={onOpen} rowExtras={props.rowExtras} />
                   )}
                 </div>
               ))}

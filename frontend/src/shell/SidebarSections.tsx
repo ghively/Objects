@@ -92,7 +92,7 @@ function Section({ section, onOpenTarget }: { section: SidebarSection; onOpenTar
         <ContextMenuTrigger asChild>
           <h2
             id={headingId}
-            className="flex items-center gap-1.5 px-2 pt-5 pb-2 text-[14px] font-semibold text-[#a7a2a1]"
+            className="flex items-center gap-1.5 px-2 pt-5 pb-2 text-[14px] font-semibold text-[var(--text-section)]"
           >
             <IconOrEmoji icon={section.icon} fallback="ph-star" size={14} />
             {section.name}

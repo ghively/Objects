@@ -11,8 +11,10 @@ import type {
   PropertyDef,
   PropertyType,
   Row,
+  StatusCategory,
 } from '@/api/types'
 import { formatNumber } from '@/properties/format'
+import { STATUS_CATEGORIES, optionCategory } from '@/tasks/statusCategory'
 import { dateSpan, startOfDay } from './dates'
 import { displayTitle, findDef, rowValue, type FilterCtx } from './filter'
 
@@ -23,11 +25,22 @@ export interface GroupOption {
 
 const o = (key: string, label: string): GroupOption => ({ key, label })
 
-const DATE_KINDS = new Set<PropertyType>(['datetime', 'datetimeSimple', 'entity_lastUpdated'])
-const NOT_GROUPABLE = new Set<PropertyType>(['blocks', 'simpleTableBlock', 'entity_createdAt'])
+const DATE_KINDS = new Set<PropertyType>(['datetime', 'datetimeSimple', 'entity_lastUpdated', 'entity_createdAt'])
+const NOT_GROUPABLE = new Set<PropertyType>(['blocks', 'simpleTableBlock'])
 
-/** The "group by" options a kind offers; the first is the default. ("Scheduled" comes in M4.) */
-export function GROUP_OPTIONS(kind: PropertyType): GroupOption[] {
+/** Group-by option of a status label: one group per status category ("By category" is our string). */
+export const STATUS_CATEGORY_OPTION = 'statusCategory'
+/** Group-by option of a date: the Tasks "Scheduled" buckets. */
+export const SCHEDULED_OPTION = 'scheduled'
+
+const isStatusLabel = (def?: Pick<PropertyDef, 'type' | 'options'>) => def?.type === 'label' && !!def.options?.isStatus
+
+/**
+ * The "group by" options a kind offers; the first is the default. `def` adds what depends on the
+ * definition (a status label also groups by category).
+ */
+export function GROUP_OPTIONS(kind: PropertyType, def?: Partial<Pick<PropertyDef, 'key'>> & Pick<PropertyDef, 'options'>): GroupOption[] {
+  if (kind === 'label' && def?.options?.isStatus) return [o('default', 'default'), o(STATUS_CATEGORY_OPTION, 'By category')]
   if (kind === 'textBlock') return [o('default', 'By Text'), o('entity', 'By Linked Objects')]
   if (kind === 'number') return [o('default', 'By Exact Value'), o('range', 'By Range')]
   if (DATE_KINDS.has(kind)) {
@@ -38,6 +51,7 @@ export function GROUP_OPTIONS(kind: PropertyType): GroupOption[] {
       o('month', 'By Month'),
       o('year', 'By Year'),
       o('relative', 'Relative'),
+      o(SCHEDULED_OPTION, 'Scheduled'),
     ]
   }
   return [o('default', 'default')]
@@ -60,7 +74,7 @@ export function GROUP_SORT_OPTIONS(kind: PropertyType): { key: GroupSortOption; 
     { key: 'ascending', label: 'ascending' },
     { key: 'descending', label: 'descending' },
   ]
-  if (kind === 'entity') {
+  if (kind === 'entity' || kind === 'entity_backlinks') {
     out.push({ key: 'createdAscending', label: 'Created oldest first' }, { key: 'createdDescending', label: 'Created newest first' })
   }
   out.push(
@@ -105,6 +119,9 @@ const DATE_LABELS: Record<string, string> = {
   nextWeek: 'Next week',
   later: 'Later', // our string: nothing in Object names dates beyond next week
 }
+// The Tasks "Scheduled" buckets in order; rows without a date fall into "No date" (Other), last.
+const SCHEDULED_ORDER = ['overdue', 'today', 'tomorrow', 'thisWeek', 'nextWeek', 'later']
+const NO_DATE = 'No date' // our string: Object names no bucket for undated tasks
 const RELATIVE_ORDER = [
   'earlier',
   'lastWeek',
@@ -168,12 +185,27 @@ function dateBucket(at: Date, option: string, now: Date): Bucket {
       }
       return { id: key, label: DATE_LABELS[key], sort: RELATIVE_ORDER.indexOf(key) }
     }
+    case SCHEDULED_OPTION: {
+      const d = daysBetween(now, at)
+      let key: string
+      if (d < 0) key = 'overdue'
+      else if (d === 0) key = 'today'
+      else if (d === 1) key = 'tomorrow'
+      else {
+        const w = Math.round((mondayOf(at).getTime() - mondayOf(now).getTime()) / (7 * DAY_MS))
+        key = w === 0 ? 'thisWeek' : w === 1 ? 'nextWeek' : 'later'
+      }
+      return { id: key, label: DATE_LABELS[key], sort: SCHEDULED_ORDER.indexOf(key) }
+    }
     default: {
       const id = dayId(at)
       return { id, label: `${SHORT_MONTHS[at.getMonth()]} ${at.getDate()}, ${at.getFullYear()}`, sort: id }
     }
   }
 }
+
+const categoryIndex = (c: StatusCategory) => STATUS_CATEGORIES.findIndex((x) => x.key === c)
+const categoryLabel = (c: StatusCategory) => STATUS_CATEGORIES[categoryIndex(c)]?.label ?? c
 
 const basename = (p: string) => p.replace(/\.md$/i, '').split('/').pop() ?? p
 
@@ -197,6 +229,13 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
       return [v === true ? { id: 'true', label: 'Checked', sort: 0 } : { id: 'false', label: 'Unchecked', sort: 1 }]
     case 'label': {
       const set = def.options.set ?? []
+      if (entry.option === STATUS_CATEGORY_OPTION && isStatusLabel(def)) {
+        // The first status names the category; no status or an unknown one is not started.
+        const first = Array.isArray(v) ? (v as string[])[0] : undefined
+        const opt = set.find((s) => s.text === first)
+        const c = opt ? optionCategory(opt) : 'not-started'
+        return [{ id: c, label: categoryLabel(c), sort: categoryIndex(c) }]
+      }
       const out: Bucket[] = []
       for (const t of Array.isArray(v) ? (v as string[]) : []) {
         const i = set.findIndex((s) => s.text === t)
@@ -204,7 +243,9 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
       }
       return out
     }
-    case 'entity': {
+    case 'entity':
+    case 'entity_backlinks': {
+      // Backlinks group like a relation: one group per linking object.
       const refs = Array.isArray(v) ? (v as EntityRef[]) : []
       const out: Bucket[] = []
       refs.forEach((r, i) => {
@@ -298,14 +339,21 @@ export function groupRows(
   const entry = groupBy?.groups?.[0]
   const def = entry ? findDef(ctx.types, entry.propertyId, entry.structureId) : undefined
   if (!entry || !def) return { groups: [{ id: OTHER_ID, label: 'Objects', rows }], hidden: [] }
-  const isStatus = def.type === 'label' && !!def.options.isStatus
+  const isStatus = isStatusLabel(def)
+  const byCategory = isStatus && entry.option === STATUS_CATEGORY_OPTION
 
   const byId = new Map<string, Entry>()
-  const other: Group = { id: OTHER_ID, label: 'Other', rows: [], isOther: true }
-  // Every label option is a group, even with no rows, so a board keeps its columns.
-  ;(def.type === 'label' ? (def.options.set ?? []) : []).forEach((opt, i) =>
-    byId.set(opt.id, { id: opt.id, label: opt.text, rows: [], color: opt.color, icon: opt.icon, sort: i, created: Infinity }),
-  )
+  const otherLabel = DATE_KINDS.has(def.type) && entry.option === SCHEDULED_OPTION ? NO_DATE : 'Other'
+  const other: Group = { id: OTHER_ID, label: otherLabel, rows: [], isOther: true }
+  if (byCategory) {
+    // The four categories are always the columns, in order.
+    STATUS_CATEGORIES.forEach((c, i) => byId.set(c.key, { id: c.key, label: c.label, rows: [], sort: i, created: Infinity }))
+  } else {
+    // Every label option is a group, even with no rows, so a board keeps its columns.
+    ;(def.type === 'label' ? (def.options.set ?? []) : []).forEach((opt, i) =>
+      byId.set(opt.id, { id: opt.id, label: opt.text, rows: [], color: opt.color, icon: opt.icon, sort: i, created: Infinity }),
+    )
+  }
   if (def.type === 'boolean') {
     byId.set('true', { id: 'true', label: 'Checked', rows: [], sort: 0, created: Infinity })
     byId.set('false', { id: 'false', label: 'Unchecked', rows: [], sort: 1, created: Infinity })
@@ -320,7 +368,7 @@ export function groupRows(
     for (const b of buckets) {
       let g = byId.get(b.id)
       if (!g) {
-        const created = def.type === 'entity' ? Date.parse(ctx.entityCreated?.[b.id] ?? '') : NaN
+        const created = def.type === 'entity' || def.type === 'entity_backlinks' ? Date.parse(ctx.entityCreated?.[b.id] ?? '') : NaN
         g = { id: b.id, label: b.label, rows: [], sort: b.sort, created: Number.isNaN(created) ? Infinity : created }
         if (def.type === 'entity_type') g.icon = ctx.types.find((x) => x.id === b.id)?.icon
         byId.set(b.id, g)
@@ -380,7 +428,7 @@ export function groupRows(
 
 /**
  * The update that moves a row into `group`, or null where a drag can't (created, updated, type,
- * number ranges and date periods).
+ * backlinks, number ranges and date periods).
  */
 export function valueForGroup(
   groupBy: GroupBy | GroupByEntry,
@@ -394,6 +442,7 @@ export function valueForGroup(
     case 'entity_createdAt':
     case 'entity_lastUpdated':
     case 'entity_type':
+    case 'entity_backlinks':
     case 'datetime':
     case 'datetimeSimple':
     case 'blocks':
@@ -404,6 +453,12 @@ export function valueForGroup(
     case 'boolean':
       return { key, value: group.id === 'true' }
     case 'label':
+      if (entry.option === STATUS_CATEGORY_OPTION && isStatusLabel(def)) {
+        // A drop into a category writes that category's first status (none: no drop).
+        const first = (def.options.set ?? []).find((s) => optionCategory(s) === group.id)
+        return first ? { key, value: [first.text] } : null
+      }
+      return { key, value: group.isOther ? [] : [group.label] }
     case 'entity_tags':
     case 'entity_collections':
     case 'entity_aliases':

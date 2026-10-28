@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { Row, TypeDef } from '@/api/types'
 import { collection, objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
-import { GROUP_OPTIONS, GROUP_SORT_OPTIONS, groupRows, valueForGroup, type GroupCtx } from './group'
+import { GROUP_OPTIONS, GROUP_SORT_OPTIONS, groupRows, isGroupable, valueForGroup, type GroupCtx } from './group'
 
 const now = new Date(2026, 9, 23, 12, 0) // Friday
 
@@ -37,8 +37,12 @@ describe('group options', () => {
   test('options per kind', () => {
     expect(GROUP_OPTIONS('textBlock').map((o) => o.label)).toEqual(['By Text', 'By Linked Objects'])
     expect(GROUP_OPTIONS('number').map((o) => o.label)).toEqual(['By Exact Value', 'By Range'])
-    expect(GROUP_OPTIONS('datetime').map((o) => o.label)).toEqual(['By Hour', 'By Day', 'By Week', 'By Month', 'By Year', 'Relative'])
+    expect(GROUP_OPTIONS('datetime').map((o) => o.label)).toEqual(['By Hour', 'By Day', 'By Week', 'By Month', 'By Year', 'Relative', 'Scheduled'])
     expect(GROUP_OPTIONS('label').map((o) => o.key)).toEqual(['default'])
+    // "Created at" groups like "Last updated" (All notes itself groups by it, Relative).
+    expect(isGroupable('entity_createdAt')).toBe(true)
+    expect(GROUP_OPTIONS('entity_createdAt')).toEqual(GROUP_OPTIONS('entity_lastUpdated'))
+    expect(GROUP_OPTIONS('entity_createdAt').map((o) => o.label)).toContain('Relative')
     expect(GROUP_SORT_OPTIONS('label').slice(0, 2).map((o) => o.label)).toEqual(['Order', 'Order inverse'])
     expect(GROUP_SORT_OPTIONS('entity').map((o) => o.label)).toContain('Created newest first')
     expect(GROUP_SORT_OPTIONS('text').at(-1)?.label).toBe('Manual')
@@ -137,5 +141,142 @@ describe('valueForGroup', () => {
     const c = collection({ id: 'tools', name: 'Tooling' })
     const { groups } = groupRows([R('a', {}, { collections: ['tooling'] })], by('collections'), undefined, ctx({ collections: [c] }))
     expect(ids(groups)).toEqual(['tools'])
+  })
+})
+
+describe('task groupings (M4)', () => {
+  // A task status set with an option that has no category ("Someday").
+  const taskStatus = propertyDef({
+    id: 'status',
+    type: 'label',
+    options: {
+      isStatus: true,
+      set: [
+        { id: 's1', text: 'Not Started', color: 'red', icon: null, statusCategory: 'not-started' },
+        { id: 's2', text: 'In Progress', color: 'blue', icon: null, statusCategory: 'in-progress' },
+        { id: 's3', text: 'On Hold', color: 'pink', icon: null, statusCategory: 'blocked' },
+        { id: 's4', text: 'Done', color: 'green', icon: null, statusCategory: 'done' },
+        { id: 's5', text: 'Someday', color: 'gray', icon: null },
+        { id: 's6', text: 'Shipped', color: 'green', icon: null, statusCategory: 'done' },
+      ],
+    },
+  })
+  const taskType = typeDef({ id: 'task', propertyDefinitions: [taskStatus, propertyDef({ id: 'date', type: 'datetimeSimple' })] })
+  const tctx = (): GroupCtx => ({ types: [taskType], collections: [], tagIdsToTitles: {}, now })
+  const T = (path: string, values: Row['values'] = {}): Row => row({ summary: objectSummary({ path, type: 'task' }), values })
+  const cat = { groups: [{ propertyId: 'status', option: 'statusCategory' }] }
+
+  test('status category option offered only for a status label; scheduled for dates', () => {
+    expect(GROUP_OPTIONS('label', taskStatus).map((o) => `${o.key}:${o.label}`)).toEqual(['default:default', 'statusCategory:By category'])
+    expect(GROUP_OPTIONS('label', flavor).map((o) => o.key)).toEqual(['default'])
+    expect(GROUP_OPTIONS('label').map((o) => o.key)).toEqual(['default'])
+    expect(GROUP_OPTIONS('datetime').map((o) => o.label)).toEqual(['By Hour', 'By Day', 'By Week', 'By Month', 'By Year', 'Relative', 'Scheduled'])
+    expect(GROUP_OPTIONS('datetimeSimple').at(-1)).toEqual({ key: 'scheduled', label: 'Scheduled' })
+  })
+
+  test('status category groups in order with no-category and Other in Not started', () => {
+    const rows = [
+      T('done', { status: ['Done'] }),
+      T('shipped', { status: ['Shipped'] }),
+      T('doing', { status: ['In Progress'] }),
+      T('someday', { status: ['Someday'] }),
+      T('none', { status: [] }),
+      T('unknown', { status: ['Gone'] }),
+      T('ns', { status: ['Not Started'] }),
+    ]
+    const { groups, hidden } = groupRows(rows, cat, undefined, tctx())
+    expect(ids(groups)).toEqual(['not-started', 'in-progress', 'blocked', 'done'])
+    expect(hidden).toEqual([])
+    expect(paths(groups[0].rows)).toEqual(['someday', 'none', 'unknown', 'ns'])
+    expect(paths(groups[1].rows)).toEqual(['doing'])
+    expect(groups[2].rows).toEqual([])
+    expect(paths(groups[3].rows)).toEqual(['done', 'shipped'])
+    expect(groups.some((g) => g.isOther)).toBe(false)
+  })
+
+  test('category group labels match reference', () => {
+    const { groups } = groupRows([], cat, undefined, tctx())
+    expect(labels(groups)).toEqual(['Not started', 'In progress', 'Blocked', 'Done'])
+  })
+
+  test('category groups honour hideEmptyGroups and hideByDefault', () => {
+    const rows = [T('a', { status: ['Done'] })]
+    expect(ids(groupRows(rows, cat, { groups: [], hideEmptyGroups: true }, tctx()).groups)).toEqual(['done'])
+    const cfg = { groups: [{ id: 'done', isHidden: false, isClosed: false }], hideByDefault: true }
+    const r = groupRows(rows, cat, cfg, tctx())
+    expect(ids(r.groups)).toEqual(['done'])
+    expect(ids(r.hidden)).toEqual(['not-started', 'in-progress', 'blocked'])
+  })
+
+  test('valueForGroup category writes first option of the category', () => {
+    const { groups } = groupRows([], cat, undefined, tctx())
+    const byId = Object.fromEntries(groups.map((g) => [g.id, g]))
+    expect(valueForGroup(cat, byId['done'], taskStatus)).toEqual({ key: 'status', value: ['Done'] })
+    expect(valueForGroup(cat, byId['not-started'], taskStatus)).toEqual({ key: 'status', value: ['Not Started'] })
+    expect(valueForGroup(cat, byId['blocked'], taskStatus)).toEqual({ key: 'status', value: ['On Hold'] })
+    // A category the set has no option for can't be dropped into.
+    const bare = propertyDef({ id: 'status', type: 'label', options: { isStatus: true, set: [{ id: 'x', text: 'Done', color: null, icon: null, statusCategory: 'done' }] } })
+    expect(valueForGroup(cat, byId['blocked'], bare)).toBeNull()
+    // "Someday" has no category, so it is the first not-started option of the bare-ish set.
+    const nocat = propertyDef({ id: 'status', type: 'label', options: { isStatus: true, set: [{ id: 'y', text: 'Someday', color: null, icon: null }] } })
+    expect(valueForGroup(cat, byId['not-started'], nocat)).toEqual({ key: 'status', value: ['Someday'] })
+  })
+
+  test('scheduled buckets against fixed now', () => {
+    // now: Friday 2026-10-23. This week runs Mon 19 – Sun 25; next week Mon 26 – Sun Nov 1.
+    const d = (s: string) => ({ start: s, resolution: 'day' })
+    const rows = [
+      T('none', {}),
+      T('later', { date: d('2026-11-02') }),
+      T('nextw', { date: d('2026-10-28') }),
+      T('sun', { date: d('2026-10-25') }),
+      T('tom', { date: d('2026-10-24') }),
+      T('today', { date: d('2026-10-23') }),
+      T('todayTime', { date: { start: '2026-10-23T15:00:00', resolution: 'time' } }),
+      T('yest', { date: d('2026-10-22') }),
+      T('old', { date: d('2026-01-01') }),
+    ]
+    const by2 = { groups: [{ propertyId: 'date', option: 'scheduled' }] }
+    const { groups } = groupRows(rows, by2, undefined, tctx())
+    expect(labels(groups)).toEqual(['Overdue', 'Today', 'Tomorrow', 'This week', 'Next week', 'Later', 'No date'])
+    expect(ids(groups)).toEqual(['overdue', 'today', 'tomorrow', 'thisWeek', 'nextWeek', 'later', 'other'])
+    expect(paths(groups[0].rows)).toEqual(['yest', 'old'])
+    expect(paths(groups[1].rows)).toEqual(['today', 'todayTime'])
+    expect(paths(groups[3].rows)).toEqual(['sun'])
+    expect(groups.at(-1)!.isOther).toBe(true)
+    expect(valueForGroup(by2, groups[1], { type: 'datetimeSimple', options: {} })).toBeNull()
+  })
+
+  test('scheduled on a Sunday: tomorrow is next week, but Tomorrow wins', () => {
+    const sunday = new Date(2026, 9, 25, 9, 0)
+    const d = (s: string) => ({ start: s, resolution: 'day' })
+    const rows = [T('mon', { date: d('2026-10-26') }), T('tue', { date: d('2026-10-27') })]
+    const { groups } = groupRows(rows, { groups: [{ propertyId: 'date', option: 'scheduled' }] }, undefined, { ...tctx(), now: sunday })
+    expect(labels(groups)).toEqual(['Tomorrow', 'Next week'])
+  })
+})
+
+describe('group by backlinks (M5)', () => {
+  test('test group by backlinks gives one group per linking object and Other', () => {
+    const bl = propertyDef({ id: 'backlinks', name: 'Backlinks', type: 'entity_backlinks' })
+    const person = typeDef({ id: 'person', propertyDefinitions: [propertyDef({ id: 'title', type: 'entity_title' }), bl] })
+    const P = (path: string, backlinks: { target: string; path: string | null }[]) =>
+      row({ summary: objectSummary({ path, type: 'person' }), values: { backlinks } })
+    const rows = [
+      P('a', [{ target: 'Ada', path: 'People/Ada.md' }]),
+      P('b', [
+        { target: 'Bob', path: 'People/Bob.md' },
+        { target: 'Ada', path: 'People/Ada.md' },
+      ]),
+      P('c', []),
+    ]
+    const c: GroupCtx = { types: [person], collections: [], tagIdsToTitles: {}, now, entityTitles: { 'People/Ada.md': 'Ada Lovelace' } }
+    const { groups } = groupRows(rows, by('backlinks'), undefined, c)
+    expect(ids(groups)).toEqual(['People/Ada.md', 'People/Bob.md', 'other'])
+    expect(labels(groups)).toEqual(['Ada Lovelace', 'Bob', 'Other'])
+    expect(groups.map((g) => paths(g.rows))).toEqual([['a', 'b'], ['b'], ['c']])
+    // Read-only: a drag into a backlinks group writes nothing.
+    expect(valueForGroup(by('backlinks'), groups[0], bl)).toBeNull()
+    expect(GROUP_SORT_OPTIONS('entity_backlinks').map((o) => o.label)).toContain('Created oldest first')
   })
 })

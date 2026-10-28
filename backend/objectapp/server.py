@@ -31,7 +31,8 @@ Routes (all JSON):
   inferred type was saved for the first time).
 - ``DELETE /api/object?path=&baseVersion=&clientId=`` -> ``{trashId, typeIds}``; ``404``,
   ``409 {currentVersion}``. Moves the file to the trash; announces ``deleted``.
-- ``DELETE /api/collections/{id}?confirm=true&clientId=`` -> ``{trashId, removedFrom, skipped}``;
+- ``DELETE /api/collections/{id}?confirm=true&clientId=`` -> ``{trashId, removedFrom, skipped, deleted}``
+  (``deleted``: the sole members moved to the trash);
   ``404``, ``428 {detail, affected}``, ``423``. ``POST /api/trash/{id}/restore`` of a collection
   entry also answers ``409`` (name taken, or its id is used by another definition).
 - ``GET /api/queries`` -> ``Query[]``; ``POST /api/queries`` ``{name?, definition?, view?, clientId?}``
@@ -41,7 +42,9 @@ Routes (all JSON):
   Announces ``queries``. Restoring one re-creates its file under the original id
   (``409`` when that file exists).
 - ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
-  ``{paths, typeIds}`` (announces ``created`` per path and ``types`` per type); ``422`` when a
+  ``{paths, typeIds, rewritten}`` (plus ``collectionIds``, ``queryIds``, ``skipped`` for a
+  collection or query entry; ``rewritten``: other files written back, announced ``changed``;
+  announces ``created`` per path and ``types`` per type); ``422`` when a
   saved type now has the trashed type's id or name;
   ``DELETE /api/trash/{id}`` and ``DELETE /api/trash`` -> ``{purged}``; ``404``.
 - ``POST /api/types`` ``{name, pluralName, icon?, color?, clientId?}`` -> ``201 TypeDef``;
@@ -75,13 +78,46 @@ Routes (all JSON):
   also renames it in every ``tags:`` list; those files are in ``relinked``.
 - ``GET /api/images`` -> ``{path}[]`` (image files outside dot-folders);
   ``POST /api/images?name=`` (raw bytes) -> ``201 {path}`` (``Attachments/<safe name>``),
-  ``415`` for a name without an image extension. ``GET /api/file?path=`` -> the image's
-  bytes; ``415`` for a non-image extension, ``404`` when missing, in a dot-folder or
-  outside the space.
+  ``415`` for a name without an image extension (kept for M2's cover-image picker).
+- M7 attachments: ``GET /api/attachments`` -> ``{path, kind, size}[]`` (files outside
+  dot-folders whose kind isn't ``file``, plus everything under ``Attachments/``; never
+  objects or whiteboard sidecars), sorted by path. ``POST /api/attachments?name=`` (raw
+  bytes) -> ``201 {path, kind}`` (``Attachments/<safe name>.<ext>``, `` (2)`` when taken,
+  never overwritten); ``413`` over 100 MiB, ``422`` empty or unusable name.
+  ``GET /api/file?path=`` -> the file's bytes with per-kind headers (images: CSP
+  ``sandbox``; pdf, audio, video: inline, ranges answered ``206``; any other file:
+  ``application/octet-stream`` as an attachment; ``nosniff`` on all); ``415`` for a ``.md``
+  file, ``404`` when missing, in a dot-folder, outside the space or a whiteboard sidecar.
+  ``POST /api/attachments/open`` ``{path}`` -> ``{ok}`` (opened with the OS default app);
+  ``404`` as above, ``415`` for an executable or script (or a ``.md``).
+- M7 spaces (the registry is ``<state dir>/spaces.json``; no folder is ever deleted):
+  ``GET /api/spaces`` -> ``{spaces: {path, name, icon, current, missing, lastOpened}[]}``
+  (registry order, the current space always listed; never writes). ``POST /api/spaces``
+  ``{name, location}`` -> ``201 {path}`` (a new folder holding only ``.object/space.json``,
+  registered); ``409`` the folder exists, ``422`` bad name, ``404`` not a folder.
+  ``POST /api/spaces/open`` ``{path}`` -> ``{path}`` (registers an existing folder; ``404``).
+  ``DELETE /api/spaces?path=`` -> ``{ok}`` (registry only; ``409`` for the current space).
+  ``POST /api/spaces/switch`` ``{path}`` -> ``202 {path}``, then the launcher restarts the
+  server on that folder on the same port; ``404`` not a folder, ``503`` without the launcher.
 - ``GET /api/resolve?link=&from=`` -> ``{path}`` or ``404``
 - ``POST /api/reveal`` ``{path}`` -> ``200 {ok}``: show the file in the OS file manager
 - ``GET /api/events`` -> Server-Sent Events; event ``change`` with a
   `ChangeEvent` as JSON data (``{kind, path, version, origin}``)
+- M6 whiteboards (`whiteboardapi.whiteboard_router`): ``GET /api/whiteboard?path=`` ->
+  ``{path, board, revision, readOnlyReason?}``; ``PUT /api/whiteboard``
+  ``{path, board, baseRevision, clientId?}`` -> ``{revision}`` (``409 {currentRevision}``,
+  ``422``, ``423``); ``GET /api/whiteboard/ink?path=`` -> ``{path, strokes, revision,
+  readOnlyReason?}``; ``PUT /api/whiteboard/ink`` ``{path, strokes, baseRevision, clientId?}``
+  -> ``{revision}``; ``POST /api/whiteboards`` ``{title?, clientId?}`` ->
+  ``201 {path, version, typeIds}``. Board and ink saves announce ``whiteboard`` with the
+  board's ``.md`` path. ``PUT /api/ui`` accepts ``whiteboard`` (the canvas display settings).
+  Deleting, restoring, purging and renaming a whiteboard carry its sidecar files; a rename
+  relinks board files too (their sidecar paths are in ``relinked``, announced ``whiteboard``).
+- M8 (plan Task 2): ``POST /api/spaces`` also takes ``setup: 'blank' | 'basic'``; the
+  ``timeZone`` device setting sets ``space.tz`` at start-up and after every successful
+  ``PUT /api/settings`` (null: the device's zone). The M8 routers (`api_tasks`,
+  `api_history`, `api_blocks`, `api_merge`, `api_spaces_m8`) are mounted on ``/api``;
+  each module's docstring lists its routes and owner task.
 
 Errors: a path outside the space or not an object is ``400``; a missing object is ``404``;
 a file the OS refused to write (locked by another program, say) is ``503 {detail}``.
@@ -96,23 +132,72 @@ import os
 import subprocess
 import sys
 import threading
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import asdict
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, FastAPI, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
+from starlette.background import BackgroundTask
 
+from . import (
+    api_blocks,
+    api_graph,
+    api_history,
+    api_merge,
+    api_references,
+    api_search,
+    api_spaces_m8,
+    api_tasks,
+    media,
+)
+from .apictx import ApiContext
+from .appstate import state_dir
 from .collections import CollectionDef
-from .jsonstore import DefinitionUnreadable, default_views, json_revision
-from .media import NotAnImage, image_media_type, image_path, import_image, list_images
+from .jsonstore import (
+    DefinitionUnreadable,
+    default_views,
+    json_revision,
+    normalize_views,
+)
+from .media import (
+    NotAnImage,
+    NotServed,
+    RefusedToOpen,
+    TooLarge,
+    attachment_media_type,
+    attachment_path,
+    import_attachment,
+    import_image,
+    kind_of,
+    list_attachments,
+    list_images,
+    open_with_system,
+    serve_headers,
+)
+from .notify import FileNotifier, system_notifier
 from .propvalues import InvalidValue
 from .queries import QueryDef
-from .space import ConfirmRequired, Conflict, ReadOnly, RestoreConflict, Space
+from .reminders import ReminderScheduler, file_clock
+from .searchindex import SearchIndex
+from .settings import SettingsProblem, time_zone
+from .settings import patch as patch_settings
+from .settings import read as read_settings
+from .space import (
+    ConfirmRequired,
+    Conflict,
+    DailyNoteExists,
+    ReadOnly,
+    RestoreConflict,
+    Space,
+)
+from .spaceconfig import SpaceConfigProblem, space_fields
+from .spaceconfig import patch as patch_space_config
+from .spaces import Registry, SpaceNameProblem, create_space, normalize
 from .typedefs import has_undecodable
 from .typemodel import (
     RevisionConflict,
@@ -123,6 +208,9 @@ from .typemodel import (
 )
 from .uistate import patch_ui, read_ui, ui_read_only_reason, ui_with_defaults
 from .watcher import ChangeEvent, SpaceWatcher
+from .whiteboardapi import whiteboard_router
+from .whiteboardfile import sidecar_owner
+from .whiteboardstore import whiteboard_ui_problem
 
 __all__ = ["EventHub", "create_app"]
 
@@ -214,6 +302,12 @@ class CreateObjectRequest(BaseModel):
     clientId: str | None = None
 
 
+class CreateDailyNoteRequest(BaseModel):
+    date: str
+    templateId: str | None = None
+    clientId: str | None = None
+
+
 class CreateTemplateRequest(BaseModel):
     name: str | None = None
     clientId: str | None = None
@@ -297,7 +391,66 @@ class SaveQueryRequest(BaseModel):
     clientId: str | None = None
 
 
-_UI_PATCH_KEYS = frozenset({"pinned", "sections", "allNotesLayout"})
+_UI_PATCH_KEYS = frozenset(
+    {"pinned", "sections", "allNotesLayout", "calendar", "tasks", "reminders", "graph", "whiteboard"}
+)
+# RootSpace.model.ts `GraphViewCustomization`, verbatim.
+_GRAPH_LIST_KEYS = ("filterStructureIds", "excludeStructureIds")
+_GRAPH_BOOL_KEYS = (
+    "showCompletedTasks",
+    "showMinimalNodes",
+    "hideLargeNodes",
+    "hideDates",
+    "hideIndirectLinks",
+    "showTagsNetwork",
+    "showSpaceTagsNetwork",
+)
+_WEEK_STARTS = ("sunday", "monday")
+_CALENDAR_HIDE_KEYS = (
+    "hideDailyNote",
+    "hideTasks",
+    "hideDated",
+    "hideCreatedOnDay",
+    "hideUpdated",
+    "hideCreateObjects",
+)
+_CALENDAR_VIEW_KEYS = ("tasksView", "createdView", "updatedView", "datedView")
+_TASK_SECTION_KEYS = frozenset(
+    {
+        "status",
+        "today",
+        "inbox",
+        "open",
+        "deadline",
+        "scheduled",
+        "recurring",
+        "reminders",
+        "tags",
+        "completed",
+        "source",
+    }
+)
+
+
+class PatchSpaceRequest(BaseModel):
+    patch: dict[str, Any]
+    baseRevision: str = ""
+    clientId: str | None = None
+
+
+class PatchSettingsRequest(BaseModel):
+    patch: dict[str, Any]
+    baseRevision: str = ""
+
+
+class CreateSpaceRequest(BaseModel):
+    name: str = ""
+    location: str = ""
+    setup: Literal["blank", "basic"] = "blank"
+
+
+class SpacePathRequest(BaseModel):
+    path: str = ""
 
 
 class EnsureTagRequest(BaseModel):
@@ -329,6 +482,10 @@ class RevealRequest(BaseModel):
     path: str
 
 
+class OpenAttachmentRequest(BaseModel):
+    path: str
+
+
 def reveal_in_file_manager(path: Path) -> None:
     """Show `path` in Explorer (selected), Finder, or the desktop's file manager."""
     if sys.platform == "win32":
@@ -343,17 +500,171 @@ def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse({"detail": message}, status_code=status)
 
 
-def create_app(space: Space, static_dir: Path | None = None, watch: bool = True) -> FastAPI:
-    """The app for `space`. With `watch`, a `SpaceWatcher` runs for the app's lifespan."""
+def _views_problem(views: dict[str, Any]) -> str | None:
+    """Why a PUT /api/views body is not a Views object, else None."""
+    if "activeTab" in views and not isinstance(views["activeTab"], str):
+        return "activeTab must be a string."
+    if "all" in views and not isinstance(views["all"], dict):
+        return "all must be an object."
+    if "dashboard" in views:
+        dash = views["dashboard"]
+        if not isinstance(dash, dict):
+            return "dashboard must be an object."
+        sections = dash.get("sections", [])
+        if not isinstance(sections, list) or not all(
+            isinstance(x, dict) and isinstance(x.get("key"), str) for x in sections
+        ):
+            return "dashboard.sections must be a list of sections with a key."
+        if not isinstance(dash.get("removedSections", []), list):
+            return "dashboard.removedSections must be a list."
+    return None
+
+
+def _ui_problem(patch: dict[str, Any]) -> str | None:
+    """Why a PUT /api/ui patch has the wrong shape, else None."""
+    if "pinned" in patch:
+        pinned = patch["pinned"]
+        if not isinstance(pinned, list) or not all(
+            isinstance(p, dict) and isinstance(p.get("kind"), str) and isinstance(p.get("id"), str)
+            for p in pinned
+        ):
+            return "pinned must be a list of {kind, id}."
+    if "sections" in patch:
+        sections = patch["sections"]
+        if not isinstance(sections, list) or not all(
+            isinstance(x, dict) and isinstance(x.get("items", []), list) for x in sections
+        ):
+            return "sections must be a list of sections with a list of items."
+    if "allNotesLayout" in patch and not isinstance(patch["allNotesLayout"], str):
+        return "allNotesLayout must be a string."
+    if "calendar" in patch:
+        problem = _calendar_ui_problem(patch["calendar"])
+        if problem:
+            return problem
+    if "tasks" in patch:
+        problem = _tasks_ui_problem(patch["tasks"])
+        if problem:
+            return problem
+    if "reminders" in patch:
+        reminders = patch["reminders"]
+        if not isinstance(reminders, dict) or not isinstance(reminders.get("enabled"), bool):
+            return "reminders must be {enabled: true|false}."
+    if "graph" in patch:
+        problem = _graph_ui_problem(patch["graph"])
+        if problem:
+            return problem
+    if "whiteboard" in patch:
+        problem = whiteboard_ui_problem(patch["whiteboard"])
+        if problem:
+            return problem
+    return None
+
+
+def _graph_ui_problem(graph: Any) -> str | None:
+    """Why a ``graph`` ui patch is not a ``GraphViewCustomization``, else None."""
+    if not isinstance(graph, dict):
+        return "graph must be an object."
+    unknown = sorted(set(graph) - set(_GRAPH_LIST_KEYS) - set(_GRAPH_BOOL_KEYS))
+    if unknown:
+        return f"Cannot patch: {', '.join(f'graph.{k}' for k in unknown)}"
+    for key in _GRAPH_LIST_KEYS:
+        if key in graph and not (
+            isinstance(graph[key], list) and all(isinstance(x, str) for x in graph[key])
+        ):
+            return f"graph.{key} must be a list of type ids."
+    for key in _GRAPH_BOOL_KEYS:
+        if key in graph and not isinstance(graph[key], bool):
+            return f"graph.{key} must be true or false."
+    return None
+
+
+def _calendar_ui_problem(cal: Any) -> str | None:
+    """Why a ``calendar`` ui patch is not a ``CalendarUi``, else None."""
+    if not isinstance(cal, dict):
+        return "calendar must be an object."
+    if "weekStart" in cal and cal["weekStart"] not in _WEEK_STARTS:
+        return "calendar.weekStart must be 'sunday' or 'monday'."
+    if "hideCalendarSidebar" in cal and not isinstance(cal["hideCalendarSidebar"], bool):
+        return "calendar.hideCalendarSidebar must be true or false."
+    if "daily" in cal:
+        daily = cal["daily"]
+        if not isinstance(daily, dict):
+            return "calendar.daily must be an object."
+        for key in _CALENDAR_HIDE_KEYS:
+            if key in daily and not isinstance(daily[key], bool):
+                return f"calendar.daily.{key} must be true or false."
+        for key in _CALENDAR_VIEW_KEYS:
+            if key in daily and not isinstance(daily[key], dict):
+                return f"calendar.daily.{key} must be a view state object."
+    return None
+
+
+def _tasks_ui_problem(tasks: Any) -> str | None:
+    """Why a ``tasks`` ui patch is not a ``TasksUi``, else None."""
+    if not isinstance(tasks, dict):
+        return "tasks must be an object."
+    if "activeTab" in tasks and tasks["activeTab"] not in _TASK_SECTION_KEYS:
+        return "tasks.activeTab must be a task section key."
+    if "views" in tasks:
+        views = tasks["views"]
+        if not isinstance(views, dict) or not all(
+            k in _TASK_SECTION_KEYS and isinstance(v, dict) for k, v in views.items()
+        ):
+            return "tasks.views must map task section keys to view state objects."
+    return None
+
+
+def create_app(
+    space: Space,
+    static_dir: Path | None = None,
+    watch: bool = True,
+    on_switch: Callable[[Path], None] | None = None,
+) -> FastAPI:
+    """The app for `space`. With `watch`, a `SpaceWatcher` runs for the app's lifespan.
+
+    `on_switch` is the launcher's ``SpaceHost.request_switch``: ``POST
+    /api/spaces/switch`` calls it with the new space's folder once the response is
+    sent. Without it that route answers 503.
+
+    The reminder scheduler runs for the app's lifespan either way. Test hooks,
+    ignored unless set: ``OBJECT_CLOCK_FILE`` (a file holding an ISO UTC instant
+    that `Space.clock` re-reads on every call), ``OBJECT_FAKE_NOTIFY_FILE`` (a
+    file-appending notifier instead of the OS one, and ``POST /api/_test/tick``)
+    and ``OBJECT_STATE_DIR`` (where the reminder ledger lives; read by `reminders`).
+    """
     hub = EventHub()
+    clock_file = os.environ.get("OBJECT_CLOCK_FILE")
+    if clock_file:
+        space.clock = file_clock(Path(clock_file))
+    fake_notify = os.environ.get("OBJECT_FAKE_NOTIFY_FILE")
+    notifier = FileNotifier(Path(fake_notify)) if fake_notify else system_notifier()
+    scheduler = ReminderScheduler(space, notifier)
+    search = SearchIndex(space)
+
+    # M8: the Time zone setting drives `space.tz`; null means the device's zone,
+    # which is whatever `space.tz` was when the app was made (tests inject one).
+    device_tz = space.tz
+
+    def settings_changed(merged: dict[str, Any]) -> None:
+        zone = time_zone(merged)
+        space.tz = zone if zone is not None else device_tz
+
+    with contextlib.suppress(ReadOnly):
+        settings_changed(read_settings()[0])
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI):
         hub.loop = asyncio.get_running_loop()
         hub.closed = False
+        scheduler.start()
+        search.start()
         if not watch:
-            yield
-            hub.close()
+            try:
+                yield
+            finally:
+                hub.close()
+                await asyncio.to_thread(search.stop)
+                await asyncio.to_thread(scheduler.stop)
             return
         watcher = SpaceWatcher(space, hub.loop)
         watcher.start()
@@ -371,12 +682,16 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             with contextlib.suppress(asyncio.CancelledError):
                 await task
             await asyncio.to_thread(watcher.stop)
+            await asyncio.to_thread(search.stop)
+            await asyncio.to_thread(scheduler.stop)
 
     app = FastAPI(
         title="Object", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
     )
     app.state.space = space
     app.state.hub = hub
+    app.state.reminders = scheduler
+    app.state.search = search
 
     @app.exception_handler(OSError)
     async def os_error(_request: Request, exc: OSError) -> JSONResponse:
@@ -390,13 +705,115 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         return JSONResponse({"detail": detail, "reason": detail}, status_code=503)
     api = APIRouter(prefix="/api")
 
-    @api.get("/space")
-    def get_space():
+    def space_info() -> dict[str, Any]:
+        fields = space_fields(space.root)
         return {
-            "name": space.name,
+            "name": fields["name"],
             "root": str(space.root),
             "types": [t.to_api(rev) for t, rev in space.types_with_revisions()],
+            "icon": fields["icon"],
+            "description": fields["description"],
+            "hideTaskManagement": fields["hideTaskManagement"],
+            "revision": fields["revision"],
         }
+
+    @api.get("/space")
+    def get_space():
+        return space_info()
+
+    @api.put("/space")
+    def put_space(req: PatchSpaceRequest):
+        try:
+            patch_space_config(space.root, req.patch, req.baseRevision)
+        except SpaceConfigProblem as exc:
+            return _error(422, exc.message)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        return space_info()
+
+    @api.get("/settings")
+    def get_settings():
+        try:
+            data, revision = read_settings()
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        return {"settings": data, "revision": revision}
+
+    @api.put("/settings")
+    def put_settings(req: PatchSettingsRequest):
+        try:
+            data, revision = patch_settings(req.patch, req.baseRevision)
+        except SettingsProblem as exc:
+            return _error(422, exc.message)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        settings_changed(data)
+        return {"settings": data, "revision": revision}
+
+    # -- spaces (M7): the registry in the state dir; folders are never deleted --
+
+    def registry() -> Registry:
+        return Registry(state_dir())
+
+    @api.get("/spaces")
+    def list_spaces():
+        return {"spaces": [asdict(e) for e in registry().list(current=space.root)]}
+
+    @api.post("/spaces", status_code=201)
+    def post_space(req: CreateSpaceRequest):
+        if not req.location.strip():
+            return _error(404, "Choose a folder for the new space.")
+        try:
+            path = create_space(req.name, req.location, setup=req.setup)
+        except SpaceNameProblem as exc:
+            return _error(422, exc.message)
+        except (NotADirectoryError, FileNotFoundError):
+            return _error(404, f"Not a folder: {req.location}")
+        except FileExistsError:
+            return _error(409, "A folder with that name already exists here.")
+        except NotImplementedError as exc:  # M8 Task 2: `basic` until Task 8 fills it
+            return _error(501, str(exc))
+        registry().register(path, touch=False)
+        return JSONResponse({"path": str(path)}, status_code=201)
+
+    def _folder(raw: str) -> Path | None:
+        if not raw.strip():
+            return None
+        path = normalize(raw)
+        return path if path.is_dir() else None
+
+    @api.post("/spaces/open")
+    def open_space(req: SpacePathRequest):
+        path = _folder(req.path)
+        if path is None:
+            return _error(404, f"Not a folder: {req.path}")
+        registry().register(path, touch=False)
+        return {"path": str(path)}
+
+    @api.delete("/spaces")
+    def remove_space(path: str = Query(default="")):
+        if not path.strip():
+            return _error(404, "No space given.")
+        target = normalize(path)
+        if os.path.normcase(str(target)) == os.path.normcase(str(space.root)):
+            return _error(409, "This space is open. Switch to another space first.")
+        registry().remove(target)
+        return {"ok": True}
+
+    @api.post("/spaces/switch", status_code=202)
+    def switch_space(req: SpacePathRequest):
+        if on_switch is None:
+            return _error(503, "Switching spaces needs the Object launcher.")
+        path = _folder(req.path)
+        if path is None:
+            return _error(404, f"Not a folder: {req.path}")
+        return JSONResponse(
+            {"path": str(path)}, status_code=202, background=BackgroundTask(on_switch, path)
+        )
 
     @api.get("/objects")
     def list_objects(type: str | None = Query(default=None)):
@@ -424,6 +841,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
                 "body": of.body,
                 "version": version,
                 "links": space.links_of(path, fm),
+                "backlinks": space.backlinks(summary.path),
             }
         )
 
@@ -432,6 +850,22 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         loop = hub.loop
         if loop is not None and loop.is_running() and not hub.closed:
             loop.call_soon_threadsafe(hub.publish, event)
+
+    def announce_relinked(paths: list[str], client_id: str | None) -> None:
+        """``changed`` per relinked object; ``whiteboard`` (its .md) per relinked board file."""
+        for path in paths:
+            owner = sidecar_owner(path)
+            if owner is not None:
+                announce(ChangeEvent("whiteboard", owner, None, origin=client_id))
+            else:
+                announce(ChangeEvent("changed", path, space.cached_version(path), origin=client_id))
+
+    def announce_whiteboard(event: ChangeEvent) -> None:
+        """The whiteboard routes' announce: a board save also refreshes the board's links and
+        search text (the link index and the search index re-read it on this rescan)."""
+        if event.kind == "whiteboard":
+            space.rescan_file(event.path)
+        announce(event)
 
     @api.put("/object/body")
     def put_body(req: SaveBodyRequest):
@@ -478,15 +912,16 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             announce(
                 ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId)
             )
-        return _display_safe(
-            {
-                "version": result.version,
-                "frontmatter": result.frontmatter,
-                "links": result.links,
-                "synced": result.synced,
-                "skipped": [asdict(s) for s in result.skipped],
-            }
-        )
+        out = {
+            "version": result.version,
+            "frontmatter": result.frontmatter,
+            "links": result.links,
+            "synced": result.synced,
+            "skipped": [asdict(s) for s in result.skipped],
+        }
+        if result.task is not None:  # only when a Task's status changed category
+            out["task"] = result.task.to_api()
+        return _display_safe(out)
 
     @api.post("/object/ensure-id")
     def ensure_id(req: EnsureIdRequest):
@@ -525,10 +960,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             announce(renamed)
         elif result.version != req.baseVersion:
             announce(ChangeEvent("changed", rel, result.version, origin=req.clientId))
-        for path in result.relinked:
-            announce(
-                ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId)
-            )
+        announce_relinked(result.relinked, req.clientId)
         return _display_safe(result.to_api())
 
     @api.get("/object/change-type")
@@ -568,10 +1000,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             )
         elif result.version != req.baseVersion:
             announce(ChangeEvent("changed", rel, result.version, origin=req.clientId))
-        for path in result.relinked:
-            announce(
-                ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId)
-            )
+        announce_relinked(result.relinked, req.clientId)
         return _display_safe(result.to_api())
 
     def announce_template_ids(before: dict[str, str], client_id: str | None) -> None:
@@ -598,6 +1027,32 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         if t is not None and not had_file and type_revision(space.root, req.typeId):
             announce(ChangeEvent("types", req.typeId, None, origin=req.clientId))
             type_ids.append(req.typeId)
+        announce_template_ids(templates_before, req.clientId)
+        announce(ChangeEvent("created", path, version, origin=req.clientId))
+        return JSONResponse(
+            {"path": path, "version": version, "typeIds": type_ids}, status_code=201
+        )
+
+    @api.post("/daily-notes", status_code=201)
+    def create_daily_note(req: CreateDailyNoteRequest):
+        before = space.daily_note_type()
+        type_id = before.id if before is not None else "dailynote"
+        had_file = bool(type_revision(space.root, type_id))
+        templates_before = space.template_versions()
+        try:
+            path, version = space.create_daily_note(req.date, req.templateId)
+        except DailyNoteExists as exc:
+            announce_template_ids(templates_before, req.clientId)
+            return JSONResponse(
+                {"detail": exc.detail, "path": exc.path, "reason": exc.reason}, status_code=409
+            )
+        except InvalidValue as exc:
+            announce_template_ids(templates_before, req.clientId)
+            return _error(422, str(exc))
+        type_ids = []
+        if not had_file and type_revision(space.root, type_id):
+            announce(ChangeEvent("types", type_id, None, origin=req.clientId))
+            type_ids.append(type_id)
         announce_template_ids(templates_before, req.clientId)
         announce(ChangeEvent("created", path, version, origin=req.clientId))
         return JSONResponse(
@@ -686,7 +1141,7 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             return _error(409, exc.detail)
         except KeyError:
             return _error(404, f"No trash entry {trash_id!r}")
-        rewritten = result.pop("rewritten", [])
+        rewritten = result.setdefault("rewritten", [])
         for type_id in result["typeIds"]:
             announce(ChangeEvent("types", type_id, None, origin=clientId))
         for collection_id in result.get("collectionIds", []):
@@ -712,6 +1167,15 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         del clientId
         return {"purged": space.empty_trash()}
 
+    @api.get("/calendar")
+    def get_calendar(from_: str | None = Query(default=None, alias="from"), to: str | None = None):
+        if not from_ or not to:
+            return _error(422, "A calendar range needs from and to (YYYY-MM-DD).")
+        try:
+            return _display_safe(space.calendar(from_, to))
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+
     @api.post("/rows")
     def post_rows(req: RowsRequest):
         search = (req.search.terms, req.search.mode) if req.search is not None else None
@@ -726,23 +1190,36 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         t = space.type_by_id(type_id)
         if t is None:
             return _error(404, f"No object type {type_id!r}")
+        store = space.store("views")
         try:
-            data, revision = space.store("views").read(type_id)
+            data, revision = store.read(type_id)
         except DefinitionUnreadable as exc:
-            revision = json_revision(space.store("views").path(type_id))
+            revision = json_revision(store.path(type_id))
             return {"views": default_views(t), "revision": revision, "readOnlyReason": exc.error}
-        return {"views": data if data is not None else default_views(t), "revision": revision}
+        except ValueError:
+            # An id no file name can hold (e.g. with a space): its views can't be stored.
+            return {
+                "views": default_views(t),
+                "revision": "",
+                "readOnlyReason": "This type's id can't be used as a file name, so its views can't be saved.",
+            }
+        return {"views": normalize_views(data, default_views(t)), "revision": revision}
 
     @api.put("/views/{type_id}")
     def put_views(type_id: str, req: SaveViewsRequest):
         if space.type_by_id(type_id) is None:
             return _error(404, f"No object type {type_id!r}")
+        problem = _views_problem(req.views)
+        if problem:
+            return _error(422, problem)
         try:
             revision = space.store("views").write(type_id, req.views, req.baseRevision)
         except RevisionConflict as exc:
             return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except ValueError:
+            return _error(422, "This type's id can't be used as a file name, so its views can't be saved.")
         announce(ChangeEvent("views", type_id, revision, origin=req.clientId))
         return {"revision": revision}
 
@@ -760,6 +1237,9 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
         unknown = sorted(set(req.patch) - _UI_PATCH_KEYS)
         if unknown:
             return _error(422, f"Cannot patch: {', '.join(unknown)}")
+        problem = _ui_problem(req.patch)
+        if problem:
+            return _error(422, problem)
         try:
             data, revision = patch_ui(space, req.patch, req.baseRevision)
         except RevisionConflict as exc:
@@ -1005,20 +1485,61 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
             return _error(415, "Only png, jpg, jpeg, gif, webp and svg images can be added")
         return JSONResponse({"path": path}, status_code=201)
 
+    @api.get("/attachments")
+    def get_attachments():
+        return _display_safe(list_attachments(space.root))
+
+    @api.post("/attachments", status_code=201)
+    async def post_attachment(request: Request, name: str = Query(default="")):
+        limit = media.MAX_ATTACHMENT_BYTES
+        too_large = _error(413, media.UPLOAD_LIMIT_DETAIL)
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > limit:
+            return too_large
+        chunks: list[bytes] = []
+        size = 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > limit:
+                return too_large
+            chunks.append(chunk)
+        data = b"".join(chunks)
+        try:
+            path, kind = await asyncio.to_thread(import_attachment, space.root, name, data)
+        except TooLarge:
+            return too_large
+        except ValueError as exc:
+            return _error(422, str(exc))
+        return JSONResponse({"path": path, "kind": kind}, status_code=201)
+
+    @api.post("/attachments/open")
+    def open_attachment(req: OpenAttachmentRequest):
+        try:
+            full = attachment_path(space.root, req.path)
+        except NotServed:
+            return _error(415, "Objects are opened in Object, not with another app.")
+        except (FileNotFoundError, OSError):
+            return _error(404, f"No file at {req.path!r}")
+        try:
+            open_with_system(full)
+        except RefusedToOpen:
+            return _error(415, media.REFUSED_OPEN_DETAIL)
+        return {"ok": True}
+
     @api.get("/file")
     def get_file(path: str):
         try:
-            full = image_path(space.root, path)
-        except NotAnImage:
-            return _error(415, "Only image files can be served")
+            full = attachment_path(space.root, path)
+        except NotServed:
+            return _error(415, "Objects are opened, not served.")
         except (FileNotFoundError, OSError):
-            return _error(404, f"No image at {path!r}")
-        # An SVG can carry script: never let a served image run anything.
-        headers = {
-            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
-            "X-Content-Type-Options": "nosniff",
-        }
-        return FileResponse(full, media_type=image_media_type(full.name), headers=headers)
+            return _error(404, f"No file at {path!r}")
+        kind = kind_of(full.name)
+        return FileResponse(
+            full,
+            media_type=attachment_media_type(full.name),
+            headers=serve_headers(kind, full.name),
+        )
 
     @api.get("/resolve")
     def resolve(link: str, from_: str | None = Query(default=None, alias="from")):
@@ -1046,7 +1567,29 @@ def create_app(space: Space, static_dir: Path | None = None, watch: bool = True)
 
         return EventSourceResponse(stream(), ping=15)
 
+    if fake_notify:
+
+        @api.post("/_test/tick")
+        def test_tick():
+            """Run one reminder check at the clock's instant (test hook only)."""
+            fired = scheduler.tick(space.clock())
+            return {
+                "fired": [
+                    {"path": d.path, "title": d.title, "body": d.body, "trigger": d.trigger.isoformat()}
+                    for d in fired
+                ]
+            }
+
+    ctx = ApiContext(space, announce, search, settings_changed)
+    api.include_router(api_search.router(ctx))
+    api.include_router(api_references.router(ctx))
+    api.include_router(api_graph.router(ctx))
+    # M8: each router is filled by its own task (see the plan's "Shared files").
+    for module in (api_tasks, api_history, api_blocks, api_merge, api_spaces_m8):
+        api.include_router(module.router(ctx))
     app.include_router(api)
+    # M6: the whiteboard routes carry their own /api prefix.
+    app.include_router(whiteboard_router(space, announce_whiteboard))
 
     if static_dir is not None and Path(static_dir).is_dir():
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")

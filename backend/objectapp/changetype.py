@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import copy
 import re
+import threading
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -103,10 +104,10 @@ class MappingRow:
 
 
 def type_category(t: TypeDefinition) -> str:
-    """``page``, ``tag``, ``task``, ``dailynote``, ``media`` or ``custom``."""
+    """``page``, ``tag``, ``task``, ``dailynote``, ``whiteboard``, ``media`` or ``custom``."""
     if t.basic:
         low = t.name.lower()
-        if low in ("page", "tag", "task", "dailynote"):
+        if low in ("page", "tag", "task", "dailynote", "whiteboard"):
             return low
         if any(low == m.lower() for m in BASIC_MEDIA_TYPES):
             return "media"
@@ -245,8 +246,26 @@ def save_change_type_preference(
     to_id: str,
     rows: Iterable[MappingRow],
     own_writes: dict[str, str] | None = None,
+    lock: threading.RLock | None = None,
 ) -> bool:
-    """Remember a mapping in ``ui.json`` (other keys kept); False when the file can't be read."""
+    """Remember a mapping in ``ui.json`` (other keys kept); False when the file can't be read.
+
+    Pass the space's ``lock`` so the read-merge-write can't interleave with a
+    ``PUT /api/ui`` (which holds it).
+    """
+    if lock is not None:
+        with lock:
+            return save_change_type_preference(root, from_id, to_id, rows, own_writes)
+    return _save_preference(root, from_id, to_id, rows, own_writes)
+
+
+def _save_preference(
+    root: Path,
+    from_id: str,
+    to_id: str,
+    rows: Iterable[MappingRow],
+    own_writes: dict[str, str] | None,
+) -> bool:
     from .space import ReadOnly
 
     data, _revision, error = _read_ui(root)

@@ -5,6 +5,22 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Object</title>
+    <script>
+      // First paint: the theme cached in localStorage "object.theme" by src/theme/applyTheme.ts
+      // (the same attributes it sets). No cache, or an unreadable one: dark (class="dark" above).
+      (function () {
+        try {
+          var t = JSON.parse(localStorage.getItem('object.theme') || 'null')
+          if (!t || ['light', 'lightDimmed', 'dark', 'darkDimmed'].indexOf(t.theme) < 0) return
+          var h = document.documentElement
+          h.setAttribute('data-theme', t.theme)
+          h.classList.toggle('dark', !!t.dark)
+          if (t.monoTags) h.setAttribute('data-mono-tags', '')
+          if (t.monoTypeLabels) h.setAttribute('data-mono-type-labels', '')
+          if (['sans-serif', 'serif', 'monospace'].indexOf(t.font) >= 0) h.setAttribute('data-font', t.font)
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

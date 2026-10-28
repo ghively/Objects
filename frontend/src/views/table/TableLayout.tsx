@@ -310,7 +310,7 @@ export function TableLayout(props: TableLayoutProps) {
             data-wrap={wrapped ? 'wrap' : 'nowrap'}
             style={{ ...cellStyle(c), minHeight: TABLE_ROW_HEIGHT }}
             className={cn(
-              'flex shrink-0 items-center border-r border-line bg-app px-2 py-0.5',
+              'flex shrink-0 items-center border-r border-line bg-app px-1.5 py-1.5',
               wrapped ? 'whitespace-normal break-words' : 'overflow-hidden whitespace-nowrap',
               !wrapped && 'h-9',
             )}
@@ -324,6 +324,7 @@ export function TableLayout(props: TableLayoutProps) {
                   value={valueFor(def, row)}
                   readOnly={row.summary.readOnly}
                   density={wrapped ? 'panel' : 'table'}
+                  inTable
                   onChange={(next: unknown) => void commit(row, def, next)}
                   onDefChange={onDefChange}
                   typeId={row.summary.type}

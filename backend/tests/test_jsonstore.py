@@ -227,6 +227,11 @@ def test_open_twice_writes_nothing(space_dir: Path):
         assert c.get("/api/ui").status_code == 200
         assert c.get("/api/collections").json() == []
         assert c.get("/api/queries").json() == []
+        assert c.get("/api/calendar?from=2026-10-01&to=2026-11-11").status_code == 200
+        # M5: the object route (with backlinks) and the rows (with backlinks values).
+        for s in space.list():
+            assert c.get("/api/object", params={"path": s.path}).status_code == 200
+        assert c.post("/api/rows", json={}).status_code == 200
     first = _snapshot(space_dir)
     space2, c2, _pub2 = _client(space_dir)
     with c2:
@@ -235,6 +240,10 @@ def test_open_twice_writes_nothing(space_dir: Path):
         assert c2.get("/api/ui").status_code == 200
         assert c2.get("/api/collections").json() == []
         assert c2.get("/api/queries").json() == []
+        assert c2.get("/api/calendar?from=2026-10-01&to=2026-11-11").status_code == 200
+        for s in space2.list():
+            assert c2.get("/api/object", params={"path": s.path}).status_code == 200
+        assert c2.post("/api/rows", json={}).status_code == 200
     assert _snapshot(space_dir) == first
     assert not (space_dir / ".object" / "views").exists()
     assert not (space_dir / ".object" / "collections").exists()

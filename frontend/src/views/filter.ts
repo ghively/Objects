@@ -11,6 +11,8 @@ import type {
   Row,
   TypeDef,
 } from '@/api/types'
+import { parseRemind } from '@/tasks/remind'
+import { parseRepeat } from '@/tasks/repeat'
 import { dateSpan, endOfDay, parseDay, resolveRelative, startOfDay } from './dates'
 
 export interface FilterOption {
@@ -72,7 +74,15 @@ const DATE: FilterOption[] = [
   o('endIsOnOrBefore', 'ends on or before'),
   o('endIsOnOrAfter', 'ends on or after'),
 ]
-// isRecurring and hasReminder come with the tasks milestone.
+// The Task date's own operators (`convolution.filter.options.dateTime.*`): offered only on a date
+// that supports reminders, which is the Task `date` alone. They need no reference value.
+export const TASK_DATE_OPTIONS: FilterOption[] = [
+  o('isRecurring', 'is recurring'),
+  o('isNotRecurring', 'is not recurring'),
+  o('hasReminder', 'has reminder'),
+  o('hasNoReminder', 'has no reminder'),
+]
+const TASK_DATE_KEYS = new Set(TASK_DATE_OPTIONS.map((x) => x.key))
 const RANGE_ONLY = new Set(DATE.map((x) => x.key).filter((k) => /^(start|end)/.test(k)))
 const SIMPLE_DATE = DATE.filter((x) => !RANGE_ONLY.has(x.key))
 const BLOCKS: FilterOption[] = [o('isNotEmpty', 'is not empty'), o('isEmpty', 'is empty')]
@@ -106,9 +116,12 @@ export const FILTER_OPTIONS: Record<PropertyType, FilterOption[]> = {
 
 /** The operators a property offers: the start/end ones only when its dates may have an end. */
 export function filterOptionsFor(def: Pick<PropertyDef, 'type' | 'options'>): FilterOption[] {
-  const all = FILTER_OPTIONS[def.type] ?? []
+  let all = FILTER_OPTIONS[def.type] ?? []
   if (def.type === 'datetime' && def.options?.constraints?.endTimeSettings === 'notAllowed') {
-    return all.filter((x) => !RANGE_ONLY.has(x.key))
+    all = all.filter((x) => !RANGE_ONLY.has(x.key))
+  }
+  if ((def.type === 'datetime' || def.type === 'datetimeSimple') && def.options?.constraints?.supportsReminders) {
+    all = [...all, ...TASK_DATE_OPTIONS]
   }
   return all
 }
@@ -158,7 +171,8 @@ export function rowValue(row: Row, propertyId: string): unknown {
     case 'coverImage':
       return s.coverImage
     case 'backlinks':
-      return undefined
+      // The live backlinks (`EntityRef[]`), sent under the type's backlinks definition's key.
+      return row.values.backlinks
     default:
       return row.values[propertyId]
   }
@@ -189,12 +203,18 @@ export function findDef(types: TypeDef[], propertyId: string, typeId?: string): 
   return kind ? { type: kind, options: {} } : undefined
 }
 
+/**
+ * Operators a saved filter may hold beyond the ones offered: the backlinks filter offers only
+ * "includes", but a saved "does not include" is evaluated rather than ignored.
+ */
+const ACCEPTED_EXTRA: Partial<Record<PropertyType, string[]>> = { entity_backlinks: ['notContains'] }
+
 /** Whether the filter names a property and an operator that still exist; an invalid one is ignored. */
 export function filterIsValid(filter: Filter, typesById: Record<string, TypeDef>): boolean {
   if (filter.structureId && !typesById[filter.structureId]) return false
   const def = findDef(Object.values(typesById), filter.propertyId, filter.structureId)
   if (!def) return false
-  return filterOptionsFor(def).some((x) => x.key === filter.option)
+  return filterOptionsFor(def).some((x) => x.key === filter.option) || !!ACCEPTED_EXTRA[def.type]?.includes(filter.option)
 }
 
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '')
@@ -351,6 +371,27 @@ function dateOf(row: Row, propertyId: string): DateValue | null {
   return (v as DateValue | null | undefined) ?? null
 }
 
+/**
+ * The Task date operators, read from the row's `repeat`/`remind` texts beside the date: a repeat
+ * counts only when it parses and the date is set; a reminder only when it also fits the date's
+ * resolution (as the server ignores the rest).
+ */
+function matchTaskDate(row: Row, f: Filter, has: boolean): boolean {
+  const date = has ? dateOf(row, f.propertyId) : null
+  const recurring = !!date && parseRepeat(row.values.repeat) !== null
+  const reminder = !!date && parseRemind(row.values.remind, date.resolution) !== null
+  switch (f.option) {
+    case 'isRecurring':
+      return recurring
+    case 'isNotRecurring':
+      return !recurring
+    case 'hasReminder':
+      return reminder
+    default:
+      return !reminder
+  }
+}
+
 /** Whether a row passes one filter. An invalid filter passes; so does a row of another type than `structureId`. */
 export function matchFilter(row: Row, f: Filter, ctx: FilterCtx): boolean {
   const byId = typeMap(ctx.types)
@@ -383,7 +424,8 @@ export function matchFilter(row: Row, f: Filter, ctx: FilterCtx): boolean {
         .filter((t): t is string => !!t)
       return matchSet(have, want, f)
     }
-    case 'entity': {
+    case 'entity':
+    case 'entity_backlinks': {
       if (f.option === 'isEmpty') return !has || entityCount(row, f.propertyId) === 0
       if (f.option === 'isNotEmpty') return has && entityCount(row, f.propertyId) > 0
       const paths = has ? entityPaths(row, f.propertyId) : []
@@ -418,12 +460,11 @@ export function matchFilter(row: Row, f: Filter, ctx: FilterCtx): boolean {
       const ref = typeof f.referenceValue === 'string' ? f.referenceValue : ''
       return f.option === 'isNot' ? icon !== ref : icon === ref
     }
-    case 'entity_backlinks':
-      return f.option === 'notContains'
     case 'datetime':
     case 'datetimeSimple':
     case 'entity_createdAt':
     case 'entity_lastUpdated':
+      if (TASK_DATE_KEYS.has(f.option)) return matchTaskDate(row, f, has)
       return matchDate(has ? dateOf(row, f.propertyId) : null, f, ctx.now)
     default:
       return f.option === 'isEmpty' ? blank(value) : !blank(value)

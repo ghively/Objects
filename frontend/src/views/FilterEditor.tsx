@@ -11,6 +11,7 @@ import { LabelPill } from '@/properties/LabelMenu'
 import { RelationPicker } from '@/properties/RelationPicker'
 import { DATE_RELATIVE_OPTIONS } from './dates'
 import { filterIsValid, filterOptionsFor } from './filter'
+import { MenuSelect, propertyOptions } from './MenuSelect'
 import { choiceFor, type PropChoice } from './properties'
 
 export interface FilterEditorProps {
@@ -19,6 +20,14 @@ export interface FilterEditorProps {
   choices: PropChoice[]
   types: TypeDef[]
   collections: Collection[]
+}
+
+/** Object's strings (ConvolutionEditor.filter.*); "Select…" is ours (no reference string for an empty picker). */
+export const FILTER_TEXT = {
+  selectDate: 'Select date',
+  oneSelected: '1 element selected',
+  elementsSelected: (count: number) => `${count} objects`,
+  select: 'Select…',
 }
 
 const SELECT = 'h-7 max-w-full rounded-md border border-line bg-raised px-1.5 text-[13px] text-fg outline-none'
@@ -89,15 +98,16 @@ function Rows({ group, onChange, choices, types, collections, depth }: FilterEdi
     if (i === 0) return <span className="w-14 shrink-0 py-1 text-fg-muted">where</span>
     if (i === 1)
       return (
-        <select
-          aria-label="Group operator"
+        <MenuSelect
+          label="Group operator"
           value={group.operator}
-          onChange={(e) => onChange({ ...group, operator: e.target.value as 'and' | 'or' })}
-          className={cn(SELECT, 'w-14 shrink-0')}
-        >
-          <option value="and">and</option>
-          <option value="or">or</option>
-        </select>
+          onChange={(v) => onChange({ ...group, operator: v as 'and' | 'or' })}
+          options={[
+            { value: 'and', label: 'and' },
+            { value: 'or', label: 'or' },
+          ]}
+          className="w-14 shrink-0"
+        />
       )
     return (
       <span data-testid="group-operator" className="w-14 shrink-0 px-1.5 py-1 text-fg-muted">
@@ -236,33 +246,22 @@ function FilterRow({
   const optionOk = options.some((o) => o.key === filter.option)
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-      <select
-        aria-label="Property"
+      <MenuSelect
+        label="Property"
         value={choice ? filter.propertyId : ''}
-        onChange={(e) => setProperty(e.target.value)}
-        className={cn(SELECT, 'min-w-[7rem]')}
-      >
-        {!choice && <option value="">Invalid</option>}
-        {eligible(choices).map((c) => (
-          <option key={c.key} value={c.key}>
-            {c.name}
-          </option>
-        ))}
-      </select>
+        onChange={setProperty}
+        options={propertyOptions(eligible(choices))}
+        placeholder="Invalid"
+        className="min-w-[7rem]"
+      />
       {choice && options.length > 0 && (
-        <select
-          aria-label="Operator"
+        <MenuSelect
+          label="Operator"
           value={optionOk ? filter.option : ''}
-          onChange={(e) => onChange({ ...filter, option: e.target.value })}
-          className={SELECT}
-        >
-          {!optionOk && <option value="">Invalid</option>}
-          {options.map((o) => (
-            <option key={o.key} value={o.key}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => onChange({ ...filter, option: v })}
+          options={options.map((o) => ({ value: o.key, label: o.label }))}
+          placeholder="Invalid"
+        />
       )}
       {valid && choice && !NO_VALUE.has(filter.option) && (
         <ValueEditor filter={filter} choice={choice} collections={collections} types={Object.values(typesById)} onChange={onChange} />
@@ -392,7 +391,7 @@ function ValueEditor({
       />
     )
   }
-  if (kind === 'entity' || kind === 'entity_tags') {
+  if (kind === 'entity' || kind === 'entity_backlinks' || kind === 'entity_tags') {
     const def: PropertyDef =
       kind === 'entity_tags'
         ? ({
@@ -430,7 +429,11 @@ function ValueEditor({
       <Popover>
         <PopoverTrigger asChild>
           <button type="button" aria-label="Value" className={cn(SELECT, 'flex items-center gap-1')}>
-            {picked.length ? picked.map((p) => p.target).join(', ') : 'Select…'}
+            {picked.length === 1
+              ? FILTER_TEXT.oneSelected
+              : picked.length > 1
+                ? FILTER_TEXT.elementsSelected(picked.length)
+                : FILTER_TEXT.select}
           </button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-auto border-line bg-raised p-0">
@@ -444,27 +447,20 @@ function ValueEditor({
     const mode = r.exactDate !== undefined ? 'exactDate' : (r.relative ?? '')
     return (
       <span className="flex items-center gap-1.5">
-        <select
-          aria-label="Date"
+        <MenuSelect
+          label="Date"
           value={mode}
-          onChange={(e) => {
-            const v = e.target.value
+          onChange={(v) => {
             if (v === 'exactDate') set({ exactDate: new Date().toISOString().slice(0, 10) })
             else if (v) set({ relative: v as never })
           }}
-          className={SELECT}
-        >
-          {mode === '' && <option value="">Select…</option>}
-          {DATE_RELATIVE_OPTIONS.map((o) => (
-            <option key={o.key} value={o.key}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          options={DATE_RELATIVE_OPTIONS.map((o) => ({ value: o.key, label: o.label }))}
+          placeholder={FILTER_TEXT.selectDate}
+        />
         {mode === 'exactDate' && (
           <Popover>
             <PopoverTrigger asChild>
-              <button type="button" aria-label="Pick date" className={SELECT}>
+              <button type="button" aria-label={FILTER_TEXT.selectDate} className={SELECT}>
                 {r.exactDate}
               </button>
             </PopoverTrigger>

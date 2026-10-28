@@ -2,6 +2,9 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Icon } from '@/components/Icon'
 import { stemOf, summaryOf, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
+import { inkPlugin } from '@/whiteboard/ink'
+import { useIsWhiteboard } from '@/whiteboard/isWhiteboard'
+import { WhiteboardPage } from '@/whiteboard/WhiteboardPage'
 import { ObjectView } from './ObjectView'
 
 function Pager() {
@@ -37,6 +40,7 @@ export function ObjectPeek() {
   const path = usePeek((s) => s.path)
   const close = usePeek((s) => s.close)
   useLinkIndex((s) => s.revision)
+  const whiteboard = useIsWhiteboard(path)
   const title = path ? (summaryOf(path)?.title ?? stemOf(path)) : ''
 
   return (
@@ -47,19 +51,33 @@ export function ObjectPeek() {
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogDescription className="sr-only">Object preview</DialogDescription>
-        {path && (
-          <ObjectView
-            key={path}
-            path={path}
-            mode="peek"
-            onExpand={() => {
-              useTabs.getState().open({ kind: 'object', path })
-              close()
-            }}
-            onDismiss={close}
-            footer={<Pager />}
-          />
-        )}
+        {path &&
+          (whiteboard ? (
+            <WhiteboardPage
+              key={path}
+              path={path}
+              mode="peek"
+              ink={inkPlugin}
+              onExpand={() => {
+                useTabs.getState().open({ kind: 'object', path }, { via: 'link' })
+                close()
+              }}
+              onDismiss={close}
+              footer={<Pager />}
+            />
+          ) : (
+            <ObjectView
+              key={path}
+              path={path}
+              mode="peek"
+              onExpand={() => {
+                useTabs.getState().open({ kind: 'object', path }, { via: 'link' })
+                close()
+              }}
+              onDismiss={close}
+              footer={<Pager />}
+            />
+          ))}
       </DialogContent>
     </Dialog>
   )

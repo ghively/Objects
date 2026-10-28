@@ -391,3 +391,81 @@ def test_api_space_returns_v2_types(space_dir):
     assert task["readOnlyReason"] is None
     assert "extra" not in task and "invalid_property_entries" not in task
     assert "tag" in types and "page" in types
+
+
+# -- M4 Task 3: the Task fields, topped up in memory --------------------------------
+
+_TASK_FIELDS = ("status", "priority", "date", "deadline", "completed", "repeat", "remind")
+
+
+def test_topup_adds_missing_task_fields_in_memory(calendar_space_dir):
+    path = calendar_space_dir / ".object" / "types" / "task.json"
+    data = json.loads(path.read_text("utf-8"))
+    data["propertyDefinitions"] = [
+        p for p in data["propertyDefinitions"] if p["key"] not in _TASK_FIELDS[1:]
+    ]
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    before = path.read_bytes()
+
+    space = Space(calendar_space_dir)
+    t = space.type_by_id("task")
+    keys = [p.key for p in t.propertyDefinitions]
+    # appended after the existing ones (M8's hidden `occurrenceLog` last)
+    assert keys[-7:] == [*_TASK_FIELDS[1:], "occurrenceLog"]
+    assert t.prop("priority").options["set"][2] == {
+        "id": "high", "text": "High", "color": "red", "icon": None
+    }  # fmt: skip
+    assert t.prop("priority").icon.val == "ph-flag"
+    date = t.prop("date")
+    assert date.type == "datetimeSimple" and date.icon.val == "ph-calendar"
+    assert date.options["constraints"] == {
+        "resolutionPreference": "day", "endTimeSettings": "notAllowed", "supportsReminders": True
+    }  # fmt: skip
+    assert t.prop("deadline").icon.val == "ph-hourglass-medium"
+    assert t.prop("completed").visibility == "hidden"
+    assert t.prop("completed").options["constraints"]["resolutionPreference"] == "time"
+    assert t.prop("repeat").type == "text" and t.prop("repeat").visibility == "hidden"
+    assert t.prop("remind").type == "text" and t.prop("remind").visibility == "hidden"
+    assert path.read_bytes() == before  # never written on open
+
+    # A type file changed outside the app is topped up again when reloaded.
+    data["description"] = "edited by hand"
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    t2, _rev = space.refresh_type("task")
+    assert t2.description == "edited by hand"
+    assert [p.key for p in t2.propertyDefinitions][-7:] == [*_TASK_FIELDS[1:], "occurrenceLog"]
+
+    # Saving the type persists the fields (the first write of the type).
+    t3, rev = space.refresh_type("task")
+    space.save_type(t3, rev)
+    saved = {p["key"] for p in json.loads(path.read_text("utf-8"))["propertyDefinitions"]}
+    assert saved >= set(_TASK_FIELDS)
+
+
+def test_topup_keeps_existing_definitions(calendar_space_dir):
+    path = calendar_space_dir / ".object" / "types" / "task.json"
+    data = json.loads(path.read_text("utf-8"))
+    prio = next(p for p in data["propertyDefinitions"] if p["key"] == "priority")
+    prio["options"]["set"] = [{"id": "p1", "text": "P1", "color": "red", "icon": None}]
+    data["propertyDefinitions"] = [
+        p for p in data["propertyDefinitions"] if p["key"] not in ("deadline", "remind")
+    ]
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    t = Space(calendar_space_dir).type_by_id("task")
+    assert [o["text"] for o in t.prop("priority").options["set"]] == ["P1"]
+    keys = [p.key for p in t.propertyDefinitions]
+    assert keys.count("priority") == 1
+    assert keys[-3:] == ["deadline", "remind", "occurrenceLog"]  # M8 adds the log last
+
+
+def test_topup_not_applied_to_other_types(calendar_space_dir):
+    space = Space(calendar_space_dir)
+    for tid in ("page", "meeting", "person", "dailynote", "event", "tag"):
+        t = space.type_by_id(tid)
+        stored = json.loads(
+            (calendar_space_dir / ".object" / "types" / f"{tid}.json").read_text("utf-8")
+        )
+        assert [p.key for p in t.propertyDefinitions] == [
+            p["key"] for p in stored["propertyDefinitions"]
+        ], tid

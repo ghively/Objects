@@ -1,0 +1,226 @@
+/* Code block (Task 9). Values from Object's index CSS: `.CodeBlock.block-outer`
+   (margin-block 4px, padding-block 3px), `.cm-editor` (radius-base, the code font
+   stack, `--code-text`), the language chrome in `--code-bg`, and the hover bar
+   (`group-hover/CodeBlock:opacity-100`). */
+.object-editor .code-block {
+  position: relative;
+  margin-block: 4px;
+  padding-block: 3px;
+  min-width: 0;
+}
+.object-editor .code-block-bar {
+  position: absolute;
+  top: 9px;
+  left: 8px;
+  right: 8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+  font-family: inherit;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  white-space: nowrap;
+}
+.object-editor .code-block:hover .code-block-bar,
+.object-editor .code-block:focus-within .code-block-bar {
+  opacity: 1;
+  pointer-events: auto;
+}
+.object-editor .code-block-bar-spacer { flex: 1; }
+.object-editor .code-block-btn,
+.object-editor .code-block-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  min-width: 22px;
+  justify-content: center;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: var(--code-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.object-editor .code-block-btn:hover,
+.object-editor .code-block-mode:hover { background: var(--bg-hover-2); color: var(--text); }
+.object-editor .code-block-btn[aria-pressed='true'] { color: var(--text); background: var(--bg-raised-2); }
+.object-editor .code-block-btn:disabled,
+.object-editor .code-block-mode:disabled { cursor: default; opacity: 0.6; }
+.object-editor .code-block-lang { border-color: var(--code-bg); }
+.object-editor .code-block-lang:hover { border-color: var(--border-subtle); }
+.object-editor .code-block-modes {
+  display: inline-flex;
+  padding: 1px;
+  margin-right: 4px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+}
+.object-editor .code-block-mode { height: 20px; border-radius: 4px; }
+.object-editor .code-block-mode[aria-pressed='true'] { background: var(--bg-raised-2); color: var(--text); }
+
+.object-editor .code-block pre.code-block-pre {
+  margin: 0;
+  padding: 2.25rem 1rem 0.75rem;
+  font-family: 'Overpass Mono', 'SF Mono', 'SFMono-Regular', 'JetBrains Mono', 'Roboto Mono', 'Liberation Mono', Consolas, ui-monospace, monospace;
+  font-size: 0.8125em;
+  line-height: 1.6;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 6px;
+  color: var(--code-text);
+  white-space: pre;
+  overflow-x: auto;
+  tab-size: 4;
+}
+.object-editor .code-block[data-wrap] pre.code-block-pre { white-space: pre-wrap; word-break: break-word; overflow-x: hidden; }
+.object-editor .code-block[data-lock] pre.code-block-pre { cursor: default; }
+.object-editor .code-block pre.code-block-pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+
+/* Previews (markdown, mermaid): Display hides the source, Edit & Display stacks both. */
+.object-editor .code-block-mode-display pre.code-block-pre { display: none; }
+.object-editor .code-block-preview {
+  padding: 2.25rem 1rem 0.75rem;
+  border: 1px solid var(--code-border);
+  border-radius: 6px;
+  white-space: normal;
+  overflow-x: auto;
+}
+.object-editor .code-block-mode-split .code-block-preview {
+  margin-top: 4px;
+  padding-top: 0.75rem;
+}
+.object-editor .code-block-preview .object-editor { min-height: 0; white-space: pre-wrap; }
+.object-editor .mermaid-preview { display: flex; justify-content: center; }
+.object-editor .mermaid-preview svg { max-width: 100%; height: auto; }
+.object-editor .code-preview-message { color: var(--text-muted); font-size: 0.875em; text-align: center; padding: 0.5em 0; }
+.object-editor .code-preview-error { color: var(--danger); text-align: left; }
+.object-editor .code-preview-error-title { font-weight: 600; }
+.object-editor .code-preview-error-detail { font-family: ui-monospace, monospace; font-size: 0.9em; white-space: pre-wrap; color: var(--text-muted); }
+
+/* Language picker (rendered in a popover portal, outside the editor). */
+.code-block-lang-filter {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  margin-bottom: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  background: var(--bg-raised-2);
+  color: var(--text);
+  font-size: 0.8125rem;
+  outline: none;
+}
+.code-block-lang-list { max-height: 260px; overflow-y: auto; }
+.code-block-lang-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 5px;
+  font-size: 0.8125rem;
+  color: var(--text);
+  text-align: left;
+}
+.code-block-lang-item:hover,
+.code-block-lang-item[aria-selected='true'] { background: var(--bg-hover-2); }
+
+/* Horizontal line (Object's `.editor-prose .HorizontalLineBlock.block-outer`:
+   padding-block 2px around a 1px rule in `horizontalLineColor`). Kept here because
+   `horizontalRule` has no node module of its own and `editor.css` belongs to Task 8. */
+.object-editor.ProseMirror hr,
+.object-editor .ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--editor-hr);
+  margin-block: calc(0.5em + 2px);
+  padding: 0;
+  height: 0;
+}
+.object-editor.ProseMirror hr.ProseMirror-selectednode { outline: 2px solid var(--block-selection-border); outline-offset: 3px; }
+
+/* Syntax highlighting (M8 Task 29). highlight.js's `hljs-*` classes onto Object's `--code-*`
+   syntax tokens (theme/codeSyntax.css, all four themes), following Object's own `tok-*` rules
+   (keyword, atom/bool, regex/escape, inserted/literal, deleted/string, number, variableName,
+   typeName, className, propertyName, operator, comment, meta, punctuation, heading, emphasis,
+   strong, link). Which hljs scope takes which token is our choice where CodeMirror's names differ.
+   A run carries its innermost scope, after a `hljs-tag` / `hljs-meta` context (code/highlight.ts). */
+.object-editor .code-block .hljs-keyword,
+.object-editor .code-block .hljs-doctag,
+.object-editor .code-block .hljs-selector-tag { color: var(--code-keyword); }
+.object-editor .code-block .hljs-literal,
+.object-editor .code-block .hljs-symbol,
+.object-editor .code-block .hljs-link { color: var(--code-bool); }
+.object-editor .code-block .hljs-regexp,
+.object-editor .code-block .hljs-char.escape_ { color: var(--code-regex); }
+.object-editor .code-block .hljs-addition,
+.object-editor .code-block .hljs-formula { color: var(--code-literal); }
+.object-editor .code-block .hljs-string,
+.object-editor .code-block .hljs-deletion { color: var(--code-string); }
+.object-editor .code-block .hljs-number { color: var(--code-number); }
+.object-editor .code-block .hljs-code { color: var(--code-string-2); }
+.object-editor .code-block .hljs-variable,
+.object-editor .code-block .hljs-template-variable { color: var(--code-variable-name); }
+.object-editor .code-block .hljs-params { color: var(--code-variable-name-local); }
+.object-editor .code-block .hljs-title,
+.object-editor .code-block .hljs-title.function_ { color: var(--code-variable-name-definition); }
+.object-editor .code-block .hljs-built_in,
+.object-editor .code-block .hljs-variable.language_ { color: var(--code-variable-name-2); }
+.object-editor .code-block .hljs-type,
+.object-editor .code-block .hljs-name { color: var(--code-type-name); }
+.object-editor .code-block .hljs-title.class_,
+.object-editor .code-block .hljs-title.class_.inherited__,
+.object-editor .code-block .hljs-class,
+.object-editor .code-block .hljs-selector-class,
+.object-editor .code-block .hljs-selector-id { color: var(--code-class-name); }
+.object-editor .code-block .hljs-selector-attr,
+.object-editor .code-block .hljs-selector-pseudo { color: var(--code-macro-name); }
+.object-editor .code-block .hljs-attr,
+.object-editor .code-block .hljs-attribute,
+.object-editor .code-block .hljs-property { color: var(--code-property-name); }
+.object-editor .code-block .hljs-operator,
+.object-editor .code-block .hljs-bullet { color: var(--code-operator); }
+.object-editor .code-block .hljs-comment,
+.object-editor .code-block .hljs-quote { color: var(--code-comment); }
+.object-editor .code-block .hljs-meta { color: var(--code-meta); }
+.object-editor .code-block .hljs-meta.hljs-keyword { color: var(--code-keyword); }
+.object-editor .code-block .hljs-meta.hljs-string { color: var(--code-string); }
+.object-editor .code-block .hljs-punctuation,
+.object-editor .code-block .hljs-tag { color: var(--code-punctuation); }
+.object-editor .code-block .hljs-tag.hljs-name { color: var(--code-type-name); }
+.object-editor .code-block .hljs-tag.hljs-attr { color: var(--code-property-name); }
+.object-editor .code-block .hljs-subst { color: var(--code-text); }
+.object-editor .code-block .hljs-section { font-weight: 700; text-decoration: underline; }
+.object-editor .code-block .hljs-emphasis { font-style: italic; }
+.object-editor .code-block .hljs-strong { font-weight: 700; }
+.object-editor .code-block .hljs-link { text-decoration: underline; }
+
+/* Mermaid export buttons (M8 Task 29): the code block bar's button look, under the diagram. */
+.object-editor .mermaid-export {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 6px;
+}
+.object-editor .mermaid-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: var(--code-bg);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  cursor: pointer;
+}
+.object-editor .mermaid-export-btn:hover { background: var(--bg-hover-2); color: var(--text); }
+.object-editor .mermaid-export-btn:disabled { cursor: default; opacity: 0.6; }
