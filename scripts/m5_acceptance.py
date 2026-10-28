@@ -400,7 +400,9 @@ def check_rebuild(run: Run, served: Served, uw: tuple[str, str] | None) -> Serve
         db.unlink()
         removed = True
     except OSError as exc:
-        removed = False
+        # Windows refuses to delete a file the running app holds open; reindex
+        # must still rebuild it in place there.
+        removed = sys.platform == "win32" and isinstance(exc, PermissionError)
         print(f"         could not delete while running: {exc}")
     code, res = run.http("POST", "/search/reindex", {})
     took = served.wait_indexed()
