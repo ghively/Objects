@@ -10,6 +10,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { useSettings } from '@/settings/useSettings'
 import { TrashView } from './TrashView'
 
 const mocked = vi.mocked(api)
@@ -158,5 +159,20 @@ describe('TrashView', () => {
     await user.click(within(row).getByRole('button', { name: 'Delete permanently' }))
     const dialog = await screen.findByRole('alertdialog', { name: 'Permanently delete' })
     expect(dialog).toHaveTextContent('permanently delete 4 object(s)?')
+  })
+})
+
+describe('TrashView times', () => {
+  test('shows when an entry was deleted in the Time zone setting', async () => {
+    const settings = useSettings.getState().settings
+    useSettings.setState({ settings: { ...settings, timeZone: 'Pacific/Auckland' } })
+    try {
+      render(<TrashView />)
+      const list = await screen.findByRole('list', { name: 'Trash' })
+      // 2026-10-20T10:00Z is 23:00 on 20 Oct in Auckland.
+      expect(within(list).getByRole('listitem', { name: 'Note' })).toHaveTextContent(/Oct 20, 2026, 11:00\sPM/)
+    } finally {
+      useSettings.setState({ settings })
+    }
   })
 })
