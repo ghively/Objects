@@ -1,8 +1,14 @@
 # Object: remaining work
 
-Status as of 2026-10-28. **All eight milestones are built, reviewed, fixed and gated.** What remains:
-1. the 2026-10-28 audit list (`audit-2026-10-28.md` in this folder: about 65 reproduced bugs and 14 completeness gaps, none fixed yet)
-2. Gene's hands-on checking, and the fixes both produce
+Status as of 2026-10-28 (evening, Gene's Windows PC). **All eight milestones are built, reviewed, fixed and gated, the audit bugs are fixed, and the guessed values now follow the full Object reference.** What remains:
+1. **M9, the completeness gaps:** Gene approved all of them; the plan is `2026-10-28-m9-completeness-gaps.md` (with Gene's answers). **On hold: don't start it until Gene says so.**
+2. Gene's hands-on checking (M1–M8 acceptance docs), including whether Object's Standard design shows properties in a sidebar or inline (`reference-check-2026-10-28.md` §5), and the fixes it produces.
+
+**Done on 2026-10-28, on Windows:**
+- **Audit bugs:** all ~65 in `audit-2026-10-28.md`, plus every "unconfirmed" item that proved real, fixed one per commit with a failing-first test, in six area branches merged into master (whiteboard, backend API, views and properties, shell, backend storage, editor).
+- **Guessed values:** checked against the full `.reference/` (`reference-check-2026-10-28.md`) and applied in four merged branches: keyboard shortcuts (one registry in `lib/shortcuts.ts`), side panel, breadcrumbs, pinned tabs, the 768 px breakpoint, dashboard default sections, Tasks tab order, slash and block menus, highlight and formula formats, search highlight colours and graph limits.
+- **Windows-only failures** from the baseline are fixed (non-portable tests, the M5 acceptance cache check, an icon first-render flicker).
+- **Gate:** pytest 1202 passed; vitest 1829 passed; `tsc` clean; build ok; `m1_roundtrip.py` and `m2`–`m8_acceptance.py` PASS on `space-sample` and `space-v1`.
 
 Spec: `docs/superpowers/specs/2026-10-23-object-design.md`. How to resume: `HANDOFF.md`, `CONTINUE.md`. Rules: `CLAUDE.md`. Process: `docs/superpowers/build-process.md`.
 
