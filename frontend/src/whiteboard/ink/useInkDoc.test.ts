@@ -205,6 +205,22 @@ describe('useInkDoc', () => {
     expect(client.save.mock.calls[1]).toEqual([PATH, [s('a')], 'r1'])
   })
 
+  test('strokes drawn before the ink file loads are kept and saved', async () => {
+    const client = fakeClient({ path: PATH, strokes: [s('a')], revision: 'r1' })
+    const load = deferred<InkResponse>()
+    client.load.mockImplementationOnce(() => load.promise)
+    const { result } = renderHook(() => useInkDoc(PATH, client))
+    act(() => result.current.save([s('b')]))
+    expect(result.current.strokes).toEqual([s('b')])
+    await act(async () => load.resolve({ path: PATH, strokes: [s('a')], revision: 'r1' }))
+    await settle()
+    expect(result.current.strokes!.map((x) => x.id)).toEqual(['a', 'b'])
+    await advance(400)
+    await settle()
+    expect(client.save).toHaveBeenCalledTimes(1)
+    expect(client.save.mock.calls[0]).toEqual([PATH, [s('a'), s('b')], 'r1'])
+  })
+
   test('a second 409 reloads and keeps the server copy', async () => {
     const client = fakeClient({ path: PATH, strokes: [s('a')], revision: 'r1' })
     const { result } = renderHook(() => useInkDoc(PATH, client))
