@@ -1432,6 +1432,10 @@ def create_app(
             # `from_json` would fill these in; an edit that clears them is refused.
             if not isinstance(data.get(field), str) or not data[field].strip():
                 return _error(422, "An object type needs a name and a plural name")
+        if data.get("propertyDefinitions") is not None and not isinstance(
+            data["propertyDefinitions"], list
+        ):
+            return _error(422, "propertyDefinitions must be a list")
         for entry in data.get("propertyDefinitions") or []:
             if isinstance(entry, dict) and "options" in entry:
                 bad = option_shape_problems(entry["options"])
