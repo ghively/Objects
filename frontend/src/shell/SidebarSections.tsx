@@ -153,13 +153,17 @@ export const REORDER_HANDLE = (name: string) => `Reorder ${name}`
 
 /**
  * The sidebar's top-level blocks in order: the ids `workspaceOrder` lists (unknown ids ignored),
- * then the missing ones in their default place: the custom sections, Pinned, the object types.
+ * with the missing ones in their default place: a custom section just above Pinned (so one added
+ * after the order was saved shows where "Add Section" puts it), Pinned and the object types last.
  */
 export function workspaceBlocks(order: unknown, sectionIds: string[]): string[] {
   const known = [...sectionIds, WORKSPACE_PINNED, WORKSPACE_OBJECTS]
   const listed = Array.isArray(order) ? order.filter((id): id is string => typeof id === 'string' && known.includes(id)) : []
-  const head = [...new Set(listed)]
-  return [...head, ...known.filter((id) => !head.includes(id))]
+  const out = [...new Set(listed)]
+  if (!out.includes(WORKSPACE_PINNED)) out.push(WORKSPACE_PINNED)
+  for (const id of sectionIds) if (!out.includes(id)) out.splice(out.indexOf(WORKSPACE_PINNED), 0, id)
+  if (!out.includes(WORKSPACE_OBJECTS)) out.push(WORKSPACE_OBJECTS)
+  return out
 }
 
 /** Save `workspaceOrder` (optimistic, after the `ui.json` saves before it; a 409 re-applies it once to the fresh state). */
