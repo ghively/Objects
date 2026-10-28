@@ -112,6 +112,25 @@ describe('code blocks', () => {
   })
 })
 
+describe('headings', () => {
+  test.each([
+    [' #', '## Title \\#'],
+    [' ##', '## Title \\##'],
+  ])('a heading ending in %j keeps it', (typed, saved) => {
+    const editor = headless('## Title\n\nP\n')
+    append(editor, 'Title', typed)
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved + '\n\nP\n')
+    expect(out.reloaded[0]).toEqual(['heading', 'Title' + typed])
+  })
+
+  test('a # inside a word is left alone', () => {
+    const editor = headless('## Title\n')
+    append(editor, 'Title', ' C#')
+    expect(serializeBody(editor)).toBe('## Title C#\n')
+  })
+})
+
 /** Replace the whole document with one paragraph of `text` (lines joined by hard breaks). */
 function setParagraph(editor: TiptapEditor, text: string): void {
   const { schema } = editor
