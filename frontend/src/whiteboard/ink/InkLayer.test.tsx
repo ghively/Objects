@@ -109,6 +109,22 @@ describe('InkLayer', () => {
     expect(s.d.startsWith('M ')).toBe(true)
   })
 
+  test('a stroke longer than the file allows is saved as several strokes', () => {
+    const { capture, onStrokesChange } = setup()
+    const el = capture()!
+    fire(el, 'pointerdown', { pointerType: 'pen', x: 0, y: 0, pressure: 0.5 })
+    const coalesced = Array.from({ length: 25_000 }, (_, i) => ({ x: (i + 1) / 10, y: (i % 7) / 10, pressure: 0.5 }))
+    fire(el, 'pointermove', { pointerType: 'pen', x: 2500, y: 0, pressure: 0.5, coalesced })
+    fire(el, 'pointerup', { pointerType: 'pen', x: 2500, y: 0, pressure: 0 })
+    const next = onStrokesChange.mock.calls[0][0] as InkStroke[]
+    expect(next.length).toBeGreaterThan(1)
+    expect(next.every((s) => s.points.length <= 20_000)).toBe(true)
+    expect(new Set(next.map((s) => s.id)).size).toBe(next.length)
+    // Consecutive pieces share their joining sample, so the line stays unbroken.
+    expect(next[1].points[0]).toEqual(next[0].points.at(-1))
+    expect(next.reduce((n, s) => n + s.points.length, 0)).toBe(25_001 + next.length - 1)
+  })
+
   test('mouse stroke uses simulated pressure', () => {
     const { capture, onStrokesChange } = setup()
     const el = capture()!

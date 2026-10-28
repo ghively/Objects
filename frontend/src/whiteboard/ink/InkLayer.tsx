@@ -10,6 +10,7 @@ import {
   newStrokeId,
   outlineFor,
   samplesFrom,
+  splitPoints,
   strokeOptions,
   svgPathFromOutline,
 } from './inkModel'
@@ -267,7 +268,9 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
     if (cancelled || g.points.length === 0) return
     const { strokes: current, zoom: z, onStrokesChange: change } = latest.current
     if (g.mode === 'draw') {
-      change([...current, finishStroke(newStrokeId(), g.tool, g.color, g.width, g.points, g.pointerType)], 'draw')
+      // A path over the file's per-stroke limit is kept as several strokes (one would fail every save).
+      const drawn = splitPoints(g.points).map((pts) => finishStroke(newStrokeId(), g.tool, g.color, g.width, pts, g.pointerType))
+      change([...current, ...drawn], 'draw')
       return
     }
     const { selection: sel, box: b } = latest.current
