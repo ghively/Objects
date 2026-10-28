@@ -57,6 +57,11 @@ describe('TabStrip', () => {
     // Middle click does not close a pinned tab.
     fireEvent(tabs()[0], new MouseEvent('auxclick', { bubbles: true, button: 1 }))
     expect(s().tabs).toHaveLength(2)
+    // Nor does the context menu: it has no "Close tab" for a pinned tab (Object refuses on every path).
+    fireEvent.contextMenu(tabs()[0])
+    expect(screen.getByRole('menuitem', { name: 'Unpin tab' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Close tab' })).toBeNull()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
 
     fireEvent.contextMenu(tabs()[0])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Unpin tab' }))
@@ -67,6 +72,14 @@ describe('TabStrip', () => {
     fireEvent.contextMenu(tabs()[0])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Close tab' }))
     expect(s().tabs).toHaveLength(1)
+  })
+
+  test('test tabs are 60 to 200 px wide with a 5 px gap (reference)', () => {
+    s().open(typeT('a'))
+    render(<TabStrip space={null} />)
+    expect(tabs()[0].className).toContain('max-w-[200px]')
+    expect(tabs()[0].className).toContain('min-w-[60px]')
+    expect(screen.getByRole('tablist', { name: 'Tabs' }).className).toContain('gap-[5px]')
   })
 
   test('test scroll buttons appear on overflow', () => {

@@ -58,22 +58,35 @@ describe('Breadcrumbs', () => {
     expect(within(row()).getAllByRole('button').map((b) => b.textContent)).toEqual(['Alpha'])
   })
 
-  test('test long trails collapse the middle', async () => {
+  test('test separators are a slash and earlier crumbs are at 80 % opacity', () => {
+    walk('Alpha', 'Beta', 'Gamma')
+    render(<Breadcrumbs space={null} />)
+    expect(row().textContent).toBe('Alpha/Beta/Gamma')
+    for (const b of within(row()).getAllByRole('button')) expect(b.className).toContain('opacity-80')
+    expect(row().querySelector('[aria-current="page"]')!.className).not.toContain('opacity-80')
+    // Three crumbs counting the current page: no menu.
+    expect(within(row()).queryByRole('button', { name: 'Show hidden breadcrumbs' })).toBeNull()
+  })
+
+  test('test at most 3 crumbs inline counting the current page; earlier ones in the menu, most recent first', async () => {
     const user = userEvent.setup()
     walk('A1', 'A2', 'A3', 'A4', 'A5', 'A6')
     render(<Breadcrumbs space={null} />)
     const more = within(row()).getByRole('button', { name: 'Show hidden breadcrumbs' })
-    expect(more).toHaveTextContent('…')
+    // A dots icon button with no text, first in the row.
+    expect(more).toHaveTextContent('')
+    expect(within(row()).getAllByRole('button')[0]).toBe(more)
     const visible = within(row())
       .getAllByRole('button')
       .filter((b) => b !== more)
       .map((b) => b.textContent)
-    expect(visible).toEqual(['A1', 'A4', 'A5'])
+    expect(visible).toEqual(['A4', 'A5'])
+    expect(row().querySelector('[aria-current="page"]')).toHaveTextContent('A6')
     await user.click(more)
     const menu = await screen.findByRole('menu')
-    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['A2', 'A3'])
-    await user.click(within(menu).getByRole('menuitem', { name: 'A3' }))
-    expect(currentTarget(s())).toEqual(objT('A3.md'))
-    expect(activeTab(s())!.index).toBe(2)
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['A3', 'A2', 'A1'])
+    await user.click(within(menu).getByRole('menuitem', { name: 'A2' }))
+    expect(currentTarget(s())).toEqual(objT('A2.md'))
+    expect(activeTab(s())!.index).toBe(1)
   })
 })

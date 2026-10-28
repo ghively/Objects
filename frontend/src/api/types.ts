@@ -869,6 +869,7 @@ export type TaskSectionKey =
   | 'tags'
   | 'source'
   | 'completed'
+  | 'all'
 
 export interface TasksUi {
   activeTab: TaskSectionKey

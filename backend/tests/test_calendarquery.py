@@ -462,6 +462,17 @@ def test_ui_accepts_calendar_tasks_reminders_keys(calendar_space_dir: Path):
         assert c.get("/api/ui").json()["ui"]["reminders"] == {"enabled": False}
 
 
+def test_ui_accepts_tasks_all_tab(calendar_space_dir: Path):
+    # The Tasks page's "All" tab (Object's `allContent`, after Completed).
+    space = _space(calendar_space_dir)
+    with TestClient(create_app(space, None, watch=False)) as c:
+        rev = c.get("/api/ui").json()["revision"]
+        tasks = {"activeTab": "all", "views": {"all": {"layout": "list"}}}
+        r = c.put("/api/ui", json={"patch": {"tasks": tasks}, "baseRevision": rev})
+        assert r.status_code == 200, r.text
+        assert c.get("/api/ui").json()["ui"]["tasks"] == tasks
+
+
 def test_ui_accepts_hide_calendar_sidebar(calendar_space_dir: Path):
     # M7 Task 3: the calendar's "hide sidebar" toggle is stored in `ui.json`'s calendar object.
     space = _space(calendar_space_dir)

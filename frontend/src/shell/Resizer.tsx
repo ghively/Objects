@@ -13,10 +13,12 @@ export interface ResizerProps {
   onDrag(delta: number): void
   /** The drag ended (pointer up) after moving `delta` px. */
   onEnd(delta: number): void
+  /** A double click on the handle (the side panel's goes back to its default width). */
+  onDoubleClick?(): void
   className?: string
 }
 
-export function Resizer({ direction, label, onDrag, onEnd, className }: ResizerProps) {
+export function Resizer({ direction, label, onDrag, onEnd, onDoubleClick, className }: ResizerProps) {
   const start = useRef<{ pos: number; id: number } | null>(null)
   const posOf = (e: ReactPointerEvent) => (direction === 'x' ? e.clientX : e.clientY)
 
@@ -54,6 +56,7 @@ export function Resizer({ direction, label, onDrag, onEnd, className }: ResizerP
       }}
       onPointerUp={finish}
       onPointerCancel={finish}
+      onDoubleClick={onDoubleClick}
       className={cn(
         'shrink-0 touch-none select-none bg-transparent transition-colors hover:bg-line',
         direction === 'x' ? 'w-1 cursor-col-resize' : 'h-1 cursor-row-resize',

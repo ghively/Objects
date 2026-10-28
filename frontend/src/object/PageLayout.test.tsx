@@ -15,8 +15,7 @@ import { api } from '@/api/client'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPage } from './ObjectPage'
-import { MIN_SIDEPANEL_WIDTH } from '@/nav/sidepanel'
-import { MIN_CONTENT_WIDTH, PageLayout, PROPERTIES_BESIDE_WIDTH, PROPERTY_PANEL_WIDTH, propertiesBeside, type PanelVariant } from './PageLayout'
+import { PageLayout, PROPERTIES_BESIDE_WIDTH, PROPERTY_PANEL_WIDTH, propertiesBeside, type PanelVariant } from './PageLayout'
 
 const mocked = vi.mocked(api)
 
@@ -137,13 +136,13 @@ describe('narrow layouts', () => {
     return { ...r, drawn }
   }
 
-  test('test the width rule: the panel sits beside from panel plus minimum content width', () => {
+  test('test the width rule: the properties sit beside from the container md breakpoint, 768 px (reference)', () => {
     expect(PROPERTY_PANEL_WIDTH).toBe(370)
-    expect(MIN_CONTENT_WIDTH).toBe(480)
-    expect(PROPERTIES_BESIDE_WIDTH).toBe(850)
+    expect(PROPERTIES_BESIDE_WIDTH).toBe(768)
     expect(propertiesBeside(null)).toBe(true)
-    expect(propertiesBeside(850)).toBe(true)
-    expect(propertiesBeside(849)).toBe(false)
+    expect(propertiesBeside(800)).toBe(true)
+    expect(propertiesBeside(768)).toBe(true)
+    expect(propertiesBeside(767)).toBe(false)
     expect(propertiesBeside(320)).toBe(false)
   })
 
@@ -156,7 +155,7 @@ describe('narrow layouts', () => {
   })
 
   test('test a narrow standard page puts the property panel inline under the title', () => {
-    const { container } = sized(752)
+    const { container } = sized(767)
     const props = screen.getByRole('complementary', { name: 'Properties' })
     expect(props.dataset.variant).toBe('card')
     const inline = container.querySelector('[data-properties-inline]') as HTMLElement
@@ -169,24 +168,35 @@ describe('narrow layouts', () => {
     expect((container.querySelector('[data-page-layout]') as HTMLElement).dataset.properties).toBe('inline')
   })
 
-  test('test other designs keep their own placement when narrow', () => {
-    const { container } = sized(500, 'encyclopedia')
-    expect(screen.getByRole('complementary', { name: 'Properties' }).dataset.variant).toBe('infobox')
+  test('test profile and encyclopedia keep their placement from 768 px and go inline below (reference isMd)', () => {
+    for (const [design, variant] of [
+      ['encyclopedia', 'infobox'],
+      ['profile', 'column'],
+    ] as const) {
+      const wide = sized(768, design)
+      expect(screen.getByRole('complementary', { name: 'Properties' }).dataset.variant).toBe(variant)
+      expect(wide.container.querySelector('[data-properties-inline]')).toBeNull()
+      wide.unmount()
+
+      const narrow = sized(767, design)
+      const props = screen.getByRole('complementary', { name: 'Properties' })
+      expect(props.dataset.variant).toBe('card')
+      expect(narrow.container.querySelector('[data-properties-inline]')?.contains(props)).toBe(true)
+      expect((narrow.container.querySelector('[data-page-layout]') as HTMLElement).dataset.properties).toBe('inline')
+      narrow.unmount()
+    }
+  })
+
+  test('test index card keeps its own placement when narrow', () => {
+    const { container } = sized(500, 'indexCard')
+    expect(screen.getByRole('complementary', { name: 'Properties' }).dataset.variant).toBe('card')
     expect(container.querySelector('[data-properties-inline]')).toBeNull()
     expect((container.querySelector('[data-page-layout]') as HTMLElement).dataset.properties).toBeUndefined()
   })
 
-  test('test the main column keeps its minimum width and leaves the side panel its minimum', () => {
-    // index.css carries the shell's rule; its numbers are these constants.
+  test('test the main column has no minimum width rule (the side panel is a share of the card)', () => {
     const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8')
-    const rule = (sel: string) => {
-      const at = css.indexOf(`\n${sel} {`)
-      return at < 0 ? '' : css.slice(at, css.indexOf('}', at))
-    }
-    expect(rule('[data-main-column]')).toContain(`min-width: min(${MIN_CONTENT_WIDTH}px, calc(100% - ${MIN_SIDEPANEL_WIDTH}px))`)
-    expect(rule('[data-main-column]:has([data-page-layout][data-properties])')).toContain(
-      `min-width: min(${PROPERTIES_BESIDE_WIDTH}px, calc(100% - ${MIN_SIDEPANEL_WIDTH}px))`,
-    )
+    expect(css).not.toMatch(/\[data-main-column\][^{]*\{[^}]*min-width/)
   })
 })
 

@@ -1,8 +1,10 @@
 /**
  * The tab strip in the top bar (moved out of `App.tsx` in M7). Non-persistent tabs show their title
  * in italic and navigate in place; a double click makes a tab persistent (and back). Pinned tabs
- * sort first and have no close button. A context menu pins, unpins and closes; scroll buttons
- * appear when the tabs overflow; the "Tab menu" button opens the searchable tab list.
+ * sort first and can't be closed: no close button and no "Close tab" item (Object refuses to
+ * close a pinned tab on every path). A context menu pins, unpins and closes; tabs are 60 to 200 px
+ * wide with a 5 px gap (Object's `oW`, `aW`, `sW`); scroll buttons appear when the tabs
+ * overflow; the "Tab menu" button opens the searchable tab list.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { SpaceInfo, TypeDef } from '@/api/types'
@@ -148,7 +150,7 @@ function TabItem({ tab, active, space }: { tab: Tab; active: boolean; space: Spa
           onAuxClick={(e) => e.button === 1 && !tab.pinned && close(tab.id)}
           onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && activate(tab.id)}
           className={cn(
-            'group flex h-8 max-w-[220px] min-w-[72px] shrink cursor-default items-center gap-1.5 rounded-lg pr-1 pl-2 text-[15px] font-medium select-none',
+            'group flex h-8 max-w-[200px] min-w-[60px] shrink cursor-default items-center gap-1.5 rounded-lg pr-1 pl-2 text-[15px] font-medium select-none',
             !tab.persistent && 'italic',
             tab.pinned && 'pr-2',
             active ? 'text-fg' : 'text-fg-muted hover:bg-hover',
@@ -183,10 +185,12 @@ function TabItem({ tab, active, space }: { tab: Tab; active: boolean; space: Spa
             Pin tab
           </ContextMenuItem>
         )}
-        <ContextMenuItem onSelect={() => close(tab.id)}>
-          <Icon name="ph-x" size={15} />
-          Close tab
-        </ContextMenuItem>
+        {!tab.pinned && (
+          <ContextMenuItem onSelect={() => close(tab.id)}>
+            <Icon name="ph-x" size={15} />
+            Close tab
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   )
@@ -243,7 +247,7 @@ export function TabStrip({ space }: { space: SpaceInfo | null }) {
         role="tablist"
         aria-label="Tabs"
         onScroll={measure}
-        className="flex min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex min-w-0 items-center gap-[5px] overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab) => (
           <TabItem key={tab.id} tab={tab} active={tab.id === activeId} space={space} />

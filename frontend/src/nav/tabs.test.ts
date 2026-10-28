@@ -58,10 +58,36 @@ describe('useTabs', () => {
     s().open(objT('Tasks/Write docs.md'))
     expect(s().tabs).toHaveLength(2)
 
-    // Closing the active tab activates its neighbour.
+    // Closing the active tab activates the most recently opened one.
     s().close(s().tabs[1].id)
     expect(s().tabs).toHaveLength(1)
     expect(currentTarget(s())).toEqual(typeT('task'))
+  })
+
+  test('closing the active tab activates the most recently opened tab, not a neighbour (reference)', () => {
+    const s = useTabs.getState
+    s().open(typeT('a'))
+    s().open(typeT('b'), { newTab: true })
+    s().open(typeT('c'), { newTab: true })
+    const [a, b, c] = s().tabs.map((t) => t.id)
+    s().activate(a)
+    s().activate(c)
+    s().close(c)
+    expect(s().activeId).toBe(a)
+    s().activate(b)
+    s().close(b)
+    expect(s().activeId).toBe(a)
+  })
+
+  test('a pinned tab is never closed, by any path (reference)', () => {
+    const s = useTabs.getState
+    s().open(typeT('a'))
+    s().open(typeT('b'), { newTab: true })
+    const pinned = s().tabs[1].id
+    s().pin(pinned)
+    s().close(pinned)
+    expect(s().tabs.map((t) => t.id)).toContain(pinned)
+    expect(s().activeId).toBe(pinned)
   })
 
   test('opening with no tabs creates one', () => {

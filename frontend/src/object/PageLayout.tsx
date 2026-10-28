@@ -11,13 +11,11 @@
  * - The cover image: `wideCoverImage` spans the whole panel, `cropCoverImage` fixes its height.
  * The page and the peek share this layout; the peek is narrower, so its gutters are too.
  *
- * Narrow widths (Standard only): the content column keeps `MIN_CONTENT_WIDTH`; when the layout
- * is narrower than the property panel plus that, the panel moves inline under the header (drawn
- * as the `card` variant). The shell gives the main column `PROPERTIES_BESIDE_WIDTH` while a panel
- * is open, shrinking the side panel to its minimum first (`index.css`, `[data-main-column]`). The
- * reference only shows the panel beside the content (`docs/05`) and stacks property
- * rows in its narrowest containers (`.xxs-container .properties-property-outer`); the widths and
- * the inline fallback are our choice.
+ * Narrow widths: below the container's md breakpoint (`PROPERTIES_BESIDE_WIDTH`, 768 px) the
+ * Standard, Profile and Encyclopedia properties move inline under the header (drawn as the `card`
+ * variant). Object shows Profile's and Encyclopedia's property sidebar only from md
+ * (`PropertiesSidebar`, `isMd`). Whether Object's Standard design has a property sidebar at all
+ * is open (reference-check section 5): Standard keeps its left panel here until Gene checks.
  */
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import { api } from '@/api/client'
@@ -34,12 +32,16 @@ export type PanelVariant = 'side' | 'card' | 'column' | 'infobox'
 
 /** The Standard left property panel's width (`PropertyPanel`'s `side` variant). */
 export const PROPERTY_PANEL_WIDTH = 370
-/** The narrowest the content column gets beside the property panel (our choice: no reference value). */
-export const MIN_CONTENT_WIDTH = 480
-/** The layout width from which the Standard property panel sits beside the content. */
-export const PROPERTIES_BESIDE_WIDTH = PROPERTY_PANEL_WIDTH + MIN_CONTENT_WIDTH
+/**
+ * The layout width from which the properties sit beside the content: Object's container `md`
+ * breakpoint (768 px), from which Profile and Encyclopedia show their property sidebar.
+ */
+export const PROPERTIES_BESIDE_WIDTH = 768
 
-/** Whether a Standard layout `width` px wide (null: not measured yet) has the panel beside the content. */
+/** The designs whose properties go inline under the header below `PROPERTIES_BESIDE_WIDTH`. */
+const INLINE_WHEN_NARROW: readonly PageDesign[] = ['standard', 'profile', 'encyclopedia']
+
+/** Whether a layout `width` px wide (null: not measured yet) has the properties beside the content. */
 export function propertiesBeside(width: number | null): boolean {
   return width === null || width >= PROPERTIES_BESIDE_WIDTH
 }
@@ -142,7 +144,7 @@ export function PageLayout({
   const rootRef = useRef<HTMLDivElement | null>(null)
   const width = useWidth(rootRef)
   const open = properties !== null && properties !== undefined && properties !== false
-  const inline = design === 'standard' && open && !propertiesBeside(width)
+  const inline = open && INLINE_WHEN_NARROW.includes(design) && !propertiesBeside(width)
   const propertiesEl =
     typeof properties === 'function' ? properties(inline ? 'card' : panelVariant(design)) : properties
   const wide = design === 'standard' && !!type?.wideLayoutMode
@@ -175,7 +177,16 @@ export function PageLayout({
       )
       break
     case 'profile':
-      content = (
+      content = inline ? (
+        <>
+          <div data-profile-column="" className="mb-6">
+            <ProfileImage summary={summary} type={type} />
+          </div>
+          {headerEl}
+          <div data-properties-inline="">{propertiesEl}</div>
+          {bodyEl}
+        </>
+      ) : (
         <div className="flex gap-10">
           <div data-profile-column="" className="flex w-[var(--profile-column-width)] shrink-0 flex-col gap-6">
             <ProfileImage summary={summary} type={type} />
@@ -189,7 +200,13 @@ export function PageLayout({
       )
       break
     case 'encyclopedia':
-      content = (
+      content = inline ? (
+        <>
+          {headerEl}
+          <div data-properties-inline="">{propertiesEl}</div>
+          {bodyEl}
+        </>
+      ) : (
         <>
           {headerEl}
           <div className="flex items-start gap-10">
@@ -215,7 +232,7 @@ export function PageLayout({
       className="flex h-full min-h-0 w-full"
       data-page-layout={design}
       data-font={type?.font ?? 'sans-serif'}
-      data-properties={design === 'standard' && open ? (inline ? 'inline' : 'beside') : undefined}
+      data-properties={inline ? 'inline' : design === 'standard' && open ? 'beside' : undefined}
     >
       {design === 'standard' && !inline && propertiesEl}
       <div className="relative flex min-w-0 flex-1 flex-col">

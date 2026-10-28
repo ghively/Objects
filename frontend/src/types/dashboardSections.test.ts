@@ -6,6 +6,7 @@ import {
   appendSection,
   buildSections,
   canHaveBacklinks,
+  canRemoveSection,
   hiddenSections,
   moveSection,
   noBacklinksRows,
@@ -22,7 +23,10 @@ const TAGS = propertyDef({ id: 'tags', key: 'tags', name: 'Tags', type: 'entity_
 const NOTE = typeDef({ id: 'note', name: 'Note', propertyDefinitions: [TAGS] })
 const PLAIN = typeDef({ id: 'plain', name: 'Plain' })
 
-const DEFAULTS = ['recentlyAccessed', 'collections', 'queries', 'inNoCollection', 'notTagged'] as const
+/** Object's initial sections (the server's `default_views`). */
+const DEFAULTS = ['recentlyAccessed', 'collections', 'queries'] as const
+/** The default set before the reference check: still what older saved views hold. */
+const OLD = ['recentlyAccessed', 'collections', 'queries', 'inNoCollection', 'notTagged'] as const
 
 function views(keys: readonly string[] = DEFAULTS, removed: string[] = []): Views {
   const v = defaultViews()
@@ -44,11 +48,12 @@ const ctx = (over: Partial<{ collections: ReturnType<typeof collection>[]; queri
 describe('buildSections', () => {
   test('test buildSections default order and notTagged only with tags', () => {
     expect(buildSections(NOTE, views(), ctx()).map((s) => s.key)).toEqual([...DEFAULTS])
-    expect(buildSections(PLAIN, views(), ctx()).map((s) => s.key)).toEqual(DEFAULTS.filter((k) => k !== 'notTagged'))
+    expect(buildSections(NOTE, views(OLD), ctx()).map((s) => s.key)).toEqual([...OLD])
+    expect(buildSections(PLAIN, views(OLD), ctx()).map((s) => s.key)).toEqual(OLD.filter((k) => k !== 'notTagged'))
   })
 
   test('labels, icons and the full-view flag come from the kind', () => {
-    const s = buildSections(NOTE, views(), ctx())
+    const s = buildSections(NOTE, views(OLD), ctx())
     expect(s.map((x) => [x.key, x.label, x.icon, x.inFullView])).toEqual([
       ['recentlyAccessed', 'Recently Opened', 'ph-clock-clockwise', false],
       ['collections', 'Collections', 'ph-cards-three', false],
@@ -101,31 +106,56 @@ describe('buildSections', () => {
   test('full-view sections become header tabs; dashboard-only ones do not', () => {
     const q = query({ id: 'q1', name: 'Open', definition: { ...query({ id: 'x' }).definition, structures: [{ id: 'note' }] } })
     const c = collection({ id: 'c1', name: 'Reading', typeIds: ['note'] })
-    const all = buildSections(NOTE, views([...DEFAULTS, 'query:q1']), ctx({ collections: [c], queries: [q] }))
+    const all = buildSections(NOTE, views([...OLD, 'query:q1']), ctx({ collections: [c], queries: [q] }))
     expect(tabSections(all).map((s) => s.key)).toEqual(['inNoCollection', 'notTagged', 'query:q1', 'collection:c1'])
   })
 })
 
 describe('section edits', () => {
-  const all = () => buildSections(NOTE, views(), ctx())
+  const all = () => buildSections(NOTE, views(OLD), ctx())
 
   test('removeSection moves the key to removedSections and showSection brings it back', () => {
-    const v = views()
-    const removed = removeSection(v, all(), 'collections')
-    expect(removed.dashboard.sections.map((s) => s.key)).toEqual(['recentlyAccessed', 'queries', 'inNoCollection', 'notTagged'])
-    expect(removed.dashboard.removedSections).toEqual(['collections'])
+    const v = views(OLD)
+    const removed = removeSection(v, all(), 'recentlyAccessed')
+    expect(removed.dashboard.sections.map((s) => s.key)).toEqual(['collections', 'queries', 'inNoCollection', 'notTagged'])
+    expect(removed.dashboard.removedSections).toEqual(['recentlyAccessed'])
 
     const after = buildSections(NOTE, removed, ctx())
-    expect(hiddenSections(after).map((s) => s.key)).toEqual(['collections'])
+    expect(hiddenSections(after).map((s) => s.key)).toEqual(['recentlyAccessed'])
     expect(visibleSections(after)).toHaveLength(4)
 
     const back = showSection(removed, after, hiddenSections(after)[0])
     expect(back.dashboard.removedSections).toEqual([])
-    expect(back.dashboard.sections.map((s) => s.key)).toEqual(['recentlyAccessed', 'queries', 'inNoCollection', 'notTagged', 'collections'])
+    expect(back.dashboard.sections.map((s) => s.key)).toEqual(['collections', 'queries', 'inNoCollection', 'notTagged', 'recentlyAccessed'])
+  })
+
+  test('Collections and Queries cannot be removed (reference canBeRemoved: false)', () => {
+    expect(canRemoveSection('collections')).toBe(false)
+    expect(canRemoveSection('queries')).toBe(false)
+    expect(canRemoveSection('recentlyAccessed')).toBe(true)
+    expect(canRemoveSection('inNoCollection')).toBe(true)
+    const v = views()
+    expect(removeSection(v, buildSections(NOTE, v, ctx()), 'collections')).toBe(v)
+    expect(removeSection(v, buildSections(NOTE, v, ctx()), 'queries')).toBe(v)
+  })
+
+  test('Not in any collection and Not tagged are offered in Add a section, not shown by default (reference)', () => {
+    const v = views()
+    const built = buildSections(NOTE, v, ctx())
+    expect(addableSections(NOTE, built, ctx()).map((s) => s.key)).toEqual(['inNoCollection', 'notTagged', 'noBacklinks'])
+    // A type without tags is not offered "Not tagged".
+    expect(addableSections(PLAIN, buildSections(PLAIN, v, ctx()), ctx()).map((s) => s.key)).toEqual(['inNoCollection', 'noBacklinks'])
+    // Added, it is a section and a header tab, and no longer offered.
+    const add = addableSections(NOTE, built, ctx())[0]
+    const next = showSection(v, built, add)
+    const after = buildSections(NOTE, next, ctx())
+    expect(visibleSections(after).map((s) => s.key)).toEqual([...DEFAULTS, 'inNoCollection'])
+    expect(tabSections(after).map((s) => s.key)).toEqual(['inNoCollection'])
+    expect(addableSections(NOTE, after, ctx()).map((s) => s.key)).toEqual(['notTagged', 'noBacklinks'])
   })
 
   test('moveSection reorders and keeps collapse state', () => {
-    const v = views()
+    const v = views(OLD)
     v.dashboard.sections[1].collapsed = true
     const moved = moveSection(v, buildSections(NOTE, v, ctx()), 'notTagged', 'recentlyAccessed')
     expect(moved.dashboard.sections.map((s) => s.key)).toEqual(['notTagged', 'recentlyAccessed', 'collections', 'queries', 'inNoCollection'])
@@ -147,8 +177,8 @@ describe('section edits', () => {
     const v = views(['inNoCollection'], ['collections'])
     const c2 = ctx({ collections: [c], queries: [q1, q2] })
     const built = buildSections(NOTE, v, c2)
-    // the collection is already a visible section (auto-appended), the query is not; "No backlinks" is always offered
-    expect(addableSections(NOTE, built, c2).map((s) => s.key)).toEqual(['collections', 'noBacklinks', 'query:q1'])
+    // the collection is already a visible section (auto-appended), the query is not; "Not tagged" and "No backlinks" are offered while not shown
+    expect(addableSections(NOTE, built, c2).map((s) => s.key)).toEqual(['collections', 'notTagged', 'noBacklinks', 'query:q1'])
   })
 })
 
@@ -216,8 +246,8 @@ describe('No backlinks section (M5)', () => {
 
   test('test no backlinks section addable, lists unlinked objects, title and description match reference', () => {
     // Not in the default set; offered in "Add a section".
-    const all = buildSections(PERSON, views(), ctx())
-    expect(all.map((s) => s.key)).toEqual([...DEFAULTS])
+    const all = buildSections(PERSON, views(OLD), ctx())
+    expect(all.map((s) => s.key)).toEqual([...OLD])
     const add = addableSections(PERSON, all, ctx())
     expect(add.map((s) => s.key)).toEqual(['noBacklinks'])
     expect(add[0]).toMatchObject({
@@ -230,7 +260,7 @@ describe('No backlinks section (M5)', () => {
     expect(SECTION_TEXT.noBacklinksDescription).toBe('All objects that are not linked in any other content.')
 
     // Added: a visible section and a header tab; buildSections keeps it.
-    const v = showSection(views(), all, add[0])
+    const v = showSection(views(OLD), all, add[0])
     const after = buildSections(PERSON, v, ctx())
     expect(visibleSections(after).map((s) => s.key).at(-1)).toBe('noBacklinks')
     expect(tabSections(after).map((s) => s.key)).toContain('noBacklinks')
@@ -249,7 +279,7 @@ describe('No backlinks section (M5)', () => {
     expect(canHaveBacklinks(typeDef({ id: 'page', name: 'Page', basic: true }))).toBe(true)
     expect(canHaveBacklinks(typeDef({ id: 'video2', name: 'Video' }))).toBe(true)
     expect(buildSections(VIDEO, views(['noBacklinks']), ctx())).toEqual([])
-    expect(addableSections(VIDEO, buildSections(VIDEO, views([]), ctx()), ctx())).toEqual([])
+    expect(addableSections(VIDEO, buildSections(VIDEO, views(OLD), ctx()), ctx())).toEqual([])
     // Every row carries its backlinks (M5 Task 13), so a type without the backlinks definition lists them too.
     expect(buildSections(NOTE, views(['noBacklinks']), ctx()).map((s) => s.key)).toEqual(['noBacklinks'])
 
