@@ -204,6 +204,7 @@ export const WB = {
   cancel: s('Cancel', 'general.cancel'),
   delete: s('Delete', 'general.delete'),
   deleteObject: s('Delete', 'EntityMenu.delete'),
+  versionHistory: s('Version History', 'EntityMenu.versionHistory.text'),
 
   // The floating inspector (M8, FloatingInspector.*); the Stats rows are our choice of stats
   inspectorOutline: s('Outline', 'FloatingInspector.tabs.outline'),

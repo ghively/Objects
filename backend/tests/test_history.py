@@ -370,7 +370,10 @@ def test_board_and_ink_snapshots_and_restore(client, space, clock):
     assert r.status_code == 200, r.text
     assert (space.root / BOARD_JSON).read_bytes() == board_before
     assert (space.root / INK).read_bytes() == ink_before
-    assert r.json() == {"revision": version_of(board_before)}
+    assert r.json() == {
+        "revision": version_of(board_before),
+        "version": version_of((space.root / BOARD).read_bytes()),
+    }
     assert len(_versions(client, BOARD)) == 3  # the state before the restore was kept
 
     assert _restore(client, BOARD, oldest["id"], "stale").status_code == 409

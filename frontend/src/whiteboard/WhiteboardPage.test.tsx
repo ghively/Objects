@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { api } from '@/api/client'
 import type { WhiteboardData } from '@/api/whiteboardTypes'
+import { useVersionHistory } from '@/history/useVersionHistory'
 import { useTabs } from '@/nav/tabs'
 import { useDeleteRequest } from '@/object/DeleteObjectDialog'
 import type { BoardMenuProps, ToolboxProps } from './canvasTypes'
@@ -44,6 +45,11 @@ vi.mock('./chrome', () => ({
       <button type="button" onClick={p.onDelete}>
         Delete board
       </button>
+      {p.onVersionHistory && (
+        <button type="button" onClick={p.onVersionHistory}>
+          Version History
+        </button>
+      )}
     </div>
   ),
   ObjectPicker: () => null,
@@ -197,6 +203,14 @@ describe('WhiteboardPage', () => {
     expect(vi.mocked(doc.flush).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(api.renameObject).mock.invocationCallOrder[0])
     await waitFor(() => expect(retarget).toHaveBeenCalledWith(PATH, 'Whiteboards/Network.md'))
     expect(screen.getByText('Network')).toBeInTheDocument()
+  })
+
+  test('the board menu opens Version History on the board', async () => {
+    useVersionHistory.getState().close()
+    await renderPage()
+    fireEvent.click(screen.getByRole('button', { name: 'Version History' }))
+    expect(useVersionHistory.getState().path).toBe(PATH)
+    useVersionHistory.getState().close()
   })
 
   test('delete request for this board opens the delete dialog and deletes with the version', async () => {

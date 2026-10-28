@@ -2,7 +2,7 @@
 
 - ``GET /api/history?path=`` -> ``{versions: VersionInfo[]}`` newest first
 - ``GET /api/history/version?path=&id=`` -> ``VersionContent``
-- ``POST /api/history/restore`` ``{path, id, baseVersion, clientId?}`` -> ``{version}`` (boards: ``{revision}``)
+- ``POST /api/history/restore`` ``{path, id, baseVersion, clientId?}`` -> ``{version}`` (boards: ``{revision, version}``: the board revision and the `.md` version)
 
 The router factory builds the space's `HistoryStore` and installs it as
 ``space.before_write``, so every app write of an object file or a board sidecar keeps a
@@ -92,7 +92,7 @@ def router(ctx: ApiContext) -> APIRouter:
         if "revision" in result:
             ctx.announce(ChangeEvent("whiteboard", rel, result["revision"], origin=req.clientId))
             ctx.announce(ChangeEvent("changed", rel, result["version"], origin=req.clientId))
-            return {"revision": result["revision"]}
+            return {"revision": result["revision"], "version": result["version"]}
         ctx.announce(ChangeEvent("changed", rel, result["version"], origin=req.clientId))
         return {"version": result["version"]}
 

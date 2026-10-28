@@ -117,6 +117,15 @@ describe('test m8 client methods call the contract routes', () => {
     expect(urlOf(h)).toBe('/api/history/restore')
     expect(bodyOf(h)).toEqual({ path: 'Pages/A.md', id: 'v-2', baseVersion: 'v4', clientId: CLIENT_ID })
     expect(seen).toEqual([{ kind: 'changed', path: 'Pages/A.md', version: 'v5', origin: CLIENT_ID }])
+
+    // A board: the canvas and ink reload on `whiteboard` (board revision), the notes on `changed`.
+    const k = respond(200, { revision: 'r9', version: 'm3' })
+    vi.stubGlobal('fetch', k)
+    const board = await collect(() => api.restoreVersion('Whiteboards/B.md', 'v-1', { baseVersion: 'm2' }))
+    expect(board).toEqual([
+      { kind: 'whiteboard', path: 'Whiteboards/B.md', version: 'r9', origin: CLIENT_ID },
+      { kind: 'changed', path: 'Whiteboards/B.md', version: 'm3', origin: CLIENT_ID },
+    ])
   })
 
   test('mergeObject', async () => {
