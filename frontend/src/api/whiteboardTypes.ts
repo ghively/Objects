@@ -198,13 +198,18 @@ export interface BoardResponse {
 }
 
 /**
- * `PUT /api/whiteboard` and `PUT /api/whiteboard/ink`. M9: a save also stamps the board `.md`'s
- * `lastUpdated` (at most once a minute); `mdVersion` is the `.md`'s version after that, so the
- * board's Notes save on top of it.
+ * The board `.md`'s `lastUpdated` stamp a board or ink save made (M9): `mdVersion` is the
+ * `.md`'s version after it and `mdBaseVersion` the version it started from. Both are absent
+ * when the stamp wrote nothing (at most once a minute, not on a read-only file).
  */
-export interface WhiteboardSaveResult {
-  revision: string
+export interface MdStamp {
   mdVersion?: string
+  mdBaseVersion?: string
+}
+
+/** `PUT /api/whiteboard` and `PUT /api/whiteboard/ink`: the sidecar's revision and the stamp. */
+export interface WhiteboardSaveResult extends MdStamp {
+  revision: string
 }
 
 /** `POST /api/whiteboards` (as `POST /api/objects`). */

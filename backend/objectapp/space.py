@@ -1597,10 +1597,12 @@ class Space:
             self.rescan_file(rel)
             return new_version
 
-    def touch(self, path: str, now: datetime | None = None) -> str:
-        """Set only the object's ``lastUpdated`` to ``now``; return its (new) version.
+    def touch(self, path: str, now: datetime | None = None) -> tuple[str, str]:
+        """Set only the object's ``lastUpdated`` to ``now``; return ``(base, version)``.
 
-        M9: a whiteboard's canvas or ink save stamps its ``.md`` (``lastUpdated`` is
+        ``base`` is the version on disk the stamp started from (read under the lock) and
+        ``version`` the version after it: equal when nothing was written. M9: a
+        whiteboard's canvas or ink save stamps its ``.md`` (``lastUpdated`` is
         component-level in Capacities). A stamp under `_TOUCH_INTERVAL` old is left as it
         is (our choice), as is a read-only file; the write takes no version-history
         snapshot (our choice). Raises `KeyError`, `ValueError` and `Conflict` (an
@@ -1614,10 +1616,19 @@ class Space:
                 return src
             return set_keys(src, {"lastUpdated": now_stamp(instant)})
 
-        try:
-            return self._write(path, None, self._fm_edit(apply), stamp=False, history=False)
-        except ReadOnly:
-            return version_of((self.root / self._rel(path)).read_bytes())
+        rel = self._rel(path)
+        with self._lock:
+            full = self.root / rel
+            if not full.is_file():
+                raise KeyError(rel)
+            base = version_of(full.read_bytes())
+            try:
+                version = self._write(
+                    rel, base, self._fm_edit(apply), stamp=False, history=False
+                )
+            except ReadOnly:
+                return base, base
+            return base, version
 
     def _rewrite_other(self, rel: str, edit: Edit, stamp: bool = False) -> str | Skip:
         """Rewrite another file on the user's behalf (unstamped unless asked).

@@ -326,26 +326,35 @@ def _save_sidecar(
 
 @dataclass(frozen=True)
 class Saved:
-    """A board or ink save: the sidecar's new revision and the board ``.md``'s version."""
+    """A board or ink save: the sidecar's new revision and the board ``.md``'s stamp."""
 
     revision: str
-    md_version: str
-    """The ``.md``'s version after the ``lastUpdated`` bump, else its current version."""
-    md_bumped: bool
+    md_version: str | None
+    """The ``.md``'s version after the ``lastUpdated`` stamp; None when nothing was written."""
+    md_base_version: str | None
+    """The ``.md``'s version on disk the stamp started from; None when nothing was written."""
+
+    @property
+    def md_bumped(self) -> bool:
+        return self.md_version is not None
 
 
-def _touch_md(space: Space, rel: str) -> tuple[str, bool]:
-    """Stamp the board ``.md``'s ``lastUpdated`` (`Space.touch`); (version, whether written).
+def _touch_md(space: Space, rel: str) -> tuple[str | None, str | None]:
+    """Stamp the board ``.md``'s ``lastUpdated`` (`Space.touch`); ``(version, base)``.
 
-    Call with ``space._lock`` held, after the sidecar is saved: a stamp that fails (the
-    ``.md`` locked, or changed on disk meanwhile) never fails the save.
+    Both are None unless the stamp wrote the disk: ``base`` is the version it started
+    from, so a client adopts ``version`` only when it holds ``base`` (a body change it
+    hasn't loaded must still meet a 409). Call with ``space._lock`` held, after the
+    sidecar is saved: a stamp that fails (the ``.md`` locked, or changed on disk
+    meanwhile) never fails the save.
     """
-    before = space.cached_version(rel)
     try:
-        version = space.touch(rel, space.clock())
+        base, version = space.touch(rel, space.clock())
     except (Conflict, KeyError, OSError):
-        return before or "", False
-    return version, version != before
+        return None, None
+    if version == base:
+        return None, None
+    return version, base
 
 
 def save_board(space: Space, path: str, board: Any, base_revision: str) -> Saved:

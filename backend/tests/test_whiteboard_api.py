@@ -202,7 +202,8 @@ def test_save_board_writes_only_its_file(ctx):
     assert changed == {"Whiteboards/Network map.whiteboard.json", NETWORK}
     data = board_file(root, NETWORK).read_bytes()
     assert data == dump_board(board)
-    assert r.json() == {"revision": version_of(data), "mdVersion": rev_of(root / NETWORK)}
+    assert r.json()["revision"] == version_of(data)
+    assert r.json()["mdVersion"] == rev_of(root / NETWORK)
 
 
 def test_md_bytes_never_change_on_board_save(ctx):
@@ -232,7 +233,8 @@ def test_md_bytes_never_change_on_board_save(ctx):
     new_lines = (root / EMPTY).read_bytes().splitlines(keepends=True)
     differ = [i for i, (a, b) in enumerate(zip(old_lines, new_lines, strict=True)) if a != b]
     assert len(differ) == 1 and new_lines[differ[0]].startswith(b"lastUpdated: ")
-    assert r.json()["mdVersion"] == rev_of(root / EMPTY)
+    # Throttled (the same minute): the stamp wrote nothing, so no mdVersion.
+    assert "mdVersion" not in r.json()
 
 
 def test_save_stale_revision_409_nothing_written(ctx):

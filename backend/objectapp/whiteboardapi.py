@@ -2,14 +2,16 @@
 
 - ``GET /api/whiteboard?path=`` -> ``BoardResponse`` ``{path, board, revision, readOnlyReason?}``
   (the empty board and ``revision: ''`` when the file is missing; nothing is written).
-- ``PUT /api/whiteboard`` ``{path, board, baseRevision, clientId?}`` -> ``{revision, mdVersion}``;
+- ``PUT /api/whiteboard`` ``{path, board, baseRevision, clientId?}`` -> ``{revision, mdVersion?, mdBaseVersion?}``;
   ``409 {currentRevision}``, ``422 {detail}``, ``423 {reason, detail}``, ``404``, ``400``.
 - ``GET /api/whiteboard/ink?path=`` -> ``InkResponse`` ``{path, strokes, revision, readOnlyReason?}``.
 - ``PUT /api/whiteboard/ink`` ``{path, strokes, baseRevision, clientId?}`` ->
-  ``{revision, mdVersion}``; the same errors.
+  ``{revision, mdVersion?, mdBaseVersion?}``; the same errors.
 
 M9: a save also stamps the board ``.md``'s ``lastUpdated`` (see `whiteboardstore`);
-``mdVersion`` is the ``.md``'s version after that, so the Notes editor saves on top of it.
+``mdVersion`` is the ``.md``'s version after that and ``mdBaseVersion`` the version the stamp
+started from; both are left out when the stamp wrote nothing (throttled, read-only, or a
+conflict). A client holding ``mdBaseVersion`` adopts ``mdVersion`` for its Notes editor.
 - ``POST /api/whiteboards`` ``{title?, clientId?}`` -> ``201 {path, version, typeIds}``;
   announces ``types`` (when the Whiteboard type's JSON was written now) and ``created``.
 
@@ -115,9 +117,12 @@ def whiteboard_router(
     def announce_saved(md_rel: str, saved: Saved, client_id: str | None) -> dict[str, str]:
         """Announce a save (and the ``.md``'s ``lastUpdated`` bump); return the response."""
         announce(ChangeEvent("whiteboard", md_rel, saved.revision, origin=client_id))
-        if saved.md_bumped:
+        out = {"revision": saved.revision}
+        if saved.md_version is not None and saved.md_base_version is not None:
             announce(ChangeEvent("changed", md_rel, saved.md_version, origin=client_id))
-        return {"revision": saved.revision, "mdVersion": saved.md_version}
+            out["mdVersion"] = saved.md_version
+            out["mdBaseVersion"] = saved.md_base_version
+        return out
 
     @api.get("/whiteboard")
     def get_board(path: str):
