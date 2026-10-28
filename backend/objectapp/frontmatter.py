@@ -199,9 +199,15 @@ def _is_filler(line: str) -> bool:
     return stripped == "" or (line.startswith("#"))
 
 
+_LINE_RE = re.compile(r"[^\r\n]*(?:\r\n|\r|\n)|[^\r\n]+$")
+
+
 def _lines(src: str) -> list[str]:
-    lines = src.splitlines(keepends=True)
-    if lines and not lines[-1].endswith("\n"):
+    # Split where ruamel counts a line break ("\n", "\r\n", a lone "\r"):
+    # `str.splitlines` would also break on U+2028, U+2029, NEL and others
+    # inside a value, shifting every later key's line span.
+    lines = _LINE_RE.findall(src)
+    if lines and not lines[-1].endswith(("\n", "\r")):
         lines[-1] += "\n"
     return lines
 

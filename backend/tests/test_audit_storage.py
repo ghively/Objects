@@ -48,3 +48,25 @@ def test_rename_carries_on_past_a_referrer_whose_frontmatter_cannot_be_rewritten
         text = (space_dir / rel).read_text(encoding="utf-8")
         assert "[[Ada King" in text, rel
         assert rel in result.relinked
+
+
+# -- #3: U+2028, U+2029 and NEL are not line breaks to the line splicer ------------------
+
+
+def test_set_keys_with_unicode_line_separators_in_a_value_keeps_other_keys():
+    from objectapp.frontmatter import parse_fm, set_keys
+
+    for ch in [" ", " ", "\x85"]:
+        src = f"id: x\ntitle: 'a{ch}b'\ndescription: d\nlastUpdated: 2026-01-01\n"
+        out = set_keys(src, {"lastUpdated": "2026-02-02"})
+        assert out == src.replace("2026-01-01", "2026-02-02"), repr(ch)
+        assert parse_fm(out)["description"] == "d"
+
+
+def test_saving_an_object_titled_with_a_line_separator_keeps_created_at(space_dir: Path):
+    space = Space(space_dir)
+    page = next(t for t in space.types if t.name == "Page")
+    rel, version = space.create_object(page.id, "Line sep")
+    space.save_body(rel, "hello\n", version)
+    _of, fm, _v = space.read(rel)
+    assert "createdAt" in fm and fm["title"] == "Line sep"
