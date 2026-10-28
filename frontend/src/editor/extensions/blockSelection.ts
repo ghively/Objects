@@ -11,8 +11,9 @@
  * Escape selects the block holding the cursor; Shift+Up/Down extend; Mod-a
  * selects the block's siblings, again the top level; Backspace/Delete delete;
  * Mod-c copies the blocks' serialized source (their original bytes when
- * unedited) as text/plain, Mod-x cuts; Mod-d duplicates; Mod-Shift-Up/Down
- * move; Tab/Shift-Tab indent and unindent list items; typing replaces the
+ * unedited) as text/plain, Mod-x cuts; Mod-d duplicates; Alt-Up/Down (with
+ * or without Shift) move them, or the block holding the cursor; Mod-e / Mod-m
+ * turn them into a code / math block; Tab/Shift-Tab indent and unindent list items; typing replaces the
  * blocks with a paragraph; a click (any selection change of its own) clears it.
  *
  * The keys come from the registry (`editor/shortcuts.ts`, `keysFor(id)`).
@@ -428,7 +429,7 @@ export function turnInto(editor: Editor, kind: TurnIntoKind): boolean {
   }
 }
 
-/** Mod-Alt-m: turn the target text block into a math block with its text (a math block back into text). */
+/** Mod-m with blocks selected: turn the target text block into a math block with its text (a math block back into text). */
 export function toggleMathBlock(editor: Editor): boolean {
   const range = targetRange(editor.state)
   if (!range || range.blocks.length !== 1) return false
@@ -459,7 +460,7 @@ export function toggleTodoInBlock(editor: Editor): boolean {
 }
 
 /**
- * Mod-Shift-Enter: open or close the toggle whose line holds the cursor; a toggle
+ * Mod-Shift-Enter (or Mod-Enter outside a to-do): open or close the toggle whose line holds the cursor; a toggle
  * with no children gets an empty child block, opened and focused.
  */
 export function toggleToggleInBlock(editor: Editor): boolean {
@@ -601,12 +602,17 @@ export const BlockSelection = Extension.create({
     const selected = () => !!getBlockSelection(editor.state)
     const hierarchy = (level: Hierarchy) => () => forEachTargetBlock(editor, (e) => e.commands.setHierarchy(level))
     const align = (value: 'center' | 'right' | null) => () => setOptionOnBlocks(editor, 'align', value)
+    // Alt-Up/Down: the selected blocks, else the block holding the cursor (not in a table, whose
+    // cells keep the key).
+    const moveSelected = (dir: -1 | 1) => () => selected() && moveBlocks(editor, dir)
+    const moveActive = (dir: -1 | 1) => () => !selected() && !inAncestor(editor, ['tableCell', 'tableHeader']) && moveBlocks(editor, dir)
     return keymapFor({
       bold: () => withTargetSelection(editor, (e) => e.commands.toggleBold()),
       italic: () => withTargetSelection(editor, (e) => e.commands.toggleItalic()),
       underline: () => withTargetSelection(editor, (e) => e.commands.toggleUnderline()),
       strikethrough: () => withTargetSelection(editor, (e) => e.commands.toggleStrike()),
-      codeToken: () => withTargetSelection(editor, (e) => e.commands.toggleCode()),
+      // Mod-e: code token on text; with blocks selected, `toggleCodeBlock` below.
+      codeToken: () => !selected() && withTargetSelection(editor, (e) => e.commands.toggleCode()),
       mathToken: () => {
         const { from, to, empty } = editor.state.selection
         if (empty || selected()) return false
@@ -620,8 +626,8 @@ export const BlockSelection = Extension.create({
       heading4: hierarchy('H4'),
       toDo: () => withTargetSelection(editor, (e) => e.commands.setListType(inAncestor(e, ['taskList']) ? null : 'todo')),
       toggle: () => withTargetSelection(editor, (e) => (inAncestor(e, ['toggle']) ? e.commands.unwrapToggle() : e.commands.wrapInToggle())),
-      toggleCodeBlock: () => withTargetSelection(editor, (e) => e.commands.toggleCodeBlock()),
-      toggleMathBlock: () => toggleMathBlock(editor),
+      toggleCodeBlock: () => selected() && withTargetSelection(editor, (e) => e.commands.toggleCodeBlock()),
+      toggleMathBlock: () => selected() && toggleMathBlock(editor),
       textAlignLeft: align(null),
       textAlignCenter: align('center'),
       textAlignRight: align('right'),
@@ -632,8 +638,14 @@ export const BlockSelection = Extension.create({
       deleteBlocks: () => selected() && deleteBlocks(editor),
       duplicateBlocks: () => selected() && duplicateBlocks(editor),
       copyBlocksAsMarkdown: () => copyBlocksAsMarkdown(editor),
-      moveSelectedBlocksUp: () => moveBlocks(editor, -1),
-      moveSelectedBlocksDown: () => moveBlocks(editor, 1),
+      moveSelectedBlocksUp: moveSelected(-1),
+      moveSelectedBlocksDown: moveSelected(1),
+      moveSelectedBlocksUpOnSameLevel: moveSelected(-1),
+      moveSelectedBlocksDownOnSameLevel: moveSelected(1),
+      moveUpBlockWithCursor: moveActive(-1),
+      moveDownBlockWithCursor: moveActive(1),
+      moveUpBlockWithCursorOnSameLevel: moveActive(-1),
+      moveDownBlockWithCursorOnSameLevel: moveActive(1),
       indentBlocks: () => indentBlocks(editor, 1) || indentListItemAtCursor(editor, 1),
       unindentBlocks: () => indentBlocks(editor, -1) || indentListItemAtCursor(editor, -1),
       toggleTodoInBlockWithCursor: () => toggleTodoInBlock(editor),

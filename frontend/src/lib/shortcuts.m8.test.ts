@@ -9,14 +9,15 @@ import {
   allShortcuts,
   keysFor,
   parseKeys,
+  sharesKeyByDesign,
 } from './shortcuts'
 
 // id → [category, scope, `shortcuts.<id>.name` (verbatim from the reference strings), keys]
 const TABLE: Record<string, [string, string, string, string[]]> = {
-  copyBlockReference: ['block', 'editor', 'Copy block reference', ['Mod-Alt-r']],
-  turnIntoObject: ['block', 'editor', 'Turn into object', ['Mod-Alt-o']],
-  turnIntoTask: ['block', 'editor', 'Turn into task', ['Mod-Alt-k']],
-  turnBlockIntoTaskObject: ['block', 'editor', 'Turn block into task object', ['Mod-Alt-Shift-k']],
+  copyBlockReference: ['block', 'editor', 'Copy block reference', ['Mod-AltCtrl-l']],
+  turnIntoObject: ['block', 'editor', 'Turn into object', ['i']],
+  turnIntoTask: ['block', 'editor', 'Turn into task', []],
+  turnBlockIntoTaskObject: ['block', 'editor', 'Turn block into task object', ['Mod-Shift-t']],
   highlightText: ['text', 'editor', 'Highlight text selection', ['Mod-Shift-h']],
   toggleFocusMode: ['global', 'global', 'Toggle focus mode', ['Mod-Shift-m']],
   openPresentationMode: ['page', 'global', 'Start presentation mode', ['Mod-AltCtrl-p']],
@@ -38,7 +39,13 @@ const TABLE: Record<string, [string, string, string, string[]]> = {
 }
 
 // Checked against Object's shortcut table (reference-check-2026-10-28 §1).
-const VERIFIED = new Set(['toggleFocusMode', 'openPresentationMode', 'exitPresentationMode', 'nextPresentationSlide', 'previousPresentationSlide'])
+const VERIFIED = new Set([
+  'copyBlockReference',
+  'turnIntoObject',
+  'turnIntoTask',
+  'turnBlockIntoTaskObject',
+  'highlightText',
+  'toggleFocusMode', 'openPresentationMode', 'exitPresentationMode', 'nextPresentationSlide', 'previousPresentationSlide'])
 
 describe('M8 shortcuts', () => {
   test('test new shortcut ids exist with reference names and categories', () => {
@@ -72,6 +79,7 @@ describe('M8 shortcuts', () => {
           const c = parseKeys(k, mac)
           const sig = `${scopeOf(d.id, d.scope)}|${c.ctrl}|${c.meta}|${c.alt}|${c.shift}|${c.key.toLowerCase()}`
           const other = seen.get(sig)
+          if (other && sharesKeyByDesign(other, d.id)) continue
           expect(other, `${d.id} (${k}) collides with ${other} in scope ${d.scope}`).toBeUndefined()
           seen.set(sig, d.id)
         }

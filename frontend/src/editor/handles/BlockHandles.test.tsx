@@ -144,7 +144,7 @@ describe('<BlockHandles>', () => {
         .querySelector('[data-slot="dropdown-menu-shortcut"]')?.textContent
     expect(hint('Insert block above')).toBe('Alt+Shift+Enter')
     expect(hint('Insert block below')).toBe('Alt+Enter')
-    expect(hint('Move up')).toBe('Ctrl+Shift+ArrowUp')
+    expect(hint('Move up')).toBe('Alt+↑')
     expect(hint('Duplicate')).toBe('Ctrl+D')
     expect(hint('Delete')).toBe('Backspace')
     expect(hint('Remove style')).toBeUndefined()

@@ -12,6 +12,7 @@ import {
   matches,
   parseKeys,
   registerShortcuts,
+  sharesKeyByDesign,
   shortcutsByCategory,
   useGlobalShortcut,
 } from './shortcuts'
@@ -160,6 +161,8 @@ describe('shortcuts', () => {
           const c = parseKeys(k, mac)
           const sig = `${d.scope}|${c.ctrl}|${c.meta}|${c.alt}|${c.shift}|${c.key.toLowerCase()}`
           const other = seen.get(sig)
+          // Object's context-dependent keys (Mod-e: code token or code block, …).
+          if (other && sharesKeyByDesign(other, d.id)) continue
           expect(other, `${d.id} (${k}) collides with ${other} in scope ${d.scope}`).toBeUndefined()
           seen.set(sig, d.id)
         }

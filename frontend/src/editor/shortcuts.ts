@@ -4,50 +4,47 @@
  * `lib/shortcuts.ts`; this module registers the editor-scope ones (again: the
  * registry keeps one entry per id, so this is idempotent) and turns them into
  * a ProseMirror key map through `keysFor(id)`, so correcting a key in the
- * registry needs no other edit. Every key here is provisional (the plan's key
- * table; Gene confirms them in the hand-check).
+ * registry needs no other edit. The keys are Object's (its shortcut table;
+ * reference-check-2026-10-28 §1); an id with no key there has none here.
  */
 import { Extension, type Editor } from '@tiptap/core'
-import { M7_SHORTCUTS, keysFor, registerShortcuts, type ShortcutDef } from '@/lib/shortcuts'
+import { M7_SHORTCUTS, M8_SHORTCUTS, allShortcuts, isMacPlatform, keysFor, registerShortcuts, type ShortcutDef } from '@/lib/shortcuts'
 import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
 import { showToast } from './media/upload'
+import { blockSelectionKey } from './extensions/blockSelection'
 import { copyBlockReference } from './nodes/blockRef'
 import { runHighlightText } from './nodes/textStyle'
 import { turnIntoObject, turnIntoTask, turnTodoIntoTask } from './turnInto'
 
 /** The editor-scope shortcuts of the plan's "Shortcut keys" table. */
-export const EDITOR_SHORTCUTS: ShortcutDef[] = M7_SHORTCUTS.filter((d) => d.scope === 'editor').map((d) => ({
-  ...d,
-  provisional: true,
-}))
+export const EDITOR_SHORTCUTS: ShortcutDef[] = M7_SHORTCUTS.filter((d) => d.scope === 'editor')
 
 /** The editor-scope ids, in the table's order. */
 export const EDITOR_SHORTCUT_IDS: string[] = EDITOR_SHORTCUTS.map((d) => d.id)
 
-/**
- * M8's editor-scope shortcuts (the plan's key table; names `shortcuts.<id>.name`,
- * verbatim). `lib/shortcuts.ts` registers them too (Task 3); these entries only
- * fill in an id the registry does not have yet, so its keys always win.
- */
-export const M8_EDITOR_SHORTCUTS: ShortcutDef[] = [
-  { id: 'copyBlockReference', category: 'block', name: 'Copy block reference', keys: ['Mod-Alt-r'], scope: 'editor', provisional: true, bound: true },
-  { id: 'turnIntoObject', category: 'block', name: 'Turn into object', keys: ['Mod-Alt-o'], scope: 'editor', provisional: true, bound: true },
-  { id: 'turnIntoTask', category: 'block', name: 'Turn into task', keys: ['Mod-Alt-k'], scope: 'editor', provisional: true, bound: true },
-  { id: 'turnBlockIntoTaskObject', category: 'block', name: 'Turn block into task object', keys: ['Mod-Alt-Shift-k'], scope: 'editor', provisional: true, bound: true },
-  { id: 'highlightText', category: 'text', name: 'Highlight text selection', keys: ['Mod-Shift-h'], scope: 'editor', provisional: true, bound: true },
-]
+/** M8's editor-scope shortcuts: the registry's own entries (`lib/shortcuts.ts`), not copies. */
+export const M8_EDITOR_SHORTCUTS: ShortcutDef[] = M8_SHORTCUTS.filter((d) => d.scope === 'editor')
 
 export const M8_EDITOR_SHORTCUT_IDS: string[] = M8_EDITOR_SHORTCUTS.map((d) => d.id)
 
 let registered = false
-/** Register the editor shortcuts with the registry (once; later corrections there win). */
+/** Register the editor shortcuts with the registry (once; an id it already has keeps its entry). */
 export function registerEditorShortcuts(): void {
   if (registered) return
   registered = true
-  const missing = [...EDITOR_SHORTCUTS, ...M8_EDITOR_SHORTCUTS].filter((d) => keysFor(d.id).length === 0)
+  const known = new Set(allShortcuts().map((d) => d.id))
+  const missing = [...EDITOR_SHORTCUTS, ...M8_EDITOR_SHORTCUTS].filter((d) => !known.has(d.id))
   if (missing.length) registerShortcuts(missing)
 }
 registerEditorShortcuts()
+
+/** A registry key as ProseMirror names it: `AltCtrl` is Alt, or Ctrl on macOS. */
+export function proseMirrorKey(spec: string, mac = isMacPlatform()): string {
+  return spec
+    .split('-')
+    .map((part, i, all) => (i < all.length - 1 && part === 'AltCtrl' ? (mac ? 'Ctrl' : 'Alt') : part))
+    .join('-')
+}
 
 /**
  * A ProseMirror key map from shortcut ids to handlers, read from the registry
@@ -56,7 +53,8 @@ registerEditorShortcuts()
 export function keymapFor(handlers: Record<string, () => boolean>): Record<string, () => boolean> {
   const map: Record<string, () => boolean> = {}
   for (const [id, run] of Object.entries(handlers)) {
-    for (const key of keysFor(id)) {
+    for (const spec of keysFor(id)) {
+      const key = proseMirrorKey(spec)
       const before = map[key]
       map[key] = before ? () => before() || run() : run
     }
@@ -110,7 +108,8 @@ export const M8Keys = Extension.create({
       indentBlocks: () => indentAtCursor(editor, 1),
       unindentBlocks: () => indentAtCursor(editor, -1),
       copyBlockReference: () => copyBlockReference(editor),
-      turnIntoObject: () => runAction(() => turnIntoObject(editor)),
+      // `I` only with blocks selected; otherwise the letter is typed.
+      turnIntoObject: () => !!blockSelectionKey.getState(editor.state) && runAction(() => turnIntoObject(editor)),
       turnIntoTask: () => runAction(() => turnIntoTask(editor)),
       turnBlockIntoTaskObject: () => runAction(() => turnTodoIntoTask(editor)),
       highlightText: () => runHighlightText(editor),
