@@ -4,10 +4,11 @@ import '@/whiteboard/test/flowEnv'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { WhiteboardSaveResult } from '@/api/whiteboardTypes'
+import type { MdStamp, WhiteboardSaveResult } from '@/api/whiteboardTypes'
 import { objectDetail, objectSummary } from '@/test/mockApi'
 import { OBJECT_DRAG_MIME } from './dnd'
 import type { WhiteboardHost } from './host'
+import type { InkPlugin } from './plugin'
 import { board } from './test/boards'
 import { mockWhiteboardApi } from './test/mockWhiteboardApi'
 import { WhiteboardPage } from './WhiteboardPage'
@@ -137,5 +138,36 @@ describe('whiteboard lastUpdated bump', () => {
     fireEvent.click(toggle)
     await waitFor(() => expect(api.saveBody).toHaveBeenCalledTimes(1))
     expect(api.saveBody).toHaveBeenCalledWith(PATH, 'First note line. More.\n', 'v1')
+  })
+
+  test('test notes save after an ink save uses the new md version', async () => {
+    let stamp: ((res: MdStamp) => void) | undefined
+    const ink: InkPlugin = {
+      Layer: () => null,
+      Toolbar: () => null,
+      useInkDoc: (_path, onMdStamp) => {
+        stamp = onMdStamp
+        return { strokes: [], readOnlyReason: null, save: () => {}, flush: async () => {} }
+      },
+    }
+    const client = mockWhiteboardApi(board(), 'rev-1')
+    render(
+      <div style={{ width: 1280, height: 800 }}>
+        <WhiteboardPage path={PATH} mode="page" host={fakeHost()} client={client} ink={ink} />
+      </div>,
+    )
+    await waitFor(() => expect(screen.getByTestId('whiteboard-canvas')).toBeInTheDocument())
+    const toggle = within(await screen.findByTestId('whiteboard-notes')).getByRole('button', { name: 'Notes' })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(screen.getByTestId('whiteboard-notes-editor')).toHaveTextContent('First note line.'))
+    // An ink save landed; the server stamped the .md from the version the Notes hold.
+    act(() => stamp?.({ mdVersion: 'v2', mdBaseVersion: 'v1' }))
+    const editor = pmEditor()
+    act(() => {
+      editor.commands.insertContentAt(editor.state.doc.content.size - 1, ' More.')
+    })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(api.saveBody).toHaveBeenCalledTimes(1))
+    expect(api.saveBody).toHaveBeenCalledWith(PATH, 'First note line. More.\n', 'v2')
   })
 })
