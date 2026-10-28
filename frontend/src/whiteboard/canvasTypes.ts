@@ -132,6 +132,8 @@ export interface BoardMenuProps {
   onExportPng?(): void
   /** M8: "Export selection as PNG", offered while something is selected. */
   onExportSelectionPng?(): void
+  /** M8: "Version History" (opens the Version History dialog on the board). */
+  onVersionHistory?(): void
   /** Clear is unavailable (locked or read-only board). */
   disabled?: boolean
 }

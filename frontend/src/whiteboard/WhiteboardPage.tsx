@@ -4,7 +4,8 @@
  * centre (with the ink plugin's pen group), the zoom menu bottom right, the selection toolbar
  * over the selection, the read-only banner, the delete flow as `ObjectView` has it and
  * "Clear Whiteboard" (board and ink, one undo step).
- * M8: the board menu's "Export as PNG" (and "Export selection as PNG") call the canvas's exporter.
+ * M8: the board menu's "Export as PNG" (and "Export selection as PNG") call the canvas's exporter;
+ * its "Version History" opens the Version History dialog on the board.
  * M8 (Task 23): the floating inspector (top right; "Outline", "Frames", "Stats", "Pin"), "Play"
  * (the toolbox) presenting the frames in reading order, and the board's "Notes" under the canvas:
  * M1's body editor on the board's `.md` body, collapsed by default (our choice). Opening the
@@ -19,6 +20,7 @@ import { Icon } from '@/components/Icon'
 import { invalidateLinkIndex, stemOf } from '@/links/linkIndex'
 import { canGoBack, useTabs } from '@/nav/tabs'
 import { Editor } from '@/editor/Editor'
+import { useVersionHistory } from '@/history/useVersionHistory'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { DeleteObjectDialog, useDeleteRequest } from '@/object/DeleteObjectDialog'
 import { DeletedBanner } from '@/object/DeletedBanner'
@@ -325,6 +327,7 @@ export function WhiteboardPage({
                 onOpenAsPage={onExpand}
                 onExportPng={() => void exportRef.current?.(title)}
                 onExportSelectionPng={() => void exportRef.current?.(title, { selection: true })}
+                onVersionHistory={() => useVersionHistory.getState().open(path)}
               />
             }
             actions={
@@ -468,6 +471,7 @@ function BoardMenuSlot({
   onOpenAsPage?(): void
   onExportPng?(): void
   onExportSelectionPng?(): void
+  onVersionHistory?(): void
 }) {
   const editable = useBoardState((s) => isEditable(s))
   const hasSelection = useBoardState((s) => s.selection.some((id) => id in s.doc.board.nodes))

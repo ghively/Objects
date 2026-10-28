@@ -2,7 +2,8 @@
  * The board's "…" menu beside its title: "Open as page" (in the peek; our string, as the page's
  * own button), "Export as PNG" and, with a selection, "Export selection as PNG" (M8; our labels,
  * adapted from `entity.settings.export.errors.whiteboardClosed`), "Clear Whiteboard" (confirmed
- * by `ClearBoardDialog`) and "Delete" (the page wires it to `host.requestDelete`, which opens
+ * by `ClearBoardDialog`), "Version History" (M8, `EntityMenu.versionHistory.text`; the board's
+ * snapshots, restorable from the dialog) and "Delete" (the page wires it to `host.requestDelete`, which opens
  * M1's delete dialog). Export works on a locked or read-only board too.
  */
 import { useState } from 'react'
@@ -19,7 +20,7 @@ export const EXPORT_AS_PNG = 'Export as PNG'
 /** Our label. */
 export const EXPORT_SELECTION_AS_PNG = 'Export selection as PNG'
 
-export function BoardMenu({ onClear, onDelete, onOpenAsPage, onExportPng, onExportSelectionPng, disabled = false }: BoardMenuProps) {
+export function BoardMenu({ onClear, onDelete, onOpenAsPage, onExportPng, onExportSelectionPng, onVersionHistory, disabled = false }: BoardMenuProps) {
   const [confirming, setConfirming] = useState(false)
   return (
     <>
@@ -59,6 +60,16 @@ export function BoardMenu({ onClear, onDelete, onOpenAsPage, onExportPng, onExpo
                 onSelect={() => {
                   close()
                   onExportSelectionPng()
+                }}
+              />
+            )}
+            {onVersionHistory && (
+              <MenuRow
+                label={WB.versionHistory.text}
+                icon={<Icon name="ph-clock-counter-clockwise" size={14} />}
+                onSelect={() => {
+                  close()
+                  onVersionHistory()
                 }}
               />
             )}

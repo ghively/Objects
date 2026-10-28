@@ -893,7 +893,14 @@ export const api = {
       '/history/restore',
       json('POST', { path, id, baseVersion: opts.baseVersion, clientId: CLIENT_ID }),
     )
-    emitLocal([changed(path, res?.version ?? res?.revision ?? null)])
+    // A board's restore rewrites its sidecars: the canvas, ink layer and notes reload on the
+    // `whiteboard` event (the server's copy carries our origin and is dropped in `ensureSource`).
+    emitLocal([
+      ...(res?.revision !== undefined
+        ? [{ kind: 'whiteboard', path, version: res.revision || null, origin: CLIENT_ID } as ChangeEvent]
+        : []),
+      changed(path, res?.version ?? null),
+    ])
     return res
   },
 

@@ -54,3 +54,18 @@ test('clear is disabled on a locked or read-only board', async () => {
   expect(screen.getByRole('menuitem', { name: 'Clear Whiteboard' })).toBeDisabled()
   expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeEnabled()
 })
+
+test('version history row', async () => {
+  const user = userEvent.setup()
+  const onVersionHistory = vi.fn()
+  render(<BoardMenu onClear={vi.fn()} onDelete={vi.fn()} onVersionHistory={onVersionHistory} disabled />)
+  await user.click(screen.getByRole('button', { name: 'More options' }))
+  expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
+    'Version History',
+    'Clear Whiteboard',
+    'Delete',
+  ])
+  // Offered on a locked or read-only board too (reading history writes nothing).
+  await user.click(screen.getByRole('menuitem', { name: 'Version History' }))
+  expect(onVersionHistory).toHaveBeenCalledTimes(1)
+})
