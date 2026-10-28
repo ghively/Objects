@@ -161,8 +161,8 @@ describe('ObjectView per-object layout (M9)', () => {
   })
 
   test('test layout keys not shown as properties', async () => {
-    for (const k of ['wideLayoutMode', 'wideCoverImage', 'coverImageOffset']) expect(RESERVED_KEYS.has(k)).toBe(true)
-    const fm = { wideLayoutMode: true, wideCoverImage: false, coverImageOffset: 40 }
+    for (const k of ['wideLayoutMode', 'wideCoverImage', 'coverImageOffset', 'defaultPageViewId']) expect(RESERVED_KEYS.has(k)).toBe(true)
+    const fm = { wideLayoutMode: true, wideCoverImage: false, coverImageOffset: 40, defaultPageViewId: 'pv1' }
     // A type without definitions (frontmatter keys become rows) and one with (external keys).
     for (const type of [
       typeDef({ id: 'page', name: 'Page' }),
