@@ -55,6 +55,8 @@ const ROWS: Row[] = [
 const BASE_UI: UiState = { pinned: [], sections: [], allNotesLayout: 'list' }
 
 const tab = (name: string) => screen.getByRole('tab', { name })
+/** Load with the Status tab saved as the active one (the default is Inbox). */
+const onStatus = () => mocked.ui.mockResolvedValue({ ui: { ...BASE_UI, tasks: { activeTab: 'status', views: {} } }, revision: 'u1' })
 const titlesIn = (el: HTMLElement) => within(el).queryAllByText(/^(Fresh|Overdue|Working|Waiting|Finished|Weekly)$/).map((n) => n.textContent)
 
 beforeEach(() => {
@@ -80,14 +82,36 @@ afterEach(() => {
 })
 
 describe('TasksPage', () => {
+  test('test tabs in the reference order with Inbox the default tab', async () => {
+    render(<TasksPage />)
+    expect(tab('Inbox')).toHaveAttribute('aria-selected', 'true')
+    const names = screen.getAllByRole('tab').map((t) => t.textContent)
+    expect(names).toEqual([
+      'Inbox',
+      'Today',
+      'Scheduled',
+      'Status',
+      'Context',
+      'Tags',
+      'Open',
+      'Deadline',
+      'Recurring',
+      'Reminders',
+      'Completed',
+      'All',
+    ])
+    const view = await screen.findByTestId('data-view')
+    // Inbox: no status or no date.
+    await waitFor(() => expect(titlesIn(view).sort()).toEqual(['Fresh']))
+  })
+
   test('test status tab groups tasks by category, defaults to kanban and offers every FULL_VIEW_LAYOUTS layout', async () => {
     const user = userEvent.setup()
     render(<TasksPage />)
     expect(screen.getByRole('heading', { name: 'Tasks' })).toBeInTheDocument()
     expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['task'] })
+    await user.click(tab('Status'))
     expect(tab('Status')).toHaveAttribute('aria-selected', 'true')
-    const names = screen.getAllByRole('tab').map((t) => t.textContent)
-    expect(names).toEqual(['Status', 'Today', 'Inbox', 'Open', 'Deadline', 'Scheduled', 'Recurring', 'Reminders', 'Tags', 'Context', 'Completed'])
     await screen.findAllByTestId('kanban-column')
     const cols = screen.getAllByTestId('kanban-column')
     expect(cols.map((c) => c.getAttribute('data-group'))).toEqual(['not-started', 'in-progress', 'blocked', 'done'])
@@ -104,6 +128,7 @@ describe('TasksPage', () => {
 
   test('test today section includes overdue and today, not done', async () => {
     const user = userEvent.setup()
+    onStatus()
     render(<TasksPage />)
     await screen.findAllByTestId('kanban-column')
     await user.click(tab('Today'))
@@ -113,6 +138,7 @@ describe('TasksPage', () => {
 
   test('test section view changes saved to ui.tasks.views and active tab saved', async () => {
     const user = userEvent.setup()
+    onStatus()
     render(<TasksPage />)
     await screen.findAllByTestId('kanban-column')
     await user.click(tab('Open'))
@@ -160,6 +186,7 @@ describe('TasksPage', () => {
   test('test ui 409 refetches and reapplies once', async () => {
     const user = userEvent.setup()
     const other = { ...BASE_UI, pinned: [{ kind: 'type' as const, id: 'page' }] }
+    onStatus()
     render(<TasksPage />)
     await screen.findAllByTestId('kanban-column')
     mocked.patchUi.mockRejectedValueOnce(new ConflictError('u9'))
@@ -190,6 +217,7 @@ describe('TasksPage', () => {
       skipped: [],
       task: null,
     })
+    onStatus()
     render(<TasksPage />)
     await screen.findAllByTestId('kanban-column')
     mocked.rows.mockResolvedValueOnce([fresh])
@@ -214,6 +242,7 @@ describe('TasksPage', () => {
       task: { completed: true, advanced: true, date: { start: next, resolution: 'day' } },
     }
     mocked.updateProperties.mockResolvedValueOnce(res)
+    onStatus()
     render(<TasksPage />)
     await screen.findAllByTestId('kanban-column')
     mocked.rows.mockResolvedValueOnce([
@@ -239,6 +268,7 @@ describe('TasksPage', () => {
 
   test('test task rows show checkbox, repeat and reminder icons, deadline label and priority', async () => {
     const user = userEvent.setup()
+    onStatus()
     render(<TasksPage />)
     await screen.findAllByTestId('kanban-column')
     await user.click(tab('Open'))
@@ -262,6 +292,7 @@ describe('TasksPage', () => {
       skipped: [],
       task: { completed: true, advanced: true, date: { start: next, resolution: 'day' } },
     })
+    onStatus()
     render(<TasksPage />)
     await screen.findAllByTestId('kanban-column')
     await user.click(tab('Recurring'))
@@ -277,6 +308,7 @@ describe('TasksPage', () => {
 
   test('Reset view restores the section preset', async () => {
     const user = userEvent.setup()
+    onStatus()
     render(<TasksPage />)
     await screen.findAllByTestId('kanban-column')
     await user.click(screen.getByRole('button', { name: 'Layout' }))
