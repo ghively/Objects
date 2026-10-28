@@ -19,6 +19,9 @@ Routes (all JSON):
 - M9 ``POST /api/object/duplicate`` ``{path, clientId?}`` -> ``201 {path, version, summary}``
   (``<Title> (Copy)`` beside the source); ``422`` for a daily note, media, template,
   whiteboard or read-only file, ``404``, ``400``. Announces ``created``.
+- M9 ``GET /api/object/export?path=&media=0|1`` -> the ``.md`` bytes as on disk
+  (``text/markdown``), or with ``media=1`` a zip of ``<stem>.md`` plus the media it
+  references (`export`); an ``attachment`` download. ``404``, ``400``. Writes nothing.
 - ``POST /api/object/rename`` ``{path, title, baseVersion, clientId?}`` ->
   ``{path, version, relinked, skipped}``; ``409 {currentVersion}``, ``423``, ``422 {detail}``
   (empty title, daily note), ``404``. Announces ``renamed`` (with ``oldPath``) when the
@@ -142,7 +145,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
 from fastapi import APIRouter, FastAPI, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
@@ -162,6 +165,7 @@ from . import (
 from .apictx import ApiContext
 from .appstate import state_dir
 from .collections import CollectionDef
+from .export import content_disposition, export_object
 from .jsonstore import (
     DefinitionUnreadable,
     default_views,
@@ -1029,6 +1033,23 @@ def create_app(
         return JSONResponse(
             _display_safe({"path": path, "version": version, "summary": asdict(summary)}),
             status_code=201,
+        )
+
+    @api.get("/object/export")
+    def export(path: str, media: str = Query(default="0")):
+        try:
+            out = export_object(space, path, media == "1")
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {path!r}")
+        return Response(
+            out.data,
+            media_type=out.media_type,
+            headers={
+                "Content-Disposition": content_disposition(out.filename),
+                "X-Content-Type-Options": "nosniff",
+            },
         )
 
     @api.post("/object/rename")
