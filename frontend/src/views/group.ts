@@ -426,18 +426,39 @@ export function groupRows(
   return { groups, hidden }
 }
 
+/** A kanban drag: the row being moved and the column it left. */
+export interface GroupMove {
+  row: Row
+  from?: Group | null
+}
+
+const sameText = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
+
+/** A multi-value list with the source column's item removed and `add` appended (once). */
+function swapText(current: unknown, fromLabel: string | null, add: string, same: (a: string, b: string) => boolean): string[] {
+  const items = (Array.isArray(current) ? (current as unknown[]) : []).filter(
+    (x): x is string => typeof x === 'string' && !(fromLabel !== null && same(x, fromLabel)),
+  )
+  if (!items.some((x) => same(x, add))) items.push(add)
+  return items
+}
+
 /**
  * The update that moves a row into `group`, or null where a drag can't (created, updated, type,
- * backlinks, number ranges and date periods).
+ * backlinks, number ranges and date periods). With `move`, a multi-value property keeps its other
+ * values: the source column's value is removed and the target's added.
  */
 export function valueForGroup(
   groupBy: GroupBy | GroupByEntry,
   group: Group,
   def: Pick<PropertyDef, 'type' | 'options'>,
+  move?: GroupMove,
 ): { key: string; value: unknown } | null {
   const entry: GroupByEntry | undefined = 'groups' in groupBy ? groupBy.groups[0] : groupBy
   if (!entry) return null
   const key = entry.propertyId
+  const current = move ? rowValue(move.row, key) : undefined
+  const from = move?.from && !move.from.isOther ? move.from : null
   switch (def.type) {
     case 'entity_createdAt':
     case 'entity_lastUpdated':
@@ -458,16 +479,31 @@ export function valueForGroup(
         const first = (def.options.set ?? []).find((s) => optionCategory(s) === group.id)
         return first ? { key, value: [first.text] } : null
       }
+      if (move && def.options.isArray && !group.isOther) {
+        return { key, value: swapText(current, from?.label ?? null, group.label, (a, b) => a === b) }
+      }
       return { key, value: group.isOther ? [] : [group.label] }
     case 'entity_tags':
     case 'entity_collections':
     case 'entity_aliases':
+      if (move && !group.isOther) return { key, value: swapText(current, from?.label ?? null, group.label, sameText) }
       return { key, value: group.isOther ? [] : [group.label] }
     case 'entity': {
       if (group.isOther) return { key, value: [] }
       const unresolved = group.id.startsWith('target:')
       const ref: EntityRef = { target: unresolved ? group.id.slice(7) : group.label, path: unresolved ? null : group.id }
-      return { key, value: [ref] }
+      if (!move || def.options.isArray === false) return { key, value: [ref] }
+      // Keep the other links; a link's group id is its resolved path, else its target.
+      const links = move.row.links[key] ?? []
+      const refs = Array.isArray(current) ? (current as (EntityRef | null)[]) : []
+      const idOf = (r: EntityRef, i: number) => {
+        const path = r.path ?? links[i] ?? null
+        return path ?? `target:${r.target}`
+      }
+      const kept = refs.flatMap((r, i) => (r && idOf(r, i) !== from?.id ? [{ r, id: idOf(r, i) }] : []))
+      const value = kept.map((x) => x.r)
+      if (!kept.some((x) => x.id === group.id)) value.push(ref)
+      return { key, value }
     }
     case 'textBlock':
       return entry.option === 'entity' ? null : { key, value: group.isOther ? '' : group.label }

@@ -22,8 +22,13 @@ export function kanbanGroupBy(groupBy: GroupBy | null, props: Pick<LayoutProps, 
   return label ? { groups: [{ propertyId: label.key, option: 'default', structureId: label.structureId }] } : null
 }
 
-function Card({ props, row, hide }: { props: LayoutProps; row: Row; hide: string[] }) {
-  const d = useDraggable({ id: row.summary.path, disabled: row.summary.readOnly })
+function Card({ props, row, hide, groupId }: { props: LayoutProps; row: Row; hide: string[]; groupId: string }) {
+  // A card with several values shows in several columns: the id names the column it is in.
+  const d = useDraggable({
+    id: `${groupId}\n${row.summary.path}`,
+    data: { path: row.summary.path, groupId },
+    disabled: row.summary.readOnly,
+  })
   return (
     <div
       ref={d.setNodeRef}
@@ -68,7 +73,7 @@ function Column({
         <span className="text-fg-muted">{group.rows.length}</span>
       </div>
       {group.rows.map((r) => (
-        <Card key={r.summary.path} props={props} row={r} hide={hide} />
+        <Card key={r.summary.path} props={props} row={r} hide={hide} groupId={group.id} />
       ))}
       <button
         type="button"
@@ -122,10 +127,13 @@ export function KanbanLayout(props: LayoutProps) {
 
   const onDragEnd = async (e: DragEndEvent) => {
     if (!e.over) return
-    const row = flat.find((r) => r.summary.path === e.active.id)
+    const data = e.active.data?.current as { path?: string; groupId?: string } | undefined
+    const path = data?.path ?? String(e.active.id)
+    const row = flat.find((r) => r.summary.path === path)
     const target = groups.find((g) => `col:${g.id}` === e.over?.id)
     if (!row || !target || target.rows.some((r) => r.summary.path === row.summary.path)) return
-    const change = update(target)
+    const from = groups.find((g) => g.id === data?.groupId) ?? groups.find((g) => g.rows.some((r) => r.summary.path === path))
+    const change = groupBy && groupDef ? valueForGroup(groupBy, target, groupDef, { row, from }) : null
     if (!change) return
     try {
       const result = await api.updateProperties(row.summary.path, { [change.key]: change.value }, row.version)

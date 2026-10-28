@@ -142,6 +142,41 @@ describe('valueForGroup', () => {
     const { groups } = groupRows([R('a', {}, { collections: ['tooling'] })], by('collections'), undefined, ctx({ collections: [c] }))
     expect(ids(groups)).toEqual(['tools'])
   })
+
+  test('a drag of a multi-value card swaps only the source column value (audit #13)', () => {
+    const labels = propertyDef({ id: 'labels', type: 'label', options: { isArray: true, set: opts('A', 'B', 'C') } })
+    const owners = propertyDef({ id: 'owner', type: 'entity', options: { isArray: true } })
+    const t = typeDef({ id: 'page', propertyDefinitions: [labels, owners] })
+    const c = (extra: Partial<GroupCtx> = {}): GroupCtx => ({ types: [t], collections: [], tagIdsToTitles: {}, now, ...extra })
+    const r = R('a', {
+      labels: ['A', 'C'],
+      owner: [
+        { target: 'Ann', path: 'People/Ann.md' },
+        { target: 'Cy', path: 'People/Cy.md' },
+      ],
+    }, { tags: ['x', 'z'] })
+    const lg = groupRows([r], by('labels'), undefined, c()).groups
+    const byLabel = (gs: { label: string }[], l: string) => gs.find((g) => g.label === l)! as (typeof lg)[number]
+    expect(valueForGroup(by('labels'), byLabel(lg, 'B'), labels, { row: r, from: byLabel(lg, 'A') })).toEqual({ key: 'labels', value: ['C', 'B'] })
+
+    const tg = groupRows([r, R('b', {}, { tags: ['y'] })], by('tags'), undefined, c()).groups
+    expect(valueForGroup(by('tags'), byLabel(tg, 'y'), { type: 'entity_tags', options: {} }, { row: r, from: byLabel(tg, 'x') })).toEqual({
+      key: 'tags',
+      value: ['z', 'y'],
+    })
+
+    const people = R('b', { owner: [{ target: 'Bo', path: 'People/Bo.md' }] })
+    const eg = groupRows([r, people], by('owner'), undefined, c()).groups
+    const bo = eg.find((g) => g.id === 'People/Bo.md')!
+    const ann = eg.find((g) => g.id === 'People/Ann.md')!
+    expect(valueForGroup(by('owner'), bo, owners, { row: r, from: ann })).toEqual({
+      key: 'owner',
+      value: [
+        { target: 'Cy', path: 'People/Cy.md' },
+        { target: 'Bo', path: 'People/Bo.md' },
+      ],
+    })
+  })
 })
 
 describe('task groupings (M4)', () => {
