@@ -290,11 +290,15 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
       const step = cfg.step && cfg.step > 0 ? cfg.step : 1
       const min = cfg.min ?? 0
       if (v < min || (cfg.max !== undefined && v > cfg.max)) return null
-      let i = Math.floor((v - min) / step)
+      // Decimal steps (0.1) don't divide exactly in binary: round away the float noise first.
+      const clean = (x: number) => Number(x.toPrecision(12))
+      const q = clean((v - min) / step)
+      let i = Math.floor(q)
       // The top of the range belongs to the last group.
-      if (cfg.max !== undefined && v === cfg.max && i > 0 && (v - min) % step === 0) i -= 1
-      const lo = min + i * step
-      return [{ id: `${lo}-${lo + step}`, label: `${lo}–${lo + step}`, sort: lo }]
+      if (cfg.max !== undefined && v === cfg.max && i > 0 && q === i) i -= 1
+      const lo = clean(min + i * step)
+      const hi = clean(min + (i + 1) * step)
+      return [{ id: `${lo}-${hi}`, label: `${lo}–${hi}`, sort: lo }]
     }
     case 'datetime':
     case 'datetimeSimple':
