@@ -8,7 +8,7 @@ Updated 2026-10-28. You are continuing "Object", a local, Markdown-backed recrea
 
 **The 2026-10-28 audit is fixed** (on Gene's Windows PC, same day): every bug in `docs/superpowers/plans/audit-2026-10-28.md` and every real "unconfirmed" item, one per commit with a failing-first test. **The guessed values were checked against the full Capacities app** (`docs/superpowers/plans/reference-check-2026-10-28.md`) and applied. Status and the gate numbers: `docs/superpowers/plans/remaining-work.md`.
 
-**Next:** Gene answers M9's open questions (encyclopedia title placement, the `…` menu order, duplicate and synced relations), then his hands-on checks, M1–M9.
+**Next:** Gene's hands-on checks, M1–M9. His answers to M9's three open questions (2026-10-29) are built.
 
 **Branch:** GitHub `master` is at the M3–M8 merge (`04e9d07`). The audit fixes, the reference corrections and M9 are on `ccr-bcf6e946-bf8moc` until it is merged.
 
@@ -24,8 +24,8 @@ Updated 2026-10-28. You are continuing "Object", a local, Markdown-backed recrea
 | M8 | every Capacities feature M4–M7 deferred, local only | `2026-10-27-m8-deferred-features.md` |
 | M9 | the audit's completeness gaps | `2026-10-28-m9-completeness-gaps.md` |
 
-Last full verification, 2026-10-28 after M9 (`d17bd90`), on Linux:
-- 1238 back-end tests passed (1 skipped: it needs a non-root user).
+Last full verification, 2026-10-29 after M9 and Gene's answers (`35bbd88`), on Linux:
+- 1239 back-end tests passed (1 skipped: it needs a non-root user).
 - 1966 front-end tests passed (1 skipped: it needs `OBJECT_ROUNDTRIP_SPACE`).
 - `tsc -b --noEmit` clean; lint 0 errors; `npm run build` ok.
 - `m9_acceptance.py` PASS on `space-m8`, `space-blocks`, `space-sample`, `space-v1`, `space-whiteboard`; `m1_roundtrip.py` and `m2`–`m8_acceptance.py` PASS on `space-sample` and `space-v1`.
@@ -41,7 +41,7 @@ Last full verification, 2026-10-28 after M9 (`d17bd90`), on Linux:
 
 ## Open items
 
-- **M9's open questions for Gene:** see `m9-acceptance.md`, "Rules the build chose".
+- **M9's rules for Gene to confirm:** see `m9-acceptance.md`, "Rules the build chose".
 
 - **Gene's hands-on checks, M1–M9.** Run them on a copy of the CPI export outside the repo, with `git init` there. Some things can only be checked on his Windows machine:
   - the pywebview window

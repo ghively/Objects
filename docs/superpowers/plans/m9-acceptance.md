@@ -8,7 +8,7 @@ Plan: `2026-10-28-m9-completeness-gaps.md`, Task 22. Date: 2026-10-28. Built on 
 |---|---|---|
 | Baseline before M9 | the gate below, at `a6bf658` | pytest 1203 passed, 1 skipped; vitest 1829 passed, 1 skipped; `tsc` clean; build ok |
 | Gate after the merge (before the fix pass) | the gate below, at `c138f1d` | pytest 1230 passed, 1 skipped, 1 load-sensitive failure (`test_graph_5000_objects_under_300ms`, run alongside vitest; passed alone); vitest 1949 passed, 1 skipped; `tsc` clean; lint 0 errors; build ok |
-| Final gate (after the fix pass) | `uv run pytest backend/tests -q`; `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run lint && npm run build` | pytest 1238 passed, 1 skipped (needs a non-root user); vitest 1966 passed, 1 skipped (needs `OBJECT_ROUNDTRIP_SPACE`); `tsc` clean; lint 0 errors; build ok. Run one after the other on a quiet machine, at `d17bd90` |
+| Final gate (after the fix pass) | `uv run pytest backend/tests -q`; `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run lint && npm run build` | pytest 1238 passed at `d17bd90`, 1239 at `35bbd88` after Gene's three answers; vitest 1966 passed, 1 skipped (needs `OBJECT_ROUNDTRIP_SPACE`); `tsc` clean; lint 0 errors; build ok. Run one after the other on a quiet machine |
 | M9 acceptance | `uv run python scripts/m9_acceptance.py backend/tests/fixtures/<space>` on `space-m8`, `space-blocks`, `space-sample`, `space-v1`, `space-whiteboard` | PASS 23/23 on each, the editor round trip included; rerun after the fix pass: PASS on each |
 | Earlier milestones | `m1_roundtrip.py`, `m2_acceptance.py` … `m8_acceptance.py` on `space-sample` and `space-v1` | PASS before and after the fix pass (m2 52 and 50, m3 14, m4 24, m5 18, m6 19, m7 23, m8 26) |
 
@@ -83,12 +83,12 @@ Front end:
 Each is marked "our choice" or "our string" in the plan or by the lane that built it.
 
 - **Whiteboard "Last updated":** the bump is throttled to 60 s and takes no version-history snapshot; a read-only `.md` is not stamped.
-- **Duplicate:** refused for whiteboards (ours), templates and read-only files, besides Capacities' daily notes and media; message "This object can't be duplicated." (ours); the copy opens in the current tab; from a row it opens in the peek. Synced relations are not mirrored to the copy's targets (the copy is one new file and nothing else changes).
+- **Duplicate:** refused for whiteboards (ours), templates and read-only files, besides Capacities' daily notes and media; message "This object can't be duplicated." (ours); the copy opens in the current tab; from a row it opens in the peek. The targets of the copy's synced (two-way) relations gain a link to the copy (Gene, 2026-10-29).
 - **Export:** Markdown only, with "Include media"; the `.md` at the zip root, media at their space-relative paths; icon `ph-export`.
 - **Cover:** `referenceImageId` dropped (the offset is cleared when the image changes); reposition offered only for cropped covers; offset rounded to whole percent; the hover buttons are icons with Capacities' labels as tooltips.
 - **Inspector:** a toggle button "Inspector" (ours), only on the full page, not in the peek; Outline leaves out headings inside embeds; `plainText` counts one paragraph per non-empty Markdown line.
-- **Encyclopedia design:** the title now sits in the content column beside the info box, with the cover above that column. **Question for Gene:** should the title span the full width again?
-- **Object `…` menu order:** Version History, Text Stats, Present, Export (M8's Version History-before-Present order kept). Capacities puts Present and Export in a section before Version History and Text Stats.
+- **Encyclopedia design:** the cover and title span the full width above the body and its info box, as before M9 (Gene, 2026-10-29; Capacities puts a non-wide cover above the content column only).
+- **Object `…` menu order:** Present, Export, then Version History, Text Stats, as in Capacities (Gene, 2026-10-29).
 - **Wide layout item** sits just above "Raw Markdown"; hidden for index card and whiteboard objects.
 - **Text property:** Enter, Shift+Enter, Escape and leaving end the edit; no slash menu or block handles in it.
 - **Embedded views:** saved 300 ms after the last change; a read-only editor keeps changes in memory; toggling "Show details" alone never writes `localDataViewInfo`.
@@ -108,7 +108,7 @@ Each is marked "our choice" or "our string" in the plan or by the lane that buil
 
 On a copy of the CPI export outside the repo, with `git init` done there:
 - [ ] Opening the space, exporting and reading stats change nothing (`git status` clean).
-- [ ] Duplicate a page, a task and a tag: the copies are named "<Title> (Copy)" and the source is untouched. The menu offers no Duplicate on a daily note, template or whiteboard.
+- [ ] Duplicate a page, a task and a tag: the copies are named "<Title> (Copy)" and the source is untouched. Duplicating an object with a two-way relation: the related objects link the copy too. The menu offers no Duplicate on a daily note, template or whiteboard.
 - [ ] Export a page as Markdown, then with "Include media": the zip opens, and images and attachments are inside (including `![[name.png]]` short-name embeds).
 - [ ] Text Stats in the `…` menu and the inspector's Stats tab agree with Capacities on the same note (words, sentences, paragraphs, characters).
 - [ ] The page inspector: the Outline jumps to headings, and Pin/Unpin is remembered.

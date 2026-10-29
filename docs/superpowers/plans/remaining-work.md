@@ -1,7 +1,7 @@
 # Object: remaining work
 
 Status as of 2026-10-28 (night, Linux cloud container). **All nine milestones are built, reviewed, fixed and gated.** M9 (the audit's completeness gaps) was built on Gene's go-ahead; its results and Gene's hand-check list are in `m9-acceptance.md`. What remains:
-1. **Gene's answers on M9's open questions** (`m9-acceptance.md`, "Rules the build chose"): the encyclopedia title placement, the object `…` menu order inherited from M8, and duplicate leaving synced relations one-sided.
+1. **M9's open questions are answered and built** (2026-10-29): the encyclopedia title spans the full width again, the object `…` menu follows Capacities' order, and Duplicate keeps two-way relations two-way.
 2. Gene's hands-on checking (M1–M9 acceptance docs), and the fixes it produces. **Settled 2026-10-28:** Gene checked Capacities: the Standard design shows properties in the side column, so Object's Standard sidebar stays (`reference-check-2026-10-28.md` §5 was wrong there). They go inline below 768 px as in Capacities; no 'always inline' option for now.
 
 **Done on 2026-10-28, on Windows:**
@@ -37,11 +37,11 @@ Each milestone's plan holds its full scope. Each acceptance doc holds its automa
 
 M8's "Coverage" section maps every deferred item to a task, or to a spec §2 exclusion: AI, network at runtime, accounts and sharing, mobile, telemetry.
 
-## Latest verification (2026-10-28, after M9, at `d17bd90`, Linux)
+## Latest verification (2026-10-28, after M9 and Gene's answers, at `35bbd88`, Linux)
 
 | Check | Result |
 |---|---|
-| `uv run pytest backend/tests -q` | 1238 passed, 1 skipped (needs a non-root user) |
+| `uv run pytest backend/tests -q` | 1239 passed, 1 skipped (needs a non-root user) |
 | `cd frontend && npx vitest run` | 1966 passed in 308 files, 1 skipped (needs `OBJECT_ROUNDTRIP_SPACE`) |
 | `npx tsc -b --noEmit` / `npm run lint` / `npm run build` | clean / 0 errors / built |
 | `scripts/m9_acceptance.py` on `space-m8`, `space-blocks`, `space-sample`, `space-v1`, `space-whiteboard` | all PASS (23/23 each) |
