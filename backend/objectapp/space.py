@@ -2690,14 +2690,18 @@ class Space:
                     return rel, version
         raise OSError(f"Could not find a free file name for {stem!r}")
 
-    def duplicate_object(self, path: str, now: datetime | None = None) -> tuple[str, str]:
-        """Copy an object as ``<Title> (Copy)`` in its own folder; return (path, version).
+    def duplicate_object(
+        self, path: str, now: datetime | None = None
+    ) -> tuple[str, str, list[str]]:
+        """Copy an object as ``<Title> (Copy)`` in its own folder; return (path, version, synced).
 
         The copy is the source's bytes (line endings and BOM included) except for a
         new ``id``, ``title: <Title> (Copy)``, fresh ``createdAt`` and ``lastUpdated``
         (``now``, default `Space.clock`) and a first ``# <Title>`` heading, which
         becomes ``# <Title> (Copy)``. The title rule is Object's
-        (``${title || 'Untitled'} (Copy)``). Writes only the new file.
+        (``${title || 'Untitled'} (Copy)``). Besides the new file, the targets of its
+        synced (two-way) relations gain ``[[<Title> (Copy)]]`` in their counterpart
+        property, as for any relation edit (Gene, 2026-10-29); ``synced`` lists them.
 
         Raises `KeyError` (no such file), `ValueError` (not an object path) and
         `InvalidValue` for what Object doesn't duplicate (daily notes and media,
@@ -2742,8 +2746,12 @@ class Space:
             for _attempt in range(100):
                 new_rel = unique_path(self.root, folder, stem)
                 if self._place(new_rel, data):
-                    return new_rel, version
-        raise OSError(f"Could not find a free file name for {stem!r}")
+                    break
+            else:
+                raise OSError(f"Could not find a free file name for {stem!r}")
+        _of, fm, _v = self.read(new_rel)
+        synced, _skipped = self._sync_relations(new_rel, t, {}, fm)
+        return new_rel, version, synced
 
     def _place(self, rel: str, data: bytes) -> bool:
         """Write a new file at ``rel`` unless something is there by then; True if written."""

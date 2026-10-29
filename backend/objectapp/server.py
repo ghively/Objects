@@ -1031,7 +1031,7 @@ def create_app(
     @api.post("/object/duplicate", status_code=201)
     def duplicate_object(req: DuplicateRequest):
         try:
-            path, version = space.duplicate_object(req.path)
+            path, version, synced = space.duplicate_object(req.path)
             summary = space.get(path)
         except InvalidValue as exc:
             return _error(422, str(exc))
@@ -1040,6 +1040,10 @@ def create_app(
         except (KeyError, FileNotFoundError):
             return _error(404, f"No object at {req.path!r}")
         announce(ChangeEvent("created", path, version, origin=req.clientId))
+        for synced_path in synced:
+            announce(
+                ChangeEvent("changed", synced_path, space.cached_version(synced_path), origin=req.clientId)
+            )
         return JSONResponse(
             _display_safe({"path": path, "version": version, "summary": asdict(summary)}),
             status_code=201,
