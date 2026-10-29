@@ -13,8 +13,8 @@
  * - The cover image: `wideCoverImage` spans the whole panel, `cropCoverImage` fixes its height.
  * The page and the peek share this layout; the peek is narrower, so its gutters are too.
  * - M9: the floating inspector (Outline, Stats; `PageInspector`) top right over the content, when
- *   `inspector` is given. Encyclopedia: a non-wide cover sits above the content column (title and
- *   body), not above the infobox beside it (Object's `RootEntity` layout).
+ *   `inspector` is given. Encyclopedia: the cover and title span the full width above the body and
+ *   its infobox (Gene, 2026-10-29, over Object's cover-above-the-content-column).
  *
  * Narrow widths: below the container's md breakpoint (`PROPERTIES_BESIDE_WIDTH`, 768 px) the
  * Standard, Profile and Encyclopedia properties move inline under the header (drawn as the `card`
@@ -256,9 +256,7 @@ export function PageLayout({
     />
   ) : null
   const gutter = mode === 'peek' ? 'px-10' : 'px-12'
-  /** Encyclopedia beside its infobox: the non-wide cover goes in the content column instead. */
-  const coverInColumn = design === 'encyclopedia' && !inline && !!coverEl && !wideCover
-  const coverOnTop = !!coverEl && !wideCover && !coverInColumn
+  const coverOnTop = !!coverEl && !wideCover
   const headerEl = (
     <div data-page-title="" style={font}>
       {header}
@@ -335,14 +333,15 @@ export function PageLayout({
           {bodyEl}
         </>
       ) : (
-        <div className="flex items-start gap-10">
-          <div data-encyclopedia-main="" className="flex min-w-0 flex-1 flex-col">
-            {coverInColumn && <div className="mb-8">{coverEl}</div>}
-            {headerEl}
-            {bodyEl}
+        <>
+          {headerEl}
+          <div className="flex items-start gap-10">
+            <div data-encyclopedia-main="" className="flex min-w-0 flex-1 flex-col">
+              {bodyEl}
+            </div>
+            {propertiesEl}
           </div>
-          {propertiesEl}
-        </div>
+        </>
       )
       break
     default:

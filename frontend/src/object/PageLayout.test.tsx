@@ -60,9 +60,12 @@ describe('PageLayout', () => {
         expect(container.querySelector('[data-profile-column] [data-profile-image]')).not.toBeNull()
       }
       if (name === 'encyclopedia') {
-        // The infobox sits next to the content column (title and body), after it.
+        // The title spans the full width above; the infobox sits next to the body, after it (Gene, 2026-10-29).
         const main = container.querySelector('[data-encyclopedia-main]') as HTMLElement
+        const title = container.querySelector('[data-page-title]') as HTMLElement
         expect(main.contains(body)).toBe(true)
+        expect(main.parentElement?.contains(title)).toBe(false)
+        expect(title.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(main.parentElement).toBe(props.parentElement)
         expect(body.compareDocumentPosition(props) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       }
@@ -118,16 +121,15 @@ describe('PageLayout', () => {
 })
 
 describe('M9 page layout', () => {
-  test('test encyclopedia cover above content', () => {
+  test('test encyclopedia cover and title above the body and infobox', () => {
     const { container } = layout({ viewDesign: 'encyclopedia', wideCoverImage: false }, 'Attachments/cover.png')
     const cover = container.querySelector('[data-cover-image]') as HTMLElement
     const main = container.querySelector('[data-encyclopedia-main]') as HTMLElement
-    const props = screen.getByRole('complementary', { name: 'Properties' })
     const title = container.querySelector('[data-page-title]') as HTMLElement
-    // Over the content column only, not over the infobox beside it.
-    expect(main.contains(cover)).toBe(true)
-    expect(main.contains(props)).toBe(false)
+    // Gene (2026-10-29): the title spans the full width again, so the cover sits above it, as before M9.
+    expect(main.parentElement?.contains(cover)).toBe(false)
     expect(cover.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(title.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   test('test the inspector toggle opens the page inspector', async () => {
