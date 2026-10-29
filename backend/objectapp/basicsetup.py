@@ -10,9 +10,9 @@ those are **our choice** (listed for Gene in the M8 plan, Task 8):
   (relation), Projects (relation to Project), Meetings (relation to Meeting), Notes.
 - Meeting: Date (date and time), Type (label), Attendees (relation to Person),
   Project (relation to Project), Reviewed (checkbox), Cover image, Notes.
-- Project: Status (status label), Type (label), Timeframe (date range),
-  Collaborators (relation to Person), Organizations (relation), Meetings
-  (relation to Meeting), Cover image, Notes.
+- Project: Status (a plain label: only Task's status is a status label), Type
+  (label), Timeframe (date range), Collaborators (relation to Person), Organizations
+  (relation), Meetings (relation to Meeting), Cover image, Notes.
 - Book: Authors (relation to Person), Genre (multi label), Type (label), Rating
   (number shown as progress out of 5), Reading timeline (date range), Cover image,
   Notes.
@@ -43,12 +43,13 @@ __all__ = ["BASIC_TYPE_IDS", "basic_types", "write_basic_types"]
 
 BASIC_TYPE_IDS = ("person", "meeting", "project", "book")
 
-# The Capacities status categories for the Project "Status" options (our mapping).
+# The Project "Status" options and their colours (our choice). It is a plain label: Capacities
+# sets ``isStatus`` (and option ``statusCategory``) only on the basic Task status.
 _PROJECT_STATUS = (
-    ("Planned", "not-started", "yellow"),
-    ("In Progress", "in-progress", "blue"),
-    ("On Hold", "blocked", "pink"),
-    ("Completed", "done", "green"),
+    ("Planned", "yellow"),
+    ("In Progress", "blue"),
+    ("On Hold", "pink"),
+    ("Completed", "green"),
 )
 
 _GENRES = (
@@ -113,11 +114,10 @@ def _notes() -> PropertyDefinition:
 
 def _status() -> PropertyDefinition:
     options = [
-        {"id": text.lower().replace(" ", "-"), "text": text, "color": color, "icon": None,
-         "statusCategory": category}
-        for text, category, color in _PROJECT_STATUS
+        {"id": text.lower().replace(" ", "-"), "text": text, "color": color, "icon": None}
+        for text, color in _PROJECT_STATUS
     ]
-    return _prop("status", "Status", "label", {"isArray": False, "set": options, "isStatus": True})
+    return _prop("status", "Status", "label", {"isArray": False, "set": options})
 
 
 def _type(

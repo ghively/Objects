@@ -2,6 +2,7 @@ import type {
   Attachment,
   BlockInfo,
   CatchUp,
+  DuplicatedObject,
   MergeResult,
   OccurrenceAction,
   OverdueInfo,
@@ -131,6 +132,8 @@ export type UiPatch = Partial<Pick<UiState, 'pinned' | 'sections' | 'allNotesLay
   graph?: GraphCustomization
   /** Replaces the whole `whiteboard` value (the canvas display settings). */
   whiteboard?: WhiteboardSettings
+  /** M9: the sidebar's section order. */
+  workspaceOrder?: string[]
 }
 
 /** `api.search` options; `types`/`excludeTypes` are type ids, `tag` a tag name. */
@@ -268,6 +271,15 @@ function emitLocal(events: ChangeEvent[]) {
   }, 0)
 }
 
+/**
+ * Announce a `changed` for `path` that this window's own write caused but `api` didn't make: a
+ * whiteboard or ink save's stamp of the board `.md`'s `lastUpdated` (M9). The server's own
+ * `changed` for it carries our `CLIENT_ID` and is dropped as an echo.
+ */
+export function announceLocalChange(path: string, version: string | null): void {
+  emitLocal([changed(path, version)])
+}
+
 function changed(path: string, version: string | null = null): ChangeEvent {
   return { kind: 'changed', path, version, origin: CLIENT_ID }
 }
@@ -403,6 +415,18 @@ export const api = {
     )
     emitLocal([movedOrChanged(path, res.path, res.version), ...(res.relinked ?? []).map((p) => changed(p))])
     return res
+  },
+
+  /** M9: duplicate an object as "<Title> (Copy)" in the same folder. */
+  async duplicateObject(path: string): Promise<DuplicatedObject> {
+    const res = await request<DuplicatedObject>('/object/duplicate', json('POST', { path, clientId: CLIENT_ID }))
+    emitLocal([created(res.path, res.version)])
+    return res
+  },
+
+  /** M9: the same-origin download URL of an object's export: its `.md`, or a zip with its media. */
+  exportObjectUrl(path: string, opts: { media: boolean }): string {
+    return `${BASE}/object/export${qs({ path, media: opts.media ? '1' : '0' })}`
   },
 
   /** Create an object. `templateId`: an id, `null` for the type's default, `"none"` for no template. */

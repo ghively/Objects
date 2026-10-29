@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { MdStamp } from '@/api/whiteboardTypes'
 
 /** The ink tools (Gene's addition; no Capacities original). `select` picks, moves and scales strokes (M8). */
 export type InkTool = 'pen' | 'highlighter' | 'eraser' | 'select'
@@ -77,5 +78,6 @@ export interface InkDoc {
 export interface InkPlugin {
   Layer: (props: InkLayerProps) => ReactNode
   Toolbar: (props: InkToolbarProps) => ReactNode
-  useInkDoc(path: string): InkDoc
+  /** M9: `onMdStamp` receives each landed save's stamp of the board `.md`. */
+  useInkDoc(path: string, onMdStamp?: (stamp: MdStamp) => void): InkDoc
 }

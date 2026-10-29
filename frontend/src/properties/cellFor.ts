@@ -49,6 +49,8 @@ export interface CellExtras {
    * `PUT /api/tasks/reminder`. Only the property panel provides it, like `onChangeMany`.
    */
   onSetReminder?(key: string, remind: string | null): void
+  /** BlocksCell and TextBlockCell: the owning object's path (the editor's token menu and block references). */
+  path?: string
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each cell takes its own value type

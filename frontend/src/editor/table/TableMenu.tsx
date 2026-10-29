@@ -11,7 +11,11 @@
  *   after", "Delete column", "Clear column", then "Sort column ascending" and
  *   "Sort column descending" (`sortColumnAscending`, `sortColumnDescending`;
  *   their place in the menu is our choice).
- * The row and column menus act on the cell holding the cursor.
+ * - "Alignment" (M9; `EditorPanel.shortLabels.alignment`): "Align text left", "Text align
+ *   center", "Text align right" (`shortcuts.textAlign*.name`), Capacities' table-cell
+ *   alignment. A GFM table aligns columns, so it sets the column's alignment (the separator
+ *   line's `:-:` / `-:`; our choice). Its place on the bar is our choice.
+ * The row, column and alignment menus act on the cell holding the cursor.
  *
  * `TableUi` puts the bar in front of each table as a widget decoration (its
  * React root mounts the first time the table is hovered or entered, so a long
@@ -26,7 +30,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import { TableMap } from '@tiptap/pm/tables'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
-import { Columns3, Rows3, Table2 } from 'lucide-react'
+import { AlignCenter, AlignLeft, AlignRight, Columns3, Rows3, Table2 } from 'lucide-react'
 import { createElement, useEffect, useReducer } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import {
@@ -34,6 +38,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -41,6 +47,7 @@ import {
   clearCell,
   clearColumn,
   clearRow,
+  columnAlignment,
   deleteColumn,
   deleteRow,
   deleteTable,
@@ -52,15 +59,24 @@ import {
   insertRowBelow,
   selectedCell,
   setHeaderColumn,
+  setColumnAlignment,
   setHeaderRow,
   sortColumn,
   tableAt,
+  type CellAlign,
 } from './tableCommands'
 import { exportTableCsv } from './csv'
 import { formulaCellsPlugin } from './FormulaCell'
 import './table.css'
 
 /** Re-render on every editor transaction (selection moves included). */
+/** Capacities' alignment items, with the bar's icons. */
+const ALIGN_ITEMS: readonly { align: CellAlign; name: string; Icon: typeof AlignLeft }[] = [
+  { align: 'left', name: 'Align text left', Icon: AlignLeft },
+  { align: 'center', name: 'Text align center', Icon: AlignCenter },
+  { align: 'right', name: 'Text align right', Icon: AlignRight },
+]
+
 function useEditorTick(editor: Editor): void {
   const [, tick] = useReducer((n: number) => n + 1, 0)
   useEffect(() => {
@@ -107,9 +123,32 @@ export function TableMenu({ editor, getPos }: TableMenuProps) {
   const editable = editor.isEditable
   // Each action reads the position afresh: an earlier edit may have moved the table.
   const at = () => getPos() ?? pos
+  const align = cell ? columnAlignment(editor.state.doc, pos, cell.col) : 'left'
+  const AlignIcon = ALIGN_ITEMS.find((a) => a.align === align)!.Icon
 
   return (
     <div className="table-menu-bar" role="toolbar">
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild disabled={!editable || !cell}>
+          <button type="button" className="table-menu-btn" aria-label="Alignment" title="Alignment">
+            <AlignIcon size={14} aria-hidden="true" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-48">
+          <DropdownMenuLabel>Alignment</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={align}
+            onValueChange={(v) => cell && setColumnAlignment(editor, at(), cell.col, v as CellAlign)}
+          >
+            {ALIGN_ITEMS.map(({ align: a, name, Icon }) => (
+              <DropdownMenuRadioItem key={a} value={a}>
+                <Icon size={14} aria-hidden="true" />
+                {name}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild disabled={!editable || !cell}>
           <button type="button" className="table-menu-btn" aria-label="Edit row" title="Edit row">

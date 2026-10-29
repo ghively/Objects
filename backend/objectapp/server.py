@@ -16,6 +16,12 @@ Routes (all JSON):
   ``423 {reason}``, ``422 {detail}``, ``404``. Announces ``changed`` for the
   object (when written) and for each synced object.
 - ``POST /api/object/ensure-id`` ``{path, clientId?}`` -> ``{id, version}``; ``423``, ``404``.
+- M9 ``POST /api/object/duplicate`` ``{path, clientId?}`` -> ``201 {path, version, summary}``
+  (``<Title> (Copy)`` beside the source); ``422`` for a daily note, media, template,
+  whiteboard or read-only file, ``404``, ``400``. Announces ``created``.
+- M9 ``GET /api/object/export?path=&media=0|1`` -> the ``.md`` bytes as on disk
+  (``text/markdown``), or with ``media=1`` a zip of ``<stem>.md`` plus the media it
+  references (`export`); an ``attachment`` download. ``404``, ``400``. Writes nothing.
 - ``POST /api/object/rename`` ``{path, title, baseVersion, clientId?}`` ->
   ``{path, version, relinked, skipped}``; ``409 {currentVersion}``, ``423``, ``422 {detail}``
   (empty title, daily note), ``404``. Announces ``renamed`` (with ``oldPath``) when the
@@ -106,12 +112,13 @@ Routes (all JSON):
   `ChangeEvent` as JSON data (``{kind, path, version, origin}``)
 - M6 whiteboards (`whiteboardapi.whiteboard_router`): ``GET /api/whiteboard?path=`` ->
   ``{path, board, revision, readOnlyReason?}``; ``PUT /api/whiteboard``
-  ``{path, board, baseRevision, clientId?}`` -> ``{revision}`` (``409 {currentRevision}``,
-  ``422``, ``423``); ``GET /api/whiteboard/ink?path=`` -> ``{path, strokes, revision,
-  readOnlyReason?}``; ``PUT /api/whiteboard/ink`` ``{path, strokes, baseRevision, clientId?}``
-  -> ``{revision}``; ``POST /api/whiteboards`` ``{title?, clientId?}`` ->
-  ``201 {path, version, typeIds}``. Board and ink saves announce ``whiteboard`` with the
-  board's ``.md`` path. ``PUT /api/ui`` accepts ``whiteboard`` (the canvas display settings).
+  ``{path, board, baseRevision, clientId?}`` -> ``{revision, mdVersion}`` (``409
+  {currentRevision}``, ``422``, ``423``); ``GET /api/whiteboard/ink?path=`` -> ``{path,
+  strokes, revision, readOnlyReason?}``; ``PUT /api/whiteboard/ink`` ``{path, strokes,
+  baseRevision, clientId?}`` -> ``{revision, mdVersion}``; ``POST /api/whiteboards``
+  ``{title?, clientId?}`` -> ``201 {path, version, typeIds}``. Board and ink saves announce
+  ``whiteboard`` with the board's ``.md`` path; M9: they also stamp the ``.md``'s
+  ``lastUpdated`` (at most once a minute), announced ``changed`` with ``mdVersion``. ``PUT /api/ui`` accepts ``whiteboard`` (the canvas display settings).
   Deleting, restoring, purging and renaming a whiteboard carry its sidecar files; a rename
   relinks board files too (their sidecar paths are in ``relinked``, announced ``whiteboard``).
 - M8 (plan Task 2): ``POST /api/spaces`` also takes ``setup: 'blank' | 'basic'``; the
@@ -139,7 +146,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
 from fastapi import APIRouter, FastAPI, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
@@ -159,6 +166,7 @@ from . import (
 from .apictx import ApiContext
 from .appstate import state_dir
 from .collections import CollectionDef
+from .export import content_disposition, export_object
 from .jsonstore import (
     DefinitionUnreadable,
     default_views,
@@ -280,6 +288,11 @@ class EnsureIdRequest(BaseModel):
     clientId: str | None = None
 
 
+class DuplicateRequest(BaseModel):
+    path: str
+    clientId: str | None = None
+
+
 class RenameRequest(BaseModel):
     path: str
     title: str
@@ -393,8 +406,11 @@ class SaveQueryRequest(BaseModel):
 
 
 _UI_PATCH_KEYS = frozenset(
-    {"pinned", "sections", "allNotesLayout", "calendar", "tasks", "reminders", "graph", "whiteboard"}
-)
+    {
+        "pinned", "sections", "allNotesLayout", "calendar", "tasks", "reminders", "graph",
+        "whiteboard", "workspaceOrder",
+    }
+)  # fmt: skip
 # RootSpace.model.ts `GraphViewCustomization`, verbatim.
 _GRAPH_LIST_KEYS = ("filterStructureIds", "excludeStructureIds")
 _GRAPH_BOOL_KEYS = (
@@ -624,6 +640,12 @@ def _ui_problem(patch: dict[str, Any]) -> str | None:
         problem = whiteboard_ui_problem(patch["whiteboard"])
         if problem:
             return problem
+    if "workspaceOrder" in patch:
+        order = patch["workspaceOrder"]
+        if not isinstance(order, list) or not all(isinstance(x, str) for x in order):
+            return "workspaceOrder must be a list of section ids."
+        if len(set(order)) != len(order):
+            return "workspaceOrder lists a section twice."
     return None
 
 
@@ -1005,6 +1027,44 @@ def create_app(
         if version != before:
             announce(ChangeEvent("changed", _norm(req.path), version, origin=req.clientId))
         return {"id": object_id, "version": version}
+
+    @api.post("/object/duplicate", status_code=201)
+    def duplicate_object(req: DuplicateRequest):
+        try:
+            path, version, synced = space.duplicate_object(req.path)
+            summary = space.get(path)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {req.path!r}")
+        announce(ChangeEvent("created", path, version, origin=req.clientId))
+        for synced_path in synced:
+            announce(
+                ChangeEvent("changed", synced_path, space.cached_version(synced_path), origin=req.clientId)
+            )
+        return JSONResponse(
+            _display_safe({"path": path, "version": version, "summary": asdict(summary)}),
+            status_code=201,
+        )
+
+    @api.get("/object/export")
+    def export(path: str, media: str = Query(default="0")):
+        try:
+            out = export_object(space, path, media == "1")
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {path!r}")
+        return Response(
+            out.data,
+            media_type=out.media_type,
+            headers={
+                "Content-Disposition": content_disposition(out.filename),
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
 
     @api.post("/object/rename")
     def rename_object(req: RenameRequest):

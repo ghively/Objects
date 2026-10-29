@@ -84,6 +84,23 @@ export function fuzzyMatch(query: string, objects: ObjectSummary[], limit = 8): 
   return scored.slice(0, limit).map((x) => x.o)
 }
 
+/**
+ * The trigger hands over to the picker a moment after `[[` (once the brackets land), so a fast
+ * typist's next characters can reach the editor first (seen in the Text cell). Those characters,
+ * right after the `[[` and up to the cursor on the same line, are taken out of the document and
+ * become the picker's query, as if typed there.
+ */
+function takeTypedAhead(editor: Editor | null, range: { from: number; to: number } | null, mode: LinkPickerMode): string {
+  if (mode !== 'link' || !editor || !range || editor.isDestroyed) return ''
+  const { doc, selection } = editor.state
+  if (!selection.empty || selection.from <= range.to || selection.from > doc.content.size) return ''
+  if (doc.textBetween(range.from, range.to, '\0', '\0') !== '[[') return ''
+  const typed = doc.textBetween(range.to, selection.from, '\n', '\0')
+  if (!typed || /[\n\0]/.test(typed)) return ''
+  editor.commands.deleteRange({ from: range.to, to: selection.from })
+  return typed
+}
+
 export function LinkPicker() {
   const { editor, range, mode, hide } = useLinkPicker()
   const objects = useLinkIndex((s) => s.objects)
@@ -94,9 +111,11 @@ export function LinkPicker() {
 
   useEffect(() => {
     if (!open) return
-    setQuery('')
+    setQuery(takeTypedAhead(editor, range, mode))
     setActive(0)
     void ensureLinkIndex()
+    // Only on opening: `editor`, `range` and `mode` are read as they are then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const matches = useMemo(() => fuzzyMatch(query, objects), [query, objects])

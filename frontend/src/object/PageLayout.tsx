@@ -6,10 +6,15 @@
  *   icon) as a large round image beside the title, the properties in a side column.
  *   `encyclopedia`: the properties in a right-hand infobox next to the body.
  * - `wideLayoutMode` removes the content max-width (Standard only: Capacities' setting "will not
- *   make any difference for encyclopedia, profile, or index card designs").
+ *   make any difference for encyclopedia, profile, or index card designs"). M9: the object's own
+ *   `wideLayoutMode` / `wideCoverImage` (frontmatter) override the type's; `coverImageOffset`
+ *   positions a cropped cover.
  * - `font` sets the title and body font family.
  * - The cover image: `wideCoverImage` spans the whole panel, `cropCoverImage` fixes its height.
  * The page and the peek share this layout; the peek is narrower, so its gutters are too.
+ * - M9: the floating inspector (Outline, Stats; `PageInspector`) top right over the content, when
+ *   `inspector` is given. Encyclopedia: the cover and title span the full width above the body and
+ *   its infobox (Gene, 2026-10-29, over Capacities' cover-above-the-content-column).
  *
  * Narrow widths: below the container's md breakpoint (`PROPERTIES_BESIDE_WIDTH`, 768 px) the
  * Standard, Profile and Encyclopedia properties move inline under the header (drawn as the `card`
@@ -17,12 +22,14 @@
  * (`PropertiesSidebar`, `isMd`). Whether Capacities' Standard design has a property sidebar at all
  * is open (reference-check section 5): Standard keeps its left panel here until Gene checks.
  */
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import { api } from '@/api/client'
-import type { ObjectSummary, TypeDef, TypeFont } from '@/api/types'
+import type { ObjectFrontmatterLayout, ObjectSummary, TypeDef, TypeFont } from '@/api/types'
 import { IconOrEmoji } from '@/components/Icon'
 import { cn } from '@/lib/utils'
 import { CoverImage } from './CoverImage'
+import { Icon } from '@/components/Icon'
+import { loadPageInspectorPinned, PageInspector, PAGE_INSPECTOR_TEXT, savePageInspectorPinned } from './PageInspector'
 import { decodeIcon } from './PropertyPanel'
 
 export type PageDesign = 'standard' | 'indexCard' | 'profile' | 'encyclopedia'
@@ -63,6 +70,25 @@ function useWidth(ref: RefObject<HTMLElement | null>): number | null {
     return () => ro.disconnect()
   }, [ref])
   return width
+}
+
+/** The object's wide layout: its own `wideLayoutMode`, else the type's (any design). */
+export function objectWideLayout(type: TypeDef | undefined, layout: ObjectFrontmatterLayout | undefined): boolean {
+  return layout?.wideLayoutMode ?? !!type?.wideLayoutMode
+}
+
+/** The object's wide cover: its own `wideCoverImage`, else the type's. */
+export function objectWideCover(type: TypeDef | undefined, layout: ObjectFrontmatterLayout | undefined): boolean {
+  return layout?.wideCoverImage ?? !!type?.wideCoverImage
+}
+
+/** The layout keys of a frontmatter, kept only when they have the right shape. */
+export function frontmatterLayout(fm: Record<string, unknown>): ObjectFrontmatterLayout {
+  const out: ObjectFrontmatterLayout = {}
+  if (typeof fm.wideLayoutMode === 'boolean') out.wideLayoutMode = fm.wideLayoutMode
+  if (typeof fm.wideCoverImage === 'boolean') out.wideCoverImage = fm.wideCoverImage
+  if (typeof fm.coverImageOffset === 'number' && Number.isFinite(fm.coverImageOffset)) out.coverImageOffset = fm.coverImageOffset
+  return out
 }
 
 export function pageDesign(type: TypeDef | undefined): PageDesign {
@@ -109,8 +135,66 @@ export interface PageLayoutProps {
   toolbar?: ReactNode
   /** Writes a new cover image (or `null` to remove it); without it the cover is read-only. */
   onCoverChange?(next: string | null): void
+  /** M9: the object's own layout keys (frontmatter), overriding the type's. */
+  layout?: ObjectFrontmatterLayout
+  /** M9: writes layout keys (wide cover toggle, cover offset); without it they are read-only. */
+  onLayoutChange?(patch: ObjectFrontmatterLayout): void
   /** Rendered over the content column (the peek's pager, dialogs). */
   children?: ReactNode
+  /** M9: show the floating page inspector, reading the page's current Markdown. */
+  inspector?: { getMarkdown(): string; dailyNote: boolean }
+}
+
+/** The inspector's top in the content column (`top-16`) when no cover is in the way. */
+const INSPECTOR_TOP = 64
+/** Its gap below a shown cover. */
+const INSPECTOR_COVER_GAP = 8
+
+/** The inspector's toggle and the inspector itself (open with the page when pinned). */
+function InspectorSlot({
+  bodyRef,
+  summary,
+  getMarkdown,
+  dailyNote,
+  top,
+}: {
+  bodyRef: RefObject<HTMLElement | null>
+  summary: ObjectSummary
+  getMarkdown(): string
+  dailyNote: boolean
+  /** Below a shown cover, so it doesn't cover the cover's controls (px from the column's top). */
+  top?: number
+}) {
+  const [pinned, setPinned] = useState(loadPageInspectorPinned)
+  const [open, setOpen] = useState(pinned)
+  const pin = useCallback((next: boolean) => {
+    setPinned(next)
+    savePageInspectorPinned(next)
+  }, [])
+  return (
+    <div className="absolute top-16 right-3.5 z-10 flex flex-col items-end gap-2" style={top !== undefined ? { top } : undefined}>
+      <button
+        type="button"
+        aria-label={PAGE_INSPECTOR_TEXT.inspector}
+        title={PAGE_INSPECTOR_TEXT.inspector}
+        aria-expanded={open}
+        className="flex size-8 items-center justify-center rounded-md border border-line bg-raised text-fg-muted shadow-sm hover:bg-hover hover:text-fg"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <Icon name="ph-list-bullets" size={16} />
+      </button>
+      {open && (
+        <PageInspector
+          bodyRef={bodyRef}
+          getMarkdown={getMarkdown}
+          summary={summary}
+          dailyNote={dailyNote}
+          pinned={pinned}
+          onPin={pin}
+        />
+      )}
+    </div>
+  )
 }
 
 function ProfileImage({ summary, type }: { summary: ObjectSummary; type?: TypeDef }) {
@@ -138,32 +222,74 @@ export function PageLayout({
   mode = 'page',
   toolbar,
   onCoverChange,
+  layout,
+  onLayoutChange,
   children,
+  inspector,
 }: PageLayoutProps) {
   const design = pageDesign(type)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
   const width = useWidth(rootRef)
+  const columnRef = useRef<HTMLDivElement | null>(null)
+  const [inspectorTop, setInspectorTop] = useState<number | undefined>(undefined)
   const open = properties !== null && properties !== undefined && properties !== false
   const inline = open && INLINE_WHEN_NARROW.includes(design) && !propertiesBeside(width)
   const propertiesEl =
     typeof properties === 'function' ? properties(inline ? 'card' : panelVariant(design)) : properties
-  const wide = design === 'standard' && !!type?.wideLayoutMode
+  const wide = design === 'standard' && objectWideLayout(type, layout)
   const font = fontStyle(type?.font)
   const cover = design !== 'profile' ? summary.coverImage : null
-  const wideCover = !!type?.wideCoverImage
+  const wideCover = objectWideCover(type, layout)
   const crop = type?.cropCoverImage ?? true
-  const coverEl = cover ? <CoverImage path={cover} wide={wideCover} crop={crop} onChange={onCoverChange} /> : null
+  const editLayout = onCoverChange ? onLayoutChange : undefined
+  const coverEl = cover ? (
+    <CoverImage
+      path={cover}
+      wide={wideCover}
+      crop={crop}
+      offset={layout?.coverImageOffset ?? undefined}
+      onChange={onCoverChange}
+      // No value: the opposite of the type's; a value: flipped. Both are `!wideCover`.
+      onToggleWide={editLayout && (() => editLayout({ wideCoverImage: !wideCover }))}
+      onOffsetChange={editLayout && ((n) => editLayout({ coverImageOffset: n }))}
+    />
+  ) : null
   const gutter = mode === 'peek' ? 'px-10' : 'px-12'
+  const coverOnTop = !!coverEl && !wideCover
   const headerEl = (
     <div data-page-title="" style={font}>
       {header}
     </div>
   )
   const bodyEl = (
-    <div data-page-body="" className="min-w-0 flex-1" style={font}>
+    <div ref={bodyRef} data-page-body="" className="min-w-0 flex-1" style={font}>
       {body}
     </div>
   )
+
+  // The inspector floats top right; with a cover shown it keeps below the cover's bottom (and so
+  // clear of its controls) until the cover scrolls away.
+  const hasInspector = !!inspector
+  const placeInspector = useCallback(() => {
+    const col = columnRef.current
+    const coverNode = col?.querySelector('[data-cover-image]')
+    if (!col || !coverNode) {
+      setInspectorTop(undefined)
+      return
+    }
+    const below = coverNode.getBoundingClientRect().bottom - col.getBoundingClientRect().top + INSPECTOR_COVER_GAP
+    setInspectorTop(below > INSPECTOR_TOP ? below : undefined)
+  }, [])
+  useLayoutEffect(() => {
+    if (!hasInspector) return
+    placeInspector()
+    const coverNode = columnRef.current?.querySelector('[data-cover-image]')
+    if (!coverNode || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(placeInspector)
+    ro.observe(coverNode)
+    return () => ro.disconnect()
+  }, [hasInspector, placeInspector, cover, wideCover, crop, design, inline])
 
   let content: ReactNode
   switch (design) {
@@ -210,7 +336,9 @@ export function PageLayout({
         <>
           {headerEl}
           <div className="flex items-start gap-10">
-            {bodyEl}
+            <div data-encyclopedia-main="" className="flex min-w-0 flex-1 flex-col">
+              {bodyEl}
+            </div>
             {propertiesEl}
           </div>
         </>
@@ -235,9 +363,9 @@ export function PageLayout({
       data-properties={inline ? 'inline' : design === 'standard' && open ? 'beside' : undefined}
     >
       {design === 'standard' && !inline && propertiesEl}
-      <div className="relative flex min-w-0 flex-1 flex-col">
+      <div ref={columnRef} className="relative flex min-w-0 flex-1 flex-col">
         {toolbar}
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto" onScroll={hasInspector && cover ? placeInspector : undefined}>
           {coverEl && wideCover && <div className="pt-3">{coverEl}</div>}
           <div
             data-page-content=""
@@ -250,11 +378,20 @@ export function PageLayout({
             )}
             data-object-path={summary.path}
           >
-            {coverEl && !wideCover && <div className="mb-8">{coverEl}</div>}
+            {coverOnTop && <div className="mb-8">{coverEl}</div>}
             {coverEl && wideCover && <div className="h-6" />}
             {content}
           </div>
         </div>
+        {inspector && (
+          <InspectorSlot
+            bodyRef={bodyRef}
+            summary={summary}
+            getMarkdown={inspector.getMarkdown}
+            dailyNote={inspector.dailyNote}
+            top={inspectorTop}
+          />
+        )}
         {children}
       </div>
     </div>

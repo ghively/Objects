@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { ApiError, CLIENT_ID, ConflictError, ReadOnlyError, RevisionConflictError } from './client'
+import { api, ApiError, CLIENT_ID, ConflictError, ReadOnlyError, RevisionConflictError } from './client'
 import { settingsOf, whiteboardApi } from './whiteboardClient'
+import type { ChangeEvent } from './types'
 import type { WhiteboardData } from './whiteboardTypes'
 
 function respond(status: number, body: unknown) {
@@ -117,5 +118,21 @@ describe('whiteboard client', () => {
         other: true,
       }),
     ).toEqual({ isSnappingToGrid: false, isSnappingToNodes: true, isZoomingOnScroll: false, isEngineeringMode: true })
+  })
+
+  test('test a board save that stamped the .md announces changed to this window', async () => {
+    vi.stubGlobal('EventSource', class extends EventTarget { close() {} })
+    const seen: ChangeEvent[] = []
+    const off = api.onChange((e) => seen.push(e))
+    try {
+      vi.stubGlobal('fetch', respond(200, { revision: 'r2', mdVersion: 'v2', mdBaseVersion: 'v1' }))
+      await whiteboardApi.saveBoard('Whiteboards/A.md', BOARD, 'r1')
+      vi.stubGlobal('fetch', respond(200, { revision: 'r3' }))
+      await whiteboardApi.saveBoard('Whiteboards/B.md', BOARD, 'r2')
+      await new Promise((r) => setTimeout(r, 0))
+    } finally {
+      off()
+    }
+    expect(seen.map((e) => [e.kind, e.path, e.version])).toEqual([['changed', 'Whiteboards/A.md', 'v2']])
   })
 })

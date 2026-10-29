@@ -1,12 +1,16 @@
 // The data view: toolbar, filter -> sort -> group pipeline and a layout, reused by type pages,
 // collections, queries and All notes. The caller owns the state (see `useViewState`).
-import { createContext, useContext, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Collection, Layout, Row, RowsScope, TypeDef, UpdateResult, ViewState } from '@/api/types'
+import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
-import { useLinkIndex } from '@/links/linkIndex'
+import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
+import { ChangeTypeDialog } from '@/object/ChangeTypeDialog'
+import { DeleteObjectDialog } from '@/object/DeleteObjectDialog'
+import { TypeChip } from '@/shell/Sidebar'
 import type { CustomizePage } from './CustomizeMenu'
 import { applyFilters } from './filter'
 import { groupRows, type Group, type GroupCtx } from './group'
@@ -25,6 +29,10 @@ import { applySorts } from './sort'
 import { Toolbar } from './Toolbar'
 import { ViewSummary } from './ViewSummary'
 import { matchingValues } from './matching'
+import { commonRowMenu, type RowMenuCtx, type RowMenuItem } from './rowMenu'
+import { SelectionBar } from './SelectionBar'
+
+export type { RowMenuItem } from './rowMenu'
 
 /**
  * Where a full-page view's toolbar goes: a type page puts it in its tab row, right-aligned, as
@@ -70,6 +78,8 @@ export interface LayoutProps {
   rowExtras?(row: Row): RowExtras
   /** A layout wrote a row (the kanban drop) and reloaded it; `result` is the server's answer. */
   onWritten?(row: Row, result: UpdateResult): void
+  /** M9: whether the row is selected ("Select multiple"); selected rows carry `data-selected`. */
+  isSelected?(path: string): boolean
 }
 
 /** What an owner adds to one row: `leading` before its title, `trailing` after it. */
@@ -103,6 +113,12 @@ export interface DataViewProps {
   patchRow?(path: string, row: Row): void
   /** Right-click menu of a row (list, card or table row): the items for that row, or none. */
   rowMenu?(row: Row): RowMenuItem[]
+  /**
+   * M9: the common row menu (`rowMenu.ts`: open, change type, copy reference, duplicate, delete)
+   * on right-click, before `rowMenu`'s own items, and multi-select with its bulk actions ("Select
+   * multiple", then click or Shift-click; Escape clears). Type pages, their sections, queries and collections.
+   */
+  rowActions?: boolean
   /** Renders layouts other than the list (table, cards, kanban). */
   renderLayout?(layout: Layout, props: LayoutProps): ReactNode | null
   /** Per-row slots for list rows and cards (see `LayoutProps.rowExtras`); without it rows render as in M3. */
@@ -111,16 +127,9 @@ export interface DataViewProps {
   onWritten?(row: Row, result: UpdateResult): void
 }
 
-export interface RowMenuItem {
-  key: string
-  label: string
-  icon: string
-  destructive?: boolean
-  onSelect(): void
-}
-
 /** A small context menu at the pointer: closes on a click elsewhere, Escape or scroll. */
 function RowContextMenu({ x, y, items, onClose }: { x: number; y: number; items: RowMenuItem[]; onClose(): void }) {
+  const [sub, setSub] = useState<string | null>(null)
   useEffect(() => {
     const close = () => onClose()
     const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -140,22 +149,59 @@ function RowContextMenu({ x, y, items, onClose }: { x: number; y: number; items:
       style={{ left: x, top: y }}
       className="fixed z-50 min-w-48 rounded-lg border border-line bg-raised p-1 text-[14px] shadow-lg"
     >
-      {items.map((it) => (
-        <button
-          key={it.key}
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            onClose()
-            it.onSelect()
-          }}
-          className={cn('flex h-8 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-hover', it.destructive && 'text-red-400')}
-        >
-          <Icon name={it.icon} size={14} />
-          {it.label}
-        </button>
-      ))}
+      {items.map((it) =>
+        it.children ? (
+          <div key={it.key} className="relative" onMouseEnter={() => setSub(it.key)}>
+            <button
+              type="button"
+              role="menuitem"
+              aria-haspopup="menu"
+              aria-expanded={sub === it.key}
+              onClick={(e) => {
+                e.stopPropagation()
+                setSub(it.key)
+              }}
+              className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-hover"
+            >
+              <Icon name={it.icon} size={14} />
+              <span className="flex-1">{it.label}</span>
+              <Icon name="ph-caret-right" size={12} />
+            </button>
+            {sub === it.key && (
+              <div
+                role="menu"
+                aria-label={it.label}
+                className="absolute top-0 left-full z-50 max-h-[360px] min-w-44 overflow-auto rounded-lg border border-line bg-raised p-1 shadow-lg"
+              >
+                {it.children.map((c) => (
+                  <RowMenuButton key={c.key} item={c} onClose={onClose} />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <RowMenuButton key={it.key} item={it} onClose={onClose} onHover={() => setSub(null)} />
+        ),
+      )}
     </div>
+  )
+}
+
+function RowMenuButton({ item, onClose, onHover }: { item: RowMenuItem; onClose(): void; onHover?(): void }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onMouseEnter={onHover}
+      onClick={() => {
+        onClose()
+        item.onSelect()
+      }}
+      className={cn('flex h-8 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-hover', item.destructive && 'text-red-400')}
+    >
+      {item.chip ? <TypeChip type={item.chip} size={18} /> : <Icon name={item.icon} size={14} />}
+      {item.label}
+    </button>
   )
 }
 
@@ -171,6 +217,20 @@ export function DataView(props: DataViewProps) {
   const objects = useLinkIndex((s) => s.objects)
   const [visible, setVisible] = useState(LOAD_PAGE)
   const [menu, setMenu] = useState<{ x: number; y: number; items: RowMenuItem[] } | null>(null)
+  // One change-type dialog per row, in turn (the bulk action runs the one-object dialog per row).
+  const [changing, setChanging] = useState<{ rows: Row[]; to: TypeDef } | null>(null)
+  const [deleting, setDeleting] = useState<Row | null>(null)
+  // The selected paths while selecting ("Select multiple"); null when not selecting.
+  const [selected, setSelected] = useState<string[] | null>(null)
+  const anchor = useRef<string | null>(null)
+  const selecting = selected !== null
+
+  useEffect(() => {
+    if (!selecting) return
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && setSelected(null)
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [selecting])
 
   const typesById = useMemo(() => Object.fromEntries(types.map((t) => [t.id, t])), [types])
 
@@ -230,7 +290,33 @@ export function DataView(props: DataViewProps) {
     onState({ ...state, viewDefinition: { ...state.viewDefinition, groupByConfig: { ...state.viewDefinition.groupByConfig, groups: next } } })
   }
 
+  const select = (paths: string[] | null, last: string | null) => {
+    anchor.current = last
+    setSelected(paths && paths.length > 0 ? paths : null)
+  }
   const onOpen = (row: Row, e: MouseEvent) => {
+    const path = row.summary.path
+    if (selected) {
+      // Shift: the range from the last clicked row, added; else toggle this row.
+      // The on-screen order: grouped views show each open group's rows in turn.
+      const order = grouped
+        ? [...new Set(result.groups.flatMap((g) => (closed(g) ? [] : g.rows)).map((r) => r.summary.path))]
+        : flat.map((r) => r.summary.path)
+      const from = anchor.current ? order.indexOf(anchor.current) : -1
+      const to = order.indexOf(path)
+      if (e.shiftKey && from >= 0 && to >= 0) {
+        const range = order.slice(Math.min(from, to), Math.max(from, to) + 1)
+        select([...new Set([...selected, ...range])], path)
+      } else {
+        select(selected.includes(path) ? selected.filter((p) => p !== path) : [...selected, path], path)
+      }
+      return
+    }
+    // Shift-click starts selecting (our choice; Capacities enters it from "Select multiple").
+    if (e.shiftKey && props.rowActions) {
+      select([path], path)
+      return
+    }
     if (e.ctrlKey || e.metaKey) {
       useTabs.getState().open({ kind: 'object', path: row.summary.path }, { newTab: true })
       return
@@ -272,6 +358,7 @@ export function DataView(props: DataViewProps) {
     patchRow: props.patchRow,
     rowExtras: props.rowExtras,
     onWritten: props.onWritten,
+    isSelected: selected ? (path) => selected.includes(path) : undefined,
     groupCount: (g) => result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length,
   }
   const builtin = (): ReactNode => {
@@ -330,15 +417,27 @@ export function DataView(props: DataViewProps) {
     />
   )
 
+  const menuCtx: RowMenuCtx = {
+    types,
+    selectMultiple: (row) => select([row.summary.path], row.summary.path),
+    changeType: (row, to) => setChanging({ rows: [row], to }),
+    requestDelete: (row) => setDeleting(row),
+  }
+  const itemsFor = (row: Row): RowMenuItem[] => [
+    ...(props.rowActions ? commonRowMenu(row, menuCtx) : []),
+    ...(props.rowMenu?.(row) ?? []),
+  ]
+  const selectedRows = selected ? flat.filter((r) => selected.includes(r.summary.path)) : []
+
   return (
     <section
       data-testid="data-view"
       onContextMenu={
-        props.rowMenu
+        props.rowMenu || props.rowActions
           ? (e) => {
               const path = (e.target as Element).closest('[data-path]')?.getAttribute('data-path')
               const row = path ? flat.find((r) => r.summary.path === path) : undefined
-              const items = row ? props.rowMenu?.(row) ?? [] : []
+              const items = row ? itemsFor(row) : []
               if (items.length === 0) return
               e.preventDefault()
               setMenu({ x: e.clientX, y: e.clientY, items })
@@ -354,6 +453,26 @@ export function DataView(props: DataViewProps) {
         </div>
       )}
       {toolbarSlot && createPortal(toolbar, toolbarSlot)}
+      {selectedRows.length > 0 && (
+        <SelectionBar
+          rows={selectedRows}
+          types={types}
+          onChangeType={(to) => {
+            const rs = selectedRows.filter((r) => !r.summary.readOnly && r.summary.template == null && r.summary.type !== to.id)
+            if (rs.length > 0) setChanging({ rows: rs, to })
+          }}
+          onOpenInSidepanel={() => {
+            for (const r of selectedRows) useTabs.getState().openInSidepanel({ kind: 'object', path: r.summary.path })
+          }}
+          onDelete={async () => {
+            for (const r of selectedRows.filter((x) => !x.summary.readOnly)) {
+              await api.deleteObject(r.summary.path, { baseVersion: r.version })
+            }
+            select(null, null)
+          }}
+          onClear={() => select(null, null)}
+        />
+      )}
       {(state.showDataViewDetails || props.pausedHint) && (
         <ViewSummary state={state} choices={choices} pausedHint={props.pausedHint} />
       )}
@@ -384,7 +503,14 @@ export function DataView(props: DataViewProps) {
                 <div key={g.id} className="flex flex-col">
                   {grouped && header(g, result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length)}
                   {!(grouped && closed(g)) && (
-                    <ListLayout rows={g.rows} typesById={typesById} multiType={multiType} onOpen={onOpen} rowExtras={props.rowExtras} />
+                    <ListLayout
+                      rows={g.rows}
+                      typesById={typesById}
+                      multiType={multiType}
+                      onOpen={onOpen}
+                      rowExtras={props.rowExtras}
+                      isSelected={layoutProps.isSelected}
+                    />
                   )}
                 </div>
               ))}
@@ -402,6 +528,30 @@ export function DataView(props: DataViewProps) {
         </>
       )}
       {menu && <RowContextMenu {...menu} onClose={() => setMenu(null)} />}
+      {changing && (
+        <ChangeTypeDialog
+          key={changing.rows[0].summary.path}
+          open
+          onOpenChange={(o) => !o && setChanging(null)}
+          path={changing.rows[0].summary.path}
+          toType={changing.to}
+          prepare={async () => changing.rows[0].version}
+          onChanged={() => {
+            void invalidateLinkIndex()
+            // The dialog closes itself first; the next row's dialog follows.
+            const rest = changing.rows.slice(1)
+            setChanging(rest.length > 0 ? { rows: rest, to: changing.to } : null)
+            if (rest.length === 0 && changing.rows.length > 1) select(null, null)
+          }}
+        />
+      )}
+      <DeleteObjectDialog
+        open={deleting !== null}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        onConfirm={async () => {
+          if (deleting) await api.deleteObject(deleting.summary.path, { baseVersion: deleting.version })
+        }}
+      />
     </section>
   )
 }

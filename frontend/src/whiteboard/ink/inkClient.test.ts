@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { ApiError, CLIENT_ID, ConflictError, ReadOnlyError, RevisionConflictError } from '@/api/client'
+import { api, ApiError, CLIENT_ID, ConflictError, ReadOnlyError, RevisionConflictError } from '@/api/client'
+import type { ChangeEvent } from '@/api/types'
 import { inkClient } from './inkClient'
 import type { InkStroke } from './types'
 
@@ -67,5 +68,19 @@ describe('ink client', () => {
     vi.stubGlobal('fetch', respond(404, { detail: 'Not found' }))
     const missing = await inkClient.load('Whiteboards/Gone.md').catch((e: unknown) => e)
     expect((missing as ApiError).status).toBe(404)
+  })
+
+  test('an ink save that stamped the .md announces changed to this window', async () => {
+    vi.stubGlobal('EventSource', class extends EventTarget { close() {} })
+    const seen: ChangeEvent[] = []
+    const off = api.onChange((e) => seen.push(e))
+    try {
+      vi.stubGlobal('fetch', respond(200, { revision: 'r2', mdVersion: 'v2', mdBaseVersion: 'v1' }))
+      await inkClient.save('Whiteboards/A.md', strokes, 'r1')
+      await new Promise((r) => setTimeout(r, 0))
+    } finally {
+      off()
+    }
+    expect(seen.map((e) => [e.kind, e.path, e.version])).toEqual([['changed', 'Whiteboards/A.md', 'v2']])
   })
 })
