@@ -189,3 +189,28 @@ def test_duplicate_announces_created(space_dir: Path):
     assert [(e.kind, e.path, e.version, e.origin) for e in published] == [
         ("created", out["path"], out["version"], "w1")
     ]
+
+
+def test_duplicate_adds_the_copy_to_synced_relations(space_dir: Path):
+    """Gene (2026-10-29): a two-way relation stays two-way, so its targets link the copy too."""
+    from test_properties import _synced_space
+
+    _synced_space(space_dir)
+    space, c, published = _client(space_dir)
+    v = version_of_file(space_dir / "A" / "A1.md")
+    space.update_properties("A/A1.md", {"rel": ["B1"]}, v)
+    published.clear()
+    with c:
+        r = _dup(c, "A/A1.md", client_id="cid")
+    assert r.status_code == 201, r.text
+    assert r.json()["path"] == "A/A1 (Copy).md"
+    b1 = (space_dir / "B" / "B1.md").read_bytes().decode()
+    assert "'[[A1]]'" in b1 and "'[[A1 (Copy)]]'" in b1
+    changed = [e.path for e in published if e.kind == "changed"]
+    assert changed == ["B/B1.md"]
+
+
+def version_of_file(p: Path) -> str:
+    from objectapp.space import version_of
+
+    return version_of(p.read_bytes())
