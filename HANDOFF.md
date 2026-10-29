@@ -1,6 +1,6 @@
 # Handoff: pick up Object from a clean clone
 
-Updated 2026-10-28. You are continuing "Object", a local, Markdown-backed recreation of Object. Read this file, then `CLAUDE.md` (rules), then `CONTINUE.md` (process). Status lives in `docs/superpowers/plans/remaining-work.md`.
+Updated 2026-10-29. You are continuing "Object", a local, Markdown-backed recreation of Object. Read this file, then `CLAUDE.md` (rules), then `CONTINUE.md` (process). Status lives in `docs/superpowers/plans/remaining-work.md`.
 
 ## Where things stand
 
@@ -10,7 +10,7 @@ Updated 2026-10-28. You are continuing "Object", a local, Markdown-backed recrea
 
 **Next:** Gene's hands-on checks, M1–M9. His answers to M9's three open questions (2026-10-29) are built.
 
-**Branch:** M1–M8, the audit fixes and the reference corrections are on `master`; M9 is on `ccr-bcf6e946-bf8moc` until its pull request is merged.
+**Branch:** everything, M1–M9 included, is on `master`. M9's branch `ccr-bcf6e946-bf8moc` was merged as pull request #3 on 2026-10-29 and is kept on GitHub for reference only.
 
 | Milestone | Scope | Plan |
 |---|---|---|
@@ -24,7 +24,7 @@ Updated 2026-10-28. You are continuing "Object", a local, Markdown-backed recrea
 | M8 | every Object feature M4–M7 deferred, local only | `2026-10-27-m8-deferred-features.md` |
 | M9 | the audit's completeness gaps | `2026-10-28-m9-completeness-gaps.md` |
 
-Last full verification, 2026-10-29 after M9 and Gene's answers (`35bbd88`), on Linux:
+Last full verification, 2026-10-29 on Windows after M9 was merged (`6ef3df8`): the same gate passed (1238 back-end, 1965 front-end; one front-end timing test timed out under load and passed alone), every acceptance script PASS. Details: `remaining-work.md`. Before that, at `35bbd88` on Linux:
 - 1239 back-end tests passed (1 skipped: it needs a non-root user).
 - 1966 front-end tests passed (1 skipped: it needs `OBJECT_ROUNDTRIP_SPACE`).
 - `tsc -b --noEmit` clean; lint 0 errors; `npm run build` ok.

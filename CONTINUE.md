@@ -4,8 +4,8 @@ Everything needed to resume is in this repo. Rules and layout: `CLAUDE.md`. Wher
 
 ## Status
 
-Take the current state from `docs/superpowers/plans/remaining-work.md` and `git log`; this file doesn't track it. As of 2026-10-28:
-- **Built:** M1–M9 are built, reviewed, fixed and gated. M8 covers every Object feature M4–M7 had deferred, local only; M9 the audit's completeness gaps.
+Take the current state from `docs/superpowers/plans/remaining-work.md` and `git log`; this file doesn't track it. As of 2026-10-29:
+- **Built:** M1–M9 are built, reviewed, fixed and gated, all on `master`. M8 covers every Object feature M4–M7 had deferred, local only; M9 the audit's completeness gaps.
 - **Out of scope by the spec:** AI, network integrations, accounts, mobile, telemetry.
 - **Pending:** Gene's hand-checks, all milestones (`plans/m1-acceptance.md` to `plans/m9-acceptance.md`, all unchecked).
 
