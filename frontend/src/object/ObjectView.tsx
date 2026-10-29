@@ -685,19 +685,6 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
               <DropdownMenuShortcut>Ctrl F</DropdownMenuShortcut>
             </DropdownMenuItem>
             <PinMenuItems pin={{ kind: 'object', path, id: summary?.id }} />
-            <DropdownMenuItem disabled={!summary} onSelect={() => useVersionHistory.getState().open(path)}>
-              <Icon name="ph-clock-counter-clockwise" size={14} />
-              {OBJECT_M8_TEXT.versionHistory}
-            </DropdownMenuItem>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger disabled={!summary}>
-                <Icon name="ph-chart-bar" size={14} />
-                {OBJECT_M9_TEXT.textStats}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="border-line bg-raised">
-                {summary && <TextStatsMenu getMarkdown={getMarkdown} summary={summary} dailyNote={dailyNote} />}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
             <DropdownMenuItem
               disabled={!summary}
               onSelect={() => {
@@ -712,6 +699,20 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
               <Icon name="ph-export" size={14} />
               {OBJECT_M9_TEXT.export}
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem disabled={!summary} onSelect={() => useVersionHistory.getState().open(path)}>
+              <Icon name="ph-clock-counter-clockwise" size={14} />
+              {OBJECT_M8_TEXT.versionHistory}
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={!summary}>
+                <Icon name="ph-chart-bar" size={14} />
+                {OBJECT_M9_TEXT.textStats}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="border-line bg-raised">
+                {summary && <TextStatsMenu getMarkdown={getMarkdown} summary={summary} dailyNote={dailyNote} />}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuItem disabled={!summary || isTemplate} onSelect={() => useAddToWhiteboard.getState().open(path)}>
               <Icon name="ph-chalkboard-simple" size={14} />
               {OBJECT_M8_TEXT.addToWhiteboard}
