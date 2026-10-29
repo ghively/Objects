@@ -10,7 +10,7 @@ Updated 2026-10-28. You are continuing "Object", a local, Markdown-backed recrea
 
 **Next:** Gene's hands-on checks, M1–M9. His answers to M9's three open questions (2026-10-29) are built.
 
-**Branch:** GitHub `master` is at the M3–M8 merge (`04e9d07`). The audit fixes, the reference corrections and M9 are on `ccr-bcf6e946-bf8moc` until it is merged.
+**Branch:** M1–M8, the audit fixes and the reference corrections are on `master`; M9 is on `ccr-bcf6e946-bf8moc` until its pull request is merged.
 
 | Milestone | Scope | Plan |
 |---|---|---|
