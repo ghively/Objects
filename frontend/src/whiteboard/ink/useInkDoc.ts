@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, ConflictError, ReadOnlyError } from '@/api/client'
+import type { MdStamp } from '@/api/whiteboardTypes'
 import { announceSave, onLocalSave } from '../localSaves'
 import { inkClient, type InkClient } from './inkClient'
 import { mergeStrokes } from './inkModel'
@@ -24,9 +25,14 @@ type Client = Pick<InkClient, 'load' | 'save'>
  * failure keeps the strokes pending, reports `saveError` and retries after a growing delay, at
  * most `INK_RETRY_LIMIT` times; the next change tries again. An external
  * `whiteboard` event for this path reloads when nothing is pending. `flush()` sends a pending save
- * now (also on unmount and `pagehide`).
+ * now (also on unmount and `pagehide`). `onMdStamp` receives each landed save's stamp of the
+ * board `.md` (M9), so the board's Notes can save on top of it.
  */
-export function useInkDoc(path: string, client: Client = inkClient): InkDoc {
+export function useInkDoc(
+  path: string,
+  client: Client = inkClient,
+  onMdStamp?: (stamp: MdStamp) => void,
+): InkDoc {
   const [strokes, setStrokes] = useState<InkStroke[] | null>(null)
   const [readOnlyReason, setReadOnlyReason] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -34,6 +40,7 @@ export function useInkDoc(path: string, client: Client = inkClient): InkDoc {
   const s = useRef({
     path,
     client,
+    onMdStamp,
     alive: true,
     loaded: false,
     readOnly: false,
@@ -47,6 +54,7 @@ export function useInkDoc(path: string, client: Client = inkClient): InkDoc {
     generation: 0,
   })
   s.current.client = client
+  s.current.onMdStamp = onMdStamp
 
   const show = useCallback((next: InkStroke[]) => {
     if (s.current.alive) setStrokes(next)
@@ -110,6 +118,7 @@ export function useInkDoc(path: string, client: Client = inkClient): InkDoc {
         if (gen !== st.generation) return
         st.revision = r.revision
         st.lastSaved = local
+        st.onMdStamp?.(r)
         announceSave({ path: p, version: r.revision, source: st })
         landed()
         return
@@ -129,6 +138,7 @@ export function useInkDoc(path: string, client: Client = inkClient): InkDoc {
           if (gen !== st.generation) return
           st.revision = r.revision
           st.lastSaved = merged
+          st.onMdStamp?.(r)
           announceSave({ path: p, version: r.revision, source: st })
           landed()
           if (st.pending) {

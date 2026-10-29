@@ -10,8 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import type { TypeDef } from '@/api/types'
 import type { Target } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
-import { PinnedSection } from './PinnedSection'
-import { AddSection, SidebarSections } from './SidebarSections'
+import { WorkspaceSections } from './SidebarSections'
 import { chipStyle } from './typeColor'
 import { QUERY_ICON } from '@/lib/defIcons'
 import { usePalette } from '@/palette/usePalette'
@@ -194,6 +193,85 @@ export function Sidebar({
     const name = (e: Entry) => (e.kind === 'type' ? e.type.pluralName : QUERIES_LABEL)
     return name(a).localeCompare(name(b), undefined, { sensitivity: 'base' })
   })
+  // The object types and the Queries entry: the `objects` block of `workspaceOrder`.
+  const objectTypes = (
+    <section aria-labelledby="sb-types">
+      <SectionHeader
+        id="sb-types"
+        action={
+          <button
+            type="button"
+            aria-label="Create object type"
+            title="Create object type"
+            onClick={() => onCreateType?.()}
+            className="flex size-6 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"
+          >
+            <Icon name="ph-plus" size={14} />
+          </button>
+        }
+      >
+        Object Types
+      </SectionHeader>
+      <ul className="flex flex-col gap-0.5 pb-2">
+        {entries.map((entry) => {
+          if (entry.kind === 'queries') {
+            return (
+              <li key="queries">
+                <button
+                  type="button"
+                  onClick={(e) => onOpenTarget?.({ kind: 'queries' }, { newTab: e.ctrlKey || e.metaKey })}
+                  aria-current={queriesActive ? 'page' : undefined}
+                  className={cn(
+                    'flex h-[36px] w-full items-center gap-2 rounded-lg px-1.5 text-left text-[15px] font-medium hover:bg-hover',
+                    queriesActive && 'bg-hover',
+                  )}
+                >
+                  <TypeChip type={QUERIES_CHIP} size={22} />
+                  <span className="min-w-0 flex-1 truncate">{QUERIES_LABEL}</span>
+                </button>
+              </li>
+            )
+          }
+          const t = entry.type
+          return (
+          <li key={t.id}>
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => onOpenType?.(t)}
+                  aria-current={activeTypeId === t.id ? 'page' : undefined}
+                  className={cn(
+                    'flex h-[36px] w-full items-center gap-2 rounded-lg px-1.5 text-left text-[15px] font-medium hover:bg-hover',
+                    activeTypeId === t.id && 'bg-hover',
+                  )}
+                >
+                  <TypeChip type={t} />
+                  <span className="min-w-0 flex-1 truncate">{t.pluralName}</span>
+                  {counts && counts[t.id] !== undefined && (
+                    <span className="text-[13px] text-fg-muted tabular-nums">{counts[t.id]}</span>
+                  )}
+                </button>
+              </ContextMenuTrigger>
+              <ContextMenuContent className="border-line bg-raised text-fg">
+                <ContextMenuItem onSelect={() => onOpenTypeSettings?.(t)}>
+                  <Icon name="ph-gear" size={14} />
+                  Object Type Settings
+                </ContextMenuItem>
+                {!t.basic && (
+                  <ContextMenuItem variant="destructive" onSelect={() => onDeleteType?.(t)}>
+                    <Icon name="ph-trash" size={14} />
+                    Delete object type
+                  </ContextMenuItem>
+                )}
+              </ContextMenuContent>
+            </ContextMenu>
+          </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
   return (
     <aside className="flex h-full w-[358px] shrink-0 flex-col bg-app pr-3.5 pl-2.5 text-fg" aria-label="Sidebar">
       <div className="flex items-center gap-2 pt-3 pb-3">
@@ -246,86 +324,8 @@ export function Sidebar({
       </nav>
 
       <ScrollArea className="min-h-0 flex-1">
-        <SidebarSections onOpenTarget={onOpenTarget} />
-        <PinnedSection onOpenTarget={onOpenTarget} />
-        <AddSection />
-
-        <section aria-labelledby="sb-types">
-          <SectionHeader
-            id="sb-types"
-            action={
-              <button
-                type="button"
-                aria-label="Create object type"
-                title="Create object type"
-                onClick={() => onCreateType?.()}
-                className="flex size-6 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"
-              >
-                <Icon name="ph-plus" size={14} />
-              </button>
-            }
-          >
-            Object Types
-          </SectionHeader>
-          <ul className="flex flex-col gap-0.5 pb-2">
-            {entries.map((entry) => {
-              if (entry.kind === 'queries') {
-                return (
-                  <li key="queries">
-                    <button
-                      type="button"
-                      onClick={(e) => onOpenTarget?.({ kind: 'queries' }, { newTab: e.ctrlKey || e.metaKey })}
-                      aria-current={queriesActive ? 'page' : undefined}
-                      className={cn(
-                        'flex h-[36px] w-full items-center gap-2 rounded-lg px-1.5 text-left text-[15px] font-medium hover:bg-hover',
-                        queriesActive && 'bg-hover',
-                      )}
-                    >
-                      <TypeChip type={QUERIES_CHIP} size={22} />
-                      <span className="min-w-0 flex-1 truncate">{QUERIES_LABEL}</span>
-                    </button>
-                  </li>
-                )
-              }
-              const t = entry.type
-              return (
-              <li key={t.id}>
-                <ContextMenu>
-                  <ContextMenuTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => onOpenType?.(t)}
-                      aria-current={activeTypeId === t.id ? 'page' : undefined}
-                      className={cn(
-                        'flex h-[36px] w-full items-center gap-2 rounded-lg px-1.5 text-left text-[15px] font-medium hover:bg-hover',
-                        activeTypeId === t.id && 'bg-hover',
-                      )}
-                    >
-                      <TypeChip type={t} />
-                      <span className="min-w-0 flex-1 truncate">{t.pluralName}</span>
-                      {counts && counts[t.id] !== undefined && (
-                        <span className="text-[13px] text-fg-muted tabular-nums">{counts[t.id]}</span>
-                      )}
-                    </button>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent className="border-line bg-raised text-fg">
-                    <ContextMenuItem onSelect={() => onOpenTypeSettings?.(t)}>
-                      <Icon name="ph-gear" size={14} />
-                      Object Type Settings
-                    </ContextMenuItem>
-                    {!t.basic && (
-                      <ContextMenuItem variant="destructive" onSelect={() => onDeleteType?.(t)}>
-                        <Icon name="ph-trash" size={14} />
-                        Delete object type
-                      </ContextMenuItem>
-                    )}
-                  </ContextMenuContent>
-                </ContextMenu>
-              </li>
-              )
-            })}
-          </ul>
-        </section>
+        {/* The custom sections, Pinned and the object types, in `ui.workspaceOrder` (M9). */}
+        <WorkspaceSections onOpenTarget={onOpenTarget} objects={objectTypes} />
 
         <div className="pb-3">
           <button

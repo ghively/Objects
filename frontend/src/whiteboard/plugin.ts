@@ -3,6 +3,7 @@
  * `whiteboard/ink/`; Task 13 passes Lane B's `inkPlugin` in, and `tsc` proves the two match).
  */
 import type { ComponentType } from 'react'
+import type { MdStamp } from '@/api/whiteboardTypes'
 
 /** One freehand stroke in canvas (flow) units (the same six fields as the ink module's `InkStroke`). */
 export interface InkStroke {
@@ -58,5 +59,6 @@ export interface InkDoc {
 export interface InkPlugin {
   Layer: ComponentType<InkLayerProps>
   Toolbar: ComponentType<InkToolbarProps>
-  useInkDoc(path: string): InkDoc
+  /** M9: `onMdStamp` receives each landed save's stamp of the board `.md`. */
+  useInkDoc(path: string, onMdStamp?: (stamp: MdStamp) => void): InkDoc
 }

@@ -18,7 +18,7 @@ import { propertyIsEmpty } from '@/properties/format'
 import { kindIcon } from '@/properties/kinds'
 import { PropertyMenu } from '@/properties/PropertyMenu'
 import { DeletePropertySection, PropertySettings } from '@/properties/PropertySettings'
-import { removeProperty } from '@/properties/typeEdits'
+import { LAYOUT_KEYS, removeProperty } from '@/properties/typeEdits'
 import type { TypeEditor } from './useTypeEditor'
 
 /** Frontmatter keys shown elsewhere (header, metadata) or kept by the app, never as extra properties. */
@@ -37,6 +37,7 @@ const CORE_KEYS = new Set([
   'lastUpdated',
   'coverImage',
   'color',
+  ...LAYOUT_KEYS,
 ])
 
 function isEmpty(v: unknown): boolean {
@@ -369,6 +370,7 @@ export function PropertyPanel({
             onOpenObject={onOpenObject}
             onChangeType={onChangeType}
             typeId={type?.id ?? summary?.type}
+            path={summary?.path}
             onOpenSettings={canEditType && typed && type ? () => setSettingsFor(def.id) : undefined}
           />
         ) : null}

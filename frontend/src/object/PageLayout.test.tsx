@@ -60,8 +60,13 @@ describe('PageLayout', () => {
         expect(container.querySelector('[data-profile-column] [data-profile-image]')).not.toBeNull()
       }
       if (name === 'encyclopedia') {
-        // The infobox sits next to the body, after it.
-        expect(body.parentElement).toBe(props.parentElement)
+        // The title spans the full width above; the infobox sits next to the body, after it (Gene, 2026-10-29).
+        const main = container.querySelector('[data-encyclopedia-main]') as HTMLElement
+        const title = container.querySelector('[data-page-title]') as HTMLElement
+        expect(main.contains(body)).toBe(true)
+        expect(main.parentElement?.contains(title)).toBe(false)
+        expect(title.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        expect(main.parentElement).toBe(props.parentElement)
         expect(body.compareDocumentPosition(props) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       }
       unmount()
@@ -112,6 +117,69 @@ describe('PageLayout', () => {
     expect(img.className).not.toContain('object-cover')
     expect(img.className).toContain('h-auto')
     expect(b.container.querySelector('[data-page-content]')?.contains(cover)).toBe(true)
+  })
+})
+
+describe('M9 page layout', () => {
+  test('test encyclopedia cover and title above the body and infobox', () => {
+    const { container } = layout({ viewDesign: 'encyclopedia', wideCoverImage: false }, 'Attachments/cover.png')
+    const cover = container.querySelector('[data-cover-image]') as HTMLElement
+    const main = container.querySelector('[data-encyclopedia-main]') as HTMLElement
+    const title = container.querySelector('[data-page-title]') as HTMLElement
+    // Gene (2026-10-29): the title spans the full width again, so the cover sits above it, as before M9.
+    expect(main.parentElement?.contains(cover)).toBe(false)
+    expect(cover.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(title.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  test('test the inspector toggle opens the page inspector', async () => {
+    localStorage.clear()
+    const user = userEvent.setup()
+    const type = typeDef({ id: 'page' })
+    const summary = objectSummary({ path: 'Pages/A.md', type: 'page', title: 'A' })
+    render(
+      <PageLayout
+        type={type}
+        summary={summary}
+        header={<h1>A</h1>}
+        properties={null}
+        body={<h2>Section</h2>}
+        inspector={{ getMarkdown: () => '## Section\n', dailyNote: false }}
+      />,
+    )
+    expect(screen.queryByRole('complementary', { name: 'Inspector' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Inspector' }))
+    const inspector = screen.getByRole('complementary', { name: 'Inspector' })
+    expect(within(inspector).getByRole('button', { name: 'Section' })).toBeInTheDocument()
+    // Pinned: it opens with the next page.
+    await user.click(within(inspector).getByRole('button', { name: 'Pin' }))
+    expect(localStorage.getItem('object.page.inspectorPinned')).toBe('1')
+  })
+
+  test('the inspector sits below a shown cover, clear of its controls', () => {
+    localStorage.clear()
+    // The cover ends 300 px below the content column's top.
+    const real = HTMLElement.prototype.getBoundingClientRect
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.hasAttribute('data-cover-image')) return { top: 60, bottom: 300, left: 0, right: 900, width: 900, height: 240 } as DOMRect
+      return real.call(this)
+    })
+    const type = typeDef({ id: 'page', wideLayoutMode: true, wideCoverImage: true })
+    const summary = objectSummary({ path: 'Pages/A.md', type: 'page', title: 'A', coverImage: 'Attachments/cover.png' })
+    render(
+      <PageLayout
+        type={type}
+        summary={summary}
+        header={<h1>A</h1>}
+        properties={null}
+        body={<p>Body</p>}
+        onCoverChange={vi.fn()}
+        inspector={{ getMarkdown: () => '', dailyNote: false }}
+      />,
+    )
+    const slot = screen.getByRole('button', { name: 'Inspector' }).parentElement as HTMLElement
+    expect(slot.style.top).toBe('308px')
+    spy.mockRestore()
   })
 })
 

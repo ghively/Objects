@@ -1,5 +1,11 @@
-import { api, ApiError, CLIENT_ID, ReadOnlyError, RevisionConflictError } from './client'
-import type { BoardResponse, CreatedWhiteboard, WhiteboardData, WhiteboardSettings } from './whiteboardTypes'
+import { announceLocalChange, api, ApiError, CLIENT_ID, ReadOnlyError, RevisionConflictError } from './client'
+import type {
+  BoardResponse,
+  CreatedWhiteboard,
+  WhiteboardData,
+  WhiteboardSaveResult,
+  WhiteboardSettings,
+} from './whiteboardTypes'
 
 const BASE = '/api'
 
@@ -76,12 +82,17 @@ export const whiteboardApi = {
     return request<BoardResponse>(`${BASE}/whiteboard?path=${encodeURIComponent(path)}`)
   },
 
-  /** `PUT /api/whiteboard`. `baseRevision` `''` creates the file. 409 → `RevisionConflictError(currentRevision)`. */
-  saveBoard(path: string, board: WhiteboardData, baseRevision: string): Promise<{ revision: string }> {
-    return request<{ revision: string }>(
+  /**
+   * `PUT /api/whiteboard`. `baseRevision` `''` creates the file. 409 → `RevisionConflictError(currentRevision)`.
+   * M9: when the save stamped the board `.md`, this window hears a `changed` for it.
+   */
+  async saveBoard(path: string, board: WhiteboardData, baseRevision: string): Promise<WhiteboardSaveResult> {
+    const res = await request<WhiteboardSaveResult>(
       `${BASE}/whiteboard`,
       json('PUT', { path, board, baseRevision, clientId: CLIENT_ID }),
     )
+    if (res?.mdVersion) announceLocalChange(path, res.mdVersion)
+    return res
   },
 
   /** `POST /api/whiteboards`: a new Whiteboard object (title blank → "Untitled", as M1). */

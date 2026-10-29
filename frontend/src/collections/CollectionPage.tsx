@@ -169,6 +169,7 @@ function PinnedSection({
       }}
       layouts={['gallery']}
       rowMenu={rowMenu}
+      rowActions
       patchRow={patchRow}
     />
   )
@@ -456,6 +457,7 @@ export function CollectionPage({ id }: { id: string }) {
           allowCreate
           onCreate={(values, typeId) => create(typeId, {}, values)}
           rowMenu={rowMenu}
+          rowActions
           patchRow={patchRow}
         />
       )}

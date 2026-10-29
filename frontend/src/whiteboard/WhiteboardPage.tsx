@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { NodeToolbar, Panel } from '@xyflow/react'
 import { api, ConflictError } from '@/api/client'
 import { whiteboardApi, type WhiteboardApi } from '@/api/whiteboardClient'
-import type { WhiteboardBoardToolMemory } from '@/api/whiteboardTypes'
+import type { MdStamp, WhiteboardBoardToolMemory, WhiteboardSaveResult } from '@/api/whiteboardTypes'
 import { Icon } from '@/components/Icon'
 import { invalidateLinkIndex, stemOf } from '@/links/linkIndex'
 import { canGoBack, useTabs } from '@/nav/tabs'
@@ -81,11 +81,28 @@ export function WhiteboardPage({
       onMemory: (m: WhiteboardBoardToolMemory) => saveToolMemory(path, m),
     }
   })
-  const { store, status, error, toast, dismissToast, flush } = useBoard(path, client, storeOptions)
+  // M9: a board save also stamps the .md's `lastUpdated`; the Notes adopt the `mdVersion` it
+  // answers when they hold its `mdBaseVersion` (see `adoptMdVersion`), so their next body save
+  // doesn't meet a 409.
+  const mdVersionRef = useRef<(res: MdStamp) => void>(() => {})
+  const boardClient = useMemo<WhiteboardApi>(
+    () => ({
+      ...client,
+      async saveBoard(p, b, base) {
+        const res: WhiteboardSaveResult = await client.saveBoard(p, b, base)
+        mdVersionRef.current(res)
+        return res
+      },
+    }),
+    [client],
+  )
+  const { store, status, error, toast, dismissToast, flush } = useBoard(path, boardClient, storeOptions)
   const exportRef = useRef<BoardExporter | null>(null)
   const settingsState = useWhiteboardSettings(client)
   const useInk = ink?.useInkDoc ?? useNoInkDoc
-  const inkDoc = useInk(path)
+  // An ink save stamps the .md too: the same guarded adopt as a board save's.
+  const onInkStamp = useCallback((res: MdStamp) => mdVersionRef.current(res), [])
+  const inkDoc = useInk(path, onInkStamp)
   const inkRef = useRef(inkDoc)
   useEffect(() => {
     inkRef.current = inkDoc
@@ -182,6 +199,20 @@ export function WhiteboardPage({
     versionRef.current = version
     setNotes((n) => ({ body: notesRef.current?.savedBody() ?? n?.body ?? '', version }))
   }, [])
+
+  /**
+   * A board save's new `.md` version (its `lastUpdated` stamp): the base of the next Notes save.
+   * Adopted only when the stamp started from the version the Notes hold; otherwise the `.md`
+   * has a change this window hasn't loaded, and the next Notes save meets the 409 that settles it.
+   */
+  const adoptMdVersion = useCallback(({ mdVersion: version, mdBaseVersion: base }: MdStamp) => {
+    if (!version || !base || base !== versionRef.current) return
+    versionRef.current = version
+    setNotes((n) => (n ? { body: notesRef.current?.savedBody() ?? n.body, version } : n))
+  }, [])
+  useEffect(() => {
+    mdVersionRef.current = adoptMdVersion
+  }, [adoptMdVersion])
 
   /** A notes save met a newer file: keep the edits when only other lines changed, else reload. */
   const onNotesConflict = useCallback(async () => {

@@ -1,8 +1,8 @@
 # Object: remaining work
 
-Status as of 2026-10-28 (evening, Gene's Windows PC). **All eight milestones are built, reviewed, fixed and gated, the audit bugs are fixed, and the guessed values now follow the full Object reference.** What remains:
-1. **M9, the completeness gaps:** Gene approved all of them; the plan is `2026-10-28-m9-completeness-gaps.md` (with Gene's answers). **On hold: don't start it until Gene says so.**
-2. Gene's hands-on checking (M1–M8 acceptance docs), and the fixes it produces. **Settled 2026-10-28:** Gene checked Object: the Standard design shows properties in the side column, so Object's Standard sidebar stays (`reference-check-2026-10-28.md` §5 was wrong there). They go inline below 768 px as in Object; no 'always inline' option for now.
+Status as of 2026-10-28 (night, Linux cloud container). **All nine milestones are built, reviewed, fixed and gated.** M9 (the audit's completeness gaps) was built on Gene's go-ahead; its results and Gene's hand-check list are in `m9-acceptance.md`. What remains:
+1. **M9's open questions are answered and built** (2026-10-29): the encyclopedia title spans the full width again, the object `…` menu follows Object's order, and Duplicate keeps two-way relations two-way.
+2. Gene's hands-on checking (M1–M9 acceptance docs), and the fixes it produces. **Settled 2026-10-28:** Gene checked Object: the Standard design shows properties in the side column, so Object's Standard sidebar stays (`reference-check-2026-10-28.md` §5 was wrong there). They go inline below 768 px as in Object; no 'always inline' option for now.
 
 **Done on 2026-10-28, on Windows:**
 - **Audit bugs:** all ~65 in `audit-2026-10-28.md`, plus every "unconfirmed" item that proved real, fixed one per commit with a failing-first test, in six area branches merged into master (whiteboard, backend API, views and properties, shell, backend storage, editor).
@@ -33,29 +33,28 @@ Each milestone's plan holds its full scope. Each acceptance doc holds its automa
 | **M6** whiteboards: shapes, frames, connectors, gates, pressure ink | `2026-10-26-m6-whiteboards-pen.md` | `ebcdcc8..c4a087c`, same gate | `m6-acceptance.md` (53, incl. Wacom) |
 | **M7** remaining blocks, light mode, settings, spaces, tabs, side panel | `2026-10-26-m7-blocks-lightmode-polish.md` | `f98e401..338a42f`, gate 2026-10-27; known-issue fixes `fc0bff2..96af06e` | `m7-acceptance.md` (57, incl. the side-by-side pass) |
 | **M8** every feature M4–M7 deferred, local only (31 tasks) | `2026-10-27-m8-deferred-features.md` | `61b6fed..0e7c748`, gate 2026-10-28; review-minor fixes `1721a4b..9383a9b` | `m8-acceptance.md` (40) |
+| **M9** the audit's completeness gaps (Tasks 1–23; 13 skipped by Gene) | `2026-10-28-m9-completeness-gaps.md` | `19a8167..c138f1d`, review fixes `3d46450..d17bd90`, gate 2026-10-28 | `m9-acceptance.md` (19) |
 
 M8's "Coverage" section maps every deferred item to a task, or to a spec §2 exclusion: AI, network at runtime, accounts and sharing, mobile, telemetry.
 
-## Latest verification (2026-10-28, at `9383a9b`, Linux)
+## Latest verification (2026-10-28, after M9 and Gene's answers, at `35bbd88`, Linux)
 
 | Check | Result |
 |---|---|
-| `uv run pytest backend/tests -q` | 1122 passed, 1 skipped (needs a non-root user) |
-| `cd frontend && npx vitest run` | 1678 passed in 279 files, 1 skipped (needs `OBJECT_ROUNDTRIP_SPACE`) |
-| `npx tsc -b --noEmit` / `npm run build` | clean / built |
+| `uv run pytest backend/tests -q` | 1239 passed, 1 skipped (needs a non-root user) |
+| `cd frontend && npx vitest run` | 1966 passed in 308 files, 1 skipped (needs `OBJECT_ROUNDTRIP_SPACE`) |
+| `npx tsc -b --noEmit` / `npm run lint` / `npm run build` | clean / 0 errors / built |
+| `scripts/m9_acceptance.py` on `space-m8`, `space-blocks`, `space-sample`, `space-v1`, `space-whiteboard` | all PASS (23/23 each) |
 | `scripts/m1_roundtrip.py` on a copy of `space-sample` and of `space-v1` | PASS |
 | `scripts/m2_acceptance.py` … `m8_acceptance.py` on `space-sample` and `space-v1` | all PASS (m2 52/52 and 50/50, m3 14/14, m4 24/24, m5 18/18, m6 19/19, m7 23/23, m8 26/26) |
-| The app (`uv run objectapp --browser`) driven in headless Chromium | home, Calendar, Tasks, Graph, Ctrl+K, an object page and a new whiteboard render with 0 console errors |
+| The app (`uv run objectapp --browser`) driven in headless Chromium | every M9 feature used once with 0 console errors and 0 requests leaving 127.0.0.1 (see `m9-acceptance.md`) |
 
 The synthetic fixture spaces are `space-sample`, `space-v1`, `space-calendar`, `space-links`, `space-whiteboard`, `space-blocks` and `space-m8`.
 
 ## What is left
 
-0. **Fix the audit list.**
-   - The list is `audit-2026-10-28.md`. Start with its "Fix first" section, items 1–17: security, data loss and breakage.
-   - One finding per commit, each with a regression test. The repro scripts are in `scripts/audit-2026-10-28/`.
-   - Gene decides which completeness gaps are in scope. The M8 Coverage table missed the M2/M3 deferrals, and the audit lists them.
-1. **Gene's hands-on checks, M1–M8:** 237 unchecked items. Run them on a copy of the CPI export kept outside the repo, with `git init` there: `npm run build` in `frontend/`, then `uv run objectapp --space <copy>`. These can only be checked on his Windows machine:
+0. **The audit list is done** (bugs fixed 2026-10-28; the completeness gaps built as M9).
+1. **Gene's hands-on checks, M1–M9:** 256 unchecked items. Run them on a copy of the CPI export kept outside the repo, with `git init` there: `npm run build` in `frontend/`, then `uv run objectapp --space <copy>`. These can only be checked on his Windows machine:
    - the pywebview window
    - Windows toast reminders
    - Wacom pressure and tilt
@@ -72,8 +71,9 @@ The synthetic fixture spaces are `space-sample`, `space-v1`, `space-calendar`, `
    - M3's default dashboard section tabs (`inNoCollection`/`notTagged`), which need the RootEntity file from the full `.reference/`
 3. **Check the CPI export for a Task type with no Done-category status option.** Inferred status sets, as in the sample spaces, have none, so those tasks can't be completed until one is added in type settings (M4 finding).
 4. **Fix what the hand-checks find.** One finding per commit, each with a regression test, then the full gate.
-5. **Deferred by Gene:** TODO handling in the editor. Logseq-style markers were considered and rejected on 2026-10-26.
-6. **Later:**
+5. **Not in M9 (Gene's call):** the sidebar types block's Sort Alphabetically / Manually (needs a key Object keeps in each type's default collection); bulk Edit property / Edit tags / Export; export to PDF, Word or LaTeX; duplicating whiteboards; Object's "name contains status" group ordering (Gene: no).
+6. **Deferred by Gene:** TODO handling in the editor. Logseq-style markers were considered and rejected on 2026-10-26.
+7. **Later:**
    - an installer (spec §6: "an installer comes later")
    - the in-app Claude Code agent (spec §2)
    - migrating `C:\Git\wiki` into Object's format (a separate project)

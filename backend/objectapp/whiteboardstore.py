@@ -5,22 +5,27 @@ sidecars beside it: ``<stem>.whiteboard.json`` (the canvas) and ``<stem>.ink.svg
 
 - Reading never writes: a missing sidecar reads as the empty board (or no strokes) with
   revision ``''``; no file is created until the first save.
-- A save writes exactly one sidecar, never the ``.md``: validated first, then, under
-  ``space._lock``, checked against the revision the client edited (``''`` = the file must not
-  exist yet), refused when the existing file can't be read (or is from a newer version), and
-  written atomically (a create through `create_new`, an update through `atomic_write` that
-  re-checks the revision right before the replace). The write is recorded in
-  ``space.own_writes`` so the watcher stays quiet.
+- A save writes one sidecar: validated first, then, under ``space._lock``, checked against
+  the revision the client edited (``''`` = the file must not exist yet), refused when the
+  existing file can't be read (or is from a newer version), and written atomically (a create
+  through `create_new`, an update through `atomic_write` that re-checks the revision right
+  before the replace). The write is recorded in ``space.own_writes`` so the watcher stays
+  quiet.
+- M9 (Gene reversed M6's "never the ``.md``"): after the sidecar, the save stamps the ``.md``'s
+  ``lastUpdated`` through `Space.touch`: only that line, at most once a minute, with no
+  version-history snapshot (both our choice). ``lastUpdated`` is component-level in
+  Object and the canvas is component data; no client code proving the bump was found.
 
 Revisions are the sha256 of the file's bytes (`space.version_of`).
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .space import version_of
+from .space import Conflict, version_of
 from .textfile import atomic_write, create_new
 from .typemodel import TypeDefinition, type_revision
 from .whiteboardfile import (
@@ -45,6 +50,7 @@ __all__ = [
     "BoardReadOnly",
     "InkInvalid",
     "NotAWhiteboard",
+    "Saved",
     "create_whiteboard",
     "ensure_whiteboard_type",
     "is_whiteboard",
@@ -318,34 +324,71 @@ def _save_sidecar(
     return new_rev
 
 
-def save_board(space: Space, path: str, board: Any, base_revision: str) -> str:
-    """Save the board JSON beside the whiteboard's ``.md``; return the new revision.
+@dataclass(frozen=True)
+class Saved:
+    """A board or ink save: the sidecar's new revision and the board ``.md``'s stamp."""
+
+    revision: str
+    md_version: str | None
+    """The ``.md``'s version after the ``lastUpdated`` stamp; None when nothing was written."""
+    md_base_version: str | None
+    """The ``.md``'s version on disk the stamp started from; None when nothing was written."""
+
+    @property
+    def md_bumped(self) -> bool:
+        return self.md_version is not None
+
+
+def _touch_md(space: Space, rel: str) -> tuple[str | None, str | None]:
+    """Stamp the board ``.md``'s ``lastUpdated`` (`Space.touch`); ``(version, base)``.
+
+    Both are None unless the stamp wrote the disk: ``base`` is the version it started
+    from, so a client adopts ``version`` only when it holds ``base`` (a body change it
+    hasn't loaded must still meet a 409). Call with ``space._lock`` held, after the
+    sidecar is saved: a stamp that fails (the ``.md`` locked, or changed on disk
+    meanwhile) never fails the save.
+    """
+    try:
+        base, version = space.touch(rel, space.clock())
+    except (Conflict, KeyError, OSError):
+        return None, None
+    if version == base:
+        return None, None
+    return version, base
+
+
+def save_board(space: Space, path: str, board: Any, base_revision: str) -> Saved:
+    """Save the board JSON beside the whiteboard's ``.md``, then stamp the ``.md``.
 
     Raises `BoardInvalid` (422), `BoardConflict` (409), `BoardReadOnly` (423), `KeyError`
-    (404), `ValueError` (400) and `NotAWhiteboard` (422). Writes only ``<stem>.whiteboard.json``.
+    (404), `ValueError` (400) and `NotAWhiteboard` (422). Writes ``<stem>.whiteboard.json``
+    and only the ``lastUpdated`` line of the ``.md`` (see `_touch_md`).
     """
     validate_board(board)
     data = dump_board(board)
     with space._lock:
         rel = _board_md(space, path)
-        return _save_sidecar(
+        revision = _save_sidecar(
             space, board_rel(rel), data, base_revision, lambda b: load_board(b)[1]
         )
+        return Saved(revision, *_touch_md(space, rel))
 
 
-def save_ink(space: Space, path: str, strokes: Any, base_revision: str) -> str:
-    """Save the ink SVG beside the whiteboard's ``.md``; return the new revision.
+def save_ink(space: Space, path: str, strokes: Any, base_revision: str) -> Saved:
+    """Save the ink SVG beside the whiteboard's ``.md``, then stamp the ``.md``.
 
-    The same rules as `save_board` (`InkInvalid` for invalid strokes). Writes only
-    ``<stem>.ink.svg``; zero strokes write the empty SVG (a save never deletes the file).
+    The same rules as `save_board` (`InkInvalid` for invalid strokes). Writes
+    ``<stem>.ink.svg`` (zero strokes write the empty SVG: a save never deletes the file)
+    and only the ``lastUpdated`` line of the ``.md``.
     """
     validate_strokes(strokes)
     data = dump_ink(strokes)
     with space._lock:
         rel = _board_md(space, path)
-        return _save_sidecar(
+        revision = _save_sidecar(
             space, ink_rel(rel), data, base_revision, lambda b: load_ink(b)[1]
         )
+        return Saved(revision, *_touch_md(space, rel))
 
 
 # --- creating ------------------------------------------------------------------------------
