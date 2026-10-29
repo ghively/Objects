@@ -408,7 +408,7 @@ class M9:
     def whiteboard(self) -> None:
         print("\n6. Whiteboard edits bump lastUpdated")
         rel = self.board
-        sidecar = str(Path(rel).with_suffix("")) + ".whiteboard.json"
+        sidecar = Path(rel).with_suffix("").as_posix() + ".whiteboard.json"
         set_clock(self.clock, LATER)
         _, cur = self.http("GET", "/whiteboard", path=rel)
         board = cur["board"]

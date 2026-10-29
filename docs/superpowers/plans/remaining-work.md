@@ -1,6 +1,6 @@
 # Object: remaining work
 
-Status as of 2026-10-28 (night, Linux cloud container). **All nine milestones are built, reviewed, fixed and gated.** M9 (the audit's completeness gaps) was built on Gene's go-ahead; its results and Gene's hand-check list are in `m9-acceptance.md`. What remains:
+Status as of 2026-10-29. **All nine milestones are built, reviewed, fixed and gated, and all are on `master`** (M9 merged as PR #3 and re-gated on Windows). M9 (the audit's completeness gaps) was built on Gene's go-ahead; its results and Gene's hand-check list are in `m9-acceptance.md`. What remains:
 1. **M9's open questions are answered and built** (2026-10-29): the encyclopedia title spans the full width again, the object `…` menu follows Capacities' order, and Duplicate keeps two-way relations two-way.
 2. Gene's hands-on checking (M1–M9 acceptance docs), and the fixes it produces. **Settled 2026-10-28:** Gene checked Capacities: the Standard design shows properties in the side column, so Object's Standard sidebar stays (`reference-check-2026-10-28.md` §5 was wrong there). They go inline below 768 px as in Capacities; no 'always inline' option for now.
 
@@ -37,7 +37,17 @@ Each milestone's plan holds its full scope. Each acceptance doc holds its automa
 
 M8's "Coverage" section maps every deferred item to a task, or to a spec §2 exclusion: AI, network at runtime, accounts and sharing, mobile, telemetry.
 
-## Latest verification (2026-10-28, after M9 and Gene's answers, at `35bbd88`, Linux)
+## Windows verification (2026-10-29, after merging M9 into master as PR #3, at `6ef3df8`)
+
+| Check | Result |
+|---|---|
+| `uv run pytest backend/tests -q` | 1238 passed, 2 skipped |
+| `cd frontend && npx vitest run` | 1965 passed, 1 skipped; 1 timed out under load (`ObjectView.writes.test.tsx` "a renamed event retargets the tabs", 5 s limit), which passed 3 of 3 runs alone |
+| `npx tsc -b --noEmit` / `npm run lint` / `npm run build` | clean / 0 errors (warnings only) / built |
+| `scripts/m9_acceptance.py` on `space-m8`, `space-blocks`, `space-sample`, `space-v1`, `space-whiteboard` | all PASS, after fixing a Windows path bug in the script (check 6 built the sidecar path with `\`) |
+| `scripts/m1_roundtrip.py` and `m2`–`m8_acceptance.py` on `space-sample` and `space-v1` | all PASS |
+
+## Linux verification (2026-10-28, after M9 and Gene's answers, at `35bbd88`)
 
 | Check | Result |
 |---|---|
