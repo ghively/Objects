@@ -8,7 +8,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-
 import type { PinRef } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
-import { useLinkIndex } from '@/links/linkIndex'
+import { byIdOf, useLinkIndex } from '@/links/linkIndex'
 import type { Target } from '@/nav/tabs'
 import { ObjectIcon } from '@/object/ObjectHeader'
 import { queryTitle } from '@/queries/autoTitle'
@@ -39,7 +39,8 @@ function draggedObject(resolved: Resolved | 'missing' | null): { path: string; t
 
 /** What a pin points at, or null while it can't be told yet; `missing` when it is gone. */
 function useResolver(): (ref: PinRef) => Resolved | 'missing' | null {
-  const objects = useLinkIndex((s) => s.objects)
+  // By id, not a scan of every summary per pin (100 pins × 5,000 objects per render).
+  const byId = useLinkIndex((s) => byIdOf(s.objects))
   const types = useLinkIndex((s) => s.types)
   const indexLoaded = useLinkIndex((s) => s.loaded)
   const { collections, queries, loaded: defsLoaded } = useDefinitions()
@@ -48,8 +49,8 @@ function useResolver(): (ref: PinRef) => Resolved | 'missing' | null {
     () => (ref: PinRef) => {
       switch (ref.kind) {
         case 'object': {
-          const o = objects.find((x) => x.id === ref.id)
-          if (!o) return indexLoaded || objects.length > 0 ? 'missing' : null
+          const o = byId.get(ref.id)
+          if (!o) return indexLoaded || byId.size > 0 ? 'missing' : null
           const type = types.find((t) => t.id === o.type)
           return {
             target: { kind: 'object', path: o.path },
@@ -82,7 +83,7 @@ function useResolver(): (ref: PinRef) => Resolved | 'missing' | null {
         }
       }
     },
-    [objects, types, indexLoaded, collections, queries, defsLoaded, titleCtx],
+    [byId, types, indexLoaded, collections, queries, defsLoaded, titleCtx],
   )
 }
 

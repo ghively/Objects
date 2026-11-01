@@ -6,6 +6,10 @@ import { useEffect } from 'react'
 import { create } from 'zustand'
 import { api, CLIENT_ID, ConflictError } from '@/api/client'
 import type { Icon, PinRef, SidebarSection, UiState } from '@/api/types'
+import { showToast } from '@/editor/media/upload'
+
+/** The toast after a `ui.json` save of the sidebar failed (Object's "Could not save …" form). */
+export const SIDEBAR_SAVE_FAILED = 'Could not save the sidebar'
 
 interface UiStore {
   ui: UiState
@@ -60,23 +64,40 @@ export async function reloadUi(): Promise<void> {
   }
 }
 
+/**
+ * Take from `from` (the server's whole `ui.json` after a save, or the fresh copy after a 409) only
+ * the keys `patch` sent. The rest of the local `ui` may hold another writer's unsaved edit (the
+ * graph's, the calendar's, the Reminders switch's), which a whole-file replace would revert on screen.
+ */
+function adopt(ui: UiState, from: Partial<UiState> | undefined | null, patch: Partial<UiState>): UiState {
+  if (!from) return ui
+  const fresh = norm(from)
+  const next: UiState = { ...ui }
+  for (const k of Object.keys(patch)) next[k] = fresh[k]
+  return next
+}
+
 async function save(patch: UiPatch, op: Op): Promise<void> {
   try {
     const res = await api.patchUi(patch, { baseRevision: useUiStore.getState().revision })
-    useUiStore.setState({ revision: res?.revision ?? useUiStore.getState().revision, ...(pending === 1 && res?.ui ? { ui: norm(res.ui) } : {}) })
+    const s = useUiStore.getState()
+    useUiStore.setState({ revision: res?.revision ?? s.revision, ...(pending === 1 ? { ui: adopt(s.ui, res?.ui, patch) } : {}) })
   } catch (e) {
     if (!(e instanceof ConflictError)) throw e
     const fresh = await api.ui()
     const base = norm(fresh?.ui)
     const again = op(base)
     if (!again) {
-      if (pending === 1) useUiStore.setState({ ui: base, revision: fresh?.revision ?? '' })
+      // Already so on the server: show its copy of what this edit touched.
+      const s = useUiStore.getState()
+      useUiStore.setState({ revision: fresh?.revision ?? '', ...(pending === 1 ? { ui: adopt(s.ui, base, patch) } : {}) })
       return
     }
     const res = await api.patchUi(again, { baseRevision: fresh?.revision ?? '' })
+    const s = useUiStore.getState()
     useUiStore.setState({
       revision: res?.revision ?? fresh?.revision ?? '',
-      ...(pending === 1 ? { ui: res?.ui ? norm(res.ui) : { ...base, ...again } } : {}),
+      ...(pending === 1 ? { ui: res?.ui ? adopt(s.ui, res.ui, again) : { ...s.ui, ...again } } : {}),
     })
   }
 }
@@ -118,7 +139,11 @@ function run(op: Op): Promise<void> {
     } finally {
       pending -= 1
     }
-    if (failed) await reloadUi()
+    // The edit is rolled back by the reload: say so, or the pin just vanishes.
+    if (failed) {
+      showToast(SIDEBAR_SAVE_FAILED)
+      await reloadUi()
+    }
   })
   queue = done
   return done
@@ -232,7 +257,8 @@ let off: (() => void) | null = null
 
 /** Pinned items and custom sections; loads `ui.json` and follows `ui` events from other windows. */
 export function usePinned(): UsePinned {
-  const { ui, loaded } = useUiStore()
+  const ui = useUiStore((s) => s.ui)
+  const loaded = useUiStore((s) => s.loaded)
   useEffect(() => {
     refs += 1
     if (refs === 1) {

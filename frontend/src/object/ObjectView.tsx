@@ -3,7 +3,7 @@
  * header and body editor (formatted or raw), with the `…` menu. `mode='inline'` (M4: the
  * calendar's daily note) renders only the body editor and its autosave.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { ObjectDetail, ObjectSummary, RenameResult, TypeDef, UpdateResult } from '@/api/types'
 import { CollectionPicker } from '@/collections/CollectionPicker'
@@ -22,7 +22,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Editor } from '@/editor/Editor'
-import { RawMode } from '@/editor/RawMode'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { FindBar } from '@/find/FindBar'
 import { useFind } from '@/find/useFind'
@@ -57,8 +56,10 @@ import { useMerge } from '@/merge/useMerge'
 import { usePresentation } from '@/present/usePresentation'
 import { CompletionLog } from '@/tasks/CompletionLog'
 import { TaskStatsSection } from '@/tasks/TaskStatsSection'
-import { useAddToWhiteboard } from '@/whiteboard/AddToWhiteboardDialog'
 import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
+
+// Raw mode (CodeMirror) loads when first switched to, not with the shell (audit 2026-11-01 F1).
+const RawMode = lazy(() => import('@/editor/RawMode').then((m) => ({ default: m.RawMode })))
 
 installWikilinkPresenter()
 installLinkPicker()
@@ -713,7 +714,11 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
                 {summary && <TextStatsMenu getMarkdown={getMarkdown} summary={summary} dailyNote={dailyNote} />}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-            <DropdownMenuItem disabled={!summary || isTemplate} onSelect={() => useAddToWhiteboard.getState().open(path)}>
+            <DropdownMenuItem
+              disabled={!summary || isTemplate}
+              // The dialog's module (and the whiteboard code behind it) loads on first use.
+              onSelect={() => void import('@/whiteboard/AddToWhiteboardDialog').then((m) => m.useAddToWhiteboard.getState().open(path))}
+            >
               <Icon name="ph-chalkboard-simple" size={14} />
               {OBJECT_M8_TEXT.addToWhiteboard}
             </DropdownMenuItem>
@@ -880,7 +885,15 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   )
 
   if (mode === 'inline') {
+    // Emptiness from the editor's DOM first: any text means not empty, with no serialising of
+    // the body (this ran twice per keystroke, on input and keyup). Only a textless document is
+    // serialised, since an image or embed alone is not empty either.
     const checkEmpty = () => {
+      const pm = inlineRef.current?.querySelector('.ProseMirror')
+      if (pm && (pm.textContent ?? '').trim() !== '') {
+        setBodyEmpty(false)
+        return
+      }
       const b = editorRef.current?.getBody()
       if (b != null) setBodyEmpty(b.trim() === '')
     }
@@ -1013,15 +1026,17 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
             )}
             <div className="text-[17px]">
               {raw ? (
-                <RawMode
-                  path={path}
-                  text={detail.body}
-                  version={version}
-                  readOnly={readOnly}
-                  onSaved={adoptVersion}
-                  onConflict={onConflict}
-                  controlRef={editorRef}
-                />
+                <Suspense fallback={null}>
+                  <RawMode
+                    path={path}
+                    text={detail.body}
+                    version={version}
+                    readOnly={readOnly}
+                    onSaved={adoptVersion}
+                    onConflict={onConflict}
+                    controlRef={editorRef}
+                  />
+                </Suspense>
               ) : (
                 <Editor
                   path={path}

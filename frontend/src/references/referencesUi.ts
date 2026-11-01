@@ -45,6 +45,8 @@ export const REFERENCES_TEXT = {
   mentionsEmpty: 'No unlinked mentions',
   /** `PageBacklinkSection.relatedContent.showMore` */
   showMore: 'Show more',
+  /** `loadMore` (Object's paged lists); the backlinks list shows 50 at a time */
+  loadMore: 'Load more',
   /** `PageBacklinkSection.relatedContent.emptyTitle` */
   relatedEmptyTitle: 'No related content yet',
   /** our string: Object's says "Semantically related…", which our lexical stand-in isn't */

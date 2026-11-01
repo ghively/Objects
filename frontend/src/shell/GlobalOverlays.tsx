@@ -13,13 +13,11 @@
  * M8 Task 3: mounts the Version History and Merge dialogs, focus mode, the presentation and the
  * "Add to whiteboard" dialog (each filled by its owner task).
  */
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { applyTheme } from '@/theme/applyTheme'
 import { useThemeShortcuts } from '@/theme/shortcuts'
 import { useGlobalShortcut } from '@/lib/shortcuts'
-import { SettingsModal } from '@/settings/SettingsModal'
-import { ShortcutsSheet } from '@/settings/ShortcutsSheet'
 import { useSettingsModal } from '@/settings/useSettingsModal'
 import { CreateSpaceDialog } from '@/spaces/CreateSpaceDialog'
 import { SpaceSwitchOverlay } from '@/spaces/SpacesMenu'
@@ -27,7 +25,13 @@ import { VersionHistoryDialog } from '@/history/VersionHistoryDialog'
 import { MergeDialog } from '@/merge/MergeDialog'
 import { FocusMode } from '@/focus/FocusMode'
 import { Presentation } from '@/present/Presentation'
-import { AddToWhiteboardDialog } from '@/whiteboard/AddToWhiteboardDialog'
+
+// Not needed to paint the shell: the Settings modal and the Shortcuts sheet load when first
+// opened; the "Add to whiteboard" dialog (and the whiteboard code behind it) loads after the
+// first paint, off the start-up path (audit 2026-11-01 F1).
+const SettingsModal = lazy(() => import('@/settings/SettingsModal').then((m) => ({ default: m.SettingsModal })))
+const ShortcutsSheet = lazy(() => import('@/settings/ShortcutsSheet').then((m) => ({ default: m.ShortcutsSheet })))
+const AddToWhiteboardDialog = lazy(() => import('@/whiteboard/AddToWhiteboardDialog').then((m) => ({ default: m.AddToWhiteboardDialog })))
 
 function ThemeFollower() {
   const settings = useSettings((s) => s.settings)
@@ -45,11 +49,19 @@ function ThemeFollower() {
 function SettingsOverlays() {
   useGlobalShortcut('openSettings', () => useSettingsModal.getState().open(), { allowInEditable: true })
   useGlobalShortcut('toggleShortcutsMenu', () => useSettingsModal.getState().toggleShortcuts(), { allowInEditable: true })
+  // Mounted (and its code loaded) once either has been opened; from then on it stays, so the
+  // closing animation and the remembered section work as before.
+  const opened = useSettingsModal((s) => s.isOpen || s.shortcutsOpen)
+  const [everOpened, setEverOpened] = useState(opened)
+  useEffect(() => {
+    if (opened) setEverOpened(true)
+  }, [opened])
+  if (!everOpened) return null
   return (
-    <>
+    <Suspense fallback={null}>
       <SettingsModal />
       <ShortcutsSheet />
-    </>
+    </Suspense>
   )
 }
 
@@ -64,7 +76,9 @@ export function GlobalOverlays() {
       <MergeDialog />
       <FocusMode />
       <Presentation />
-      <AddToWhiteboardDialog />
+      <Suspense fallback={null}>
+        <AddToWhiteboardDialog />
+      </Suspense>
     </>
   )
 }

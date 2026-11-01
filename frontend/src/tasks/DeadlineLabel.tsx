@@ -58,8 +58,8 @@ export function DeadlineLabel({
   const missed = text === 'Missed'
   return (
     <span data-testid="deadline-label" className={cn('inline-flex items-center gap-1.5 text-[13px]', className)}>
-      <span className={missed ? 'text-red-400' : 'text-fg-muted'}>{text}</span>
-      {scheduledAfterDeadline(date, deadline) && <span className="text-amber-400">Scheduled after deadline</span>}
+      <span className={missed ? 'text-[var(--danger)]' : 'text-fg-muted'}>{text}</span>
+      {scheduledAfterDeadline(date, deadline) && <span className="text-[var(--warning)]">Scheduled after deadline</span>}
     </span>
   )
 }

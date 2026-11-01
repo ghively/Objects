@@ -1,19 +1,16 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
-import type { SpaceInfo, TypeDef } from '@/api/types'
+import type { ChangeKind, ObjectSummary, SpaceInfo, TypeDef } from '@/api/types'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { createAndOpen } from '@/create/createAndOpen'
 import { NewObjectMenu } from '@/create/NewObjectMenu'
 import { AllNotesView } from '@/allnotes/AllNotesView'
-import { CalendarPage } from '@/calendar/CalendarPage'
 import { CollectionPage } from '@/collections/CollectionPage'
 import { QueriesPage } from '@/queries/QueriesPage'
 import { QueryPage } from '@/queries/QueryPage'
-import { GraphPage } from '@/graph/GraphPage'
-import { LocalGraphPanel } from '@/graph/LocalGraphPanel'
 import { LinkPicker } from '@/links/LinkPicker'
-import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { invalidateLinkIndex, refreshLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { setRecentSpace } from '@/nav/recent'
 import { isSidepanelShown } from '@/nav/sidepanel'
 import {
@@ -43,15 +40,41 @@ import { usePanelShortcuts, useTabShortcuts } from '@/shell/shortcuts'
 import { isEditableTarget } from '@/lib/shortcuts'
 import { applyOpenOnStart } from '@/nav/startup'
 import { useSettings } from '@/settings/useSettings'
+import { fetchSpace } from '@/settings/useSpaceInfo'
 import { TopBar } from '@/shell/TopBar'
 import { TasksPage } from '@/tasks/TasksPage'
 import { TrashView } from '@/trash/TrashView'
 import { CreateTypeDialog } from '@/types/CreateTypeDialog'
 import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
 import { TypePage } from '@/types/TypePage'
-import { TypeSettings } from '@/types/TypeSettings'
+
+// Pages whose code the shell does not need at start (the graph's sigma and graphology, the
+// calendar, type settings) load when first shown (audit 2026-11-01 F1).
+const CalendarPage = lazy(() => import('@/calendar/CalendarPage').then((m) => ({ default: m.CalendarPage })))
+const GraphPage = lazy(() => import('@/graph/GraphPage').then((m) => ({ default: m.GraphPage })))
+const LocalGraphPanel = lazy(() => import('@/graph/LocalGraphPanel').then((m) => ({ default: m.LocalGraphPanel })))
+const TypeSettings = lazy(() => import('@/types/TypeSettings').then((m) => ({ default: m.TypeSettings })))
 
 const REFRESH_DELAY_MS = 150
+/** Events after which the whole object list and the types are fetched again (a `changed` refreshes one summary). */
+const RELOAD_INDEX_KINDS = new Set<ChangeKind>(['created', 'deleted', 'renamed', 'types'])
+
+let lastCounts: Record<string, number> | undefined
+/**
+ * Objects per type id, as a store selector: the same object while the numbers are the same, so a
+ * refreshed summary (a new `objects` array, one body save) re-renders neither the shell nor the
+ * sidebar. Undefined until the index has answered once.
+ */
+function countsByType(s: { objects: ObjectSummary[]; loaded: boolean }): Record<string, number> | undefined {
+  if (!s.loaded && s.objects.length === 0) return undefined
+  const c: Record<string, number> = {}
+  for (const o of s.objects) c[o.type] = (c[o.type] ?? 0) + 1
+  const prev = lastCounts
+  const keys = Object.keys(c)
+  if (prev && keys.length === Object.keys(prev).length && keys.every((k) => prev[k] === c[k])) return prev
+  lastCounts = c
+  return c
+}
 
 /** Inputs, text areas, selects, contenteditable (the body editor) and CodeMirror (raw mode). */
 export { isEditableTarget }
@@ -85,13 +108,15 @@ function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
     }
     case 'typeSettings':
       return (
-        <TypeSettings
-          key={target.typeId}
-          typeId={target.typeId}
-          onOpenType={(typeId) => open({ kind: 'type', typeId })}
-          onOpenTemplate={(path) => open({ kind: 'object', path })}
-          onDeleted={() => open({ kind: 'trash' })}
-        />
+        <Suspense fallback={null}>
+          <TypeSettings
+            key={target.typeId}
+            typeId={target.typeId}
+            onOpenType={(typeId) => open({ kind: 'type', typeId })}
+            onOpenTemplate={(path) => open({ kind: 'object', path })}
+            onDeleted={() => open({ kind: 'trash' })}
+          />
+        </Suspense>
       )
     case 'trash':
       return <TrashView />
@@ -104,11 +129,19 @@ function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
     case 'allNotes':
       return <AllNotesView />
     case 'calendar':
-      return <CalendarPage onOpenTarget={(t) => open(t)} />
+      return (
+        <Suspense fallback={null}>
+          <CalendarPage onOpenTarget={(t) => open(t)} />
+        </Suspense>
+      )
     case 'tasks':
       return <TasksPage />
     case 'graph':
-      return <GraphPage onOpenTarget={(t, o) => open(t, o)} />
+      return (
+        <Suspense fallback={null}>
+          <GraphPage onOpenTarget={(t, o) => open(t, o)} />
+        </Suspense>
+      )
     case 'search':
       // M8: the extended search page; a new query or toggle remounts it with what was typed.
       return <SearchPage key={`${target.q ?? ''}|${target.textOnly ? 1 : 0}`} q={target.q} textOnly={target.textOnly} />
@@ -124,23 +157,29 @@ export default function App() {
   const [newMenuOpen, setNewMenuOpen] = useState(false)
   // Tabs and recent items are stored per space: content waits until this space's tabs are loaded.
   const [tabsReady, setTabsReady] = useState(false)
-  const tabs = useTabs()
-  const target = tabsReady ? currentTarget(tabs) : null
+  // Individual selectors, not the whole tabs store: a navigation or history push in some other
+  // tab must not re-render the shell. The actions are stable, read once.
+  const current = useTabs(currentTarget)
+  const target = tabsReady ? current : null
+  const panelShown = useTabs((s) => isSidepanelShown(activeTab(s)))
+  const backable = useTabs(canGoBack)
+  const forwardable = useTabs(canGoForward)
+  const { open, toggleSidepanel, back, forward, newTab, openInSidepanel } = useTabs.getState()
   useTabShortcuts()
   usePanelShortcuts({ toggleLeftSidebar: () => setSidebarOpen((v) => !v) })
-  const sidepanelShown = tabsReady && isSidepanelShown(activeTab(tabs))
+  const sidepanelShown = tabsReady && panelShown
 
   useEffect(() => {
     let live = true
-    api
-      .space()
+    // The device settings don't depend on the space: fetched alongside it, not after it. A
+    // settings failure keeps the tabs. `fetchSpace` is one request shared with the link index.
+    const settings = useSettings.getState()
+    const settingsReady = settings.loaded ? Promise.resolve() : settings.load().catch(() => undefined)
+    fetchSpace()
       .then(async (s) => {
-        await Promise.all([setTabsSpace(s.root), setRecentSpace(s.root)])
+        await Promise.all([setTabsSpace(s.root), setRecentSpace(s.root), settingsReady])
         if (!live) return
-        // "When this space opens" (per space, on this device). A settings failure keeps the tabs.
-        const settings = useSettings.getState()
-        if (!settings.loaded) await settings.load().catch(() => undefined)
-        if (!live) return
+        // "When this space opens" (per space, on this device).
         applyOpenOnStart(useSettings.getState().settings.openOnStart?.[s.root])
         setSpace(s)
         setTabsReady(true)
@@ -155,17 +194,28 @@ export default function App() {
 
   // Objects created, changed (a title edit) or deleted, on disk or by our own
   // saves: refresh the summaries and types (sidebar, counts, tab labels, link
-  // colours and resolutions). Bursts of events coalesce into one reload.
+  // colours and resolutions). Bursts of events coalesce into one refresh: the
+  // changed objects' summaries alone, or the whole list when the set of objects
+  // or a type changed.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null
+    let full = false
+    const changedPaths = new Set<string>()
     const off = api.onChange((e) => {
       // A file moved (renamed, or retyped into another folder): every tab and the peek follow it.
       if (e.kind === 'renamed' && e.oldPath) useTabs.getState().retarget(e.oldPath, e.path)
-      // `types` (a type definition saved) and every file change reload the summaries and types.
+      if (e.kind === 'changed') changedPaths.add(e.path)
+      else if (RELOAD_INDEX_KINDS.has(e.kind)) full = true
+      else return // ui, collections, queries, views, whiteboard: not the index's business
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => {
         timer = null
-        void invalidateLinkIndex()
+        const paths = [...changedPaths]
+        changedPaths.clear()
+        if (full) {
+          full = false
+          void invalidateLinkIndex()
+        } else void refreshLinkIndex(paths)
       }, REFRESH_DELAY_MS)
     })
     return () => {
@@ -174,7 +224,6 @@ export default function App() {
     }
   }, [])
 
-  const objects = useLinkIndex((s) => s.objects)
   const types = useSpaceTypes(space)
 
   // Shortcuts, only when focus is not in an editable element (there Ctrl+Backspace deletes a word):
@@ -209,13 +258,12 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const indexLoaded = useLinkIndex((s) => s.loaded)
+  const objectCounts = useLinkIndex(countsByType)
   const counts = useMemo(() => {
-    if (!space || (!indexLoaded && objects.length === 0)) return undefined
+    if (!space || !objectCounts) return undefined
     const c: Record<string, number> = Object.fromEntries(types.map((t) => [t.id, 0]))
-    for (const o of objects) c[o.type] = (c[o.type] ?? 0) + 1
-    return c
-  }, [space, types, objects, indexLoaded])
+    return { ...c, ...objectCounts }
+  }, [space, types, objectCounts])
 
   const activeType = target?.kind === 'type' ? types.find((t) => t.id === target.typeId) : undefined
 
@@ -223,7 +271,7 @@ export default function App() {
   if (error) {
     content = <Centered title="Can't reach the Object back end." subtitle={error} />
   } else if (target) {
-    content = pageFor(target, { types, space, open: tabs.open })
+    content = pageFor(target, { types, space, open })
   } else if (!tabsReady) {
     content = null
   } else {
@@ -235,14 +283,16 @@ export default function App() {
   const renderSidepanel = (t: SidepanelTarget, nav: { open(t: Target, o?: OpenOptions): void }): ReactNode => {
     if (t.kind === 'localGraph') {
       return target?.kind === 'object' ? (
-        <LocalGraphPanel path={target.path} />
+        <Suspense fallback={null}>
+          <LocalGraphPanel path={target.path} />
+        </Suspense>
       ) : (
         <Centered title="Graph View" subtitle="Open an object to see its graph." />
       )
     }
     // M8: the backlinks entry follows the tab's current object.
     if (t.kind === 'backlinks') return <BacklinksPanel path={target?.kind === 'object' ? target.path : null} />
-    return pageFor(t, { types, space, open: (x, o) => (o?.newTab ? tabs.open(x, o) : nav.open(x, o)) })
+    return pageFor(t, { types, space, open: (x, o) => (o?.newTab ? open(x, o) : nav.open(x, o)) })
   }
 
   return (
@@ -251,13 +301,13 @@ export default function App() {
         <TopBar
           spaceName={space?.name ?? '…'}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
-          onToggleRightPanel={tabs.toggleSidepanel}
+          onToggleRightPanel={toggleSidepanel}
           rightPanelOpen={sidepanelShown}
-          onBack={tabs.back}
-          onForward={tabs.forward}
-          canGoBack={canGoBack(tabs)}
-          canGoForward={canGoForward(tabs)}
-          onNewTab={tabs.newTab}
+          onBack={back}
+          onForward={forward}
+          canGoBack={backable}
+          canGoForward={forwardable}
+          onNewTab={newTab}
           tabs={<TabStrip space={space} />}
         />
         <div className="flex min-h-0 flex-1">
@@ -266,15 +316,15 @@ export default function App() {
               <Sidebar
                 types={types}
                 activeTypeId={activeType?.id}
-                onOpenType={(t) => tabs.open({ kind: 'type', typeId: t.id })}
+                onOpenType={(t) => open({ kind: 'type', typeId: t.id })}
                 counts={counts}
                 onNew={() => setNewMenuOpen(true)}
                 onCreateType={() => setCreateTypeOpen(true)}
-                onOpenTypeSettings={(t) => tabs.open({ kind: 'typeSettings', typeId: t.id })}
+                onOpenTypeSettings={(t) => open({ kind: 'typeSettings', typeId: t.id })}
                 onDeleteType={setDeleting}
-                onOpenTrash={() => tabs.open({ kind: 'trash' })}
+                onOpenTrash={() => open({ kind: 'trash' })}
                 trashActive={target?.kind === 'trash'}
-                onOpenTarget={(t, o) => tabs.open(t, o)}
+                onOpenTarget={(t, o) => open(t, o)}
                 queriesActive={target?.kind === 'queries'}
                 allNotesActive={target?.kind === 'allNotes'}
                 calendarActive={target?.kind === 'calendar'}
@@ -296,17 +346,17 @@ export default function App() {
         </div>
         <ObjectPeek />
         <CommandPalette
-          onOpenTarget={(t, o) => tabs.open(t, o)}
+          onOpenTarget={(t, o) => open(t, o)}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
-          onToggleRightPanel={tabs.toggleSidepanel}
-          onShowRightPanel={() => tabs.openInSidepanel({ kind: 'localGraph' })}
+          onToggleRightPanel={toggleSidepanel}
+          onShowRightPanel={() => openInSidepanel({ kind: 'localGraph' })}
         />
         <LinkPicker />
         <NewObjectMenu open={newMenuOpen} onOpenChange={setNewMenuOpen} />
         <CreateTypeDialog
           open={createTypeOpen}
           onOpenChange={setCreateTypeOpen}
-          onCreated={(t) => tabs.open({ kind: 'typeSettings', typeId: t.id })}
+          onCreated={(t) => open({ kind: 'typeSettings', typeId: t.id })}
         />
         {deleting && (
           <DeleteTypeDialog

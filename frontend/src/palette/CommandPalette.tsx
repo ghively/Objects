@@ -59,11 +59,13 @@ export interface CommandPaletteProps {
   onShowRightPanel: () => void
 }
 
-/** True when a modal dialog other than the palette (and the object peek) is open. */
+/**
+ * True when a modal dialog other than the palette (and the object peek) is open. Modals only:
+ * Radix gives a popover `role="dialog"` too, and the shortcut must still work with the tab menu,
+ * the spaces menu, a status popover, a date or icon picker open.
+ */
 function otherModalOpen(): boolean {
-  const open = [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].filter(
-    (el) => !el.closest('[data-command-palette]'),
-  )
+  const open = [...document.querySelectorAll('[aria-modal="true"]')].filter((el) => !el.closest('[data-command-palette]'))
   const allowed = usePeek.getState().path ? 1 : 0
   return open.length > allowed
 }

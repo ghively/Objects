@@ -117,6 +117,8 @@ describe('themes', () => {
       ['--label-text-gray', gray[600], gray[600], gray[500]],
       ['--label-border-rose', colourTone('rose', 300), colourTone('rose', 300), colourTone('rose', 500)],
       ['--line-green', colourTone('green', 500), colourTone('green', 500), colourTone('green', 400)],
+      // Object's `text-amber-600 dark:text-amber-400` ("Scheduled after deadline").
+      ['--warning', '#dd7400', '#dd7400', '#fcbb00'],
     ]
     for (const [token, l, ld, dd] of rows) {
       expect([light.get(token), lightDimmed.get(token), darkDimmed.get(token)], token).toEqual([l, ld, dd])
