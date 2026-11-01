@@ -307,3 +307,22 @@ def test_deeply_nested_yaml_is_a_frontmatter_error(tmp_path):
     (tmp_path / "deep.md").write_text("---\n" + deep + "---\nbody\n", encoding="utf-8")
     raw = read_raw(tmp_path, "deep.md")
     assert raw.readOnly and "YAML" in (raw.readOnlyReason or "")
+
+
+def test_top_level_merge_key_is_a_frontmatter_error(tmp_path):
+    from objectapp.typedefs import read_raw
+
+    merged = "base: &b\n  x: 1\n<<: *b\ntitle: Merge\n"
+    with pytest.raises(FrontmatterError, match="merge"):
+        parse_fm(merged)
+    with pytest.raises(FrontmatterError, match="merge"):  # not KeyError from `lc.key`
+        set_keys(merged, {"lastUpdated": "2026-01-01T00:00:00.000Z"})
+    with pytest.raises(FrontmatterError):
+        rename_key(merged, "title", "name")
+    (tmp_path / "merge.md").write_text("---\n" + merged + "---\nbody\n", encoding="utf-8")
+    raw = read_raw(tmp_path, "merge.md")
+    assert raw.readOnly and "merge" in (raw.readOnlyReason or "")
+    # A merge key inside a value is ordinary YAML: the file stays editable.
+    nested = "base: &b\n  x: 1\nderived:\n  <<: *b\n  y: 2\ntitle: T\n"
+    assert parse_fm(nested)["derived"] == {"x": 1, "y": 2}
+    assert set_keys(nested, {"title": "U"}) == nested.replace("title: T", "title: U")
