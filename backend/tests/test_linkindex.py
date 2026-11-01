@@ -344,3 +344,32 @@ def test_bare_relation_value_follows_a_rename_incrementally(links_space_dir: Pat
     assert space.links.outgoing(grace) == fresh.links.outgoing(grace)
     assert space.links.backlinks(result.path) == fresh.links.backlinks(result.path)
     assert grace not in space.links.backlinks(BABBAGE)
+
+
+def test_whiteboard_template_board_links_follow_a_rename(tmp_path: Path):
+    # Audit 2026-11-01 fix pass: a whiteboard template's board (entity blocks, text-block
+    # wikilinks) is relinked by a rename like any board's; the index must list the template
+    # among the name's mentions although it is never a link source.
+    import json
+    import shutil
+
+    from wb_support import copy_whiteboard_space
+
+    root = copy_whiteboard_space(tmp_path)
+    tpl = "Templates/Whiteboards/Plan template.md"
+    (root / "Templates" / "Whiteboards").mkdir(parents=True)
+    (root / tpl).write_bytes(
+        b"---\nid: 01JBW6WB0000000000000000TP\ntype: 'Whiteboard'\ntemplate: Plan template\n---\n"
+    )
+    shutil.copy(
+        root / "Whiteboards" / "Network map.whiteboard.json",
+        root / "Templates" / "Whiteboards" / "Plan template.whiteboard.json",
+    )
+    space = Space(root)
+    assert tpl in space.links.mentioning(["Router A"])
+    result = space.rename_object(
+        "Pages/Router A.md", "Router Alpha", space.cached_version("Pages/Router A.md")
+    )
+    assert "Templates/Whiteboards/Plan template.whiteboard.json" in result.relinked
+    board = json.loads((root / "Templates/Whiteboards/Plan template.whiteboard.json").read_text("utf-8"))
+    assert board["blocks"]["b-router-a"]["link"] == "[[Router Alpha]]"
