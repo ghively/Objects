@@ -12,13 +12,14 @@
  */
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { renderDisplayMath } from './renderMath'
+import { renderDisplayMath, useMathReady } from './renderMath'
 
 export function MathBlockView({ node, editor, getPos, updateAttributes, selected }: NodeViewProps) {
   const text = String(node.attrs.text ?? '')
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(text)
   const areaRef = useRef<HTMLTextAreaElement>(null)
+  const ready = useMathReady()
 
   // Follow outside changes (undo, an external reload) while the panel is closed.
   useEffect(() => {
@@ -30,7 +31,8 @@ export function MathBlockView({ node, editor, getPos, updateAttributes, selected
   }, [editing])
 
   const shown = editing ? draft : text
-  const html = useMemo(() => (shown.trim() ? renderDisplayMath(shown) : ''), [shown])
+  // `ready`: rendered again, for real, once KaTeX has loaded.
+  const html = useMemo(() => (shown.trim() ? renderDisplayMath(shown) : ''), [shown, ready])
 
   const open = () => {
     if (!editor.isEditable) return
