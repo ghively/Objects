@@ -205,6 +205,9 @@ function RowMenuButton({ item, onClose, onHover }: { item: RowMenuItem; onClose(
   )
 }
 
+/** The tag type's id (tag values are the tag objects' titles). */
+const TAG_TYPE = 'tag'
+
 const defaultPipeline: Pipeline = (rows, state, ctx) => {
   const sorted = applySorts(applyFilters(rows, state.filterGroup, ctx), state.sorts, ctx)
   const g = groupRows(sorted, state.groupBy, state.viewDefinition.groupByConfig, ctx)
@@ -250,7 +253,8 @@ export function DataView(props: DataViewProps) {
     const entityCreated: Record<string, string> = {}
     for (const o of objects) {
       if (o.id) {
-        tagIdsToTitles[o.id] = o.title
+        // Only tag objects: a page titled like a tag must not take over the tag's group id.
+        if (o.type === TAG_TYPE) tagIdsToTitles[o.id] = o.title
         pathsById[o.id] = o.path
       }
       entityTitles[o.path] = o.title

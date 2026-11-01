@@ -228,9 +228,21 @@ const textBucket = (s: string): Bucket[] => {
 /** The text a text group stands for: its id, which `textBucket` set to the whole text. */
 const groupText = (group: Group) => (group.isOther ? '' : group.id)
 
+/** What one `groupRows` call computes once and every row reads. */
+interface Scratch {
+  /** Tag title → tag object id (the inverse of `ctx.tagIdsToTitles`). */
+  tagsByTitle: Map<string, string>
+}
+
+function scratchFor(ctx: GroupCtx): Scratch {
+  const tagsByTitle = new Map<string, string>()
+  for (const [id, title] of Object.entries(ctx.tagIdsToTitles)) tagsByTitle.set(title, id)
+  return { tagsByTitle }
+}
+
 /** The groups a row belongs to for one entry; none means "Other". */
 /** `null` drops the row from every group (a number outside its range). */
-function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type' | 'options'>, ctx: GroupCtx): Bucket[] | null {
+function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type' | 'options'>, ctx: GroupCtx, scratch: Scratch): Bucket[] | null {
   const v = rowValue(row, entry.propertyId)
   switch (def.type) {
     case 'boolean':
@@ -265,10 +277,8 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
       })
       return out
     }
-    case 'entity_tags': {
-      const byTitle = Object.fromEntries(Object.entries(ctx.tagIdsToTitles).map(([id, t]) => [t, id]))
-      return (row.summary.tags ?? []).map((t) => ({ id: byTitle[t] ?? t, label: t, sort: t }))
-    }
+    case 'entity_tags':
+      return (row.summary.tags ?? []).map((t) => ({ id: scratch.tagsByTitle.get(t) ?? t, label: t, sort: t }))
     case 'entity_collections': {
       const out: Bucket[] = []
       for (const name of row.summary.collections ?? []) {
@@ -383,10 +393,11 @@ export function groupRows(
     byId.set('false', { id: 'false', label: 'Unchecked', rows: [], sort: 1, created: Infinity })
   }
   const byType = typeMap(ctx.types)
+  const scratch = scratchFor(ctx)
   for (const row of rows) {
     // A row of another type than the grouping's, or one whose type has the key as another kind
     // (text where the view's definition is a label), can't be bucketed: it sits in Other.
-    const buckets = !sameKind(row, entry, def, byType[row.summary.type]) ? [] : rowBuckets(row, entry, def, ctx)
+    const buckets = !sameKind(row, entry, def, byType[row.summary.type]) ? [] : rowBuckets(row, entry, def, ctx, scratch)
     if (!buckets) continue
     if (!buckets.length) {
       other.rows.push(row)
