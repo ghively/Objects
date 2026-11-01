@@ -130,11 +130,11 @@ export function KanbanLayout(props: LayoutProps) {
     () => groups.map((g) => ({ group: g, rows: g.rows.length > (shown[g.id] ?? LOAD_PAGE) ? g.rows.slice(0, shown[g.id] ?? LOAD_PAGE) : g.rows })),
     [groups, shown],
   )
-  // The cards on screen want their previews (rows load without them).
-  const { loadPreviews } = props
+  // The cards on screen want their previews (rows load without them), when the cards show one.
+  const { loadPreviews, showsPreviews } = props
   useEffect(() => {
-    loadPreviews(pages.flatMap((p) => p.rows))
-  }, [pages, loadPreviews])
+    if (showsPreviews) loadPreviews(pages.flatMap((p) => p.rows))
+  }, [pages, loadPreviews, showsPreviews])
 
   const say = (text: string) => {
     setNotice(text)

@@ -2,7 +2,7 @@ import { act, render, renderHook, screen, waitFor, within } from '@testing-libra
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { ChangeEvent, Row, ViewState } from '@/api/types'
+import type { ChangeEvent, DataViewDefinition, Row, ViewState } from '@/api/types'
 import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
@@ -13,6 +13,7 @@ vi.mock('@/api/client', async (orig) => ({
 import { api, ConflictError } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek } from '@/nav/tabs'
+import { cardProperties } from './cards/cardConfig'
 import { DataView } from './DataView'
 import { emptyFilterGroup } from './model'
 import { useRows } from './useRows'
@@ -276,10 +277,12 @@ describe('preview paging (audit 2026-11-01 P2)', () => {
     return scope?.preview === false ? wanted.map((r) => ({ ...r, preview: '' })) : wanted
   }
   const calls = () => mocked.rows.mock.calls.map(([scope]) => scope)
-  function Owner({ layout }: { layout: 'list' | 'grid' }) {
+  function Owner({ layout, def }: { layout: 'list' | 'grid' | 'kanban'; def?: Partial<DataViewDefinition> }) {
     const { rows, loading, patchRow } = useRows({ typeIds: ['page'] })
-    const [state, setState] = useState<ViewState>({ ...base(), viewDefinition: { dataViewLayout: layout } })
-    return <DataView rows={rows} loading={loading} types={[PAGE]} scope={{ typeIds: ['page'] }} state={state} onState={setState} layouts={['list', 'grid']} patchRow={patchRow} />
+    const [state, setState] = useState<ViewState>({ ...base(), viewDefinition: { dataViewLayout: layout, ...def } })
+    return (
+      <DataView rows={rows} loading={loading} types={[PAGE]} scope={{ typeIds: ['page'] }} state={state} onState={setState} layouts={['list', 'grid', 'kanban']} patchRow={patchRow} />
+    )
   }
 
   beforeEach(() => {
@@ -305,6 +308,22 @@ describe('preview paging (audit 2026-11-01 P2)', () => {
     const after = bytes(SERVER.map((r) => ({ ...r, preview: '' }))) + bytes(SERVER.slice(0, 50)) + bytes(SERVER.slice(50, 100))
     console.log(`P2 bytes: rows with previews ${before}; rows without + 2 preview pages ${after}; first paint ${bytes(SERVER.map((r) => ({ ...r, preview: '' }))) + bytes(SERVER.slice(0, 50))}`)
     expect(after).toBeLessThan(before)
+  })
+
+  // Review fix 2026-11-01 #6: the kanban pages on its own, and asked for previews even when its cards show none.
+  test('a kanban whose cards show no preview fetches none; one whose cards do fetches its cards', async () => {
+    const noPreview: Partial<DataViewDefinition> = {
+      smallCardViewConfigs: { page: { entityViewType: 'smallCard', properties: cardProperties(PAGE).filter((p) => p.propertyId !== 'computed_preview') } },
+    }
+    const { unmount } = render(<Owner layout="kanban" def={noPreview} />)
+    await waitFor(() => expect(screen.getAllByTestId('kanban-card').length).toBeGreaterThan(0))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(calls()).toEqual([{ typeIds: ['page'], preview: false }])
+    unmount()
+    mocked.rows.mockClear()
+    render(<Owner layout="kanban" />)
+    await waitFor(() => expect(screen.getAllByTestId('card-preview').length).toBeGreaterThan(0))
+    expect(calls()[1]?.preview).toBe(true)
   })
 
   test('the list never fetches previews', async () => {
