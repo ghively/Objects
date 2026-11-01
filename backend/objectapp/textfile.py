@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import difflib
 import os
-import tempfile
+import secrets
+import stat
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -129,19 +130,72 @@ def _temp_prefix(path: Path) -> str:
     return f".{name}."
 
 
+_OPEN_FLAGS = (
+    os.O_WRONLY
+    | os.O_CREAT
+    | os.O_EXCL
+    | getattr(os, "O_NOFOLLOW", 0)
+    | getattr(os, "O_BINARY", 0)
+)
+
+
+def _open_temp(path: Path) -> tuple[int, str]:
+    """A new temp file beside `path`, created with mode ``0o666`` (the umask applies).
+
+    `tempfile.mkstemp` would make it 0600, and `os.replace` carries the temp file's
+    bits over to `path`: a 0644 file saved by the app would lose group/other read.
+    """
+    prefix = _temp_prefix(path)
+    for _attempt in range(100):
+        tmp_name = str(path.parent / f"{prefix}{secrets.token_hex(4)}.tmp")
+        try:
+            return os.open(tmp_name, _OPEN_FLAGS, 0o666), tmp_name
+        except FileExistsError:
+            continue
+    raise FileExistsError(f"No free temp name beside {path}")
+
+
+def _keep_mode(fd: int, tmp_name: str, path: Path) -> None:
+    """Give the temp file the permission bits `path` has now, when it exists."""
+    try:
+        mode = stat.S_IMODE(os.stat(path).st_mode)
+    except OSError:
+        return  # a new file keeps the default bits
+    try:
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, mode)
+        else:
+            os.chmod(tmp_name, mode)
+    except OSError:
+        pass  # a file system without permission bits
+
+
+def _write_temp(path: Path, data: bytes, keep_mode: bool = False) -> str:
+    """Write `data` to a new temp file beside `path` (fsynced); return its name."""
+    fd, tmp_name = _open_temp(path)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            if keep_mode:
+                _keep_mode(fh.fileno(), tmp_name, path)
+            fh.write(data)
+            fh.flush()
+            os.fsync(fh.fileno())
+    except BaseException:
+        os.unlink(tmp_name)
+        raise
+    return tmp_name
+
+
 def atomic_write(path: Path, data: bytes, check: Callable[[], None] | None = None) -> None:
     """Write `data` to `path` via a temp file in the same folder and `os.replace`.
 
+    An existing file keeps its permission bits; a new one gets ``0o666 & ~umask``.
     `check`, when given, runs right before the replace; if it raises, the temp
     file is removed, `path` is left as it was and the exception propagates.
     """
     path = Path(path)
-    fd, tmp_name = tempfile.mkstemp(prefix=_temp_prefix(path), suffix=".tmp", dir=path.parent)
+    tmp_name = _write_temp(path, data, keep_mode=True)
     try:
-        with os.fdopen(fd, "wb") as fh:
-            fh.write(data)
-            fh.flush()
-            os.fsync(fh.fileno())
         if check is not None:
             check()
         retry_os(lambda: os.replace(tmp_name, path))
@@ -151,19 +205,6 @@ def atomic_write(path: Path, data: bytes, check: Callable[[], None] | None = Non
         except FileNotFoundError:
             pass
         raise
-
-
-def _write_temp(path: Path, data: bytes) -> str:
-    fd, tmp_name = tempfile.mkstemp(prefix=_temp_prefix(path), suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "wb") as fh:
-            fh.write(data)
-            fh.flush()
-            os.fsync(fh.fileno())
-    except BaseException:
-        os.unlink(tmp_name)
-        raise
-    return tmp_name
 
 
 def create_new(path: Path, data: bytes) -> None:
