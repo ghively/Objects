@@ -774,11 +774,24 @@ class SearchIndex:
             params.extend(sorted(type_set))
         # Over-fetch: the tag and exclude filters apply afterwards, and title hits may repeat.
         fetch = min(limit * 4 + 50, 1000)
-        rows = self._query(
-            f"SELECT path, {_BM25} AS r FROM fts WHERE {where} ORDER BY r LIMIT ?",
-            [*params, fetch],
-        )
-        return [(p, round(-float(r), 4)) for p, r in rows if p in candidates]
+        # Rowids only: selecting ``path`` here would read it from the content table for
+        # every hit before the sort (audit 2026-11-01 B9); `meta` names the kept ones.
+        with self._db_lock:
+            rows = self._query(
+                f"SELECT rowid, {_BM25} AS r FROM fts WHERE {where} ORDER BY r LIMIT ?",
+                [*params, fetch],
+            )
+            names = dict(
+                self._query(
+                    f"SELECT rowid, path FROM meta WHERE rowid IN ({', '.join('?' for _ in rows)})",
+                    [rowid for rowid, _r in rows],
+                )
+            ) if rows else {}
+        return [
+            (p, round(-float(r), 4))
+            for rowid, r in rows
+            if (p := names.get(rowid)) is not None and p in candidates
+        ]
 
     def _snippets(
         self, match: str, paths: list[str]
@@ -790,9 +803,12 @@ class SearchIndex:
             f"snippet(fts, {i + 2}, '{_HL_OPEN}', '{_HL_CLOSE}', '…', {_SNIPPET_TOKENS})"
             for i in range(len(_COLUMNS))
         )
+        # ``+rowid`` keeps the filter out of FTS5's plan: the match runs once and each hit
+        # is kept or dropped by its rowid. ``path IN`` read every hit's path (audit
+        # 2026-11-01 B9), and a plain ``rowid IN`` re-runs the match once per rowid.
         rows = self._query(
-            f"SELECT path, {snippets} FROM fts WHERE fts MATCH ? "
-            f"AND path IN ({', '.join('?' for _ in paths)})",
+            f"SELECT path, {snippets} FROM fts WHERE fts MATCH ? AND +rowid IN "
+            f"(SELECT rowid FROM meta WHERE path IN ({', '.join('?' for _ in paths)}))",
             [match, *paths],
         )
         out: dict[str, list[dict[str, Any]]] = {}
