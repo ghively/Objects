@@ -794,3 +794,72 @@ def test_badly_shaped_options_in_a_type_file_are_normalised_on_load(space_dir: P
     assert members.options["allowedTypes"] == []
     assert members.options["fixedSet"] == []
     assert "numberFormat" not in members.options
+
+
+def test_save_type_rewrites_files_without_holding_the_space_lock(space_dir: Path, monkeypatch):
+    # Audit 2026-11-01 P5: the plan runs under the lock; each rewrite takes it for its own
+    # file only, so a reader on another thread gets in between two files.
+    import threading
+
+    for i in range(6):
+        _write(
+            space_dir / "Tasks" / f"Task {i}.md",
+            f"---\ntype: 'Task'\ntitle: Task {i}\nstatus: Not Started\n---\n",
+        )
+    space = Space(space_dir)
+    acquired: list[bool] = []
+    real = Space._rewrite_other
+
+    def spy(self, rel, edit, stamp=False):
+        got: list[bool] = []
+
+        def reader() -> None:
+            ok = self._lock.acquire(timeout=2)
+            got.append(ok)
+            if ok:
+                self._lock.release()
+
+        th = threading.Thread(target=reader)
+        th.start()
+        th.join()
+        acquired.extend(got)
+        return real(self, rel, edit, stamp)
+
+    monkeypatch.setattr(Space, "_rewrite_other", spy)
+    t = _edit(space, "task")
+    for opt in t.prop("status").options["set"]:
+        if opt["text"] == "Not Started":
+            opt["text"] = "Todo"
+    result = _save(space, t)
+    assert len(result.rewritten) == 7
+    assert acquired and all(acquired)
+    texts = [o["text"] for o in space.type_by_id("task").prop("status").options["set"]]
+    assert "Todo" in texts and "Not Started" not in texts
+    assert type_revision(space.root, "task") == result.revision
+
+
+def test_other_type_writes_wait_out_a_running_save(space_dir: Path, monkeypatch):
+    # While `save_type` rewrites outside the lock, a template registration or another
+    # type save of that type is refused (409) instead of racing the JSON write.
+    space = Space(space_dir)
+    seen: dict[str, object] = {}
+    real = Space._apply_type_ops
+
+    def during(self, to_write, run):
+        seen["templates"] = self._save_templates_field(self.type_by_id("task"), {"ids": ["x"]})
+        try:
+            self._commit_type(self.type_by_id("task"), type_revision(self.root, "task"))
+        except RevisionConflict as exc:
+            seen["commit"] = exc
+        return real(self, to_write, run)
+
+    monkeypatch.setattr(Space, "_apply_type_ops", during)
+    t = _edit(space, "task")
+    for opt in t.prop("status").options["set"]:
+        if opt["text"] == "Not Started":
+            opt["text"] = "Todo"
+    result = _save(space, t)
+    assert result.rewritten == ["Tasks/Write docs.md"]
+    assert seen["templates"] is False and isinstance(seen["commit"], RevisionConflict)
+    assert space._types_saving == set()
+    assert space.type_by_id("task").templates.get("ids", []) == []

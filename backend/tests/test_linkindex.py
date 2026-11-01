@@ -227,3 +227,32 @@ def test_names_change_reresolves_only_the_sources_that_mention_the_name(
     path, _v = space.create_object("page", "Charles B")
     assert ENGINE in space.links.backlinks(path)
     assert ENGINE in resolved and not any(p.startswith("Pages/Other ") for p in resolved)
+
+
+def test_type_save_reextracts_only_that_types_members(links_space_dir: Path, monkeypatch):
+    # Audit 2026-11-01 P5: a `types` change naming the type re-extracts its members only.
+    import copy
+
+    from objectapp.typemodel import type_revision
+
+    space = Space(links_space_dir)
+    space.links.backlinks(ADA)  # built
+    calls: list[str] = []
+    real = LinkIndex._extract
+
+    def spy(self, path):
+        calls.append(path)
+        return real(self, path)
+
+    monkeypatch.setattr(LinkIndex, "_extract", spy)
+    t = copy.deepcopy(space.type_by_id("person"))
+    t.description = "People we read about"
+    space.save_type(t, type_revision(space.root, "person"))
+    assert space.links.link_keys(BABBAGE, ADA) == (False, ["manager"])
+    members = {s.path for s in space.list("person")}
+    assert set(calls) == members, calls
+    # A change that names no type still re-extracts everything.
+    calls.clear()
+    space._types_changed()
+    space.links.backlinks(ADA)
+    assert len(calls) == len(space.links._sources)
