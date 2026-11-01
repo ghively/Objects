@@ -82,16 +82,31 @@ def encode_like(original: bytes, new_text: str) -> bytes:
     if tail:
         new_lines.append(tail)
 
-    out: list[bytes] = []
-    matcher = difflib.SequenceMatcher(None, old_norm, new_lines, autojunk=False)
-    for op, i1, i2, j1, j2 in matcher.get_opcodes():
-        if op == "equal":
-            out.extend(old_raw[i1:i2])
-        elif op in ("insert", "replace"):
-            for line in new_lines[j1:j2]:
-                if tf.eol == "\r\n":
-                    line = line.replace("\n", "\r\n")
-                out.append(line.encode("utf-8", errors=_ERRORS))
+    # The lines unchanged at both ends (a property edit leaves the whole body alone, a
+    # body edit the frontmatter) are copied as they are; only the middle is diffed.
+    n_old, n_new = len(old_norm), len(new_lines)
+    limit = min(n_old, n_new)
+    head = 0
+    while head < limit and old_norm[head] == new_lines[head]:
+        head += 1
+    tail = 0
+    while tail < limit - head and old_norm[n_old - 1 - tail] == new_lines[n_new - 1 - tail]:
+        tail += 1
+
+    out: list[bytes] = list(old_raw[:head])
+    if head < n_old - tail or head < n_new - tail:
+        matcher = difflib.SequenceMatcher(
+            None, old_norm[head : n_old - tail], new_lines[head : n_new - tail], autojunk=False
+        )
+        for op, i1, i2, j1, j2 in matcher.get_opcodes():
+            if op == "equal":
+                out.extend(old_raw[head + i1 : head + i2])
+            elif op in ("insert", "replace"):
+                for line in new_lines[head + j1 : head + j2]:
+                    if tf.eol == "\r\n":
+                        line = line.replace("\n", "\r\n")
+                    out.append(line.encode("utf-8", errors=_ERRORS))
+    out.extend(old_raw[n_old - tail :])
     data = b"".join(out)
     return BOM + data if tf.bom else data
 
