@@ -1,6 +1,6 @@
 // The data view: toolbar, filter -> sort -> group pipeline and a layout, reused by type pages,
 // collections, queries and All notes. The caller owns the state (see `useViewState`).
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Collection, Layout, Row, RowsScope, TypeDef, UpdateResult, ViewState } from '@/api/types'
 import { api } from '@/api/client'
@@ -8,6 +8,7 @@ import { Icon } from '@/components/Icon'
 import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
+import { useZonedToday } from '@/lib/zonedShell'
 import { ChangeTypeDialog } from '@/object/ChangeTypeDialog'
 import { DeleteObjectDialog } from '@/object/DeleteObjectDialog'
 import { TypeChip } from '@/shell/Sidebar'
@@ -236,6 +237,8 @@ export function DataView(props: DataViewProps) {
   }, [selecting])
 
   const typesById = useMemo(() => Object.fromEntries(types.map((t) => [t.id, t])), [types])
+  // The selection as a set: layouts ask per row.
+  const selectedSet = useMemo(() => (selected ? new Set(selected) : null), [selected])
 
   // The types the view spans: the scope's, else those of its rows, else every type.
   const viewTypes = useMemo(() => {
@@ -246,6 +249,8 @@ export function DataView(props: DataViewProps) {
   const choices = useMemo(() => propertyChoices(viewTypes), [viewTypes])
   const multiType = viewTypes.length > 1
 
+  // `now` matters by day (relative filters and groups): it refreshes when the zone's day changes.
+  const today = useZonedToday()
   const ctx = useMemo<GroupCtx>(() => {
     const tagIdsToTitles: Record<string, string> = {}
     const pathsById: Record<string, string> = {}
@@ -262,8 +267,8 @@ export function DataView(props: DataViewProps) {
     }
     const viewTypeIds = viewTypes.map((t) => t.id)
     return { types, viewTypeIds, collections, tagIdsToTitles, pathsById, entityTitles, entityCreated, now: new Date() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` is fixed per data change
-  }, [types, viewTypes, collections, objects, rows])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` is fixed per day (`today`)
+  }, [types, viewTypes, collections, objects, today])
 
   const result = useMemo(() => (props.pipeline ?? defaultPipeline)(rows, state, ctx), [props.pipeline, rows, state, ctx])
   const flat = result.rows
@@ -298,7 +303,7 @@ export function DataView(props: DataViewProps) {
     anchor.current = last
     setSelected(paths && paths.length > 0 ? paths : null)
   }
-  const onOpen = (row: Row, e: MouseEvent) => {
+  const open = (row: Row, e: MouseEvent) => {
     const path = row.summary.path
     if (selected) {
       // Shift: the range from the last clicked row, added; else toggle this row.
@@ -327,6 +332,10 @@ export function DataView(props: DataViewProps) {
     }
     usePeek.getState().peek(row.summary.path, flat.map((r) => r.summary.path))
   }
+  // A stable `onOpen` reading the latest state, so memoized rows don't re-render per view render.
+  const openRef = useRef(open)
+  openRef.current = open
+  const onOpen = useCallback((row: Row, e: MouseEvent) => openRef.current(row, e), [])
 
   const header = (g: Group, count: number) => (
     <button
@@ -362,7 +371,7 @@ export function DataView(props: DataViewProps) {
     patchRow: props.patchRow,
     rowExtras: props.rowExtras,
     onWritten: props.onWritten,
-    isSelected: selected ? (path) => selected.includes(path) : undefined,
+    isSelected: selectedSet ? (path) => selectedSet.has(path) : undefined,
     groupCount: (g) => result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length,
   }
   const builtin = (): ReactNode => {
@@ -431,7 +440,7 @@ export function DataView(props: DataViewProps) {
     ...(props.rowActions ? commonRowMenu(row, menuCtx) : []),
     ...(props.rowMenu?.(row) ?? []),
   ]
-  const selectedRows = selected ? flat.filter((r) => selected.includes(r.summary.path)) : []
+  const selectedRows = selectedSet ? flat.filter((r) => selectedSet.has(r.summary.path)) : []
 
   return (
     <section
