@@ -304,3 +304,25 @@ def test_save_body_never_flushes_the_cache_under_the_space_lock(space_dir: Path,
         assert read_raw(space_dir, rel, cache=False).of.body == f"Typing {i}\n"
     fmcache.flush_all()
     assert under_lock and not any(under_lock)
+
+
+def test_many_puts_arm_one_flush_timer(tmp_path: Path, monkeypatch):
+    """Re-measured after the fix pass: a timer per `put` cost 3 s on a 5,000-file scan."""
+    import threading
+
+    started: list[object] = []
+    real_timer = threading.Timer
+
+    class CountingTimer(real_timer):  # type: ignore[misc,valid-type]
+        def start(self) -> None:
+            started.append(self)
+            super().start()
+
+    monkeypatch.setattr(threading, "Timer", CountingTimer)
+    cache = fmcache.FrontmatterCache(tmp_path)
+    try:
+        for i in range(1000):
+            cache.put(f"Pages/{i}.md", f"title: {i}\n", {"title": str(i)})
+        assert len(started) == 1
+    finally:
+        cache.flush()  # cancels the timer

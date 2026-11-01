@@ -128,9 +128,14 @@ class FrontmatterCache:
                 self._unwritable = True  # a read-only location: parse as if there were no cache
 
     def _arm_timer(self) -> None:
-        """(Re)start the delayed flush; called with the lock held."""
+        """Start the delayed flush unless one is pending; called with the lock held.
+
+        One timer per dirty window, not one per `put`: the opening scan puts thousands
+        of entries, and cancelling and starting a `Timer` for each cost 3 s at 5,000
+        files (re-measured after the audit fix pass).
+        """
         if self._timer is not None:
-            self._timer.cancel()
+            return
         timer = threading.Timer(_FLUSH_AFTER, self.flush)
         timer.daemon = True
         timer.name = f"fmcache-flush:{self.root.name}"
