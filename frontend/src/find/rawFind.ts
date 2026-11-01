@@ -10,7 +10,10 @@
 import { RangeSetBuilder, StateEffect, StateField, type EditorState, type Extension } from '@codemirror/state'
 import { Decoration, EditorView, type DecorationSet } from '@codemirror/view'
 import type { FindControl, FindStatus } from '@/editor/extensions/findInPage'
+import { RAW_CONTROLS } from './findControl'
 import { findMatches, NO_FIND_OPTIONS, type FindOptions, type TextMatch } from './findText'
+
+export { isRawFindControl } from './findControl'
 
 const MATCH_CLASS = 'find-match'
 const CURRENT_CLASS = 'find-match-current'
@@ -71,12 +74,6 @@ export function getRawFindState(state: EditorState): RawFindState {
   return state.field(rawFindField, false) ?? EMPTY
 }
 
-const RAW_CONTROLS = new WeakSet<FindControl>()
-
-/** Whether `control` is raw mode's (the find bar re-binds when the editor switches mode). */
-export function isRawFindControl(control: FindControl | undefined): boolean {
-  return !!control && RAW_CONTROLS.has(control)
-}
 
 export interface RawFind {
   /** Add to the view's state (again after every `setState`, then call `reapply`). */

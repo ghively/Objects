@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { ChangeKind, ObjectSummary, SpaceInfo, TypeDef } from '@/api/types'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -6,12 +6,9 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { createAndOpen } from '@/create/createAndOpen'
 import { NewObjectMenu } from '@/create/NewObjectMenu'
 import { AllNotesView } from '@/allnotes/AllNotesView'
-import { CalendarPage } from '@/calendar/CalendarPage'
 import { CollectionPage } from '@/collections/CollectionPage'
 import { QueriesPage } from '@/queries/QueriesPage'
 import { QueryPage } from '@/queries/QueryPage'
-import { GraphPage } from '@/graph/GraphPage'
-import { LocalGraphPanel } from '@/graph/LocalGraphPanel'
 import { LinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, refreshLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { setRecentSpace } from '@/nav/recent'
@@ -50,7 +47,13 @@ import { TrashView } from '@/trash/TrashView'
 import { CreateTypeDialog } from '@/types/CreateTypeDialog'
 import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
 import { TypePage } from '@/types/TypePage'
-import { TypeSettings } from '@/types/TypeSettings'
+
+// Pages whose code the shell does not need at start (the graph's sigma and graphology, the
+// calendar, type settings) load when first shown (audit 2026-11-01 F1).
+const CalendarPage = lazy(() => import('@/calendar/CalendarPage').then((m) => ({ default: m.CalendarPage })))
+const GraphPage = lazy(() => import('@/graph/GraphPage').then((m) => ({ default: m.GraphPage })))
+const LocalGraphPanel = lazy(() => import('@/graph/LocalGraphPanel').then((m) => ({ default: m.LocalGraphPanel })))
+const TypeSettings = lazy(() => import('@/types/TypeSettings').then((m) => ({ default: m.TypeSettings })))
 
 const REFRESH_DELAY_MS = 150
 /** Events after which the whole object list and the types are fetched again (a `changed` refreshes one summary). */
@@ -105,13 +108,15 @@ function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
     }
     case 'typeSettings':
       return (
-        <TypeSettings
-          key={target.typeId}
-          typeId={target.typeId}
-          onOpenType={(typeId) => open({ kind: 'type', typeId })}
-          onOpenTemplate={(path) => open({ kind: 'object', path })}
-          onDeleted={() => open({ kind: 'trash' })}
-        />
+        <Suspense fallback={null}>
+          <TypeSettings
+            key={target.typeId}
+            typeId={target.typeId}
+            onOpenType={(typeId) => open({ kind: 'type', typeId })}
+            onOpenTemplate={(path) => open({ kind: 'object', path })}
+            onDeleted={() => open({ kind: 'trash' })}
+          />
+        </Suspense>
       )
     case 'trash':
       return <TrashView />
@@ -124,11 +129,19 @@ function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
     case 'allNotes':
       return <AllNotesView />
     case 'calendar':
-      return <CalendarPage onOpenTarget={(t) => open(t)} />
+      return (
+        <Suspense fallback={null}>
+          <CalendarPage onOpenTarget={(t) => open(t)} />
+        </Suspense>
+      )
     case 'tasks':
       return <TasksPage />
     case 'graph':
-      return <GraphPage onOpenTarget={(t, o) => open(t, o)} />
+      return (
+        <Suspense fallback={null}>
+          <GraphPage onOpenTarget={(t, o) => open(t, o)} />
+        </Suspense>
+      )
     case 'search':
       // M8: the extended search page; a new query or toggle remounts it with what was typed.
       return <SearchPage key={`${target.q ?? ''}|${target.textOnly ? 1 : 0}`} q={target.q} textOnly={target.textOnly} />
@@ -270,7 +283,9 @@ export default function App() {
   const renderSidepanel = (t: SidepanelTarget, nav: { open(t: Target, o?: OpenOptions): void }): ReactNode => {
     if (t.kind === 'localGraph') {
       return target?.kind === 'object' ? (
-        <LocalGraphPanel path={target.path} />
+        <Suspense fallback={null}>
+          <LocalGraphPanel path={target.path} />
+        </Suspense>
       ) : (
         <Centered title="Graph View" subtitle="Open an object to see its graph." />
       )

@@ -76,3 +76,17 @@ export function saveCalendarDaily(patch: Partial<CalendarDaily>): Promise<void> 
 export function saveCalendarUi(patch: Partial<Pick<CalendarUi, 'weekStart' | 'hideCalendarSidebar'>>): Promise<void> {
   return enqueue((cal) => ({ ...cal, ...patch }))
 }
+
+/** Whether the calendar sidebar is open (`ui.calendar.hideCalendarSidebar` absent or false). */
+export function useCalendarSidebarOpen(): boolean {
+  return useUiStore((s) => s.ui.calendar?.hideCalendarSidebar) !== true
+}
+
+/**
+ * Show or hide the calendar sidebar ("Toggle calendar sidebar"), saved to `ui.json`. Here, not in
+ * `CalendarPage`, so the shell's shortcut needs none of the calendar page's code at start.
+ */
+export function toggleCalendarSidebar(): Promise<void> {
+  const hidden = useUiStore.getState().ui.calendar?.hideCalendarSidebar === true
+  return saveCalendarUi({ hideCalendarSidebar: !hidden })
+}
