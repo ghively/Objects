@@ -225,8 +225,31 @@ from .whiteboardstore import whiteboard_ui_problem
 __all__ = ["EventHub", "create_app"]
 
 
+EVENT_QUEUE_MAX = 1000
+"""Events held for one SSE client that isn't reading; past this its backlog is dropped."""
+
+RESYNC_EVENTS = tuple(
+    ChangeEvent(kind, "*", None) for kind in ("types", "views", "ui", "collections", "queries")
+)
+"""What replaces a dropped backlog: the resync the client itself announces after a
+reconnect (``api/client.ts`` ``RESYNC_EVENTS``), on which every consumer reloads."""
+
+
+def _offer(q: asyncio.Queue[ChangeEvent | None], event: ChangeEvent | None) -> None:
+    """Queue `event`; on a full queue drop the backlog for the resync (or the end, None)."""
+    try:
+        q.put_nowait(event)
+        return
+    except asyncio.QueueFull:
+        pass
+    while not q.empty():
+        q.get_nowait()
+    for item in RESYNC_EVENTS if event is not None else (None,):
+        q.put_nowait(item)
+
+
 class EventHub:
-    """Fans `ChangeEvent`s out to every connected SSE client (one queue each)."""
+    """Fans `ChangeEvent`s out to every connected SSE client (one bounded queue each)."""
 
     def __init__(self) -> None:
         self._subscribers: set[asyncio.Queue[ChangeEvent | None]] = set()
@@ -239,7 +262,7 @@ class EventHub:
         with self._lock:
             subscribers = list(self._subscribers)
         for q in subscribers:
-            q.put_nowait(event)
+            _offer(q, event)
 
     def close(self) -> None:
         """End every open stream. Safe to call from any thread."""
@@ -249,12 +272,12 @@ class EventHub:
         loop = self.loop
         for q in subscribers:
             if loop is not None and loop.is_running():
-                loop.call_soon_threadsafe(q.put_nowait, None)
+                loop.call_soon_threadsafe(_offer, q, None)
             else:
-                q.put_nowait(None)
+                _offer(q, None)
 
     async def subscribe(self) -> AsyncIterator[ChangeEvent]:
-        q: asyncio.Queue[ChangeEvent | None] = asyncio.Queue()
+        q: asyncio.Queue[ChangeEvent | None] = asyncio.Queue(EVENT_QUEUE_MAX)
         with self._lock:
             self._subscribers.add(q)
         try:
@@ -486,17 +509,49 @@ class SyncRequest(BaseModel):
     clientId: str | None = None
 
 
-def _display_safe(value):
-    """`value` with undecodable bytes (surrogate escapes) shown as U+FFFD, so it can be JSON."""
+def _undecodable_in(value) -> bool:
+    if isinstance(value, str):
+        return has_undecodable(value)
+    if isinstance(value, dict):
+        return any(_undecodable_in(k) or _undecodable_in(v) for k, v in value.items())
+    if isinstance(value, list):
+        return any(_undecodable_in(v) for v in value)
+    return False
+
+
+def _display_copy(value):
     if isinstance(value, str):
         if has_undecodable(value):
             return value.encode("utf-8", errors="surrogateescape").decode("utf-8", errors="replace")
         return value
     if isinstance(value, dict):
-        return {_display_safe(k): _display_safe(v) for k, v in value.items()}
+        return {_display_copy(k): _display_copy(v) for k, v in value.items()}
     if isinstance(value, list):
-        return [_display_safe(v) for v in value]
+        return [_display_copy(v) for v in value]
     return value
+
+
+def _display_safe(value):
+    """`value` with undecodable bytes (surrogate escapes) shown as U+FFFD, so it can be JSON.
+
+    Only a name from the disk (a path, a file-stem title) can hold them, so the usual
+    answer is `value` itself; a copy is made only when one does.
+    """
+    return _display_copy(value) if _undecodable_in(value) else value
+
+
+class SafeJSONResponse(JSONResponse):
+    """A `JSONResponse` encoded as it is, through `_display_safe` only when that fails.
+
+    Walking a big answer for surrogates costs as much as encoding it (audit 2026-11-01:
+    145 ms on 3 MB of rows), while UTF-8 encoding refuses them anyway: the encode is the check.
+    """
+
+    def render(self, content: Any) -> bytes:
+        try:
+            return super().render(content)
+        except UnicodeEncodeError:
+            return super().render(_display_safe(content))
 
 
 class RevealRequest(BaseModel):
@@ -936,7 +991,7 @@ def create_app(
         # A JSONResponse is encoded here, on the worker thread; a plain return would run
         # FastAPI's per-value `jsonable_encoder` on the event loop (audit 2026-11-01 B2:
         # 120 ms per request at 5,000 objects, stalling SSE and every other request).
-        return JSONResponse(_display_safe([asdict(s) for s in space.list(type or None)]))
+        return SafeJSONResponse([asdict(s) for s in space.list(type or None)])
 
     @api.get("/object")
     def get_object(path: str):
@@ -1329,7 +1384,7 @@ def create_app(
         if not from_ or not to:
             return _error(422, "A calendar range needs from and to (YYYY-MM-DD).")
         try:
-            return JSONResponse(_display_safe(space.calendar(from_, to)))  # see `list_objects`
+            return SafeJSONResponse(space.calendar(from_, to))  # see `list_objects`
         except InvalidValue as exc:
             return _error(422, str(exc))
 
@@ -1340,7 +1395,7 @@ def create_app(
             rows = space.rows(req.typeIds, req.collectionIds, req.paths, search, req.preview)
         except InvalidValue as exc:
             return _error(422, str(exc))
-        return JSONResponse(_display_safe({"rows": [asdict(r) for r in rows]}))  # see `list_objects`
+        return SafeJSONResponse({"rows": [asdict(r) for r in rows]})  # see `list_objects`
 
     @api.get("/views/{type_id}")
     def get_views(type_id: str):
@@ -1670,6 +1725,8 @@ def create_app(
             path = await asyncio.to_thread(import_image, space.root, name, data)
         except NotAnImage:
             return _error(415, "Only png, jpg, jpeg, gif, webp and svg images can be added")
+        except media.SidecarUpload:
+            return _error(415, media.SIDECAR_UPLOAD_DETAIL)
         except TooLarge:
             return too_large
         except ValueError as exc:
@@ -1692,6 +1749,8 @@ def create_app(
             return too_large
         except media.MarkdownUpload:
             return _error(415, media.MARKDOWN_UPLOAD_DETAIL)
+        except media.SidecarUpload:
+            return _error(415, media.SIDECAR_UPLOAD_DETAIL)
         except ValueError as exc:
             return _error(422, str(exc))
         return JSONResponse({"path": path, "kind": kind}, status_code=201)

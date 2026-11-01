@@ -23,7 +23,7 @@ from urllib.parse import quote
 
 from .space import safe_filename
 from .textfile import create_new
-from .whiteboardfile import INK_SUFFIX, sidecar_owner
+from .whiteboardfile import BOARD_SUFFIX, INK_SUFFIX, sidecar_owner
 
 __all__ = [
     "ATTACHMENTS",
@@ -190,6 +190,7 @@ def import_image(root: Path, name: str, data: bytes) -> str:
     `MAX_ATTACHMENT_BYTES` and `ValueError` for an empty upload (as `import_attachment`).
     """
     stem, ext = _safe_image_name(name)
+    _refuse_sidecar_name(f"{stem}{ext}", name)
     if len(data) > MAX_ATTACHMENT_BYTES:
         raise TooLarge(name)
     if not data:
@@ -303,6 +304,23 @@ class MarkdownUpload(ValueError):
 
 
 MARKDOWN_UPLOAD_DETAIL = "A Markdown file can't be added as an attachment: it would become an object."
+
+
+class SidecarUpload(ValueError):
+    """An upload named like a whiteboard's ``.ink.svg`` or ``.whiteboard.json`` (415)."""
+
+
+SIDECAR_UPLOAD_DETAIL = (
+    "A file named like a whiteboard's ink or board file (.ink.svg, .whiteboard.json) "
+    "can't be added as an attachment."
+)
+
+
+def _refuse_sidecar_name(file_name: str, name: str) -> None:
+    """Raise `SidecarUpload` for a name a whiteboard's files use: beside an object of the
+    same stem it would be hidden as that board's (`sidecar_owner`), or taken for it."""
+    if file_name.lower().endswith((INK_SUFFIX, BOARD_SUFFIX)):
+        raise SidecarUpload(name)
 
 
 class TooLarge(ValueError):
@@ -426,6 +444,7 @@ def import_attachment(root: Path, name: str, data: bytes) -> tuple[str, Attachme
     stem, ext = _safe_attachment_name(name)
     if f"{stem}{ext}".lower().endswith(".md"):
         raise MarkdownUpload(name)
+    _refuse_sidecar_name(f"{stem}{ext}", name)
     folder = Path(root) / ATTACHMENTS
     folder.mkdir(parents=True, exist_ok=True)
     n = 1
