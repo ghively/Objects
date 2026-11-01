@@ -1633,13 +1633,35 @@ def create_app(
     def get_images():
         return _display_safe(list_images(space.root))
 
+    async def _upload_body(request: Request) -> bytes | None:
+        """The uploaded bytes, or None once they exceed Capacities' 100 MiB limit (413)."""
+        limit = media.MAX_ATTACHMENT_BYTES
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > limit:
+            return None
+        chunks: list[bytes] = []
+        size = 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > limit:
+                return None
+            chunks.append(chunk)
+        return b"".join(chunks)
+
     @api.post("/images", status_code=201)
     async def post_image(request: Request, name: str = Query(default="")):
-        data = await request.body()
+        too_large = _error(413, media.UPLOAD_LIMIT_DETAIL)
+        data = await _upload_body(request)
+        if data is None:
+            return too_large
         try:
             path = await asyncio.to_thread(import_image, space.root, name, data)
         except NotAnImage:
             return _error(415, "Only png, jpg, jpeg, gif, webp and svg images can be added")
+        except TooLarge:
+            return too_large
+        except ValueError as exc:
+            return _error(422, str(exc))
         return JSONResponse({"path": path}, status_code=201)
 
     @api.get("/attachments")
@@ -1648,19 +1670,10 @@ def create_app(
 
     @api.post("/attachments", status_code=201)
     async def post_attachment(request: Request, name: str = Query(default="")):
-        limit = media.MAX_ATTACHMENT_BYTES
         too_large = _error(413, media.UPLOAD_LIMIT_DETAIL)
-        declared = request.headers.get("content-length", "")
-        if declared.isdigit() and int(declared) > limit:
+        data = await _upload_body(request)
+        if data is None:
             return too_large
-        chunks: list[bytes] = []
-        size = 0
-        async for chunk in request.stream():
-            size += len(chunk)
-            if size > limit:
-                return too_large
-            chunks.append(chunk)
-        data = b"".join(chunks)
         try:
             path, kind = await asyncio.to_thread(import_attachment, space.root, name, data)
         except TooLarge:
