@@ -1,9 +1,10 @@
 """Watch a space folder and turn file changes into `ChangeEvent`s.
 
 watchdog delivers file-system events on its own thread. Each object path is
-debounced (150 ms of quiet), then re-read: the `Space` summary is refreshed and
-a `ChangeEvent` is put on `SpaceWatcher.events` (an asyncio queue on the given
-loop). Nothing is emitted for:
+debounced (150 ms of quiet) by one worker thread that keeps a pending set, then
+re-read in batches: the `Space` summary is refreshed and a `ChangeEvent` per path
+is put on `SpaceWatcher.events` (an asyncio queue on the given loop). Nothing is
+emitted for:
 
 - dot-folders (``.capacities``, ``.capacities-cache``, ``.git``…), dot-files and
   non-``.md`` files;
@@ -32,6 +33,7 @@ from __future__ import annotations
 import asyncio
 import os
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Literal
@@ -43,9 +45,11 @@ from .space import Space, version_of
 from .typedefs import is_ignored
 from .whiteboardfile import sidecar_owner
 
-__all__ = ["DEBOUNCE_SECONDS", "ChangeEvent", "SpaceWatcher"]
+__all__ = ["DEBOUNCE_SECONDS", "FLUSH_SLICE", "ChangeEvent", "SpaceWatcher"]
 
 DEBOUNCE_SECONDS = 0.150
+FLUSH_SLICE = 0.025
+"""How long (seconds) one acquisition of the space's lock keeps refreshing due paths."""
 _DEFINITION_FOLDERS = ("collections", "queries", "views")
 
 
@@ -108,8 +112,11 @@ class SpaceWatcher:
         self.space = space
         self.loop = loop
         self.events: asyncio.Queue[ChangeEvent] = asyncio.Queue()
-        self._timers: dict[str, threading.Timer] = {}
-        self._lock = threading.Lock()
+        self._pending: dict[str, tuple[float, str | None]] = {}
+        """Debounce key -> (deadline, the raw path to resolve at flush time, or None for a
+        key that already is the space-relative path)."""
+        self._cond = threading.Condition()
+        self._worker: threading.Thread | None = None
         self._observer = None
         self._stopped = False
 
@@ -118,7 +125,8 @@ class SpaceWatcher:
     def start(self) -> None:
         if self._observer is not None:
             return
-        self._stopped = False
+        with self._cond:
+            self._stopped = False
         observer = Observer()
         observer.schedule(_Handler(self), str(self.space.root), recursive=True)
         observer.daemon = True
@@ -126,12 +134,13 @@ class SpaceWatcher:
         self._observer = observer
 
     def stop(self) -> None:
-        self._stopped = True
-        with self._lock:
-            timers = list(self._timers.values())
-            self._timers.clear()
-        for t in timers:
-            t.cancel()
+        with self._cond:
+            self._stopped = True
+            self._pending.clear()
+            worker, self._worker = self._worker, None
+            self._cond.notify_all()
+        if worker is not None and worker is not threading.current_thread():
+            worker.join(timeout=5)
         observer, self._observer = self._observer, None
         if observer is not None:
             observer.stop()
@@ -182,15 +191,32 @@ class SpaceWatcher:
             return rel.as_posix()
         return None
 
+    def _quick_rel(self, path: str) -> str | None:
+        """A lexical space-relative path for `path`, without touching the file system.
+
+        It drops what can't be an object or watched definition (dot-folders, dot-files,
+        other suffixes) and keys the debounce; the exact path (`resolve()`, which opens
+        the file on Windows) is worked out at flush time, under the space's lock. A
+        path that can't be placed lexically (a symlinked root) is kept as it is.
+        """
+        try:
+            rel = PurePosixPath(Path(os.path.abspath(path)).relative_to(self.space.root).as_posix())
+        except ValueError:
+            return path
+        if not rel.parts:
+            return None
+        if rel.parts[0] == ".capacities":
+            return rel.as_posix() if rel.suffix == ".json" else None
+        if is_ignored(rel) or rel.name.startswith("."):
+            return None
+        if rel.suffix.lower() != ".md" and not sidecar_owner(rel.as_posix()):
+            return None
+        return rel.as_posix()
+
     def _touch(self, path: str) -> None:
-        # `resolve()` opens the file on Windows; doing that while the app
-        # replaces it would make the replace fail, so wait for the space's lock.
-        with self.space._lock:
-            rel = self._relpath(path)
-            if rel is None:
-                rel = self._definition_rel(path)
-        if rel is not None:
-            self._schedule(rel)
+        key = self._quick_rel(path)
+        if key is not None:
+            self._schedule(key, path)
 
     def _touch_folder(self, path: str) -> None:
         """A folder moved or vanished: re-check every known object beneath it, templates included."""
@@ -204,38 +230,83 @@ class SpaceWatcher:
         for p in beneath:
             self._schedule(p)
 
-    def _schedule(self, rel: str) -> None:
-        if self._stopped:
-            return
-        timer = threading.Timer(DEBOUNCE_SECONDS, self._fire, args=(rel,))
-        timer.daemon = True
-        with self._lock:
-            old = self._timers.pop(rel, None)
-            self._timers[rel] = timer
-        if old is not None:
-            old.cancel()
-        timer.start()
+    def _schedule(self, key: str, path: str | None = None) -> None:
+        """Debounce `key` (a space-relative path, or `path`'s lexical stand-in): it is
+        refreshed once `DEBOUNCE_SECONDS` pass with no further event for it."""
+        with self._cond:
+            if self._stopped:
+                return
+            idle = not self._pending
+            self._pending[key] = (time.monotonic() + DEBOUNCE_SECONDS, path)
+            if self._worker is None or not self._worker.is_alive():
+                self._worker = threading.Thread(target=self._run, name="watcher-debounce", daemon=True)
+                self._worker.start()
+            if idle:
+                # A new deadline is never earlier than the ones pending, so the worker
+                # only needs waking from its idle wait (a burst of events is one wake).
+                self._cond.notify()
 
-    # -- debounced handling (timer thread) ----------------------------------
+    # -- debounced handling (the one worker thread) ----------------------------
+
+    def _run(self) -> None:
+        """Wait for the earliest deadline, take every due path, flush them as one batch."""
+        while True:
+            with self._cond:
+                while not self._stopped:
+                    now = time.monotonic()
+                    due = [k for k, (deadline, _p) in self._pending.items() if deadline <= now]
+                    if due:
+                        break
+                    if self._pending:
+                        self._cond.wait(min(d for d, _p in self._pending.values()) - now)
+                    else:
+                        self._cond.wait()
+                if self._stopped:
+                    return
+                batch = [(k, self._pending.pop(k)[1]) for k in due]
+            self._flush(batch)
 
     def _fire(self, rel: str) -> None:
-        with self._lock:
-            if self._timers.get(rel) is threading.current_thread():
-                del self._timers[rel]
-        if self._stopped:
-            return
-        try:
+        """Refresh one space-relative path now (what the worker does for each due path)."""
+        self._flush([(rel, None)])
+
+    def _flush(self, batch: list[tuple[str, str | None]]) -> None:
+        """Refresh the due paths in slices under the space's lock; emit their events at once.
+
+        One lock acquisition per slice (not per path) keeps a 1,000-file change from
+        contending with readers 1,000 times, while a slice is short enough (`FLUSH_SLICE`)
+        that a save or a list never waits long. The events keep their per-path shape; the
+        loop receives the whole batch in one callback.
+        """
+        events: list[ChangeEvent] = []
+        i = 0
+        while i < len(batch):
             # Read under the space's lock: an open read handle (no FILE_SHARE_DELETE
             # on Windows) would make a concurrent save's replace fail.
             with self.space._lock:
-                event = self._refresh(rel)
-        except Exception:  # never let a bad file kill the watcher thread
-            return
-        if event is not None and not self._stopped:
+                started = time.monotonic()
+                first = i
+                while i < len(batch) and (i == first or time.monotonic() - started < FLUSH_SLICE):
+                    key, path = batch[i]
+                    i += 1
+                    if self._stopped:
+                        return
+                    try:
+                        rel = key if path is None else (self._relpath(path) or self._definition_rel(path))
+                        event = self._refresh(rel) if rel is not None else None
+                    except Exception:  # never let a bad file kill the watcher thread
+                        event = None
+                    if event is not None:
+                        events.append(event)
+        if events and not self._stopped:
             try:
-                self.loop.call_soon_threadsafe(self.events.put_nowait, event)
+                self.loop.call_soon_threadsafe(self._emit, events)
             except RuntimeError:  # loop closed
                 pass
+
+    def _emit(self, events: list[ChangeEvent]) -> None:
+        for event in events:
+            self.events.put_nowait(event)
 
     def _refresh_definition(self, rel: str) -> ChangeEvent | None:
         """A JSON definition changed: an event unless it is the app's own write."""
