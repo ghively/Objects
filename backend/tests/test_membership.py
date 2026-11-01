@@ -244,17 +244,17 @@ def test_rename_conflict_skipped_untouched(space_dir: Path, monkeypatch):
     _member(space_dir, SERVER, "collections: [Tooling]")
     target = space_dir / SERVER
     space, c, _pub = _client(space_dir)
-    real = space_mod.atomic_write
+    real = space_mod._write_temp  # `_write` syncs a temp file, then re-checks and replaces
     written: list[bytes] = []
 
-    def patched(path, data, check=None):
+    def patched(path, data):
         if Path(path) == target and len(written) < 2:
             ext = target.read_bytes() + f"external {len(written)}\n".encode()
             target.write_bytes(ext)
             written.append(ext)
-        return real(path, data, check=check)
+        return real(path, data)
 
-    monkeypatch.setattr(space_mod, "atomic_write", patched)
+    monkeypatch.setattr(space_mod, "_write_temp", patched)
     with c:
         r = _rename(c)
     assert r.status_code == 200
