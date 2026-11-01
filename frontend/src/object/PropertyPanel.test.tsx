@@ -148,6 +148,29 @@ describe('PropertyPanel definition editing', () => {
     expect(added).toMatchObject({ type: 'boolean', key: 'checkbox', name: 'Checkbox' })
   })
 
+  test('a new label whose type save resolves null is not applied to the value', async () => {
+    const user = userEvent.setup()
+    const KIND = propertyDef({ id: 'p-kind', key: 'kind', name: 'Kind', type: 'label', options: { set: [] } })
+    const T = typeDef({ id: 'project', name: 'Project', propertyDefinitions: [KIND] })
+    const onChange = vi.fn()
+    const onTypeChange = vi.fn(async () => null)
+    render(
+      <PropertyPanel
+        type={T}
+        frontmatter={{ title: 'X' }}
+        summary={objectSummary({ path: 'Projects/X.md', type: 'project' })}
+        onChange={onChange}
+        onTypeChange={onTypeChange}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Edit Kind' }))
+    await user.type(screen.getByRole('textbox', { name: 'Search or Create' }), 'Beta')
+    await user.click(screen.getByRole('button', { name: "New 'Beta'" }))
+    expect(onTypeChange).toHaveBeenCalledTimes(1)
+    expect(await screen.findByRole('alert')).toHaveTextContent('The label could not be created.')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   test('Add Property is disabled on a basic type', () => {
     render(
       <PropertyPanel

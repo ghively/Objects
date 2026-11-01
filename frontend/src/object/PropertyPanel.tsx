@@ -319,9 +319,10 @@ export function PropertyPanel({
   }
   const external = externalKeys(type, frontmatter)
 
+  // Resolves the save's result (null when it failed), so a new label is applied only once saved.
   const onDefChange = async (next: PropertyDef) => {
-    if (!type || !onTypeChange) return
-    await onTypeChange({
+    if (!type || !onTypeChange) return null
+    return onTypeChange({
       ...type,
       propertyDefinitions: type.propertyDefinitions.map((d) => (d.id === next.id ? next : d)),
     })

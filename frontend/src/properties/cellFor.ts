@@ -26,7 +26,7 @@ import { UrlCell } from './cells/UrlCell'
 /** What some cells take besides `CellProps`; every cell ignores the extras it doesn't use. */
 export interface CellExtras {
   /** LabelCell: saves an edited option set (the type) before the value is applied. */
-  onDefChange?(next: PropertyDef): void | Promise<void>
+  onDefChange?(next: PropertyDef): void | Promise<unknown>
   /** TagsCell: opens a tag's page. */
   onOpenTag?(name: string): void
   /** RelationCell: opens a linked object. */
