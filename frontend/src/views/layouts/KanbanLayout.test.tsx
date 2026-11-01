@@ -178,6 +178,21 @@ describe('KanbanLayout', () => {
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Bs/B1.md', { stage: ['Y'] }, 'v3'))
   })
 
+  test('a column shows a page of cards and loads more on its own (audit 2026-11-01 P1)', async () => {
+    const user = userEvent.setup()
+    const many = Array.from({ length: 120 }, (_, i) => mk(100 + i, ['Done']))
+    render(<DataView rows={[...ROWS, ...many]} types={[TASK]} scope={{ typeIds: ['task'] }} state={kanban()} onState={vi.fn()} layouts={['kanban']} />)
+    const done = columns()[1]
+    expect(within(done).getAllByTestId('kanban-card')).toHaveLength(50)
+    // The header counts every card of the column.
+    expect(within(done).getByText('121')).toBeInTheDocument()
+    expect(within(columns()[0]).queryByRole('button', { name: 'Load more' })).toBeNull()
+    await user.click(within(done).getByRole('button', { name: 'Load more' }))
+    expect(within(done).getAllByTestId('kanban-card')).toHaveLength(100)
+    // The board pages per column: no view-wide "Load more".
+    expect(screen.getAllByRole('button', { name: 'Load more' })).toHaveLength(1)
+  })
+
   test('test kanban drop on createdAt grouping disabled', () => {
     render(
       <Harness

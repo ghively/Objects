@@ -1,5 +1,6 @@
 // `kanban`: one column per group (the view's grouping, else the first label property). Cards drag
-// between columns and a drop writes the group's value; "+" creates an object in a column.
+// between columns and a drop writes the group's value; "+" creates an object in a column. Each
+// column shows a page of cards (`LOAD_PAGE`) and loads more on its own.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { api, ConflictError } from '@/api/client'
@@ -12,6 +13,7 @@ import type { LayoutProps } from '../DataView'
 import { findDef } from '../filter'
 import { canDropRow, groupRows, valueForGroup, type Group } from '../group'
 import { matchingValues } from '../matching'
+import { LOAD_PAGE } from '../model'
 import { propertyChoices } from '../properties'
 import { createRowWrites } from '../rowWrites'
 import { CardItem } from './CardItem'
@@ -62,6 +64,9 @@ function Column({
   onAdd(): void
 }) {
   const drop = useDroppable({ id: `col:${group.id}`, disabled: !droppable })
+  // How many cards the column shows; the header counts them all.
+  const [shown, setShown] = useState(LOAD_PAGE)
+  const rows = group.rows.length > shown ? group.rows.slice(0, shown) : group.rows
   return (
     <div
       ref={drop.setNodeRef}
@@ -74,9 +79,18 @@ function Column({
         {title}
         <span className="text-fg-muted">{group.rows.length}</span>
       </div>
-      {group.rows.map((r) => (
+      {rows.map((r) => (
         <Card key={r.summary.path} props={props} row={r} hide={hide} groupId={group.id} />
       ))}
+      {group.rows.length > shown && (
+        <button
+          type="button"
+          onClick={() => setShown((n) => n + LOAD_PAGE)}
+          className="mx-auto rounded-lg px-3 py-1 text-[14px] text-fg-muted hover:bg-hover"
+        >
+          Load more
+        </button>
+      )}
       <button
         type="button"
         aria-label={`Add to ${group.label}`}
