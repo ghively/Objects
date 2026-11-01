@@ -19,7 +19,7 @@ import { api } from '@/api/client'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command'
 import { createAndOpen, openObject, type OpenMods } from '@/create/createAndOpen'
-import { ensureLinkIndex, typeOf, useLinkIndex } from '@/links/linkIndex'
+import { ensureLinkIndex, typeOf, typesByIdOf, useLinkIndex } from '@/links/linkIndex'
 import { useRecent } from '@/nav/recent'
 import { isTagType } from '@/object/ObjectHeader'
 import { setObjectDragData } from '@/shell/objectDrag'
@@ -125,14 +125,15 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch }: SearchViewP
   }, [q, filters])
 
   const tagNames = useMemo(() => {
+    const byId = typesByIdOf(types)
     const names = new Map<string, string>()
     for (const o of objects) {
       if (o.template) continue
-      if (isTagType(typeOf(o.type), o.type) && o.title) names.set(o.title.toLowerCase(), o.title)
+      if (isTagType(o.type ? byId.get(o.type) : undefined, o.type) && o.title) names.set(o.title.toLowerCase(), o.title)
       for (const t of o.tags) if (!names.has(t.toLowerCase())) names.set(t.toLowerCase(), t)
     }
     return [...names.values()]
-  }, [objects])
+  }, [objects, types])
 
   const options = useMemo(() => buildSearchOptions(q, types, tagNames, filters), [q, types, tagNames, filters])
 
