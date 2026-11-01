@@ -2,6 +2,10 @@
 // a create, delete, rename, type or collection event reloads everything (value shapes and
 // collection-name resolution may have changed); otherwise the changed paths are fetched in ONE
 // call and merged in. Other kinds (queries, views, ui) are ignored.
+//
+// Rows load without previews (`preview: false`; audit 2026-11-01 P2): the pipeline runs over
+// every row, but only a card layout's visible page shows a preview, and `DataView` fetches those
+// after (`api.rows({ paths, preview: true })`) and patches them in through `patchRow`.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import type { ChangeEvent, Row, RowsScope } from '@/api/types'
@@ -27,7 +31,7 @@ export function useRows(scope: RowsScope): UseRows {
   const reload = useCallback(async () => {
     const n = ++seq.current
     try {
-      const next = await api.rows(scopeRef.current)
+      const next = await api.rows({ ...scopeRef.current, preview: false })
       if (n === seq.current) setRows(next)
     } catch (e) {
       console.warn('Could not load rows:', e)
@@ -59,7 +63,7 @@ export function useRows(scope: RowsScope): UseRows {
       if (wanted.length === 0) return
       const n = seq.current
       try {
-        const fresh = await api.rows({ ...scopeRef.current, paths: wanted })
+        const fresh = await api.rows({ ...scopeRef.current, paths: wanted, preview: false })
         if (n !== seq.current) return
         const byPath = new Map(fresh.map((r) => [r.summary.path, r]))
         setRows((cur) => {

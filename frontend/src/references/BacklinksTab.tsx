@@ -58,8 +58,8 @@ export function EntryHeader({
   list: string[]
   action?: ReactNode
 }) {
-  useLinkIndex((s) => s.revision) // re-render when types load
-  const type = typeOf(summary?.type)
+  // Only this entry's type (loaded later than the entries, perhaps): not every index revision.
+  const type = useLinkIndex((s) => (summary?.type ? s.types.find((t) => t.id === summary.type) : undefined))
   const title = summary?.title || stemOf(path)
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -168,19 +168,25 @@ export interface BacklinksTabProps {
   nestedView?: NestedBacklinkView
 }
 
+/** How many backlinks show at first and how many more each "Load more" adds. */
+export const BACKLINKS_PAGE = 50
+
 export function BacklinksTab({
   entries,
   summaries,
   view = 'embed',
   nestedView = 'showBlockContainingBacklink',
 }: BacklinksTabProps) {
+  // Paged: an object with hundreds of backlinks must not render them all at once (`loadMore`).
+  const [shown, setShown] = useState(BACKLINKS_PAGE)
   if (entries.length === 0) {
     return <EmptyState title={REFERENCES_TEXT.backlinksEmptyTitle} description={REFERENCES_TEXT.backlinksEmptyDescription} />
   }
   const list = entries.map((e) => e.path)
+  const page = entries.length > shown ? entries.slice(0, shown) : entries
   return (
     <ul className="flex flex-col gap-3" data-references-list="backlinks">
-      {entries.map((entry) => {
+      {page.map((entry) => {
         const summary = summaries[entry.path]
         const defs = typeOf(summary?.type)?.propertyDefinitions ?? []
         return (
@@ -212,6 +218,17 @@ export function BacklinksTab({
           </li>
         )
       })}
+      {entries.length > shown && (
+        <li>
+          <button
+            type="button"
+            onClick={() => setShown((n) => n + BACKLINKS_PAGE)}
+            className="rounded-md px-2 py-1 text-[13px] text-fg-muted hover:bg-hover hover:text-fg"
+          >
+            {REFERENCES_TEXT.loadMore}
+          </button>
+        </li>
+      )}
     </ul>
   )
 }

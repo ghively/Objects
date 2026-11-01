@@ -6,7 +6,7 @@
  * and the panel keys (Ctrl+Shift+←/→) stay out of text fields and editors, where those keys move
  * and select by word.
  */
-import { toggleCalendarSidebar } from '@/calendar/CalendarPage'
+import { toggleCalendarSidebar } from '@/calendar/calendarUi'
 import { M7_SHORTCUTS, registerShortcuts, useGlobalShortcut } from '@/lib/shortcuts'
 import { useTabs } from '@/nav/tabs'
 import { useTabMenu } from '@/shell/TabMenu'

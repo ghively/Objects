@@ -81,7 +81,7 @@ describe('SearchPage', () => {
     await waitFor(() => expect(mocked.search).toHaveBeenCalled(), ASYNC)
     expect(lastSearch()?.[0]).toBe('alpha')
     expect(lastSearch()?.[1]).toMatchObject({ mode: 'auto' })
-    await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ paths: ['Pages/Beta.md', 'Pages/Alpha.md'] }), ASYNC)
+    await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ paths: ['Pages/Beta.md', 'Pages/Alpha.md'], preview: false }), ASYNC)
     // Rows come in the server's rank order, with the full-text snippet beside them: wait for the
     // render that shows both rows, then check it as a whole.
     await waitFor(() => {

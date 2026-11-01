@@ -2,7 +2,7 @@ import { act, render, renderHook, screen, waitFor, within } from '@testing-libra
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { ChangeEvent, Row, ViewState } from '@/api/types'
+import type { ChangeEvent, DataViewDefinition, Row, ViewState } from '@/api/types'
 import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
@@ -11,8 +11,9 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api, ConflictError } from '@/api/client'
-import { resetLinkIndex } from '@/links/linkIndex'
+import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek } from '@/nav/tabs'
+import { cardProperties } from './cards/cardConfig'
 import { DataView } from './DataView'
 import { emptyFilterGroup } from './model'
 import { useRows } from './useRows'
@@ -159,6 +160,25 @@ describe('DataView', () => {
     expect(screen.getByText('Alphabet')).toBeInTheDocument()
   })
 
+  test('a tags group is keyed by the tag object, not a same-titled page (audit 2026-11-01)', () => {
+    useLinkIndex.setState({
+      objects: [
+        objectSummary({ path: 'Tags/Work.md', type: 'tag', title: 'Work', id: 'TAGID' }),
+        objectSummary({ path: 'Pages/Work.md', type: 'page', title: 'Work', id: 'PAGEID' }),
+      ],
+      loaded: true,
+    })
+    const rows = [mk('Pages/Alpha.md', { tags: ['Work'] }), mk('Pages/Beta.md', { tags: ['Home'] })]
+    const init: ViewState = {
+      ...base(),
+      groupBy: { groups: [{ propertyId: 'tags', option: 'default' }] },
+      viewDefinition: { dataViewLayout: 'list', groupByConfig: { groups: [{ id: 'TAGID', isHidden: true, isClosed: false }] } },
+    }
+    render(<Harness rows={rows} init={init} />)
+    // The hidden "Work" group stays hidden; only "Home" shows.
+    expect(screen.getAllByTestId('group-header').map((h) => h.textContent)).toEqual(['Home1'])
+  })
+
   test('test load more pages by 50', async () => {
     const user = userEvent.setup()
     const many = Array.from({ length: 120 }, (_, i) => mk(`Pages/P${String(i).padStart(3, '0')}.md`))
@@ -247,6 +267,73 @@ describe('DataView', () => {
   })
 })
 
+describe('preview paging (audit 2026-11-01 P2)', () => {
+  // A "server" of 120 pages with a 1,500-character preview each; rows without previews are small.
+  const SERVER = Array.from({ length: 120 }, (_, i) =>
+    row({ summary: objectSummary({ path: `Pages/P${String(i).padStart(3, '0')}.md`, type: 'page', title: `P${i}` }), preview: `preview ${i} `.padEnd(1500, 'x') }),
+  )
+  const answer = async (scope?: Parameters<typeof api.rows>[0]) => {
+    const wanted = scope?.paths ? SERVER.filter((r) => scope.paths?.includes(r.summary.path)) : SERVER
+    return scope?.preview === false ? wanted.map((r) => ({ ...r, preview: '' })) : wanted
+  }
+  const calls = () => mocked.rows.mock.calls.map(([scope]) => scope)
+  function Owner({ layout, def }: { layout: 'list' | 'grid' | 'kanban'; def?: Partial<DataViewDefinition> }) {
+    const { rows, loading, patchRow } = useRows({ typeIds: ['page'] })
+    const [state, setState] = useState<ViewState>({ ...base(), viewDefinition: { dataViewLayout: layout, ...def } })
+    return (
+      <DataView rows={rows} loading={loading} types={[PAGE]} scope={{ typeIds: ['page'] }} state={state} onState={setState} layouts={['list', 'grid', 'kanban']} patchRow={patchRow} />
+    )
+  }
+
+  beforeEach(() => {
+    mocked.rows.mockReset()
+    mocked.rows.mockImplementation(answer)
+    mocked.onChange.mockReturnValue(() => undefined)
+  })
+
+  test('rows load without previews; a card layout fetches the visible page, then the next page on Load more', async () => {
+    const user = userEvent.setup()
+    render(<Owner layout="grid" />)
+    await waitFor(() => expect(screen.getAllByTestId('card-preview')).toHaveLength(50))
+    expect(calls()[0]).toEqual({ typeIds: ['page'], preview: false })
+    expect(calls()[1]).toEqual({ paths: SERVER.slice(0, 50).map((r) => r.summary.path), preview: true })
+    expect(screen.getAllByTestId('card-preview')[0].textContent?.startsWith('preview 0 ')).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'Load more' }))
+    await waitFor(() => expect(screen.getAllByTestId('card-preview')).toHaveLength(100))
+    expect(calls()).toHaveLength(3)
+    expect(calls()[2]).toEqual({ paths: SERVER.slice(50, 100).map((r) => r.summary.path), preview: true })
+    // What the page cost: the full rows once, previews for the 100 on screen; before, every preview came with the rows.
+    const bytes = (rows: Row[]) => JSON.stringify(rows).length
+    const before = bytes(SERVER)
+    const after = bytes(SERVER.map((r) => ({ ...r, preview: '' }))) + bytes(SERVER.slice(0, 50)) + bytes(SERVER.slice(50, 100))
+    console.log(`P2 bytes: rows with previews ${before}; rows without + 2 preview pages ${after}; first paint ${bytes(SERVER.map((r) => ({ ...r, preview: '' }))) + bytes(SERVER.slice(0, 50))}`)
+    expect(after).toBeLessThan(before)
+  })
+
+  // Review fix 2026-11-01 #6: the kanban pages on its own, and asked for previews even when its cards show none.
+  test('a kanban whose cards show no preview fetches none; one whose cards do fetches its cards', async () => {
+    const noPreview: Partial<DataViewDefinition> = {
+      smallCardViewConfigs: { page: { entityViewType: 'smallCard', properties: cardProperties(PAGE).filter((p) => p.propertyId !== 'computed_preview') } },
+    }
+    const { unmount } = render(<Owner layout="kanban" def={noPreview} />)
+    await waitFor(() => expect(screen.getAllByTestId('kanban-card').length).toBeGreaterThan(0))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(calls()).toEqual([{ typeIds: ['page'], preview: false }])
+    unmount()
+    mocked.rows.mockClear()
+    render(<Owner layout="kanban" />)
+    await waitFor(() => expect(screen.getAllByTestId('card-preview').length).toBeGreaterThan(0))
+    expect(calls()[1]?.preview).toBe(true)
+  })
+
+  test('the list never fetches previews', async () => {
+    render(<Owner layout="list" />)
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(50))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(calls()).toEqual([{ typeIds: ['page'], preview: false }])
+  })
+})
+
 describe('useRows', () => {
   let emit: (e: ChangeEvent) => void
   const A = mk('Pages/A.md')
@@ -273,7 +360,7 @@ describe('useRows', () => {
     act(() => emit(ev('changed', 'Pages/A.md')))
     await waitFor(() => expect(result.current.rows[0].summary.title).toBe('Renamed in place'))
     expect(mocked.rows).toHaveBeenCalledTimes(1)
-    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['page'], paths: ['Pages/A.md'] })
+    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['page'], paths: ['Pages/A.md'], preview: false })
     expect(result.current.rows[1]).toBe(B)
     expect(result.current.rows[2]).toBe(C)
   })
@@ -291,7 +378,7 @@ describe('useRows', () => {
     await waitFor(() => expect(mocked.rows).toHaveBeenCalled())
     await new Promise((r) => setTimeout(r, 250))
     expect(mocked.rows).toHaveBeenCalledTimes(1)
-    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['page'], paths: ['Pages/A.md', 'Pages/B.md', 'Pages/C.md'] })
+    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['page'], paths: ['Pages/A.md', 'Pages/B.md', 'Pages/C.md'], preview: false })
   })
 
   test('a requested path the scoped call no longer returns is dropped', async () => {
@@ -309,7 +396,7 @@ describe('useRows', () => {
     mocked.rows.mockClear()
     act(() => emit(ev('types', 'page')))
     await waitFor(() => expect(mocked.rows).toHaveBeenCalledTimes(1))
-    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['page'] })
+    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['page'], preview: false })
     mocked.rows.mockClear()
     act(() => emit(ev('views', 'page')))
     act(() => emit(ev('ui', 'ui.json')))

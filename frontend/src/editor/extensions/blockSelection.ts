@@ -11,7 +11,8 @@
  * Escape selects the block holding the cursor; Shift+Up/Down extend; Mod-a
  * selects the block's siblings, again the top level; Backspace/Delete delete;
  * Mod-c copies the blocks' serialized source (their original bytes when
- * unedited) as text/plain, Mod-x cuts; Mod-d duplicates; Alt-Up/Down (with
+ * unedited) as text/plain, Mod-x cuts, and pasted Markdown text is read as
+ * blocks (`pasteSlice`); Mod-d duplicates; Alt-Up/Down (with
  * or without Shift) move them, or the block holding the cursor; Mod-e / Mod-m
  * turn them into a code / math block; Tab/Shift-Tab indent and unindent list items; typing replaces the
  * blocks with a paragraph; a click (any selection change of its own) clears it.
@@ -19,14 +20,16 @@
  * The keys come from the registry (`editor/shortcuts.ts`, `keysFor(id)`).
  */
 import { Extension, type Editor } from '@tiptap/core'
-import type { Node as PMNode } from '@tiptap/pm/model'
+import { Fragment, Slice, type Node as PMNode, type ResolvedPos } from '@tiptap/pm/model'
 import { NodeSelection, Plugin, PluginKey, Selection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
-import { serializeBody } from '../document'
+import { parseBody, serializeBody } from '../document'
+import { contentMatchesSnapshot } from './blockSource'
 import { BLOCK_PARENTS, blockChain, optionApplies, setOptionAt, type BlockRef, type Hierarchy, type ListType } from '../nodes/blockOptions'
 import { isToggleOpen } from '../nodes/toggle'
 import type { Option } from '../annotations'
 import { keymapFor } from '../shortcuts'
+import { BLOCK_ID_SUFFIX } from '../blocks'
 
 export type BlockSelectionState = { anchor: number; head: number } | null
 
@@ -248,7 +251,23 @@ export function deleteBlocks(editor: Editor): boolean {
   return true
 }
 
-/** Duplicate the target blocks below themselves; the copies become the block selection. */
+/** Remove the ` ^id` block ids from the textblocks in `[from, to)`: a copy of a block is not its reference target. */
+function stripBlockIds(tr: Transaction, from: number, to: number): void {
+  const cuts: [number, number][] = []
+  tr.doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isTextblock) return true
+    const m = BLOCK_ID_SUFFIX.exec(node.textContent)
+    if (m) cuts.push([pos + 1 + m.index, pos + 1 + node.content.size])
+    return false
+  })
+  for (const [a, b] of cuts.reverse()) tr.delete(a, b)
+}
+
+/**
+ * Duplicate the target blocks below themselves; the copies become the block
+ * selection. A copy carries no block id (two blocks with one id would make
+ * its references ambiguous).
+ */
 export function duplicateBlocks(editor: Editor): boolean {
   const range = targetRange(editor.state)
   if (!range) return false
@@ -264,9 +283,12 @@ export function duplicateBlocks(editor: Editor): boolean {
   if ('blockTrailing' in last.attrs) tr.setNodeAttribute(lastPos, 'blockTrailing', blank)
   const at = tr.mapping.map(range.to)
   tr.insert(at, copies)
-  const size = copies.reduce((sum, n) => sum + n.nodeSize, 0)
-  const copyRange = rangeBetween(tr.doc, at, at + size - copies[copies.length - 1].nodeSize)
-  editor.view.dispatch(selectRange(tr, copyRange))
+  stripBlockIds(tr, at, at + copies.reduce((sum, n) => sum + n.nodeSize, 0))
+  // The copies as inserted (shorter without their ids): the selection spans their first and last.
+  const $at = tr.doc.resolve(at)
+  let lastStart = at
+  for (let i = 0; i < copies.length - 1; i++) lastStart += $at.parent.child($at.index() + i).nodeSize
+  editor.view.dispatch(selectRange(tr, rangeBetween(tr.doc, at, lastStart)))
   return true
 }
 
@@ -582,6 +604,117 @@ function onClipboard(view: EditorView, event: ClipboardEvent, cut: boolean, edit
 }
 
 // ---------------------------------------------------------------------------
+// Pasting
+
+/**
+ * Text that reads as Markdown: a line starting a block (heading, list item,
+ * quote, fence, table row, rule, math, comment, embed) or carrying a whole
+ * inline pattern (a closed code span, a strong, emphasis or strikethrough
+ * pair, a link or wikilink). A lone backtick or asterisk in prose is not one,
+ * so such text is left to ProseMirror's own text paste (one paragraph per
+ * line) instead of becoming one paragraph with soft breaks.
+ */
+const MD_BLOCK_START = /^ {0,3}(?:#{1,6}(?:[ \t]|$)|[-+*](?:[ \t]|$)|\d{1,9}[.)](?:[ \t]|$)|>|`{3}|~{3}|\||(?:[-*_][ \t]*){3,}$|\$\$|<!--|!\[)/m
+const MD_INLINE = /`[^`\n]+`|\*\*\S[^\n]*?\*\*|\*\S[^*\n]*\*|~~\S[^\n]*?~~|\[\[[^\]\n]+\]\]|\[[^\]\n]*\]\([^)\n]*\)/
+
+export function looksLikeMarkdown(text: string): boolean {
+  return MD_BLOCK_START.test(text) || MD_INLINE.test(text)
+}
+
+/**
+ * Pasted text (our own block copy, or Markdown from elsewhere) read as a body
+ * is: the same parser as `loadBody`, so lists, headings, tables, math and
+ * annotated blocks come back as those blocks instead of one escaped paragraph
+ * per line. A block that still equals its copied source keeps its bytes on save.
+ * Null (the default paste) for plain text, or when the text does not parse.
+ */
+export function pasteBlocks(editor: Editor, text: string): PMNode[] | null {
+  if (!looksLikeMarkdown(text)) return null
+  try {
+    const { content } = parseBody(editor, text.replace(/\r\n?/g, '\n'))
+    if (!content.length) return null
+    return content.map((json) => {
+      const node = editor.schema.nodeFromJSON(json)
+      // Our own copy or cut (the block as loaded) keeps its source; anything else is a new block.
+      return contentMatchesSnapshot(editor, node) ? node : withoutSource(node)
+    })
+  } catch {
+    return null
+  }
+}
+
+const SOURCE_ATTRS = ['blockSource', 'blockOrigin', 'blockTrailing']
+
+/** `node` and its descendants without their source attributes. */
+function withoutSource(node: PMNode): PMNode {
+  const content = Fragment.from(node.content.content.map(withoutSource))
+  if (!SOURCE_ATTRS.some((k) => k in node.attrs)) return node.copy(content)
+  const attrs = { ...node.attrs }
+  for (const k of SOURCE_ATTRS) if (k in attrs) attrs[k] = null
+  return node.type.create(attrs, content, node.marks)
+}
+
+/**
+ * Blocks parsed by `clipboardTextParser` for the paste `handlePaste` is about
+ * to see (ProseMirror calls the two in turn, synchronously). A single paragraph
+ * is left to ProseMirror, which merges it into the text at the cursor; anything
+ * else is inserted as whole blocks by `insertPastedBlocks`.
+ */
+let pendingBlocks: PMNode[] | null = null
+
+/** Whether the paste lands in a table cell, which holds no blocks: the default text paste applies there. */
+function inTableCell($context: ResolvedPos): boolean {
+  for (let d = $context.depth; d >= 1; d--) {
+    const role = $context.node(d).type.spec.tableRole
+    if (role === 'cell' || role === 'header_cell') return true
+  }
+  return false
+}
+
+function parsePastedText(editor: Editor, text: string, $context: ResolvedPos): Slice | null {
+  pendingBlocks = null
+  if (inTableCell($context)) return null
+  const nodes = pasteBlocks(editor, text)
+  if (!nodes) return null
+  if (nodes.length > 1 || nodes[0].type.name !== 'paragraph') pendingBlocks = nodes
+  return new Slice(Fragment.from(nodes), 0, 0)
+}
+
+/**
+ * Insert `nodes` as blocks at the selection: in place of an empty textblock,
+ * before or after the textblock when the cursor is at its start or end, else
+ * splitting it. Inside a list item, a table cell or a quote the default paste
+ * (ProseMirror fitting the slice) applies instead.
+ */
+export function insertPastedBlocks(view: EditorView, nodes: PMNode[]): boolean {
+  const { state } = view
+  const tr = state.tr
+  if (!state.selection.empty) tr.deleteSelection()
+  const $pos = tr.selection.$from
+  const parent = $pos.parent
+  if (!parent.isTextblock || !BLOCK_PARENTS.has($pos.node($pos.depth - 1).type.name)) return false
+  let at: number
+  if (parent.content.size === 0) {
+    at = $pos.before()
+    tr.replaceWith(at, $pos.after(), nodes)
+  } else if ($pos.parentOffset === parent.content.size) {
+    at = $pos.after()
+    tr.insert(at, nodes)
+  } else if ($pos.parentOffset === 0) {
+    at = $pos.before()
+    tr.insert(at, nodes)
+  } else {
+    tr.split($pos.pos)
+    at = $pos.pos + 1 // between the two halves
+    tr.insert(at, nodes)
+  }
+  const size = nodes.reduce((sum, n) => sum + n.nodeSize, 0)
+  tr.setSelection(Selection.near(tr.doc.resolve(at + size), -1))
+  view.dispatch(tr.scrollIntoView().setMeta('paste', true).setMeta('uiEvent', 'paste'))
+  return true
+}
+
+// ---------------------------------------------------------------------------
 
 function decorations(state: EditorState): DecorationSet {
   const range = blockSelectionRange(state)
@@ -592,10 +725,22 @@ function decorations(state: EditorState): DecorationSet {
   )
 }
 
-export const BlockSelection = Extension.create({
+export interface BlockSelectionOptions {
+  /**
+   * Read pasted text as Markdown (`pasteBlocks`). Off for an editor that holds one paragraph
+   * (a Text property cell), where a list or heading has no place: the plain text paste applies.
+   */
+  markdownPaste: boolean
+}
+
+export const BlockSelection = Extension.create<BlockSelectionOptions>({
   name: 'blockSelection',
   // Before StarterKit's keymaps (Backspace, Tab, Mod-a) and after the slash menu.
   priority: 900,
+
+  addOptions() {
+    return { markdownPaste: true }
+  },
 
   addKeyboardShortcuts() {
     const editor = this.editor
@@ -691,6 +836,14 @@ export const BlockSelection = Extension.create({
           handleDOMEvents: {
             copy: (view, event) => onClipboard(view, event, false, editor),
             cut: (view, event) => onClipboard(view, event, true, editor),
+          },
+          // Not for "paste as plain text" (`plain`); a falsy result leaves the default text paste.
+          clipboardTextParser: (text, $context, plain) =>
+            (plain || !this.options.markdownPaste ? null : parsePastedText(editor, text, $context)) as Slice,
+          handlePaste(view) {
+            const nodes = pendingBlocks
+            pendingBlocks = null
+            return !!nodes && insertPastedBlocks(view, nodes)
           },
         },
       }),

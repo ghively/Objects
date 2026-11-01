@@ -136,7 +136,7 @@ def test_bump_keeps_crlf_bom(ctx):
 def test_bump_takes_no_history_version(ctx):
     space, c, _events, root, _clock = ctx
     seen: list[str] = []
-    space.before_write = lambda rel, _data: seen.append(rel)
+    space.before_write = lambda rel, _data, _id=None: seen.append(rel)
     assert put_board(c, root, NETWORK).status_code == 200
     assert NETWORK not in seen
     assert seen == ["Whiteboards/Network map.whiteboard.json"]

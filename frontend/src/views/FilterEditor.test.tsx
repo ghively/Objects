@@ -10,6 +10,7 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
+import { useSettings } from '@/settings/useSettings'
 import { FilterEditor } from './FilterEditor'
 import { emptyFilterGroup } from './model'
 import { propertyChoices } from './properties'
@@ -123,6 +124,24 @@ describe('FilterEditor', () => {
     expect(await screen.findByRole('menu', { name: 'Date' })).toBeInTheDocument()
   })
 
+  test('"Specific date" defaults to today in the Time zone setting, not the UTC day (audit 2026-11-01)', async () => {
+    useSettings.setState({ settings: { ...useSettings.getState().settings, timeZone: 'America/Los_Angeles' } })
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date('2026-11-01T03:00:00Z') }) // Oct 31, 8 PM in LA
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const onChange = vi.fn()
+    const T = typeDef({ id: 'task', propertyDefinitions: [propertyDef({ id: 'due', type: 'datetime', name: 'Due' })] })
+    const init: FilterGroup = { type: 'filterGroup', operator: 'and', elements: [{ type: 'filter', propertyId: 'due', option: 'is' }] }
+    try {
+      render(<FilterEditor group={init} onChange={onChange} choices={propertyChoices([T])} types={[T]} collections={[]} />)
+      await user.click(screen.getByRole('button', { name: 'Date' }))
+      await user.click(await screen.findByRole('menuitemradio', { name: 'Specific date' }))
+      expect((onChange.mock.calls[0][0] as FilterGroup).elements[0]).toMatchObject({ referenceValue: { exactDate: '2026-10-31' } })
+    } finally {
+      vi.useRealTimers()
+      useSettings.setState({ settings: { ...useSettings.getState().settings, timeZone: null } })
+    }
+  })
+
   test('a percentage filter value is typed in percent and stored as the fraction', () => {
     const T = typeDef({
       id: 'deal',
@@ -135,10 +154,85 @@ describe('FilterEditor', () => {
       elements: [{ type: 'filter', propertyId: 'odds', option: 'greater', referenceValue: 0.143 }],
     }
     render(<FilterEditor group={init} onChange={onChange} choices={propertyChoices([T])} types={[T]} collections={[]} />)
-    const value = screen.getByRole('spinbutton', { name: 'Value' })
-    expect(value).toHaveValue(14.3)
+    const value = screen.getByRole('textbox', { name: 'Value' })
+    expect(value).toHaveValue('14.3')
     fireEvent.change(value, { target: { value: '25' } })
     expect((onChange.mock.calls.at(-1)![0] as FilterGroup).elements[0]).toMatchObject({ referenceValue: 0.25 })
+  })
+
+  test('a number being typed (1., -, 1e) keeps the last value; leaving shows the value applied', async () => {
+    const T = typeDef({ id: 'deal', propertyDefinitions: [propertyDef({ id: 'amount', type: 'number', name: 'Amount' })] })
+    const onChange = vi.fn()
+    function H() {
+      const [group, setGroup] = useState<FilterGroup>({
+        type: 'filterGroup',
+        operator: 'and',
+        elements: [{ type: 'filter', propertyId: 'amount', option: 'greater', referenceValue: 3 }],
+      })
+      return (
+        <FilterEditor
+          group={group}
+          onChange={(g) => {
+            setGroup(g)
+            onChange(g)
+          }}
+          choices={propertyChoices([T])}
+          types={[T]}
+          collections={[]}
+        />
+      )
+    }
+    const user = userEvent.setup()
+    render(<H />)
+    const value = screen.getByRole('textbox', { name: 'Value' })
+    const ref = () => ((onChange.mock.calls.at(-1)![0] as FilterGroup).elements[0] as { referenceValue?: unknown }).referenceValue
+    await user.clear(value)
+    await user.type(value, '1.')
+    expect(value).toHaveValue('1.')
+    expect(ref()).toBe(1)
+    await user.type(value, '5')
+    expect(ref()).toBe(1.5)
+    await user.type(value, '-', { initialSelectionStart: 0, initialSelectionEnd: 3 })
+    expect(value).toHaveValue('-')
+    // "-" is a number being typed: the filter keeps the last value applied.
+    expect(ref()).toBe(1.5)
+    await user.type(value, '2e')
+    expect(value).toHaveValue('-2e')
+    expect(ref()).toBe(-2)
+    await user.type(value, '1')
+    expect(ref()).toBe(-20)
+    await user.type(value, 'e')
+    await user.tab()
+    expect(value).toHaveValue('-20')
+  })
+
+  test('a number filter reads numbers as the number cells do: the decimal comma, "+5", no infinity', () => {
+    const T = typeDef({ id: 'deal', propertyDefinitions: [propertyDef({ id: 'amount', type: 'number', name: 'Amount' })] })
+    const onChange = vi.fn()
+    const init: FilterGroup = {
+      type: 'filterGroup',
+      operator: 'and',
+      elements: [{ type: 'filter', propertyId: 'amount', option: 'greater', referenceValue: 3 }],
+    }
+    const before = useSettings.getState().settings
+    useSettings.setState({ settings: { ...before, decimalSeparator: 'comma' } })
+    try {
+      render(<FilterEditor group={init} onChange={onChange} choices={propertyChoices([T])} types={[T]} collections={[]} />)
+      const value = screen.getByRole('textbox', { name: 'Value' })
+      const ref = () => ((onChange.mock.calls.at(-1)![0] as FilterGroup).elements[0] as { referenceValue?: unknown }).referenceValue
+      fireEvent.change(value, { target: { value: '1,5' } })
+      expect(value).not.toHaveAttribute('aria-invalid')
+      expect(ref()).toBe(1.5)
+      fireEvent.change(value, { target: { value: '+5' } })
+      expect(value).not.toHaveAttribute('aria-invalid')
+      expect(ref()).toBe(5)
+      const calls = onChange.mock.calls.length
+      fireEvent.change(value, { target: { value: '1e400' } })
+      expect(onChange.mock.calls.length).toBe(calls) // not applied
+      expect(value).toHaveAttribute('aria-invalid', 'true')
+    } finally {
+      useSettings.setState({ settings: before })
+    }
   })
 
   test('shows "No eligible properties available" without properties', () => {

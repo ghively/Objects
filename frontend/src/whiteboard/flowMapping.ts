@@ -92,6 +92,86 @@ export function toFlow(
   return { nodes, edges }
 }
 
+/** A node's rendered size (React Flow's measuring), given back so hidden nodes keep theirs. */
+export type MeasuredSize = { width: number; height: number }
+
+interface NodeEntry {
+  node: WhiteboardNode
+  block: WhiteboardBlock | undefined
+  selected: boolean
+  measured: MeasuredSize | undefined
+  theme: string
+  flow: FlowNode
+}
+
+interface EdgeEntry {
+  edge: WhiteboardEdge
+  block: WhiteboardBlock | undefined
+  selected: boolean
+  theme: string
+  flow: FlowEdge
+}
+
+const sameSize = (a: MeasuredSize | undefined, b: MeasuredSize | undefined) =>
+  a === b || (!!a && !!b && a.width === b.width && a.height === b.height)
+
+/**
+ * The canvas's projection, cached per node and edge id: `project` gives back the same `FlowNode`
+ * or `FlowEdge` object for an element whose inputs (its node or edge object, its block, whether
+ * it is selected, its measured size and the theme) are unchanged, so React Flow's memoized node
+ * components skip it. Nudging one of 60 nodes then renders one node, not 60. `data.theme` is
+ * there so a theme change re-renders every memoized view (they read the theme themselves).
+ */
+export class FlowProjection {
+  private nodes = new Map<string, NodeEntry>()
+  private edges = new Map<string, EdgeEntry>()
+
+  project(
+    board: WhiteboardData,
+    selected: ReadonlySet<string>,
+    measured: Record<string, MeasuredSize>,
+    theme: string,
+  ): { nodes: FlowNode[]; edges: FlowEdge[] } {
+    const blocks = board.blocks ?? {}
+    const nodes: FlowNode[] = []
+    for (const id in board.nodes) {
+      const n = board.nodes[id]
+      const block = n.blockId !== undefined ? blocks[n.blockId] : undefined
+      const sel = selected.has(id)
+      const m = measured[id]
+      const have = this.nodes.get(id)
+      if (have && have.node === n && have.block === block && have.selected === sel && sameSize(have.measured, m) && have.theme === theme) {
+        nodes.push(have.flow)
+        continue
+      }
+      const flow = toFlowNode(n, blocks, sel)
+      if (m) flow.measured = m
+      flow.data = { ...flow.data, theme }
+      this.nodes.set(id, { node: n, block, selected: sel, measured: m, theme, flow })
+      nodes.push(flow)
+    }
+    for (const id of this.nodes.keys()) if (!(id in board.nodes)) this.nodes.delete(id)
+
+    const edges: FlowEdge[] = []
+    for (const id in board.edges) {
+      const e = board.edges[id]
+      const block = e.blockId !== undefined ? blocks[e.blockId] : undefined
+      const sel = selected.has(id)
+      const have = this.edges.get(id)
+      if (have && have.edge === e && have.block === block && have.selected === sel && have.theme === theme) {
+        edges.push(have.flow)
+        continue
+      }
+      const flow = toFlowEdge(e, blocks, sel)
+      flow.data = { ...flow.data!, theme }
+      this.edges.set(id, { edge: e, block, selected: sel, theme, flow })
+      edges.push(flow)
+    }
+    for (const id of this.edges.keys()) if (!(id in board.edges)) this.edges.delete(id)
+    return { nodes, edges }
+  }
+}
+
 /**
  * Applies React Flow's position and size changes to the board. Only fields that actually changed
  * are rewritten (every other key, known or not, is kept), unchanged nodes keep their identity and

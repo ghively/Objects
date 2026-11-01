@@ -1,0 +1,16 @@
+tables fixture (makeBigBody): loadBody ms: 13688.2
+tables fixture (makeBigBody): doc nodes: 1064890
+tables fixture (makeBigBody): body bytes: 982597
+tables fixture (makeBigBody): serializeBody (unedited, autosave path) ms: 17.4
+tables fixture (makeBigBody): roundtrip equal: true
+tables fixture (makeBigBody): keystroke dispatch ms (start, middle, end): 488, 186, 251.9
+tables fixture (makeBigBody): serializeBody after edits ms: 55.3
+tables fixture (makeBigBody): 10 keystrokes at end ms: 1478.9
+prose 1MB: loadBody ms: 1746
+prose 1MB: doc nodes: 974096
+prose 1MB: body bytes: 1000051
+prose 1MB: serializeBody (unedited, autosave path) ms: 133
+prose 1MB: roundtrip equal: true
+prose 1MB: keystroke dispatch ms (start, middle, end): 31.2, 70.4, 33.7
+prose 1MB: serializeBody after edits ms: 56.7
+prose 1MB: 10 keystrokes at end ms: 173.5

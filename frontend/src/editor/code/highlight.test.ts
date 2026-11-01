@@ -2,10 +2,13 @@ import { Editor as TiptapEditor } from '@tiptap/core'
 import { EditorContent } from '@tiptap/react'
 import { act, render, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 import { editorExtensions, loadBody, serializeBody } from '../document'
-import { CodeHighlightKey, grammarOf, highlightTokens, HIGHLIGHT_DEBOUNCE_MS, registeredGrammars } from './highlight'
+import { CodeHighlightKey, grammarOf, highlightTokens, HIGHLIGHT_DEBOUNCE_MS, knownGrammars, loadGrammar, registeredGrammars } from './highlight'
 import { LANGUAGES, PLAIN_TEXT } from './languages'
+
+// The grammars load on demand (F1); these tests look at highlighted output, so load them all first.
+beforeAll(() => Promise.all(knownGrammars().map(loadGrammar)))
 
 vi.mock('mermaid', () => ({
   default: { initialize: vi.fn(), render: vi.fn(async () => ({ svg: '<svg></svg>' })) },
@@ -130,8 +133,9 @@ describe('code highlighting', () => {
     expect(editor.view.dom.querySelector('[class^="hljs-"]')).toBeNull()
   })
 
-  test('test every language maps to a registered grammar', () => {
+  test('test every language maps to a grammar we ship (registered once loaded)', () => {
     const registered = registeredGrammars()
+    expect(registered.sort()).toEqual(knownGrammars().sort())
     for (const lang of LANGUAGES) {
       if (lang === PLAIN_TEXT || lang.id === 'mermaid') {
         expect(lang.hljs, lang.label).toBeUndefined()

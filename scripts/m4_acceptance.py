@@ -409,7 +409,8 @@ class M4:
         time.sleep(0.5)
         n = self.notifications(title)
         status = git(self.root, "status", "--porcelain", "-uall").strip()
-        self.run.report(n == 1 and not status, f"after a restart: {n} notification in all, space clean")
+        self.run.report(n == 1 and not status, f"after a restart: {n} notification in all, space clean",
+                        *([f"git status: {status}"] if status else []))
 
     # 8 -------------------------------------------------------------------------
     def ui_keys(self) -> None:

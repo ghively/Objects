@@ -1,0 +1,27 @@
+// AUDIT SCRATCH (delete before finishing): calendar date math at DST and year boundaries.
+import { describe, expect, test } from 'vitest'
+import { addDays, addMonths, monthGrid, rangeFor, startOfWeek, weekNumber } from '@/calendar/dates'
+import { arrowStep, pagerStep } from '@/calendar/useCalendar'
+
+describe('audit: calendar date math', () => {
+  test('DST and year boundaries', () => {
+    expect(addDays('2026-11-01', 1)).toBe('2026-11-02') // US fall-back day
+    expect(addDays('2026-03-08', 1)).toBe('2026-03-09') // US spring-forward day
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01')
+    expect(addMonths('2026-01-31', 1)).toBe('2026-02-28')
+    expect(addMonths('2024-01-31', 1)).toBe('2024-02-29')
+    expect(addMonths('2026-12-15', 1)).toBe('2027-01-15')
+    expect(addMonths('2026-01-15', -1)).toBe('2025-12-15')
+    expect(weekNumber('2026-12-31', 'monday')).toBe(53)
+    expect(weekNumber('2027-01-01', 'monday')).toBe(53)
+    expect(weekNumber('2027-01-04', 'monday')).toBe(1)
+    expect(weekNumber('2027-01-03', 'sunday')).toBe(1) // Sunday belongs to the next ISO week
+    expect(startOfWeek('2027-01-01', 'sunday')).toBe('2026-12-27')
+    expect(startOfWeek('2027-01-01', 'monday')).toBe('2026-12-28')
+    expect(rangeFor('month', '2026-02-10', 'sunday').days.length).toBe(28)
+    expect(rangeFor('week', '2027-01-01', 'monday').from).toBe('2026-12-28')
+    expect(monthGrid(2027, 1, 'sunday')[0][0]).toBe('2026-12-27')
+    expect(pagerStep('month', '2026-01-31', 1)).toBe('2026-02-28')
+    expect(arrowStep('month', '2024-02-29', 'ArrowDown')).toBe('2025-02-28')
+  })
+})

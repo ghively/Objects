@@ -70,6 +70,44 @@ describe('[[ trigger', () => {
     expect(serializeBody(editor)).toBe('Hello [[Ada Lovelace]]\n')
   })
 
+  /** Type `[[` at the end of the first paragraph, as the input rule sees it; resolves once the picker has the range. */
+  async function typeBrackets(): Promise<number> {
+    const view = editor.view
+    const end = editor.state.doc.firstChild!.nodeSize - 1
+    editor.commands.insertContentAt(end, '[')
+    const at = end + 1
+    view.someProp('handleTextInput', (f) => f(view, at, at, '[', () => view.state.tr))
+    editor.commands.insertContentAt(at, '[')
+    await waitFor(() => expect(useLinkPicker.getState().range).toEqual({ from: end, to: end + 2 }))
+    return end
+  }
+
+  // Audit 2026-11-01 (unconfirmed): a cancelled picker leaves the `[[`. Kept, as Object: its
+  // link dropdown searches the text typed inline after `[[`, and dismissing it leaves that text
+  // (the slash menu here does the same with `/`). The query typed in the picker is put back too.
+  test('cancelling the picker leaves the [[ and the query typed in it', async () => {
+    await typeBrackets()
+    render(<LinkPicker />)
+    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    fireEvent.change(input, { target: { value: 'ada' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    await waitFor(() => expect(useLinkPicker.getState().range).toBeNull())
+    expect(editor.state.doc.textContent).toBe('Hello [[ada')
+    expect(editor.state.doc.firstChild!.content.childCount).toBe(1) // plain text, no link
+    const saved = serializeBody(editor)
+    loadBody(editor, saved)
+    expect(editor.state.doc.textContent).toBe('Hello [[ada') // saved as literal text
+  })
+
+  test('cancelling with an empty query leaves just the [[', async () => {
+    await typeBrackets()
+    render(<LinkPicker />)
+    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    await waitFor(() => expect(useLinkPicker.getState().range).toBeNull())
+    expect(editor.state.doc.textContent).toBe('Hello [[')
+  })
+
   test('test link picker embed mode inserts an object embed', async () => {
     // The editor's pickObjectEmbed() opens the picker in embed mode at the cursor.
     loadBody(editor, 'First\n\nSecond\n')
@@ -89,4 +127,12 @@ describe('[[ trigger', () => {
     expect(serializeBody(editor)).toBe('First\n\n![[Ada Lovelace]]\n\nSecond\n')
     expect(editor.state.doc.child(1).type.name).toBe('objectEmbed')
   })
+})
+
+// Audit 2026-11-01: a title with a breaking character links by its path form, as the back end does.
+import { wikilinkTargetFor } from '@/editor/extensions/wikilink'
+
+test('test picker targets a title with a pipe by its path', () => {
+  expect(wikilinkTargetFor({ title: 'A|B', path: 'Pages/A|B.md' })).toBe('Pages/A|B')
+  expect(wikilinkTargetFor({ title: 'Plain', path: 'Pages/Plain.md' })).toBe('Plain')
 })

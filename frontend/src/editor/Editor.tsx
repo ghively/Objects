@@ -50,6 +50,8 @@ export type EditorProps = {
   readOnly: boolean
   onSaved: (version: string) => void
   onConflict: (currentVersion: string) => void
+  /** The object's id, when known (see `useAutosave`). */
+  objectId?: string | null
   /** Optional control handle for external-change and conflict handling (Task 10). */
   controlRef?: Ref<BodyEditorHandle | null>
 }
@@ -58,7 +60,7 @@ export type EditorProps = {
  * Formatted block editor for an object's body. Unedited blocks are saved
  * byte-for-byte; saves happen 1000 ms after the last change and on blur.
  */
-export function Editor({ path, body, version, readOnly, onSaved, onConflict, controlRef }: EditorProps) {
+export function Editor({ path, body, version, readOnly, onSaved, onConflict, objectId, controlRef }: EditorProps) {
   const autosaveRef = useRef<ReturnType<typeof useAutosave> | null>(null)
   const disableSpellcheck = useSettings((s) => s.settings.disableSpellcheck)
   const disableNumbered = useSettings((s) => s.settings.disableNumberedListTransformation)
@@ -90,6 +92,7 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict, con
     getBody: () => (editor && !editor.isDestroyed ? serializeBody(editor) : null),
     onSaved,
     onConflict,
+    objectId,
   })
   autosaveRef.current = autosave
 
@@ -147,7 +150,7 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict, con
   // Leaving an object (or unmounting) with a pending save: save it under its own path.
   useEffect(() => {
     return () => {
-      void autosave.flush(path) // no-op when nothing changed since the last load/save
+      void autosave.leave(path) // no-op when nothing changed since the last load/save
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path])

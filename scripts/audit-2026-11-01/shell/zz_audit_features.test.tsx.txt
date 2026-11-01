@@ -1,0 +1,130 @@
+// AUDIT SCRATCH (delete before finishing): tasks, calendar, graph, theme details.
+import { act, render, renderHook, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { ChangeEvent } from '@/api/types'
+import { row, typeDef, propertyDef, graphData } from '@/test/mockApi'
+
+const dialogProps: unknown[] = []
+vi.mock('@/api/client', async (orig) => ({
+  ...(await orig<typeof import('@/api/client')>()),
+  api: (await import('@/test/mockApi')).mockApi(),
+}))
+vi.mock('@/tasks/RecurringOverdueDialog', () => ({
+  RecurringOverdueDialog: (p: Record<string, unknown>) => {
+    dialogProps.push(p)
+    return <div data-testid="overdue-dialog" data-weekstart={String(p.weekStart)} />
+  },
+}))
+
+import { api } from '@/api/client'
+import { TaskCheckbox } from '@/tasks/TaskCheckbox'
+import { useWeekStart } from '@/calendar/useCalendar'
+import { resetPinned, useUiStore } from '@/shell/usePinned'
+import { ReminderMenu } from '@/tasks/ReminderMenu'
+import { resetGraphData, useGraphData } from '@/graph/useGraphData'
+import { useCalendarRange } from '@/calendar/useCalendarRange'
+
+const mocked = vi.mocked(api)
+const listeners = new Set<(e: ChangeEvent) => void>()
+const emit = (e: ChangeEvent) => {
+  for (const cb of [...listeners]) cb(e)
+}
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+beforeEach(() => {
+  dialogProps.length = 0
+  listeners.clear()
+  resetPinned()
+  resetGraphData()
+  for (const fn of Object.values(mocked)) vi.mocked(fn).mockClear()
+  mocked.onChange.mockImplementation((cb) => {
+    listeners.add(cb)
+    return () => listeners.delete(cb)
+  })
+})
+
+const TASK = typeDef({
+  id: 'task',
+  name: 'Task',
+  pluralName: 'Tasks',
+  basic: true,
+  propertyDefinitions: [
+    propertyDef({
+      id: 'status',
+      key: 'status',
+      name: 'Status',
+      type: 'select',
+      options: {
+        options: [
+          { id: 'o', text: 'Open', color: 'gray', category: 'not-started' },
+          { id: 'd', text: 'Done', color: 'green', category: 'done' },
+        ],
+      },
+    }),
+    propertyDef({ id: 'date', key: 'date', name: 'Date', type: 'date' }),
+    propertyDef({ id: 'repeat', key: 'repeat', name: 'Repeat', type: 'text' }),
+  ],
+})
+
+describe('audit: week start defaults disagree', () => {
+  test('with ui.calendar unset, the calendar starts weeks on Sunday but the overdue dialog is told Monday', async () => {
+    useUiStore.setState({ ui: { pinned: [], sections: [], allNotesLayout: 'list' }, revision: 'r1', loaded: true })
+    mocked.ui.mockResolvedValue({ ui: { pinned: [], sections: [], allNotesLayout: 'list' }, revision: 'r1' })
+    const { result } = renderHook(() => useWeekStart())
+    expect(result.current).toBe('sunday')
+
+    const taskApi = {
+      updateProperties: mocked.updateProperties,
+      rows: mocked.rows,
+      overdue: vi.fn(async () => ({ count: 3, capped: false, missed: ['2026-10-28', '2026-10-29', '2026-10-30'], current: '2026-10-31', today: '2026-11-01' })),
+      occurrence: vi.fn(),
+    }
+    const r = row({ path: 'Tasks/T.md', values: { status: ['Open'], date: { start: '2020-01-01', resolution: 'day' }, repeat: 'every day' } })
+    r.summary.type = 'task'
+    render(<TaskCheckbox row={r} type={TASK} taskApi={taskApi as never} />)
+    await act(async () => {
+      screen.getByRole('checkbox').click()
+      await sleep(20)
+    })
+    const dlg = await screen.findByTestId('overdue-dialog')
+    console.log('AUDIT overdue dialog weekStart =', dlg.getAttribute('data-weekstart'), 'calendar weekStart =', result.current)
+    expect(dlg.getAttribute('data-weekstart')).toBe('monday')
+  })
+})
+
+describe('audit: light theme leftovers', () => {
+  test('the reminder time input forces a dark native picker whatever the theme', () => {
+    document.documentElement.setAttribute('data-theme', 'light')
+    const { container } = render(<ReminderMenu value="on the day at 09:00" resolution="day" onChange={() => undefined} />)
+    const input = container.querySelector('input[type=time]')!
+    expect(input.className).toContain('[color-scheme:dark]')
+  })
+})
+
+describe('audit: graph and calendar refetch on every body save', () => {
+  test('useGraphData reloads the whole graph on a body-only changed event', async () => {
+    mocked.graph.mockResolvedValue(graphData())
+    renderHook(() => useGraphData())
+    await sleep(10)
+    const before = mocked.graph.mock.calls.length
+    for (let i = 0; i < 5; i++) {
+      await act(async () => {
+        emit({ kind: 'changed', path: 'Pages/X.md', version: `v${i}`, origin: 'other' })
+        await sleep(600)
+      })
+    }
+    console.log('AUDIT graph refetches after 5 body saves:', mocked.graph.mock.calls.length - before)
+    expect(mocked.graph.mock.calls.length - before).toBe(5)
+  })
+
+  test('useCalendarRange reloads on a body-only changed event of an object outside the range', async () => {
+    renderHook(() => useCalendarRange({ from: '2026-11-01', to: '2026-11-01' }))
+    await sleep(10)
+    const before = mocked.calendar.mock.calls.length
+    await act(async () => {
+      emit({ kind: 'changed', path: 'Pages/X.md', version: 'v2', origin: 'other' })
+      await sleep(250)
+    })
+    expect(mocked.calendar.mock.calls.length - before).toBe(1)
+  })
+})

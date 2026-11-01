@@ -8,6 +8,8 @@ view over the whole space costs one pass over memory. The client's view engine
 from __future__ import annotations
 
 import re
+import threading
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -17,7 +19,15 @@ from .typedefs import RawObject
 if TYPE_CHECKING:
     from .space import ObjectSummary, Space
 
-__all__ = ["MAX_TERMS", "MIN_TERM", "SEARCH_MODES", "Row", "body_preview", "build_rows"]
+__all__ = [
+    "MAX_TERMS",
+    "MIN_TERM",
+    "SEARCH_MODES",
+    "Row",
+    "body_preview",
+    "build_rows",
+    "cached_preview",
+]
 
 MIN_TERM = 2
 MAX_TERMS = 5
@@ -65,8 +75,32 @@ def _wiki(m: re.Match[str]) -> str:
     return alias if alias is not None and alias.strip() else m.group(1)
 
 
+def _preview_line(line: str) -> str:
+    """One body line as plain text (block markers, links and emphasis stripped)."""
+    line = _BLOCK_ID_RE.sub("", line)
+    line = _HEADING_RE.sub("", line)
+    line = _QUOTE_RE.sub("", line)
+    line = _LIST_RE.sub("", line)
+    line = _TASK_RE.sub("", line)
+    line = _TAG_RE.sub("", line)
+    line = _IMAGE_RE.sub(r"\1", line)
+    line = _MDLINK_RE.sub(r"\1", line)
+    line = _WIKI_RE.sub(_wiki, line)
+    line = _STRONG_RE.sub(r"\2", line)
+    line = _EM_STAR_RE.sub(r"\1", line)
+    line = _EM_UNDER_RE.sub(r"\1", line)
+    line = _STRIKE_RE.sub(r"\1", line)
+    return _CODE_RE.sub(r"\1", line)
+
+
 def body_preview(body: str, limit: int = 280) -> str:
-    """Plain text of a Markdown body, at most `limit` characters ('' when empty)."""
+    """Plain text of a Markdown body, at most `limit` characters ('' when empty).
+
+    Only as much of the body as the preview can show is cleaned: the line loop
+    stops once about three times `limit` characters are collected and resumes only
+    if whitespace collapsing left fewer than the preview needs (audit 2026-11-01
+    P2: it ran over whole 50 KB bodies, 2.0 of the 2.7 s of a 1,753-row request).
+    """
     lines = body.replace("\r\n", "\n").split("\n")
     i = 0
     while i < len(lines) and not lines[i].strip():
@@ -75,36 +109,59 @@ def body_preview(body: str, limit: int = 280) -> str:
         i += 1
     out: list[str] = []
     fenced = False
-    for line in lines[i:]:
-        if _FENCE_RE.match(line):
-            fenced = not fenced
-            continue
-        if fenced or line.lstrip().startswith("|") or _RULE_RE.match(line):
-            continue
-        if _COMMENT_LINE_RE.match(line) or _MATH_FENCE_RE.match(line):
-            continue
-        line = _BLOCK_ID_RE.sub("", line)
-        line = _HEADING_RE.sub("", line)
-        line = _QUOTE_RE.sub("", line)
-        line = _LIST_RE.sub("", line)
-        line = _TASK_RE.sub("", line)
-        line = _TAG_RE.sub("", line)
-        line = _IMAGE_RE.sub(r"\1", line)
-        line = _MDLINK_RE.sub(r"\1", line)
-        line = _WIKI_RE.sub(_wiki, line)
-        line = _STRONG_RE.sub(r"\2", line)
-        line = _EM_STAR_RE.sub(r"\1", line)
-        line = _EM_UNDER_RE.sub(r"\1", line)
-        line = _STRIKE_RE.sub(r"\1", line)
-        line = _CODE_RE.sub(r"\1", line)
-        out.append(line)
-    text = _SPACE_RE.sub(" ", " ".join(out)).strip()
+    enough = 3 * limit + 1
+    collected = 0
+    text = ""
+    n = len(lines)
+    while True:
+        while i < n and collected < enough:
+            line = lines[i]
+            i += 1
+            if _FENCE_RE.match(line):
+                fenced = not fenced
+                continue
+            if fenced or line.lstrip().startswith("|") or _RULE_RE.match(line):
+                continue
+            if _COMMENT_LINE_RE.match(line) or _MATH_FENCE_RE.match(line):
+                continue
+            line = _preview_line(line)
+            out.append(line)
+            collected += len(line) + 1
+        text = _SPACE_RE.sub(" ", " ".join(out)).strip()
+        if i >= n or len(text) > limit:
+            break
+        collected = 0  # the collapsed text is still short: read on
     if len(text) <= limit:
         return text
     cut = text[: max(limit - 1, 0)]
     if text[len(cut)] != " " and " " in cut:
         cut = cut[: cut.rindex(" ")]
     return cut.rstrip() + "…"
+
+
+_PREVIEW_CACHE_MAX = 20_000
+_preview_cache: OrderedDict[tuple[str, str], str] = OrderedDict()
+_preview_lock = threading.Lock()
+
+
+def cached_preview(path: str, version: str, body: str) -> str:
+    """`body_preview(body)`, remembered per ``(path, version)``.
+
+    The version is the file's content hash, so an entry can never go stale; the
+    oldest entries leave once the cache holds `_PREVIEW_CACHE_MAX`.
+    """
+    key = (path, version)
+    with _preview_lock:
+        hit = _preview_cache.get(key)
+        if hit is not None:
+            _preview_cache.move_to_end(key)
+            return hit
+    preview = body_preview(body)
+    with _preview_lock:
+        _preview_cache[key] = preview
+        if len(_preview_cache) > _PREVIEW_CACHE_MAX:
+            _preview_cache.popitem(last=False)
+    return preview
 
 
 # -- scope and search ---------------------------------------------------------------------
@@ -149,8 +206,13 @@ def build_rows(
     collection_ids: list[str] | None = None,
     paths: list[str] | None = None,
     search: tuple[list[str], str] | None = None,
+    preview: bool = True,
 ) -> list[Row]:
-    """The rows of the space's objects in scope, sorted by path (templates excluded)."""
+    """The rows of the space's objects in scope, sorted by path (templates excluded).
+
+    ``preview=False`` leaves ``Row.preview`` empty: a view loads its rows that way and
+    fetches the previews of the rows it shows (audit 2026-11-01 P2).
+    """
     terms: list[str] = []
     mode = "auto"
     if search is not None:
@@ -195,14 +257,15 @@ def build_rows(
             continue
         if terms and not _matches(raw, summary, terms, mode):
             continue
-        rows.append(_row(space, raw, summary))
+        rows.append(_row(space, raw, summary, preview))
     return rows
 
 
-def _row(space: Space, raw: RawObject, summary: ObjectSummary) -> Row:
+def _row(space: Space, raw: RawObject, summary: ObjectSummary, preview: bool = True) -> Row:
     from .space import version_of
 
     t = space.type_by_id(summary.type)
+    version = version_of(raw.data)
     values: dict[str, Any] = {}
     links: dict[str, list[str | None]] = {}
     for p in t.propertyDefinitions if t is not None else []:
@@ -229,8 +292,8 @@ def _row(space: Space, raw: RawObject, summary: ObjectSummary) -> Row:
         values["backlinks"] = space.backlinks(summary.path)
     return Row(
         summary=summary,
-        version=version_of(raw.data),
+        version=version,
         values=values,
         links=links,
-        preview=body_preview(raw.of.body),
+        preview=cached_preview(raw.path, version, raw.of.body) if preview else "",
     )

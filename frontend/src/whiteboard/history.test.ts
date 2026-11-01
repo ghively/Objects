@@ -73,6 +73,18 @@ describe('History', () => {
     expect(last).toEqual(doc(50))
   })
 
+  test('rebase keeps every step, mapped onto the new document', () => {
+    const h = new History<Doc>(doc(0))
+    h.push(doc(1), 'a')
+    h.push(doc(2), 'b')
+    h.undo()
+    h.rebase(doc(11), (step) => doc(step.n + 10))
+    expect(h.current).toEqual(doc(11))
+    expect(h.redo()).toEqual(doc(12))
+    h.undo()
+    expect(h.undo()).toEqual(doc(10))
+  })
+
   test('reset forgets every step', () => {
     const h = new History<Doc>(doc(0))
     h.push(doc(1), 'a')

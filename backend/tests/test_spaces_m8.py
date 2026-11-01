@@ -187,6 +187,24 @@ def test_permanent_delete_with_matching_token_deletes(tmp_path: Path, state: Pat
     assert not other.exists()
 
 
+def test_permanent_delete_os_failure_is_503(tmp_path: Path, state: Path, monkeypatch):
+    """Audit 2026-11-01: a file-system failure answers 503 like the rest of the app, not 500."""
+    monkeypatch.setenv("OBJECT_FAKE_TRASH_FILE", "unavailable")
+    current = _space(tmp_path, "current")
+    other = _space(tmp_path, "other")
+    Registry(state).register(other, touch=False)
+
+    def busy(_path):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(spaces_mod.shutil, "rmtree", busy)
+    with _client(current) as client:
+        r = client.post("/api/spaces/delete", json={"path": str(other), "permanent": True})
+        assert r.status_code == 503, r.text
+        assert "Permission denied" in r.json()["detail"]
+    assert other.is_dir()
+
+
 def test_permanent_recheck_refuses_folder_that_lost_object(
     tmp_path: Path, state: Path, monkeypatch
 ):

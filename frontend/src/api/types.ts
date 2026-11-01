@@ -749,6 +749,8 @@ export interface RowsScope {
   collectionIds?: string[]
   paths?: string[]
   search?: { terms: string[]; mode: 'auto' | 'fullText' | 'semantic' | 'title' }
+  /** False leaves `Row.preview` empty; a view fetches the visible rows' previews after. */
+  preview?: boolean
 }
 
 export interface DeleteCollectionResult {

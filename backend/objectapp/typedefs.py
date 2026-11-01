@@ -8,6 +8,7 @@ are kept in memory until the user saves them (see `typemodel.load_types`).
 
 from __future__ import annotations
 
+import os
 import re
 from collections import Counter
 from collections.abc import Iterable, Iterator
@@ -15,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
+from . import fmcache
 from .frontmatter import FrontmatterError, parse_fm
 from .objfile import ObjectFile, split_object
 from .textfile import decode
@@ -127,18 +129,32 @@ def is_ignored(rel: PurePosixPath) -> bool:
 
 
 def iter_object_paths(root: Path) -> Iterator[str]:
-    """Every ``*.md`` object file under `root`, as sorted space-relative POSIX paths."""
+    """Every ``*.md`` object file under `root`, as sorted space-relative POSIX paths.
+
+    The suffix matches in any case (``Note.MD``), as `Space._rel` and the watcher accept
+    it on every system; dot-folders are not entered.
+    """
     root = Path(root)
     found = []
-    for p in root.rglob("*.md"):
-        rel = PurePosixPath(p.relative_to(root).as_posix())
-        if is_ignored(rel) or rel.name.startswith(".") or not p.is_file():
-            continue
-        found.append(rel.as_posix())
+    for folder, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        base = PurePosixPath(Path(folder).relative_to(root).as_posix())
+        for name in files:
+            if name.startswith(".") or not name.lower().endswith(".md"):
+                continue
+            if not os.path.isfile(os.path.join(folder, name)):
+                continue
+            rel = base / name
+            if is_ignored(rel):
+                continue
+            found.append(rel.as_posix())
     yield from sorted(found)
 
 
-def read_raw(root: Path, rel: str) -> RawObject:
+def read_raw(root: Path, rel: str, cache: bool = True) -> RawObject:
+    """Read one object file. With ``cache``, the parsed frontmatter of an unchanged
+    source comes from the space's `fmcache` (a file outside the space's objects).
+    """
     path = Path(root) / rel
     data = path.read_bytes()
 
@@ -153,12 +169,20 @@ def read_raw(root: Path, rel: str) -> RawObject:
     read_only = not of.fm_ok
     reason = of.fm_error if read_only else None
     if of.fm_ok and of.frontmatter_src is not None:
-        try:
-            fm = parse_fm(of.frontmatter_src)
-        except FrontmatterError as exc:
-            fm = {}
-            read_only = True
-            reason = f"Frontmatter is not valid YAML: {exc}"
+        store = fmcache.for_root(root) if cache else None
+        cached = store.get(rel, of.frontmatter_src) if store is not None else None
+        if cached is not None:
+            fm = cached
+        else:
+            try:
+                fm = parse_fm(of.frontmatter_src)
+            except FrontmatterError as exc:
+                fm = {}
+                read_only = True
+                reason = f"Frontmatter is not valid YAML: {exc}"
+            else:
+                if store is not None:
+                    store.put(rel, of.frontmatter_src, fm)
     type_name = DEFAULT_TYPE
     if not read_only:
         t = fm.get("type")

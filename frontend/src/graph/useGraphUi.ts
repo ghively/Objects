@@ -1,13 +1,18 @@
 // `ui.graph`: the saved `GraphViewCustomization`. Edits are optimistic and saved debounced 400 ms
-// as the whole merged value (the server replaces top-level keys). On a 409 the fresh `ui.json`
-// is fetched, the pending edits are re-applied to its `graph` once and saved again (M3's
-// `useViewState` pattern; never a blind overwrite).
+// as the whole merged value (the server replaces top-level keys), through the one `ui.json` save
+// queue (`enqueueUiSave`) so a pin or calendar save never lands between a graph edit and its
+// save with a stale revision. On a 409 the fresh `ui.json` is fetched, the pending edits are
+// re-applied to its `graph` once and saved again (M3's `useViewState` pattern; never a blind
+// overwrite). A failed save says so and reloads.
 import { useCallback, useEffect } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { GraphCustomization } from '@/api/types'
-import { reloadUi, useUiStore } from '@/shell/usePinned'
+import { showToast } from '@/editor/media/upload'
+import { enqueueUiSave, loadUi, reloadUi, useUiStore } from '@/shell/usePinned'
 
 export const SAVE_DELAY_MS = 400
+/** The toast after a `ui.json` save of the graph settings failed (Object's "Could not save …" form). */
+export const GRAPH_SAVE_FAILED = 'Could not save the graph settings'
 
 const EMPTY: GraphCustomization = {}
 
@@ -24,6 +29,32 @@ function setGraph(graph: GraphCustomization, revision?: string): void {
   useUiStore.setState({ ui: { ...s.ui, graph }, ...(revision !== undefined ? { revision } : {}) })
 }
 
+/** One save of `next`, after the `ui.json` saves queued before it. Returns false when it failed. */
+async function saveGraph(next: GraphCustomization, patches: Partial<GraphCustomization>[]): Promise<boolean> {
+  const { revision } = useUiStore.getState()
+  try {
+    const res = await api.patchUi({ graph: next }, { baseRevision: revision })
+    useUiStore.setState({ revision: res?.revision ?? useUiStore.getState().revision })
+    return true
+  } catch (e) {
+    if (!(e instanceof ConflictError)) {
+      console.warn('Could not save the graph settings:', e)
+      return false
+    }
+    try {
+      const fresh = await api.ui()
+      const again = patches.reduce<GraphCustomization>((g, p) => ({ ...g, ...p }), graphOf(fresh?.ui))
+      const res = await api.patchUi({ graph: again }, { baseRevision: fresh?.revision ?? '' })
+      // Only `graph` is ours to replace: the rest of the local ui may hold another writer's unsaved edit.
+      useUiStore.setState({ ui: { ...useUiStore.getState().ui, graph: again }, revision: res?.revision ?? fresh?.revision ?? '' })
+      return true
+    } catch (e2) {
+      console.warn('Could not save the graph settings:', e2)
+      return false
+    }
+  }
+}
+
 async function flush(): Promise<void> {
   timer = null
   const patches = pending
@@ -31,27 +62,11 @@ async function flush(): Promise<void> {
   pending = []
   latest = null
   if (patches.length === 0) return
-  const { revision } = useUiStore.getState()
   setGraph(next)
-  try {
-    const res = await api.patchUi({ graph: next }, { baseRevision: revision })
-    useUiStore.setState({ revision: res?.revision ?? useUiStore.getState().revision })
-  } catch (e) {
-    if (!(e instanceof ConflictError)) {
-      console.warn('Could not save the graph settings:', e)
-      return
-    }
-    try {
-      const fresh = await api.ui()
-      const again = patches.reduce<GraphCustomization>((g, p) => ({ ...g, ...p }), graphOf(fresh?.ui))
-      const res = await api.patchUi({ graph: again }, { baseRevision: fresh?.revision ?? '' })
-      useUiStore.setState({
-        ui: { ...(fresh?.ui ?? useUiStore.getState().ui), graph: again },
-        revision: res?.revision ?? fresh?.revision ?? '',
-      })
-    } catch (e2) {
-      console.warn('Could not save the graph settings:', e2)
-    }
+  const saved = await enqueueUiSave(() => saveGraph(next, patches))
+  if (!saved) {
+    showToast(GRAPH_SAVE_FAILED)
+    await reloadUi()
   }
 }
 
@@ -82,7 +97,7 @@ export function useGraphUi(): { custom: GraphCustomization; patch(partial: Parti
   const custom = useUiStore((s) => graphOf(s.ui))
   const loaded = useUiStore((s) => s.loaded)
   useEffect(() => {
-    if (!loaded) void reloadUi()
+    if (!loaded) void loadUi()
   }, [loaded])
   const patch = useCallback((partial: Partial<GraphCustomization>) => patchGraphUi(partial), [])
   return { custom, patch }

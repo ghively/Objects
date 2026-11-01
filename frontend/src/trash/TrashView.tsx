@@ -118,7 +118,7 @@ export function TrashView() {
       <div className="mx-auto w-full max-w-[1100px] px-10 pt-6 pb-16">
         <p className="mb-4 text-[14px] text-fg-muted">{TRASH_TEXT.info}</p>
         {error && (
-          <p role="alert" className="mb-3 text-[13px] text-red-400">
+          <p role="alert" className="mb-3 text-[13px] text-[var(--danger)]">
             {error}
           </p>
         )}
@@ -157,7 +157,7 @@ export function TrashView() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-red-400"
+                  className="text-[var(--danger)]"
                   disabled={busy !== null}
                   onClick={() => setPurging(item)}
                 >

@@ -83,7 +83,10 @@ describe('TableLayout', () => {
   test('renders one column per property with rows', () => {
     render(<Harness />)
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Title', 'Note', 'Amount'])
-    expect(screen.getAllByLabelText('Title').map((i) => (i as HTMLInputElement).value)).toEqual(['Alpha', 'Beta'])
+    expect(screen.getAllByLabelText(/^Title of /).map((i) => (i as HTMLInputElement).value)).toEqual(['Alpha', 'Beta'])
+    // Each title input is named by its row.
+    expect(screen.getByLabelText('Title of Alpha')).toHaveValue('Alpha')
+    expect(screen.getByLabelText('Title of Beta')).toHaveValue('Beta')
   })
 
   test('multiple types shows refusal text', () => {
@@ -230,13 +233,43 @@ describe('TableLayout', () => {
     expect(screen.getByTestId('table-notice')).toHaveTextContent('Changed elsewhere. Reloaded.')
   })
 
+  test('a number retyped after a failed write is sent again (audit 2026-11-01 #11)', async () => {
+    const user = userEvent.setup()
+    mocked.updateProperties.mockRejectedValueOnce(new Error('disk full'))
+    render(<Harness />)
+    const input = screen.getAllByLabelText('Amount')[0]
+    await user.clear(input)
+    await user.type(input, '5')
+    await user.tab()
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(1))
+    expect(screen.getByTestId('table-notice')).toHaveTextContent('disk full')
+    // The cell shows the stored value again; typing the same number must write it, not skip it.
+    expect(input).toHaveValue('1,200')
+    await user.clear(input)
+    await user.type(input, '5')
+    await user.tab()
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(2))
+    expect(mocked.updateProperties).toHaveBeenLastCalledWith('Pages/Alpha.md', { amount: 5 }, 'v7')
+  })
+
   test('title cell rename calls renameObject', async () => {
     const user = userEvent.setup()
     render(<Harness />)
-    const input = screen.getAllByLabelText('Title')[0]
+    const input = screen.getByLabelText('Title of Alpha')
     await user.clear(input)
     await user.type(input, 'Omega')
     await user.tab()
+    await waitFor(() => expect(mocked.renameObject).toHaveBeenCalledWith('Pages/Alpha.md', 'Omega', 'v7'))
+  })
+
+  test('title cell: Escape ends the edit and commits, as a text cell', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    const input = screen.getByLabelText('Title of Alpha')
+    await user.clear(input)
+    await user.type(input, 'Omega{Escape}')
+    expect(input).not.toHaveFocus()
+    expect(input).toHaveValue('Omega')
     await waitFor(() => expect(mocked.renameObject).toHaveBeenCalledWith('Pages/Alpha.md', 'Omega', 'v7'))
   })
 
@@ -244,6 +277,6 @@ describe('TableLayout', () => {
     const ro = row({ summary: objectSummary({ path: 'Pages/Locked.md', readOnly: true }), values: { note: 'x' } })
     render(<Harness rows={[ro]} />)
     expect(screen.getByLabelText('Note')).toHaveAttribute('readonly')
-    expect(screen.getByLabelText('Title')).toHaveAttribute('readonly')
+    expect(screen.getByLabelText(/^Title of /)).toHaveAttribute('readonly')
   })
 })

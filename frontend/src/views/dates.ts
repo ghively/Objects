@@ -1,7 +1,7 @@
 // Date helpers for filters and sorts: relative ranges against an injected `now`, and the
 // day-level interval of a date value. Pure functions; weeks run Monday to Sunday.
 import type { DateRelative, DateValue } from '@/api/types'
-import { fromWallClock, wallClock, zonedInstant, zonedStartOfDay } from '@/lib/zonedTime'
+import { fromWallClock, wallClock, zonedInstant, zonedParts, zonedStartOfDay } from '@/lib/zonedTime'
 
 /** The relative options in the reference's order, with its labels ("Specific date" is the exact-date pick). */
 export const DATE_RELATIVE_OPTIONS: { key: DateRelative | 'exactDate'; label: string }[] = [
@@ -109,4 +109,82 @@ export function dateSpan(v: DateValue | null | undefined): DateSpan | null {
   const start = parsePoint(v.start, resolution)
   if (!start) return null
   return { start, end: parsePoint(v.end, resolution), resolution }
+}
+
+// Filters and groups compare days, so they read a value's days as `YYYY-MM-DD` strings (which
+// compare as dates) instead of building its instants: a day-resolution value is its text, a
+// time-resolution one is one `zonedParts` call, memoized per instant for the duration of a call
+// (`dayReader`), as the zone's days never change inside one call.
+
+const DAY_RE = /^(\d{4}-\d{2}-\d{2})/
+
+/** The time-zone setting's day of an ISO instant (`YYYY-MM-DD`), or null when it doesn't parse. */
+export function dayOfInstant(iso: string): string | null {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? null : zonedParts(d).date
+}
+
+/** A `dayOfInstant` that remembers its answers; make one per filter or grouping pass. */
+export function dayReader(): (iso: string) => string | null {
+  const seen = new Map<string, string | null>()
+  return (iso) => {
+    let day = seen.get(iso)
+    if (day === undefined) {
+      day = dayOfInstant(iso)
+      seen.set(iso, day)
+    }
+    return day
+  }
+}
+
+export interface DaySpan {
+  /** `YYYY-MM-DD` of the start, in the time-zone setting. */
+  start: string
+  /** The end's day; null when the value has none. */
+  end: string | null
+  resolution: 'day' | 'time'
+}
+
+function dayPoint(iso: string | null | undefined, resolution: 'day' | 'time', dayOf: (iso: string) => string | null): string | null {
+  if (!iso) return null
+  if (resolution === 'day') return DAY_RE.exec(iso)?.[1] ?? null
+  return dayOf(iso)
+}
+
+/** `dateSpan` as days: the same values are usable (a day text must start with `YYYY-MM-DD`). */
+export function daySpan(v: DateValue | null | undefined, dayOf: (iso: string) => string | null = dayOfInstant): DaySpan | null {
+  if (!v || typeof v !== 'object') return null
+  const resolution = v.resolution === 'time' ? 'time' : 'day'
+  const start = dayPoint(v.start, resolution, dayOf)
+  if (!start) return null
+  return { start, end: dayPoint(v.end, resolution, dayOf), resolution }
+}
+
+/** An inclusive range of days, for `resolveRelative`'s result or an exact date; `''` starts at the earliest date. */
+export interface DayRange {
+  start: string
+  end: string
+}
+
+/** The days of an instant range (`resolveRelative`); `overdue`'s open start becomes `''`. */
+export function dayRange(range: { start: Date; end: Date }): DayRange {
+  return { start: range.start.getTime() <= -8.64e15 ? '' : zonedParts(range.start).date, end: zonedParts(range.end).date }
+}
+
+/**
+ * A date value's start as a wall-clock carrier (`lib/zonedTime` `wallClock`) for grouping: a
+ * day-resolution value is its calendar day at local midnight with no zone arithmetic; a
+ * time-resolution one is `wallClock`. Null without a usable start.
+ */
+export function wallStart(v: DateValue | null | undefined): Date | null {
+  if (!v || typeof v !== 'object' || !v.start) return null
+  if (v.resolution === 'time') {
+    const d = new Date(v.start)
+    return Number.isNaN(d.getTime()) ? null : wallClock(d)
+  }
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v.start)
+  if (!m) return null
+  const out = new Date(+m[1], +m[2] - 1, +m[3])
+  if (+m[1] < 100) out.setFullYear(+m[1])
+  return out
 }

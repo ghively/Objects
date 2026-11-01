@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import stat
 import threading
 import time
 from pathlib import Path
@@ -61,8 +62,8 @@ def test_create_new_loses_a_race_with_an_external_writer(tmp_path: Path, monkeyp
     target = tmp_path / "a.md"
     real = textfile._write_temp
 
-    def write_then_race(path, data):
-        tmp = real(path, data)
+    def write_then_race(path, data, **kw):
+        tmp = real(path, data, **kw)
         target.write_bytes(b"external")
         return tmp
 
@@ -124,12 +125,25 @@ def test_write_route_maps_a_locked_file_to_503(space_dir: Path, monkeypatch):
     version = space.read(ADA)[2]
 
     def locked(*_a, **_k):
-        raise PermissionError(13, "Access is denied")
+        exc = PermissionError(13, "The process cannot access the file")
+        exc.winerror = 32  # a Windows sharing violation
+        raise exc
 
     monkeypatch.setattr(space, "save_body", locked)
     r = client.put("/api/object/body", json={"path": ADA, "body": "x", "baseVersion": version})
     assert r.status_code == 503
     assert "in use" in r.json()["detail"]
+
+    # Audit 2026-11-01: a plain permission error (EACCES) is not a lock, so it is
+    # reported in the OS's words, not as "in use by another program".
+    def denied(*_a, **_k):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(space, "save_body", denied)
+    r = client.put("/api/object/body", json={"path": ADA, "body": "x", "baseVersion": version})
+    assert r.status_code == 503
+    assert "in use" not in r.json()["detail"]
+    assert "Permission denied" in r.json()["detail"]
 
 
 def test_rename_keeps_the_title_when_the_file_cannot_move(space_dir: Path, monkeypatch):
@@ -145,3 +159,15 @@ def test_rename_keeps_the_title_when_the_file_cannot_move(space_dir: Path, monke
     _of, fm, now = space.read(ADA)
     assert fm["title"] == "Ada King"
     assert result.version == now
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+@pytest.mark.parametrize("mode", [0o644, 0o664])
+def test_a_save_through_the_space_keeps_the_file_mode(space_dir, mode):
+    """Audit 2026-11-01: `Space._write` syncs its own temp file; it must keep the bits too."""
+    path = space_dir / "Tasks" / "Write docs.md"
+    path.chmod(mode)
+    space = Space(space_dir)
+    _of, _fm, version = space.read("Tasks/Write docs.md")
+    space.update_properties("Tasks/Write docs.md", {"description": "kept"}, version)
+    assert stat.S_IMODE(path.stat().st_mode) == mode

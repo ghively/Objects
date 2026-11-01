@@ -12,7 +12,7 @@ import { Icon, IconOrEmoji } from '@/components/Icon'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { cn } from '@/lib/utils'
-import { stemOf, useLinkIndex } from '@/links/linkIndex'
+import { byPathOf, stemOf, useLinkIndex } from '@/links/linkIndex'
 import { tabTarget, useTabs, type Tab, type Target } from '@/nav/tabs'
 import { ObjectIcon } from '@/object/ObjectHeader'
 import { queryTitle } from '@/queries/autoTitle'
@@ -29,7 +29,7 @@ export function useSpaceTypes(space: SpaceInfo | null): TypeDef[] {
 
 /** Title of a target as tabs, crumbs and the tab menu show it. */
 export function useTargetTitle(space: SpaceInfo | null): (target: Target | null) => string {
-  const objects = useLinkIndex((s) => s.objects)
+  const byPath = useLinkIndex((s) => byPathOf(s.objects))
   const types = useSpaceTypes(space)
   const { collections, queries } = useDefinitions()
   const titleCtx = useTitleCtx(types)
@@ -65,16 +65,16 @@ export function useTargetTitle(space: SpaceInfo | null): (target: Target | null)
           return target.kind === 'type' ? type.pluralName : `${type.name} settings`
         }
         case 'object':
-          return objects.find((o) => o.path === target.path)?.title ?? stemOf(target.path)
+          return byPath.get(target.path)?.title ?? stemOf(target.path)
       }
     },
-    [objects, types, collections, queries, titleCtx],
+    [byPath, types, collections, queries, titleCtx],
   )
 }
 
 /** A target's icon and title (tabs, breadcrumbs, the tab menu). */
 export function TargetLabel({ target, space }: { target: Target | null; space: SpaceInfo | null }) {
-  const objects = useLinkIndex((s) => s.objects)
+  const byPath = useLinkIndex((s) => byPathOf(s.objects))
   const types = useSpaceTypes(space)
   const { collections, queries } = useDefinitions()
   const title = useTargetTitle(space)(target)
@@ -101,7 +101,7 @@ export function TargetLabel({ target, space }: { target: Target | null; space: S
     const type = types.find((t) => t.id === target.typeId)
     icon = type ? <TypeChip type={type} size={22} /> : null
   } else if (target?.kind === 'object') {
-    const summary = objects.find((o) => o.path === target.path)
+    const summary = byPath.get(target.path)
     const type = types.find((t) => t.id === summary?.type)
     icon = summary?.icon ? <ObjectIcon icon={summary.icon} size={15} /> : type ? <TypeChip type={type} size={22} /> : null
   }

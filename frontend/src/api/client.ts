@@ -14,6 +14,7 @@ import type {
   CalendarRange,
   CalendarUi,
   ChangeEvent,
+  ChangeKind,
   ChangeKindResult,
   Collection,
   CreatedDailyNote,
@@ -200,6 +201,11 @@ async function request<T>(path: string, init?: RequestInit, on409?: (d: Record<s
     ...init,
     headers: { Accept: 'application/json', ...(init?.headers ?? {}) },
   })
+  return answer<T>(res, path, on409)
+}
+
+/** A response's JSON body, or the error its status maps to. */
+async function answer<T>(res: Response, path: string, on409?: (d: Record<string, unknown>) => Error): Promise<T> {
   const data = await readJson(res)
   if (res.ok) return data as T
   const d = detailOf(data)
@@ -226,6 +232,39 @@ async function request<T>(path: string, init?: RequestInit, on409?: (d: Record<s
           ? data
           : res.statusText
   throw new ApiError(res.status, message)
+}
+
+/** The last body and `ETag` per conditional GET path (`/graph`). */
+const etagged = new Map<string, { etag: string; body: unknown }>()
+
+/**
+ * A GET that revalidates: with a cached `ETag` it sends `If-None-Match`, and a `304` answers the
+ * cached body itself (the same object, so callers can skip work on identity). A server that sends
+ * no `ETag` gets a plain request each time.
+ */
+async function conditionalGet<T>(path: string): Promise<T> {
+  const cached = etagged.get(path)
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { Accept: 'application/json', ...(cached ? { 'If-None-Match': cached.etag } : {}) },
+  })
+  if (res.status === 304 && cached) return cached.body as T
+  if (res.status === 304) return request<T>(path)
+  let data: T
+  try {
+    data = await answer<T>(res, path)
+  } catch (e) {
+    etagged.delete(path)
+    throw e
+  }
+  const etag = res.headers.get('ETag')
+  if (etag) etagged.set(path, { etag, body: data })
+  else etagged.delete(path)
+  return data
+}
+
+/** Forget the cached conditional GET bodies (tests; a space switch reloads the page). */
+export function resetGraphCache(): void {
+  etagged.clear()
 }
 
 /** One FastAPI validation error, `field: message`. */
@@ -308,9 +347,42 @@ function json(method: string, body: unknown): RequestInit {
 
 const seg = encodeURIComponent
 
+/**
+ * The events every listener resyncs from after the stream dropped: the server keeps no replay
+ * (no `Last-Event-ID`), so whatever happened while disconnected is announced as "everything
+ * may have changed". `types` with path `*` reloads summaries, types, rows, references, the
+ * calendar and the graph, and makes the open object, board and ink documents re-check their
+ * versions; `views` reloads a type page's saved views; the others reload `ui.json` and the
+ * definitions. The origin is no window's, so nothing takes them for its own echo.
+ */
+export const RESYNC_PATH = '*'
+const RESYNC_EVENTS: readonly ChangeEvent[] = [
+  { kind: 'types', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'views', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'ui', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'collections', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'queries', path: RESYNC_PATH, version: null, origin: null },
+]
+
+/** Whether `e` is the synthetic "everything of `kind` may have changed" event sent after a reconnect. */
+export function isResync(e: ChangeEvent, kind: ChangeKind): boolean {
+  return e.kind === kind && e.path === RESYNC_PATH
+}
+
 function ensureSource() {
   if (source || typeof EventSource === 'undefined') return
   source = new EventSource(`${BASE}/events`)
+  // The browser reconnects an `EventSource` by itself after a drop (server restart, sleep), but
+  // the events published in between are gone: `open` after an `error` resyncs every consumer.
+  let dropped = false
+  source.onerror = () => {
+    dropped = true
+  }
+  source.onopen = () => {
+    if (!dropped) return
+    dropped = false
+    for (const e of RESYNC_EVENTS) emit({ ...e })
+  }
   source.addEventListener('change', (msg) => {
     let e: ChangeEvent
     try {
@@ -799,7 +871,7 @@ export const api = {
 
   /** Every object as a graph node, with link and tag pairs. */
   graph(): Promise<GraphData> {
-    return request<GraphData>('/graph')
+    return conditionalGet<GraphData>('/graph')
   },
 
   // ---- M7: attachments, space settings, device settings, spaces ----

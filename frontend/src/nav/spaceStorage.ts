@@ -71,3 +71,49 @@ export async function switchStoreSpace<S>(
   }
   await store.persist.rehydrate()
 }
+
+/** The `state` zustand's `persist` wrapped in a stored value, or null when it isn't one. */
+function persistedState(raw: string | null): unknown {
+  if (raw === null) return null
+  try {
+    const parsed = JSON.parse(raw) as { state?: unknown } | null
+    return parsed && typeof parsed === 'object' ? (parsed.state ?? null) : null
+  } catch {
+    return null
+  }
+}
+
+/** Whether every key of `patch` already holds the same value (or JSON-equal data) in `state`. */
+function sameSlice<S>(patch: Partial<S>, state: S): boolean {
+  return (Object.keys(patch) as (keyof S)[]).every((k) => {
+    const a = patch[k]
+    const b = state[k]
+    return Object.is(a, b) || JSON.stringify(a) === JSON.stringify(b)
+  })
+}
+
+/**
+ * Follow another window's writes to the store's key (the `storage` event never fires in the
+ * window that wrote). `merge` gets what that window stored, what the key held before its write
+ * (so its removals can be told from our own additions) and our state; it returns the change to
+ * apply, or null. Our write of the merged state reaches the other window the same way, so both
+ * converge. Returns the function that stops following (tests).
+ */
+export function followStorage<S>(
+  store: StoreApi<S> & PersistApi,
+  merge: (incoming: unknown, previous: unknown, current: S) => Partial<S> | null,
+): () => void {
+  if (typeof window === 'undefined') return () => undefined
+  const onStorage = (e: StorageEvent) => {
+    if (e.key !== store.persist.getOptions().name) return
+    const incoming = persistedState(e.newValue)
+    if (incoming === null) return
+    const state = store.getState()
+    const patch = merge(incoming, persistedState(e.oldValue), state)
+    // Only a real change is applied: `persist` writes the key on every setState, and a write that
+    // differs from the other window's (each keeps its own `activeId`) wakes it in turn, endlessly.
+    if (patch && !sameSlice(patch, state)) store.setState(patch)
+  }
+  window.addEventListener('storage', onStorage)
+  return () => window.removeEventListener('storage', onStorage)
+}

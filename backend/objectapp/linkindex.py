@@ -16,21 +16,29 @@ counted (`date_tokens`, `date_references`).
 The index stores each source's link *targets* (`_extract`, one method, the hook
 point for other kinds of objects) and resolves them on read. `on_change` only
 records the change: the next read re-extracts the changed sources, re-extracts
-everything after a type change (property definitions decide which keys are
-relations), and re-resolves every stored target when the set of names changed
-(`Space._names_rev`). Nothing is ever written.
+a changed type's members (property definitions decide which keys are
+relations; everything when the change names no type), and re-resolves the
+sources holding a link written to a name that
+changed (`Space._names_since`; every source when the space can't say which).
+Nothing is ever written.
+
+It also keeps, for every object (templates too), the folded text of each link
+target as written (`mentioning`): a rename or type change asks it which files
+could hold a link to rewrite instead of scanning the whole space (audit
+2026-11-01 P4).
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from .dailynotes import parse_day
 from .propvalues import decode_value
-from .relink import code_ranges, wikilink_spans, wikilink_targets
+from .relink import code_ranges, segments, wikilink_spans, wikilink_targets
+from .resolver import fold as _fold
 
 if TYPE_CHECKING:
     from .space import Space, SpaceChange
@@ -38,17 +46,23 @@ if TYPE_CHECKING:
 __all__ = ["LinkIndex", "count_date_tokens"]
 
 _DATA_VIEW_PREFIXES = ("collection:", "query:")
+_MAX_PENDING = 5000
+"""Changes `LinkIndex` keeps between reads before it collapses them to one full rebuild."""
 _TIME_RE = re.compile(
     r"<time\b[^>]*?\bdatetime\s*=\s*([\"'])(\d{4}-\d{2}-\d{2})\1[^>]*>", re.IGNORECASE
 )
+_TIME_HINT_RE = re.compile(r"<time\b", re.IGNORECASE)
 
 
-def count_date_tokens(body: str) -> dict[str, int]:
-    """``{day: count}`` of the date tokens ``<time datetime="YYYY-MM-DD">`` outside code."""
+def count_date_tokens(body: str, code: list[tuple[int, int]] | None = None) -> dict[str, int]:
+    """``{day: count}`` of the date tokens ``<time datetime="YYYY-MM-DD">`` outside code.
+
+    ``code`` is `code_ranges` of ``body`` when the caller already has it.
+    """
     out: dict[str, int] = {}
-    if "<" not in body:
+    if "<" not in body or _TIME_HINT_RE.search(body) is None:
         return out
-    ranges = code_ranges(body)
+    ranges = code_ranges(body) if code is None else code
     for m in _TIME_RE.finditer(body):
         pos = m.start()
         if any(s <= pos < e for s, e in ranges):
@@ -80,10 +94,6 @@ class _Resolved:
     """Tag object paths, in tag order, distinct."""
 
 
-def _fold(text: str) -> str:
-    return " ".join(text.split()).casefold()
-
-
 def _strings(value: Any) -> Iterator[str]:
     if isinstance(value, str):
         yield value
@@ -97,9 +107,15 @@ class LinkIndex:
     def __init__(self, space: Space) -> None:
         self._space = space
         self._pending: list[SpaceChange] = []
+        self._overflow = False
+        """More changes came in than `_MAX_PENDING` allows: the next read rebuilds everything."""
         self._built = False
         self._names_rev = -1
         self._sources: dict[str, _Extracted] = {}
+        self._targets: dict[str, frozenset[str]] = {}
+        """Path -> folded link target texts as written (every object, templates included)."""
+        self._mentions: dict[str, set[str]] = {}
+        """Folded link target text -> the paths holding such a link (the inverse of `_targets`)."""
         self._resolved: dict[str, _Resolved] = {}
         self._in: dict[str, set[str]] = {}
         self._tagged: dict[str, set[str]] = {}
@@ -114,12 +130,23 @@ class LinkIndex:
     # -- change tracking ------------------------------------------------------
 
     def on_change(self, change: SpaceChange) -> None:
-        """Record a change (called by the space, maybe under its lock): never blocks."""
+        """Record a change (called by the space, maybe under its lock): never blocks.
+
+        The list is bounded: past `_MAX_PENDING` changes (or the space's object count,
+        when larger) with no read in between, it collapses to "rebuild everything",
+        which costs no more than re-extracting that many sources.
+        """
+        if self._overflow:
+            return
         self._pending.append(change)
+        if len(self._pending) > max(_MAX_PENDING, len(self._space._raw)):
+            self._overflow = True
+            self._pending = []
 
     def _fresh(self) -> bool:
         return (
             self._built
+            and not self._overflow
             and not self._pending
             and self._names_rev == self._space._names_rev
         )
@@ -130,32 +157,51 @@ class LinkIndex:
         space = self._space
         with space._lock:
             pending, self._pending = self._pending, []
+            overflow, self._overflow = self._overflow, False
             self._sources_rev += 1
-            full = not self._built or any(c.kind == "types" for c in pending)
+            # A type change re-extracts its members (the definitions decide which keys
+            # are relations); one that names no type re-extracts everything.
+            full = not self._built or overflow or any(
+                c.kind == "types" and c.type_id is None for c in pending
+            )
             dirty: set[str] = set()
             if full:
                 self._sources = {}
+                self._targets = {}
+                self._mentions = {}
                 for path in list(space._raw):
                     ex = self._extract_if_source(path)
                     if ex is not None:
                         self._sources[path] = ex
+                    self._set_mentions(path, self._written_targets(path, ex))
                 self._built = True
             else:
                 dirty = {c.path for c in pending if c.path}
+                type_ids = {c.type_id for c in pending if c.kind == "types" and c.type_id}
+                if type_ids:
+                    dirty.update(p for p, s in space._summaries.items() if s.type in type_ids)
                 for path in dirty:
                     ex = self._extract_if_source(path)
                     if ex is None:
                         self._sources.pop(path, None)
                     else:
                         self._sources[path] = ex
+                    self._set_mentions(path, self._written_targets(path, ex))
             names_rev = space._names_rev
-            if full or names_rev != self._names_rev:
+            changed_names: frozenset[str] | None = frozenset()
+            if names_rev != self._names_rev:
+                changed_names = space._names_since(self._names_rev)
                 self._names_rev = names_rev
+            if full or changed_names is None:
                 self._resolve_all()
             else:
+                # Only a link written to a changed name can resolve differently now.
+                affected = set(dirty)
+                for name in changed_names:
+                    affected.update(self._mentions.get(name, ()))
                 changed = False
-                tag_paths = self._tag_paths() if dirty else {}
-                for path in dirty:
+                tag_paths = self._tag_paths() if affected else {}
+                for path in affected:
                     changed |= self._resolve_source(path, tag_paths)
                 if changed:
                     self._bump()
@@ -186,13 +232,14 @@ class LinkIndex:
         summary = space._summaries[path]
         ex = _Extracted(tags=list(summary.tags))
         body = raw.of.body
+        segs = segments(body)  # one pass over the body for links and date tokens alike
         if "[[" in body:
             ex.body = [
                 t
-                for t, s, _e in wikilink_spans(body)
+                for t, s, _e in wikilink_spans(body, segs)
                 if not (body.startswith("!", s) and t.lstrip().startswith(_DATA_VIEW_PREFIXES))
             ]
-        ex.tokens = count_date_tokens(body)
+        ex.tokens = count_date_tokens(body, code_ranges(body, segs))
         # M6: a whiteboard's board links count as body links (imported here: no import cycle).
         from .whiteboardindex import board_for_index
         from .whiteboardtrash import board_links
@@ -222,6 +269,50 @@ class LinkIndex:
             days.update(d for t in targets if isinstance(t, str) and (d := parse_day(t)) is not None)
         ex.days = frozenset(days)
         return ex
+
+    def _written_targets(self, path: str, ex: _Extracted | None) -> frozenset[str]:
+        """The folded target texts of every link in ``path`` (frontmatter and body).
+
+        Every target `_extract` resolves is here, so a change to that name re-resolves
+        the holder: the ``[[links]]``, and the relation values written bare (``manager:
+        Charles Babbage``), which `decode_value` accepts as links too.
+        """
+        raw = self._space._raw.get(path)
+        if raw is None:
+            return frozenset()
+        if ex is not None:
+            body_targets: list[str] = ex.body
+            prop_targets: list[str] = [
+                t for targets in ex.props.values() for t in targets if isinstance(t, str)
+            ]
+        else:  # a template: not a source, but a rename still rewrites its links
+            body = raw.of.body
+            body_targets = [t for t, _s, _e in wikilink_spans(body)] if "[[" in body else []
+            prop_targets = []
+            # A whiteboard template's board is relinked like any board's (M6).
+            from .whiteboardindex import board_for_index
+            from .whiteboardtrash import board_links
+
+            board, _revision = board_for_index(self._space, path)
+            if board is not None:
+                body_targets = [*body_targets, *board_links(board)]
+        src = raw.of.frontmatter_src or ""
+        fm_targets = wikilink_targets(src) if "[[" in src else set()
+        tags = ex.tags if ex is not None else ()  # a tag's rename re-resolves its holders
+        return frozenset(_fold(t) for t in (*body_targets, *prop_targets, *fm_targets, *tags))
+
+    def _set_mentions(self, path: str, targets: frozenset[str]) -> None:
+        old = self._targets.pop(path, None)
+        for t in old or ():
+            paths = self._mentions.get(t)
+            if paths is not None:
+                paths.discard(path)
+                if not paths:
+                    del self._mentions[t]
+        if targets:
+            self._targets[path] = targets
+            for t in targets:
+                self._mentions.setdefault(t, set()).add(path)
 
     # -- resolution -----------------------------------------------------------
 
@@ -328,6 +419,18 @@ class LinkIndex:
         out = sorted(self._in.get(path, ()), key=key)
         self._backlinks_cache[path] = out
         return list(out)
+
+    def mentioning(self, names: Iterable[str]) -> set[str]:
+        """The objects (templates included) with a link whose target text is one of ``names``.
+
+        Matched case-insensitively with whitespace collapsed, wherever the link
+        resolves: the candidates a rename or type change checks instead of every file.
+        """
+        self._ensure()
+        out: set[str] = set()
+        for name in names:
+            out.update(self._mentions.get(_fold(name), ()))
+        return out
 
     def link_keys(self, src: str, dst: str) -> tuple[bool, list[str]]:
         """Whether ``src``'s body links to ``dst``, and the property keys that do."""

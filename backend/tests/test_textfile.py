@@ -101,3 +101,65 @@ def test_atomic_write_check_failure_leaves_original(tmp_path):
         atomic_write(p, b"new\n", check=refuse)
     assert p.read_bytes() == b"original\n"
     assert [x.name for x in tmp_path.iterdir()] == ["obj.md"]
+
+
+def test_encode_like_skips_the_line_diff_when_only_the_frontmatter_changed(monkeypatch):
+    """Audit 2026-11-01 B1: a property edit paid a SequenceMatcher over the whole body."""
+    import difflib
+
+    original = b"\xef\xbb\xbf---\r\ntitle: A\r\nn: 1\n---\r\nbody one\nbody two\r\nlast"
+    new_text = "---\ntitle: A\nn: 2\n---\nbody one\nbody two\nlast"
+    seen: list[tuple[int, int]] = []
+    real = difflib.SequenceMatcher
+
+    def recording(isjunk, a, b, autojunk=True):
+        seen.append((len(a), len(b)))
+        return real(isjunk, a, b, autojunk=autojunk)
+
+    monkeypatch.setattr(difflib, "SequenceMatcher", recording)
+    assert encode_like(original, new_text) == b"\xef\xbb\xbf---\r\ntitle: A\r\nn: 2\r\n---\r\nbody one\nbody two\r\nlast"
+    assert seen == [(1, 1)]  # only the changed line is diffed, not the 7-line file
+    # A body-only edit leaves the frontmatter's lines alone the same way.
+    body_edit = "---\ntitle: A\nn: 1\n---\nbody one\nBODY TWO\nlast"
+    assert encode_like(original, body_edit) == b"\xef\xbb\xbf---\r\ntitle: A\r\nn: 1\n---\r\nbody one\nBODY TWO\r\nlast"
+    assert seen == [(1, 1), (1, 1)]
+    assert encode_like(original, decode(original).text) == original
+    assert len(seen) == 2  # nothing changed: no diff at all
+
+
+# -- audit 2026-11-01: a save keeps the file's permission bits -----------------------
+
+
+def _mode(p: Path) -> int:
+    import stat
+
+    return stat.S_IMODE(p.stat().st_mode)
+
+
+def _umask() -> int:
+    import os
+
+    old = os.umask(0)
+    os.umask(old)
+    return old
+
+
+@pytest.mark.skipif(__import__("os").name == "nt", reason="POSIX permission bits")
+@pytest.mark.parametrize("mode", [0o644, 0o664, 0o600])
+def test_atomic_write_keeps_the_existing_mode(tmp_path, mode):
+    p = _write(tmp_path, b"original\n")
+    p.chmod(mode)
+    atomic_write(p, b"new\n")
+    assert p.read_bytes() == b"new\n"
+    assert _mode(p) == mode
+
+
+@pytest.mark.skipif(__import__("os").name == "nt", reason="POSIX permission bits")
+def test_new_files_get_the_umask_default_mode(tmp_path):
+    from objectapp.textfile import create_new
+
+    expected = 0o666 & ~_umask()
+    atomic_write(tmp_path / "fresh.md", b"x")
+    create_new(tmp_path / "brand-new.md", b"y")
+    assert _mode(tmp_path / "fresh.md") == expected
+    assert _mode(tmp_path / "brand-new.md") == expected

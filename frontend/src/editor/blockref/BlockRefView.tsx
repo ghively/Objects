@@ -50,6 +50,8 @@ export function scrollToBlock(path: string, id: string, tries = 40): Promise<boo
   return new Promise((resolve) => {
     let n = 0
     const step = () => {
+      // The poll can outlive its page (a test's teardown, a closed window): stop quietly.
+      if (typeof document === 'undefined') return resolve(false)
       const roots = document.querySelectorAll(`[data-object-path="${CSS.escape(path)}"]`)
       for (const root of Array.from(roots)) {
         if (root.closest('[data-block-ref-key]')) continue

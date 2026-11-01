@@ -1,0 +1,42 @@
+{
+ "tGraphCanvas": 3000,
+ "workers": 1,
+ "heapBeforeMB": 36,
+ "heapGraphMB": 47,
+ "long": [
+  156,
+  150,
+  1625,
+  845
+ ],
+ "api": [
+  "inter-latin-700-normal-Yt3aPRU 24656B 107ms@2323",
+  "graph 904524B 102ms@2331",
+  "sigma.esm-BJR69hkr.js 90027B 6ms@2466"
+ ],
+ "loading": false
+}
+{
+ "heapsAfterRoundTrips": [
+  64,
+  125,
+  51,
+  50,
+  112,
+  145
+ ],
+ "heapsAfterPeeks": [
+  70,
+  54,
+  62,
+  72,
+  56,
+  63,
+  70,
+  78,
+  59,
+  66
+ ],
+ "workersTotal": 7,
+ "finalHeapMB": 67
+}

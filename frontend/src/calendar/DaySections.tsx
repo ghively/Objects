@@ -457,7 +457,16 @@ export function DaySections({ day, today, calendarDay, rows, filter = 'all', onC
       <p className="text-[14px] text-fg-muted">{SECTIONS_TEXT.emptyHint}</p>
     </div>
   )
-  const common = { types, layouts: SECTION_LAYOUTS, compact: true, embedded: true, patchRow: rows.patchRow, loading: rows.loading }
+  // The day's rows arrive with their previews in one `api.rows` call, so no section fetches any.
+  const common = {
+    types,
+    layouts: SECTION_LAYOUTS,
+    compact: true,
+    embedded: true,
+    patchRow: rows.patchRow,
+    loading: rows.loading,
+    previewsLoaded: true,
+  }
   const emptyLine = (text: string) => <p className="py-2 text-[14px] text-fg-muted">{text}</p>
   const referenceExtras = (row: Row) => {
     const n = referenceCounts.get(row.summary.path) ?? 0

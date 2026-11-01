@@ -12,14 +12,20 @@ checked with `media.attachment_path`: missing files, paths outside the space or 
 dot-folder, whiteboard sidecars and ``.md`` objects are skipped. A path that isn't a file
 there is looked up as the editor does (`findAttachment` in ``editor/media/upload.ts``,
 Obsidian's short form): the attachment at that path ignoring case, else (a bare file name)
-the first attachment with that file name. Exporting reads only; the
-zip is built in memory.
+the first attachment with that file name. Exporting reads only the space: the zip is
+written to a temporary file in the system temp folder (``<temp>/object-exports``, never
+in the space or the app's state dir) and streamed from there (`export_object_to_file`), so a 100 MB attachment is
+never held in memory; the file is removed once sent (`Export.cleanup`), and files older
+than an hour that a crash left behind are removed by the next export.
 """
 
 from __future__ import annotations
 
 import io
+import os
 import re
+import tempfile
+import time
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
@@ -32,20 +38,67 @@ from .typedefs import read_raw
 if TYPE_CHECKING:
     from .space import Space
 
-__all__ = ["Export", "content_disposition", "export_object", "referenced_media"]
+__all__ = [
+    "Export",
+    "content_disposition",
+    "export_dir",
+    "export_object",
+    "export_object_to_file",
+    "referenced_media",
+]
 
 # ``![alt](path "title")`` / ``[text](<path with spaces>)``: the destination only.
 _MD_LINK_RE = re.compile(r"!?\[[^\]\n]*\]\(\s*(?:<([^>\n]*)>|([^)\s]+))[^)\n]*\)")
 _SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 
 
-class Export:
-    """A download: its bytes, file name and media type."""
+_STALE_SECONDS = 3600
 
-    def __init__(self, data: bytes, filename: str, media_type: str) -> None:
+
+class Export:
+    """A download: its bytes (or the temporary ``file`` holding them), file name and media type."""
+
+    def __init__(
+        self, data: bytes, filename: str, media_type: str, file: Path | None = None
+    ) -> None:
         self.data = data
         self.filename = filename
         self.media_type = media_type
+        self.file = file
+        """A temporary file to send instead of ``data`` (then ``data`` is empty); see `cleanup`."""
+
+    def cleanup(self) -> None:
+        """Remove the temporary ``file`` (call it once the response is sent). Idempotent."""
+        if self.file is not None:
+            try:
+                self.file.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:  # still open elsewhere (Windows): the next export's sweep removes it
+                pass
+
+
+def export_dir() -> Path:
+    """Where media exports are assembled: the system temp folder's ``object-exports``.
+
+    Outside every space and outside the app's state dir, which reads must leave unchanged
+    (the M9 acceptance checks that an export adds nothing there).
+    """
+    return Path(tempfile.gettempdir()) / "object-exports"
+
+
+def _sweep(folder: Path, now: float) -> None:
+    """Remove export files a crash or an aborted download left behind (older than an hour)."""
+    try:
+        entries = list(os.scandir(folder))
+    except OSError:
+        return
+    for entry in entries:
+        try:
+            if entry.is_file() and now - entry.stat().st_mtime > _STALE_SECONDS:
+                os.unlink(entry.path)
+        except OSError:
+            continue
 
 
 def _outside_code(text: str) -> str:
@@ -115,28 +168,64 @@ def referenced_media(root: Path, rel: str, fm: dict, body: str) -> list[str]:
     return out
 
 
-def export_object(space: Space, path: str, media: bool) -> Export:
-    """The export of the object at ``path``. Writes nothing.
-
-    Raises `ValueError` (not an object path, 400) and `KeyError` (no such file, 404).
-    """
-    rel = space._rel(path)
-    full = space.root / rel
-    if not full.is_file():
-        raise KeyError(rel)
-    stem = PurePosixPath(rel).stem
-    if not media:
-        return Export(full.read_bytes(), f"{stem}.md", "text/markdown; charset=utf-8")
+def _write_zip(space: Space, rel: str, stem: str, out) -> None:
+    """The media zip of ``rel`` into the binary file object ``out`` (attachments streamed)."""
     raw = read_raw(space.root, rel)
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED, strict_timestamps=False) as zf:
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, strict_timestamps=False) as zf:
         zf.writestr(f"{stem}.md", raw.data)
         for item in referenced_media(space.root, rel, raw.fm, raw.of.body):
             try:
                 zf.write(space.root / item, item)
             except OSError:
                 continue  # gone or unreadable since it was found: skipped like a missing one
+
+
+def _object_rel(space: Space, path: str) -> str:
+    rel = space._rel(path)
+    if not (space.root / rel).is_file():
+        raise KeyError(rel)
+    return rel
+
+
+def export_object(space: Space, path: str, media: bool) -> Export:
+    """The export of the object at ``path``, in memory. Writes nothing.
+
+    Raises `ValueError` (not an object path, 400) and `KeyError` (no such file, 404).
+    The route uses `export_object_to_file`, which never holds the zip in memory.
+    """
+    rel = _object_rel(space, path)
+    stem = PurePosixPath(rel).stem
+    if not media:
+        return Export((space.root / rel).read_bytes(), f"{stem}.md", "text/markdown; charset=utf-8")
+    buf = io.BytesIO()
+    _write_zip(space, rel, stem, buf)
     return Export(buf.getvalue(), f"{stem}.zip", "application/zip")
+
+
+def export_object_to_file(space: Space, path: str, media: bool) -> Export:
+    """The export of the object at ``path``; with ``media``, as a temporary zip ``file``.
+
+    Without ``media`` it is the ``.md`` bytes (``data``), as `export_object`. With it, the
+    zip is written to a new file in `export_dir` and returned as ``Export.file`` (``data``
+    empty): the caller sends that file and then calls `Export.cleanup`. Writes nothing in
+    the space. Raises `ValueError` (400) and `KeyError` (404), as `export_object`.
+    """
+    if not media:
+        return export_object(space, path, False)
+    rel = _object_rel(space, path)
+    stem = PurePosixPath(rel).stem
+    folder = export_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    _sweep(folder, time.time())
+    fd, name = tempfile.mkstemp(prefix="export-", suffix=".zip", dir=folder)
+    out = Export(b"", f"{stem}.zip", "application/zip", file=Path(name))
+    try:
+        with os.fdopen(fd, "wb") as f:
+            _write_zip(space, rel, stem, f)
+    except BaseException:
+        out.cleanup()
+        raise
+    return out
 
 
 def content_disposition(filename: str) -> str:

@@ -10,7 +10,8 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
-import { CSV_ROW_LIMIT, csvRecord, csvTargets, defaultMapping, ImportCsvDialog } from './ImportCsvDialog'
+import { useSettings } from '@/settings/useSettings'
+import { CSV_ROW_LIMIT, csvRecord, csvTargets, csvValue, defaultMapping, ImportCsvDialog } from './ImportCsvDialog'
 
 const mocked = vi.mocked(api)
 const TITLE = propertyDef({ id: 'title', key: 'title', name: 'Title', type: 'entity_title' })
@@ -66,6 +67,38 @@ describe('ImportCsvDialog', () => {
     expect(csvRecord(['X', '', 'B', 'many', 'Poetry'], mapping, targets)).toEqual({ title: 'X', values: { author: 'B' } })
   })
 
+  test('a percentage column is read in percent, as the cell is (audit 2026-11-01 #14)', () => {
+    const share = propertyDef({ id: 'share', key: 'share', name: 'Share', type: 'number', options: { numberFormat: { type: 'percentage', options: {} } } })
+    const plain = propertyDef({ id: 'rate', key: 'rate', name: 'Rate', type: 'number' })
+    expect(csvValue(share, '25')).toBe(0.25)
+    expect(csvValue(share, '25%')).toBe(0.25)
+    expect(csvValue(share, '14.3')).toBe(0.143)
+    // A plain number keeps "25" and reads a trailing % as the fraction, as its cell does.
+    expect(csvValue(plain, '25')).toBe(25)
+    expect(csvValue(plain, '25%')).toBe(0.25)
+  })
+
+  test('a quoted cell is one value; only an unquoted cell with commas is a list; text is trimmed (audit 2026-11-01)', () => {
+    const people = propertyDef({ id: 'people', key: 'people', name: 'People', type: 'entity', options: { isArray: true } })
+    const tags = propertyDef({ id: 'tags', key: 'tags', name: 'Tags', type: 'entity_tags' })
+    const q = (text: string) => ({ text, quoted: true })
+    expect(csvValue(people, q('Smith, John'))).toEqual([{ target: 'Smith, John', path: null }])
+    expect(csvValue(people, 'Smith, John')).toEqual([
+      { target: 'Smith', path: null },
+      { target: 'John', path: null },
+    ])
+    expect(csvValue(tags, q('a, b'))).toEqual(['a, b'])
+    expect(csvValue(tags, ' a , b ')).toEqual(['a', 'b'])
+    expect(csvValue(GENRE, q('Fiction'))).toEqual(['Fiction'])
+    expect(csvValue(AUTHOR, '  hello  ')).toBe('hello')
+    // Records keep the quoting through the dialog's reader.
+    const targets = csvTargets(typeDef({ id: 'b', propertyDefinitions: [TITLE, people] }))
+    expect(csvRecord([q('Dune'), q('Smith, John')], ['title', 'people'], targets)).toEqual({
+      title: 'Dune',
+      values: { people: [{ target: 'Smith, John', path: null }] },
+    })
+  })
+
   test('test creates one object per row', async () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
@@ -78,6 +111,43 @@ describe('ImportCsvDialog', () => {
       ['book', { title: 'Emma', templateId: 'none', values: { author: 'Austen' } }],
     ])
     expect(mocked.createCollection).not.toHaveBeenCalled()
+  })
+
+  test("a column written with decimal commas is read with them, whatever the setting", async () => {
+    const before = useSettings.getState().settings
+    useSettings.setState({ settings: { ...before, decimalSeparator: 'dot' } })
+    try {
+      // A plain value follows the setting: "1,5" under "dot" is 15.
+      expect(csvValue(PAGES, '1,5')).toBe(15)
+      expect(csvValue(PAGES, '1,5', true)).toBe(1.5)
+      const user = userEvent.setup()
+      const onOpenChange = vi.fn()
+      render(<ImportCsvDialog type={BOOK} open onOpenChange={onOpenChange} />)
+      await upload(user, 'Name,Pages\r\nDune,"1,5"\r\nEmma,"1.234,25"\r\nOdd,12\r\n')
+      await user.click(await screen.findByRole('button', { name: 'Import' }))
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+      expect(mocked.createObject.mock.calls.map((c) => c[1]?.values)).toEqual([{ pages: 1.5 }, { pages: 1234.25 }, { pages: 12 }])
+    } finally {
+      useSettings.setState({ settings: before })
+    }
+  })
+
+  test('a column the cells cannot tell about follows the setting', async () => {
+    const before = useSettings.getState().settings
+    useSettings.setState({ settings: { ...before, decimalSeparator: 'comma' } })
+    try {
+      const user = userEvent.setup()
+      const onOpenChange = vi.fn()
+      render(<ImportCsvDialog type={BOOK} open onOpenChange={onOpenChange} />)
+      // "1.234" reads either way: the setting (comma) makes it 1234. "2.5" can only be a point: 2.5.
+      await upload(user, 'Name,Pages,Pages\r\nDune,1.234,2.5\r\n')
+      await user.click(await screen.findByRole('button', { name: 'Import' }))
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+      expect(mocked.createObject.mock.calls[0][1]?.values).toEqual({ pages: 1234 })
+      expect(csvRecord(['Dune', '', '2.5'], ['title', 'pages', 'pages'], csvTargets(BOOK), [undefined, undefined, false]).values).toEqual({ pages: 2.5 })
+    } finally {
+      useSettings.setState({ settings: before })
+    }
   })
 
   test('test over row limit shows not supported', async () => {

@@ -12,6 +12,8 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import { useCalendar } from '@/calendar/useCalendar'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useFocusMode } from '@/focus/useFocusMode'
 import { todayYmd } from '@/calendar/dates'
 import { useLinkIndex } from '@/links/linkIndex'
@@ -117,10 +119,43 @@ describe('shortcuts', () => {
 
     const other = document.createElement('div')
     other.setAttribute('role', 'dialog')
+    other.setAttribute('aria-modal', 'true')
     document.body.appendChild(other)
     await user.keyboard('{Control>}k{/Control}')
     expect(usePalette.getState().open).toBe(false)
     other.remove()
+  })
+
+  test('Ctrl+K works while a popover (tab menu, spaces menu, date picker) is open', async () => {
+    const { user } = setup()
+    render(
+      <Popover open>
+        <PopoverTrigger asChild>
+          <button type="button">menu</button>
+        </PopoverTrigger>
+        <PopoverContent>a popover</PopoverContent>
+      </Popover>,
+    )
+    await screen.findByText('a popover')
+    // Radix gives a popover `role="dialog"` too; it is not a modal.
+    expect(document.querySelectorAll('[role="dialog"]').length).toBeGreaterThan(0)
+    await user.keyboard('{Control>}k{/Control}')
+    await waitFor(() => expect(usePalette.getState().open).toBe(true))
+  })
+
+  test('the app dialogs are modal (aria-modal), which is what the shortcut counts', async () => {
+    const { user } = setup()
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Some dialog</DialogTitle>
+        </DialogContent>
+      </Dialog>,
+    )
+    await screen.findByText('Some dialog')
+    expect(document.querySelector('[aria-modal="true"]')).not.toBeNull()
+    await user.keyboard('{Control>}k{/Control}')
+    expect(usePalette.getState().open).toBe(false)
   })
 
   test('the footer switches modes', async () => {

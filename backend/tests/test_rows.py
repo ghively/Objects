@@ -197,3 +197,102 @@ def test_preview_skips_annotations_and_math_fences():
         "Price $5 and $6.\n"
     )
     assert body_preview(body) == "Rollout notes Inside the toggle. E = mc^2 Price $5 and $6."
+
+
+def test_rows_without_preview_skips_body_preview(space_dir):
+    """Audit 2026-11-01 P2: a view fetches rows without previews first, then the visible page's."""
+    space = Space(space_dir)
+    with_preview = _by_path(space.rows(["task"]))
+    without = _by_path(space.rows(["task"], preview=False))
+    assert set(with_preview) == set(without)
+    assert any(r.preview for r in with_preview.values())
+    assert all(r.preview == "" for r in without.values())
+    for path, row in without.items():
+        assert row.values == with_preview[path].values
+        assert row.version == with_preview[path].version
+
+
+def _naive_preview(body: str, limit: int = 280) -> str:
+    """`body_preview` as it was before the early stop (audit 2026-11-01 P2): the whole body."""
+    from objectapp import rows as rows_mod
+
+    lines = body.replace("\r\n", "\n").split("\n")
+    i = 0
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    if i < len(lines) and rows_mod._H1_RE.match(lines[i]):
+        i += 1
+    out: list[str] = []
+    fenced = False
+    for line in lines[i:]:
+        if rows_mod._FENCE_RE.match(line):
+            fenced = not fenced
+            continue
+        if fenced or line.lstrip().startswith("|") or rows_mod._RULE_RE.match(line):
+            continue
+        if rows_mod._COMMENT_LINE_RE.match(line) or rows_mod._MATH_FENCE_RE.match(line):
+            continue
+        out.append(rows_mod._preview_line(line))
+    text = rows_mod._SPACE_RE.sub(" ", " ".join(out)).strip()
+    if len(text) <= limit:
+        return text
+    cut = text[: max(limit - 1, 0)]
+    if text[len(cut)] != " " and " " in cut:
+        cut = cut[: cut.rindex(" ")]
+    return cut.rstrip() + "…"
+
+
+_PREVIEW_BODIES = [
+    "",
+    "# Title only\n",
+    "short line\n\nanother",
+    "word " * 300,
+    "\n".join(f"line {i} with **bold** and [[Link {i}|alias]]" for i in range(400)),
+    "\n".join(["   " * 50 + "x"] * 200),  # whitespace-heavy: collapsing shrinks the text
+    "\n".join(["a" * 10 + " " * 500] * 30 + ["tail word"]),
+    "```\n" + "code\n" * 500 + "```\n" + "after the fence " * 40,
+    "| a | b |\n|---|---|\n" + "| 1 | 2 |\n" * 300 + "prose after a long table",
+    "- item\n" * 100 + "> quote " * 100,
+    "x" * 1000,  # one unbreakable word longer than the limit
+    "y" * 279 + " z",
+    "\n".join(f"{'ab' * 70}" for _ in range(10)),
+]
+
+
+@pytest.mark.parametrize("body", _PREVIEW_BODIES, ids=range(len(_PREVIEW_BODIES)))
+def test_body_preview_early_stop_matches_full_pass(body):
+    for limit in (280, 40, 1):
+        assert body_preview(body, limit) == _naive_preview(body, limit), limit
+
+
+def test_cached_preview_is_keyed_by_path_and_version(monkeypatch):
+    from objectapp import rows as rows_mod
+
+    rows_mod._preview_cache.clear()
+    calls: list[str] = []
+    real = rows_mod.body_preview
+    monkeypatch.setattr(rows_mod, "body_preview", lambda body, limit=280: calls.append(body) or real(body, limit))
+    assert rows_mod.cached_preview("Pages/A.md", "v1", "one") == "one"
+    assert rows_mod.cached_preview("Pages/A.md", "v1", "one") == "one"
+    assert calls == ["one"]
+    assert rows_mod.cached_preview("Pages/A.md", "v2", "two") == "two"  # a new version recomputes
+    assert rows_mod.cached_preview("Pages/B.md", "v1", "three") == "three"
+    assert calls == ["one", "two", "three"]
+    # Bounded: the least recently used entry leaves first.
+    rows_mod._preview_cache.clear()
+    monkeypatch.setattr(rows_mod, "_PREVIEW_CACHE_MAX", 2)
+    rows_mod.cached_preview("Pages/A.md", "v1", "one")
+    rows_mod.cached_preview("Pages/B.md", "v1", "two")
+    rows_mod.cached_preview("Pages/A.md", "v1", "one")  # touched: B is now the oldest
+    rows_mod.cached_preview("Pages/C.md", "v1", "three")
+    assert list(rows_mod._preview_cache) == [("Pages/A.md", "v1"), ("Pages/C.md", "v1")]
+    rows_mod._preview_cache.clear()
+
+
+def test_rows_route_preview_flag(space_dir):
+    client = TestClient(create_app(Space(space_dir), None, watch=False))
+    with client:
+        full = client.post("/api/rows", json={"typeIds": ["task"]}).json()["rows"]
+        bare = client.post("/api/rows", json={"typeIds": ["task"], "preview": False}).json()["rows"]
+    assert any(r["preview"] for r in full)
+    assert all(r["preview"] == "" for r in bare)

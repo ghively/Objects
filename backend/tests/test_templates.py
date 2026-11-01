@@ -284,3 +284,35 @@ def test_template_routes_and_delete_unregisters(space_dir: Path):
     assert tid not in task.templates["ids"]
     assert task.templates["defaultTemplateId"] is None
     assert client.get("/api/types/task/templates").json() == []
+
+
+def test_restoring_a_deleted_template_re_registers_it(space_dir: Path):
+    # Audit 2026-11-01: delete unregisters the template; restore must register it again,
+    # in its old place in `templates.ids` and as the default when it was.
+    space = Space(space_dir)
+    first, _ = space.create_template("task", "First")
+    middle, _ = space.create_template("task", "Middle")
+    last, _ = space.create_template("task", "Last")
+    mid_id = space.get(middle).id
+    _set_default(space, "task", mid_id)
+    order = list(space.type_by_id("task").templates["ids"])
+    assert order.index(mid_id) == 1
+
+    item = space.delete_object(middle)
+    task = space.type_by_id("task")
+    assert mid_id not in task.templates["ids"] and task.templates["defaultTemplateId"] is None
+
+    restored = space.restore(item.id)
+    assert restored["paths"] == [middle]
+    task = space.type_by_id("task")
+    assert task.templates["ids"] == order
+    assert task.templates["defaultTemplateId"] == mid_id
+    assert [s.path for s in space.list_templates("task")] == [first, middle, last]
+    # The type file carries the registration too (re-read from disk).
+    assert space._stored_type("task").templates["defaultTemplateId"] == mid_id
+
+    # A template that was registered but not the default comes back without becoming it.
+    item = space.delete_object(last)
+    space.restore(item.id)
+    task = space.type_by_id("task")
+    assert task.templates["ids"] == order and task.templates["defaultTemplateId"] == mid_id

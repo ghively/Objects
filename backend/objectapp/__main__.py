@@ -135,14 +135,29 @@ def startup_root(space_arg: Path | None) -> Path | None:
     return None
 
 
-def _wait_until_up(url: str, timeout: float = 10.0) -> None:
+def _wait_until_up(url: str, timeout: float = 10.0, thread: threading.Thread | None = None) -> bool:
+    """True once the server answers; False when it hasn't by `timeout` or `thread` ended first.
+
+    uvicorn ends its thread when it can't bind the port (another Object is running
+    there), so waiting on is pointless: the launcher must not open a window on it.
+    """
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
             with urllib.request.urlopen(url + "api/space", timeout=1):
-                return
+                return True
         except OSError:
+            if thread is not None and not thread.is_alive():
+                return False
             time.sleep(0.1)
+    return False
+
+
+def _port_taken_message(port: int) -> str:
+    return (
+        f"Object could not start: port {port} is already in use. "
+        "Is Object already running? Close it, or pass --port to use another port."
+    )
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -164,7 +179,12 @@ def main(argv: list[str] | None = None) -> None:
     )
     thread.start()
     url = f"http://{HOST}:{args.port}/"
-    _wait_until_up(url)
+    if not _wait_until_up(url, thread=thread) and not thread.is_alive():
+        # The server thread died before answering: the port is taken (uvicorn logged
+        # "address already in use"). A window on that URL would show another
+        # program, or nothing.
+        host.stop()
+        parser.exit(1, _port_taken_message(args.port) + "\n")
 
     try:
         if args.browser:

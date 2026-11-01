@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { api, ConflictError, ReadOnlyError } from '@/api/client'
+import { api, ConflictError, isResync, ReadOnlyError } from '@/api/client'
 import type { MdStamp } from '@/api/whiteboardTypes'
 import { announceSave, onLocalSave } from '../localSaves'
 import { inkClient, type InkClient } from './inkClient'
@@ -23,7 +23,9 @@ type Client = Pick<InkClient, 'load' | 'save'>
  * A 409 reloads, merges the local additions and removals by stroke id onto the server copy and
  * saves once with the new revision; a second 409 reloads and keeps the server copy. Any other
  * failure keeps the strokes pending, reports `saveError` and retries after a growing delay, at
- * most `INK_RETRY_LIMIT` times; the next change tries again. An external
+ * most `INK_RETRY_LIMIT` times; the next change tries again. A first load that fails is retried
+ * the same way (strokes drawn meanwhile stay pending and are merged onto the file when it loads);
+ * only after the retries does the ink open read-only with the reason. An external
  * `whiteboard` event for this path reloads when nothing is pending. `flush()` sends a pending save
  * now (also on unmount and `pagehide`). `onMdStamp` receives each landed save's stamp of the
  * board `.md` (M9), so the board's Notes can save on top of it.
@@ -51,6 +53,9 @@ export function useInkDoc(
     inFlight: null as Promise<void> | null,
     /** Failed saves in a row (reset by a save that lands). */
     failures: 0,
+    /** Failed first loads in a row, and the retry waiting. */
+    loadFailures: 0,
+    loadTimer: null as ReturnType<typeof setTimeout> | null,
     generation: 0,
   })
   s.current.client = client
@@ -107,6 +112,7 @@ export function useInkDoc(
     }, delay)
   }, [])
   const runRef = useRef<() => Promise<void>>(async () => undefined)
+  const reloadRef = useRef<() => Promise<void>>(async () => undefined)
 
   const saveOnce = useCallback(
     async (local: InkStroke[]) => {
@@ -215,9 +221,11 @@ export function useInkDoc(
       clearTimeout(st.timer)
       st.timer = null
     }
-    // Wait for the save in flight, then send what is still pending (a few tries if saves fail).
+    // Wait for the save in flight, then send what is still pending. One failed attempt ends it
+    // (its retry timer, or the next change, tries again): no burst of PUTs at a server that is down.
     for (let i = 0; i < 5 && (st.inFlight || (st.pending && !st.readOnly)); i++) {
       await run()
+      if (st.failures > 0) return
       if (st.timer) {
         clearTimeout(st.timer)
         st.timer = null
@@ -256,6 +264,18 @@ export function useInkDoc(
       applyLoad(res)
     } catch (err) {
       if (gen !== st.generation) return
+      if (!st.loaded && st.loadFailures < INK_RETRY_LIMIT) {
+        // The first load failed (the server down, a transient error): retry with a growing delay.
+        // Marking the ink read-only here would drop what is drawn meanwhile; it stays pending.
+        console.error('ink load failed', err)
+        st.loadFailures += 1
+        const delay = Math.min(INK_RETRY_MS * 2 ** (st.loadFailures - 1), INK_RETRY_MAX_MS)
+        st.loadTimer = setTimeout(() => {
+          st.loadTimer = null
+          void reloadRef.current()
+        }, delay)
+        return
+      }
       st.loaded = true
       st.readOnly = true
       if (st.alive) {
@@ -264,6 +284,16 @@ export function useInkDoc(
       }
     }
   }, [applyLoad, run, show])
+  reloadRef.current = reload
+
+  const clearLoadRetry = useCallback(() => {
+    const st = s.current
+    if (st.loadTimer) {
+      clearTimeout(st.loadTimer)
+      st.loadTimer = null
+    }
+    st.loadFailures = 0
+  }, [])
 
   // Load once per path.
   useEffect(() => {
@@ -276,13 +306,17 @@ export function useInkDoc(
     st.lastSaved = []
     st.pending = null
     st.failures = 0
+    clearLoadRetry()
     setStrokes(null)
     setReadOnlyReason(null)
     setSaveError(null)
     void reload()
     // Moving to another board sends this one's pending save first (it captures the old path).
-    return () => void flush()
-  }, [path, reload, flush])
+    return () => {
+      clearLoadRetry()
+      void flush()
+    }
+  }, [path, reload, flush, clearLoadRetry])
 
   // External changes to this board's files, and saves by another view of it in this window.
   useEffect(() => {
@@ -295,6 +329,8 @@ export function useInkDoc(
     }
     const offChange = api.onChange((e) => {
       if ((e.kind as string) === 'whiteboard') changed(e.path, e.version)
+      // The stream reconnected: the ink may have changed meanwhile; the revision check decides.
+      else if (isResync(e, 'types')) changed(s.current.path, null)
     })
     const offLocal = onLocalSave((e) => {
       if (e.source !== s.current) changed(e.path, e.version)

@@ -1,12 +1,14 @@
 // The filter popover's body: nested AND/OR rows, each a property, an operator and a value editor.
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
-import type { Collection, EntityRef, Filter, FilterGroup, FilterReference, PropertyDef, TypeDef } from '@/api/types'
+import type { Collection, EntityRef, Filter, FilterGroup, FilterReference, NumberFormat, PropertyDef, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useLinkIndex } from '@/links/linkIndex'
 import { cn } from '@/lib/utils'
+import { zonedToday } from '@/lib/zonedTime'
 import { DatePicker } from '@/properties/DatePicker'
+import { parseNumberInput, usesRadixComma } from '@/properties/format'
 import { LabelPill } from '@/properties/LabelMenu'
 import { RelationPicker } from '@/properties/RelationPicker'
 import { DATE_RELATIVE_OPTIONS } from './dates'
@@ -276,6 +278,60 @@ function FilterRow({
   )
 }
 
+/** `n` times 10^`by`, without the binary rounding of a multiplication (0.143 → 14.3). */
+function shift(n: number, by: number): number {
+  const [mantissa, exp] = String(n).split('e')
+  return Number(`${mantissa}e${Number(exp ?? 0) + by}`)
+}
+
+/** A number still being typed: `-`, `+`, `.`, `1e`, `1e-` (either decimal separator). */
+const NUMBER_PREFIX = /^\s*[-+]?[\d.,]*(e[-+]?)?\s*$/i
+
+/**
+ * A filter's number, read as the number cells read theirs (`parseNumberInput`: the "Decimal
+ * separator" setting, a leading `+`, nothing that isn't finite). The text is kept as typed: a
+ * complete number applies at once, an empty field clears the value, and a number still being
+ * typed (`-`, `1.`, `1e`) keeps the last value applied. Leaving the field shows the value applied.
+ */
+function NumberValue({
+  value,
+  format,
+  onChange,
+}: {
+  value: number | undefined
+  format?: NumberFormat | null
+  onChange(next: number | undefined): void
+}) {
+  const comma = usesRadixComma(format)
+  const shown = value === undefined ? '' : comma ? String(value).replace('.', ',') : String(value)
+  const [text, setText] = useState(shown)
+  const focused = useRef(false)
+  useEffect(() => {
+    if (!focused.current) setText(shown)
+  }, [shown])
+  return (
+    <input
+      aria-label="Value"
+      inputMode="decimal"
+      value={text}
+      aria-invalid={(parseNumberInput(text, format) === undefined && !NUMBER_PREFIX.test(text)) || undefined}
+      onFocus={() => (focused.current = true)}
+      onChange={(e) => {
+        const raw = e.target.value
+        setText(raw)
+        const n = parseNumberInput(raw, format)
+        if (n === null) onChange(undefined)
+        else if (n !== undefined) onChange(n)
+      }}
+      onBlur={() => {
+        focused.current = false
+        setText(shown)
+      }}
+      className={cn(SELECT, 'w-28')}
+    />
+  )
+}
+
 function MultiPick({
   label,
   items,
@@ -356,21 +412,13 @@ function ValueEditor({
   }
   if (kind === 'number') {
     // A percentage stores the fraction (0.25): its filter value is typed and shown in percent (25).
-    const pct = (choice.def as PropertyDef).options?.numberFormat?.type === 'percentage'
-    const shift = (n: number, by: number) => {
-      const [mantissa, exp] = String(n).split('e')
-      return Number(`${mantissa}e${Number(exp ?? 0) + by}`)
-    }
+    const format = (choice.def as PropertyDef).options?.numberFormat ?? null
+    const pct = format?.type === 'percentage'
     return (
-      <input
-        aria-label="Value"
-        type="number"
-        value={typeof ref === 'number' ? (pct ? shift(ref, 2) : ref) : ''}
-        onChange={(e) => {
-          const n = e.target.value === '' ? undefined : Number(e.target.value)
-          set(n === undefined || Number.isNaN(n) ? undefined : pct ? shift(n, -2) : n)
-        }}
-        className={cn(SELECT, 'w-28')}
+      <NumberValue
+        value={typeof ref === 'number' ? (pct ? shift(ref, 2) : ref) : undefined}
+        format={format}
+        onChange={(n) => set(n === undefined ? undefined : pct ? shift(n, -2) : n)}
       />
     )
   }
@@ -460,7 +508,7 @@ function ValueEditor({
           label="Date"
           value={mode}
           onChange={(v) => {
-            if (v === 'exactDate') set({ exactDate: new Date().toISOString().slice(0, 10) })
+            if (v === 'exactDate') set({ exactDate: zonedToday() })
             else if (v) set({ relative: v as never })
           }}
           options={DATE_RELATIVE_OPTIONS.map((o) => ({ value: o.key, label: o.label }))}

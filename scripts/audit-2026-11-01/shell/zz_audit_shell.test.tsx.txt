@@ -1,0 +1,192 @@
+// AUDIT SCRATCH (delete before finishing): shell state, startup requests and render counts.
+import { act, render, screen, waitFor } from '@testing-library/react'
+import { Profiler } from 'react'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { ChangeEvent, SpaceInfo } from '@/api/types'
+import { objectDetail, objectSummary, typeDef } from '@/test/mockApi'
+
+let sidebarRenders = 0
+let typePageRenders = 0
+let objectPageRenders = 0
+
+vi.mock('@/api/client', async (orig) => ({
+  ...(await orig<typeof import('@/api/client')>()),
+  api: (await import('@/test/mockApi')).mockApi(),
+}))
+vi.mock('@/shell/Sidebar', async (orig) => {
+  const m = await orig<typeof import('@/shell/Sidebar')>()
+  return {
+    ...m,
+    Sidebar: (p: Parameters<typeof m.Sidebar>[0]) => {
+      sidebarRenders++
+      return m.Sidebar(p)
+    },
+  }
+})
+vi.mock('@/types/TypePage', async (orig) => {
+  const m = await orig<typeof import('@/types/TypePage')>()
+  return {
+    ...m,
+    TypePage: (p: Parameters<typeof m.TypePage>[0]) => {
+      typePageRenders++
+      return m.TypePage(p)
+    },
+  }
+})
+vi.mock('@/object/ObjectPage', () => ({
+  ObjectPage: ({ path }: { path: string }) => {
+    objectPageRenders++
+    return <div data-testid="object-page">{path}</div>
+  },
+}))
+
+import { api } from '@/api/client'
+import { resetLinkIndex } from '@/links/linkIndex'
+import { usePeek, useTabs } from '@/nav/tabs'
+import { resetPinned, useUiStore, pinnedActions } from '@/shell/usePinned'
+import { saveWorkspaceOrder } from '@/shell/SidebarSections'
+import { resetSpaceInfo } from '@/settings/useSpaceInfo'
+import App from './App'
+
+const mocked = vi.mocked(api)
+const listeners = new Set<(e: ChangeEvent) => void>()
+const emit = (e: ChangeEvent) => {
+  for (const cb of [...listeners]) cb(e)
+}
+
+const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true, revision: 'r1' })
+const PROJECT = typeDef({ id: 'project', name: 'Project', pluralName: 'Projects', revision: 'r1' })
+const OBJECTS = Array.from({ length: 300 }, (_, i) => objectSummary({ path: `Projects/P${i}.md`, type: 'project', title: `P${i}`, id: `id${i}` }))
+
+beforeEach(() => {
+  localStorage.clear()
+  useTabs.getState().reset()
+  usePeek.getState().close()
+  resetLinkIndex()
+  resetPinned()
+  resetSpaceInfo()
+  listeners.clear()
+  sidebarRenders = typePageRenders = objectPageRenders = 0
+  for (const fn of Object.values(mocked)) vi.mocked(fn).mockClear()
+  mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE, PROJECT] } as SpaceInfo)
+  mocked.objects.mockResolvedValue(OBJECTS)
+  mocked.object.mockImplementation(async (path: string) => objectDetail({ summary: objectSummary({ path, type: 'project' }), version: 'v1' }))
+  mocked.onChange.mockImplementation((cb) => {
+    listeners.add(cb)
+    return () => listeners.delete(cb)
+  })
+})
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+describe('audit: startup', () => {
+  test('how many times GET /api/space is fetched at startup, and whether settings wait for it', async () => {
+    let resolveSpace: (s: SpaceInfo) => void = () => undefined
+    mocked.space.mockImplementationOnce(() => new Promise<SpaceInfo>((r) => (resolveSpace = r)))
+    render(<App />)
+    await sleep(20)
+    const settingsBeforeSpace = mocked.settings.mock.calls.length
+    resolveSpace({ name: 's', root: '/s', types: [PAGE, PROJECT] } as SpaceInfo)
+    await screen.findByRole('button', { name: 'New' })
+    await sleep(50)
+    console.log('AUDIT startup: api.space calls =', mocked.space.mock.calls.length, '; api.settings calls before space resolved =', settingsBeforeSpace, '; after =', mocked.settings.mock.calls.length)
+    console.log('AUDIT startup: api.objects calls =', mocked.objects.mock.calls.length, 'api.ui calls =', mocked.ui.mock.calls.length, 'collections =', mocked.collections.mock.calls.length)
+    expect(mocked.space.mock.calls.length).toBeGreaterThanOrEqual(3)
+    expect(settingsBeforeSpace).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('audit: SSE event fan-out', () => {
+  test('one body-only change to an unrelated object re-renders the whole shell and refetches every summary', async () => {
+    useTabs.getState().open({ kind: 'object', path: 'Projects/P1.md' })
+    let commits = 0
+    render(
+      <Profiler id="app" onRender={() => commits++}>
+        <App />
+      </Profiler>,
+    )
+    await screen.findByTestId('object-page')
+    await waitFor(() => expect(mocked.objects).toHaveBeenCalled())
+    await sleep(100)
+    const before = { commits, sidebarRenders, objectPageRenders, objects: mocked.objects.mock.calls.length, space: mocked.space.mock.calls.length }
+    // Another window saved the body of some other object (no title, no type change).
+    await act(async () => {
+      emit({ kind: 'changed', path: 'Projects/P250.md', version: 'v9', origin: 'other-window' })
+      await sleep(250)
+    })
+    const after = { commits, sidebarRenders, objectPageRenders, objects: mocked.objects.mock.calls.length, space: mocked.space.mock.calls.length }
+    console.log('AUDIT one SSE changed event:', { before, after })
+    expect(after.objects).toBe(before.objects + 1)
+    expect(after.space).toBe(before.space + 1)
+    expect(after.sidebarRenders).toBeGreaterThan(before.sidebarRenders)
+    expect(after.objectPageRenders).toBeGreaterThan(before.objectPageRenders)
+  })
+
+  test('ten body saves 200 ms apart = ten full summary refetches', async () => {
+    useTabs.getState().open({ kind: 'type', typeId: 'project' })
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Projects' })
+    await sleep(100)
+    const before = mocked.objects.mock.calls.length
+    for (let i = 0; i < 10; i++) {
+      await act(async () => {
+        emit({ kind: 'changed', path: 'Projects/P7.md', version: `v${i}`, origin: 'other' })
+        await sleep(200)
+      })
+    }
+    console.log('AUDIT 10 changed events -> api.objects calls:', mocked.objects.mock.calls.length - before, 'typePage renders:', typePageRenders)
+    expect(mocked.objects.mock.calls.length - before).toBe(10)
+  })
+})
+
+describe('audit: ui.json saves', () => {
+  test('a failed pin disappears silently: no toast, no alert', async () => {
+    mocked.patchUi.mockRejectedValue(new Error('disk full'))
+    mocked.ui.mockResolvedValue({ ui: { pinned: [], sections: [], allNotesLayout: 'list' }, revision: 'r1' })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    render(<App />)
+    await screen.findByRole('button', { name: 'New' })
+    await act(async () => {
+      await pinnedActions.pin({ kind: 'type', id: 'project' })
+      await sleep(20)
+    })
+    expect(useUiStore.getState().ui.pinned).toEqual([])
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryAllByRole('status').map((e) => e.textContent).filter(Boolean)).toEqual([])
+    expect(warn).toHaveBeenCalledWith('Could not save the sidebar state:', expect.anything())
+    warn.mockRestore()
+  })
+
+  test('a failed workspaceOrder save keeps the unsaved order on screen (never reverted, no message)', async () => {
+    mocked.patchUi.mockRejectedValue(new Error('disk full'))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    useUiStore.setState({ ui: { pinned: [], sections: [], allNotesLayout: 'list', workspaceOrder: ['pinned', 'objects'] }, revision: 'r1', loaded: true })
+    await saveWorkspaceOrder(['objects', 'pinned'])
+    await sleep(10)
+    expect(useUiStore.getState().ui.workspaceOrder).toEqual(['objects', 'pinned'])
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+})
+
+describe('audit: tabs in two windows', () => {
+  test('a second window writing object.tabs:<root> is overwritten by this window on its next navigation', async () => {
+    render(<App />)
+    await screen.findByRole('button', { name: 'New' })
+    await act(async () => {
+      useTabs.getState().open({ kind: 'object', path: 'Projects/P1.md' })
+    })
+    const key = 'object.tabs:/s'
+    const mine = JSON.parse(localStorage.getItem(key)!)
+    expect(mine.state.tabs).toHaveLength(1)
+    // Window B (same space) opened two more tabs and persisted them.
+    const other = { ...mine, state: { ...mine.state, tabs: [...mine.state.tabs, { id: 'tB1', history: [{ kind: 'trash' }], index: 0, crumbs: [[]] }, { id: 'tB2', history: [{ kind: 'tasks' }], index: 0, crumbs: [[]] }] } }
+    localStorage.setItem(key, JSON.stringify(other))
+    await act(async () => {
+      useTabs.getState().open({ kind: 'object', path: 'Projects/P2.md' })
+    })
+    const after = JSON.parse(localStorage.getItem(key)!)
+    console.log('AUDIT tabs after both windows wrote:', after.state.tabs.map((t: { id: string }) => t.id))
+    expect(after.state.tabs.some((t: { id: string }) => t.id === 'tB1')).toBe(false)
+  })
+})
