@@ -291,3 +291,19 @@ def test_replace_in_value_unchanged_and_absent():
 def test_replace_in_value_changes_one_item_only():
     out = replace_in_value(SRC, "tags", lambda t: "ML" if t == "LLM" else t)
     assert _changed(SRC, out) == ["- tags: [AI, LLM]", "+ tags: [AI, ML]"]
+
+
+# -- audit 2026-11-01: a bad file opens read-only; it never crashes the space -------
+
+
+def test_deeply_nested_yaml_is_a_frontmatter_error(tmp_path):
+    from objectapp.typedefs import read_raw
+
+    deep = "a: " + "[" * 3000 + "]" * 3000 + "\n"
+    with pytest.raises(FrontmatterError):
+        parse_fm(deep)
+    with pytest.raises(FrontmatterError):
+        set_keys(deep, {"b": 1})
+    (tmp_path / "deep.md").write_text("---\n" + deep + "---\nbody\n", encoding="utf-8")
+    raw = read_raw(tmp_path, "deep.md")
+    assert raw.readOnly and "YAML" in (raw.readOnlyReason or "")
