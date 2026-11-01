@@ -520,6 +520,15 @@ def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse({"detail": message}, status_code=status)
 
 
+def _unusable_id(id: str) -> bool:
+    """An id no definition file name can hold, so no definition can exist under it.
+
+    `JsonStore.path` checks the id's characters; the length is checked here so an
+    over-long id from a URL answers 404 instead of ``ENAMETOOLONG`` from the OS (503).
+    """
+    return "\x00" in id or len(id.encode("utf-8", errors="surrogateescape")) > 200
+
+
 # The host names this app answers to. Any other ``Host`` is a DNS-rebinding page
 # (a foreign name resolved to 127.0.0.1), refused on every request. The port is not
 # checked: the Vite dev server proxies with its own port in ``Host``. Tests add
@@ -875,8 +884,11 @@ def create_app(
     def _folder(raw: str) -> Path | None:
         if not raw.strip():
             return None
-        path = normalize(raw)
-        return path if path.is_dir() else None
+        try:
+            path = normalize(raw)
+            return path if path.is_dir() else None
+        except (ValueError, OSError):  # a NUL, or a path too long for the OS to stat
+            return None
 
     @api.post("/spaces/open")
     def open_space(req: SpacePathRequest):
@@ -890,7 +902,10 @@ def create_app(
     def remove_space(path: str = Query(default="")):
         if not path.strip():
             return _error(404, "No space given.")
-        target = normalize(path)
+        try:
+            target = normalize(path)
+        except ValueError:
+            return _error(404, f"Not a folder: {path[:60]!r}")
         if os.path.normcase(str(target)) == os.path.normcase(str(space.root)):
             return _error(409, "This space is open. Switch to another space first.")
         registry().remove(target)
@@ -1452,6 +1467,8 @@ def create_app(
 
     @api.put("/queries/{query_id}")
     def save_query(query_id: str, req: SaveQueryRequest):
+        if _unusable_id(query_id):
+            return _error(404, f"No query {query_id[:60]!r}")
         q = QueryDef.from_json(req.query, fallback_id=query_id)
         q.id = query_id
         try:
@@ -1469,6 +1486,8 @@ def create_app(
 
     @api.delete("/queries/{query_id}")
     def delete_query(query_id: str, clientId: str | None = Query(default=None)):
+        if _unusable_id(query_id):
+            return _error(404, f"No query {query_id[:60]!r}")
         try:
             trash_id = space.delete_query(query_id)
         except ReadOnly as exc:

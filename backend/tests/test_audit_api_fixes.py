@@ -1,0 +1,176 @@
+"""Audit 2026-11-01 (back-end API): malformed input answers 4xx, never 500 or 503.
+
+#4a: a NUL byte or an over-long component in a space path, a definition id or an
+object path (`fuzz_routes.py`'s cases).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+from objectapp import spaces
+from objectapp.server import create_app
+from objectapp.space import Space
+
+NUL_PATHS = ["a\x00b", "/tmp/x\x00", "\x00"]
+LONG = "x" * 5000
+
+
+@pytest.fixture
+def client(m8_space_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    monkeypatch.setenv("OBJECT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("OBJECT_CACHE_DIR", str(tmp_path / "cache"))
+    app = create_app(Space(m8_space_dir), watch=False, on_switch=lambda _p: None)
+    return TestClient(app, raise_server_exceptions=False)
+
+
+# -- #4a: NUL and over-long space paths ------------------------------------------------
+
+
+@pytest.mark.parametrize("path", NUL_PATHS)
+def test_normalize_rejects_nul(path: str):
+    with pytest.raises(ValueError):
+        spaces.normalize(path)
+
+
+def test_normalize_rejects_over_long_path():
+    with pytest.raises(ValueError):
+        spaces.normalize(LONG)
+
+
+@pytest.mark.parametrize("path", [*NUL_PATHS, LONG])
+def test_space_routes_refuse_bad_paths(client: TestClient, path: str, m8_space_dir: Path):
+    calls = {
+        "open": client.post("/api/spaces/open", json={"path": path}),
+        "remove": client.delete("/api/spaces", params={"path": path}),
+        "create-location": client.post("/api/spaces", json={"name": "x", "location": path}),
+        "delete": client.post("/api/spaces/delete", json={"path": path}),
+        "delete-permanent": client.post("/api/spaces/delete", json={"path": path, "permanent": True}),
+        "switch": client.post("/api/spaces/switch", json={"path": path}),
+    }
+    assert {k: r.status_code for k, r in calls.items()} == {
+        "open": 404,
+        "remove": 404,
+        "create-location": 404,
+        "delete": 404,
+        "delete-permanent": 404,
+        "switch": 404,
+    }, {k: r.text[:80] for k, r in calls.items()}
+    for r in calls.values():
+        assert "detail" in r.json()
+
+
+def test_registry_remove_ignores_nul(tmp_path: Path):
+    reg = spaces.Registry(tmp_path / "state")
+    reg.register(tmp_path)
+    with pytest.raises(ValueError):
+        reg.remove("a\x00b")
+    assert [e.path for e in reg.list()] == [str(tmp_path.resolve())]
+
+
+# -- #4a: over-long definition ids ----------------------------------------------------
+
+LONG_ID = "A" * 300
+
+
+def test_long_query_id_is_404_not_503(client: TestClient):
+    put = client.put(f"/api/queries/{LONG_ID}", json={"query": {}, "baseRevision": ""})
+    delete = client.delete(f"/api/queries/{LONG_ID}")
+    assert (put.status_code, delete.status_code) == (404, 404), (put.text, delete.text)
+
+
+def test_long_collection_and_view_ids_are_4xx(client: TestClient):
+    calls = [
+        client.get(f"/api/views/{LONG_ID}"),
+        client.put(f"/api/views/{LONG_ID}", json={"views": {}, "baseRevision": ""}),
+        client.put(f"/api/collections/{LONG_ID}", json={"collection": {}, "baseRevision": ""}),
+        client.delete(f"/api/collections/{LONG_ID}"),
+    ]
+    assert [r.status_code // 100 for r in calls] == [4, 4, 4, 4], [r.text[:80] for r in calls]
+
+
+# -- #4a: over-long object paths on every path-taking route ----------------------------
+
+
+def _strict_rel(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Lane B1b's `Space._rel`: an over-long component is a `ValueError`, not an `OSError`."""
+    original = Space._rel
+
+    def rel(self: Space, path: str) -> str:
+        if any(len(part.encode("utf-8")) > 255 for part in str(path).replace("\\", "/").split("/")):
+            raise ValueError(f"Not an object path: {path[:40]!r}")
+        return original(self, path)
+
+    monkeypatch.setattr(Space, "_rel", rel)
+
+
+def test_long_object_path_is_4xx_on_every_route(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    _strict_rel(monkeypatch)
+    p = LONG + ".md"
+    v = client.get("/api/object", params={"path": "Pages/Source note.md"}).json()["version"]
+    board = {"version": 1, "nodes": {}, "edges": {}}
+    calls = {
+        "GET /api/object": client.get("/api/object", params={"path": p}),
+        "GET /api/object/export": client.get("/api/object/export", params={"path": p, "media": "1"}),
+        "GET /api/history": client.get("/api/history", params={"path": p}),
+        "GET /api/history/version": client.get("/api/history/version", params={"path": p, "id": "x"}),
+        "GET /api/references": client.get("/api/references", params={"path": p}),
+        "GET /api/whiteboard": client.get("/api/whiteboard", params={"path": p}),
+        "GET /api/whiteboard/ink": client.get("/api/whiteboard/ink", params={"path": p}),
+        "GET /api/tasks/overdue": client.get("/api/tasks/overdue", params={"path": p}),
+        "GET /api/tasks/stats": client.get("/api/tasks/stats", params={"path": p}),
+        "GET /api/file": client.get("/api/file", params={"path": p}),
+        "GET /api/block": client.get("/api/block", params={"path": p, "id": "abcdef"}),
+        "GET /api/block/references": client.get("/api/block/references", params={"path": p, "id": "abcdef"}),
+        "GET /api/object/change-type": client.get("/api/object/change-type", params={"path": p, "typeId": "page"}),
+        "GET /api/resolve": client.get("/api/resolve", params={"link": p, "from": p}),
+        "DELETE /api/object": client.delete("/api/object", params={"path": p}),
+        "PUT /api/object/body": client.put("/api/object/body", json={"path": p, "body": "x", "baseVersion": v}),
+        "PUT /api/object/properties": client.put(
+            "/api/object/properties", json={"path": p, "updates": {"title": "x"}, "baseVersion": v}
+        ),
+        "POST /api/object/ensure-id": client.post("/api/object/ensure-id", json={"path": p}),
+        "POST /api/object/duplicate": client.post("/api/object/duplicate", json={"path": p}),
+        "POST /api/object/rename": client.post("/api/object/rename", json={"path": p, "title": "x", "baseVersion": v}),
+        "POST /api/object/change-type": client.post(
+            "/api/object/change-type", json={"path": p, "typeId": "page", "mapping": {}, "baseVersion": v}
+        ),
+        "POST /api/object/apply-template": client.post(
+            "/api/object/apply-template", json={"path": p, "templateId": "x", "baseVersion": v}
+        ),
+        "POST /api/reveal": client.post("/api/reveal", json={"path": p}),
+        "POST /api/attachments/open": client.post("/api/attachments/open", json={"path": p}),
+        "PUT /api/whiteboard": client.put("/api/whiteboard", json={"path": p, "board": board, "baseRevision": ""}),
+        "PUT /api/whiteboard/ink": client.put("/api/whiteboard/ink", json={"path": p, "strokes": [], "baseRevision": ""}),
+        "POST /api/tasks/occurrence": client.post(
+            "/api/tasks/occurrence", json={"path": p, "action": "complete", "baseVersion": v}
+        ),
+        "PUT /api/tasks/reminder": client.put(
+            "/api/tasks/reminder", json={"path": p, "key": "date", "remind": "on the day at 09:00", "baseVersion": v}
+        ),
+        "POST /api/history/restore": client.post("/api/history/restore", json={"path": p, "id": "x", "baseVersion": v}),
+        "POST /api/object/merge source": client.post(
+            "/api/object/merge",
+            json={"source": p, "target": "Pages/Merge target.md", "sourceVersion": "x", "targetVersion": "x", "confirm": True},
+        ),
+        "POST /api/object/merge target": client.post(
+            "/api/object/merge",
+            json={"source": "Pages/Merge source.md", "target": p, "sourceVersion": "x", "targetVersion": "x", "confirm": True},
+        ),
+        "POST /api/references/link": client.post(
+            "/api/references/link",
+            json={"path": p, "target": "x", "start": 0, "end": 1, "text": "x", "baseVersion": v},
+        ),
+        "POST /api/images": client.post(
+            "/api/images", params={"name": p}, content=b"x", headers={"content-type": "application/octet-stream"}
+        ),
+        "POST /api/attachments": client.post(
+            "/api/attachments", params={"name": p}, content=b"x", headers={"content-type": "application/octet-stream"}
+        ),
+    }
+    bad = {k: (r.status_code, r.text[:80]) for k, r in calls.items() if r.status_code // 100 != 4}
+    assert bad == {}
+    # Unknown paths in a rows request are skipped, not an error.
+    assert client.post("/api/rows", json={"paths": [p]}).json() == {"rows": []}
