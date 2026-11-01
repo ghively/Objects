@@ -193,15 +193,16 @@ class SpaceWatcher:
             self._schedule(rel)
 
     def _touch_folder(self, path: str) -> None:
-        """A folder moved or vanished: re-check every known object beneath it."""
+        """A folder moved or vanished: re-check every known object beneath it, templates included."""
         with self.space._lock:
             rel = self._space_rel(path)
-        if rel is None:
-            return
-        prefix = rel.as_posix() + "/"
-        for s in self.space.list():
-            if s.path.startswith(prefix):
-                self._schedule(s.path)
+            if rel is None:
+                return
+            prefix = rel.as_posix() + "/"
+            # `space.list()` leaves templates out; the summaries hold every known file.
+            beneath = [p for p in self.space._summaries if p.startswith(prefix)]
+        for p in beneath:
+            self._schedule(p)
 
     def _schedule(self, rel: str) -> None:
         if self._stopped:
