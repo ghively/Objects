@@ -11,7 +11,8 @@
  * Escape selects the block holding the cursor; Shift+Up/Down extend; Mod-a
  * selects the block's siblings, again the top level; Backspace/Delete delete;
  * Mod-c copies the blocks' serialized source (their original bytes when
- * unedited) as text/plain, Mod-x cuts; Mod-d duplicates; Alt-Up/Down (with
+ * unedited) as text/plain, Mod-x cuts, and pasted Markdown text is read as
+ * blocks (`pasteSlice`); Mod-d duplicates; Alt-Up/Down (with
  * or without Shift) move them, or the block holding the cursor; Mod-e / Mod-m
  * turn them into a code / math block; Tab/Shift-Tab indent and unindent list items; typing replaces the
  * blocks with a paragraph; a click (any selection change of its own) clears it.
@@ -19,10 +20,11 @@
  * The keys come from the registry (`editor/shortcuts.ts`, `keysFor(id)`).
  */
 import { Extension, type Editor } from '@tiptap/core'
-import type { Node as PMNode } from '@tiptap/pm/model'
+import { Fragment, Slice, type Node as PMNode } from '@tiptap/pm/model'
 import { NodeSelection, Plugin, PluginKey, Selection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
-import { serializeBody } from '../document'
+import { parseBody, serializeBody } from '../document'
+import { contentMatchesSnapshot } from './blockSource'
 import { BLOCK_PARENTS, blockChain, optionApplies, setOptionAt, type BlockRef, type Hierarchy, type ListType } from '../nodes/blockOptions'
 import { isToggleOpen } from '../nodes/toggle'
 import type { Option } from '../annotations'
@@ -582,6 +584,105 @@ function onClipboard(view: EditorView, event: ClipboardEvent, cut: boolean, edit
 }
 
 // ---------------------------------------------------------------------------
+// Pasting
+
+/**
+ * Text that reads as Markdown: a line starting a block (heading, list item,
+ * quote, fence, table row, rule, math, comment, embed) or carrying inline
+ * syntax (code, strong, strikethrough, a link or wikilink). Plain prose is
+ * left to ProseMirror's own text paste (one paragraph per line).
+ */
+const MD_BLOCK_START = /^ {0,3}(?:#{1,6}(?:[ \t]|$)|[-+*](?:[ \t]|$)|\d{1,9}[.)](?:[ \t]|$)|>|`{3}|~{3}|\||(?:[-*_][ \t]*){3,}$|\$\$|<!--|!\[)/m
+const MD_INLINE = /\*\*|`|\[\[|\]\(|~~/
+
+export function looksLikeMarkdown(text: string): boolean {
+  return MD_BLOCK_START.test(text) || MD_INLINE.test(text)
+}
+
+/**
+ * Pasted text (our own block copy, or Markdown from elsewhere) read as a body
+ * is: the same parser as `loadBody`, so lists, headings, tables, math and
+ * annotated blocks come back as those blocks instead of one escaped paragraph
+ * per line. A block that still equals its copied source keeps its bytes on save.
+ * Null (the default paste) for plain text, or when the text does not parse.
+ */
+export function pasteBlocks(editor: Editor, text: string): PMNode[] | null {
+  if (!looksLikeMarkdown(text)) return null
+  try {
+    const { content } = parseBody(editor, text.replace(/\r\n?/g, '\n'))
+    if (!content.length) return null
+    return content.map((json) => {
+      const node = editor.schema.nodeFromJSON(json)
+      // Our own copy or cut (the block as loaded) keeps its source; anything else is a new block.
+      return contentMatchesSnapshot(editor, node) ? node : withoutSource(node)
+    })
+  } catch {
+    return null
+  }
+}
+
+const SOURCE_ATTRS = ['blockSource', 'blockOrigin', 'blockTrailing']
+
+/** `node` and its descendants without their source attributes. */
+function withoutSource(node: PMNode): PMNode {
+  const content = Fragment.from(node.content.content.map(withoutSource))
+  if (!SOURCE_ATTRS.some((k) => k in node.attrs)) return node.copy(content)
+  const attrs = { ...node.attrs }
+  for (const k of SOURCE_ATTRS) if (k in attrs) attrs[k] = null
+  return node.type.create(attrs, content, node.marks)
+}
+
+/**
+ * Blocks parsed by `clipboardTextParser` for the paste `handlePaste` is about
+ * to see (ProseMirror calls the two in turn, synchronously). A single paragraph
+ * is left to ProseMirror, which merges it into the text at the cursor; anything
+ * else is inserted as whole blocks by `insertPastedBlocks`.
+ */
+let pendingBlocks: PMNode[] | null = null
+
+function parsePastedText(editor: Editor, text: string): Slice | null {
+  pendingBlocks = null
+  const nodes = pasteBlocks(editor, text)
+  if (!nodes) return null
+  if (nodes.length > 1 || nodes[0].type.name !== 'paragraph') pendingBlocks = nodes
+  return new Slice(Fragment.from(nodes), 0, 0)
+}
+
+/**
+ * Insert `nodes` as blocks at the selection: in place of an empty textblock,
+ * before or after the textblock when the cursor is at its start or end, else
+ * splitting it. Inside a list item, a table cell or a quote the default paste
+ * (ProseMirror fitting the slice) applies instead.
+ */
+export function insertPastedBlocks(view: EditorView, nodes: PMNode[]): boolean {
+  const { state } = view
+  const tr = state.tr
+  if (!state.selection.empty) tr.deleteSelection()
+  const $pos = tr.selection.$from
+  const parent = $pos.parent
+  if (!parent.isTextblock || !BLOCK_PARENTS.has($pos.node($pos.depth - 1).type.name)) return false
+  let at: number
+  if (parent.content.size === 0) {
+    at = $pos.before()
+    tr.replaceWith(at, $pos.after(), nodes)
+  } else if ($pos.parentOffset === parent.content.size) {
+    at = $pos.after()
+    tr.insert(at, nodes)
+  } else if ($pos.parentOffset === 0) {
+    at = $pos.before()
+    tr.insert(at, nodes)
+  } else {
+    tr.split($pos.pos)
+    at = $pos.pos + 1 // between the two halves
+    tr.insert(at, nodes)
+  }
+  const size = nodes.reduce((sum, n) => sum + n.nodeSize, 0)
+  tr.setSelection(Selection.near(tr.doc.resolve(at + size), -1))
+  view.dispatch(tr.scrollIntoView().setMeta('paste', true).setMeta('uiEvent', 'paste'))
+  return true
+}
+
+// ---------------------------------------------------------------------------
 
 function decorations(state: EditorState): DecorationSet {
   const range = blockSelectionRange(state)
@@ -691,6 +792,13 @@ export const BlockSelection = Extension.create({
           handleDOMEvents: {
             copy: (view, event) => onClipboard(view, event, false, editor),
             cut: (view, event) => onClipboard(view, event, true, editor),
+          },
+          // Not for "paste as plain text" (`plain`); a falsy result leaves the default text paste.
+          clipboardTextParser: (text, _context, plain) => (plain ? null : parsePastedText(editor, text)) as Slice,
+          handlePaste(view) {
+            const nodes = pendingBlocks
+            pendingBlocks = null
+            return !!nodes && insertPastedBlocks(view, nodes)
           },
         },
       }),

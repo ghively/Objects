@@ -9,7 +9,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { afterEach, describe, expect, test } from 'vitest'
 import { formatAnnotation, makeOption, parseAnnotation } from './annotations'
 import { editorExtensions, loadBody, serializeBody } from './document'
-import { turnInto } from './extensions/blockSelection'
+import { blocksSource, deleteBlocks, selectBlocks, turnInto } from './extensions/blockSelection'
 import { moveBlockTo } from './handles/dragMove'
 import { codeFence } from './preserve'
 
@@ -92,6 +92,104 @@ describe('dragging a block', () => {
     const body = '# H\nText\n\nP\n'
     const editor = headless(body)
     expect(serializeBody(editor)).toBe(body)
+  })
+})
+
+/** Paste `text` as `text/plain` at the selection (a real paste event, not `pasteText`, which pastes as plain text). */
+function paste(editor: TiptapEditor, text: string): void {
+  const event = new Event('paste', { bubbles: true, cancelable: true }) as Event & { clipboardData: unknown }
+  event.clipboardData = { getData: (type: string) => (type === 'text/plain' ? text : ''), types: ['text/plain'], files: [] }
+  editor.view.dom.dispatchEvent(event)
+}
+
+describe('pasting Markdown text (audit 2026-11-01 #8)', () => {
+  test('a copied list pasted back is a list again, with its bytes', () => {
+    const editor = headless('* a\n* b\n\nP\n')
+    selectBlocks(editor, 0)
+    const copied = blocksSource(editor)
+    expect(copied).toBe('* a\n* b')
+    editor.commands.setTextSelection(find(editor, 'P').pos + 2)
+    paste(editor, copied)
+    const out = saveAndReload(editor)
+    expect(shape(editor)).toEqual([
+      ['bulletList', 'ab'],
+      ['paragraph', 'P'],
+      ['bulletList', 'ab'],
+    ])
+    expect(out.saved).toBe('* a\n* b\n\nP\n* a\n* b\n')
+    expect(out.reloaded).toEqual(shape(editor))
+  })
+
+  test('cut and paste keeps the blocks', () => {
+    const editor = headless('- a\n- b\n\nP\n')
+    selectBlocks(editor, 0)
+    const copied = blocksSource(editor)
+    deleteBlocks(editor)
+    expect(serializeBody(editor)).toBe('P\n')
+    editor.commands.setTextSelection(2)
+    editor.commands.splitBlock()
+    paste(editor, copied)
+    expect(shape(editor)).toEqual([
+      ['paragraph', 'P'],
+      ['bulletList', 'ab'],
+    ])
+    expect(serializeBody(editor)).toBe('P\n- a\n- b\n')
+  })
+
+  test('a list, a heading and a table from elsewhere come in as those blocks', () => {
+    const editor = headless('Hello\n\nb\n')
+    editor.commands.setTextSelection(find(editor, 'b').pos + 2)
+    paste(editor, '- one\n- two\n\n# Head\n\n| a | b |\n|---|---|\n| 1 | 2 |\n')
+    const out = saveAndReload(editor)
+    expect(shape(editor)).toEqual([
+      ['paragraph', 'Hello'],
+      ['paragraph', 'b'],
+      ['bulletList', 'onetwo'],
+      ['heading', 'Head'],
+      ['table', 'ab12'],
+    ])
+    expect(out.saved).toBe('Hello\n\nb\n\n- one\n- two\n\n# Head\n\n| a   | b   |\n| --- | --- |\n| 1   | 2   |\n')
+    expect(out.reloaded).toEqual(shape(editor))
+  })
+
+  test('a fenced block pasted into the middle of a paragraph splits it', () => {
+    const editor = headless('ab\n')
+    editor.commands.setTextSelection(2)
+    paste(editor, '```js\ncode\n```')
+    expect(shape(editor)).toEqual([
+      ['paragraph', 'a'],
+      ['codeBlock', 'code'],
+      ['paragraph', 'b'],
+    ])
+    expect(serializeBody(editor)).toBe('a\n\n```js\ncode\n```\n\nb\n')
+  })
+
+  test('pasted inline Markdown joins the paragraph', () => {
+    const editor = headless('Hello world\n')
+    editor.commands.setTextSelection(7)
+    paste(editor, 'a **b** c')
+    expect(shape(editor)).toEqual([['paragraph', 'Hello a b cworld']])
+    expect(serializeBody(editor)).toBe('Hello a **b** cworld\n')
+  })
+
+  test('plain prose pastes as before, one paragraph per line', () => {
+    const editor = headless('Hello world\n\nb\n')
+    editor.commands.setTextSelection(7)
+    paste(editor, 'line1\nline2\n\npara2')
+    expect(shape(editor)).toEqual([
+      ['paragraph', 'Hello line1'],
+      ['paragraph', 'line2'],
+      ['paragraph', 'para2world'],
+      ['paragraph', 'b'],
+    ])
+  })
+
+  test('paste as plain text is left alone', () => {
+    const editor = headless('P\n')
+    editor.commands.setTextSelection(2)
+    ;(globalThis as { ClipboardEvent?: unknown }).ClipboardEvent ??= class extends Event {}
+    editor.view.pasteText('- a\n- b')
+    expect(shape(editor).map(([t]) => t)).toEqual(['paragraph', 'paragraph'])
   })
 })
 

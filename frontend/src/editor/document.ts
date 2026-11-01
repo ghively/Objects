@@ -333,17 +333,26 @@ function loadContainer(editor: Editor, node: Extract<TreeNode, { kind: 'containe
   return { type: node.name, attrs, content: loaded.content.length ? loaded.content : [placeholder()] }
 }
 
-/** Replace the editor's document with `body`. The load is not undoable and fires no update. */
-export function loadBody(editor: Editor, body: string): void {
+type ParsedBody = { content: JSONContent[]; leading: string; trailing: string }
+
+/**
+ * The nodes for `body`'s blocks, each stamped with its source, with the blank
+ * lines before the first block and after the last. Used by `loadBody` and for
+ * pasted Markdown (`extensions/blockSelection.ts`).
+ */
+export function parseBody(editor: Editor, body: string): ParsedBody {
   const blocks = splitBlocks(body)
   let leading = ''
   let trailing = ''
   if (blocks.length && blocks[0].kind === 'space') leading = blocks.shift()!.raw
   if (blocks.length && blocks[blocks.length - 1].kind === 'space') trailing = blocks.pop()!.raw
-
   const loaded = loadList(editor, buildTree(blocks))
-  leading += loaded.leading
-  const content = loaded.content
+  return { content: loaded.content, leading: leading + loaded.leading, trailing }
+}
+
+/** Replace the editor's document with `body`. The load is not undoable and fires no update. */
+export function loadBody(editor: Editor, body: string): void {
+  const { content, leading, trailing } = parseBody(editor, body)
   if (content.length === 0) content.push({ type: 'paragraph' })
 
   const doc = editor.schema.nodeFromJSON({ type: 'doc', content })
