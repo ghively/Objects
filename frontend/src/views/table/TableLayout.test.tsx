@@ -83,7 +83,10 @@ describe('TableLayout', () => {
   test('renders one column per property with rows', () => {
     render(<Harness />)
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Title', 'Note', 'Amount'])
-    expect(screen.getAllByLabelText('Title').map((i) => (i as HTMLInputElement).value)).toEqual(['Alpha', 'Beta'])
+    expect(screen.getAllByLabelText(/^Title of /).map((i) => (i as HTMLInputElement).value)).toEqual(['Alpha', 'Beta'])
+    // Each title input is named by its row.
+    expect(screen.getByLabelText('Title of Alpha')).toHaveValue('Alpha')
+    expect(screen.getByLabelText('Title of Beta')).toHaveValue('Beta')
   })
 
   test('multiple types shows refusal text', () => {
@@ -252,7 +255,7 @@ describe('TableLayout', () => {
   test('title cell rename calls renameObject', async () => {
     const user = userEvent.setup()
     render(<Harness />)
-    const input = screen.getAllByLabelText('Title')[0]
+    const input = screen.getByLabelText('Title of Alpha')
     await user.clear(input)
     await user.type(input, 'Omega')
     await user.tab()
@@ -262,7 +265,7 @@ describe('TableLayout', () => {
   test('title cell: Escape ends the edit and commits, as a text cell', async () => {
     const user = userEvent.setup()
     render(<Harness />)
-    const input = screen.getAllByLabelText('Title')[0]
+    const input = screen.getByLabelText('Title of Alpha')
     await user.clear(input)
     await user.type(input, 'Omega{Escape}')
     expect(input).not.toHaveFocus()
@@ -274,6 +277,6 @@ describe('TableLayout', () => {
     const ro = row({ summary: objectSummary({ path: 'Pages/Locked.md', readOnly: true }), values: { note: 'x' } })
     render(<Harness rows={[ro]} />)
     expect(screen.getByLabelText('Note')).toHaveAttribute('readonly')
-    expect(screen.getByLabelText('Title')).toHaveAttribute('readonly')
+    expect(screen.getByLabelText(/^Title of /)).toHaveAttribute('readonly')
   })
 })
