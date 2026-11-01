@@ -437,18 +437,34 @@ class SearchIndex:
         _board, board_revision = board_for_index(self.space, path)
         return f"{version}+{board_revision}" if board_revision else version
 
+    def _type_fingerprints(self) -> dict[str, str]:
+        """Type id -> a hash of what its definition contributes to the ``props`` column."""
+        out: dict[str, str] = {}
+        for t in self.space.types:
+            shape = [
+                (p.key, p.name, p.type, p.extra.get("isNotSearchable") is True)
+                for p in t.propertyDefinitions
+            ]
+            out[t.id] = hashlib.sha256(json.dumps(shape).encode("utf-8")).hexdigest()
+        return out
+
     def _types_fingerprint(self) -> str:
-        shape = sorted(
-            (
-                t.id,
-                [
-                    (p.key, p.name, p.type, p.extra.get("isNotSearchable") is True)
-                    for p in t.propertyDefinitions
-                ],
-            )
-            for t in self.space.types
-        )
-        return hashlib.sha256(json.dumps(shape).encode("utf-8")).hexdigest()
+        """The stored ``meta`` row for the types: the per-type hashes as sorted JSON, so
+        `_sync_types` can tell which types changed (audit 2026-11-01 P5)."""
+        return json.dumps(self._type_fingerprints(), sort_keys=True, separators=(",", ":"))
+
+    @staticmethod
+    def _changed_types(stored: str | None, fingerprint: str) -> set[str] | None:
+        """The type ids whose hash differs between two `_types_fingerprint` values; None
+        when the stored value isn't in that format (every type counts as changed)."""
+        try:
+            before = json.loads(stored or "")
+            after = json.loads(fingerprint)
+        except ValueError:
+            return None
+        if not isinstance(before, dict) or not isinstance(after, dict):
+            return None
+        return {k for k in before.keys() | after.keys() if before.get(k) != after.get(k)}
 
     # -- writing -------------------------------------------------------------------
 
@@ -574,17 +590,28 @@ class SearchIndex:
         stored = self._stored()
         if stored.get(_TYPES_KEY) == fingerprint:
             return
-        updates: list[tuple[str, str]] = []
-        for p in self._snapshot():
+        # Only the changed types' members can have a different ``props`` column, plus any
+        # object whose stored type isn't its current one (its type resolved differently
+        # after the change). Documenting all 5,001 objects took 7 s (audit 2026-11-01 P5).
+        changed = self._changed_types(stored.get(_TYPES_KEY), fingerprint)
+        with self._db_lock:
+            rows = self._conn.execute(
+                "SELECT m.path, f.props, f.type FROM fts f JOIN meta m ON m.rowid = f.rowid"
+            ).fetchall()
+        indexed = {path: (props, type_id) for path, props, type_id in rows}
+        updates: list[str] = []
+        for p, (_raw, summary) in self._snapshot().items():
+            row = indexed.get(p)
+            if (
+                changed is not None
+                and summary.type not in changed
+                and row is not None
+                and row[1] == summary.type
+            ):
+                continue
             doc = self._document(p)
             if doc is None:
                 continue
-            with self._db_lock:
-                row = self._conn.execute(
-                    "SELECT f.props, f.type FROM fts f JOIN meta m ON m.rowid = f.rowid "
-                    "WHERE m.path = ?",
-                    (p,),
-                ).fetchone()
             if row is None or row[0] != doc["props"] or row[1] != doc["type"]:
                 updates.append(p)
         self._index(updates)
