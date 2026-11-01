@@ -550,11 +550,14 @@ export function serializeBody(editor: Editor): string {
   const { leading, trailing, eol, final } = loaded ?? { leading: '', trailing: '', eol: '\n', final: '' }
   const blocks: EditorBlock[] = []
   if (leading) blocks.push({ raw: leading, markdown: leading, kind: 'space' })
-  editor.state.doc.forEach((node) => {
+  const { doc } = editor.state
+  doc.forEach((node, _offset, index) => {
     const entry = nodeEntry(editor, node, eol)
     if (entry) blocks.push(entry)
+    // The blank lines after the last block are `trailing` (the load leaves the last node none);
+    // a node that became last through a join or a move drops the ones it carried.
     const after = node.attrs.blockTrailing as string | null | undefined
-    if (after) blocks.push({ raw: after, markdown: after, kind: 'space' })
+    if (after && index < doc.childCount - 1) blocks.push({ raw: after, markdown: after, kind: 'space' })
   })
   if (trailing) blocks.push({ raw: trailing, markdown: trailing, kind: 'space' })
   const out = serializeWithPreservation(blocks, loaded ? eol : undefined)
