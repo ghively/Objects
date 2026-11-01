@@ -39,7 +39,7 @@ from typing import Any
 
 from .textfile import atomic_write
 
-__all__ = ["FrontmatterCache", "cache_dir_for_root", "flush_all", "for_root"]
+__all__ = ["FrontmatterCache", "cache_dir_for_root", "flush_all", "for_root", "forget_all"]
 
 CACHE_FOLDER = ".capacities-cache"
 FILE_NAME = "frontmatter.json"
@@ -203,6 +203,18 @@ def flush_all() -> None:
         caches = list(_caches.values())
     for cache in caches:
         cache.flush()
+
+
+def forget_all() -> None:
+    """Drop every space's cache without writing, cancelling pending flush timers (tests)."""
+    with _caches_lock:
+        caches = list(_caches.values())
+        _caches.clear()
+    for cache in caches:
+        with cache._lock:
+            if cache._timer is not None:
+                cache._timer.cancel()
+                cache._timer = None
 
 
 atexit.register(flush_all)
