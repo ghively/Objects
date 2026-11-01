@@ -3,7 +3,9 @@
  * (the app's block editor extensions, wikilinks included, so unedited Markdown comes back
  * byte for byte), and `MarkdownView`, the read-only rendering shown while nobody edits.
  *
- * The editor commits exactly once: on blur or Escape it calls `onCommit(markdown)`.
+ * The editor commits exactly once: on blur or Escape it calls `onCommit(markdown)`, and so does
+ * an unmount that comes first (the canvas renders only visible nodes, so a node being edited
+ * that leaves the viewport is unmounted without either), so nothing typed is lost.
  */
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
@@ -22,6 +24,9 @@ export interface TextBlockEditorProps {
 export function TextBlockEditor({ markdown, align, onCommit, className }: TextBlockEditorProps) {
   const committed = useRef(false)
   const commitRef = useRef<() => void>(() => {})
+  /** The Markdown as last typed: what an unmount commits once the editor itself is gone. */
+  const latest = useRef(markdown)
+  const mounted = useRef(false)
 
   const editor = useEditor({
     extensions: editorExtensions(),
@@ -39,13 +44,28 @@ export function TextBlockEditor({ markdown, align, onCommit, className }: TextBl
       },
     },
     onBlur: () => commitRef.current(),
+    onUpdate: ({ editor: e }) => {
+      latest.current = serializeBody(e)
+    },
   })
 
   commitRef.current = () => {
-    if (committed.current || !editor || editor.isDestroyed) return
+    if (committed.current) return
     committed.current = true
-    onCommit(serializeBody(editor))
+    onCommit(editor && !editor.isDestroyed ? serializeBody(editor) : latest.current)
   }
+
+  // Unmounted before a blur or Escape: commit what was typed. One microtask later, because
+  // StrictMode's mount-unmount-mount rehearsal remounts synchronously and must not end the edit.
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      queueMicrotask(() => {
+        if (!mounted.current) commitRef.current()
+      })
+    }
+  }, [])
 
   const loaded = useRef(false)
   useEffect(() => {
