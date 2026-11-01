@@ -739,6 +739,8 @@ class Space:
         self._lock = threading.RLock()
         self._raw: dict[str, RawObject] = {}
         self._summaries: dict[str, ObjectSummary] = {}
+        self._checked_rels: set[str] = set()
+        """Known object paths that passed `_rel`'s full check since their last rescan."""
         self._listeners: list[Callable[[SpaceChange], None]] = []
         self._names_rev = 0
         """Bumped whenever the set of link names changes (see `_names_changed`)."""
@@ -1517,7 +1519,15 @@ class Space:
     # -- paths --------------------------------------------------------------
 
     def _rel(self, path: str) -> str:
-        """Normalise a space-relative path; reject anything outside the space."""
+        """Normalise a space-relative path; reject anything outside the space.
+
+        A path the space already knows in exactly this spelling, and that passed the
+        full check (``resolve()``, which costs ~46 µs) since it was last rescanned, is
+        answered from `_checked_rels`; `rescan_file` forgets it first, so a file replaced
+        on disk (say, by a symlink out of the space) is checked again.
+        """
+        if path in self._checked_rels and path in self._summaries:
+            return path
         rel = PurePosixPath(str(path).replace("\\", "/"))
         if rel.is_absolute() or ".." in rel.parts or not rel.parts:
             raise ValueError(f"Path is outside the space: {path!r}")
@@ -1531,7 +1541,10 @@ class Space:
             raise ValueError(f"Not an object path: {path!r}") from exc
         if not full.is_relative_to(self.root):
             raise ValueError(f"Path is outside the space: {path!r}")
-        return rel.as_posix()
+        out = rel.as_posix()
+        if out in self._summaries:
+            self._checked_rels.add(out)
+        return out
 
     def abspath(self, path: str) -> Path:
         return self.root / self._rel(path)
@@ -2239,6 +2252,7 @@ class Space:
         with self._lock:
             self._raw.pop(rel, None)
             gone = self._summaries.pop(rel, None)
+            self._checked_rels.discard(rel)
             if gone is not None:
                 self._names_changed(gone, None)
             self._fire(SpaceChange("object", rel))
@@ -4546,6 +4560,8 @@ class Space:
         Every exit tells the listeners (`add_listener`) about the path, and a
         change to the names links resolve by invalidates the resolver.
         """
+        # The file may have been replaced on disk: check its path in full again.
+        self._checked_rels.discard(path)
         rel = self._rel(path)
         full = self.root / rel
         with self._lock:
@@ -4564,6 +4580,7 @@ class Space:
             if raw is None:
                 self._raw.pop(rel, None)
                 self._summaries.pop(rel, None)
+                self._checked_rels.discard(rel)
             else:
                 self._raw[rel] = raw
                 if self._type_id(raw.typeName) not in {t.id for t in self.types}:
