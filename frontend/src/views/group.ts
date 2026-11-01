@@ -219,10 +219,14 @@ function dateOf(row: Row, propertyId: string): DateValue | null {
   return (v as DateValue | null | undefined) ?? null
 }
 
+/** A text group: the whole text is the id (and what a drop writes); only the label is cut. */
 const textBucket = (s: string): Bucket[] => {
-  const t = s.trim().slice(0, TEXT_MAX)
-  return t ? [{ id: t, label: t, sort: t }] : []
+  const t = s.trim()
+  return t ? [{ id: t, label: t.slice(0, TEXT_MAX), sort: t }] : []
 }
+
+/** The text a text group stands for: its id, which `textBucket` set to the whole text. */
+const groupText = (group: Group) => (group.isOther ? '' : group.id)
 
 /** The groups a row belongs to for one entry; none means "Other". */
 /** `null` drops the row from every group (a number outside its range). */
@@ -529,8 +533,8 @@ export function valueForGroup(
       return { key, value }
     }
     case 'textBlock':
-      return entry.option === 'entity' ? null : { key, value: group.isOther ? '' : group.label }
+      return entry.option === 'entity' ? null : { key, value: groupText(group) }
     default:
-      return { key, value: group.isOther ? '' : group.label }
+      return { key, value: groupText(group) }
   }
 }
