@@ -37,6 +37,29 @@ export async function concernsRange(path: string, from: string, to: string): Pro
   }
 }
 
+/**
+ * Every path a range lists: daily notes, tasks, dated, created, updated, backlinks, references,
+ * timeline and warnings. `summaries` holds only some of them (the server leaves out the created,
+ * updated, backlinks, references and timeline paths), so membership is read from the days.
+ */
+export function rangePathSet(res: CalendarRange): Set<string> {
+  const out = new Set<string>(Object.keys(res.summaries ?? {}))
+  for (const cd of Object.values(res.days ?? {})) {
+    if (!cd) continue
+    if (cd.dailyNote) out.add(cd.dailyNote.path)
+    for (const t of cd.tasks ?? []) out.add(t.path)
+    for (const d of cd.dated ?? []) out.add(d.path)
+    for (const p of cd.created ?? []) out.add(p)
+    for (const p of cd.updated ?? []) out.add(p)
+    const m = cd as { backlinks?: string[]; references?: { path: string }[]; timeline?: { path: string }[] }
+    for (const p of m.backlinks ?? []) out.add(p)
+    for (const r of m.references ?? []) out.add(r.path)
+    for (const t of m.timeline ?? []) out.add(t.path)
+  }
+  for (const w of res.warnings ?? []) for (const p of w.paths ?? []) out.add(p)
+  return out
+}
+
 export interface CalendarRangeState {
   data: CalendarRange | null
   loading: boolean
@@ -53,6 +76,8 @@ export function useCalendarRange(range: { from: string; to: string } | null): Ca
   const day = useRef(todayYmd())
   /** The last answer, for telling whether a changed object is among the shown days' objects. */
   const latest = useRef<CalendarRange | null>(null)
+  /** Every path the last answer lists. */
+  const latestPaths = useRef<Set<string>>(new Set())
 
   const load = useCallback(() => {
     if (from === null || to === null) return
@@ -64,6 +89,7 @@ export function useCalendarRange(range: { from: string; to: string } | null): Ca
       .then((res) => {
         if (my !== seq.current) return
         latest.current = res
+        latestPaths.current = res ? rangePathSet(res) : new Set()
         setState({ key: forKey, data: res })
       })
       .catch((e: unknown) => {
@@ -96,7 +122,7 @@ export function useCalendarRange(range: { from: string; to: string } | null): Ca
       // recurrence put it in the range now, which one small `/api/rows` call tells.
       const shown = latest.current
       const today = todayYmd()
-      if (!shown || shown.from !== from || shown.to !== to || shown.summaries[e.path] || (today >= from && today <= to)) return schedule()
+      if (!shown || shown.from !== from || shown.to !== to || latestPaths.current.has(e.path) || (today >= from && today <= to)) return schedule()
       void concernsRange(e.path, from, to).then((yes) => {
         if (yes && alive) schedule()
       })
