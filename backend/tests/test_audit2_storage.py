@@ -424,3 +424,53 @@ def test_rel_refuses_a_component_over_255_bytes(space_dir: Path):
     with pytest.raises(ValueError, match="too long"):
         space._rel("Pages/" + "漢" * 100 + ".md")  # 303 bytes
     assert space._rel("Pages/" + "漢" * 80 + ".md")  # 243 bytes
+
+
+# -- 10: a flush of many paths (a git checkout) is one resync -------------------------
+
+
+def _flushed(space: Space, paths: list[str]) -> list:
+    import asyncio
+
+    from objectapp.watcher import SpaceWatcher
+
+    loop = asyncio.new_event_loop()
+    try:
+        watcher = SpaceWatcher(space, loop)  # not started: the batch is flushed by hand
+        watcher._flush([(p, None) for p in paths])
+        loop.run_until_complete(asyncio.sleep(0.05))
+        out = []
+        while not watcher.events.empty():
+            out.append(watcher.events.get_nowait())
+        return out
+    finally:
+        loop.close()
+
+
+def test_a_big_watcher_batch_is_one_resync_event(space_dir: Path):
+    from objectapp.watcher import RESYNC_AFTER
+
+    space = Space(space_dir)
+    new = [f"Pages/Checked out {i:03d}.md" for i in range(RESYNC_AFTER + 1)]
+    for rel in new:
+        _write(space_dir / rel, f"---\ntitle: {rel}\n---\n")
+    folder = space_dir / ".capacities" / "collections"
+    folder.mkdir(parents=True)
+    _write(folder / "reading.json", '{"id": "reading", "name": "Reading", "typeIds": []}\n')
+    events = _flushed(space, [*new, ".capacities/collections/reading.json"])
+    assert [(e.kind, e.path, e.origin) for e in events] == [
+        ("types", "*", None),
+        ("collections", "reading", None),
+    ]
+    assert all(rel in space._summaries for rel in new)  # every file was still rescanned
+
+
+def test_a_small_watcher_batch_keeps_one_event_per_path(space_dir: Path):
+    from objectapp.watcher import RESYNC_AFTER
+
+    space = Space(space_dir)
+    new = [f"Pages/Small {i:03d}.md" for i in range(RESYNC_AFTER)]
+    for rel in new:
+        _write(space_dir / rel, f"---\ntitle: {rel}\n---\n")
+    events = _flushed(space, new)
+    assert sorted((e.kind, e.path) for e in events) == [("created", rel) for rel in new]
