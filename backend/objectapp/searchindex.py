@@ -151,6 +151,27 @@ class SearchIndex:
         self._thread: threading.Thread | None = None
         self._unsubscribe = None
         self._fallback_logged = False
+        self._pending: dict[str, int] = {}
+        """Path -> change count, for the objects whose change the thread has not applied yet
+        (see `pending_paths`); the count tells an apply step whether a newer change arrived."""
+        self._pending_lock = threading.Lock()
+
+    def pending_paths(self) -> set[str]:
+        """The paths changed since the index last applied them (the debounce window).
+
+        A reader that pre-filters by the index (`references.unlinked_mentions`) scans
+        these too, so a fresh edit is never missed; cheaper than comparing every
+        object's version against the stored one (audit 2026-11-01 B6).
+        """
+        with self._pending_lock:
+            return set(self._pending)
+
+    def _settle_pending(self, seen: dict[str, int]) -> None:
+        """Forget the pending paths whose change count is still what `seen` recorded."""
+        with self._pending_lock:
+            for path, count in seen.items():
+                if self._pending.get(path) == count:
+                    del self._pending[path]
 
     # -- lifecycle -----------------------------------------------------------------
 
@@ -188,6 +209,9 @@ class SearchIndex:
 
     def _on_change(self, change: SpaceChange) -> None:
         # A listener only enqueues (it may run under the space lock).
+        if change.kind == "object" and change.path:
+            with self._pending_lock:
+                self._pending[change.path] = self._pending.get(change.path, 0) + 1
         self._queue.put((change.kind, change.path))
 
     def reindex(self) -> None:
@@ -437,18 +461,34 @@ class SearchIndex:
         _board, board_revision = board_for_index(self.space, path)
         return f"{version}+{board_revision}" if board_revision else version
 
+    def _type_fingerprints(self) -> dict[str, str]:
+        """Type id -> a hash of what its definition contributes to the ``props`` column."""
+        out: dict[str, str] = {}
+        for t in self.space.types:
+            shape = [
+                (p.key, p.name, p.type, p.extra.get("isNotSearchable") is True)
+                for p in t.propertyDefinitions
+            ]
+            out[t.id] = hashlib.sha256(json.dumps(shape).encode("utf-8")).hexdigest()
+        return out
+
     def _types_fingerprint(self) -> str:
-        shape = sorted(
-            (
-                t.id,
-                [
-                    (p.key, p.name, p.type, p.extra.get("isNotSearchable") is True)
-                    for p in t.propertyDefinitions
-                ],
-            )
-            for t in self.space.types
-        )
-        return hashlib.sha256(json.dumps(shape).encode("utf-8")).hexdigest()
+        """The stored ``meta`` row for the types: the per-type hashes as sorted JSON, so
+        `_sync_types` can tell which types changed (audit 2026-11-01 P5)."""
+        return json.dumps(self._type_fingerprints(), sort_keys=True, separators=(",", ":"))
+
+    @staticmethod
+    def _changed_types(stored: str | None, fingerprint: str) -> set[str] | None:
+        """The type ids whose hash differs between two `_types_fingerprint` values; None
+        when the stored value isn't in that format (every type counts as changed)."""
+        try:
+            before = json.loads(stored or "")
+            after = json.loads(fingerprint)
+        except ValueError:
+            return None
+        if not isinstance(before, dict) or not isinstance(after, dict):
+            return None
+        return {k for k in before.keys() | after.keys() if before.get(k) != after.get(k)}
 
     # -- writing -------------------------------------------------------------------
 
@@ -506,6 +546,8 @@ class SearchIndex:
         stored = self._stored()
         stored_types = stored.pop(_TYPES_KEY, None)
         fingerprint = self._types_fingerprint()
+        with self._pending_lock:
+            was_pending = dict(self._pending)  # changes the snapshot below includes
         current = self._snapshot()
         gone = [p for p in stored if p not in current]
         changed = [
@@ -521,6 +563,7 @@ class SearchIndex:
         self._index(sorted(changed))
         if stored_types != fingerprint:
             self._write(lambda conn: self._put_types_key(conn, fingerprint))
+        self._settle_pending(was_pending)
 
     @staticmethod
     def _put_types_key(conn: sqlite3.Connection, fingerprint: str) -> None:
@@ -554,6 +597,8 @@ class SearchIndex:
             self._write(apply)
 
     def _update_paths(self, paths: list[str]) -> None:
+        with self._pending_lock:
+            seen = {p: self._pending[p] for p in paths if p in self._pending}
         stored = self._stored()
         todo = []
         for p in paths:
@@ -567,6 +612,7 @@ class SearchIndex:
                 todo.append(p)
         if todo:
             self._index(todo)
+        self._settle_pending(seen)
 
     def _sync_types(self) -> None:
         """A type changed: re-index the ``props`` of objects whose text differs."""
@@ -574,17 +620,28 @@ class SearchIndex:
         stored = self._stored()
         if stored.get(_TYPES_KEY) == fingerprint:
             return
-        updates: list[tuple[str, str]] = []
-        for p in self._snapshot():
+        # Only the changed types' members can have a different ``props`` column, plus any
+        # object whose stored type isn't its current one (its type resolved differently
+        # after the change). Documenting all 5,001 objects took 7 s (audit 2026-11-01 P5).
+        changed = self._changed_types(stored.get(_TYPES_KEY), fingerprint)
+        with self._db_lock:
+            rows = self._conn.execute(
+                "SELECT m.path, f.props, f.type FROM fts f JOIN meta m ON m.rowid = f.rowid"
+            ).fetchall()
+        indexed = {path: (props, type_id) for path, props, type_id in rows}
+        updates: list[str] = []
+        for p, (_raw, summary) in self._snapshot().items():
+            row = indexed.get(p)
+            if (
+                changed is not None
+                and summary.type not in changed
+                and row is not None
+                and row[1] == summary.type
+            ):
+                continue
             doc = self._document(p)
             if doc is None:
                 continue
-            with self._db_lock:
-                row = self._conn.execute(
-                    "SELECT f.props, f.type FROM fts f JOIN meta m ON m.rowid = f.rowid "
-                    "WHERE m.path = ?",
-                    (p,),
-                ).fetchone()
             if row is None or row[0] != doc["props"] or row[1] != doc["type"]:
                 updates.append(p)
         self._index(updates)

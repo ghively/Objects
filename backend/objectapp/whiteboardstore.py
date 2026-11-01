@@ -33,6 +33,7 @@ from .whiteboardfile import (
     board_rel,
     dump_board,
     empty_board,
+    encode_like_sidecar,
     ink_rel,
     load_board,
     validate_board,
@@ -223,6 +224,26 @@ def _board_md(space: Space, path: str) -> str:
     return rel
 
 
+def _board_md_or_sidecar(space: Space, path: str) -> tuple[str, str | None]:
+    """`_board_md`, but an object that isn't typed Whiteboard yet has ``<stem>.whiteboard.json``
+    beside it is served read-only: ``(rel, reason)``, `reason` None for a real whiteboard.
+
+    A board whose ``.md`` has malformed (or no) frontmatter reads as a plain, untyped
+    object; its canvas is intact and must still open (audit 2026-11-01), only not be
+    edited until the ``.md`` is repaired.
+    """
+    try:
+        return _board_md(space, path), None
+    except NotAWhiteboard:
+        rel = space._rel(path)
+        if not (space.root / board_rel(rel)).is_file():
+            raise
+        summary = space.get(rel)
+        if summary.readOnlyReason:
+            return rel, f"The whiteboard opens read-only: {summary.readOnlyReason}"
+        return rel, f"{rel} isn't typed Whiteboard, so its board opens read-only."
+
+
 def _read_bytes(full: Path) -> bytes | None:
     try:
         return full.read_bytes()
@@ -236,32 +257,35 @@ def _read_bytes(full: Path) -> bytes | None:
 def read_board(space: Space, path: str) -> dict[str, Any]:
     """``BoardResponse``: ``{path, board, revision, readOnlyReason?}``. Writes nothing."""
     with space._lock:
-        rel = _board_md(space, path)
+        rel, md_reason = _board_md_or_sidecar(space, path)
         data = _read_bytes(space.root / board_rel(rel))
     if data is None:
         return {"path": rel, "board": empty_board(), "revision": ""}
     board, reason = load_board(data)
     out: dict[str, Any] = {"path": rel, "board": board, "revision": version_of(data)}
-    if reason:
-        out["readOnlyReason"] = reason
+    if reason or md_reason:
+        out["readOnlyReason"] = reason or md_reason
     return out
 
 
 def read_ink(space: Space, path: str) -> dict[str, Any]:
     """``InkResponse``: ``{path, strokes, revision, readOnlyReason?}``. Writes nothing."""
     with space._lock:
-        rel = _board_md(space, path)
+        rel, md_reason = _board_md_or_sidecar(space, path)
         data = _read_bytes(space.root / ink_rel(rel))
     if data is None:
-        return {"path": rel, "strokes": [], "revision": ""}
+        out: dict[str, Any] = {"path": rel, "strokes": [], "revision": ""}
+        if md_reason:
+            out["readOnlyReason"] = md_reason
+        return out
     strokes, reason = load_ink(data)
-    out: dict[str, Any] = {
+    out = {
         "path": rel,
         "strokes": strokes,
         "revision": version_of(data),
     }
-    if reason:
-        out["readOnlyReason"] = reason
+    if reason or md_reason:
+        out["readOnlyReason"] = reason or md_reason
     return out
 
 
@@ -286,6 +310,7 @@ def _save_sidecar(
         reason = unreadable(current)
         if reason:
             raise BoardReadOnly(reason)
+    data = encode_like_sidecar(current, data)  # keep the file's BOM and CRLF
     current_rev = version_of(current) if current is not None else ""
     if current_rev != base_revision:
         raise BoardConflict(current_rev)
@@ -367,7 +392,9 @@ def save_board(space: Space, path: str, board: Any, base_revision: str) -> Saved
     validate_board(board)
     data = dump_board(board)
     with space._lock:
-        rel = _board_md(space, path)
+        rel, md_reason = _board_md_or_sidecar(space, path)
+        if md_reason:
+            raise BoardReadOnly(md_reason)
         revision = _save_sidecar(
             space, board_rel(rel), data, base_revision, lambda b: load_board(b)[1]
         )
@@ -384,7 +411,9 @@ def save_ink(space: Space, path: str, strokes: Any, base_revision: str) -> Saved
     validate_strokes(strokes)
     data = dump_ink(strokes)
     with space._lock:
-        rel = _board_md(space, path)
+        rel, md_reason = _board_md_or_sidecar(space, path)
+        if md_reason:
+            raise BoardReadOnly(md_reason)
         revision = _save_sidecar(
             space, ink_rel(rel), data, base_revision, lambda b: load_ink(b)[1]
         )

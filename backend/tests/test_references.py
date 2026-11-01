@@ -196,6 +196,54 @@ def test_mentions_exclude_links_code_and_self(links, links_space_dir: Path):
     assert ENGINE not in [e["path"] for e in mentions]  # its own heading never counts
 
 
+# -- audit 2026-11-01 B6: one body parse per (path, version); fresh edits via pending paths --
+
+
+def test_bodies_are_scanned_once_per_version(links, monkeypatch):
+    space, idx = links
+    refs._scan_cache.clear()
+    parsed: list[str] = []
+    real = refs.wikilink_spans
+    monkeypatch.setattr(refs, "wikilink_spans", lambda body: parsed.append(body) or real(body))
+    first = references(space, idx, ENGINE)
+    sources = {e["path"] for e in first["backlinks"]} | {e["path"] for e in first["mentions"]}
+    assert len(sources) >= 3
+    assert len(parsed) == len(set(parsed))  # each body parsed once, backlinks and mentions shared
+    parsed.clear()
+    assert references(space, idx, ENGINE) == first
+    assert parsed == []  # all from the cache
+    # An edit (a new version) is parsed again.
+    body = space.read(NOTES)[0].body
+    space.save_body(NOTES, body + "\nMore about the Analytical Engine.\n", space.read(NOTES)[2])
+    again = references(space, idx, ENGINE)
+    assert len(parsed) == 1
+    assert _entry(again["mentions"], NOTES)["version"] == space.read(NOTES)[2]
+    refs._scan_cache.clear()
+
+
+def test_fresh_edit_is_scanned_before_the_index_applies_it(links, links_space_dir: Path, monkeypatch):
+    space, idx = links
+    monkeypatch.setattr(idx, "_update_paths", lambda paths: None)  # the index never catches up
+    _write(
+        links_space_dir,
+        "Pages/Fresh.md",
+        "---\ntype: 'Page'\ntitle: Fresh\n---\n\nThe Analytical Engine, just written.\n",
+    )
+    space.rescan_file("Pages/Fresh.md")
+    assert "Pages/Fresh.md" in idx.pending_paths()
+    assert idx.phrase_candidates("Analytical Engine") is not None
+    assert "Pages/Fresh.md" in [e["path"] for e in unlinked_mentions(space, idx, ENGINE)]
+    # Once applied, the path leaves the pending set; a change arriving meanwhile keeps it.
+    monkeypatch.undo()
+    idx._update_paths(["Pages/Fresh.md"])
+    assert "Pages/Fresh.md" not in idx.pending_paths()
+    idx._pending["Pages/Fresh.md"] = 2
+    idx._settle_pending({"Pages/Fresh.md": 1})
+    assert "Pages/Fresh.md" in idx.pending_paths()
+    idx._settle_pending({"Pages/Fresh.md": 2})
+    assert "Pages/Fresh.md" not in idx.pending_paths()
+
+
 def test_mentions_respect_roles(links, links_space_dir: Path):
     space, idx = links
     # A Tag never mentions (not canBeUnlinkedMention); a DailyNote does.

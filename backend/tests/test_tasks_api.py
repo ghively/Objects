@@ -216,7 +216,8 @@ def test_overdue_capped_at_99(client: TestClient, m8_space_dir: Path):
     assert r.status_code == 200, r.text
     info = r.json()
     assert (info["count"], info["capped"], len(info["missed"])) == (99, True, 99)
-    assert info["missed"][0] == "2026-01-01"
+    # The 99 most recent (Gene, audit 2026-11-01), not the oldest.
+    assert (info["missed"][0], info["missed"][-1]) == ("2026-07-20", "2026-10-26")
     # Exactly 99 is not capped.
     rel = _write_task(m8_space_dir, "Ninety nine", "2026-07-20", "every day")  # 07-20 .. 10-26
     info = client.get("/api/tasks/overdue", params={"path": rel}).json()
@@ -255,6 +256,26 @@ def test_catch_up_choices(client: TestClient, m8_space_dir: Path, action, catch_
     # The old log lines are untouched bytes.
     text = (m8_space_dir / rel).read_text("utf-8")
     assert "occurrenceLog: |-\n" + "".join(f"  {ln}\n" for ln in old) in text
+
+
+def test_catch_up_logs_at_most_the_99_most_recent(client: TestClient, m8_space_dir: Path):
+    """Audit 2026-11-01 (Gene: cap at 99): a daily task dated 1800 wrote a 10,001-line log."""
+    rel = _write_task(m8_space_dir, "Ancient daily", "1800-01-01", "every day")
+    info = client.get("/api/tasks/overdue", params={"path": rel}).json()
+    assert (info["count"], info["capped"]) == (99, True)
+    assert (info["missed"][0], info["missed"][-1]) == ("2026-07-20", "2026-10-26")
+    r = _occurrence(client, rel, "skip", "catchUpThroughNow")
+    assert r.status_code == 200, r.text
+    log = _log(m8_space_dir, rel)
+    assert len(log) == 99
+    assert log[0].startswith("2026-07-20") and log[-1].startswith("2026-10-26")
+    assert r.json()["frontmatter"]["date"] == "2026-10-27"
+    assert (m8_space_dir / rel).stat().st_size < 8_000
+    # catchUpBeforeNow still logs the most recent missed occurrence only.
+    rel = _write_task(m8_space_dir, "Ancient weekly", "1800-01-07", "every week")
+    r = _occurrence(client, rel, "complete", "catchUpBeforeNow")
+    assert r.status_code == 200, r.text
+    assert [ln[:10] for ln in _log(m8_space_dir, rel)] == ["2026-10-20"]
 
 
 def test_catch_up_bad_choices_422(client: TestClient, m8_space_dir: Path):
