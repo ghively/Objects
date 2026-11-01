@@ -457,3 +457,23 @@ def test_restore_type_refuses_when_a_type_now_has_its_id(space_dir: Path):
     assert not (space_dir / "Gizmos" / "G1.md").exists()
     assert len(space.list_trash()) == 3
     assert files
+
+
+def test_restore_type_rescans_only_the_files_it_changes(space_dir: Path, monkeypatch):
+    # Audit 2026-11-01 B10: a type restore no longer re-reads every file in the space.
+    _gizmo_space(space_dir)
+    space = Space(space_dir)
+    item = _trash_gizmo(space)
+    rescanned: list[str] = []
+    real = Space.rescan_file
+
+    def spy(self, path):
+        rescanned.append(path)
+        return real(self, path)
+
+    monkeypatch.setattr(Space, "rescan_file", spy)
+    result = space.restore(item.id)
+    assert {"Gizmos/G1.md", "Gizmos/G2.md"} <= set(result["paths"])
+    assert not any(p.startswith(("People/", "Pages/", "Tasks/", "Servers/")) for p in rescanned)
+    assert space.get("Gizmos/G1.md").type == "gizmo"
+    assert space.type_by_id("gizmo") is not None

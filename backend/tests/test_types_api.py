@@ -863,3 +863,35 @@ def test_other_type_writes_wait_out_a_running_save(space_dir: Path, monkeypatch)
     assert seen["templates"] is False and isinstance(seen["commit"], RevisionConflict)
     assert space._types_saving == set()
     assert space.type_by_id("task").templates.get("ids", []) == []
+
+
+def test_type_save_plans_from_the_scanned_frontmatter_without_parsing_again(
+    space_dir: Path, monkeypatch
+):
+    # Audit 2026-11-01 B10: the ops take the parsed values the space already holds.
+    from objectapp import space as space_mod
+
+    for i in range(5):
+        _write(
+            space_dir / "Tasks" / f"Task {i}.md",
+            f"---\ntype: 'Task'\ntitle: Task {i}\nstatus: Not Started\n---\n",
+        )
+    space = Space(space_dir)
+    parses: list[str] = []
+    real = space_mod.parse_fm
+
+    def spy(src):
+        parses.append(src)
+        return real(src)
+
+    monkeypatch.setattr(space_mod, "parse_fm", spy)
+    t = _edit(space, "task")
+    status = t.prop("status")
+    status.options["set"] = [o for o in status.options["set"] if o["text"] != "Not Started"]
+    with pytest.raises(ConfirmRequired) as info:
+        _save(space, t)
+    assert info.value.affected == 6
+    assert parses == []
+    result = _save(space, t, confirm=True)
+    assert len(result.rewritten) == 6
+    assert all("Not Started" not in (space_dir / rel).read_text() for rel in result.rewritten)
