@@ -53,7 +53,7 @@ describe('AllNotesView', () => {
     await screen.findByText('New')
     expect(screen.queryByText('Do')).not.toBeInTheDocument()
     expect(screen.queryByText('2026-10-26')).not.toBeInTheDocument()
-    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['page'] })
+    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['page'], preview: false })
     const headers = screen.getAllByTestId('group-header').map((h) => h.textContent)
     // Newest first.
     expect(headers[0]).toMatch(/^Today/)

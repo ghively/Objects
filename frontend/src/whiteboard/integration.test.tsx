@@ -68,7 +68,7 @@ beforeEach(() => {
 describe('whiteboard integration', () => {
   test('test whiteboard object opens WhiteboardPage in page and peek with the ink plugin', async () => {
     const { unmount } = render(<ObjectPage path={BOARD} />)
-    expect(screen.getByTestId('whiteboard-page')).toHaveAttribute('data-mode', 'page')
+    expect(await screen.findByTestId('whiteboard-page')).toHaveAttribute('data-mode', 'page')
     expect(pageProps.at(-1)?.ink).toBe(inkPlugin)
     unmount()
 
@@ -79,7 +79,7 @@ describe('whiteboard integration', () => {
     render(<ObjectPeek />)
     act(() => usePeek.getState().peek(BOARD))
     await waitFor(() => expect(pageProps.at(-1)?.mode).toBe('peek'))
-    expect(screen.getByTestId('whiteboard-page')).toHaveAttribute('data-mode', 'peek')
+    expect(await screen.findByTestId('whiteboard-page')).toHaveAttribute('data-mode', 'peek')
     const last = pageProps.at(-1)
     expect(last?.ink).toBe(inkPlugin)
     expect(last?.footer).toBeTruthy()
