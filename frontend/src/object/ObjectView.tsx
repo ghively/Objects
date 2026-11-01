@@ -4,7 +4,7 @@
  * calendar's daily note) renders only the body editor and its autosave.
  */
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { api, ConflictError } from '@/api/client'
+import { api, ConflictError, isResync } from '@/api/client'
 import type { ObjectDetail, ObjectSummary, RenameResult, TypeDef, UpdateResult } from '@/api/types'
 import { CollectionPicker } from '@/collections/CollectionPicker'
 import { Icon } from '@/components/Icon'
@@ -334,6 +334,12 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
 
   useEffect(() => {
     return api.onChange((e) => {
+      // The stream reconnected: whatever happened meanwhile is unknown, so re-check the version
+      // on disk (`reconcile` carries on when it is still ours).
+      if (isResync(e, 'types')) {
+        enqueue(false)
+        return
+      }
       if (e.path !== path) return
       if (e.kind === 'deleted') {
         editorRef.current?.hold()

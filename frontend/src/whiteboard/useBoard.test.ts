@@ -43,6 +43,20 @@ async function advance(ms: number) {
 }
 
 describe('useBoard', () => {
+  // Review fix 2026-11-01 #3: the stream's reconnect resync re-checks the board's revision.
+  test('a resync after the stream reconnected reloads a board whose file changed meanwhile', async () => {
+    const { client, store } = await setup()
+    expect(client.board).toHaveBeenCalledTimes(1)
+    client.board.mockResolvedValue({ path: PATH, board: board([node({ id: 'a', position: { x: 500, y: 0 } })]), revision: 'rev-2' })
+    act(() => emit({ kind: 'types', path: '*', version: null }))
+    await waitFor(() => expect(store.getState().doc.board.nodes.a.position).toEqual({ x: 500, y: 0 }))
+    // The same revision again: fetched, nothing reloaded.
+    const seq = store.getState().boardSeq
+    act(() => emit({ kind: 'types', path: '*', version: null }))
+    await waitFor(() => expect(client.board).toHaveBeenCalledTimes(3))
+    expect(store.getState().boardSeq).toBe(seq)
+  })
+
   test('open, pan, zoom and select save nothing', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const { client, store, hook } = await setup()

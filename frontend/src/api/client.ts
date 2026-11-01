@@ -14,6 +14,7 @@ import type {
   CalendarRange,
   CalendarUi,
   ChangeEvent,
+  ChangeKind,
   ChangeKindResult,
   Collection,
   CreatedDailyNote,
@@ -312,15 +313,23 @@ const seg = encodeURIComponent
  * The events every listener resyncs from after the stream dropped: the server keeps no replay
  * (no `Last-Event-ID`), so whatever happened while disconnected is announced as "everything
  * may have changed". `types` with path `*` reloads summaries, types, rows, references, the
- * calendar and the graph; the others reload `ui.json` and the definitions. The origin is no
- * window's, so nothing takes them for its own echo.
+ * calendar and the graph, and makes the open object, board and ink documents re-check their
+ * versions; `views` reloads a type page's saved views; the others reload `ui.json` and the
+ * definitions. The origin is no window's, so nothing takes them for its own echo.
  */
+export const RESYNC_PATH = '*'
 const RESYNC_EVENTS: readonly ChangeEvent[] = [
-  { kind: 'types', path: '*', version: null, origin: null },
-  { kind: 'ui', path: '*', version: null, origin: null },
-  { kind: 'collections', path: '*', version: null, origin: null },
-  { kind: 'queries', path: '*', version: null, origin: null },
+  { kind: 'types', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'views', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'ui', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'collections', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'queries', path: RESYNC_PATH, version: null, origin: null },
 ]
+
+/** Whether `e` is the synthetic "everything of `kind` may have changed" event sent after a reconnect. */
+export function isResync(e: ChangeEvent, kind: ChangeKind): boolean {
+  return e.kind === kind && e.path === RESYNC_PATH
+}
 
 function ensureSource() {
   if (source || typeof EventSource === 'undefined') return

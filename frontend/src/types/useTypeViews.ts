@@ -2,7 +2,7 @@
 // debounced save. A save carries the revision it was based on; on a 409 the stored views are
 // fetched, the pending edits are re-applied to them once, and the save is tried again.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, ConflictError } from '@/api/client'
+import { api, ConflictError, isResync } from '@/api/client'
 import type { Views } from '@/api/types'
 
 const SAVE_DELAY_MS = 300
@@ -40,9 +40,10 @@ export function useTypeViews(typeId: string): { views: Views | null; update(edit
     pending.current = []
     setViews(null)
     void load()
-    // Another window's save (or an external edit) of this type's views replaces ours.
+    // Another window's save (or an external edit) of this type's views replaces ours; so does
+    // a resync after the stream reconnected (path `*`, no version).
     const off = api.onChange((e) => {
-      if (e.kind !== 'views' || e.path !== idRef.current) return
+      if (e.kind !== 'views' || (e.path !== idRef.current && !isResync(e, 'views'))) return
       if (saving.current || pending.current.length > 0 || e.version === revision.current) return
       void load()
     })

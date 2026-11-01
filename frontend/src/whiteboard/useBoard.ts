@@ -16,7 +16,7 @@
  * - Pending changes are flushed on unmount and on `pagehide`.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, ConflictError, ReadOnlyError } from '@/api/client'
+import { api, ConflictError, isResync, ReadOnlyError } from '@/api/client'
 import { whiteboardApi, type WhiteboardApi } from '@/api/whiteboardClient'
 import type { WhiteboardData } from '@/api/whiteboardTypes'
 import { announceSave, onLocalSave } from './localSaves'
@@ -261,6 +261,8 @@ export function useBoard(
     }
     const offChange = api.onChange((e) => {
       if ((e.kind as string) === 'whiteboard' && e.path === path) changedElsewhere(e.version)
+      // The stream reconnected: the board may have changed meanwhile; the revision check decides.
+      else if (isResync(e, 'types')) changedElsewhere(null)
     })
     const offLocal = onLocalSave((e) => {
       if (e.source !== saver && e.path === path) changedElsewhere(e.version)

@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { NodeToolbar, Panel } from '@xyflow/react'
-import { api, ConflictError } from '@/api/client'
+import { api, ConflictError, isResync } from '@/api/client'
 import { whiteboardApi, type WhiteboardApi } from '@/api/whiteboardClient'
 import type { MdStamp, WhiteboardBoardToolMemory, WhiteboardSaveResult } from '@/api/whiteboardTypes'
 import { Icon } from '@/components/Icon'
@@ -176,6 +176,10 @@ export function WhiteboardPage({
   useEffect(
     () =>
       api.onChange((e) => {
+        if (isResync(e, 'types')) {
+          void loadDetail() // the stream reconnected: the title and notes may have changed meanwhile
+          return
+        }
         if (e.path !== path) return
         if (e.kind === 'deleted') {
           deletedRef.current = true

@@ -74,8 +74,10 @@ describe('api.onChange over SSE', () => {
     es.dispatch('open')
     // One event per kind the hooks listen for, from no window of ours, so every consumer reloads.
     const kinds = seen.map((e) => e.kind)
-    expect(kinds).toEqual(expect.arrayContaining(['types', 'ui', 'collections', 'queries']))
+    expect(kinds).toEqual(expect.arrayContaining(['types', 'views', 'ui', 'collections', 'queries']))
     expect(seen.find((e) => e.kind === 'types')?.path).toBe('*')
+    // Review fix 2026-11-01 #3: a type page's saved views resync too.
+    expect(seen.find((e) => e.kind === 'views')?.path).toBe('*')
     for (const e of seen) {
       expect(e.origin).not.toBe(CLIENT_ID)
       expect(e.version).toBeNull()

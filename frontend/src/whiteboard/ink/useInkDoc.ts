@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { api, ConflictError, ReadOnlyError } from '@/api/client'
+import { api, ConflictError, isResync, ReadOnlyError } from '@/api/client'
 import type { MdStamp } from '@/api/whiteboardTypes'
 import { announceSave, onLocalSave } from '../localSaves'
 import { inkClient, type InkClient } from './inkClient'
@@ -329,6 +329,8 @@ export function useInkDoc(
     }
     const offChange = api.onChange((e) => {
       if ((e.kind as string) === 'whiteboard') changed(e.path, e.version)
+      // The stream reconnected: the ink may have changed meanwhile; the revision check decides.
+      else if (isResync(e, 'types')) changed(s.current.path, null)
     })
     const offLocal = onLocalSave((e) => {
       if (e.source !== s.current) changed(e.path, e.version)
