@@ -118,6 +118,10 @@ def parse_fm(src: str) -> dict:
         data = _plain_yaml().load(src)
     except YAMLError as exc:
         raise FrontmatterError(str(exc)) from exc
+    except RecursionError as exc:
+        # ruamel's composer recurses per nesting level: `[[[[…` 500 deep is a bad file,
+        # not a crash of the whole space.
+        raise FrontmatterError("Frontmatter is nested too deeply") from exc
     if data is None:
         return {}
     if not isinstance(data, dict):
@@ -130,6 +134,8 @@ def _load_rt(src: str) -> CommentedMap | None:
         data = _rt_yaml().load(src)
     except YAMLError as exc:
         raise FrontmatterError(str(exc)) from exc
+    except RecursionError as exc:
+        raise FrontmatterError("Frontmatter is nested too deeply") from exc
     if data is None:
         return None
     if not isinstance(data, CommentedMap):
