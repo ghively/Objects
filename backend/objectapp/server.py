@@ -225,8 +225,31 @@ from .whiteboardstore import whiteboard_ui_problem
 __all__ = ["EventHub", "create_app"]
 
 
+EVENT_QUEUE_MAX = 1000
+"""Events held for one SSE client that isn't reading; past this its backlog is dropped."""
+
+RESYNC_EVENTS = tuple(
+    ChangeEvent(kind, "*", None) for kind in ("types", "views", "ui", "collections", "queries")
+)
+"""What replaces a dropped backlog: the resync the client itself announces after a
+reconnect (``api/client.ts`` ``RESYNC_EVENTS``), on which every consumer reloads."""
+
+
+def _offer(q: asyncio.Queue[ChangeEvent | None], event: ChangeEvent | None) -> None:
+    """Queue `event`; on a full queue drop the backlog for the resync (or the end, None)."""
+    try:
+        q.put_nowait(event)
+        return
+    except asyncio.QueueFull:
+        pass
+    while not q.empty():
+        q.get_nowait()
+    for item in RESYNC_EVENTS if event is not None else (None,):
+        q.put_nowait(item)
+
+
 class EventHub:
-    """Fans `ChangeEvent`s out to every connected SSE client (one queue each)."""
+    """Fans `ChangeEvent`s out to every connected SSE client (one bounded queue each)."""
 
     def __init__(self) -> None:
         self._subscribers: set[asyncio.Queue[ChangeEvent | None]] = set()
@@ -239,7 +262,7 @@ class EventHub:
         with self._lock:
             subscribers = list(self._subscribers)
         for q in subscribers:
-            q.put_nowait(event)
+            _offer(q, event)
 
     def close(self) -> None:
         """End every open stream. Safe to call from any thread."""
@@ -249,12 +272,12 @@ class EventHub:
         loop = self.loop
         for q in subscribers:
             if loop is not None and loop.is_running():
-                loop.call_soon_threadsafe(q.put_nowait, None)
+                loop.call_soon_threadsafe(_offer, q, None)
             else:
-                q.put_nowait(None)
+                _offer(q, None)
 
     async def subscribe(self) -> AsyncIterator[ChangeEvent]:
-        q: asyncio.Queue[ChangeEvent | None] = asyncio.Queue()
+        q: asyncio.Queue[ChangeEvent | None] = asyncio.Queue(EVENT_QUEUE_MAX)
         with self._lock:
             self._subscribers.add(q)
         try:
