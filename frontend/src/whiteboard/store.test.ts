@@ -276,6 +276,34 @@ describe('board store', () => {
     expect(onMemory).toHaveBeenLastCalledWith(expect.objectContaining({ lastUsedTool: 'hand', lastPointerTool: 'hand' }))
   })
 
+  test('loading strokes keeps the steps made before, rebased onto the loaded strokes', () => {
+    const s = storeWith(board([node({ id: 'a', position: { x: 0, y: 0 } })]))
+    s.getState().actions.nudge(30, 0, ['a'])
+    s.getState().actions.setStrokes([stroke('mine')], 'draw')
+    s.getState().canvas.loadStrokes([stroke('file'), s.getState().doc.strokes[0] as InkStroke])
+    expect(s.getState().canUndo).toBe(true)
+    s.getState().actions.undo()
+    // The stroke drawn here is undone; the one from the file stays.
+    expect(s.getState().doc.strokes.map((x) => (x as InkStroke).id)).toEqual(['file'])
+    s.getState().actions.undo()
+    expect(s.getState().doc.board.nodes.a.position).toEqual({ x: 0, y: 0 })
+    expect(s.getState().doc.strokes.map((x) => (x as InkStroke).id)).toEqual(['file'])
+    expect(s.getState().canUndo).toBe(false)
+    s.getState().actions.redo()
+    s.getState().actions.redo()
+    expect(s.getState().doc.strokes.map((x) => (x as InkStroke).id)).toEqual(['file', 'mine'])
+  })
+
+  test('an external board load keeps the steps made before', () => {
+    const s = storeWith(board([node({ id: 'a', position: { x: 0, y: 0 } })]))
+    s.getState().actions.nudge(30, 0, ['a'])
+    const cur = s.getState().doc.board
+    s.getState().canvas.load({ board: { ...cur, nodes: { ...cur.nodes, b: node({ id: 'b' }) } }, strokes: [] })
+    s.getState().actions.undo()
+    expect(s.getState().doc.board.nodes.a.position).toEqual({ x: 0, y: 0 })
+    expect(s.getState().doc.board.nodes.b).toBeDefined()
+  })
+
   test('loading strokes from the ink file is not an undo step', () => {
     const s = storeWith()
     s.getState().canvas.loadStrokes([stroke('a')])

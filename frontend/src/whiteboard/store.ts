@@ -18,6 +18,7 @@ import type { BoardActions } from './canvasTypes'
 import type { BoardDoc } from './flowMapping'
 import { fromFlowChange } from './flowMapping'
 import { History } from './history'
+import { mergeBoards } from './merge'
 import {
   emptyBoard,
   isCircuitLabel,
@@ -33,11 +34,11 @@ export type { BoardDoc }
 
 /** Store-internal actions the canvas and `useBoard` use (not part of the sub-lane contract). */
 export interface CanvasActions {
-  /** A document from the server (first load or external reload): replaces the doc and forgets every step. */
+  /** A document from the server (first load or external reload): replaces the doc; the steps are rebased onto it. */
   load(doc: BoardDoc): void
-  /** The board after a merge: replaces it without marking it dirty and restarts the history. */
+  /** The board after a merge: replaces it without marking it dirty; the steps are rebased onto it. */
   replaceBoard(board: WhiteboardData): void
-  /** Strokes from the ink file (first load or the ink doc's own merge): no step, not dirty. */
+  /** Strokes from the ink file (first load or the ink doc's own merge): no step, not dirty, the steps rebased. */
   loadStrokes(strokes: InkStroke[]): void
   setReadOnly(reason: string | null): void
   /** The ink file can't be written: no edit (clear, undo, redo, ink select) touches the strokes. */
@@ -128,6 +129,28 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
     }
 
     const ids = (given?: string[]) => given ?? get().selection
+
+    /**
+     * `doc` replaces the current document from outside (a reload, a merge, the ink file): each
+     * history step keeps its own changes, replayed onto `doc` (boards by a three-way merge,
+     * strokes by id), so the undo history survives.
+     */
+    const rebase = (doc: BoardDoc) => {
+      history.rebase(doc, (step, old) => ({
+        board:
+          doc.board === old.board
+            ? step.board
+            : step.board === old.board
+              ? doc.board
+              : mergeBoards(old.board, step.board, doc.board),
+        strokes:
+          doc.strokes === old.strokes
+            ? step.strokes
+            : step.strokes === old.strokes
+              ? doc.strokes
+              : rebaseStrokes(old.strokes as InkStroke[], step.strokes as InkStroke[], doc.strokes as InkStroke[]),
+      }))
+    }
 
     /** A history step to show: with the ink read-only, the strokes stay as they are. */
     const keepInk = (step: BoardDoc, current: BoardDoc): BoardDoc =>
@@ -311,7 +334,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
 
     const canvas: CanvasActions = {
       load(doc) {
-        history.reset(doc)
+        rebase(doc)
         set({
           doc,
           selection: get().selection.filter((id) => id in doc.board.nodes || id in doc.board.edges),
@@ -319,10 +342,10 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
         })
       },
       replaceBoard(board) {
-        // Every older step lacks the other window's merged changes, so undoing to one would
-        // delete them on the next save: the history restarts here, as on an external reload.
+        // Every older step is rebased onto the merged board, so undoing one doesn't delete the
+        // other window's merged changes on the next save.
         const doc = { ...get().doc, board }
-        history.reset(doc)
+        rebase(doc)
         set({
           doc,
           selection: get().selection.filter((id) => id in board.nodes || id in board.edges),
@@ -331,8 +354,9 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       },
       loadStrokes(strokes) {
         const doc = { ...get().doc, strokes }
-        // Strokes arrive once the ink file loads: every older step would otherwise undo them away.
-        history.reset(doc)
+        // Strokes arrive once the ink file loads: every older step is rebased onto them, so undo
+        // neither drops them nor loses the steps made before.
+        rebase(doc)
         set({ doc, ...sync() })
       },
       setReadOnly(reason) {
@@ -426,6 +450,21 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       canvas,
     }
   })
+}
+
+/**
+ * The strokes of a history step replayed onto newly loaded ones, by id (as the ink module's
+ * `mergeStrokes`; snapshots share stroke objects, so a stroke changed in the step is a new object):
+ * strokes the step removed stay removed, ones it added or changed are kept.
+ */
+function rebaseStrokes(base: readonly InkStroke[], step: readonly InkStroke[], loaded: readonly InkStroke[]): InkStroke[] {
+  const baseById = new Map(base.map((s) => [s.id, s]))
+  const stepIds = new Set(step.map((s) => s.id))
+  const changed = new Map(step.filter((s) => baseById.has(s.id) && baseById.get(s.id) !== s).map((s) => [s.id, s]))
+  const out = loaded.filter((s) => !baseById.has(s.id) || stepIds.has(s.id)).map((s) => changed.get(s.id) ?? s)
+  const have = new Set(out.map((s) => s.id))
+  for (const s of step) if (!baseById.has(s.id) && !have.has(s.id)) out.push(s)
+  return out
 }
 
 function moveBy(board: WhiteboardData, ids: string[], dx: number, dy: number): WhiteboardData {

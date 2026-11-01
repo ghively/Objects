@@ -90,7 +90,19 @@ export class History<T> {
     return this.entries[this.index].doc
   }
 
-  /** Forgets every step (an external reload): `doc` becomes the bottom. */
+  /**
+   * The document changed under the history (an external reload, a merge, the ink file loading):
+   * `doc` becomes the current step and every other step is mapped by `rebase`, which replays that
+   * step's own differences from the old current document onto `doc`, so undo keeps working.
+   */
+  rebase(doc: T, rebase: (step: T, oldCurrent: T) => T): void {
+    const old = this.entries[this.index].doc
+    this.entries = this.entries.map((e, i) =>
+      i === this.index ? { ...e, doc } : { ...e, doc: e.doc === old ? doc : rebase(e.doc, old) },
+    )
+  }
+
+  /** Forgets every step: `doc` becomes the bottom. */
   reset(doc: T): void {
     this.entries = [{ doc, label: '', key: null }]
     this.index = 0
