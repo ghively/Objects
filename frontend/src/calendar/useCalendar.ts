@@ -5,7 +5,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
 import { zonedToday } from '@/lib/zonedTime'
 import { useSettings } from '@/settings/useSettings'
-import { reloadUi, useUiStore } from '@/shell/usePinned'
+import { loadUi, useUiStore } from '@/shell/usePinned'
 import { addDays, addMonths, addYears, todayYmd, type CalendarView, type Day, type WeekStart } from './dates'
 
 export type StepKey = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown'
@@ -101,19 +101,12 @@ useSettings.subscribe((s, prev) => {
   if (useCalendar.getState().anchor === was) useCalendar.setState({ anchor: todayYmd() })
 })
 
-let uiRequested = false
-
 /** `ui.calendar.weekStart` (default Sunday, as the screenshots); loads `ui.json` if nobody has. */
 export function useWeekStart(): WeekStart {
   const loaded = useUiStore((s) => s.loaded)
   const ws = useUiStore((s) => s.ui.calendar?.weekStart)
   useEffect(() => {
-    if (!loaded && !uiRequested) {
-      uiRequested = true
-      void reloadUi().finally(() => {
-        uiRequested = false
-      })
-    }
+    if (!loaded) void loadUi()
   }, [loaded])
   return ws === 'monday' ? 'monday' : 'sunday'
 }

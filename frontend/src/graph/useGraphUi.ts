@@ -8,7 +8,7 @@ import { useCallback, useEffect } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { GraphCustomization } from '@/api/types'
 import { showToast } from '@/editor/media/upload'
-import { enqueueUiSave, reloadUi, useUiStore } from '@/shell/usePinned'
+import { enqueueUiSave, loadUi, reloadUi, useUiStore } from '@/shell/usePinned'
 
 export const SAVE_DELAY_MS = 400
 /** The toast after a `ui.json` save of the graph settings failed (Object's "Could not save …" form). */
@@ -97,7 +97,7 @@ export function useGraphUi(): { custom: GraphCustomization; patch(partial: Parti
   const custom = useUiStore((s) => graphOf(s.ui))
   const loaded = useUiStore((s) => s.loaded)
   useEffect(() => {
-    if (!loaded) void reloadUi()
+    if (!loaded) void loadUi()
   }, [loaded])
   const patch = useCallback((partial: Partial<GraphCustomization>) => patchGraphUi(partial), [])
   return { custom, patch }
