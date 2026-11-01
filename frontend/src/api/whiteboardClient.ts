@@ -1,4 +1,5 @@
 import { announceLocalChange, api, ApiError, CLIENT_ID, ReadOnlyError, RevisionConflictError } from './client'
+import { announceSave } from '@/whiteboard/localSaves'
 import type {
   BoardResponse,
   CreatedWhiteboard,
@@ -84,7 +85,11 @@ export const whiteboardApi = {
 
   /**
    * `PUT /api/whiteboard`. `baseRevision` `''` creates the file. 409 → `RevisionConflictError(currentRevision)`.
-   * M9: when the save stamped the board `.md`, this window hears a `changed` for it.
+   * M9: when the save stamped the board `.md`, this window hears a `changed` for it. The save is
+   * also announced to the views of the board open in this window (`localSaves`), since the
+   * server's `whiteboard` event for it carries our `CLIENT_ID` and is dropped as an echo: so a
+   * board saved outside a board hook ("Add to whiteboard", "Turn into whiteboard") shows up in
+   * them. A view that made the save sees its own revision in it and ignores it.
    */
   async saveBoard(path: string, board: WhiteboardData, baseRevision: string): Promise<WhiteboardSaveResult> {
     const res = await request<WhiteboardSaveResult>(
@@ -92,6 +97,7 @@ export const whiteboardApi = {
       json('PUT', { path, board, baseRevision, clientId: CLIENT_ID }),
     )
     if (res?.mdVersion) announceLocalChange(path, res.mdVersion)
+    if (res?.revision !== undefined) announceSave({ path, version: res.revision, source: whiteboardApi })
     return res
   },
 
