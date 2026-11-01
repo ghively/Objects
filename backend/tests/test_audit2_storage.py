@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import pytest
+from objectapp import space as space_mod
 from objectapp.space import Space
 
 ADA = "People/Ada Lovelace.md"
@@ -124,3 +125,32 @@ def test_type_id_keeps_name_then_id_then_former_name_order(space_dir: Path):
     assert space._type_id("shared") == "a"  # a name beats an id
     assert space._type_id("b") == "shared"  # a name beats a former name
     assert space._type_id("OLDER") == "c"  # the first type wins within one kind
+
+
+# -- 3: a template of an unknown type doesn't re-infer every file per rescan ---------
+
+
+def test_rescanning_a_template_of_an_unknown_type_infers_nothing(space_dir: Path, monkeypatch):
+    rel = "Templates/Gizmo template.md"
+    (space_dir / "Templates").mkdir(exist_ok=True)
+    _write(space_dir / rel, "---\ntype: Gizmo\ntemplate: 'Gizmo'\ntitle: Gizmo template\n---\n")
+    space = Space(space_dir)
+    assert space._type_id("Gizmo") not in {t.id for t in space.types}
+    calls = []
+    real = space_mod.infer_types_from
+    monkeypatch.setattr(
+        space_mod, "infer_types_from", lambda objs: calls.append(1) or real(objs)
+    )
+    for i in range(3):
+        _write(
+            space_dir / rel,
+            f"---\ntype: Gizmo\ntemplate: 'Gizmo'\ntitle: Gizmo template\n---\nEdit {i}\n",
+        )
+        space.rescan_file(rel)
+    assert calls == []
+    # An ordinary object of a new type is still inferred (once).
+    _write(space_dir / "Pages/A gizmo.md", "---\ntype: Gizmo\ntitle: A gizmo\n---\n")
+    space.rescan_file("Pages/A gizmo.md")
+    space.rescan_file("Pages/A gizmo.md")
+    assert len(calls) == 1
+    assert space.get("Pages/A gizmo.md").type in {t.id for t in space.types}

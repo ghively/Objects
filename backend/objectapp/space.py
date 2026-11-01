@@ -4631,7 +4631,12 @@ class Space:
                 self._checked_rels.discard(rel)
             else:
                 self._raw[rel] = raw
-                if self._type_id(raw.typeName) not in {t.id for t in self.types}:
+                # A template never makes a type (`infer_types_from` skips it), so one whose
+                # type stays unknown would re-infer every file on each rescan for nothing.
+                template = not raw.readOnly and raw.fm.get("template") not in (None, "")
+                if not template and self._type_id(raw.typeName) not in {
+                    t.id for t in self.types
+                }:
                     self._merge_types(infer_types_from(self._raw.values()))
                 self._summaries[rel] = self._summarize(raw)
             after = self._summaries.get(rel)
