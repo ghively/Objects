@@ -1638,7 +1638,7 @@ class Space:
         try:
             if history:
                 self._call_before_write(rel, raw.data)
-            tmp = _write_temp(full, data)  # written and fsynced beside the file
+            tmp = _write_temp(full, data, keep_mode=True)  # written and fsynced beside the file
         except BaseException:
             forget()
             raise
