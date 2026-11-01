@@ -1821,8 +1821,11 @@ class Space:
         of = split_object(text)
         if not of.fm_ok:
             return None
-        if stamped is not None:
-            fm = {**stamped, **before.fm, **stamped}  # an inserted id keeps its first place
+        if stamped is not None and ("id" not in stamped or "id" in before.fm):
+            # In the file's order: stamped keys already there were set in place, a new
+            # `lastUpdated` was appended. A newly inserted id (once per object: first, or
+            # last in a flow-style mapping) is left to the parse below.
+            fm = {**before.fm, **stamped}
         elif of.frontmatter_src is None:
             fm = {}
         else:

@@ -453,3 +453,63 @@ def test_hook_failure_never_stops_a_write(client, space, monkeypatch):
     space.before_write = boom
     _save_body(client, PAGE, "Still saved.\n")
     assert "Still saved." in (space.root / PAGE).read_text(encoding="utf-8")
+
+
+def test_versions_keeps_one_rebuilt_version_in_memory(tmp_path):
+    """End review 2: `versions()` kept every rebuilt version (404 MB for a 2 MB x 200 file)."""
+    import tracemalloc
+
+    root = tmp_path / "space"
+    (root / "Pages").mkdir(parents=True)
+    store = HistoryStore(root)
+    rel = "Pages/Hub.md"
+    body = bytearray(b"x" * 1_000_000)
+    for i in range(100):
+        body[i * 100 : i * 100 + 10] = b"edit%06d" % i
+        data = b"---\nid: 01JC8M80000000000000000099\ntitle: Hub\n---\n" + bytes(body)
+        assert store.snapshot(rel, data, T0 + timedelta(minutes=6 * i))
+    (root / rel).write_bytes(data)
+    tracemalloc.start()
+    try:
+        versions = store.versions(rel)
+        _cur, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert len(versions) == 100
+    assert {v["title"] for v in versions} == {"Hub"}
+    assert peak < 8_000_000, peak  # a few rebuilt copies, not one per version
+
+
+def test_a_corrupt_gzip_version_reads_as_unreadable(tmp_path):
+    """End review 2: a `.md.gz` whose deflate stream is damaged raised `zlib.error` (a 500)."""
+    import gzip
+    import zlib
+
+    from objectapp.history import VersionNotFound
+
+    root = tmp_path / "space"
+    (root / "Pages").mkdir(parents=True)
+    store = HistoryStore(root)
+    rel = "Pages/Hub.md"
+    data = b"---\nid: 01JC8M80000000000000000098\ntitle: Hub\n---\n" + bytes(range(256)) * 40
+    vid = store.snapshot(rel, data, T0)
+    (root / rel).write_bytes(data)
+    path = next(store.dir.iterdir()) / f"{vid}.md.gz"
+    packed = path.read_bytes()
+    for i in range(10, len(packed) - 8):  # the first flip that breaks the deflate stream itself
+        bad = bytearray(packed)
+        bad[i] ^= 0xFF
+        try:
+            gzip.decompress(bytes(bad))
+        except zlib.error:
+            break
+        except (OSError, EOFError, ValueError):
+            continue
+    else:
+        pytest.fail("no single flipped byte gives zlib.error")
+    path.write_bytes(bytes(bad))
+    versions = store.versions(rel)
+    assert [v["id"] for v in versions] == [vid]
+    assert versions[0]["title"] is None  # like any version whose bytes are gone
+    with pytest.raises(VersionNotFound):
+        store.content(rel, vid)
