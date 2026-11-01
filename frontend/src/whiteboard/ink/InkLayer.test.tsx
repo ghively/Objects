@@ -1,9 +1,10 @@
 import '@/whiteboard/test/flowEnv'
 import { act, render } from '@testing-library/react'
 import { ReactFlow, ReactFlowProvider } from '@xyflow/react'
+import { useState } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { InkLayer } from './InkLayer'
-import { DEFAULT_INK, finishStroke } from './inkModel'
+import { DEFAULT_INK, finishStroke, SPLIT_STROKE_POINTS } from './inkModel'
 import type { InkLayerProps, InkStroke, InkToolState } from './types'
 
 type Sample = { x: number; y: number; pressure?: number }
@@ -109,16 +110,41 @@ describe('InkLayer', () => {
     expect(s.d.startsWith('M ')).toBe(true)
   })
 
-  test('a stroke longer than the file allows is saved as several strokes', () => {
-    const { capture, onStrokesChange } = setup()
-    const el = capture()!
+  test('a long stroke is cut into pieces while drawn; no piece can exceed the server caps', () => {
+    // As on the page: the strokes the layer commits come back as its `strokes` prop.
+    const onStrokesChange = vi.fn()
+    function Page() {
+      const [strokes, setStrokes] = useState<InkStroke[]>([])
+      const change: InkLayerProps['onStrokesChange'] = (next, label) => {
+        setStrokes(next)
+        onStrokesChange(next, label)
+      }
+      return <InkLayer strokes={strokes} tool={DEFAULT_INK} readOnly={false} panning={false} onStrokesChange={change} onWheel={vi.fn()} />
+    }
+    const utils = render(
+      <div style={{ width: 1280, height: 800 }}>
+        <ReactFlowProvider>
+          <ReactFlow nodes={[]} edges={[]}>
+            <Page />
+          </ReactFlow>
+        </ReactFlowProvider>
+      </div>,
+    )
+    const el = utils.container.querySelector('[data-ink-capture]')!
     fire(el, 'pointerdown', { pointerType: 'pen', x: 0, y: 0, pressure: 0.5 })
     const coalesced = Array.from({ length: 25_000 }, (_, i) => ({ x: (i + 1) / 10, y: (i % 7) / 10, pressure: 0.5 }))
     fire(el, 'pointermove', { pointerType: 'pen', x: 2500, y: 0, pressure: 0.5, coalesced })
+    // Whole pieces are committed before the pen lifts (the live preview keeps only the tail).
+    const whileDrawing = onStrokesChange.mock.calls.length
+    expect(whileDrawing).toBeGreaterThan(0)
+    const committed = onStrokesChange.mock.calls.at(-1)![0] as InkStroke[]
+    expect(committed.every((s) => s.points.length <= SPLIT_STROKE_POINTS)).toBe(true)
+    expect(utils.container.querySelectorAll('[data-stroke-id]')).toHaveLength(committed.length)
     fire(el, 'pointerup', { pointerType: 'pen', x: 2500, y: 0, pressure: 0 })
-    const next = onStrokesChange.mock.calls[0][0] as InkStroke[]
-    expect(next.length).toBeGreaterThan(1)
-    expect(next.every((s) => s.points.length <= 20_000)).toBe(true)
+    expect(onStrokesChange.mock.calls.length).toBe(whileDrawing + 1)
+    const next = onStrokesChange.mock.calls.at(-1)![0] as InkStroke[]
+    expect(next.length).toBeGreaterThan(committed.length)
+    expect(next.every((s) => s.points.length <= SPLIT_STROKE_POINTS)).toBe(true)
     expect(new Set(next.map((s) => s.id)).size).toBe(next.length)
     // Consecutive pieces share their joining sample, so the line stays unbroken.
     expect(next[1].points[0]).toEqual(next[0].points.at(-1))

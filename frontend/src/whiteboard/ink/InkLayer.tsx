@@ -3,6 +3,7 @@ import { useReactFlow, useViewport, ViewportPortal } from '@xyflow/react'
 import {
   ERASER_RADIUS_PX,
   HIGHLIGHTER_OPACITY,
+  SPLIT_STROKE_POINTS,
   finishStroke,
   hitStrokes,
   isBarrelButton,
@@ -245,9 +246,27 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
     const ev = e.nativeEvent
     if (!g || ev.pointerId !== g.pointerId) return
     g.points = g.points.concat(samplesFrom(ev, toFlow))
-    if (g.mode === 'draw') setLive({ tool: g.tool, color: g.color, width: g.width, pointerType: g.pointerType, points: g.points })
-    else if (g.mode === 'lasso') setLasso(g.points)
+    if (g.mode === 'draw') {
+      if (g.points.length > SPLIT_STROKE_POINTS) commitPieces(g)
+      setLive({ tool: g.tool, color: g.color, width: g.width, pointerType: g.pointerType, points: g.points })
+    } else if (g.mode === 'lasso') setLasso(g.points)
     else if (g.mode === 'move' || g.mode === 'scale') setPreview(selectionTransform(g))
+  }
+
+  /**
+   * A stroke over the per-stroke limit is cut while it is drawn: the whole pieces are committed
+   * now (one stroke each) and the tail, starting at the last committed sample, stays live.
+   */
+  const commitPieces = (g: Gesture) => {
+    const pieces = splitPoints(g.points)
+    const tail = pieces.pop()!
+    if (pieces.length === 0) return
+    const { strokes: current, onStrokesChange: change } = latest.current
+    const drawn = pieces.map((pts) => finishStroke(newStrokeId(), g.tool, g.color, g.width, pts, g.pointerType))
+    const next = [...current, ...drawn]
+    latest.current.strokes = next // until the parent re-renders with them
+    g.points = tail
+    change(next, 'draw')
   }
 
   /** The SVG transform previewing a move or scale gesture on the selected strokes. */
@@ -281,7 +300,7 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
     if (cancelled || g.points.length === 0) return
     const { strokes: current, zoom: z, onStrokesChange: change } = latest.current
     if (g.mode === 'draw') {
-      // A path over the file's per-stroke limit is kept as several strokes (one would fail every save).
+      // The pieces `commitPieces` hasn't committed (normally one; a huge sample batch may leave more).
       const drawn = splitPoints(g.points).map((pts) => finishStroke(newStrokeId(), g.tool, g.color, g.width, pts, g.pointerType))
       change([...current, ...drawn], 'draw')
       return

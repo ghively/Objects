@@ -7,7 +7,9 @@ import {
   HIGHLIGHTER_OPACITY,
   HIGHLIGHTER_WIDTHS,
   INK_COLORS,
+  MAX_STROKE_POINTS,
   PEN_WIDTHS,
+  SPLIT_STROKE_POINTS,
   finishStroke,
   hitStrokes,
   isBarrelButton,
@@ -17,6 +19,7 @@ import {
   outlineFor,
   penAltitude,
   samplesFrom,
+  splitPoints,
   strokePointerType,
   tiltFactor,
   strokeOptions,
@@ -62,6 +65,26 @@ function fakePointer(init: Partial<PointerEvent> & { coalesced?: Partial<Pointer
 }
 
 describe('ink model', () => {
+  test('a stroke at the file point cap splits into pieces whose paths stay well under the server 1 MB cap', () => {
+    // A wiggly pen path: every coordinate carries decimals, so `d` is as long as it gets.
+    const pts: [number, number, number][] = []
+    for (let i = 0; i < MAX_STROKE_POINTS; i++) {
+      pts.push([1000 + Math.sin(i / 7) * 300 + i * 0.05, 2000 + Math.cos(i / 11) * 200, 0.3 + 0.4 * Math.abs(Math.sin(i / 5))])
+    }
+    const whole = finishStroke('X', 'pen', '#5c5959', 4, pts, 'pen')
+    expect(new TextEncoder().encode(whole.d).length).toBeGreaterThan(1_000_000) // why splitting is needed
+    const pieces = splitPoints(pts)
+    expect(pieces.length).toBeGreaterThan(1)
+    for (const piece of pieces) {
+      expect(piece.length).toBeLessThanOrEqual(SPLIT_STROKE_POINTS)
+      const d = finishStroke('Y', 'pen', '#5c5959', 4, piece, 'pen').d
+      expect(new TextEncoder().encode(d).length).toBeLessThan(750_000)
+    }
+    // Consecutive pieces share their joining sample, so the line stays unbroken.
+    expect(pieces[1][0]).toBe(pts[SPLIT_STROKE_POINTS - 1])
+    expect(SPLIT_STROKE_POINTS).toBeLessThan(MAX_STROKE_POINTS)
+  })
+
   test('constants', () => {
     expect(PEN_WIDTHS).toEqual([2, 4, 8])
     expect(HIGHLIGHTER_WIDTHS).toEqual([16, 32])
