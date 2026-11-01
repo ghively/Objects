@@ -120,7 +120,12 @@ class FrontmatterCache:
             for rel in [r for r in self._entries if not (self.root / r).is_file()]:
                 del self._entries[rel]
             payload = {"v": _VERSION, "entries": {r: [h, fm] for r, (h, fm) in self._entries.items()}}
-            data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            try:
+                data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            except UnicodeEncodeError:
+                # A lone surrogate in a value (YAML's "\uDC80" escape) isn't UTF-8: escape it
+                # as JSON does (``json.loads`` gives it back as it was).
+                data = json.dumps(payload, separators=(",", ":")).encode("ascii")
             try:
                 self.path.parent.mkdir(parents=True, exist_ok=True)
                 self._ignore_in_git()

@@ -48,6 +48,7 @@ __all__ = [
     "rename_key",
     "replace_in_value",
     "set_keys",
+    "take_parsed",
 ]
 
 # Strings that a YAML 1.1/1.2 resolver would read as a timestamp. The export
@@ -573,7 +574,9 @@ def _encode_item(new: str, style: str, indent: str) -> str:
     return "'" + new.replace("'", "''") + "'"
 
 
-def replace_in_value(src: str, key: str, fn: Callable[[str], str]) -> str:
+def replace_in_value(
+    src: str, key: str, fn: Callable[[str], str], parsed: dict | None = None
+) -> str:
     """Apply ``fn`` to each scalar of one key's value, replacing only what changed.
 
     Works on a scalar, a flow list, a block list or a block scalar (each of its
@@ -586,11 +589,25 @@ def replace_in_value(src: str, key: str, fn: Callable[[str], str]) -> str:
     need quoting...) is re-rendered whole, on the key's own lines only. An
     absent key, or no change, returns ``src`` itself. Raises `FrontmatterError`
     when ``src`` or the result is not valid YAML.
+
+    ``parsed`` is `parse_fm` of ``src`` when the caller has it (spares a parse). With it,
+    a value written on its key's one line at the top level (``type: 'Book'``) is edited
+    from the text alone, without the round-trip parse, and the result is checked by one
+    plain parse, which `take_parsed` then hands on instead of a parse of its own.
     """
+    if parsed is not None:
+        if key not in parsed:
+            return src
+        expected = _map_strings(parsed[key], fn)
+        if expected == parsed[key]:
+            return src
+        out = _replace_on_one_line(src, key, fn)
+        if out is not None and _reads_back_as(out, {**parsed, key: expected}):
+            return out
     data = _load_rt(src)
     if data is None or key not in data:
         return src
-    before = parse_fm(src)
+    before = parsed if parsed is not None else parse_fm(src)
     expected = _map_strings(before[key], fn)
     if expected == before[key]:
         return src
@@ -600,7 +617,10 @@ def replace_in_value(src: str, key: str, fn: Callable[[str], str]) -> str:
             after = parse_fm(out)
         except FrontmatterError:
             return False
-        return after.keys() == before.keys() and after[key] == expected
+        if after.keys() == before.keys() and after[key] == expected:
+            _remember_parsed(out, after)
+            return True
+        return False
 
     if not data.fa.flow_style():
         out = _replace_in_place(src, data, key, fn)
@@ -616,6 +636,90 @@ def replace_in_value(src: str, key: str, fn: Callable[[str], str]) -> str:
     if not reads_back(out):
         raise FrontmatterError(f"Rewriting {key!r} broke its value")
     return out
+
+
+_PARSED_KEEP = 8
+_parsed: dict[str, dict] = {}
+"""Source -> its `parse_fm`, kept by the edit that checked it, for `take_parsed` (a few)."""
+_parsed_lock = threading.Lock()
+
+
+def _remember_parsed(src: str, fm: dict) -> None:
+    """Keep ``fm`` (a parse of ``src`` that nothing else holds) for one `take_parsed`."""
+    with _parsed_lock:
+        _parsed.pop(src, None)
+        _parsed[src] = fm
+        while len(_parsed) > _PARSED_KEEP:
+            del _parsed[next(iter(_parsed))]
+
+
+def take_parsed(src: str) -> dict:
+    """`parse_fm` of ``src``: the parse an edit just checked its result with, else a new one.
+
+    A kept parse is handed out once (it is then the caller's to change); a second call
+    parses again. Raises `FrontmatterError` as `parse_fm`.
+    """
+    with _parsed_lock:
+        fm = _parsed.pop(src, None)
+    return fm if fm is not None else parse_fm(src)
+
+
+def _reads_back_as(out: str, expected: dict) -> bool:
+    """Whether ``out`` parses to exactly ``expected`` (the parse is kept for `take_parsed`)."""
+    try:
+        after = parse_fm(out)
+    except FrontmatterError:
+        return False
+    if after != expected:
+        return False
+    _remember_parsed(out, after)
+    return True
+
+
+_ONE_LINE_STOP = frozenset("|>&*!{?-#")
+
+
+def _replace_on_one_line(src: str, key: str, fn: Callable[[str], str]) -> str | None:
+    """`_replace_in_place` from the text alone, for a value on its key's only line.
+
+    The key must start exactly one line, at column 0, written plain, and its value
+    (scalars, or a flow list) must end on that line. Anything else is None (the
+    round-trip path then does it); the caller checks the result by parsing it.
+    """
+    if not _rt_yaml_key_plain(key):
+        return None
+    lines = _lines(src)
+    prefix = key + ":"
+    rows = [
+        i
+        for i, line in enumerate(lines)
+        if line.startswith(prefix) and line[len(prefix) : len(prefix) + 1] in (" ", "\t")
+    ]
+    if len(rows) != 1:
+        return None
+    row = rows[0]
+    line = lines[row]
+    body = line.rstrip("\r\n")
+    rest = body[len(prefix) :].strip()
+    if not rest or rest[0] in _ONE_LINE_STOP:
+        return None
+    if rest[0] == "[" and not rest.endswith("]"):
+        return None  # a flow list running on to the next line
+    if rest[0] in "'\"":
+        start = body.index(rest[0], len(prefix))
+        end = _quoted_end(body, start)
+        if end != len(body.rstrip(" \t")) or end - start < 2 or body[end - 1] != rest[0]:
+            return None  # runs on to the next line, or more follows it (a comment...)
+    nxt = lines[row + 1] if row + 1 < len(lines) else ""
+    if nxt[:1] in (" ", "\t"):
+        return None  # a continuation or a nested value below
+    items = _scan_items(body, len(prefix))
+    if not items:
+        return None
+    text, changed = _edit_items(body, items, fn, multiline_plain=False)
+    if not changed:
+        return None
+    return "".join(lines[:row]) + text + line[len(body) :] + "".join(lines[row + 1 :])
 
 
 def _map_strings(value: Any, fn: Callable[[str], str]) -> Any:
@@ -676,6 +780,16 @@ def _replace_in_place(
             while e > s and text[e - 1] in " \t\r":
                 e -= 1
             items = ([(s, e, "plain")] if e > s else []) + _scan_block_scalar(text, start_at)
+    text, changed = _edit_items(text, items, fn, multiline_plain)
+    if not changed:
+        return None
+    return head + text + tail
+
+
+def _edit_items(
+    text: str, items: list[_ItemSpan], fn: Callable[[str], str], multiline_plain: bool
+) -> tuple[str, bool]:
+    """``text`` with ``fn`` applied to each item it changes, each in its own style."""
     changed = False
     for s, e, style in reversed(items):
         raw = text[s:e]
@@ -695,9 +809,7 @@ def _replace_in_place(
             encoded = _encode_item(new, style, indent)
         text = text[:s] + encoded + text[e:]
         changed = True
-    if not changed:
-        return None
-    return head + text + tail
+    return text, changed
 
 
 def remove_items(src: str, key: str, drop: Callable[[str], bool]) -> str | None:

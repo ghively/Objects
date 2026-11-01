@@ -46,6 +46,8 @@ if TYPE_CHECKING:
 __all__ = ["LinkIndex", "count_date_tokens"]
 
 _DATA_VIEW_PREFIXES = ("collection:", "query:")
+_MAX_PENDING = 5000
+"""Changes `LinkIndex` keeps between reads before it collapses them to one full rebuild."""
 _TIME_RE = re.compile(
     r"<time\b[^>]*?\bdatetime\s*=\s*([\"'])(\d{4}-\d{2}-\d{2})\1[^>]*>", re.IGNORECASE
 )
@@ -105,6 +107,8 @@ class LinkIndex:
     def __init__(self, space: Space) -> None:
         self._space = space
         self._pending: list[SpaceChange] = []
+        self._overflow = False
+        """More changes came in than `_MAX_PENDING` allows: the next read rebuilds everything."""
         self._built = False
         self._names_rev = -1
         self._sources: dict[str, _Extracted] = {}
@@ -126,12 +130,23 @@ class LinkIndex:
     # -- change tracking ------------------------------------------------------
 
     def on_change(self, change: SpaceChange) -> None:
-        """Record a change (called by the space, maybe under its lock): never blocks."""
+        """Record a change (called by the space, maybe under its lock): never blocks.
+
+        The list is bounded: past `_MAX_PENDING` changes (or the space's object count,
+        when larger) with no read in between, it collapses to "rebuild everything",
+        which costs no more than re-extracting that many sources.
+        """
+        if self._overflow:
+            return
         self._pending.append(change)
+        if len(self._pending) > max(_MAX_PENDING, len(self._space._raw)):
+            self._overflow = True
+            self._pending = []
 
     def _fresh(self) -> bool:
         return (
             self._built
+            and not self._overflow
             and not self._pending
             and self._names_rev == self._space._names_rev
         )
@@ -142,10 +157,11 @@ class LinkIndex:
         space = self._space
         with space._lock:
             pending, self._pending = self._pending, []
+            overflow, self._overflow = self._overflow, False
             self._sources_rev += 1
             # A type change re-extracts its members (the definitions decide which keys
             # are relations); one that names no type re-extracts everything.
-            full = not self._built or any(
+            full = not self._built or overflow or any(
                 c.kind == "types" and c.type_id is None for c in pending
             )
             dirty: set[str] = set()

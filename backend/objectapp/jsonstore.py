@@ -106,13 +106,20 @@ class JsonStore:
     def revision(self, id: str) -> str:
         return json_revision(self.path(id))
 
-    def _load(self, path: Path) -> tuple[dict[str, Any] | None, str, str | None]:
-        """(data, revision, error) of one file; data is None when missing or unreadable."""
+    def _load(
+        self, path: Path, known: str | None = None
+    ) -> tuple[dict[str, Any] | None, str, str | None]:
+        """(data, revision, error) of one file; data is None when missing or unreadable.
+
+        A file whose revision is ``known`` is not parsed (data and error None).
+        """
         try:
             raw = path.read_bytes()
         except (FileNotFoundError, NotADirectoryError):
             return None, "", None
         revision = hashlib.sha256(raw).hexdigest()
+        if known is not None and revision == known:
+            return None, revision, None
         try:
             return parse_json_object(raw), revision, None
         except (ValueError, UnicodeDecodeError) as exc:
@@ -126,8 +133,15 @@ class JsonStore:
             raise DefinitionUnreadable(path, error)
         return data, revision
 
-    def list(self) -> list[tuple[str, dict[str, Any] | None, str, str | None]]:
-        """``(id, data, revision, error)`` for every ``*.json`` file, sorted by id."""
+    def list(
+        self, known: dict[str, str] | None = None
+    ) -> list[tuple[str, dict[str, Any] | None, str, str | None]]:
+        """``(id, data, revision, error)`` for every ``*.json`` file, sorted by id.
+
+        ``known`` maps ids to the revision the caller already holds parsed: such a file
+        is read and hashed but not parsed (its data and error are None).
+        """
+        known = known or {}
         out = []
         try:
             files = sorted(p for p in self.dir.glob("*.json") if p.is_file())
@@ -136,7 +150,7 @@ class JsonStore:
         for p in files:
             if not _ID_RE.match(p.stem):
                 continue
-            data, revision, error = self._load(p)
+            data, revision, error = self._load(p, known.get(p.stem))
             out.append((p.stem, data, revision, error))
         return out
 
