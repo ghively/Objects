@@ -68,7 +68,8 @@ def test_day_backlinks_without_daily_note(calendar_space_dir: Path):
     assert b not in day["backlinks"]
     r = space.calendar(DAY, "2026-10-28")
     assert r["days"]["2026-10-28"]["backlinks"] == [b]
-    assert a in r["summaries"] and b in r["summaries"]
+    # Backlinks get their rows by path; summaries are only for notes, tasks and dated.
+    assert a not in r["summaries"] and b not in r["summaries"]
 
 
 def test_day_backlinks_with_daily_note_exclude_it(calendar_space_dir: Path):
@@ -151,8 +152,9 @@ def test_timeline_sorted_with_kinds(calendar_space_dir: Path):
         {"path": "Tasks/Timed task.md", "at": "2026-10-27T10:00:00Z", "kind": "task"},
         {"path": late, "at": "2026-10-27T15:00:00Z", "kind": "created"},
     ]
-    for e in timeline:
-        assert e["path"] in r["summaries"]
+    # The dated and task entries carry summaries; the created ones get rows by path.
+    assert {"Meetings/Kickoff.md", "Tasks/Timed task.md"} <= set(r["summaries"])
+    assert early not in r["summaries"] and late not in r["summaries"]
     assert all(e["path"] != "Tasks/Day task.md" for e in timeline)
     before = space.calendar("2026-10-26", "2026-10-26")["days"]["2026-10-26"]["timeline"]
     assert [e["path"] for e in before] == ["Pages/Before page.md"]

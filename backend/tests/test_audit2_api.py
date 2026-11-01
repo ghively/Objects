@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import os
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from objectapp import server
+from objectapp import calendarquery, server
 from objectapp.server import create_app
 from objectapp.space import Space
 
@@ -64,3 +65,61 @@ def test_big_reads_show_an_undecodable_file_name(space_dir: Path, tmp_path: Path
     assert r.status_code == 200
     assert "Bad � name.md" in {row["summary"]["path"] for row in r.json()["rows"]}
     assert c.get("/api/graph").status_code == 200
+
+
+# -- /api/calendar: summaries for what the client reads them for; the lock only to snapshot --
+
+
+def _calendar_space(root: Path) -> Space:
+    space = Space(root)
+    space.clock = lambda: datetime(2026, 10, 27, 9, 0, tzinfo=UTC)
+    space.tz = timezone(timedelta(hours=2))
+    return space
+
+
+def test_calendar_summaries_cover_notes_tasks_and_dated_only(calendar_space_dir: Path):
+    p = calendar_space_dir / "Pages" / "Linker.md"
+    p.write_text(
+        "---\nid: 01JBQ4Z7S3N8V2K5D9X6AUDIT2\ntype: 'Page'\ntitle: Linker\n"
+        "createdAt: 2026-10-22T08:00:00.000Z\nlastUpdated: 2026-10-23T08:00:00.000Z\n---\n"
+        "See [[2026-10-22]].\n",
+        encoding="utf-8",
+    )
+    r = _calendar_space(calendar_space_dir).calendar("2026-10-20", "2026-10-28")
+    shown: set[str] = set()
+    other: set[str] = set()
+    for day in r["days"].values():
+        if day["dailyNote"]:
+            shown.add(day["dailyNote"]["path"])
+        shown.update(e["path"] for e in day["tasks"])
+        shown.update(e["path"] for e in day["dated"])
+        other.update(day["created"])
+        other.update(day["updated"])
+        other.update(day["backlinks"])
+        other.update(e["path"] for e in day["references"])
+        other.update(e["path"] for e in day["timeline"])
+    for w in r["warnings"]:
+        shown.update(w["paths"])
+    assert "Pages/Linker.md" in other
+    assert set(r["summaries"]) == shown
+    for path, s in r["summaries"].items():
+        assert s["path"] == path
+
+
+def test_calendar_computes_outside_the_space_lock(calendar_space_dir: Path, monkeypatch):
+    space = _calendar_space(calendar_space_dir)
+    held: list[bool] = []
+    real_task, real_stamps = calendarquery._Query.task, calendarquery._Query.stamps
+
+    def task(self, *args):
+        held.append(space._lock._is_owned())
+        return real_task(self, *args)
+
+    def stamps(self, *args):
+        held.append(space._lock._is_owned())
+        return real_stamps(self, *args)
+
+    monkeypatch.setattr(calendarquery._Query, "task", task)
+    monkeypatch.setattr(calendarquery._Query, "stamps", stamps)
+    space.calendar("2026-10-20", "2026-10-28")
+    assert held and not any(held)
