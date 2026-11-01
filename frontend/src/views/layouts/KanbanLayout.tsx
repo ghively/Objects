@@ -1,5 +1,6 @@
 // `kanban`: one column per group (the view's grouping, else the first label property). Cards drag
-// between columns and a drop writes the group's value; "+" creates an object in a column.
+// between columns and a drop writes the group's value; "+" creates an object in a column. Each
+// column shows a page of cards (`LOAD_PAGE`) and loads more on its own.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { api, ConflictError } from '@/api/client'
@@ -9,8 +10,10 @@ import { usePeek } from '@/nav/tabs'
 import { LabelPill } from '@/properties/LabelMenu'
 import { cn } from '@/lib/utils'
 import type { LayoutProps } from '../DataView'
-import { groupRows, valueForGroup, type Group } from '../group'
+import { findDef } from '../filter'
+import { canDropRow, groupRows, valueForGroup, type Group } from '../group'
 import { matchingValues } from '../matching'
+import { LOAD_PAGE } from '../model'
 import { propertyChoices } from '../properties'
 import { createRowWrites } from '../rowWrites'
 import { CardItem } from './CardItem'
@@ -47,18 +50,23 @@ function Card({ props, row, hide, groupId }: { props: LayoutProps; row: Row; hid
 
 function Column({
   group,
+  rows,
   droppable,
   props,
   hide,
   title,
   onAdd,
+  onMore,
 }: {
   group: Group
+  /** The cards shown (a page of the group's rows); the header counts them all. */
+  rows: Row[]
   droppable: boolean
   props: LayoutProps
   hide: string[]
   title: React.ReactNode
   onAdd(): void
+  onMore(): void
 }) {
   const drop = useDroppable({ id: `col:${group.id}`, disabled: !droppable })
   return (
@@ -73,9 +81,14 @@ function Column({
         {title}
         <span className="text-fg-muted">{group.rows.length}</span>
       </div>
-      {group.rows.map((r) => (
+      {rows.map((r) => (
         <Card key={r.summary.path} props={props} row={r} hide={hide} groupId={group.id} />
       ))}
+      {group.rows.length > rows.length && (
+        <button type="button" onClick={onMore} className="mx-auto rounded-lg px-3 py-1 text-[14px] text-fg-muted hover:bg-hover">
+          Load more
+        </button>
+      )}
       <button
         type="button"
         aria-label={`Add to ${group.label}`}
@@ -101,16 +114,27 @@ export function KanbanLayout(props: LayoutProps) {
     [],
   )
 
-  const groupBy = useMemo(() => kanbanGroupBy(state.groupBy, props), [state.groupBy, props])
-  const choices = useMemo(() => propertyChoices(viewTypes), [viewTypes])
+  const groupBy = useMemo(() => kanbanGroupBy(state.groupBy, { viewTypes }), [state.groupBy, viewTypes])
   const entry = groupBy?.groups[0]
-  const groupDef = entry ? choices.find((c) => c.key === entry.propertyId)?.def : undefined
+  // The definition the columns follow: the grouping's type's, as `groupRows` resolves it.
+  const groupDef = entry ? findDef(ctx.types, entry.propertyId, entry.structureId, ctx.viewTypeIds) : undefined
   const { groups } = useMemo(
     () => groupRows(flat, groupBy, state.viewDefinition.groupByConfig, ctx),
     [flat, groupBy, state.viewDefinition.groupByConfig, ctx],
   )
   const update = (g: Group) => (groupBy && groupDef ? valueForGroup(groupBy, g, groupDef) : null)
   const hide = entry ? [entry.propertyId] : []
+  // How many cards each column shows (`LOAD_PAGE` until its "Load more").
+  const [shown, setShown] = useState<Record<string, number>>({})
+  const pages = useMemo(
+    () => groups.map((g) => ({ group: g, rows: g.rows.length > (shown[g.id] ?? LOAD_PAGE) ? g.rows.slice(0, shown[g.id] ?? LOAD_PAGE) : g.rows })),
+    [groups, shown],
+  )
+  // The cards on screen want their previews (rows load without them).
+  const { loadPreviews } = props
+  useEffect(() => {
+    loadPreviews(pages.flatMap((p) => p.rows))
+  }, [pages, loadPreviews])
 
   const say = (text: string) => {
     setNotice(text)
@@ -137,6 +161,8 @@ export function KanbanLayout(props: LayoutProps) {
     const row = flat.find((r) => r.summary.path === path)
     const target = groups.find((g) => `col:${g.id}` === e.over?.id)
     if (!row || !target || target.rows.some((r) => r.summary.path === row.summary.path)) return
+    // A row whose type has the key as another kind (text under a label grouping) can't take the value.
+    if (!entry || !groupDef || !canDropRow(row, entry, groupDef, props.types)) return
     const from = groups.find((g) => g.id === data?.groupId) ?? groups.find((g) => g.rows.some((r) => r.summary.path === path))
     const change = groupBy && groupDef ? valueForGroup(groupBy, target, groupDef, { row, from }) : null
     if (!change) return
@@ -174,14 +200,16 @@ export function KanbanLayout(props: LayoutProps) {
     <div data-testid="kanban">
       <DndContext sensors={sensors} onDragEnd={(e) => void onDragEnd(e)}>
         <div className="flex items-start gap-3 overflow-x-auto pb-2">
-          {groups.map((g) => (
+          {pages.map(({ group: g, rows }) => (
             <Column
               key={g.id}
               group={g}
+              rows={rows}
               droppable={update(g) !== null}
               props={props}
               hide={hide}
               onAdd={() => void add(g)}
+              onMore={() => setShown((s) => ({ ...s, [g.id]: (s[g.id] ?? LOAD_PAGE) + LOAD_PAGE }))}
               title={
                 groupDef?.type === 'label' && !g.isOther ? (
                   <LabelPill option={{ text: g.label, color: g.color ?? null, icon: null }} />

@@ -114,6 +114,12 @@ export function progressFraction(v: number | null | undefined, fmt?: NumberForma
  * (`isRadixComma` or the "Decimal separator" setting), `.` groups and `,` is the decimal point
  * (`1.234,5` → 1234.5); otherwise `,` groups.
  */
+/** A typed percent as its fraction, shifted in decimal (14.3 → 0.143, not 14.3 / 100 = 0.14300000000000002). */
+export function fromPercent(n: number): number {
+  const [mantissa, exp] = String(n).split('e')
+  return Number(`${mantissa}e${Number(exp ?? 0) - 2}`)
+}
+
 export function parseNumberInput(s: string, fmt?: NumberFormat | null): number | null | undefined {
   let t = s.replace(/​/g, '').trim()
   if (t === '') return null
@@ -127,10 +133,7 @@ export function parseNumberInput(s: string, fmt?: NumberFormat | null): number |
   if (!/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(t)) return undefined
   const n = Number(t)
   if (!Number.isFinite(n)) return undefined
-  if (!percent || fmt?.type === 'percentage') return n
-  // Shift in decimal (14.3 → 0.143, not 14.3 / 100).
-  const [mantissa, exp] = String(n).split('e')
-  return Number(`${mantissa}e${Number(exp ?? 0) - 2}`)
+  return !percent || fmt?.type === 'percentage' ? n : fromPercent(n)
 }
 
 const formatters = new Map<string, Intl.DateTimeFormat>()

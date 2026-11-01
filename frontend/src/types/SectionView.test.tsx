@@ -46,7 +46,7 @@ describe('SectionView: No backlinks (M5)', () => {
     )
     expect(section.key).toBe('noBacklinks')
     render(<SectionView type={PERSON} section={section} search="" onViewDefinition={() => {}} />)
-    await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['person'] }))
+    await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['person'], preview: false }))
     expect(await screen.findByText('Bob')).toBeInTheDocument()
     expect(screen.getByText('Cy')).toBeInTheDocument()
     expect(screen.queryByText('Ada')).toBeNull()

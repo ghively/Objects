@@ -19,10 +19,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
-import { parseCsv } from '@/lib/csvParse'
+import { parseCsvCells, type CsvCell } from '@/lib/csvParse'
 import { CHANGE_TYPE_TEXT } from '@/object/ChangeTypeDialog'
 import { parseDateInput } from '@/properties/DatePicker'
-import { parseNumberInput } from '@/properties/format'
+import { fromPercent, parseNumberInput } from '@/properties/format'
 
 export const IMPORT_CSV_TEXT = {
   /** `database.options.options.importCsv.text` */
@@ -110,20 +110,29 @@ export function defaultMapping(columns: string[], targets: CsvTarget[]): (string
 }
 
 const TRUE_TEXTS = new Set(['true', 'yes', '1'])
-const splitList = (s: string) =>
-  s
-    .split(',')
+/** The values of a list cell: a quoted cell is one value (Gene); an unquoted one splits on its commas. */
+const splitList = (cell: CsvCell) =>
+  (cell.quoted ? [cell.text] : cell.text.split(','))
     .map((x) => x.trim())
     .filter(Boolean)
 
-/** A cell's text as the API value of `def`, read the way that kind's cell reads typed text; undefined to skip it. */
-export function csvValue(def: PropertyDef, text: string): unknown {
-  const t = text.trim()
+const asCell = (cell: string | CsvCell): CsvCell => (typeof cell === 'string' ? { text: cell, quoted: false } : cell)
+
+/**
+ * A cell's text as the API value of `def`, read the way that kind's cell reads typed text (every
+ * kind trimmed); undefined to skip it. A plain string is an unquoted cell.
+ */
+export function csvValue(def: PropertyDef, cell: string | CsvCell): unknown {
+  const c = asCell(cell)
+  const t = c.text.trim()
   if (!t) return undefined
   switch (def.type) {
     case 'number': {
-      const n = parseNumberInput(t)
-      return typeof n === 'number' ? n : undefined
+      // As the cell reads typed text: a percentage property's cell is in percent, so "25" is 0.25.
+      const fmt = def.options.numberFormat
+      const n = parseNumberInput(t, fmt)
+      if (typeof n !== 'number') return undefined
+      return fmt?.type === 'percentage' ? fromPercent(n) : n
     }
     case 'boolean':
       return TRUE_TEXTS.has(t.toLowerCase())
@@ -133,7 +142,7 @@ export function csvValue(def: PropertyDef, text: string): unknown {
     case 'label': {
       // Only the property's own options (case-insensitive); a single-select takes the first.
       const set = (def.options as { set?: { text: string }[] }).set ?? []
-      const found = splitList(t)
+      const found = splitList(c)
         .map((x) => set.find((o) => o.text.toLowerCase() === x.toLowerCase())?.text)
         .filter((x): x is string => !!x)
       const many = (def.options as { isArray?: boolean }).isArray !== false
@@ -142,32 +151,36 @@ export function csvValue(def: PropertyDef, text: string): unknown {
     }
     case 'entity': {
       const many = (def.options as { isArray?: boolean }).isArray !== false
-      const targets = many ? splitList(t) : [t]
+      const targets = many ? splitList(c) : [t]
       return targets.map((target) => ({ target, path: null }))
     }
     case 'entity_tags':
     case 'entity_aliases':
-      return [...new Set(splitList(t))]
+      return [...new Set(splitList(c))]
     default:
-      return text
+      return t
   }
 }
 
 /** One record as `{title, values}`; when several columns map to one target, the first non-empty value wins. */
-export function csvRecord(record: string[], mapping: (string | null)[], targets: CsvTarget[]): { title: string; values: Record<string, unknown> } {
+export function csvRecord(
+  record: (string | CsvCell)[],
+  mapping: (string | null)[],
+  targets: CsvTarget[],
+): { title: string; values: Record<string, unknown> } {
   let title: string | undefined
   const values: Record<string, unknown> = {}
   mapping.forEach((key, i) => {
     if (!key) return
-    const text = record[i] ?? ''
+    const cell = asCell(record[i] ?? '')
     if (key === TITLE_TARGET) {
-      if (title === undefined && text.trim()) title = text.trim()
+      if (title === undefined && cell.text.trim()) title = cell.text.trim()
       return
     }
     if (key in values) return
     const def = targets.find((t) => t.key === key)?.def
     if (!def) return
-    const v = csvValue(def, text)
+    const v = csvValue(def, cell)
     if (v !== undefined) values[key] = v
   })
   return { title: title ?? '', values }
@@ -175,7 +188,7 @@ export function csvRecord(record: string[], mapping: (string | null)[], targets:
 
 interface Parsed {
   name: string
-  rows: string[][]
+  rows: CsvCell[][]
   error: boolean
 }
 
@@ -192,10 +205,10 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
   const columns = useMemo(() => {
     if (!file) return []
     const head = header ? file.rows[0] ?? [] : []
-    return Array.from({ length: width }, (_, i) => head[i]?.trim() || IMPORT_CSV_TEXT.column(i + 1))
+    return Array.from({ length: width }, (_, i) => head[i]?.text.trim() || IMPORT_CSV_TEXT.column(i + 1))
   }, [file, header, width])
   // A record whose fields are all empty (a blank line) is skipped, not imported as "Untitled".
-  const data = file ? (header ? file.rows.slice(1) : file.rows).filter((r) => r.some((f) => f.trim() !== '')) : []
+  const data = file ? (header ? file.rows.slice(1) : file.rows).filter((r) => r.some((f) => f.text.trim() !== '')) : []
   const tooMany = data.length > CSV_ROW_LIMIT
   const collectionName = file ? file.name.replace(/\.csv$/i, '') || 'Import' : ''
 
@@ -211,19 +224,19 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
   const read = async (f: File | undefined) => {
     if (!f) return
     setError(null)
-    const parsed = parseCsv(await f.text())
+    const parsed = parseCsvCells(await f.text())
     const next = { name: f.name, rows: parsed.rows, error: parsed.error }
     setFile(next)
     const head = header ? next.rows[0] ?? [] : []
     const w = Math.max(0, ...next.rows.map((r) => r.length))
-    setMapping(defaultMapping(Array.from({ length: w }, (_, i) => head[i]?.trim() ?? ''), targets))
+    setMapping(defaultMapping(Array.from({ length: w }, (_, i) => head[i]?.text.trim() ?? ''), targets))
   }
 
   const toggleHeader = (on: boolean) => {
     setHeader(on)
     if (!file) return
     const head = on ? file.rows[0] ?? [] : []
-    setMapping(defaultMapping(Array.from({ length: width }, (_, i) => head[i]?.trim() ?? ''), targets))
+    setMapping(defaultMapping(Array.from({ length: width }, (_, i) => head[i]?.text.trim() ?? ''), targets))
   }
 
   const run = async () => {
