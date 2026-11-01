@@ -202,6 +202,11 @@ describe('DatePicker: the Time zone setting', () => {
     fireEvent.change(time, { target: { value: '10:30' } })
     expect(onChange.mock.calls.at(-1)![0].start).toBe(new Date(new Date(nine).getTime() + 90 * 60000).toISOString())
   })
+
+  it('the time input follows the theme, not a forced dark colour scheme (audit 2026-11-01)', () => {
+    render(<DatePicker value={{ start: nine, resolution: 'time' }} onChange={() => {}} now={AT} />)
+    expect(screen.getByLabelText('Start time').className).not.toMatch(/color-scheme/)
+  })
 })
 
 // M4 Task 9: the Task date picker (schedule suggestions, Repeat, Reminder).
