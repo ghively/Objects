@@ -151,6 +151,27 @@ class SearchIndex:
         self._thread: threading.Thread | None = None
         self._unsubscribe = None
         self._fallback_logged = False
+        self._pending: dict[str, int] = {}
+        """Path -> change count, for the objects whose change the thread has not applied yet
+        (see `pending_paths`); the count tells an apply step whether a newer change arrived."""
+        self._pending_lock = threading.Lock()
+
+    def pending_paths(self) -> set[str]:
+        """The paths changed since the index last applied them (the debounce window).
+
+        A reader that pre-filters by the index (`references.unlinked_mentions`) scans
+        these too, so a fresh edit is never missed; cheaper than comparing every
+        object's version against the stored one (audit 2026-11-01 B6).
+        """
+        with self._pending_lock:
+            return set(self._pending)
+
+    def _settle_pending(self, seen: dict[str, int]) -> None:
+        """Forget the pending paths whose change count is still what `seen` recorded."""
+        with self._pending_lock:
+            for path, count in seen.items():
+                if self._pending.get(path) == count:
+                    del self._pending[path]
 
     # -- lifecycle -----------------------------------------------------------------
 
@@ -188,6 +209,9 @@ class SearchIndex:
 
     def _on_change(self, change: SpaceChange) -> None:
         # A listener only enqueues (it may run under the space lock).
+        if change.kind == "object" and change.path:
+            with self._pending_lock:
+                self._pending[change.path] = self._pending.get(change.path, 0) + 1
         self._queue.put((change.kind, change.path))
 
     def reindex(self) -> None:
@@ -522,6 +546,8 @@ class SearchIndex:
         stored = self._stored()
         stored_types = stored.pop(_TYPES_KEY, None)
         fingerprint = self._types_fingerprint()
+        with self._pending_lock:
+            was_pending = dict(self._pending)  # changes the snapshot below includes
         current = self._snapshot()
         gone = [p for p in stored if p not in current]
         changed = [
@@ -537,6 +563,7 @@ class SearchIndex:
         self._index(sorted(changed))
         if stored_types != fingerprint:
             self._write(lambda conn: self._put_types_key(conn, fingerprint))
+        self._settle_pending(was_pending)
 
     @staticmethod
     def _put_types_key(conn: sqlite3.Connection, fingerprint: str) -> None:
@@ -570,6 +597,8 @@ class SearchIndex:
             self._write(apply)
 
     def _update_paths(self, paths: list[str]) -> None:
+        with self._pending_lock:
+            seen = {p: self._pending[p] for p in paths if p in self._pending}
         stored = self._stored()
         todo = []
         for p in paths:
@@ -583,6 +612,7 @@ class SearchIndex:
                 todo.append(p)
         if todo:
             self._index(todo)
+        self._settle_pending(seen)
 
     def _sync_types(self) -> None:
         """A type changed: re-index the ``props`` of objects whose text differs."""
