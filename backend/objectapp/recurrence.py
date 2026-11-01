@@ -19,8 +19,8 @@ reads it from `ui.json`).
 from __future__ import annotations
 
 import calendar
+import math
 from datetime import date, datetime, timedelta, tzinfo
-
 from pathlib import Path
 
 from .localtime import from_local, to_local
@@ -245,7 +245,72 @@ def _jump_to_before(
         if last <= cur_day:
             return current
         return _on_day(current, last, tz)
+    found: date | None = None
+    if rule.every >= 1 and rule.on is not None:
+        found = _anchored_jump(rule, cur_day, target, week_start)
+    elif rule.every >= 1 and rule.unit in ("month", "year"):
+        found = _clamped_jump(rule, cur_day, target)
+    if found is not None and cur_day < found < target:
+        return _on_day(current, found, tz)
     return current
+
+
+def _anchored_jump(rule: RepeatRule, cur_day: date, target: date, week_start: WeekStart) -> date | None:
+    """The last date of an anchored rule's series from `cur_day` before `target`, or None.
+
+    The series is every matching date after `cur_day` in the periods ``k * every``
+    from `cur_day`'s (each step counts from a date in such a period), so the periods
+    are searched back from the one `target` falls in. None when none of the last
+    `_MAX_PERIODS` periods matches: the caller steps (and fails) as before.
+    """
+    if rule.unit == "week":
+        units = (_week_anchor(target, week_start) - _week_anchor(cur_day, week_start)).days // 7
+    elif rule.unit == "month":
+        units = (target.year * 12 + target.month) - (cur_day.year * 12 + cur_day.month)
+    elif rule.unit == "year":
+        units = target.year - cur_day.year
+    else:
+        return None
+    top = units // rule.every
+    for k in range(top, max(top - _MAX_PERIODS, -1), -1):
+        for cand in reversed(_period(rule, cur_day, k, week_start)):
+            if cand < target:
+                return cand if cand > cur_day else None
+    return None
+
+
+def _clamped_jump(rule: RepeatRule, cur_day: date, target: date) -> date | None:
+    """A date of a plain month/year rule's series from `cur_day`, in a month before `target`'s.
+
+    Each step clamps to the new month's last day from the previous result, so the
+    day after ``k`` steps is the smallest of `cur_day`'s day and every visited
+    month's length (`_clamped_day`).
+    """
+    n = rule.every * (12 if rule.unit == "year" else 1)
+    base = cur_day.year * 12 + cur_day.month - 1
+    k = (target.year * 12 + target.month - 1 - base) // n - 1
+    if k <= 0:
+        return None
+    year, month = divmod(base + k * n, 12)
+    day = _clamped_day(cur_day, n, k) if cur_day.day > 28 else cur_day.day
+    return date(year, month + 1, day)
+
+
+def _clamped_day(start: date, n: int, k: int) -> int:
+    """The day of month after `k` steps of `n` months from `start`, each clamped."""
+    day = start.day
+    base = start.year * 12 + start.month - 1
+    cycle = 12 // math.gcd(n, 12)  # steps until the month of the year comes round again
+    for j in range(1, min(k, cycle) + 1):
+        year, month = divmod(base + j * n, 12)
+        if month + 1 != 2:
+            day = min(day, calendar.monthrange(year, month + 1)[1])  # the same every year
+            continue
+        # February: 29 days in leap years only, so walk its visits to the first common year.
+        while j <= k and day > 28:
+            day = min(day, 29 if calendar.isleap((base + j * n) // 12) else 28)
+            j += cycle
+    return day
 
 
 def next_date(
