@@ -123,9 +123,21 @@ class FrontmatterCache:
             data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
             try:
                 self.path.parent.mkdir(parents=True, exist_ok=True)
+                self._ignore_in_git()
                 atomic_write(self.path, data)
             except OSError:
                 self._unwritable = True  # a read-only location: parse as if there were no cache
+
+    def _ignore_in_git(self) -> None:
+        """A cache folder inside the space carries ``.gitignore`` ``*`` (as the search index's
+        does), written by whichever of the two creates the folder first, so a ``git add -A``
+        between the first open and the index's start never tracks the cache."""
+        folder = self.path.parent
+        if folder.parent != self.root:
+            return  # outside the space (OBJECT_CACHE_DIR): nothing to hide from git
+        ignore = folder / ".gitignore"
+        if not ignore.exists():
+            atomic_write(ignore, b"*\n")
 
     def _arm_timer(self) -> None:
         """Start the delayed flush unless one is pending; called with the lock held.
