@@ -4,9 +4,13 @@
 // state is fetched and the same edit is re-applied to it once (never a blind overwrite).
 import { api, ConflictError } from '@/api/client'
 import type { CalendarUi, UiState } from '@/api/types'
-import { enqueueUiSave, pendingUiSaves, useUiStore } from '@/shell/usePinned'
+import { showToast } from '@/editor/media/upload'
+import { enqueueUiSave, pendingUiSaves, reloadUi, useUiStore } from '@/shell/usePinned'
 
 export type CalendarDaily = CalendarUi['daily']
+
+/** The toast after a `ui.json` save of the calendar settings failed (Object's "Could not save …" form). */
+export const CALENDAR_SAVE_FAILED = 'Could not save the calendar settings'
 
 const EMPTY_DAILY: CalendarDaily = {}
 
@@ -44,15 +48,23 @@ async function save(edit: CalendarEdit): Promise<void> {
   }
 }
 
-/** Apply `edit` to `ui.calendar` now and save it after the edits before it. */
-function enqueue(edit: CalendarEdit): Promise<void> {
+/** Apply `edit` to `ui.calendar` now and save it after the edits before it; a failure says so and reloads. */
+async function enqueue(edit: CalendarEdit): Promise<void> {
   const cur = useUiStore.getState().ui
   useUiStore.setState({ ui: { ...cur, calendar: edit(calendarOf(cur)) } })
-  return enqueueUiSave(() =>
-    save(edit).catch((e: unknown) => {
-      console.warn('Could not save the calendar settings:', e)
-    }),
+  const saved = await enqueueUiSave(() =>
+    save(edit).then(
+      () => true,
+      (e: unknown) => {
+        console.warn('Could not save the calendar settings:', e)
+        return false
+      },
+    ),
   )
+  if (!saved) {
+    showToast(CALENDAR_SAVE_FAILED)
+    await reloadUi()
+  }
 }
 
 /** Merge `patch` into `ui.calendar.daily` now and save it after the edits before it. */
