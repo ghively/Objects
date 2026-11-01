@@ -114,12 +114,12 @@ describe('KanbanLayout', () => {
   })
 
   test('a second drop of the same card sends the first write version (audit #14)', async () => {
-    mocked.rows.mockResolvedValueOnce([]).mockResolvedValueOnce([])
     render(<Harness patchRow={vi.fn()} />)
     const [notStarted, done] = columns().map((c) => c.getAttribute('data-group'))
+    const reloads = () => mocked.rows.mock.calls.filter(([scope]) => !scope?.preview).length
     dragEnd?.({ active: { id: 'Tasks/T1.md' }, over: { id: `col:${done}` } })
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(1))
-    await waitFor(() => expect(mocked.rows).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(reloads()).toBe(1))
     // The rows never caught up (no patch landed): the card is still in its old column.
     dragEnd?.({ active: { id: 'Tasks/T1.md' }, over: { id: `col:${done}` } })
     expect(notStarted).toBeTruthy()
@@ -133,14 +133,15 @@ describe('KanbanLayout', () => {
     const res: UpdateResult = { version: 'v8', frontmatter: {}, links: {}, synced: [], skipped: [], task: { completed: true, advanced: false } }
     const fresh = mk(1, ['Done'], 'v8')
     mocked.updateProperties.mockResolvedValueOnce(res)
-    mocked.rows.mockResolvedValueOnce([fresh])
+    // The cards' preview fetch answers nothing; the drop's reload answers the fresh row.
+    mocked.rows.mockImplementation(async (scope) => (scope?.preview ? [] : [fresh]))
     render(<Harness patchRow={patch} onWritten={onWritten} />)
     const done = columns()[1].getAttribute('data-group')
     dragEnd?.({ active: { id: 'Tasks/T1.md' }, over: { id: `col:${done}` } })
     await waitFor(() => expect(onWritten).toHaveBeenCalledTimes(1))
     expect(mocked.updateProperties).toHaveBeenCalledTimes(1)
     expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/T1.md', { status: ['Done'] }, 'v7')
-    expect(mocked.rows).toHaveBeenCalledTimes(1)
+    expect(mocked.rows.mock.calls.filter(([scope]) => !scope?.preview)).toHaveLength(1)
     expect(mocked.rows).toHaveBeenCalledWith({ paths: ['Tasks/T1.md'] })
     expect(patch).toHaveBeenCalledWith('Tasks/T1.md', fresh)
     expect(onWritten.mock.calls[0][0].summary.path).toBe('Tasks/T1.md')
@@ -191,6 +192,19 @@ describe('KanbanLayout', () => {
     expect(within(done).getAllByTestId('kanban-card')).toHaveLength(100)
     // The board pages per column: no view-wide "Load more".
     expect(screen.getAllByRole('button', { name: 'Load more' })).toHaveLength(1)
+  })
+
+  test('the board fetches previews for the cards on screen, and the next page on its "Load more" (audit 2026-11-01 P2)', async () => {
+    const user = userEvent.setup()
+    const many = Array.from({ length: 70 }, (_, i) => mk(100 + i, ['Done']))
+    const previews = () => mocked.rows.mock.calls.filter(([scope]) => scope?.preview).map(([scope]) => scope?.paths ?? [])
+    render(<DataView rows={many} types={[TASK]} scope={{ typeIds: ['task'] }} state={kanban()} onState={vi.fn()} layouts={['kanban']} patchRow={vi.fn()} />)
+    await waitFor(() => expect(previews()).toHaveLength(1))
+    expect(previews()[0]).toHaveLength(50)
+    expect(previews()[0][0]).toBe('Tasks/T100.md')
+    await user.click(screen.getByRole('button', { name: 'Load more' }))
+    await waitFor(() => expect(previews()).toHaveLength(2))
+    expect(previews()[1]).toEqual(many.slice(50).map((r) => r.summary.path))
   })
 
   test('test kanban drop on createdAt grouping disabled', () => {
