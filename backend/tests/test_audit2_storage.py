@@ -381,6 +381,20 @@ def test_history_index_write_is_checked_against_a_concurrent_writer(tmp_path: Pa
     assert raced and "other" in ids and vid in ids and len(ids) == 3
 
 
+def test_frontmatter_cache_flushes_a_lone_surrogate_value(space_dir: Path):
+    """Found with the surrogate title above: the cache's flush raised and dropped the cache."""
+    from objectapp import fmcache
+
+    _write(space_dir / "Pages/Odd.md", '---\ntitle: "Odd \\uDC80"\n---\n')
+    space = Space(space_dir)  # the opening scan flushes the cache
+    assert space.get("Pages/Odd.md").title == "Odd \udc80"
+    cache = fmcache.for_root(space_dir)
+    assert cache.path.is_file()
+    cache._entries = None  # read it back from the file
+    src = "title: \"Odd \\uDC80\"\n"
+    assert cache.get("Pages/Odd.md", src) == {"title": "Odd \udc80"}
+
+
 # -- 12: `_rel`'s component cap counts what the file system counts ---------------------
 
 
