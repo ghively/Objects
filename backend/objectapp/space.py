@@ -79,7 +79,7 @@ from .propvalues import (
     encode_updates,
     encode_value,
 )
-from .spaceconfig import space_fields
+from .spaceconfig import SPACE_REL, space_fields
 from .recurrence import week_start_of
 from .taskhook import TaskResult, on_status_change
 from .linkindex import LinkIndex
@@ -772,11 +772,28 @@ class Space:
 
     @property
     def name(self) -> str:
-        """``.capacities/space.json``'s ``name``, else the folder name (re-read on every access)."""
-        return space_fields(self.root)["name"]
+        """``.capacities/space.json``'s ``name``, else the folder name.
+
+        Re-read only when the file's stat (times, size, inode) changed since the last
+        access, so an edit made outside the app is still seen at once.
+        """
+        try:
+            st = os.stat(self._space_json)
+            key: tuple | None = (st.st_mtime_ns, st.st_ctime_ns, st.st_size, st.st_ino)
+        except OSError:
+            key = None
+        cached = self._name_cache
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        name = space_fields(self.root)["name"]
+        self._name_cache = (key, name)
+        return name
 
     def __init__(self, root: Path) -> None:
         self.root = Path(root).resolve()
+        self._space_json = os.fspath(self.root / SPACE_REL)
+        self._name_cache: tuple[tuple | None, str] | None = None
+        """(`space.json`'s stat key, the name read with it) for `name`."""
         self._lock = threading.RLock()
         self._raw: dict[str, RawObject] = {}
         self._summaries: dict[str, ObjectSummary] = {}

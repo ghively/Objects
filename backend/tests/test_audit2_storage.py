@@ -239,3 +239,29 @@ def test_media_export_sweeps_stale_files_and_cleans_up_on_failure(
     with pytest.raises(OSError):
         export.export_object_to_file(space, ADA, True)
     assert sorted(p.name for p in folder.iterdir()) == ["export-new.zip"]
+
+
+# -- 6: `Space.name` is read once per change of space.json ----------------------------
+
+
+def test_space_name_is_cached_until_space_json_changes(space_dir: Path, monkeypatch):
+    from objectapp import spaceconfig
+
+    space = Space(space_dir)
+    assert space.name == space_dir.name
+    reads = []
+    real = spaceconfig.read
+    monkeypatch.setattr(spaceconfig, "read", lambda root: reads.append(1) or real(root))
+    for _ in range(20):
+        assert space.name == space_dir.name
+    assert reads == []
+    cfg = space_dir / ".capacities" / "space.json"
+    cfg.parent.mkdir(exist_ok=True)
+    cfg.write_text('{"name": "Work"}', encoding="utf-8")
+    assert space.name == "Work"
+    assert space.name == "Work"
+    assert len(reads) == 1
+    cfg.write_text('{"name": "Home"}', encoding="utf-8")  # same size, edited in place
+    assert space.name == "Home"
+    cfg.unlink()
+    assert space.name == space_dir.name
