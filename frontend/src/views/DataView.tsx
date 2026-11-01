@@ -138,11 +138,15 @@ export interface DataViewProps {
   onWritten?(row: Row, result: UpdateResult): void
 }
 
-/** Whether a dialog, menu or popover is open or holds `target` (its Escape is its own). */
+/**
+ * Whether a dialog, menu or popover is open or holds `target` (its Escape is its own). A tooltip
+ * (a popper too) is not one: Escape goes on to the view.
+ */
 function overlayOpen(target: EventTarget | null): boolean {
   const OVERLAY = '[role="dialog"], [role="alertdialog"], [role="menu"], [data-radix-popper-content-wrapper]'
   if (target instanceof Element && target.closest(`${OVERLAY}, [role="listbox"]`)) return true
-  return document.querySelector(OVERLAY) !== null
+  const tooltip = (el: Element) => el.matches('[data-radix-popper-content-wrapper]') && el.querySelector('[role="tooltip"]') !== null
+  return [...document.querySelectorAll(OVERLAY)].some((el) => !tooltip(el))
 }
 
 /** Our string: a bulk delete where some rows failed (they stay selected). */
