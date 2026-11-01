@@ -81,6 +81,14 @@ class SpaceEntry:
 _MAX_COMPONENT_BYTES = 255
 
 
+def _component_too_long(part: str) -> bool:
+    """Whether one path component is longer than the file system takes: UTF-16 code
+    units on Windows (NTFS), bytes elsewhere (a name that wasn't UTF-8 keeps its bytes)."""
+    if os.name == "nt":
+        return len(part.encode("utf-16-le", errors="surrogatepass")) // 2 > _MAX_COMPONENT_BYTES
+    return len(part.encode("utf-8", errors="surrogateescape")) > _MAX_COMPONENT_BYTES
+
+
 def normalize(path: Path | str) -> Path:
     """The absolute, resolved form of `path` (``~`` expanded) the registry stores.
 
@@ -92,7 +100,7 @@ def normalize(path: Path | str) -> Path:
     text = os.path.expanduser(str(path))
     if "\x00" in text:
         raise ValueError(f"embedded null character in path: {text!r}")
-    if any(len(part.encode("utf-8")) > _MAX_COMPONENT_BYTES for part in text.replace("\\", "/").split("/")):
+    if any(_component_too_long(part) for part in text.replace("\\", "/").split("/")):
         raise ValueError(f"path component too long: {text[:60]!r}")
     return Path(text).resolve()
 
