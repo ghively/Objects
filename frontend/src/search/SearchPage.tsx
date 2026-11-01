@@ -13,7 +13,7 @@ import { api } from '@/api/client'
 import type { Layout, QueryDefinition, Row, SearchResponse, SearchResult, ViewState } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { Switch } from '@/components/ui/switch'
-import { ensureLinkIndex, typeOf, useLinkIndex } from '@/links/linkIndex'
+import { ensureLinkIndex, typeOf, typesByIdOf, useLinkIndex } from '@/links/linkIndex'
 import { useTabs } from '@/nav/tabs'
 import { isTagType } from '@/object/ObjectHeader'
 import { Highlight } from '@/palette/Highlight'
@@ -163,14 +163,15 @@ export function SearchPage({ q: initialQ = '', textOnly: initialTextOnly = false
   }
 
   const tagNames = useMemo(() => {
+    const byId = typesByIdOf(types)
     const names = new Map<string, string>()
     for (const o of objects) {
       if (o.template) continue
-      if (isTagType(typeOf(o.type), o.type) && o.title) names.set(o.title.toLowerCase(), o.title)
+      if (isTagType(o.type ? byId.get(o.type) : undefined, o.type) && o.title) names.set(o.title.toLowerCase(), o.title)
       for (const t of o.tags) if (!names.has(t.toLowerCase())) names.set(t.toLowerCase(), t)
     }
     return [...names.values()]
-  }, [objects])
+  }, [objects, types])
 
   const tagIdOf = (name: string): string | null => {
     const n = name.toLowerCase()

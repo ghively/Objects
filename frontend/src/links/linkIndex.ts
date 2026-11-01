@@ -159,9 +159,23 @@ export function summaryOf(path: string): ObjectSummary | undefined {
   return byPathOf(useLinkIndex.getState().objects).get(path)
 }
 
+/** Per `types` array, the types by id: `typeOf` runs per object in lists (5,000 × 50 scans). */
+const typeMaps = new WeakMap<TypeDef[], Map<string, TypeDef>>()
+
+/** `types` by id, the same Map for the same array. */
+export function typesByIdOf(types: TypeDef[]): ReadonlyMap<string, TypeDef> {
+  let m = typeMaps.get(types)
+  if (!m) {
+    m = new Map()
+    for (const t of types) if (!m.has(t.id)) m.set(t.id, t)
+    typeMaps.set(types, m)
+  }
+  return m
+}
+
 export function typeOf(typeId: string | undefined | null): TypeDef | undefined {
   if (!typeId) return undefined
-  return useLinkIndex.getState().types.find((t) => t.id === typeId)
+  return typesByIdOf(useLinkIndex.getState().types).get(typeId)
 }
 
 /** A display title for a path when its summary isn't loaded: the file stem. */
