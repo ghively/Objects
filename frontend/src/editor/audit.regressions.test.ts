@@ -409,6 +409,28 @@ describe('plain text that looks like Markdown', () => {
     },
   )
 
+  test.each([
+    ['    four spaces', '&nbsp;   four spaces'],
+    ['\tTabbed', '&nbsp;Tabbed'],
+    ['  \t mixed', '&nbsp; \t mixed'],
+  ])('a paragraph starting with %j stays a paragraph (audit 2026-11-01 #7)', (text, saved) => {
+    const editor = headless('P\n')
+    setParagraph(editor, text)
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved + '\n')
+    expect(out.reloaded).toEqual([['paragraph', String.fromCharCode(0xa0) + text.slice(1)]])
+    // Reloaded and edited again, the line keeps that form.
+    const again = headless(out.saved)
+    append(again, 'e', 'Z')
+    expect(serializeBody(again)).toBe(saved + 'Z\n')
+  })
+
+  test('a later line of a paragraph may be indented', () => {
+    const editor = headless('P\n')
+    setParagraph(editor, 'a\n    b')
+    expect(serializeBody(editor)).toBe('a  \n    b\n')
+  })
+
   test('typing into a paragraph that starts with an escape keeps it', () => {
     const editor = headless('\\# not a heading\n\nP\n')
     append(editor, 'heading', '!')
