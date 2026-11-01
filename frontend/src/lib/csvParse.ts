@@ -90,3 +90,40 @@ export function parseCsvCells(text: string): CsvCellsResult {
   if (field !== '' || row.length > 0 || wasQuoted) endRow()
   return { rows, error }
 }
+
+/** A number written with `.` as the decimal point (`,` grouping thousands in threes). */
+const DOT_NUMBER = /^[-+]?(\d{1,3}(,\d{3})+|\d*)(\.\d*)?(e[-+]?\d+)?$/i
+/** A number written with `,` as the decimal point (`.` grouping thousands in threes). */
+const COMMA_NUMBER = /^[-+]?(\d{1,3}(\.\d{3})+|\d*)(,\d*)?(e[-+]?\d+)?$/i
+
+/**
+ * The decimal separator a column's numbers are written with: `true` for the comma, `false` for
+ * the point, `undefined` when the cells can't tell (no numbers, or every one reads either way, as
+ * `1.234` or `12`); the decimal-separator setting decides then. A column is the comma's when
+ * every numeric cell reads with the comma as the decimal point and at least one doesn't with the
+ * point (`1,5`), and the other way round. A trailing `%` and spaces are ignored; cells that read
+ * neither way aren't numbers and don't count.
+ */
+export function columnDecimalComma(cells: readonly string[]): boolean | undefined {
+  let comma = true
+  let dot = true
+  let onlyComma = false
+  let onlyDot = false
+  let numbers = 0
+  for (const cell of cells) {
+    const t = cell.replace(/\s+/g, '').replace(/%$/, '')
+    if (!/\d/.test(t)) continue
+    const c = COMMA_NUMBER.test(t)
+    const d = DOT_NUMBER.test(t)
+    if (!c && !d) continue
+    numbers++
+    comma &&= c
+    dot &&= d
+    onlyComma ||= c && !d
+    onlyDot ||= d && !c
+  }
+  if (!numbers) return undefined
+  if (comma && onlyComma) return true
+  if (dot && onlyDot) return false
+  return undefined
+}

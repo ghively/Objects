@@ -1,7 +1,7 @@
 // M9 Task 19: the CSV reader for Import CSV (RFC 4180; the inverse of `toCsv`).
 import { describe, expect, test } from 'vitest'
 import { toCsv } from '@/editor/table/csv'
-import { parseCsv, parseCsvCells } from './csvParse'
+import { columnDecimalComma, parseCsv, parseCsvCells } from './csvParse'
 
 describe('parseCsv', () => {
   test('test parse quotes newlines bom', () => {
@@ -60,5 +60,19 @@ describe('parseCsv', () => {
       ],
       error: false,
     })
+  })
+})
+
+describe('columnDecimalComma', () => {
+  test('a column whose numbers only read with the comma as the decimal point is the comma\'s', () => {
+    expect(columnDecimalComma(['1,5', '2', '', 'n/a', '1.234,25', '12,5 %'])).toBe(true)
+  })
+  test('one only the point reads is the point\'s', () => {
+    expect(columnDecimalComma(['1.5', '1,234.5', '7'])).toBe(false)
+  })
+  test('cells that read either way, mixed ones and no numbers decide nothing', () => {
+    expect(columnDecimalComma(['1.234', '12', '1,500'])).toBeUndefined()
+    expect(columnDecimalComma(['1,5', '2.5'])).toBeUndefined()
+    expect(columnDecimalComma(['', 'abc'])).toBeUndefined()
   })
 })
