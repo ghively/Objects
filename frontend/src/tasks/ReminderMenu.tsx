@@ -73,6 +73,15 @@ export function ReminderMenu({ value, resolution, onChange, hint }: ReminderMenu
   const [notice, setNotice] = useState(false)
   const rule = parseRemind(value, resolution)
   const [time, setTime] = useState(rule?.timeOfDay ?? DEFAULT_REMINDER_TIME)
+  // The saved time can change from elsewhere (another window, an undo): follow it, except while
+  // the field has focus, where it waits for the blur.
+  const propTime = rule?.timeOfDay
+  const [synced, setSynced] = useState(propTime)
+  const [editing, setEditing] = useState(false)
+  if (propTime !== synced && !editing) {
+    setSynced(propTime)
+    if (propTime) setTime(propTime)
+  }
   const current = rule ? labelOf(rule, resolution) : value && value.trim() ? value : 'No reminder'
 
   const pick = (next: ReminderRule | null) => {
@@ -139,6 +148,8 @@ export function ReminderMenu({ value, resolution, onChange, hint }: ReminderMenu
               type="time"
               value={time}
               onChange={(e) => setTimeOfDay(e.target.value)}
+              onFocus={() => setEditing(true)}
+              onBlur={() => setEditing(false)}
               className="h-7 w-28 rounded-md border border-line bg-raised px-2 text-[13px] text-fg outline-none"
             />
           </div>
