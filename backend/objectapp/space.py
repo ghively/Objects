@@ -317,8 +317,9 @@ def unique_path(root: Path, folder: str, stem: str, same_as: str | None = None) 
     folder = folder.strip("/")
     base = Path(root) / folder if folder else Path(root)
     try:
-        taken = {p.name.lower() for p in base.iterdir()} if base.is_dir() else set()
-    except OSError:
+        # Names only (no Path per entry): a restore of a type calls this once per object.
+        taken = {name.lower() for name in os.listdir(base)}
+    except OSError:  # no such folder (yet), or unreadable
         taken = set()
     own = None
     if same_as:
