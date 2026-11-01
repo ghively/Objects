@@ -169,17 +169,16 @@ class HistoryStore:
             return None
         return object_id if _SAFE_KEY_RE.match(object_id) else "id-" + _sha1(object_id)[:16]
 
-    def _key_of(self, md_rel: str, md_data: bytes | None) -> str:
-        return self._id_key(_str(_fm_of(md_data).get("id"))) or self._path_key(md_rel)
+    def _keys_for(self, md_rel: str, object_id: str | None = None) -> list[str]:
+        """The keys whose versions belong to the object at ``md_rel`` now (id key, path key).
 
-    def _keys_for(self, md_rel: str) -> list[str]:
-        """The keys whose versions belong to the object at ``md_rel`` now (id key, path key)."""
-        keys = []
-        id_key = self._id_key(_str(_fm_of(_read(self.root / md_rel)).get("id")))
-        if id_key:
-            keys.append(id_key)
-        keys.append(self._path_key(md_rel))
-        return keys
+        ``object_id`` is the file's frontmatter ``id`` when the caller has it; otherwise the
+        file is read and parsed for it.
+        """
+        if object_id is None:
+            object_id = _str(_fm_of(_read(self.root / md_rel)).get("id"))
+        id_key = self._id_key(object_id)
+        return [id_key, self._path_key(md_rel)] if id_key else [self._path_key(md_rel)]
 
     def _load_index(self, key: str) -> list[dict[str, Any]]:
         data = _read(self.dir / key / _INDEX)
@@ -191,10 +190,15 @@ class HistoryStore:
             return []
         return [e for e in items if isinstance(e, dict) and isinstance(e.get("id"), str)] if isinstance(items, list) else []
 
-    def _entries(self, md_rel: str) -> list[tuple[str, dict[str, Any]]]:
-        """(key, entry) of every version of the object, oldest first."""
+    def _entries(
+        self, md_rel: str, keys: list[str] | None = None
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """(key, entry) of every version of the object, oldest first.
+
+        ``keys`` are the object's keys when the caller computed them already (`_keys_for`).
+        """
         out: list[tuple[int, int, str, dict[str, Any]]] = []
-        for rank, key in enumerate(reversed(self._keys_for(md_rel))):
+        for rank, key in enumerate(reversed(keys or self._keys_for(md_rel))):
             for pos, entry in enumerate(self._load_index(key)):
                 out.append((rank, pos, key, entry))
         # Oldest first by instant; within one instant, the index order (path key first).
@@ -217,16 +221,30 @@ class HistoryStore:
 
     # -- writing --------------------------------------------------------------
 
-    def snapshot(self, rel: str, data: bytes, now: datetime, force: bool = False) -> str | None:
+    def snapshot(
+        self,
+        rel: str,
+        data: bytes,
+        now: datetime,
+        force: bool = False,
+        object_id: str | None = None,
+    ) -> str | None:
         """Keep ``data`` (``rel``'s bytes before an app write) as a version; return its id.
 
         Nothing is kept (None) when the object's newest version is less than 5 minutes old,
-        unless ``force`` (a restore keeps the current state always).
+        unless ``force`` (a restore keeps the current state always). ``object_id`` is the
+        file's frontmatter ``id`` when the caller has parsed it already (spares the parse).
         """
         rel = PurePosixPath(rel).as_posix()
         md_rel = _md_of(rel)
         with self._lock:
-            entries = self._entries(md_rel)
+            # `data` is the .md as it stands on disk (the bytes before the write), so the
+            # object's id comes from it: one parse, no second read of the file.
+            md_data = data if rel == md_rel else _read(self.root / md_rel)
+            if object_id is None:
+                object_id = _str(_fm_of(md_data).get("id"))
+            keys = self._keys_for(md_rel, object_id or "")
+            entries = self._entries(md_rel, keys)
             if entries and not force:
                 newest = _parse_iso(entries[-1][1].get("at", ""))
                 if newest is not None and now - newest < VERSION_GAP:
@@ -236,13 +254,15 @@ class HistoryStore:
             if kind == "whiteboard":
                 stem = _stem(md_rel)
                 for path, ext in ((md_rel, ".md"), (stem + BOARD_SUFFIX, BOARD_SUFFIX), (stem + INK_SUFFIX, INK_SUFFIX)):
-                    content = data if path == rel else _read(self.root / path)
+                    if path == md_rel:
+                        content = md_data
+                    else:
+                        content = data if path == rel else _read(self.root / path)
                     if content is not None:
                         files[ext] = content
             else:
                 files[".md"] = data
-            md_data = files.get(".md") if ".md" in files else _read(self.root / md_rel)
-            key = self._key_of(md_rel, md_data)
+            key = keys[0]
             folder = self.dir / key
             folder.mkdir(parents=True, exist_ok=True)
             base = now.astimezone(UTC).strftime("%Y%m%dT%H%M%S") + f"{now.microsecond // 1000:03d}Z"
@@ -258,11 +278,14 @@ class HistoryStore:
             index = self._load_index(key)
             index.append({"id": vid, "at": _iso(now), "rel": md_rel, "kind": kind, "files": names})
             atomic_write(folder / _INDEX, dump_json(index))
-            self._prune(md_rel)
+            self._prune(md_rel, keys, len(entries) + 1)
             return vid
 
-    def _prune(self, md_rel: str) -> None:
-        entries = self._entries(md_rel)
+    def _prune(self, md_rel: str, keys: list[str], count: int) -> None:
+        """Drop the oldest versions beyond `MAX_VERSIONS`; ``count`` is how many there are now."""
+        if count <= MAX_VERSIONS:
+            return
+        entries = self._entries(md_rel, keys)
         extra = len(entries) - MAX_VERSIONS
         if extra <= 0:
             return

@@ -25,6 +25,7 @@ files (so it can keep the watcher quiet and its index current).
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
@@ -32,11 +33,20 @@ from pathlib import Path
 from typing import Any
 
 from .textfile import atomic_write
+from .typedefs import read_raw
 
 __all__ = ["RETENTION", "Trash", "TrashItem", "parse_stamp", "ulid_time"]
 
 RETENTION = timedelta(days=30)
 """Entries older than this are purged when the space opens."""
+
+# Characters no file name may hold (Windows' set covers the others').
+_ILLEGAL_RE = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+
+
+def _file_stem(title: str) -> str:
+    """A safe file stem for ``title`` (`space.safe_filename` can't be imported here)."""
+    return " ".join(_ILLEGAL_RE.sub("", title).split()).strip(". ")[:120].rstrip(". ")
 
 
 @dataclass
@@ -142,9 +152,40 @@ class Trash:
         atomic_write(path, _dump(data))
 
     def object_meta(self, trash_id: str) -> dict[str, Any] | None:
+        """The entry's metadata; made up from the ``.md`` itself when the ``.json`` is missing or unreadable."""
         if not self._safe_id(trash_id) or not self.object_file(trash_id).is_file():
             return None
-        return _load(self.object_meta_file(trash_id))
+        return _load(self.object_meta_file(trash_id)) or self._fallback_meta(trash_id)
+
+    def _fallback_meta(self, trash_id: str) -> dict[str, Any]:
+        """Metadata for a trashed ``.md`` without its ``.json``: still listed, restorable (into
+        the space root, named after its title) and purged by the ULID's time."""
+        title = ""
+        try:
+            fm = read_raw(self.dir, f"{trash_id}.md", cache=False).fm  # no cache under the trash
+            title = fm.get("title") if isinstance(fm.get("title"), str) else ""
+        except OSError:
+            pass
+        title = title.strip() or trash_id
+        return {
+            "id": trash_id,
+            "kind": "object",
+            "originalPath": f"{_file_stem(title) or trash_id}.md",
+            "title": title,
+            "type": "",
+            "deletedAt": self._stamp_of(trash_id, self.object_file(trash_id)),
+        }
+
+    @staticmethod
+    def _stamp_of(trash_id: str, path: Path) -> str:
+        """When an entry without a recorded ``deletedAt`` was deleted: the ULID's time, else the file's mtime."""
+        when = ulid_time(trash_id)
+        if when is None:
+            try:
+                when = datetime.fromtimestamp(path.stat().st_mtime, UTC)
+            except OSError:
+                return ""
+        return when.strftime("%Y-%m-%dT%H:%M:%S.") + f"{when.microsecond // 1000:03d}Z"
 
     def manifest(self, trash_id: str) -> dict[str, Any] | None:
         if not self._safe_id(trash_id):
@@ -190,20 +231,13 @@ class Trash:
         recorded = self._query_meta(trash_id).get("deletedAt")
         if isinstance(recorded, str) and recorded:
             return recorded
-        when = ulid_time(trash_id)
-        if when is None:
-            try:
-                when = datetime.fromtimestamp(self.query_file(trash_id).stat().st_mtime, UTC)
-            except OSError:
-                return ""
-        return when.strftime("%Y-%m-%dT%H:%M:%S.") + f"{when.microsecond // 1000:03d}Z"
+        return self._stamp_of(trash_id, self.query_file(trash_id))
 
     def object_ids(self) -> list[str]:
+        """Every trashed object: its ``.md`` is the entry; the ``.json`` may be missing."""
         if not self.dir.is_dir():
             return []
-        return sorted(
-            p.stem for p in self.dir.glob("*.json") if self.object_file(p.stem).is_file()
-        )
+        return sorted(p.stem for p in self.dir.glob("*.md") if self._safe_id(p.stem))
 
     def type_ids(self) -> list[str]:
         if not self.types_dir.is_dir():
