@@ -10,13 +10,18 @@ Within a step the linking object's folder wins, then the oldest ``createdAt``
 (missing last), then the path. Each bucket is kept sorted by the last two keys,
 so a lookup is the first entry in the linking folder, else the first entry.
 
-The space rebuilds it lazily whenever the set of names changes (an object
+The space builds it lazily and, whenever one object's names change (an object
 created, deleted, moved or retyped, or a change of ``title``, ``aliases``,
-``createdAt`` or ``template``).
+``createdAt`` or ``template``), replaces it with `Resolver.updated`: a copy
+that shares every untouched bucket, so a reader always sees a whole resolver
+and the change costs the one object's entries, not a rebuild (audit 2026-11-01
+P6). `link_names` lists the folded link texts an object answers to; links whose
+target folds to one of them are the only ones a change can re-resolve.
 """
 
 from __future__ import annotations
 
+import bisect
 from collections.abc import Iterable, Mapping
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
@@ -24,10 +29,24 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .space import ObjectSummary
 
-__all__ = ["Resolver", "link_candidates"]
+__all__ = ["Resolver", "fold", "link_candidates", "link_names"]
 
-# (folder, path) entries, sorted by (createdAt missing, createdAt, path).
-_Bucket = list[tuple[str, str]]
+# (sort key, folder, path) entries, sorted by the key (createdAt missing, createdAt, path).
+_Entry = tuple[tuple[bool, str, str], str, str]
+_Bucket = list[_Entry]
+
+
+def fold(text: str) -> str:
+    """Link text normalised for matching: whitespace collapsed, case folded."""
+    return " ".join(text.split()).casefold()
+
+
+def link_names(summary: ObjectSummary) -> frozenset[str]:
+    """The folded link texts that can reach ``summary``: title, aliases, stem and path form."""
+    path = summary.path
+    names = {fold(summary.title), fold(PurePosixPath(path).stem), fold(path[:-3])}
+    names.update(fold(a) for a in summary.aliases)
+    return frozenset(names)
 
 
 def link_candidates(link: str) -> list[str]:
@@ -46,7 +65,14 @@ def link_candidates(link: str) -> list[str]:
 
 
 def _folder_of(path: str) -> str:
-    return PurePosixPath(path).parent.as_posix()
+    # `PurePosixPath(path).parent.as_posix()` for a normalised space path, without the
+    # object construction (it runs once per resolved link).
+    head, sep, _name = path.rpartition("/")
+    return head if sep else "."
+
+
+def _sort_key(s: ObjectSummary) -> tuple[bool, str, str]:
+    return (s.createdAt is None, s.createdAt or "", s.path)
 
 
 class Resolver:
@@ -67,18 +93,55 @@ class Resolver:
         for s in summaries:
             if s.template is not None:
                 continue
-            keyed.append(((s.createdAt is None, s.createdAt or "", s.path), s))
+            keyed.append((_sort_key(s), s))
         keyed.sort(key=lambda it: it[0])
-        for _key, s in keyed:
-            entry = (_folder_of(s.path), s.path)
+        for key, s in keyed:
+            entry = (key, _folder_of(s.path), s.path)
             r._paths.add(s.path)
             r._title.setdefault(s.title, []).append(entry)
             for a in dict.fromkeys(a.lower() for a in aliases.get(s.path, ())):
                 r._alias.setdefault(a, []).append(entry)
-            for k in dict.fromkeys(
-                (s.title.lower(), PurePosixPath(s.path).stem.lower())
-            ):
+            for k in dict.fromkeys((s.title.lower(), PurePosixPath(s.path).stem.lower())):
                 r._ci.setdefault(k, []).append(entry)
+        return r
+
+    @staticmethod
+    def _keys(s: ObjectSummary) -> list[tuple[str, str]]:
+        """Which table each of ``s``'s names goes in (the tables are named by attribute)."""
+        out: list[tuple[str, str]] = [("_title", s.title)]
+        out += [("_alias", a) for a in dict.fromkeys(a.lower() for a in s.aliases)]
+        out += [("_ci", k) for k in dict.fromkeys((s.title.lower(), PurePosixPath(s.path).stem.lower()))]
+        return out
+
+    def updated(self, before: ObjectSummary | None, after: ObjectSummary | None) -> Resolver:
+        """A resolver with ``before``'s entries replaced by ``after``'s (either may be None).
+
+        Shares the untouched buckets with ``self``, which stays as it was, so the space can
+        swap it in atomically under a reader. Same contents as a fresh `build`; the lookup
+        cache starts empty.
+        """
+        r = Resolver()
+        r._paths = set(self._paths)
+        r._title, r._alias, r._ci = dict(self._title), dict(self._alias), dict(self._ci)
+        if before is not None and before.template is None:
+            r._paths.discard(before.path)
+            entry = (_sort_key(before), _folder_of(before.path), before.path)
+            for table, key in self._keys(before):
+                buckets = getattr(r, table)
+                bucket = [e for e in buckets.get(key, ()) if e != entry]
+                if bucket:
+                    buckets[key] = bucket
+                else:
+                    buckets.pop(key, None)
+        if after is not None and after.template is None:
+            r._paths.add(after.path)
+            entry = (_sort_key(after), _folder_of(after.path), after.path)
+            for table, key in self._keys(after):
+                buckets = getattr(r, table)
+                bucket = list(buckets.get(key, ()))
+                if entry not in bucket:
+                    bisect.insort(bucket, entry)
+                buckets[key] = bucket
         return r
 
     @staticmethod
@@ -86,10 +149,10 @@ class Resolver:
         if not bucket:
             return None
         if from_folder is not None:
-            for folder, path in bucket:
+            for _key, folder, path in bucket:
                 if folder == from_folder:
                     return path
-        return bucket[0][1]
+        return bucket[0][2]
 
     def resolve(self, link: str, from_path: str | None) -> str | None:
         """The path ``[[link]]`` from ``from_path`` resolves to, or None."""
