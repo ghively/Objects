@@ -3910,6 +3910,7 @@ class Space:
             rewritten, skipped = self._apply_type_ops(to_write, run)
             with self._lock:
                 revision = write_type_json(self.root, new, current)
+                self._loaded_revisions[new.id] = revision  # else the next refresh reloads it
                 self._sort_types()
         except BaseException:
             with self._lock:

@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from objectapp.propvalues import InvalidValue
 from objectapp.server import create_app
-from objectapp.space import ConfirmRequired, ReadOnly, Skip, Space
+from objectapp.space import ConfirmRequired, ReadOnly, Skip, Space, SpaceChange
 from objectapp.typemodel import (
     LabelOption,
     PropertyDefinition,
@@ -908,3 +908,19 @@ def test_type_save_plans_from_the_scanned_frontmatter_without_parsing_again(
     result = _save(space, t, confirm=True)
     assert len(result.rewritten) == 6
     assert all("Not Started" not in (space_dir / rel).read_text() for rel in result.rewritten)
+
+
+def test_save_type_records_the_new_revision_so_refresh_type_is_quiet(space_dir: Path):
+    # Audit 2026-11-01 fix pass: `save_type` wrote the JSON but never recorded its revision,
+    # so the `refresh_type` that `GET /api/types` runs right after a save reloaded the file and
+    # fired a second `types` change for a type that hadn't changed since.
+    space = Space(space_dir)
+    t = _edit(space, "task")
+    t.description = "Edited"
+    result = _save(space, t)
+    changes: list[SpaceChange] = []
+    space.add_listener(changes.append)
+    mem, revision = space.refresh_type("task")
+    assert revision == result.revision
+    assert mem is not None and mem.description == "Edited"
+    assert changes == []
