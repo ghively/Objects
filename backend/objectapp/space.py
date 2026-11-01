@@ -68,7 +68,7 @@ from .jsonstore import DefinitionUnreadable, JsonStore
 from .localtime import SystemTz, from_local, to_local
 from .queries import DEFAULT_NAME as DEFAULT_QUERY_NAME
 from .queries import LIMIT_SIZES, MAX_SEARCH_TERMS, QueryDef, query_type_ids
-from .objfile import ObjectFile, join_object
+from .objfile import ObjectFile, join_object, split_object
 from .rows import member_of
 from .propvalues import (
     KIND_TRANSFORMS,
@@ -96,14 +96,17 @@ from .textfile import (
     _write_temp,
     atomic_write,
     create_new,
+    decode,
     encode_like,
     move_no_overwrite,
     retry_os,
 )
 from .trash import Trash, TrashItem
 from .typedefs import (
+    DEFAULT_TYPE,
     SYSTEM_KEYS,
     RawObject,
+    has_undecodable,
     infer_types_from,
     is_ignored,
     iter_object_paths,
@@ -1604,16 +1607,19 @@ class Space:
             of = edit(raw.of, dict(raw.fm))
             if of is None or join_object(of) == join_object(raw.of):
                 return current
+            stamped: dict[str, str] | None = None
             if stamp:
                 insert_first = None if _str_or_none(raw.fm.get("id")) else {"id": new_ulid()}
-                fm_src = set_keys(
-                    of.frontmatter_src or "",
-                    {"lastUpdated": now_stamp(now or self.clock())},
-                    insert_first=insert_first,
-                )
+                stamps = {"lastUpdated": now_stamp(now or self.clock())}
+                if of.frontmatter_src == raw.of.frontmatter_src:
+                    stamped = {**(insert_first or {}), **stamps}  # the only frontmatter change
+                fm_src = set_keys(of.frontmatter_src or "", stamps, insert_first=insert_first)
                 of = replace(of, frontmatter_src=fm_src)
+            elif of.frontmatter_src == raw.of.frontmatter_src:
+                stamped = {}
             # Untouched lines keep their own bytes (and line endings) from the original.
-            data = encode_like(raw.data, join_object(of))
+            text = join_object(of)
+            data = encode_like(raw.data, text)
             new_version = version_of(data)
             self.own_writes[rel] = new_version
 
@@ -1646,8 +1652,43 @@ class Space:
                     pass
                 forget()
                 raise
-            self.rescan_file(rel)
+            fresh = self._raw_after_write(rel, data, text, raw, stamped)
+            if fresh is None:
+                self.rescan_file(rel)
+            else:
+                self._rescan_with(rel, fresh)
             return new_version
+
+    @staticmethod
+    def _raw_after_write(
+        rel: str, data: bytes, text: str, before: RawObject, stamped: dict[str, str] | None
+    ) -> RawObject | None:
+        """What `read_raw` would give for the file `_write` just wrote, without reading it.
+
+        ``stamped`` holds the frontmatter keys `_write` itself set when the edit left the
+        frontmatter alone (``{}`` when nothing changed there), so ``before``'s parsed values
+        are reused instead of parsing the YAML again. None means "re-read the file"
+        (anything unusual: undecodable text, a changed frontmatter that doesn't parse).
+        """
+        if has_undecodable(text) or decode(data).text != text:
+            return None
+        of = split_object(text)
+        if not of.fm_ok:
+            return None
+        if stamped is not None:
+            fm = {**stamped, **before.fm, **stamped}  # an inserted id keeps its first place
+        elif of.frontmatter_src is None:
+            fm = {}
+        else:
+            try:
+                fm = parse_fm(of.frontmatter_src)
+            except FrontmatterError:
+                return None
+        t = fm.get("type")
+        type_name = t.strip() if isinstance(t, str) and t.strip() else DEFAULT_TYPE
+        return RawObject(
+            path=rel, data=data, of=of, fm=fm, readOnly=False, typeName=type_name
+        )
 
     def touch(self, path: str, now: datetime | None = None) -> tuple[str, str]:
         """Set only the object's ``lastUpdated`` to ``now``; return ``(base, version)``.
@@ -4451,13 +4492,18 @@ class Space:
         rel = self._rel(path)
         full = self.root / rel
         with self._lock:
-            before = self._summaries.get(rel)
             raw: RawObject | None = None
             if full.is_file():
                 try:
                     raw = read_raw(self.root, rel)
                 except OSError:
                     raw = None
+            self._rescan_with(rel, raw)
+
+    def _rescan_with(self, rel: str, raw: RawObject | None) -> None:
+        """`rescan_file` given what the file holds (None: it is gone; see `_raw_after_write`)."""
+        with self._lock:
+            before = self._summaries.get(rel)
             if raw is None:
                 self._raw.pop(rel, None)
                 self._summaries.pop(rel, None)
