@@ -13,8 +13,8 @@ dot-folder, whiteboard sidecars and ``.md`` objects are skipped. A path that isn
 there is looked up as the editor does (`findAttachment` in ``editor/media/upload.ts``,
 Obsidian's short form): the attachment at that path ignoring case, else (a bare file name)
 the first attachment with that file name. Exporting reads only the space: the zip is
-written to a temporary file in the per-user state dir (``<state dir>/exports``, never in
-the space) and streamed from there (`export_object_to_file`), so a 100 MB attachment is
+written to a temporary file in the system temp folder (``<temp>/object-exports``, never
+in the space or the app's state dir) and streamed from there (`export_object_to_file`), so a 100 MB attachment is
 never held in memory; the file is removed once sent (`Export.cleanup`), and files older
 than an hour that a crash left behind are removed by the next export.
 """
@@ -31,7 +31,6 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote
 
-from .appstate import state_dir
 from .media import Attachment, NotServed, attachment_path, list_attachments
 from .relink import code_ranges, wikilink_targets
 from .typedefs import read_raw
@@ -80,8 +79,12 @@ class Export:
 
 
 def export_dir() -> Path:
-    """Where media exports are assembled: ``<state dir>/exports`` (outside every space)."""
-    return state_dir() / "exports"
+    """Where media exports are assembled: the system temp folder's ``object-exports``.
+
+    Outside every space and outside the app's state dir, which reads must leave unchanged
+    (the M9 acceptance checks that an export adds nothing there).
+    """
+    return Path(tempfile.gettempdir()) / "object-exports"
 
 
 def _sweep(folder: Path, now: float) -> None:

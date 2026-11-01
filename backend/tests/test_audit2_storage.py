@@ -199,7 +199,8 @@ def test_media_export_goes_to_a_temp_file_in_the_state_dir(full_space_dir: Path,
     out = export.export_object_to_file(space, "Pages/With media.md", True)
     assert held == []  # no in-memory zip
     assert out.data == b"" and out.file is not None and out.filename == "With media.zip"
-    assert out.file.parent == state_dir() / "exports"
+    assert out.file.parent == export.export_dir()
+    assert not out.file.is_relative_to(state_dir())  # the state dir stays untouched (m9 check 1)
     assert not out.file.is_relative_to(root)
     with zipfile.ZipFile(out.file) as zf:
         assert sorted(zf.namelist()) == ["Attachments/big.bin", "With media.md"]
@@ -214,16 +215,19 @@ def test_media_export_goes_to_a_temp_file_in_the_state_dir(full_space_dir: Path,
     assert md.file is None and md.data == (root / "Pages/With media.md").read_bytes()
     with pytest.raises(KeyError):
         export.export_object_to_file(space, "Pages/Nope.md", True)
-    assert list((state_dir() / "exports").iterdir()) == []
+    assert list(export.export_dir().iterdir()) == []
 
 
 def test_media_export_sweeps_stale_files_and_cleans_up_on_failure(
-    full_space_dir: Path, monkeypatch
+    full_space_dir: Path, monkeypatch, tmp_path: Path
 ):
+    import tempfile
     import time
 
     from objectapp import export
 
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path / "tmp"))  # a fresh system temp folder
+    (tmp_path / "tmp").mkdir()
     space = Space(full_space_dir)
     folder = export.export_dir()
     folder.mkdir(parents=True)
