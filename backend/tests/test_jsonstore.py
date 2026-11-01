@@ -115,6 +115,30 @@ def test_store_rejects_unsafe_and_over_long_ids(space_dir: Path):
     assert store.path("x" * 100).name == "x" * 100 + ".json"
 
 
+def test_ui_patch_does_not_overwrite_an_external_edit(space_dir: Path, monkeypatch):
+    """Audit 2026-11-01: `write_ui_patch` replaced the file without re-checking it."""
+    from objectapp import textfile, uistate
+
+    space = Space(space_dir)
+    _ui, revision = uistate.patch_ui(space, {"pinned": ["a"]}, None)
+    path = space_dir / ".capacities" / "ui.json"
+    external = [b'{"pinned": ["external"], "sections": ["ext"]}\n']
+
+    def racing(target, data, check=None):
+        if Path(target) == path:  # an editor saves between the read and the replace
+            path.write_bytes(external[-1])
+        textfile.atomic_write(target, data, check=check)
+
+    monkeypatch.setattr(uistate, "atomic_write", racing)
+    with pytest.raises(RevisionConflict):
+        uistate.patch_ui(space, {"allNotesLayout": "grid"}, revision)
+    assert path.read_bytes() == external[-1]
+    external.append(b'{"pinned": ["external", "again"]}\n')
+    with pytest.raises(RevisionConflict):  # a patch without a base revision re-checks too
+        uistate.patch_ui(space, {"allNotesLayout": "grid"}, None)
+    assert path.read_bytes() == external[-1]
+
+
 def test_collection_with_a_non_latin_name_is_created(space_dir: Path):
     space, c, _pub = _client(space_dir)
     with c:
