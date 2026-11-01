@@ -37,7 +37,7 @@ from typing import TYPE_CHECKING, Any
 
 from .dailynotes import parse_day
 from .propvalues import decode_value
-from .relink import code_ranges, wikilink_spans, wikilink_targets
+from .relink import code_ranges, segments, wikilink_spans, wikilink_targets
 from .resolver import fold as _fold
 
 if TYPE_CHECKING:
@@ -49,14 +49,18 @@ _DATA_VIEW_PREFIXES = ("collection:", "query:")
 _TIME_RE = re.compile(
     r"<time\b[^>]*?\bdatetime\s*=\s*([\"'])(\d{4}-\d{2}-\d{2})\1[^>]*>", re.IGNORECASE
 )
+_TIME_HINT_RE = re.compile(r"<time\b", re.IGNORECASE)
 
 
-def count_date_tokens(body: str) -> dict[str, int]:
-    """``{day: count}`` of the date tokens ``<time datetime="YYYY-MM-DD">`` outside code."""
+def count_date_tokens(body: str, code: list[tuple[int, int]] | None = None) -> dict[str, int]:
+    """``{day: count}`` of the date tokens ``<time datetime="YYYY-MM-DD">`` outside code.
+
+    ``code`` is `code_ranges` of ``body`` when the caller already has it.
+    """
     out: dict[str, int] = {}
-    if "<" not in body:
+    if "<" not in body or _TIME_HINT_RE.search(body) is None:
         return out
-    ranges = code_ranges(body)
+    ranges = code_ranges(body) if code is None else code
     for m in _TIME_RE.finditer(body):
         pos = m.start()
         if any(s <= pos < e for s, e in ranges):
@@ -212,13 +216,14 @@ class LinkIndex:
         summary = space._summaries[path]
         ex = _Extracted(tags=list(summary.tags))
         body = raw.of.body
+        segs = segments(body)  # one pass over the body for links and date tokens alike
         if "[[" in body:
             ex.body = [
                 t
-                for t, s, _e in wikilink_spans(body)
+                for t, s, _e in wikilink_spans(body, segs)
                 if not (body.startswith("!", s) and t.lstrip().startswith(_DATA_VIEW_PREFIXES))
             ]
-        ex.tokens = count_date_tokens(body)
+        ex.tokens = count_date_tokens(body, code_ranges(body, segs))
         # M6: a whiteboard's board links count as body links (imported here: no import cycle).
         from .whiteboardindex import board_for_index
         from .whiteboardtrash import board_links
