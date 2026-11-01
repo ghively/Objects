@@ -796,10 +796,12 @@ def create_app(
 
     @app.exception_handler(OSError)
     async def os_error(_request: Request, exc: OSError) -> JSONResponse:
-        # A file locked by another program (Windows sharing violations) or a
-        # transient file-system failure: report it as JSON the client can show
-        # and retry, never as a bare 500.
-        if isinstance(exc, PermissionError):
+        # A file locked by another program (a Windows sharing violation, winerror
+        # 32) or a transient file-system failure: report it as JSON the client can
+        # show and retry, never as a bare 500. A plain `PermissionError` (EACCES on
+        # macOS/Linux, a read-only file on Windows) is not a lock, so it gets the
+        # OS's own words.
+        if isinstance(exc, PermissionError) and getattr(exc, "winerror", None) == 32:
             detail = "A file is in use by another program. Try again in a moment."
         else:
             detail = f"The file system refused the change: {exc.strerror or exc}"
