@@ -593,11 +593,69 @@ function preserveLines(origLines: string[], regenLines: string[], baseline?: str
     }
     return alignLines(origLines, regenLines, baseLines, regenLines, restyle)
   }
-  // A quote the serializer lays out on other lines than the original (a nested
-  // quote's lazy line `> c` written `> > c`, a `>` line added between blocks):
-  // lines compare by their text, so the untouched ones keep their markers.
-  const key = kind === 'blockquote' ? (l: string) => l.replace(QUOTE_PREFIX, '').trimEnd() : (l: string) => l.trimEnd()
+  if (kind === 'blockquote') return preserveQuote(origLines, regenLines)
+  const key = (l: string) => l.trimEnd()
   return alignLines(origLines, regenLines, origLines.map(key), regenLines.map(key), (line) => line)
+}
+
+/** A quote line with only markers: a blank line inside the quote. */
+const bareQuote = (line: string): boolean => line.replace(QUOTE_PREFIX, '').trim() === ''
+/** The number of `>` markers a line starts with. */
+const quoteDepth = (line: string): number => (QUOTE_PREFIX.exec(line)![0].match(/>/g) ?? []).length
+const quoteKey = (line: string): string => line.replace(QUOTE_PREFIX, '').trimEnd()
+/** A quote line a lazy line after it continues: paragraph text, not a blank, heading, fence, item or table row. */
+const continuesParagraph = (line: string): boolean =>
+  !/^(?:$|#{1,6}(?:\s|$)|`{3}|~{3}|[-*+](?:\s|$)|\d{1,9}[.)](?:\s|$)|\||<)/.test(line.replace(QUOTE_PREFIX, '').trim())
+
+/**
+ * A quote the serializer lays out on other lines than the original (a nested
+ * quote's lazy line `> c` written `> > c`, a `>` line added between blocks):
+ * lines compare by their text, so the untouched ones keep their markers.
+ * - A bare `>` line the serializer puts before a deeper nested quote, or after
+ *   a heading, where the original had none, is dropped: the nested quote
+ *   interrupts the paragraph above it anyway (`> a` then `> > b`), and a
+ *   heading is one line.
+ * - An edited line that takes an original line's place keeps that line's
+ *   markers when they read the same: as many (only their spacing differs), or
+ *   fewer on a lazy continuation of the paragraph above it.
+ */
+function preserveQuote(origLines: string[], regenLines: string[]): string[] {
+  const origKeys = origLines.map(quoteKey)
+  let match = alignMatch(origKeys, regenLines.map(quoteKey))
+  const lines = regenLines.filter((line, j) => {
+    if (!bareQuote(line) || match[j] >= 0 || j === 0 || j + 1 >= regenLines.length) return true
+    const prev = regenLines[j - 1]
+    const next = regenLines[j + 1]
+    if (bareQuote(prev) || bareQuote(next)) return true
+    const heading = /^#{1,6}(?:\s|$)/.test(prev.replace(QUOTE_PREFIX, '').trim())
+    if (quoteDepth(next) <= quoteDepth(prev) && !(heading && quoteDepth(next) === quoteDepth(prev))) return true
+    // The original's two lines on either side, if it had them adjacent (no blank between).
+    const at = match[j - 1] >= 0 ? match[j - 1] + 1 : match[j + 1] >= 0 ? match[j + 1] : -1
+    return !(at > 0 && at < origLines.length && !bareQuote(origLines[at]) && !bareQuote(origLines[at - 1]))
+  })
+  if (lines.length !== regenLines.length) match = alignMatch(origKeys, lines.map(quoteKey))
+
+  // Pair the edited lines with the original lines they replace, gap by gap.
+  const replaces = new Int32Array(lines.length).fill(-1)
+  let o = 0
+  let r = 0
+  for (let j = 0; j <= lines.length; j++) {
+    if (j < lines.length && match[j] < 0) continue
+    const oEnd = j < lines.length ? match[j] : origLines.length
+    if (oEnd - o === j - r) for (let n = 0; n < j - r; n++) replaces[r + n] = o + n
+    o = oEnd + 1
+    r = j + 1
+  }
+  return lines.map((line, j) => {
+    if (match[j] >= 0) return origLines[match[j]]
+    const orig = replaces[j] >= 0 ? origLines[replaces[j]] : null
+    if (orig === null || bareQuote(orig) || bareQuote(line)) return line
+    const depth = quoteDepth(line)
+    const origDepth = quoteDepth(orig)
+    const lazy = origDepth < depth && j > 0 && continuesParagraph(lines[j - 1]) && quoteDepth(lines[j - 1]) === depth
+    if (origDepth !== depth && !lazy) return line
+    return QUOTE_PREFIX.exec(orig)![0] + line.slice(QUOTE_PREFIX.exec(line)![0].length)
+  })
 }
 
 /**

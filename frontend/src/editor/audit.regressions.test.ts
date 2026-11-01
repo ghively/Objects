@@ -467,12 +467,43 @@ describe('minor drift on edited lines', () => {
     expect(serializeBody(reloaded)).toBe(saved) // and it saves back the same
   })
 
-  test('editing one line of a nested blockquote keeps the other lines (audit 2026-11-01)', () => {
-    const editor = headless('> a\n> > b\n> c\n')
-    append(editor, 'a', 'Z')
+  // Audit 2026-11-01 leftover: the serializer's `>` line between a paragraph and a nested quote
+  // (which interrupts it anyway) was added to an otherwise untouched quote.
+  test.each([
+    ['> a\n> > b\n> c\n', 'a', '> aZ\n> > b\n> c\n'],
+    ['> a\n> > b\n> c\n', 'c', '> a\n> > b\n> cZ\n'],
+    ['> a\n> > b\n', 'a', '> aZ\n> > b\n'],
+    ['> a\n> > b\n', 'b', '> a\n> > bZ\n'],
+    ['> a\n> > # H\n> > b\n', 'b', '> a\n> > # H\n> > bZ\n'],
+    ['> x\n> a\n> > > b\n', 'a', '> x\n> aZ\n> > > b\n'],
+  ])('editing one line of a nested blockquote changes only that line (%j, %s)', (body, needle, saved) => {
+    const before = shape(headless(body))
+    const editor = headless(body)
+    append(editor, needle, 'Z')
     const out = saveAndReload(editor)
-    expect(out.saved).toBe('> aZ\n>\n> > b\n> c\n')
-    expect(out.reloaded).toEqual([['blockquote', 'aZb\nc']])
+    expect(out.saved).toBe(saved)
+    expect(out.reloaded).toEqual(shape(editor))
+    expect(before.length).toBe(out.reloaded.length)
+  })
+
+  test('a paragraph split inside a quote keeps its blank `>` line', () => {
+    const editor = headless('> ab\n> > c\n')
+    const f = find(editor, 'ab')
+    editor.commands.setTextSelection(f.pos + 2)
+    editor.commands.splitBlock()
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe('> a\n>\n> b\n> > c\n')
+    expect(out.reloaded).toEqual(shape(editor))
+  })
+
+  test('a nested quote added under a paragraph is still saved', () => {
+    const editor = headless('> a\n\nafter\n')
+    const f = find(editor, 'a')
+    const { schema } = editor
+    const inner = schema.nodes.blockquote.create(null, schema.nodes.paragraph.create(null, schema.text('n')))
+    editor.view.dispatch(editor.state.tr.insert(f.pos + f.node.nodeSize, inner))
+    const out = saveAndReload(editor)
+    expect(out.reloaded).toEqual(shape(editor))
   })
 
   test('a tab-indented sibling item is kept when another item is edited (audit 2026-11-01)', () => {
