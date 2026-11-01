@@ -196,6 +196,33 @@ def test_non_latin_collection_and_query_names_never_500(client: TestClient, m8_s
             assert "name" in r.json()["detail"]
 
 
+# -- `POST /api/images` has the same size and emptiness rules as attachments --------------
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
+
+
+def test_image_upload_refuses_empty_and_over_limit(client: TestClient, m8_space_dir: Path, monkeypatch: pytest.MonkeyPatch):
+    from objectapp import media
+
+    monkeypatch.setattr(media, "MAX_ATTACHMENT_BYTES", 16)
+    headers = {"content-type": "application/octet-stream"}
+    empty = client.post("/api/images", params={"name": "e.png"}, content=b"", headers=headers)
+    assert empty.status_code == 422, empty.text
+    big = client.post("/api/images", params={"name": "big.png"}, content=PNG + b"x", headers=headers)
+    assert big.status_code == 413, big.text
+    assert "100 MiB" in big.json()["detail"]
+    # A declared length over the limit is refused before the body is read.
+    declared = client.post(
+        "/api/images", params={"name": "d.png"}, content=PNG, headers={**headers, "content-length": "999"}
+    )
+    assert declared.status_code == 413
+    assert not (m8_space_dir / "Attachments" / "big.png").exists()
+    assert not (m8_space_dir / "Attachments" / "e.png").exists()
+    ok = client.post("/api/images", params={"name": "ok.png"}, content=PNG, headers=headers)
+    assert ok.status_code == 201, ok.text
+    assert (m8_space_dir / "Attachments" / "ok.png").read_bytes() == PNG
+
+
 @pytest.mark.xfail(reason="needs lane B1a: a Unicode id regex in JsonStore", strict=False)
 @pytest.mark.parametrize("name", NON_LATIN)
 def test_non_latin_collection_and_query_names_are_created(client: TestClient, m8_space_dir: Path, name: str):

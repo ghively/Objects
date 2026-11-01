@@ -149,9 +149,14 @@ def _safe_image_name(name: str) -> tuple[str, str]:
 def import_image(root: Path, name: str, data: bytes) -> str:
     """Write ``data`` to ``Attachments/<safe name>`` (`` (2)``... when taken); return the path.
 
-    Raises `NotAnImage` when ``name`` has no image extension.
+    Raises `NotAnImage` when ``name`` has no image extension, `TooLarge` over
+    `MAX_ATTACHMENT_BYTES` and `ValueError` for an empty upload (as `import_attachment`).
     """
     stem, ext = _safe_image_name(name)
+    if len(data) > MAX_ATTACHMENT_BYTES:
+        raise TooLarge(name)
+    if not data:
+        raise ValueError("The file is empty")
     folder = Path(root) / ATTACHMENTS
     folder.mkdir(parents=True, exist_ok=True)
     n = 1
