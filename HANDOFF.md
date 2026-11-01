@@ -8,9 +8,11 @@ Updated 2026-10-29. You are continuing "Object", a local, Markdown-backed recrea
 
 **The 2026-10-28 audit is fixed** (on Gene's Windows PC, same day): every bug in `docs/superpowers/plans/audit-2026-10-28.md` and every real "unconfirmed" item, one per commit with a failing-first test. **The guessed values were checked against the full Capacities app** (`docs/superpowers/plans/reference-check-2026-10-28.md`) and applied. Status and the gate numbers: `docs/superpowers/plans/remaining-work.md`.
 
-**Next:** Gene's hands-on checks, M1–M9. His answers to M9's three open questions (2026-10-29) are built.
+**The 2026-11-01 full audit (bugs and optimization) is fixed** on branch `ccr-bcf6e946-bf8moc` (Linux cloud container): `docs/superpowers/plans/audit-2026-11-01.md` holds the findings, Gene's answers and the before/after numbers; the repro scripts are in `scripts/audit-2026-11-01/`. Headlines: opening a 5,000-object space warm 6 s → 0.6 s, a rename 4 s → 0.4 s, type saves no longer block reads for seconds, the kanban pages, the entry bundle 3.4 MB → 273 KB, and sixteen data-loss or security bugs closed.
 
-**Branch:** everything, M1–M9 included, is on `master`. M9's branch `ccr-bcf6e946-bf8moc` was merged as pull request #3 on 2026-10-29 and is kept on GitHub for reference only.
+**Next:** merge `ccr-bcf6e946-bf8moc` into `master` and re-gate on Windows (as M9 was), then Gene's hands-on checks, M1–M9.
+
+**Branch:** M1–M9 are on `master` (M9 merged as pull request #3 on 2026-10-29). The audit fix pass is on `ccr-bcf6e946-bf8moc`, restarted from `master` at `8a3c8fb`, until it is merged.
 
 | Milestone | Scope | Plan |
 |---|---|---|
@@ -24,7 +26,7 @@ Updated 2026-10-29. You are continuing "Object", a local, Markdown-backed recrea
 | M8 | every Capacities feature M4–M7 deferred, local only | `2026-10-27-m8-deferred-features.md` |
 | M9 | the audit's completeness gaps | `2026-10-28-m9-completeness-gaps.md` |
 
-Last full verification, 2026-10-29 on Windows after M9 was merged (`6ef3df8`): the same gate passed (1238 back-end, 1965 front-end; one front-end timing test timed out under load and passed alone), every acceptance script PASS. Details: `remaining-work.md`. Before that, at `35bbd88` on Linux:
+Last full verification, 2026-11-01 on Linux after the audit fix pass (`b7e8761`): 1381 back-end tests passed (1 skipped, 3 xpassed), 2138 front-end tests passed (1 skipped), `tsc` clean, lint 0 errors, build ok; every acceptance script PASS (`m1_roundtrip.py`, `m2`–`m9_acceptance.py` on `space-sample` and `space-v1`; `m9` on three more spaces). Details: `remaining-work.md`. Before that, 2026-10-29 on Windows after M9 was merged (`6ef3df8`): the same gate passed (1238 back-end, 1965 front-end), every acceptance script PASS; and at `35bbd88` on Linux:
 - 1239 back-end tests passed (1 skipped: it needs a non-root user).
 - 1966 front-end tests passed (1 skipped: it needs `OBJECT_ROUNDTRIP_SPACE`).
 - `tsc -b --noEmit` clean; lint 0 errors; `npm run build` ok.
@@ -35,7 +37,7 @@ Last full verification, 2026-10-29 on Windows after M9 was merged (`6ef3df8`): t
 
 1. Set up: install `uv` and Node 22+; run `uv sync`, then `cd frontend && npm ci`. Use `npm ci`, not `npm install`: a newer npm rewrites `package-lock.json`.
 2. Run the baseline: `uv run pytest backend/tests -q`, then `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build`. Report any failure before changing code.
-3. **The audit list and M9 are done** (2026-10-28). Don't redo them; `remaining-work.md` and `m9-acceptance.md` list what landed.
+3. **Both audits and M9 are done** (2026-10-28 and 2026-11-01). Don't redo them; `remaining-work.md`, `m9-acceptance.md` and `audit-2026-11-01.md` list what landed and what was left by choice.
 4. Pick up Gene's findings from his hand-checks (`docs/superpowers/plans/m1-acceptance.md` to `m9-acceptance.md`, 256 unchecked items) and fix them the same way. After each batch, rerun the full gate and every acceptance script on fixture copies.
 5. Keep `remaining-work.md`, `CONTINUE.md` and this file current, commit, and push.
 

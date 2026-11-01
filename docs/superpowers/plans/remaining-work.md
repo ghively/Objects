@@ -1,7 +1,7 @@
 # Object: remaining work
 
-Status as of 2026-10-29. **All nine milestones are built, reviewed, fixed and gated, and all are on `master`** (M9 merged as PR #3 and re-gated on Windows). M9 (the audit's completeness gaps) was built on Gene's go-ahead; its results and Gene's hand-check list are in `m9-acceptance.md`. What remains:
-1. **M9's open questions are answered and built** (2026-10-29): the encyclopedia title spans the full width again, the object `…` menu follows Capacities' order, and Duplicate keeps two-way relations two-way.
+Status as of 2026-11-01. **All nine milestones are built, reviewed, fixed and gated, and all are on `master`** (M9 merged as PR #3 and re-gated on Windows). **The 2026-11-01 full audit (bugs and optimization) is fixed** on branch `ccr-bcf6e946-bf8moc`: `audit-2026-11-01.md` holds the findings, Gene's answers, and the measured before/after; every confirmed bug and every fix-first/should-fix performance item is fixed one per commit with a failing-first test, reviewed once, review findings fixed, gated. What remains:
+1. **Merge the audit fix branch** (`ccr-bcf6e946-bf8moc`) into `master` and re-gate on Windows, as M9 was.
 2. Gene's hands-on checking (M1–M9 acceptance docs), and the fixes it produces. **Settled 2026-10-28:** Gene checked Capacities: the Standard design shows properties in the side column, so Object's Standard sidebar stays (`reference-check-2026-10-28.md` §5 was wrong there). They go inline below 768 px as in Capacities; no 'always inline' option for now.
 
 **Done on 2026-10-28, on Windows:**
@@ -37,6 +37,16 @@ Each milestone's plan holds its full scope. Each acceptance doc holds its automa
 
 M8's "Coverage" section maps every deferred item to a task, or to a spec §2 exclusion: AI, network at runtime, accounts and sharing, mobile, telemetry.
 
+## Linux verification (2026-11-01, after the full audit fix pass, at `b7e8761`)
+
+| Check | Result |
+|---|---|
+| `uv run pytest backend/tests -q` | 1381 passed, 1 skipped (needs a non-root user), 3 xpassed (at `4c4b726`; the two tests added after it pass) |
+| `cd frontend && npx vitest run` | 2138 passed, 1 skipped (needs `OBJECT_ROUNDTRIP_SPACE`) |
+| `npx tsc -b --noEmit` / `npm run lint` / `npm run build` | clean / 0 errors / built; the entry chunk is 273 KB (76 KB gzip), down from 3.4 MB |
+| `scripts/m1_roundtrip.py`, `m2`–`m9_acceptance.py` on `space-sample` and `space-v1`; `m9` on `space-m8`, `space-blocks`, `space-whiteboard` | all PASS (m2 52/52 and 50/50, m3 14/14, m4 24/24, m5 18/18, m6 19/19, m7 23/23, m8 26/26, m9 23/23 on each of the five spaces) |
+| Performance after the fixes (synthetic 5,001-object space, headless Chromium) | see `audit-2026-11-01.md`, "Measured after the fixes" |
+
 ## Windows verification (2026-10-29, after merging M9 into master as PR #3, at `6ef3df8`)
 
 | Check | Result |
@@ -63,7 +73,7 @@ The synthetic fixture spaces are `space-sample`, `space-v1`, `space-calendar`, `
 
 ## What is left
 
-0. **The audit list is done** (bugs fixed 2026-10-28; the completeness gaps built as M9).
+0. **Both audit lists are done:** 2026-10-28 (bugs fixed, completeness gaps built as M9) and 2026-11-01 (bugs and optimization, fixed on `ccr-bcf6e946-bf8moc`; merge it). Still listed there and not fixed, by choice: the minor and unconfirmed items of `audit-2026-11-01.md`, search snippet cost B9 (measured: the premise didn't hold), a 4-space continuation line after Shift-Enter in a list item losing 2 spaces (Markdown strips it), the nested blockquote's extra `>` line, and the Windows CJK folder-name length edge.
 1. **Gene's hands-on checks, M1–M9:** 256 unchecked items. Run them on a copy of the CPI export kept outside the repo, with `git init` there: `npm run build` in `frontend/`, then `uv run objectapp --space <copy>`. These can only be checked on his Windows machine:
    - the pywebview window
    - Windows toast reminders
