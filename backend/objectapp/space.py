@@ -728,7 +728,48 @@ def _yaml_single_quoted(text: str) -> str:
 _link_candidates = link_candidates
 
 
+class _TypeList(list):
+    """`Space.types`: a list that tells the space whenever it is changed in place."""
+
+    def __init__(self, items: Iterable[TypeDefinition], changed: Callable[[], None]) -> None:
+        super().__init__(items)
+        self._changed = changed
+
+
+def _notifying(name: str) -> Callable[..., Any]:
+    method = getattr(list, name)
+
+    def wrapper(self: _TypeList, *args: Any, **kwargs: Any) -> Any:
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            self._changed()
+
+    wrapper.__name__ = name
+    return wrapper
+
+
+for _name in (
+    "append", "extend", "insert", "remove", "pop", "clear", "sort", "reverse",
+    "__setitem__", "__delitem__", "__iadd__", "__imul__",
+):
+    setattr(_TypeList, _name, _notifying(_name))
+
+
 class Space:
+    @property
+    def types(self) -> list[TypeDefinition]:
+        """The space's types; assigning or changing it in place drops the `_type_id` lookup."""
+        return self._types
+
+    @types.setter
+    def types(self, value: Iterable[TypeDefinition]) -> None:
+        self._types = _TypeList(value, self._forget_type_ids)
+        self._forget_type_ids()
+
+    def _forget_type_ids(self) -> None:
+        self._type_ids = None
+
     @property
     def name(self) -> str:
         """``.object/space.json``'s ``name``, else the folder name (re-read on every access)."""
@@ -1504,17 +1545,24 @@ class Space:
         return next((t for t in self.types if t.id == type_id), None)
 
     def _type_id(self, type_name: str) -> str:
-        """The id of the type `type_name` names: by name, then id, then former names."""
-        lowered = type_name.lower()
-        for match in (
-            lambda t: t.name.lower() == lowered,
-            lambda t: t.id.lower() == lowered,
-            lambda t: lowered in (f.lower() for f in t.formerNames),
-        ):
-            for t in self.types:
-                if match(t):
-                    return t.id
-        return slug(type_name)
+        """The id of the type `type_name` names: by name, then id, then former names.
+
+        Case-insensitive; answered from a lookup built once per change of `types`.
+        """
+        lookup = self._type_ids
+        if lookup is None:
+            lookup = {}
+            # Lowest priority first, so a name overrides an id overrides a former name,
+            # and within one kind the first type in `types` wins.
+            for t in reversed(self.types):
+                for f in t.formerNames:
+                    lookup[f.lower()] = t.id
+            for kind in ("id", "name"):
+                for t in reversed(self.types):
+                    lookup[getattr(t, kind).lower()] = t.id
+            self._type_ids = lookup
+        found = lookup.get(type_name.lower())
+        return found if found is not None else slug(type_name)
 
     # -- paths --------------------------------------------------------------
 
@@ -4619,6 +4667,7 @@ class Space:
 
     def _types_changed(self, type_id: str | None = None) -> None:
         """Tell the listeners that a type definition changed (``type_id`` when known)."""
+        self._forget_type_ids()
         self._fire(SpaceChange("types", None, type_id))
 
     def _names_changed(
