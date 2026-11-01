@@ -15,7 +15,7 @@ import { resetLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPage } from '@/object/ObjectPage'
 import { flushAll } from '@/lib/flush'
-import { keptUnsaved, resetUnsaved } from './unsaved'
+import { keepUnsaved, keptUnsaved, resetUnsaved } from './unsaved'
 
 const mocked = vi.mocked(api)
 
@@ -183,6 +183,37 @@ describe('edits that could not be saved when the object is left', () => {
     expect(keptUnsaved(PATH)).not.toBeNull()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Take theirs' }))
     await waitFor(() => expect(serializeBody(first.editor)).toBe(THEIRS))
+    expect(keptUnsaved(PATH)).toBeNull()
+  })
+})
+
+describe('the recovery dialog', () => {
+  const KEPT = 'First paragraph. kept\n\nSecond paragraph.\n'
+
+  test('a double-click on "Save changes" saves once', async () => {
+    keepUnsaved(PATH, KEPT)
+    await openPage()
+    const dialog = await screen.findByRole('dialog', { name: 'Recover unsaved changes' })
+    const save = within(dialog).getByRole('button', { name: 'Save changes' })
+    mocked.saveBody.mockImplementationOnce(async () => ({ version: 'v2' }))
+    mocked.saveBody.mockImplementationOnce(async () => {
+      throw new ConflictError('v2')
+    })
+    fireEvent.click(save)
+    fireEvent.click(save)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(mocked.saveBody.mock.calls.filter((c) => c[1] === KEPT)).toHaveLength(1)
+    expect(keptUnsaved(PATH)).toBeNull()
+  })
+
+  test('a conflict on save whose file already holds the kept text closes the dialog', async () => {
+    keepUnsaved(PATH, KEPT)
+    await openPage()
+    const dialog = await screen.findByRole('dialog', { name: 'Recover unsaved changes' })
+    mocked.saveBody.mockRejectedValueOnce(new ConflictError('v2'))
+    onDisk = detail(KEPT, 'v2') // another window saved the same text meanwhile
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(keptUnsaved(PATH)).toBeNull()
   })
 })

@@ -177,6 +177,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   const [pending, setPending] = useState<{ mine: string; theirs: ObjectDetail } | null>(null)
   /** Edits kept when this object was last left unsaved (`editor/unsaved.ts`), offered on open. */
   const [recovery, setRecovery] = useState<{ kept: string; onDisk: string; error: string | null } | null>(null)
+  /** Set while "Save changes" is writing the kept text. */
+  const [savingKept, setSavingKept] = useState(false)
+  const savingKeptRef = useRef(false)
   // Subscribe so the type chip and properties pick up types once the index loads.
   useLinkIndex((s) => s.revision)
 
@@ -404,7 +407,10 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   const saveKept = async () => {
     const r = recovery
     const h = editorRef.current
-    if (!r) return
+    // One save at a time: a second click would send the same text on the same version.
+    if (!r || savingKeptRef.current) return
+    savingKeptRef.current = true
+    setSavingKept(true)
     h?.hold()
     try {
       const res = await api.saveBody(path, r.kept, versionRef.current)
@@ -421,7 +427,13 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
           h?.reload(d.body, d.version)
           setDetail(d)
           adoptVersion(d.version)
-          setRecovery({ kept: r.kept, onDisk: d.body, error: null })
+          if (d.body === r.kept) {
+            // The file already holds the kept text: nothing left to recover.
+            dropUnsaved(path)
+            setRecovery(null)
+          } else {
+            setRecovery({ kept: r.kept, onDisk: d.body, error: null })
+          }
         } catch {
           /* gone or unreadable: keep asking with what we have */
         }
@@ -429,6 +441,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         setRecovery({ ...r, error: 'Could not save the changes.' })
       }
       void h?.resume(versionRef.current)
+    } finally {
+      savingKeptRef.current = false
+      setSavingKept(false)
     }
   }
 
@@ -897,6 +912,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
       kept={recovery?.kept ?? ''}
       onDisk={recovery?.onDisk ?? ''}
       error={recovery?.error}
+      saving={savingKept}
       onSave={() => void saveKept()}
       onDiscard={discardKept}
     />
