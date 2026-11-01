@@ -486,6 +486,24 @@ describe('minor drift on edited lines', () => {
     expect(before.length).toBe(out.reloaded.length)
   })
 
+  // End review of the second audit fix pass: a quote inside a list item was rewritten on an
+  // unrelated edit (a bare `  >` line added, a lazy line given the inner quote's marker).
+  test.each([
+    ['- item\n  > q1\n  > > q2\n', 'item', '- itemZ\n  > q1\n  > > q2\n'],
+    ['- item\n  > q1\n  > > q2\n', 'q1', '- item\n  > q1Z\n  > > q2\n'],
+    ['- item\n  > > q2\n  > q3\n', 'item', '- itemZ\n  > > q2\n  > q3\n'],
+    ['- item\n  > > q2\n  > q3\n', 'q2', '- item\n  > > q2\n  > q3Z\n'],
+    ['1. item\n   > q1\n   > > q2\n2. next\n', 'next', '1. item\n   > q1\n   > > q2\n2. nextZ\n'],
+  ])('a quote inside a list item keeps its lines when another line is edited (%j, %s)', (body, needle, saved) => {
+    const before = shape(headless(body))
+    const editor = headless(body)
+    append(editor, needle, 'Z')
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved)
+    expect(out.reloaded).toEqual(shape(editor))
+    expect(before.length).toBe(out.reloaded.length)
+  })
+
   test('a paragraph split inside a quote keeps its blank `>` line', () => {
     const editor = headless('> ab\n> > c\n')
     const f = find(editor, 'ab')

@@ -200,7 +200,58 @@ function listKey(line: string, parsed: ListLine | null): string {
   return `I\0${parsed.depth}\0${ordered}\0${content.replace(/\\$/, '').trimEnd()}`
 }
 
-function preserveList(origLines: string[], regenLines: string[]): string[] {
+/** A quote line inside a list item: not an item, and `>` after its indent. */
+const quoteInItem = (line: string, parsed: ListLine | null): boolean => !parsed && /^[ \t]*>/.test(line)
+
+/** The runs of consecutive quote lines inside items, as [start, end) line ranges. */
+function quoteRuns(lines: string[], parsed: (ListLine | null)[]): [number, number][] {
+  const runs: [number, number][] = []
+  for (let i = 0; i < lines.length; i++) {
+    if (!quoteInItem(lines[i], parsed[i])) continue
+    let end = i + 1
+    while (end < lines.length && quoteInItem(lines[end], parsed[end])) end++
+    runs.push([i, end])
+    i = end - 1
+  }
+  return runs
+}
+
+/**
+ * Quotes inside list items get the same care as top-level ones (`preserveQuote`): the
+ * serializer's own layout (a bare `>` line before a nested quote, a lazy line written with
+ * the inner quote's markers) is replaced by the original's where the text is the same.
+ * The n-th quote of the regenerated list is paired with the n-th of the original when both
+ * have as many; the indent shared by a quote's lines is set aside meanwhile.
+ */
+function keepQuotesInItems(origLines: string[], regenLines: string[]): string[] {
+  const origRuns = quoteRuns(origLines, parseList(origLines))
+  const regenRuns = quoteRuns(regenLines, parseList(regenLines))
+  if (origRuns.length === 0 || origRuns.length !== regenRuns.length) return regenLines
+  const commonIndent = (lines: string[]): string => {
+    let indent = /^[ \t]*/.exec(lines[0])![0]
+    for (const l of lines) while (!l.startsWith(indent)) indent = indent.slice(0, -1)
+    return indent
+  }
+  const out: string[] = []
+  let at = 0
+  regenRuns.forEach(([start, end], n) => {
+    const orig = origLines.slice(origRuns[n][0], origRuns[n][1])
+    const regen = regenLines.slice(start, end)
+    const oi = commonIndent(orig)
+    const ri = commonIndent(regen)
+    const kept = preserveQuote(
+      orig.map((l) => l.slice(oi.length)),
+      regen.map((l) => l.slice(ri.length)),
+    )
+    out.push(...regenLines.slice(at, start), ...kept.map((l) => oi + l))
+    at = end
+  })
+  out.push(...regenLines.slice(at))
+  return out
+}
+
+function preserveList(origLines: string[], regenInput: string[]): string[] {
+  const regenLines = keepQuotesInItems(origLines, regenInput)
   const origParsed = parseList(origLines)
   const regenParsed = parseList(regenLines)
 
