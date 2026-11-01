@@ -45,11 +45,13 @@ from .space import Space, version_of
 from .typedefs import is_ignored
 from .whiteboardfile import sidecar_owner
 
-__all__ = ["DEBOUNCE_SECONDS", "FLUSH_SLICE", "ChangeEvent", "SpaceWatcher"]
+__all__ = ["DEBOUNCE_SECONDS", "FLUSH_SLICE", "SLICE_GAP", "ChangeEvent", "SpaceWatcher"]
 
 DEBOUNCE_SECONDS = 0.150
 FLUSH_SLICE = 0.025
 """How long (seconds) one acquisition of the space's lock keeps refreshing due paths."""
+SLICE_GAP = 0.002
+"""Seconds the flush sleeps between slices so a waiting reader can take the lock."""
 _DEFINITION_FOLDERS = ("collections", "queries", "views")
 
 
@@ -298,6 +300,10 @@ class SpaceWatcher:
                         event = None
                     if event is not None:
                         events.append(event)
+            # Let a waiting reader or save in before the next slice: the lock is not fair,
+            # and re-taking it at once starved readers for up to 0.9 s on a 1,000-file change.
+            if i < len(batch):
+                time.sleep(SLICE_GAP)
         if events and not self._stopped:
             try:
                 self.loop.call_soon_threadsafe(self._emit, events)
