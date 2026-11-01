@@ -178,7 +178,7 @@ class BoardSaver {
     this.onToast(`${WB.saveFailed.text}${reason}`)
   }
 
-  /** The server copy replaces everything here (history cleared). */
+  /** The server copy replaces the board here (the undo steps are rebased onto it). */
   reload(board: WhiteboardData, revision: string, readOnlyReason: string | null): void {
     const s = this.store.getState()
     s.canvas.load({ board, strokes: s.doc.strokes })

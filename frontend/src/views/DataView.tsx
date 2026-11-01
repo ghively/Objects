@@ -1,6 +1,6 @@
 // The data view: toolbar, filter -> sort -> group pipeline and a layout, reused by type pages,
 // collections, queries and All notes. The caller owns the state (see `useViewState`).
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Collection, Layout, Row, RowsScope, TypeDef, UpdateResult, ViewState } from '@/api/types'
 import { api } from '@/api/client'
@@ -138,12 +138,76 @@ export interface DataViewProps {
   onWritten?(row: Row, result: UpdateResult): void
 }
 
-/** A small context menu at the pointer: closes on a click elsewhere, Escape or scroll. */
-function RowContextMenu({ x, y, items, onClose }: { x: number; y: number; items: RowMenuItem[]; onClose(): void }) {
+/** Whether a dialog, menu or popover is open or holds `target` (its Escape is its own). */
+function overlayOpen(target: EventTarget | null): boolean {
+  const OVERLAY = '[role="dialog"], [role="alertdialog"], [role="menu"], [data-radix-popper-content-wrapper]'
+  if (target instanceof Element && target.closest(`${OVERLAY}, [role="listbox"]`)) return true
+  return document.querySelector(OVERLAY) !== null
+}
+
+/** Our string: a bulk delete where some rows failed (they stay selected). */
+export function bulkDeleteFailed(failed: number, total: number, reason: string): string {
+  const head = `${failed} of ${total} ${total === 1 ? 'object' : 'objects'} could not be deleted.`
+  return reason ? `${head} ${reason}` : head
+}
+
+/** The menu items whose own menu is `menu` (not a submenu's). */
+function menuItems(menu: Element): HTMLElement[] {
+  return [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')].filter((el) => el.closest('[role="menu"]') === menu)
+}
+
+/** The element under `root` matching `selector` whose `attr` is `value`. */
+function byData(root: Element | null, selector: string, attr: string, value: string | null): HTMLElement | undefined {
+  return [...(root?.querySelectorAll<HTMLElement>(selector) ?? [])].find((el) => el.getAttribute(attr) === value)
+}
+
+/** What gets focus back when the row menu closes: the focused control in the row, else its first. */
+function rowFocusTarget(row: Element | null): HTMLElement | null {
+  if (!row) return null
+  const active = document.activeElement
+  if (active instanceof HTMLElement && active !== document.body && row.contains(active)) return active
+  if (row instanceof HTMLElement && row.tabIndex >= 0) return row
+  return row.querySelector<HTMLElement>('button, input, a[href], [tabindex]:not([tabindex="-1"])')
+}
+
+/**
+ * A small context menu at the pointer: closes on a click elsewhere, Escape or scroll. Keyboard:
+ * the first item takes focus; Up/Down/Home/End move between items, Right opens a submenu and Left
+ * leaves it, Enter activates, Escape closes and returns focus to the row (`returnFocus`).
+ */
+function RowContextMenu({
+  x,
+  y,
+  items,
+  onClose,
+  returnFocus,
+}: {
+  x: number
+  y: number
+  items: RowMenuItem[]
+  onClose(): void
+  returnFocus?: HTMLElement | null
+}) {
   const [sub, setSub] = useState<string | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
+  // Set when a submenu was opened by the keyboard: its first item takes focus once it renders.
+  const focusSub = useRef(false)
+  useEffect(() => {
+    if (ref.current) menuItems(ref.current)[0]?.focus()
+  }, [])
+  useEffect(() => {
+    if (!sub || !focusSub.current) return
+    focusSub.current = false
+    const inner = byData(ref.current, '[role="menu"][data-sub]', 'data-sub', sub)
+    if (inner) menuItems(inner)[0]?.focus()
+  }, [sub])
   useEffect(() => {
     const close = () => onClose()
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      onClose()
+      returnFocus?.focus()
+    }
     window.addEventListener('click', close)
     window.addEventListener('scroll', close, true)
     window.addEventListener('keydown', key)
@@ -152,12 +216,48 @@ function RowContextMenu({ x, y, items, onClose }: { x: number; y: number; items:
       window.removeEventListener('scroll', close, true)
       window.removeEventListener('keydown', key)
     }
-  }, [onClose])
+  }, [onClose, returnFocus])
+
+  const onKeyDown = (e: ReactKeyboardEvent) => {
+    const target = e.target as HTMLElement
+    const menu = target.closest('[role="menu"]')
+    if (!menu) return
+    const list = menuItems(menu)
+    const at = list.indexOf(target)
+    const move = (i: number) => {
+      e.preventDefault()
+      list[(i + list.length) % list.length]?.focus()
+    }
+    if (e.key === 'ArrowDown') move(at + 1)
+    else if (e.key === 'ArrowUp') move(at < 0 ? list.length - 1 : at - 1)
+    else if (e.key === 'Home') move(0)
+    else if (e.key === 'End') move(list.length - 1)
+    else if (e.key === 'ArrowRight' && target.getAttribute('aria-haspopup') === 'menu') {
+      e.preventDefault()
+      const key = target.getAttribute('data-key')
+      if (!key) return
+      if (sub === key) {
+        const inner = byData(ref.current, '[role="menu"][data-sub]', 'data-sub', key)
+        if (inner) menuItems(inner)[0]?.focus()
+      } else {
+        focusSub.current = true
+        setSub(key)
+      }
+    } else if (e.key === 'ArrowLeft' && menu !== ref.current) {
+      e.preventDefault()
+      const key = menu.getAttribute('data-sub')
+      setSub(null)
+      byData(ref.current, '[role="menuitem"][data-key]', 'data-key', key)?.focus()
+    }
+  }
+
   return (
     <div
+      ref={ref}
       role="menu"
       data-testid="row-menu"
       style={{ left: x, top: y }}
+      onKeyDown={onKeyDown}
       className="fixed z-50 min-w-48 rounded-lg border border-line bg-raised p-1 text-[14px] shadow-lg"
     >
       {items.map((it) =>
@@ -168,11 +268,12 @@ function RowContextMenu({ x, y, items, onClose }: { x: number; y: number; items:
               role="menuitem"
               aria-haspopup="menu"
               aria-expanded={sub === it.key}
+              data-key={it.key}
               onClick={(e) => {
                 e.stopPropagation()
                 setSub(it.key)
               }}
-              className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-hover"
+              className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-hover focus-visible:bg-hover focus-visible:outline-none"
             >
               <Icon name={it.icon} size={14} />
               <span className="flex-1">{it.label}</span>
@@ -182,6 +283,7 @@ function RowContextMenu({ x, y, items, onClose }: { x: number; y: number; items:
               <div
                 role="menu"
                 aria-label={it.label}
+                data-sub={it.key}
                 className="absolute top-0 left-full z-50 max-h-[360px] min-w-44 overflow-auto rounded-lg border border-line bg-raised p-1 shadow-lg"
               >
                 {it.children.map((c) => (
@@ -208,7 +310,10 @@ function RowMenuButton({ item, onClose, onHover }: { item: RowMenuItem; onClose(
         onClose()
         item.onSelect()
       }}
-      className={cn('flex h-8 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-hover', item.destructive && 'text-red-400')}
+      className={cn(
+        'flex h-8 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-hover focus-visible:bg-hover focus-visible:outline-none',
+        item.destructive && 'text-red-400',
+      )}
     >
       {item.chip ? <TypeChip type={item.chip} size={18} /> : <Icon name={item.icon} size={14} />}
       {item.label}
@@ -230,7 +335,7 @@ export function DataView(props: DataViewProps) {
   const collections = props.collections ?? []
   const objects = useLinkIndex((s) => s.objects)
   const [visible, setVisible] = useState(LOAD_PAGE)
-  const [menu, setMenu] = useState<{ x: number; y: number; items: RowMenuItem[] } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; items: RowMenuItem[]; returnFocus: HTMLElement | null } | null>(null)
   // One change-type dialog per row, in turn (the bulk action runs the one-object dialog per row).
   const [changing, setChanging] = useState<{ rows: Row[]; to: TypeDef } | null>(null)
   const [deleting, setDeleting] = useState<Row | null>(null)
@@ -241,7 +346,11 @@ export function DataView(props: DataViewProps) {
 
   useEffect(() => {
     if (!selecting) return
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && setSelected(null)
+    const key = (e: KeyboardEvent) => {
+      // An Escape meant for an open dialog, menu or popover closes that, not the selection.
+      if (e.key !== 'Escape' || e.defaultPrevented || overlayOpen(e.target)) return
+      setSelected(null)
+    }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
   }, [selecting])
@@ -503,12 +612,13 @@ export function DataView(props: DataViewProps) {
       onContextMenu={
         props.rowMenu || props.rowActions
           ? (e) => {
-              const path = (e.target as Element).closest('[data-path]')?.getAttribute('data-path')
+              const rowEl = (e.target as Element).closest('[data-path]')
+              const path = rowEl?.getAttribute('data-path')
               const row = path ? flat.find((r) => r.summary.path === path) : undefined
               const items = row ? itemsFor(row) : []
               if (items.length === 0) return
               e.preventDefault()
-              setMenu({ x: e.clientX, y: e.clientY, items })
+              setMenu({ x: e.clientX, y: e.clientY, items, returnFocus: rowFocusTarget(rowEl) })
             }
           : undefined
       }
@@ -533,10 +643,27 @@ export function DataView(props: DataViewProps) {
             for (const r of selectedRows) useTabs.getState().openInSidepanel({ kind: 'object', path: r.summary.path })
           }}
           onDelete={async () => {
-            for (const r of selectedRows.filter((x) => !x.summary.readOnly)) {
-              await api.deleteObject(r.summary.path, { baseVersion: r.version })
+            // Every row is tried; the ones that fail stay selected and the count is reported.
+            const failed: Row[] = []
+            let reason = ''
+            const targets = selectedRows.filter((x) => !x.summary.readOnly)
+            for (const r of targets) {
+              try {
+                await api.deleteObject(r.summary.path, { baseVersion: r.version })
+              } catch (err) {
+                failed.push(r)
+                reason ||= err instanceof Error ? err.message : String(err)
+              }
             }
-            select(null, null)
+            if (failed.length === 0) {
+              select(null, null)
+              return
+            }
+            select(
+              failed.map((r) => r.summary.path),
+              failed[failed.length - 1].summary.path,
+            )
+            throw new Error(bulkDeleteFailed(failed.length, targets.length, reason))
           }}
           onClear={() => select(null, null)}
         />

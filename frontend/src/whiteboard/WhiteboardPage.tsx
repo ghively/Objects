@@ -154,12 +154,20 @@ export function WhiteboardPage({
   const [notesToast, setNotesToast] = useState<string | null>(null)
   const notesRef = useRef<BodyEditorHandle | null>(null)
 
+  // Bumped by every local change of the `.md` (a Notes save, an adopted stamp, a rename, a
+  // conflict reload) and every detail request: an answer to a request older than either is stale
+  // (a GET ordered before a Notes save that has since landed) and must not replace newer state.
+  const localSeqRef = useRef(0)
+  const detailSeqRef = useRef(0)
   const loadDetail = useCallback(async () => {
+    const seq = ++detailSeqRef.current
+    const local = localSeqRef.current
     try {
       const d = await api.object(path)
+      setHasDetail(true)
+      if (seq !== detailSeqRef.current || local !== localSeqRef.current) return
       versionRef.current = d.version
       setTitle(d.summary.title)
-      setHasDetail(true)
       // Notes with unsaved edits keep them when the body changed on disk; their next save
       // meets the revision check and `onNotesConflict` settles it.
       const h = notesRef.current
@@ -206,6 +214,7 @@ export function WhiteboardPage({
   }, [flush])
 
   const onNotesSaved = useCallback((version: string) => {
+    localSeqRef.current++
     versionRef.current = version
     setNotes((n) => ({ body: notesRef.current?.savedBody() ?? n?.body ?? '', version }))
   }, [])
@@ -217,6 +226,7 @@ export function WhiteboardPage({
    */
   const adoptMdVersion = useCallback(({ mdVersion: version, mdBaseVersion: base }: MdStamp) => {
     if (!version || !base || base !== versionRef.current) return
+    localSeqRef.current++
     versionRef.current = version
     setNotes((n) => (n ? { body: notesRef.current?.savedBody() ?? n.body, version } : n))
   }, [])
@@ -228,6 +238,7 @@ export function WhiteboardPage({
   const onNotesConflict = useCallback(async () => {
     try {
       const d = await api.object(path)
+      localSeqRef.current++
       versionRef.current = d.version
       setTitle(d.summary.title)
       const h = notesRef.current
@@ -261,6 +272,7 @@ export function WhiteboardPage({
     async (next: string) => {
       await flushAll()
       const res = await api.renameObject(path, next, versionRef.current)
+      localSeqRef.current++
       versionRef.current = res.version
       setNotes((n) => (n ? { ...n, version: res.version } : n))
       setTitle(next)

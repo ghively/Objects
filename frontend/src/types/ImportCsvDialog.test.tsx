@@ -10,6 +10,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
+import { useSettings } from '@/settings/useSettings'
 import { CSV_ROW_LIMIT, csvRecord, csvTargets, csvValue, defaultMapping, ImportCsvDialog } from './ImportCsvDialog'
 
 const mocked = vi.mocked(api)
@@ -110,6 +111,43 @@ describe('ImportCsvDialog', () => {
       ['book', { title: 'Emma', templateId: 'none', values: { author: 'Austen' } }],
     ])
     expect(mocked.createCollection).not.toHaveBeenCalled()
+  })
+
+  test("a column written with decimal commas is read with them, whatever the setting", async () => {
+    const before = useSettings.getState().settings
+    useSettings.setState({ settings: { ...before, decimalSeparator: 'dot' } })
+    try {
+      // A plain value follows the setting: "1,5" under "dot" is 15.
+      expect(csvValue(PAGES, '1,5')).toBe(15)
+      expect(csvValue(PAGES, '1,5', true)).toBe(1.5)
+      const user = userEvent.setup()
+      const onOpenChange = vi.fn()
+      render(<ImportCsvDialog type={BOOK} open onOpenChange={onOpenChange} />)
+      await upload(user, 'Name,Pages\r\nDune,"1,5"\r\nEmma,"1.234,25"\r\nOdd,12\r\n')
+      await user.click(await screen.findByRole('button', { name: 'Import' }))
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+      expect(mocked.createObject.mock.calls.map((c) => c[1]?.values)).toEqual([{ pages: 1.5 }, { pages: 1234.25 }, { pages: 12 }])
+    } finally {
+      useSettings.setState({ settings: before })
+    }
+  })
+
+  test('a column the cells cannot tell about follows the setting', async () => {
+    const before = useSettings.getState().settings
+    useSettings.setState({ settings: { ...before, decimalSeparator: 'comma' } })
+    try {
+      const user = userEvent.setup()
+      const onOpenChange = vi.fn()
+      render(<ImportCsvDialog type={BOOK} open onOpenChange={onOpenChange} />)
+      // "1.234" reads either way: the setting (comma) makes it 1234. "2.5" can only be a point: 2.5.
+      await upload(user, 'Name,Pages,Pages\r\nDune,1.234,2.5\r\n')
+      await user.click(await screen.findByRole('button', { name: 'Import' }))
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+      expect(mocked.createObject.mock.calls[0][1]?.values).toEqual({ pages: 1234 })
+      expect(csvRecord(['Dune', '', '2.5'], ['title', 'pages', 'pages'], csvTargets(BOOK), [undefined, undefined, false]).values).toEqual({ pages: 2.5 })
+    } finally {
+      useSettings.setState({ settings: before })
+    }
   })
 
   test('test over row limit shows not supported', async () => {

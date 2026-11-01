@@ -171,3 +171,61 @@ describe('whiteboard lastUpdated bump', () => {
     expect(api.saveBody).toHaveBeenCalledWith(PATH, 'First note line. More.\n', 'v2')
   })
 })
+
+describe('whiteboard notes and a stale detail answer', () => {
+  test('a GET answered after a Notes save landed never regresses the Notes', async () => {
+    let emit: ((e: { kind: string; path: string; version?: string }) => void) | null = null
+    vi.mocked(api.onChange).mockImplementation(((cb: typeof emit) => {
+      emit = cb
+      return () => undefined
+    }) as unknown as typeof api.onChange)
+    const client = mockWhiteboardApi(board(), 'rev-1')
+    render(
+      <div style={{ width: 1280, height: 800 }}>
+        <WhiteboardPage path={PATH} mode="page" host={fakeHost()} client={client} />
+      </div>,
+    )
+    await waitFor(() => expect(screen.getByTestId('whiteboard-canvas')).toBeInTheDocument())
+    const toggle = within(await screen.findByTestId('whiteboard-notes')).getByRole('button', { name: 'Notes' })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(screen.getByTestId('whiteboard-notes-editor')).toHaveTextContent('First note line.'))
+
+    // A change event starts a GET whose answer (the old body) arrives late.
+    let answer: (() => void) | null = null
+    vi.mocked(api.object).mockImplementationOnce(
+      (path: string) =>
+        new Promise((resolve) => {
+          answer = () =>
+            resolve(objectDetail({ summary: objectSummary({ path, title: 'Board' }), body: 'First note line.\n', version: 'v1' }))
+        }),
+    )
+    act(() => emit?.({ kind: 'changed', path: PATH, version: 'v0' }))
+    expect(answer).not.toBeNull()
+
+    // Meanwhile a Notes save lands.
+    const editor = pmEditor()
+    act(() => {
+      editor.commands.insertContentAt(editor.state.doc.content.size - 1, ' More.')
+    })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(api.saveBody).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    // The late answer is older than the save: ignored.
+    await act(async () => {
+      answer?.()
+      await Promise.resolve()
+    })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(screen.getByTestId('whiteboard-notes-editor')).toHaveTextContent('First note line. More.'))
+    const again = pmEditor()
+    act(() => {
+      again.commands.insertContentAt(again.state.doc.content.size - 1, ' Again.')
+    })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(api.saveBody).toHaveBeenCalledTimes(2))
+    expect(api.saveBody).toHaveBeenLastCalledWith(PATH, 'First note line. More. Again.\n', 'v1+1')
+  })
+})

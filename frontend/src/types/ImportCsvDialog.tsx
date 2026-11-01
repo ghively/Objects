@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
-import { parseCsvCells, type CsvCell } from '@/lib/csvParse'
+import { columnDecimalComma, parseCsvCells, type CsvCell } from '@/lib/csvParse'
 import { CHANGE_TYPE_TEXT } from '@/object/ChangeTypeDialog'
 import { parseDateInput } from '@/properties/DatePicker'
 import { fromPercent, parseNumberInput } from '@/properties/format'
@@ -120,9 +120,11 @@ const asCell = (cell: string | CsvCell): CsvCell => (typeof cell === 'string' ? 
 
 /**
  * A cell's text as the API value of `def`, read the way that kind's cell reads typed text (every
- * kind trimmed); undefined to skip it. A plain string is an unquoted cell.
+ * kind trimmed); undefined to skip it. A plain string is an unquoted cell. `radixComma` is the
+ * column's decimal separator as detected in the file (`columnDecimalComma`); left out, the
+ * decimal-separator setting (or the property's number format) decides.
  */
-export function csvValue(def: PropertyDef, cell: string | CsvCell): unknown {
+export function csvValue(def: PropertyDef, cell: string | CsvCell, radixComma?: boolean): unknown {
   const c = asCell(cell)
   const t = c.text.trim()
   if (!t) return undefined
@@ -130,7 +132,7 @@ export function csvValue(def: PropertyDef, cell: string | CsvCell): unknown {
     case 'number': {
       // As the cell reads typed text: a percentage property's cell is in percent, so "25" is 0.25.
       const fmt = def.options.numberFormat
-      const n = parseNumberInput(t, fmt)
+      const n = parseNumberInput(t, fmt, radixComma)
       if (typeof n !== 'number') return undefined
       return fmt?.type === 'percentage' ? fromPercent(n) : n
     }
@@ -162,11 +164,15 @@ export function csvValue(def: PropertyDef, cell: string | CsvCell): unknown {
   }
 }
 
-/** One record as `{title, values}`; when several columns map to one target, the first non-empty value wins. */
+/**
+ * One record as `{title, values}`; when several columns map to one target, the first non-empty
+ * value wins. `radix` holds each column's detected decimal separator (`csvDecimalCommas`).
+ */
 export function csvRecord(
   record: (string | CsvCell)[],
   mapping: (string | null)[],
   targets: CsvTarget[],
+  radix: (boolean | undefined)[] = [],
 ): { title: string; values: Record<string, unknown> } {
   let title: string | undefined
   const values: Record<string, unknown> = {}
@@ -180,10 +186,15 @@ export function csvRecord(
     if (key in values) return
     const def = targets.find((t) => t.key === key)?.def
     if (!def) return
-    const v = csvValue(def, cell)
+    const v = csvValue(def, cell, radix[i])
     if (v !== undefined) values[key] = v
   })
   return { title: title ?? '', values }
+}
+
+/** Each column's decimal separator as its cells are written (`columnDecimalComma`). */
+export function csvDecimalCommas(data: (string | CsvCell)[][], width: number): (boolean | undefined)[] {
+  return Array.from({ length: width }, (_, i) => columnDecimalComma(data.map((r) => asCell(r[i] ?? '').text)))
 }
 
 interface Parsed {
@@ -248,8 +259,9 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
         const c = await api.createCollection(collectionName, [type.id])
         collections = [c.name]
       }
+      const radix = csvDecimalCommas(data, width)
       for (let i = 0; i < data.length; i++) {
-        const { title, values } = csvRecord(data[i], mapping, targets)
+        const { title, values } = csvRecord(data[i], mapping, targets, radix)
         // No template: the file's values are the object (our choice).
         await api.createObject(type.id, { title, templateId: 'none', values: collections ? { ...values, collections } : values })
         setProgress({ done: i + 1, total: data.length })

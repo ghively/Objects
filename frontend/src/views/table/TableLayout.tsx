@@ -115,6 +115,9 @@ function HeaderCell({
   )
 }
 
+/** Our string: each row's title input is named by its row ("Title of Alpha"). */
+export const titleLabel = (title: string) => `Title of ${title || 'Untitled'}`
+
 function TitleCell({ row, onRename, onOpen }: { row: Row; onRename(row: Row, title: string): void; onOpen(e: ReactMouseEvent): void }) {
   const [text, setText] = useState(row.summary.title)
   const focused = useRef(false)
@@ -132,7 +135,7 @@ function TitleCell({ row, onRename, onOpen }: { row: Row; onRename(row: Row, tit
   return (
     <div className="group/title flex w-full min-w-0 items-center gap-1">
       <input
-        aria-label="Title"
+        aria-label={titleLabel(row.summary.title)}
         value={text}
         readOnly={row.summary.readOnly}
         onFocus={() => (focused.current = true)}
@@ -142,9 +145,10 @@ function TitleCell({ row, onRename, onOpen }: { row: Row; onRename(row: Row, tit
           if (!row.summary.readOnly) commit()
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur()
-          if (e.key === 'Escape') {
-            setText(row.summary.title)
+          // As every other cell (TextCell): Enter and Escape end the edit, which commits; an
+          // empty title still reverts. Object saves fields as you type: no edit to cancel.
+          if (e.key === 'Enter' || e.key === 'Escape') {
+            e.preventDefault()
             e.currentTarget.blur()
           }
         }}
@@ -177,7 +181,7 @@ interface TableRowProps {
   onOpen(row: Row, e: ReactMouseEvent): void
   rename(row: Row, title: string): void
   commit(row: Row, def: PropertyDef, next: unknown): Promise<boolean>
-  onDefChange(next: PropertyDef): Promise<void>
+  onDefChange(next: PropertyDef): Promise<unknown>
   openSettings(id: string): void
 }
 
@@ -378,9 +382,10 @@ export function TableLayout(props: TableLayoutProps) {
 
   const save = typeEditor.save
   const onDefChange = useCallback(
+    // Resolves the save's result (null when it failed), so a new label is applied only once saved.
     async (next: PropertyDef) => {
-      if (!type) return
-      await save({ ...type, propertyDefinitions: type.propertyDefinitions.map((d) => (d.id === next.id ? next : d)) })
+      if (!type) return null
+      return save({ ...type, propertyDefinitions: type.propertyDefinitions.map((d) => (d.id === next.id ? next : d)) })
     },
     [type, save],
   )
