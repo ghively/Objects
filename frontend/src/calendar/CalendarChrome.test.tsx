@@ -245,4 +245,16 @@ describe('CalendarChrome', () => {
     expect(view()).toBe('day')
     expect(anchor()).toBe(TODAY)
   })
+
+  test("the Today button's bold state rolls over at midnight", () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 23, 23, 59, 50))
+    render(<CalendarChrome weekStart="sunday" rightPanelOpen={false} onToggleRightPanel={vi.fn()} onOpenTarget={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Today' }).className).toContain('font-semibold')
+    // Nothing else re-renders the chrome; the anchor stays on the old day.
+    act(() => {
+      vi.advanceTimersByTime(60_000)
+    })
+    expect(screen.getByRole('button', { name: 'Today' }).className).toContain('font-normal')
+  })
 })
