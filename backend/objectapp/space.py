@@ -385,11 +385,14 @@ class SpaceChange:
     """A change to the space's in-memory scan, for `Space.add_listener` listeners.
 
     ``kind`` is ``'object'`` (``path`` is the object's space path; it may be gone
-    now) or ``'types'`` (a type definition changed; ``path`` is None).
+    now) or ``'types'`` (a type definition changed; ``path`` is None and
+    ``type_id`` names the type when the change knows it, so an index can
+    limit its work to that type's members).
     """
 
     kind: str
     path: str | None
+    type_id: str | None = field(default=None, compare=False)
 
 
 def _names_key(s: ObjectSummary | None) -> tuple | None:
@@ -723,6 +726,8 @@ class Space:
         self._name_changes: deque[tuple[int, frozenset[str] | None]] = deque(maxlen=512)
         """(`_names_rev`, the folded link names that change touched; None when unknown)."""
         self._resolver: Resolver | None = None
+        self._types_saving: set[str] = set()
+        """Types whose `save_type` is rewriting objects outside the lock (no other type write then)."""
         self._links = LinkIndex(self)
         self._listeners.append(self._links.on_change)
         self.own_writes: dict[str, str] = {}
@@ -2620,6 +2625,7 @@ class Space:
         if t.readOnlyReason or type_revision(self.root, t.id):
             return False
         try:
+            self._check_type_free(t.id)
             write_type_json(self.root, t, "")
         except (RevisionConflict, TypeReadOnly):
             return False
@@ -3092,6 +3098,7 @@ class Space:
         new = copy.deepcopy(t)
         new.templates = templates
         try:
+            self._check_type_free(t.id)
             write_type_json(self.root, new, type_revision(self.root, t.id))
         except (RevisionConflict, TypeReadOnly):
             return False
@@ -3280,6 +3287,7 @@ class Space:
 
     def _save_type(self, t: TypeDefinition) -> bool:
         try:
+            self._check_type_free(t.id)
             write_type_json(self.root, t, type_revision(self.root, t.id))
         except (RevisionConflict, TypeReadOnly):
             return False
@@ -3295,6 +3303,7 @@ class Space:
         records them so a restore puts them back.
         """
         with self._lock:
+            self._check_type_free(type_def.id)
             trash_id = new_ulid()
             folder = self.trash.type_dir(trash_id)
             folder.mkdir(parents=True, exist_ok=True)
@@ -3805,19 +3814,35 @@ class Space:
 
             # The rewritten files are rescanned as they are written, so they must
             # already resolve to the edited type (a renamed type by its new name).
+            self._check_type_free(new.id, current)
+            self._types_saving.add(new.id)
             self.types = [new if x.id == new.id else x for x in self.types]
             self._types_changed(new.id)
-            try:
-                rewritten, skipped = self._apply_type_ops(to_write, run)
+        # The files are rewritten outside the lock (each `_write` takes it for its own
+        # file), so reads go on meanwhile; `_types_saving` keeps other type writes out.
+        try:
+            rewritten, skipped = self._apply_type_ops(to_write, run)
+            with self._lock:
                 revision = write_type_json(self.root, new, current)
-            except BaseException:
+                self._sort_types()
+        except BaseException:
+            with self._lock:
                 self.types = [mem if x.id == new.id else x for x in self.types]
                 self._types_changed(new.id)
                 for rel in members:
                     self.rescan_file(rel)
-                raise
-            self._sort_types()
-            return SaveTypeResult(new, rewritten, skipped, revision)
+            raise
+        finally:
+            with self._lock:
+                self._types_saving.discard(new.id)
+        return SaveTypeResult(new, rewritten, skipped, revision)
+
+    def _check_type_free(self, type_id: str, revision: str | None = None) -> None:
+        """Raise `RevisionConflict` while a `save_type` of ``type_id`` is still rewriting files."""
+        if type_id in self._types_saving:
+            raise RevisionConflict(
+                type_revision(self.root, type_id) if revision is None else revision
+            )
 
     def _apply_type_ops(
         self, to_write: list[str], run: Callable[[str, str], str]
@@ -4123,6 +4148,7 @@ class Space:
 
     def _commit_type(self, t: TypeDefinition, base_revision: str) -> str:
         """Write a type's JSON and put it in memory; return the new revision."""
+        self._check_type_free(t.id, base_revision)
         revision = write_type_json(self.root, t, base_revision)
         self._loaded_revisions[t.id] = revision
         if any(x.id == t.id for x in self.types):
@@ -4449,8 +4475,8 @@ class Space:
                 _log.exception("A space change listener failed on %s", change)
 
     def _types_changed(self, type_id: str | None = None) -> None:
-        """Tell the listeners that a type definition changed (``type_id`` is informative)."""
-        self._fire(SpaceChange("types", None))
+        """Tell the listeners that a type definition changed (``type_id`` when known)."""
+        self._fire(SpaceChange("types", None, type_id))
 
     def _names_changed(
         self, before: ObjectSummary | None = None, after: ObjectSummary | None = None

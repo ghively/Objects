@@ -16,8 +16,9 @@ counted (`date_tokens`, `date_references`).
 The index stores each source's link *targets* (`_extract`, one method, the hook
 point for other kinds of objects) and resolves them on read. `on_change` only
 records the change: the next read re-extracts the changed sources, re-extracts
-everything after a type change (property definitions decide which keys are
-relations), and re-resolves the sources holding a link written to a name that
+a changed type's members (property definitions decide which keys are
+relations; everything when the change names no type), and re-resolves the
+sources holding a link written to a name that
 changed (`Space._names_since`; every source when the space can't say which).
 Nothing is ever written.
 
@@ -138,7 +139,11 @@ class LinkIndex:
         with space._lock:
             pending, self._pending = self._pending, []
             self._sources_rev += 1
-            full = not self._built or any(c.kind == "types" for c in pending)
+            # A type change re-extracts its members (the definitions decide which keys
+            # are relations); one that names no type re-extracts everything.
+            full = not self._built or any(
+                c.kind == "types" and c.type_id is None for c in pending
+            )
             dirty: set[str] = set()
             if full:
                 self._sources = {}
@@ -152,6 +157,9 @@ class LinkIndex:
                 self._built = True
             else:
                 dirty = {c.path for c in pending if c.path}
+                type_ids = {c.type_id for c in pending if c.kind == "types" and c.type_id}
+                if type_ids:
+                    dirty.update(p for p, s in space._summaries.items() if s.type in type_ids)
                 for path in dirty:
                     ex = self._extract_if_source(path)
                     if ex is None:
