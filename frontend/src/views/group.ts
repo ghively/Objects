@@ -12,12 +12,13 @@ import type {
   PropertyType,
   Row,
   StatusCategory,
+  TypeDef,
 } from '@/api/types'
 import { formatNumber } from '@/properties/format'
 import { STATUS_CATEGORIES, optionCategory } from '@/tasks/statusCategory'
 import { wallClock } from '@/lib/zonedTime'
 import { dateSpan } from './dates'
-import { displayTitle, findDef, rowValue, type FilterCtx } from './filter'
+import { defIn, displayTitle, findDef, rowValue, typeMap, type FilterCtx } from './filter'
 
 export interface GroupOption {
   key: string
@@ -326,6 +327,18 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
   }
 }
 
+/** Whether `row` groups under `def`: its type is the grouping's (if named) and defines the key as the same kind, or not at all. */
+function sameKind(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'>, type: TypeDef | undefined): boolean {
+  if (entry.structureId && row.summary.type !== entry.structureId) return false
+  const own = defIn(type, entry.propertyId)
+  return !own || own.type === def.type
+}
+
+/** Whether a kanban drop may write `def`'s value on `row` (see `sameKind`): a row of a type with the key as another kind is refused. */
+export function canDropRow(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'>, types: TypeDef[]): boolean {
+  return sameKind(row, entry, def, types.find((t) => t.id === row.summary.type))
+}
+
 const cmpSort = (a: number | string, b: number | string): number =>
   typeof a === 'number' && typeof b === 'number'
     ? a - b
@@ -365,8 +378,11 @@ export function groupRows(
     byId.set('true', { id: 'true', label: 'Checked', rows: [], sort: 0, created: Infinity })
     byId.set('false', { id: 'false', label: 'Unchecked', rows: [], sort: 1, created: Infinity })
   }
+  const byType = typeMap(ctx.types)
   for (const row of rows) {
-    const buckets = entry.structureId && row.summary.type !== entry.structureId ? [] : rowBuckets(row, entry, def, ctx)
+    // A row of another type than the grouping's, or one whose type has the key as another kind
+    // (text where the view's definition is a label), can't be bucketed: it sits in Other.
+    const buckets = !sameKind(row, entry, def, byType[row.summary.type]) ? [] : rowBuckets(row, entry, def, ctx)
     if (!buckets) continue
     if (!buckets.length) {
       other.rows.push(row)

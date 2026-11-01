@@ -9,7 +9,8 @@ import { usePeek } from '@/nav/tabs'
 import { LabelPill } from '@/properties/LabelMenu'
 import { cn } from '@/lib/utils'
 import type { LayoutProps } from '../DataView'
-import { groupRows, valueForGroup, type Group } from '../group'
+import { findDef } from '../filter'
+import { canDropRow, groupRows, valueForGroup, type Group } from '../group'
 import { matchingValues } from '../matching'
 import { propertyChoices } from '../properties'
 import { createRowWrites } from '../rowWrites'
@@ -101,10 +102,10 @@ export function KanbanLayout(props: LayoutProps) {
     [],
   )
 
-  const groupBy = useMemo(() => kanbanGroupBy(state.groupBy, props), [state.groupBy, props])
-  const choices = useMemo(() => propertyChoices(viewTypes), [viewTypes])
+  const groupBy = useMemo(() => kanbanGroupBy(state.groupBy, { viewTypes }), [state.groupBy, viewTypes])
   const entry = groupBy?.groups[0]
-  const groupDef = entry ? choices.find((c) => c.key === entry.propertyId)?.def : undefined
+  // The definition the columns follow: the grouping's type's, as `groupRows` resolves it.
+  const groupDef = entry ? findDef(ctx.types, entry.propertyId, entry.structureId, ctx.viewTypeIds) : undefined
   const { groups } = useMemo(
     () => groupRows(flat, groupBy, state.viewDefinition.groupByConfig, ctx),
     [flat, groupBy, state.viewDefinition.groupByConfig, ctx],
@@ -137,6 +138,8 @@ export function KanbanLayout(props: LayoutProps) {
     const row = flat.find((r) => r.summary.path === path)
     const target = groups.find((g) => `col:${g.id}` === e.over?.id)
     if (!row || !target || target.rows.some((r) => r.summary.path === row.summary.path)) return
+    // A row whose type has the key as another kind (text under a label grouping) can't take the value.
+    if (!entry || !groupDef || !canDropRow(row, entry, groupDef, props.types)) return
     const from = groups.find((g) => g.id === data?.groupId) ?? groups.find((g) => g.rows.some((r) => r.summary.path === path))
     const change = groupBy && groupDef ? valueForGroup(groupBy, target, groupDef, { row, from }) : null
     if (!change) return
