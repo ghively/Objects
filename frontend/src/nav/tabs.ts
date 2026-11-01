@@ -583,12 +583,23 @@ export function mergeTabsFromStorage(incoming: unknown, previous: unknown, curre
   for (const t of current.tabs) {
     if (t.id === current.activeId) merged.push(t)
     else if (closed.has(t.id)) continue
-    else merged.push(theirs.find((x) => x.id === t.id) ?? t)
+    else {
+      const their = theirs.find((x) => x.id === t.id)
+      // Keep our object when their copy is the same tab, so an unchanged state is told apart below.
+      merged.push(their && !sameTab(their, t) ? their : t)
+    }
   }
   for (const t of theirs) if (!ours.has(t.id)) merged.push(t)
   const tabs = sortPinned(merged)
   const activeId = tabs.some((t) => t.id === current.activeId) ? current.activeId : (tabs[0]?.id ?? null)
+  // Nothing changed for this window (their write only differs in `activeId`, or echoes our own
+  // merge): no patch, or our re-write would differ from theirs and ping-pong between the windows.
+  if (activeId === current.activeId && tabs.length === current.tabs.length && tabs.every((t, i) => t === current.tabs[i])) return null
   return { tabs, activeId }
+}
+
+function sameTab(a: Tab, b: Tab): boolean {
+  return a === b || JSON.stringify(a) === JSON.stringify(b)
 }
 
 followStorage(useTabs, mergeTabsFromStorage)

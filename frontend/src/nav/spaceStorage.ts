@@ -83,6 +83,15 @@ function persistedState(raw: string | null): unknown {
   }
 }
 
+/** Whether every key of `patch` already holds the same value (or JSON-equal data) in `state`. */
+function sameSlice<S>(patch: Partial<S>, state: S): boolean {
+  return (Object.keys(patch) as (keyof S)[]).every((k) => {
+    const a = patch[k]
+    const b = state[k]
+    return Object.is(a, b) || JSON.stringify(a) === JSON.stringify(b)
+  })
+}
+
 /**
  * Follow another window's writes to the store's key (the `storage` event never fires in the
  * window that wrote). `merge` gets what that window stored, what the key held before its write
@@ -99,8 +108,11 @@ export function followStorage<S>(
     if (e.key !== store.persist.getOptions().name) return
     const incoming = persistedState(e.newValue)
     if (incoming === null) return
-    const patch = merge(incoming, persistedState(e.oldValue), store.getState())
-    if (patch) store.setState(patch)
+    const state = store.getState()
+    const patch = merge(incoming, persistedState(e.oldValue), state)
+    // Only a real change is applied: `persist` writes the key on every setState, and a write that
+    // differs from the other window's (each keeps its own `activeId`) wakes it in turn, endlessly.
+    if (patch && !sameSlice(patch, state)) store.setState(patch)
   }
   window.addEventListener('storage', onStorage)
   return () => window.removeEventListener('storage', onStorage)
