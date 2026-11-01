@@ -273,6 +273,53 @@ def test_type_change_reindexes_props(links):
     assert _wait(lambda: CHARLES not in _paths(idx.search("difference")))
 
 
+def test_type_change_documents_only_the_types_members(links, monkeypatch):
+    """Audit 2026-11-01 P5: a type change re-documented all 5,001 objects (7 s); only the
+    changed type's members (and an object whose stored type is stale) are looked at."""
+    space, idx = links
+    documented: list[str] = []
+    real = idx._document
+    monkeypatch.setattr(idx, "_document", lambda p: documented.append(p) or real(p))
+    t = space.type_by_id("person")
+    bio = next(p for p in t.propertyDefinitions if p.key == "bio")
+    bio.extra["isNotSearchable"] = True
+    idx._sync_types()
+    people = {s.path for s in space._summaries.values() if s.type == "person" and s.template is None}
+    assert people and set(documented) == people
+    assert CHARLES not in _paths(idx.search("difference"))
+    # Nothing to do when the types are unchanged.
+    documented.clear()
+    idx._sync_types()
+    assert documented == []
+    # An object whose stored type column is stale is re-documented even if its type
+    # didn't change (its type name resolved differently after the change).
+    stale = next(p for p, s in space._summaries.items() if s.type == "page" and s.template is None)
+    with idx._db_lock:
+        idx._conn.execute(
+            "UPDATE fts SET type = 'gone' WHERE rowid = (SELECT rowid FROM meta WHERE path = ?)", (stale,)
+        )
+        idx._conn.commit()
+    bio.extra["isNotSearchable"] = False
+    documented.clear()
+    idx._sync_types()
+    assert set(documented) == people | {stale}
+    with idx._db_lock:
+        row = idx._conn.execute(
+            "SELECT type FROM fts WHERE rowid = (SELECT rowid FROM meta WHERE path = ?)", (stale,)
+        ).fetchone()
+    assert row == ("page",)
+    assert CHARLES in _paths(idx.search("difference"))
+
+
+def test_changed_types_fingerprint_diff():
+    before = '{"page":"a","task":"b"}'
+    assert SearchIndex._changed_types(before, '{"page":"a","task":"c"}') == {"task"}
+    assert SearchIndex._changed_types(before, '{"page":"a","task":"b","tag":"d"}') == {"tag"}
+    assert SearchIndex._changed_types(before, '{"page":"a"}') == {"task"}
+    assert SearchIndex._changed_types("deadbeef", '{"page":"a"}') is None  # the old one-hash format
+    assert SearchIndex._changed_types(None, '{"page":"a"}') is None
+
+
 def test_partial_until_initial_sync(links_space_dir: Path, tmp_path: Path):
     space = Space(links_space_dir)
     idx = SearchIndex(space, tmp_path / "cache")

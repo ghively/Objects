@@ -151,6 +151,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 from starlette.background import BackgroundTask
+from starlette.middleware.gzip import GZipMiddleware
 
 from . import (
     api_blocks,
@@ -520,6 +521,15 @@ def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse({"detail": message}, status_code=status)
 
 
+def _unusable_id(id: str) -> bool:
+    """An id no definition file name can hold, so no definition can exist under it.
+
+    `JsonStore.path` checks the id's characters; the length is checked here so an
+    over-long id from a URL answers 404 instead of ``ENAMETOOLONG`` from the OS (503).
+    """
+    return "\x00" in id or len(id.encode("utf-8", errors="surrogateescape")) > 200
+
+
 # The host names this app answers to. Any other ``Host`` is a DNS-rebinding page
 # (a foreign name resolved to 127.0.0.1), refused on every request. The port is not
 # checked: the Vite dev server proxies with its own port in ``Host``. Tests add
@@ -779,7 +789,13 @@ def create_app(
     app = FastAPI(
         title="Object", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
     )
-    app.add_middleware(LocalOnlyMiddleware)
+    # Audit 2026-11-01 F11: gzip the API's JSON and the static bundle (3.4 MB + 4.5 MB
+    # of assets; matters over Tailscale). Starlette leaves ``text/event-stream`` alone
+    # by default, so /api/events is never buffered; small answers stay as they are.
+    # Level 1, not Starlette's 9: on the 9 MB all-rows answer level 9 cost 465 ms of
+    # CPU for 1.5 MB on the wire, level 1 under 40 ms for 1.9 MB.
+    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=1)
+    app.add_middleware(LocalOnlyMiddleware)  # added last: the outermost, so it checks first
     app.state.space = space
     app.state.hub = hub
     app.state.reminders = scheduler
@@ -787,10 +803,12 @@ def create_app(
 
     @app.exception_handler(OSError)
     async def os_error(_request: Request, exc: OSError) -> JSONResponse:
-        # A file locked by another program (Windows sharing violations) or a
-        # transient file-system failure: report it as JSON the client can show
-        # and retry, never as a bare 500.
-        if isinstance(exc, PermissionError):
+        # A file locked by another program (a Windows sharing violation, winerror
+        # 32) or a transient file-system failure: report it as JSON the client can
+        # show and retry, never as a bare 500. A plain `PermissionError` (EACCES on
+        # macOS/Linux, a read-only file on Windows) is not a lock, so it gets the
+        # OS's own words.
+        if isinstance(exc, PermissionError) and getattr(exc, "winerror", None) == 32:
             detail = "A file is in use by another program. Try again in a moment."
         else:
             detail = f"The file system refused the change: {exc.strerror or exc}"
@@ -875,8 +893,11 @@ def create_app(
     def _folder(raw: str) -> Path | None:
         if not raw.strip():
             return None
-        path = normalize(raw)
-        return path if path.is_dir() else None
+        try:
+            path = normalize(raw)
+            return path if path.is_dir() else None
+        except (ValueError, OSError):  # a NUL, or a path too long for the OS to stat
+            return None
 
     @api.post("/spaces/open")
     def open_space(req: SpacePathRequest):
@@ -890,7 +911,10 @@ def create_app(
     def remove_space(path: str = Query(default="")):
         if not path.strip():
             return _error(404, "No space given.")
-        target = normalize(path)
+        try:
+            target = normalize(path)
+        except ValueError:
+            return _error(404, f"Not a folder: {path[:60]!r}")
         if os.path.normcase(str(target)) == os.path.normcase(str(space.root)):
             return _error(409, "This space is open. Switch to another space first.")
         registry().remove(target)
@@ -909,7 +933,10 @@ def create_app(
 
     @api.get("/objects")
     def list_objects(type: str | None = Query(default=None)):
-        return _display_safe([asdict(s) for s in space.list(type or None)])
+        # A JSONResponse is encoded here, on the worker thread; a plain return would run
+        # FastAPI's per-value `jsonable_encoder` on the event loop (audit 2026-11-01 B2:
+        # 120 ms per request at 5,000 objects, stalling SSE and every other request).
+        return JSONResponse(_display_safe([asdict(s) for s in space.list(type or None)]))
 
     @api.get("/object")
     def get_object(path: str):
@@ -1302,7 +1329,7 @@ def create_app(
         if not from_ or not to:
             return _error(422, "A calendar range needs from and to (YYYY-MM-DD).")
         try:
-            return _display_safe(space.calendar(from_, to))
+            return JSONResponse(_display_safe(space.calendar(from_, to)))  # see `list_objects`
         except InvalidValue as exc:
             return _error(422, str(exc))
 
@@ -1313,7 +1340,7 @@ def create_app(
             rows = space.rows(req.typeIds, req.collectionIds, req.paths, search, req.preview)
         except InvalidValue as exc:
             return _error(422, str(exc))
-        return _display_safe({"rows": [asdict(r) for r in rows]})
+        return JSONResponse(_display_safe({"rows": [asdict(r) for r in rows]}))  # see `list_objects`
 
     @api.get("/views/{type_id}")
     def get_views(type_id: str):
@@ -1392,6 +1419,8 @@ def create_app(
             c = space.create_collection(req.name, req.typeIds, req.icon)
         except InvalidValue as exc:
             return _error(422, str(exc))
+        except ValueError:  # `JsonStore.path` refused the id made from the name
+            return _error(422, "This name can't be used as a file name. Try a different name.")
         announce(ChangeEvent("collections", c.id, None, origin=req.clientId))
         return JSONResponse(_display_safe(c.to_api(space.collection_revision(c.id))), status_code=201)
 
@@ -1447,11 +1476,15 @@ def create_app(
             q = space.create_query(req.name, req.definition, req.view)
         except InvalidValue as exc:
             return _error(422, str(exc))
+        except ValueError:  # `JsonStore.path` refused the id made from the name
+            return _error(422, "This name can't be used as a file name. Try a different name.")
         announce(ChangeEvent("queries", q.id, None, origin=req.clientId))
         return JSONResponse(_display_safe(q.to_api(space.query_revision(q.id))), status_code=201)
 
     @api.put("/queries/{query_id}")
     def save_query(query_id: str, req: SaveQueryRequest):
+        if _unusable_id(query_id):
+            return _error(404, f"No query {query_id[:60]!r}")
         q = QueryDef.from_json(req.query, fallback_id=query_id)
         q.id = query_id
         try:
@@ -1469,6 +1502,8 @@ def create_app(
 
     @api.delete("/queries/{query_id}")
     def delete_query(query_id: str, clientId: str | None = Query(default=None)):
+        if _unusable_id(query_id):
+            return _error(404, f"No query {query_id[:60]!r}")
         try:
             trash_id = space.delete_query(query_id)
         except ReadOnly as exc:
@@ -1610,13 +1645,35 @@ def create_app(
     def get_images():
         return _display_safe(list_images(space.root))
 
+    async def _upload_body(request: Request) -> bytes | None:
+        """The uploaded bytes, or None once they exceed Object's 100 MiB limit (413)."""
+        limit = media.MAX_ATTACHMENT_BYTES
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > limit:
+            return None
+        chunks: list[bytes] = []
+        size = 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > limit:
+                return None
+            chunks.append(chunk)
+        return b"".join(chunks)
+
     @api.post("/images", status_code=201)
     async def post_image(request: Request, name: str = Query(default="")):
-        data = await request.body()
+        too_large = _error(413, media.UPLOAD_LIMIT_DETAIL)
+        data = await _upload_body(request)
+        if data is None:
+            return too_large
         try:
             path = await asyncio.to_thread(import_image, space.root, name, data)
         except NotAnImage:
             return _error(415, "Only png, jpg, jpeg, gif, webp and svg images can be added")
+        except TooLarge:
+            return too_large
+        except ValueError as exc:
+            return _error(422, str(exc))
         return JSONResponse({"path": path}, status_code=201)
 
     @api.get("/attachments")
@@ -1625,19 +1682,10 @@ def create_app(
 
     @api.post("/attachments", status_code=201)
     async def post_attachment(request: Request, name: str = Query(default="")):
-        limit = media.MAX_ATTACHMENT_BYTES
         too_large = _error(413, media.UPLOAD_LIMIT_DETAIL)
-        declared = request.headers.get("content-length", "")
-        if declared.isdigit() and int(declared) > limit:
+        data = await _upload_body(request)
+        if data is None:
             return too_large
-        chunks: list[bytes] = []
-        size = 0
-        async for chunk in request.stream():
-            size += len(chunk)
-            if size > limit:
-                return too_large
-            chunks.append(chunk)
-        data = b"".join(chunks)
         try:
             path, kind = await asyncio.to_thread(import_attachment, space.root, name, data)
         except TooLarge:

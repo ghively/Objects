@@ -76,9 +76,25 @@ class SpaceEntry:
     lastOpened: str | None
 
 
+# No file system takes a name component longer than this (NTFS: 255 UTF-16 units,
+# ext4/APFS: 255 bytes), so a longer one can only be malformed input.
+_MAX_COMPONENT_BYTES = 255
+
+
 def normalize(path: Path | str) -> Path:
-    """The absolute, resolved form of `path` (``~`` expanded) the registry stores."""
-    return Path(os.path.expanduser(str(path))).resolve()
+    """The absolute, resolved form of `path` (``~`` expanded) the registry stores.
+
+    Raises `ValueError` (the routes answer 404 "Not a folder") for a path no file
+    system can hold: one with a NUL byte (`Path.resolve` raises that itself on
+    POSIX, not on Windows) or an over-long name component (`os.stat` would raise
+    ``ENAMETOOLONG``, which the routes must not report as a file-system failure).
+    """
+    text = os.path.expanduser(str(path))
+    if "\x00" in text:
+        raise ValueError(f"embedded null character in path: {text!r}")
+    if any(len(part.encode("utf-8")) > _MAX_COMPONENT_BYTES for part in text.replace("\\", "/").split("/")):
+        raise ValueError(f"path component too long: {text[:60]!r}")
+    return Path(text).resolve()
 
 
 def _key(path: Path | str) -> str:
@@ -244,9 +260,12 @@ def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
     name = name.strip()
     if len(name) > MAX_NAME_LENGTH:
         raise SpaceNameProblem(f"A space name can have at most {MAX_NAME_LENGTH} characters.")
-    parent = normalize(location)
-    if not parent.is_dir():
-        raise NotADirectoryError(f"Not a folder: {parent}")
+    try:
+        parent = normalize(location)
+        if not parent.is_dir():
+            raise NotADirectoryError(f"Not a folder: {parent}")
+    except ValueError as exc:  # a NUL, or a component too long for any file system
+        raise NotADirectoryError(f"Not a folder: {str(location)[:60]!r}") from exc
     target = parent / safe_filename(name)
     target.mkdir()  # FileExistsError when anything is already there
     (target / ".object").mkdir()
@@ -297,12 +316,15 @@ def folder_token(path: Path) -> str:
 
 
 def _is_space_folder(path: Path) -> bool:
-    return (
-        path.is_dir()
-        and not path.is_symlink()
-        and (path / ".object").is_dir()
-        and not (path / ".object").is_symlink()
-    )
+    try:
+        return (
+            path.is_dir()
+            and not path.is_symlink()
+            and (path / ".object").is_dir()
+            and not (path / ".object").is_symlink()
+        )
+    except OSError:  # a path the OS can't even stat (too long) is no space folder
+        return False
 
 
 def _within(child: Path, parent: Path) -> bool:
@@ -374,7 +396,10 @@ def delete_space(
     reg = registry or Registry(state_dir())
     if not isinstance(path, (str, Path)) or not str(path).strip():
         raise SpaceNotFound("No space given.")
-    target = normalize(path)
+    try:
+        target = normalize(path)
+    except ValueError as exc:
+        raise SpaceNotFound(f"Not a space folder: {str(path)[:60]!r}") from exc
     if current is not None:
         cur = normalize(current)
         if _within(cur, target) or _within(target, cur):
