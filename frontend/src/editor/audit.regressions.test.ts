@@ -413,6 +413,32 @@ describe('lines with ::', () => {
   })
 })
 
+describe('typed field and footnote definition lines (audit 2026-11-01)', () => {
+  test.each([
+    ['Key:: value', 'Key\\:: value'],
+    ['[^1]: footnote', '\\[^1\\]: footnote'],
+  ])('%j typed stays a paragraph', (text, saved) => {
+    const editor = headless('P\n')
+    setParagraph(editor, text)
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved + '\n')
+    expect(out.reloaded).toEqual([['paragraph', text]])
+    const again = headless(out.saved)
+    append(again, 'e', 'Z')
+    expect(serializeBody(again)).toBe(saved + 'Z\n')
+  })
+
+  test('a footnote reference in text keeps its brackets', () => {
+    const editor = headless('P\n')
+    setParagraph(editor, 'a [^1] b')
+    expect(serializeBody(editor)).toBe('a [^1] b\n')
+  })
+
+  test('a field line in a file still loads raw', () => {
+    expect(shape(headless('Key:: value\n')).map(([t]) => t)).toEqual(['rawBlock'])
+  })
+})
+
 describe('headings', () => {
   test.each([
     [' #', '## Title \\#'],
