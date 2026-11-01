@@ -138,6 +138,19 @@ export interface DataViewProps {
   onWritten?(row: Row, result: UpdateResult): void
 }
 
+/** Whether a dialog, menu or popover is open or holds `target` (its Escape is its own). */
+function overlayOpen(target: EventTarget | null): boolean {
+  const OVERLAY = '[role="dialog"], [role="alertdialog"], [role="menu"], [data-radix-popper-content-wrapper]'
+  if (target instanceof Element && target.closest(`${OVERLAY}, [role="listbox"]`)) return true
+  return document.querySelector(OVERLAY) !== null
+}
+
+/** Our string: a bulk delete where some rows failed (they stay selected). */
+export function bulkDeleteFailed(failed: number, total: number, reason: string): string {
+  const head = `${failed} of ${total} ${total === 1 ? 'object' : 'objects'} could not be deleted.`
+  return reason ? `${head} ${reason}` : head
+}
+
 /** A small context menu at the pointer: closes on a click elsewhere, Escape or scroll. */
 function RowContextMenu({ x, y, items, onClose }: { x: number; y: number; items: RowMenuItem[]; onClose(): void }) {
   const [sub, setSub] = useState<string | null>(null)
@@ -241,7 +254,11 @@ export function DataView(props: DataViewProps) {
 
   useEffect(() => {
     if (!selecting) return
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && setSelected(null)
+    const key = (e: KeyboardEvent) => {
+      // An Escape meant for an open dialog, menu or popover closes that, not the selection.
+      if (e.key !== 'Escape' || e.defaultPrevented || overlayOpen(e.target)) return
+      setSelected(null)
+    }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
   }, [selecting])
@@ -533,10 +550,27 @@ export function DataView(props: DataViewProps) {
             for (const r of selectedRows) useTabs.getState().openInSidepanel({ kind: 'object', path: r.summary.path })
           }}
           onDelete={async () => {
-            for (const r of selectedRows.filter((x) => !x.summary.readOnly)) {
-              await api.deleteObject(r.summary.path, { baseVersion: r.version })
+            // Every row is tried; the ones that fail stay selected and the count is reported.
+            const failed: Row[] = []
+            let reason = ''
+            const targets = selectedRows.filter((x) => !x.summary.readOnly)
+            for (const r of targets) {
+              try {
+                await api.deleteObject(r.summary.path, { baseVersion: r.version })
+              } catch (err) {
+                failed.push(r)
+                reason ||= err instanceof Error ? err.message : String(err)
+              }
             }
-            select(null, null)
+            if (failed.length === 0) {
+              select(null, null)
+              return
+            }
+            select(
+              failed.map((r) => r.summary.path),
+              failed[failed.length - 1].summary.path,
+            )
+            throw new Error(bulkDeleteFailed(failed.length, targets.length, reason))
           }}
           onClear={() => select(null, null)}
         />

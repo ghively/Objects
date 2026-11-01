@@ -179,6 +179,46 @@ describe('DataView multi-select (Task 18)', () => {
     expect(selectedTitles()).toEqual([])
   })
 
+  test('Escape with a dialog open closes the dialog, not the selection', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await startSelecting(user, 'A')
+    await user.click(screen.getByRole('button', { name: 'Delete objects' }))
+    await screen.findByRole('alertdialog')
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(selectedTitles()).toEqual(['A'])
+  })
+
+  test('deselecting the last row leaves "Select multiple"', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await startSelecting(user, 'B')
+    await user.click(screen.getByText('B'))
+    expect(screen.queryByTestId('selection-bar')).toBeNull()
+    // A click opens the peek again.
+    await user.click(screen.getByText('C'))
+    expect(usePeek.getState().path).toBe('Pages/C.md')
+  })
+
+  test('bulk delete goes past a failing row, reports the count and keeps only the failed rows selected', async () => {
+    mocked.deleteObject.mockImplementation(async (path) => {
+      if (path === 'Pages/B.md') throw new Error('Locked.')
+      return { trashId: 't' }
+    })
+    const user = userEvent.setup()
+    render(<Harness />)
+    await startSelecting(user, 'A')
+    await user.click(screen.getByText('B'))
+    await user.click(screen.getByText('C'))
+    await user.click(screen.getByRole('button', { name: 'Delete objects' }))
+    const dialog = await screen.findByRole('alertdialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Delete 3 objects' }))
+    await waitFor(() => expect(mocked.deleteObject).toHaveBeenCalledTimes(3))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('1 of 3 objects could not be deleted. Locked.')
+    expect(selectedTitles()).toEqual(['B'])
+  })
+
   test('test table and card rows show the selection', async () => {
     const user = userEvent.setup()
     const { unmount } = render(<Harness layout="table" />)
