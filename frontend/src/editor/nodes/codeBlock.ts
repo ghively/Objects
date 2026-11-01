@@ -18,6 +18,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import type { Option } from '../annotations'
+import { codeFence } from '../preserve'
 import { CodeBlockView } from '../code/CodeBlockView'
 import { codeHighlightPlugin } from '../code/highlight'
 import '../../theme/codeSyntax.css'
@@ -52,16 +53,8 @@ export function touchesLockedCode(tr: Transaction, state: EditorState): boolean 
 
 export const CodeBlockLockKey = new PluginKey('codeBlockLock')
 
-/**
- * The fence for `text`: three backticks, or one more than the longest run of
- * backticks that starts a line inside (CommonMark: such a line would
- * otherwise close the block early).
- */
-export function codeFence(text: string): string {
-  let longest = 0
-  for (const m of text.matchAll(/^ {0,3}(`{3,})/gm)) longest = Math.max(longest, m[1].length)
-  return '`'.repeat(Math.max(3, longest + 1))
-}
+/** The fence for `text` (`preserve.ts`): three backticks, or more when a line inside would close it. */
+export { codeFence }
 
 export const CodeBlock = BaseCodeBlock.extend({
   renderMarkdown: (node, h) => {

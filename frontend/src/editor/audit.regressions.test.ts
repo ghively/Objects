@@ -11,6 +11,7 @@ import { formatAnnotation, makeOption, parseAnnotation } from './annotations'
 import { editorExtensions, loadBody, serializeBody } from './document'
 import { turnInto } from './extensions/blockSelection'
 import { moveBlockTo } from './handles/dragMove'
+import { codeFence } from './preserve'
 
 const editors: TiptapEditor[] = []
 afterEach(() => {
@@ -101,6 +102,30 @@ describe('code blocks', () => {
     const { saved, reloaded } = saveAndReload(editor)
     expect(reloaded).toEqual([['codeBlock', 'foo\n```\nbar']])
     expect(saved).toBe('````\nfoo\n```\nbar\n````\n')
+  })
+
+  test.each([
+    ['\n~~~', '~~~~\ncode\n~~~\n~~~~\n', 'code\n~~~'],
+    ['\n```', '~~~\ncode\n```\n~~~\n', 'code\n```'],
+    ['Z', '~~~\ncodeZ\n~~~\n', 'codeZ'],
+  ])('a tilde-fenced block keeps its fence when %j is typed inside (audit 2026-11-01 #6)', (typed, saved, text) => {
+    const editor = headless('~~~\ncode\n~~~\n')
+    append(editor, 'code', typed)
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved)
+    expect(out.reloaded).toEqual([['codeBlock', text]])
+  })
+
+  test('an edited tilde-fenced block keeps its info string and indented closing fence', () => {
+    const editor = headless('~~~ js \nx\n  ~~~~\n')
+    append(editor, 'x', 'Z')
+    expect(serializeBody(editor)).toBe('~~~ js \nxZ\n  ~~~~\n')
+  })
+
+  test('codeFence counts runs of the fence character only', () => {
+    expect(codeFence('a\n~~~\nb', '~')).toBe('~~~~')
+    expect(codeFence('a\n```\nb', '~')).toBe('~~~')
+    expect(codeFence('a\n~~~\nb')).toBe('```')
   })
 
   test('a new code block with a ```` line gets a longer fence', () => {
