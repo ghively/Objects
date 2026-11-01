@@ -152,6 +152,36 @@ def test_watcher_silent_for_property_update_and_sync(space_dir: Path):
     _run(space_dir, scenario)
 
 
+def test_one_worker_thread_debounces_every_path(space_dir: Path):
+    """Audit 2026-11-01 B5: one `threading.Timer` per touched path (1,000 threads for a checkout)."""
+    space = Space(space_dir)
+    loop = asyncio.new_event_loop()
+    try:
+        watcher = SpaceWatcher(space, loop)  # not started: paths are scheduled by hand
+        edited = [s.path for s in space.list()][:3]
+        for rel in edited:
+            (space_dir / rel).write_bytes((space_dir / rel).read_bytes() + b"\nexternal\n")
+        before = threading.active_count()
+        for rel in [s.path for s in space.list()] * 20:  # 20 raw events per file
+            watcher._schedule(rel)
+            watcher._touch(str(space_dir / rel))
+        assert threading.active_count() == before + 1
+        assert [t.name for t in threading.enumerate() if t.name.startswith("watcher")] == ["watcher-debounce"]
+        deadline = time.monotonic() + 3
+        got: list[ChangeEvent] = []
+        while time.monotonic() < deadline and len(got) < len(edited):
+            loop.run_until_complete(asyncio.sleep(0.05))
+            while not watcher.events.empty():
+                got.append(watcher.events.get_nowait())
+        assert sorted((e.kind, e.path) for e in got) == sorted(("changed", rel) for rel in edited)
+        loop.run_until_complete(asyncio.sleep(0.4))
+        assert watcher.events.empty()  # unchanged files and repeats make no event
+        watcher.stop()
+        assert all(not t.name.startswith("watcher") for t in threading.enumerate())
+    finally:
+        loop.close()
+
+
 def test_change_event_has_old_path_and_new_kinds():
     ev = ChangeEvent(kind="renamed", path="People/Ada King.md", version="v", oldPath="People/Ada.md")
     assert ev.oldPath == "People/Ada.md"
