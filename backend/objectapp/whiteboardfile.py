@@ -45,6 +45,7 @@ __all__ = [
     "BoardInvalid",
     "board_rel",
     "dump_board",
+    "encode_like_sidecar",
     "media_path_problem",
     "weblink_problem",
     "empty_board",
@@ -375,3 +376,22 @@ def load_board(data: bytes) -> tuple[dict[str, Any], str | None]:
 def dump_board(board: dict[str, Any]) -> bytes:
     """The file bytes: ``indent=2``, non-ASCII kept, LF, trailing newline, key order as given."""
     return dump_json(board)
+
+
+_BOM = b"\xef\xbb\xbf"
+
+
+def encode_like_sidecar(current: bytes | None, data: bytes) -> bytes:
+    """`data` (LF, no BOM, as `dump_board` and `dump_ink` write it) in `current`'s conventions.
+
+    A sidecar edited by hand or another tool may carry a UTF-8 BOM or CRLF line
+    endings; a save keeps both, as object saves do (`textfile.encode_like`). Newlines
+    inside values are escaped in both formats, so only line breaks change.
+    """
+    if not current:
+        return data
+    if b"\r\n" in current:
+        data = data.replace(b"\n", b"\r\n")
+    if current.startswith(_BOM):
+        data = _BOM + data
+    return data
