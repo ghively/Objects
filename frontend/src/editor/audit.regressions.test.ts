@@ -9,7 +9,8 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { afterEach, describe, expect, test } from 'vitest'
 import { formatAnnotation, makeOption, parseAnnotation } from './annotations'
 import { editorExtensions, loadBody, serializeBody } from './document'
-import { blocksSource, deleteBlocks, selectBlocks, turnInto } from './extensions/blockSelection'
+import { blockSelectionRange, blocksSource, deleteBlocks, duplicateBlocks, selectBlocks, turnInto } from './extensions/blockSelection'
+import { isWikilinkTarget, wikilinkMarkdown } from './extensions/wikilink'
 import { moveBlockTo } from './handles/dragMove'
 import { codeFence } from './preserve'
 
@@ -510,6 +511,59 @@ describe('to-do lists with [X] or plain items (audit 2026-11-01, Gene: accept bo
       ['taskList', 'ab'],
       ['paragraph', 'After'],
     ])
+  })
+})
+
+describe('duplicating a block (audit 2026-11-01)', () => {
+  test('the copy carries no block id', () => {
+    const editor = headless('para ^abc123\n\nX\n')
+    selectBlocks(editor, 0)
+    expect(duplicateBlocks(editor)).toBe(true)
+    expect(shape(editor)).toEqual([
+      ['paragraph', 'para ^abc123'],
+      ['paragraph', 'para'],
+      ['paragraph', 'X'],
+    ])
+    expect(serializeBody(editor)).toBe('para ^abc123\n\npara\n\nX\n')
+    // The copies are the block selection.
+    expect(blockSelectionRange(editor.state)?.blocks.map((b) => b.node.textContent)).toEqual(['para'])
+  })
+
+  test('ids on several items of a duplicated list are all dropped', () => {
+    const editor = headless('- a ^aaaaaa\n- b ^bbbbbb\n')
+    selectBlocks(editor, 0)
+    duplicateBlocks(editor)
+    expect(serializeBody(editor)).toBe('- a ^aaaaaa\n- b ^bbbbbb\n\n- a\n- b\n')
+  })
+})
+
+describe('wikilink targets (audit 2026-11-01)', () => {
+  test.each([
+    ['A|B', '[[A]]'],
+    ['A]]B', '[[AB]]'],
+    ['A#B', '[[AB]]'],
+    ['Plain title', '[[Plain title]]'],
+  ])('a link to %j is written unambiguously as %s', (target, saved) => {
+    expect(wikilinkMarkdown(target, null)).toBe(saved)
+    const editor = headless('x\n')
+    editor.commands.setTextSelection(2)
+    editor.commands.insertContent({ type: 'wikilink', attrs: { target, label: null } })
+    const out = serializeBody(editor)
+    expect(out).toBe('x' + saved + '\n')
+    const links: string[] = []
+    headless(out).state.doc.descendants((n) => {
+      if (n.type.name === 'wikilink') links.push(n.attrs.target as string)
+    })
+    expect(links).toEqual([saved.slice(2, -2)])
+  })
+
+  test('a label may hold a pipe', () => {
+    expect(wikilinkMarkdown('A', 'l|m')).toBe('[[A|l|m]]')
+  })
+
+  test('isWikilinkTarget tells the pickers when to pass the path form', () => {
+    expect(isWikilinkTarget('Plain')).toBe(true)
+    expect(['A|B', 'A]B', 'A[B', 'A#B', 'A\nB', ' '].map(isWikilinkTarget)).toEqual([false, false, false, false, false, false])
   })
 })
 
