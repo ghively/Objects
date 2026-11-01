@@ -32,7 +32,10 @@ __all__ = [
     "normalize_views",
 ]
 
-_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+# A definition id names a file: a letter or digit (any script, so `slug` of a non-Latin
+# name is accepted) then up to 99 word characters, dots or dashes; `path` also refuses a
+# trailing dot. `typedefs.slug` never makes an id this rejects.
+_ID_RE = re.compile(r"^[^\W_][\w.-]{0,99}$")
 _MEDIA_GRID_TYPES = frozenset({"image", "weblink", "tweet"})
 
 
