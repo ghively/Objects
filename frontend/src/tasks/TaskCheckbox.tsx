@@ -48,7 +48,8 @@ export function TaskCheckbox({
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [overdue, setOverdue] = useState<{ action: OccurrenceAction; info: OverdueInfo } | null>(null)
-  const weekStart = useUiStore((s) => (s.ui.calendar?.weekStart === 'sunday' ? 'sunday' : 'monday'))
+  // Unset means Sunday, as the calendar's `useWeekStart` reads it: both grids start weeks on the same day.
+  const weekStart = useUiStore((s) => (s.ui.calendar?.weekStart === 'monday' ? 'monday' : 'sunday'))
   const category: StatusCategory = categoryOf(row, type)
   const done = category === 'done'
   const color = statusOption(row, type)?.color ?? null
