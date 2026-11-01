@@ -455,3 +455,40 @@ def test_rename_route_and_events(space_dir: Path):
             json={"path": "Pages/Nope.md", "title": "X", "baseVersion": "0" * 64},
         )
         assert r.status_code == 404
+
+
+def test_rename_checks_only_the_files_the_link_index_says_mention_the_name(
+    links_space_dir: Path, monkeypatch
+):
+    # Audit 2026-11-01 P4: candidates come from the link index, not a scan of every file.
+    for i in range(40):
+        (links_space_dir / "Pages" / f"Bystander {i}.md").write_bytes(
+            b"---\ntype: 'Page'\ntitle: Bystander %d\n---\n\nSee [[Ada Lovelace]].\n" % i
+        )
+    space = Space(links_space_dir)
+    space.links.backlinks(ADA)  # the index is built once, before the rename
+    scanned: list[str] = []
+    real = space_mod.wikilink_targets
+
+    def spy(text: str):
+        scanned.append(text)
+        return real(text)
+
+    monkeypatch.setattr(space_mod, "wikilink_targets", spy)
+    babbage = "People/Charles Babbage.md"
+    result = space.rename_object(babbage, "Charles B", space.cached_version(babbage))
+
+    assert result.relinked and result.path == "People/Charles B.md"
+    assert all("Charles Babbage" in t or "Charles B" in t for t in scanned), len(scanned)
+    assert len(scanned) < 40
+    # Every link that reached it still does, after the index caught up.
+    assert set(space.links.backlinks(result.path)) >= set(result.relinked) - {result.path}
+
+
+def test_rename_relinks_a_template_that_links_to_the_object(links_space_dir: Path):
+    tpl = links_space_dir / "Templates" / "Pages" / "Linking template.md"
+    assert b"[[Ada Lovelace]]" in tpl.read_bytes()
+    space = Space(links_space_dir)
+    result = space.rename_object(ADA, "Ada King", space.cached_version(ADA))
+    assert "Templates/Pages/Linking template.md" in result.relinked
+    assert b"[[Ada King]]" in tpl.read_bytes()

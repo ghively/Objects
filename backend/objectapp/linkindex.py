@@ -19,12 +19,17 @@ records the change: the next read re-extracts the changed sources, re-extracts
 everything after a type change (property definitions decide which keys are
 relations), and re-resolves every stored target when the set of names changed
 (`Space._names_rev`). Nothing is ever written.
+
+It also keeps, for every object (templates too), the folded text of each link
+target as written (`mentioning`): a rename or type change asks it which files
+could hold a link to rewrite instead of scanning the whole space (audit
+2026-11-01 P4).
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -100,6 +105,10 @@ class LinkIndex:
         self._built = False
         self._names_rev = -1
         self._sources: dict[str, _Extracted] = {}
+        self._targets: dict[str, frozenset[str]] = {}
+        """Path -> folded link target texts as written (every object, templates included)."""
+        self._mentions: dict[str, set[str]] = {}
+        """Folded link target text -> the paths holding such a link (the inverse of `_targets`)."""
         self._resolved: dict[str, _Resolved] = {}
         self._in: dict[str, set[str]] = {}
         self._tagged: dict[str, set[str]] = {}
@@ -135,10 +144,13 @@ class LinkIndex:
             dirty: set[str] = set()
             if full:
                 self._sources = {}
+                self._targets = {}
+                self._mentions = {}
                 for path in list(space._raw):
                     ex = self._extract_if_source(path)
                     if ex is not None:
                         self._sources[path] = ex
+                    self._set_mentions(path, self._written_targets(path, ex))
                 self._built = True
             else:
                 dirty = {c.path for c in pending if c.path}
@@ -148,6 +160,7 @@ class LinkIndex:
                         self._sources.pop(path, None)
                     else:
                         self._sources[path] = ex
+                    self._set_mentions(path, self._written_targets(path, ex))
             names_rev = space._names_rev
             if full or names_rev != self._names_rev:
                 self._names_rev = names_rev
@@ -222,6 +235,33 @@ class LinkIndex:
             days.update(d for t in targets if isinstance(t, str) and (d := parse_day(t)) is not None)
         ex.days = frozenset(days)
         return ex
+
+    def _written_targets(self, path: str, ex: _Extracted | None) -> frozenset[str]:
+        """The folded target texts of every ``[[link]]`` in ``path`` (frontmatter and body)."""
+        raw = self._space._raw.get(path)
+        if raw is None:
+            return frozenset()
+        if ex is not None:
+            body_targets: list[str] = ex.body
+        else:  # a template: not a source, but a rename still rewrites its links
+            body = raw.of.body
+            body_targets = [t for t, _s, _e in wikilink_spans(body)] if "[[" in body else []
+        src = raw.of.frontmatter_src or ""
+        fm_targets = wikilink_targets(src) if "[[" in src else set()
+        return frozenset(_fold(t) for t in (*body_targets, *fm_targets))
+
+    def _set_mentions(self, path: str, targets: frozenset[str]) -> None:
+        old = self._targets.pop(path, None)
+        for t in old or ():
+            paths = self._mentions.get(t)
+            if paths is not None:
+                paths.discard(path)
+                if not paths:
+                    del self._mentions[t]
+        if targets:
+            self._targets[path] = targets
+            for t in targets:
+                self._mentions.setdefault(t, set()).add(path)
 
     # -- resolution -----------------------------------------------------------
 
@@ -328,6 +368,18 @@ class LinkIndex:
         out = sorted(self._in.get(path, ()), key=key)
         self._backlinks_cache[path] = out
         return list(out)
+
+    def mentioning(self, names: Iterable[str]) -> set[str]:
+        """The objects (templates included) with a link whose target text is one of ``names``.
+
+        Matched case-insensitively with whitespace collapsed, wherever the link
+        resolves: the candidates a rename or type change checks instead of every file.
+        """
+        self._ensure()
+        out: set[str] = set()
+        for name in names:
+            out.update(self._mentions.get(_fold(name), ()))
+        return out
 
     def link_keys(self, src: str, dst: str) -> tuple[bool, list[str]]:
         """Whether ``src``'s body links to ``dst``, and the property keys that do."""

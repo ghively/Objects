@@ -2042,8 +2042,7 @@ class Space:
         or that resolve to another object with the same title, don't.
         """
         names = {_fold(old_title), _fold(PurePosixPath(rel).stem), _fold(rel[:-3])}
-        with self._lock:
-            raws = list(self._raw.values())
+        raws = self._mentioning(names)
         out: dict[str, set[str]] = {}
         for raw in raws:
             text = (raw.of.frontmatter_src or "") + raw.of.body
@@ -2066,8 +2065,7 @@ class Space:
         ones that change to their old object's unambiguous link text.
         """
         names = {_fold(new_title), _fold(safe_filename(new_title))}
-        with self._lock:
-            raws = list(self._raw.values())
+        raws = self._mentioning(names)
         out: dict[str, dict[str, str]] = {}
         for raw in raws:
             text = (raw.of.frontmatter_src or "") + raw.of.body
@@ -2083,6 +2081,16 @@ class Space:
             if found:
                 out[raw.path] = found
         return out
+
+    def _mentioning(self, names: set[str]) -> list[RawObject]:
+        """The objects holding a link whose target text folds to one of ``names`` (by path).
+
+        The link index's candidates (audit 2026-11-01 P4): the callers then check each
+        file's links exactly instead of scanning every file in the space.
+        """
+        candidates = self._links.mentioning(names)
+        with self._lock:
+            return [self._raw[p] for p in sorted(candidates) if p in self._raw]
 
     @staticmethod
     def _relink_edit(targets: set[str], new_text: str) -> Edit:
@@ -2182,8 +2190,9 @@ class Space:
         if t is None:
             return {}
         names = {_fold(old_title), _fold(PurePosixPath(rel).stem), _fold(rel[:-3])}
+        candidates = self._links.mentioning(names)  # a board's links count as body links
         with self._lock:
-            boards = [p for p, s in self._summaries.items() if s.type == t.id]
+            boards = sorted(p for p, s in self._summaries.items() if s.type == t.id and p in candidates)
         out: dict[str, set[str]] = {}
         for md in boards:
             with self._lock:
