@@ -572,6 +572,22 @@ describe('wikilink targets (audit 2026-11-01)', () => {
   })
 })
 
+describe('loading the same source twice (audit 2026-11-01 F9: parsed blocks are cached)', () => {
+  test('a body opened again loads the same, saves the same bytes and shares no node attributes', () => {
+    const body = '# H\n\nPlain text.\n\n1\\. not a list\n\n- a\n- b\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n> q\n'
+    const first = headless(body)
+    const second = headless(body)
+    expect(shape(second)).toEqual(shape(first))
+    expect(shape(second).map(([t]) => t)).toEqual(['heading', 'paragraph', 'paragraph', 'bulletList', 'table', 'blockquote'])
+    expect(serializeBody(second)).toBe(body)
+    // An edit in one editor leaves the other's load untouched.
+    append(second, 'Plain', 'Z')
+    expect(serializeBody(second)).toBe(body.replace('Plain text.', 'Plain text.Z'))
+    expect(serializeBody(first)).toBe(body)
+    expect(serializeBody(headless(body))).toBe(body)
+  })
+})
+
 describe('math blocks (audit 2026-11-01)', () => {
   test.each([
     ['x\n$$\ny', '$$\nx\n\\$$\ny\n$$\n'],

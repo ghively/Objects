@@ -17,7 +17,7 @@ import { getExtensionField, type AnyExtension, type Editor, type JSONContent } f
 import { OrderedList, TaskItem } from '@tiptap/extension-list'
 import { TableKit } from '@tiptap/extension-table'
 import { Markdown } from '@tiptap/markdown'
-import type { Node as PMNode } from '@tiptap/pm/model'
+import type { Node as PMNode, Schema } from '@tiptap/pm/model'
 import StarterKit from '@tiptap/starter-kit'
 import {
   classifyEmbedLine,
@@ -251,17 +251,84 @@ function sourceToNode(editor: Editor, block: SourceBlock, options?: readonly Opt
   }
   const md = editor.markdown
   if (!md || RAW_KINDS.has(block.kind) || FIELD_LINE.test(block.raw)) return rawNode(block.raw)
+  const cache = parseCacheOf(editor)
+  const key = block.kind + '\0' + block.raw
+  const hit = cache.map.get(key)
+  if (hit) {
+    // Most recently used last; a copy, since the caller adds its attributes.
+    cache.map.delete(key)
+    cache.map.set(key, hit)
+    return { ...hit, attrs: hit.attrs ? { ...hit.attrs } : undefined }
+  }
+  const node = parseSourceBlock(editor, block)
+  remember(cache, key, node, block.raw.length)
+  return { ...node, attrs: node.attrs ? { ...node.attrs } : undefined }
+}
+
+function parseSourceBlock(editor: Editor, block: SourceBlock): JSONContent {
+  const md = editor.markdown!
   try {
     const parsed = md.parse(block.raw.replace(/\r\n?/g, '\n'))
     const nodes = parsed.content ?? []
     if (nodes.length !== 1) return rawNode(block.raw)
     const node = nodes[0]
     editor.schema.nodeFromJSON(node).check()
-    const regenerated = md.serialize({ type: 'doc', content: [node] })
+    // Did the parse lose anything? Plain text needs no serializing to tell (F9).
+    const plain = plainTextOf(node)
+    const regenerated = plain ?? md.serialize({ type: 'doc', content: [node] })
     if (contentKey(regenerated) !== contentKey(block.raw)) return rawNode(block.raw)
     return node
   } catch {
     return rawNode(block.raw)
+  }
+}
+
+/**
+ * The text of a paragraph or heading made of unmarked text (and hard breaks)
+ * whose serialized form differs from it only by backslash escapes and the
+ * heading marks, which `contentKey` ignores; null for anything else (marks,
+ * atoms, characters the serializer encodes: entities, dollars, a non-breaking
+ * space; or a line starting like a list item or a quote, which `contentKey`
+ * would strip from the bare text but not from the escaped form).
+ */
+function plainTextOf(node: JSONContent): string | null {
+  if (node.type !== 'paragraph' && node.type !== 'heading') return null
+  let text = ''
+  for (const n of node.content ?? []) {
+    if (n.type === 'hardBreak') text += '\n'
+    else if (n.type === 'text' && !n.marks?.length) text += n.text ?? ''
+    else return null
+  }
+  return /[&<>$\u00a0]/.test(text) || /^[ \t]*(?:[*+-]|\d{1,9}[.)]|>)(?:[ \t]|$)/m.test(text) ? null : text
+}
+
+/**
+ * Parsed blocks by kind and source, per schema (audit F9). A body opened
+ * again (a tab switched to, a reload after an outside change) skips the
+ * parse, check and serialize of every block it still shares with an earlier
+ * load. Least recently used entries go once the sources held pass the cap.
+ */
+const PARSE_CACHE_BYTES = 8 * 1024 * 1024
+type ParseCache = { map: Map<string, JSONContent>; bytes: number }
+const parseCaches = new WeakMap<Schema, ParseCache>()
+
+function parseCacheOf(editor: Editor): ParseCache {
+  let cache = parseCaches.get(editor.schema)
+  if (!cache) {
+    cache = { map: new Map(), bytes: 0 }
+    parseCaches.set(editor.schema, cache)
+  }
+  return cache
+}
+
+function remember(cache: ParseCache, key: string, node: JSONContent, size: number): void {
+  if (size > PARSE_CACHE_BYTES / 4) return
+  cache.map.set(key, node)
+  cache.bytes += size
+  for (const [k] of cache.map) {
+    if (cache.bytes <= PARSE_CACHE_BYTES) break
+    cache.map.delete(k)
+    cache.bytes -= k.length - 1 - k.indexOf('\0')
   }
 }
 
