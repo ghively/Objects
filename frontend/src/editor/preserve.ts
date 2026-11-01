@@ -434,7 +434,10 @@ export function preserveBlock(
 
   let lines: string[]
   const origLines = origBody.split(/\r\n|\n|\r/)
-  if ((kind === 'table' || kind === 'list') && origBody !== '') {
+  const fenced = kind === 'code' ? preserveFenced(origLines, regenLines, baseline) : null
+  if (fenced) {
+    lines = fenced
+  } else if ((kind === 'table' || kind === 'list') && origBody !== '') {
     lines = kind === 'table' ? preserveTable(origLines, regenLines) : preserveList(origLines, regenLines)
   } else if (origBody !== '' && (origLines.length > 1 || regenLines.length > 1)) {
     lines = preserveLines(origLines, regenLines, baseline)
@@ -442,6 +445,54 @@ export function preserveBlock(
     lines = regenLines
   }
   return lines.join(eol) + tail
+}
+
+// ---------------------------------------------------------------- code fences
+
+const FENCE_LINE = /^( {0,3})(`{3,}|~{3,})(.*)$/
+
+/**
+ * The fence for a code block's `text`: three of `char` (a backtick or a tilde),
+ * or one more than the longest run of that character that starts a line inside
+ * (CommonMark: such a line would otherwise close the block early). Backticks
+ * inside a tilde fence, and tildes inside a backtick fence, are plain text.
+ */
+export function codeFence(text: string, char = '`'): string {
+  let longest = 0
+  const run = new RegExp(`^ {0,3}(${char === '`' ? '`' : '~'}{3,})`, 'gm')
+  for (const m of text.matchAll(run)) longest = Math.max(longest, m[1].length)
+  return char.repeat(Math.max(3, longest + 1))
+}
+
+/**
+ * A fenced code block keeps its original fence character (the serializer
+ * always writes backticks), its indent and info string, and its fence length
+ * unless a line typed inside would close it; only the inner lines are aligned.
+ * Null when the original is not a fenced block (an indented one, or a block
+ * whose source no longer looks like code).
+ */
+function preserveFenced(origLines: string[], regenLines: string[], baseline?: string): string[] | null {
+  const open = FENCE_LINE.exec(origLines[0] ?? '')
+  const regenOpen = FENCE_LINE.exec(regenLines[0] ?? '')
+  if (!open || !regenOpen || regenLines.length < 2 || !FENCE_LINE.test(regenLines[regenLines.length - 1])) return null
+  const char = open[2][0]
+  // The original's closing fence: same character, at least as long as the opening one.
+  const closeLine = origLines.length > 1 ? FENCE_LINE.exec(origLines[origLines.length - 1]) : null
+  const close = closeLine && closeLine[2][0] === char && closeLine[2].length >= open[2].length && closeLine[3].trim() === '' ? closeLine : null
+  const origInner = origLines.slice(1, close ? -1 : undefined)
+  const regenInner = regenLines.slice(1, -1)
+
+  const baseLines = baseline === undefined ? null : splitTail(toLF(baseline))[0].split('\n')
+  const baseInner = baseLines && baseLines.length === origLines.length && close ? baseLines.slice(1, -1).join('\n') : undefined
+  const inner = origInner.length ? preserveLines(origInner, regenInner, baseInner) : regenInner
+
+  // Keep the original fence runs unless an inner line would now close the block.
+  const needed = codeFence(inner.join('\n'), char).length
+  const openRun = char.repeat(Math.max(open[2].length, needed))
+  const info = open[3].trim() === regenOpen[3].trim() ? open[3] : regenOpen[3]
+  const closeRun = close ? char.repeat(Math.max(close[2].length, needed)) : openRun
+  const closeIndent = close ? close[1] : open[1]
+  return [open[1] + openRun + info, ...inner, closeIndent + closeRun]
 }
 
 /**
