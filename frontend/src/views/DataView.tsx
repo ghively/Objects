@@ -172,7 +172,7 @@ function rowFocusTarget(row: Element | null): HTMLElement | null {
 
 /**
  * A small context menu at the pointer: closes on a click elsewhere, Escape or scroll. Keyboard:
- * the first item takes focus; Up/Down/Home/End move between items, Right opens a submenu and Left
+ * the first item takes focus; Up/Down/Home/End move between items (Tab doesn't leave the menu), Right opens a submenu and Left
  * leaves it, Enter activates, Escape closes and returns focus to the row (`returnFocus`).
  */
 function RowContextMenu({
@@ -219,6 +219,11 @@ function RowContextMenu({
   }, [onClose, returnFocus])
 
   const onKeyDown = (e: ReactKeyboardEvent) => {
+    // As the app's (Radix) menus: Tab doesn't move focus out of an open menu.
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      return
+    }
     const target = e.target as HTMLElement
     const menu = target.closest('[role="menu"]')
     if (!menu) return

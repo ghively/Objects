@@ -249,6 +249,20 @@ describe('DataView multi-select (Task 18)', () => {
     expect(selectedTitles()).toEqual(['B'])
   })
 
+  test('Tab keeps focus in the row menu, as in the app\'s Radix menus', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.pointer({ keys: '[MouseRight]', target: rowEl('B') })
+    const menu = await screen.findByTestId('row-menu')
+    const first = within(menu).getByRole('menuitem', { name: 'Select multiple' })
+    expect(first).toHaveFocus()
+    await user.keyboard('{Tab}')
+    expect(first).toHaveFocus()
+    await user.keyboard('{Shift>}{Tab}{/Shift}')
+    expect(first).toHaveFocus()
+    expect(screen.getByTestId('row-menu')).toBeInTheDocument()
+  })
+
   test('Escape closes the row menu and returns focus to the row', async () => {
     const user = userEvent.setup()
     render(<Harness />)
