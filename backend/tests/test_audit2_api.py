@@ -67,6 +67,61 @@ def test_big_reads_show_an_undecodable_file_name(space_dir: Path, tmp_path: Path
     assert c.get("/api/graph").status_code == 200
 
 
+# -- GET /api/graph: ETag on every 200, 304 while the graph is unchanged ----------------
+
+
+@pytest.fixture
+def links_client(links_space_dir: Path, tmp_path: Path, monkeypatch) -> TestClient:
+    monkeypatch.setenv("OBJECT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("OBJECT_CACHE_DIR", str(tmp_path / "cache"))
+    return TestClient(create_app(Space(links_space_dir), watch=False), raise_server_exceptions=False)
+
+
+def _save_body(c: TestClient, path: str, edit) -> None:
+    obj = c.get("/api/object", params={"path": path}).json()
+    r = c.put(
+        "/api/object/body",
+        json={"path": path, "body": edit(obj["body"]), "baseVersion": obj["version"]},
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_graph_answers_304_until_it_changes(links_client: TestClient):
+    c = links_client
+    r = c.get("/api/graph")
+    assert r.status_code == 200
+    etag = r.headers["etag"]
+    assert etag.startswith('"') and etag.endswith('"')
+    assert "no-cache" in r.headers.get("cache-control", "")
+    again = c.get("/api/graph", headers={"If-None-Match": etag})
+    assert again.status_code == 304 and again.headers["etag"] == etag and again.content == b""
+    assert c.get("/api/graph", headers={"If-None-Match": f'W/{etag}, "other"'}).status_code == 304
+    assert c.get("/api/graph", headers={"If-None-Match": '"other"'}).status_code == 200
+    # A body edit that changes no link, title or flag leaves the graph as it was.
+    _save_body(c, "Pages/Notes on mentions.md", lambda b: b + "\nMore words.\n")
+    assert c.get("/api/graph", headers={"If-None-Match": etag}).status_code == 304
+    # A new link changes it.
+    _save_body(c, "Pages/Notes on mentions.md", lambda b: b + "\nSee [[Charles Babbage]].\n")
+    r2 = c.get("/api/graph", headers={"If-None-Match": etag})
+    assert r2.status_code == 200 and r2.headers["etag"] != etag
+    assert r2.json() == c.get("/api/graph").json()
+    assert c.get("/api/graph", headers={"If-None-Match": r2.headers["etag"]}).status_code == 304
+
+
+def test_graph_etag_follows_a_title_change(links_client: TestClient):
+    c = links_client
+    path = "Pages/Notes on mentions.md"
+    etag = c.get("/api/graph").headers["etag"]
+    version = c.get("/api/object", params={"path": path}).json()["version"]
+    r = c.post(
+        "/api/object/rename", json={"path": path, "title": "Renamed notes", "baseVersion": version}
+    )
+    assert r.status_code == 200, r.text
+    r = c.get("/api/graph", headers={"If-None-Match": etag})
+    assert r.status_code == 200 and r.headers["etag"] != etag
+    assert "Renamed notes" in {n["title"] for n in r.json()["nodes"]}
+
+
 # -- /api/calendar: summaries for what the client reads them for; the lock only to snapshot --
 
 
