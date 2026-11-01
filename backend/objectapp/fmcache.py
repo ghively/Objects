@@ -16,10 +16,14 @@ scalars) are stored; and a hit is a fresh copy, so an edit to one object's
 The cache dir is the search index's (`searchindex.cache_dir_for`, mirrored here
 because that module imports `space`, which imports `typedefs`): under
 ``$OBJECT_CACHE_DIR`` keyed by the space root's hash, else
-``<root>/.object-cache``. Entries added or refreshed are flushed to disk,
-atomically and at most once a second, from a later `read_raw` call or at
-interpreter exit; a flush drops the entries of files that no longer exist.
-Nothing else under the space is ever written.
+``<root>/.object-cache``. Entries added or refreshed are flushed to disk
+atomically, never from the `get`/`put` that a `read_raw` makes (that could be a
+request thread holding the space's lock: a flush stats every entry, dumps them all
+and fsyncs, ~90 ms at 5,000 objects): `put` schedules one coalesced daemon timer
+that writes `_FLUSH_AFTER` seconds after the last `put`, `Space.__init__` flushes
+once when its scan is done (so a second start finds nothing dirty and writes
+nothing), and interpreter exit flushes whatever is left. A flush drops the entries
+of files that no longer exist. Nothing else under the space is ever written.
 """
 
 from __future__ import annotations
@@ -30,7 +34,6 @@ import hashlib
 import json
 import os
 import threading
-import time
 from pathlib import Path
 from typing import Any
 
@@ -41,8 +44,8 @@ __all__ = ["FrontmatterCache", "cache_dir_for_root", "flush_all", "for_root"]
 CACHE_FOLDER = ".object-cache"
 FILE_NAME = "frontmatter.json"
 _VERSION = 1
-_FLUSH_AFTER = 1.0
-"""Seconds a dirty entry waits for more before the cache is written."""
+_FLUSH_AFTER = 10.0
+"""Seconds after the last `put` before the timer writes the cache (later puts restart it)."""
 
 
 def cache_dir_for_root(root: Path) -> Path:
@@ -66,7 +69,9 @@ class FrontmatterCache:
         self.path = cache_dir_for_root(self.root) / FILE_NAME
         self._lock = threading.Lock()
         self._entries: dict[str, tuple[str, dict[str, Any]]] | None = None
-        self._dirty_since: float | None = None
+        self._dirty = False
+        self._timer: threading.Timer | None = None
+        """The pending delayed flush (daemon thread), set by `put`, cancelled by `flush`."""
         self._unwritable = False
 
     # -- the file -------------------------------------------------------------
@@ -100,11 +105,18 @@ class FrontmatterCache:
         return self._entries
 
     def flush(self) -> None:
-        """Write the entries now (a no-op when nothing changed or the dir can't be written)."""
+        """Write the entries now (a no-op when nothing changed or the dir can't be written).
+
+        Never called by `get` or `put`: the callers are the timer `put` arms, the end of a
+        space's opening scan and interpreter exit, none of them under the space's lock.
+        """
         with self._lock:
-            if self._dirty_since is None or self._entries is None or self._unwritable:
+            if self._timer is not None:
+                self._timer.cancel()
+                self._timer = None
+            if not self._dirty or self._entries is None or self._unwritable:
                 return
-            self._dirty_since = None
+            self._dirty = False
             for rel in [r for r in self._entries if not (self.root / r).is_file()]:
                 del self._entries[rel]
             payload = {"v": _VERSION, "entries": {r: [h, fm] for r, (h, fm) in self._entries.items()}}
@@ -115,9 +127,15 @@ class FrontmatterCache:
             except OSError:
                 self._unwritable = True  # a read-only location: parse as if there were no cache
 
-    def _flush_if_due(self) -> None:
-        if self._dirty_since is not None and time.monotonic() - self._dirty_since >= _FLUSH_AFTER:
-            self.flush()
+    def _arm_timer(self) -> None:
+        """(Re)start the delayed flush; called with the lock held."""
+        if self._timer is not None:
+            self._timer.cancel()
+        timer = threading.Timer(_FLUSH_AFTER, self.flush)
+        timer.daemon = True
+        timer.name = f"fmcache-flush:{self.root.name}"
+        self._timer = timer
+        timer.start()
 
     # -- lookups ---------------------------------------------------------------
 
@@ -126,7 +144,6 @@ class FrontmatterCache:
         with self._lock:
             entry = self._ensure().get(rel)
             hit = copy.deepcopy(entry[1]) if entry is not None and entry[0] == _digest(src) else None
-        self._flush_if_due()
         return hit
 
     def put(self, rel: str, src: str, fm: dict[str, Any]) -> None:
@@ -139,9 +156,9 @@ class FrontmatterCache:
             return  # non-string keys, NaN...: parse it every time rather than cache a different value
         with self._lock:
             self._ensure()[rel] = (_digest(src), stored)
-            if self._dirty_since is None:
-                self._dirty_since = time.monotonic()
-        self._flush_if_due()
+            self._dirty = True
+            if not self._unwritable:
+                self._arm_timer()
 
 
 _caches: dict[str, FrontmatterCache] = {}

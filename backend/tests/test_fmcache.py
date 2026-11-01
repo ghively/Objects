@@ -62,14 +62,15 @@ def test_cache_file_lives_beside_the_search_index(space_dir: Path):
 def test_warm_open_parses_only_the_files_that_changed(space_dir: Path, monkeypatch):
     Space(space_dir)  # M1's first open writes the inferred types; later opens write nothing
     fmcache._caches.clear()
+    fmcache.for_root(space_dir).path.unlink()  # the opening scan wrote it: start cold
+    fmcache._caches.clear()
     parses = _count_parses(monkeypatch)
     before = _snapshot(space_dir)
     Space(space_dir)
     cold = len(parses)
     assert cold == _parsable(space_dir) == 9
     assert _snapshot(space_dir) == before  # opening writes nothing in the space
-    fmcache.flush_all()  # what the first process does within a second, or at exit
-    assert fmcache.for_root(space_dir).path.is_file()
+    assert fmcache.for_root(space_dir).path.is_file()  # the opening scan flushed it once
 
     fmcache._caches.clear()  # a new process: the entries come from the file
     parses.clear()
@@ -209,3 +210,97 @@ def test_repeated_dumps_on_the_shared_instance_match_fresh_ones():
     for _ in range(5):
         assert frontmatter.set_keys(src, {"n": 2, "new": ["x", "y"], "desc": None}) == first
     assert parse_fm(first) == {**parse_fm(src), "n": 2, "new": ["x", "y"], "desc": None}
+
+
+# -- when the cache is written (fix pass 2026-11-01) ---------------------------------------------
+#
+# `get`/`put` run inside `read_raw`, which `Space._write` calls under the space's lock on
+# every save, so neither may flush (a stat per entry, one dump of everything, an fsync).
+# The writers are: the delayed timer `put` arms, `Space.__init__` once its scan is done,
+# and interpreter exit.
+
+
+def _spy_writes(monkeypatch) -> list[Path]:
+    written: list[Path] = []
+    real = fmcache.atomic_write
+
+    def spy(path, data, *args, **kwargs):
+        written.append(Path(path))
+        return real(path, data, *args, **kwargs)
+
+    monkeypatch.setattr(fmcache, "atomic_write", spy)
+    return written
+
+
+def test_get_and_put_never_write_inline(space_dir: Path, monkeypatch):
+    monkeypatch.setattr(fmcache, "_FLUSH_AFTER", 3600.0)
+    fmcache._caches.clear()
+    written = _spy_writes(monkeypatch)
+    cache = fmcache.for_root(space_dir)
+    cache.put("Pages/A.md", "title: A\n", {"title": "A"})
+    for _ in range(3):
+        assert cache.get("Pages/A.md", "title: A\n") == {"title": "A"}
+        cache.put("Pages/B.md", "title: B\n", {"title": "B"})
+    assert written == [] and not cache.path.exists()
+    assert cache._timer is not None and cache._timer.daemon  # one pending delayed flush
+    cache.flush()
+    assert written == [cache.path] and cache._timer is None
+
+
+def test_the_timer_flush_writes_after_its_delay_and_coalesces_puts(space_dir: Path, monkeypatch):
+    import time
+
+    monkeypatch.setattr(fmcache, "_FLUSH_AFTER", 0.05)
+    fmcache._caches.clear()
+    written = _spy_writes(monkeypatch)
+    cache = fmcache.for_root(space_dir)
+    rels = list(iter_object_paths(space_dir))  # a flush keeps only the entries of existing files
+    for i, rel in enumerate(rels):
+        cache.put(rel, f"title: {i}\n", {"title": str(i)})
+    deadline = time.monotonic() + 3
+    while not cache.path.is_file() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    time.sleep(0.15)  # a second timer, had the puts not been coalesced, would fire by now
+    assert written == [cache.path]
+    assert len(json.loads(cache.path.read_bytes())["entries"]) == len(rels) > 1
+    assert cache._timer is None
+
+
+def test_a_second_start_in_the_same_process_changes_no_byte_or_mtime_of_the_cache(
+    space_dir: Path, monkeypatch
+):
+    monkeypatch.setattr(fmcache, "_FLUSH_AFTER", 3600.0)  # no timer helps the test along
+    fmcache._caches.clear()
+    Space(space_dir)  # the opening scan flushes once, synchronously
+    path = fmcache.for_root(space_dir).path
+    assert path.is_file()
+    before = (path.read_bytes(), path.stat().st_mtime_ns)
+    written = _spy_writes(monkeypatch)
+    Space(space_dir)
+    fmcache.flush_all()  # nothing is dirty after a start that hit on every file
+    assert written == []
+    assert (path.read_bytes(), path.stat().st_mtime_ns) == before
+
+
+def test_save_body_never_flushes_the_cache_under_the_space_lock(space_dir: Path, monkeypatch):
+    monkeypatch.setattr(fmcache, "_FLUSH_AFTER", 0.0)  # a flush is always due
+    fmcache._caches.clear()
+    under_lock: list[bool] = []
+    opened: list[Space] = []
+    real = fmcache.FrontmatterCache.flush
+
+    def spy(self):
+        if opened:  # the opening scan's own flush runs before the space exists
+            under_lock.append(opened[0]._lock._is_owned())
+        return real(self)
+
+    monkeypatch.setattr(fmcache.FrontmatterCache, "flush", spy)
+    space = Space(space_dir)
+    opened.append(space)
+    rel = "Pages/Alpha.md"
+    for i in range(3):
+        space.save_body(rel, f"Typing {i}\n", space.cached_version(rel))
+        # (Not through the cache: a cached read here would spare the next save its miss.)
+        assert read_raw(space_dir, rel, cache=False).of.body == f"Typing {i}\n"
+    fmcache.flush_all()
+    assert under_lock and not any(under_lock)
