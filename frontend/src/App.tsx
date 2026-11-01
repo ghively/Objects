@@ -39,6 +39,7 @@ import { TabStrip, useSpaceTypes } from '@/shell/TabStrip'
 import { usePanelShortcuts, useTabShortcuts } from '@/shell/shortcuts'
 import { isEditableTarget } from '@/lib/shortcuts'
 import { applyOpenOnStart } from '@/nav/startup'
+import { prefetchOnIdle } from '@/nav/prefetch'
 import { useSettings } from '@/settings/useSettings'
 import { fetchSpace } from '@/settings/useSpaceInfo'
 import { TopBar } from '@/shell/TopBar'
@@ -50,9 +51,14 @@ import { TypePage } from '@/types/TypePage'
 
 // Pages whose code the shell does not need at start (the graph's sigma and graphology, the
 // calendar, type settings) load when first shown (audit 2026-11-01 F1).
-const CalendarPage = lazy(() => import('@/calendar/CalendarPage').then((m) => ({ default: m.CalendarPage })))
-const GraphPage = lazy(() => import('@/graph/GraphPage').then((m) => ({ default: m.GraphPage })))
-const LocalGraphPanel = lazy(() => import('@/graph/LocalGraphPanel').then((m) => ({ default: m.LocalGraphPanel })))
+const loadCalendarPage = () => import('@/calendar/CalendarPage')
+const loadGraphPage = () => import('@/graph/GraphPage')
+const loadLocalGraphPanel = () => import('@/graph/LocalGraphPanel')
+const CalendarPage = lazy(() => loadCalendarPage().then((m) => ({ default: m.CalendarPage })))
+const GraphPage = lazy(() => loadGraphPage().then((m) => ({ default: m.GraphPage })))
+const LocalGraphPanel = lazy(() => loadLocalGraphPanel().then((m) => ({ default: m.LocalGraphPanel })))
+// Warm those chunks once the shell is idle, so their first open costs no download.
+const PREFETCH = [loadGraphPage, loadLocalGraphPanel, loadCalendarPage]
 const TypeSettings = lazy(() => import('@/types/TypeSettings').then((m) => ({ default: m.TypeSettings })))
 
 const REFRESH_DELAY_MS = 150
@@ -168,6 +174,8 @@ export default function App() {
   useTabShortcuts()
   usePanelShortcuts({ toggleLeftSidebar: () => setSidebarOpen((v) => !v) })
   const sidepanelShown = tabsReady && panelShown
+
+  useEffect(() => prefetchOnIdle(PREFETCH), [])
 
   useEffect(() => {
     let live = true
