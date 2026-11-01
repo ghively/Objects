@@ -47,8 +47,15 @@ export function NumberCell({ def, value, readOnly, density, inTable, onChange }:
     if (typed === undefined) return
     const n = typed === null ? null : scale === 1 ? typed : fromPercent(typed)
     if (n === last.current) return
+    const prev = last.current
     last.current = n
-    onChange(n)
+    const res = onChange(n)
+    // A failed write never landed: forget it, so typing the same number again writes again.
+    if (res instanceof Promise) {
+      void res.then((ok) => {
+        if (ok === false && last.current === n) last.current = prev
+      })
+    }
   }
 
   const shown = focused ? text : formatNumber(value, fmt)
