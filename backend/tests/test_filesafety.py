@@ -62,8 +62,8 @@ def test_create_new_loses_a_race_with_an_external_writer(tmp_path: Path, monkeyp
     target = tmp_path / "a.md"
     real = textfile._write_temp
 
-    def write_then_race(path, data):
-        tmp = real(path, data)
+    def write_then_race(path, data, **kw):
+        tmp = real(path, data, **kw)
         target.write_bytes(b"external")
         return tmp
 

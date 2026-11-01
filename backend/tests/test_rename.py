@@ -347,9 +347,9 @@ def _external_writes(monkeypatch, target: Path, times: int) -> list[bytes]:
 
     real_temp, real_atomic = space_mod._write_temp, space_mod.atomic_write
 
-    def temp(path, data):
+    def temp(path, data, **kw):
         external(path)
-        return real_temp(path, data)
+        return real_temp(path, data, **kw)
 
     def atomic(path, data, check=None):
         external(path)

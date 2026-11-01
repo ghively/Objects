@@ -247,12 +247,12 @@ def test_rename_conflict_skipped_untouched(space_dir: Path, monkeypatch):
     real = space_mod._write_temp  # `_write` syncs a temp file, then re-checks and replaces
     written: list[bytes] = []
 
-    def patched(path, data):
+    def patched(path, data, **kw):
         if Path(path) == target and len(written) < 2:
             ext = target.read_bytes() + f"external {len(written)}\n".encode()
             target.write_bytes(ext)
             written.append(ext)
-        return real(path, data)
+        return real(path, data, **kw)
 
     monkeypatch.setattr(space_mod, "_write_temp", patched)
     with c:
