@@ -171,12 +171,18 @@ function round(n: number, places: number): number {
 
 /** The file's point limit per stroke (`whiteboardink.MAX_POINTS`); one save over it fails. */
 export const MAX_STROKE_POINTS = 20_000
+/**
+ * A path is cut into strokes of at most this many points while it is drawn. The file also caps a
+ * stroke's `d` at 1 MB (`whiteboardink.MAX_D_BYTES`), which a 20,000-point pen stroke exceeds
+ * (1.33 MB; it would fail every later save): 10,000 points stay under 0.7 MB.
+ */
+export const SPLIT_STROKE_POINTS = 10_000
 
 /**
  * A drawn path cut into pieces of at most `max` points, each starting at the previous piece's
  * last point so the line stays unbroken.
  */
-export function splitPoints<T>(points: readonly T[], max = MAX_STROKE_POINTS): T[][] {
+export function splitPoints<T>(points: readonly T[], max = SPLIT_STROKE_POINTS): T[][] {
   if (points.length <= max) return [points.slice()]
   const out: T[][] = []
   for (let start = 0; start < points.length - 1; start += max - 1) out.push(points.slice(start, start + max))
