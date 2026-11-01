@@ -265,3 +265,42 @@ def test_space_name_is_cached_until_space_json_changes(space_dir: Path, monkeypa
     assert space.name == "Home"
     cfg.unlink()
     assert space.name == space_dir.name
+
+
+# -- 7: reloading collections parses only the files that changed ----------------------
+
+
+def test_reload_collections_parses_only_changed_files(space_dir: Path, monkeypatch):
+    from objectapp import jsonstore
+
+    folder = space_dir / ".object" / "collections"
+    folder.mkdir(parents=True)
+    for cid in ("one", "two", "three"):
+        (folder / f"{cid}.json").write_text(
+            f'{{"id": "{cid}", "name": "{cid.title()}", "typeIds": []}}\n', encoding="utf-8"
+        )
+    space = Space(space_dir)
+    parses = []
+    real = jsonstore.parse_json_object
+    monkeypatch.setattr(jsonstore, "parse_json_object", lambda d: parses.append(d) or real(d))
+    for _ in range(5):
+        space.reload_collections()
+    assert parses == []
+    assert [c.name for c in space.list_collections()] == ["One", "Three", "Two"]
+
+    (folder / "two.json").write_text('{"id": "two", "name": "Second", "typeIds": []}\n')
+    (folder / "four.json").write_text('{"id": "four", "name": "Four", "typeIds": []}\n')
+    (folder / "one.json").unlink()
+    (folder / "three.json").write_text("{not json")
+    pairs = space.collections_with_revisions()
+    assert len(parses) == 3  # two.json, three.json (unreadable now) and four.json
+    by_id = {c.id: (c, rev) for c, rev in pairs}
+    assert sorted(by_id) == ["four", "three", "two"]
+    assert by_id["two"][0].name == "Second"
+    assert by_id["three"][0].readOnlyReason
+    assert by_id["two"][1] == space.collection_revision("two")
+
+    # A definition the app replaced in memory is re-read from its file.
+    space.collections["four"] = space._load_collection("four", {"name": "Stale"}, None)
+    space.reload_collections()
+    assert space.collections["four"].name == "Four"
