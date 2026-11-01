@@ -17,8 +17,9 @@ The index stores each source's link *targets* (`_extract`, one method, the hook
 point for other kinds of objects) and resolves them on read. `on_change` only
 records the change: the next read re-extracts the changed sources, re-extracts
 everything after a type change (property definitions decide which keys are
-relations), and re-resolves every stored target when the set of names changed
-(`Space._names_rev`). Nothing is ever written.
+relations), and re-resolves the sources holding a link written to a name that
+changed (`Space._names_since`; every source when the space can't say which).
+Nothing is ever written.
 
 It also keeps, for every object (templates too), the folded text of each link
 target as written (`mentioning`): a rename or type change asks it which files
@@ -36,6 +37,7 @@ from typing import TYPE_CHECKING, Any
 from .dailynotes import parse_day
 from .propvalues import decode_value
 from .relink import code_ranges, wikilink_spans, wikilink_targets
+from .resolver import fold as _fold
 
 if TYPE_CHECKING:
     from .space import Space, SpaceChange
@@ -83,10 +85,6 @@ class _Resolved:
     """Target path -> (a body link, the property keys that link)."""
     tags: tuple[str, ...]
     """Tag object paths, in tag order, distinct."""
-
-
-def _fold(text: str) -> str:
-    return " ".join(text.split()).casefold()
 
 
 def _strings(value: Any) -> Iterator[str]:
@@ -162,13 +160,20 @@ class LinkIndex:
                         self._sources[path] = ex
                     self._set_mentions(path, self._written_targets(path, ex))
             names_rev = space._names_rev
-            if full or names_rev != self._names_rev:
+            changed_names: frozenset[str] | None = frozenset()
+            if names_rev != self._names_rev:
+                changed_names = space._names_since(self._names_rev)
                 self._names_rev = names_rev
+            if full or changed_names is None:
                 self._resolve_all()
             else:
+                # Only a link written to a changed name can resolve differently now.
+                affected = set(dirty)
+                for name in changed_names:
+                    affected.update(self._mentions.get(name, ()))
                 changed = False
-                tag_paths = self._tag_paths() if dirty else {}
-                for path in dirty:
+                tag_paths = self._tag_paths() if affected else {}
+                for path in affected:
                     changed |= self._resolve_source(path, tag_paths)
                 if changed:
                     self._bump()
@@ -248,7 +253,8 @@ class LinkIndex:
             body_targets = [t for t, _s, _e in wikilink_spans(body)] if "[[" in body else []
         src = raw.of.frontmatter_src or ""
         fm_targets = wikilink_targets(src) if "[[" in src else set()
-        return frozenset(_fold(t) for t in (*body_targets, *fm_targets))
+        tags = ex.tags if ex is not None else ()  # a tag's rename re-resolves its holders
+        return frozenset(_fold(t) for t in (*body_targets, *fm_targets, *tags))
 
     def _set_mentions(self, path: str, targets: frozenset[str]) -> None:
         old = self._targets.pop(path, None)

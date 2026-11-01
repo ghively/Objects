@@ -191,3 +191,39 @@ def test_link_index_5000_objects_50000_links_under_2s(
         space.links.backlinks(sample)
     per = (time.perf_counter() - t0) / 100
     assert per < 0.001 * SLACK, per
+
+
+def test_names_change_reresolves_only_the_sources_that_mention_the_name(
+    links_space_dir: Path, monkeypatch
+):
+    # Audit 2026-11-01 P6: a rename re-resolves the links written to the old or new name,
+    # not every link in the space.
+    for i in range(30):
+        (links_space_dir / "Pages" / f"Other {i}.md").write_bytes(
+            b"---\ntype: 'Page'\ntitle: Other %d\n---\n\nSee [[Ada Lovelace]].\n" % i
+        )
+    space = Space(links_space_dir)
+    space.links.backlinks(ADA)  # built
+    resolved: list[str] = []
+    real_one = LinkIndex._resolve_one
+
+    def spy(self, path, tag_paths):
+        resolved.append(path)
+        return real_one(self, path, tag_paths)
+
+    def never(self):
+        raise AssertionError("a full re-resolve")
+
+    monkeypatch.setattr(LinkIndex, "_resolve_one", spy)
+    monkeypatch.setattr(LinkIndex, "_resolve_all", never)
+    before = set(space.links.backlinks(BABBAGE))
+    result = space.rename_object(BABBAGE, "Charles B", space.cached_version(BABBAGE))
+    assert set(space.links.backlinks(result.path)) == before
+    assert space.links.backlinks(BABBAGE) == []
+    assert not any(p.startswith("Pages/Other ") for p in resolved), resolved
+    assert len(resolved) < 30
+    # A new object taking a linked name re-resolves the linkers of that name only.
+    resolved.clear()
+    path, _v = space.create_object("page", "Charles B")
+    assert ENGINE in space.links.backlinks(path)
+    assert ENGINE in resolved and not any(p.startswith("Pages/Other ") for p in resolved)

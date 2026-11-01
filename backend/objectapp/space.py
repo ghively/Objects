@@ -28,6 +28,7 @@ import random
 import re
 import shutil
 import threading
+from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta, tzinfo
@@ -88,7 +89,7 @@ from .relink import (
     rewrite_tag_lists,
     wikilink_targets,
 )
-from .resolver import Resolver, link_candidates
+from .resolver import Resolver, link_candidates, link_names
 from .roles import role_of
 from .templates import TemplateError, creation_variable, expand_title, resolve_date_variable
 from .textfile import atomic_write, create_new, encode_like, move_no_overwrite, retry_os
@@ -719,6 +720,8 @@ class Space:
         self._listeners: list[Callable[[SpaceChange], None]] = []
         self._names_rev = 0
         """Bumped whenever the set of link names changes (see `_names_changed`)."""
+        self._name_changes: deque[tuple[int, frozenset[str] | None]] = deque(maxlen=512)
+        """(`_names_rev`, the folded link names that change touched; None when unknown)."""
         self._resolver: Resolver | None = None
         self._links = LinkIndex(self)
         self._listeners.append(self._links.on_change)
@@ -2149,8 +2152,9 @@ class Space:
         self.own_writes.pop(rel, None)
         with self._lock:
             self._raw.pop(rel, None)
-            if self._summaries.pop(rel, None) is not None:
-                self._names_changed()
+            gone = self._summaries.pop(rel, None)
+            if gone is not None:
+                self._names_changed(gone, None)
             self._fire(SpaceChange("object", rel))
         self.rescan_file(new_rel)
 
@@ -4413,8 +4417,9 @@ class Space:
                 if self._type_id(raw.typeName) not in {t.id for t in self.types}:
                     self._merge_types(infer_types_from(self._raw.values()))
                 self._summaries[rel] = self._summarize(raw)
-            if _names_key(before) != _names_key(self._summaries.get(rel)):
-                self._names_changed()
+            after = self._summaries.get(rel)
+            if _names_key(before) != _names_key(after):
+                self._names_changed(before, after)
             self._fire(SpaceChange("object", rel))
 
     # -- change listeners -------------------------------------------------------
@@ -4447,10 +4452,39 @@ class Space:
         """Tell the listeners that a type definition changed (``type_id`` is informative)."""
         self._fire(SpaceChange("types", None))
 
-    def _names_changed(self) -> None:
-        """The set of link names changed: rebuild the resolver on its next use."""
+    def _names_changed(
+        self, before: ObjectSummary | None = None, after: ObjectSummary | None = None
+    ) -> None:
+        """The set of link names changed: move the resolver along, or drop it.
+
+        ``before`` and ``after`` are the one object's summaries around the change: the
+        resolver is replaced by `Resolver.updated` and the link index learns which link
+        names it touched (`_names_since`). Without them the resolver is rebuilt on its
+        next use and every link re-resolved.
+        """
         self._names_rev += 1
-        self._resolver = None
+        if before is None and after is None:
+            self._resolver = None
+            self._name_changes.append((self._names_rev, None))
+            return
+        names = frozenset().union(*(link_names(s) for s in (before, after) if s is not None))
+        r = self._resolver
+        if r is not None:
+            self._resolver = r.updated(before, after)
+        self._name_changes.append((self._names_rev, names))
+
+    def _names_since(self, rev: int) -> frozenset[str] | None:
+        """The folded link names changed since `_names_rev` was ``rev``; None when unknown."""
+        out: set[str] = set()
+        seen = rev
+        for r, names in self._name_changes:
+            if r <= rev:
+                continue
+            if r != seen + 1 or names is None:
+                return None
+            seen = r
+            out |= names
+        return frozenset(out) if seen == self._names_rev else None
 
     # -- links --------------------------------------------------------------
 
