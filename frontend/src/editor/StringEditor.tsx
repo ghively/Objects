@@ -95,7 +95,7 @@ export function StringEditor({
   const dirty = useRef(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [extensions] = useState(() => [...editorExtensions(), placeholderExtension(() => latest.current.placeholder)])
+  const [extensions] = useState(() => [...editorExtensions({ singleParagraph }), placeholderExtension(() => latest.current.placeholder)])
 
   const editor = useEditor({
     extensions,

@@ -68,6 +68,8 @@ import { LazyTable } from './table/LazyTable'
 export type EditorExtensionOptions = {
   /** `false` leaves out the "1. " input rule (`EditorSettings.disableNumberedListTransformation`). */
   numberedListInputRule?: boolean
+  /** The editor holds one paragraph (a Text property cell): pasted text is never read as Markdown blocks. */
+  singleParagraph?: boolean
 }
 
 /**
@@ -159,7 +161,7 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
     DataViewEmbed,
     RecordAudio,
     SlashMenu,
-    BlockSelection,
+    BlockSelection.configure({ markdownPaste: !opts.singleParagraph }),
     M8Keys,
     FileDrop,
   ]
