@@ -113,6 +113,26 @@ const TEXT_ID = 'text:'
 const ALIAS_ID = 'alias:'
 const LINK_ID = 'link:'
 const TAG_ID = 'tag:'
+const VALUE_PREFIXES = [TEXT_ID, ALIAS_ID, LINK_ID, TAG_ID]
+
+/** A saved group-config entry's id matches a group's id, or the bare value a view saved before ids carried a prefix. */
+function sameGroupId(saved: string, id: string): boolean {
+  if (saved === id) return true
+  const prefix = VALUE_PREFIXES.find((p) => id.startsWith(p))
+  return prefix !== undefined && saved === id.slice(prefix.length)
+}
+
+/** The saved `groupByConfig.groups` entry for the group `id` (also by its legacy bare id), if any. */
+export function findGroupConfig<T extends { id: string }>(groups: T[] | undefined, id: string): T | undefined {
+  return groups?.find((x) => x.id === id) ?? groups?.find((x) => sameGroupId(x.id, id))
+}
+
+/** Where the group `id` sits in the saved order, or -1. */
+export function groupConfigIndex(groups: { id: string }[] | undefined, id: string): number {
+  if (!groups) return -1
+  const exact = groups.findIndex((x) => x.id === id)
+  return exact >= 0 ? exact : groups.findIndex((x) => sameGroupId(x.id, id))
+}
 
 const DATE_LABELS: Record<string, string> = {
   overdue: 'Overdue',
@@ -440,7 +460,7 @@ export function groupRows(
   let list = [...byId.values()]
   if (config?.hideEmptyGroups) list = list.filter((g) => g.rows.length > 0)
   const manualPos = (id: string) => {
-    const i = (config?.groups ?? []).findIndex((x) => x.id === id)
+    const i = groupConfigIndex(config?.groups, id)
     return i < 0 ? Infinity : i
   }
   const cmp: Record<GroupSortOption, (a: Entry, b: Entry) => number> = {
@@ -478,7 +498,7 @@ export function groupRows(
   const groups: Group[] = []
   const hidden: Group[] = []
   for (const g of ordered) {
-    const c = config?.groups?.find((x) => x.id === g.id)
+    const c = findGroupConfig(config?.groups, g.id)
     if (c ? c.isHidden : !!config?.hideByDefault) hidden.push(g)
     else groups.push(g)
   }

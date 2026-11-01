@@ -14,7 +14,7 @@ import { DeleteObjectDialog } from '@/object/DeleteObjectDialog'
 import { TypeChip } from '@/shell/Sidebar'
 import type { CustomizePage } from './CustomizeMenu'
 import { applyFilters } from './filter'
-import { groupRows, type Group, type GroupCtx } from './group'
+import { findGroupConfig, groupRows, type Group, type GroupCtx } from './group'
 import { cardProperties } from './cards/cardConfig'
 import { CardCustomizePage } from './cards/CardCustomize'
 import { EmbedLayout } from './layouts/EmbedLayout'
@@ -298,11 +298,12 @@ export function DataView(props: DataViewProps) {
   const total = result.groups.reduce((n, g) => n + g.rows.length, 0)
 
   const cfgGroups = state.viewDefinition.groupByConfig?.groups ?? []
-  const closed = (g: Group) => !!cfgGroups.find((x) => x.id === g.id)?.isClosed
+  const closed = (g: Group) => !!findGroupConfig(cfgGroups, g.id)?.isClosed
   const toggle = (g: Group) => {
-    const have = cfgGroups.find((x) => x.id === g.id)
+    const have = findGroupConfig(cfgGroups, g.id)
+    // A legacy (bare-id) entry is rewritten under the group's current id.
     const next = have
-      ? cfgGroups.map((x) => (x.id === g.id ? { ...x, isClosed: !x.isClosed } : x))
+      ? cfgGroups.map((x) => (x === have ? { ...x, id: g.id, isClosed: !x.isClosed } : x))
       : [...cfgGroups, { id: g.id, isHidden: false, isClosed: true }]
     onState({ ...state, viewDefinition: { ...state.viewDefinition, groupByConfig: { ...state.viewDefinition.groupByConfig, groups: next } } })
   }
