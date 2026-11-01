@@ -10,6 +10,7 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
+import { useSettings } from '@/settings/useSettings'
 import { FilterEditor } from './FilterEditor'
 import { emptyFilterGroup } from './model'
 import { propertyChoices } from './properties'
@@ -121,6 +122,24 @@ describe('FilterEditor', () => {
     expect(screen.getByRole('button', { name: 'Date' })).toHaveTextContent('Select date')
     await user.click(screen.getByRole('button', { name: 'Date' }))
     expect(await screen.findByRole('menu', { name: 'Date' })).toBeInTheDocument()
+  })
+
+  test('"Specific date" defaults to today in the Time zone setting, not the UTC day (audit 2026-11-01)', async () => {
+    useSettings.setState({ settings: { ...useSettings.getState().settings, timeZone: 'America/Los_Angeles' } })
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date('2026-11-01T03:00:00Z') }) // Oct 31, 8 PM in LA
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const onChange = vi.fn()
+    const T = typeDef({ id: 'task', propertyDefinitions: [propertyDef({ id: 'due', type: 'datetime', name: 'Due' })] })
+    const init: FilterGroup = { type: 'filterGroup', operator: 'and', elements: [{ type: 'filter', propertyId: 'due', option: 'is' }] }
+    try {
+      render(<FilterEditor group={init} onChange={onChange} choices={propertyChoices([T])} types={[T]} collections={[]} />)
+      await user.click(screen.getByRole('button', { name: 'Date' }))
+      await user.click(await screen.findByRole('menuitemradio', { name: 'Specific date' }))
+      expect((onChange.mock.calls[0][0] as FilterGroup).elements[0]).toMatchObject({ referenceValue: { exactDate: '2026-10-31' } })
+    } finally {
+      vi.useRealTimers()
+      useSettings.setState({ settings: { ...useSettings.getState().settings, timeZone: null } })
+    }
   })
 
   test('a percentage filter value is typed in percent and stored as the fraction', () => {
