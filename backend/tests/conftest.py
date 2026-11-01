@@ -109,6 +109,15 @@ def _search_cache_stays_in_the_sandbox(tmp_path_factory, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_frontmatter_cache_timer_outlives_its_test():
+    """A cache flush timer armed by one test must not fire into a later one."""
+    yield
+    from objectapp import fmcache
+
+    fmcache.forget_all()
+
+
+@pytest.fixture(autouse=True)
 def _reminders_stay_in_the_sandbox(tmp_path_factory, monkeypatch):
     """M4 Task 6: every app lifespan runs the reminder scheduler.
 
