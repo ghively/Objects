@@ -115,6 +115,9 @@ function HeaderCell({
   )
 }
 
+/** Our string: each row's title input is named by its row ("Title of Alpha"). */
+export const titleLabel = (title: string) => `Title of ${title || 'Untitled'}`
+
 function TitleCell({ row, onRename, onOpen }: { row: Row; onRename(row: Row, title: string): void; onOpen(e: ReactMouseEvent): void }) {
   const [text, setText] = useState(row.summary.title)
   const focused = useRef(false)
@@ -132,7 +135,7 @@ function TitleCell({ row, onRename, onOpen }: { row: Row; onRename(row: Row, tit
   return (
     <div className="group/title flex w-full min-w-0 items-center gap-1">
       <input
-        aria-label="Title"
+        aria-label={titleLabel(row.summary.title)}
         value={text}
         readOnly={row.summary.readOnly}
         onFocus={() => (focused.current = true)}
