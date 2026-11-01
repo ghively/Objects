@@ -180,6 +180,40 @@ describe('board store', () => {
     expect(s.getState().doc.strokes).toEqual([stroke('s1')])
   })
 
+  test('a read-only ink file keeps its strokes out of every edit: clear, undo, redo and ink-select', () => {
+    const b = board([node({ id: 'a', blockId: 'b1' })], [], { b1: textBlock('hi') })
+    const s = createBoardStore({ doc: { board: b, strokes: [stroke('s1')] } })
+    const a = s.getState().actions
+    a.setStrokes([stroke('s1'), stroke('s2')], 'draw') // while the ink file was writable
+    expect(s.getState().strokesSeq).toBe(1)
+    s.getState().canvas.setInkReadOnly(true)
+    expect(s.getState().inkReadOnly).toBe(true)
+    const strokes = s.getState().doc.strokes
+    // Ink-select moves, erases and new strokes are refused.
+    a.setStrokes([stroke('s1')], 'erase')
+    expect(s.getState().doc.strokes).toBe(strokes)
+    // "Clear Whiteboard" clears the board but not the ink.
+    a.clearBoard()
+    expect(s.getState().doc.board.nodes).toEqual({})
+    expect(s.getState().doc.strokes).toBe(strokes)
+    // Undo and redo step through the board's changes and leave the strokes as they are.
+    a.undo() // the clear
+    expect(Object.keys(s.getState().doc.board.nodes)).toEqual(['a'])
+    expect(s.getState().doc.strokes).toBe(strokes)
+    a.undo() // the stroke drawn while writable: the board doesn't change, the ink stays
+    expect(s.getState().doc.strokes).toBe(strokes)
+    a.redo()
+    a.redo()
+    expect(s.getState().doc.board.nodes).toEqual({})
+    expect(s.getState().doc.strokes).toBe(strokes)
+    expect(s.getState().strokesSeq).toBe(1)
+    // Writable again: strokes change as before.
+    s.getState().canvas.setInkReadOnly(false)
+    a.setStrokes([], 'erase')
+    expect(s.getState().doc.strokes).toEqual([])
+    expect(s.getState().strokesSeq).toBe(2)
+  })
+
   test('locked board is view only; unlock still works', () => {
     const s = storeWith(board([node({ id: 'a' })], [], {}, { locked: true }))
     const a = s.getState().actions
