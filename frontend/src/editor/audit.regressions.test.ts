@@ -419,6 +419,12 @@ describe('minor drift on edited lines', () => {
     expect(out.reloaded).toEqual([['blockquote', 'aZb\nc']])
   })
 
+  test('a tab-indented sibling item is kept when another item is edited (audit 2026-11-01)', () => {
+    const editor = headless('- a\n   - b\n\t- c\n')
+    append(editor, 'a', 'Z')
+    expect(serializeBody(editor)).toBe('- aZ\n   - b\n\t- c\n')
+  })
+
   test('an edited blockquote line keeps its marker', () => {
     const editor = headless('> a\n> b\n')
     append(editor, 'b', 'X')
