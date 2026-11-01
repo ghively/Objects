@@ -173,3 +173,69 @@ def test_link_index_pending_collapses_to_a_full_rebuild(space_dir: Path, monkeyp
     space.rescan_file("Pages/Notes.md")
     assert "Pages/Notes.md" not in space.links.backlinks("Pages/Alpha.md")
     assert space.links._pending == [] and not space.links._overflow
+
+
+# -- 5: a media export is streamed through a temporary file outside the space --------
+
+
+def test_media_export_goes_to_a_temp_file_in_the_state_dir(full_space_dir: Path, monkeypatch):
+    import io
+    import zipfile
+
+    from objectapp import export
+    from objectapp.appstate import state_dir
+
+    root = full_space_dir
+    big = root / "Attachments" / "big.bin"
+    big.write_bytes(os.urandom(256) * 4096)  # 1 MB
+    _write(root / "Pages/With media.md", "---\ntitle: With media\n---\n![[Attachments/big.bin]]\n")
+    space = Space(root)
+    before = {p.relative_to(root) for p in root.rglob("*")}
+
+    held = []
+    real_bytesio = io.BytesIO
+    monkeypatch.setattr(export.io, "BytesIO", lambda *a: held.append(1) or real_bytesio(*a))
+    out = export.export_object_to_file(space, "Pages/With media.md", True)
+    assert held == []  # no in-memory zip
+    assert out.data == b"" and out.file is not None and out.filename == "With media.zip"
+    assert out.file.parent == state_dir() / "exports"
+    assert not out.file.is_relative_to(root)
+    with zipfile.ZipFile(out.file) as zf:
+        assert sorted(zf.namelist()) == ["Attachments/big.bin", "With media.md"]
+        assert zf.read("Attachments/big.bin") == big.read_bytes()
+    out.cleanup()
+    out.cleanup()  # idempotent
+    assert not out.file.exists()
+    assert {p.relative_to(root) for p in root.rglob("*")} == before  # nothing in the space
+
+    # Without media it is the file's bytes, no temp file.
+    md = export.export_object_to_file(space, "Pages/With media.md", False)
+    assert md.file is None and md.data == (root / "Pages/With media.md").read_bytes()
+    with pytest.raises(KeyError):
+        export.export_object_to_file(space, "Pages/Nope.md", True)
+    assert list((state_dir() / "exports").iterdir()) == []
+
+
+def test_media_export_sweeps_stale_files_and_cleans_up_on_failure(
+    full_space_dir: Path, monkeypatch
+):
+    import time
+
+    from objectapp import export
+
+    space = Space(full_space_dir)
+    folder = export.export_dir()
+    folder.mkdir(parents=True)
+    stale, fresh = folder / "export-old.zip", folder / "export-new.zip"
+    stale.write_bytes(b"x")
+    fresh.write_bytes(b"x")
+    old = time.time() - 2 * 3600
+    os.utime(stale, (old, old))
+
+    def boom(*_a):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(export, "_write_zip", boom)
+    with pytest.raises(OSError):
+        export.export_object_to_file(space, ADA, True)
+    assert sorted(p.name for p in folder.iterdir()) == ["export-new.zip"]
