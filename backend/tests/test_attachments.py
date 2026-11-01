@@ -221,11 +221,14 @@ def test_open_uses_os_and_refuses_executables(env):
 
 
 # Audit 2026-11-01 #5 (Gene: whitelist): only documents, images, audio, video, PDFs and
-# archives are handed to the OS; everything the OS might run is refused.
+# archives are handed to the OS; everything the OS might run is refused. An SVG is viewed
+# in the app (`/api/file`, sandboxed), never opened outside: most desktops hand it to a
+# browser, where its scripts run under file:// (fix pass).
 RUNNABLE = ["exe", "pif", "scf", "msc", "inf", "ws", "wsc", "sct", "application", "gadget", "py",
             "pyw", "pyz", "desktop", "appimage", "run", "bin", "iso", "dmg", "pkg", "sh", "js",
-            "jar", "lnk", "url", "bat", "cmd", "ps1", "rb", "pl", "html", "htm", "svgz", ""]
-OPENABLE = ["pdf", "png", "jpg", "svg", "mp3", "wav", "mp4", "mov", "docx", "xlsx", "pptx", "odt",
+            "jar", "lnk", "url", "bat", "cmd", "ps1", "rb", "pl", "html", "htm", "svg", "svgz",
+            "SVG", ""]
+OPENABLE = ["pdf", "png", "jpg", "mp3", "wav", "mp4", "mov", "docx", "xlsx", "pptx", "odt",
             "txt", "csv", "epub", "zip", "7z", "tar", "gz", "DOCX", "Zip"]
 
 

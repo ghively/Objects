@@ -268,10 +268,16 @@ ARCHIVE_OPEN_EXTENSIONS = frozenset({
 })
 
 
+# Image kinds the app serves but never hands to the OS: most desktops open an SVG in a
+# browser, where its embedded script runs under file:// (fix pass 2026-11-01). It stays
+# viewable in the app through `/api/file`, under the image sandbox CSP.
+NOT_OPENABLE_IMAGES = frozenset({"svg"})
+
+
 def _openable_extensions() -> frozenset[str]:
     media = (IMAGE_EXTENSIONS, PDF_MEDIA_TYPES, AUDIO_MEDIA_TYPES, VIDEO_MEDIA_TYPES)
     return frozenset(
-        {ext.lstrip(".") for table in media for ext in table}
+        ({ext.lstrip(".") for table in media for ext in table} - NOT_OPENABLE_IMAGES)
         | DOCUMENT_OPEN_EXTENSIONS
         | ARCHIVE_OPEN_EXTENSIONS
     )
