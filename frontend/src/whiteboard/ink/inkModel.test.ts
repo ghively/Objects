@@ -19,6 +19,8 @@ import {
   outlineFor,
   penAltitude,
   samplesFrom,
+  segSegDist2,
+  segments,
   splitPoints,
   strokePointerType,
   tiltFactor,
@@ -65,6 +67,33 @@ function fakePointer(init: Partial<PointerEvent> & { coalesced?: Partial<Pointer
 }
 
 describe('ink model', () => {
+  test('the eraser hit test over big ink matches the plain double loop and stays quick', () => {
+    const strokes: InkStroke[] = []
+    for (let n = 0; n < 2000; n++) {
+      const pts: [number, number, number][] = []
+      for (let i = 0; i < 100; i++) pts.push([(n % 40) * 50 + i * 0.5, Math.floor(n / 40) * 50 + Math.sin(i) * 10, 0.5])
+      strokes.push({ id: `s${n}`, tool: 'pen', color: '#000000', width: 4, points: pts, d: '' })
+    }
+    const eraser: [number, number, number][] = []
+    for (let i = 0; i < 150; i++) eraser.push([i * 13, 1000 + i * 8, 0.5])
+    const radius = 10
+    // The oracle: every stroke segment against every eraser segment.
+    const brute = new Set<string>()
+    const eraserSegs = segments(eraser)
+    for (const s of strokes) {
+      if (segments(s.points).some(([a, b]) => eraserSegs.some(([c, d]) => segSegDist2(a, b, c, d) <= radius * radius))) brute.add(s.id)
+    }
+    expect(brute.size).toBeGreaterThan(20)
+    const t0 = performance.now()
+    const hit = hitStrokes(strokes, eraser, radius)
+    const ms = performance.now() - t0
+    expect(hit).toEqual(brute)
+    expect(ms).toBeLessThan(250) // 1.4 s with the double loop
+    // Single-point strokes and a one-point eraser path go through the same index.
+    expect(hitStrokes([{ ...strokes[0], points: [[5, 5, 0.5]] }], [[5, 12, 0.5]], radius)).toEqual(new Set(['s0']))
+    expect(hitStrokes([{ ...strokes[0], points: [[5, 5, 0.5]] }], [[5, 16, 0.5]], radius)).toEqual(new Set())
+  })
+
   test('a stroke at the file point cap splits into pieces whose paths stay well under the server 1 MB cap', () => {
     // A wiggly pen path: every coordinate carries decimals, so `d` is as long as it gets.
     const pts: [number, number, number][] = []
