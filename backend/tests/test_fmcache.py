@@ -326,3 +326,27 @@ def test_many_puts_arm_one_flush_timer(tmp_path: Path, monkeypatch):
         assert len(started) == 1
     finally:
         cache.flush()  # cancels the timer
+
+
+def test_a_cache_folder_inside_the_space_is_ignored_by_git_from_its_first_write(space_dir: Path, monkeypatch):
+    """m4 acceptance: the first `git add -A` raced the search index's .gitignore and tracked the cache."""
+    monkeypatch.delenv("OBJECT_CACHE_DIR", raising=False)
+    fmcache._caches.clear()
+    cache = fmcache.for_root(space_dir)
+    assert cache.path.parent == space_dir / fmcache.CACHE_FOLDER
+    cache.put("Pages/Alpha.md", "title: Alpha\n", {"title": "Alpha"})
+    cache.flush()
+    assert (space_dir / fmcache.CACHE_FOLDER / ".gitignore").read_bytes() == b"*\n"
+    assert cache.path.is_file()
+
+
+def test_a_cache_folder_outside_the_space_gets_no_gitignore(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("OBJECT_CACHE_DIR", str(tmp_path / "caches"))
+    fmcache._caches.clear()
+    root = tmp_path / "space"
+    root.mkdir()
+    cache = fmcache.for_root(root)
+    cache.put("Pages/A.md", "title: A\n", {"title": "A"})
+    cache.flush()
+    assert cache.path.is_file()
+    assert not (cache.path.parent / ".gitignore").exists()
