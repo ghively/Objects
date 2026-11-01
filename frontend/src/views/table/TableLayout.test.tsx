@@ -230,6 +230,25 @@ describe('TableLayout', () => {
     expect(screen.getByTestId('table-notice')).toHaveTextContent('Changed elsewhere. Reloaded.')
   })
 
+  test('a number retyped after a failed write is sent again (audit 2026-11-01 #11)', async () => {
+    const user = userEvent.setup()
+    mocked.updateProperties.mockRejectedValueOnce(new Error('disk full'))
+    render(<Harness />)
+    const input = screen.getAllByLabelText('Amount')[0]
+    await user.clear(input)
+    await user.type(input, '5')
+    await user.tab()
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(1))
+    expect(screen.getByTestId('table-notice')).toHaveTextContent('disk full')
+    // The cell shows the stored value again; typing the same number must write it, not skip it.
+    expect(input).toHaveValue('1,200')
+    await user.clear(input)
+    await user.type(input, '5')
+    await user.tab()
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(2))
+    expect(mocked.updateProperties).toHaveBeenLastCalledWith('Pages/Alpha.md', { amount: 5 }, 'v7')
+  })
+
   test('title cell rename calls renameObject', async () => {
     const user = userEvent.setup()
     render(<Harness />)

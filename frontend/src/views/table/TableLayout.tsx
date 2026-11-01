@@ -260,7 +260,8 @@ export function TableLayout(props: TableLayoutProps) {
     }
   }
 
-  const commit = async (row: Row, def: PropertyDef, next: unknown) => {
+  /** Writes one cell; resolves `false` when the write failed (the cell then offers the value again). */
+  const commit = async (row: Row, def: PropertyDef, next: unknown): Promise<boolean> => {
     try {
       // Writes to one row run in turn, each from the newest version (the rows may lag behind).
       await writes.run(row, async (version, cur) => {
@@ -276,8 +277,10 @@ export function TableLayout(props: TableLayoutProps) {
         patchRow?.(row.summary.path, patched)
         return res
       })
+      return true
     } catch (err) {
       await fail(row, err)
+      return false
     }
   }
 
@@ -337,7 +340,7 @@ export function TableLayout(props: TableLayoutProps) {
                   readOnly={row.summary.readOnly}
                   density={wrapped ? 'panel' : 'table'}
                   inTable
-                  onChange={(next: unknown) => void commit(row, def, next)}
+                  onChange={(next: unknown) => commit(row, def, next)}
                   onDefChange={onDefChange}
                   typeId={row.summary.type}
                   onOpenObject={(path: string) => useTabs.getState().open({ kind: 'object', path })}
