@@ -63,6 +63,7 @@ from .frontmatter import (
 )
 from .ids import new_ulid
 from .collections import CollectionDef, SaveCollectionResult
+from . import fmcache
 from .dailynotes import FILE_NAME_TAKEN, DailyNoteExists, build_index, day_of, parse_day
 from .jsonstore import DefinitionUnreadable, JsonStore
 from .localtime import SystemTz, from_local, to_local
@@ -780,6 +781,10 @@ class Space:
         """Type id -> the revision of its file when the in-memory copy was loaded or written."""
         for rel, raw in self._raw.items():
             self._summaries[rel] = self._summarize(raw)
+        # The frontmatter cache is written once here, outside any lock (startup only), so a
+        # later start in this process finds nothing dirty and writes nothing; after this,
+        # only the cache's own timer and interpreter exit write it (never a request thread).
+        fmcache.for_root(self.root).flush()
         self.collections: dict[str, CollectionDef] = {}
         """Collection id -> definition (unreadable files included, read-only)."""
         for cid, data, _rev, err in self.store("collections").list():
