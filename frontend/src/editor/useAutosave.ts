@@ -101,8 +101,10 @@ export function useAutosave(opts: AutosaveOptions) {
         } catch (err) {
           if (!aliveRef.current || optsRef.current.path !== path) {
             // The editor has left this object: nobody is there to resolve a conflict
-            // or see a retry, so keep the text to offer when the object opens again.
-            keepUnsaved(path, body)
+            // or see a retry, so keep the text to offer when the object opens again:
+            // the text asked for on leaving, when it is newer than this save's.
+            const q = queuedRef.current
+            keepUnsaved(path, q?.path === path && q.body !== null ? q.body : body)
           } else if (err instanceof ConflictError) {
             pausedRef.current = true
             setSaveError(null)
