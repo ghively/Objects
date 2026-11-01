@@ -9,6 +9,7 @@
  * is stripped before reporting.
  */
 import { Extension, type Editor as TiptapEditor } from '@tiptap/core'
+import { Fragment, Slice, type Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { EditorContent, useEditor } from '@tiptap/react'
@@ -47,6 +48,29 @@ export interface StringEditorProps {
 /** `s` without one trailing line break. */
 export function stripFinalNewline(s: string): string {
   return s.replace(/\r?\n$/, '')
+}
+
+/**
+ * A pasted slice as one paragraph's inline content (single-paragraph mode): its textblocks,
+ * empty ones skipped, joined with a space, and line breaks as spaces. Marks and inline nodes
+ * are kept; block nodes without text (an image, a divider) are dropped.
+ */
+export function oneParagraph(slice: Slice): Slice {
+  const first = slice.content.firstChild
+  if (!first || first.isInline) return slice
+  const schema = first.type.schema
+  const parts: PMNode[] = []
+  slice.content.descendants((node) => {
+    if (!node.isTextblock) return true
+    const inline: PMNode[] = []
+    node.forEach((child) => inline.push(child.type.name === 'hardBreak' ? schema.text(' ') : child))
+    if (inline.every((n) => n.isText && n.text!.trim() === '')) return false
+    if (parts.length) parts.push(schema.text(' '))
+    parts.push(...inline)
+    return false
+  })
+  if (!parts.length) return Slice.empty
+  return new Slice(Fragment.from(schema.nodes.paragraph.create(null, parts)), 1, 1)
 }
 
 function placeholderExtension(text: () => string | undefined) {
@@ -111,6 +135,8 @@ export function StringEditor({
         ...(singleParagraph ? {} : { 'aria-multiline': 'true' }),
         ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
       },
+      // A paragraph has no line breaks: pasted lines and paragraphs are joined with a space.
+      transformPasted: (slice) => (latest.current.singleParagraph ? oneParagraph(slice) : slice),
       handleKeyDown: (_view, event) => {
         if (event.key === 'Escape' && latest.current.onEscape) {
           flushRef.current()

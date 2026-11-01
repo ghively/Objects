@@ -22,6 +22,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Editor } from '@/editor/Editor'
+import { RecoveryDialog } from '@/editor/RecoveryDialog'
+import { dropUnsaved, keptUnsaved } from '@/editor/unsaved'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { FindBar } from '@/find/FindBar'
 import { useFind } from '@/find/useFind'
@@ -173,6 +175,8 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   }, [])
   /** An external change that collided with unsaved edits, awaiting keep-mine / take-theirs. */
   const [pending, setPending] = useState<{ mine: string; theirs: ObjectDetail } | null>(null)
+  /** Edits kept when this object was last left unsaved (`editor/unsaved.ts`), offered on open. */
+  const [recovery, setRecovery] = useState<{ kept: string; onDisk: string; error: string | null } | null>(null)
   // Subscribe so the type chip and properties pick up types once the index loads.
   useLinkIndex((s) => s.revision)
 
@@ -383,11 +387,60 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     unblockRef.current()
   }
 
+  /** Offer the edits kept for this object, if any differ from what is on disk. */
+  const offerKept = useCallback(
+    (d: ObjectDetail) => {
+      const kept = keptUnsaved(path)
+      if (kept === null) return
+      if (kept === d.body) dropUnsaved(path)
+      else setRecovery({ kept, onDisk: d.body, error: null })
+    },
+    [path],
+  )
+
+  /** "Save changes": write the kept text over the version on disk and show it. */
+  const saveKept = async () => {
+    const r = recovery
+    const h = editorRef.current
+    if (!r) return
+    h?.hold()
+    try {
+      const res = await api.saveBody(path, r.kept, versionRef.current)
+      dropUnsaved(path)
+      setRecovery(null)
+      h?.reload(r.kept, res.version)
+      setDetail((d) => (d ? { ...d, body: r.kept, version: res.version } : d))
+      adoptVersion(res.version)
+    } catch (err) {
+      if (err instanceof ConflictError) {
+        // Changed again meanwhile: show the newest version and ask again.
+        try {
+          const d = await api.object(path)
+          h?.reload(d.body, d.version)
+          setDetail(d)
+          adoptVersion(d.version)
+          setRecovery({ kept: r.kept, onDisk: d.body, error: null })
+        } catch {
+          /* gone or unreadable: keep asking with what we have */
+        }
+      } else {
+        setRecovery({ ...r, error: 'Could not save the changes.' })
+      }
+      void h?.resume(versionRef.current)
+    }
+  }
+
+  const discardKept = () => {
+    dropUnsaved(path)
+    setRecovery(null)
+  }
+
   useEffect(() => {
     let alive = true
     blockedRef.current = false
     pendingRef.current = false
     setPending(null)
+    setRecovery(null)
     if (renamedToRef.current === path) {
       // Our own rename: keep showing the object while its new path loads.
       renamedToRef.current = null
@@ -414,12 +467,13 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         if (!alive) return
         setDetail(d)
         adoptVersion(d.version)
+        offerKept(d)
       })
       .catch((e: unknown) => alive && setError(e instanceof Error ? e.message : String(e)))
     return () => {
       alive = false
     }
-  }, [path, adoptVersion, markDeleted])
+  }, [path, adoptVersion, markDeleted, offerKept])
 
   const toggleRaw = async () => {
     // Save everything first (and wait for saves already in flight or queued),
@@ -834,6 +888,18 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     }
   }, [mode, autoFocus, hasDetail])
 
+  const recoveryDialog = (
+    <RecoveryDialog
+      open={recovery !== null}
+      path={path}
+      kept={recovery?.kept ?? ''}
+      onDisk={recovery?.onDisk ?? ''}
+      error={recovery?.error}
+      onSave={() => void saveKept()}
+      onDiscard={discardKept}
+    />
+  )
+
   const overlays = (
     <>
       {footer && <div className="absolute right-4 bottom-4">{footer}</div>}
@@ -845,6 +911,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         onKeepMine={keepMine}
         onTakeTheirs={takeTheirs}
       />
+      {recoveryDialog}
       {typeEditor.dialog}
       <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} />
       {exportOpen && <ExportDialog open onOpenChange={setExportOpen} path={path} prepare={settle} />}
@@ -891,12 +958,13 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   )
 
   if (mode === 'inline') {
-    // Emptiness from the editor's DOM first: any text means not empty, with no serialising of
-    // the body (this ran twice per keystroke, on input and keyup). Only a textless document is
-    // serialised, since an image or embed alone is not empty either.
+    // Emptiness from the editor's DOM first: any text, or any block but a paragraph (an image,
+    // a divider, an embed: each writes Markdown of its own), means not empty, with no
+    // serialising of the body (this ran twice per keystroke, on input and keyup). Only a
+    // document of textless paragraphs is serialised.
     const checkEmpty = () => {
       const pm = inlineRef.current?.querySelector('.ProseMirror')
-      if (pm && (pm.textContent ?? '').trim() !== '') {
+      if (pm && ((pm.textContent ?? '').trim() !== '' || [...pm.children].some((c) => c.tagName !== 'P'))) {
         setBodyEmpty(false)
         return
       }
@@ -944,6 +1012,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
           onKeepMine={keepMine}
           onTakeTheirs={takeTheirs}
         />
+        {recoveryDialog}
       </div>
     )
   }
