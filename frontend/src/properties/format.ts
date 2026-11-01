@@ -112,7 +112,8 @@ export function progressFraction(v: number | null | undefined, fmt?: NumberForma
  * What the user typed into a number cell: `null` for an empty input (clear the value), the
  * number, or `undefined` when it isn't a number (callers ignore it). With a comma radix
  * (`isRadixComma` or the "Decimal separator" setting), `.` groups and `,` is the decimal point
- * (`1.234,5` → 1234.5); otherwise `,` groups.
+ * (`1.234,5` → 1234.5); otherwise `,` groups. `radixComma`, when given, overrides both (Import
+ * CSV's per-column detection).
  */
 /** A typed percent as its fraction, shifted in decimal (14.3 → 0.143, not 14.3 / 100 = 0.14300000000000002). */
 export function fromPercent(n: number): number {
@@ -120,10 +121,10 @@ export function fromPercent(n: number): number {
   return Number(`${mantissa}e${Number(exp ?? 0) - 2}`)
 }
 
-export function parseNumberInput(s: string, fmt?: NumberFormat | null): number | null | undefined {
+export function parseNumberInput(s: string, fmt?: NumberFormat | null, radixComma?: boolean): number | null | undefined {
   let t = s.replace(/​/g, '').trim()
   if (t === '') return null
-  if (usesRadixComma(fmt)) t = t.replace(/\./g, '').replace(/,/g, '.')
+  if (radixComma ?? usesRadixComma(fmt)) t = t.replace(/\./g, '').replace(/,/g, '.')
   else t = t.replace(/,/g, '')
   t = t.replace(/\s+/g, '')
   // A trailing "%": a percentage cell is edited in percent already; elsewhere it is the fraction.
