@@ -240,6 +240,18 @@ def test_rename_key_absent_noop_and_existing_target_raises():
         rename_key(SRC, "url", "title")
 
 
+def test_rename_key_explicit_key_form_stays_valid_yaml():
+    """Audit 2026-11-01: `? status` / `: Done` used to come back as `? state: Done`."""
+    src = "? status\n: Done\ntitle: T\n"
+    out = rename_key(src, "status", "state")
+    assert out == "? state\n: Done\ntitle: T\n"
+    assert parse_fm(out) == {"state": "Done", "title": "T"}
+    crlf = "? status\r\n: Done\r\ntitle: T\r\n"
+    assert parse_fm(rename_key(crlf, "status", "state")) == {"state": "Done", "title": "T"}
+    for quoted, old in [("'a b': 1\nc: 2\n", "a b"), ('"a\\tb": 1\nc: 2\n', "a\tb"), ("'it''s': 1\nc: 2\n", "it's")]:
+        assert parse_fm(rename_key(quoted, old, "z")) == {"z": 1, "c": 2}
+
+
 def test_set_none_renders_null():
     assert set_keys("title: X\n", {"k": None}) == "title: X\nk: null\n"
     assert set_keys("k: 5\ntitle: X\n", {"k": None}) == "k: null\ntitle: X\n"
