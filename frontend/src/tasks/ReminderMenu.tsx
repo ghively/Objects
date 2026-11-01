@@ -139,7 +139,7 @@ export function ReminderMenu({ value, resolution, onChange, hint }: ReminderMenu
               type="time"
               value={time}
               onChange={(e) => setTimeOfDay(e.target.value)}
-              className="h-7 w-28 rounded-md border border-line bg-raised px-2 text-[13px] text-fg outline-none [color-scheme:dark]"
+              className="h-7 w-28 rounded-md border border-line bg-raised px-2 text-[13px] text-fg outline-none"
             />
           </div>
           <div className="mt-1 flex flex-wrap gap-1">

@@ -73,7 +73,7 @@ export function onChoices(unit: 'month' | 'year', d: Date): RepeatOn[] {
 }
 
 const FIELD =
-  'h-8 rounded-md border border-line bg-raised px-2 text-[14px] text-fg outline-none focus:border-fg-muted [color-scheme:dark]'
+  'h-8 rounded-md border border-line bg-raised px-2 text-[14px] text-fg outline-none focus:border-fg-muted'
 
 export function CustomRepeatDialog({ initial, day, onSave, onCancel }: CustomRepeatDialogProps) {
   const fromWeekday = initial?.unit === 'weekday'
