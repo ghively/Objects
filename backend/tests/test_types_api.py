@@ -879,19 +879,32 @@ def test_type_save_plans_from_the_scanned_frontmatter_without_parsing_again(
     space = Space(space_dir)
     parses: list[str] = []
     real = space_mod.parse_fm
+    round_trips: list[str] = []
+    real_replace, real_set = space_mod.replace_in_value, space_mod.set_keys
 
     def spy(src):
         parses.append(src)
         return real(src)
 
+    def spy_replace(src, key, fn):
+        round_trips.append(key)
+        return real_replace(src, key, fn)
+
+    def spy_set(src, updates, insert_first=None):
+        round_trips.append(str(sorted(updates)))
+        return real_set(src, updates, insert_first=insert_first)
+
     monkeypatch.setattr(space_mod, "parse_fm", spy)
+    monkeypatch.setattr(space_mod, "replace_in_value", spy_replace)
+    monkeypatch.setattr(space_mod, "set_keys", spy_set)
     t = _edit(space, "task")
     status = t.prop("status")
     status.options["set"] = [o for o in status.options["set"] if o["text"] != "Not Started"]
     with pytest.raises(ConfirmRequired) as info:
         _save(space, t)
     assert info.value.affected == 6
-    assert parses == []
+    # The plan asks each op whether it applies: no YAML is parsed or rewritten for it.
+    assert parses == [] and round_trips == []
     result = _save(space, t, confirm=True)
     assert len(result.rewritten) == 6
     assert all("Not Started" not in (space_dir / rel).read_text() for rel in result.rewritten)
