@@ -32,12 +32,17 @@ export type AutosaveOptions = {
   getBody: () => string | null
   onSaved: (version: string) => void
   onConflict?: (currentVersion: string) => void
+  /** The id of the object at `path`, when known: kept unsaved text is tied to it (`unsaved.ts`). */
+  objectId?: string | null
 }
 
 export function useAutosave(opts: AutosaveOptions) {
   const optsRef = useRef(opts)
+  /** The object id last seen at each path this editor showed (kept text is tied to it). */
+  const idsRef = useRef(new Map<string, string | null>())
   useLayoutEffect(() => {
     optsRef.current = opts
+    if (opts.objectId !== undefined) idsRef.current.set(opts.path, opts.objectId)
   })
 
   const versionRef = useRef(opts.version)
@@ -95,7 +100,7 @@ export function useAutosave(opts: AutosaveOptions) {
             // What is on disk is now newer than any text kept for this object
             // earlier (e.g. by a settle while saving was paused): offering that
             // again would revert these edits.
-            dropUnsaved(path)
+            dropUnsaved(path, idsRef.current.get(path))
             optsRef.current.onSaved(res.version)
           }
         } catch (err) {
@@ -104,7 +109,7 @@ export function useAutosave(opts: AutosaveOptions) {
             // or see a retry, so keep the text to offer when the object opens again:
             // the text asked for on leaving, when it is newer than this save's.
             const q = queuedRef.current
-            keepUnsaved(path, q?.path === path && q.body !== null ? q.body : body)
+            keepUnsaved(path, q?.path === path && q.body !== null ? q.body : body, idsRef.current.get(path))
           } else if (err instanceof ConflictError) {
             pausedRef.current = true
             setSaveError(null)
@@ -182,7 +187,7 @@ export function useAutosave(opts: AutosaveOptions) {
     if (!pausedRef.current || o.readOnly) return false
     const body = o.getBody()
     if (body !== null && savedBodyRef.current !== null && body !== savedBodyRef.current) {
-      keepUnsaved(path ?? o.path, body)
+      keepUnsaved(path ?? o.path, body, idsRef.current.get(path ?? o.path))
     }
     return true
   }, [])

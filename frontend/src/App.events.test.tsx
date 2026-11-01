@@ -147,3 +147,17 @@ describe('change events (P3)', () => {
     expect(mocked.space.mock.calls.length).toBe(3) // start-up and the two full fetches
   })
 })
+
+describe('kept unsaved text (end review of the second audit fix pass)', () => {
+  test('follows its object when it is renamed elsewhere', async () => {
+    const { keepUnsaved, keptUnsaved, resetUnsaved } = await import('@/editor/unsaved')
+    render(<App />)
+    await screen.findByRole('button', { name: 'New' })
+    resetUnsaved()
+    keepUnsaved('Projects/P1.md', 'mine\n', 'id1')
+    act(() => emit({ kind: 'renamed', path: 'Projects/Renamed.md', oldPath: 'Projects/P1.md', version: 'v2', origin: 'other-window' }))
+    expect(keptUnsaved('Projects/P1.md')).toBeNull()
+    expect(keptUnsaved('Projects/Renamed.md', 'id1')).toBe('mine\n')
+    resetUnsaved()
+  })
+})

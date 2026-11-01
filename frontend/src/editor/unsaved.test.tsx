@@ -141,6 +141,23 @@ describe('edits that could not be saved when the object is left', () => {
     expect(mocked.saveBody).toHaveBeenCalledTimes(1)
   })
 
+  test('text kept for a deleted object is not offered to another object made at its path', async () => {
+    onDisk = { ...onDisk, summary: { ...onDisk.summary, id: 'id-old' } }
+    mocked.saveBody.mockRejectedValueOnce(new ConflictError('v2'))
+    const first = await openPage()
+    const mine = typeMine(first.editor)
+    onDisk = { ...detail(THEIRS, 'v2'), summary: { ...onDisk.summary, id: 'id-old' } }
+    await screen.findByRole('dialog', { name: /changed on disk/i }, { timeout: 2500 })
+    first.unmount()
+    expect(keptUnsaved(PATH, 'id-old')).toBe(mine)
+
+    onDisk = { ...detail(THEIRS, 'v5'), summary: { ...onDisk.summary, id: 'id-new' } }
+    await openPage(THEIRS)
+    await act(async () => new Promise((r) => setTimeout(r, 50)))
+    expect(screen.queryByRole('dialog', { name: 'Recover unsaved changes' })).not.toBeInTheDocument()
+    expect(keptUnsaved(PATH, 'id-old')).toBe(mine) // still there, should the old object be restored
+  })
+
   test('a clean leave keeps nothing', async () => {
     const first = await openPage()
     typeMine(first.editor)

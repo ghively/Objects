@@ -183,6 +183,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   /** Mirrors `recovery` for `reconcile`. */
   const recoveryRef = useRef(recovery)
   recoveryRef.current = recovery
+  /** The shown object's id, when known (kept unsaved text is tied to it). */
+  const objectIdRef = useRef<string | null>(null)
+  objectIdRef.current = detail?.summary.path === path ? detail.summary.id : null
   // Subscribe so the type chip and properties pick up types once the index loads.
   useLinkIndex((s) => s.revision)
 
@@ -256,9 +259,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         // The recovery dialog compares the kept text with what is on disk: show the
         // new version, or close it when the file now holds the kept text.
         if (recoveryRef.current) {
-          const kept = keptUnsaved(path)
+          const kept = keptUnsaved(path, theirs.summary.id)
           if (kept === null || kept === theirs.body) {
-            if (kept !== null) dropUnsaved(path)
+            if (kept !== null) dropUnsaved(path, theirs.summary.id)
             setRecovery(null)
           } else {
             setRecovery({ kept, onDisk: theirs.body, error: null })
@@ -399,7 +402,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     pendingRef.current = false
     if (!p) return
     // Their version replaces my edits: any text kept from them is stale too.
-    dropUnsaved(path)
+    dropUnsaved(path, p.theirs.summary.id)
     h?.reload(p.theirs.body, p.theirs.version)
     setDetail(p.theirs)
     adoptVersion(p.theirs.version)
@@ -409,9 +412,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   /** Offer the edits kept for this object, if any differ from what is on disk. */
   const offerKept = useCallback(
     (d: ObjectDetail) => {
-      const kept = keptUnsaved(path)
+      const kept = keptUnsaved(path, d.summary.id)
       if (kept === null) return
-      if (kept === d.body) dropUnsaved(path)
+      if (kept === d.body) dropUnsaved(path, d.summary.id)
       else setRecovery({ kept, onDisk: d.body, error: null })
     },
     [path],
@@ -428,7 +431,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     h?.hold()
     try {
       const res = await api.saveBody(path, r.kept, versionRef.current)
-      dropUnsaved(path)
+      dropUnsaved(path, objectIdRef.current)
       setRecovery(null)
       h?.reload(r.kept, res.version)
       setDetail((d) => (d ? { ...d, body: r.kept, version: res.version } : d))
@@ -443,7 +446,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
           adoptVersion(d.version)
           if (d.body === r.kept) {
             // The file already holds the kept text: nothing left to recover.
-            dropUnsaved(path)
+            dropUnsaved(path, d.summary.id)
             setRecovery(null)
           } else {
             setRecovery({ kept: r.kept, onDisk: d.body, error: null })
@@ -462,7 +465,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   }
 
   const discardKept = () => {
-    dropUnsaved(path)
+    dropUnsaved(path, objectIdRef.current)
     setRecovery(null)
   }
 
@@ -1031,6 +1034,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
                 readOnly={readOnly || deleted}
                 onSaved={adoptVersion}
                 onConflict={onConflict}
+                objectId={detail.summary.path === path ? detail.summary.id : undefined}
                 controlRef={editorRef}
               />
             </div>
@@ -1141,6 +1145,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
                     readOnly={readOnly}
                     onSaved={adoptVersion}
                     onConflict={onConflict}
+                    objectId={detail.summary.path === path ? detail.summary.id : undefined}
                     controlRef={editorRef}
                   />
                 </Suspense>
@@ -1152,6 +1157,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
                   readOnly={readOnly}
                   onSaved={adoptVersion}
                   onConflict={onConflict}
+                  objectId={detail.summary.path === path ? detail.summary.id : undefined}
                   controlRef={editorRef}
                 />
               )}
