@@ -142,9 +142,10 @@ function TitleCell({ row, onRename, onOpen }: { row: Row; onRename(row: Row, tit
           if (!row.summary.readOnly) commit()
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur()
-          if (e.key === 'Escape') {
-            setText(row.summary.title)
+          // As every other cell (TextCell): Enter and Escape end the edit, which commits; an
+          // empty title still reverts. Object saves fields as you type: no edit to cancel.
+          if (e.key === 'Enter' || e.key === 'Escape') {
+            e.preventDefault()
             e.currentTarget.blur()
           }
         }}

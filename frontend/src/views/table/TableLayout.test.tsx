@@ -259,6 +259,17 @@ describe('TableLayout', () => {
     await waitFor(() => expect(mocked.renameObject).toHaveBeenCalledWith('Pages/Alpha.md', 'Omega', 'v7'))
   })
 
+  test('title cell: Escape ends the edit and commits, as a text cell', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    const input = screen.getAllByLabelText('Title')[0]
+    await user.clear(input)
+    await user.type(input, 'Omega{Escape}')
+    expect(input).not.toHaveFocus()
+    expect(input).toHaveValue('Omega')
+    await waitFor(() => expect(mocked.renameObject).toHaveBeenCalledWith('Pages/Alpha.md', 'Omega', 'v7'))
+  })
+
   test('read-only row renders read-only cells', () => {
     const ro = row({ summary: objectSummary({ path: 'Pages/Locked.md', readOnly: true }), values: { note: 'x' } })
     render(<Harness rows={[ro]} />)
