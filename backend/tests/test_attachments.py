@@ -210,10 +210,39 @@ def test_open_uses_os_and_refuses_executables(env):
     ]
     exe = client.post("/api/attachments/open", json={"path": "Attachments/tool.exe"})
     assert exe.status_code == 415
-    assert exe.json()["detail"] == "Open it from the file manager instead."
+    assert exe.json()["detail"] == (
+        "Object only opens documents, images, audio, video, PDFs and archives. "
+        "Open it from the file manager instead."
+    )
     outside = client.post("/api/attachments/open", json={"path": "../outside.pdf"})
     assert outside.status_code == 404
     assert len(opened.read_text(encoding="utf-8").splitlines()) == 1
+
+
+# Audit 2026-11-01 #5 (Gene: whitelist): only documents, images, audio, video, PDFs and
+# archives are handed to the OS; everything the OS might run is refused.
+RUNNABLE = ["exe", "pif", "scf", "msc", "inf", "ws", "wsc", "sct", "application", "gadget", "py",
+            "pyw", "pyz", "desktop", "appimage", "run", "bin", "iso", "dmg", "pkg", "sh", "js",
+            "jar", "lnk", "url", "bat", "cmd", "ps1", "rb", "pl", "html", "htm", "svgz", ""]
+OPENABLE = ["pdf", "png", "jpg", "svg", "mp3", "wav", "mp4", "mov", "docx", "xlsx", "pptx", "odt",
+            "txt", "csv", "epub", "zip", "7z", "tar", "gz", "DOCX", "Zip"]
+
+
+def test_open_whitelists_documents_media_and_archives(env):
+    root, client, opened = env
+    for ext in RUNNABLE:
+        name = f"open-{ext or 'noext'}" + (f".{ext}" if ext else "")
+        (root / "Attachments" / name).write_bytes(b"x")
+        res = client.post("/api/attachments/open", json={"path": f"Attachments/{name}"})
+        assert res.status_code == 415, (ext, res.text)
+        assert "documents, images, audio, video, PDFs and archives" in res.json()["detail"]
+    assert not opened.exists()
+    for ext in OPENABLE:
+        name = f"open-{ext}.{ext}"
+        (root / "Attachments" / name).write_bytes(b"x")
+        res = client.post("/api/attachments/open", json={"path": f"Attachments/{name}"})
+        assert res.status_code == 200, (ext, res.text)
+    assert len(opened.read_text(encoding="utf-8").splitlines()) == len(OPENABLE)
 
 
 def test_listing_and_serving_write_nothing(env):
