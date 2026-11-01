@@ -118,6 +118,8 @@ export interface DataViewProps {
   customizePages?: CustomizePage[]
   /** Replace one row after an inline edit (from `useRows`). */
   patchRow?(path: string, row: Row): void
+  /** The rows came with their previews (not from `useRows`'s preview-less load): fetch none. */
+  previewsLoaded?: boolean
   /** Right-click menu of a row (list, card or table row): the items for that row, or none. */
   rowMenu?(row: Row): RowMenuItem[]
   /**
@@ -351,8 +353,10 @@ export function DataView(props: DataViewProps) {
   const patchRowRef = useRef(props.patchRow)
   patchRowRef.current = props.patchRow
   const previewed = useRef(new Set<string>())
+  const previewsLoadedRef = useRef(props.previewsLoaded)
+  previewsLoadedRef.current = props.previewsLoaded
   const loadPreviews = useCallback((wanted: Row[]) => {
-    if (!patchRowRef.current) return
+    if (!patchRowRef.current || previewsLoadedRef.current) return
     const paths: string[] = []
     for (const r of wanted) {
       if (r.preview) continue
@@ -435,7 +439,9 @@ export function DataView(props: DataViewProps) {
   const cardLayout = layout === 'grid' || layout === 'wall' || layout === 'gallery' || layout === 'kanban'
   // Only a card layout whose cards include the preview needs previews; the list and table never do.
   const showsPreviews =
-    cardLayout && viewTypes.some((t) => cardProperties(t, state.viewDefinition).some((p) => p.propertyId === 'computed_preview'))
+    cardLayout &&
+    !props.previewsLoaded &&
+    viewTypes.some((t) => cardProperties(t, state.viewDefinition).some((p) => p.propertyId === 'computed_preview'))
   useEffect(() => {
     // The kanban pages per column and asks for its own rows.
     if (showsPreviews && layout !== 'kanban') loadPreviews(paged.flatMap((g) => g.rows))
