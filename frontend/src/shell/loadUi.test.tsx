@@ -45,3 +45,32 @@ test('everyone mounted before the first answer shares one GET /api/ui', async ()
   expect(useUiStore.getState().revision).toBe('r1')
   expect(mocked.ui).toHaveBeenCalledTimes(1)
 })
+
+test('usePinned under StrictMode subscribes to change events once, and unsubscribes after the last consumer', async () => {
+  let active = 0
+  mocked.onChange.mockReset()
+  mocked.onChange.mockImplementation(() => {
+    active += 1
+    return () => {
+      active -= 1
+    }
+  })
+  mocked.ui.mockResolvedValue({ ui: UI, revision: 'r1' })
+  function Pins() {
+    usePinned()
+    return null
+  }
+  const { unmount } = render(
+    <StrictMode>
+      <Pins />
+      <Pins />
+    </StrictMode>,
+  )
+  await act(async () => undefined)
+  expect(mocked.onChange).toHaveBeenCalledTimes(1)
+  expect(active).toBe(1)
+  expect(mocked.ui).toHaveBeenCalledTimes(1)
+  unmount()
+  await act(async () => undefined)
+  expect(active).toBe(0)
+})

@@ -277,7 +277,7 @@ export function usePinned(): UsePinned {
   const loaded = useUiStore((s) => s.loaded)
   useEffect(() => {
     refs += 1
-    if (refs === 1) {
+    if (refs === 1 && !off) {
       void loadUi()
       off = api.onChange((e) => {
         if (e.kind === 'ui' && e.origin !== CLIENT_ID) void reloadUi()
@@ -285,10 +285,14 @@ export function usePinned(): UsePinned {
     }
     return () => {
       refs -= 1
-      if (refs === 0) {
-        off?.()
-        off = null
-      }
+      // Unsubscribe a microtask later: StrictMode's unmount-and-remount (and a consumer moving in
+      // one commit) re-acquires first, so there is one subscription per store, not one per mount.
+      if (refs === 0)
+        queueMicrotask(() => {
+          if (refs > 0) return
+          off?.()
+          off = null
+        })
     }
   }, [])
   return {
