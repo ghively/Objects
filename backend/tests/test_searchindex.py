@@ -378,10 +378,9 @@ def test_index_keeps_foreign_cache_files(tmp_path: Path, monkeypatch):
     assert ignored.read_bytes() == data
     assert ignored.stat().st_mtime_ns == stat.st_mtime_ns
     after = _snapshot(root)
-    assert set(after) - set(before) == {
-        ".capacities-cache/search.sqlite",
-        ".capacities-cache/.gitignore",
-    }
+    # The opening scan already wrote the cache's `.gitignore` (with the frontmatter cache).
+    assert before[".capacities-cache/.gitignore"] == b"*\n"
+    assert set(after) - set(before) == {".capacities-cache/search.sqlite"}
     assert {k: v for k, v in after.items() if k in before} == before
     assert not any(p.startswith(".capacities-cache") for p in Space(root)._raw)
 
