@@ -1798,6 +1798,10 @@ class Space:
             if fresh is None:
                 self.rescan_file(rel)
             else:
+                if fresh.of.frontmatter_src is not None:
+                    # The next `read_raw` of this file (the next save, a rescan) finds its
+                    # new frontmatter parsed instead of parsing it again.
+                    fmcache.for_root(self.root).put(rel, fresh.of.frontmatter_src, fresh.fm)
                 self._rescan_with(rel, fresh)
             return new_version
 
