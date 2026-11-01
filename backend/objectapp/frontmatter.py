@@ -21,6 +21,7 @@ from __future__ import annotations
 import io
 import json
 import re
+import threading
 from collections.abc import Callable, Iterable
 from typing import Any
 
@@ -96,18 +97,35 @@ _PlainConstructor.add_constructor(
 )
 
 
+# One YAML instance of each kind per thread: constructing one costs about as much as
+# parsing a typical frontmatter (audit 2026-11-01, B3). `load` and `dump` reset the
+# instance's reader, scanner and emitter afterwards; one that failed mid-parse is
+# dropped (`_discard_yaml`) rather than trusted again.
+_local = threading.local()
+
+
 def _plain_yaml() -> YAML:
-    y = YAML(typ="safe", pure=True)
-    y.Constructor = _PlainConstructor
+    y = getattr(_local, "plain", None)
+    if y is None:
+        y = YAML(typ="safe", pure=True)
+        y.Constructor = _PlainConstructor
+        _local.plain = y
     return y
 
 
 def _rt_yaml() -> YAML:
-    y = YAML(typ="rt")
-    y.preserve_quotes = True
-    y.width = 4096
-    y.indent(mapping=2, sequence=4, offset=2)
+    y = getattr(_local, "rt", None)
+    if y is None:
+        y = YAML(typ="rt")
+        y.preserve_quotes = True
+        y.width = 4096
+        y.indent(mapping=2, sequence=4, offset=2)
+        _local.rt = y
     return y
+
+
+def _discard_yaml(kind: str) -> None:
+    setattr(_local, kind, None)
 
 
 def _plain(value: Any) -> Any:
@@ -136,10 +154,12 @@ def parse_fm(src: str) -> dict:
     try:
         data = _plain_yaml().load(src)
     except YAMLError as exc:
+        _discard_yaml("plain")
         raise FrontmatterError(str(exc)) from exc
     except RecursionError as exc:
         # ruamel's composer recurses per nesting level: `[[[[…` 500 deep is a bad file,
         # not a crash of the whole space.
+        _discard_yaml("plain")
         raise FrontmatterError("Frontmatter is nested too deeply") from exc
     if data is None:
         return {}
@@ -152,8 +172,10 @@ def _load_rt(src: str) -> CommentedMap | None:
     try:
         data = _rt_yaml().load(src)
     except YAMLError as exc:
+        _discard_yaml("rt")
         raise FrontmatterError(str(exc)) from exc
     except RecursionError as exc:
+        _discard_yaml("rt")
         raise FrontmatterError("Frontmatter is nested too deeply") from exc
     if data is None:
         return None
