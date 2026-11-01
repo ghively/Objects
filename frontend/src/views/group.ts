@@ -17,7 +17,7 @@ import type {
 import { formatNumber } from '@/properties/format'
 import { STATUS_CATEGORIES, optionCategory } from '@/tasks/statusCategory'
 import { wallClock } from '@/lib/zonedTime'
-import { dateSpan } from './dates'
+import { wallStart } from './dates'
 import { defIn, displayTitle, findDef, rowValue, typeMap, type FilterCtx } from './filter'
 
 export interface GroupOption {
@@ -238,12 +238,27 @@ const groupText = (group: Group) => (group.isOther ? '' : group.id.startsWith(TE
 interface Scratch {
   /** Tag title → tag object id (the inverse of `ctx.tagIdsToTitles`). */
   tagsByTitle: Map<string, string>
+  /** `ctx.now` as a wall-clock carrier (the relative and scheduled buckets). */
+  nowWall: Date
+  /** A date value's start as a carrier, remembered per start text (`wallStart` reads the zone once per instant). */
+  wallOf(v: DateValue | null): Date | null
 }
 
 function scratchFor(ctx: GroupCtx): Scratch {
   const tagsByTitle = new Map<string, string>()
   for (const [id, title] of Object.entries(ctx.tagIdsToTitles)) tagsByTitle.set(title, id)
-  return { tagsByTitle }
+  const walls = new Map<string, Date | null>()
+  const wallOf = (v: DateValue | null): Date | null => {
+    if (!v || typeof v !== 'object' || !v.start) return null
+    const key = `${v.resolution === 'time' ? 't' : 'd'}${v.start}`
+    let at = walls.get(key)
+    if (at === undefined) {
+      at = wallStart(v)
+      walls.set(key, at)
+    }
+    return at
+  }
+  return { tagsByTitle, nowWall: wallClock(ctx.now), wallOf }
 }
 
 /** The groups a row belongs to for one entry; none means "Other". */
@@ -325,8 +340,8 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
     case 'datetimeSimple':
     case 'entity_createdAt':
     case 'entity_lastUpdated': {
-      const span = dateSpan(dateOf(row, entry.propertyId))
-      return span ? [dateBucket(wallClock(span.start), entry.option, wallClock(ctx.now))] : []
+      const at = scratch.wallOf(dateOf(row, entry.propertyId))
+      return at ? [dateBucket(at, entry.option, scratch.nowWall)] : []
     }
     case 'entity_title':
       return textBucket(displayTitle(row))
