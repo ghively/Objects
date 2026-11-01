@@ -880,7 +880,15 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   )
 
   if (mode === 'inline') {
+    // Emptiness from the editor's DOM first: any text means not empty, with no serialising of
+    // the body (this ran twice per keystroke, on input and keyup). Only a textless document is
+    // serialised, since an image or embed alone is not empty either.
     const checkEmpty = () => {
+      const pm = inlineRef.current?.querySelector('.ProseMirror')
+      if (pm && (pm.textContent ?? '').trim() !== '') {
+        setBodyEmpty(false)
+        return
+      }
       const b = editorRef.current?.getBody()
       if (b != null) setBodyEmpty(b.trim() === '')
     }
