@@ -215,6 +215,22 @@ def test_rename_keeps_alias_and_heading_suffix(space_dir: Path):
     )
 
 
+def test_rename_leaves_a_heading_inside_a_code_block_alone(space_dir: Path):
+    # Audit 2026-11-01: a `# Alpha` shell comment in a fence is not the title heading.
+    page = space_dir / "Pages" / "Alpha.md"
+    page.write_bytes(
+        b"---\ntype: 'Page'\ntitle: Alpha\n---\n\n"
+        b"```sh\n# Alpha\necho hi\n```\n\nIntro `# Alpha` text.\n\n# Alpha\n\nText\n"
+    )
+    space = Space(space_dir)
+    result = space.rename_object("Pages/Alpha.md", "Beta", _version(space, "Pages/Alpha.md"))
+
+    body = (space_dir / result.path).read_text(encoding="utf-8").split("---\n", 2)[2]
+    assert "```sh\n# Alpha\necho hi\n```" in body
+    assert "Intro `# Alpha` text." in body
+    assert body.endswith("\n# Beta\n\nText\n")
+
+
 @pytest.mark.parametrize(
     ("title", "stem"),
     [("Ada [x]", "Ada x"), ("Ada #1", "Ada 1"), ("Ada|B", "Ada"), ("Ada: K's #1", "Ada")],
