@@ -1,6 +1,6 @@
 # Object: remaining work
 
-Status as of 2026-11-01. **All nine milestones are built, reviewed, fixed and gated, and all are on `master`** (M9 merged as PR #3 and re-gated on Windows). **The 2026-11-01 full audit (bugs and optimization) is fixed** on branch `ccr-bcf6e946-bf8moc`: `audit-2026-11-01.md` holds the findings, Gene's answers, and the measured before/after; every confirmed bug and every fix-first/should-fix performance item is fixed one per commit with a failing-first test, reviewed once, review findings fixed, gated. What remains:
+Status as of 2026-11-01. **All nine milestones are built, reviewed, fixed and gated, and all are on `master`** (M9 merged as PR #3 and re-gated on Windows). **The 2026-11-01 full audit (bugs and optimization) is fixed, all of it,** on branch `ccr-bcf6e946-bf8moc`: `audit-2026-11-01.md` holds the findings, Gene's answers, the measured before/after and the second pass that took every minor, unconfirmed and partly fixed item; each fix has a failing-first test, both passes were reviewed and their review findings fixed, gated. What remains:
 1. **Merge the audit fix branch** (`ccr-bcf6e946-bf8moc`) into `master` and re-gate on Windows, as M9 was.
 2. Gene's hands-on checking (M1–M9 acceptance docs), and the fixes it produces. **Settled 2026-10-28:** Gene checked Object: the Standard design shows properties in the side column, so Object's Standard sidebar stays (`reference-check-2026-10-28.md` §5 was wrong there). They go inline below 768 px as in Object; no 'always inline' option for now.
 
@@ -37,7 +37,16 @@ Each milestone's plan holds its full scope. Each acceptance doc holds its automa
 
 M8's "Coverage" section maps every deferred item to a task, or to a spec §2 exclusion: AI, network at runtime, accounts and sharing, mobile, telemetry.
 
-## Linux verification (2026-11-01, after the full audit fix pass, at `b7e8761`)
+## Linux verification (2026-11-02, after both audit fix passes, at `71ef3b6`)
+
+| Check | Result |
+|---|---|
+| `uv run pytest backend/tests -q` | 1469 passed, 1 skipped (needs a non-root user), 3 xpassed |
+| `cd frontend && npx vitest run` | 2284 passed, 1 skipped (needs `OBJECT_ROUNDTRIP_SPACE`) |
+| `npx tsc -b --noEmit` / `npm run lint` / `npm run build` | clean / 0 errors / built |
+| `scripts/m1_roundtrip.py`, `m2`–`m9_acceptance.py` on `space-sample` and `space-v1`; `m9` on `space-m8`, `space-blocks`, `space-whiteboard` | all PASS |
+
+## Linux verification (2026-11-01, after the first audit fix pass, at `b7e8761`)
 
 | Check | Result |
 |---|---|
@@ -73,7 +82,7 @@ The synthetic fixture spaces are `space-sample`, `space-v1`, `space-calendar`, `
 
 ## What is left
 
-0. **Both audit lists are done:** 2026-10-28 (bugs fixed, completeness gaps built as M9) and 2026-11-01 (bugs and optimization, fixed on `ccr-bcf6e946-bf8moc`; merge it). Still listed there and not fixed, by choice: the minor and unconfirmed items of `audit-2026-11-01.md`, search snippet cost B9 (measured: the premise didn't hold), a 4-space continuation line after Shift-Enter in a list item losing 2 spaces (Markdown strips it), the nested blockquote's extra `>` line, and the Windows CJK folder-name length edge.
+0. **Both audit lists are done:** 2026-10-28 (bugs fixed, completeness gaps built as M9) and 2026-11-01 (bugs and optimization, every item, fixed on `ccr-bcf6e946-bf8moc`; merge it). One open question for Gene: should the object page title also commit on Escape, as table title cells now do?
 1. **Gene's hands-on checks, M1–M9:** 256 unchecked items. Run them on a copy of the CPI export kept outside the repo, with `git init` there: `npm run build` in `frontend/`, then `uv run objectapp --space <copy>`. These can only be checked on his Windows machine:
    - the pywebview window
    - Windows toast reminders
