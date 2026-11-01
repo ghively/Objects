@@ -1,6 +1,7 @@
 // The table layout: one structure, resizable and reorderable columns, a pinned (sticky) prefix,
 // hidden and wrapped columns, a calculation footer and inline cell editing with the M2 cells.
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+// Rows are memoized on their row, columns, widths and selection, so one cell edit re-renders one row.
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { api, ConflictError } from '@/api/client'
@@ -162,8 +163,82 @@ function TitleCell({ row, onRename, onOpen }: { row: Row; onRename(row: Row, tit
   )
 }
 
+const openObject = (path: string) => useTabs.getState().open({ kind: 'object', path })
+
+interface TableRowProps {
+  row: Row
+  columns: TableColumn[]
+  defs: Record<string, PropertyDef>
+  config: TableViewConfig
+  widths: Record<string, number>
+  sticky: Record<string, number>
+  selected: boolean
+  canEditType: boolean
+  onOpen(row: Row, e: ReactMouseEvent): void
+  rename(row: Row, title: string): void
+  commit(row: Row, def: PropertyDef, next: unknown): Promise<boolean>
+  onDefChange(next: PropertyDef): Promise<void>
+  openSettings(id: string): void
+}
+
+/** One row of cells; re-renders only when its row, the columns, their widths or its selection change. */
+const TableRow = memo(function TableRow({ row, columns, defs, config, widths, sticky, selected, canEditType, onOpen, rename, commit, onDefChange, openSettings }: TableRowProps) {
+  const cellStyle = (c: TableColumn): CSSProperties => ({
+    width: `${widths[c.id] ?? c.colWidth}rem`,
+    ...(sticky[c.id] !== undefined ? { position: 'sticky', left: `${sticky[c.id]}rem`, zIndex: 1 } : {}),
+  })
+  return (
+    <div
+      role="row"
+      data-path={row.summary.path}
+      data-selected={selected || undefined}
+      style={{ minHeight: TABLE_ROW_HEIGHT }}
+      className={cn('flex border-b border-line hover:bg-hover/40', selected && 'bg-[var(--block-selection-bg)]')}
+    >
+      {columns.map((c) => {
+        const def = defs[c.id]
+        const wrapped = isWrapped(config, c.id)
+        const Cell = def ? cellForDef(def) : null
+        return (
+          <div
+            key={c.id}
+            role="cell"
+            data-col={c.id}
+            data-wrap={wrapped ? 'wrap' : 'nowrap'}
+            style={{ ...cellStyle(c), minHeight: TABLE_ROW_HEIGHT }}
+            className={cn(
+              'flex shrink-0 items-center border-r border-line bg-app px-1.5 py-1.5',
+              wrapped ? 'whitespace-normal break-words' : 'overflow-hidden whitespace-nowrap',
+              !wrapped && 'h-9',
+            )}
+          >
+            {def?.type === 'entity_title' ? (
+              <TitleCell row={row} onRename={rename} onOpen={(e) => onOpen(row, e)} />
+            ) : def && Cell ? (
+              <div className="min-w-0 flex-1">
+                <Cell
+                  def={def}
+                  value={valueFor(def, row)}
+                  readOnly={row.summary.readOnly}
+                  density={wrapped ? 'panel' : 'table'}
+                  inTable
+                  onChange={(next: unknown) => commit(row, def, next)}
+                  onDefChange={onDefChange}
+                  typeId={row.summary.type}
+                  onOpenObject={openObject}
+                  onOpenSettings={canEditType ? () => openSettings(def.id) : undefined}
+                />
+              </div>
+            ) : null}
+          </div>
+        )
+      })}
+    </div>
+  )
+})
+
 export function TableLayout(props: TableLayoutProps) {
-  const { groups, grouped, state, onState, viewTypes, ctx, header, closed, onOpen, flat, patchRow } = props
+  const { groups, grouped, state, onState, viewTypes, ctx, header, closed, onOpen, flat } = props
   const type: TypeDef | undefined = viewTypes.length === 1 ? viewTypes[0] : undefined
   const typeEditor = useTypeEditor(type?.id)
   const [settingsFor, setSettingsFor] = useState<string | null>(null)
@@ -171,6 +246,9 @@ export function TableLayout(props: TableLayoutProps) {
   const [live, setLive] = useState<{ id: string; rem: number } | null>(null)
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const writes = useMemo(() => createRowWrites(), [])
+  // The owner's `patchRow` may be a new function per render: the row callbacks read the latest one.
+  const patchRowRef = useRef(props.patchRow)
+  patchRowRef.current = props.patchRow
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   useEffect(
@@ -205,15 +283,13 @@ export function TableLayout(props: TableLayoutProps) {
     return out
   }, [columns, widths, config?.pinnedColumnIndex])
 
-  if (!type || !config) {
-    return <p className="py-6 text-center text-[14px] text-fg-muted">Table cannot be displayed for multiple object types.</p>
-  }
-
-  const saveConfig = (next: TableViewConfig) =>
+  const saveConfig = (next: TableViewConfig) => {
+    if (!type) return
     onState({
       ...state,
       viewDefinition: { ...state.viewDefinition, tableConfigs: { ...state.viewDefinition.tableConfigs, [type.id]: next } },
     })
+  }
 
   const startResize = (e: ReactMouseEvent, col: TableColumn) => {
     e.preventDefault()
@@ -229,129 +305,110 @@ export function TableLayout(props: TableLayoutProps) {
       document.removeEventListener('mousemove', move)
       document.removeEventListener('mouseup', up)
       setLive(null)
-      if (rem !== startRem) saveConfig(setColWidth(config, col.id, rem))
+      if (rem !== startRem && config) saveConfig(setColWidth(config, col.id, rem))
     }
     document.addEventListener('mousemove', move)
     document.addEventListener('mouseup', up)
   }
 
   const onDragEnd = (e: DragEndEvent) => {
-    if (e.over && e.active.id !== e.over.id) saveConfig(moveColumn(config, String(e.active.id), String(e.over.id)))
+    if (config && e.over && e.active.id !== e.over.id) saveConfig(moveColumn(config, String(e.active.id), String(e.over.id)))
   }
 
-  const reloadRow = async (row: Row) => {
-    try {
-      const [fresh] = await api.rows({ paths: [row.summary.path] })
-      if (fresh) {
-        writes.seen(fresh, row)
-        patchRow?.(row.summary.path, fresh)
+  const reloadRow = useCallback(
+    async (row: Row) => {
+      try {
+        const [fresh] = await api.rows({ paths: [row.summary.path] })
+        if (fresh) {
+          writes.seen(fresh, row)
+          patchRowRef.current?.(row.summary.path, fresh)
+        }
+      } catch (err) {
+        console.warn('Could not reload row:', err)
       }
-    } catch (err) {
-      console.warn('Could not reload row:', err)
-    }
-  }
+    },
+    [writes],
+  )
 
-  const fail = async (row: Row, err: unknown) => {
-    if (err instanceof ConflictError) {
-      await reloadRow(row)
-      say('Changed elsewhere. Reloaded.')
-    } else {
-      say(err instanceof Error ? err.message : 'Could not save.')
-    }
-  }
+  const fail = useCallback(
+    async (row: Row, err: unknown) => {
+      if (err instanceof ConflictError) {
+        await reloadRow(row)
+        say('Changed elsewhere. Reloaded.')
+      } else {
+        say(err instanceof Error ? err.message : 'Could not save.')
+      }
+    },
+    [reloadRow, say],
+  )
 
   /** Writes one cell; resolves `false` when the write failed (the cell then offers the value again). */
-  const commit = async (row: Row, def: PropertyDef, next: unknown): Promise<boolean> => {
-    try {
-      // Writes to one row run in turn, each from the newest version (the rows may lag behind).
-      await writes.run(row, async (version, cur) => {
-        const res = await api.updateProperties(row.summary.path, { [def.key]: next }, version)
-        const nextLinks = res.links?.[def.key]
-        const patched: Row = {
-          ...cur,
-          version: res.version,
-          values: { ...cur.values, [def.key]: cellValue(def, res.frontmatter ?? { [def.key]: next }, res.links ?? {}, cur.summary) },
-          links: nextLinks ? { ...cur.links, [def.key]: nextLinks } : cur.links,
-        }
-        writes.seen(patched)
-        patchRow?.(row.summary.path, patched)
-        return res
-      })
-      return true
-    } catch (err) {
-      await fail(row, err)
-      return false
-    }
-  }
+  const commit = useCallback(
+    async (row: Row, def: PropertyDef, next: unknown): Promise<boolean> => {
+      try {
+        // Writes to one row run in turn, each from the newest version (the rows may lag behind).
+        await writes.run(row, async (version, cur) => {
+          const res = await api.updateProperties(row.summary.path, { [def.key]: next }, version)
+          const nextLinks = res.links?.[def.key]
+          const patched: Row = {
+            ...cur,
+            version: res.version,
+            values: { ...cur.values, [def.key]: cellValue(def, res.frontmatter ?? { [def.key]: next }, res.links ?? {}, cur.summary) },
+            links: nextLinks ? { ...cur.links, [def.key]: nextLinks } : cur.links,
+          }
+          writes.seen(patched)
+          patchRowRef.current?.(row.summary.path, patched)
+          return res
+        })
+        return true
+      } catch (err) {
+        await fail(row, err)
+        return false
+      }
+    },
+    [writes, fail],
+  )
 
-  const rename = async (row: Row, title: string) => {
-    try {
-      await writes.run(row, (version) => api.renameObject(row.summary.path, title, version))
-    } catch (err) {
-      await fail(row, err)
-    }
-  }
+  const rename = useCallback(
+    (row: Row, title: string) => {
+      void writes.run(row, (version) => api.renameObject(row.summary.path, title, version)).catch((err: unknown) => fail(row, err))
+    },
+    [writes, fail],
+  )
 
-  const onDefChange = async (next: PropertyDef) => {
-    await typeEditor.save({ ...type, propertyDefinitions: type.propertyDefinitions.map((d) => (d.id === next.id ? next : d)) })
+  const save = typeEditor.save
+  const onDefChange = useCallback(
+    async (next: PropertyDef) => {
+      if (!type) return
+      await save({ ...type, propertyDefinitions: type.propertyDefinitions.map((d) => (d.id === next.id ? next : d)) })
+    },
+    [type, save],
+  )
+
+  if (!type || !config) {
+    return <p className="py-6 text-center text-[14px] text-fg-muted">Table cannot be displayed for multiple object types.</p>
   }
 
   const canEditType = !type.basic && !type.readOnlyReason
   const total = columns.reduce((n, c) => n + (widths[c.id] ?? c.colWidth), 0)
 
-  const cellStyle = (c: TableColumn): CSSProperties => ({
-    width: `${widths[c.id] ?? c.colWidth}rem`,
-    ...(sticky[c.id] !== undefined ? { position: 'sticky', left: `${sticky[c.id]}rem`, zIndex: 1 } : {}),
-  })
-
   const renderRow = (row: Row) => (
-    <div
+    <TableRow
       key={row.summary.path}
-      role="row"
-      data-path={row.summary.path}
-      data-selected={props.isSelected?.(row.summary.path) || undefined}
-      style={{ minHeight: TABLE_ROW_HEIGHT }}
-      className={cn('flex border-b border-line hover:bg-hover/40', props.isSelected?.(row.summary.path) && 'bg-[var(--block-selection-bg)]')}
-    >
-      {columns.map((c) => {
-        const def = defs[c.id]
-        const wrapped = isWrapped(config, c.id)
-        const Cell = def ? cellForDef(def) : null
-        return (
-          <div
-            key={c.id}
-            role="cell"
-            data-col={c.id}
-            data-wrap={wrapped ? 'wrap' : 'nowrap'}
-            style={{ ...cellStyle(c), minHeight: TABLE_ROW_HEIGHT }}
-            className={cn(
-              'flex shrink-0 items-center border-r border-line bg-app px-1.5 py-1.5',
-              wrapped ? 'whitespace-normal break-words' : 'overflow-hidden whitespace-nowrap',
-              !wrapped && 'h-9',
-            )}
-          >
-            {def?.type === 'entity_title' ? (
-              <TitleCell row={row} onRename={(r, t) => void rename(r, t)} onOpen={(e) => onOpen(row, e)} />
-            ) : def && Cell ? (
-              <div className="min-w-0 flex-1">
-                <Cell
-                  def={def}
-                  value={valueFor(def, row)}
-                  readOnly={row.summary.readOnly}
-                  density={wrapped ? 'panel' : 'table'}
-                  inTable
-                  onChange={(next: unknown) => commit(row, def, next)}
-                  onDefChange={onDefChange}
-                  typeId={row.summary.type}
-                  onOpenObject={(path: string) => useTabs.getState().open({ kind: 'object', path })}
-                  onOpenSettings={canEditType ? () => setSettingsFor(def.id) : undefined}
-                />
-              </div>
-            ) : null}
-          </div>
-        )
-      })}
-    </div>
+      row={row}
+      columns={columns}
+      defs={defs}
+      config={config}
+      widths={widths}
+      sticky={sticky}
+      selected={props.isSelected?.(row.summary.path) ?? false}
+      canEditType={canEditType}
+      onOpen={onOpen}
+      rename={rename}
+      commit={commit}
+      onDefChange={onDefChange}
+      openSettings={setSettingsFor}
+    />
   )
 
   return (
