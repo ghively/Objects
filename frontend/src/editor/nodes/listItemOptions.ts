@@ -20,7 +20,8 @@
 import { Node, type MarkdownToken } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type Transaction } from '@tiptap/pm/state'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { Decoration, type DecorationSet } from '@tiptap/pm/view'
+import { buildDecorations, updateDecorations, type DecorationVisitor } from '../extensions/incrementalDecorations'
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Icon, isIconifyId } from '@/components/Icon'
@@ -170,34 +171,30 @@ function itemIconWidget(value: string): HTMLElement {
   return el
 }
 
-function itemDecorations(doc: PMNode): DecorationSet {
-  const decos: Decoration[] = []
-  doc.descendants((node, pos) => {
-    if (LIST_ITEM_TYPES.has(node.type.name)) {
-      const found = itemOptionsNode(node, pos)
-      const options = found ? ((found.node.attrs.options as Option[] | null) ?? []) : []
-      const attrs = itemOptionAttrs(options)
-      if (Object.keys(attrs).length) decos.push(Decoration.node(pos, pos + node.nodeSize, attrs))
-      const icon = options.find((o) => o.key === 'icon')
-      if (icon && isKnownValue(icon) && typeof icon.value === 'string' && node.firstChild?.isTextblock) {
-        const value = icon.value
-        // A to-do item's text block follows its checkbox: the icon goes at the start of the text.
-        decos.push(
-          Decoration.widget(pos + 2, () => itemIconWidget(value), {
-            side: -1,
-            key: `item-icon:${value}`,
-            ignoreSelection: true,
-            destroy: (dom) => {
-              const root = (dom as RootHolder)._root
-              if (root) queueMicrotask(() => root.unmount())
-            },
-          }),
-        )
-      }
+const itemVisitor: DecorationVisitor = (node, pos, decos) => {
+  if (LIST_ITEM_TYPES.has(node.type.name)) {
+    const found = itemOptionsNode(node, pos)
+    const options = found ? ((found.node.attrs.options as Option[] | null) ?? []) : []
+    const attrs = itemOptionAttrs(options)
+    if (Object.keys(attrs).length) decos.push(Decoration.node(pos, pos + node.nodeSize, attrs))
+    const icon = options.find((o) => o.key === 'icon')
+    if (icon && isKnownValue(icon) && typeof icon.value === 'string' && node.firstChild?.isTextblock) {
+      const value = icon.value
+      // A to-do item's text block follows its checkbox: the icon goes at the start of the text.
+      decos.push(
+        Decoration.widget(pos + 2, () => itemIconWidget(value), {
+          side: -1,
+          key: `item-icon:${value}`,
+          ignoreSelection: true,
+          destroy: (dom) => {
+            const root = (dom as RootHolder)._root
+            if (root) queueMicrotask(() => root.unmount())
+          },
+        }),
+      )
     }
-    return !node.isTextblock
-  })
-  return DecorationSet.create(doc, decos)
+  }
+  return !node.isTextblock
 }
 
 export const ListItemOptions = Node.create({
@@ -254,8 +251,8 @@ export const ListItemOptions = Node.create({
       new Plugin<DecorationSet>({
         key: itemDecoKey,
         state: {
-          init: (_, state) => itemDecorations(state.doc),
-          apply: (tr, old) => (tr.docChanged ? itemDecorations(tr.doc) : old),
+          init: (_, state) => buildDecorations(state.doc, itemVisitor),
+          apply: (tr, old) => updateDecorations(old, tr, itemVisitor),
         },
         props: { decorations: (state) => itemDecoKey.getState(state) },
       }),

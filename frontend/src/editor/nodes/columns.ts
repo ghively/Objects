@@ -20,7 +20,8 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { Decoration, type DecorationSet } from '@tiptap/pm/view'
+import { buildDecorations, updateDecorations, type DecorationVisitor } from '../extensions/incrementalDecorations'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { ColumnsView } from '../layout/ColumnsView'
 import { MAX_COLUMNS } from '../layout/Divider'
@@ -54,18 +55,14 @@ export { MAX_COLUMNS }
 const emptyColumnKey = new PluginKey<DecorationSet>('emptyColumn')
 
 /** Mark the lone empty paragraph of each empty column, so it shows a placeholder line. */
-function emptyColumns(doc: PMNode): DecorationSet {
-  const decos: Decoration[] = []
-  doc.descendants((node, pos) => {
-    if (node.type.name === 'column') {
-      const only = node.childCount === 1 ? node.firstChild! : null
-      if (only && only.type.name === 'paragraph' && only.content.size === 0) {
-        decos.push(Decoration.node(pos + 1, pos + 1 + only.nodeSize, { class: 'column-empty', 'data-column-empty': '' }))
-      }
+const emptyColumnVisitor: DecorationVisitor = (node, pos, decos) => {
+  if (node.type.name === 'column') {
+    const only = node.childCount === 1 ? node.firstChild! : null
+    if (only && only.type.name === 'paragraph' && only.content.size === 0) {
+      decos.push(Decoration.node(pos + 1, pos + 1 + only.nodeSize, { class: 'column-empty', 'data-column-empty': '' }))
     }
-    return !node.isTextblock && !node.isAtom
-  })
-  return DecorationSet.create(doc, decos)
+  }
+  return !node.isTextblock && !node.isAtom
 }
 
 export const Column = Node.create({
@@ -128,8 +125,8 @@ export const Columns = Node.create({
       new Plugin<DecorationSet>({
         key: emptyColumnKey,
         state: {
-          init: (_, state) => emptyColumns(state.doc),
-          apply: (tr, old) => (tr.docChanged ? emptyColumns(tr.doc) : old),
+          init: (_, state) => buildDecorations(state.doc, emptyColumnVisitor),
+          apply: (tr, old) => updateDecorations(old, tr, emptyColumnVisitor),
         },
         props: {
           decorations: (state) => emptyColumnKey.getState(state),
