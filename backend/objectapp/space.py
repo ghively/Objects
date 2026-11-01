@@ -673,6 +673,9 @@ class _TypeOp:
     fn: Callable[[str, str, dict], str]
     confirm: bool
     """True when it removes values (the save then needs ``confirm``)."""
+    applies: Callable[[dict, str], bool]
+    """``applies(fm, rel)``: whether ``fn`` would change the file, from its values alone
+    (the plan runs this under the lock; ``fn``'s YAML round trip runs per file outside it)."""
 
 
 def version_of(data: bytes) -> str:
@@ -3868,24 +3871,24 @@ class Space:
             members = self._type_members(old.id) if ops else []
             raws = {rel: self._raw[rel] for rel in members if rel in self._raw}
 
-            def run(src: str, rel: str, fm: dict, only_confirm: bool = False) -> str:
+            def run(src: str, rel: str, fm: dict) -> str:
                 parsed = src  # the source `fm` holds; re-parsed only after an op changed it
                 for op in ops:
-                    if not (op.confirm or not only_confirm):
-                        continue
                     if src != parsed:
                         fm = parse_fm(src) if src else {}
                         parsed = src
                     src = op.fn(src, rel, fm)
                 return src
 
+            # The plan only asks each op whether it applies (values already parsed); the
+            # rewrites themselves run per file outside the lock.
             to_write: list[str] = []
             affected = 0
             for rel, raw in raws.items():
-                src = raw.of.frontmatter_src or ""
-                if run(src, rel, raw.fm, only_confirm=True) != src:
+                hits = [op for op in ops if op.applies(raw.fm, rel)]
+                if any(op.confirm for op in hits):
                     affected += 1
-                if run(src, rel, raw.fm) != src:
+                if hits:
                     to_write.append(rel)
             if (deletes_property or affected) and not confirm:
                 raise ConfirmRequired(
@@ -3973,7 +3976,7 @@ class Space:
             ):
                 former.append(old.name)
             new.formerNames = former
-            ops.append(_TypeOp(self._type_line_op(old.name, new.name), confirm=False))
+            ops.append(self._type_line_op(old.name, new.name))
 
         ids = [p.id for p in new.propertyDefinitions]
         keys = [p.key for p in new.propertyDefinitions]
@@ -3997,7 +4000,7 @@ class Space:
             if old.basic:
                 raise InvalidValue(BASIC_LOCKED)
             deletes_property = True
-            ops.append(_TypeOp(self._delete_key_op(p.key), confirm=True))
+            ops.append(self._delete_key_op(p.key))
 
         for p in new.propertyDefinitions:
             before = old_by_id.get(p.id)
@@ -4068,25 +4071,28 @@ class Space:
                 raise InvalidValue(f"No object has the id {object_id!r}")
 
     @staticmethod
-    def _type_line_op(old_name: str, new_name: str) -> Callable[[str, str, dict], str]:
+    def _type_line_op(old_name: str, new_name: str) -> _TypeOp:
         folded = old_name.lower()
 
-        def fn(src: str, _rel: str, fm: dict) -> str:
-            value = fm.get("type") if src else None
-            if not isinstance(value, str) or value.strip().lower() != folded:
+        def applies(fm: dict, _rel: str) -> bool:
+            value = fm.get("type")
+            return isinstance(value, str) and value.strip().lower() == folded
+
+        def fn(src: str, rel: str, fm: dict) -> str:
+            if not src or not applies(fm, rel):
                 return src
             return replace_in_value(
                 src, "type", lambda v: new_name if v.strip().lower() == folded else v
             )
 
-        return fn
+        return _TypeOp(fn, confirm=False, applies=applies)
 
     @staticmethod
-    def _delete_key_op(key: str) -> Callable[[str, str, dict], str]:
+    def _delete_key_op(key: str) -> _TypeOp:
         def fn(src: str, _rel: str, _fm: dict) -> str:
             return delete_keys(src, [key]) if src else src
 
-        return fn
+        return _TypeOp(fn, confirm=True, applies=lambda fm, _rel: key in fm)
 
     @staticmethod
     def _label_ops(before: PropertyDefinition, p: PropertyDefinition) -> list[_TypeOp]:
@@ -4106,15 +4112,23 @@ class Space:
 
         if deleted or collapse:
 
-            def remove(src: str, _rel: str, fm: dict) -> str:
-                raw = fm.get(key) if src else None
+            def removal(raw: Any) -> tuple[list, list, bool] | None:
+                """(items, kept, squash) when the value loses something, else None."""
                 if raw is None:
-                    return src
+                    return None
                 items = [i for i in (raw if isinstance(raw, list) else [raw]) if i is not None]
                 kept = [i for i in items if _fold(i) not in deleted]
                 squash = collapse and isinstance(raw, list) and len(kept) >= 2
                 if not squash and len(kept) == len(items):
+                    return None
+                return items, kept, squash
+
+            def remove(src: str, _rel: str, fm: dict) -> str:
+                raw = fm.get(key) if src else None
+                plan = removal(raw)
+                if plan is None:
                     return src
+                _items, kept, squash = plan
                 if squash:
                     value: Any = kept[0]
                 elif not kept:
@@ -4128,16 +4142,23 @@ class Space:
                     value = kept[0]
                 return set_keys(src, {key: value})
 
-            ops.append(_TypeOp(remove, confirm=True))
+            ops.append(
+                _TypeOp(remove, confirm=True, applies=lambda fm, _rel: removal(fm.get(key)) is not None)
+            )
 
         if renamed:
 
-            def rename(src: str, _rel: str, fm: dict) -> str:
-                if not src or key not in fm:
+            def renames(fm: dict, _rel: str) -> bool:
+                raw = fm.get(key)
+                items = raw if isinstance(raw, list) else [raw]
+                return any(isinstance(i, str) and _fold(i) in renamed for i in items)
+
+            def rename(src: str, rel: str, fm: dict) -> str:
+                if not src or not renames(fm, rel):
                     return src
                 return replace_in_value(src, key, lambda v: renamed.get(_fold(v), v))
 
-            ops.append(_TypeOp(rename, confirm=False))
+            ops.append(_TypeOp(rename, confirm=False, applies=renames))
         return ops
 
     def _entity_op(self, before: PropertyDefinition, p: PropertyDefinition) -> _TypeOp | None:
@@ -4167,15 +4188,23 @@ class Space:
                 return True
             return fixed is not None and summary.id not in fixed
 
-        def fn(src: str, rel: str, fm: dict) -> str:
-            raw = fm.get(key) if src else None
+        def removal(raw: Any, rel: str) -> tuple[list, list, bool] | None:
+            """(items, kept, squash) when the value loses a link, else None."""
             if raw is None:
-                return src
+                return None
             items = [i for i in (raw if isinstance(raw, list) else [raw]) if i is not None]
             kept = [i for i in items if not breaks_rules(i, rel)]
             squash = collapse and isinstance(raw, list) and len(kept) >= 2
             if not squash and len(kept) == len(items):
+                return None
+            return items, kept, squash
+
+        def fn(src: str, rel: str, fm: dict) -> str:
+            raw = fm.get(key) if src else None
+            plan = removal(raw, rel)
+            if plan is None:
                 return src
+            _items, kept, squash = plan
             if not kept:
                 value: Any = None
             elif squash or not isinstance(raw, list):
@@ -4187,7 +4216,7 @@ class Space:
                     return out
             return set_keys(src, {key: value})
 
-        return _TypeOp(fn, confirm=True)
+        return _TypeOp(fn, confirm=True, applies=lambda fm, rel: removal(fm.get(key), rel) is not None)
 
     def delete_type(self, type_id: str, confirm: bool = False) -> TrashItem:
         """Move a type, its objects and templates to the trash.
