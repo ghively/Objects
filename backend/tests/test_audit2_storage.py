@@ -684,3 +684,30 @@ def test_hub_rename_history_growth_is_small(links_space_dir: Path):
         # The second rename's snapshots are deltas: no new files, a few hundred bytes each.
         assert sizes[2][1] == sizes[1][1]
         assert sizes[2][0] - sizes[1][0] < 600 * (referrers + 1)
+
+
+@pytest.mark.parametrize(
+    "front",
+    [
+        "title: A\ntype: Page\nzeta: 1\n",  # an id inserted first, lastUpdated appended
+        "id: 01JC8M80000000000000000097\ntitle: A\nzeta: 1\n",  # lastUpdated appended
+        "title: A\nlastUpdated: 2026-01-01T00:00:00Z\nid: ''\nzeta: 1\n",  # both in place
+    ],
+)
+def test_a_stamped_write_caches_the_frontmatter_in_the_file_order(space_dir: Path, front: str):
+    """End review 2: the cached frontmatter put stamped keys first after a stamped save."""
+    from objectapp import fmcache
+    from objectapp.frontmatter import parse_fm
+    from objectapp.objfile import split_object
+    from objectapp.textfile import decode
+
+    rel = "Pages/Order.md"
+    _write(space_dir / rel, f"---\n{front}---\nbody\n")
+    space = Space(space_dir)
+    _of, _fm, version = space.read(rel)
+    space.save_body(rel, "new body\n", version)
+    src = split_object(decode((space_dir / rel).read_bytes()).text).frontmatter_src
+    want = list(parse_fm(src))
+    assert list(space._raw[rel].fm) == want
+    cached = fmcache.for_root(space.root).get(rel, src)
+    assert cached is not None and list(cached) == want
