@@ -100,7 +100,7 @@ describe('TypePage', () => {
     const user = userEvent.setup()
     render(<TypePage type={TASK} />)
     await screen.findByTestId('data-view')
-    await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['task'] }))
+    await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['task'], preview: false }))
     await user.click(screen.getByRole('button', { name: 'Layout' }))
     const items = (await screen.findAllByRole('menuitemcheckbox')).map((i) => i.textContent)
     expect(items).toEqual(['List', 'Gallery', 'Wall', 'Table', 'Embed', 'Kanban'])
@@ -206,7 +206,7 @@ describe('TypePage', () => {
     render(<TypePage type={TASK} />)
     const strip = await screen.findByTestId('gallery')
     await waitFor(() => expect(within(strip).getAllByTestId('gallery-item')).toHaveLength(2))
-    expect(mocked.rows).toHaveBeenCalledWith({ paths: ['Tasks/Beta.md', 'Tasks/Alpha.md'] })
+    expect(mocked.rows).toHaveBeenCalledWith({ paths: ['Tasks/Beta.md', 'Tasks/Alpha.md'], preview: false })
     // most recent first
     expect(within(strip).getAllByTestId('gallery-item').map((e) => e.textContent)).toEqual([
       expect.stringContaining('Beta'),

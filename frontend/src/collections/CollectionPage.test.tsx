@@ -62,7 +62,7 @@ describe('CollectionPage', () => {
     setup()
     render(<CollectionPage id="tooling" />)
     expect(await screen.findByRole('textbox', { name: 'Collection name' })).toHaveValue('Tooling')
-    await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ collectionIds: ['tooling'] }))
+    await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ collectionIds: ['tooling'], preview: false }))
     expect(await screen.findByText('Alpha')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true')
   })

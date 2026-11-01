@@ -15,6 +15,7 @@ import { TypeChip } from '@/shell/Sidebar'
 import type { CustomizePage } from './CustomizeMenu'
 import { applyFilters } from './filter'
 import { groupRows, type Group, type GroupCtx } from './group'
+import { cardProperties } from './cards/cardConfig'
 import { CardCustomizePage } from './cards/CardCustomize'
 import { EmbedLayout } from './layouts/EmbedLayout'
 import { GalleryLayout } from './layouts/GalleryLayout'
@@ -81,6 +82,11 @@ export interface LayoutProps {
   onWritten?(row: Row, result: UpdateResult): void
   /** M9: whether the row is selected ("Select multiple"); selected rows carry `data-selected`. */
   isSelected?(path: string): boolean
+  /**
+   * Fetch the previews of rows the layout shows (rows load without them). The view calls it for
+   * its paged rows; a layout that pages on its own (the kanban) calls it with the rows on screen.
+   */
+  loadPreviews(rows: Row[]): void
 }
 
 /** What an owner adds to one row: `leading` before its title, `trailing` after it. */
@@ -337,6 +343,37 @@ export function DataView(props: DataViewProps) {
   openRef.current = open
   const onOpen = useCallback((row: Row, e: MouseEvent) => openRef.current(row, e), [])
 
+  // P2: rows arrive without previews (`useRows`); a card layout fetches its visible page's in one
+  // call and patches each row's `preview` in, once per row version. A row that changed meanwhile
+  // (another version) is left alone: its new version is fetched on the next pass.
+  const rowsRef = useRef(rows)
+  rowsRef.current = rows
+  const patchRowRef = useRef(props.patchRow)
+  patchRowRef.current = props.patchRow
+  const previewed = useRef(new Set<string>())
+  const loadPreviews = useCallback((wanted: Row[]) => {
+    if (!patchRowRef.current) return
+    const paths: string[] = []
+    for (const r of wanted) {
+      if (r.preview) continue
+      const key = `${r.summary.path}@${r.version}`
+      if (previewed.current.has(key)) continue
+      previewed.current.add(key)
+      paths.push(r.summary.path)
+    }
+    if (paths.length === 0) return
+    void api
+      .rows({ paths, preview: true })
+      .then((fresh) => {
+        const current = new Map(rowsRef.current.map((r) => [r.summary.path, r]))
+        for (const f of fresh) {
+          const cur = current.get(f.summary.path)
+          if (cur && cur.version === f.version && f.preview) patchRowRef.current?.(f.summary.path, { ...cur, preview: f.preview })
+        }
+      })
+      .catch((err: unknown) => console.warn('Could not load previews:', err))
+  }, [])
+
   const header = (g: Group, count: number) => (
     <button
       key={`h-${g.id}`}
@@ -373,6 +410,7 @@ export function DataView(props: DataViewProps) {
     onWritten: props.onWritten,
     isSelected: selectedSet ? (path) => selectedSet.has(path) : undefined,
     groupCount: (g) => result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length,
+    loadPreviews,
   }
   const builtin = (): ReactNode => {
     switch (layout) {
@@ -395,6 +433,13 @@ export function DataView(props: DataViewProps) {
   const custom = props.renderLayout?.(layout, layoutProps) ?? builtin()
   const tableType = layout === 'table' && viewTypes.length === 1 ? viewTypes[0] : undefined
   const cardLayout = layout === 'grid' || layout === 'wall' || layout === 'gallery' || layout === 'kanban'
+  // Only a card layout whose cards include the preview needs previews; the list and table never do.
+  const showsPreviews =
+    cardLayout && viewTypes.some((t) => cardProperties(t, state.viewDefinition).some((p) => p.propertyId === 'computed_preview'))
+  useEffect(() => {
+    // The kanban pages per column and asks for its own rows.
+    if (showsPreviews && layout !== 'kanban') loadPreviews(paged.flatMap((g) => g.rows))
+  }, [showsPreviews, layout, paged, loadPreviews])
   const customizePages = [
     ...(tableType
       ? [{ key: 'table', label: 'Table', icon: 'ph-table', body: <TableCustomizePage type={tableType} state={state} onState={onState} /> }]

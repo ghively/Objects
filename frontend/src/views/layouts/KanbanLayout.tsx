@@ -50,23 +50,25 @@ function Card({ props, row, hide, groupId }: { props: LayoutProps; row: Row; hid
 
 function Column({
   group,
+  rows,
   droppable,
   props,
   hide,
   title,
   onAdd,
+  onMore,
 }: {
   group: Group
+  /** The cards shown (a page of the group's rows); the header counts them all. */
+  rows: Row[]
   droppable: boolean
   props: LayoutProps
   hide: string[]
   title: React.ReactNode
   onAdd(): void
+  onMore(): void
 }) {
   const drop = useDroppable({ id: `col:${group.id}`, disabled: !droppable })
-  // How many cards the column shows; the header counts them all.
-  const [shown, setShown] = useState(LOAD_PAGE)
-  const rows = group.rows.length > shown ? group.rows.slice(0, shown) : group.rows
   return (
     <div
       ref={drop.setNodeRef}
@@ -82,12 +84,8 @@ function Column({
       {rows.map((r) => (
         <Card key={r.summary.path} props={props} row={r} hide={hide} groupId={group.id} />
       ))}
-      {group.rows.length > shown && (
-        <button
-          type="button"
-          onClick={() => setShown((n) => n + LOAD_PAGE)}
-          className="mx-auto rounded-lg px-3 py-1 text-[14px] text-fg-muted hover:bg-hover"
-        >
+      {group.rows.length > rows.length && (
+        <button type="button" onClick={onMore} className="mx-auto rounded-lg px-3 py-1 text-[14px] text-fg-muted hover:bg-hover">
           Load more
         </button>
       )}
@@ -126,6 +124,17 @@ export function KanbanLayout(props: LayoutProps) {
   )
   const update = (g: Group) => (groupBy && groupDef ? valueForGroup(groupBy, g, groupDef) : null)
   const hide = entry ? [entry.propertyId] : []
+  // How many cards each column shows (`LOAD_PAGE` until its "Load more").
+  const [shown, setShown] = useState<Record<string, number>>({})
+  const pages = useMemo(
+    () => groups.map((g) => ({ group: g, rows: g.rows.length > (shown[g.id] ?? LOAD_PAGE) ? g.rows.slice(0, shown[g.id] ?? LOAD_PAGE) : g.rows })),
+    [groups, shown],
+  )
+  // The cards on screen want their previews (rows load without them).
+  const { loadPreviews } = props
+  useEffect(() => {
+    loadPreviews(pages.flatMap((p) => p.rows))
+  }, [pages, loadPreviews])
 
   const say = (text: string) => {
     setNotice(text)
@@ -191,14 +200,16 @@ export function KanbanLayout(props: LayoutProps) {
     <div data-testid="kanban">
       <DndContext sensors={sensors} onDragEnd={(e) => void onDragEnd(e)}>
         <div className="flex items-start gap-3 overflow-x-auto pb-2">
-          {groups.map((g) => (
+          {pages.map(({ group: g, rows }) => (
             <Column
               key={g.id}
               group={g}
+              rows={rows}
               droppable={update(g) !== null}
               props={props}
               hide={hide}
               onAdd={() => void add(g)}
+              onMore={() => setShown((s) => ({ ...s, [g.id]: (s[g.id] ?? LOAD_PAGE) + LOAD_PAGE }))}
               title={
                 groupDef?.type === 'label' && !g.isOther ? (
                   <LabelPill option={{ text: g.label, color: g.color ?? null, icon: null }} />
