@@ -758,8 +758,8 @@ class Space:
         """The only source of "now" for stamps, the Task hook and the calendar (tests set it)."""
         self.tz: tzinfo = SystemTz()
         """The local zone (DST-aware) that turns instants into local days (tests set it)."""
-        self.before_write: Callable[[str, bytes], None] | None = None
-        """M8 version history: called as ``before_write(rel, current_bytes)`` inside the lock
+        self.before_write: Callable[[str, bytes, str | None], None] | None = None
+        """M8 version history: called as ``before_write(rel, current_bytes, object_id)``
         right before the app replaces an existing file (never on create, never on read).
         Errors it raises are logged and never stop the write (see `_call_before_write`)."""
         for rel in iter_object_paths(self.root):
@@ -1106,13 +1106,17 @@ class Space:
                 return Skip(rel, f"The file could not be written: {exc.strerror or exc}")
         raise AssertionError("unreachable")
 
-    def _call_before_write(self, rel: str, data: bytes) -> None:
-        """Run the `before_write` hook (M8 history) for ``rel``'s current bytes; never raises."""
+    def _call_before_write(self, rel: str, data: bytes, object_id: str | None = None) -> None:
+        """Run the `before_write` hook (M8 history) for ``rel``'s current bytes; never raises.
+
+        ``object_id`` is the object's id when the caller already knows it, so the history
+        store needn't parse the frontmatter again (re-measured after the audit fix pass).
+        """
         hook = self.before_write
         if hook is None:
             return
         try:
-            hook(rel, data)
+            hook(rel, data, object_id)
         except Exception:  # noqa: BLE001 - history must never stop a save
             _log.exception("The pre-write hook failed for %s", rel)
 
@@ -1642,7 +1646,7 @@ class Space:
 
         try:
             if history:
-                self._call_before_write(rel, raw.data)
+                self._call_before_write(rel, raw.data, _str_or_none(raw.fm.get("id")))
             tmp = _write_temp(full, data, keep_mode=True)  # written and fsynced beside the file
         except BaseException:
             forget()

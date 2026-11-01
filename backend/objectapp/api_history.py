@@ -40,7 +40,9 @@ def router(ctx: ApiContext) -> APIRouter:
 
     space = ctx.space
     store = HistoryStore(space.root, is_whiteboard=lambda md: is_whiteboard(space, md))
-    space.before_write = lambda rel, data: store.snapshot(rel, data, space.clock())
+    space.before_write = lambda rel, data, object_id=None: store.snapshot(
+        rel, data, space.clock(), object_id=object_id
+    )
     r = APIRouter()
 
     def object_rel(path: str) -> str:

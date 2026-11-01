@@ -234,6 +234,17 @@ def test_snapshot_parses_once_and_reads_nothing_for_an_object(m8_space_dir, monk
     assert len(store.versions(PAGE)) == 4  # all under one key
 
 
+def test_a_save_through_the_space_hands_the_id_to_the_snapshot(client, space, monkeypatch):
+    """Re-measured after the fix pass: the hook parsed the frontmatter once per rewritten file."""
+    from objectapp import history
+
+    parses = []
+    real_fm_of = history._fm_of
+    monkeypatch.setattr(history, "_fm_of", lambda d: parses.append(d) or real_fm_of(d))
+    _save_body(client, PAGE, "Saved with the id known.\n")
+    assert parses == []
+
+
 def test_history_follows_rename_by_id(client, space, clock):
     _save_body(client, PAGE, "Before the rename.\n")
     clock.advance(minutes=6)
@@ -429,7 +440,7 @@ def test_relink_and_property_writes_snapshot_referrers(client, space, clock):
 
 
 def test_hook_failure_never_stops_a_write(client, space, monkeypatch):
-    def boom(rel, data):
+    def boom(rel, data, object_id=None):
         raise OSError("disk full")
 
     space.before_write = boom
