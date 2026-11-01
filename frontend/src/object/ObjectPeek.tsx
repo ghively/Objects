@@ -2,10 +2,9 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Icon } from '@/components/Icon'
 import { stemOf, summaryOf, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
-import { inkPlugin } from '@/whiteboard/ink'
 import { useIsWhiteboard } from '@/whiteboard/isWhiteboard'
-import { WhiteboardPage } from '@/whiteboard/WhiteboardPage'
 import { ObjectView } from './ObjectView'
+import { WhiteboardPageLazy } from './WhiteboardLazy'
 
 function Pager() {
   const { index, list, next, prev } = usePeek()
@@ -53,11 +52,10 @@ export function ObjectPeek() {
         <DialogDescription className="sr-only">Object preview</DialogDescription>
         {path &&
           (whiteboard ? (
-            <WhiteboardPage
+            <WhiteboardPageLazy
               key={path}
               path={path}
               mode="peek"
-              ink={inkPlugin}
               onExpand={() => {
                 useTabs.getState().open({ kind: 'object', path }, { via: 'link' })
                 close()

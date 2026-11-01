@@ -110,7 +110,8 @@ describe('M5 mounts in the app', () => {
 
     act(() => seen.palette!.onShowRightPanel())
     const panel = await screen.findByRole('complementary', { name: 'Side panel' })
-    expect(within(panel).getByTestId('local-graph')).toHaveTextContent('local graph of Pages/A.md')
+    // The local graph's code loads on first show (lazy): wait for it.
+    expect(await within(panel).findByTestId('local-graph')).toHaveTextContent('local graph of Pages/A.md')
     expect(within(panel).getByText('Graph View')).toBeInTheDocument()
     act(() => seen.palette!.onShowRightPanel()) // reveals, never toggles or duplicates
     expect(screen.getByRole('complementary', { name: 'Side panel' })).toBeInTheDocument()
