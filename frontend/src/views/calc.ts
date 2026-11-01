@@ -162,12 +162,18 @@ export interface CalcResult {
   display: string
 }
 
-/** One calculation over `rows` for a property. An empty result (no numbers, no dates) is `{null, ''}`. */
-export function calculate(rows: Row[], propertyId: string, kind: CalcKind, ctx: FilterCtx): CalcResult {
+/**
+ * One calculation over `rows` for a property. An empty result (no numbers, no dates) is `{null, ''}`.
+ * `structureId` is the calculation's own type: its definition is used when that type has the
+ * property, else the view's types' (as a filter's `structureId`).
+ */
+export function calculate(rows: Row[], propertyId: string, kind: CalcKind, ctx: FilterCtx, structureId?: string): CalcResult {
   const total = rows.length
   const none: CalcResult = { value: null, display: '' }
   if (kind === 'countAll') return { value: total, display: String(total) }
-  const def = findDef(ctx.types, propertyId, undefined, ctx.viewTypeIds)
+  const def =
+    (structureId ? findDef(ctx.types, propertyId, structureId) : undefined) ??
+    findDef(ctx.types, propertyId, undefined, ctx.viewTypeIds)
   if (!def) return none
   const cells = rows.map((r) => cellOf(r, propertyId, def.type))
   const filled = cells.filter((c) => c.keys.length > 0).length
