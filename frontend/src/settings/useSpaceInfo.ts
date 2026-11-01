@@ -17,11 +17,31 @@ export interface SpaceInfoState {
 }
 
 let loading: Promise<void> | null = null
+let inFlight: Promise<SpaceInfo> | null = null
 let queue: Promise<void> = Promise.resolve()
 
 function titled(s: SpaceInfo): SpaceInfo {
   if (typeof document !== 'undefined' && s.name) document.title = `${s.name} · Object`
   return s
+}
+
+/**
+ * `GET /api/space`, shared by everyone asking while one is in flight (App's start-up, the link
+ * index, `ensure`), so a start makes one request instead of three. The answer updates the store.
+ */
+export function fetchSpace(): Promise<SpaceInfo> {
+  if (inFlight) return inFlight
+  const p = api
+    .space()
+    .then((s) => {
+      if (s) useSpaceInfo.setState({ space: s, loaded: true })
+      return s
+    })
+    .finally(() => {
+      if (inFlight === p) inFlight = null
+    })
+  inFlight = p
+  return p
 }
 
 export const useSpaceInfo = create<SpaceInfoState>()((set, get) => ({
@@ -30,9 +50,8 @@ export const useSpaceInfo = create<SpaceInfoState>()((set, get) => ({
 
   async load() {
     try {
-      const s = await api.space()
-      if (s) set({ space: s, loaded: true })
-      else set({ loaded: true })
+      const s = await fetchSpace()
+      if (!s) set({ loaded: true })
     } catch {
       set({ loaded: true })
     }
@@ -79,6 +98,7 @@ export const useSpaceInfo = create<SpaceInfoState>()((set, get) => ({
 /** Forget the loaded info (tests). */
 export function resetSpaceInfo(): void {
   loading = null
+  inFlight = null
   queue = Promise.resolve()
   useSpaceInfo.setState({ space: null, loaded: false })
 }
