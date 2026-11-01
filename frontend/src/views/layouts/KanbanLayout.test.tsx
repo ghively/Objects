@@ -147,6 +147,37 @@ describe('KanbanLayout', () => {
     expect(onWritten.mock.calls[0][1]).toBe(res)
   })
 
+  test('a drop of a row whose type has the key as text writes nothing (audit 2026-11-01 #12)', async () => {
+    const NOTE = typeDef({ id: 'note', name: 'Note', pluralName: 'Notes', propertyDefinitions: [propertyDef({ id: 'status', type: 'text', name: 'Status' })] })
+    const textRow = row({ summary: objectSummary({ path: 'Notes/N1.md', type: 'note' }), values: { status: 'Done' } })
+    const [state, setState] = [kanban(), vi.fn()]
+    render(
+      <DataView rows={[...ROWS, textRow]} types={[TASK, NOTE]} scope={{ typeIds: ['task', 'note'] }} state={state} onState={setState} layouts={['kanban']} />,
+    )
+    // The text "Done" is not the label "Done": the row sits in Other.
+    const other = columns().find((c) => c.getAttribute('data-group') === 'other')!
+    expect(within(other).getByText('N1')).toBeTruthy()
+    const done = columns()[1].getAttribute('data-group')
+    dragEnd?.({ active: { id: 'Notes/N1.md', data: { current: { path: 'Notes/N1.md', groupId: 'other' } } }, over: { id: `col:${done}` } })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(mocked.updateProperties).not.toHaveBeenCalled()
+    // A task's drop still writes the label.
+    dragEnd?.({ active: { id: 'Tasks/T1.md' }, over: { id: `col:${done}` } })
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/T1.md', { status: ['Done'] }, 'v7'))
+  })
+
+  test("the group definition follows the grouping's structureId", async () => {
+    // Two types with `stage` labels: the grouping names the second type, so its options are the columns.
+    const A = typeDef({ id: 'a', name: 'A', pluralName: 'As', propertyDefinitions: [propertyDef({ id: 'stage', type: 'label', name: 'Stage', options: { set: [{ id: 'x', text: 'X', color: null, icon: null }] } })] })
+    const B = typeDef({ id: 'b', name: 'B', pluralName: 'Bs', propertyDefinitions: [propertyDef({ id: 'stage', type: 'label', name: 'Stage', options: { set: [{ id: 'y', text: 'Y', color: null, icon: null }] } })] })
+    const rows = [row({ summary: objectSummary({ path: 'Bs/B1.md', type: 'b' }), values: { stage: [] }, version: 'v3' })]
+    const state = kanban({ groupBy: { groups: [{ propertyId: 'stage', option: 'default', structureId: 'b' }] } })
+    render(<DataView rows={rows} types={[A, B]} scope={{ typeIds: ['a', 'b'] }} state={state} onState={vi.fn()} layouts={['kanban']} />)
+    expect(columns().map((c) => c.getAttribute('data-group'))).toEqual(['y', 'other'])
+    dragEnd?.({ active: { id: 'Bs/B1.md' }, over: { id: 'col:y' } })
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Bs/B1.md', { stage: ['Y'] }, 'v3'))
+  })
+
   test('test kanban drop on createdAt grouping disabled', () => {
     render(
       <Harness

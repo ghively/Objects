@@ -182,13 +182,14 @@ export function rowValue(row: Row, propertyId: string): unknown {
   }
 }
 
-function typeMap(types: TypeDef[]): Record<string, TypeDef> {
+export function typeMap(types: TypeDef[]): Record<string, TypeDef> {
   return Object.fromEntries(types.map((t) => [t.id, t]))
 }
 
 type DefLike = Pick<PropertyDef, 'type' | 'options'>
 
-function defIn(type: TypeDef | undefined, propertyId: string): DefLike | undefined {
+/** The definition `type` itself has for `propertyId` (system ids count), or none. */
+export function defIn(type: TypeDef | undefined, propertyId: string): DefLike | undefined {
   if (!type) return undefined
   const d = type.propertyDefinitions.find((p) => p.key === propertyId || p.id === propertyId)
   if (d) return d
