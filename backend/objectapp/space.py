@@ -664,9 +664,13 @@ def _fold(value: Any) -> str:
 
 @dataclass
 class _TypeOp:
-    """One rewrite every file of a type gets: ``fn(src, rel) -> src``."""
+    """One rewrite every file of a type gets: ``fn(src, rel, fm) -> src``.
 
-    fn: Callable[[str, str], str]
+    ``fm`` is ``src`` parsed (the caller has it already: the scan's values, or the
+    write's), so an op never parses the frontmatter itself.
+    """
+
+    fn: Callable[[str, str, dict], str]
     confirm: bool
     """True when it removes values (the save then needs ``confirm``)."""
 
@@ -3554,9 +3558,18 @@ class Space:
                 if other.id not in type_ids:
                     type_ids.append(other.id)
         self.trash.remove_type(trash_id)
-        # Objects whose type was unknown while it was in the trash resolve again.
-        for rel in list(self._raw):
-            self.rescan_file(rel)
+        # Objects whose type was unknown while it was in the trash resolve again: only the
+        # ones whose summary no longer matches what their type name resolves to are
+        # rescanned, not the whole space (audit 2026-11-01 B10).
+        known = {t.id for t in self.types}
+        for rel, raw in list(self._raw.items()):
+            summary = self._summaries.get(rel)
+            if (
+                summary is None
+                or summary.type not in known
+                or summary.type != self._type_id(raw.typeName)
+            ):
+                self.rescan_file(rel)
         return paths, type_ids
 
     def _restore_object_entry(self, trash_id: str, meta: dict) -> str:
@@ -3855,19 +3868,24 @@ class Space:
             members = self._type_members(old.id) if ops else []
             raws = {rel: self._raw[rel] for rel in members if rel in self._raw}
 
-            def run(src: str, rel: str, only_confirm: bool = False) -> str:
+            def run(src: str, rel: str, fm: dict, only_confirm: bool = False) -> str:
+                parsed = src  # the source `fm` holds; re-parsed only after an op changed it
                 for op in ops:
-                    if op.confirm or not only_confirm:
-                        src = op.fn(src, rel)
+                    if not (op.confirm or not only_confirm):
+                        continue
+                    if src != parsed:
+                        fm = parse_fm(src) if src else {}
+                        parsed = src
+                    src = op.fn(src, rel, fm)
                 return src
 
             to_write: list[str] = []
             affected = 0
             for rel, raw in raws.items():
                 src = raw.of.frontmatter_src or ""
-                if run(src, rel, only_confirm=True) != src:
+                if run(src, rel, raw.fm, only_confirm=True) != src:
                     affected += 1
-                if run(src, rel) != src:
+                if run(src, rel, raw.fm) != src:
                     to_write.append(rel)
             if (deletes_property or affected) and not confirm:
                 raise ConfirmRequired(
@@ -3909,17 +3927,17 @@ class Space:
             )
 
     def _apply_type_ops(
-        self, to_write: list[str], run: Callable[[str, str], str]
+        self, to_write: list[str], run: Callable[[str, str, dict], str]
     ) -> tuple[list[str], list[Skip]]:
-        """Rewrite each file with ``run(src, rel)`` (unstamped); (rewritten, skipped)."""
+        """Rewrite each file with ``run(src, rel, fm)`` (unstamped); (rewritten, skipped)."""
         rewritten: list[str] = []
         skipped: list[Skip] = []
         for rel in to_write:
             wrote: list[bool] = []
 
-            def edit(of: ObjectFile, _fm: dict, rel=rel, wrote=wrote) -> ObjectFile | None:
+            def edit(of: ObjectFile, fm: dict, rel=rel, wrote=wrote) -> ObjectFile | None:
                 src = of.frontmatter_src or ""
-                out = run(src, rel)
+                out = run(src, rel, fm)
                 wrote.append(out != src)
                 return replace(of, frontmatter_src=out) if out != src else None
 
@@ -4050,11 +4068,11 @@ class Space:
                 raise InvalidValue(f"No object has the id {object_id!r}")
 
     @staticmethod
-    def _type_line_op(old_name: str, new_name: str) -> Callable[[str, str], str]:
+    def _type_line_op(old_name: str, new_name: str) -> Callable[[str, str, dict], str]:
         folded = old_name.lower()
 
-        def fn(src: str, _rel: str) -> str:
-            value = parse_fm(src).get("type") if src else None
+        def fn(src: str, _rel: str, fm: dict) -> str:
+            value = fm.get("type") if src else None
             if not isinstance(value, str) or value.strip().lower() != folded:
                 return src
             return replace_in_value(
@@ -4064,8 +4082,8 @@ class Space:
         return fn
 
     @staticmethod
-    def _delete_key_op(key: str) -> Callable[[str, str], str]:
-        def fn(src: str, _rel: str) -> str:
+    def _delete_key_op(key: str) -> Callable[[str, str, dict], str]:
+        def fn(src: str, _rel: str, _fm: dict) -> str:
             return delete_keys(src, [key]) if src else src
 
         return fn
@@ -4088,8 +4106,8 @@ class Space:
 
         if deleted or collapse:
 
-            def remove(src: str, _rel: str) -> str:
-                raw = parse_fm(src).get(key) if src else None
+            def remove(src: str, _rel: str, fm: dict) -> str:
+                raw = fm.get(key) if src else None
                 if raw is None:
                     return src
                 items = [i for i in (raw if isinstance(raw, list) else [raw]) if i is not None]
@@ -4114,8 +4132,8 @@ class Space:
 
         if renamed:
 
-            def rename(src: str, _rel: str) -> str:
-                if not src or key not in parse_fm(src):
+            def rename(src: str, _rel: str, fm: dict) -> str:
+                if not src or key not in fm:
                     return src
                 return replace_in_value(src, key, lambda v: renamed.get(_fold(v), v))
 
@@ -4149,8 +4167,8 @@ class Space:
                 return True
             return fixed is not None and summary.id not in fixed
 
-        def fn(src: str, rel: str) -> str:
-            raw = parse_fm(src).get(key) if src else None
+        def fn(src: str, rel: str, fm: dict) -> str:
+            raw = fm.get(key) if src else None
             if raw is None:
                 return src
             items = [i for i in (raw if isinstance(raw, list) else [raw]) if i is not None]
@@ -4295,8 +4313,7 @@ class Space:
                 if encoded is not None:
                     to_write.append(rel)
 
-            def run(fm_src: str, _rel: str) -> str:
-                fm = parse_fm(fm_src) if fm_src else {}
+            def run(fm_src: str, _rel: str, fm: dict) -> str:
                 if dst.key in fm:
                     return fm_src
                 encoded, _ = converted(fm)
