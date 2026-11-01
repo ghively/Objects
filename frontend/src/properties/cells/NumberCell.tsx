@@ -2,16 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import type { NumberFormat } from '@/api/types'
 import { useSettings } from '@/settings/useSettings'
 import { lineColor } from '@/theme/palette'
-import { formatNumber, parseNumberInput, placeholderFor, progressFraction } from '../format'
+import { formatNumber, fromPercent, parseNumberInput, placeholderFor, progressFraction } from '../format'
 import { CELL_TEXT, type CellProps } from './types'
 
 const DEBOUNCE_MS = 250
-
-/** A typed percent as its fraction, shifted in decimal (14.3 → 0.143, not 14.3 / 100 = 0.14300000000000002). */
-function fromPercent(n: number): number {
-  const [mantissa, exp] = String(n).split('e')
-  return Number(`${mantissa}e${Number(exp ?? 0) - 2}`)
-}
 
 /**
  * A number. While focused it edits the plain number and saves 250 ms after typing stops and on
