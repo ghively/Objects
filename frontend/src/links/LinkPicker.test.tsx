@@ -90,3 +90,11 @@ describe('[[ trigger', () => {
     expect(editor.state.doc.child(1).type.name).toBe('objectEmbed')
   })
 })
+
+// Audit 2026-11-01: a title with a breaking character links by its path form, as the back end does.
+import { wikilinkTargetFor } from '@/editor/extensions/wikilink'
+
+test('test picker targets a title with a pipe by its path', () => {
+  expect(wikilinkTargetFor({ title: 'A|B', path: 'Pages/A|B.md' })).toBe('Pages/A|B')
+  expect(wikilinkTargetFor({ title: 'Plain', path: 'Pages/Plain.md' })).toBe('Plain')
+})

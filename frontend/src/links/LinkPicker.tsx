@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { create } from 'zustand'
 import type { ObjectSummary } from '@/api/types'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { setWikilinkTrigger } from '@/editor/extensions/wikilink'
+import { setWikilinkTrigger, wikilinkTargetFor } from '@/editor/extensions/wikilink'
 import { setObjectEmbedPicker } from '@/editor/nodes/objectEmbed'
 import { TypeChip } from '@/shell/Sidebar'
 import { cn } from '@/lib/utils'
@@ -140,7 +140,7 @@ export function LinkPicker() {
       editor
         .chain()
         .focus()
-        .insertContentAt(at, [{ type: 'wikilink', attrs: { target: o.title, label: null } }])
+        .insertContentAt(at, [{ type: 'wikilink', attrs: { target: wikilinkTargetFor(o), label: null } }])
         .run()
     } else {
       editor.commands.focus()
