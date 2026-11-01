@@ -60,6 +60,21 @@ function fakeClient(initial: InkResponse) {
 }
 
 describe('useInkDoc', () => {
+  // Review fix 2026-11-01 #3: the stream's reconnect resync re-checks the ink's revision.
+  test('a resync after the stream reconnected reloads ink that changed meanwhile', async () => {
+    const client = fakeClient({ path: PATH, strokes: [s('a')], revision: 'r1' })
+    const { result } = renderHook(() => useInkDoc(PATH, client))
+    await settle()
+    expect(result.current.strokes).toEqual([s('a')])
+    client.load.mockResolvedValue({ path: PATH, strokes: [s('a'), s('b')], revision: 'r2' })
+    act(() => {
+      for (const l of listeners) l({ kind: 'types', path: '*', version: null, origin: null })
+    })
+    await settle()
+    expect(client.load).toHaveBeenCalledTimes(2)
+    expect(result.current.strokes).toEqual([s('a'), s('b')])
+  })
+
   test('ink loads without saving', async () => {
     const client = fakeClient({ path: PATH, strokes: [s('a')], revision: 'r1' })
     const { result } = renderHook(() => useInkDoc(PATH, client))
