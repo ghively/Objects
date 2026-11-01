@@ -327,3 +327,20 @@ def test_extract_walks_each_body_once(links_space_dir: Path, monkeypatch):
     ex = space.links._extract(rel)
     assert ex.body == ["Ada Lovelace"] and ex.tokens == {"2026-10-27": 1}
     assert len(walks) == 1
+
+
+def test_bare_relation_value_follows_a_rename_incrementally(links_space_dir: Path):
+    # Audit 2026-11-01 fix pass: a relation written as a bare value (`manager: Charles
+    # Babbage`, no `[[ ]]`) is a link the index resolves, so its holder must be re-resolved
+    # when that name is renamed, created or deleted; the incremental result equals a fresh open.
+    grace = "People/Grace Hopper.md"
+    (links_space_dir / grace).write_bytes(
+        b"---\ntype: 'Person'\ntitle: Grace Hopper\nmanager: Charles Babbage\n---\n\nBody.\n"
+    )
+    space = Space(links_space_dir)
+    assert space.links.outgoing(grace) == {BABBAGE}
+    result = space.rename_object(BABBAGE, "Charles B", space.cached_version(BABBAGE))
+    fresh = Space(links_space_dir)
+    assert space.links.outgoing(grace) == fresh.links.outgoing(grace)
+    assert space.links.backlinks(result.path) == fresh.links.backlinks(result.path)
+    assert grace not in space.links.backlinks(BABBAGE)
