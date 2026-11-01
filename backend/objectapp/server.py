@@ -1702,6 +1702,8 @@ def create_app(
             path = await asyncio.to_thread(import_image, space.root, name, data)
         except NotAnImage:
             return _error(415, "Only png, jpg, jpeg, gif, webp and svg images can be added")
+        except media.SidecarUpload:
+            return _error(415, media.SIDECAR_UPLOAD_DETAIL)
         except TooLarge:
             return too_large
         except ValueError as exc:
@@ -1724,6 +1726,8 @@ def create_app(
             return too_large
         except media.MarkdownUpload:
             return _error(415, media.MARKDOWN_UPLOAD_DETAIL)
+        except media.SidecarUpload:
+            return _error(415, media.SIDECAR_UPLOAD_DETAIL)
         except ValueError as exc:
             return _error(422, str(exc))
         return JSONResponse({"path": path, "kind": kind}, status_code=201)
