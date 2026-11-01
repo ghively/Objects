@@ -15,9 +15,10 @@
 import type { NodeViewRendererProps } from '@tiptap/core'
 import { Table, TableView } from '@tiptap/extension-table'
 import type { Node as PMNode } from '@tiptap/pm/model'
-import { Plugin, PluginKey, Selection, type EditorState, type Transaction } from '@tiptap/pm/state'
+import { NodeSelection, Plugin, PluginKey, Selection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { Decoration, DecorationSet, type EditorView, type NodeView } from '@tiptap/pm/view'
-import { cellText } from './tableCommands'
+import { evaluateFormula, isFormula, shownText } from './formulas'
+import { cellText, tableGrid } from './tableCommands'
 
 /** Tables with more rows than this start as a preview. */
 export const LAZY_TABLE_ROWS = 20
@@ -45,11 +46,42 @@ export function expandTable(view: EditorView, pos: number): void {
   view.dispatch(view.state.tr.setMeta(lazyTableKey, { expand: pos } satisfies Meta))
 }
 
-/** The table holding the selection's start, as a top-level or container child, or null. */
+/**
+ * The table holding the selection's start, as a top-level or container child, or the table a
+ * `NodeSelection` selects (arrow keys onto a preview select the whole node), or null.
+ */
 function selectionTable(state: EditorState): number | null {
-  const { $from } = state.selection
+  const sel = state.selection
+  if (sel instanceof NodeSelection && sel.node.type.name === 'table') return sel.from
+  const { $from } = sel
   for (let d = $from.depth; d >= 1; d--) if ($from.node(d).type.name === 'table') return $from.before(d)
   return null
+}
+
+/**
+ * The preview rows' texts as the table shows them: a formula cell's computed value (or error
+ * title), as the `FormulaCell` plugin draws it once expanded, any other cell as written. Only
+ * the preview's formulas are evaluated; the whole grid is read, as their references may reach
+ * below the preview.
+ */
+function previewTexts(table: PMNode, rows: number): string[][] {
+  const texts: string[][] = []
+  let grid: string[][] | null = null
+  for (let r = 0; r < rows; r++) {
+    const row = table.child(r)
+    const out: string[] = []
+    let col = 0
+    row.forEach((cell) => {
+      const text = cellText(cell)
+      if (isFormula(text)) {
+        grid ??= tableGrid(table)
+        out.push(shownText(text, evaluateFormula(text, grid, { row: r, col })))
+      } else out.push(text)
+      col += (cell.attrs.colspan as number) || 1
+    })
+    texts.push(out)
+  }
+  return texts
 }
 
 function expandedDecoration(doc: PMNode, pos: number): Decoration | null {
@@ -101,13 +133,14 @@ class TablePreviewView implements NodeView {
     const table = document.createElement('table')
     const body = table.appendChild(document.createElement('tbody'))
     const rows = Math.min(PREVIEW_ROWS, this.node.childCount)
+    const texts = previewTexts(this.node, rows)
     for (let r = 0; r < rows; r++) {
       const row = this.node.child(r)
       const tr = body.appendChild(document.createElement('tr'))
-      row.forEach((cell) => {
+      row.forEach((cell, _offset, i) => {
         const el = tr.appendChild(document.createElement(cell.type.spec.tableRole === 'header_cell' ? 'th' : 'td'))
         if (cell.attrs.colspan > 1) el.colSpan = cell.attrs.colspan
-        el.textContent = cellText(cell)
+        el.textContent = texts[r][i]
       })
     }
     const more = document.createElement('button')
