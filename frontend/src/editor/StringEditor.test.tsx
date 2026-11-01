@@ -66,7 +66,47 @@ describe('StringEditor', () => {
       types.push(n.type.name)
     })
     expect(types).not.toContain('bulletList')
-    expect(editor.state.doc.textContent).toBe('Note- a- b')
+    expect(editor.state.doc.childCount).toBe(1)
+    expect(editor.state.doc.textContent).toBe('Note- a - b')
+  })
+
+  // Audit 2026-11-01 (unconfirmed, second pass): plain multi-line text split into paragraphs.
+  test('in single-paragraph mode a multi-line paste stays one paragraph, lines joined with a space', async () => {
+    const { editor, dom, onChange } = await mount('Note', { singleParagraph: true })
+    act(() => {
+      editor.commands.setTextSelection(5)
+    })
+    paste(dom, ' line one\r\nline two\n\nline three\n')
+    expect(editor.state.doc.childCount).toBe(1)
+    expect(editor.state.doc.textContent).toBe('Note line one line two line three')
+    act(() => {
+      fireEvent.blur(dom)
+    })
+    expect(onChange).toHaveBeenLastCalledWith('Note line one line two line three')
+  })
+
+  test('in single-paragraph mode pasted HTML paragraphs are joined too, marks kept', async () => {
+    const { editor, dom } = await mount('Note', { singleParagraph: true })
+    act(() => {
+      editor.commands.setTextSelection(5)
+    })
+    const event = new Event('paste', { bubbles: true, cancelable: true }) as Event & { clipboardData: unknown }
+    const html = '<p><strong>bold</strong></p><ul><li><p>item</p></li></ul><p>last<br>line</p>'
+    event.clipboardData = {
+      getData: (type: string) => (type === 'text/html' ? html : type === 'text/plain' ? 'bold\nitem\nlast\nline' : ''),
+      types: ['text/html', 'text/plain'],
+      files: [],
+    }
+    act(() => {
+      dom.dispatchEvent(event)
+    })
+    expect(editor.state.doc.childCount).toBe(1)
+    expect(editor.state.doc.textContent).toBe('Notebold item last line')
+    let bold = ''
+    editor.state.doc.descendants((n) => {
+      if (n.isText && n.marks.some((m) => m.type.name === 'bold')) bold += n.text
+    })
+    expect(bold).toBe('bold')
   })
 
   test('test no-edit blur writes nothing', async () => {
