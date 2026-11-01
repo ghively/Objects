@@ -173,6 +173,37 @@ def test_event_hub_bounds_a_slow_subscriber():
     asyncio.run(main())
 
 
+# -- spaces.normalize: a name component's limit is the file system's own -----------------
+
+
+def test_component_limit_counts_utf16_units_on_windows(monkeypatch):
+    from objectapp import spaces
+
+    cjk = "文" * 200  # 200 UTF-16 units, 600 UTF-8 bytes
+    emoji = "\U0001f600" * 128  # 256 UTF-16 units (surrogate pairs), 512 bytes
+    monkeypatch.setattr(spaces.os, "name", "nt")
+    assert not spaces._component_too_long(cjk)
+    assert not spaces._component_too_long("x" * 255)
+    assert spaces._component_too_long("x" * 256)
+    assert spaces._component_too_long(emoji)
+    assert not spaces._component_too_long("\U0001f600" * 127)
+    monkeypatch.setattr(spaces.os, "name", "posix")
+    assert spaces._component_too_long(cjk)
+    assert not spaces._component_too_long("文" * 85)  # 255 bytes
+    assert spaces._component_too_long("文" * 86)
+    assert not spaces._component_too_long("x" * 255)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="a POSIX path")
+def test_normalize_takes_an_undecodable_posix_name(tmp_path: Path):
+    from objectapp import spaces
+
+    bad = os.fsdecode(os.fsencode(str(tmp_path)) + b"/caf\xe9")
+    assert spaces.normalize(bad) == Path(bad).resolve()
+    with pytest.raises(ValueError):
+        spaces.normalize(str(tmp_path / ("文" * 86)))
+
+
 # -- GET /api/graph: ETag on every 200, 304 while the graph is unchanged ----------------
 
 
