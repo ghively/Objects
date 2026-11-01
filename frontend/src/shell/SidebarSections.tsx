@@ -25,7 +25,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { cn } from '@/lib/utils'
 import { PinList, PinnedSection, type OpenTarget } from './PinnedSection'
 import { PINNED_TEXT } from './pinText'
-import { enqueueUiSave, pendingUiSaves, usePinned, useUiStore } from './usePinned'
+import { showToast } from '@/editor/media/upload'
+import { enqueueUiSave, pendingUiSaves, reloadUi, SIDEBAR_SAVE_FAILED, usePinned, useUiStore } from './usePinned'
 
 export const SECTION_TEXT = {
   add: 'Add Section',
@@ -177,10 +178,10 @@ export function workspaceBlocks(order: unknown, sectionIds: string[]): string[] 
 }
 
 /** Save `workspaceOrder` (optimistic, after the `ui.json` saves before it; a 409 re-applies it once to the fresh state). */
-export function saveWorkspaceOrder(order: string[]): Promise<void> {
+export async function saveWorkspaceOrder(order: string[]): Promise<void> {
   const cur = useUiStore.getState().ui
   useUiStore.setState({ ui: { ...cur, workspaceOrder: order } })
-  return enqueueUiSave(async () => {
+  const saved = await enqueueUiSave(async () => {
     try {
       const base = useUiStore.getState()
       try {
@@ -194,10 +195,17 @@ export function saveWorkspaceOrder(order: string[]): Promise<void> {
         const rest = pendingUiSaves() === 1 && fresh?.ui ? fresh.ui : useUiStore.getState().ui
         useUiStore.setState({ ui: { ...rest, workspaceOrder: order }, revision: res?.revision ?? fresh?.revision ?? '' })
       }
+      return true
     } catch (e) {
       console.warn('Could not save the sidebar order:', e)
+      return false
     }
   })
+  // The unsaved order must not stay on screen as if it were saved: say so and reload.
+  if (!saved) {
+    showToast(SIDEBAR_SAVE_FAILED)
+    await reloadUi()
+  }
 }
 
 /**

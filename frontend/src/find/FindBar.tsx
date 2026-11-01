@@ -9,7 +9,7 @@ import { Icon } from '@/components/Icon'
 import type { FindStatus } from '@/editor/extensions/findInPage'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { cn } from '@/lib/utils'
-import { isRawFindControl } from './rawFind'
+import { isRawFindControl } from './findControl'
 import { useFind } from './useFind'
 
 export interface FindBarProps {

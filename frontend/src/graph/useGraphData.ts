@@ -16,6 +16,8 @@ const RELOAD_ON = new Set<ChangeKind>(['created', 'deleted', 'renamed', 'changed
 
 let seq = 0
 
+const sameGraph = (a: GraphData, b: GraphData): boolean => JSON.stringify(a) === JSON.stringify(b)
+
 export const useGraphDataStore = create<GraphDataState>()((set) => ({
   data: null,
   loading: false,
@@ -23,8 +25,10 @@ export const useGraphDataStore = create<GraphDataState>()((set) => ({
     const n = ++seq
     set({ loading: true })
     try {
-      const data = await api.graph()
-      if (n === seq) set({ data: data ?? { nodes: [], links: [], tagged: [] }, loading: false })
+      const next = (await api.graph()) ?? { nodes: [], links: [], tagged: [] }
+      // The same payload keeps the same object: the canvas rebuilds its graph and restarts the
+      // layout (up to seconds) on a new `data`, and a body-only save changes no node or link.
+      if (n === seq) set((s) => ({ data: s.data && sameGraph(s.data, next) ? s.data : next, loading: false }))
     } catch (e) {
       console.warn('Could not load the graph:', e)
       if (n === seq) set({ loading: false })
@@ -76,5 +80,8 @@ export function useGraphData(): GraphDataState {
     acquire()
     return release
   }, [])
-  return useGraphDataStore()
+  const data = useGraphDataStore((s) => s.data)
+  const loading = useGraphDataStore((s) => s.loading)
+  const reload = useGraphDataStore((s) => s.reload)
+  return { data, loading, reload }
 }

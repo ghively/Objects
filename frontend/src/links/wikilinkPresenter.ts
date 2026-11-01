@@ -7,9 +7,8 @@
  * colour, sits in front of the title unless "Show object type icon for inline
  * object links" is off (`hideEntityIconsOnInlineLinks`).
  */
-import type { IconifyJSON } from '@iconify/types'
-import { getIconData, iconToHTML, iconToSVG } from '@iconify/utils'
-import { iconName, isIconifyId, parseIconId } from '@/components/Icon'
+import { iconToHTML, iconToSVG } from '@iconify/utils'
+import { iconName, isIconifyId, resolveIcon, resolveIconSync } from '@/components/Icon'
 import type { Icon as IconValue } from '@/api/types'
 import { setWikilinkPresenter, type WikilinkAttrs } from '@/editor/extensions/wikilink'
 import { usePeek, useTabs } from '@/nav/tabs'
@@ -22,35 +21,14 @@ function fromPath(dom: HTMLElement): string | undefined {
   return dom.closest('[data-object-path]')?.getAttribute('data-object-path') ?? undefined
 }
 
-const ICON_SETS: Record<string, () => Promise<unknown>> = {
-  ph: () => import('@iconify-json/ph/icons.json'),
-  'vscode-icons': () => import('@iconify-json/vscode-icons/icons.json'),
-}
-const iconSets = new Map<string, Promise<IconifyJSON | null>>()
-
-function iconSet(prefix: string): Promise<IconifyJSON | null> {
-  let p = iconSets.get(prefix)
-  if (!p) {
-    const load = ICON_SETS[prefix]
-    p = load
-      ? load().then((m) => ((m as { default?: IconifyJSON }).default ?? m) as IconifyJSON).catch(() => null)
-      : Promise.resolve(null)
-    iconSets.set(prefix, p)
-  }
-  return p
-}
-
-/** The SVG markup of an Iconify id (falling back to `ph-cube`), sized to the text. */
+/**
+ * The SVG markup of an Iconify id (falling back to `ph-cube`), sized to the text. The app's own
+ * icons are at hand; a user-chosen one loads its full set once (`<Icon>`'s loader and cache).
+ */
 async function iconSvg(id: string): Promise<string | null> {
-  const { prefix, name } = parseIconId(id)
-  const set = prefix ? await iconSet(prefix) : null
-  let data = set ? getIconData(set, name) : null
-  if (!data) {
-    const ph = await iconSet('ph')
-    data = ph ? getIconData(ph, 'cube') : null
-  }
-  if (!data) return null
-  const svg = iconToSVG(data, { width: '1em', height: '1em' })
+  const r = resolveIconSync(id) ?? (await resolveIcon(id).catch(() => null))
+  if (!r) return null
+  const svg = iconToSVG(r.data, { width: '1em', height: '1em' })
   return iconToHTML(svg.body, { ...svg.attributes, fill: 'currentColor' })
 }
 
