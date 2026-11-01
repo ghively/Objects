@@ -109,6 +109,12 @@ export function WhiteboardPage({
   })
 
   // ---- ink: the ink file feeds the store's strokes; stroke edits go back to the ink doc ----
+  // While the ink file is read-only, no store edit (clear, undo, redo, ink select) may change the
+  // strokes, or the store would diverge from the file (the ink doc ignores the change).
+  const inkReadOnly = !!inkDoc.readOnlyReason
+  useEffect(() => {
+    store.getState().canvas.setInkReadOnly(inkReadOnly)
+  }, [inkReadOnly, store])
   const sentRef = useRef<InkStroke[] | null>(null)
   useEffect(() => {
     const strokes = inkDoc.strokes

@@ -1,13 +1,4 @@
-import {
-  finishStroke,
-  MAX_STROKE_POINTS as MAX_POINTS,
-  newStrokeId,
-  pointSegDist2,
-  segSegDist2,
-  segments,
-  strokeBounds,
-  strokePointerType,
-} from './inkModel'
+import { EraserIndex, finishStroke, MAX_STROKE_POINTS as MAX_POINTS, newStrokeId, strokeBounds, strokePointerType } from './inkModel'
 import type { InkStroke } from './types'
 
 type P = [number, number, number]
@@ -46,21 +37,11 @@ export function erasePartially(
   newId: () => string = newStrokeId,
 ): { strokes: InkStroke[]; changed: boolean } {
   if (eraserPath.length === 0) return { strokes: [...strokes], changed: false }
-  const eb = strokeBounds({ points: eraserPath as P[] })
-  const eraserSegs = segments(eraserPath)
-  const r2 = radiusFlow * radiusFlow
-  const near = (x: number, y: number) => eraserSegs.some(([c, d]) => pointSegDist2(x, y, c[0], c[1], d[0], d[1]) <= r2)
+  const index = new EraserIndex(eraserPath, radiusFlow)
   let changed = false
   const out: InkStroke[] = []
   for (const s of strokes) {
-    const b = strokeBounds(s)
-    const misses =
-      s.points.length === 0 ||
-      b.minX - radiusFlow > eb.maxX ||
-      b.maxX + radiusFlow < eb.minX ||
-      b.minY - radiusFlow > eb.maxY ||
-      b.maxY + radiusFlow < eb.minY
-    if (misses) {
+    if (s.points.length === 0 || !index.overlaps(strokeBounds(s))) {
       out.push(s)
       continue
     }
@@ -70,14 +51,14 @@ export function erasePartially(
     let cut = false
     for (let i = 0; i < pts.length; i++) {
       const p = pts[i]
-      if (near(p[0], p[1])) {
+      if (index.nearPoint(p[0], p[1])) {
         cut = true
         if (run.length) runs.push(run)
         run = []
         continue
       }
       // Two kept neighbours whose segment the eraser still crosses: break between them.
-      if (run.length && eraserSegs.some(([c, d]) => segSegDist2(run[run.length - 1], p, c, d) <= r2)) {
+      if (run.length && index.nearSegment(run[run.length - 1], p)) {
         cut = true
         runs.push(run)
         run = []

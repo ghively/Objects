@@ -49,4 +49,25 @@ describe('erasePartially', () => {
     expect(r.changed).toBe(false)
     expect(r.strokes[0]).toBe(a)
   })
+
+  test('partial erase over big ink cuts exactly the strokes the eraser passes and stays quick', () => {
+    const strokes: InkStroke[] = []
+    for (let n = 0; n < 2000; n++) {
+      const pts: [number, number, number][] = []
+      for (let i = 0; i < 100; i++) pts.push([(n % 40) * 50 + i * 0.5, Math.floor(n / 40) * 50 + Math.sin(i) * 10, 0.5])
+      strokes.push({ id: `s${n}`, tool: 'pen', color: '#000000', width: 4, points: pts, d: '' })
+    }
+    const eraser: [number, number, number][] = []
+    for (let i = 0; i < 150; i++) eraser.push([i * 13, 1000 + i * 8, 0.5])
+    const hit = hitStrokes(strokes, eraser, 10)
+    const t0 = performance.now()
+    const cut = erasePartially(strokes, eraser, 10, ids())
+    const ms = performance.now() - t0
+    expect(cut.changed).toBe(true)
+    const kept = new Set(cut.strokes.filter((s) => strokes.includes(s)).map((s) => s.id))
+    expect(strokes.filter((s) => !kept.has(s.id)).map((s) => s.id).sort()).toEqual([...hit].sort())
+    // No piece passes under the eraser any more.
+    expect(hitStrokes(cut.strokes.filter((s) => !strokes.includes(s)), eraser, 9.9).size).toBe(0)
+    expect(ms).toBeLessThan(500) // 2.6 s with the double loop
+  })
 })

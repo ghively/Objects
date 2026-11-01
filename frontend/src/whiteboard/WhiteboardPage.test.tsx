@@ -181,6 +181,23 @@ describe('WhiteboardPage', () => {
     expect(screen.getByRole('button', { name: 'undo' })).toBeDisabled()
   })
 
+  test('clear whiteboard with a read-only ink file clears the board and leaves the ink alone', async () => {
+    const { plugin, doc } = fakeInk([stroke('s1')])
+    doc.readOnlyReason = 'foreign'
+    const b = board([node({ id: 'a' })])
+    const { client } = await renderPage({ board: b, ink: plugin })
+    await waitFor(() => expect(screen.getByTestId('ink-layer').dataset.strokes).toBe('1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Whiteboard' }))
+    await waitFor(() => expect(client.saveBoard).toHaveBeenCalledTimes(1))
+    expect(client.saveBoard.mock.calls[0][1].nodes).toEqual({})
+    // The strokes stay as the file has them: nothing for the ink doc to save, nothing to undo away.
+    expect(doc.save).not.toHaveBeenCalled()
+    expect(screen.getByTestId('ink-layer').dataset.strokes).toBe('1')
+    fireEvent.click(screen.getByRole('button', { name: 'undo' }))
+    expect(doc.save).not.toHaveBeenCalled()
+    expect(screen.getByTestId('ink-layer').dataset.strokes).toBe('1')
+  })
+
   test('stroke and node changes share one history', async () => {
     const { plugin, doc, layer } = fakeInk([])
     const { client } = await renderPage({ ink: plugin })

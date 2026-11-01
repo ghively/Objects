@@ -3,6 +3,7 @@ import { api, ApiError, CLIENT_ID, ConflictError, ReadOnlyError, RevisionConflic
 import { settingsOf, whiteboardApi } from './whiteboardClient'
 import type { ChangeEvent } from './types'
 import type { WhiteboardData } from './whiteboardTypes'
+import { onLocalSave, type LocalSave } from '@/whiteboard/localSaves'
 
 function respond(status: number, body: unknown) {
   return vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }))
@@ -118,6 +119,38 @@ describe('whiteboard client', () => {
         other: true,
       }),
     ).toEqual({ isSnappingToGrid: false, isSnappingToNodes: true, isZoomingOnScroll: false, isEngineeringMode: true })
+  })
+
+  test('test a board save is announced to the other views of the board in this window', async () => {
+    // "Add to whiteboard" and "Turn into whiteboard" save through the client, not a board hook; the
+    // server's event for the save carries our CLIENT_ID and is dropped as an echo, so the open view
+    // of the board hears of it only through this announcement.
+    await new Promise((r) => setTimeout(r, 0)) // the earlier tests' saves have announced by now
+    const seen: LocalSave[] = []
+    const off = onLocalSave((e) => seen.push(e))
+    try {
+      vi.stubGlobal('fetch', respond(200, { revision: 'r2' }))
+      await whiteboardApi.saveBoard('Whiteboards/A.md', BOARD, 'r1')
+      await new Promise((r) => setTimeout(r, 0))
+    } finally {
+      off()
+    }
+    expect(seen.map((e) => [e.path, e.version])).toEqual([['Whiteboards/A.md', 'r2']])
+    expect(seen[0].source).toBe(whiteboardApi)
+  })
+
+  test('test a settings save announces a local ui event, as every other ui.json write', async () => {
+    vi.stubGlobal('EventSource', class extends EventTarget { close() {} })
+    const seen: ChangeEvent[] = []
+    const off = api.onChange((e) => seen.push(e))
+    try {
+      vi.stubGlobal('fetch', respond(200, { ui: { whiteboard: { isShowingDots: false } }, revision: 'u2' }))
+      await whiteboardApi.saveSettings({ isShowingDots: false }, 'u1')
+      await new Promise((r) => setTimeout(r, 0))
+    } finally {
+      off()
+    }
+    expect(seen.map((e) => [e.kind, e.path, e.version, e.origin])).toEqual([['ui', 'ui.json', 'u2', CLIENT_ID]])
   })
 
   test('test a board save that stamped the .md announces changed to this window', async () => {

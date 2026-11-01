@@ -1,9 +1,22 @@
 import '@/whiteboard/test/flowEnv'
 import { act, render } from '@testing-library/react'
-import { ReactFlow, ReactFlowProvider } from '@xyflow/react'
+import { ReactFlow, ReactFlowProvider, useViewport } from '@xyflow/react'
+import { useState } from 'react'
 import { describe, expect, test, vi } from 'vitest'
+let outlineCalls = 0
+vi.mock('./inkModel', async (orig) => {
+  const m = (await orig()) as typeof import('./inkModel')
+  return {
+    ...m,
+    outlineFor: (...args: Parameters<typeof m.outlineFor>) => {
+      outlineCalls++
+      return m.outlineFor(...args)
+    },
+  }
+})
+
 import { InkLayer } from './InkLayer'
-import { DEFAULT_INK, finishStroke } from './inkModel'
+import { DEFAULT_INK, finishStroke, SPLIT_STROKE_POINTS } from './inkModel'
 import type { InkLayerProps, InkStroke, InkToolState } from './types'
 
 type Sample = { x: number; y: number; pressure?: number }
@@ -49,6 +62,8 @@ function fire(el: Element, type: string, init: PInit) {
     el.dispatchEvent(pointer(type, init))
   })
 }
+
+const nextFrame = () => act(() => new Promise<void>((r) => requestAnimationFrame(() => r())))
 
 function setup(props: Partial<InkLayerProps> = {}) {
   const onStrokesChange = vi.fn()
@@ -109,20 +124,67 @@ describe('InkLayer', () => {
     expect(s.d.startsWith('M ')).toBe(true)
   })
 
-  test('a stroke longer than the file allows is saved as several strokes', () => {
-    const { capture, onStrokesChange } = setup()
-    const el = capture()!
+  test('a long stroke is cut into pieces while drawn; no piece can exceed the server caps', () => {
+    // As on the page: the strokes the layer commits come back as its `strokes` prop.
+    const onStrokesChange = vi.fn()
+    function Page() {
+      const [strokes, setStrokes] = useState<InkStroke[]>([])
+      const change: InkLayerProps['onStrokesChange'] = (next, label) => {
+        setStrokes(next)
+        onStrokesChange(next, label)
+      }
+      return <InkLayer strokes={strokes} tool={DEFAULT_INK} readOnly={false} panning={false} onStrokesChange={change} onWheel={vi.fn()} />
+    }
+    const utils = render(
+      <div style={{ width: 1280, height: 800 }}>
+        <ReactFlowProvider>
+          <ReactFlow nodes={[]} edges={[]}>
+            <Page />
+          </ReactFlow>
+        </ReactFlowProvider>
+      </div>,
+    )
+    const el = utils.container.querySelector('[data-ink-capture]')!
     fire(el, 'pointerdown', { pointerType: 'pen', x: 0, y: 0, pressure: 0.5 })
     const coalesced = Array.from({ length: 25_000 }, (_, i) => ({ x: (i + 1) / 10, y: (i % 7) / 10, pressure: 0.5 }))
     fire(el, 'pointermove', { pointerType: 'pen', x: 2500, y: 0, pressure: 0.5, coalesced })
+    // Whole pieces are committed before the pen lifts (the live preview keeps only the tail).
+    const whileDrawing = onStrokesChange.mock.calls.length
+    expect(whileDrawing).toBeGreaterThan(0)
+    const committed = onStrokesChange.mock.calls.at(-1)![0] as InkStroke[]
+    expect(committed.every((s) => s.points.length <= SPLIT_STROKE_POINTS)).toBe(true)
+    expect(utils.container.querySelectorAll('[data-stroke-id]')).toHaveLength(committed.length)
     fire(el, 'pointerup', { pointerType: 'pen', x: 2500, y: 0, pressure: 0 })
-    const next = onStrokesChange.mock.calls[0][0] as InkStroke[]
-    expect(next.length).toBeGreaterThan(1)
-    expect(next.every((s) => s.points.length <= 20_000)).toBe(true)
+    expect(onStrokesChange.mock.calls.length).toBe(whileDrawing + 1)
+    const next = onStrokesChange.mock.calls.at(-1)![0] as InkStroke[]
+    expect(next.length).toBeGreaterThan(committed.length)
+    expect(next.every((s) => s.points.length <= SPLIT_STROKE_POINTS)).toBe(true)
     expect(new Set(next.map((s) => s.id)).size).toBe(next.length)
     // Consecutive pieces share their joining sample, so the line stays unbroken.
     expect(next[1].points[0]).toEqual(next[0].points.at(-1))
     expect(next.reduce((n, s) => n + s.points.length, 0)).toBe(25_001 + next.length - 1)
+  })
+
+  test('the live stroke outline is rebuilt once per animation frame, not per pointer move', async () => {
+    const { capture, container, onStrokesChange } = setup()
+    const el = capture()!
+    fire(el, 'pointerdown', { pointerType: 'pen', x: 0, y: 0, pressure: 0.5 })
+    await nextFrame()
+    expect(container.querySelector('[data-ink-live]')).not.toBeNull()
+    const before = outlineCalls
+    for (let i = 1; i <= 50; i++) fire(el, 'pointermove', { pointerType: 'pen', x: i, y: 0, pressure: 0.5 })
+    expect(outlineCalls - before).toBe(0)
+    const dBefore = container.querySelector('[data-ink-live]')!.getAttribute('d')
+    await nextFrame()
+    expect(outlineCalls - before).toBe(1)
+    expect(container.querySelector('[data-ink-live]')!.getAttribute('d')).not.toBe(dBefore)
+    fire(el, 'pointerup', { pointerType: 'pen', x: 50, y: 0 })
+    expect(container.querySelector('[data-ink-live]')).toBeNull()
+    expect(onStrokesChange).toHaveBeenCalledTimes(1)
+    expect((onStrokesChange.mock.calls[0][0] as InkStroke[])[0].points).toHaveLength(51)
+    // Nothing is shown after the gesture ended, even if a frame was still pending.
+    await nextFrame()
+    expect(container.querySelector('[data-ink-live]')).toBeNull()
   })
 
   test('mouse stroke uses simulated pressure', () => {
@@ -204,6 +266,46 @@ describe('InkLayer', () => {
     const s = onStrokesChange.mock.calls[0][0][0] as InkStroke
     expect(s.points.every(([x, y]) => x <= 30 && y === 0)).toBe(true)
     expect(container.querySelector('[data-ink-live]')).toBeNull()
+  })
+
+  test('a two-finger pinch while the pen tool is armed zooms the canvas and draws nothing', () => {
+    const seen: { zoom: number }[] = []
+    function Probe() {
+      seen.push(useViewport())
+      return null
+    }
+    const onStrokesChange = vi.fn()
+    const utils = render(
+      <div style={{ width: 1280, height: 800 }}>
+        <ReactFlowProvider>
+          <ReactFlow nodes={[]} edges={[]} minZoom={0.1} maxZoom={4}>
+            <InkLayer strokes={[]} tool={DEFAULT_INK} readOnly={false} panning={false} onStrokesChange={onStrokesChange} onWheel={vi.fn()} />
+            <Probe />
+          </ReactFlow>
+        </ReactFlowProvider>
+      </div>,
+    )
+    const el = utils.container.querySelector('[data-ink-capture]')!
+    fire(el, 'pointerdown', { pointerType: 'touch', pointerId: 1, x: 100, y: 100 })
+    fire(el, 'pointermove', { pointerType: 'touch', pointerId: 1, x: 110, y: 110 })
+    expect(utils.container.querySelector('[data-ink-live]')).not.toBeNull()
+    // The second finger makes it a pinch: the first finger's stroke is dropped, unsaved.
+    fire(el, 'pointerdown', { pointerType: 'touch', pointerId: 2, x: 300, y: 300 })
+    expect(utils.container.querySelector('[data-ink-live]')).toBeNull()
+    fire(el, 'pointermove', { pointerType: 'touch', pointerId: 1, x: 80, y: 80 })
+    fire(el, 'pointermove', { pointerType: 'touch', pointerId: 2, x: 320, y: 320 })
+    fire(el, 'pointermove', { pointerType: 'touch', pointerId: 1, x: 60, y: 60 })
+    fire(el, 'pointerup', { pointerType: 'touch', pointerId: 1, x: 60, y: 60 })
+    fire(el, 'pointerup', { pointerType: 'touch', pointerId: 2, x: 320, y: 320 })
+    expect(onStrokesChange).not.toHaveBeenCalled()
+    expect(utils.container.querySelector('[data-ink-live]')).toBeNull()
+    // The fingers' distance grew from 190*sqrt(2) (at the pinch's start) to 260*sqrt(2): the canvas zoomed in by that ratio.
+    expect(seen.at(-1)!.zoom).toBeCloseTo(260 / 190, 4)
+    // The second finger lifting leaves nothing armed: a new finger draws again.
+    fire(el, 'pointerdown', { pointerType: 'touch', pointerId: 3, x: 10, y: 10 })
+    fire(el, 'pointermove', { pointerType: 'touch', pointerId: 3, x: 40, y: 10 })
+    fire(el, 'pointerup', { pointerType: 'touch', pointerId: 3, x: 40, y: 10 })
+    expect(onStrokesChange).toHaveBeenCalledTimes(1)
   })
 
   test('a palm already down does not block the pen: the pen draws and the palm is dropped', () => {

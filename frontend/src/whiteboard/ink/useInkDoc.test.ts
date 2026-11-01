@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { api, ApiError, RevisionConflictError } from '@/api/client'
 import type { ChangeEvent } from '@/api/types'
-import { useInkDoc } from './useInkDoc'
+import { INK_RETRY_LIMIT, INK_RETRY_MS, useInkDoc } from './useInkDoc'
 import type { InkResponse, InkStroke } from './types'
 
 const PATH = 'Whiteboards/Board.md'
@@ -70,6 +70,44 @@ describe('useInkDoc', () => {
     await advance(2000)
     expect(client.load).toHaveBeenCalledTimes(1)
     expect(client.save).not.toHaveBeenCalled()
+  })
+
+  test('a failed first load is retried with backoff; strokes drawn meanwhile are kept and saved', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const client = fakeClient({ path: PATH, strokes: [s('a')], revision: 'r1' })
+    client.load.mockRejectedValueOnce(new ApiError(500, 'down')).mockRejectedValueOnce(new ApiError(500, 'down'))
+    const { result } = renderHook(() => useInkDoc(PATH, client))
+    await settle()
+    expect(client.load).toHaveBeenCalledTimes(1)
+    expect(result.current.readOnlyReason).toBeNull()
+    // Drawn while the file is still loading.
+    act(() => result.current.save([s('b')]))
+    expect(result.current.strokes).toEqual([s('b')])
+    await advance(INK_RETRY_MS)
+    await settle()
+    expect(client.load).toHaveBeenCalledTimes(2)
+    await advance(INK_RETRY_MS * 2)
+    await settle()
+    expect(client.load).toHaveBeenCalledTimes(3)
+    expect(result.current.readOnlyReason).toBeNull()
+    expect(result.current.strokes!.map((x) => x.id).sort()).toEqual(['a', 'b'])
+    await advance(400)
+    await settle()
+    expect(client.save).toHaveBeenCalledTimes(1)
+    expect(client.save.mock.calls[0][2]).toBe('r1')
+    expect((client.save.mock.calls[0][1] as InkStroke[]).map((x) => x.id).sort()).toEqual(['a', 'b'])
+  })
+
+  test('a first load that keeps failing opens the ink read-only with the reason', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const client = fakeClient({ path: PATH, strokes: [], revision: 'r1' })
+    client.load.mockRejectedValue(new ApiError(500, 'down'))
+    const { result } = renderHook(() => useInkDoc(PATH, client))
+    await settle()
+    await advance(10 * 60_000)
+    expect(client.load).toHaveBeenCalledTimes(1 + INK_RETRY_LIMIT)
+    expect(result.current.readOnlyReason).toBe('down')
+    expect(result.current.strokes).toEqual([])
   })
 
   test('a read-only ink file reports its reason and never saves', async () => {
@@ -188,6 +226,23 @@ describe('useInkDoc', () => {
     await settle()
     expect(client.save.mock.calls.at(-1)![1]).toEqual([s('a'), s('b')])
     expect(result.current.saveError).toBeNull()
+  })
+
+  test('flush against a failing server tries once, not a burst', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const client = fakeClient({ path: PATH, strokes: [], revision: 'r1' })
+    client.save.mockRejectedValue(new ApiError(500, 'down'))
+    const { result } = renderHook(() => useInkDoc(PATH, client))
+    await settle()
+    act(() => result.current.save([s('a')]))
+    await advance(400) // the first save fails; a retry is pending
+    await settle()
+    expect(client.save).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      await result.current.flush()
+    })
+    expect(client.save).toHaveBeenCalledTimes(2)
+    expect(result.current.strokes).toEqual([s('a')]) // still pending, still shown
   })
 
   test('a failed ink save is retried with the same strokes', async () => {
