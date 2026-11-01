@@ -847,8 +847,9 @@ class Space:
         fmcache.for_root(self.root).flush()
         self.collections: dict[str, CollectionDef] = {}
         """Collection id -> definition (unreadable files included, read-only)."""
-        for cid, data, _rev, err in self.store("collections").list():
-            self.collections[cid] = self._load_collection(cid, data, err)
+        self._collections_loaded: dict[str, tuple[str, CollectionDef]] = {}
+        """Collection id -> (its file's revision, the definition parsed from it)."""
+        self.reload_collections()
         self.purge_expired(datetime.now(UTC))
 
     # -- types --------------------------------------------------------------
@@ -962,12 +963,39 @@ class Space:
                 self.collections[collection_id] = self._load_collection(collection_id, data, error)
 
     def reload_collections(self) -> None:
-        """Re-read every collection file (the list route does this, so it is never stale)."""
+        """Re-read the collection files that changed (the list route does this, so it is never stale).
+
+        Every file is read and hashed; one is parsed again only when its revision differs
+        from the one its in-memory definition was loaded at (and that definition is still
+        the one in `collections`), so external edits, additions and removals all show.
+        """
         with self._lock:
-            found = {}
-            for cid, data, _rev, err in self.store("collections").list():
-                found[cid] = self._load_collection(cid, data, err)
+            loaded = self._collections_loaded
+            known = {
+                cid: rev
+                for cid, (rev, c) in loaded.items()
+                if self.collections.get(cid) is c
+            }
+            found: dict[str, CollectionDef] = {}
+            fresh: dict[str, tuple[str, CollectionDef]] = {}
+            for cid, data, rev, err in self.store("collections").list(known):
+                if cid in known and known[cid] == rev:
+                    c = self.collections[cid]
+                else:
+                    c = self._load_collection(cid, data, err)
+                found[cid] = c
+                fresh[cid] = (rev, c)
             self.collections = found
+            self._collections_loaded = fresh
+
+    def collections_with_revisions(self) -> list[tuple[CollectionDef, str]]:
+        """`reload_collections`, then every collection with its file's revision, sorted as
+        `list_collections` (one read of each file in all)."""
+        with self._lock:
+            self.reload_collections()
+            return [
+                (c, self._collections_loaded[c.id][0]) for c in self.list_collections()
+            ]
 
     def list_collections(self) -> list[CollectionDef]:
         with self._lock:
