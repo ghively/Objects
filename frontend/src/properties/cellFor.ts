@@ -23,6 +23,9 @@ import { TypeChipCell } from './cells/TypeChipCell'
 import type { CellProps } from './cells/types'
 import { UrlCell } from './cells/UrlCell'
 
+/** The kinds whose cell reads `frontmatter` (DateCell: `repeat`, `remind`, `reminders`, `template`). */
+export const FRONTMATTER_KINDS: ReadonlySet<PropertyType> = new Set<PropertyType>(['datetime', 'datetimeSimple'])
+
 /** What some cells take besides `CellProps`; every cell ignores the extras it doesn't use. */
 export interface CellExtras {
   /** LabelCell: saves an edited option set (the type) before the value is applied. */
@@ -37,7 +40,11 @@ export interface CellExtras {
   onOpenSettings?(): void
   /** CollectionsCell: the object's type id (the picker lists collections that hold it). */
   typeId?: string
-  /** The object's raw frontmatter, for a cell that reads a sibling key (the Task date reads `repeat`, `remind`). */
+  /**
+   * The object's raw frontmatter, for a cell that reads a sibling key (the Task date reads
+   * `repeat`, `remind`). The property panel re-renders a row for a change of another key only
+   * when its kind is in `FRONTMATTER_KINDS`: a cell that reads it must have its kind listed there.
+   */
   frontmatter?: Record<string, unknown>
   /**
    * Write several keys in one `updateProperties` call (`remove` deletes keys). Only the property
