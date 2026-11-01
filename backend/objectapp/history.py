@@ -35,6 +35,7 @@ import json
 import logging
 import re
 import threading
+import zlib
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -492,7 +493,7 @@ class HistoryStore:
                 packed = _read(self.dir / key / PurePosixPath(name).name)
                 try:
                     return gzip.decompress(packed) if packed is not None else None
-                except (OSError, EOFError, ValueError):
+                except (OSError, EOFError, ValueError, zlib.error):
                     return None
             if name == entry["id"] + ".md":
                 return _read(self.dir / key / PurePosixPath(name).name)
