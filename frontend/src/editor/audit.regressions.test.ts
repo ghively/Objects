@@ -88,6 +88,23 @@ describe('dragging a block', () => {
     expect(saved.startsWith('C\n\nA\n\nB')).toBe(true)
   })
 
+  test.each([
+    ['A\n\nB\n\nC\n', 'C\n\nA\n\nB\n'],
+    ['A\n\nB\n\nC', 'C\n\nA\n\nB'],
+    ['A\n\nB\n\nC\n\n', 'C\n\nA\n\nB\n\n'],
+  ])('moving the last block of %j to the top keeps the end of the body (audit 2026-11-01)', (body, saved) => {
+    const editor = headless(body)
+    moveBlockTo(editor, topPos(editor, 'C'), 0)
+    expect(serializeBody(editor)).toBe(saved)
+  })
+
+  test('joining two paragraphs leaves no blank line at the end', () => {
+    const editor = headless('A\n\nB\n')
+    editor.commands.setTextSelection(find(editor, 'B').pos + 1)
+    editor.commands.joinBackward()
+    expect(serializeBody(editor)).toBe('AB\n')
+  })
+
   test('a heading directly followed by its paragraph stays as written', () => {
     const body = '# H\nText\n\nP\n'
     const editor = headless(body)
