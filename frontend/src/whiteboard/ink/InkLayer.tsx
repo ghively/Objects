@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
-import { useReactFlow, useViewport, ViewportPortal } from '@xyflow/react'
+import { useReactFlow, useStoreApi, useViewport, ViewportPortal } from '@xyflow/react'
 import {
   ERASER_RADIUS_PX,
   HIGHLIGHTER_OPACITY,
@@ -62,6 +62,19 @@ type Gesture = {
 
 type Live = { tool: InkStrokeTool; color: string; width: number; pointerType: string; points: [number, number, number][] }
 
+type ClientPoint = { x: number; y: number }
+
+/** A two-finger pinch on the overlay: its fingers and where the canvas stood when it began. */
+type Pinch = {
+  ids: [number, number]
+  startDistance: number
+  startMid: ClientPoint
+  viewport: { x: number; y: number; zoom: number }
+}
+
+const distance = (a: ClientPoint, b: ClientPoint) => Math.hypot(b.x - a.x, b.y - a.y)
+const midpoint = (a: ClientPoint, b: ClientPoint): ClientPoint => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
+
 function LivePath({ live }: { live: Live }) {
   const d = useMemo(
     () => svgPathFromOutline(outlineFor(live.points, strokeOptions(live.tool, live.width, live.pointerType))),
@@ -91,10 +104,13 @@ const SVG_STYLE: CSSProperties = {
  * The freehand ink layer, rendered as a child of `<ReactFlow>`. The strokes draw in flow
  * coordinates inside `ViewportPortal` (above nodes and connectors). While an ink tool is on and
  * the board is writable and not panning, a capture overlay over the pane turns pointer input
- * into strokes (pen pressure and coalesced samples) or erase gestures.
+ * into strokes (pen pressure and coalesced samples) or erase gestures. Two fingers pinch-zoom the
+ * canvas (the overlay's `touch-action: none` keeps the browser's own zoom out, and React Flow
+ * never sees the touches, so the overlay moves the viewport itself).
  */
 export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, onWheel }: InkLayerProps) {
-  const { screenToFlowPosition } = useReactFlow()
+  const { screenToFlowPosition, getViewport, setViewport } = useReactFlow()
+  const flowStore = useStoreApi()
   const { zoom } = useViewport()
   const [live, setLive] = useState<Live | null>(null)
   /** The ink selection (the Select ink tool); ids of strokes that no longer exist drop out. */
@@ -106,6 +122,9 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
   const gesture = useRef<Gesture | null>(null)
   /** Pens currently in contact (palm rejection: touch is ignored while one is down). */
   const pensDown = useRef(new Set<number>())
+  /** Fingers in contact, by pointer id, at their last screen position. */
+  const touches = useRef(new Map<number, ClientPoint>())
+  const pinch = useRef<Pinch | null>(null)
   const overlay = useRef<HTMLDivElement | null>(null)
 
   const selection = useMemo(() => {
@@ -151,7 +170,9 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
   useEffect(() => {
     if (!capturing) {
       gesture.current = null
+      pinch.current = null
       pensDown.current.clear()
+      touches.current.clear()
       setLive(null)
     }
   }, [capturing])
@@ -171,15 +192,31 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
     const ev = e.nativeEvent
     const t = latest.current.tool
     if (!t) return
+    if (ev.pointerType === 'touch') touches.current.set(ev.pointerId, { x: ev.clientX, y: ev.clientY })
+    if (pinch.current) return
     if (ev.pointerType === 'touch' && pensDown.current.size > 0) return
     const prior = gesture.current
     if (prior) {
+      if (prior.pointerType !== 'touch') return
+      if (ev.pointerType === 'touch') {
+        // A second finger: a pinch, not a stroke. The first finger's gesture is dropped, unsaved,
+        // and the two fingers zoom the canvas until one lifts.
+        dropGesture()
+        e.preventDefault()
+        e.stopPropagation()
+        try {
+          e.currentTarget.setPointerCapture?.(ev.pointerId)
+        } catch {
+          /* jsdom */
+        }
+        const a = touches.current.get(prior.pointerId)
+        const b = touches.current.get(ev.pointerId)
+        if (a && b) pinch.current = { ids: [prior.pointerId, ev.pointerId], startDistance: distance(a, b), startMid: midpoint(a, b), viewport: getViewport() }
+        return
+      }
       // A palm that touched down first gives way to the pen: its gesture is dropped, unsaved.
-      if (ev.pointerType !== 'pen' || prior.pointerType !== 'touch') return
-      gesture.current = null
-      setLive(null)
-      setLasso(null)
-      setPreview(null)
+      if (ev.pointerType !== 'pen') return
+      dropGesture()
       try {
         e.currentTarget.releasePointerCapture?.(prior.pointerId)
       } catch {
@@ -241,9 +278,39 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
     if (mode === 'draw') setLive({ tool: g.tool, color: g.color, width: g.width, pointerType: g.pointerType, points: g.points })
   }
 
+  /** Abandons the gesture in progress (nothing is saved). */
+  const dropGesture = () => {
+    gesture.current = null
+    setLive(null)
+    setLasso(null)
+    setPreview(null)
+  }
+
+  /** Zoom about the fingers: the canvas point under their first midpoint stays under the current one. */
+  const applyPinch = (p: Pinch) => {
+    const a = touches.current.get(p.ids[0])
+    const b = touches.current.get(p.ids[1])
+    if (!a || !b || p.startDistance === 0) return
+    const { minZoom, maxZoom } = flowStore.getState()
+    const next = Math.min(maxZoom, Math.max(minZoom, (p.viewport.zoom * distance(a, b)) / p.startDistance))
+    const rect = overlay.current?.getBoundingClientRect()
+    const left = rect?.left ?? 0
+    const top = rect?.top ?? 0
+    const mid = midpoint(a, b)
+    const fx = (p.startMid.x - left - p.viewport.x) / p.viewport.zoom
+    const fy = (p.startMid.y - top - p.viewport.y) / p.viewport.zoom
+    void setViewport({ x: mid.x - left - fx * next, y: mid.y - top - fy * next, zoom: next })
+  }
+
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const g = gesture.current
     const ev = e.nativeEvent
+    if (ev.pointerType === 'touch' && touches.current.has(ev.pointerId)) touches.current.set(ev.pointerId, { x: ev.clientX, y: ev.clientY })
+    const p = pinch.current
+    if (p) {
+      if (p.ids.includes(ev.pointerId)) applyPinch(p)
+      return
+    }
+    const g = gesture.current
     if (!g || ev.pointerId !== g.pointerId) return
     g.points = g.points.concat(samplesFrom(ev, toFlow))
     if (g.mode === 'draw') {
@@ -286,6 +353,13 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
   const end = (e: ReactPointerEvent<HTMLDivElement>, cancelled: boolean) => {
     const ev = e.nativeEvent
     if (ev.pointerType === 'pen') pensDown.current.delete(ev.pointerId)
+    touches.current.delete(ev.pointerId)
+    const p = pinch.current
+    if (p) {
+      // Either finger lifting ends the pinch; the other one draws nothing until it lifts too.
+      if (p.ids.includes(ev.pointerId)) pinch.current = null
+      return
+    }
     const g = gesture.current
     if (!g || ev.pointerId !== g.pointerId) return
     gesture.current = null
