@@ -96,9 +96,16 @@ export function GraphCanvas({
   const types = useLinkIndex((s) => s.types)
   const objects = useLinkIndex((s) => s.objects)
   const typesById = useMemo(() => Object.fromEntries(types.map((t) => [t.id, t])), [types])
+  // Keyed by content: a summary refresh gives a new `objects` array, and a new map here would
+  // rebuild the graph and restart the layout (up to seconds) for a save that changed no colour.
+  const tagColorsRef = useRef<Record<string, string | null>>({})
   const tagColors = useMemo(() => {
     const m: Record<string, string | null> = {}
     for (const o of objects) if (o.color) m[o.path] = o.color
+    const prev = tagColorsRef.current
+    const prevKeys = Object.keys(prev)
+    if (prevKeys.length === Object.keys(m).length && prevKeys.every((k) => prev[k] === m[k])) return prev
+    tagColorsRef.current = m
     return m
   }, [objects])
 
