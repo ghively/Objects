@@ -63,6 +63,7 @@ import { M8Keys } from './shortcuts'
 import { withTextEscapes } from './textEscapes'
 import { NbspEntity, withLinkForms } from './extensions/linkForms'
 import { RecordAudio } from './media/recordAudio'
+import { LazyTable } from './table/LazyTable'
 
 export type EditorExtensionOptions = {
   /** `false` leaves out the "1. " input rule (`EditorSettings.disableNumberedListTransformation`). */
@@ -131,7 +132,8 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
     withoutRegistryKeys(CodeBlock),
     withoutRegistryKeys(TaskListCommonMark),
     withoutRegistryKeys(TaskItem.configure({ nested: true })),
-    TableKit.configure({ table: { resizable: false } }),
+    TableKit.configure({ table: false }),
+    LazyTable.configure({ resizable: false }),
     Markdown,
     BlockSource,
     BlockOptions,
