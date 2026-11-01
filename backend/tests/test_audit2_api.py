@@ -67,6 +67,36 @@ def test_big_reads_show_an_undecodable_file_name(space_dir: Path, tmp_path: Path
     assert c.get("/api/graph").status_code == 200
 
 
+# -- uploads named like a whiteboard's sidecar files are refused --------------------------
+
+
+@pytest.mark.parametrize(
+    "name", ["Board.ink.svg", "Board.whiteboard.json", "b.INK.SVG", "dir/x.Whiteboard.Json", "x.ink.svg "]
+)
+@pytest.mark.parametrize("route", ["/api/attachments", "/api/images"])
+def test_sidecar_named_uploads_answer_415(client: TestClient, space_dir: Path, name: str, route: str):
+    body = b"<svg xmlns='http://www.w3.org/2000/svg'/>" if "svg" in name.lower() else b"{}"
+    before = client.get("/api/attachments").json()
+    r = client.post(route, params={"name": name}, content=body, headers={"content-type": "application/octet-stream"})
+    assert r.status_code == 415, r.text
+    if route == "/api/attachments" or name.lower().endswith(".svg"):
+        assert "whiteboard" in r.json()["detail"]  # else: not an image either
+    assert client.get("/api/attachments").json() == before
+    folder = space_dir / "Attachments"
+    assert not folder.exists() or not [
+        p for p in folder.iterdir() if p.name.lower().endswith((".ink.svg", ".whiteboard.json"))
+    ]
+
+
+def test_other_svg_and_json_uploads_still_work(client: TestClient):
+    octet = {"content-type": "application/octet-stream"}
+    svg = b"<svg xmlns='http://www.w3.org/2000/svg'/>"
+    assert client.post("/api/attachments", params={"name": "ink.svg"}, content=svg, headers=octet).status_code == 201
+    assert client.post("/api/images", params={"name": "diagram.svg"}, content=svg, headers=octet).status_code == 201
+    r = client.post("/api/attachments", params={"name": "whiteboard.json"}, content=b"{}", headers=octet)
+    assert r.status_code == 201
+
+
 # -- GET /api/graph: ETag on every 200, 304 while the graph is unchanged ----------------
 
 
