@@ -3,6 +3,10 @@
 // is rebuilt from the visible nodes and edges, laid out by ForceAtlas2 in a worker. Hovering a
 // node keeps it and its neighbours bright and dims the rest; `showMinimalNodes` hides labels.
 // sigma is loaded on first use: it touches WebGL at import, and it stays out of the main bundle.
+// A rebuild fills a new graph, positioned from the start, away from the renderer (in slices with
+// a yield between them when it is big), then hands it to sigma in one `setGraph`: no per-node
+// renderer events, and the old graph stays on screen until the new one is ready. A big graph is
+// laid out before it is handed over (see the build effect).
 import Graph from 'graphology'
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import type Sigma from 'sigma'
@@ -22,7 +26,18 @@ import {
   REDUCED_NODE_SIZE,
   type EdgeKind,
 } from './graphStyle'
-import { runLayout } from './layout'
+import { runLayout, startPosition } from './layout'
+
+/** Above this many visible nodes the graph is built in slices of this size, yielding between them. */
+export const BUILD_SLICE = 1500
+const EDGE_SLICE = 10_000
+
+/** Let the browser paint and handle input between slices. */
+function yieldToBrowser(): Promise<void> {
+  const s = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler
+  if (typeof s?.yield === 'function') return s.yield()
+  return new Promise((r) => setTimeout(r, 0))
+}
 
 export interface GraphCanvasProps {
   data: GraphData
@@ -64,6 +79,9 @@ interface EdgeAttrs {
 }
 
 type SigmaClick = { node: string; event?: { original?: MouseEvent | TouchEvent } }
+
+type CanvasGraph = Graph<NodeAttrs, EdgeAttrs>
+const newGraph = (): CanvasGraph => new Graph<NodeAttrs, EdgeAttrs>({ type: 'undirected', multi: false })
 
 export function GraphCanvas({
   data,
@@ -109,8 +127,9 @@ export function GraphCanvas({
     return m
   }, [objects])
 
-  // One graph and one sigma per mount.
-  const [graph] = useState(() => new Graph<NodeAttrs, EdgeAttrs>({ type: 'undirected', multi: false }))
+  // The graph on screen (a rebuild replaces it) and one sigma per mount.
+  const graphRef = useRef<CanvasGraph | null>(null)
+  if (!graphRef.current) graphRef.current = newGraph()
   const [sigmaReady, setSigmaReady] = useState(0)
   useEffect(() => {
     const el = container.current
@@ -119,11 +138,19 @@ export function GraphCanvas({
     let sigma: Sigma<NodeAttrs, EdgeAttrs> | null = null
     const expose = exposeRef.current
     void import('sigma')
-      .then(({ default: SigmaClass }) => {
+      .then(async ({ default: SigmaClass }) => {
         if (cancelled) return
-        sigma = start(SigmaClass, el)
+        // A big graph is handed over in the next task: creating the WebGL context and compiling
+        // the shaders, then indexing thousands of nodes, would otherwise be one long task.
+        const big = (graphRef.current?.order ?? 0) > BUILD_SLICE
+        sigma = start(SigmaClass, el, big ? newGraph() : graphRef.current!)
         sigmaRef.current = sigma
         if (expose) expose.current = sigma
+        if (big && sigma) {
+          await yieldToBrowser()
+          if (cancelled || !sigma) return
+          if (sigma.getGraph() !== graphRef.current) sigma.setGraph(graphRef.current!)
+        }
         setSigmaReady((n) => n + 1)
       })
       .catch((e: unknown) => console.warn('Could not load the graph renderer:', e))
@@ -136,12 +163,14 @@ export function GraphCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one renderer per mount
   }, [])
 
-  function start(SigmaClass: typeof Sigma, el: HTMLElement): Sigma<NodeAttrs, EdgeAttrs> | null {
+  function start(SigmaClass: typeof Sigma, el: HTMLElement, initial: CanvasGraph): Sigma<NodeAttrs, EdgeAttrs> | null {
     const colors = canvasColors()
     colorsRef.current = colors
     let sigma: Sigma<NodeAttrs, EdgeAttrs>
+    // The reducers read the graph sigma draws (a rebuild replaces it).
+    const shown = (): CanvasGraph => sigma.getGraph()
     try {
-      sigma = new SigmaClass<NodeAttrs, EdgeAttrs>(graph, el, {
+      sigma = new SigmaClass<NodeAttrs, EdgeAttrs>(initial, el, {
         allowInvalidContainer: true,
         renderLabels: true,
         labelColor: { color: colors.label },
@@ -153,7 +182,7 @@ export function GraphCanvas({
           const res: Partial<NodeAttrs> & NodeAttrs = { ...attrs }
           const h = hovered.current
           if (h) {
-            if (node === h || graph.areNeighbors(node, h)) {
+            if (node === h || shown().areNeighbors(node, h)) {
               res.forceLabel = true
               res.zIndex = 1
             } else {
@@ -173,7 +202,7 @@ export function GraphCanvas({
         edgeReducer: (edge, attrs) => {
           const h = hovered.current
           if (!h) return attrs
-          const [a, b] = graph.extremities(edge)
+          const [a, b] = shown().extremities(edge)
           if (a === h || b === h) return { ...attrs, size: attrs.size + 0.5 }
           return { ...attrs, color: 'rgba(0,0,0,0)' }
         },
@@ -192,68 +221,115 @@ export function GraphCanvas({
       sigma.refresh()
     })
     sigma.on('clickNode', ({ node, event }: SigmaClick) => {
-      if (!graph.hasNode(node)) return
-      clickRef.current(graph.getNodeAttribute(node, 'path'), event?.original)
+      const g = shown()
+      if (!g.hasNode(node)) return
+      clickRef.current(g.getNodeAttribute(node, 'path'), event?.original)
     })
     return sigma
   }
 
   // Rebuild the graph from what is visible, then lay it out.
   useEffect(() => {
-    graph.clear()
-    const keys = new Map<string, string>()
-    for (const i of visible.nodes) {
-      const node = data.nodes[i]
-      if (!node) continue
-      const key = String(i)
-      keys.set(node.path, key)
-      const themeColor = nodeColor(node, typesById, tagColors[node.path])
-      graph.addNode(key, {
-        path: node.path,
-        label: node.title || node.path,
-        size: nodeSize(node.degree),
-        color: colorValue(themeColor),
-        themeColor,
-        x: 0,
-        y: 0,
-      })
-    }
-    // Reduced nodes (kept by a filter only to carry links): smallest size, gray, unlabelled.
-    for (const i of visible.reduced) {
-      const key = String(i)
-      if (!graph.hasNode(key)) continue
-      graph.mergeNodeAttributes(key, {
-        size: REDUCED_NODE_SIZE,
-        color: colorValue(REDUCED_NODE_COLOR),
-        themeColor: REDUCED_NODE_COLOR,
-        reduced: true,
-      })
-    }
-    keyByPath.current = keys
-    const add = (pairs: [number, number][], kind: EdgeKind) => {
-      const style = edgeStyle(kind)
-      for (const [a, b] of pairs) {
-        const ka = String(a)
-        const kb = String(b)
-        if (!graph.hasNode(ka) || !graph.hasNode(kb) || graph.hasEdge(ka, kb)) continue
-        graph.addEdge(ka, kb, { kind, color: style.color, size: style.size })
-      }
-    }
-    add(visible.links, 'link')
-    add(visible.tagLinks, 'tag')
-
     const ctrl = new AbortController()
-    layoutRef.current?.({ running: true, progress: 0 })
-    void runLayout(graph, {
-      signal: ctrl.signal,
-      onProgress: (progress) => {
-        if (!ctrl.signal.aborted) layoutRef.current?.({ running: progress < 1, progress })
-      },
-    }).then(() => {
-      if (!ctrl.signal.aborted) layoutRef.current?.({ running: false, progress: 1 })
-    })
+    const { signal } = ctrl
+    const big = visible.nodes.length > BUILD_SLICE
+    void (async () => {
+      const next = newGraph()
+      const keys = new Map<string, string>()
+      const added = new Set<string>()
+      const reduced = new Set(visible.reduced)
+      const order = visible.nodes.length
+      // ~20 theme colours, each read from CSS once per build instead of once per node.
+      const colorCache = new Map<ThemeColor, string>()
+      const color = (c: ThemeColor): string => {
+        let v = colorCache.get(c)
+        if (v === undefined) colorCache.set(c, (v = colorValue(c)))
+        return v
+      }
+      const nodes: { key: string; attributes: NodeAttrs }[] = []
+      for (let n = 0; n < visible.nodes.length; n++) {
+        const i = visible.nodes[n]
+        const node = data.nodes[i]
+        const key = String(i)
+        if (node && !added.has(key)) {
+          added.add(key)
+          keys.set(node.path, key)
+          // Reduced nodes (kept by a filter only to carry links): smallest size, gray, unlabelled.
+          const isReduced = reduced.has(i)
+          const themeColor = isReduced ? REDUCED_NODE_COLOR : nodeColor(node, typesById, tagColors[node.path])
+          const p = startPosition(node.path, order)
+          const attributes: NodeAttrs = {
+            path: node.path,
+            label: node.title || node.path,
+            size: isReduced ? REDUCED_NODE_SIZE : nodeSize(node.degree),
+            color: color(themeColor),
+            themeColor,
+            x: p.x,
+            y: p.y,
+          }
+          if (isReduced) attributes.reduced = true
+          nodes.push({ key, attributes })
+        }
+        if (nodes.length >= BUILD_SLICE || n === visible.nodes.length - 1) {
+          next.import({ nodes: nodes.splice(0) })
+          if (big) {
+            await yieldToBrowser()
+            if (signal.aborted) return
+          }
+        }
+      }
+      const seen = new Set<string>()
+      const edges: { source: string; target: string; attributes: EdgeAttrs }[] = []
+      const add = async (pairs: [number, number][], kind: EdgeKind) => {
+        const style = edgeStyle(kind)
+        for (const [a, b] of pairs) {
+          const ka = String(a)
+          const kb = String(b)
+          const pair = a < b ? `${a}-${b}` : `${b}-${a}`
+          if (ka !== kb && next.hasNode(ka) && next.hasNode(kb) && !seen.has(pair)) {
+            seen.add(pair)
+            edges.push({ source: ka, target: kb, attributes: { kind, color: style.color, size: style.size } })
+          }
+          if (edges.length >= EDGE_SLICE) {
+            next.import({ edges: edges.splice(0) })
+            if (big) {
+              await yieldToBrowser()
+              if (signal.aborted) return
+            }
+          }
+        }
+      }
+      await add(visible.links, 'link')
+      await add(visible.tagLinks, 'tag')
+      if (signal.aborted) return
+      if (edges.length) next.import({ edges })
+
+      // On screen in one step: sigma indexes the whole graph once.
+      const show = () => {
+        graphRef.current = next
+        keyByPath.current = keys
+        const sigma = sigmaRef.current
+        if (sigma && sigma.getGraph() !== next) sigma.setGraph(next)
+      }
+      // A small graph is shown at once and moves while it settles. A big one is laid out before
+      // it is shown ("Arranging the layout", then "Drawing the graph"): with sigma listening, each
+      // ForceAtlas2 step re-indexes every node (~100 ms at 5,000), so the page would stay busy
+      // for the whole layout; away from sigma a step costs a few ms.
+      if (!big) show()
+      layoutRef.current?.({ running: true, progress: 0 })
+      await runLayout(next, {
+        signal,
+        seeded: true,
+        onProgress: (progress) => {
+          if (!signal.aborted) layoutRef.current?.({ running: progress < 1, progress })
+        },
+      })
+      if (signal.aborted) return
+      if (big) show()
+      layoutRef.current?.({ running: false, progress: 1 })
+    })()
     return () => ctrl.abort()
-  }, [graph, data, visible, typesById, tagColors])
+  }, [data, visible, typesById, tagColors])
 
   const minimalRef = useRef(!!custom.showMinimalNodes)
   minimalRef.current = !!custom.showMinimalNodes
@@ -272,13 +348,21 @@ export function GraphCanvas({
     firstTheme.current = themeName
     const colors = canvasColors()
     colorsRef.current = colors
-    graph.forEachNode((key, attrs) => graph.setNodeAttribute(key, 'color', colorValue(attrs.themeColor)))
+    const values = new Map<ThemeColor, string>()
+    graphRef.current!.updateEachNodeAttributes(
+      (_key, attrs) => {
+        let v = values.get(attrs.themeColor)
+        if (v === undefined) values.set(attrs.themeColor, (v = colorValue(attrs.themeColor)))
+        return { ...attrs, color: v }
+      },
+      { attributes: ['color'] },
+    )
     const sigma = sigmaRef.current
     if (!sigma) return
     sigma.setSetting('labelColor', { color: colors.label })
     sigma.setSetting('defaultEdgeColor', colors.edge)
     sigma.refresh()
-  }, [themeName, graph])
+  }, [themeName])
 
   useEffect(() => {
     const sigma = sigmaRef.current

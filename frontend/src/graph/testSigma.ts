@@ -10,6 +10,8 @@ export interface FakeSigma {
   killed: boolean
   /** Times `refresh()` ran. */
   refreshes: number
+  /** Times `setGraph()` handed it a graph (each one a full re-index in sigma). */
+  graphsSet: number
   /** The layer canvases `getCanvases()` returns (sized like sigma's, at a pixel ratio of 2). */
   canvases: Record<string, HTMLCanvasElement>
   /** Fire a sigma event, as a click or hover on the canvas would. */
@@ -26,6 +28,7 @@ export function sigmaModule() {
     camera = { animate: vi.fn(async () => undefined), animatedReset: vi.fn(async () => undefined) }
     killed = false
     refreshes = 0
+    graphsSet = 0
     canvases: Record<string, HTMLCanvasElement> = Object.fromEntries(
       ['edges', 'nodes', 'labels', 'hovers', 'hoverNodes', 'mouse'].map((name) => {
         const c = document.createElement('canvas')
@@ -46,6 +49,13 @@ export function sigmaModule() {
     }
     emit(event: string, payload: unknown) {
       this.handlers[event]?.(payload)
+    }
+    getGraph() {
+      return this.graph
+    }
+    setGraph(graph: FakeSigma['graph']) {
+      this.graph = graph
+      this.graphsSet++
     }
     setSetting(key: string, value: unknown) {
       this.settings[key] = value

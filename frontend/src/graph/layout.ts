@@ -36,14 +36,24 @@ export function initialPosition(path: string, order: number): { x: number; y: nu
   return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }
 }
 
-/** Give every node `x`/`y`: its last position, or one from the hash of its `path` attribute. */
+/** Where `path` starts in a graph of `order` nodes: its last position, or one from its hash. */
+export function startPosition(path: string, order: number): { x: number; y: number } {
+  return positions.get(path) ?? initialPosition(path, order)
+}
+
+/**
+ * Give every node `x`/`y`: its last position, or one from the hash of its `path` attribute. One
+ * `updateEachNodeAttributes` (one event for a renderer listening, not one per node).
+ */
 export function seedPositions(graph: Graph): void {
   const order = graph.order
-  graph.forEachNode((key, attrs) => {
-    const path = (attrs.path as string | undefined) ?? key
-    const p = positions.get(path) ?? initialPosition(path, order)
-    graph.mergeNodeAttributes(key, { x: p.x, y: p.y })
-  })
+  graph.updateEachNodeAttributes(
+    (key, attrs) => {
+      const p = startPosition((attrs.path as string | undefined) ?? key, order)
+      return { ...attrs, x: p.x, y: p.y }
+    },
+    { attributes: ['x', 'y'] },
+  )
 }
 
 function remember(graph: Graph): void {
@@ -55,12 +65,14 @@ function remember(graph: Graph): void {
 
 export interface LayoutOptions {
   signal?: AbortSignal
+  /** The nodes already carry their start positions (`startPosition`): skip `seedPositions`. */
+  seeded?: boolean
   /** 0–1 while running. */
   onProgress?: (progress: number) => void
 }
 
-export function runLayout(graph: Graph, { signal, onProgress }: LayoutOptions = {}): Promise<void> {
-  seedPositions(graph)
+export function runLayout(graph: Graph, { signal, onProgress, seeded }: LayoutOptions = {}): Promise<void> {
+  if (!seeded) seedPositions(graph)
   if (graph.order < 2 || graph.size === 0 || signal?.aborted) {
     remember(graph)
     onProgress?.(1)
