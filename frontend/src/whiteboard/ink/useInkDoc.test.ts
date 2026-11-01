@@ -190,6 +190,23 @@ describe('useInkDoc', () => {
     expect(result.current.saveError).toBeNull()
   })
 
+  test('flush against a failing server tries once, not a burst', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const client = fakeClient({ path: PATH, strokes: [], revision: 'r1' })
+    client.save.mockRejectedValue(new ApiError(500, 'down'))
+    const { result } = renderHook(() => useInkDoc(PATH, client))
+    await settle()
+    act(() => result.current.save([s('a')]))
+    await advance(400) // the first save fails; a retry is pending
+    await settle()
+    expect(client.save).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      await result.current.flush()
+    })
+    expect(client.save).toHaveBeenCalledTimes(2)
+    expect(result.current.strokes).toEqual([s('a')]) // still pending, still shown
+  })
+
   test('a failed ink save is retried with the same strokes', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const client = fakeClient({ path: PATH, strokes: [], revision: 'r1' })

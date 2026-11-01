@@ -187,6 +187,11 @@ class BoardSaver {
     s.canvas.setReadOnly(readOnlyReason)
   }
 
+  /**
+   * Saves what is pending now, waiting for the save in flight first. One failed attempt ends it
+   * (the retry timer it set, or the next edit, tries again): a server that is down must not get a
+   * burst of PUTs on unmount, a tab switch or `pagehide`.
+   */
   async flush(): Promise<void> {
     if (this.timer) {
       clearTimeout(this.timer)
@@ -196,6 +201,7 @@ class BoardSaver {
       if (this.inFlight) await this.inFlight
       else if (!this.readOnly && this.store.getState().boardSeq !== this.savedSeq) await this.save()
       else return
+      if (this.failures > 0) return
     }
   }
 }
