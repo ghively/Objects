@@ -43,6 +43,7 @@ import { fuzzyMatch, fuzzyScore } from '@/links/LinkPicker'
 import { openExtendedSearch } from '@/search/openSearch'
 import { TypeChip } from '@/shell/Sidebar'
 import { blockSelectionRange, turnInto } from '../extensions/blockSelection'
+import { wikilinkTargetFor } from '../extensions/wikilink'
 import { TURN_INTO_ITEMS } from '../handles/BlockMenu'
 import { ColorMenu, COLOR_MENU_TEXT } from './ColorMenu'
 import './tokens.css'
@@ -133,11 +134,11 @@ export async function createObjectFromSelection(editor: Editor, typeId: string, 
   return true
 }
 
-/** "Link existing object with text selection.": the selection becomes a link to `object`. */
-export function linkSelectionToObject(editor: Editor, object: Pick<ObjectSummary, 'title'>): boolean {
+/** "Link existing object with text selection.": the selection becomes a link to `object` (by path when its title cannot be a target). */
+export function linkSelectionToObject(editor: Editor, object: Pick<ObjectSummary, 'title' | 'path'>): boolean {
   const text = selectionText(editor)
   if (text === null) return false
-  return linkSelectionTo(editor, object.title, text.trim())
+  return linkSelectionTo(editor, wikilinkTargetFor(object), text.trim())
 }
 
 /** "Search for content matching your selection": the extended search with the selected text. */
