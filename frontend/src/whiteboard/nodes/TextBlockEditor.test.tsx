@@ -16,6 +16,30 @@ async function mount(markdown: string) {
 }
 
 describe('TextBlockEditor', () => {
+  test('typed text commits when the editor unmounts without blur or Escape (the node left the viewport)', async () => {
+    const { onCommit, dom, unmount } = await mount('')
+    act(() => {
+      dom.editor!.commands.focus('end')
+      dom.editor!.commands.insertContent('Hello typed text')
+    })
+    // `onlyRenderVisibleElements` unmounts a node that leaves the viewport mid-edit: no blur, no Escape.
+    unmount()
+    await act(async () => {})
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    expect(onCommit).toHaveBeenCalledWith('Hello typed text')
+  })
+
+  test('an editor that already committed does not commit again on unmount', async () => {
+    const { onCommit, dom, unmount } = await mount('')
+    act(() => {
+      dom.editor!.commands.insertContent('Once')
+      fireEvent.keyDown(dom, { key: 'Escape' })
+    })
+    unmount()
+    await act(async () => {})
+    expect(onCommit).toHaveBeenCalledTimes(1)
+  })
+
   test('unedited Markdown with a wikilink commits byte for byte, once', async () => {
     const md = 'See [[Router A|the router]] and **this**.\n\n- one\n- two'
     const { onCommit, dom } = await mount(md)

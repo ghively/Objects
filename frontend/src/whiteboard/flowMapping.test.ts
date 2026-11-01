@@ -1,7 +1,7 @@
 import type { NodeChange } from '@xyflow/react'
 import { describe, expect, test } from 'vitest'
 import type { WhiteboardData, WhiteboardNode } from '@/api/whiteboardTypes'
-import { FLOW_EDGE_TYPE, fromFlowChange, toFlow, type FlowEdge, type FlowNode } from './flowMapping'
+import { FLOW_EDGE_TYPE, FlowProjection, fromFlowChange, toFlow, type FlowEdge, type FlowNode } from './flowMapping'
 import { board, edge, fixtureBoards, node, textBlock } from './test/boards'
 
 /** The board rebuilt from its projection: the original objects, with the flow geometry written back. */
@@ -113,5 +113,54 @@ describe('toFlow / fromFlowChange', () => {
       expect(flow.nodes).toHaveLength(5000)
     }
     expect(best).toBeLessThan(50)
+  })
+})
+
+describe('FlowProjection', () => {
+  test('keeps the FlowNode and FlowEdge of every element whose inputs did not change', () => {
+    const b = board([node({ id: 'a', blockId: 'b1' }), node({ id: 'b' })], [edge({ id: 'e', source: 'a', target: 'b' })], { b1: textBlock('hi') })
+    const p = new FlowProjection()
+    const byId = (r: { nodes: FlowNode[] }, id: string) => r.nodes.find((n) => n.id === id)!
+    const first = p.project(b, new Set(), {}, 'dark')
+    expect(first.nodes.map((n) => n.id)).toEqual(['a', 'b'])
+    expect(byId(first, 'a').data).toEqual({ node: b.nodes.a, block: b.blocks.b1, theme: 'dark' })
+
+    // Node a moved: only its FlowNode is rebuilt; b and the edge keep their identity.
+    const moved = { ...b, nodes: { ...b.nodes, a: { ...b.nodes.a, position: { x: 30, y: 0 } } } }
+    const second = p.project(moved, new Set(), {}, 'dark')
+    expect(byId(second, 'a')).not.toBe(byId(first, 'a'))
+    expect(byId(second, 'a').position).toEqual({ x: 30, y: 0 })
+    expect(byId(second, 'b')).toBe(byId(first, 'b'))
+    expect(second.edges[0]).toBe(first.edges[0])
+
+    // Selecting b rebuilds b only; measuring a rebuilds a only; the same size again rebuilds nothing.
+    const third = p.project(moved, new Set(['b']), {}, 'dark')
+    expect(byId(third, 'b')).not.toBe(byId(second, 'b'))
+    expect(byId(third, 'b').selected).toBe(true)
+    expect(byId(third, 'a')).toBe(byId(second, 'a'))
+    const fourth = p.project(moved, new Set(['b']), { a: { width: 100, height: 40 } }, 'dark')
+    expect(byId(fourth, 'a')).not.toBe(byId(third, 'a'))
+    expect(byId(fourth, 'a').measured).toEqual({ width: 100, height: 40 })
+    expect(byId(fourth, 'b')).toBe(byId(third, 'b'))
+    const again = p.project(moved, new Set(['b']), { a: { width: 100, height: 40 } }, 'dark')
+    expect(again.nodes).toEqual(fourth.nodes)
+    expect(byId(again, 'a')).toBe(byId(fourth, 'a'))
+
+    // A block edit rebuilds its node; a theme change rebuilds everything.
+    const edited = { ...moved, blocks: { b1: textBlock('changed') } }
+    const fifth = p.project(edited, new Set(['b']), { a: { width: 100, height: 40 } }, 'dark')
+    expect(byId(fifth, 'a')).not.toBe(byId(fourth, 'a'))
+    expect(byId(fifth, 'b')).toBe(byId(fourth, 'b'))
+    const sixth = p.project(edited, new Set(['b']), { a: { width: 100, height: 40 } }, 'light')
+    expect(byId(sixth, 'a')).not.toBe(byId(fifth, 'a'))
+    expect(byId(sixth, 'b')).not.toBe(byId(fifth, 'b'))
+    expect(sixth.edges[0]).not.toBe(fifth.edges[0])
+    expect(byId(sixth, 'b').data.theme).toBe('light')
+
+    // A removed node leaves the projection.
+    const fewer = { ...edited, nodes: { a: edited.nodes.a }, edges: {} }
+    const seventh = p.project(fewer, new Set(), {}, 'light')
+    expect(seventh.nodes.map((n) => n.id)).toEqual(['a'])
+    expect(seventh.edges).toEqual([])
   })
 })

@@ -2,7 +2,7 @@
  * A connector's label box at the path midpoint (the reference CSS `[data-whiteboard-edge-label]`
  * rules in `whiteboard.css`). While editing it is a one-line input over the label's Markdown
  * (our choice: Task 10's `TextBlockEditor` belongs to another lane). Enter, Escape or blur
- * commits once.
+ * commits once; so does an unmount that comes first (the edge left the viewport mid-edit).
  */
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 
@@ -48,6 +48,8 @@ function LabelInput({ initial, onCommit }: { initial: string; onCommit(text: str
   const [draft, setDraft] = useState(initial)
   const done = useRef(false)
   const ref = useRef<HTMLInputElement>(null)
+  const latest = useRef({ draft, onCommit })
+  latest.current = { draft, onCommit }
   useEffect(() => {
     const el = ref.current
     if (!el) return
@@ -57,8 +59,21 @@ function LabelInput({ initial, onCommit }: { initial: string; onCommit(text: str
   const commit = () => {
     if (done.current) return
     done.current = true
-    onCommit(draft)
+    latest.current.onCommit(latest.current.draft)
   }
+  // Unmounted before Enter, Escape or blur: commit the draft. Deferred a microtask so StrictMode's
+  // synchronous mount-unmount-mount rehearsal doesn't end the edit.
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      queueMicrotask(() => {
+        if (!mounted.current) commit()
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     e.stopPropagation()
     if (e.key === 'Enter' || e.key === 'Escape') {

@@ -1,12 +1,15 @@
 /**
  * The canvas display settings (`ui.json` key `whiteboard`, Capacities' user-level names), with
  * the defaults filled in. Reading writes nothing; `set` writes once per toggle, and on a 409
- * refetches and re-applies the toggle once (as M3's `useViewState`).
+ * refetches and re-applies the toggle once (as M3's `useViewState`). Every landed save moves the
+ * shared `useUiStore` revision forward (the server's `ui` event for it is our own echo and is
+ * dropped), so the sidebar's next `ui.json` save doesn't meet a 409.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConflictError } from '@/api/client'
 import { whiteboardApi, type WhiteboardApi } from '@/api/whiteboardClient'
 import type { WhiteboardSettings } from '@/api/whiteboardTypes'
+import { useUiStore } from '@/shell/usePinned'
 import type { ResolvedSettings, SettingKey } from './canvasTypes'
 import { DEFAULT_SETTINGS } from './model'
 
@@ -20,6 +23,12 @@ export interface WhiteboardSettingsState {
 
 export function resolveSettings(stored: WhiteboardSettings): ResolvedSettings {
   return { ...DEFAULT_SETTINGS, ...stored }
+}
+
+/** A landed settings save: the shared `ui.json` state takes the new revision and value. */
+function adoptUiRevision(settings: WhiteboardSettings, revision: string): void {
+  const s = useUiStore.getState()
+  useUiStore.setState({ ui: { ...s.ui, whiteboard: settings }, revision })
 }
 
 export function useWhiteboardSettings(client: SettingsClient = whiteboardApi): WhiteboardSettingsState {
@@ -49,8 +58,11 @@ export function useWhiteboardSettings(client: SettingsClient = whiteboardApi): W
       ref.current = { ...ref.current, stored: next }
       setStored(next)
       try {
-        const res = await client.saveSettings(next, ref.current.revision)
+        // The sidebar's saves keep the shared ui store's revision current; it is the fresher base.
+        const ui = useUiStore.getState()
+        const res = await client.saveSettings(next, ui.loaded && ui.revision ? ui.revision : ref.current.revision)
         ref.current = { stored: { ...res.settings, [key]: value }, revision: res.revision }
+        adoptUiRevision(ref.current.stored, res.revision)
       } catch (err) {
         if (!(err instanceof ConflictError)) {
           console.warn('Could not save the canvas display settings:', err)
@@ -62,6 +74,7 @@ export function useWhiteboardSettings(client: SettingsClient = whiteboardApi): W
           const res = await client.saveSettings(again, fresh.revision)
           ref.current = { stored: { ...res.settings, [key]: value }, revision: res.revision }
           setStored(ref.current.stored)
+          adoptUiRevision(ref.current.stored, res.revision)
         } catch (err2) {
           console.warn('Could not save the canvas display settings:', err2)
         }
