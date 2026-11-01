@@ -13,11 +13,11 @@ from .graphdata import graph_data
 __all__ = ["router"]
 
 
-def _display_safe(value: Any) -> Any:
+def _safe_json(value: Any) -> JSONResponse:
     # Imported lazily: server.py imports this module.
-    from .server import _display_safe as safe
+    from .server import SafeJSONResponse
 
-    return safe(value)
+    return SafeJSONResponse(value)
 
 
 def router(ctx: ApiContext) -> APIRouter:
@@ -27,6 +27,6 @@ def router(ctx: ApiContext) -> APIRouter:
     @r.get("/graph")
     def get_graph() -> JSONResponse:
         # A JSONResponse skips FastAPI's per-value encoder (100,000 link ints at 5,000 objects).
-        return JSONResponse(_display_safe(graph_data(ctx.space)))
+        return _safe_json(graph_data(ctx.space))
 
     return r

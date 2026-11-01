@@ -486,17 +486,49 @@ class SyncRequest(BaseModel):
     clientId: str | None = None
 
 
-def _display_safe(value):
-    """`value` with undecodable bytes (surrogate escapes) shown as U+FFFD, so it can be JSON."""
+def _undecodable_in(value) -> bool:
+    if isinstance(value, str):
+        return has_undecodable(value)
+    if isinstance(value, dict):
+        return any(_undecodable_in(k) or _undecodable_in(v) for k, v in value.items())
+    if isinstance(value, list):
+        return any(_undecodable_in(v) for v in value)
+    return False
+
+
+def _display_copy(value):
     if isinstance(value, str):
         if has_undecodable(value):
             return value.encode("utf-8", errors="surrogateescape").decode("utf-8", errors="replace")
         return value
     if isinstance(value, dict):
-        return {_display_safe(k): _display_safe(v) for k, v in value.items()}
+        return {_display_copy(k): _display_copy(v) for k, v in value.items()}
     if isinstance(value, list):
-        return [_display_safe(v) for v in value]
+        return [_display_copy(v) for v in value]
     return value
+
+
+def _display_safe(value):
+    """`value` with undecodable bytes (surrogate escapes) shown as U+FFFD, so it can be JSON.
+
+    Only a name from the disk (a path, a file-stem title) can hold them, so the usual
+    answer is `value` itself; a copy is made only when one does.
+    """
+    return _display_copy(value) if _undecodable_in(value) else value
+
+
+class SafeJSONResponse(JSONResponse):
+    """A `JSONResponse` encoded as it is, through `_display_safe` only when that fails.
+
+    Walking a big answer for surrogates costs as much as encoding it (audit 2026-11-01:
+    145 ms on 3 MB of rows), while UTF-8 encoding refuses them anyway: the encode is the check.
+    """
+
+    def render(self, content: Any) -> bytes:
+        try:
+            return super().render(content)
+        except UnicodeEncodeError:
+            return super().render(_display_safe(content))
 
 
 class RevealRequest(BaseModel):
@@ -936,7 +968,7 @@ def create_app(
         # A JSONResponse is encoded here, on the worker thread; a plain return would run
         # FastAPI's per-value `jsonable_encoder` on the event loop (audit 2026-11-01 B2:
         # 120 ms per request at 5,000 objects, stalling SSE and every other request).
-        return JSONResponse(_display_safe([asdict(s) for s in space.list(type or None)]))
+        return SafeJSONResponse([asdict(s) for s in space.list(type or None)])
 
     @api.get("/object")
     def get_object(path: str):
@@ -1329,7 +1361,7 @@ def create_app(
         if not from_ or not to:
             return _error(422, "A calendar range needs from and to (YYYY-MM-DD).")
         try:
-            return JSONResponse(_display_safe(space.calendar(from_, to)))  # see `list_objects`
+            return SafeJSONResponse(space.calendar(from_, to))  # see `list_objects`
         except InvalidValue as exc:
             return _error(422, str(exc))
 
@@ -1340,7 +1372,7 @@ def create_app(
             rows = space.rows(req.typeIds, req.collectionIds, req.paths, search, req.preview)
         except InvalidValue as exc:
             return _error(422, str(exc))
-        return JSONResponse(_display_safe({"rows": [asdict(r) for r in rows]}))  # see `list_objects`
+        return SafeJSONResponse({"rows": [asdict(r) for r in rows]})  # see `list_objects`
 
     @api.get("/views/{type_id}")
     def get_views(type_id: str):
