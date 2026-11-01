@@ -65,7 +65,10 @@ def link_candidates(link: str) -> list[str]:
 
 
 def _folder_of(path: str) -> str:
-    return PurePosixPath(path).parent.as_posix()
+    # `PurePosixPath(path).parent.as_posix()` for a normalised space path, without the
+    # object construction (it runs once per resolved link).
+    head, sep, _name = path.rpartition("/")
+    return head if sep else "."
 
 
 def _sort_key(s: ObjectSummary) -> tuple[bool, str, str]:
