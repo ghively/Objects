@@ -154,10 +154,56 @@ describe('FilterEditor', () => {
       elements: [{ type: 'filter', propertyId: 'odds', option: 'greater', referenceValue: 0.143 }],
     }
     render(<FilterEditor group={init} onChange={onChange} choices={propertyChoices([T])} types={[T]} collections={[]} />)
-    const value = screen.getByRole('spinbutton', { name: 'Value' })
-    expect(value).toHaveValue(14.3)
+    const value = screen.getByRole('textbox', { name: 'Value' })
+    expect(value).toHaveValue('14.3')
     fireEvent.change(value, { target: { value: '25' } })
     expect((onChange.mock.calls.at(-1)![0] as FilterGroup).elements[0]).toMatchObject({ referenceValue: 0.25 })
+  })
+
+  test('a number being typed (1., -, 1e) keeps the last value; leaving shows the value applied', async () => {
+    const T = typeDef({ id: 'deal', propertyDefinitions: [propertyDef({ id: 'amount', type: 'number', name: 'Amount' })] })
+    const onChange = vi.fn()
+    function H() {
+      const [group, setGroup] = useState<FilterGroup>({
+        type: 'filterGroup',
+        operator: 'and',
+        elements: [{ type: 'filter', propertyId: 'amount', option: 'greater', referenceValue: 3 }],
+      })
+      return (
+        <FilterEditor
+          group={group}
+          onChange={(g) => {
+            setGroup(g)
+            onChange(g)
+          }}
+          choices={propertyChoices([T])}
+          types={[T]}
+          collections={[]}
+        />
+      )
+    }
+    const user = userEvent.setup()
+    render(<H />)
+    const value = screen.getByRole('textbox', { name: 'Value' })
+    const ref = () => ((onChange.mock.calls.at(-1)![0] as FilterGroup).elements[0] as { referenceValue?: unknown }).referenceValue
+    await user.clear(value)
+    await user.type(value, '1.')
+    expect(value).toHaveValue('1.')
+    expect(ref()).toBe(1)
+    await user.type(value, '5')
+    expect(ref()).toBe(1.5)
+    await user.type(value, '-', { initialSelectionStart: 0, initialSelectionEnd: 3 })
+    expect(value).toHaveValue('-')
+    // "-" is a number being typed: the filter keeps the last value applied.
+    expect(ref()).toBe(1.5)
+    await user.type(value, '2e')
+    expect(value).toHaveValue('-2e')
+    expect(ref()).toBe(-2)
+    await user.type(value, '1')
+    expect(ref()).toBe(-20)
+    await user.type(value, 'e')
+    await user.tab()
+    expect(value).toHaveValue('-20')
   })
 
   test('shows "No eligible properties available" without properties', () => {
