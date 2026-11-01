@@ -3,7 +3,7 @@
 Snapshots live outside the space, in the per-user state dir::
 
     <state dir>/history/<sha1(space root)[:16]>/<key>/<UTC stamp>.<ext>
-    <state dir>/history/<sha1(space root)[:16]>/<key>/index.json   [{id, at, rel, files}]
+    <state dir>/history/<sha1(space root)[:16]>/<key>/index.json   [{id, at, rel, files, ...}]
 
 ``<key>`` is the object's frontmatter ``id``, else ``path-<sha1(rel)[:16]>``, so the history
 follows a rename. The rules (the plan's Global Constraints, "our rules", listed for Gene):
@@ -11,6 +11,13 @@ follows a rename. The rules (the plan's Global Constraints, "our rules", listed 
 - `snapshot` runs only from `Space.before_write` (and a restore): it keeps the file's current
   bytes when the object's newest version is older than 5 minutes or it has none (so a typing
   session is one version). At most 200 versions per object; the oldest go first.
+- An object's version is stored cheaply (audit 2026-11-01: a hub rename kept 214 full copies,
+  1-4 MB): as a delta against the object's previous version when the two share all but a
+  small middle (a relink, a type rename, a short edit) - the entry's ``delta`` holds the
+  previous version's id, the common prefix and suffix lengths, the new middle (base64) and
+  the sha1 of the whole, so no file at all; otherwise as ``<stamp>.md.gz`` (gzip). A delta
+  chain is at most 16 long; pruning a version another one is a delta of first stores that
+  one whole. Older plain ``<stamp>.md`` files are still read.
 - A whiteboard's version holds its ``.md`` and both sidecars (whichever exist), whichever of
   the three is being written. Boards are restore-only (no preview text).
 - Reading (`versions`, `content`) writes nothing and creates no folder.
@@ -21,6 +28,8 @@ follows a rename. The rules (the plan's Global Constraints, "our rules", listed 
 
 from __future__ import annotations
 
+import base64
+import gzip
 import hashlib
 import json
 import logging
@@ -63,6 +72,59 @@ class _IndexChanged(Exception):
 
 
 _INDEX_RETRIES = 5
+_GZ = ".md.gz"
+_MAX_CHAIN = 16
+"""Deltas in a row before a version is stored whole again (bounds a read's work)."""
+_DELTA_MAX = 0.5
+"""A delta is kept only when its middle is under this share of the version's bytes."""
+
+
+def _gzip(data: bytes) -> bytes:
+    return gzip.compress(data, compresslevel=6, mtime=0)
+
+
+def _common_prefix(a: bytes, b: bytes) -> int:
+    """Length of the common prefix of ``a`` and ``b`` (binary search over slice compares)."""
+    lo, hi = 0, min(len(a), len(b))
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if a[:mid] == b[:mid]:
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo
+
+
+def _common_suffix(a: bytes, b: bytes, limit: int) -> int:
+    """Length (at most ``limit``) of the common suffix of ``a`` and ``b``."""
+    lo, hi = 0, limit
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if a[len(a) - mid :] == b[len(b) - mid :]:
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo
+
+
+def _make_delta(base: bytes, data: bytes) -> tuple[int, int, bytes]:
+    """(prefix, suffix, middle): ``data == base[:prefix] + middle + base[len(base) - suffix:]``."""
+    prefix = _common_prefix(base, data)
+    suffix = _common_suffix(base, data, min(len(base), len(data)) - prefix)
+    return prefix, suffix, data[prefix : len(data) - suffix]
+
+
+def _apply_delta(base: bytes, delta: dict[str, Any]) -> bytes | None:
+    """The version a delta entry describes, or None when it doesn't check out (sha1)."""
+    try:
+        prefix, suffix = int(delta["prefix"]), int(delta["suffix"])
+        middle = base64.b64decode(delta["mid"], validate=True)
+    except (KeyError, TypeError, ValueError):
+        return None
+    if prefix < 0 or suffix < 0 or prefix + suffix > len(base):
+        return None
+    data = base[:prefix] + middle + base[len(base) - suffix :]
+    return data if hashlib.sha1(data).hexdigest() == delta.get("sha1") else None
 
 
 def _sha1(text: str) -> str:
@@ -295,9 +357,12 @@ class HistoryStore:
                         content = data if path == rel else _read(self.root / path)
                     if content is not None:
                         files[ext] = content
-            else:
-                files[".md"] = data
             key = keys[0]
+            delta: dict[str, Any] | None = None
+            if kind != "whiteboard":
+                delta = self._delta_for(key, [e for k, e in entries if k == key], data)
+                if delta is None:
+                    files[_GZ] = _gzip(data)
             folder = self.dir / key
             folder.mkdir(parents=True, exist_ok=True)
             base = now.astimezone(UTC).strftime("%Y%m%dT%H%M%S") + f"{now.microsecond // 1000:03d}Z"
@@ -310,7 +375,13 @@ class HistoryStore:
             for ext, content in files.items():
                 atomic_write(folder / (vid + ext), content)
                 names.append(vid + ext)
-            entry = {"id": vid, "at": _iso(now), "rel": md_rel, "kind": kind, "files": names}
+            entry: dict[str, Any] = {
+                "id": vid, "at": _iso(now), "rel": md_rel, "kind": kind, "files": names
+            }
+            if kind != "whiteboard":
+                entry["size"] = len(data)
+            if delta is not None:
+                entry["delta"] = delta
             self._update_index(key, lambda index: [*index, entry])
             self._prune(md_rel, keys, len(entries) + 1)
             return vid
@@ -329,7 +400,12 @@ class HistoryStore:
         for key, ids in drop.items():
             folder = self.dir / key
             index = self._load_index(key)
-            self._update_index(key, lambda now, ids=ids: [e for e in now if e["id"] not in ids])
+            whole = self._materialise_dependents(key, index, ids)
+
+            def keep(now: list[dict[str, Any]], ids=ids, whole=whole) -> list[dict[str, Any]]:
+                return [whole.get(e["id"], e) for e in now if e["id"] not in ids]
+
+            self._update_index(key, keep)
             for e in index:
                 if e["id"] in ids:
                     for name in e.get("files", []):
@@ -338,7 +414,130 @@ class HistoryStore:
                         except OSError:
                             pass
 
+    def _materialise_dependents(
+        self, key: str, index: list[dict[str, Any]], dropped: set[str]
+    ) -> dict[str, dict[str, Any]]:
+        """Store whole (``.md.gz``) every kept version whose delta chain reaches a dropped one.
+
+        Returns id -> the entry to keep in its place.
+        """
+        by_id = {e["id"]: e for e in index}
+        memo: dict[str, bytes] = {}
+        out: dict[str, dict[str, Any]] = {}
+        for e in index:
+            if e["id"] in dropped or not isinstance(e.get("delta"), dict):
+                continue
+            if not self._chain(e, by_id) & dropped:
+                continue
+            data = self._md(key, e, by_id, memo)
+            if data is None:
+                continue  # already unreadable: dropping its base changes nothing
+            name = e["id"] + _GZ
+            atomic_write(self.dir / key / name, _gzip(data))
+            whole = {k: v for k, v in e.items() if k != "delta"}
+            whole["files"] = [name]
+            out[e["id"]] = whole
+        return out
+
+    @staticmethod
+    def _chain(entry: dict[str, Any], by_id: dict[str, dict[str, Any]]) -> set[str]:
+        """The ids of the versions ``entry``'s delta chain rests on (not ``entry`` itself)."""
+        seen: set[str] = set()
+        e = entry
+        while isinstance(e.get("delta"), dict) and len(seen) <= MAX_VERSIONS:
+            base = e["delta"].get("base")
+            if not isinstance(base, str) or base in seen:
+                break
+            seen.add(base)
+            nxt = by_id.get(base)
+            if nxt is None:
+                break
+            e = nxt
+        return seen
+
+    def _delta_for(
+        self, key: str, own: list[dict[str, Any]], data: bytes
+    ) -> dict[str, Any] | None:
+        """A delta of ``data`` against ``key``'s newest version, when that is small; else None."""
+        if not own:
+            return None
+        base = own[-1]
+        if self._is_board_entry(base):
+            return None
+        by_id = {e["id"]: e for e in own}
+        if len(self._chain(base, by_id)) + 1 >= _MAX_CHAIN:
+            return None
+        base_data = self._md(key, base, by_id)
+        if base_data is None:
+            return None
+        prefix, suffix, middle = _make_delta(base_data, data)
+        if len(middle) >= _DELTA_MAX * len(data):
+            return None
+        return {
+            "base": base["id"],
+            "prefix": prefix,
+            "suffix": suffix,
+            "mid": base64.b64encode(middle).decode("ascii"),
+            "sha1": hashlib.sha1(data).hexdigest(),
+        }
+
     # -- reading --------------------------------------------------------------
+
+    def _stored_md(self, key: str, entry: dict[str, Any]) -> bytes | None:
+        """A whole stored ``.md`` version: ``<id>.md.gz`` or (older) ``<id>.md``."""
+        for name in entry.get("files", []):
+            if not isinstance(name, str):
+                continue
+            if name == entry["id"] + _GZ:
+                packed = _read(self.dir / key / PurePosixPath(name).name)
+                try:
+                    return gzip.decompress(packed) if packed is not None else None
+                except (OSError, EOFError, ValueError):
+                    return None
+            if name == entry["id"] + ".md":
+                return _read(self.dir / key / PurePosixPath(name).name)
+        return None
+
+    def _md(
+        self,
+        key: str,
+        entry: dict[str, Any],
+        by_id: dict[str, dict[str, Any]] | None = None,
+        memo: dict[str, bytes] | None = None,
+    ) -> bytes | None:
+        """The ``.md`` bytes of a version, following its delta chain (None when unreadable).
+
+        ``by_id`` is ``key``'s index by id and ``memo`` id -> bytes already rebuilt, when
+        the caller reads several versions.
+        """
+        memo = memo if memo is not None else {}
+        chain: list[dict[str, Any]] = []
+        e = entry
+        while True:
+            if e["id"] in memo:
+                data: bytes | None = memo[e["id"]]
+                break
+            if not isinstance(e.get("delta"), dict):
+                data = self._stored_md(key, e)
+                break
+            chain.append(e)
+            if len(chain) > MAX_VERSIONS:
+                return None
+            if by_id is None:
+                by_id = {x["id"]: x for x in self._load_index(key)}
+            nxt = by_id.get(e["delta"].get("base"))
+            if nxt is None:
+                return None
+            e = nxt
+        if data is None:
+            return None
+        memo[e["id"]] = data
+        for d in reversed(chain):
+            data = _apply_delta(data, d["delta"])
+            if data is None:
+                return None
+            memo[d["id"]] = data
+        return data
 
     def _find(self, md_rel: str, version_id: str) -> tuple[str, dict[str, Any], int]:
         for number, (key, entry) in enumerate(self._entries(md_rel), start=1):
@@ -347,6 +546,8 @@ class HistoryStore:
         raise VersionNotFound(version_id)
 
     def _file(self, key: str, entry: dict[str, Any], ext: str) -> bytes | None:
+        if ext == ".md":
+            return self._md(key, entry)
         for name in entry.get("files", []):
             if isinstance(name, str) and name == entry["id"] + ext:
                 return _read(self.dir / key / PurePosixPath(name).name)
@@ -357,15 +558,21 @@ class HistoryStore:
         md_rel = _md_of(PurePosixPath(rel).as_posix())
         with self._lock:
             entries = self._entries(md_rel)
+            by_key: dict[str, dict[str, dict[str, Any]]] = {}
+            for key, entry in entries:
+                by_key.setdefault(key, {})[entry["id"]] = entry
+            memos: dict[str, dict[str, bytes]] = {}
             out = []
             for number, (key, entry) in enumerate(entries, start=1):
-                size = 0
-                for name in entry.get("files", []):
-                    try:
-                        size += (self.dir / key / PurePosixPath(str(name)).name).stat().st_size
-                    except OSError:
-                        pass
-                md = self._file(key, entry, ".md")
+                md = self._md(key, entry, by_key[key], memos.setdefault(key, {}))
+                size = entry.get("size")
+                if not isinstance(size, int):  # a version kept before sizes were recorded
+                    size = 0
+                    for name in entry.get("files", []):
+                        try:
+                            size += (self.dir / key / PurePosixPath(str(name)).name).stat().st_size
+                        except OSError:
+                            pass
                 kind = entry.get("kind") if entry.get("kind") in ("object", "whiteboard") else (
                     "whiteboard" if any(str(n).endswith((BOARD_SUFFIX, INK_SUFFIX)) for n in entry.get("files", [])) else "object"
                 )
