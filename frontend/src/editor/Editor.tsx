@@ -147,7 +147,7 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict, con
   // Leaving an object (or unmounting) with a pending save: save it under its own path.
   useEffect(() => {
     return () => {
-      void autosave.flush(path) // no-op when nothing changed since the last load/save
+      void autosave.leave(path) // no-op when nothing changed since the last load/save
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path])
