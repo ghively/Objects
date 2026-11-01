@@ -90,6 +90,41 @@ def test_new_id_unique_slug(space_dir: Path):
     assert held.new_id("Inbox") == "inbox-3"
 
 
+@pytest.mark.parametrize(
+    "name",
+    ["日本語", "ü", "데이터", "ⅷ", "ａｂｃ", "é" * 150, "x" * 300, "!!!"],
+    ids=["cjk", "umlaut", "hangul", "roman-numeral", "fullwidth", "long-accented", "long-ascii", "symbols"],
+)
+def test_store_accepts_every_id_slug_makes(space_dir: Path, name: str):
+    """Audit 2026-11-01 #3: a non-Latin collection or query name used to 500 at `path`."""
+    from objectapp.typedefs import slug
+
+    store = _store(space_dir)
+    cid = store.new_id(name)
+    assert cid == slug(name)
+    rev = store.write(cid, {"id": cid, "name": name}, "")
+    assert store.read(cid) == ({"id": cid, "name": name}, rev)
+    assert [i for i, *_ in store.list()] == [cid]
+
+
+def test_store_rejects_unsafe_and_over_long_ids(space_dir: Path):
+    store = _store(space_dir)
+    for bad in ["", ".", "..", "a..", "a/b", "a\\b", "-a", "_a", "a b", "x" * 101, "日本語/x"]:
+        with pytest.raises(ValueError):
+            store.path(bad)
+    assert store.path("x" * 100).name == "x" * 100 + ".json"
+
+
+def test_collection_with_a_non_latin_name_is_created(space_dir: Path):
+    space, c, _pub = _client(space_dir)
+    with c:
+        r = c.post("/api/collections", json={"name": "日本語"})
+        assert r.status_code == 201, r.text
+        assert r.json()["id"] == "日本語"
+        assert (space_dir / ".object" / "collections" / "日本語.json").is_file()
+        assert [x.name for x in Space(space_dir).list_collections()] == ["日本語"]
+
+
 def test_get_views_defaults_without_writing(space_dir: Path):
     _space, c, _pub = _client(space_dir)
     with c:
