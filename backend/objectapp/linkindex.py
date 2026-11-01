@@ -273,6 +273,13 @@ class LinkIndex:
             body = raw.of.body
             body_targets = [t for t, _s, _e in wikilink_spans(body)] if "[[" in body else []
             prop_targets = []
+            # A whiteboard template's board is relinked like any board's (M6).
+            from .whiteboardindex import board_for_index
+            from .whiteboardtrash import board_links
+
+            board, _revision = board_for_index(self._space, path)
+            if board is not None:
+                body_targets = [*body_targets, *board_links(board)]
         src = raw.of.frontmatter_src or ""
         fm_targets = wikilink_targets(src) if "[[" in src else set()
         tags = ex.tags if ex is not None else ()  # a tag's rename re-resolves its holders
