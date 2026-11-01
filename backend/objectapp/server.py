@@ -1407,6 +1407,8 @@ def create_app(
             c = space.create_collection(req.name, req.typeIds, req.icon)
         except InvalidValue as exc:
             return _error(422, str(exc))
+        except ValueError:  # `JsonStore.path` refused the id made from the name
+            return _error(422, "This name can't be used as a file name. Try a different name.")
         announce(ChangeEvent("collections", c.id, None, origin=req.clientId))
         return JSONResponse(_display_safe(c.to_api(space.collection_revision(c.id))), status_code=201)
 
@@ -1462,6 +1464,8 @@ def create_app(
             q = space.create_query(req.name, req.definition, req.view)
         except InvalidValue as exc:
             return _error(422, str(exc))
+        except ValueError:  # `JsonStore.path` refused the id made from the name
+            return _error(422, "This name can't be used as a file name. Try a different name.")
         announce(ChangeEvent("queries", q.id, None, origin=req.clientId))
         return JSONResponse(_display_safe(q.to_api(space.query_revision(q.id))), status_code=201)
 

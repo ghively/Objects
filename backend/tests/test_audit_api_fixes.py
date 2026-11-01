@@ -174,3 +174,33 @@ def test_long_object_path_is_4xx_on_every_route(client: TestClient, monkeypatch:
     assert bad == {}
     # Unknown paths in a rows request are skipped, not an error.
     assert client.post("/api/rows", json={"paths": [p]}).json() == {"rows": []}
+
+
+# -- #3 (route half): a non-Latin collection or query name never 500s ------------------
+
+NON_LATIN = ["日本語", "ü", "데이터"]
+
+
+@pytest.mark.parametrize("name", NON_LATIN)
+def test_non_latin_collection_and_query_names_never_500(client: TestClient, m8_space_dir: Path, name: str):
+    # Lane B1a makes `JsonStore` accept such ids (201); until merged the route answers 422.
+    collection = client.post("/api/collections", json={"name": name, "typeIds": ["page"]})
+    query = client.post("/api/queries", json={"name": name, "definition": {}, "view": {}})
+    assert collection.status_code in (201, 422), collection.text
+    assert query.status_code in (201, 422), query.text
+    for r, folder in ((collection, "collections"), (query, "queries")):
+        if r.status_code == 201:
+            file = m8_space_dir / ".object" / folder / f"{r.json()['id']}.json"
+            assert file.is_file() and file.read_text(encoding="utf-8").strip().startswith("{")
+        else:
+            assert "name" in r.json()["detail"]
+
+
+@pytest.mark.xfail(reason="needs lane B1a: a Unicode id regex in JsonStore", strict=False)
+@pytest.mark.parametrize("name", NON_LATIN)
+def test_non_latin_collection_and_query_names_are_created(client: TestClient, m8_space_dir: Path, name: str):
+    collection = client.post("/api/collections", json={"name": name, "typeIds": ["page"]})
+    query = client.post("/api/queries", json={"name": name, "definition": {}, "view": {}})
+    assert (collection.status_code, query.status_code) == (201, 201)
+    assert (m8_space_dir / ".object" / "collections" / f"{collection.json()['id']}.json").is_file()
+    assert (m8_space_dir / ".object" / "queries" / f"{query.json()['id']}.json").is_file()
