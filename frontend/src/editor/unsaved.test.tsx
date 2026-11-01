@@ -216,4 +216,17 @@ describe('the recovery dialog', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(keptUnsaved(PATH)).toBeNull()
   })
+
+  test('"Version on disk" follows a change made while the dialog is open', async () => {
+    keepUnsaved(PATH, KEPT)
+    await openPage()
+    const dialog = await screen.findByRole('dialog', { name: 'Recover unsaved changes' })
+    onDisk = detail(THEIRS, 'v2')
+    act(() => {
+      for (const cb of [...listeners]) cb({ kind: 'changed', path: PATH, version: 'v2' })
+    })
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText('Version on disk')).toHaveTextContent(/edited in VS Code/),
+    )
+  })
 })

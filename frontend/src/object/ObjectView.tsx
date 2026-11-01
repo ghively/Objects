@@ -180,6 +180,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   /** Set while "Save changes" is writing the kept text. */
   const [savingKept, setSavingKept] = useState(false)
   const savingKeptRef = useRef(false)
+  /** Mirrors `recovery` for `reconcile`. */
+  const recoveryRef = useRef(recovery)
+  recoveryRef.current = recovery
   // Subscribe so the type chip and properties pick up types once the index loads.
   useLinkIndex((s) => s.revision)
 
@@ -250,6 +253,17 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         h?.reload(theirs.body, theirs.version)
         setDetail(theirs)
         adoptVersion(theirs.version)
+        // The recovery dialog compares the kept text with what is on disk: show the
+        // new version, or close it when the file now holds the kept text.
+        if (recoveryRef.current) {
+          const kept = keptUnsaved(path)
+          if (kept === null || kept === theirs.body) {
+            if (kept !== null) dropUnsaved(path)
+            setRecovery(null)
+          } else {
+            setRecovery({ kept, onDisk: theirs.body, error: null })
+          }
+        }
         unblockRef.current()
         return
       }
