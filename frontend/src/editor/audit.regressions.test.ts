@@ -10,7 +10,7 @@ import { afterEach, describe, expect, test } from 'vitest'
 import { formatAnnotation, makeOption, parseAnnotation } from './annotations'
 import { editorExtensions, loadBody, serializeBody } from './document'
 import { blockSelectionRange, blocksSource, deleteBlocks, duplicateBlocks, selectBlocks, turnInto } from './extensions/blockSelection'
-import { isWikilinkTarget, wikilinkMarkdown } from './extensions/wikilink'
+import { isWikilinkTarget, wikilinkMarkdown, wikilinkTargetFor } from './extensions/wikilink'
 import { moveBlockTo } from './handles/dragMove'
 import { codeFence } from './preserve'
 
@@ -559,6 +559,11 @@ describe('wikilink targets (audit 2026-11-01)', () => {
 
   test('a label may hold a pipe', () => {
     expect(wikilinkMarkdown('A', 'l|m')).toBe('[[A|l|m]]')
+  })
+
+  test('wikilinkTargetFor links an object by path when its title cannot be a target', () => {
+    expect(wikilinkTargetFor({ title: 'Plain', path: 'Pages/Plain.md' })).toBe('Plain')
+    expect(wikilinkTargetFor({ title: 'A|B', path: 'Pages/A.md' })).toBe('Pages/A')
   })
 
   test('isWikilinkTarget tells the pickers when to pass the path form', () => {
