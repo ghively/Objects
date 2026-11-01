@@ -81,7 +81,13 @@ from .spaceconfig import space_fields
 from .recurrence import week_start_of
 from .taskhook import TaskResult, on_status_change
 from .linkindex import LinkIndex
-from .relink import relink_frontmatter, replace_wikilinks, rewrite_tag_lists, wikilink_targets
+from .relink import (
+    code_ranges,
+    relink_frontmatter,
+    replace_wikilinks,
+    rewrite_tag_lists,
+    wikilink_targets,
+)
 from .resolver import Resolver, link_candidates
 from .roles import role_of
 from .templates import TemplateError, creation_variable, expand_title, resolve_date_variable
@@ -2229,7 +2235,10 @@ class Space:
         def edit(of: ObjectFile, _fm: dict) -> ObjectFile | None:
             src = set_keys(of.frontmatter_src or "", {"title": new_title})
             body = of.body
+            code = code_ranges(body)  # a `# Old title` line inside a fence is not the heading
             for m in _HEADING_RE.finditer(body):
+                if any(s <= m.start() < e for s, e in code):
+                    continue
                 if m.group(1).strip() == old_title:
                     body = body[: m.start()] + f"# {new_title}" + body[m.end() :]
                     break
