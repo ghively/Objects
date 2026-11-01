@@ -520,7 +520,7 @@ export function DataView(props: DataViewProps) {
               ))}
             </div>
           )}
-          {total > visible && (
+          {total > visible && layout !== 'kanban' && (
             <button
               type="button"
               onClick={() => setVisible((v) => v + LOAD_PAGE)}
