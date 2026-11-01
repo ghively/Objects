@@ -411,6 +411,14 @@ describe('minor drift on edited lines', () => {
     expect(breaks).toBe(1)
   })
 
+  test('editing one line of a nested blockquote keeps the other lines (audit 2026-11-01)', () => {
+    const editor = headless('> a\n> > b\n> c\n')
+    append(editor, 'a', 'Z')
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe('> aZ\n>\n> > b\n> c\n')
+    expect(out.reloaded).toEqual([['blockquote', 'aZb\nc']])
+  })
+
   test('an edited blockquote line keeps its marker', () => {
     const editor = headless('> a\n> b\n')
     append(editor, 'b', 'X')

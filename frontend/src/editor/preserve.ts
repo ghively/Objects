@@ -451,7 +451,7 @@ export function preserveBlock(
   } else if ((kind === 'table' || kind === 'list') && origBody !== '') {
     lines = kind === 'table' ? preserveTable(origLines, regenLines) : preserveList(origLines, regenLines)
   } else if (origBody !== '' && (origLines.length > 1 || regenLines.length > 1)) {
-    lines = preserveLines(origLines, regenLines, baseline)
+    lines = preserveLines(origLines, regenLines, baseline, kind)
   } else {
     lines = regenLines
   }
@@ -516,7 +516,7 @@ function preserveFenced(origLines: string[], regenLines: string[], baseline?: st
  */
 const QUOTE_PREFIX = /^(?:[ \t]{0,3}>[ \t]?)*/
 
-function preserveLines(origLines: string[], regenLines: string[], baseline?: string): string[] {
+function preserveLines(origLines: string[], regenLines: string[], baseline?: string, kind?: string): string[] {
   const baseLines = baseline === undefined ? null : splitTail(toLF(baseline))[0].split('\n')
   // Against the baseline (the serializer's own output) lines compare exactly,
   // so an edit adding only trailing blanks or a hard break counts; against
@@ -533,13 +533,11 @@ function preserveLines(origLines: string[], regenLines: string[], baseline?: str
     }
     return alignLines(origLines, regenLines, baseLines, regenLines, restyle)
   }
-  return alignLines(
-    origLines,
-    regenLines,
-    origLines.map((l) => l.trimEnd()),
-    regenLines.map((l) => l.trimEnd()),
-    (line) => line,
-  )
+  // A quote the serializer lays out on other lines than the original (a nested
+  // quote's lazy line `> c` written `> > c`, a `>` line added between blocks):
+  // lines compare by their text, so the untouched ones keep their markers.
+  const key = kind === 'blockquote' ? (l: string) => l.replace(QUOTE_PREFIX, '').trimEnd() : (l: string) => l.trimEnd()
+  return alignLines(origLines, regenLines, origLines.map(key), regenLines.map(key), (line) => line)
 }
 
 /**
