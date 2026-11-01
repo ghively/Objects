@@ -224,6 +224,24 @@ describe('useBoard', () => {
     expect(client.board).not.toHaveBeenCalled()
   })
 
+  test('flush against a failing server tries once, not a burst (unmount, tab switch, pagehide)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const client = mockWhiteboardApi(board([node({ id: 'a', position: { x: 0, y: 0 } })]), 'rev-1')
+    client.saveBoard.mockRejectedValue(new ApiError(500, 'boom'))
+    const hook = renderHook(() => useBoard(PATH, client))
+    await waitFor(() => expect(hook.result.current.status).toBe('ready'))
+    act(() => hook.result.current.store.getState().actions.nudge(30, 0, ['a']))
+    await advance(SAVE_DELAY_MS + 10) // the scheduled save fails; a retry is pending
+    const before = client.saveBoard.mock.calls.length
+    expect(before).toBe(1)
+    await act(async () => hook.result.current.flush())
+    expect(client.saveBoard.mock.calls.length - before).toBe(1)
+    hook.unmount()
+    await advance(50)
+    expect(client.saveBoard.mock.calls.length - before).toBeLessThanOrEqual(2)
+  })
+
   test('the same board open twice in this window (page and peek) sees its own saves', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const client = mockWhiteboardApi(board([node({ id: 'a', position: { x: 0, y: 0 } })]), 'rev-1')

@@ -215,9 +215,11 @@ export function useInkDoc(
       clearTimeout(st.timer)
       st.timer = null
     }
-    // Wait for the save in flight, then send what is still pending (a few tries if saves fail).
+    // Wait for the save in flight, then send what is still pending. One failed attempt ends it
+    // (its retry timer, or the next change, tries again): no burst of PUTs at a server that is down.
     for (let i = 0; i < 5 && (st.inFlight || (st.pending && !st.readOnly)); i++) {
       await run()
+      if (st.failures > 0) return
       if (st.timer) {
         clearTimeout(st.timer)
         st.timer = null
