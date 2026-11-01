@@ -1,6 +1,6 @@
 import '@/whiteboard/test/flowEnv'
 import { act, render } from '@testing-library/react'
-import { ReactFlow, ReactFlowProvider } from '@xyflow/react'
+import { ReactFlow, ReactFlowProvider, useViewport } from '@xyflow/react'
 import { useState } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { InkLayer } from './InkLayer'
@@ -230,6 +230,46 @@ describe('InkLayer', () => {
     const s = onStrokesChange.mock.calls[0][0][0] as InkStroke
     expect(s.points.every(([x, y]) => x <= 30 && y === 0)).toBe(true)
     expect(container.querySelector('[data-ink-live]')).toBeNull()
+  })
+
+  test('a two-finger pinch while the pen tool is armed zooms the canvas and draws nothing', () => {
+    const seen: { zoom: number }[] = []
+    function Probe() {
+      seen.push(useViewport())
+      return null
+    }
+    const onStrokesChange = vi.fn()
+    const utils = render(
+      <div style={{ width: 1280, height: 800 }}>
+        <ReactFlowProvider>
+          <ReactFlow nodes={[]} edges={[]} minZoom={0.1} maxZoom={4}>
+            <InkLayer strokes={[]} tool={DEFAULT_INK} readOnly={false} panning={false} onStrokesChange={onStrokesChange} onWheel={vi.fn()} />
+            <Probe />
+          </ReactFlow>
+        </ReactFlowProvider>
+      </div>,
+    )
+    const el = utils.container.querySelector('[data-ink-capture]')!
+    fire(el, 'pointerdown', { pointerType: 'touch', pointerId: 1, x: 100, y: 100 })
+    fire(el, 'pointermove', { pointerType: 'touch', pointerId: 1, x: 110, y: 110 })
+    expect(utils.container.querySelector('[data-ink-live]')).not.toBeNull()
+    // The second finger makes it a pinch: the first finger's stroke is dropped, unsaved.
+    fire(el, 'pointerdown', { pointerType: 'touch', pointerId: 2, x: 300, y: 300 })
+    expect(utils.container.querySelector('[data-ink-live]')).toBeNull()
+    fire(el, 'pointermove', { pointerType: 'touch', pointerId: 1, x: 80, y: 80 })
+    fire(el, 'pointermove', { pointerType: 'touch', pointerId: 2, x: 320, y: 320 })
+    fire(el, 'pointermove', { pointerType: 'touch', pointerId: 1, x: 60, y: 60 })
+    fire(el, 'pointerup', { pointerType: 'touch', pointerId: 1, x: 60, y: 60 })
+    fire(el, 'pointerup', { pointerType: 'touch', pointerId: 2, x: 320, y: 320 })
+    expect(onStrokesChange).not.toHaveBeenCalled()
+    expect(utils.container.querySelector('[data-ink-live]')).toBeNull()
+    // The fingers' distance grew from 190*sqrt(2) (at the pinch's start) to 260*sqrt(2): the canvas zoomed in by that ratio.
+    expect(seen.at(-1)!.zoom).toBeCloseTo(260 / 190, 4)
+    // The second finger lifting leaves nothing armed: a new finger draws again.
+    fire(el, 'pointerdown', { pointerType: 'touch', pointerId: 3, x: 10, y: 10 })
+    fire(el, 'pointermove', { pointerType: 'touch', pointerId: 3, x: 40, y: 10 })
+    fire(el, 'pointerup', { pointerType: 'touch', pointerId: 3, x: 40, y: 10 })
+    expect(onStrokesChange).toHaveBeenCalledTimes(1)
   })
 
   test('a palm already down does not block the pen: the pen draws and the palm is dropped', () => {
