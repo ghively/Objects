@@ -72,7 +72,7 @@ import type { Placement, ResolvedSettings, ZoomCommand } from './canvasTypes'
 import { ObjectPicker } from './chrome'
 import { mayCarryObject, readDroppedObject } from './dnd'
 import { MarkerDefs, edgeTypes } from './edges'
-import { toFlow, type FlowEdge, type FlowNode } from './flowMapping'
+import { FlowProjection, type FlowEdge, type FlowNode } from './flowMapping'
 import { QuickCreateMenu, type QuickCreatePick } from './chrome/QuickCreateMenu'
 import { WeblinkInput } from './chrome/WeblinkInput'
 import { mediaHost, type WhiteboardHost } from './host'
@@ -197,19 +197,12 @@ function CanvasInner({ boardKey, settings, host, ink, inkReadOnly, renderChrome,
   const themeName = useThemeName()
   const dark = themeName === 'dark' || themeName === 'darkDimmed'
   const selected = useMemo(() => new Set(selection), [selection])
-  const flow = useMemo(() => toFlow(board, selected), [board, selected])
-  const nodes = useMemo(
-    () =>
-      flow.nodes.map((n) => ({
-        ...n,
-        ...(measured[n.id] ? { measured: measured[n.id] } : {}),
-        data: { ...n.data, theme: themeName },
-      })),
-    [flow.nodes, measured, themeName],
-  )
-  const edges = useMemo(
-    () => flow.edges.map((e) => (e.data ? { ...e, data: { ...e.data, theme: themeName } } : e)),
-    [flow.edges, themeName],
+  // Cached per element: a board change rebuilds only the FlowNodes/FlowEdges whose inputs changed,
+  // so the other nodes' memoized components don't re-render.
+  const projection = useRef(new FlowProjection())
+  const { nodes, edges } = useMemo(
+    () => projection.current.project(board, selected, measured, themeName),
+    [board, selected, measured, themeName],
   )
 
   const panning = spaceHeld || tool === 'hand'
