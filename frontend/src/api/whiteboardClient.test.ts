@@ -139,6 +139,20 @@ describe('whiteboard client', () => {
     expect(seen[0].source).toBe(whiteboardApi)
   })
 
+  test('test a settings save announces a local ui event, as every other ui.json write', async () => {
+    vi.stubGlobal('EventSource', class extends EventTarget { close() {} })
+    const seen: ChangeEvent[] = []
+    const off = api.onChange((e) => seen.push(e))
+    try {
+      vi.stubGlobal('fetch', respond(200, { ui: { whiteboard: { isShowingDots: false } }, revision: 'u2' }))
+      await whiteboardApi.saveSettings({ isShowingDots: false }, 'u1')
+      await new Promise((r) => setTimeout(r, 0))
+    } finally {
+      off()
+    }
+    expect(seen.map((e) => [e.kind, e.path, e.version, e.origin])).toEqual([['ui', 'ui.json', 'u2', CLIENT_ID]])
+  })
+
   test('test a board save that stamped the .md announces changed to this window', async () => {
     vi.stubGlobal('EventSource', class extends EventTarget { close() {} })
     const seen: ChangeEvent[] = []

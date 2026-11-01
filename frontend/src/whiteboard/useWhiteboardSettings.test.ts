@@ -1,10 +1,27 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
 import { RevisionConflictError } from '@/api/client'
+import { resetPinned, useUiStore } from '@/shell/usePinned'
 import { mockWhiteboardApi } from './test/mockWhiteboardApi'
 import { useWhiteboardSettings } from './useWhiteboardSettings'
 
 describe('useWhiteboardSettings', () => {
+  beforeEach(() => resetPinned())
+
+  test("a landed save moves the shared ui.json revision forward, so the sidebar's next save is not a 409", async () => {
+    const client = mockWhiteboardApi()
+    useUiStore.setState({ ui: { pinned: [], sections: [], allNotesLayout: 'list' }, revision: 'ui-1', loaded: true })
+    const { result } = renderHook(() => useWhiteboardSettings(client))
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => result.current.set('isShowingDots', false))
+    expect(client.saveSettings).toHaveBeenCalledWith({ isShowingDots: false }, 'ui-1')
+    expect(useUiStore.getState().revision).toBe('ui-2')
+    expect(useUiStore.getState().ui.whiteboard).toEqual({ isShowingDots: false })
+    // A sidebar save landed meanwhile (the store holds its revision): the next toggle builds on it.
+    useUiStore.setState({ revision: 'ui-3' })
+    await act(async () => result.current.set('isEngineeringMode', true))
+    expect(client.saveSettings).toHaveBeenLastCalledWith({ isShowingDots: false, isEngineeringMode: true }, 'ui-3')
+  })
   test('settings toggle writes ui once; defaults when absent', async () => {
     const client = mockWhiteboardApi()
     const { result } = renderHook(() => useWhiteboardSettings(client))
