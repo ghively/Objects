@@ -340,6 +340,20 @@ def unique_path(root: Path, folder: str, stem: str, same_as: str | None = None) 
         n += 1
 
 
+_MAX_COMPONENT = 255
+
+
+def _component_too_long(part: str) -> bool:
+    """Whether one path component is longer than the file system allows.
+
+    NTFS allows 255 UTF-16 code units per name (a character outside the BMP is two);
+    Linux and macOS file systems allow 255 bytes (of UTF-8).
+    """
+    if os.name == "nt":
+        return len(part.encode("utf-16-le", "surrogatepass")) > 2 * _MAX_COMPONENT
+    return len(part.encode("utf-8", "surrogateescape")) > _MAX_COMPONENT
+
+
 def _same_file(a: Path, b: Path) -> bool:
     """Whether ``a`` and ``b`` name one file (e.g. two spellings on a case-insensitive disk)."""
     try:
@@ -1630,7 +1644,7 @@ class Space:
             raise ValueError(f"Path is outside the space: {path!r}")
         if is_ignored(rel) or rel.name.startswith(".") or rel.suffix.lower() != ".md":
             raise ValueError(f"Not an object path: {path!r}")
-        if any(len(part.encode("utf-8", "surrogateescape")) > 255 for part in rel.parts):
+        if any(_component_too_long(part) for part in rel.parts):
             raise ValueError(f"Path component too long: {path!r}")
         try:
             full = (self.root / rel).resolve()
