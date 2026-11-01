@@ -478,3 +478,38 @@ def test_versions_keeps_one_rebuilt_version_in_memory(tmp_path):
     assert len(versions) == 100
     assert {v["title"] for v in versions} == {"Hub"}
     assert peak < 8_000_000, peak  # a few rebuilt copies, not one per version
+
+
+def test_a_corrupt_gzip_version_reads_as_unreadable(tmp_path):
+    """End review 2: a `.md.gz` whose deflate stream is damaged raised `zlib.error` (a 500)."""
+    import gzip
+    import zlib
+
+    from objectapp.history import VersionNotFound
+
+    root = tmp_path / "space"
+    (root / "Pages").mkdir(parents=True)
+    store = HistoryStore(root)
+    rel = "Pages/Hub.md"
+    data = b"---\nid: 01JC8M80000000000000000098\ntitle: Hub\n---\n" + bytes(range(256)) * 40
+    vid = store.snapshot(rel, data, T0)
+    (root / rel).write_bytes(data)
+    path = next(store.dir.iterdir()) / f"{vid}.md.gz"
+    packed = path.read_bytes()
+    for i in range(10, len(packed) - 8):  # the first flip that breaks the deflate stream itself
+        bad = bytearray(packed)
+        bad[i] ^= 0xFF
+        try:
+            gzip.decompress(bytes(bad))
+        except zlib.error:
+            break
+        except (OSError, EOFError, ValueError):
+            continue
+    else:
+        pytest.fail("no single flipped byte gives zlib.error")
+    path.write_bytes(bytes(bad))
+    versions = store.versions(rel)
+    assert [v["id"] for v in versions] == [vid]
+    assert versions[0]["title"] is None  # like any version whose bytes are gone
+    with pytest.raises(VersionNotFound):
+        store.content(rel, vid)
