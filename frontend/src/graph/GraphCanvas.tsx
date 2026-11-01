@@ -83,6 +83,19 @@ type SigmaClick = { node: string; event?: { original?: MouseEvent | TouchEvent }
 type CanvasGraph = Graph<NodeAttrs, EdgeAttrs>
 const newGraph = (): CanvasGraph => new Graph<NodeAttrs, EdgeAttrs>({ type: 'undirected', multi: false })
 
+/** Paint every node of `graph` with the current theme's value of its theme colour. */
+function recolor(graph: CanvasGraph): void {
+  const values = new Map<ThemeColor, string>()
+  graph.updateEachNodeAttributes(
+    (_key, attrs) => {
+      let v = values.get(attrs.themeColor)
+      if (v === undefined) values.set(attrs.themeColor, (v = colorValue(attrs.themeColor)))
+      return { ...attrs, color: v }
+    },
+    { attributes: ['color'] },
+  )
+}
+
 export function GraphCanvas({
   data,
   visible,
@@ -108,6 +121,9 @@ export function GraphCanvas({
   highlight.current = highlightPath ?? null
   // Colours sigma draws with: concrete values read from the theme's tokens, refreshed on a theme change.
   const themeName = useThemeName()
+  /** The theme now (a build compares it with the one it started in). */
+  const themeRef = useRef(themeName)
+  themeRef.current = themeName
   const colorsRef = useRef<ReturnType<typeof canvasColors> | null>(null)
   if (!colorsRef.current) colorsRef.current = canvasColors()
 
@@ -233,6 +249,7 @@ export function GraphCanvas({
     const ctrl = new AbortController()
     const { signal } = ctrl
     const big = visible.nodes.length > BUILD_SLICE
+    const builtTheme = themeRef.current
     void (async () => {
       const next = newGraph()
       const keys = new Map<string, string>()
@@ -304,8 +321,10 @@ export function GraphCanvas({
       if (signal.aborted) return
       if (edges.length) next.import({ edges })
 
-      // On screen in one step: sigma indexes the whole graph once.
+      // On screen in one step: sigma indexes the whole graph once. The theme may have changed
+      // while a big graph was laid out off screen (the repaint only reached the graph shown then).
       const show = () => {
+        if (themeRef.current !== builtTheme) recolor(next)
         graphRef.current = next
         keyByPath.current = keys
         const sigma = sigmaRef.current
@@ -348,15 +367,7 @@ export function GraphCanvas({
     firstTheme.current = themeName
     const colors = canvasColors()
     colorsRef.current = colors
-    const values = new Map<ThemeColor, string>()
-    graphRef.current!.updateEachNodeAttributes(
-      (_key, attrs) => {
-        let v = values.get(attrs.themeColor)
-        if (v === undefined) values.set(attrs.themeColor, (v = colorValue(attrs.themeColor)))
-        return { ...attrs, color: v }
-      },
-      { attributes: ['color'] },
-    )
+    recolor(graphRef.current!)
     const sigma = sigmaRef.current
     if (!sigma) return
     sigma.setSetting('labelColor', { color: colors.label })
