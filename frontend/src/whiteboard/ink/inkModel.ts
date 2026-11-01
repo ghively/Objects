@@ -270,6 +270,122 @@ export function segments(points: readonly (readonly number[])[]): [readonly numb
 }
 
 /**
+ * The eraser path on a coarse grid (cells four radii wide over the path's bounds; each segment,
+ * grown by the radius, is filed in every cell it covers), so a stroke's segments and points are
+ * tested against the few eraser segments near them instead of all of them. The plain double loop
+ * took 1.4 s for 2,000 strokes of 100 points against a 150-point eraser path, freezing the canvas.
+ */
+export class EraserIndex {
+  /** The path's bounds grown by the radius: a stroke outside them can't be hit. */
+  readonly bounds: Bounds
+  private readonly r2: number
+  private readonly cell: number
+  private readonly cols: number
+  private readonly rows: number
+  private readonly segs: [readonly number[], readonly number[]][]
+  /** Per segment, its bounds grown by the radius (minX, minY, maxX, maxY). */
+  private readonly segBounds: Float64Array
+  /** Per cell (column-major), the segments filed in it. */
+  private readonly cells: (number[] | undefined)[]
+  /** Per segment, the id of the last query that tested it (each is tested once per query). */
+  private readonly seen: Int32Array
+  private query = 0
+
+  constructor(eraserPath: readonly (readonly number[])[], radiusFlow: number) {
+    const r = Math.max(radiusFlow, 0)
+    this.r2 = r * r
+    this.cell = Math.max(4 * r, 1)
+    const b = strokeBounds({ points: eraserPath as [number, number, number][] })
+    this.bounds = { minX: b.minX - r, minY: b.minY - r, maxX: b.maxX + r, maxY: b.maxY + r }
+    this.cols = eraserPath.length ? Math.floor((this.bounds.maxX - this.bounds.minX) / this.cell) + 1 : 0
+    this.rows = eraserPath.length ? Math.floor((this.bounds.maxY - this.bounds.minY) / this.cell) + 1 : 0
+    this.cells = new Array<number[] | undefined>(this.cols * this.rows)
+    this.segs = eraserPath.length ? segments(eraserPath) : []
+    this.segBounds = new Float64Array(this.segs.length * 4)
+    this.seen = new Int32Array(this.segs.length)
+    this.segs.forEach(([c, d], i) => {
+      const minX = Math.min(c[0], d[0]) - r
+      const minY = Math.min(c[1], d[1]) - r
+      const maxX = Math.max(c[0], d[0]) + r
+      const maxY = Math.max(c[1], d[1]) + r
+      this.segBounds.set([minX, minY, maxX, maxY], i * 4)
+      const x0 = this.col(minX)
+      const x1 = this.col(maxX)
+      const y0 = this.row(minY)
+      const y1 = this.row(maxY)
+      for (let cx = x0; cx <= x1; cx++) {
+        for (let cy = y0; cy <= y1; cy++) {
+          const at = cx * this.rows + cy
+          const list = this.cells[at]
+          if (list) list.push(i)
+          else this.cells[at] = [i]
+        }
+      }
+    })
+  }
+
+  private col(x: number): number {
+    return Math.min(this.cols - 1, Math.max(0, Math.floor((x - this.bounds.minX) / this.cell)))
+  }
+
+  private row(y: number): number {
+    return Math.min(this.rows - 1, Math.max(0, Math.floor((y - this.bounds.minY) / this.cell)))
+  }
+
+  /** Whether a stroke with these bounds comes anywhere near the path. */
+  overlaps(b: Bounds): boolean {
+    const e = this.bounds
+    return !(b.minX > e.maxX || b.maxX < e.minX || b.minY > e.maxY || b.maxY < e.minY)
+  }
+
+  /**
+   * Whether an eraser segment within the radius of the box `minX..maxX, minY..maxY` passes `test`
+   * (the exact distance check); each candidate is tested once, and the first pass ends the query.
+   */
+  private any(minX: number, minY: number, maxX: number, maxY: number, test: (c: readonly number[], d: readonly number[]) => boolean): boolean {
+    const e = this.bounds
+    if (minX > e.maxX || maxX < e.minX || minY > e.maxY || maxY < e.minY) return false
+    const q = ++this.query
+    const sb = this.segBounds
+    const x1 = this.col(maxX)
+    const y0 = this.row(minY)
+    const y1 = this.row(maxY)
+    for (let cx = this.col(minX); cx <= x1; cx++) {
+      for (let cy = y0; cy <= y1; cy++) {
+        const list = this.cells[cx * this.rows + cy]
+        if (!list) continue
+        for (let k = 0; k < list.length; k++) {
+          const i = list[k]
+          if (this.seen[i] === q) continue
+          this.seen[i] = q
+          const o = i * 4
+          if (sb[o] > maxX || sb[o + 2] < minX || sb[o + 1] > maxY || sb[o + 3] < minY) continue
+          const [c, d] = this.segs[i]
+          if (test(c, d)) return true
+        }
+      }
+    }
+    return false
+  }
+
+  /** Whether the path passes within the radius of the segment ab. */
+  nearSegment(a: readonly number[], b: readonly number[]): boolean {
+    return this.any(
+      Math.min(a[0], b[0]),
+      Math.min(a[1], b[1]),
+      Math.max(a[0], b[0]),
+      Math.max(a[1], b[1]),
+      (c, d) => segSegDist2(a, b, c, d) <= this.r2,
+    )
+  }
+
+  /** Whether the path passes within the radius of the point. */
+  nearPoint(x: number, y: number): boolean {
+    return this.any(x, y, x, y, (c, d) => pointSegDist2(x, y, c[0], c[1], d[0], d[1]) <= this.r2)
+  }
+}
+
+/**
  * The ids of every stroke whose points pass within `radiusFlow` (canvas units; the screen radius
  * divided by the zoom) of the eraser path. Whole strokes only.
  */
@@ -280,21 +396,18 @@ export function hitStrokes(
 ): Set<string> {
   const hit = new Set<string>()
   if (eraserPath.length === 0) return hit
-  const eb = strokeBounds({ points: eraserPath as [number, number, number][] })
-  const r2 = radiusFlow * radiusFlow
-  const eraserSegs = segments(eraserPath)
+  const index = new EraserIndex(eraserPath, radiusFlow)
   for (const s of strokes) {
-    if (s.points.length === 0) continue
-    const b = strokeBounds(s)
-    if (b.minX - radiusFlow > eb.maxX || b.maxX + radiusFlow < eb.minX) continue
-    if (b.minY - radiusFlow > eb.maxY || b.maxY + radiusFlow < eb.minY) continue
-    const strokeSegs = segments(s.points)
-    outer: for (const [a, bb] of strokeSegs) {
-      for (const [c, d] of eraserSegs) {
-        if (segSegDist2(a, bb, c, d) <= r2) {
-          hit.add(s.id)
-          break outer
-        }
+    if (s.points.length === 0 || !index.overlaps(strokeBounds(s))) continue
+    const pts = s.points
+    if (pts.length === 1) {
+      if (index.nearSegment(pts[0], pts[0])) hit.add(s.id)
+      continue
+    }
+    for (let i = 0; i + 1 < pts.length; i++) {
+      if (index.nearSegment(pts[i], pts[i + 1])) {
+        hit.add(s.id)
+        break
       }
     }
   }
