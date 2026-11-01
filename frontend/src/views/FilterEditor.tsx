@@ -6,6 +6,7 @@ import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useLinkIndex } from '@/links/linkIndex'
 import { cn } from '@/lib/utils'
+import { zonedToday } from '@/lib/zonedTime'
 import { DatePicker } from '@/properties/DatePicker'
 import { LabelPill } from '@/properties/LabelMenu'
 import { RelationPicker } from '@/properties/RelationPicker'
@@ -460,7 +461,7 @@ function ValueEditor({
           label="Date"
           value={mode}
           onChange={(v) => {
-            if (v === 'exactDate') set({ exactDate: new Date().toISOString().slice(0, 10) })
+            if (v === 'exactDate') set({ exactDate: zonedToday() })
             else if (v) set({ relative: v as never })
           }}
           options={DATE_RELATIVE_OPTIONS.map((o) => ({ value: o.key, label: o.label }))}
