@@ -222,3 +222,70 @@ def test_forms_resolve_like_reference(links_space_dir: Path, link: str):
     space = Space(links_space_dir)
     for fp in _from_paths(space):
         assert space.resolve(link, fp) == reference_resolve(space, link, fp)
+
+
+def test_names_change_updates_the_resolver_in_place_instead_of_rebuilding(
+    links_space_dir: Path, monkeypatch
+):
+    # Audit 2026-11-01 P6: a create, rename, alias edit or delete moves the resolver along;
+    # the result is what a fresh build would give.
+    from objectapp.resolver import Resolver
+
+    space = Space(links_space_dir)
+    space.resolve("Ada", None)  # the first build
+    builds: list[int] = []
+    real_build = Resolver.build
+
+    def spy(summaries, aliases):
+        builds.append(1)
+        return real_build(summaries, aliases)
+
+    monkeypatch.setattr(Resolver, "build", staticmethod(spy))
+
+    def fresh() -> Resolver:
+        aliases = {rel: _str_list(raw.fm.get("aliases")) for rel, raw in space._raw.items()}
+        return real_build(list(space._summaries.values()), aliases)
+
+    def same_as_fresh() -> None:
+        r, f = space._current_resolver(), fresh()
+        assert (r._paths, r._title, r._alias, r._ci) == (f._paths, f._title, f._alias, f._ci)
+        _assert_same(space)
+
+    src = "Pages/Analytical Engine.md"
+    rel = "People/Charles Babbage.md"
+    space.update_properties(rel, {"aliases": ["Babbage"]}, space.cached_version(rel))
+    assert space.resolve("Babbage", src) == rel
+    same_as_fresh()
+    renamed = space.rename_object(rel, "Charles B", space.cached_version(rel)).path
+    assert space.resolve("Charles B", src) == renamed
+    assert space.resolve("Charles Babbage", src) is None
+    same_as_fresh()
+    path, _version = space.create_object("page", "Charles B")
+    assert space.resolve("Charles B", src) == path
+    same_as_fresh()
+    space.delete_object(path, space.cached_version(path))
+    assert space.resolve("Charles B", src) == renamed
+    same_as_fresh()
+    # An external edit of `createdAt` (the watcher's rescan) reorders a same-title bucket.
+    ada = links_space_dir / "People" / "Ada Lovelace.md"
+    text = ada.read_text(encoding="utf-8")
+    assert "createdAt: " in text
+    ada.write_text(
+        "\n".join(
+            "createdAt: 2030-01-01T00:00:00.000Z" if ln.startswith("createdAt: ") else ln
+            for ln in text.split("\n")
+        ),
+        encoding="utf-8",
+    )
+    space.rescan_file("People/Ada Lovelace.md")
+    assert space.resolve("Ada Lovelace", None) == "Archive/Ada Lovelace.md"
+    same_as_fresh()
+    assert builds == []
+    # The space can still say what changed since the index last looked.
+    assert "charles b" in space._names_since(0)
+    assert space._names_since(space._names_rev) == frozenset()
+    # Without summaries around a change, it can't: the resolver is rebuilt once.
+    space._names_changed()
+    assert space._names_since(0) is None
+    space.resolve("Ada", None)
+    assert builds == [1]

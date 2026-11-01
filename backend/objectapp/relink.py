@@ -23,6 +23,7 @@ __all__ = [
     "relink_frontmatter",
     "replace_wikilinks",
     "rewrite_tag_lists",
+    "segments",
     "wikilink_spans",
     "wikilink_targets",
 ]
@@ -38,15 +39,23 @@ def _segments(text: str) -> Iterator[tuple[int, int, bool]]:
 
     Code is a fenced block (from its opening fence line to the closing one, or
     to the end) or an inline code span (a run of backticks up to the next run
-    of the same length on the same line).
+    of the same length on the same line). Plain text between them is one span,
+    however many lines it covers; a text with no backtick and no ``~~~`` is one
+    plain span (the common case, answered without looking at its lines).
     """
+    if "`" not in text and "~~~" not in text:
+        if text:
+            yield 0, len(text), False
+        return
     pos = 0
     fence: str | None = None
     code_start = 0
+    plain_start: int | None = None
     for line in text.splitlines(keepends=True):
         start, end = pos, pos + len(line)
         pos = end
-        m = _FENCE_RE.match(line)
+        # A fence line holds three backticks or tildes: the regex only runs for those.
+        m = _FENCE_RE.match(line) if ("```" in line or "~~~" in line) else None
         if fence is not None:
             closes = m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence)
             if closes and not line[m.end() :].strip():
@@ -54,12 +63,29 @@ def _segments(text: str) -> Iterator[tuple[int, int, bool]]:
                 fence = None
             continue
         if m and not (m.group(1)[0] == "`" and "`" in line[m.end() :]):
+            if plain_start is not None:
+                yield plain_start, start, False
+                plain_start = None
             fence = m.group(1)
             code_start = start
             continue
+        if "`" not in line:
+            if plain_start is None:
+                plain_start = start
+            continue
+        if plain_start is not None:
+            yield plain_start, start, False
+            plain_start = None
         yield from _inline_segments(line, start)
+    if plain_start is not None:
+        yield plain_start, pos, False
     if fence is not None:
         yield code_start, pos, True
+
+
+def segments(text: str) -> list[tuple[int, int, bool]]:
+    """`_segments` as a list, to hand to `wikilink_spans` and `code_ranges` for one pass."""
+    return list(_segments(text))
 
 
 def _inline_segments(line: str, offset: int) -> Iterator[tuple[int, int, bool]]:
@@ -91,16 +117,19 @@ def wikilink_targets(text: str) -> set[str]:
     return out
 
 
-def wikilink_spans(text: str) -> list[tuple[str, int, int]]:
+def wikilink_spans(
+    text: str, segs: list[tuple[int, int, bool]] | None = None
+) -> list[tuple[str, int, int]]:
     """``(target, start, end)`` of each link outside code, in order.
 
     ``target`` is the text before any ``#`` or ``|``, as written; the span covers
-    the whole ``[[…]]``, or ``![[…]]`` for an embed.
+    the whole ``[[…]]``, or ``![[…]]`` for an embed. ``segs`` is `segments` of
+    ``text`` when the caller already has it.
     """
     out: list[tuple[str, int, int]] = []
     if "[[" not in text:
         return out
-    for s, e, code in _segments(text):
+    for s, e, code in segs if segs is not None else _segments(text):
         if code:
             continue
         for m in _LINK_RE.finditer(text, s, e):
@@ -111,9 +140,11 @@ def wikilink_spans(text: str) -> list[tuple[str, int, int]]:
     return out
 
 
-def code_ranges(text: str) -> list[tuple[int, int]]:
+def code_ranges(
+    text: str, segs: list[tuple[int, int, bool]] | None = None
+) -> list[tuple[int, int]]:
     """``(start, end)`` of each fenced code block and inline code span, in order."""
-    return [(s, e) for s, e, code in _segments(text) if code]
+    return [(s, e) for s, e, code in (segs if segs is not None else _segments(text)) if code]
 
 
 def replace_wikilinks(text: str, should_rewrite: Callable[[str], bool], new_target: str) -> str:

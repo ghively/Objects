@@ -1,5 +1,6 @@
 """The link index: wikilink spans, backlinks, property links, tags, freshness (M5 Task 2)."""
 
+import itertools
 import os
 import time
 from pathlib import Path
@@ -191,3 +192,138 @@ def test_link_index_5000_objects_50000_links_under_2s(
         space.links.backlinks(sample)
     per = (time.perf_counter() - t0) / 100
     assert per < 0.001 * SLACK, per
+
+
+def test_names_change_reresolves_only_the_sources_that_mention_the_name(
+    links_space_dir: Path, monkeypatch
+):
+    # Audit 2026-11-01 P6: a rename re-resolves the links written to the old or new name,
+    # not every link in the space.
+    for i in range(30):
+        (links_space_dir / "Pages" / f"Other {i}.md").write_bytes(
+            b"---\ntype: 'Page'\ntitle: Other %d\n---\n\nSee [[Ada Lovelace]].\n" % i
+        )
+    space = Space(links_space_dir)
+    space.links.backlinks(ADA)  # built
+    resolved: list[str] = []
+    real_one = LinkIndex._resolve_one
+
+    def spy(self, path, tag_paths):
+        resolved.append(path)
+        return real_one(self, path, tag_paths)
+
+    def never(self):
+        raise AssertionError("a full re-resolve")
+
+    monkeypatch.setattr(LinkIndex, "_resolve_one", spy)
+    monkeypatch.setattr(LinkIndex, "_resolve_all", never)
+    before = set(space.links.backlinks(BABBAGE))
+    result = space.rename_object(BABBAGE, "Charles B", space.cached_version(BABBAGE))
+    assert set(space.links.backlinks(result.path)) == before
+    assert space.links.backlinks(BABBAGE) == []
+    assert not any(p.startswith("Pages/Other ") for p in resolved), resolved
+    assert len(resolved) < 30
+    # A new object taking a linked name re-resolves the linkers of that name only.
+    resolved.clear()
+    path, _v = space.create_object("page", "Charles B")
+    assert ENGINE in space.links.backlinks(path)
+    assert ENGINE in resolved and not any(p.startswith("Pages/Other ") for p in resolved)
+
+
+def test_type_save_reextracts_only_that_types_members(links_space_dir: Path, monkeypatch):
+    # Audit 2026-11-01 P5: a `types` change naming the type re-extracts its members only.
+    import copy
+
+    from objectapp.typemodel import type_revision
+
+    space = Space(links_space_dir)
+    space.links.backlinks(ADA)  # built
+    calls: list[str] = []
+    real = LinkIndex._extract
+
+    def spy(self, path):
+        calls.append(path)
+        return real(self, path)
+
+    monkeypatch.setattr(LinkIndex, "_extract", spy)
+    t = copy.deepcopy(space.type_by_id("person"))
+    t.description = "People we read about"
+    space.save_type(t, type_revision(space.root, "person"))
+    assert space.links.link_keys(BABBAGE, ADA) == (False, ["manager"])
+    members = {s.path for s in space.list("person")}
+    assert set(calls) == members, calls
+    # A change that names no type still re-extracts everything.
+    calls.clear()
+    space._types_changed()
+    space.links.backlinks(ADA)
+    assert len(calls) == len(space.links._sources)
+
+
+def test_segments_fast_paths_keep_the_code_ranges():
+    # Audit 2026-11-01 B4: plain text is one span; the lines are only walked for backticks.
+    from objectapp.relink import segments
+
+    plain = "See [[A]] and [[B]].\nMore text\n\nAnd [[C]].\n"
+    assert segments(plain) == [(0, len(plain), False)]
+    assert wikilink_spans(plain) == wikilink_spans(plain, segments(plain))
+    assert [t for t, _s, _e in wikilink_spans(plain)] == ["A", "B", "C"]
+    assert segments("") == []
+
+    text = (
+        "Intro [[A]]\nline two\n"
+        "```\n[[Not]]\n```\n"
+        "Plain `[[Nope]]` here [[B]]\n"
+        "~~~\n[[Tilde]]\n~~~\n"
+        "Tail [[C]]\n"
+    )
+    segs = segments(text)
+    assert [text[s:e] for s, e, code in segs if code] == [
+        "```\n[[Not]]\n```\n",
+        "`[[Nope]]`",
+        "~~~\n[[Tilde]]\n~~~\n",
+    ]
+    assert code_ranges(text) == code_ranges(text, segs) == [(s, e) for s, e, c in segs if c]
+    assert [t for t, _s, _e in wikilink_spans(text, segs)] == ["A", "B", "C"]
+    # The spans cover the whole text, in order, without gaps or overlaps.
+    assert segs[0][0] == 0 and segs[-1][1] == len(text)
+    assert all(a[1] == b[0] for a, b in itertools.pairwise(segs))
+    # An unclosed fence runs to the end; a fence with a backtick after it is inline code.
+    assert code_ranges("a\n```\n[[x]]\n") == [(2, 12)]
+    assert wikilink_spans("``` [[A]] ```\n") == []
+
+
+def test_date_tokens_skip_bodies_without_a_time_tag_and_take_shared_code_ranges():
+    from objectapp.linkindex import count_date_tokens
+
+    assert count_date_tokens("<b>bold</b> and [[A]]\n") == {}
+    body = (
+        'Due <time datetime="2026-10-27">2026-10-27</time>.\n'
+        '```\n<TIME datetime="2026-10-28">x</TIME>\n```\n'
+        '<Time datetime="2026-10-27">again</Time>\n'
+    )
+    assert count_date_tokens(body) == {"2026-10-27": 2}
+    assert count_date_tokens(body, code_ranges(body)) == {"2026-10-27": 2}
+    assert count_date_tokens(body, []) == {"2026-10-27": 2, "2026-10-28": 1}
+
+
+def test_extract_walks_each_body_once(links_space_dir: Path, monkeypatch):
+    from objectapp import relink
+
+    rel = "Pages/Analytical Engine.md"
+    (links_space_dir / rel).write_bytes(
+        b"---\ntype: 'Page'\ntitle: Analytical Engine\n---\n\n"
+        b"See [[Ada Lovelace]] and `[[Charles Babbage]]`.\n"
+        b'Due <time datetime="2026-10-27">2026-10-27</time>.\n'
+    )
+    space = Space(links_space_dir)
+    walks: list[str] = []
+    real = relink._segments
+
+    def spy(text):
+        walks.append(text)
+        return real(text)
+
+    monkeypatch.setattr(relink, "_segments", spy)
+    ex = space.links._extract(rel)
+    assert ex.body == ["Ada Lovelace"] and ex.tokens == {"2026-10-27": 1}
+    assert len(walks) == 1

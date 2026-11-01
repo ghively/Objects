@@ -215,6 +215,22 @@ def test_rename_keeps_alias_and_heading_suffix(space_dir: Path):
     )
 
 
+def test_rename_leaves_a_heading_inside_a_code_block_alone(space_dir: Path):
+    # Audit 2026-11-01: a `# Alpha` shell comment in a fence is not the title heading.
+    page = space_dir / "Pages" / "Alpha.md"
+    page.write_bytes(
+        b"---\ntype: 'Page'\ntitle: Alpha\n---\n\n"
+        b"```sh\n# Alpha\necho hi\n```\n\nIntro `# Alpha` text.\n\n# Alpha\n\nText\n"
+    )
+    space = Space(space_dir)
+    result = space.rename_object("Pages/Alpha.md", "Beta", _version(space, "Pages/Alpha.md"))
+
+    body = (space_dir / result.path).read_text(encoding="utf-8").split("---\n", 2)[2]
+    assert "```sh\n# Alpha\necho hi\n```" in body
+    assert "Intro `# Alpha` text." in body
+    assert body.endswith("\n# Beta\n\nText\n")
+
+
 @pytest.mark.parametrize(
     ("title", "stem"),
     [("Ada [x]", "Ada x"), ("Ada #1", "Ada 1"), ("Ada|B", "Ada"), ("Ada: K's #1", "Ada")],
@@ -316,17 +332,31 @@ def test_readonly_referrer_reported_in_skipped(space_dir: Path):
 
 
 def _external_writes(monkeypatch, target: Path, times: int) -> list[bytes]:
-    real = space_mod.atomic_write
+    """Change `target` on disk right before each of the space's next `times` writes to it.
+
+    `_write` syncs a temp file (`_write_temp`) and replaces after a version re-check;
+    `_write_exact` goes through `atomic_write`: both entry points are patched.
+    """
     written: list[bytes] = []
 
-    def patched(path, data, check=None):
+    def external(path) -> None:
         if Path(path) == target and len(written) < times:
             ext = target.read_bytes() + f"external {len(written)}\n".encode()
             target.write_bytes(ext)
             written.append(ext)
-        return real(path, data, check=check)
 
-    monkeypatch.setattr(space_mod, "atomic_write", patched)
+    real_temp, real_atomic = space_mod._write_temp, space_mod.atomic_write
+
+    def temp(path, data):
+        external(path)
+        return real_temp(path, data)
+
+    def atomic(path, data, check=None):
+        external(path)
+        return real_atomic(path, data, check=check)
+
+    monkeypatch.setattr(space_mod, "_write_temp", temp)
+    monkeypatch.setattr(space_mod, "atomic_write", atomic)
     return written
 
 
@@ -439,3 +469,40 @@ def test_rename_route_and_events(space_dir: Path):
             json={"path": "Pages/Nope.md", "title": "X", "baseVersion": "0" * 64},
         )
         assert r.status_code == 404
+
+
+def test_rename_checks_only_the_files_the_link_index_says_mention_the_name(
+    links_space_dir: Path, monkeypatch
+):
+    # Audit 2026-11-01 P4: candidates come from the link index, not a scan of every file.
+    for i in range(40):
+        (links_space_dir / "Pages" / f"Bystander {i}.md").write_bytes(
+            b"---\ntype: 'Page'\ntitle: Bystander %d\n---\n\nSee [[Ada Lovelace]].\n" % i
+        )
+    space = Space(links_space_dir)
+    space.links.backlinks(ADA)  # the index is built once, before the rename
+    scanned: list[str] = []
+    real = space_mod.wikilink_targets
+
+    def spy(text: str):
+        scanned.append(text)
+        return real(text)
+
+    monkeypatch.setattr(space_mod, "wikilink_targets", spy)
+    babbage = "People/Charles Babbage.md"
+    result = space.rename_object(babbage, "Charles B", space.cached_version(babbage))
+
+    assert result.relinked and result.path == "People/Charles B.md"
+    assert all("Charles Babbage" in t or "Charles B" in t for t in scanned), len(scanned)
+    assert len(scanned) < 40
+    # Every link that reached it still does, after the index caught up.
+    assert set(space.links.backlinks(result.path)) >= set(result.relinked) - {result.path}
+
+
+def test_rename_relinks_a_template_that_links_to_the_object(links_space_dir: Path):
+    tpl = links_space_dir / "Templates" / "Pages" / "Linking template.md"
+    assert b"[[Ada Lovelace]]" in tpl.read_bytes()
+    space = Space(links_space_dir)
+    result = space.rename_object(ADA, "Ada King", space.cached_version(ADA))
+    assert "Templates/Pages/Linking template.md" in result.relinked
+    assert b"[[Ada King]]" in tpl.read_bytes()
