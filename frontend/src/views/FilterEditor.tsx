@@ -1,5 +1,5 @@
 // The filter popover's body: nested AND/OR rows, each a property, an operator and a value editor.
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { Collection, EntityRef, Filter, FilterGroup, FilterReference, PropertyDef, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
@@ -277,6 +277,51 @@ function FilterRow({
   )
 }
 
+/** `n` times 10^`by`, without the binary rounding of a multiplication (0.143 → 14.3). */
+function shift(n: number, by: number): number {
+  const [mantissa, exp] = String(n).split('e')
+  return Number(`${mantissa}e${Number(exp ?? 0) + by}`)
+}
+
+/** A whole number as typed: digits, one point, an exponent. */
+const FULL_NUMBER = /^\s*-?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?\s*$/i
+/** A number being typed: `-`, `1.`, `.`, `1e`, `1e-`. */
+const NUMBER_PREFIX = /^\s*-?\d*\.?\d*(e[-+]?\d*)?\s*$/i
+
+/**
+ * A filter's number. The text is kept as typed: a complete number applies at once, an empty
+ * field clears the value, and a number still being typed (`-`, `1.`, `1e`) keeps the last value
+ * applied. Leaving the field shows the value applied.
+ */
+function NumberValue({ value, onChange }: { value: number | undefined; onChange(next: number | undefined): void }) {
+  const shown = value === undefined ? '' : String(value)
+  const [text, setText] = useState(shown)
+  const focused = useRef(false)
+  useEffect(() => {
+    if (!focused.current) setText(shown)
+  }, [shown])
+  return (
+    <input
+      aria-label="Value"
+      inputMode="decimal"
+      value={text}
+      aria-invalid={!NUMBER_PREFIX.test(text) || undefined}
+      onFocus={() => (focused.current = true)}
+      onChange={(e) => {
+        const raw = e.target.value
+        setText(raw)
+        if (raw.trim() === '') onChange(undefined)
+        else if (FULL_NUMBER.test(raw)) onChange(Number(raw))
+      }}
+      onBlur={() => {
+        focused.current = false
+        setText(shown)
+      }}
+      className={cn(SELECT, 'w-28')}
+    />
+  )
+}
+
 function MultiPick({
   label,
   items,
@@ -358,20 +403,10 @@ function ValueEditor({
   if (kind === 'number') {
     // A percentage stores the fraction (0.25): its filter value is typed and shown in percent (25).
     const pct = (choice.def as PropertyDef).options?.numberFormat?.type === 'percentage'
-    const shift = (n: number, by: number) => {
-      const [mantissa, exp] = String(n).split('e')
-      return Number(`${mantissa}e${Number(exp ?? 0) + by}`)
-    }
     return (
-      <input
-        aria-label="Value"
-        type="number"
-        value={typeof ref === 'number' ? (pct ? shift(ref, 2) : ref) : ''}
-        onChange={(e) => {
-          const n = e.target.value === '' ? undefined : Number(e.target.value)
-          set(n === undefined || Number.isNaN(n) ? undefined : pct ? shift(n, -2) : n)
-        }}
-        className={cn(SELECT, 'w-28')}
+      <NumberValue
+        value={typeof ref === 'number' ? (pct ? shift(ref, 2) : ref) : undefined}
+        onChange={(n) => set(n === undefined ? undefined : pct ? shift(n, -2) : n)}
       />
     )
   }
