@@ -383,6 +383,42 @@ def occurrences(
     return out
 
 
+def scheduled_days(
+    rule: RepeatRule,
+    current: DateLike,
+    start: date,
+    end: date,
+    tz: tzinfo,
+    limit: int = 100_000,
+) -> list[date] | None:
+    """The local days of ``scheduled_between(rule, current, start, end, tz, limit=limit)``
+    for a fixed-pattern rule (every N days or weeks, every weekday), counted without
+    building a date per step; None for any other rule, and for a history reaching more
+    than `_MAX_STEPS` // 2 days back from `current` (where the walk back stops early).
+
+    A timed date's day is taken to stay the same day at each step, as `_jump_to_before` does.
+    """
+    interval = _plain_interval_days(rule)
+    weekday = rule.on is None and rule.unit == "weekday"
+    if interval is None and not weekday:
+        return None
+    if end < start or limit <= 0:
+        return []
+    cur = _local_day(current, tz).toordinal()
+    if cur - start.toordinal() > _MAX_STEPS // 2:
+        return None
+    until = rule.until_date
+    hi = min(end, until).toordinal() if until is not None else end.toordinal()
+    lo = start.toordinal()
+    if interval is not None:
+        first = cur + -((cur - lo) // interval) * interval  # the first day >= lo on the grid
+        ords: range | list[int] = range(first, hi + 1, interval)
+    else:
+        # date.fromordinal(n).weekday() == (n + 6) % 7; the current day counts on a weekend.
+        ords = [n for n in range(lo, hi + 1) if (n + 6) % 7 < 5 or n == cur]
+    return [date.fromordinal(n) for n in ords[:limit]]
+
+
 def scheduled_between(
     rule: RepeatRule,
     current: DateLike,
