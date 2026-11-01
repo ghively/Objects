@@ -43,11 +43,11 @@ def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse({"detail": message}, status_code=status)
 
 
-def _display_safe(value):
+def _safe_json(value) -> JSONResponse:
     # Imported lazily: server.py imports this module.
-    from .server import _display_safe as safe
+    from .server import SafeJSONResponse
 
-    return safe(value)
+    return SafeJSONResponse(value)
 
 
 def router(ctx: ApiContext) -> APIRouter:
@@ -72,7 +72,7 @@ def router(ctx: ApiContext) -> APIRouter:
             data = references(space, ctx.search, rel, related_limit=relatedLimit)
         except KeyError:
             return _error(404, f"No object at {path!r}")
-        return JSONResponse(_display_safe(data))
+        return _safe_json(data)
 
     @r.post("/references/link")
     def post_link(req: LinkMentionRequest):
