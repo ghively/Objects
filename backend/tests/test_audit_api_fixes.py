@@ -223,6 +223,30 @@ def test_image_upload_refuses_empty_and_over_limit(client: TestClient, m8_space_
     assert (m8_space_dir / "Attachments" / "ok.png").read_bytes() == PNG
 
 
+# -- B2: the bulk routes encode their JSON on the worker thread -------------------------
+
+
+def test_bulk_routes_skip_fastapi_encoder(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    """`list_objects`, `get_calendar` and `post_rows` return a `JSONResponse` (as `api_graph`
+    does), so FastAPI's `jsonable_encoder` never runs on the event loop for them."""
+    import fastapi.routing
+
+    def boom(*_a, **_k):
+        raise AssertionError("jsonable_encoder ran on the event loop")
+
+    plain = client.get("/api/objects").json()
+    monkeypatch.setattr(fastapi.routing, "jsonable_encoder", boom)
+    objects = client.get("/api/objects")
+    calendar = client.get("/api/calendar", params={"from": "2026-10-01", "to": "2026-10-31"})
+    rows = client.post("/api/rows", json={"typeIds": ["task"]})
+    assert (objects.status_code, calendar.status_code, rows.status_code) == (200, 200, 200)
+    assert objects.json() == plain
+    assert "days" in calendar.json() and rows.json()["rows"]
+    assert rows.headers["content-type"].startswith("application/json")
+    # Error answers are unchanged.
+    assert client.get("/api/calendar", params={"from": "x", "to": "y"}).status_code == 422
+
+
 @pytest.mark.xfail(reason="needs lane B1a: a Unicode id regex in JsonStore", strict=False)
 @pytest.mark.parametrize("name", NON_LATIN)
 def test_non_latin_collection_and_query_names_are_created(client: TestClient, m8_space_dir: Path, name: str):

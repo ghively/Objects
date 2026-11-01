@@ -926,7 +926,10 @@ def create_app(
 
     @api.get("/objects")
     def list_objects(type: str | None = Query(default=None)):
-        return _display_safe([asdict(s) for s in space.list(type or None)])
+        # A JSONResponse is encoded here, on the worker thread; a plain return would run
+        # FastAPI's per-value `jsonable_encoder` on the event loop (audit 2026-11-01 B2:
+        # 120 ms per request at 5,000 objects, stalling SSE and every other request).
+        return JSONResponse(_display_safe([asdict(s) for s in space.list(type or None)]))
 
     @api.get("/object")
     def get_object(path: str):
@@ -1319,7 +1322,7 @@ def create_app(
         if not from_ or not to:
             return _error(422, "A calendar range needs from and to (YYYY-MM-DD).")
         try:
-            return _display_safe(space.calendar(from_, to))
+            return JSONResponse(_display_safe(space.calendar(from_, to)))  # see `list_objects`
         except InvalidValue as exc:
             return _error(422, str(exc))
 
@@ -1330,7 +1333,7 @@ def create_app(
             rows = space.rows(req.typeIds, req.collectionIds, req.paths, search, req.preview)
         except InvalidValue as exc:
             return _error(422, str(exc))
-        return _display_safe({"rows": [asdict(r) for r in rows]})
+        return JSONResponse(_display_safe({"rows": [asdict(r) for r in rows]}))  # see `list_objects`
 
     @api.get("/views/{type_id}")
     def get_views(type_id: str):
