@@ -381,6 +381,8 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     setPending(null)
     pendingRef.current = false
     if (!p) return
+    // Their version replaces my edits: any text kept from them is stale too.
+    dropUnsaved(path)
     h?.reload(p.theirs.body, p.theirs.version)
     setDetail(p.theirs)
     adoptVersion(p.theirs.version)

@@ -148,4 +148,41 @@ describe('edits that could not be saved when the object is left', () => {
     await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledTimes(1))
     expect(keptUnsaved(PATH)).toBeNull()
   })
+
+  test('text kept by a settle while paused is forgotten once Keep mine saves it', async () => {
+    mocked.saveBody.mockRejectedValueOnce(new ConflictError('v2'))
+    const first = await openPage()
+    typeMine(first.editor)
+    onDisk = detail(THEIRS, 'v2')
+    const dialog = await screen.findByRole('dialog', { name: /changed on disk/i }, { timeout: 2500 })
+    await act(async () => {
+      await flushAll() // e.g. a version restore or export settles the editor while paused
+    })
+    expect(keptUnsaved(PATH)).not.toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Keep mine' }))
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(keptUnsaved(PATH)).toBeNull())
+    // More typing and a clean leave: reopening offers nothing old.
+    const later = typeMine(first.editor)
+    first.unmount()
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledTimes(3))
+    onDisk = detail(later, 'v9')
+    await openPage(later)
+    expect(screen.queryByRole('dialog', { name: 'Recover unsaved changes' })).not.toBeInTheDocument()
+  })
+
+  test('text kept by a settle while paused is forgotten on Take theirs', async () => {
+    mocked.saveBody.mockRejectedValueOnce(new ConflictError('v2'))
+    const first = await openPage()
+    typeMine(first.editor)
+    onDisk = detail(THEIRS, 'v2')
+    const dialog = await screen.findByRole('dialog', { name: /changed on disk/i }, { timeout: 2500 })
+    await act(async () => {
+      await flushAll()
+    })
+    expect(keptUnsaved(PATH)).not.toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Take theirs' }))
+    await waitFor(() => expect(serializeBody(first.editor)).toBe(THEIRS))
+    expect(keptUnsaved(PATH)).toBeNull()
+  })
 })

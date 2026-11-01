@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api, ConflictError, ReadOnlyError } from '@/api/client'
 import type { FindControl } from './extensions/findInPage'
-import { keepUnsaved } from './unsaved'
+import { dropUnsaved, keepUnsaved } from './unsaved'
 
 export const AUTOSAVE_DELAY_MS = 1000
 /** First retry delay after a failed save; it doubles up to `AUTOSAVE_RETRY_MAX_MS`. */
@@ -92,6 +92,10 @@ export function useAutosave(opts: AutosaveOptions) {
             savedBodyRef.current = body
             retryDelayRef.current = AUTOSAVE_RETRY_MS
             setSaveError(null)
+            // What is on disk is now newer than any text kept for this object
+            // earlier (e.g. by a settle while saving was paused): offering that
+            // again would revert these edits.
+            dropUnsaved(path)
             optsRef.current.onSaved(res.version)
           }
         } catch (err) {
