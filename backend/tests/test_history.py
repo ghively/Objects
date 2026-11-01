@@ -180,7 +180,8 @@ def test_history_lives_in_state_dir(client, space, clock):
     assert len(index) == 1
     entry = index[0]
     assert set(entry) >= {"id", "at", "rel", "files"}
-    assert entry["rel"] == PAGE and entry["files"] == [entry["id"] + ".md"]
+    # The first version is stored whole, gzipped (audit 2026-11-01: cheap snapshots).
+    assert entry["rel"] == PAGE and entry["files"] == [entry["id"] + ".md.gz"]
     assert (key_dir / entry["files"][0]).is_file()
 
 
@@ -207,8 +208,13 @@ def test_prune_at_200(tmp_path, m8_space_dir):
     assert first not in {v["id"] for v in versions}
     assert versions[-1]["number"] == 1
     assert store.content(PAGE, versions[-1]["id"])["text"].endswith("1")
+    for v in versions:  # every kept version still reads back, deltas included
+        assert store.content(PAGE, v["id"])["text"].endswith(str(v["number"]))
     folder = next((store.dir).iterdir())
-    assert len([p for p in folder.iterdir() if p.suffix == ".md"]) == MAX_VERSIONS
+    index = json.loads((folder / "index.json").read_bytes())
+    assert len(index) == MAX_VERSIONS
+    stored = {name for e in index for name in e["files"]}
+    assert {p.name for p in folder.iterdir()} == stored | {"index.json"}  # no orphan files
 
 
 def test_snapshot_parses_once_and_reads_nothing_for_an_object(m8_space_dir, monkeypatch):
@@ -225,7 +231,8 @@ def test_snapshot_parses_once_and_reads_nothing_for_an_object(m8_space_dir, monk
         vid = store.snapshot(PAGE, data + str(i).encode(), T0 + timedelta(minutes=6 * i))
         assert vid
     assert len(parses) == 3  # one per snapshot: the bytes being kept are the file's
-    assert all(p.name == "index.json" for p in reads)  # the object file itself is never re-read
+    # The object file itself is never re-read (only the history's own files are).
+    assert all(p.is_relative_to(store.dir) for p in reads)
     # A caller that already knows the id spares the parse too.
     parses.clear()
     object_id = parse_fm(split_object(decode(data).text).frontmatter_src)["id"]
@@ -267,7 +274,7 @@ def test_object_without_id_keyed_by_path(client, space, clock):
     store = HistoryStore(space.root)
     vid = store.snapshot(rel, (space.root / rel).read_bytes(), T0)
     key = "path-" + hashlib.sha1(rel.encode()).hexdigest()[:16]
-    assert (store.dir / key / f"{vid}.md").is_file()
+    assert (store.dir / key / f"{vid}.md.gz").is_file()
     # A stamped save inserts an id; the earlier version is still listed for the object.
     clock.advance(minutes=6)
     _save_body(client, rel, "Now with an id.\n")

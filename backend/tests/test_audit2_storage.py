@@ -1,6 +1,7 @@
 """Regression tests for the storage-core items of the 2026-11-01 audit's second fix pass."""
 
 import os
+from itertools import pairwise
 from pathlib import Path
 
 import pytest
@@ -541,3 +542,128 @@ def test_type_rename_parses_each_rewritten_file_once(space_dir: Path, monkeypatc
         assert "type: 'Human'" in text
         assert space.get(rel).type == "person"
         assert space._raw[rel].fm["type"] == "Human"
+
+
+# -- 8: history snapshots are deltas or gzip, not whole copies --------------------------
+
+
+def _store(tmp_path: Path):
+    from datetime import UTC, datetime
+
+    from objectapp.history import HistoryStore
+
+    root = tmp_path / "space"
+    (root / "Pages").mkdir(parents=True)
+    return HistoryStore(root), datetime(2026, 11, 1, 10, 0, tzinfo=UTC)
+
+
+def _page(i: int, body: str = "") -> bytes:
+    text = "Lorem ipsum dolor sit amet, a long enough body for a delta. " * 40
+    return (
+        f"---\nid: 01JC8M80000000000000000077\ntitle: Page {i}\n---\n{text}{body}\n"
+    ).encode()
+
+
+def test_a_small_change_is_kept_as_a_delta_with_no_file(tmp_path: Path):
+    import json
+    from datetime import timedelta
+
+    store, t0 = _store(tmp_path)
+    rel = "Pages/P.md"
+    datas = [_page(i) for i in range(5)]
+    vids = [store.snapshot(rel, d, t0 + timedelta(minutes=6 * i)) for i, d in enumerate(datas)]
+    folder = store.dir / "01JC8M80000000000000000077"
+    index = json.loads((folder / "index.json").read_bytes())
+    assert index[0]["files"] == [vids[0] + ".md.gz"]
+    assert all(e["files"] == [] and e["delta"]["base"] == p["id"] for p, e in pairwise(index))
+    assert sorted(p.name for p in folder.iterdir()) == sorted([vids[0] + ".md.gz", "index.json"])
+    stored = sum(p.stat().st_size for p in folder.iterdir())
+    assert stored < len(datas[0])  # five versions in less than one plain copy
+    (store.root / rel).write_bytes(datas[-1])  # the object's id is read from its file
+    for vid, data in zip(vids, datas):
+        assert store.content(rel, vid)["text"] == data.decode()
+    assert [v["size"] for v in store.versions(rel)] == [len(d) for d in reversed(datas)]
+    assert [v["title"] for v in store.versions(rel)] == [f"Page {i}" for i in range(4, -1, -1)]
+
+
+def test_a_big_change_and_a_long_chain_store_the_version_whole(tmp_path: Path):
+    import json
+    from datetime import timedelta
+
+    from objectapp import history
+
+    store, t0 = _store(tmp_path)
+    rel = "Pages/P.md"
+    vids = [store.snapshot(rel, _page(i), t0 + timedelta(minutes=6 * i)) for i in range(40)]
+    index = json.loads((store.dir / "01JC8M80000000000000000077" / "index.json").read_bytes())
+    whole = [i for i, e in enumerate(index) if "delta" not in e]
+    assert whole == list(range(0, 40, history._MAX_CHAIN))
+    other = b"---\nid: 01JC8M80000000000000000077\n---\n" + b"completely different\n" * 200
+    vid = store.snapshot(rel, other, t0 + timedelta(hours=10))
+    index = json.loads((store.dir / "01JC8M80000000000000000077" / "index.json").read_bytes())
+    assert index[-1]["id"] == vid and index[-1]["files"] == [vid + ".md.gz"]
+    (store.root / rel).write_bytes(other)
+    assert store.content(rel, vid)["text"] == other.decode()
+    assert store.content(rel, vids[37])["text"] == _page(37).decode()
+
+
+def test_legacy_plain_versions_still_read_and_a_corrupt_delta_is_not_found(tmp_path: Path):
+    import json
+    from datetime import timedelta
+
+    from objectapp.history import VersionNotFound
+
+    store, t0 = _store(tmp_path)
+    rel = "Pages/P.md"
+    folder = store.dir / "01JC8M80000000000000000077"
+    folder.mkdir(parents=True)
+    (folder / "20261101T090000000Z.md").write_bytes(_page(0))
+    (folder / "index.json").write_text(json.dumps([
+        {"id": "20261101T090000000Z", "at": "2026-11-01T09:00:00.000Z", "rel": rel,
+         "kind": "object", "files": ["20261101T090000000Z.md"]},
+    ]))
+    vid = store.snapshot(rel, _page(1), t0 + timedelta(minutes=6))
+    (store.root / rel).write_bytes(_page(2))
+    index = json.loads((folder / "index.json").read_bytes())
+    assert index[-1]["delta"]["base"] == "20261101T090000000Z"
+    assert store.content(rel, "20261101T090000000Z")["text"] == _page(0).decode()
+    assert store.content(rel, vid)["text"] == _page(1).decode()
+    index[-1]["delta"]["mid"] = "QUJD"  # "ABC": the sha1 no longer matches
+    (folder / "index.json").write_text(json.dumps(index))
+    with pytest.raises(VersionNotFound):
+        store.content(rel, vid)
+
+
+def test_hub_rename_history_growth_is_small(links_space_dir: Path):
+    from datetime import timedelta
+
+    from fastapi.testclient import TestClient
+    from objectapp.appstate import state_dir
+    from objectapp.server import create_app
+
+    space = Space(links_space_dir)
+    app = create_app(space, None, watch=False)
+    app.state.hub.publish = lambda _e: None
+    clock = [space.clock()]
+    space.clock = lambda: clock[0]
+    with TestClient(app) as c:
+        target = next(p for p in space._summaries if space.links.backlinks(p))
+        referrers = len(space.links.backlinks(target))
+
+        def size() -> tuple[int, int]:
+            files = [p for p in (state_dir() / "history").rglob("*") if p.is_file()]
+            return sum(p.stat().st_size for p in files), len(files)
+
+        sizes = [size() if (state_dir() / "history").exists() else (0, 0)]
+        for title in ("Renamed once", "Renamed twice"):
+            clock[0] += timedelta(minutes=10)
+            r = c.post(
+                "/api/object/rename",
+                json={"path": target, "title": title, "baseVersion": space.read(target)[2]},
+            )
+            assert r.status_code == 200, r.text
+            target = r.json()["path"]
+            sizes.append(size())
+        # The second rename's snapshots are deltas: no new files, a few hundred bytes each.
+        assert sizes[2][1] == sizes[1][1]
+        assert sizes[2][0] - sizes[1][0] < 600 * (referrers + 1)
