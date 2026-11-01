@@ -380,6 +380,20 @@ describe('minor drift on edited lines', () => {
     expect(serializeBody(editor)).toBe(saved)
   })
 
+  test('Shift-Enter at the end of a list item is saved as a hard break (audit 2026-11-01)', () => {
+    const editor = headless('- a\n- b\n')
+    editor.commands.setTextSelection(find(editor, 'b').pos + 2)
+    editor.commands.setHardBreak()
+    editor.view.dispatch(editor.state.tr.insertText('cont'))
+    const saved = serializeBody(editor)
+    expect(saved).toBe('- a\n- b  \n  cont\n')
+    let breaks = 0
+    headless(saved).state.doc.descendants((n) => {
+      if (n.type.name === 'hardBreak') breaks++
+    })
+    expect(breaks).toBe(1)
+  })
+
   test('an edited blockquote line keeps its marker', () => {
     const editor = headless('> a\n> b\n')
     append(editor, 'b', 'X')

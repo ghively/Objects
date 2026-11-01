@@ -244,8 +244,18 @@ function preserveList(origLines: string[], regenLines: string[]): string[] {
     origLines.map((l, i) => listKey(l, origParsed[i])),
     regenLines.map((l, i) => listKey(l, regenParsed[i])),
   )
-  return keepListStarts(weaveBlankLines(origLines, regenLines, match, restyle), regenParsed)
+  // The key ignores a hard break, so a Shift-Enter typed at the end of an
+  // unchanged item still matches its original line: that line takes the
+  // regenerated ending (restyled), or the break would be saved as a soft one.
+  const kept = origLines.slice()
+  match.forEach((o, k) => {
+    if (o >= 0 && HARD_BREAK.test(regenLines[k]) && !HARD_BREAK.test(origLines[o])) kept[o] = restyle(regenLines[k], k)
+  })
+  return keepListStarts(weaveBlankLines(kept, regenLines, match, restyle), regenParsed)
 }
+
+/** A line ending in a hard break: two or more blanks, or a backslash. */
+const HARD_BREAK = /(?:[ \t]{2,}|\\)$/
 
 /** Line index and number of the first item of each ordered list (CommonMark: its start). */
 function orderedStarts(parsed: (ListLine | null)[]): [number, string][] {
