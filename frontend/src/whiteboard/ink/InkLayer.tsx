@@ -75,6 +75,7 @@ type Pinch = {
 const distance = (a: ClientPoint, b: ClientPoint) => Math.hypot(b.x - a.x, b.y - a.y)
 const midpoint = (a: ClientPoint, b: ClientPoint): ClientPoint => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
 
+/** The stroke being drawn; one `Live` per animation frame, so the outline is built once per frame. */
 function LivePath({ live }: { live: Live }) {
   const d = useMemo(
     () => svgPathFromOutline(outlineFor(live.points, strokeOptions(live.tool, live.width, live.pointerType))),
@@ -120,6 +121,8 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
   const [preview, setPreview] = useState<string | null>(null)
   const selecting = tool?.tool === 'select'
   const gesture = useRef<Gesture | null>(null)
+  /** The animation frame that will show the live stroke as drawn so far (one per frame, not per move). */
+  const frame = useRef<number | null>(null)
   /** Pens currently in contact (palm rejection: touch is ignored while one is down). */
   const pensDown = useRef(new Set<number>())
   /** Fingers in contact, by pointer id, at their last screen position. */
@@ -173,6 +176,7 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
       pinch.current = null
       pensDown.current.clear()
       touches.current.clear()
+      cancelFrame()
       setLive(null)
     }
   }, [capturing])
@@ -278,9 +282,30 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
     if (mode === 'draw') setLive({ tool: g.tool, color: g.color, width: g.width, pointerType: g.pointerType, points: g.points })
   }
 
+  const cancelFrame = () => {
+    if (frame.current === null) return
+    cancelAnimationFrame(frame.current)
+    frame.current = null
+  }
+
+  /**
+   * Shows the stroke drawn so far on the next animation frame. Pointer moves arrive far more often
+   * than frames are painted (120–240 Hz pens), and the outline is recomputed from every point
+   * (11 ms at 3,000 points), so it is built once per frame from the points as they stand then.
+   */
+  const scheduleLive = (g: Gesture) => {
+    if (frame.current !== null) return
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null
+      if (gesture.current !== g) return
+      setLive({ tool: g.tool, color: g.color, width: g.width, pointerType: g.pointerType, points: g.points })
+    })
+  }
+
   /** Abandons the gesture in progress (nothing is saved). */
   const dropGesture = () => {
     gesture.current = null
+    cancelFrame()
     setLive(null)
     setLasso(null)
     setPreview(null)
@@ -312,11 +337,12 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
     }
     const g = gesture.current
     if (!g || ev.pointerId !== g.pointerId) return
-    g.points = g.points.concat(samplesFrom(ev, toFlow))
+    // Pushed, not copied: a long stroke's points are appended to in place.
+    for (const p of samplesFrom(ev, toFlow)) g.points.push(p)
     if (g.mode === 'draw') {
       if (g.points.length > SPLIT_STROKE_POINTS) commitPieces(g)
-      setLive({ tool: g.tool, color: g.color, width: g.width, pointerType: g.pointerType, points: g.points })
-    } else if (g.mode === 'lasso') setLasso(g.points)
+      scheduleLive(g)
+    } else if (g.mode === 'lasso') setLasso(g.points.slice())
     else if (g.mode === 'move' || g.mode === 'scale') setPreview(selectionTransform(g))
   }
 
@@ -362,10 +388,7 @@ export function InkLayer({ strokes, tool, readOnly, panning, onStrokesChange, on
     }
     const g = gesture.current
     if (!g || ev.pointerId !== g.pointerId) return
-    gesture.current = null
-    setLive(null)
-    setLasso(null)
-    setPreview(null)
+    dropGesture()
     try {
       e.currentTarget.releasePointerCapture?.(ev.pointerId)
     } catch {
