@@ -304,6 +304,21 @@ describe('board store', () => {
     expect(s.getState().doc.board.nodes.b).toBeDefined()
   })
 
+  test('undo after a reload does not bring back a node another window deleted', () => {
+    const s = storeWith(
+      board([node({ id: 'a', position: { x: 0, y: 0 } }), node({ id: 'b' })], [edge({ id: 'e', source: 'a', target: 'b' })]),
+    )
+    s.getState().actions.nudge(30, 0, ['a'])
+    const cur = s.getState().doc.board
+    const nodes = { ...cur.nodes }
+    delete nodes.a
+    s.getState().canvas.load({ board: { ...cur, nodes, edges: {} }, strokes: [] })
+    s.getState().actions.undo()
+    expect(s.getState().doc.board.nodes.a).toBeUndefined()
+    expect(s.getState().doc.board.edges.e).toBeUndefined()
+    expect(s.getState().doc.board.nodes.b).toBeDefined()
+  })
+
   test('loading strokes from the ink file is not an undo step', () => {
     const s = storeWith()
     s.getState().canvas.loadStrokes([stroke('a')])
