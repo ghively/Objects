@@ -274,6 +274,7 @@ _RESERVED_STEMS = frozenset(
 
 
 _LINK_UNSAFE_RE = re.compile(r"[\[\]#]")
+_SURROGATE_RE = re.compile("[\ud800-\udfff]")
 # A title that can't be a wikilink target as it is (it would end the target early).
 _LINK_BREAKING_RE = re.compile(r"[\[\]|#\n]")
 
@@ -300,6 +301,9 @@ def safe_filename(title: str) -> str:
     # `[`, `]` and `#` are legal in file names but end a wikilink's target, so
     # the path form of a link (see `Space._link_text`) must never contain them.
     title = _LINK_UNSAFE_RE.sub("", str(title or ""))
+    # A lone surrogate (JSON allows "\udc80") is no character: on Linux it would become a
+    # file name that isn't UTF-8. It is replaced, as a decoder replaces a bad byte.
+    title = _SURROGATE_RE.sub("\ufffd", title)
     m = _ILLEGAL_FILENAME_RE.search(title)
     stem = clean(title[: m.start()] if m else title)
     if not stem:

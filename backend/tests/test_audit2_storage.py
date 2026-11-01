@@ -304,3 +304,78 @@ def test_reload_collections_parses_only_changed_files(space_dir: Path, monkeypat
     space.collections["four"] = space._load_collection("four", {"name": "Stale"}, None)
     space.reload_collections()
     assert space.collections["four"].name == "Four"
+
+
+# -- 9: unconfirmed storage items --------------------------------------------------------
+
+
+def test_an_upper_case_md_suffix_is_listed_from_the_start(space_dir: Path):
+    from objectapp.typedefs import iter_object_paths
+
+    _write(space_dir / "Pages/Shout.MD", "---\ntitle: Shout\n---\nLoud.\n")
+    _write(space_dir / "Pages/Mixed.Md", "---\ntitle: Mixed\n---\n")
+    (space_dir / ".dotfolder").mkdir()
+    _write(space_dir / ".dotfolder/In dot folder.md", "x\n")
+    _write(space_dir / "Pages/.dotfile.md", "x\n")
+    _write(space_dir / "Pages/Not an object.mdx", "x\n")
+    paths = list(iter_object_paths(space_dir))
+    assert "Pages/Shout.MD" in paths and "Pages/Mixed.Md" in paths
+    assert not any(p.startswith(".") or "/." in p or p.endswith(".mdx") for p in paths)
+    assert paths == sorted(paths)
+    space = Space(space_dir)
+    assert space.get("Pages/Shout.MD").title == "Shout"
+    assert "Pages/Shout.MD" in {s.path for s in space.list()}
+
+
+def test_safe_filename_replaces_a_lone_surrogate(space_dir: Path):
+    from objectapp.space import safe_filename
+
+    for title in ("A\udc80B", "\ud800", "x\udfff\udfffy"):
+        stem = safe_filename(title)
+        stem.encode("utf-8")  # a UTF-8 file name
+        assert "�" in stem
+    assert safe_filename("A\udc80B") == "A�B"
+    space = Space(space_dir)
+    _of, _fm, version = space.read("Pages/Alpha.md")
+    try:
+        res = space.rename_object("Pages/Alpha.md", "Alpha \udc80", version)
+    except ValueError:
+        pass  # refused cleanly
+    else:
+        res.path.encode("utf-8")
+        assert (space_dir / res.path).is_file()
+    assert all(p.encode("utf-8") for p in os.listdir(space_dir / "Pages"))
+
+
+def test_history_index_write_is_checked_against_a_concurrent_writer(tmp_path: Path, monkeypatch):
+    import json
+    from datetime import UTC, datetime, timedelta
+
+    from objectapp import history
+
+    root = tmp_path / "space"
+    (root / "Pages").mkdir(parents=True)
+    rel = "Pages/A.md"
+    data = b"---\nid: 01JC8M80000000000000000099\ntitle: A\n---\nBody.\n"
+    (root / rel).write_bytes(data)
+    store = history.HistoryStore(root)
+    t0 = datetime(2026, 11, 1, 10, 0, tzinfo=UTC)
+    store.snapshot(rel, data, t0)
+    index_path = store.dir / "01JC8M80000000000000000099" / "index.json"
+
+    real = history.atomic_write
+    raced = []
+
+    def racing(path, payload, check=None):
+        if Path(path).name == "index.json" and not raced:
+            # Another app on the same space adds a version between the read and the replace.
+            others = json.loads(index_path.read_bytes())
+            others.append({"id": "other", "at": "2026-11-01T10:07:00.000Z", "rel": rel, "files": []})
+            index_path.write_bytes(json.dumps(others).encode())
+            raced.append(1)
+        return real(path, payload, check=check)
+
+    monkeypatch.setattr(history, "atomic_write", racing)
+    vid = store.snapshot(rel, data + b"more\n", t0 + timedelta(minutes=10))
+    ids = [e["id"] for e in json.loads(index_path.read_bytes())]
+    assert raced and "other" in ids and vid in ids and len(ids) == 3
