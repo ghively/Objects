@@ -437,6 +437,36 @@ describe('minor drift on edited lines', () => {
     expect(breaks).toBe(1)
   })
 
+  // Audit 2026-11-01 leftover: the loader strips the leading blanks of a line after a hard break
+  // in a list item (all of four or more, two of fewer), and an ordered or to-do item's new
+  // continuation line gained blanks on reload. A run of four or more is written `&nbsp;` + rest.
+  const BODIES: Record<string, string> = {
+    paragraph: 'b\n',
+    bullet: '- a\n- b\n',
+    ordered: '1. a\n2. b\n',
+    wide: '9. a\n10. b\n',
+    todo: '- [ ] b\n',
+    nested: '- a\n  - b\n',
+  }
+  test.each(
+    Object.keys(BODIES).flatMap((where) =>
+      ['cont', ' one', '  two', '   three', '    four', '      six', '\ttab'].map((line) => [line, where]),
+    ),
+  )('a continuation line %j after Shift-Enter in a %s item reloads exactly', (line, where) => {
+    const body = BODIES[where]
+    const editor = headless(body)
+    editor.commands.setTextSelection(find(editor, 'b').pos + 2)
+    editor.commands.setHardBreak()
+    editor.view.dispatch(editor.state.tr.insertText(line))
+    const saved = serializeBody(editor)
+    const text = (e: TiptapEditor) => find(e, 'b').node.textContent.replaceAll(String.fromCharCode(0xa0), ' ')
+    const reloaded = headless(saved)
+    // In an item a leading tab is kept as `&nbsp;`, as on a paragraph's first line.
+    expect(text(reloaded)).toBe('b' + (where === 'paragraph' ? line : line.replace('\t', ' ')))
+    expect(saved.startsWith(body.slice(0, -1))).toBe(true) // the untouched lines are unchanged
+    expect(serializeBody(reloaded)).toBe(saved) // and it saves back the same
+  })
+
   test('editing one line of a nested blockquote keeps the other lines (audit 2026-11-01)', () => {
     const editor = headless('> a\n> > b\n> c\n')
     append(editor, 'a', 'Z')
