@@ -379,3 +379,34 @@ def test_history_index_write_is_checked_against_a_concurrent_writer(tmp_path: Pa
     vid = store.snapshot(rel, data + b"more\n", t0 + timedelta(minutes=10))
     ids = [e["id"] for e in json.loads(index_path.read_bytes())]
     assert raced and "other" in ids and vid in ids and len(ids) == 3
+
+
+# -- 12: `_rel`'s component cap counts what the file system counts ---------------------
+
+
+def test_component_cap_counts_utf16_units_on_windows_and_bytes_elsewhere(monkeypatch):
+    cjk = "漢" * 200 + ".md"  # 203 UTF-16 units, 603 UTF-8 bytes
+    emoji = "\U0001f600" * 127 + ".md"  # 257 UTF-16 units (surrogate pairs), 511 bytes
+    exact = "é" * 252 + ".md"  # 255 UTF-16 units, 507 bytes
+
+    monkeypatch.setattr(space_mod.os, "name", "nt")
+    assert not space_mod._component_too_long(cjk)
+    assert space_mod._component_too_long(emoji)
+    assert not space_mod._component_too_long(exact)
+    assert space_mod._component_too_long("a" * 253 + ".md")
+    monkeypatch.undo()
+
+    monkeypatch.setattr(space_mod.os, "name", "posix")
+    assert space_mod._component_too_long(cjk)
+    assert space_mod._component_too_long(emoji)
+    assert space_mod._component_too_long(exact)
+    assert not space_mod._component_too_long("a" * 252 + ".md")
+    assert space_mod._component_too_long("a" * 253 + ".md")
+
+
+@pytest.mark.skipif(os.name == "nt", reason="the POSIX branch")
+def test_rel_refuses_a_component_over_255_bytes(space_dir: Path):
+    space = Space(space_dir)
+    with pytest.raises(ValueError, match="too long"):
+        space._rel("Pages/" + "漢" * 100 + ".md")  # 303 bytes
+    assert space._rel("Pages/" + "漢" * 80 + ".md")  # 243 bytes
