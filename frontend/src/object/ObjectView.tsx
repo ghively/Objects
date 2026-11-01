@@ -177,6 +177,15 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   const [pending, setPending] = useState<{ mine: string; theirs: ObjectDetail } | null>(null)
   /** Edits kept when this object was last left unsaved (`editor/unsaved.ts`), offered on open. */
   const [recovery, setRecovery] = useState<{ kept: string; onDisk: string; error: string | null } | null>(null)
+  /** Set while "Save changes" is writing the kept text. */
+  const [savingKept, setSavingKept] = useState(false)
+  const savingKeptRef = useRef(false)
+  /** Mirrors `recovery` for `reconcile`. */
+  const recoveryRef = useRef(recovery)
+  recoveryRef.current = recovery
+  /** The shown object's id, when known (kept unsaved text is tied to it). */
+  const objectIdRef = useRef<string | null>(null)
+  objectIdRef.current = detail?.summary.path === path ? detail.summary.id : null
   // Subscribe so the type chip and properties pick up types once the index loads.
   useLinkIndex((s) => s.revision)
 
@@ -247,6 +256,17 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         h?.reload(theirs.body, theirs.version)
         setDetail(theirs)
         adoptVersion(theirs.version)
+        // The recovery dialog compares the kept text with what is on disk: show the
+        // new version, or close it when the file now holds the kept text.
+        if (recoveryRef.current) {
+          const kept = keptUnsaved(path, theirs.summary.id)
+          if (kept === null || kept === theirs.body) {
+            if (kept !== null) dropUnsaved(path, theirs.summary.id)
+            setRecovery(null)
+          } else {
+            setRecovery({ kept, onDisk: theirs.body, error: null })
+          }
+        }
         unblockRef.current()
         return
       }
@@ -381,6 +401,8 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     setPending(null)
     pendingRef.current = false
     if (!p) return
+    // Their version replaces my edits: any text kept from them is stale too.
+    dropUnsaved(path, p.theirs.summary.id)
     h?.reload(p.theirs.body, p.theirs.version)
     setDetail(p.theirs)
     adoptVersion(p.theirs.version)
@@ -390,9 +412,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   /** Offer the edits kept for this object, if any differ from what is on disk. */
   const offerKept = useCallback(
     (d: ObjectDetail) => {
-      const kept = keptUnsaved(path)
+      const kept = keptUnsaved(path, d.summary.id)
       if (kept === null) return
-      if (kept === d.body) dropUnsaved(path)
+      if (kept === d.body) dropUnsaved(path, d.summary.id)
       else setRecovery({ kept, onDisk: d.body, error: null })
     },
     [path],
@@ -402,11 +424,14 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   const saveKept = async () => {
     const r = recovery
     const h = editorRef.current
-    if (!r) return
+    // One save at a time: a second click would send the same text on the same version.
+    if (!r || savingKeptRef.current) return
+    savingKeptRef.current = true
+    setSavingKept(true)
     h?.hold()
     try {
       const res = await api.saveBody(path, r.kept, versionRef.current)
-      dropUnsaved(path)
+      dropUnsaved(path, objectIdRef.current)
       setRecovery(null)
       h?.reload(r.kept, res.version)
       setDetail((d) => (d ? { ...d, body: r.kept, version: res.version } : d))
@@ -419,7 +444,13 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
           h?.reload(d.body, d.version)
           setDetail(d)
           adoptVersion(d.version)
-          setRecovery({ kept: r.kept, onDisk: d.body, error: null })
+          if (d.body === r.kept) {
+            // The file already holds the kept text: nothing left to recover.
+            dropUnsaved(path, d.summary.id)
+            setRecovery(null)
+          } else {
+            setRecovery({ kept: r.kept, onDisk: d.body, error: null })
+          }
         } catch {
           /* gone or unreadable: keep asking with what we have */
         }
@@ -427,11 +458,14 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         setRecovery({ ...r, error: 'Could not save the changes.' })
       }
       void h?.resume(versionRef.current)
+    } finally {
+      savingKeptRef.current = false
+      setSavingKept(false)
     }
   }
 
   const discardKept = () => {
-    dropUnsaved(path)
+    dropUnsaved(path, objectIdRef.current)
     setRecovery(null)
   }
 
@@ -895,6 +929,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
       kept={recovery?.kept ?? ''}
       onDisk={recovery?.onDisk ?? ''}
       error={recovery?.error}
+      saving={savingKept}
       onSave={() => void saveKept()}
       onDiscard={discardKept}
     />
@@ -999,6 +1034,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
                 readOnly={readOnly || deleted}
                 onSaved={adoptVersion}
                 onConflict={onConflict}
+                objectId={detail.summary.path === path ? detail.summary.id : undefined}
                 controlRef={editorRef}
               />
             </div>
@@ -1109,6 +1145,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
                     readOnly={readOnly}
                     onSaved={adoptVersion}
                     onConflict={onConflict}
+                    objectId={detail.summary.path === path ? detail.summary.id : undefined}
                     controlRef={editorRef}
                   />
                 </Suspense>
@@ -1120,6 +1157,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
                   readOnly={readOnly}
                   onSaved={adoptVersion}
                   onConflict={onConflict}
+                  objectId={detail.summary.path === path ? detail.summary.id : undefined}
                   controlRef={editorRef}
                 />
               )}

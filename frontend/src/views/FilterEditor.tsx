@@ -1,13 +1,14 @@
 // The filter popover's body: nested AND/OR rows, each a property, an operator and a value editor.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
-import type { Collection, EntityRef, Filter, FilterGroup, FilterReference, PropertyDef, TypeDef } from '@/api/types'
+import type { Collection, EntityRef, Filter, FilterGroup, FilterReference, NumberFormat, PropertyDef, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useLinkIndex } from '@/links/linkIndex'
 import { cn } from '@/lib/utils'
 import { zonedToday } from '@/lib/zonedTime'
 import { DatePicker } from '@/properties/DatePicker'
+import { parseNumberInput, usesRadixComma } from '@/properties/format'
 import { LabelPill } from '@/properties/LabelMenu'
 import { RelationPicker } from '@/properties/RelationPicker'
 import { DATE_RELATIVE_OPTIONS } from './dates'
@@ -283,18 +284,26 @@ function shift(n: number, by: number): number {
   return Number(`${mantissa}e${Number(exp ?? 0) + by}`)
 }
 
-/** A whole number as typed: digits, one point, an exponent. */
-const FULL_NUMBER = /^\s*-?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?\s*$/i
-/** A number being typed: `-`, `1.`, `.`, `1e`, `1e-`. */
-const NUMBER_PREFIX = /^\s*-?\d*\.?\d*(e[-+]?\d*)?\s*$/i
+/** A number still being typed: `-`, `+`, `.`, `1e`, `1e-` (either decimal separator). */
+const NUMBER_PREFIX = /^\s*[-+]?[\d.,]*(e[-+]?)?\s*$/i
 
 /**
- * A filter's number. The text is kept as typed: a complete number applies at once, an empty
- * field clears the value, and a number still being typed (`-`, `1.`, `1e`) keeps the last value
- * applied. Leaving the field shows the value applied.
+ * A filter's number, read as the number cells read theirs (`parseNumberInput`: the "Decimal
+ * separator" setting, a leading `+`, nothing that isn't finite). The text is kept as typed: a
+ * complete number applies at once, an empty field clears the value, and a number still being
+ * typed (`-`, `1.`, `1e`) keeps the last value applied. Leaving the field shows the value applied.
  */
-function NumberValue({ value, onChange }: { value: number | undefined; onChange(next: number | undefined): void }) {
-  const shown = value === undefined ? '' : String(value)
+function NumberValue({
+  value,
+  format,
+  onChange,
+}: {
+  value: number | undefined
+  format?: NumberFormat | null
+  onChange(next: number | undefined): void
+}) {
+  const comma = usesRadixComma(format)
+  const shown = value === undefined ? '' : comma ? String(value).replace('.', ',') : String(value)
   const [text, setText] = useState(shown)
   const focused = useRef(false)
   useEffect(() => {
@@ -305,13 +314,14 @@ function NumberValue({ value, onChange }: { value: number | undefined; onChange(
       aria-label="Value"
       inputMode="decimal"
       value={text}
-      aria-invalid={!NUMBER_PREFIX.test(text) || undefined}
+      aria-invalid={(parseNumberInput(text, format) === undefined && !NUMBER_PREFIX.test(text)) || undefined}
       onFocus={() => (focused.current = true)}
       onChange={(e) => {
         const raw = e.target.value
         setText(raw)
-        if (raw.trim() === '') onChange(undefined)
-        else if (FULL_NUMBER.test(raw)) onChange(Number(raw))
+        const n = parseNumberInput(raw, format)
+        if (n === null) onChange(undefined)
+        else if (n !== undefined) onChange(n)
       }}
       onBlur={() => {
         focused.current = false
@@ -402,10 +412,12 @@ function ValueEditor({
   }
   if (kind === 'number') {
     // A percentage stores the fraction (0.25): its filter value is typed and shown in percent (25).
-    const pct = (choice.def as PropertyDef).options?.numberFormat?.type === 'percentage'
+    const format = (choice.def as PropertyDef).options?.numberFormat ?? null
+    const pct = format?.type === 'percentage'
     return (
       <NumberValue
         value={typeof ref === 'number' ? (pct ? shift(ref, 2) : ref) : undefined}
+        format={format}
         onChange={(n) => set(n === undefined ? undefined : pct ? shift(n, -2) : n)}
       />
     )

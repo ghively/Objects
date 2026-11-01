@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api, ConflictError, ReadOnlyError } from '@/api/client'
 import type { FindControl } from './extensions/findInPage'
-import { keepUnsaved } from './unsaved'
+import { dropUnsaved, keepUnsaved } from './unsaved'
 
 export const AUTOSAVE_DELAY_MS = 1000
 /** First retry delay after a failed save; it doubles up to `AUTOSAVE_RETRY_MAX_MS`. */
@@ -32,12 +32,17 @@ export type AutosaveOptions = {
   getBody: () => string | null
   onSaved: (version: string) => void
   onConflict?: (currentVersion: string) => void
+  /** The id of the object at `path`, when known: kept unsaved text is tied to it (`unsaved.ts`). */
+  objectId?: string | null
 }
 
 export function useAutosave(opts: AutosaveOptions) {
   const optsRef = useRef(opts)
+  /** The object id last seen at each path this editor showed (kept text is tied to it). */
+  const idsRef = useRef(new Map<string, string | null>())
   useLayoutEffect(() => {
     optsRef.current = opts
+    if (opts.objectId !== undefined) idsRef.current.set(opts.path, opts.objectId)
   })
 
   const versionRef = useRef(opts.version)
@@ -92,13 +97,19 @@ export function useAutosave(opts: AutosaveOptions) {
             savedBodyRef.current = body
             retryDelayRef.current = AUTOSAVE_RETRY_MS
             setSaveError(null)
+            // What is on disk is now newer than any text kept for this object
+            // earlier (e.g. by a settle while saving was paused): offering that
+            // again would revert these edits.
+            dropUnsaved(path, idsRef.current.get(path))
             optsRef.current.onSaved(res.version)
           }
         } catch (err) {
           if (!aliveRef.current || optsRef.current.path !== path) {
             // The editor has left this object: nobody is there to resolve a conflict
-            // or see a retry, so keep the text to offer when the object opens again.
-            keepUnsaved(path, body)
+            // or see a retry, so keep the text to offer when the object opens again:
+            // the text asked for on leaving, when it is newer than this save's.
+            const q = queuedRef.current
+            keepUnsaved(path, q?.path === path && q.body !== null ? q.body : body, idsRef.current.get(path))
           } else if (err instanceof ConflictError) {
             pausedRef.current = true
             setSaveError(null)
@@ -176,7 +187,7 @@ export function useAutosave(opts: AutosaveOptions) {
     if (!pausedRef.current || o.readOnly) return false
     const body = o.getBody()
     if (body !== null && savedBodyRef.current !== null && body !== savedBodyRef.current) {
-      keepUnsaved(path ?? o.path, body)
+      keepUnsaved(path ?? o.path, body, idsRef.current.get(path ?? o.path))
     }
     return true
   }, [])

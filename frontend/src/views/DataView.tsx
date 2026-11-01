@@ -138,11 +138,15 @@ export interface DataViewProps {
   onWritten?(row: Row, result: UpdateResult): void
 }
 
-/** Whether a dialog, menu or popover is open or holds `target` (its Escape is its own). */
+/**
+ * Whether a dialog, menu or popover is open or holds `target` (its Escape is its own). A tooltip
+ * (a popper too) is not one: Escape goes on to the view.
+ */
 function overlayOpen(target: EventTarget | null): boolean {
   const OVERLAY = '[role="dialog"], [role="alertdialog"], [role="menu"], [data-radix-popper-content-wrapper]'
   if (target instanceof Element && target.closest(`${OVERLAY}, [role="listbox"]`)) return true
-  return document.querySelector(OVERLAY) !== null
+  const tooltip = (el: Element) => el.matches('[data-radix-popper-content-wrapper]') && el.querySelector('[role="tooltip"]') !== null
+  return [...document.querySelectorAll(OVERLAY)].some((el) => !tooltip(el))
 }
 
 /** Our string: a bulk delete where some rows failed (they stay selected). */
@@ -172,7 +176,7 @@ function rowFocusTarget(row: Element | null): HTMLElement | null {
 
 /**
  * A small context menu at the pointer: closes on a click elsewhere, Escape or scroll. Keyboard:
- * the first item takes focus; Up/Down/Home/End move between items, Right opens a submenu and Left
+ * the first item takes focus; Up/Down/Home/End move between items (Tab doesn't leave the menu), Right opens a submenu and Left
  * leaves it, Enter activates, Escape closes and returns focus to the row (`returnFocus`).
  */
 function RowContextMenu({
@@ -219,6 +223,11 @@ function RowContextMenu({
   }, [onClose, returnFocus])
 
   const onKeyDown = (e: ReactKeyboardEvent) => {
+    // As the app's (Radix) menus: Tab doesn't move focus out of an open menu.
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      return
+    }
     const target = e.target as HTMLElement
     const menu = target.closest('[role="menu"]')
     if (!menu) return

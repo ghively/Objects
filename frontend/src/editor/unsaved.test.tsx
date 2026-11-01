@@ -15,7 +15,7 @@ import { resetLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPage } from '@/object/ObjectPage'
 import { flushAll } from '@/lib/flush'
-import { keptUnsaved, resetUnsaved } from './unsaved'
+import { keepUnsaved, keptUnsaved, resetUnsaved } from './unsaved'
 
 const mocked = vi.mocked(api)
 
@@ -141,11 +141,109 @@ describe('edits that could not be saved when the object is left', () => {
     expect(mocked.saveBody).toHaveBeenCalledTimes(1)
   })
 
+  test('text kept for a deleted object is not offered to another object made at its path', async () => {
+    onDisk = { ...onDisk, summary: { ...onDisk.summary, id: 'id-old' } }
+    mocked.saveBody.mockRejectedValueOnce(new ConflictError('v2'))
+    const first = await openPage()
+    const mine = typeMine(first.editor)
+    onDisk = { ...detail(THEIRS, 'v2'), summary: { ...onDisk.summary, id: 'id-old' } }
+    await screen.findByRole('dialog', { name: /changed on disk/i }, { timeout: 2500 })
+    first.unmount()
+    expect(keptUnsaved(PATH, 'id-old')).toBe(mine)
+
+    onDisk = { ...detail(THEIRS, 'v5'), summary: { ...onDisk.summary, id: 'id-new' } }
+    await openPage(THEIRS)
+    await act(async () => new Promise((r) => setTimeout(r, 50)))
+    expect(screen.queryByRole('dialog', { name: 'Recover unsaved changes' })).not.toBeInTheDocument()
+    expect(keptUnsaved(PATH, 'id-old')).toBe(mine) // still there, should the old object be restored
+  })
+
   test('a clean leave keeps nothing', async () => {
     const first = await openPage()
     typeMine(first.editor)
     first.unmount()
     await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledTimes(1))
     expect(keptUnsaved(PATH)).toBeNull()
+  })
+
+  test('text kept by a settle while paused is forgotten once Keep mine saves it', async () => {
+    mocked.saveBody.mockRejectedValueOnce(new ConflictError('v2'))
+    const first = await openPage()
+    typeMine(first.editor)
+    onDisk = detail(THEIRS, 'v2')
+    const dialog = await screen.findByRole('dialog', { name: /changed on disk/i }, { timeout: 2500 })
+    await act(async () => {
+      await flushAll() // e.g. a version restore or export settles the editor while paused
+    })
+    expect(keptUnsaved(PATH)).not.toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Keep mine' }))
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(keptUnsaved(PATH)).toBeNull())
+    // More typing and a clean leave: reopening offers nothing old.
+    const later = typeMine(first.editor)
+    first.unmount()
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledTimes(3))
+    onDisk = detail(later, 'v9')
+    await openPage(later)
+    expect(screen.queryByRole('dialog', { name: 'Recover unsaved changes' })).not.toBeInTheDocument()
+  })
+
+  test('text kept by a settle while paused is forgotten on Take theirs', async () => {
+    mocked.saveBody.mockRejectedValueOnce(new ConflictError('v2'))
+    const first = await openPage()
+    typeMine(first.editor)
+    onDisk = detail(THEIRS, 'v2')
+    const dialog = await screen.findByRole('dialog', { name: /changed on disk/i }, { timeout: 2500 })
+    await act(async () => {
+      await flushAll()
+    })
+    expect(keptUnsaved(PATH)).not.toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Take theirs' }))
+    await waitFor(() => expect(serializeBody(first.editor)).toBe(THEIRS))
+    expect(keptUnsaved(PATH)).toBeNull()
+  })
+})
+
+describe('the recovery dialog', () => {
+  const KEPT = 'First paragraph. kept\n\nSecond paragraph.\n'
+
+  test('a double-click on "Save changes" saves once', async () => {
+    keepUnsaved(PATH, KEPT)
+    await openPage()
+    const dialog = await screen.findByRole('dialog', { name: 'Recover unsaved changes' })
+    const save = within(dialog).getByRole('button', { name: 'Save changes' })
+    mocked.saveBody.mockImplementationOnce(async () => ({ version: 'v2' }))
+    mocked.saveBody.mockImplementationOnce(async () => {
+      throw new ConflictError('v2')
+    })
+    fireEvent.click(save)
+    fireEvent.click(save)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(mocked.saveBody.mock.calls.filter((c) => c[1] === KEPT)).toHaveLength(1)
+    expect(keptUnsaved(PATH)).toBeNull()
+  })
+
+  test('a conflict on save whose file already holds the kept text closes the dialog', async () => {
+    keepUnsaved(PATH, KEPT)
+    await openPage()
+    const dialog = await screen.findByRole('dialog', { name: 'Recover unsaved changes' })
+    mocked.saveBody.mockRejectedValueOnce(new ConflictError('v2'))
+    onDisk = detail(KEPT, 'v2') // another window saved the same text meanwhile
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(keptUnsaved(PATH)).toBeNull()
+  })
+
+  test('"Version on disk" follows a change made while the dialog is open', async () => {
+    keepUnsaved(PATH, KEPT)
+    await openPage()
+    const dialog = await screen.findByRole('dialog', { name: 'Recover unsaved changes' })
+    onDisk = detail(THEIRS, 'v2')
+    act(() => {
+      for (const cb of [...listeners]) cb({ kind: 'changed', path: PATH, version: 'v2' })
+    })
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText('Version on disk')).toHaveTextContent(/edited in VS Code/),
+    )
   })
 })
