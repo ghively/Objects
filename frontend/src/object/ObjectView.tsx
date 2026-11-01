@@ -958,12 +958,13 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   )
 
   if (mode === 'inline') {
-    // Emptiness from the editor's DOM first: any text means not empty, with no serialising of
-    // the body (this ran twice per keystroke, on input and keyup). Only a textless document is
-    // serialised, since an image or embed alone is not empty either.
+    // Emptiness from the editor's DOM first: any text, or any block but a paragraph (an image,
+    // a divider, an embed: each writes Markdown of its own), means not empty, with no
+    // serialising of the body (this ran twice per keystroke, on input and keyup). Only a
+    // document of textless paragraphs is serialised.
     const checkEmpty = () => {
       const pm = inlineRef.current?.querySelector('.ProseMirror')
-      if (pm && (pm.textContent ?? '').trim() !== '') {
+      if (pm && ((pm.textContent ?? '').trim() !== '' || [...pm.children].some((c) => c.tagName !== 'P'))) {
         setBodyEmpty(false)
         return
       }
