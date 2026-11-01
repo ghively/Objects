@@ -11,6 +11,7 @@ import { QueriesPage } from '@/queries/QueriesPage'
 import { QueryPage } from '@/queries/QueryPage'
 import { LinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, refreshLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { setUnsavedSpace } from '@/editor/unsaved'
 import { setRecentSpace } from '@/nav/recent'
 import { isSidepanelShown } from '@/nav/sidepanel'
 import {
@@ -185,6 +186,7 @@ export default function App() {
     const settingsReady = settings.loaded ? Promise.resolve() : settings.load().catch(() => undefined)
     fetchSpace()
       .then(async (s) => {
+        setUnsavedSpace(s.root)
         await Promise.all([setTabsSpace(s.root), setRecentSpace(s.root), settingsReady])
         if (!live) return
         // "When this space opens" (per space, on this device).

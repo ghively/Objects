@@ -14,6 +14,7 @@ import { serializeBody } from '@/editor/document'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPage } from '@/object/ObjectPage'
+import { flushAll } from '@/lib/flush'
 import { keptUnsaved, resetUnsaved } from './unsaved'
 
 const mocked = vi.mocked(api)
@@ -125,6 +126,19 @@ describe('edits that could not be saved when the object is left', () => {
     mocked.saveBody.mockRejectedValueOnce(new ConflictError('v2'))
     first.unmount() // the unmount flush gets the 409 after the view is gone
     await waitFor(() => expect(keptUnsaved(PATH)).toBe(mine))
+  })
+
+  test('a space switch with the conflict dialog open keeps the text before the page reloads', async () => {
+    mocked.saveBody.mockRejectedValueOnce(new ConflictError('v2'))
+    const first = await openPage()
+    const mine = typeMine(first.editor)
+    onDisk = detail(THEIRS, 'v2')
+    await screen.findByRole('dialog', { name: /changed on disk/i }, { timeout: 2500 })
+    await act(async () => {
+      await flushAll() // what `switchSpace` runs before the server switches and the page reloads
+    })
+    expect(keptUnsaved(PATH)).toBe(mine) // no unmount happens: a reload skips the effect cleanups
+    expect(mocked.saveBody).toHaveBeenCalledTimes(1)
   })
 
   test('a clean leave keeps nothing', async () => {
