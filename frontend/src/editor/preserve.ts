@@ -193,7 +193,8 @@ function parseList(lines: string[]): (ListLine | null)[] {
 }
 
 function listKey(line: string, parsed: ListLine | null): string {
-  if (!parsed) return 'C\0' + line.trim()
+  // A continuation line (a later paragraph's, too) ends in a hard break written either way.
+  if (!parsed) return 'C\0' + line.trim().replace(/\\$/, '').trimEnd()
   const ordered = /\d/.test(parsed.marker) ? 'o' : 'b'
   // A hard break may be written `\` or as trailing blanks, and a done box `[x]` or `[X]`: the same line.
   const content = parsed.content.replace(/^\[X\](?=[ \t]|$)/, '[x]')
@@ -289,8 +290,8 @@ function preserveList(origLines: string[], regenInput: string[]): string[] {
   // leaves it short).
   const continuation = (line: string, i: number): string => {
     if (line.trim() === '') return line
-    const first = firstParagraphItem(i)
-    if (first >= 0) return firstParagraphLine(line, i, first)
+    const owner = breakOwner(i)
+    if (owner) return lineAfterBreak(line, i, owner.item, owner.base)
     const replaced = replacedOriginal(i)
     if (replaced !== null && !origParsed[replaced])
       return /^[ \t]*/.exec(origLines[replaced])![0] + line.trimStart()
@@ -306,23 +307,40 @@ function preserveList(origLines: string[], regenInput: string[]): string[] {
     return ' '.repeat(col + Math.max(0, own - regenCol)) + line.trimStart()
   }
 
-  /** For a line after a hard break in an item's first paragraph, that item's line; else -1. */
-  const firstParagraphItem = (i: number): number => {
-    for (let k = i - 1; k >= 0 && HARD_BREAK.test(regenLines[k]); k--) if (regenParsed[k]) return k
-    return -1
+  /**
+   * For a line after a hard break in an item, that item's line and how far the serializer
+   * indents the line before its own text: by the item's indent in its first paragraph, to
+   * its text column in a later one (after a blank line); else null.
+   */
+  const breakOwner = (i: number): { item: number; base: number } | null => {
+    let k = i - 1
+    for (; k >= 0 && !isBlank(regenLines[k]) && HARD_BREAK.test(regenLines[k]); k--) {
+      if (regenParsed[k]) return { item: k, base: regenParsed[k]!.indent.length }
+    }
+    const start = k + 1 // the paragraph's first line
+    if (start >= i || start === 0 || !isBlank(regenLines[start - 1])) return null
+    const width = indentWidth(/^[ \t]*/.exec(regenLines[start])![0])
+    for (let j = start - 1; j >= 0; j--) {
+      const p = regenParsed[j]
+      if (!p) continue
+      const head = p.indent + p.marker + (p.gap || ' ')
+      if (indentWidth(head) <= width) return { item: j, base: head.length }
+      if (p.depth === 0) return null
+    }
+    return null
   }
 
-  // A line after a hard break in an item's first paragraph. The serializer
-  // indents it by the item's indent only, so blanks beyond that are the text's
+  // A line after a hard break in an item. The serializer indents it by `base`
+  // (see `breakOwner`), so blanks beyond that are the text's
   // own (a line typed after Shift-Enter that starts with spaces). The loader
   // strips the item's indent and two columns (an ordered item's: its marker's
   // width, `10.` three) and keeps further blanks as text,
   // except four or more (or a tab), which it drops: their first is written
   // `&nbsp;`, as on a paragraph's first line (`escapeLineStarts`). An original
   // line whose blanks read back as the same text keeps them.
-  const firstParagraphLine = (line: string, i: number, first: number): string => {
+  const lineAfterBreak = (line: string, i: number, first: number, base: number): string => {
     const lead = /^[ \t]*/.exec(line)![0]
-    const text = lead.slice(Math.min(lead.length, regenParsed[first]!.indent.length))
+    const text = lead.slice(Math.min(lead.length, base))
     const item = LIST_ITEM.exec(match[first] >= 0 ? origLines[match[first]] : restyle(regenLines[first], first))
     const marker = item ? item[2] : regenParsed[first]!.marker
     const indent = (item ? item[1] : regenParsed[first]!.indent) + ' '.repeat(/\d/.test(marker) ? marker.length : 2)
