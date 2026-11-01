@@ -140,11 +140,15 @@ def _safe_shift(d: date, days: int) -> date:
 def _missed(
     rule: RepeatRule, current: DateLike, today: date, tz: tzinfo, week_start: str, limit: int
 ) -> list[DateLike]:
-    """The scheduled dates from ``current`` up to yesterday, oldest first (by due date only)."""
+    """The newest `limit` scheduled dates from ``current`` up to yesterday, oldest first
+    (by due date only). Capacities shows at most 99 missed occurrences (`OVERDUE_CAP`);
+    Gene: the most recent ones (audit 2026-11-01)."""
     cur_day = _day(current, tz)
     if rule.mode != "dueDate" or cur_day >= today:
         return []
-    return scheduled_between(rule, current, cur_day, today - _ONE_DAY, tz, week_start, limit)
+    return scheduled_between(
+        rule, current, cur_day, today - _ONE_DAY, tz, week_start, limit, newest=True
+    )
 
 
 def overdue_info(state: TaskState, now: datetime, tz: tzinfo, week_start: str) -> dict[str, Any]:
@@ -154,7 +158,7 @@ def overdue_info(state: TaskState, now: datetime, tz: tzinfo, week_start: str) -
     if state.current is not None:
         missed = _missed(state.rule, state.current, today, tz, week_start, OVERDUE_CAP + 1)
     capped = len(missed) > OVERDUE_CAP
-    missed = missed[:OVERDUE_CAP]
+    missed = missed[-OVERDUE_CAP:]
     return {
         "count": len(missed),
         "capped": capped,
@@ -203,7 +207,9 @@ def plan_occurrence(
         return [current], next_date(rule, current, now, today, tz, week_start)
     if catch_up == "advanceOne":
         return [current], _step_once(rule, current, tz, week_start)
-    missed = _missed(rule, current, today, tz, week_start, 10_000)
+    # At most the 99 most recent missed occurrences are logged (Capacities' cap; a daily
+    # task dated 1800 otherwise wrote a 10,001-line log).
+    missed = _missed(rule, current, today, tz, week_start, OVERDUE_CAP)
     nxt = next_date(rule, current, now, today, tz, week_start)
     if catch_up == "catchUpBeforeNow":
         return [missed[-1] if missed else current], nxt
