@@ -353,9 +353,11 @@ def _key_token_end(line: str, col: int) -> int:
                     continue
                 return j + 1
             j += 1
-        return len(line)
+        return len(line.rstrip("\r\n"))
     m = re.compile(r":(?=[ \t\r\n]|$)").search(line, col)
-    return m.start() if m else len(line)
+    # An explicit key (`? status` on its own line) has no `:` on the line: the token
+    # ends before the line break, which must stay.
+    return m.start() if m else len(line.rstrip("\r\n"))
 
 
 def _render_key(key: str) -> str:
@@ -385,7 +387,16 @@ def rename_key(src: str, old: str, new: str) -> str:
     row, col = data.lc.key(old)
     line = lines[row]
     lines[row] = line[:col] + _render_key(new) + line[_key_token_end(line, col) :]
-    return "".join(lines)
+    out = "".join(lines)
+    expected = {(new if k == old else k): v for k, v in parse_fm(src).items()}
+    try:
+        if parse_fm(out) == expected:
+            return out
+    except FrontmatterError:
+        pass
+    # The key's line couldn't be spliced (an unusual key form): re-render the key
+    # at the end instead of returning something that doesn't read back.
+    return set_keys(delete_keys(src, [old]), {new: data[old]})
 
 
 # -- in-place value edits --------------------------------------------------------
