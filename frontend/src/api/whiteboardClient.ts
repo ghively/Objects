@@ -115,17 +115,15 @@ export const whiteboardApi = {
   },
 
   /**
-   * `PUT /api/ui` with `{patch: {whiteboard}}`. Sent directly because `UiPatch` has no
-   * `whiteboard` key until Task 13 (it may switch this to `api.patchUi`). 409 → `RevisionConflictError`.
+   * `PUT /api/ui` with `{patch: {whiteboard}}` through `api.patchUi`, so the save is announced to
+   * this window as a local `ui` event like every other `ui.json` write. 409 → `RevisionConflictError`.
+   * The caller keeps `useUiStore.revision` current (see `useWhiteboardSettings`).
    */
   async saveSettings(
     settings: WhiteboardSettings,
     baseRevision: string,
   ): Promise<{ settings: WhiteboardSettings; revision: string }> {
-    const res = await request<{ ui: Record<string, unknown>; revision: string }>(
-      `${BASE}/ui`,
-      json('PUT', { patch: { whiteboard: settings }, baseRevision, clientId: CLIENT_ID }),
-    )
+    const res = await api.patchUi({ whiteboard: settings }, { baseRevision })
     return { settings: settingsOf(res?.ui?.whiteboard), revision: res?.revision ?? '' }
   },
 }
