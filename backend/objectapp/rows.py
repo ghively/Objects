@@ -149,8 +149,13 @@ def build_rows(
     collection_ids: list[str] | None = None,
     paths: list[str] | None = None,
     search: tuple[list[str], str] | None = None,
+    preview: bool = True,
 ) -> list[Row]:
-    """The rows of the space's objects in scope, sorted by path (templates excluded)."""
+    """The rows of the space's objects in scope, sorted by path (templates excluded).
+
+    ``preview=False`` leaves ``Row.preview`` empty: a view loads its rows that way and
+    fetches the previews of the rows it shows (audit 2026-11-01 P2).
+    """
     terms: list[str] = []
     mode = "auto"
     if search is not None:
@@ -195,11 +200,11 @@ def build_rows(
             continue
         if terms and not _matches(raw, summary, terms, mode):
             continue
-        rows.append(_row(space, raw, summary))
+        rows.append(_row(space, raw, summary, preview))
     return rows
 
 
-def _row(space: Space, raw: RawObject, summary: ObjectSummary) -> Row:
+def _row(space: Space, raw: RawObject, summary: ObjectSummary, preview: bool = True) -> Row:
     from .space import version_of
 
     t = space.type_by_id(summary.type)
@@ -232,5 +237,5 @@ def _row(space: Space, raw: RawObject, summary: ObjectSummary) -> Row:
         version=version_of(raw.data),
         values=values,
         links=links,
-        preview=body_preview(raw.of.body),
+        preview=body_preview(raw.of.body) if preview else "",
     )

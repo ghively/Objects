@@ -1450,11 +1450,12 @@ class Space:
         collection_ids: list[str] | None = None,
         paths: list[str] | None = None,
         search: tuple[list[str], str] | None = None,
+        preview: bool = True,
     ):
         """The objects in scope as `rows.Row`s (decoded values, links, preview), sorted by path."""
         from .rows import build_rows
 
-        return build_rows(self, type_ids, collection_ids, paths, search)
+        return build_rows(self, type_ids, collection_ids, paths, search, preview)
 
     def type_by_id(self, type_id: str) -> TypeDefinition | None:
         return next((t for t in self.types if t.id == type_id), None)

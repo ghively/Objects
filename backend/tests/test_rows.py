@@ -197,3 +197,25 @@ def test_preview_skips_annotations_and_math_fences():
         "Price $5 and $6.\n"
     )
     assert body_preview(body) == "Rollout notes Inside the toggle. E = mc^2 Price $5 and $6."
+
+
+def test_rows_without_preview_skips_body_preview(space_dir):
+    """Audit 2026-11-01 P2: a view fetches rows without previews first, then the visible page's."""
+    space = Space(space_dir)
+    with_preview = _by_path(space.rows(["task"]))
+    without = _by_path(space.rows(["task"], preview=False))
+    assert set(with_preview) == set(without)
+    assert any(r.preview for r in with_preview.values())
+    assert all(r.preview == "" for r in without.values())
+    for path, row in without.items():
+        assert row.values == with_preview[path].values
+        assert row.version == with_preview[path].version
+
+
+def test_rows_route_preview_flag(space_dir):
+    client = TestClient(create_app(Space(space_dir), None, watch=False))
+    with client:
+        full = client.post("/api/rows", json={"typeIds": ["task"]}).json()["rows"]
+        bare = client.post("/api/rows", json={"typeIds": ["task"], "preview": False}).json()["rows"]
+    assert any(r["preview"] for r in full)
+    assert all(r["preview"] == "" for r in bare)
