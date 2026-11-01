@@ -22,7 +22,7 @@ import {
   visibleAreas,
   type PanelArea,
 } from './sidepanel'
-import { switchStoreSpace } from './spaceStorage'
+import { followStorage, switchStoreSpace } from './spaceStorage'
 
 export type Target =
   | { kind: 'type'; typeId: string }
@@ -558,6 +558,38 @@ export const useTabs = create<TabsState>()(
 export function setTabsSpace(root: string | null): Promise<void> {
   return switchStoreSpace(useTabs, 'object.tabs', root, { tabs: [], activeId: null })
 }
+
+/**
+ * Another window of this space wrote its tabs: merge them into ours instead of letting the next
+ * navigation here overwrite them (each window writes the whole `{tabs, activeId}`). Tabs by id:
+ * one it closed (in `previous`, gone from `incoming`) closes here too unless it is our active tab;
+ * a shared tab takes its newer copy, again except our active tab; its new tabs are appended; our
+ * `activeId` stays ours.
+ */
+export function mergeTabsFromStorage(incoming: unknown, previous: unknown, current: Pick<TabsState, 'tabs' | 'activeId'>): Pick<TabsState, 'tabs' | 'activeId'> | null {
+  const inc = incoming as Partial<TabsState> | null
+  if (!inc || !Array.isArray(inc.tabs)) return null
+  const theirs = inc.tabs.map(cleanTab).filter((t): t is Tab => t !== null)
+  const theirIds = new Set(theirs.map((t) => t.id))
+  const prev = previous as Partial<TabsState> | null
+  const closed = new Set<string>()
+  if (prev && Array.isArray(prev.tabs)) {
+    for (const t of prev.tabs as Partial<Tab>[]) if (typeof t?.id === 'string' && !theirIds.has(t.id)) closed.add(t.id)
+  }
+  const ours = new Set(current.tabs.map((t) => t.id))
+  const merged: Tab[] = []
+  for (const t of current.tabs) {
+    if (t.id === current.activeId) merged.push(t)
+    else if (closed.has(t.id)) continue
+    else merged.push(theirs.find((x) => x.id === t.id) ?? t)
+  }
+  for (const t of theirs) if (!ours.has(t.id)) merged.push(t)
+  const tabs = sortPinned(merged)
+  const activeId = tabs.some((t) => t.id === current.activeId) ? current.activeId : (tabs[0]?.id ?? null)
+  return { tabs, activeId }
+}
+
+followStorage(useTabs, mergeTabsFromStorage)
 
 export interface PeekState {
   /** The object shown in the peek, or null when closed. */
