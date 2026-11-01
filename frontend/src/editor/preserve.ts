@@ -151,16 +151,22 @@ function indentWidth(ws: string): number {
   return w
 }
 
-/** Parse list lines, giving each item a nesting depth from its indent. */
+/**
+ * Parse list lines, giving each item a nesting depth as CommonMark does: an
+ * item is nested in the previous one when its indent reaches that item's
+ * content column (indent, marker and gap; a tab is four columns), so `   - b`
+ * and `\t- c` are siblings.
+ */
 function parseList(lines: string[]): (ListLine | null)[] {
-  const stack: number[] = []
+  const columns: number[] = [] // content column of the open item at each depth
   return lines.map((line) => {
     const m = LIST_ITEM.exec(line)
     if (!m) return null
     const w = indentWidth(m[1])
-    while (stack.length && w < stack[stack.length - 1]) stack.pop()
-    if (!stack.length || w > stack[stack.length - 1]) stack.push(w)
-    return { indent: m[1], marker: m[2], gap: m[3], content: m[4], depth: stack.length - 1 }
+    while (columns.length && w < columns[columns.length - 1]) columns.pop()
+    const depth = columns.length
+    columns.push(indentWidth(m[1] + m[2] + (m[3] || ' ')))
+    return { indent: m[1], marker: m[2], gap: m[3], content: m[4], depth }
   })
 }
 
