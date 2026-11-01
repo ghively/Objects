@@ -257,7 +257,8 @@ let off: (() => void) | null = null
 
 /** Pinned items and custom sections; loads `ui.json` and follows `ui` events from other windows. */
 export function usePinned(): UsePinned {
-  const { ui, loaded } = useUiStore()
+  const ui = useUiStore((s) => s.ui)
+  const loaded = useUiStore((s) => s.loaded)
   useEffect(() => {
     refs += 1
     if (refs === 1) {
