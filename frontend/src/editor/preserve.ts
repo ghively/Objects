@@ -238,6 +238,8 @@ function preserveList(origLines: string[], regenLines: string[]): string[] {
   // leaves it short).
   const continuation = (line: string, i: number): string => {
     if (line.trim() === '') return line
+    const first = firstParagraphItem(i)
+    if (first >= 0) return firstParagraphLine(line, i, first)
     const replaced = replacedOriginal(i)
     if (replaced !== null && !origParsed[replaced])
       return /^[ \t]*/.exec(origLines[replaced])![0] + line.trimStart()
@@ -251,6 +253,36 @@ function preserveList(origLines: string[], regenLines: string[]): string[] {
     const regenCol = q.indent.length + q.marker.length + q.gap.length
     const own = /^[ \t]*/.exec(line)![0].length
     return ' '.repeat(col + Math.max(0, own - regenCol)) + line.trimStart()
+  }
+
+  /** For a line after a hard break in an item's first paragraph, that item's line; else -1. */
+  const firstParagraphItem = (i: number): number => {
+    for (let k = i - 1; k >= 0 && HARD_BREAK.test(regenLines[k]); k--) if (regenParsed[k]) return k
+    return -1
+  }
+
+  // A line after a hard break in an item's first paragraph. The serializer
+  // indents it by the item's indent only, so blanks beyond that are the text's
+  // own (a line typed after Shift-Enter that starts with spaces). The loader
+  // strips the item's indent and two columns (an ordered item's: its marker's
+  // width, `10.` three) and keeps further blanks as text,
+  // except four or more (or a tab), which it drops: their first is written
+  // `&nbsp;`, as on a paragraph's first line (`escapeLineStarts`). An original
+  // line whose blanks read back as the same text keeps them.
+  const firstParagraphLine = (line: string, i: number, first: number): string => {
+    const lead = /^[ \t]*/.exec(line)![0]
+    const text = lead.slice(Math.min(lead.length, regenParsed[first]!.indent.length))
+    const item = LIST_ITEM.exec(match[first] >= 0 ? origLines[match[first]] : restyle(regenLines[first], first))
+    const marker = item ? item[2] : regenParsed[first]!.marker
+    const indent = (item ? item[1] : regenParsed[first]!.indent) + ' '.repeat(/\d/.test(marker) ? marker.length : 2)
+    const replaced = replacedOriginal(i)
+    if (replaced !== null && !origParsed[replaced]) {
+      const origLead = /^[ \t]*/.exec(origLines[replaced])![0]
+      const same = text === '' ? origLead.length <= indent.length : origLead.length - indent.length === text.length
+      if (same && !/\t/.test(origLead + text)) return origLead + line.trimStart()
+    }
+    if (text.length >= 4 || text.includes('\t')) return indent + '&nbsp;' + text.slice(1) + line.trimStart()
+    return indent + text + line.trimStart()
   }
 
   /** The original line regenerated line `i` replaces, as `weaveBlankLines` pairs them, or null. */
