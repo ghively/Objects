@@ -172,9 +172,10 @@ const edges = new WeakMap<Editor, Edges>()
 
 /**
  * A `Key:: value` field line (kept raw). The `::` is followed by a blank or the
- * line end, so `std::vector` or `a::b` in text is not one.
+ * line end, so `std::vector` or `a::b` in text is not one; `Key\:: value` is
+ * the escaped text the editor writes for a typed one (`escapeLineStarts`).
  */
-const FIELD_LINE = /^[^\s:][^:\n]*::(?:[ \t]|$)/m
+const FIELD_LINE = /^[^\s:][^:\n]*(?<!\\)::(?:[ \t]|$)/m
 const RAW_KINDS = new Set(['html', 'def', 'raw', 'text'])
 const CONTAINERS = new Set(['toggle', 'group', 'columns', 'indent'])
 /** Leaf types whose Markdown this module writes itself (`customMarkdown`). */
