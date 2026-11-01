@@ -1,0 +1,62 @@
+{
+ "tSidebar": 507,
+ "tCounts": 1357,
+ "paint": [
+  "first-paint@76",
+  "first-contentful-paint@484"
+ ],
+ "heapMB": 38,
+ "long": [
+  184,
+  68
+ ],
+ "api": [
+  "space 17166B 32ms@446",
+  "ui 372B 23ms@446",
+  "collections 896B 28ms@447",
+  "queries 699B 23ms@447",
+  "space 17166B 348ms@449",
+  "space 17166B 352ms@449",
+  "objects 1909760B 358ms@449",
+  "settings 1160B 5ms@851"
+ ]
+}
+{
+ "tTypePage": 1918,
+ "long": [],
+ "heapMB": 38,
+ "api": [
+  "types/page/templates 302B 14ms",
+  "views/page 657B 12ms",
+  "rows 5420232B 1479ms"
+ ],
+ "rows": 50
+}
+{
+ "afterExternalEdit": {
+  "long": [],
+  "heapMB": 38,
+  "api": [
+   "space 17166B 18ms@6099",
+   "objects 1909760B 252ms@6099",
+   "rows 1480B 44ms@6118"
+  ]
+ }
+}
+{
+ "tGraphCanvas": 2989,
+ "tGraphLayoutDone": 2994,
+ "long": [
+  130,
+  155,
+  1630,
+  852
+ ],
+ "heapMB": 38,
+ "nodes": "5022"
+}
+{
+ "paletteTypingMs": 688,
+ "long": [],
+ "heapMB": 38
+}

@@ -1,0 +1,63 @@
+{
+ "tDcl": 443,
+ "tSidebar": 698,
+ "tCounts": 804,
+ "nav": {
+  "dcl": 435,
+  "load": 435,
+  "paint": [
+   {
+    "name": "first-paint",
+    "t": 64
+   },
+   {
+    "name": "first-contentful-paint",
+    "t": 576
+   }
+  ],
+  "heapMB": 33,
+  "longTasks": [
+   231,
+   104
+  ]
+ }
+}
+resources at startup:
+  t=18ms  3418397 B 46ms index-9fDvALaZ.js
+  t=18ms     1416 B 29ms rolldown-runtime-COiEfhsA.js
+  t=18ms   210872 B 27ms index-rUxqFUVa.css
+  t=496ms    24752 B 78ms inter-latin-600-normal-LgqL8muc.woff2
+  t=497ms    24572 B 67ms inter-latin-500-normal-Cerq10X2.woff2
+  t=497ms    25340 B 92ms inter-latin-400-italic-D1l0FflY.woff2
+  t=519ms    17164 B 10ms space
+  t=520ms      372 B 19ms ui
+  t=521ms      896 B 18ms collections
+  t=522ms      699 B 53ms queries
+  t=524ms    17164 B 52ms space
+  t=525ms    17164 B 76ms space
+  t=525ms     8230 B 50ms objects
+  t=540ms  4498601 B 170ms icons-EZnl7Oe0.js
+  t=636ms     1160 B 62ms settings
+  t=732ms    23964 B 22ms inter-latin-400-normal-C38fXH4l.woff2
+{
+ "tTypePage": 125,
+ "tOpenObject": 252,
+ "longTasksDuringNav": [
+  132
+ ],
+ "heapAfterNavMB": 33,
+ "tGraph": 478,
+ "heapAfterGraphMB": 33,
+ "assetsLoadedSoFar": [
+  "index-9fDvALaZ.js 3418397B",
+  "rolldown-runtime-COiEfhsA.js 1416B",
+  "index-rUxqFUVa.css 210872B",
+  "inter-latin-600-normal-LgqL8muc.woff2 24752B",
+  "inter-latin-500-normal-Cerq10X2.woff2 24572B",
+  "inter-latin-400-italic-D1l0FflY.woff2 25340B",
+  "icons-EZnl7Oe0.js 4498601B",
+  "inter-latin-400-normal-C38fXH4l.woff2 23964B",
+  "inter-latin-700-normal-Yt3aPRUw.woff2 24656B",
+  "sigma.esm-BJR69hkr.js 90027B"
+ ]
+}

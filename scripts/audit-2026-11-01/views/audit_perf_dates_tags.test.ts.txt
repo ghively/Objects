@@ -1,0 +1,54 @@
+import { describe, expect, test } from 'vitest'
+import type { Filter, Row, TypeDef } from '@/api/types'
+import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
+import { useSettings } from '@/settings/useSettings'
+import { applyFilters, type FilterCtx } from './filter'
+import { groupRows, type GroupCtx } from './group'
+import { wallClock } from '@/lib/zonedTime'
+import { formatDate } from '@/properties/format'
+
+const N = 2000
+const now = new Date(2026, 9, 23, 12, 0)
+const page: TypeDef = typeDef({ id: 'page', propertyDefinitions: [propertyDef({ id: 'due', type: 'datetime' }), propertyDef({ id: 'tags', type: 'entity_tags' })] })
+const rows: Row[] = Array.from({ length: N }, (_, i) =>
+  row({
+    summary: objectSummary({ path: `T/${i}.md`, type: 'page', tags: [`tag${i % 50}`] }),
+    values: { due: { start: `2026-${String(1 + (i % 12)).padStart(2, '0')}-${String(1 + (i % 28)).padStart(2, '0')}T09:00:00Z`, resolution: 'time' } },
+  }),
+)
+const ctx = (tags = 50): GroupCtx & FilterCtx => {
+  const tagIdsToTitles: Record<string, string> = {}
+  for (let i = 0; i < tags; i++) tagIdsToTitles[`id${i}`] = `tag${i}`
+  return { types: [page], viewTypeIds: ['page'], collections: [], tagIdsToTitles, now }
+}
+const time = (label: string, fn: () => unknown, reps = 3) => {
+  let best = Infinity
+  for (let r = 0; r < reps; r++) {
+    const t0 = performance.now()
+    fn()
+    best = Math.min(best, performance.now() - t0)
+  }
+  console.log(`${label}: ${best.toFixed(1)} ms`)
+  return best
+}
+const dateFilter: Filter = { type: 'filter', propertyId: 'due', option: 'isAfter', referenceValue: { relative: 'today' } }
+const fg = { type: 'filterGroup' as const, operator: 'and' as const, elements: [dateFilter] }
+
+describe('audit: date costs by time-zone setting', () => {
+  test('device zone (null) vs a named zone', () => {
+    const zone = (tz: string | null) => useSettings.setState({ settings: { ...useSettings.getState().settings, timeZone: tz } })
+    for (const tz of [null, 'Europe/Berlin']) {
+      zone(tz)
+      const label = tz ?? 'device zone (null)'
+      time(`${label}: wallClock x${N}`, () => { for (let i = 0; i < N; i++) wallClock(now) })
+      time(`${label}: date filter isAfter today (${N} rows)`, () => applyFilters(rows, fg, ctx()))
+      time(`${label}: group by date / day (${N} rows)`, () => groupRows(rows, { groups: [{ propertyId: 'due', option: 'day' }] }, undefined, ctx()))
+      time(`${label}: group by date / relative (${N} rows)`, () => groupRows(rows, { groups: [{ propertyId: 'due', option: 'relative' }] }, undefined, ctx()))
+      time(`${label}: formatDate x${N} (a table of date cells)`, () => { for (const r of rows) formatDate(r.values.due as never) })
+    }
+    zone(null)
+    time(`group by tags, tagIdsToTitles=50 (only tags)`, () => groupRows(rows, { groups: [{ propertyId: 'tags', option: 'default' }] }, undefined, ctx(50)))
+    time(`group by tags, tagIdsToTitles=1000`, () => groupRows(rows, { groups: [{ propertyId: 'tags', option: 'default' }] }, undefined, ctx(1000)))
+    expect(true).toBe(true)
+  }, 120000)
+})
