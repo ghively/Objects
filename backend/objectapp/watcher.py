@@ -3,8 +3,9 @@
 watchdog delivers file-system events on its own thread. Each object path is
 debounced (150 ms of quiet) by one worker thread that keeps a pending set, then
 re-read in batches: the `Space` summary is refreshed and a `ChangeEvent` per path
-is put on `SpaceWatcher.events` (an asyncio queue on the given loop). Nothing is
-emitted for:
+is put on `SpaceWatcher.events` (an asyncio queue on the given loop); a batch of
+more than `RESYNC_AFTER` object events (a ``git checkout``) is sent as one resync
+(``types`` at ``*``) instead. Nothing is emitted for:
 
 - dot-folders (``.object``, ``.object-cache``, ``.git``…), dot-files and
   non-``.md`` files;
@@ -45,13 +46,26 @@ from .space import Space, version_of
 from .typedefs import is_ignored
 from .whiteboardfile import sidecar_owner
 
-__all__ = ["DEBOUNCE_SECONDS", "FLUSH_SLICE", "SLICE_GAP", "ChangeEvent", "SpaceWatcher"]
+__all__ = [
+    "DEBOUNCE_SECONDS",
+    "FLUSH_SLICE",
+    "RESYNC_AFTER",
+    "RESYNC_PATH",
+    "SLICE_GAP",
+    "ChangeEvent",
+    "SpaceWatcher",
+]
 
 DEBOUNCE_SECONDS = 0.150
 FLUSH_SLICE = 0.025
 """How long (seconds) one acquisition of the space's lock keeps refreshing due paths."""
 SLICE_GAP = 0.002
 """Seconds the flush sleeps between slices so a waiting reader can take the lock."""
+RESYNC_AFTER = 100
+"""More object events than this in one flush (a ``git checkout``) are sent as one resync."""
+RESYNC_PATH = "*"
+"""``types`` with this path: "everything may have changed" (the client's ``RESYNC_PATH``)."""
+_OBJECT_KINDS = frozenset({"created", "changed", "deleted", "renamed", "whiteboard"})
 _DEFINITION_FOLDERS = ("collections", "queries", "views")
 
 
@@ -79,6 +93,21 @@ class ChangeEvent:
     """For a write made through the API: the writing client's id (its ``clientId``)."""
     oldPath: str | None = None
     """For ``renamed``: the object's path before the move."""
+
+
+def _collapsed(events: list[ChangeEvent]) -> list[ChangeEvent]:
+    """``events``, with more than `RESYNC_AFTER` object events replaced by one resync.
+
+    A branch switch touching thousands of files would otherwise send one event per file,
+    each making every window refetch; the resync (``types`` at `RESYNC_PATH`, no origin)
+    makes every client reload everything once, as after a dropped event stream. The
+    definition events (``collections``, ``queries``, ``views``, ``ui``) are kept.
+    """
+    objects = [e for e in events if e.kind in _OBJECT_KINDS]
+    if len(objects) <= RESYNC_AFTER:
+        return events
+    rest = [e for e in events if e.kind not in _OBJECT_KINDS]
+    return [ChangeEvent(kind="types", path=RESYNC_PATH, version=None), *rest]
 
 
 def _has_exact_name(full: Path) -> bool:
@@ -304,6 +333,7 @@ class SpaceWatcher:
             # and re-taking it at once starved readers for up to 0.9 s on a 1,000-file change.
             if i < len(batch):
                 time.sleep(SLICE_GAP)
+        events = _collapsed(events)
         if events and not self._stopped:
             try:
                 self.loop.call_soon_threadsafe(self._emit, events)

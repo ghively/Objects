@@ -60,6 +60,7 @@ from .frontmatter import (
     rename_key,
     replace_in_value,
     set_keys,
+    take_parsed,
 )
 from .ids import new_ulid
 from .collections import CollectionDef, SaveCollectionResult
@@ -79,7 +80,7 @@ from .propvalues import (
     encode_updates,
     encode_value,
 )
-from .spaceconfig import space_fields
+from .spaceconfig import SPACE_REL, space_fields
 from .recurrence import week_start_of
 from .taskhook import TaskResult, on_status_change
 from .linkindex import LinkIndex
@@ -274,6 +275,7 @@ _RESERVED_STEMS = frozenset(
 
 
 _LINK_UNSAFE_RE = re.compile(r"[\[\]#]")
+_SURROGATE_RE = re.compile("[\ud800-\udfff]")
 # A title that can't be a wikilink target as it is (it would end the target early).
 _LINK_BREAKING_RE = re.compile(r"[\[\]|#\n]")
 
@@ -300,6 +302,9 @@ def safe_filename(title: str) -> str:
     # `[`, `]` and `#` are legal in file names but end a wikilink's target, so
     # the path form of a link (see `Space._link_text`) must never contain them.
     title = _LINK_UNSAFE_RE.sub("", str(title or ""))
+    # A lone surrogate (JSON allows "\udc80") is no character: on Linux it would become a
+    # file name that isn't UTF-8. It is replaced, as a decoder replaces a bad byte.
+    title = _SURROGATE_RE.sub("\ufffd", title)
     m = _ILLEGAL_FILENAME_RE.search(title)
     stem = clean(title[: m.start()] if m else title)
     if not stem:
@@ -334,6 +339,20 @@ def unique_path(root: Path, folder: str, stem: str, same_as: str | None = None) 
         if name.lower() not in taken or name.lower() == own:
             return f"{folder}/{name}" if folder else name
         n += 1
+
+
+_MAX_COMPONENT = 255
+
+
+def _component_too_long(part: str) -> bool:
+    """Whether one path component is longer than the file system allows.
+
+    NTFS allows 255 UTF-16 code units per name (a character outside the BMP is two);
+    Linux and macOS file systems allow 255 bytes (of UTF-8).
+    """
+    if os.name == "nt":
+        return len(part.encode("utf-16-le", "surrogatepass")) > 2 * _MAX_COMPONENT
+    return len(part.encode("utf-8", "surrogateescape")) > _MAX_COMPONENT
 
 
 def _same_file(a: Path, b: Path) -> bool:
@@ -728,17 +747,77 @@ def _yaml_single_quoted(text: str) -> str:
 _link_candidates = link_candidates
 
 
+class _TypeList(list):
+    """`Space.types`: a list that tells the space whenever it is changed in place."""
+
+    def __init__(self, items: Iterable[TypeDefinition], changed: Callable[[], None]) -> None:
+        super().__init__(items)
+        self._changed = changed
+
+
+def _notifying(name: str) -> Callable[..., Any]:
+    method = getattr(list, name)
+
+    def wrapper(self: _TypeList, *args: Any, **kwargs: Any) -> Any:
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            self._changed()
+
+    wrapper.__name__ = name
+    return wrapper
+
+
+for _name in (
+    "append", "extend", "insert", "remove", "pop", "clear", "sort", "reverse",
+    "__setitem__", "__delitem__", "__iadd__", "__imul__",
+):
+    setattr(_TypeList, _name, _notifying(_name))
+
+
 class Space:
     @property
+    def types(self) -> list[TypeDefinition]:
+        """The space's types; assigning or changing it in place drops the `_type_id` lookup."""
+        return self._types
+
+    @types.setter
+    def types(self, value: Iterable[TypeDefinition]) -> None:
+        self._types = _TypeList(value, self._forget_type_ids)
+        self._forget_type_ids()
+
+    def _forget_type_ids(self) -> None:
+        self._type_ids = None
+
+    @property
     def name(self) -> str:
-        """``.object/space.json``'s ``name``, else the folder name (re-read on every access)."""
-        return space_fields(self.root)["name"]
+        """``.object/space.json``'s ``name``, else the folder name.
+
+        Re-read only when the file's stat (times, size, inode) changed since the last
+        access, so an edit made outside the app is still seen at once.
+        """
+        try:
+            st = os.stat(self._space_json)
+            key: tuple | None = (st.st_mtime_ns, st.st_ctime_ns, st.st_size, st.st_ino)
+        except OSError:
+            key = None
+        cached = self._name_cache
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        name = space_fields(self.root)["name"]
+        self._name_cache = (key, name)
+        return name
 
     def __init__(self, root: Path) -> None:
         self.root = Path(root).resolve()
+        self._space_json = os.fspath(self.root / SPACE_REL)
+        self._name_cache: tuple[tuple | None, str] | None = None
+        """(`space.json`'s stat key, the name read with it) for `name`."""
         self._lock = threading.RLock()
         self._raw: dict[str, RawObject] = {}
         self._summaries: dict[str, ObjectSummary] = {}
+        self._checked_rels: set[str] = set()
+        """Known object paths that passed `_rel`'s full check since their last rescan."""
         self._listeners: list[Callable[[SpaceChange], None]] = []
         self._names_rev = 0
         """Bumped whenever the set of link names changes (see `_names_changed`)."""
@@ -787,8 +866,9 @@ class Space:
         fmcache.for_root(self.root).flush()
         self.collections: dict[str, CollectionDef] = {}
         """Collection id -> definition (unreadable files included, read-only)."""
-        for cid, data, _rev, err in self.store("collections").list():
-            self.collections[cid] = self._load_collection(cid, data, err)
+        self._collections_loaded: dict[str, tuple[str, CollectionDef]] = {}
+        """Collection id -> (its file's revision, the definition parsed from it)."""
+        self.reload_collections()
         self.purge_expired(datetime.now(UTC))
 
     # -- types --------------------------------------------------------------
@@ -902,12 +982,39 @@ class Space:
                 self.collections[collection_id] = self._load_collection(collection_id, data, error)
 
     def reload_collections(self) -> None:
-        """Re-read every collection file (the list route does this, so it is never stale)."""
+        """Re-read the collection files that changed (the list route does this, so it is never stale).
+
+        Every file is read and hashed; one is parsed again only when its revision differs
+        from the one its in-memory definition was loaded at (and that definition is still
+        the one in `collections`), so external edits, additions and removals all show.
+        """
         with self._lock:
-            found = {}
-            for cid, data, _rev, err in self.store("collections").list():
-                found[cid] = self._load_collection(cid, data, err)
+            loaded = self._collections_loaded
+            known = {
+                cid: rev
+                for cid, (rev, c) in loaded.items()
+                if self.collections.get(cid) is c
+            }
+            found: dict[str, CollectionDef] = {}
+            fresh: dict[str, tuple[str, CollectionDef]] = {}
+            for cid, data, rev, err in self.store("collections").list(known):
+                if cid in known and known[cid] == rev:
+                    c = self.collections[cid]
+                else:
+                    c = self._load_collection(cid, data, err)
+                found[cid] = c
+                fresh[cid] = (rev, c)
             self.collections = found
+            self._collections_loaded = fresh
+
+    def collections_with_revisions(self) -> list[tuple[CollectionDef, str]]:
+        """`reload_collections`, then every collection with its file's revision, sorted as
+        `list_collections` (one read of each file in all)."""
+        with self._lock:
+            self.reload_collections()
+            return [
+                (c, self._collections_loaded[c.id][0]) for c in self.list_collections()
+            ]
 
     def list_collections(self) -> list[CollectionDef]:
         with self._lock:
@@ -1502,28 +1609,43 @@ class Space:
         return next((t for t in self.types if t.id == type_id), None)
 
     def _type_id(self, type_name: str) -> str:
-        """The id of the type `type_name` names: by name, then id, then former names."""
-        lowered = type_name.lower()
-        for match in (
-            lambda t: t.name.lower() == lowered,
-            lambda t: t.id.lower() == lowered,
-            lambda t: lowered in (f.lower() for f in t.formerNames),
-        ):
-            for t in self.types:
-                if match(t):
-                    return t.id
-        return slug(type_name)
+        """The id of the type `type_name` names: by name, then id, then former names.
+
+        Case-insensitive; answered from a lookup built once per change of `types`.
+        """
+        lookup = self._type_ids
+        if lookup is None:
+            lookup = {}
+            # Lowest priority first, so a name overrides an id overrides a former name,
+            # and within one kind the first type in `types` wins.
+            for t in reversed(self.types):
+                for f in t.formerNames:
+                    lookup[f.lower()] = t.id
+            for kind in ("id", "name"):
+                for t in reversed(self.types):
+                    lookup[getattr(t, kind).lower()] = t.id
+            self._type_ids = lookup
+        found = lookup.get(type_name.lower())
+        return found if found is not None else slug(type_name)
 
     # -- paths --------------------------------------------------------------
 
     def _rel(self, path: str) -> str:
-        """Normalise a space-relative path; reject anything outside the space."""
+        """Normalise a space-relative path; reject anything outside the space.
+
+        A path the space already knows in exactly this spelling, and that passed the
+        full check (``resolve()``, which costs ~46 µs) since it was last rescanned, is
+        answered from `_checked_rels`; `rescan_file` forgets it first, so a file replaced
+        on disk (say, by a symlink out of the space) is checked again.
+        """
+        if path in self._checked_rels and path in self._summaries:
+            return path
         rel = PurePosixPath(str(path).replace("\\", "/"))
         if rel.is_absolute() or ".." in rel.parts or not rel.parts:
             raise ValueError(f"Path is outside the space: {path!r}")
         if is_ignored(rel) or rel.name.startswith(".") or rel.suffix.lower() != ".md":
             raise ValueError(f"Not an object path: {path!r}")
-        if any(len(part.encode("utf-8", "surrogateescape")) > 255 for part in rel.parts):
+        if any(_component_too_long(part) for part in rel.parts):
             raise ValueError(f"Path component too long: {path!r}")
         try:
             full = (self.root / rel).resolve()
@@ -1531,7 +1653,10 @@ class Space:
             raise ValueError(f"Not an object path: {path!r}") from exc
         if not full.is_relative_to(self.root):
             raise ValueError(f"Path is outside the space: {path!r}")
-        return rel.as_posix()
+        out = rel.as_posix()
+        if out in self._summaries:
+            self._checked_rels.add(out)
+        return out
 
     def abspath(self, path: str) -> Path:
         return self.root / self._rel(path)
@@ -1673,6 +1798,10 @@ class Space:
             if fresh is None:
                 self.rescan_file(rel)
             else:
+                if fresh.of.frontmatter_src is not None:
+                    # The next `read_raw` of this file (the next save, a rescan) finds its
+                    # new frontmatter parsed instead of parsing it again.
+                    fmcache.for_root(self.root).put(rel, fresh.of.frontmatter_src, fresh.fm)
                 self._rescan_with(rel, fresh)
             return new_version
 
@@ -1698,7 +1827,8 @@ class Space:
             fm = {}
         else:
             try:
-                fm = parse_fm(of.frontmatter_src)
+                # An edit that checked its result by parsing it hands that parse on.
+                fm = take_parsed(of.frontmatter_src)
             except FrontmatterError:
                 return None
         t = fm.get("type")
@@ -2239,6 +2369,7 @@ class Space:
         with self._lock:
             self._raw.pop(rel, None)
             gone = self._summaries.pop(rel, None)
+            self._checked_rels.discard(rel)
             if gone is not None:
                 self._names_changed(gone, None)
             self._fire(SpaceChange("object", rel))
@@ -2611,7 +2742,7 @@ class Space:
             if src_text is None:
                 new = set_keys(f"type: {_yaml_single_quoted(name)}\n", {"title": title})
             elif isinstance(fm.get("type"), str):
-                new = replace_in_value(src_text, "type", lambda _v: name)
+                new = replace_in_value(src_text, "type", lambda _v: name, parsed=fm)
             else:
                 new = set_keys(src_text, {"type": SingleQuotedScalarString(name)})
             sets: dict[str, Any] = {}
@@ -3885,7 +4016,7 @@ class Space:
                 parsed = src  # the source `fm` holds; re-parsed only after an op changed it
                 for op in ops:
                     if src != parsed:
-                        fm = parse_fm(src) if src else {}
+                        fm = take_parsed(src) if src else {}
                         parsed = src
                     src = op.fn(src, rel, fm)
                 return src
@@ -4093,7 +4224,7 @@ class Space:
             if not src or not applies(fm, rel):
                 return src
             return replace_in_value(
-                src, "type", lambda v: new_name if v.strip().lower() == folded else v
+                src, "type", lambda v: new_name if v.strip().lower() == folded else v, parsed=fm
             )
 
         return _TypeOp(fn, confirm=False, applies=applies)
@@ -4167,7 +4298,7 @@ class Space:
             def rename(src: str, rel: str, fm: dict) -> str:
                 if not src or not renames(fm, rel):
                     return src
-                return replace_in_value(src, key, lambda v: renamed.get(_fold(v), v))
+                return replace_in_value(src, key, lambda v: renamed.get(_fold(v), v), parsed=fm)
 
             ops.append(_TypeOp(rename, confirm=False, applies=renames))
         return ops
@@ -4546,6 +4677,8 @@ class Space:
         Every exit tells the listeners (`add_listener`) about the path, and a
         change to the names links resolve by invalidates the resolver.
         """
+        # The file may have been replaced on disk: check its path in full again.
+        self._checked_rels.discard(path)
         rel = self._rel(path)
         full = self.root / rel
         with self._lock:
@@ -4564,9 +4697,15 @@ class Space:
             if raw is None:
                 self._raw.pop(rel, None)
                 self._summaries.pop(rel, None)
+                self._checked_rels.discard(rel)
             else:
                 self._raw[rel] = raw
-                if self._type_id(raw.typeName) not in {t.id for t in self.types}:
+                # A template never makes a type (`infer_types_from` skips it), so one whose
+                # type stays unknown would re-infer every file on each rescan for nothing.
+                template = not raw.readOnly and raw.fm.get("template") not in (None, "")
+                if not template and self._type_id(raw.typeName) not in {
+                    t.id for t in self.types
+                }:
                     self._merge_types(infer_types_from(self._raw.values()))
                 self._summaries[rel] = self._summarize(raw)
             after = self._summaries.get(rel)
@@ -4602,6 +4741,7 @@ class Space:
 
     def _types_changed(self, type_id: str | None = None) -> None:
         """Tell the listeners that a type definition changed (``type_id`` when known)."""
+        self._forget_type_ids()
         self._fire(SpaceChange("types", None, type_id))
 
     def _names_changed(
