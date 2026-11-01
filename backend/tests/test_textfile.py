@@ -101,3 +101,41 @@ def test_atomic_write_check_failure_leaves_original(tmp_path):
         atomic_write(p, b"new\n", check=refuse)
     assert p.read_bytes() == b"original\n"
     assert [x.name for x in tmp_path.iterdir()] == ["obj.md"]
+
+
+# -- audit 2026-11-01: a save keeps the file's permission bits -----------------------
+
+
+def _mode(p: Path) -> int:
+    import stat
+
+    return stat.S_IMODE(p.stat().st_mode)
+
+
+def _umask() -> int:
+    import os
+
+    old = os.umask(0)
+    os.umask(old)
+    return old
+
+
+@pytest.mark.skipif(__import__("os").name == "nt", reason="POSIX permission bits")
+@pytest.mark.parametrize("mode", [0o644, 0o664, 0o600])
+def test_atomic_write_keeps_the_existing_mode(tmp_path, mode):
+    p = _write(tmp_path, b"original\n")
+    p.chmod(mode)
+    atomic_write(p, b"new\n")
+    assert p.read_bytes() == b"new\n"
+    assert _mode(p) == mode
+
+
+@pytest.mark.skipif(__import__("os").name == "nt", reason="POSIX permission bits")
+def test_new_files_get_the_umask_default_mode(tmp_path):
+    from objectapp.textfile import create_new
+
+    expected = 0o666 & ~_umask()
+    atomic_write(tmp_path / "fresh.md", b"x")
+    create_new(tmp_path / "brand-new.md", b"y")
+    assert _mode(tmp_path / "fresh.md") == expected
+    assert _mode(tmp_path / "brand-new.md") == expected
