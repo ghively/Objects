@@ -100,8 +100,16 @@ def write_ui_patch(
         previous = own_writes.get(UI_REL) if own_writes is not None else None
         if own_writes is not None:
             own_writes[UI_REL] = revision
+
+        def unchanged() -> None:
+            # Re-check right before the replace: an external edit since the read
+            # above is a conflict, never overwritten (as `JsonStore.write`).
+            now = _read(root)[1]
+            if now != current:
+                raise RevisionConflict(now)
+
         try:
-            atomic_write(path, payload)
+            atomic_write(path, payload, check=unchanged)
         except BaseException:
             if own_writes is not None:
                 if previous is None:

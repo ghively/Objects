@@ -240,6 +240,18 @@ def test_rename_key_absent_noop_and_existing_target_raises():
         rename_key(SRC, "url", "title")
 
 
+def test_rename_key_explicit_key_form_stays_valid_yaml():
+    """Audit 2026-11-01: `? status` / `: Done` used to come back as `? state: Done`."""
+    src = "? status\n: Done\ntitle: T\n"
+    out = rename_key(src, "status", "state")
+    assert out == "? state\n: Done\ntitle: T\n"
+    assert parse_fm(out) == {"state": "Done", "title": "T"}
+    crlf = "? status\r\n: Done\r\ntitle: T\r\n"
+    assert parse_fm(rename_key(crlf, "status", "state")) == {"state": "Done", "title": "T"}
+    for quoted, old in [("'a b': 1\nc: 2\n", "a b"), ('"a\\tb": 1\nc: 2\n', "a\tb"), ("'it''s': 1\nc: 2\n", "it's")]:
+        assert parse_fm(rename_key(quoted, old, "z")) == {"z": 1, "c": 2}
+
+
 def test_set_none_renders_null():
     assert set_keys("title: X\n", {"k": None}) == "title: X\nk: null\n"
     assert set_keys("k: 5\ntitle: X\n", {"k": None}) == "k: null\ntitle: X\n"
@@ -291,3 +303,38 @@ def test_replace_in_value_unchanged_and_absent():
 def test_replace_in_value_changes_one_item_only():
     out = replace_in_value(SRC, "tags", lambda t: "ML" if t == "LLM" else t)
     assert _changed(SRC, out) == ["- tags: [AI, LLM]", "+ tags: [AI, ML]"]
+
+
+# -- audit 2026-11-01: a bad file opens read-only; it never crashes the space -------
+
+
+def test_deeply_nested_yaml_is_a_frontmatter_error(tmp_path):
+    from objectapp.typedefs import read_raw
+
+    deep = "a: " + "[" * 3000 + "]" * 3000 + "\n"
+    with pytest.raises(FrontmatterError):
+        parse_fm(deep)
+    with pytest.raises(FrontmatterError):
+        set_keys(deep, {"b": 1})
+    (tmp_path / "deep.md").write_text("---\n" + deep + "---\nbody\n", encoding="utf-8")
+    raw = read_raw(tmp_path, "deep.md")
+    assert raw.readOnly and "YAML" in (raw.readOnlyReason or "")
+
+
+def test_top_level_merge_key_is_a_frontmatter_error(tmp_path):
+    from objectapp.typedefs import read_raw
+
+    merged = "base: &b\n  x: 1\n<<: *b\ntitle: Merge\n"
+    with pytest.raises(FrontmatterError, match="merge"):
+        parse_fm(merged)
+    with pytest.raises(FrontmatterError, match="merge"):  # not KeyError from `lc.key`
+        set_keys(merged, {"lastUpdated": "2026-01-01T00:00:00.000Z"})
+    with pytest.raises(FrontmatterError):
+        rename_key(merged, "title", "name")
+    (tmp_path / "merge.md").write_text("---\n" + merged + "---\nbody\n", encoding="utf-8")
+    raw = read_raw(tmp_path, "merge.md")
+    assert raw.readOnly and "merge" in (raw.readOnlyReason or "")
+    # A merge key inside a value is ordinary YAML: the file stays editable.
+    nested = "base: &b\n  x: 1\nderived:\n  <<: *b\n  y: 2\ntitle: T\n"
+    assert parse_fm(nested)["derived"] == {"x": 1, "y": 2}
+    assert set_keys(nested, {"title": "U"}) == nested.replace("title: T", "title: U")

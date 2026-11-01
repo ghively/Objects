@@ -21,13 +21,15 @@ from __future__ import annotations
 import io
 import json
 import re
+import threading
 from collections.abc import Callable, Iterable
 from typing import Any
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
-from ruamel.yaml.constructor import SafeConstructor
+from ruamel.yaml.constructor import ConstructorError, SafeConstructor
 from ruamel.yaml.error import YAMLError
+from ruamel.yaml.nodes import MappingNode
 from ruamel.yaml.scalarstring import (
     DoubleQuotedScalarString,
     LiteralScalarString,
@@ -67,8 +69,26 @@ class FlowList(list):
     """
 
 
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+_MERGE_MESSAGE = "Frontmatter uses a merge key (<<), which can't be edited in place"
+
+
+def _has_top_level_merge(node: Any) -> bool:
+    return isinstance(node, MappingNode) and any(k.tag == _MERGE_TAG for k, _v in node.value)
+
+
 class _PlainConstructor(SafeConstructor):
-    """Safe constructor that keeps timestamps as their source text."""
+    """Safe constructor that keeps timestamps as their source text.
+
+    A merge key at the top level (``<<: *anchor``) is refused: the merged-in keys
+    have no lines of their own, so none of the line-splicing edits below could
+    work on the file (the round-trip loader reports the same via ``data.merge``).
+    """
+
+    def construct_document(self, node: Any) -> Any:
+        if _has_top_level_merge(node):
+            raise ConstructorError(None, None, _MERGE_MESSAGE, node.start_mark)
+        return super().construct_document(node)
 
 
 _PlainConstructor.add_constructor(
@@ -77,18 +97,35 @@ _PlainConstructor.add_constructor(
 )
 
 
+# One YAML instance of each kind per thread: constructing one costs about as much as
+# parsing a typical frontmatter (audit 2026-11-01, B3). `load` and `dump` reset the
+# instance's reader, scanner and emitter afterwards; one that failed mid-parse is
+# dropped (`_discard_yaml`) rather than trusted again.
+_local = threading.local()
+
+
 def _plain_yaml() -> YAML:
-    y = YAML(typ="safe", pure=True)
-    y.Constructor = _PlainConstructor
+    y = getattr(_local, "plain", None)
+    if y is None:
+        y = YAML(typ="safe", pure=True)
+        y.Constructor = _PlainConstructor
+        _local.plain = y
     return y
 
 
 def _rt_yaml() -> YAML:
-    y = YAML(typ="rt")
-    y.preserve_quotes = True
-    y.width = 4096
-    y.indent(mapping=2, sequence=4, offset=2)
+    y = getattr(_local, "rt", None)
+    if y is None:
+        y = YAML(typ="rt")
+        y.preserve_quotes = True
+        y.width = 4096
+        y.indent(mapping=2, sequence=4, offset=2)
+        _local.rt = y
     return y
+
+
+def _discard_yaml(kind: str) -> None:
+    setattr(_local, kind, None)
 
 
 def _plain(value: Any) -> Any:
@@ -117,7 +154,13 @@ def parse_fm(src: str) -> dict:
     try:
         data = _plain_yaml().load(src)
     except YAMLError as exc:
+        _discard_yaml("plain")
         raise FrontmatterError(str(exc)) from exc
+    except RecursionError as exc:
+        # ruamel's composer recurses per nesting level: `[[[[…` 500 deep is a bad file,
+        # not a crash of the whole space.
+        _discard_yaml("plain")
+        raise FrontmatterError("Frontmatter is nested too deeply") from exc
     if data is None:
         return {}
     if not isinstance(data, dict):
@@ -129,11 +172,17 @@ def _load_rt(src: str) -> CommentedMap | None:
     try:
         data = _rt_yaml().load(src)
     except YAMLError as exc:
+        _discard_yaml("rt")
         raise FrontmatterError(str(exc)) from exc
+    except RecursionError as exc:
+        _discard_yaml("rt")
+        raise FrontmatterError("Frontmatter is nested too deeply") from exc
     if data is None:
         return None
     if not isinstance(data, CommentedMap):
         raise FrontmatterError(f"Frontmatter is a {type(data).__name__}, not a mapping")
+    if data.merge:
+        raise FrontmatterError(_MERGE_MESSAGE)
     return data
 
 
@@ -326,9 +375,11 @@ def _key_token_end(line: str, col: int) -> int:
                     continue
                 return j + 1
             j += 1
-        return len(line)
+        return len(line.rstrip("\r\n"))
     m = re.compile(r":(?=[ \t\r\n]|$)").search(line, col)
-    return m.start() if m else len(line)
+    # An explicit key (`? status` on its own line) has no `:` on the line: the token
+    # ends before the line break, which must stay.
+    return m.start() if m else len(line.rstrip("\r\n"))
 
 
 def _render_key(key: str) -> str:
@@ -358,7 +409,16 @@ def rename_key(src: str, old: str, new: str) -> str:
     row, col = data.lc.key(old)
     line = lines[row]
     lines[row] = line[:col] + _render_key(new) + line[_key_token_end(line, col) :]
-    return "".join(lines)
+    out = "".join(lines)
+    expected = {(new if k == old else k): v for k, v in parse_fm(src).items()}
+    try:
+        if parse_fm(out) == expected:
+            return out
+    except FrontmatterError:
+        pass
+    # The key's line couldn't be spliced (an unusual key form): re-render the key
+    # at the end instead of returning something that doesn't read back.
+    return set_keys(delete_keys(src, [old]), {new: data[old]})
 
 
 # -- in-place value edits --------------------------------------------------------
