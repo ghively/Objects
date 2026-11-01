@@ -29,6 +29,7 @@ import { BLOCK_PARENTS, blockChain, optionApplies, setOptionAt, type BlockRef, t
 import { isToggleOpen } from '../nodes/toggle'
 import type { Option } from '../annotations'
 import { keymapFor } from '../shortcuts'
+import { BLOCK_ID_SUFFIX } from '../blocks'
 
 export type BlockSelectionState = { anchor: number; head: number } | null
 
@@ -250,7 +251,23 @@ export function deleteBlocks(editor: Editor): boolean {
   return true
 }
 
-/** Duplicate the target blocks below themselves; the copies become the block selection. */
+/** Remove the ` ^id` block ids from the textblocks in `[from, to)`: a copy of a block is not its reference target. */
+function stripBlockIds(tr: Transaction, from: number, to: number): void {
+  const cuts: [number, number][] = []
+  tr.doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isTextblock) return true
+    const m = BLOCK_ID_SUFFIX.exec(node.textContent)
+    if (m) cuts.push([pos + 1 + m.index, pos + 1 + node.content.size])
+    return false
+  })
+  for (const [a, b] of cuts.reverse()) tr.delete(a, b)
+}
+
+/**
+ * Duplicate the target blocks below themselves; the copies become the block
+ * selection. A copy carries no block id (two blocks with one id would make
+ * its references ambiguous).
+ */
 export function duplicateBlocks(editor: Editor): boolean {
   const range = targetRange(editor.state)
   if (!range) return false
@@ -266,9 +283,12 @@ export function duplicateBlocks(editor: Editor): boolean {
   if ('blockTrailing' in last.attrs) tr.setNodeAttribute(lastPos, 'blockTrailing', blank)
   const at = tr.mapping.map(range.to)
   tr.insert(at, copies)
-  const size = copies.reduce((sum, n) => sum + n.nodeSize, 0)
-  const copyRange = rangeBetween(tr.doc, at, at + size - copies[copies.length - 1].nodeSize)
-  editor.view.dispatch(selectRange(tr, copyRange))
+  stripBlockIds(tr, at, at + copies.reduce((sum, n) => sum + n.nodeSize, 0))
+  // The copies as inserted (shorter without their ids): the selection spans their first and last.
+  const $at = tr.doc.resolve(at)
+  let lastStart = at
+  for (let i = 0; i < copies.length - 1; i++) lastStart += $at.parent.child($at.index() + i).nodeSize
+  editor.view.dispatch(selectRange(tr, rangeBetween(tr.doc, at, lastStart)))
   return true
 }
 
