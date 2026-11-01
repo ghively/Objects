@@ -15,7 +15,8 @@ import type { Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { TableMap } from '@tiptap/pm/tables'
-import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
+import { Decoration, type DecorationSet, type EditorView } from '@tiptap/pm/view'
+import { buildDecorations, updateDecorations, type DecorationVisitor } from '../extensions/incrementalDecorations'
 import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import {
@@ -156,12 +157,25 @@ function firstBlockEnd(cell: PMNode, cellPos: number): number {
   return first ? cellPos + 2 + first.content.size : cellPos + 1
 }
 
-function formulaDecorations(doc: PMNode, editing: Editing | null, active: number): DecorationSet {
-  const decos: Decoration[] = []
-  doc.descendants((node, pos) => {
+/** Does any cell of `table` hold a formula? Cheaper than building its grid (most tables hold none). */
+function hasFormula(table: PMNode): boolean {
+  let found = false
+  table.descendants((node) => {
+    if (found) return false
+    const role = node.type.spec.tableRole
+    if (role !== 'cell' && role !== 'header_cell') return true
+    if (isFormula(cellText(node))) found = true
+    return false
+  })
+  return found
+}
+
+/** The decorations of each table holding a formula (`editing`: the cell with the caret). */
+function formulaVisitor(editing: Editing | null, active: number): DecorationVisitor {
+  return (node, pos, decos) => {
     if (node.type.name !== 'table') return !node.isTextblock && !node.isAtom
+    if (!hasFormula(node)) return false
     const grid = tableGrid(node)
-    if (!grid.some((row) => row.some(isFormula))) return false
     const results = evaluateGrid(grid)
     const map = TableMap.get(node)
     for (let row = 0; row < map.height; row++) {
@@ -206,8 +220,7 @@ function formulaDecorations(doc: PMNode, editing: Editing | null, active: number
       }
     }
     return false
-  })
-  return DecorationSet.create(doc, decos)
+  }
 }
 
 type Meta = { active: number }
@@ -225,16 +238,21 @@ export function formulaCellsPlugin(editor: Editor): Plugin<FormulaState> {
     state: {
       init: (_, state) => {
         const editing = editingOf(state, editable())
-        return { decos: formulaDecorations(state.doc, editing, 0), editing, active: 0 }
+        return { decos: buildDecorations(state.doc, formulaVisitor(editing, 0)), editing, active: 0 }
       },
       apply: (tr: Transaction, old, _oldState, state) => {
         const meta = tr.getMeta(formulaCellsKey) as Meta | undefined
         const editing = editingOf(state, editable())
-        if (!tr.docChanged && !meta && sameEditing(old.editing, editing)) {
-          return { ...old, editing, decos: old.decos.map(tr.mapping, tr.doc) }
+        const same = sameEditing(old.editing, editing)
+        if (!tr.docChanged && !meta && same) return { ...old, editing }
+        const active = meta ? meta.active : same ? old.active : 0
+        // Only the changed blocks are redone, plus the tables the caret left or entered.
+        const also: number[] = []
+        if (!same || meta) {
+          if (old.editing) also.push(tr.mapping.map(old.editing.cellPos))
+          if (editing) also.push(editing.cellPos)
         }
-        const active = meta ? meta.active : sameEditing(old.editing, editing) ? old.active : 0
-        return { decos: formulaDecorations(state.doc, editing, active), editing, active }
+        return { decos: updateDecorations(old.decos, tr, formulaVisitor(editing, active), also), editing, active }
       },
     },
     props: {

@@ -6,7 +6,7 @@
  */
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { renderMath } from './renderMath'
+import { renderMath, useMathReady } from './renderMath'
 
 export function InlineMathView({ node, editor, getPos, updateAttributes, deleteNode, selected }: NodeViewProps) {
   const text = String(node.attrs.text ?? '')
@@ -14,6 +14,7 @@ export function InlineMathView({ node, editor, getPos, updateAttributes, deleteN
   const [draft, setDraft] = useState(text)
   const inputRef = useRef<HTMLInputElement>(null)
   const closed = useRef(false)
+  const ready = useMathReady()
 
   useEffect(() => {
     if (!editing) setDraft(text)
@@ -27,7 +28,8 @@ export function InlineMathView({ node, editor, getPos, updateAttributes, deleteN
   }, [editing])
 
   const shown = editing ? draft : text
-  const html = useMemo(() => (shown.trim() ? renderMath(shown, { display: false }) : ''), [shown])
+  // `ready`: rendered again, for real, once KaTeX has loaded.
+  const html = useMemo(() => (shown.trim() ? renderMath(shown, { display: false }) : ''), [shown, ready])
 
   const open = () => {
     if (!editor.isEditable) return

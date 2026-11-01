@@ -62,15 +62,36 @@ function exactNorm(s: string): string {
 
 // ---------------------------------------------------------------- tables
 
-const PIPE_SPLIT = /(?<!\\)\|/
-
 type RowStyle = { indent: string; lead: boolean; trail: boolean; pad: string }
 
+/**
+ * The cells of a row: split at every `|` that is neither escaped nor inside a
+ * code span (the serializer writes such a pipe `\|`, as GFM asks; a file may
+ * hold it bare, and the parser reads both as one cell).
+ */
 function splitCellsRaw(line: string): string[] {
   let s = line.trim()
   if (s.startsWith('|')) s = s.slice(1)
   if (s.endsWith('|') && !s.endsWith('\\|')) s = s.slice(0, -1)
-  return s.split(PIPE_SPLIT)
+  const cells: string[] = []
+  let start = 0
+  let i = 0
+  while (i < s.length) {
+    const ch = s[i]
+    if (ch === '\\') i += 2
+    else if (ch === '`') {
+      // A code span runs to the next backtick run of the same length (or the line end).
+      let n = 1
+      while (s[i + n] === '`') n++
+      const close = s.indexOf('`'.repeat(n), i + n)
+      i = close < 0 ? s.length : close + n
+    } else if (ch === '|') {
+      cells.push(s.slice(start, i))
+      start = ++i
+    } else i++
+  }
+  cells.push(s.slice(start))
+  return cells
 }
 
 function isSeparatorCell(c: string): boolean {
@@ -78,7 +99,8 @@ function isSeparatorCell(c: string): boolean {
 }
 
 function tableKey(line: string): string {
-  const cells = splitCellsRaw(line).map((c) => c.trim())
+  // `\|` and a bare pipe inside a code span are the same cell text.
+  const cells = splitCellsRaw(line).map((c) => c.trim().replace(/\\\|/g, '|'))
   if (cells.length > 0 && cells.every(isSeparatorCell)) {
     return (
       'S\0' +
@@ -151,24 +173,31 @@ function indentWidth(ws: string): number {
   return w
 }
 
-/** Parse list lines, giving each item a nesting depth from its indent. */
+/**
+ * Parse list lines, giving each item a nesting depth as CommonMark does: an
+ * item is nested in the previous one when its indent reaches that item's
+ * content column (indent, marker and gap; a tab is four columns), so `   - b`
+ * and `\t- c` are siblings.
+ */
 function parseList(lines: string[]): (ListLine | null)[] {
-  const stack: number[] = []
+  const columns: number[] = [] // content column of the open item at each depth
   return lines.map((line) => {
     const m = LIST_ITEM.exec(line)
     if (!m) return null
     const w = indentWidth(m[1])
-    while (stack.length && w < stack[stack.length - 1]) stack.pop()
-    if (!stack.length || w > stack[stack.length - 1]) stack.push(w)
-    return { indent: m[1], marker: m[2], gap: m[3], content: m[4], depth: stack.length - 1 }
+    while (columns.length && w < columns[columns.length - 1]) columns.pop()
+    const depth = columns.length
+    columns.push(indentWidth(m[1] + m[2] + (m[3] || ' ')))
+    return { indent: m[1], marker: m[2], gap: m[3], content: m[4], depth }
   })
 }
 
 function listKey(line: string, parsed: ListLine | null): string {
   if (!parsed) return 'C\0' + line.trim()
   const ordered = /\d/.test(parsed.marker) ? 'o' : 'b'
-  // A hard break may be written `\` or as trailing blanks: the same line.
-  return `I\0${parsed.depth}\0${ordered}\0${parsed.content.replace(/\\$/, '').trimEnd()}`
+  // A hard break may be written `\` or as trailing blanks, and a done box `[x]` or `[X]`: the same line.
+  const content = parsed.content.replace(/^\[X\](?=[ \t]|$)/, '[x]')
+  return `I\0${parsed.depth}\0${ordered}\0${content.replace(/\\$/, '').trimEnd()}`
 }
 
 function preserveList(origLines: string[], regenLines: string[]): string[] {
@@ -243,8 +272,18 @@ function preserveList(origLines: string[], regenLines: string[]): string[] {
     origLines.map((l, i) => listKey(l, origParsed[i])),
     regenLines.map((l, i) => listKey(l, regenParsed[i])),
   )
-  return keepListStarts(weaveBlankLines(origLines, regenLines, match, restyle), regenParsed)
+  // The key ignores a hard break, so a Shift-Enter typed at the end of an
+  // unchanged item still matches its original line: that line takes the
+  // regenerated ending (restyled), or the break would be saved as a soft one.
+  const kept = origLines.slice()
+  match.forEach((o, k) => {
+    if (o >= 0 && HARD_BREAK.test(regenLines[k]) && !HARD_BREAK.test(origLines[o])) kept[o] = restyle(regenLines[k], k)
+  })
+  return keepListStarts(weaveBlankLines(kept, regenLines, match, restyle), regenParsed)
 }
+
+/** A line ending in a hard break: two or more blanks, or a backslash. */
+const HARD_BREAK = /(?:[ \t]{2,}|\\)$/
 
 /** Line index and number of the first item of each ordered list (CommonMark: its start). */
 function orderedStarts(parsed: (ListLine | null)[]): [number, string][] {
@@ -434,14 +473,65 @@ export function preserveBlock(
 
   let lines: string[]
   const origLines = origBody.split(/\r\n|\n|\r/)
-  if ((kind === 'table' || kind === 'list') && origBody !== '') {
+  const fenced = kind === 'code' ? preserveFenced(origLines, regenLines, baseline) : null
+  if (fenced) {
+    lines = fenced
+  } else if ((kind === 'table' || kind === 'list') && origBody !== '') {
     lines = kind === 'table' ? preserveTable(origLines, regenLines) : preserveList(origLines, regenLines)
   } else if (origBody !== '' && (origLines.length > 1 || regenLines.length > 1)) {
-    lines = preserveLines(origLines, regenLines, baseline)
+    lines = preserveLines(origLines, regenLines, baseline, kind)
   } else {
     lines = regenLines
   }
   return lines.join(eol) + tail
+}
+
+// ---------------------------------------------------------------- code fences
+
+const FENCE_LINE = /^( {0,3})(`{3,}|~{3,})(.*)$/
+
+/**
+ * The fence for a code block's `text`: three of `char` (a backtick or a tilde),
+ * or one more than the longest run of that character that starts a line inside
+ * (CommonMark: such a line would otherwise close the block early). Backticks
+ * inside a tilde fence, and tildes inside a backtick fence, are plain text.
+ */
+export function codeFence(text: string, char = '`'): string {
+  let longest = 0
+  const run = new RegExp(`^ {0,3}(${char === '`' ? '`' : '~'}{3,})`, 'gm')
+  for (const m of text.matchAll(run)) longest = Math.max(longest, m[1].length)
+  return char.repeat(Math.max(3, longest + 1))
+}
+
+/**
+ * A fenced code block keeps its original fence character (the serializer
+ * always writes backticks), its indent and info string, and its fence length
+ * unless a line typed inside would close it; only the inner lines are aligned.
+ * Null when the original is not a fenced block (an indented one, or a block
+ * whose source no longer looks like code).
+ */
+function preserveFenced(origLines: string[], regenLines: string[], baseline?: string): string[] | null {
+  const open = FENCE_LINE.exec(origLines[0] ?? '')
+  const regenOpen = FENCE_LINE.exec(regenLines[0] ?? '')
+  if (!open || !regenOpen || regenLines.length < 2 || !FENCE_LINE.test(regenLines[regenLines.length - 1])) return null
+  const char = open[2][0]
+  // The original's closing fence: same character, at least as long as the opening one.
+  const closeLine = origLines.length > 1 ? FENCE_LINE.exec(origLines[origLines.length - 1]) : null
+  const close = closeLine && closeLine[2][0] === char && closeLine[2].length >= open[2].length && closeLine[3].trim() === '' ? closeLine : null
+  const origInner = origLines.slice(1, close ? -1 : undefined)
+  const regenInner = regenLines.slice(1, -1)
+
+  const baseLines = baseline === undefined ? null : splitTail(toLF(baseline))[0].split('\n')
+  const baseInner = baseLines && baseLines.length === origLines.length && close ? baseLines.slice(1, -1).join('\n') : undefined
+  const inner = origInner.length ? preserveLines(origInner, regenInner, baseInner) : regenInner
+
+  // Keep the original fence runs unless an inner line would now close the block.
+  const needed = codeFence(inner.join('\n'), char).length
+  const openRun = char.repeat(Math.max(open[2].length, needed))
+  const info = open[3].trim() === regenOpen[3].trim() ? open[3] : regenOpen[3]
+  const closeRun = close ? char.repeat(Math.max(close[2].length, needed)) : openRun
+  const closeIndent = close ? close[1] : open[1]
+  return [open[1] + openRun + info, ...inner, closeIndent + closeRun]
 }
 
 /**
@@ -454,7 +544,7 @@ export function preserveBlock(
  */
 const QUOTE_PREFIX = /^(?:[ \t]{0,3}>[ \t]?)*/
 
-function preserveLines(origLines: string[], regenLines: string[], baseline?: string): string[] {
+function preserveLines(origLines: string[], regenLines: string[], baseline?: string, kind?: string): string[] {
   const baseLines = baseline === undefined ? null : splitTail(toLF(baseline))[0].split('\n')
   // Against the baseline (the serializer's own output) lines compare exactly,
   // so an edit adding only trailing blanks or a hard break counts; against
@@ -471,13 +561,11 @@ function preserveLines(origLines: string[], regenLines: string[], baseline?: str
     }
     return alignLines(origLines, regenLines, baseLines, regenLines, restyle)
   }
-  return alignLines(
-    origLines,
-    regenLines,
-    origLines.map((l) => l.trimEnd()),
-    regenLines.map((l) => l.trimEnd()),
-    (line) => line,
-  )
+  // A quote the serializer lays out on other lines than the original (a nested
+  // quote's lazy line `> c` written `> > c`, a `>` line added between blocks):
+  // lines compare by their text, so the untouched ones keep their markers.
+  const key = kind === 'blockquote' ? (l: string) => l.replace(QUOTE_PREFIX, '').trimEnd() : (l: string) => l.trimEnd()
+  return alignLines(origLines, regenLines, origLines.map(key), regenLines.map(key), (line) => line)
 }
 
 /**

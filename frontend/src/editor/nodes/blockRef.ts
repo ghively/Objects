@@ -24,7 +24,8 @@
 import { Node, mergeAttributes, type Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type Transaction } from '@tiptap/pm/state'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { Decoration, type DecorationSet } from '@tiptap/pm/view'
+import { buildDecorations, updateDecorations, type DecorationVisitor } from '../extensions/incrementalDecorations'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { stemOf, summaryOf } from '@/links/linkIndex'
 import { BLOCK_ID_SUFFIX, blockIdsIn, blockRefMarkdown, newBlockId } from '../blocks'
@@ -170,20 +171,16 @@ function referencedInWidgets(editor: Editor, state: { doc: PMNode }, ids: Decora
 }
 
 /** The trailing ` ^id` of each text block, drawn muted. */
-function blockIdDecorations(doc: PMNode): DecorationSet {
-  const decos: Decoration[] = []
-  doc.descendants((node, pos) => {
-    if (!node.isTextblock) return true
-    if (node.type.name === 'codeBlock' || node.type.name === 'rawBlock') return false
-    const last = node.lastChild
-    const m = last?.isText ? BLOCK_ID_SUFFIX.exec(last.text ?? '') : null
-    if (m) {
-      const end = pos + 1 + node.content.size
-      decos.push(Decoration.inline(end - m[0].length + 1, end, { class: 'block-id', 'data-block-id': m[1] }, { blockId: m[1] }))
-    }
-    return false
-  })
-  return DecorationSet.create(doc, decos)
+const blockIdVisitor: DecorationVisitor = (node, pos, decos) => {
+  if (!node.isTextblock) return true
+  if (node.type.name === 'codeBlock' || node.type.name === 'rawBlock') return false
+  const last = node.lastChild
+  const m = last?.isText ? BLOCK_ID_SUFFIX.exec(last.text ?? '') : null
+  if (m) {
+    const end = pos + 1 + node.content.size
+    decos.push(Decoration.inline(end - m[0].length + 1, end, { class: 'block-id', 'data-block-id': m[1] }, { blockId: m[1] }))
+  }
+  return false
 }
 
 export const BlockRef = Node.create({
@@ -243,8 +240,8 @@ export const BlockRef = Node.create({
       new Plugin<DecorationSet>({
         key: blockIdKey,
         state: {
-          init: (_, state) => blockIdDecorations(state.doc),
-          apply: (tr, old) => (tr.docChanged ? blockIdDecorations(tr.doc) : old),
+          init: (_, state) => buildDecorations(state.doc, blockIdVisitor),
+          apply: (tr, old) => updateDecorations(old, tr, blockIdVisitor),
         },
         props: {
           decorations: (state) => {

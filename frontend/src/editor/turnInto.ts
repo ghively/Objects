@@ -24,7 +24,7 @@ import { Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { api } from '@/api/client'
 import type { TypeDef } from '@/api/types'
 import { invalidateLinkIndex, stemOf, summaryOf, typeOf, useLinkIndex } from '@/links/linkIndex'
-import { NotBuiltYet } from '@/lib/notBuilt'
+import { turnBlocksIntoWhiteboard } from '@/whiteboard/turnInto'
 import { firstOptionOf, statusDef } from '@/tasks/statusCategory'
 import { makeOption } from './annotations'
 import { BLOCK_ID_SUFFIX } from './blocks'
@@ -280,9 +280,6 @@ export function hasTodoAt(editor: Editor): boolean {
 
 type BoardHelper = (blocks: string[], title: string) => Promise<string>
 
-/** `whiteboard/turnInto.ts`' helper (Task 22), loaded on demand; null while that module is missing. */
-const boardModules = import.meta.glob<{ turnBlocksIntoWhiteboard?: BoardHelper }>('../whiteboard/turnInto.ts')
-
 let boardHelperOverride: BoardHelper | null = null
 
 /** Tests: use `fn` instead of the whiteboard module's helper (`null` restores it). */
@@ -290,12 +287,9 @@ export function setBoardHelperForTests(fn: BoardHelper | null): void {
   boardHelperOverride = fn
 }
 
+/** `whiteboard/turnInto.ts`' helper (Task 22; imported statically, as `AddToWhiteboardDialog` does). */
 async function boardHelper(): Promise<BoardHelper> {
-  if (boardHelperOverride) return boardHelperOverride
-  const load = Object.values(boardModules)[0]
-  const mod = load ? await load() : null
-  if (!mod?.turnBlocksIntoWhiteboard) throw new NotBuiltYet('turnBlocksIntoWhiteboard')
-  return mod.turnBlocksIntoWhiteboard
+  return boardHelperOverride ?? turnBlocksIntoWhiteboard
 }
 
 export async function turnIntoWhiteboard(editor: Editor): Promise<boolean> {

@@ -8,8 +8,40 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 
 export const WIKILINK_RE = /^\[\[([^[\]\n|]+?)(?:\|([^[\]\n]+?))?\]\]/
 
+/** Characters that end a wikilink's target early (`[[A|B]]` reads as target A, label B). */
+const TARGET_BREAKING = /[[\]|#\n]/
+
+/** Can `title` be written as a wikilink target as it is? */
+export function isWikilinkTarget(title: string): boolean {
+  return title.trim() !== '' && !TARGET_BREAKING.test(title)
+}
+
+/**
+ * `target` as a wikilink can hold it. A title with `[`, `]`, `|`, `#` or a line
+ * break cannot be a target (the back end links such objects by their path,
+ * `space.py` `_link_text`, which the pickers should pass instead); written as
+ * is it would be an ambiguous link to another object, so those characters are
+ * dropped, as `safe_filename` drops them from the file stem (`|` and a line
+ * break end the stem, so the text is cut there).
+ */
+export function wikilinkTarget(target: string): string {
+  if (isWikilinkTarget(target)) return target
+  const cut = target.split(/[|\n]/, 1)[0]
+  return cut.replace(/[[\]#]/g, '').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * The target a link to `object` is written with: its title, or, when the title
+ * cannot be a target, its path without `.md` (the back end's `_link_text` does
+ * the same, and resolves a path target).
+ */
+export function wikilinkTargetFor(object: { title: string; path: string }): string {
+  return isWikilinkTarget(object.title) ? object.title : object.path.replace(/\.md$/i, '')
+}
+
 export function wikilinkMarkdown(target: string, label: string | null): string {
-  return label ? `[[${target}|${label}]]` : `[[${target}]]`
+  const t = wikilinkTarget(target)
+  return label ? `[[${t}|${label}]]` : `[[${t}]]`
 }
 
 export type WikilinkAttrs = { target: string; label: string | null }

@@ -15,9 +15,9 @@
  * block").
  */
 import { Node, mergeAttributes } from '@tiptap/core'
-import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type Transaction } from '@tiptap/pm/state'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { Decoration, type DecorationSet } from '@tiptap/pm/view'
+import { buildDecorations, updateDecorations, type DecorationVisitor } from '../extensions/incrementalDecorations'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { GroupView } from '../layout/GroupView'
 import { ancestorOfType, containerSourceAttributes, unwrapAt, wrapBlocks } from './containers'
@@ -38,23 +38,19 @@ export function ungroupAt(tr: Transaction, pos: number): boolean {
 const groupPlaceholderKey = new PluginKey<DecorationSet>('groupPlaceholder')
 
 /** The placeholder on each group's first child while it is an empty text block. */
-function groupPlaceholders(doc: PMNode): DecorationSet {
-  const decos: Decoration[] = []
-  doc.descendants((node, pos) => {
-    if (node.type.name === 'group') {
-      const first = node.firstChild
-      if (first && first.isTextblock && first.content.size === 0) {
-        decos.push(
-          Decoration.node(pos + 1, pos + 1 + first.nodeSize, {
-            class: 'group-placeholder',
-            'data-placeholder': GROUP_PLACEHOLDER,
-          }),
-        )
-      }
+const groupPlaceholderVisitor: DecorationVisitor = (node, pos, decos) => {
+  if (node.type.name === 'group') {
+    const first = node.firstChild
+    if (first && first.isTextblock && first.content.size === 0) {
+      decos.push(
+        Decoration.node(pos + 1, pos + 1 + first.nodeSize, {
+          class: 'group-placeholder',
+          'data-placeholder': GROUP_PLACEHOLDER,
+        }),
+      )
     }
-    return !node.isTextblock && !node.isAtom
-  })
-  return DecorationSet.create(doc, decos)
+  }
+  return !node.isTextblock && !node.isAtom
 }
 
 declare module '@tiptap/core' {
@@ -97,8 +93,8 @@ export const Group = Node.create({
       new Plugin<DecorationSet>({
         key: groupPlaceholderKey,
         state: {
-          init: (_, state) => groupPlaceholders(state.doc),
-          apply: (tr, old) => (tr.docChanged ? groupPlaceholders(tr.doc) : old),
+          init: (_, state) => buildDecorations(state.doc, groupPlaceholderVisitor),
+          apply: (tr, old) => updateDecorations(old, tr, groupPlaceholderVisitor),
         },
         props: {
           decorations: (state) => groupPlaceholderKey.getState(state),

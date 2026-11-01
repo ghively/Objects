@@ -20,10 +20,11 @@ async function mount(body: string): Promise<TiptapEditor> {
 }
 
 describe('MathBlockView', () => {
-  test('renders the formula with KaTeX in display mode', async () => {
+  test('renders the formula with KaTeX in display mode (once KaTeX has loaded)', async () => {
     await mount('Intro\n\n$$\nE = mc^2\n$$\n')
     const render = await screen.findByTestId('math-block-render')
-    expect(render.querySelector('.katex-display')).not.toBeNull()
+    await waitFor(() => expect(render.querySelector('.katex-display')).not.toBeNull())
+    expect(render.querySelector('.math-pending')).toBeNull()
   })
 
   test('math block editor opens, previews and closes', async () => {
