@@ -5,7 +5,7 @@ import type { DataViewDefinition, Layout, ViewState } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { cn } from '@/lib/utils'
 import { CALC_KINDS, CALC_LABELS } from './calc'
-import type { Group } from './group'
+import { findGroupConfig, type Group } from './group'
 import { LAYOUTS } from './model'
 import { choiceFor, type PropChoice } from './properties'
 
@@ -72,15 +72,20 @@ export function CustomizeMenu({ state, onState, choices, groups, hidden, layouts
     const hiddenIds = new Set(hidden.map((g) => g.id))
     const setCfg = (next: Partial<Config>) => setDef({ groupByConfig: { ...cfg, ...next } })
     const flag = (id: string, isHidden: boolean) => {
-      const have = cfg.groups.find((g) => g.id === id)
+      const have = findGroupConfig(cfg.groups, id)
+      // A legacy (bare-id) entry is rewritten under the group's current id.
       const next = have
-        ? cfg.groups.map((g) => (g.id === id ? { ...g, isHidden } : g))
+        ? cfg.groups.map((g) => (g === have ? { ...g, id, isHidden } : g))
         : [...cfg.groups, { id, isHidden, isClosed: false }]
       setCfg({ groups: next })
     }
     const setAll = (isHidden: boolean) => {
       const byId = new Map(cfg.groups.map((g) => [g.id, g]))
-      for (const g of all) byId.set(g.id, { id: g.id, isClosed: byId.get(g.id)?.isClosed ?? false, isHidden })
+      for (const g of all) {
+        const have = findGroupConfig(cfg.groups, g.id)
+        if (have && have.id !== g.id) byId.delete(have.id)
+        byId.set(g.id, { id: g.id, isClosed: have?.isClosed ?? false, isHidden })
+      }
       // Keep the config's own order for known groups, then the rest in view order.
       setCfg({ groups: [...byId.values()] })
     }

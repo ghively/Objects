@@ -146,6 +146,23 @@ describe('groupRows', () => {
     expect(valueForGroup(by('note'), groups[1], note)).toEqual({ key: 'note', value: '' })
   })
 
+  test('a config saved with bare ids (before text groups got the "text:" prefix) still hides and orders them (review fix 2026-11-01 #2)', () => {
+    const rows = [R('a', { note: 'Work' }), R('b', { note: 'Home' }), R('c', { note: 'Play' })]
+    const config = {
+      groups: [
+        { id: 'Play', isHidden: false, isClosed: false },
+        { id: 'Work', isHidden: false, isClosed: false },
+        { id: 'Home', isHidden: true, isClosed: false },
+      ],
+    }
+    const { groups, hidden } = groupRows(rows, { ...by('note'), sortOption: 'manual' }, config, ctx())
+    expect(labels(groups)).toEqual(['Play', 'Work'])
+    expect(labels(hidden)).toEqual(['Home'])
+    // The current, prefixed ids keep working too.
+    const prefixed = { groups: config.groups.map((g) => ({ ...g, id: 'text:' + g.id })) }
+    expect(labels(groupRows(rows, { ...by('note'), sortOption: 'manual' }, prefixed, ctx()).groups)).toEqual(['Play', 'Work'])
+  })
+
   test('only the label of a long text group is cut: the id and the written value keep the whole text (audit 2026-11-01 #13)', () => {
     const long = 'x'.repeat(500)
     const { groups } = groupRows([R('a', { note: `${long}A` }), R('b', { note: `${long}B` }), R('c', { note: 'short' })], by('note'), undefined, ctx())
