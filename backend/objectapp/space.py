@@ -2972,6 +2972,14 @@ class Space:
                 meta.pop("typeTrashId")
             if collection_trash_id is None:
                 meta.pop("collectionTrashId")
+            unregister = (
+                summary is not None and summary.template and summary.id and type_trash_id is None
+            )
+            if unregister:
+                # Restore puts the template back where it was in the type's `templates`.
+                registration = self._template_registration(summary.type, summary.id)
+                if registration is not None:
+                    meta["template"] = registration
             whiteboard = self._is_whiteboard(rel)
             meta_file = self.trash.object_meta_file(item.id)
             self.trash.write_json(meta_file, meta)
@@ -2994,7 +3002,7 @@ class Space:
                     meta_file.unlink(missing_ok=True)
                     self.rescan_file(rel)
                     raise
-            if summary is not None and summary.template and summary.id and type_trash_id is None:
+            if unregister:
                 self.unregister_template(summary.type, summary.id)
             return item
 
@@ -3072,6 +3080,42 @@ class Space:
         self.types = [new if x.id == t.id else x for x in self.types]
         self._types_changed(t.id)
         return True
+
+    def _template_registration(self, type_id: str, template_id: str) -> dict[str, Any] | None:
+        """A template's place in its type's ``templates`` (kept in its trash meta), or None."""
+        t = self.type_by_id(type_id)
+        if t is None:
+            return None
+        ids = list(t.templates.get("ids") or [])
+        default = t.templates.get("defaultTemplateId") == template_id
+        if template_id not in ids and not default:
+            return None
+        return {"index": ids.index(template_id) if template_id in ids else None, "default": default}
+
+    def _register_template(self, path: str, registration: dict[str, Any]) -> None:
+        """Put a restored template back in its type's ``templates`` (see `delete_object`).
+
+        Its id returns to its old position in ``ids`` (or the end) and it becomes the
+        default again unless another template is by now.
+        """
+        with self._lock:
+            summary = self._summaries.get(path)
+            if summary is None or not summary.id or not summary.template:
+                return
+            t = self.type_by_id(summary.type)
+            if t is None or t.readOnlyReason:
+                return
+            ids = list(t.templates.get("ids") or [])
+            if summary.id not in ids:
+                index = registration.get("index")
+                at = min(index, len(ids)) if isinstance(index, int) and index >= 0 else len(ids)
+                ids.insert(at, summary.id)
+            default = t.templates.get("defaultTemplateId")
+            if registration.get("default") and default is None:
+                default = summary.id
+            templates = {**t.templates, "ids": ids, "defaultTemplateId": default}
+            if templates != t.templates:
+                self._save_templates_field(t, templates)
 
     def unregister_template(self, type_id: str, template_id: str) -> bool:
         """Drop a template's id from its type's ``templates``; True when the type was written."""
@@ -3436,6 +3480,9 @@ class Space:
         else:
             path = self._restore_file(original, data)
         self.trash.remove_object(trash_id)
+        registration = meta.get("template")
+        if isinstance(registration, dict):
+            self._register_template(path, registration)
         return path
 
     def _restore_whiteboard(self, trash_id: str, original: str, data: bytes) -> str:
