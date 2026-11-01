@@ -26,8 +26,9 @@ from typing import Any
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
-from ruamel.yaml.constructor import SafeConstructor
+from ruamel.yaml.constructor import ConstructorError, SafeConstructor
 from ruamel.yaml.error import YAMLError
+from ruamel.yaml.nodes import MappingNode
 from ruamel.yaml.scalarstring import (
     DoubleQuotedScalarString,
     LiteralScalarString,
@@ -67,8 +68,26 @@ class FlowList(list):
     """
 
 
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+_MERGE_MESSAGE = "Frontmatter uses a merge key (<<), which can't be edited in place"
+
+
+def _has_top_level_merge(node: Any) -> bool:
+    return isinstance(node, MappingNode) and any(k.tag == _MERGE_TAG for k, _v in node.value)
+
+
 class _PlainConstructor(SafeConstructor):
-    """Safe constructor that keeps timestamps as their source text."""
+    """Safe constructor that keeps timestamps as their source text.
+
+    A merge key at the top level (``<<: *anchor``) is refused: the merged-in keys
+    have no lines of their own, so none of the line-splicing edits below could
+    work on the file (the round-trip loader reports the same via ``data.merge``).
+    """
+
+    def construct_document(self, node: Any) -> Any:
+        if _has_top_level_merge(node):
+            raise ConstructorError(None, None, _MERGE_MESSAGE, node.start_mark)
+        return super().construct_document(node)
 
 
 _PlainConstructor.add_constructor(
@@ -140,6 +159,8 @@ def _load_rt(src: str) -> CommentedMap | None:
         return None
     if not isinstance(data, CommentedMap):
         raise FrontmatterError(f"Frontmatter is a {type(data).__name__}, not a mapping")
+    if data.merge:
+        raise FrontmatterError(_MERGE_MESSAGE)
     return data
 
 
