@@ -135,6 +135,17 @@ describe('groupRows', () => {
     expect(groups[0].label).toHaveLength(500)
   })
 
+  test('a text value "other" is not the Other group (audit 2026-11-01)', () => {
+    const { groups } = groupRows([R('a', { note: 'other' }), R('b', {})], by('note'), undefined, ctx())
+    expect(groups.map((g) => paths(g.rows))).toEqual([['a'], ['b']])
+    expect(new Set(ids(groups)).size).toBe(2)
+    expect(groups[0].isOther).toBeUndefined()
+    expect(groups[1].isOther).toBe(true)
+    const note = page.propertyDefinitions.find((d) => d.id === 'note')!
+    expect(valueForGroup(by('note'), groups[0], note)).toEqual({ key: 'note', value: 'other' })
+    expect(valueForGroup(by('note'), groups[1], note)).toEqual({ key: 'note', value: '' })
+  })
+
   test('only the label of a long text group is cut: the id and the written value keep the whole text (audit 2026-11-01 #13)', () => {
     const long = 'x'.repeat(500)
     const { groups } = groupRows([R('a', { note: `${long}A` }), R('b', { note: `${long}B` }), R('c', { note: 'short' })], by('note'), undefined, ctx())

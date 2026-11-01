@@ -107,6 +107,12 @@ type Config = DataViewDefinition['groupByConfig']
 
 export const OTHER_ID = 'other'
 const TEXT_MAX = 500
+// Ids made from values (texts, aliases, linked titles, unknown tags) carry a prefix, so a value
+// "other" is not the Other group and no two kinds of value share an id.
+const TEXT_ID = 'text:'
+const ALIAS_ID = 'alias:'
+const LINK_ID = 'link:'
+const TAG_ID = 'tag:'
 
 const DATE_LABELS: Record<string, string> = {
   overdue: 'Overdue',
@@ -222,11 +228,11 @@ function dateOf(row: Row, propertyId: string): DateValue | null {
 /** A text group: the whole text is the id (and what a drop writes); only the label is cut. */
 const textBucket = (s: string): Bucket[] => {
   const t = s.trim()
-  return t ? [{ id: t, label: t.slice(0, TEXT_MAX), sort: t }] : []
+  return t ? [{ id: TEXT_ID + t, label: t.slice(0, TEXT_MAX), sort: t }] : []
 }
 
-/** The text a text group stands for: its id, which `textBucket` set to the whole text. */
-const groupText = (group: Group) => (group.isOther ? '' : group.id)
+/** The text a text group stands for: its id without the prefix, which `textBucket` set to the whole text. */
+const groupText = (group: Group) => (group.isOther ? '' : group.id.startsWith(TEXT_ID) ? group.id.slice(TEXT_ID.length) : group.label)
 
 /** What one `groupRows` call computes once and every row reads. */
 interface Scratch {
@@ -278,7 +284,7 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
       return out
     }
     case 'entity_tags':
-      return (row.summary.tags ?? []).map((t) => ({ id: scratch.tagsByTitle.get(t) ?? t, label: t, sort: t }))
+      return (row.summary.tags ?? []).map((t) => ({ id: scratch.tagsByTitle.get(t) ?? TAG_ID + t, label: t, sort: t }))
     case 'entity_collections': {
       const out: Bucket[] = []
       for (const name of row.summary.collections ?? []) {
@@ -295,7 +301,7 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
       return t ? [{ id: t.id, label: t.name, sort: t.name }] : []
     }
     case 'entity_aliases':
-      return (row.summary.aliases ?? []).map((a) => ({ id: a, label: a, sort: a }))
+      return (row.summary.aliases ?? []).map((a) => ({ id: ALIAS_ID + a, label: a, sort: a }))
     case 'number': {
       if (typeof v !== 'number' || Number.isNaN(v)) return []
       if (entry.option !== 'range') {
@@ -330,7 +336,7 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
         const out: Bucket[] = []
         for (const m of s.matchAll(/\[\[([^\]|#]+)/g)) {
           const t = m[1].trim()
-          if (t && !out.some((b) => b.id === t)) out.push({ id: t, label: t, sort: t })
+          if (t && !out.some((b) => b.id === LINK_ID + t)) out.push({ id: LINK_ID + t, label: t, sort: t })
         }
         return out
       }
