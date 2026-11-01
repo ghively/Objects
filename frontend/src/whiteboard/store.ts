@@ -40,6 +40,8 @@ export interface CanvasActions {
   /** Strokes from the ink file (first load or the ink doc's own merge): no step, not dirty. */
   loadStrokes(strokes: InkStroke[]): void
   setReadOnly(reason: string | null): void
+  /** The ink file can't be written: no edit (clear, undo, redo, ink select) touches the strokes. */
+  setInkReadOnly(readOnly: boolean): void
   setInkTool(tool: InkToolState | null): void
   /** A node drag starts: frames take the nodes wholly inside them (containment at drag start). */
   beginDrag(ids: string[], opts?: { duplicate?: boolean }): void
@@ -64,6 +66,8 @@ export interface BoardState {
   memory: WhiteboardBoardToolMemory
   /** Set when the board file can't be written (unreadable or from a newer version). */
   readOnlyReason: string | null
+  /** Set when the ink file can't be written; the strokes then stay as loaded (see `setInkReadOnly`). */
+  inkReadOnly: boolean
   canUndo: boolean
   canRedo: boolean
   /** Bumped by every local change to the board / the strokes (what to save). */
@@ -125,6 +129,10 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
 
     const ids = (given?: string[]) => given ?? get().selection
 
+    /** A history step to show: with the ink read-only, the strokes stay as they are. */
+    const keepInk = (step: BoardDoc, current: BoardDoc): BoardDoc =>
+      get().inkReadOnly && step.strokes !== current.strokes ? { ...step, strokes: current.strokes } : step
+
     const remember = (patch: Partial<WhiteboardBoardToolMemory>) => {
       const memory = { ...get().memory, ...patch }
       set({ memory })
@@ -151,9 +159,10 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       },
       undo() {
         if (get().readOnlyReason) return
-        const doc = history.undo()
-        if (!doc) return
+        const step = history.undo()
+        if (!step) return
         const prev = get().doc
+        const doc = keepInk(step, prev)
         set({
           doc,
           boardSeq: doc.board !== prev.board ? get().boardSeq + 1 : get().boardSeq,
@@ -164,9 +173,10 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       },
       redo() {
         if (get().readOnlyReason) return
-        const doc = history.redo()
-        if (!doc) return
+        const step = history.redo()
+        if (!step) return
         const prev = get().doc
+        const doc = keepInk(step, prev)
         set({
           doc,
           boardSeq: doc.board !== prev.board ? get().boardSeq + 1 : get().boardSeq,
@@ -272,7 +282,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
         const s = get()
         if (!isEditable(s)) return
         const board = A.clearBoard(s.doc.board)
-        const strokes = s.doc.strokes.length ? [] : s.doc.strokes
+        const strokes = s.doc.strokes.length && !s.inkReadOnly ? [] : s.doc.strokes
         commit({ board, strokes }, 'clear')
         set({ selection: [], editingId: null })
       },
@@ -294,7 +304,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       },
       setStrokes(next, label) {
         const s = get()
-        if (!isEditable(s)) return
+        if (!isEditable(s) || s.inkReadOnly) return
         commit({ ...s.doc, strokes: next }, label)
       },
     }
@@ -327,6 +337,9 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       },
       setReadOnly(reason) {
         set({ readOnlyReason: reason, ...(reason ? { editingId: null } : {}) })
+      },
+      setInkReadOnly(readOnly) {
+        if (get().inkReadOnly !== readOnly) set({ inkReadOnly: readOnly })
       },
       setInkTool(tool) {
         set(tool ? { inkTool: tool, tool: 'select' } : { inkTool: null })
@@ -403,6 +416,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       editingId: null,
       memory: opts.memory ?? {},
       readOnlyReason: null,
+      inkReadOnly: false,
       canUndo: false,
       canRedo: false,
       boardSeq: 0,
