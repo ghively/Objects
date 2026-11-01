@@ -1,9 +1,9 @@
 // Two windows of one space share `object.tabs:<root>` and `object.recent:<root>`: each one's
 // writes must merge into the other instead of being overwritten at the next navigation
 // (audit 2026-11-01 #16).
-import { beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { setRecentSpace, useRecent } from './recent'
-import { currentTarget, setTabsSpace, useTabs, type Tab, type Target } from './tabs'
+import { currentTarget, mergeTabsFromStorage, setTabsSpace, useTabs, type Tab, type Target } from './tabs'
 
 const objT = (path: string): Target => ({ kind: 'object', path })
 const tab = (id: string, target: Target, extra: Partial<Tab> = {}): Tab => ({ id, history: [target], index: 0, crumbs: [[]], ...extra })
@@ -86,6 +86,47 @@ describe('tabs in two windows', () => {
     expect(b.persistent).toBe(true)
     // Our active tab is ours alone: the other window's stale copy of it changes nothing.
     expect(s().tabs.find((t) => t.id === mineId)!.history).toEqual([objT('Projects/P1.md')])
+  })
+
+  // Review fix 2026-11-01 #1: a write that only differs in the other window's `activeId` must not
+  // be answered with a write of our own, or the two windows ping-pong forever.
+  test("the other window's write of our own tabs with its activeId changes nothing and writes nothing", () => {
+    const s = useTabs.getState
+    s().open(objT('Projects/P1.md'))
+    s().open(objT('Projects/P2.md'), { newTab: true })
+    const mineId = s().activeId!
+    const otherId = s().tabs.find((t) => t.id !== mineId)!.id
+    const before = s()
+    const mine = stored<{ tabs: Tab[]; activeId: string }>(key)
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+    try {
+      // Window B has the same tabs but a different active one, and its save wrote them again.
+      const oldValue = localStorage.getItem(key)
+      const newValue = JSON.stringify({ ...mine, state: { ...mine.state, activeId: otherId } })
+      window.dispatchEvent(new StorageEvent('storage', { key, oldValue, newValue, storageArea: localStorage }))
+      expect(setItem).not.toHaveBeenCalled()
+      expect(s().tabs).toBe(before.tabs)
+      expect(s().activeId).toBe(mineId)
+    } finally {
+      setItem.mockRestore()
+    }
+  })
+
+  test('two windows converge after one round of merging', () => {
+    const a = { tabs: [tab('tA', objT('A.md')), tab('shared', { kind: 'tasks' })], activeId: 'tA' }
+    const b = { tabs: [tab('shared', { kind: 'tasks' }), tab('tB', { kind: 'trash' })], activeId: 'tB' }
+    // B writes; A merges it (previous: A's own last write).
+    const aPatch = mergeTabsFromStorage(b, a, a)!
+    expect(aPatch.tabs.map((t) => t.id)).toEqual(['tA', 'shared', 'tB'])
+    expect(aPatch.activeId).toBe('tA')
+    // A's write reaches B (previous: B's write): B takes A's new tab and keeps its active one.
+    const bPatch = mergeTabsFromStorage(aPatch, b, b)!
+    expect(bPatch.tabs.map((t) => t.id).sort()).toEqual(['shared', 'tA', 'tB'])
+    expect(bPatch.activeId).toBe('tB')
+    // B's write reaches A: nothing new, so A stays silent and the round ends.
+    expect(mergeTabsFromStorage(bPatch, aPatch, aPatch)).toBeNull()
+    // And B hearing nothing changes nothing either.
+    expect(mergeTabsFromStorage(aPatch, aPatch, bPatch)).toBeNull()
   })
 
   test('writes to another key, another space or garbage are ignored', () => {
