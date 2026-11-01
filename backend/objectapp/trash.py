@@ -162,7 +162,7 @@ class Trash:
         the space root, named after its title) and purged by the ULID's time."""
         title = ""
         try:
-            fm = read_raw(self.dir, f"{trash_id}.md").fm
+            fm = read_raw(self.dir, f"{trash_id}.md", cache=False).fm  # no cache under the trash
             title = fm.get("title") if isinstance(fm.get("title"), str) else ""
         except OSError:
             pass
