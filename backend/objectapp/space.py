@@ -60,6 +60,7 @@ from .frontmatter import (
     rename_key,
     replace_in_value,
     set_keys,
+    take_parsed,
 )
 from .ids import new_ulid
 from .collections import CollectionDef, SaveCollectionResult
@@ -1822,7 +1823,8 @@ class Space:
             fm = {}
         else:
             try:
-                fm = parse_fm(of.frontmatter_src)
+                # An edit that checked its result by parsing it hands that parse on.
+                fm = take_parsed(of.frontmatter_src)
             except FrontmatterError:
                 return None
         t = fm.get("type")
@@ -2736,7 +2738,7 @@ class Space:
             if src_text is None:
                 new = set_keys(f"type: {_yaml_single_quoted(name)}\n", {"title": title})
             elif isinstance(fm.get("type"), str):
-                new = replace_in_value(src_text, "type", lambda _v: name)
+                new = replace_in_value(src_text, "type", lambda _v: name, parsed=fm)
             else:
                 new = set_keys(src_text, {"type": SingleQuotedScalarString(name)})
             sets: dict[str, Any] = {}
@@ -4010,7 +4012,7 @@ class Space:
                 parsed = src  # the source `fm` holds; re-parsed only after an op changed it
                 for op in ops:
                     if src != parsed:
-                        fm = parse_fm(src) if src else {}
+                        fm = take_parsed(src) if src else {}
                         parsed = src
                     src = op.fn(src, rel, fm)
                 return src
@@ -4218,7 +4220,7 @@ class Space:
             if not src or not applies(fm, rel):
                 return src
             return replace_in_value(
-                src, "type", lambda v: new_name if v.strip().lower() == folded else v
+                src, "type", lambda v: new_name if v.strip().lower() == folded else v, parsed=fm
             )
 
         return _TypeOp(fn, confirm=False, applies=applies)
@@ -4292,7 +4294,7 @@ class Space:
             def rename(src: str, rel: str, fm: dict) -> str:
                 if not src or not renames(fm, rel):
                     return src
-                return replace_in_value(src, key, lambda v: renamed.get(_fold(v), v))
+                return replace_in_value(src, key, lambda v: renamed.get(_fold(v), v), parsed=fm)
 
             ops.append(_TypeOp(rename, confirm=False, applies=renames))
         return ops
