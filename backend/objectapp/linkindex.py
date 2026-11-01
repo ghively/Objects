@@ -255,19 +255,28 @@ class LinkIndex:
         return ex
 
     def _written_targets(self, path: str, ex: _Extracted | None) -> frozenset[str]:
-        """The folded target texts of every ``[[link]]`` in ``path`` (frontmatter and body)."""
+        """The folded target texts of every link in ``path`` (frontmatter and body).
+
+        Every target `_extract` resolves is here, so a change to that name re-resolves
+        the holder: the ``[[links]]``, and the relation values written bare (``manager:
+        Charles Babbage``), which `decode_value` accepts as links too.
+        """
         raw = self._space._raw.get(path)
         if raw is None:
             return frozenset()
         if ex is not None:
             body_targets: list[str] = ex.body
+            prop_targets: list[str] = [
+                t for targets in ex.props.values() for t in targets if isinstance(t, str)
+            ]
         else:  # a template: not a source, but a rename still rewrites its links
             body = raw.of.body
             body_targets = [t for t, _s, _e in wikilink_spans(body)] if "[[" in body else []
+            prop_targets = []
         src = raw.of.frontmatter_src or ""
         fm_targets = wikilink_targets(src) if "[[" in src else set()
         tags = ex.tags if ex is not None else ()  # a tag's rename re-resolves its holders
-        return frozenset(_fold(t) for t in (*body_targets, *fm_targets, *tags))
+        return frozenset(_fold(t) for t in (*body_targets, *prop_targets, *fm_targets, *tags))
 
     def _set_mentions(self, path: str, targets: frozenset[str]) -> None:
         old = self._targets.pop(path, None)
