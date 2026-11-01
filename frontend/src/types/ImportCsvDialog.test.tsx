@@ -77,6 +77,27 @@ describe('ImportCsvDialog', () => {
     expect(csvValue(plain, '25%')).toBe(0.25)
   })
 
+  test('a quoted cell is one value; only an unquoted cell with commas is a list; text is trimmed (audit 2026-11-01)', () => {
+    const people = propertyDef({ id: 'people', key: 'people', name: 'People', type: 'entity', options: { isArray: true } })
+    const tags = propertyDef({ id: 'tags', key: 'tags', name: 'Tags', type: 'entity_tags' })
+    const q = (text: string) => ({ text, quoted: true })
+    expect(csvValue(people, q('Smith, John'))).toEqual([{ target: 'Smith, John', path: null }])
+    expect(csvValue(people, 'Smith, John')).toEqual([
+      { target: 'Smith', path: null },
+      { target: 'John', path: null },
+    ])
+    expect(csvValue(tags, q('a, b'))).toEqual(['a, b'])
+    expect(csvValue(tags, ' a , b ')).toEqual(['a', 'b'])
+    expect(csvValue(GENRE, q('Fiction'))).toEqual(['Fiction'])
+    expect(csvValue(AUTHOR, '  hello  ')).toBe('hello')
+    // Records keep the quoting through the dialog's reader.
+    const targets = csvTargets(typeDef({ id: 'b', propertyDefinitions: [TITLE, people] }))
+    expect(csvRecord([q('Dune'), q('Smith, John')], ['title', 'people'], targets)).toEqual({
+      title: 'Dune',
+      values: { people: [{ target: 'Smith, John', path: null }] },
+    })
+  })
+
   test('test creates one object per row', async () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
