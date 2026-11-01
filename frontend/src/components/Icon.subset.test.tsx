@@ -58,10 +58,23 @@ describe('Icon with the app subset', () => {
     // The next start (a fresh module): drawn at once from what was remembered, no load.
     vi.resetModules()
     phLoads = 0
-    const fresh = await mod()
-    expect(fresh.resolveIconSync('ph-alien')?.resolved).toBe('ph:alien')
-    expect(renderToString(<fresh.Icon name="ph-alien" />)).toContain('data-resolved="ph:alien"')
-    expect(phLoads).toBe(0)
+    // Loading the full set now would be a wasted 4.4 MB: make it fail loudly.
+    vi.doMock('@iconify-json/ph/icons.json', () => {
+      throw new Error('the full Phosphor set was loaded for a remembered icon')
+    })
+    try {
+      const fresh = await mod()
+      expect(fresh.resolveIconSync('ph-alien')?.resolved).toBe('ph:alien')
+      expect(renderToString(<fresh.Icon name="ph-alien" />)).toContain('data-resolved="ph:alien"')
+      // Review fix 2026-11-01 #6: the async resolver takes the remembered icon too, without the load.
+      expect((await fresh.resolveIcon('ph-alien'))?.resolved).toBe('ph:alien')
+      expect(phLoads).toBe(0)
+    } finally {
+      vi.doMock('@iconify-json/ph/icons.json', async () => {
+        phLoads++
+        return iconSet('@iconify-json/ph')
+      })
+    }
   }, 20000)
 
   test('an id the full set does not have falls back to ph-cube after the load', async () => {

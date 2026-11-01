@@ -122,8 +122,6 @@ export interface ResolvedIcon {
   fallback: boolean
 }
 
-const inSubset = (prefix: string, name: string): boolean => !!SUBSETS[prefix] && !!getIconData(SUBSETS[prefix], name)
-
 /**
  * Icon data at hand without loading anything: the subset, a remembered icon, a loaded full set
  * (an icon found there is remembered, so the next start has it before the set loads).
@@ -159,10 +157,15 @@ export function resolveIconSync(id: string): ResolvedIcon | null | undefined {
   return data ? { data, resolved: `${FALLBACK_PREFIX}:${FALLBACK_NAME}`, fallback: true } : null
 }
 
-/** The icon for `id`, loading its full set when the subset lacks it (`dataAtHand` remembers a find). */
+/**
+ * The icon for `id`: what is at hand (the subset, a remembered icon, a loaded set) without loading
+ * anything, else its full set is loaded first (`dataAtHand` remembers a find).
+ */
 export async function resolveIcon(id: string): Promise<ResolvedIcon | null> {
-  const { prefix, name } = parseIconId(id)
-  if (prefix && !inSubset(prefix, name)) await loadCollection(prefix)
+  const atHand = resolveIconSync(id)
+  if (atHand !== undefined) return atHand
+  const { prefix } = parseIconId(id)
+  if (prefix) await loadCollection(prefix)
   return resolveIconSync(id) ?? null
 }
 

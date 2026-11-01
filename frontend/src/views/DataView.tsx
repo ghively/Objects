@@ -84,9 +84,11 @@ export interface LayoutProps {
   isSelected?(path: string): boolean
   /**
    * Fetch the previews of rows the layout shows (rows load without them). The view calls it for
-   * its paged rows; a layout that pages on its own (the kanban) calls it with the rows on screen.
+   * its paged rows; a layout that pages on its own (the kanban) calls it with the rows on screen,
+   * and only while `showsPreviews` (its cards include the preview, and the rows came without).
    */
   loadPreviews(rows: Row[]): void
+  showsPreviews: boolean
 }
 
 /** What an owner adds to one row: `leading` before its title, `trailing` after it. */
@@ -395,6 +397,12 @@ export function DataView(props: DataViewProps) {
   )
 
   const layout = state.viewDefinition.dataViewLayout
+  const cardLayout = layout === 'grid' || layout === 'wall' || layout === 'gallery' || layout === 'kanban'
+  // Only a card layout whose cards include the preview needs previews; the list and table never do.
+  const showsPreviews =
+    cardLayout &&
+    !props.previewsLoaded &&
+    viewTypes.some((t) => cardProperties(t, state.viewDefinition).some((p) => p.propertyId === 'computed_preview'))
   const layoutProps: LayoutProps = {
     groups: paged,
     grouped,
@@ -416,6 +424,7 @@ export function DataView(props: DataViewProps) {
     isSelected: selectedSet ? (path) => selectedSet.has(path) : undefined,
     groupCount: (g) => result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length,
     loadPreviews,
+    showsPreviews,
   }
   const builtin = (): ReactNode => {
     switch (layout) {
@@ -437,12 +446,6 @@ export function DataView(props: DataViewProps) {
   }
   const custom = props.renderLayout?.(layout, layoutProps) ?? builtin()
   const tableType = layout === 'table' && viewTypes.length === 1 ? viewTypes[0] : undefined
-  const cardLayout = layout === 'grid' || layout === 'wall' || layout === 'gallery' || layout === 'kanban'
-  // Only a card layout whose cards include the preview needs previews; the list and table never do.
-  const showsPreviews =
-    cardLayout &&
-    !props.previewsLoaded &&
-    viewTypes.some((t) => cardProperties(t, state.viewDefinition).some((p) => p.propertyId === 'computed_preview'))
   useEffect(() => {
     // The kanban pages per column and asks for its own rows.
     if (showsPreviews && layout !== 'kanban') loadPreviews(paged.flatMap((g) => g.rows))
