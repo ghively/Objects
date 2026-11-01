@@ -512,6 +512,23 @@ def test_replace_in_value_with_parsed_matches_the_round_trip_path(src: str):
         assert frontmatter.take_parsed(fast) == frontmatter.parse_fm(fast)
 
 
+def test_a_write_leaves_its_new_frontmatter_in_the_cache(space_dir: Path, monkeypatch):
+    """Re-measured: a second type rename parsed every file again in `read_raw` (a cache miss)."""
+    from objectapp import typedefs
+    from objectapp.typedefs import read_raw
+
+    space = Space(space_dir)
+    space.update_properties(ADA, {"description": "Changed"}, space.read(ADA)[2])
+    space.save_body(ADA, "A new body.\n", space.read(ADA)[2])  # a stamped body save
+    parses = []
+    real = typedefs.parse_fm
+    monkeypatch.setattr(typedefs, "parse_fm", lambda s: parses.append(s) or real(s))
+    raw = read_raw(space_dir, ADA)
+    assert parses == []
+    assert raw.fm == real(raw.of.frontmatter_src)
+    assert raw.fm["description"] == "Changed"
+
+
 def test_type_rename_parses_each_rewritten_file_once(space_dir: Path, monkeypatch):
     import copy
 
