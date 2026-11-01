@@ -202,6 +202,31 @@ describe('pasting Markdown text (audit 2026-11-01 #8)', () => {
     ])
   })
 
+  // Review fix 2026-11-01 #5.
+  test('a lone backtick or asterisk is not Markdown: prose pastes one paragraph per line', () => {
+    const editor = headless('P\n')
+    editor.commands.setTextSelection(2)
+    paste(editor, "it's a `tick\nnext line * here")
+    expect(shape(editor)).toEqual([
+      ['paragraph', "Pit's a `tick"],
+      ['paragraph', 'next line * here'],
+    ])
+    // A closed code span, a strong pair or a link still is.
+    const rich = headless('P\n')
+    rich.commands.setTextSelection(2)
+    paste(rich, 'x `y` **z** [l](http://e.com)')
+    expect(serializeBody(rich)).toBe('Px `y` **z** [l](http://e.com)\n')
+  })
+
+  test('a list pasted into a table cell stays plain text, every marker kept', () => {
+    const editor = headless('| a | b |\n|---|---|\n| 1 | 2 |\n')
+    const cell = find(editor, '1')
+    editor.commands.setTextSelection(cell.pos + 1)
+    paste(editor, '- x\n- y')
+    expect(shape(editor)).toEqual([['table', 'ab- x- y12']])
+    expect(serializeBody(editor)).toContain('- x<br>- y1')
+  })
+
   test('paste as plain text is left alone', () => {
     const editor = headless('P\n')
     editor.commands.setTextSelection(2)

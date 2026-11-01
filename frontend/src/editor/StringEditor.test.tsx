@@ -44,7 +44,31 @@ const RICH = [
   'See [[Runbook]] and **this**.',
 ].join('\n')
 
+/** Paste `text` as `text/plain` at the selection. */
+function paste(dom: HTMLElement, text: string) {
+  const event = new Event('paste', { bubbles: true, cancelable: true }) as Event & { clipboardData: unknown }
+  event.clipboardData = { getData: (type: string) => (type === 'text/plain' ? text : ''), types: ['text/plain'], files: [] }
+  act(() => {
+    dom.dispatchEvent(event)
+  })
+}
+
 describe('StringEditor', () => {
+  // Review fix 2026-11-01 #5: a Text property cell holds no blocks, so a pasted list is text.
+  test('in single-paragraph mode a pasted list stays plain text, markers kept', async () => {
+    const { editor, dom } = await mount('Note', { singleParagraph: true })
+    act(() => {
+      editor.commands.setTextSelection(5)
+    })
+    paste(dom, '- a\n- b')
+    const types: string[] = []
+    editor.state.doc.descendants((n) => {
+      types.push(n.type.name)
+    })
+    expect(types).not.toContain('bulletList')
+    expect(editor.state.doc.textContent).toBe('Note- a- b')
+  })
+
   test('test no-edit blur writes nothing', async () => {
     const { onChange, dom } = await mount(RICH)
     act(() => {

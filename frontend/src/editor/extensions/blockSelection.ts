@@ -20,7 +20,7 @@
  * The keys come from the registry (`editor/shortcuts.ts`, `keysFor(id)`).
  */
 import { Extension, type Editor } from '@tiptap/core'
-import { Fragment, Slice, type Node as PMNode } from '@tiptap/pm/model'
+import { Fragment, Slice, type Node as PMNode, type ResolvedPos } from '@tiptap/pm/model'
 import { NodeSelection, Plugin, PluginKey, Selection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import { parseBody, serializeBody } from '../document'
@@ -608,12 +608,14 @@ function onClipboard(view: EditorView, event: ClipboardEvent, cut: boolean, edit
 
 /**
  * Text that reads as Markdown: a line starting a block (heading, list item,
- * quote, fence, table row, rule, math, comment, embed) or carrying inline
- * syntax (code, strong, strikethrough, a link or wikilink). Plain prose is
- * left to ProseMirror's own text paste (one paragraph per line).
+ * quote, fence, table row, rule, math, comment, embed) or carrying a whole
+ * inline pattern (a closed code span, a strong, emphasis or strikethrough
+ * pair, a link or wikilink). A lone backtick or asterisk in prose is not one,
+ * so such text is left to ProseMirror's own text paste (one paragraph per
+ * line) instead of becoming one paragraph with soft breaks.
  */
 const MD_BLOCK_START = /^ {0,3}(?:#{1,6}(?:[ \t]|$)|[-+*](?:[ \t]|$)|\d{1,9}[.)](?:[ \t]|$)|>|`{3}|~{3}|\||(?:[-*_][ \t]*){3,}$|\$\$|<!--|!\[)/m
-const MD_INLINE = /\*\*|`|\[\[|\]\(|~~/
+const MD_INLINE = /`[^`\n]+`|\*\*\S[^\n]*?\*\*|\*\S[^*\n]*\*|~~\S[^\n]*?~~|\[\[[^\]\n]+\]\]|\[[^\]\n]*\]\([^)\n]*\)/
 
 export function looksLikeMarkdown(text: string): boolean {
   return MD_BLOCK_START.test(text) || MD_INLINE.test(text)
@@ -660,8 +662,18 @@ function withoutSource(node: PMNode): PMNode {
  */
 let pendingBlocks: PMNode[] | null = null
 
-function parsePastedText(editor: Editor, text: string): Slice | null {
+/** Whether the paste lands in a table cell, which holds no blocks: the default text paste applies there. */
+function inTableCell($context: ResolvedPos): boolean {
+  for (let d = $context.depth; d >= 1; d--) {
+    const role = $context.node(d).type.spec.tableRole
+    if (role === 'cell' || role === 'header_cell') return true
+  }
+  return false
+}
+
+function parsePastedText(editor: Editor, text: string, $context: ResolvedPos): Slice | null {
   pendingBlocks = null
+  if (inTableCell($context)) return null
   const nodes = pasteBlocks(editor, text)
   if (!nodes) return null
   if (nodes.length > 1 || nodes[0].type.name !== 'paragraph') pendingBlocks = nodes
@@ -713,10 +725,22 @@ function decorations(state: EditorState): DecorationSet {
   )
 }
 
-export const BlockSelection = Extension.create({
+export interface BlockSelectionOptions {
+  /**
+   * Read pasted text as Markdown (`pasteBlocks`). Off for an editor that holds one paragraph
+   * (a Text property cell), where a list or heading has no place: the plain text paste applies.
+   */
+  markdownPaste: boolean
+}
+
+export const BlockSelection = Extension.create<BlockSelectionOptions>({
   name: 'blockSelection',
   // Before StarterKit's keymaps (Backspace, Tab, Mod-a) and after the slash menu.
   priority: 900,
+
+  addOptions() {
+    return { markdownPaste: true }
+  },
 
   addKeyboardShortcuts() {
     const editor = this.editor
@@ -814,7 +838,8 @@ export const BlockSelection = Extension.create({
             cut: (view, event) => onClipboard(view, event, true, editor),
           },
           // Not for "paste as plain text" (`plain`); a falsy result leaves the default text paste.
-          clipboardTextParser: (text, _context, plain) => (plain ? null : parsePastedText(editor, text)) as Slice,
+          clipboardTextParser: (text, $context, plain) =>
+            (plain || !this.options.markdownPaste ? null : parsePastedText(editor, text, $context)) as Slice,
           handlePaste(view) {
             const nodes = pendingBlocks
             pendingBlocks = null
