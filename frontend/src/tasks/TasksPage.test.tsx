@@ -241,7 +241,7 @@ describe('TasksPage', () => {
     })
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/Fresh.md', { status: ['In Progress'] }, 'v1'))
     expect(mocked.updateProperties).toHaveBeenCalledTimes(1)
-    await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['task'], paths: ['Tasks/Fresh.md'], preview: false }))
+    await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ paths: ['Tasks/Fresh.md'] }))
     const cols = screen.getAllByTestId('kanban-column')
     await waitFor(() => expect(titlesIn(cols[1]).sort()).toEqual(['Fresh', 'Working']))
   })
