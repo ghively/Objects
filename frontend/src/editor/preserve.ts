@@ -62,15 +62,36 @@ function exactNorm(s: string): string {
 
 // ---------------------------------------------------------------- tables
 
-const PIPE_SPLIT = /(?<!\\)\|/
-
 type RowStyle = { indent: string; lead: boolean; trail: boolean; pad: string }
 
+/**
+ * The cells of a row: split at every `|` that is neither escaped nor inside a
+ * code span (the serializer writes such a pipe `\|`, as GFM asks; a file may
+ * hold it bare, and the parser reads both as one cell).
+ */
 function splitCellsRaw(line: string): string[] {
   let s = line.trim()
   if (s.startsWith('|')) s = s.slice(1)
   if (s.endsWith('|') && !s.endsWith('\\|')) s = s.slice(0, -1)
-  return s.split(PIPE_SPLIT)
+  const cells: string[] = []
+  let start = 0
+  let i = 0
+  while (i < s.length) {
+    const ch = s[i]
+    if (ch === '\\') i += 2
+    else if (ch === '`') {
+      // A code span runs to the next backtick run of the same length (or the line end).
+      let n = 1
+      while (s[i + n] === '`') n++
+      const close = s.indexOf('`'.repeat(n), i + n)
+      i = close < 0 ? s.length : close + n
+    } else if (ch === '|') {
+      cells.push(s.slice(start, i))
+      start = ++i
+    } else i++
+  }
+  cells.push(s.slice(start))
+  return cells
 }
 
 function isSeparatorCell(c: string): boolean {
@@ -78,7 +99,8 @@ function isSeparatorCell(c: string): boolean {
 }
 
 function tableKey(line: string): string {
-  const cells = splitCellsRaw(line).map((c) => c.trim())
+  // `\|` and a bare pipe inside a code span are the same cell text.
+  const cells = splitCellsRaw(line).map((c) => c.trim().replace(/\\\|/g, '|'))
   if (cells.length > 0 && cells.every(isSeparatorCell)) {
     return (
       'S\0' +

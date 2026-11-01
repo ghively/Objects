@@ -425,6 +425,13 @@ describe('minor drift on edited lines', () => {
     expect(serializeBody(editor)).toBe('- aZ\n   - b\n\t- c\n')
   })
 
+  test('a table row with a pipe in a code span is kept when another row is edited (audit 2026-11-01)', () => {
+    const body = '| a | b |\n|---|---|\n| [[x]] | `c|d` |\n| 1 | 2 |\n'
+    const editor = headless(body)
+    append(editor, '1', 'Z')
+    expect(serializeBody(editor)).toBe('| a | b |\n|---|---|\n| [[x]] | `c|d` |\n| 1Z | 2 |\n')
+  })
+
   test('an edited blockquote line keeps its marker', () => {
     const editor = headless('> a\n> b\n')
     append(editor, 'b', 'X')
