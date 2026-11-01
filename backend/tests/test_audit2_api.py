@@ -133,6 +133,46 @@ def test_locked_whiteboard_files_answer_in_use(tmp_path: Path, monkeypatch, rout
     assert r.status_code == 503 and "in use" not in r.json()["detail"]
 
 
+# -- EventHub: a bounded queue per subscriber; overflow becomes one resync event --------
+
+
+def test_event_hub_bounds_a_slow_subscriber():
+    import asyncio
+
+    from objectapp.server import EventHub
+    from objectapp.watcher import ChangeEvent
+
+    async def main() -> None:
+        hub = EventHub()
+        hub.loop = asyncio.get_running_loop()
+        stream = hub.subscribe()
+        first = asyncio.ensure_future(stream.__anext__())
+        await asyncio.sleep(0)
+        hub.publish(ChangeEvent("changed", "p-first", "v", origin="me"))
+        assert (await first).path == "p-first"
+        (q,) = hub._subscribers
+        sizes = []
+        for i in range(2500):
+            hub.publish(ChangeEvent("changed", f"p{i}", "v", origin="me"))
+            sizes.append(q.qsize())
+        assert max(sizes) <= server.EVENT_QUEUE_MAX == 1000
+        got = [await stream.__anext__() for _ in range(q.qsize())]
+        # The resync the client sends itself after a reconnect (`api/client.ts` RESYNC_EVENTS).
+        resync = [ChangeEvent(k, "*", None) for k in ("types", "views", "ui", "collections", "queries")]
+        assert got[:5] == resync and all(e.origin is None for e in got[:5])
+        # 1,000 fill the queue; p1000 drops them for the resync (5), p1001..p1995 fill it
+        # again, p1996 drops those, and p1997..p2499 follow the second resync.
+        assert [e.path for e in got[5:]] == [f"p{i}" for i in range(1997, 2500)]
+        # A full queue still ends when the hub closes.
+        for i in range(1000):
+            hub.publish(ChangeEvent("changed", f"q{i}", "v"))
+        hub.close()
+        rest = [e async for e in stream]
+        assert len(rest) <= 1000
+
+    asyncio.run(main())
+
+
 # -- GET /api/graph: ETag on every 200, 304 while the graph is unchanged ----------------
 
 
