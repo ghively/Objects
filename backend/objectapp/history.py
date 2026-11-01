@@ -58,6 +58,13 @@ class VersionNotFound(KeyError):
     """No such version for that object (404)."""
 
 
+class _IndexChanged(Exception):
+    """An index file changed between its read and its replace (see `_update_index`)."""
+
+
+_INDEX_RETRIES = 5
+
+
 def _sha1(text: str) -> str:
     return hashlib.sha1(text.encode("utf-8")).hexdigest()
 
@@ -181,7 +188,10 @@ class HistoryStore:
         return [id_key, self._path_key(md_rel)] if id_key else [self._path_key(md_rel)]
 
     def _load_index(self, key: str) -> list[dict[str, Any]]:
-        data = _read(self.dir / key / _INDEX)
+        return self._parse_index(_read(self.dir / key / _INDEX))
+
+    @staticmethod
+    def _parse_index(data: bytes | None) -> list[dict[str, Any]]:
         if data is None:
             return []
         try:
@@ -220,6 +230,31 @@ class HistoryStore:
         return "object"
 
     # -- writing --------------------------------------------------------------
+
+    def _update_index(
+        self, key: str, change: Callable[[list[dict[str, Any]]], list[dict[str, Any]]]
+    ) -> list[dict[str, Any]]:
+        """Rewrite ``key``'s index as ``change(current entries)``, checked like `jsonstore`.
+
+        The index is re-read right before the replace; if another writer (a second app on
+        the same space) changed it since it was read, the change is applied again to what
+        is there now instead of overwriting it.
+        """
+        path = self.dir / key / _INDEX
+        for _attempt in range(_INDEX_RETRIES):
+            before = _read(path)
+            entries = change(self._parse_index(before))
+
+            def unchanged(before: bytes | None = before) -> None:
+                if _read(path) != before:
+                    raise _IndexChanged
+
+            try:
+                atomic_write(path, dump_json(entries), check=unchanged)
+            except _IndexChanged:
+                continue
+            return entries
+        raise OSError(f"The history index {path} keeps changing")
 
     def snapshot(
         self,
@@ -275,9 +310,8 @@ class HistoryStore:
             for ext, content in files.items():
                 atomic_write(folder / (vid + ext), content)
                 names.append(vid + ext)
-            index = self._load_index(key)
-            index.append({"id": vid, "at": _iso(now), "rel": md_rel, "kind": kind, "files": names})
-            atomic_write(folder / _INDEX, dump_json(index))
+            entry = {"id": vid, "at": _iso(now), "rel": md_rel, "kind": kind, "files": names}
+            self._update_index(key, lambda index: [*index, entry])
             self._prune(md_rel, keys, len(entries) + 1)
             return vid
 
@@ -295,8 +329,7 @@ class HistoryStore:
         for key, ids in drop.items():
             folder = self.dir / key
             index = self._load_index(key)
-            keep = [e for e in index if e["id"] not in ids]
-            atomic_write(folder / _INDEX, dump_json(keep))
+            self._update_index(key, lambda now, ids=ids: [e for e in now if e["id"] not in ids])
             for e in index:
                 if e["id"] in ids:
                     for name in e.get("files", []):

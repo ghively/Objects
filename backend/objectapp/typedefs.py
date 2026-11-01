@@ -8,6 +8,7 @@ are kept in memory until the user saves them (see `typemodel.load_types`).
 
 from __future__ import annotations
 
+import os
 import re
 from collections import Counter
 from collections.abc import Iterable, Iterator
@@ -128,14 +129,25 @@ def is_ignored(rel: PurePosixPath) -> bool:
 
 
 def iter_object_paths(root: Path) -> Iterator[str]:
-    """Every ``*.md`` object file under `root`, as sorted space-relative POSIX paths."""
+    """Every ``*.md`` object file under `root`, as sorted space-relative POSIX paths.
+
+    The suffix matches in any case (``Note.MD``), as `Space._rel` and the watcher accept
+    it on every system; dot-folders are not entered.
+    """
     root = Path(root)
     found = []
-    for p in root.rglob("*.md"):
-        rel = PurePosixPath(p.relative_to(root).as_posix())
-        if is_ignored(rel) or rel.name.startswith(".") or not p.is_file():
-            continue
-        found.append(rel.as_posix())
+    for folder, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        base = PurePosixPath(Path(folder).relative_to(root).as_posix())
+        for name in files:
+            if name.startswith(".") or not name.lower().endswith(".md"):
+                continue
+            if not os.path.isfile(os.path.join(folder, name)):
+                continue
+            rel = base / name
+            if is_ignored(rel):
+                continue
+            found.append(rel.as_posix())
     yield from sorted(found)
 
 
