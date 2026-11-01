@@ -110,4 +110,27 @@ describe('GraphCanvas', () => {
     await waitFor(() => expect(sigmaInstances[0]?.graph.order).toBe(N))
     expect(sigmaInstances[0].graph.size).toBe(N - 1)
   })
+
+  test('a theme change while a big graph is laid out paints it in the new theme', async () => {
+    root.style.setProperty('--line-gray', '#111111')
+    const N = BUILD_SLICE + 10
+    const nodes = Array.from({ length: N }, (_, i) => ({ path: `P/${i}.md`, title: `${i}`, type: 'nope', icon: null, degree: 1, tag: false, daily: false, done: false }))
+    const data = graphData({ nodes, links: [] })
+    const visible = { nodes: nodes.map((_, i) => i), links: [[0, 1] as [number, number]], reduced: [], tagLinks: [] }
+    let switched = false
+    const onLayout = (s: { running: boolean }) => {
+      if (!s.running || switched) return
+      // Built with the dark colours, not shown yet: the theme changes now.
+      switched = true
+      root.style.setProperty('--line-gray', '#222222')
+      root.setAttribute('data-theme', 'light')
+      root.classList.remove('dark')
+    }
+    render(<GraphCanvas data={data} visible={visible} custom={{}} onNodeClick={vi.fn()} onLayout={onLayout} />)
+    await waitFor(() => expect(sigmaInstances[0]?.graph.order).toBe(N))
+    expect(switched).toBe(true)
+    const g = sigmaInstances[0].graph
+    expect(g.getNodeAttribute('0', 'color')).toBe('#222222')
+    expect(g.getNodeAttribute(String(N - 1), 'color')).toBe('#222222')
+  })
 })
