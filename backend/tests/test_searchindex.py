@@ -353,7 +353,12 @@ def test_index_writes_only_cache_dir(links_space_dir: Path, monkeypatch):
     idx.stop()
     after = _snapshot(links_space_dir)
     new = set(after) - set(before)
-    assert new == {".capacities-cache/search.sqlite", ".capacities-cache/.gitignore"}
+    # Since the 2026-11-01 audit the scan also writes the parsed-frontmatter cache there.
+    assert new == {
+        ".capacities-cache/search.sqlite",
+        ".capacities-cache/.gitignore",
+        ".capacities-cache/frontmatter.json",
+    }
     assert after[".capacities-cache/.gitignore"] == b"*\n"
     assert {k: v for k, v in after.items() if k in before} == before
 
