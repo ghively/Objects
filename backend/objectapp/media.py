@@ -29,6 +29,8 @@ __all__ = [
     "IMAGE_EXTENSIONS",
     "MAX_ATTACHMENT_BYTES",
     "MARKDOWN_UPLOAD_DETAIL",
+    "OPENABLE_EXTENSIONS",
+    "REFUSED_OPEN_DETAIL",
     "Attachment",
     "AttachmentKind",
     "MarkdownUpload",
@@ -207,13 +209,38 @@ VIDEO_MEDIA_TYPES = {
     ".ogv": "video/ogg",
 }
 
-# Extensions `open_with_system` refuses: programs and scripts the OS would run.
-REFUSED_OPEN_EXTENSIONS = frozenset({
-    "exe", "bat", "cmd", "com", "ps1", "psm1", "vbs", "vbe", "js", "jse", "wsf", "wsh",
-    "msi", "msp", "scr", "lnk", "url", "hta", "cpl", "reg", "jar", "sh", "bash", "zsh",
-    "app", "command",
+# Document and archive extensions `open_with_system` may hand to the OS, beside the
+# image, PDF, audio and video kinds `kind_of` knows. A whitelist (audit 2026-11-01
+# #5, Gene's call): anything else, in particular whatever the OS might run
+# (`.exe`, `.py`, `.desktop`, `.appimage`...), is refused, so a space received from
+# someone else can't launch a program through Object.
+DOCUMENT_OPEN_EXTENSIONS = frozenset({
+    "txt", "rtf", "csv", "tsv", "json", "xml", "yaml", "yml", "log",
+    "doc", "docx", "dot", "dotx", "odt", "ott", "pages",
+    "xls", "xlsx", "xlsm", "ods", "ots", "numbers",
+    "ppt", "pptx", "pps", "ppsx", "odp", "otp", "key",
+    "epub", "mobi", "azw", "azw3", "djvu", "xps", "oxps", "tex", "bib",
 })
-REFUSED_OPEN_DETAIL = "Open it from the file manager instead."  # our string
+ARCHIVE_OPEN_EXTENSIONS = frozenset({
+    "zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "tbz2", "xz", "txz", "zst", "lz", "lzma",
+})
+
+
+def _openable_extensions() -> frozenset[str]:
+    media = (IMAGE_EXTENSIONS, PDF_MEDIA_TYPES, AUDIO_MEDIA_TYPES, VIDEO_MEDIA_TYPES)
+    return frozenset(
+        {ext.lstrip(".") for table in media for ext in table}
+        | DOCUMENT_OPEN_EXTENSIONS
+        | ARCHIVE_OPEN_EXTENSIONS
+    )
+
+
+OPENABLE_EXTENSIONS = _openable_extensions()
+
+REFUSED_OPEN_DETAIL = (  # our string
+    "Object only opens documents, images, audio, video, PDFs and archives. "
+    "Open it from the file manager instead."
+)
 
 _IMAGE_SANDBOX_CSP = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
 _EXT_RE = re.compile(r"[a-z0-9]{1,10}")
@@ -394,11 +421,13 @@ def serve_headers(kind: AttachmentKind, name: str = "") -> dict[str, str]:
 def open_with_system(full: Path) -> None:
     """Open ``full`` with the OS default app (a list of arguments, never a shell).
 
-    Raises `RefusedToOpen` for executables and scripts. With ``OBJECT_FAKE_OPEN_FILE``
-    set (a test hook) the absolute path is appended to that file instead.
+    Raises `RefusedToOpen` for anything but a document, image, audio, video, PDF or
+    archive extension (`OPENABLE_EXTENSIONS`; no extension counts as refused). With
+    ``OBJECT_FAKE_OPEN_FILE`` set (a test hook) the absolute path is appended to that
+    file instead.
     """
     full = Path(full)
-    if full.suffix.lower().lstrip(".") in REFUSED_OPEN_EXTENSIONS:
+    if full.suffix.lower().lstrip(".") not in OPENABLE_EXTENSIONS:
         raise RefusedToOpen(str(full))
     fake = os.environ.get("OBJECT_FAKE_OPEN_FILE")
     if fake:
