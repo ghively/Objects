@@ -16,7 +16,8 @@
 import { Extension } from '@tiptap/core'
 import type { Node as PMNode, ResolvedPos } from '@tiptap/pm/model'
 import { NodeSelection, Plugin, PluginKey, type Transaction } from '@tiptap/pm/state'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { Decoration, type DecorationSet } from '@tiptap/pm/view'
+import { buildDecorations, updateDecorations, type DecorationVisitor } from '../extensions/incrementalDecorations'
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Icon, isIconifyId } from '@/components/Icon'
@@ -195,29 +196,25 @@ function iconWidget(value: string): HTMLElement {
   return el
 }
 
-function iconDecorations(doc: PMNode): DecorationSet {
-  const decos: Decoration[] = []
-  doc.descendants((node, pos) => {
-    if (!ICON_TYPES.has(node.type.name)) return true
-    const icon = ((node.attrs.blockOptions as Option[] | null) ?? []).find((o) => o.key === 'icon')
-    if (icon && isKnownValue(icon) && typeof icon.value === 'string') {
-      const value = icon.value
-      decos.push(
-        Decoration.widget(pos + 1, () => iconWidget(value), {
-          side: -1,
-          key: `block-icon:${value}`,
-          ignoreSelection: true,
-          destroy: (dom) => {
-            const root = (dom as HTMLElement & { _root?: { unmount(): void } })._root
-            // Unmount outside React's render phase (a widget can go mid-render).
-            if (root) queueMicrotask(() => root.unmount())
-          },
-        }),
-      )
-    }
-    return false
-  })
-  return DecorationSet.create(doc, decos)
+const iconVisitor: DecorationVisitor = (node, pos, decos) => {
+  if (!ICON_TYPES.has(node.type.name)) return true
+  const icon = ((node.attrs.blockOptions as Option[] | null) ?? []).find((o) => o.key === 'icon')
+  if (icon && isKnownValue(icon) && typeof icon.value === 'string') {
+    const value = icon.value
+    decos.push(
+      Decoration.widget(pos + 1, () => iconWidget(value), {
+        side: -1,
+        key: `block-icon:${value}`,
+        ignoreSelection: true,
+        destroy: (dom) => {
+          const root = (dom as HTMLElement & { _root?: { unmount(): void } })._root
+          // Unmount outside React's render phase (a widget can go mid-render).
+          if (root) queueMicrotask(() => root.unmount())
+        },
+      }),
+    )
+  }
+  return false
 }
 
 export const blockIconKey = new PluginKey<DecorationSet>('blockIcons')
@@ -290,8 +287,8 @@ export const BlockOptions = Extension.create({
       new Plugin<DecorationSet>({
         key: blockIconKey,
         state: {
-          init: (_, state) => iconDecorations(state.doc),
-          apply: (tr, old) => (tr.docChanged ? iconDecorations(tr.doc) : old),
+          init: (_, state) => buildDecorations(state.doc, iconVisitor),
+          apply: (tr, old) => updateDecorations(old, tr, iconVisitor),
         },
         props: {
           decorations: (state) => blockIconKey.getState(state),

@@ -45,8 +45,12 @@ export function protectLinkText(content: JSONContent[] | undefined): JSONContent
   })
 }
 
-/** A full or collapsed reference link (`[a][r]`, `[a][]`) or a footnote reference (`[^1]`). */
-const REFERENCE = /\[\^[^\]\s]+\]|\[[^[\]\n]+\]\[[^[\]\n]*\]/g
+/**
+ * A full or collapsed reference link (`[a][r]`, `[a][]`) or a footnote
+ * reference (`[^1]`), but not a footnote definition (`[^1]:` at a line start,
+ * which stays escaped so the line remains a paragraph).
+ */
+const REFERENCE = /(?<![^\n])\[\^[^\]\s]+\](?!:)|(?<=[^\n])\[\^[^\]\s]+\]|\[[^[\]\n]+\]\[[^[\]\n]*\]/g
 
 /**
  * `text` with the brackets of reference links and footnote references

@@ -1,9 +1,21 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { describe, expect, test } from 'vitest'
-import { displayMathRows, renderDisplayMath, renderMath } from './renderMath'
+import { beforeAll, describe, expect, test } from 'vitest'
+import { displayMathRows, loadMath, mathReady, renderDisplayMath, renderMath } from './renderMath'
+
+describe('renderMath before KaTeX has loaded', () => {
+  test('a formula is its escaped source, and the load starts', async () => {
+    expect(mathReady()).toBe(false)
+    expect(renderMath('a<b', { display: false })).toBe('<span class="math-pending">a&#60;b</span>')
+    await loadMath()
+    expect(mathReady()).toBe(true)
+    expect(renderMath('a<b', { display: false })).toContain('class="katex"')
+  })
+})
 
 describe('renderMath', () => {
+  beforeAll(() => loadMath())
+
   test('renders display and inline formulas with HTML and MathML', () => {
     const display = renderMath('E = mc^2', { display: true })
     expect(display).toContain('katex-display')
@@ -39,9 +51,9 @@ describe('renderMath', () => {
       expect(u).not.toMatch(/^(?:[a-z]+:)?\/\//i)
       expect(u).toMatch(/^fonts\//)
     }
-    // renderMath.ts imports that very stylesheet, never a CDN copy.
+    // renderMath.ts loads that very stylesheet (with KaTeX, on the first formula), never a CDN copy.
     const source = readFileSync(require.resolve('./renderMath.ts'), 'utf8')
-    expect(source).toContain("import 'katex/dist/katex.min.css'")
+    expect(source).toContain("import('katex/dist/katex.min.css')")
     expect(source).not.toMatch(/https?:\/\//)
   })
   // Known issue 7: KaTeX ignores a blank line, so two formulas ran together on one line.

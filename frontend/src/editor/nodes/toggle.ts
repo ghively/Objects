@@ -20,7 +20,8 @@
 import { Node, mergeAttributes, type Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
-import { Decoration, DecorationSet, type NodeView } from '@tiptap/pm/view'
+import { Decoration, type DecorationSet, type NodeView } from '@tiptap/pm/view'
+import { buildDecorations, updateDecorations, type DecorationVisitor } from '../extensions/incrementalDecorations'
 import { useSettings } from '@/settings/useSettings'
 import type { Option } from '../annotations'
 import { ancestorOfType, containerSourceAttributes, flag, unwrapAt, wrapBlocks } from './containers'
@@ -200,21 +201,17 @@ class ToggleView implements NodeView {
 const toggleHideKey = new PluginKey<DecorationSet>('toggleHide')
 
 /** Hide every child but the first of each closed toggle. */
-function hiddenChildren(doc: PMNode): DecorationSet {
-  const decos: Decoration[] = []
-  doc.descendants((node, pos) => {
-    if (node.type.name === 'toggle' && !isToggleOpen(node.attrs.blockOptions as Option[] | null)) {
-      let at = pos + 1
-      node.forEach((child, _offset, index) => {
-        if (index > 0) {
-          decos.push(Decoration.node(at, at + child.nodeSize, { style: 'display: none', 'data-toggle-hidden': '' }))
-        }
-        at += child.nodeSize
-      })
-    }
-    return node.isBlock && !node.isTextblock
-  })
-  return DecorationSet.create(doc, decos)
+const hiddenChildrenVisitor: DecorationVisitor = (node, pos, decos) => {
+  if (node.type.name === 'toggle' && !isToggleOpen(node.attrs.blockOptions as Option[] | null)) {
+    let at = pos + 1
+    node.forEach((child, _offset, index) => {
+      if (index > 0) {
+        decos.push(Decoration.node(at, at + child.nodeSize, { style: 'display: none', 'data-toggle-hidden': '' }))
+      }
+      at += child.nodeSize
+    })
+  }
+  return node.isBlock && !node.isTextblock
 }
 
 export const Toggle = Node.create({
@@ -246,8 +243,8 @@ export const Toggle = Node.create({
       new Plugin<DecorationSet>({
         key: toggleHideKey,
         state: {
-          init: (_, state) => hiddenChildren(state.doc),
-          apply: (tr, old) => (tr.docChanged ? hiddenChildren(tr.doc) : old),
+          init: (_, state) => buildDecorations(state.doc, hiddenChildrenVisitor),
+          apply: (tr, old) => updateDecorations(old, tr, hiddenChildrenVisitor),
         },
         props: {
           decorations: (state) => toggleHideKey.getState(state),

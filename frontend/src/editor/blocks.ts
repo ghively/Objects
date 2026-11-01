@@ -14,9 +14,11 @@ export type SourceBlock = { kind: string; raw: string }
 // indent) starts a math block, which ends at the next line that ends with `$$`
 // (trailing blanks allowed); blank lines inside belong to it. `$$x$$` alone on
 // a line is a one-line block. Without a closing line it is not a math block.
+// A line ending in `\$$` does not close it: that is how the editor writes a
+// `$$` the formula itself ends a line with (`nodes/mathBlock.ts`).
 
 const MATH_OPEN = /^ {0,3}\$\$/
-const MATH_CLOSE = /\$\$[ \t]*$/
+const MATH_CLOSE = /(?<!\\)\$\$[ \t]*$/
 
 /** Length of the math block at the start of `src` (no final line break), or 0. */
 function matchMath(src: string): number {
