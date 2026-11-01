@@ -92,7 +92,14 @@ from .relink import (
 from .resolver import Resolver, link_candidates, link_names
 from .roles import role_of
 from .templates import TemplateError, creation_variable, expand_title, resolve_date_variable
-from .textfile import atomic_write, create_new, encode_like, move_no_overwrite, retry_os
+from .textfile import (
+    _write_temp,
+    atomic_write,
+    create_new,
+    encode_like,
+    move_no_overwrite,
+    retry_os,
+)
 from .trash import Trash, TrashItem
 from .typedefs import (
     SYSTEM_KEYS,
@@ -1577,6 +1584,11 @@ class Space:
         untouched line's bytes are kept; the replace re-checks the version.
         ``now`` is the write's instant for the stamp (default: `Space.clock`).
         Without ``history`` the write takes no version-history snapshot (`before_write`).
+
+        The lock is held for the read and the edit, released while the history
+        snapshot and the temp file are written and synced (the slow part; reads go
+        on meanwhile), and taken again for the version re-check, the replace and
+        the rescan, so a write since the read still surfaces as a conflict.
         """
         rel = self._rel(rel)
         full = self.root / rel
@@ -1603,25 +1615,36 @@ class Space:
             # Untouched lines keep their own bytes (and line endings) from the original.
             data = encode_like(raw.data, join_object(of))
             new_version = version_of(data)
+            self.own_writes[rel] = new_version
 
-            def unchanged_on_disk() -> None:
+        def forget() -> None:
+            if self.own_writes.get(rel) == new_version:
+                del self.own_writes[rel]
+
+        try:
+            if history:
+                self._call_before_write(rel, raw.data)
+            tmp = _write_temp(full, data)  # written and fsynced beside the file
+        except BaseException:
+            forget()
+            raise
+        with self._lock:
+            try:
                 # Re-check right before the replace: an external write since the
                 # read above must surface as a conflict, never be overwritten.
                 try:
-                    now = version_of(full.read_bytes())
+                    on_disk = version_of(full.read_bytes())
                 except OSError as exc:
                     raise KeyError(rel) from exc
-                if now != current:
-                    raise Conflict(now)
-
-            if history:
-                self._call_before_write(rel, raw.data)
-            self.own_writes[rel] = new_version
-            try:
-                atomic_write(full, data, check=unchanged_on_disk)
+                if on_disk != current:
+                    raise Conflict(on_disk)
+                retry_os(lambda: os.replace(tmp, full))
             except BaseException:
-                if self.own_writes.get(rel) == new_version:
-                    del self.own_writes[rel]
+                try:
+                    os.unlink(tmp)
+                except FileNotFoundError:
+                    pass
+                forget()
                 raise
             self.rescan_file(rel)
             return new_version

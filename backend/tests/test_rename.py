@@ -332,17 +332,31 @@ def test_readonly_referrer_reported_in_skipped(space_dir: Path):
 
 
 def _external_writes(monkeypatch, target: Path, times: int) -> list[bytes]:
-    real = space_mod.atomic_write
+    """Change `target` on disk right before each of the space's next `times` writes to it.
+
+    `_write` syncs a temp file (`_write_temp`) and replaces after a version re-check;
+    `_write_exact` goes through `atomic_write`: both entry points are patched.
+    """
     written: list[bytes] = []
 
-    def patched(path, data, check=None):
+    def external(path) -> None:
         if Path(path) == target and len(written) < times:
             ext = target.read_bytes() + f"external {len(written)}\n".encode()
             target.write_bytes(ext)
             written.append(ext)
-        return real(path, data, check=check)
 
-    monkeypatch.setattr(space_mod, "atomic_write", patched)
+    real_temp, real_atomic = space_mod._write_temp, space_mod.atomic_write
+
+    def temp(path, data):
+        external(path)
+        return real_temp(path, data)
+
+    def atomic(path, data, check=None):
+        external(path)
+        return real_atomic(path, data, check=check)
+
+    monkeypatch.setattr(space_mod, "_write_temp", temp)
+    monkeypatch.setattr(space_mod, "atomic_write", atomic)
     return written
 
 

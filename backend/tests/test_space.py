@@ -1,10 +1,11 @@
 import errno
 import hashlib
+import os
 from pathlib import Path
 
 import pytest
 
-from objectapp.space import ObjectSummary, Space
+from objectapp.space import Conflict, ObjectSummary, Space, version_of
 from objectapp.typedefs import infer_types_from, iter_object_paths, read_raw
 from objectapp.typemodel import load_types
 
@@ -218,3 +219,49 @@ def test_open_never_writes(space_dir):
     for t in s2.types:
         s2.list(t.id)
     assert _hashes(space_dir) == before
+
+
+def test_a_read_does_not_wait_for_a_saves_fsync(space_dir, monkeypatch):
+    # Audit 2026-11-01 B11: the lock is released while the temp file is synced.
+    import threading
+    import time
+
+    s = Space(space_dir)
+    rel = "People/Ada Lovelace.md"
+    base = s.read(rel)[2]
+    in_fsync = threading.Event()
+
+    def slow_fsync(fd):
+        in_fsync.set()
+        time.sleep(0.4)
+
+    monkeypatch.setattr(os, "fsync", slow_fsync)
+    waits: list[float] = []
+
+    def save() -> None:
+        s.save_body(rel, "A new body\n", base)
+
+    writer = threading.Thread(target=save)
+    writer.start()
+    assert in_fsync.wait(5)
+    t0 = time.perf_counter()
+    listed = s.list()
+    waits.append(time.perf_counter() - t0)
+    writer.join(10)
+    assert not writer.is_alive()
+    assert listed and waits[0] < 0.2, waits
+    assert s.read(rel)[0].body == "A new body\n"
+    assert s.get(rel).title == "Ada Lovelace"
+    # The conflict guarantee survived the split: a write between the read and the
+    # replace is seen and nothing is overwritten.
+    full = space_dir / rel
+    original = full.read_bytes()
+
+    def external_edit(fd):
+        full.write_bytes(original.replace(b"A new body", b"Someone else's body"))
+
+    monkeypatch.setattr(os, "fsync", external_edit)
+    with pytest.raises(Conflict):
+        s.save_body(rel, "Mine\n", version_of(original))
+    assert b"Someone else's body" in full.read_bytes()
+    assert not list(full.parent.glob("*.tmp"))
