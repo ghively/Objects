@@ -371,6 +371,8 @@ class RowsRequest(BaseModel):
     collectionIds: list[str] | None = None
     paths: list[str] | None = None
     search: RowsSearch | None = None
+    #: False leaves ``preview`` empty (a view fetches the visible rows' previews after).
+    preview: bool = True
 
 
 class PatchUiRequest(BaseModel):
@@ -1308,7 +1310,7 @@ def create_app(
     def post_rows(req: RowsRequest):
         search = (req.search.terms, req.search.mode) if req.search is not None else None
         try:
-            rows = space.rows(req.typeIds, req.collectionIds, req.paths, search)
+            rows = space.rows(req.typeIds, req.collectionIds, req.paths, search, req.preview)
         except InvalidValue as exc:
             return _error(422, str(exc))
         return _display_safe({"rows": [asdict(r) for r in rows]})
