@@ -1,3 +1,4 @@
+import errno
 import hashlib
 from pathlib import Path
 
@@ -149,6 +150,22 @@ def test_paths_outside_space_rejected(space_dir):
     s = Space(space_dir)
     with pytest.raises((KeyError, ValueError)):
         s.read("../outside.md")
+
+
+def test_over_long_path_component_is_a_value_error(space_dir, monkeypatch):
+    # Audit 2026-11-01 #4b: the routes map ValueError to 400; an OSError would be a 503.
+    s = Space(space_dir)
+    with pytest.raises(ValueError):
+        s._rel("Pages/" + "a" * 300 + ".md")
+    with pytest.raises(ValueError):
+        s.read("a" * 256 + "/Alpha.md")
+
+    def resolve(self, strict=False):  # what some Python builds and Windows do
+        raise OSError(errno.ENAMETOOLONG, "File name too long")
+
+    monkeypatch.setattr(type(Path()), "resolve", resolve)
+    with pytest.raises(ValueError):
+        s._rel("Pages/Alpha.md")
 
 
 def test_resolve_same_folder_first(space_dir):

@@ -1488,7 +1488,12 @@ class Space:
             raise ValueError(f"Path is outside the space: {path!r}")
         if is_ignored(rel) or rel.name.startswith(".") or rel.suffix.lower() != ".md":
             raise ValueError(f"Not an object path: {path!r}")
-        full = (self.root / rel).resolve()
+        if any(len(part.encode("utf-8", "surrogateescape")) > 255 for part in rel.parts):
+            raise ValueError(f"Path component too long: {path!r}")
+        try:
+            full = (self.root / rel).resolve()
+        except OSError as exc:  # e.g. ENAMETOOLONG: a bad path, not a file-system fault
+            raise ValueError(f"Not an object path: {path!r}") from exc
         if not full.is_relative_to(self.root):
             raise ValueError(f"Path is outside the space: {path!r}")
         return rel.as_posix()
