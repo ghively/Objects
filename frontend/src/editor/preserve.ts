@@ -167,8 +167,9 @@ function parseList(lines: string[]): (ListLine | null)[] {
 function listKey(line: string, parsed: ListLine | null): string {
   if (!parsed) return 'C\0' + line.trim()
   const ordered = /\d/.test(parsed.marker) ? 'o' : 'b'
-  // A hard break may be written `\` or as trailing blanks: the same line.
-  return `I\0${parsed.depth}\0${ordered}\0${parsed.content.replace(/\\$/, '').trimEnd()}`
+  // A hard break may be written `\` or as trailing blanks, and a done box `[x]` or `[X]`: the same line.
+  const content = parsed.content.replace(/^\[X\](?=[ \t]|$)/, '[x]')
+  return `I\0${parsed.depth}\0${ordered}\0${content.replace(/\\$/, '').trimEnd()}`
 }
 
 function preserveList(origLines: string[], regenLines: string[]): string[] {

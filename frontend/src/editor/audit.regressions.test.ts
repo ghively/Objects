@@ -413,6 +413,54 @@ describe('lines with ::', () => {
   })
 })
 
+/** Every task item's checked state, in document order. */
+function checks(editor: TiptapEditor): boolean[] {
+  const out: boolean[] = []
+  editor.state.doc.descendants((n) => {
+    if (n.type.name === 'taskItem') out.push(n.attrs.checked as boolean)
+  })
+  return out
+}
+
+describe('to-do lists with [X] or plain items (audit 2026-11-01, Gene: accept both)', () => {
+  test('an uppercase [X] loads as a done task list and keeps its bytes', () => {
+    const body = '* [ ] a\n* [X] b\n'
+    const editor = headless(body)
+    expect(shape(editor)).toEqual([['taskList', 'ab']])
+    expect(checks(editor)).toEqual([false, true])
+    expect(serializeBody(editor)).toBe(body)
+    append(editor, 'a', 'Z')
+    expect(serializeBody(editor)).toBe('* [ ] aZ\n* [X] b\n')
+  })
+
+  test.each([
+    ['- [ ] a\n- plain\n', [false]],
+    ['- plain\n- [ ] a\n', [false]],
+    ['- [X] done\n- plain\n  - [x] nested\n', [true, true]],
+  ])('%j loads as a bullet list with task items', (body, checked) => {
+    const editor = headless(body)
+    expect(shape(editor).map(([t]) => t)).toEqual(['bulletList'])
+    expect(checks(editor)).toEqual(checked)
+    expect(serializeBody(editor)).toBe(body)
+  })
+
+  test('editing one item of a mixed list changes only its line', () => {
+    const editor = headless('- [ ] a\n- plain\n  - [x] nested\n')
+    append(editor, 'plain', 'Z')
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe('- [ ] a\n- plainZ\n  - [x] nested\n')
+    expect(out.reloaded).toEqual([['bulletList', 'aplainZnested']])
+  })
+
+  test('a to-do list followed by a paragraph after a blank line is still one list', () => {
+    const editor = headless('- [ ] a\n- [x] b\n\nAfter\n')
+    expect(shape(editor)).toEqual([
+      ['taskList', 'ab'],
+      ['paragraph', 'After'],
+    ])
+  })
+})
+
 describe('typed field and footnote definition lines (audit 2026-11-01)', () => {
   test.each([
     ['Key:: value', 'Key\\:: value'],
