@@ -1067,8 +1067,10 @@ function LostState({ onBack, paneSize }: { onBack(): void; paneSize(): { width: 
   const flowH = useFlowStore((s) => s.height)
   const pane = flowW > 0 && flowH > 0 ? { width: flowW, height: flowH } : paneSize()
   const view: Box = { x: -x / zoom, y: -y / zoom, width: pane.width / zoom, height: pane.height / zoom }
-  const boxes = [...Object.values(board.nodes).map((n) => nodeBox(n)), ...strokeBoxes(strokes)]
-  const bounds = boundsOf(boxes)
+  // Every pan and zoom frame re-renders this; the boxes (a pass over every ink point) only
+  // depend on the content.
+  const boxes = useMemo(() => [...Object.values(board.nodes).map((n) => nodeBox(n)), ...strokeBoxes(strokes)], [board.nodes, strokes])
+  const bounds = useMemo(() => boundsOf(boxes), [boxes])
   if (!bounds) return null
   const visible = boxes.some(
     (b) =>
