@@ -3,6 +3,18 @@ import { act, render } from '@testing-library/react'
 import { ReactFlow, ReactFlowProvider, useViewport } from '@xyflow/react'
 import { useState } from 'react'
 import { describe, expect, test, vi } from 'vitest'
+let outlineCalls = 0
+vi.mock('./inkModel', async (orig) => {
+  const m = (await orig()) as typeof import('./inkModel')
+  return {
+    ...m,
+    outlineFor: (...args: Parameters<typeof m.outlineFor>) => {
+      outlineCalls++
+      return m.outlineFor(...args)
+    },
+  }
+})
+
 import { InkLayer } from './InkLayer'
 import { DEFAULT_INK, finishStroke, SPLIT_STROKE_POINTS } from './inkModel'
 import type { InkLayerProps, InkStroke, InkToolState } from './types'
@@ -50,6 +62,8 @@ function fire(el: Element, type: string, init: PInit) {
     el.dispatchEvent(pointer(type, init))
   })
 }
+
+const nextFrame = () => act(() => new Promise<void>((r) => requestAnimationFrame(() => r())))
 
 function setup(props: Partial<InkLayerProps> = {}) {
   const onStrokesChange = vi.fn()
@@ -149,6 +163,28 @@ describe('InkLayer', () => {
     // Consecutive pieces share their joining sample, so the line stays unbroken.
     expect(next[1].points[0]).toEqual(next[0].points.at(-1))
     expect(next.reduce((n, s) => n + s.points.length, 0)).toBe(25_001 + next.length - 1)
+  })
+
+  test('the live stroke outline is rebuilt once per animation frame, not per pointer move', async () => {
+    const { capture, container, onStrokesChange } = setup()
+    const el = capture()!
+    fire(el, 'pointerdown', { pointerType: 'pen', x: 0, y: 0, pressure: 0.5 })
+    await nextFrame()
+    expect(container.querySelector('[data-ink-live]')).not.toBeNull()
+    const before = outlineCalls
+    for (let i = 1; i <= 50; i++) fire(el, 'pointermove', { pointerType: 'pen', x: i, y: 0, pressure: 0.5 })
+    expect(outlineCalls - before).toBe(0)
+    const dBefore = container.querySelector('[data-ink-live]')!.getAttribute('d')
+    await nextFrame()
+    expect(outlineCalls - before).toBe(1)
+    expect(container.querySelector('[data-ink-live]')!.getAttribute('d')).not.toBe(dBefore)
+    fire(el, 'pointerup', { pointerType: 'pen', x: 50, y: 0 })
+    expect(container.querySelector('[data-ink-live]')).toBeNull()
+    expect(onStrokesChange).toHaveBeenCalledTimes(1)
+    expect((onStrokesChange.mock.calls[0][0] as InkStroke[])[0].points).toHaveLength(51)
+    // Nothing is shown after the gesture ended, even if a frame was still pending.
+    await nextFrame()
+    expect(container.querySelector('[data-ink-live]')).toBeNull()
   })
 
   test('mouse stroke uses simulated pressure', () => {
