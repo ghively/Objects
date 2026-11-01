@@ -25,17 +25,22 @@ declare module '@tiptap/core' {
   }
 }
 
-/** The TeX inside a math source block: the delimiters and their line breaks removed, LF line ends. */
+/**
+ * The TeX inside a math source block: the delimiters and their line breaks
+ * removed, LF line ends, and a `\$$` at a line end read back as the `$$` it
+ * stands for (`blocks.ts` `MATH_CLOSE`: an unescaped one would close the block).
+ */
 export function mathBlockText(raw: string): string {
   let s = raw.replace(/\r\n?/g, '\n').replace(/\n$/, '')
   s = s.replace(/^ {0,3}\$\$/, '').replace(/\$\$[ \t]*$/, '')
   if (s.startsWith('\n')) s = s.slice(1)
   if (s.endsWith('\n')) s = s.slice(0, -1)
-  return s
+  return s.replace(/\\(\$\$[ \t]*)$/gm, '$1')
 }
 
+/** The block's Markdown; a `$$` ending a line of the formula is written `\$$` so it does not close the block. */
 export function mathBlockMarkdown(text: string): string {
-  return `$$\n${text}\n$$`
+  return `$$\n${text.replace(/(?<!\\)(\$\$[ \t]*)$/gm, '\\$1')}\n$$`
 }
 
 export const MathBlock = Node.create({

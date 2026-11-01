@@ -475,6 +475,21 @@ describe('to-do lists with [X] or plain items (audit 2026-11-01, Gene: accept bo
   })
 })
 
+describe('math blocks (audit 2026-11-01)', () => {
+  test.each([
+    ['x\n$$\ny', '$$\nx\n\\$$\ny\n$$\n'],
+    ['x $$', '$$\nx \\$$\n$$\n'],
+  ])('a formula containing %j at a line end stays one block', (text, saved) => {
+    const editor = headless('$$\nx\n$$\n')
+    editor.view.dispatch(editor.state.tr.setNodeAttribute(0, 'text', text))
+    expect(serializeBody(editor)).toBe(saved)
+    const again = headless(saved)
+    expect(shape(again)).toEqual([['mathBlock', '']])
+    expect(again.state.doc.firstChild!.attrs.text).toBe(text)
+    expect(serializeBody(again)).toBe(saved)
+  })
+})
+
 describe('typed field and footnote definition lines (audit 2026-11-01)', () => {
   test.each([
     ['Key:: value', 'Key\\:: value'],
