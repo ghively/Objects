@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
 from typing import Literal, TypedDict
 from urllib.parse import quote
@@ -93,21 +94,57 @@ def _is_ink_sidecar(root: Path, rel: str) -> bool:
         return False
 
 
+def _ext(name: str) -> str:
+    """``PurePosixPath(name).suffix.lower()`` without building a path (listing walks call
+    it per file; audit 2026-11-01 B7)."""
+    base = str(name or "").rstrip("/").rsplit("/", 1)[-1]
+    i = base.rfind(".")
+    if i <= 0 or i == len(base) - 1:
+        return ""
+    return base[i:].lower()
+
+
+def _walk(root: Path) -> Iterator[tuple[str, os.DirEntry[str]]]:
+    """``(space-relative POSIX path, entry)`` of every file under `root` outside dot-folders.
+
+    Dot-folders (``.git``, ``.trash``, ``.capacities-cache``) are pruned before they are
+    read, not filtered after (`rglob` walked 20,000 ``.git`` files per listing, audit
+    2026-11-01 B7); dot-files are skipped; symlinked folders are not followed and a folder
+    that can't be read is skipped, as with `rglob`.
+    """
+    stack = [(str(root), "")]
+    while stack:
+        folder, prefix = stack.pop()
+        try:
+            with os.scandir(folder) as it:
+                entries = list(it)
+        except OSError:
+            continue
+        for entry in entries:
+            name = entry.name
+            if name.startswith("."):
+                continue
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    stack.append((entry.path, f"{prefix}{name}/"))
+                    continue
+                if not entry.is_file():
+                    continue
+            except OSError:
+                continue
+            yield f"{prefix}{name}", entry
+
+
 def list_images(root: Path) -> list[dict[str, str]]:
     """``[{path}]`` for every image file in the space outside dot-folders, sorted by path."""
     root = Path(root)
     out: list[str] = []
-    for p in root.rglob("*"):
-        rel = p.relative_to(root)
-        if _hidden(rel.parts) or not is_image_name(p.name):
+    for rel, _entry in _walk(root):
+        if _ext(rel) not in IMAGE_EXTENSIONS:
             continue
-        if _is_ink_sidecar(root, rel.as_posix()):
+        if rel.lower().endswith(INK_SUFFIX) and _is_ink_sidecar(root, rel):
             continue
-        try:
-            if p.is_file():
-                out.append(rel.as_posix())
-        except OSError:
-            continue
+        out.append(rel)
     return [{"path": p} for p in sorted(out)]
 
 
@@ -270,27 +307,23 @@ class RefusedToOpen(ValueError):
     """An executable or script the app won't hand to the OS (415)."""
 
 
+_KIND_BY_EXT: dict[str, AttachmentKind] = {
+    **dict.fromkeys(IMAGE_EXTENSIONS, "image"),
+    **dict.fromkeys(PDF_MEDIA_TYPES, "pdf"),
+    **dict.fromkeys(AUDIO_MEDIA_TYPES, "audio"),
+    **dict.fromkeys(VIDEO_MEDIA_TYPES, "video"),
+}
+_MEDIA_TYPE_BY_EXT = {**IMAGE_EXTENSIONS, **PDF_MEDIA_TYPES, **AUDIO_MEDIA_TYPES, **VIDEO_MEDIA_TYPES}
+
+
 def kind_of(name: str) -> AttachmentKind:
     """The attachment kind of a file name, by its (case-insensitive) extension."""
-    ext = PurePosixPath(str(name or "")).suffix.lower()
-    if ext in IMAGE_EXTENSIONS:
-        return "image"
-    if ext in PDF_MEDIA_TYPES:
-        return "pdf"
-    if ext in AUDIO_MEDIA_TYPES:
-        return "audio"
-    if ext in VIDEO_MEDIA_TYPES:
-        return "video"
-    return "file"
+    return _KIND_BY_EXT.get(_ext(name), "file")
 
 
 def attachment_media_type(name: str) -> str:
     """The ``Content-Type`` a file is served with (``application/octet-stream`` for a `file`)."""
-    ext = PurePosixPath(name).suffix.lower()
-    for table in (IMAGE_EXTENSIONS, PDF_MEDIA_TYPES, AUDIO_MEDIA_TYPES, VIDEO_MEDIA_TYPES):
-        if ext in table:
-            return table[ext]
-    return "application/octet-stream"
+    return _MEDIA_TYPE_BY_EXT.get(_ext(name), "application/octet-stream")
 
 
 def _is_sidecar(root: Path, rel: str) -> bool:
@@ -340,26 +373,20 @@ def list_attachments(root: Path) -> list[Attachment]:
     """
     root = Path(root)
     out: list[Attachment] = []
-    for p in root.rglob("*"):
+    for rel, entry in _walk(root):
+        ext = _ext(rel)
+        kind = _KIND_BY_EXT.get(ext, "file")
+        if kind == "file" and rel.split("/", 1)[0] != ATTACHMENTS:
+            continue
+        if ext == ".md":
+            continue
+        if (ext == ".json" or ext == ".svg") and _is_sidecar(root, rel):
+            continue  # sidecar names end in .whiteboard.json / .ink.svg
         try:
-            rel = p.relative_to(root)
-        except ValueError:
-            continue
-        if _hidden(rel.parts):
-            continue
-        rel_text = rel.as_posix()
-        kind = kind_of(p.name)
-        if kind == "file" and rel.parts[0] != ATTACHMENTS:
-            continue
-        if p.suffix.lower() == ".md" or _is_sidecar(root, rel_text):
-            continue
-        try:
-            if not p.is_file():
-                continue
-            size = p.stat().st_size
+            size = entry.stat().st_size
         except OSError:
             continue
-        out.append({"path": rel_text, "kind": kind, "size": size})
+        out.append({"path": rel, "kind": kind, "size": size})
     out.sort(key=lambda a: a["path"])
     return out
 

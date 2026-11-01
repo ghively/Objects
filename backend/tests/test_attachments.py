@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -243,6 +244,78 @@ def test_open_whitelists_documents_media_and_archives(env):
         res = client.post("/api/attachments/open", json={"path": f"Attachments/{name}"})
         assert res.status_code == 200, (ext, res.text)
     assert len(opened.read_text(encoding="utf-8").splitlines()) == len(OPENABLE)
+
+
+# Audit 2026-11-01 B7: listings prune dot-folders before reading them and classify files by
+# a cheap extension lookup; the results are what the rglob walk produced.
+
+
+def test_listings_never_read_dot_folders(env, monkeypatch):
+    from objectapp import media
+
+    root, client, _ = env
+    git = root / ".git" / "objects" / "ab"
+    git.mkdir(parents=True)
+    for i in range(50):
+        (git / f"blob{i}.png").write_bytes(b"x")
+    (root / ".trash").mkdir(exist_ok=True)
+    (root / ".trash" / "old.pdf").write_bytes(b"x")
+    (root / "Attachments" / ".hidden.png").write_bytes(b"x")
+    opened: list[str] = []
+    real = os.scandir
+
+    def spy(path=".", *a, **k):
+        opened.append(str(path))
+        return real(path, *a, **k)
+
+    monkeypatch.setattr(media.os, "scandir", spy)
+    attachments = [a["path"] for a in media.list_attachments(root)]
+    images = [i["path"] for i in media.list_images(root)]
+    assert not any("/.git" in p or "/.trash" in p for p in opened), opened
+    assert all(not p.startswith(".") and "/." not in p for p in attachments + images)
+    assert "Attachments/.hidden.png" not in images
+    assert "Attachments/pixel.png" in images and "Attachments/report.pdf" in attachments
+    assert client.get("/api/attachments").json() == media.list_attachments(root)
+
+
+def test_listings_match_the_rglob_walk(env):
+    from objectapp import media
+
+    root, _client, _ = env
+    (root / "Loose").mkdir()
+    (root / "Loose" / "deck.pptx").write_bytes(b"x")  # a `file` outside Attachments: not listed
+    (root / "Loose" / "clip.MP4").write_bytes(b"x")  # media anywhere is listed
+    (root / "Loose" / "note.md").write_bytes(b"---\ntitle: n\n---\n")
+    (root / "Attachments" / "odd.").write_bytes(b"x")
+    (root / "Attachments" / "no_ext").write_bytes(b"x")
+    expected = []
+    for p in root.rglob("*"):
+        rel = p.relative_to(root)
+        if any(part.startswith(".") for part in rel.parts) or not p.is_file():
+            continue
+        kind = media.kind_of(p.name)
+        if (kind == "file" and rel.parts[0] != "Attachments") or p.suffix.lower() == ".md":
+            continue
+        expected.append({"path": rel.as_posix(), "kind": kind, "size": p.stat().st_size})
+    expected.sort(key=lambda a: a["path"])
+    assert media.list_attachments(root) == expected
+    assert [i["path"] for i in media.list_images(root)] == sorted(
+        a["path"] for a in expected if a["kind"] == "image"
+    )
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["x.", "x..", ".hidden", ".hidden.png", "a.b.PNG", "noext", "dir/x.", "dir.d/x", "a\\b.png", "",
+     "x.png/", "a/.png", "..png", "x.tar.gz", "Attachments/report.PDF", " .png", "x. ", "clip.weba"],
+)
+def test_ext_matches_pure_posix_path_suffix(name):
+    from pathlib import PurePosixPath
+
+    from objectapp import media
+
+    assert media._ext(name) == PurePosixPath(name).suffix.lower()
+    assert media.kind_of(name) in ("image", "pdf", "audio", "video", "file")
 
 
 def test_listing_and_serving_write_nothing(env):
