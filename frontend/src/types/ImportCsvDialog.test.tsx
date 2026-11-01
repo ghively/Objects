@@ -10,7 +10,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
-import { CSV_ROW_LIMIT, csvRecord, csvTargets, defaultMapping, ImportCsvDialog } from './ImportCsvDialog'
+import { CSV_ROW_LIMIT, csvRecord, csvTargets, csvValue, defaultMapping, ImportCsvDialog } from './ImportCsvDialog'
 
 const mocked = vi.mocked(api)
 const TITLE = propertyDef({ id: 'title', key: 'title', name: 'Title', type: 'entity_title' })
@@ -64,6 +64,17 @@ describe('ImportCsvDialog', () => {
     })
     // An unknown option and a non-number are skipped, not sent.
     expect(csvRecord(['X', '', 'B', 'many', 'Poetry'], mapping, targets)).toEqual({ title: 'X', values: { author: 'B' } })
+  })
+
+  test('a percentage column is read in percent, as the cell is (audit 2026-11-01 #14)', () => {
+    const share = propertyDef({ id: 'share', key: 'share', name: 'Share', type: 'number', options: { numberFormat: { type: 'percentage', options: {} } } })
+    const plain = propertyDef({ id: 'rate', key: 'rate', name: 'Rate', type: 'number' })
+    expect(csvValue(share, '25')).toBe(0.25)
+    expect(csvValue(share, '25%')).toBe(0.25)
+    expect(csvValue(share, '14.3')).toBe(0.143)
+    // A plain number keeps "25" and reads a trailing % as the fraction, as its cell does.
+    expect(csvValue(plain, '25')).toBe(25)
+    expect(csvValue(plain, '25%')).toBe(0.25)
   })
 
   test('test creates one object per row', async () => {

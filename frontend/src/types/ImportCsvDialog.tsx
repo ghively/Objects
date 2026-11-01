@@ -22,7 +22,7 @@ import { Switch } from '@/components/ui/switch'
 import { parseCsv } from '@/lib/csvParse'
 import { CHANGE_TYPE_TEXT } from '@/object/ChangeTypeDialog'
 import { parseDateInput } from '@/properties/DatePicker'
-import { parseNumberInput } from '@/properties/format'
+import { fromPercent, parseNumberInput } from '@/properties/format'
 
 export const IMPORT_CSV_TEXT = {
   /** `database.options.options.importCsv.text` */
@@ -122,8 +122,11 @@ export function csvValue(def: PropertyDef, text: string): unknown {
   if (!t) return undefined
   switch (def.type) {
     case 'number': {
-      const n = parseNumberInput(t)
-      return typeof n === 'number' ? n : undefined
+      // As the cell reads typed text: a percentage property's cell is in percent, so "25" is 0.25.
+      const fmt = def.options.numberFormat
+      const n = parseNumberInput(t, fmt)
+      if (typeof n !== 'number') return undefined
+      return fmt?.type === 'percentage' ? fromPercent(n) : n
     }
     case 'boolean':
       return TRUE_TEXTS.has(t.toLowerCase())
