@@ -125,3 +125,36 @@ describe('edits made while a save is in flight', () => {
     })
   })
 })
+
+describe('a save that fails after the editor left', () => {
+  test('keeps the text queued while it was in flight, not the older in-flight text', async () => {
+    const { keptUnsaved, resetUnsaved } = await import('./unsaved')
+    resetUnsaved()
+    let reject!: (e: unknown) => void
+    vi.mocked(api.saveBody).mockImplementation(() => new Promise((_res, rej) => (reject = rej)))
+    let body: string | null = 'A1'
+    const { result, rerender } = renderHook(
+      (p: { path: string }) =>
+        useAutosave({ path: p.path, version: 'v0', readOnly: false, getBody: () => body, onSaved: () => {} }),
+      { initialProps: { path: 'a.md' } },
+    )
+    act(() => result.current.markLoaded('A0', 'v0'))
+    let first!: Promise<void>
+    await act(async () => {
+      first = result.current.flush()
+    })
+    body = 'A2'
+    await act(async () => {
+      void result.current.leave('a.md')
+    })
+    rerender({ path: 'b.md' })
+    body = 'B0'
+    await act(async () => {
+      reject(new Error('server gone'))
+      await first
+    })
+    expect(keptUnsaved('a.md')).toBe('A2')
+    resetUnsaved()
+  })
+})
+

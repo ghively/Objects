@@ -212,8 +212,12 @@ describe('whiteboard notes and a stale detail answer', () => {
     await act(async () => {
       await Promise.resolve()
     })
+    // What a GET sent from now on reads: the saved Notes.
+    vi.mocked(api.object).mockImplementation(async (path: string) =>
+      objectDetail({ summary: objectSummary({ path, title: 'Board' }), body: 'First note line. More.\n', version: 'v1+1' }),
+    )
 
-    // The late answer is older than the save: ignored.
+    // The late answer is older than the save: ignored (and asked again).
     await act(async () => {
       answer?.()
       await Promise.resolve()
@@ -227,5 +231,55 @@ describe('whiteboard notes and a stale detail answer', () => {
     fireEvent.click(toggle)
     await waitFor(() => expect(api.saveBody).toHaveBeenCalledTimes(2))
     expect(api.saveBody).toHaveBeenLastCalledWith(PATH, 'First note line. More. Again.\n', 'v1+1')
+  })
+
+  test('a GET dropped because a Notes save landed meanwhile is asked again', async () => {
+    let emit: ((e: { kind: string; path: string; version?: string }) => void) | null = null
+    vi.mocked(api.onChange).mockImplementation(((cb: typeof emit) => {
+      emit = cb
+      return () => undefined
+    }) as unknown as typeof api.onChange)
+    const client = mockWhiteboardApi(board(), 'rev-1')
+    render(
+      <div style={{ width: 1280, height: 800 }}>
+        <WhiteboardPage path={PATH} mode="page" host={fakeHost()} client={client} />
+      </div>,
+    )
+    await waitFor(() => expect(screen.getByTestId('whiteboard-canvas')).toBeInTheDocument())
+    const toggle = within(await screen.findByTestId('whiteboard-notes')).getByRole('button', { name: 'Notes' })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(screen.getByTestId('whiteboard-notes-editor')).toHaveTextContent('First note line.'))
+
+    // Another window renames the board's title; the change event's GET answers late.
+    let answer: (() => void) | null = null
+    vi.mocked(api.object).mockImplementationOnce(
+      (path: string) =>
+        new Promise((resolve) => {
+          answer = () =>
+            resolve(objectDetail({ summary: objectSummary({ path, title: 'Elsewhere' }), body: 'First note line.\n', version: 'v1t' }))
+        }),
+    )
+    act(() => emit?.({ kind: 'changed', path: PATH, version: 'v1t' }))
+    expect(answer).not.toBeNull()
+
+    // Meanwhile a Notes save lands.
+    const editor = pmEditor()
+    act(() => {
+      editor.commands.insertContentAt(editor.state.doc.content.size - 1, ' More.')
+    })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(api.saveBody).toHaveBeenCalledTimes(1))
+    vi.mocked(api.object).mockImplementation(async (path: string) =>
+      objectDetail({ summary: objectSummary({ path, title: 'Elsewhere' }), body: 'First note line. More.\n', version: 'v1+1' }),
+    )
+    const gets = vi.mocked(api.object).mock.calls.length
+
+    // The late answer is dropped, and a fresh one brings the new title without waiting for an event.
+    await act(async () => {
+      answer?.()
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(vi.mocked(api.object).mock.calls.length).toBe(gets + 1))
+    expect(await screen.findAllByText('Elsewhere')).not.toHaveLength(0)
   })
 })

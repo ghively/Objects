@@ -17,6 +17,8 @@ export interface RecoveryDialogProps {
   onDisk: string
   /** Set while the last save of the kept text failed. */
   error?: string | null
+  /** Set while the kept text is being saved: the buttons wait for it. */
+  saving?: boolean
   onSave: () => void
   onDiscard: () => void
 }
@@ -38,7 +40,7 @@ function Pane({ label, text }: { label: string; text: string }) {
   )
 }
 
-export function RecoveryDialog({ open, path, kept, onDisk, error, onSave, onDiscard }: RecoveryDialogProps) {
+export function RecoveryDialog({ open, path, kept, onDisk, error, saving, onSave, onDiscard }: RecoveryDialogProps) {
   return (
     <Dialog open={open}>
       <DialogContent
@@ -68,6 +70,7 @@ export function RecoveryDialog({ open, path, kept, onDisk, error, onSave, onDisc
           <button
             type="button"
             onClick={onDiscard}
+            disabled={saving}
             className="h-9 rounded-lg bg-raised px-3 text-[14px] font-medium hover:bg-hover"
           >
             Discard
@@ -75,6 +78,7 @@ export function RecoveryDialog({ open, path, kept, onDisk, error, onSave, onDisc
           <button
             type="button"
             onClick={onSave}
+            disabled={saving}
             className="h-9 rounded-lg bg-primary-btn px-3 text-[14px] font-medium text-app hover:opacity-90"
           >
             Save changes

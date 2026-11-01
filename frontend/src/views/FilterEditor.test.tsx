@@ -206,6 +206,35 @@ describe('FilterEditor', () => {
     expect(value).toHaveValue('-20')
   })
 
+  test('a number filter reads numbers as the number cells do: the decimal comma, "+5", no infinity', () => {
+    const T = typeDef({ id: 'deal', propertyDefinitions: [propertyDef({ id: 'amount', type: 'number', name: 'Amount' })] })
+    const onChange = vi.fn()
+    const init: FilterGroup = {
+      type: 'filterGroup',
+      operator: 'and',
+      elements: [{ type: 'filter', propertyId: 'amount', option: 'greater', referenceValue: 3 }],
+    }
+    const before = useSettings.getState().settings
+    useSettings.setState({ settings: { ...before, decimalSeparator: 'comma' } })
+    try {
+      render(<FilterEditor group={init} onChange={onChange} choices={propertyChoices([T])} types={[T]} collections={[]} />)
+      const value = screen.getByRole('textbox', { name: 'Value' })
+      const ref = () => ((onChange.mock.calls.at(-1)![0] as FilterGroup).elements[0] as { referenceValue?: unknown }).referenceValue
+      fireEvent.change(value, { target: { value: '1,5' } })
+      expect(value).not.toHaveAttribute('aria-invalid')
+      expect(ref()).toBe(1.5)
+      fireEvent.change(value, { target: { value: '+5' } })
+      expect(value).not.toHaveAttribute('aria-invalid')
+      expect(ref()).toBe(5)
+      const calls = onChange.mock.calls.length
+      fireEvent.change(value, { target: { value: '1e400' } })
+      expect(onChange.mock.calls.length).toBe(calls) // not applied
+      expect(value).toHaveAttribute('aria-invalid', 'true')
+    } finally {
+      useSettings.setState({ settings: before })
+    }
+  })
+
   test('shows "No eligible properties available" without properties', () => {
     render(<FilterEditor group={emptyFilterGroup()} onChange={() => undefined} choices={[]} types={[]} collections={[]} />)
     expect(screen.getByText('No eligible properties available')).toBeInTheDocument()

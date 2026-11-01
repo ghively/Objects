@@ -11,7 +11,7 @@ import { QueriesPage } from '@/queries/QueriesPage'
 import { QueryPage } from '@/queries/QueryPage'
 import { LinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, refreshLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { setUnsavedSpace } from '@/editor/unsaved'
+import { moveUnsaved, setUnsavedSpace } from '@/editor/unsaved'
 import { setRecentSpace } from '@/nav/recent'
 import { isSidepanelShown } from '@/nav/sidepanel'
 import {
@@ -213,7 +213,11 @@ export default function App() {
     const changedPaths = new Set<string>()
     const off = api.onChange((e) => {
       // A file moved (renamed, or retyped into another folder): every tab and the peek follow it.
-      if (e.kind === 'renamed' && e.oldPath) useTabs.getState().retarget(e.oldPath, e.path)
+      if (e.kind === 'renamed' && e.oldPath) {
+        useTabs.getState().retarget(e.oldPath, e.path)
+        // Text kept unsaved under the old path (`editor/unsaved.ts`) is offered at the new one.
+        moveUnsaved(e.oldPath, e.path)
+      }
       if (e.kind === 'changed') changedPaths.add(e.path)
       else if (RELOAD_INDEX_KINDS.has(e.kind)) full = true
       else return // ui, collections, queries, views, whiteboard: not the index's business

@@ -423,6 +423,37 @@ describe('minor drift on edited lines', () => {
     expect(serializeBody(editor)).toBe(saved)
   })
 
+  // End review of the second audit fix pass: a hard break in an item's second paragraph.
+  test.each([
+    ['- a\n\n  para\\\n    cont\n', 'cont', '- a\n\n  para\\\n    contZ\n'],
+    ['- a\n\n  para\\\n  cont\n', 'cont', '- a\n\n  para\\\n  contZ\n'],
+    ['- a\n\n  para\\\n  cont\n', 'a', '- aZ\n\n  para\\\n  cont\n'],
+    ['1. a\n\n   para\\\n   cont\n', 'cont', '1. a\n\n   para\\\n   contZ\n'],
+  ])('a hard break in a list item\'s second paragraph is kept (%j, %s)', (body, needle, saved) => {
+    const editor = headless(body)
+    append(editor, needle, 'Z')
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved)
+    expect(out.reloaded).toEqual(shape(editor))
+  })
+
+  test.each(
+    ['- a\n\n  para\n', '1. a\n\n   para\n', '- a\n\n  para\n- b\n', '- a\n  - b\n\n    para\n'].flatMap((body) =>
+      ['cont', ' one', '  two', '    four', '      six', '\ttab'].map((line) => [line, body]),
+    ),
+  )('a continuation line %j after Shift-Enter in a later paragraph of %j reloads exactly', (line, body) => {
+    const editor = headless(body)
+    const f = find(editor, 'para')
+    editor.commands.setTextSelection(f.pos + f.node.nodeSize - 1)
+    editor.commands.setHardBreak()
+    editor.view.dispatch(editor.state.tr.insertText(line))
+    const saved = serializeBody(editor)
+    const text = (e: TiptapEditor) => find(e, 'para').node.textContent.replaceAll(String.fromCharCode(0xa0), ' ')
+    const reloaded = headless(saved)
+    expect(text(reloaded)).toBe('para' + line.replace('\t', ' '))
+    expect(serializeBody(reloaded)).toBe(saved)
+  })
+
   test('Shift-Enter at the end of a list item is saved as a hard break (audit 2026-11-01)', () => {
     const editor = headless('- a\n- b\n')
     editor.commands.setTextSelection(find(editor, 'b').pos + 2)
@@ -477,6 +508,24 @@ describe('minor drift on edited lines', () => {
     ['> a\n> > # H\n> > b\n', 'b', '> a\n> > # H\n> > bZ\n'],
     ['> x\n> a\n> > > b\n', 'a', '> x\n> aZ\n> > > b\n'],
   ])('editing one line of a nested blockquote changes only that line (%j, %s)', (body, needle, saved) => {
+    const before = shape(headless(body))
+    const editor = headless(body)
+    append(editor, needle, 'Z')
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved)
+    expect(out.reloaded).toEqual(shape(editor))
+    expect(before.length).toBe(out.reloaded.length)
+  })
+
+  // End review of the second audit fix pass: a quote inside a list item was rewritten on an
+  // unrelated edit (a bare `  >` line added, a lazy line given the inner quote's marker).
+  test.each([
+    ['- item\n  > q1\n  > > q2\n', 'item', '- itemZ\n  > q1\n  > > q2\n'],
+    ['- item\n  > q1\n  > > q2\n', 'q1', '- item\n  > q1Z\n  > > q2\n'],
+    ['- item\n  > > q2\n  > q3\n', 'item', '- itemZ\n  > > q2\n  > q3\n'],
+    ['- item\n  > > q2\n  > q3\n', 'q2', '- item\n  > > q2\n  > q3Z\n'],
+    ['1. item\n   > q1\n   > > q2\n2. next\n', 'next', '1. item\n   > q1\n   > > q2\n2. nextZ\n'],
+  ])('a quote inside a list item keeps its lines when another line is edited (%j, %s)', (body, needle, saved) => {
     const before = shape(headless(body))
     const editor = headless(body)
     append(editor, needle, 'Z')
