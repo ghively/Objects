@@ -4,7 +4,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ChangeEvent } from '@/api/types'
-import { calendarRange, objectSummary, row } from '@/test/mockApi'
+import { calendarDay, calendarRange, objectSummary, row } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig<typeof import('@/api/client')>()),
@@ -52,6 +52,19 @@ afterEach(() => {
 })
 
 describe('useCalendarRange on a changed event', () => {
+  test('an object listed only under Created (no summary) of a shown day reloads', async () => {
+    mocked.calendar.mockImplementation(async (from, to) =>
+      calendarRange({ from, to, today: '2026-10-23', summaries: {}, days: { '2026-10-07': calendarDay({ created: ['Pages/Made.md'] }) } }),
+    )
+    renderHook(() => useCalendarRange(RANGE))
+    await act(async () => {})
+    expect(mocked.calendar).toHaveBeenCalledTimes(1)
+    emit('changed', 'Pages/Made.md')
+    await settle()
+    expect(mocked.calendar).toHaveBeenCalledTimes(2)
+    expect(mocked.rows).not.toHaveBeenCalled()
+  })
+
   test('an object among the shown days reloads; one elsewhere with no date in range does not', async () => {
     renderHook(() => useCalendarRange(RANGE))
     await act(async () => {})

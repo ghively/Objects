@@ -28,7 +28,8 @@ export const useGraphDataStore = create<GraphDataState>()((set) => ({
       const next = (await api.graph()) ?? { nodes: [], links: [], tagged: [] }
       // The same payload keeps the same object: the canvas rebuilds its graph and restarts the
       // layout (up to seconds) on a new `data`, and a body-only save changes no node or link.
-      if (n === seq) set((s) => ({ data: s.data && sameGraph(s.data, next) ? s.data : next, loading: false }))
+      // A `304` answers the cached body itself, so identity skips the deep compare.
+      if (n === seq) set((s) => ({ data: s.data && (s.data === next || sameGraph(s.data, next)) ? s.data : next, loading: false }))
     } catch (e) {
       console.warn('Could not load the graph:', e)
       if (n === seq) set({ loading: false })

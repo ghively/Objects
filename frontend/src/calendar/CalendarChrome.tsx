@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
 import { cn } from '@/lib/utils'
+import { useZonedToday } from '@/lib/zonedShell'
 import { currentTarget, useTabs, type Target } from '@/nav/tabs'
 import { formatMonthTitle, todayYmd, weekNumber, type CalendarView, type WeekStart } from './dates'
 import { useCalendar, type StepKey } from './useCalendar'
@@ -51,7 +52,8 @@ export function CalendarChrome({ weekStart, rightPanelOpen, onToggleRightPanel, 
   const view = useCalendar((s) => s.view)
   const anchor = useCalendar((s) => s.anchor)
   const { setView, previous, next } = useCalendar.getState()
-  const today = todayYmd()
+  // Re-renders when the day changes, so the Today button's bold state rolls over at midnight.
+  const today = useZonedToday()
 
   const openTargetRef = useRef(onOpenTarget)
   useEffect(() => {

@@ -3,6 +3,7 @@
 // `useCollections` / `useQueries` over the same events).
 import { useEffect } from 'react'
 import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 import { api } from '@/api/client'
 import type { Collection, Query } from '@/api/types'
 
@@ -19,6 +20,9 @@ let refs = 0
 let off: (() => void) | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
 let seq = 0
+// The last release is deferred to a microtask: an unmount and a mount in the same commit (a tab
+// switch, a moved subtree) would otherwise reset the store and refetch, flashing the labels.
+let releasePending = false
 
 export async function reloadDefinitions(): Promise<void> {
   return reload()
@@ -37,6 +41,11 @@ async function reload(): Promise<void> {
 
 function acquire(): void {
   refs += 1
+  if (releasePending) {
+    // Re-acquired before the deferred release ran: the subscription and data are still live.
+    releasePending = false
+    return
+  }
   if (refs > 1) return
   void reload()
   off = api.onChange((e) => {
@@ -51,6 +60,14 @@ function acquire(): void {
 
 function release(): void {
   refs = Math.max(0, refs - 1)
+  if (refs > 0 || releasePending) return
+  releasePending = true
+  queueMicrotask(teardown)
+}
+
+function teardown(): void {
+  if (!releasePending) return
+  releasePending = false
   if (refs > 0) return
   off?.()
   off = null
@@ -66,5 +83,6 @@ export function useDefinitions(): DefsState {
     acquire()
     return release
   }, [])
-  return useDefs()
+  // Only the three fields, compared shallowly: a write that changes none of them re-renders nothing.
+  return useDefs(useShallow((s) => ({ collections: s.collections, queries: s.queries, loaded: s.loaded })))
 }
