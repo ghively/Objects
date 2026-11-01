@@ -142,7 +142,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
             ? step.board
             : step.board === old.board
               ? doc.board
-              : mergeBoards(old.board, step.board, doc.board),
+              : keepRemoteDeletes(old.board, doc.board, mergeBoards(old.board, step.board, doc.board)),
         strokes:
           doc.strokes === old.strokes
             ? step.strokes
@@ -450,6 +450,38 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       canvas,
     }
   })
+}
+
+/**
+ * A history step replayed onto a reloaded board (`merged`): nodes, edges and blocks that were in
+ * the board the step was taken against (`old`) but are gone from the reloaded one were deleted
+ * elsewhere, and undo or redo must not bring them back (`mergeBoards` lets a local change win,
+ * which suits a save but not a step of history). Edges left without an end go too; a block still
+ * used by a remaining node or edge stays, so the board stays valid.
+ */
+function keepRemoteDeletes(old: WhiteboardData, loaded: WhiteboardData, merged: WhiteboardData): WhiteboardData {
+  const gone = (rec: 'nodes' | 'edges' | 'blocks') =>
+    Object.keys(old[rec] ?? {}).filter((id) => !(id in (loaded[rec] ?? {})) && id in (merged[rec] ?? {}))
+  const nodes = gone('nodes')
+  const edges = gone('edges')
+  const blocks = gone('blocks')
+  if (nodes.length + edges.length + blocks.length === 0) return merged
+  const out: WhiteboardData = {
+    ...merged,
+    nodes: { ...merged.nodes },
+    edges: { ...merged.edges },
+    blocks: { ...merged.blocks },
+  }
+  for (const id of nodes) delete out.nodes[id]
+  for (const id of edges) delete out.edges[id]
+  for (const [id, e] of Object.entries(out.edges)) {
+    if (!out.nodes[e.source] || !out.nodes[e.target]) delete out.edges[id]
+  }
+  const used = new Set(
+    [...Object.values(out.nodes), ...Object.values(out.edges)].map((o) => o.blockId).filter((id) => id !== undefined),
+  )
+  for (const id of blocks) if (!used.has(id)) delete out.blocks[id]
+  return out
 }
 
 /**
