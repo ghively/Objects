@@ -508,13 +508,13 @@ class HistoryStore:
         """The ``.md`` bytes of a version, following its delta chain (None when unreadable).
 
         ``by_id`` is ``key``'s index by id and ``memo`` id -> bytes already rebuilt, when
-        the caller reads several versions.
+        the caller reads several versions; it gets every version this rebuilds. Without one
+        nothing is kept beyond the chain being walked.
         """
-        memo = memo if memo is not None else {}
         chain: list[dict[str, Any]] = []
         e = entry
         while True:
-            if e["id"] in memo:
+            if memo is not None and e["id"] in memo:
                 data: bytes | None = memo[e["id"]]
                 break
             if not isinstance(e.get("delta"), dict):
@@ -531,12 +531,14 @@ class HistoryStore:
             e = nxt
         if data is None:
             return None
-        memo[e["id"]] = data
+        if memo is not None:
+            memo[e["id"]] = data
         for d in reversed(chain):
             data = _apply_delta(data, d["delta"])
             if data is None:
                 return None
-            memo[d["id"]] = data
+            if memo is not None:
+                memo[d["id"]] = data
         return data
 
     def _find(self, md_rel: str, version_id: str) -> tuple[str, dict[str, Any], int]:
@@ -561,10 +563,13 @@ class HistoryStore:
             by_key: dict[str, dict[str, dict[str, Any]]] = {}
             for key, entry in entries:
                 by_key.setdefault(key, {})[entry["id"]] = entry
+            # Each key keeps only its last rebuilt version: the next one's delta rests on it,
+            # and keeping them all held every version of a big file in memory at once.
             memos: dict[str, dict[str, bytes]] = {}
             out = []
             for number, (key, entry) in enumerate(entries, start=1):
-                md = self._md(key, entry, by_key[key], memos.setdefault(key, {}))
+                md = self._md(key, entry, by_key[key], memos.get(key, {}))
+                memos[key] = {entry["id"]: md} if md is not None else {}
                 size = entry.get("size")
                 if not isinstance(size, int):  # a version kept before sizes were recorded
                     size = 0
