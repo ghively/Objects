@@ -124,12 +124,25 @@ def test_write_route_maps_a_locked_file_to_503(space_dir: Path, monkeypatch):
     version = space.read(ADA)[2]
 
     def locked(*_a, **_k):
-        raise PermissionError(13, "Access is denied")
+        exc = PermissionError(13, "The process cannot access the file")
+        exc.winerror = 32  # a Windows sharing violation
+        raise exc
 
     monkeypatch.setattr(space, "save_body", locked)
     r = client.put("/api/object/body", json={"path": ADA, "body": "x", "baseVersion": version})
     assert r.status_code == 503
     assert "in use" in r.json()["detail"]
+
+    # Audit 2026-11-01: a plain permission error (EACCES) is not a lock, so it is
+    # reported in the OS's words, not as "in use by another program".
+    def denied(*_a, **_k):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(space, "save_body", denied)
+    r = client.put("/api/object/body", json={"path": ADA, "body": "x", "baseVersion": version})
+    assert r.status_code == 503
+    assert "in use" not in r.json()["detail"]
+    assert "Permission denied" in r.json()["detail"]
 
 
 def test_rename_keeps_the_title_when_the_file_cannot_move(space_dir: Path, monkeypatch):
