@@ -167,13 +167,29 @@ export function useAutosave(opts: AutosaveOptions) {
   )
 
   /**
+   * While saving is paused (a conflict being resolved, a read-only file), unsaved edits
+   * can't be written; keep them for the next open. `settle` runs this too: a space switch
+   * settles every editor and then reloads the page, which never runs an unmount.
+   */
+  const keepIfPaused = useCallback((path?: string): boolean => {
+    const o = optsRef.current
+    if (!pausedRef.current || o.readOnly) return false
+    const body = o.getBody()
+    if (body !== null && savedBodyRef.current !== null && body !== savedBodyRef.current) {
+      keepUnsaved(path ?? o.path, body)
+    }
+    return true
+  }, [])
+
+  /**
    * Save now and resolve only once nothing is left to save: any save already in
    * flight, and any save queued behind it, has finished.
    */
   const settle = useCallback(async (): Promise<void> => {
+    keepIfPaused()
     await flush()
     while (runningRef.current) await runningRef.current
-  }, [flush])
+  }, [flush, keepIfPaused])
   useLayoutEffect(() => {
     flushRef.current = flush
   }, [flush])
@@ -237,18 +253,13 @@ export function useAutosave(opts: AutosaveOptions) {
    */
   const leave = useCallback(
     (path?: string): Promise<void> => {
-      const o = optsRef.current
-      if (pausedRef.current && !o.readOnly) {
+      if (keepIfPaused(path)) {
         cancel()
-        const body = o.getBody()
-        if (body !== null && savedBodyRef.current !== null && body !== savedBodyRef.current) {
-          keepUnsaved(path ?? o.path, body)
-        }
         return Promise.resolve()
       }
       return flush(path)
     },
-    [cancel, flush],
+    [cancel, flush, keepIfPaused],
   )
 
   useEffect(() => {
