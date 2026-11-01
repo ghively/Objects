@@ -211,6 +211,29 @@ def test_prune_at_200(tmp_path, m8_space_dir):
     assert len([p for p in folder.iterdir() if p.suffix == ".md"]) == MAX_VERSIONS
 
 
+def test_snapshot_parses_once_and_reads_nothing_for_an_object(m8_space_dir, monkeypatch):
+    """Audit 2026-11-01 B1: `snapshot` parsed the frontmatter 3x and read the file twice."""
+    from objectapp import history
+
+    store = HistoryStore(m8_space_dir)
+    data = (m8_space_dir / PAGE).read_bytes()
+    parses, reads = [], []
+    real_fm_of, real_read = history._fm_of, history._read
+    monkeypatch.setattr(history, "_fm_of", lambda d: parses.append(d) or real_fm_of(d))
+    monkeypatch.setattr(history, "_read", lambda p: reads.append(p) or real_read(p))
+    for i in range(3):
+        vid = store.snapshot(PAGE, data + str(i).encode(), T0 + timedelta(minutes=6 * i))
+        assert vid
+    assert len(parses) == 3  # one per snapshot: the bytes being kept are the file's
+    assert all(p.name == "index.json" for p in reads)  # the object file itself is never re-read
+    # A caller that already knows the id spares the parse too.
+    parses.clear()
+    object_id = parse_fm(split_object(decode(data).text).frontmatter_src)["id"]
+    assert store.snapshot(PAGE, data, T0 + timedelta(minutes=30), object_id=object_id)
+    assert parses == []
+    assert len(store.versions(PAGE)) == 4  # all under one key
+
+
 def test_history_follows_rename_by_id(client, space, clock):
     _save_body(client, PAGE, "Before the rename.\n")
     clock.advance(minutes=6)
