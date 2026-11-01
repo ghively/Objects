@@ -11,7 +11,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api, ConflictError } from '@/api/client'
-import { resetLinkIndex } from '@/links/linkIndex'
+import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek } from '@/nav/tabs'
 import { DataView } from './DataView'
 import { emptyFilterGroup } from './model'
@@ -157,6 +157,25 @@ describe('DataView', () => {
     expect(last.viewDefinition.groupByConfig?.groups).toContainEqual({ id: 'o1', isHidden: false, isClosed: true })
     expect(screen.queryByText('Alpha')).not.toBeInTheDocument()
     expect(screen.getByText('Alphabet')).toBeInTheDocument()
+  })
+
+  test('a tags group is keyed by the tag object, not a same-titled page (audit 2026-11-01)', () => {
+    useLinkIndex.setState({
+      objects: [
+        objectSummary({ path: 'Tags/Work.md', type: 'tag', title: 'Work', id: 'TAGID' }),
+        objectSummary({ path: 'Pages/Work.md', type: 'page', title: 'Work', id: 'PAGEID' }),
+      ],
+      loaded: true,
+    })
+    const rows = [mk('Pages/Alpha.md', { tags: ['Work'] }), mk('Pages/Beta.md', { tags: ['Home'] })]
+    const init: ViewState = {
+      ...base(),
+      groupBy: { groups: [{ propertyId: 'tags', option: 'default' }] },
+      viewDefinition: { dataViewLayout: 'list', groupByConfig: { groups: [{ id: 'TAGID', isHidden: true, isClosed: false }] } },
+    }
+    render(<Harness rows={rows} init={init} />)
+    // The hidden "Work" group stays hidden; only "Home" shows.
+    expect(screen.getAllByTestId('group-header').map((h) => h.textContent)).toEqual(['Home1'])
   })
 
   test('test load more pages by 50', async () => {
