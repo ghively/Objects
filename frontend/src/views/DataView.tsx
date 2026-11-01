@@ -1,6 +1,6 @@
 // The data view: toolbar, filter -> sort -> group pipeline and a layout, reused by type pages,
 // collections, queries and All notes. The caller owns the state (see `useViewState`).
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Collection, Layout, Row, RowsScope, TypeDef, UpdateResult, ViewState } from '@/api/types'
 import { api } from '@/api/client'
@@ -8,12 +8,14 @@ import { Icon } from '@/components/Icon'
 import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
+import { useZonedToday } from '@/lib/zonedShell'
 import { ChangeTypeDialog } from '@/object/ChangeTypeDialog'
 import { DeleteObjectDialog } from '@/object/DeleteObjectDialog'
 import { TypeChip } from '@/shell/Sidebar'
 import type { CustomizePage } from './CustomizeMenu'
 import { applyFilters } from './filter'
 import { groupRows, type Group, type GroupCtx } from './group'
+import { cardProperties } from './cards/cardConfig'
 import { CardCustomizePage } from './cards/CardCustomize'
 import { EmbedLayout } from './layouts/EmbedLayout'
 import { GalleryLayout } from './layouts/GalleryLayout'
@@ -80,6 +82,11 @@ export interface LayoutProps {
   onWritten?(row: Row, result: UpdateResult): void
   /** M9: whether the row is selected ("Select multiple"); selected rows carry `data-selected`. */
   isSelected?(path: string): boolean
+  /**
+   * Fetch the previews of rows the layout shows (rows load without them). The view calls it for
+   * its paged rows; a layout that pages on its own (the kanban) calls it with the rows on screen.
+   */
+  loadPreviews(rows: Row[]): void
 }
 
 /** What an owner adds to one row: `leading` before its title, `trailing` after it. */
@@ -205,6 +212,9 @@ function RowMenuButton({ item, onClose, onHover }: { item: RowMenuItem; onClose(
   )
 }
 
+/** The tag type's id (tag values are the tag objects' titles). */
+const TAG_TYPE = 'tag'
+
 const defaultPipeline: Pipeline = (rows, state, ctx) => {
   const sorted = applySorts(applyFilters(rows, state.filterGroup, ctx), state.sorts, ctx)
   const g = groupRows(sorted, state.groupBy, state.viewDefinition.groupByConfig, ctx)
@@ -233,6 +243,8 @@ export function DataView(props: DataViewProps) {
   }, [selecting])
 
   const typesById = useMemo(() => Object.fromEntries(types.map((t) => [t.id, t])), [types])
+  // The selection as a set: layouts ask per row.
+  const selectedSet = useMemo(() => (selected ? new Set(selected) : null), [selected])
 
   // The types the view spans: the scope's, else those of its rows, else every type.
   const viewTypes = useMemo(() => {
@@ -243,6 +255,8 @@ export function DataView(props: DataViewProps) {
   const choices = useMemo(() => propertyChoices(viewTypes), [viewTypes])
   const multiType = viewTypes.length > 1
 
+  // `now` matters by day (relative filters and groups): it refreshes when the zone's day changes.
+  const today = useZonedToday()
   const ctx = useMemo<GroupCtx>(() => {
     const tagIdsToTitles: Record<string, string> = {}
     const pathsById: Record<string, string> = {}
@@ -250,7 +264,8 @@ export function DataView(props: DataViewProps) {
     const entityCreated: Record<string, string> = {}
     for (const o of objects) {
       if (o.id) {
-        tagIdsToTitles[o.id] = o.title
+        // Only tag objects: a page titled like a tag must not take over the tag's group id.
+        if (o.type === TAG_TYPE) tagIdsToTitles[o.id] = o.title
         pathsById[o.id] = o.path
       }
       entityTitles[o.path] = o.title
@@ -258,8 +273,8 @@ export function DataView(props: DataViewProps) {
     }
     const viewTypeIds = viewTypes.map((t) => t.id)
     return { types, viewTypeIds, collections, tagIdsToTitles, pathsById, entityTitles, entityCreated, now: new Date() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` is fixed per data change
-  }, [types, viewTypes, collections, objects, rows])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` is fixed per day (`today`)
+  }, [types, viewTypes, collections, objects, today])
 
   const result = useMemo(() => (props.pipeline ?? defaultPipeline)(rows, state, ctx), [props.pipeline, rows, state, ctx])
   const flat = result.rows
@@ -294,7 +309,7 @@ export function DataView(props: DataViewProps) {
     anchor.current = last
     setSelected(paths && paths.length > 0 ? paths : null)
   }
-  const onOpen = (row: Row, e: MouseEvent) => {
+  const open = (row: Row, e: MouseEvent) => {
     const path = row.summary.path
     if (selected) {
       // Shift: the range from the last clicked row, added; else toggle this row.
@@ -323,6 +338,41 @@ export function DataView(props: DataViewProps) {
     }
     usePeek.getState().peek(row.summary.path, flat.map((r) => r.summary.path))
   }
+  // A stable `onOpen` reading the latest state, so memoized rows don't re-render per view render.
+  const openRef = useRef(open)
+  openRef.current = open
+  const onOpen = useCallback((row: Row, e: MouseEvent) => openRef.current(row, e), [])
+
+  // P2: rows arrive without previews (`useRows`); a card layout fetches its visible page's in one
+  // call and patches each row's `preview` in, once per row version. A row that changed meanwhile
+  // (another version) is left alone: its new version is fetched on the next pass.
+  const rowsRef = useRef(rows)
+  rowsRef.current = rows
+  const patchRowRef = useRef(props.patchRow)
+  patchRowRef.current = props.patchRow
+  const previewed = useRef(new Set<string>())
+  const loadPreviews = useCallback((wanted: Row[]) => {
+    if (!patchRowRef.current) return
+    const paths: string[] = []
+    for (const r of wanted) {
+      if (r.preview) continue
+      const key = `${r.summary.path}@${r.version}`
+      if (previewed.current.has(key)) continue
+      previewed.current.add(key)
+      paths.push(r.summary.path)
+    }
+    if (paths.length === 0) return
+    void api
+      .rows({ paths, preview: true })
+      .then((fresh) => {
+        const current = new Map(rowsRef.current.map((r) => [r.summary.path, r]))
+        for (const f of fresh) {
+          const cur = current.get(f.summary.path)
+          if (cur && cur.version === f.version && f.preview) patchRowRef.current?.(f.summary.path, { ...cur, preview: f.preview })
+        }
+      })
+      .catch((err: unknown) => console.warn('Could not load previews:', err))
+  }, [])
 
   const header = (g: Group, count: number) => (
     <button
@@ -358,8 +408,9 @@ export function DataView(props: DataViewProps) {
     patchRow: props.patchRow,
     rowExtras: props.rowExtras,
     onWritten: props.onWritten,
-    isSelected: selected ? (path) => selected.includes(path) : undefined,
+    isSelected: selectedSet ? (path) => selectedSet.has(path) : undefined,
     groupCount: (g) => result.groups.find((x) => x.id === g.id)?.rows.length ?? g.rows.length,
+    loadPreviews,
   }
   const builtin = (): ReactNode => {
     switch (layout) {
@@ -382,6 +433,13 @@ export function DataView(props: DataViewProps) {
   const custom = props.renderLayout?.(layout, layoutProps) ?? builtin()
   const tableType = layout === 'table' && viewTypes.length === 1 ? viewTypes[0] : undefined
   const cardLayout = layout === 'grid' || layout === 'wall' || layout === 'gallery' || layout === 'kanban'
+  // Only a card layout whose cards include the preview needs previews; the list and table never do.
+  const showsPreviews =
+    cardLayout && viewTypes.some((t) => cardProperties(t, state.viewDefinition).some((p) => p.propertyId === 'computed_preview'))
+  useEffect(() => {
+    // The kanban pages per column and asks for its own rows.
+    if (showsPreviews && layout !== 'kanban') loadPreviews(paged.flatMap((g) => g.rows))
+  }, [showsPreviews, layout, paged, loadPreviews])
   const customizePages = [
     ...(tableType
       ? [{ key: 'table', label: 'Table', icon: 'ph-table', body: <TableCustomizePage type={tableType} state={state} onState={onState} /> }]
@@ -427,7 +485,7 @@ export function DataView(props: DataViewProps) {
     ...(props.rowActions ? commonRowMenu(row, menuCtx) : []),
     ...(props.rowMenu?.(row) ?? []),
   ]
-  const selectedRows = selected ? flat.filter((r) => selected.includes(r.summary.path)) : []
+  const selectedRows = selectedSet ? flat.filter((r) => selectedSet.has(r.summary.path)) : []
 
   return (
     <section
@@ -516,7 +574,7 @@ export function DataView(props: DataViewProps) {
               ))}
             </div>
           )}
-          {total > visible && (
+          {total > visible && layout !== 'kanban' && (
             <button
               type="button"
               onClick={() => setVisible((v) => v + LOAD_PAGE)}

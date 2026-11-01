@@ -1,7 +1,7 @@
 // M9 Task 19: the CSV reader for Import CSV (RFC 4180; the inverse of `toCsv`).
 import { describe, expect, test } from 'vitest'
 import { toCsv } from '@/editor/table/csv'
-import { parseCsv } from './csvParse'
+import { parseCsv, parseCsvCells } from './csvParse'
 
 describe('parseCsv', () => {
   test('test parse quotes newlines bom', () => {
@@ -41,5 +41,24 @@ describe('parseCsv', () => {
     expect(parseCsv('a,"open\nb').error).toBe(true)
     expect(parseCsv('a,b"c').error).toBe(true)
     expect(parseCsv('a,b"c').rows).toEqual([['a', 'b"c']])
+  })
+
+  test('text after a closing quote is kept but flagged (audit 2026-11-01)', () => {
+    expect(parseCsv('"a"x,b')).toEqual({ rows: [['ax', 'b']], error: true })
+    expect(parseCsv('"a" ,b').error).toBe(true)
+    expect(parseCsv('"a",b\n"c"\n').error).toBe(false)
+  })
+
+  test('parseCsvCells tells a quoted cell from an unquoted one', () => {
+    expect(parseCsvCells('"Smith, John",x,""\n')).toEqual({
+      rows: [
+        [
+          { text: 'Smith, John', quoted: true },
+          { text: 'x', quoted: false },
+          { text: '', quoted: true },
+        ],
+      ],
+      error: false,
+    })
   })
 })

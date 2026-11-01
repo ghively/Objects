@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { Row, TypeDef } from '@/api/types'
 import { collection, objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
-import { GROUP_OPTIONS, GROUP_SORT_OPTIONS, groupRows, isGroupable, valueForGroup, type GroupCtx } from './group'
+import { GROUP_OPTIONS, GROUP_SORT_OPTIONS, canDropRow, groupRows, isGroupable, valueForGroup, type GroupCtx } from './group'
 
 const now = new Date(2026, 9, 23, 12, 0) // Friday
 
@@ -134,6 +134,30 @@ describe('groupRows', () => {
     const { groups } = groupRows([R('a', { note: 'z'.repeat(600) })], by('note'), undefined, ctx())
     expect(groups[0].label).toHaveLength(500)
   })
+
+  test('a text value "other" is not the Other group (audit 2026-11-01)', () => {
+    const { groups } = groupRows([R('a', { note: 'other' }), R('b', {})], by('note'), undefined, ctx())
+    expect(groups.map((g) => paths(g.rows))).toEqual([['a'], ['b']])
+    expect(new Set(ids(groups)).size).toBe(2)
+    expect(groups[0].isOther).toBeUndefined()
+    expect(groups[1].isOther).toBe(true)
+    const note = page.propertyDefinitions.find((d) => d.id === 'note')!
+    expect(valueForGroup(by('note'), groups[0], note)).toEqual({ key: 'note', value: 'other' })
+    expect(valueForGroup(by('note'), groups[1], note)).toEqual({ key: 'note', value: '' })
+  })
+
+  test('only the label of a long text group is cut: the id and the written value keep the whole text (audit 2026-11-01 #13)', () => {
+    const long = 'x'.repeat(500)
+    const { groups } = groupRows([R('a', { note: `${long}A` }), R('b', { note: `${long}B` }), R('c', { note: 'short' })], by('note'), undefined, ctx())
+    // Two texts sharing a 500-character prefix are two groups.
+    expect(groups.map((g) => paths(g.rows)).sort()).toEqual([['a'], ['b'], ['c']])
+    const [ga, gb, gc] = ['a', 'b', 'c'].map((p) => groups.find((g) => g.rows[0].summary.path === p)!)
+    expect(ga.label).toHaveLength(500)
+    expect(ga.id).not.toBe(gb.id)
+    const note = page.propertyDefinitions.find((d) => d.id === 'note')!
+    expect(valueForGroup(by('note'), ga, note, { row: gc.rows[0], from: gc })).toEqual({ key: 'note', value: `${long}A` })
+    expect(valueForGroup(by('note'), gc, note)).toEqual({ key: 'note', value: 'short' })
+  })
 })
 
 describe('valueForGroup', () => {
@@ -159,6 +183,20 @@ describe('valueForGroup', () => {
     const c: GroupCtx = { types: [other, mine], viewTypeIds: ['mine'], collections: [], tagIdsToTitles: {}, now }
     const r = R('a', { stage: ['Live'] }, { type: 'mine' })
     expect(labels(groupRows([r], by('stage'), undefined, c).groups)).toEqual(['Draft', 'Live'])
+  })
+
+  test('a row whose type defines the key as another kind sits in Other and cannot be dropped (audit 2026-11-01 #12)', () => {
+    const a = typeDef({ id: 'a', propertyDefinitions: [propertyDef({ id: 'status', type: 'label', options: { isArray: false, set: opts('Done') } })] })
+    const b = typeDef({ id: 'b', propertyDefinitions: [propertyDef({ id: 'status', type: 'text' })] })
+    const c: GroupCtx = { types: [a, b], viewTypeIds: ['a', 'b'], collections: [], tagIdsToTitles: {}, now }
+    const rows = [R('A/x.md', { status: ['Done'] }, { type: 'a' }), R('B/y.md', { status: 'Done' }, { type: 'b' })]
+    const { groups } = groupRows(rows, by('status'), undefined, c)
+    expect(ids(groups)).toEqual(['o1', 'other'])
+    expect(paths(groups[0].rows)).toEqual(['A/x.md'])
+    expect(paths(groups[1].rows)).toEqual(['B/y.md'])
+    const def = a.propertyDefinitions[0]
+    expect(canDropRow(rows[0], by('status').groups[0], def, c.types)).toBe(true)
+    expect(canDropRow(rows[1], by('status').groups[0], def, c.types)).toBe(false)
   })
 
   test('a drag of a multi-value card swaps only the source column value (audit #13)', () => {

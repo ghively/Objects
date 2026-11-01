@@ -1,5 +1,7 @@
 // The filter engine: Capacities' operators per property kind, and pure matchers over rows.
-// Nested AND/OR groups; an empty group passes; an invalid filter is ignored.
+// Nested AND/OR groups; an empty group passes; an invalid filter is ignored. A filter group is
+// compiled once per pass (`applyFilters`): the type map, each filter's validity and definitions,
+// a date filter's reference range and the day of every instant are computed once, not per row.
 import type {
   Collection,
   DateValue,
@@ -13,7 +15,7 @@ import type {
 } from '@/api/types'
 import { parseRemind } from '@/tasks/remind'
 import { parseRepeat } from '@/tasks/repeat'
-import { dateSpan, endOfDay, parseDay, resolveRelative, startOfDay } from './dates'
+import { dayRange, dayReader, daySpan, endOfDay, parseDay, resolveRelative, startOfDay, type DayRange } from './dates'
 
 export interface FilterOption {
   key: string
@@ -182,13 +184,14 @@ export function rowValue(row: Row, propertyId: string): unknown {
   }
 }
 
-function typeMap(types: TypeDef[]): Record<string, TypeDef> {
+export function typeMap(types: TypeDef[]): Record<string, TypeDef> {
   return Object.fromEntries(types.map((t) => [t.id, t]))
 }
 
 type DefLike = Pick<PropertyDef, 'type' | 'options'>
 
-function defIn(type: TypeDef | undefined, propertyId: string): DefLike | undefined {
+/** The definition `type` itself has for `propertyId` (system ids count), or none. */
+export function defIn(type: TypeDef | undefined, propertyId: string): DefLike | undefined {
   if (!type) return undefined
   const d = type.propertyDefinitions.find((p) => p.key === propertyId || p.id === propertyId)
   if (d) return d
@@ -319,8 +322,21 @@ function collectionIds(row: Row, collections: Collection[]): string[] {
   return out
 }
 
-function matchDate(value: DateValue | null | undefined, f: Filter, now: Date): boolean {
-  const span = dateSpan(value)
+/** A date filter's reference as days: a relative range (a day, a week, a month, a year) or an exact date; null without one. */
+function referenceRange(f: Filter, now: Date): DayRange | null {
+  const ref = f.referenceValue as { relative?: string; exactDate?: string } | undefined
+  if (!ref || typeof ref !== 'object' || Array.isArray(ref)) return null
+  if (ref.relative) return dayRange(resolveRelative(ref.relative as never, now))
+  if (ref.exactDate) {
+    const d = parseDay(ref.exactDate)
+    return d ? dayRange({ start: startOfDay(d), end: endOfDay(d) }) : null
+  }
+  return null
+}
+
+/** Compares by day (`YYYY-MM-DD` strings order as dates): the reference's range against the value's days. */
+function matchDate(value: DateValue | null | undefined, f: Filter, range: DayRange | null, dayOf: (iso: string) => string | null): boolean {
+  const span = daySpan(value, dayOf)
   const opt = f.option
   if (opt === 'isEmpty') return !span
   if (opt === 'isNotEmpty') return !!span
@@ -328,21 +344,11 @@ function matchDate(value: DateValue | null | undefined, f: Filter, now: Date): b
   if (opt === 'startIsNotEmpty') return true
   if (opt === 'endIsEmpty') return !span.end
   if (opt === 'endIsNotEmpty') return !!span.end
-  // The comparison is by day: the reference's range (a day, a week, a month, a year) against the value's days.
-  const ref = f.referenceValue as { relative?: string; exactDate?: string } | undefined
-  let range: { start: Date; end: Date } | null = null
-  if (ref && typeof ref === 'object' && !Array.isArray(ref)) {
-    if (ref.relative) range = resolveRelative(ref.relative as never, now)
-    else if (ref.exactDate) {
-      const d = parseDay(ref.exactDate)
-      if (d) range = { start: startOfDay(d), end: endOfDay(d) }
-    }
-  }
   if (!range) return false
-  const vStart = startOfDay(span.start).getTime()
-  const vEnd = endOfDay(span.end ?? span.start).getTime()
-  const rs = range.start.getTime()
-  const re = range.end.getTime()
+  const vStart = span.start
+  const vEnd = span.end ?? span.start
+  const rs = range.start
+  const re = range.end
   const point = /^start/.test(opt) ? vStart : vEnd
   switch (opt) {
     case 'is':
@@ -401,16 +407,51 @@ function matchTaskDate(row: Row, f: Filter, has: boolean): boolean {
   }
 }
 
+type Test = (row: Row) => boolean
+
+/** What a filter pass computes once: the type map and the day of each instant it meets. */
+interface Pass {
+  byId: Record<string, TypeDef>
+  dayOf: (iso: string) => string | null
+}
+
+const passFor = (ctx: FilterCtx): Pass => ({ byId: typeMap(ctx.types), dayOf: dayReader() })
+
+/**
+ * One filter as a test over rows, or null for an invalid one (skipped). The definition a row reads
+ * is its own type's (looked up once per type), else the view's; a date reference resolves once.
+ */
+function compileFilter(f: Filter, ctx: FilterCtx, pass: Pass): Test | null {
+  if (!filterIsValid(f, pass.byId, ctx.viewTypeIds)) return null
+  const fallback = findDef(ctx.types, f.propertyId, f.structureId, ctx.viewTypeIds)
+  const owns = new Map<string, DefLike | undefined>()
+  let range: DayRange | null | undefined
+  return (row) => {
+    if (f.structureId && row.summary.type !== f.structureId) return true
+    let own = owns.get(row.summary.type)
+    if (own === undefined && !owns.has(row.summary.type)) {
+      own = defIn(pass.byId[row.summary.type], f.propertyId)
+      owns.set(row.summary.type, own)
+    }
+    const def = own ?? fallback
+    if (!def) return true
+    if (def.type === 'datetime' || def.type === 'datetimeSimple' || def.type === 'entity_createdAt' || def.type === 'entity_lastUpdated') {
+      if (TASK_DATE_KEYS.has(f.option)) return matchTaskDate(row, f, !!own)
+      if (range === undefined) range = referenceRange(f, ctx.now)
+      return matchDate(own ? dateOf(row, f.propertyId) : null, f, range, pass.dayOf)
+    }
+    return matchKind(row, f, def, !!own, ctx)
+  }
+}
+
 /** Whether a row passes one filter. An invalid filter passes; so does a row of another type than `structureId`. */
 export function matchFilter(row: Row, f: Filter, ctx: FilterCtx): boolean {
-  const byId = typeMap(ctx.types)
-  if (!filterIsValid(f, byId, ctx.viewTypeIds)) return true
-  if (f.structureId && row.summary.type !== f.structureId) return true
-  const own = defIn(byId[row.summary.type], f.propertyId)
-  const def = own ?? findDef(ctx.types, f.propertyId, f.structureId, ctx.viewTypeIds)
-  if (!def) return true
+  return compileFilter(f, ctx, passFor(ctx))?.(row) ?? true
+}
+
+/** The non-date kinds' matchers (`def` is the row's own definition when `has`, else the view's). */
+function matchKind(row: Row, f: Filter, def: DefLike, has: boolean, ctx: FilterCtx): boolean {
   const kind = def.type
-  const has = !!own
   const value = has ? rowValue(row, f.propertyId) : undefined
   switch (kind) {
     case 'entity_title':
@@ -469,32 +510,29 @@ export function matchFilter(row: Row, f: Filter, ctx: FilterCtx): boolean {
       const ref = typeof f.referenceValue === 'string' ? f.referenceValue : ''
       return f.option === 'isNot' ? icon !== ref : icon === ref
     }
-    case 'datetime':
-    case 'datetimeSimple':
-    case 'entity_createdAt':
-    case 'entity_lastUpdated':
-      if (TASK_DATE_KEYS.has(f.option)) return matchTaskDate(row, f, has)
-      return matchDate(has ? dateOf(row, f.propertyId) : null, f, ctx.now)
     default:
       return f.option === 'isEmpty' ? blank(value) : !blank(value)
   }
 }
 
-function isEffective(el: Filter | FilterGroup, byId: Record<string, TypeDef>, viewTypeIds?: string[]): boolean {
-  if (el.type === 'filter') return filterIsValid(el, byId, viewTypeIds)
-  return el.elements.some((e) => isEffective(e, byId, viewTypeIds))
+/** A group as a test over rows, or null when nothing in it is effective (such a group passes). */
+function compileGroup(group: FilterGroup, ctx: FilterCtx, pass: Pass): Test | null {
+  const tests: Test[] = []
+  for (const e of group.elements) {
+    const t = e.type === 'filter' ? compileFilter(e, ctx, pass) : compileGroup(e, ctx, pass)
+    if (t) tests.push(t)
+  }
+  if (tests.length === 0) return null
+  return group.operator === 'or' ? (row) => tests.some((t) => t(row)) : (row) => tests.every((t) => t(row))
 }
 
 /** Whether a row passes a group. Invalid filters and groups without any are skipped; none left passes. */
 export function matchGroup(row: Row, group: FilterGroup, ctx: FilterCtx): boolean {
-  const byId = typeMap(ctx.types)
-  const els = group.elements.filter((e) => isEffective(e, byId, ctx.viewTypeIds))
-  if (els.length === 0) return true
-  const test = (e: Filter | FilterGroup) => (e.type === 'filter' ? matchFilter(row, e, ctx) : matchGroup(row, e, ctx))
-  return group.operator === 'or' ? els.some(test) : els.every(test)
+  return compileGroup(group, ctx, passFor(ctx))?.(row) ?? true
 }
 
 export function applyFilters(rows: Row[], group: FilterGroup | null | undefined, ctx: FilterCtx): Row[] {
   if (!group || group.elements.length === 0) return rows
-  return rows.filter((r) => matchGroup(r, group, ctx))
+  const test = compileGroup(group, ctx, passFor(ctx))
+  return test ? rows.filter(test) : rows
 }
