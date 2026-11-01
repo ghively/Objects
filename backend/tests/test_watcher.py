@@ -248,6 +248,33 @@ def test_relpath_survives_vanished_parent(space_dir: Path, monkeypatch):
     watcher.stop()
 
 
+def test_touch_folder_drops_templates_under_a_moved_folder(full_space_dir: Path):
+    """Windows reports one event for a moved folder: `_touch_folder` must cover templates too.
+
+    Audit 2026-11-01: it re-checked `space.list()`, which excludes templates, so a
+    template under the moved folder stayed in the index.
+    """
+    import os
+    import time
+
+    space = Space(full_space_dir)
+    loop = asyncio.new_event_loop()
+    watcher = SpaceWatcher(space, loop)  # not started: the folder handler is driven by hand
+    try:
+        before = [s.path for s in space.list_templates("task")]
+        assert before and all(p.startswith("Templates/") for p in before)
+        os.rename(full_space_dir / "Templates", full_space_dir / "Templates-moved")
+        watcher._touch_folder(str(full_space_dir / "Templates"))
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline and space.list_templates("task"):
+            time.sleep(0.05)
+        assert space.list_templates("task") == []
+        assert all(not p.startswith("Templates/") for p in (s.path for s in space.list()))
+    finally:
+        watcher.stop()
+        loop.close()
+
+
 def test_watcher_reports_external_collection_edit(space_dir: Path):
     target = space_dir / ".object" / "collections" / "x.json"
 
