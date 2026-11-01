@@ -32,6 +32,8 @@ export const STATUS_SECTIONS: readonly { category: StatusCategory; name: string 
 const MAX_TEXT = 100
 const DUPLICATE = 'A label with this name already exists. The name of label has to be unique.'
 const SECTION_PREFIX = 'section:'
+/** Our string: shown in the menu when the type save behind a new option failed. */
+const CREATE_FAILED = 'The label could not be created.'
 
 export interface LabelMenuProps {
   def: PropertyDef
@@ -40,9 +42,11 @@ export interface LabelMenuProps {
   onChange(next: string[]): void
   /**
    * Edits to the option set (create, rename, recolour, re-icon, reorder, delete). The parent saves
-   * the type; when it returns a promise, a new option's value is applied only after it settles.
+   * the type; when it returns a promise, a new option's value is applied only after it resolves to
+   * something other than `null` (the type editor's "cancelled or failed"); a rejection or `null`
+   * leaves the value as it was and shows the failure.
    */
-  onDefChange(next: PropertyDef): void | Promise<void>
+  onDefChange(next: PropertyDef): void | Promise<unknown>
   /** Called after a single-select pick, so the parent can close its popover. */
   onClose?(): void
   /** Opens the property's settings (the gear in the search field). */
@@ -98,6 +102,7 @@ export function LabelMenu({ def, value, onChange, onDefChange, onClose, onOpenSe
   const isStatus = !!def.options.isStatus
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<string | null>(null)
+  const [failure, setFailure] = useState<string | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -128,7 +133,18 @@ export function LabelMenu({ def, value, onChange, onDefChange, onClose, onOpenSe
       icon: null,
       ...(isStatus ? { statusCategory: statusCategory ?? 'not-started' } : {}),
     }
-    await onDefChange(withSet([...set, option]))
+    setFailure(null)
+    let saved: unknown
+    try {
+      saved = await onDefChange(withSet([...set, option]))
+    } catch (err) {
+      setFailure(err instanceof Error && err.message ? err.message : CREATE_FAILED)
+      return
+    }
+    if (saved === null) {
+      setFailure(CREATE_FAILED)
+      return
+    }
     setQuery('')
     if (!select) {
       setEditing(option.id)
@@ -283,6 +299,11 @@ export function LabelMenu({ def, value, onChange, onDefChange, onClose, onOpenSe
         )}
         {searching && shown.length === 0 && !canCreate && (
           <p className="px-2 py-1 text-[13px] text-fg-muted">No options found</p>
+        )}
+        {failure && (
+          <p role="alert" className="px-2 py-1 text-[13px] text-red-400">
+            {failure}
+          </p>
         )}
       </div>
     </div>

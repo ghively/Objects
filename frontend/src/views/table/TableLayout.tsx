@@ -177,7 +177,7 @@ interface TableRowProps {
   onOpen(row: Row, e: ReactMouseEvent): void
   rename(row: Row, title: string): void
   commit(row: Row, def: PropertyDef, next: unknown): Promise<boolean>
-  onDefChange(next: PropertyDef): Promise<void>
+  onDefChange(next: PropertyDef): Promise<unknown>
   openSettings(id: string): void
 }
 
@@ -378,9 +378,10 @@ export function TableLayout(props: TableLayoutProps) {
 
   const save = typeEditor.save
   const onDefChange = useCallback(
+    // Resolves the save's result (null when it failed), so a new label is applied only once saved.
     async (next: PropertyDef) => {
-      if (!type) return
-      await save({ ...type, propertyDefinitions: type.propertyDefinitions.map((d) => (d.id === next.id ? next : d)) })
+      if (!type) return null
+      return save({ ...type, propertyDefinitions: type.propertyDefinitions.map((d) => (d.id === next.id ? next : d)) })
     },
     [type, save],
   )

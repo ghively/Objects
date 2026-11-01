@@ -65,6 +65,22 @@ describe('LabelMenu', () => {
     expect(onDefChange.mock.invocationCallOrder[0]).toBeLessThan(onChange.mock.invocationCallOrder[0])
   })
 
+  it('a new option is not applied when the type save fails or resolves null, and the failure shows', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const onDefChange = vi.fn().mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('Disk full.'))
+    render(<LabelMenu def={labelDef([opt('a', 'Alpha')])} value={[]} onChange={onChange} onDefChange={onDefChange} />)
+    await user.type(screen.getByRole('textbox', { name: 'Search or Create' }), 'Beta')
+    await user.click(screen.getByRole('button', { name: "New 'Beta'" }))
+    expect(onDefChange).toHaveBeenCalledTimes(1)
+    expect(onChange).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('The label could not be created.')
+    await user.click(screen.getByRole('button', { name: "New 'Beta'" }))
+    expect(onDefChange).toHaveBeenCalledTimes(2)
+    expect(onChange).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Disk full.')
+  })
+
   it('an exact match offers no "New" item', async () => {
     const user = userEvent.setup()
     render(<LabelMenu def={labelDef([opt('a', 'Alpha')])} value={[]} onChange={vi.fn()} onDefChange={vi.fn()} />)
