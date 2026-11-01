@@ -9,10 +9,14 @@
  * - `hold()` / `resume()` let the owner pause saving while it resolves an external change.
  * - Any other failure (a file locked by another program, the server gone) sets
  *   `saveError` and retries with a growing delay until a save succeeds.
+ * - `leave()` (the editor leaving an object or unmounting) saves pending edits; edits
+ *   that can't be saved (saving is paused, or the save fails after the object was
+ *   left) are kept in `unsaved.ts` and offered when the object opens again.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api, ConflictError, ReadOnlyError } from '@/api/client'
 import type { FindControl } from './extensions/findInPage'
+import { keepUnsaved } from './unsaved'
 
 export const AUTOSAVE_DELAY_MS = 1000
 /** First retry delay after a failed save; it doubles up to `AUTOSAVE_RETRY_MAX_MS`. */
@@ -49,6 +53,8 @@ export function useAutosave(opts: AutosaveOptions) {
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retryDelayRef = useRef(AUTOSAVE_RETRY_MS)
   const [saveError, setSaveError] = useState<string | null>(null)
+  /** False once the editor using this hook has unmounted. */
+  const aliveRef = useRef(true)
 
   const clearRetry = useCallback(() => {
     if (retryTimerRef.current !== null) {
@@ -89,7 +95,11 @@ export function useAutosave(opts: AutosaveOptions) {
             optsRef.current.onSaved(res.version)
           }
         } catch (err) {
-          if (err instanceof ConflictError) {
+          if (!aliveRef.current || optsRef.current.path !== path) {
+            // The editor has left this object: nobody is there to resolve a conflict
+            // or see a retry, so keep the text to offer when the object opens again.
+            keepUnsaved(path, body)
+          } else if (err instanceof ConflictError) {
             pausedRef.current = true
             setSaveError(null)
             optsRef.current.onConflict?.(err.currentVersion)
@@ -220,18 +230,41 @@ export function useAutosave(opts: AutosaveOptions) {
 
   const isPending = useCallback(() => timerRef.current !== null, [])
 
-  useEffect(
-    () => () => {
+  /**
+   * The editor is leaving `path` (switching objects or unmounting): save pending
+   * edits under it. While saving is paused (a conflict being resolved, a read-only
+   * file) they can't be saved, so they are kept to be offered on the next open.
+   */
+  const leave = useCallback(
+    (path?: string): Promise<void> => {
+      const o = optsRef.current
+      if (pausedRef.current && !o.readOnly) {
+        cancel()
+        const body = o.getBody()
+        if (body !== null && savedBodyRef.current !== null && body !== savedBodyRef.current) {
+          keepUnsaved(path ?? o.path, body)
+        }
+        return Promise.resolve()
+      }
+      return flush(path)
+    },
+    [cancel, flush],
+  )
+
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
       cancel()
       clearRetry()
-    },
-    [cancel, clearRetry],
-  )
+    }
+  }, [cancel, clearRetry])
 
   return {
     schedule,
     flush,
     settle,
+    leave,
     markLoaded,
     cancel,
     hold,

@@ -437,12 +437,73 @@ describe('minor drift on edited lines', () => {
     expect(breaks).toBe(1)
   })
 
-  test('editing one line of a nested blockquote keeps the other lines (audit 2026-11-01)', () => {
-    const editor = headless('> a\n> > b\n> c\n')
-    append(editor, 'a', 'Z')
+  // Audit 2026-11-01 leftover: the loader strips the leading blanks of a line after a hard break
+  // in a list item (all of four or more, two of fewer), and an ordered or to-do item's new
+  // continuation line gained blanks on reload. A run of four or more is written `&nbsp;` + rest.
+  const BODIES: Record<string, string> = {
+    paragraph: 'b\n',
+    bullet: '- a\n- b\n',
+    ordered: '1. a\n2. b\n',
+    wide: '9. a\n10. b\n',
+    todo: '- [ ] b\n',
+    nested: '- a\n  - b\n',
+  }
+  test.each(
+    Object.keys(BODIES).flatMap((where) =>
+      ['cont', ' one', '  two', '   three', '    four', '      six', '\ttab'].map((line) => [line, where]),
+    ),
+  )('a continuation line %j after Shift-Enter in a %s item reloads exactly', (line, where) => {
+    const body = BODIES[where]
+    const editor = headless(body)
+    editor.commands.setTextSelection(find(editor, 'b').pos + 2)
+    editor.commands.setHardBreak()
+    editor.view.dispatch(editor.state.tr.insertText(line))
+    const saved = serializeBody(editor)
+    const text = (e: TiptapEditor) => find(e, 'b').node.textContent.replaceAll(String.fromCharCode(0xa0), ' ')
+    const reloaded = headless(saved)
+    // In an item a leading tab is kept as `&nbsp;`, as on a paragraph's first line.
+    expect(text(reloaded)).toBe('b' + (where === 'paragraph' ? line : line.replace('\t', ' ')))
+    expect(saved.startsWith(body.slice(0, -1))).toBe(true) // the untouched lines are unchanged
+    expect(serializeBody(reloaded)).toBe(saved) // and it saves back the same
+  })
+
+  // Audit 2026-11-01 leftover: the serializer's `>` line between a paragraph and a nested quote
+  // (which interrupts it anyway) was added to an otherwise untouched quote.
+  test.each([
+    ['> a\n> > b\n> c\n', 'a', '> aZ\n> > b\n> c\n'],
+    ['> a\n> > b\n> c\n', 'c', '> a\n> > b\n> cZ\n'],
+    ['> a\n> > b\n', 'a', '> aZ\n> > b\n'],
+    ['> a\n> > b\n', 'b', '> a\n> > bZ\n'],
+    ['> a\n> > # H\n> > b\n', 'b', '> a\n> > # H\n> > bZ\n'],
+    ['> x\n> a\n> > > b\n', 'a', '> x\n> aZ\n> > > b\n'],
+  ])('editing one line of a nested blockquote changes only that line (%j, %s)', (body, needle, saved) => {
+    const before = shape(headless(body))
+    const editor = headless(body)
+    append(editor, needle, 'Z')
     const out = saveAndReload(editor)
-    expect(out.saved).toBe('> aZ\n>\n> > b\n> c\n')
-    expect(out.reloaded).toEqual([['blockquote', 'aZb\nc']])
+    expect(out.saved).toBe(saved)
+    expect(out.reloaded).toEqual(shape(editor))
+    expect(before.length).toBe(out.reloaded.length)
+  })
+
+  test('a paragraph split inside a quote keeps its blank `>` line', () => {
+    const editor = headless('> ab\n> > c\n')
+    const f = find(editor, 'ab')
+    editor.commands.setTextSelection(f.pos + 2)
+    editor.commands.splitBlock()
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe('> a\n>\n> b\n> > c\n')
+    expect(out.reloaded).toEqual(shape(editor))
+  })
+
+  test('a nested quote added under a paragraph is still saved', () => {
+    const editor = headless('> a\n\nafter\n')
+    const f = find(editor, 'a')
+    const { schema } = editor
+    const inner = schema.nodes.blockquote.create(null, schema.nodes.paragraph.create(null, schema.text('n')))
+    editor.view.dispatch(editor.state.tr.insert(f.pos + f.node.nodeSize, inner))
+    const out = saveAndReload(editor)
+    expect(out.reloaded).toEqual(shape(editor))
   })
 
   test('a tab-indented sibling item is kept when another item is edited (audit 2026-11-01)', () => {

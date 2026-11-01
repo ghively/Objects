@@ -60,7 +60,7 @@ export function RawMode({ path, text, version, onSaved, onConflict, readOnly = f
     })
     viewRef.current = view
     return () => {
-      void autosaveRef.current.flush()
+      void autosaveRef.current.leave()
       view.destroy()
       viewRef.current = null
     }
