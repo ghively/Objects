@@ -97,6 +97,42 @@ def test_other_svg_and_json_uploads_still_work(client: TestClient):
     assert r.status_code == 201
 
 
+# -- a whiteboard sidecar locked by another program answers "in use", not a bare 500 -----
+
+
+def _locked(*_a, **_k):
+    exc = PermissionError(13, "The process cannot access the file")
+    exc.winerror = 32  # a Windows sharing violation
+    raise exc
+
+
+@pytest.mark.parametrize("route", ["board", "ink"])
+def test_locked_whiteboard_files_answer_in_use(tmp_path: Path, monkeypatch, route: str):
+    from objectapp import whiteboardapi
+    from wb_support import copy_whiteboard_space
+
+    root = copy_whiteboard_space(tmp_path)
+    monkeypatch.setenv("OBJECT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("OBJECT_CACHE_DIR", str(tmp_path / "cache"))
+    c = TestClient(create_app(Space(root), watch=False), raise_server_exceptions=False)
+    path = "Whiteboards/Empty board.md"
+    url = "/api/whiteboard" if route == "board" else "/api/whiteboard/ink"
+    for name in ("read_board", "read_ink", "save_board", "save_ink"):
+        monkeypatch.setattr(whiteboardapi, name, _locked)
+    r = c.get(url, params={"path": path})
+    assert r.status_code == 503 and "in use" in r.json()["detail"], r.text
+    payload = {"board": {"nodes": [], "edges": []}} if route == "board" else {"strokes": []}
+    r = c.put(url, json={"path": path, "baseRevision": "", **payload})
+    assert r.status_code == 503 and "in use" in r.json()["detail"], r.text
+
+    def denied(*_a, **_k):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(whiteboardapi, "read_board" if route == "board" else "read_ink", denied)
+    r = c.get(url, params={"path": path})
+    assert r.status_code == 503 and "in use" not in r.json()["detail"]
+
+
 # -- GET /api/graph: ETag on every 200, 304 while the graph is unchanged ----------------
 
 
