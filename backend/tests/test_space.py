@@ -265,3 +265,52 @@ def test_a_read_does_not_wait_for_a_saves_fsync(space_dir, monkeypatch):
         s.save_body(rel, "Mine\n", version_of(original))
     assert b"Someone else's body" in full.read_bytes()
     assert not list(full.parent.glob("*.tmp"))
+
+
+def test_a_write_rescans_from_what_it_wrote_without_reading_the_file_again(space_dir, monkeypatch):
+    # Audit 2026-11-01 B1: `_write` reads the file once; the rescan reuses the written object.
+    from objectapp import space as space_mod
+    from objectapp.frontmatter import parse_fm
+
+    s = Space(space_dir)
+    reads: list[str] = []
+    rescans: list[str] = []
+    real_read, real_parse = space_mod.read_raw, space_mod.parse_fm
+    parses: list[str] = []
+
+    def spy_read(root, rel):
+        reads.append(rel)
+        return real_read(root, rel)
+
+    def spy_parse(src):
+        parses.append(src)
+        return real_parse(src)
+
+    monkeypatch.setattr(space_mod, "read_raw", spy_read)
+    monkeypatch.setattr(space_mod, "parse_fm", spy_parse)
+    monkeypatch.setattr(Space, "rescan_file", lambda self, path: rescans.append(path))
+    rel = "People/Ada Lovelace.md"
+
+    def same_as_disk(rel: str = rel) -> None:
+        assert s._raw[rel] == real_read(space_dir, rel)
+        assert s._summaries[rel] == s._summarize(real_read(space_dir, rel))
+
+    # A body save: `_write` reads the file once and the frontmatter only gets the stamp,
+    # so nothing is parsed or re-read for the rescan.
+    s.save_body(rel, "New body\n", s.cached_version(rel))
+    assert reads == [rel] and parses == [] and rescans == []
+    same_as_disk()
+    assert s.get(rel).lastUpdated != "2026-01-10T08:00:00.000Z"
+    # A property edit changes the frontmatter: parsed from what was written, not re-read.
+    reads.clear()
+    s.update_properties(rel, {"description": "A new description"}, s.cached_version(rel))
+    assert rescans == []
+    same_as_disk()
+    assert s.get(rel).description == "A new description"
+    # A file without frontmatter gets a fence block with the stamp and an id.
+    bare = "Pages/Notes.md"
+    s.save_body(bare, "Body of a bare page\n", s.cached_version(bare))
+    assert rescans == []
+    same_as_disk(bare)
+    assert s.get(bare).id and s.get(bare).lastUpdated
+    assert parse_fm(s._raw[bare].of.frontmatter_src)["id"] == s.get(bare).id
