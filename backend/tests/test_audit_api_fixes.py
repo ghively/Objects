@@ -247,6 +247,67 @@ def test_bulk_routes_skip_fastapi_encoder(client: TestClient, monkeypatch: pytes
     assert client.get("/api/calendar", params={"from": "x", "to": "y"}).status_code == 422
 
 
+# -- F11: gzip for the API and the static bundle; SSE is never buffered by it ---------------
+
+
+def test_api_json_is_gzipped_above_1kb(client: TestClient):
+    plain = client.get("/api/objects", headers={"accept-encoding": "identity"})
+    assert "content-encoding" not in plain.headers
+    zipped = client.get("/api/objects", headers={"accept-encoding": "gzip"})
+    assert zipped.headers.get("content-encoding") == "gzip"
+    assert zipped.json() == plain.json()  # httpx decodes it; same content
+    assert int(zipped.headers["content-length"]) < len(plain.content) // 2
+    small = client.get("/api/ui", headers={"accept-encoding": "gzip"})
+    assert len(small.content) < 1024 and "content-encoding" not in small.headers
+
+
+def test_static_files_are_gzipped(m8_space_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("OBJECT_STATE_DIR", str(tmp_path / "state"))
+    static = tmp_path / "dist"
+    static.mkdir()
+    (static / "index.html").write_text("<!doctype html><title>Object</title>" + "<p>x</p>\n" * 400, encoding="utf-8")
+    (static / "app.js").write_text("console.log(1);\n" * 200, encoding="utf-8")
+    (static / "tiny.css").write_text("body{}", encoding="utf-8")
+    app = create_app(Space(m8_space_dir), static, watch=False)
+    with TestClient(app) as c:
+        for name in ("", "index.html", "app.js"):
+            r = c.get(f"/{name}", headers={"accept-encoding": "gzip"})
+            assert r.status_code == 200 and r.headers.get("content-encoding") == "gzip", name
+        assert c.get("/index.html", headers={"accept-encoding": "gzip"}).text == (static / "index.html").read_text()
+        assert "content-encoding" not in c.get("/tiny.css", headers={"accept-encoding": "gzip"}).headers
+
+
+def test_sse_is_not_buffered_by_gzip(m8_space_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    import threading
+    import time
+
+    from objectapp.watcher import ChangeEvent
+
+    monkeypatch.setenv("OBJECT_STATE_DIR", str(tmp_path / "state"))
+    app = create_app(Space(m8_space_dir), watch=False)
+    with (
+        TestClient(app) as c,
+        c.stream("GET", "/api/events", headers={"accept-encoding": "gzip, deflate"}) as resp,
+    ):
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/event-stream")
+        assert "content-encoding" not in resp.headers
+
+        def publish():
+            time.sleep(0.2)
+            app.state.hub.publish(ChangeEvent("changed", "Pages/Source note.md", "v1"))
+
+        threading.Thread(target=publish, daemon=True).start()
+        t0 = time.monotonic()
+        got = None
+        for line in resp.iter_lines():
+            if line.startswith("data:") and "Source note" in line:
+                got = line
+                break
+            assert time.monotonic() - t0 < 5, "the event did not arrive"
+        assert got is not None and time.monotonic() - t0 < 3
+
+
 @pytest.mark.xfail(reason="needs lane B1a: a Unicode id regex in JsonStore", strict=False)
 @pytest.mark.parametrize("name", NON_LATIN)
 def test_non_latin_collection_and_query_names_are_created(client: TestClient, m8_space_dir: Path, name: str):

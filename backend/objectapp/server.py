@@ -151,6 +151,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 from starlette.background import BackgroundTask
+from starlette.middleware.gzip import GZipMiddleware
 
 from . import (
     api_blocks,
@@ -788,7 +789,13 @@ def create_app(
     app = FastAPI(
         title="Object", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
     )
-    app.add_middleware(LocalOnlyMiddleware)
+    # Audit 2026-11-01 F11: gzip the API's JSON and the static bundle (3.4 MB + 4.5 MB
+    # of assets; matters over Tailscale). Starlette leaves ``text/event-stream`` alone
+    # by default, so /api/events is never buffered; small answers stay as they are.
+    # Level 1, not Starlette's 9: on the 9 MB all-rows answer level 9 cost 465 ms of
+    # CPU for 1.5 MB on the wire, level 1 under 40 ms for 1.9 MB.
+    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=1)
+    app.add_middleware(LocalOnlyMiddleware)  # added last: the outermost, so it checks first
     app.state.space = space
     app.state.hub = hub
     app.state.reminders = scheduler
