@@ -160,3 +160,27 @@ def test_export_includes_short_name_embeds(space_root: Path):
     assert r.status_code == 200, r.text
     names = zipfile.ZipFile(io.BytesIO(r.content)).namelist()
     assert sorted(names) == ["Attachments/Diagram.PNG", "Attachments/photo.png", "Short.md"]
+
+
+def test_export_with_media_streams_a_temp_file_and_removes_it(space_root: Path, monkeypatch):
+    """Audit pass 2: the zip is built in a temp file outside the space, not in memory."""
+    from objectapp import export as export_mod
+
+    built = []
+    real = export_mod.export_object_to_file
+
+    def spy(*args, **kwargs):
+        out = real(*args, **kwargs)
+        built.append(out)
+        return out
+
+    monkeypatch.setattr("objectapp.server.export_object_to_file", spy, raising=False)
+    c = _client(space_root)
+    with c:
+        r = _export(c, PAGE, 1)
+    assert r.status_code == 200, r.text
+    with zipfile.ZipFile(io.BytesIO(r.content)) as zf:
+        assert zf.read("Export me.md") == PAGE_BYTES
+    assert len(built) == 1 and built[0].file is not None
+    assert not str(built[0].file).startswith(str(space_root))
+    assert not built[0].file.exists()  # removed once the response was sent

@@ -167,7 +167,7 @@ from . import (
 from .apictx import ApiContext
 from .appstate import state_dir
 from .collections import CollectionDef
-from .export import content_disposition, export_object
+from .export import content_disposition, export_object_to_file
 from .jsonstore import (
     DefinitionUnreadable,
     default_views,
@@ -1136,19 +1136,21 @@ def create_app(
     @api.get("/object/export")
     def export(path: str, media: str = Query(default="0")):
         try:
-            out = export_object(space, path, media == "1")
+            out = export_object_to_file(space, path, media == "1")
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
             return _error(404, f"No object at {path!r}")
-        return Response(
-            out.data,
-            media_type=out.media_type,
-            headers={
-                "Content-Disposition": content_disposition(out.filename),
-                "X-Content-Type-Options": "nosniff",
-            },
-        )
+        headers = {
+            "Content-Disposition": content_disposition(out.filename),
+            "X-Content-Type-Options": "nosniff",
+        }
+        if out.file is not None:
+            # The zip was streamed to a temp file outside the space; removed once sent.
+            return FileResponse(
+                out.file, media_type=out.media_type, headers=headers, background=BackgroundTask(out.cleanup)
+            )
+        return Response(out.data, media_type=out.media_type, headers=headers)
 
     @api.post("/object/rename")
     def rename_object(req: RenameRequest):
@@ -1463,10 +1465,8 @@ def create_app(
 
     @api.get("/collections")
     def get_collections():
-        space.reload_collections()
-        return _display_safe(
-            [c.to_api(space.collection_revision(c.id)) for c in space.list_collections()]
-        )
+        # One read of each collection file: its definition and revision together.
+        return _display_safe([c.to_api(rev) for c, rev in space.collections_with_revisions()])
 
     @api.post("/collections", status_code=201)
     def create_collection(req: CreateCollectionRequest):
