@@ -109,6 +109,8 @@ export interface OpenOptions {
    * menu, palette, start-up, calendar) starts an empty trail.
    */
   via?: 'link' | 'nav'
+  /** Navigate the active tab even when it is persistent (start-up's "When this space opens"). */
+  inPlace?: boolean
 }
 
 export interface TabsState {
@@ -357,7 +359,7 @@ export const useTabs = create<TabsState>()(
           return
         }
         if (sameTarget(tabTarget(tab), target)) return
-        if (tab.persistent && tab.index >= 0) {
+        if (tab.persistent && tab.index >= 0 && !opts?.inPlace) {
           // A persistent tab keeps its page: the new page opens in a new tab right after it.
           const t = freshTab(target, trail)
           const i = s.tabs.findIndex((x) => x.id === tab.id)
