@@ -154,3 +154,22 @@ def test_rescanning_a_template_of_an_unknown_type_infers_nothing(space_dir: Path
     space.rescan_file("Pages/A gizmo.md")
     assert len(calls) == 1
     assert space.get("Pages/A gizmo.md").type in {t.id for t in space.types}
+
+
+# -- 4: the link index's pending changes are bounded --------------------------------
+
+
+def test_link_index_pending_collapses_to_a_full_rebuild(space_dir: Path, monkeypatch):
+    from objectapp import linkindex
+
+    monkeypatch.setattr(linkindex, "_MAX_PENDING", 5)
+    space = Space(space_dir)
+    assert "Pages/Notes.md" in space.links.backlinks("Pages/Alpha.md")
+    for i in range(200):
+        _write(space_dir / "Pages/Notes.md", f"Mentions [[Alpha]] {i}.\n")
+        space.rescan_file("Pages/Notes.md")
+    assert len(space.links._pending) <= max(5, len(space._raw)) + 1
+    _write(space_dir / "Pages/Notes.md", "No links any more.\n")
+    space.rescan_file("Pages/Notes.md")
+    assert "Pages/Notes.md" not in space.links.backlinks("Pages/Alpha.md")
+    assert space.links._pending == [] and not space.links._overflow
