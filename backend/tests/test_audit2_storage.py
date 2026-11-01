@@ -474,3 +474,70 @@ def test_a_small_watcher_batch_keeps_one_event_per_path(space_dir: Path):
         _write(space_dir / rel, f"---\ntitle: {rel}\n---\n")
     events = _flushed(space, new)
     assert sorted((e.kind, e.path) for e in events) == [("created", rel) for rel in new]
+
+
+# -- 11: a type rename rewrites each file with one YAML parse --------------------------
+
+_ONE_LINE_CASES = [
+    "type: 'Book'\ntitle: A\n",
+    'type: "Book"\ntitle: A\n',
+    "type: Book\ntitle: A\n",
+    "title: A\ntype: Book # a comment\n",
+    "title: A\ntype:   'Book'   \n",
+    "type: [Book, Other]\n",
+    "type: 'Bo''ok'\n",
+    "type: Book\n  continued\n",
+    "type: |\n  Book\n",
+    "type:\n  - Book\n",
+    'a: "x\ntype: Book"\ntype: Book\n',
+    "type: 'Book\n  more'\n",
+    "type: &a Book\nother: *a\n",
+    "type: Book\nlist:\n  - [[x]]\n",
+]
+
+
+@pytest.mark.parametrize("src", _ONE_LINE_CASES)
+def test_replace_in_value_with_parsed_matches_the_round_trip_path(src: str):
+    from objectapp import frontmatter
+
+    def fn(v: str) -> str:
+        return "Volume: two" if v in ("Book", "Bo'ok") else v
+
+    fm = frontmatter.parse_fm(src)
+    slow = frontmatter.replace_in_value(src, "type", fn)
+    fast = frontmatter.replace_in_value(src, "type", fn, parsed=fm)
+    assert fast == slow
+    if fast != src:
+        assert frontmatter.take_parsed(fast) == frontmatter.parse_fm(fast)
+
+
+def test_type_rename_parses_each_rewritten_file_once(space_dir: Path, monkeypatch):
+    import copy
+
+    from objectapp import frontmatter
+
+    space = Space(space_dir)
+    members = space._type_members("person")
+    for i in range(4):
+        _write(
+            space_dir / f"People/Extra {i}.md",
+            f"---\ntype: 'Person'\ntitle: Extra {i}\nrole: 'x'\n---\nBody {i}.\n",
+        )
+        space.rescan_file(f"People/Extra {i}.md")
+    members = space._type_members("person")
+    t, rev = space.refresh_type("person")
+    new = copy.deepcopy(t)
+    new.name, new.pluralName = "Human", "Humans"
+    parses, rt = [], []
+    real_parse, real_rt = frontmatter.parse_fm, frontmatter._load_rt
+    monkeypatch.setattr(frontmatter, "parse_fm", lambda s: parses.append(s) or real_parse(s))
+    monkeypatch.setattr(frontmatter, "_load_rt", lambda s: rt.append(s) or real_rt(s))
+    res = space.save_type(new, rev, confirm=True)
+    assert sorted(res.rewritten) == sorted(members) and len(members) >= 5
+    assert rt == []
+    assert len(parses) == len(members)  # the check of each result, handed on to the rescan
+    for rel in members:
+        text = (space_dir / rel).read_text(encoding="utf-8")
+        assert "type: 'Human'" in text
+        assert space.get(rel).type == "person"
+        assert space._raw[rel].fm["type"] == "Human"
