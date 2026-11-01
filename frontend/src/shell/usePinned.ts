@@ -45,10 +45,12 @@ const same = (a: PinRef, b: PinRef) => a.kind === b.kind && a.id === b.id
 
 let pending = 0
 let queue: Promise<void> = Promise.resolve()
+let loading: Promise<void> | null = null
 
 export function resetPinned(): void {
   pending = 0
   queue = Promise.resolve()
+  loading = null
   useUiStore.setState({ ui: EMPTY, revision: '', loaded: false })
 }
 
@@ -62,6 +64,20 @@ export async function reloadUi(): Promise<void> {
     console.warn('Could not load the sidebar state:', e)
     useUiStore.setState({ loaded: true })
   }
+}
+
+/**
+ * The first load of `ui.json`, shared by everyone asking while one is in flight (the sidebar, the
+ * calendar's week start, the graph settings, the Notifications section), so mounting them before
+ * the first answer makes one request. A `ui` event from elsewhere still reloads with `reloadUi`.
+ */
+export function loadUi(): Promise<void> {
+  if (loading) return loading
+  const p = reloadUi().finally(() => {
+    if (loading === p) loading = null
+  })
+  loading = p
+  return p
 }
 
 /**
@@ -261,18 +277,22 @@ export function usePinned(): UsePinned {
   const loaded = useUiStore((s) => s.loaded)
   useEffect(() => {
     refs += 1
-    if (refs === 1) {
-      void reloadUi()
+    if (refs === 1 && !off) {
+      void loadUi()
       off = api.onChange((e) => {
         if (e.kind === 'ui' && e.origin !== CLIENT_ID) void reloadUi()
       })
     }
     return () => {
       refs -= 1
-      if (refs === 0) {
-        off?.()
-        off = null
-      }
+      // Unsubscribe a microtask later: StrictMode's unmount-and-remount (and a consumer moving in
+      // one commit) re-acquires first, so there is one subscription per store, not one per mount.
+      if (refs === 0)
+        queueMicrotask(() => {
+          if (refs > 0) return
+          off?.()
+          off = null
+        })
     }
   }, [])
   return {

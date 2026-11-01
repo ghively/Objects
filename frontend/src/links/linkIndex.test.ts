@@ -1,7 +1,8 @@
 import { afterEach, expect, test, vi } from 'vitest'
 import { api } from '@/api/client'
 import type { ObjectSummary } from '@/api/types'
-import { invalidateLinkIndex, resetLinkIndex, useLinkIndex } from './linkIndex'
+import { typeDef } from '@/test/mockApi'
+import { invalidateLinkIndex, resetLinkIndex, typeOf, useLinkIndex } from './linkIndex'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -32,4 +33,17 @@ test('invalidating during a load fetches again instead of joining the stale requ
   await first
   expect(useLinkIndex.getState().objects.map((o) => o.path)).toEqual(['A.md', 'B.md'])
   expect(useLinkIndex.getState().loaded).toBe(true)
+})
+
+test('typeOf looks a type up by id without scanning the types per call', () => {
+  const types = Array.from({ length: 50 }, (_, i) => typeDef({ id: `t${i}` }))
+  const find = vi.spyOn(types, 'find')
+  useLinkIndex.setState({ types })
+  for (let i = 0; i < 5000; i++) expect(typeOf(`t${i % 50}`)?.id).toBe(`t${i % 50}`)
+  expect(typeOf('nope')).toBeUndefined()
+  expect(find).not.toHaveBeenCalled()
+  // A new types array is a new map.
+  useLinkIndex.setState({ types: [typeDef({ id: 't1', name: 'Renamed' })] })
+  expect(typeOf('t1')?.name).toBe('Renamed')
+  expect(typeOf('t2')).toBeUndefined()
 })

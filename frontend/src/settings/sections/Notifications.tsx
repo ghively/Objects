@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { api, ConflictError } from '@/api/client'
 import { Icon } from '@/components/Icon'
-import { enqueueUiSave, reloadUi, useUiStore } from '@/shell/usePinned'
+import { enqueueUiSave, loadUi, useUiStore } from '@/shell/usePinned'
 import { SaveError, SectionHeader, SwitchRow, errorText } from '../controls'
 
 export const NOTIFICATIONS_TEXT = {
@@ -50,7 +50,7 @@ export function NotificationsSection() {
   const enabled = useUiStore((s) => s.ui.reminders?.enabled ?? true)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
-    if (!loaded) void reloadUi()
+    if (!loaded) void loadUi()
   }, [loaded])
   return (
     <div>
