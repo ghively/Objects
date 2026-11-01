@@ -308,9 +308,34 @@ function json(method: string, body: unknown): RequestInit {
 
 const seg = encodeURIComponent
 
+/**
+ * The events every listener resyncs from after the stream dropped: the server keeps no replay
+ * (no `Last-Event-ID`), so whatever happened while disconnected is announced as "everything
+ * may have changed". `types` with path `*` reloads summaries, types, rows, references, the
+ * calendar and the graph; the others reload `ui.json` and the definitions. The origin is no
+ * window's, so nothing takes them for its own echo.
+ */
+const RESYNC_EVENTS: readonly ChangeEvent[] = [
+  { kind: 'types', path: '*', version: null, origin: null },
+  { kind: 'ui', path: '*', version: null, origin: null },
+  { kind: 'collections', path: '*', version: null, origin: null },
+  { kind: 'queries', path: '*', version: null, origin: null },
+]
+
 function ensureSource() {
   if (source || typeof EventSource === 'undefined') return
   source = new EventSource(`${BASE}/events`)
+  // The browser reconnects an `EventSource` by itself after a drop (server restart, sleep), but
+  // the events published in between are gone: `open` after an `error` resyncs every consumer.
+  let dropped = false
+  source.onerror = () => {
+    dropped = true
+  }
+  source.onopen = () => {
+    if (!dropped) return
+    dropped = false
+    for (const e of RESYNC_EVENTS) emit({ ...e })
+  }
   source.addEventListener('change', (msg) => {
     let e: ChangeEvent
     try {
