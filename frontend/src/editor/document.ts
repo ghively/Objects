@@ -40,7 +40,7 @@ import { BlockSelection } from './extensions/blockSelection'
 import { FileDrop } from './extensions/fileDrop'
 import { RawBlock } from './extensions/rawBlock'
 import { SlashMenu } from './extensions/slashMenu'
-import { TaskListCommonMark } from './extensions/taskListMarkdown'
+import { TaskListCommonMark, withTaskItems } from './extensions/taskListMarkdown'
 import { Wikilink } from './extensions/wikilink'
 import { BlockOptions, optionApplies } from './nodes/blockOptions'
 import { Bookmark, bookmarkMarkdown } from './nodes/bookmark'
@@ -114,7 +114,7 @@ export function withoutRegistryKeys<T extends AnyExtension>(ext: T): T {
  */
 const RegistryStarterKit = StarterKit.extend({
   addExtensions() {
-    return (this.parent?.() ?? []).map(withoutRegistryKeys).map(withTextEscapes).map(withLinkForms)
+    return (this.parent?.() ?? []).map(withoutRegistryKeys).map(withTextEscapes).map(withLinkForms).map(withTaskItems)
   },
 })
 
@@ -208,6 +208,7 @@ const NODE_KIND: Record<string, string> = {
 function contentKey(md: string): string {
   return md
     .replace(/\r\n?/g, '\n')
+    .replace(/\[X\]/g, '[x]') // a done box either way
     .replace(/^[ \t]*(?:>[ \t]?)+/gm, '')
     .replace(/^[ \t]*(?:[*+-]|\d{1,9}[.)])[ \t]+/gm, '')
     .replace(/[\s*_`~\\#=+-]/g, '')
