@@ -1,0 +1,67 @@
+import { describe, expect, test } from 'vitest'
+import type { Filter, Row, TypeDef } from '@/api/types'
+import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
+import { applyFilters, type FilterCtx } from './filter'
+import { applySorts } from './sort'
+import { groupRows, type GroupCtx } from './group'
+import { calculate } from './calc'
+
+const N = 2000
+const now = new Date(2026, 9, 23, 12, 0)
+const opts = ['Todo', 'Doing', 'Done'].map((t, i) => ({ id: `o${i}`, text: t, color: null, icon: null }))
+const defs = (i: number) => [
+  propertyDef({ id: 'title', type: 'entity_title' }),
+  propertyDef({ id: 'status', type: 'label', options: { set: opts } }),
+  propertyDef({ id: 'qty', type: 'number' }),
+  propertyDef({ id: 'due', type: 'datetime' }),
+  propertyDef({ id: 'note', type: 'text' }),
+  propertyDef({ id: 'tags', type: 'entity_tags' }),
+  ...Array.from({ length: 10 }, (_, k) => propertyDef({ id: `p${i}_${k}`, type: 'text' })),
+]
+// 20 types, as a mid-size space has.
+const types: TypeDef[] = Array.from({ length: 20 }, (_, i) => typeDef({ id: `t${i}`, propertyDefinitions: defs(i) }))
+const rows: Row[] = Array.from({ length: N }, (_, i) =>
+  row({
+    summary: objectSummary({ path: `T/${i}.md`, type: `t${i % 20}`, title: `Row ${i}`, tags: [`tag${i % 50}`], createdAt: new Date(2026, 0, 1 + (i % 300)).toISOString() }),
+    values: { status: [opts[i % 3].text], qty: i % 97, due: { start: `2026-${String(1 + (i % 12)).padStart(2, '0')}-${String(1 + (i % 28)).padStart(2, '0')}`, resolution: 'day' }, note: `n${i % 40}` },
+  }),
+)
+// 5,000 objects with ids (every object has one): DataView maps all of them into tagIdsToTitles.
+const tagIdsToTitles: Record<string, string> = {}
+for (let i = 0; i < 5000; i++) tagIdsToTitles[`id${i}`] = i < 50 ? `tag${i}` : `Object ${i}`
+const ctx: GroupCtx & FilterCtx = { types, viewTypeIds: types.map((t) => t.id), collections: [], tagIdsToTitles, now }
+
+const time = (label: string, fn: () => unknown, reps = 3) => {
+  let best = Infinity
+  for (let r = 0; r < reps; r++) {
+    const t0 = performance.now()
+    fn()
+    best = Math.min(best, performance.now() - t0)
+  }
+  console.log(`${label}: ${best.toFixed(1)} ms (best of ${reps}, ${N} rows)`)
+  return best
+}
+
+describe('audit: pipeline cost', () => {
+  const filters: Filter[] = [
+    { type: 'filter', propertyId: 'status', option: 'contains', referenceValue: ['o0', 'o1'] },
+    { type: 'filter', propertyId: 'qty', option: 'greater', referenceValue: 3 },
+    { type: 'filter', propertyId: 'note', option: 'contains', referenceValue: 'n' },
+  ]
+  const group = { type: 'filterGroup' as const, operator: 'and' as const, elements: filters }
+  test('filter / sort / group / calc timings', () => {
+    const f = time('applyFilters (3 filters, 20 types)', () => applyFilters(rows, group, ctx))
+    time('applyFilters (1 filter)', () => applyFilters(rows, { ...group, elements: [filters[1]] }, ctx))
+    time('applySorts (status, qty)', () => applySorts(rows, [{ propertyId: 'status', option: 'ascending' }, { propertyId: 'qty', option: 'descending' }], ctx))
+    time('groupRows by label', () => groupRows(rows, { groups: [{ propertyId: 'status', option: 'default' }] }, undefined, ctx))
+    const g = time('groupRows by tags (5,000 objects in tagIdsToTitles)', () => groupRows(rows, { groups: [{ propertyId: 'tags', option: 'default' }] }, undefined, ctx))
+    time('groupRows by date (relative)', () => groupRows(rows, { groups: [{ propertyId: 'due', option: 'relative' }] }, undefined, ctx))
+    time('calculate x10 columns (countUnique)', () => { for (let k = 0; k < 10; k++) calculate(rows, 'note', 'countUnique', ctx) })
+    time('ctx maps rebuild (5,000 objects)', () => {
+      const a: Record<string, string> = {}, b: Record<string, string> = {}, c: Record<string, string> = {}
+      for (let i = 0; i < 5000; i++) { a[`id${i}`] = `t${i}`; b[`id${i}`] = `p/${i}.md`; c[`p/${i}.md`] = `t${i}` }
+    })
+    expect(f).toBeGreaterThan(0)
+    expect(g).toBeGreaterThan(0)
+  })
+})

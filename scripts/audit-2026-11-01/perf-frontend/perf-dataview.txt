@@ -1,0 +1,34 @@
+pipeline(plain) 5000 rows best-of-5 ms: 2.3
+pipeline(sort title) 5000 rows best-of-5 ms: 24.8
+pipeline(group status + sort created) 5000 rows best-of-5 ms: 4.7
+list mount wall ms: 151.1
+list mount profiler ms: 125
+list InlineToken renders at mount: 50
+list rows in DOM: 50
+list one-row patch rerender wall ms: 48.2
+list one-row patch InlineToken renders: 50
+list grouped by status mount wall ms: 81.1
+list grouped by status mount profiler ms: 74.3
+list grouped by status InlineToken renders at mount: 50
+list grouped by status rows in DOM: 50
+list grouped by status one-row patch rerender wall ms: 42.1
+list grouped by status one-row patch InlineToken renders: 50
+grid (cards) mount wall ms: 110.4
+grid (cards) mount profiler ms: 104.5
+grid (cards) InlineToken renders at mount: 0
+grid (cards) rows in DOM: 50
+grid (cards) one-row patch rerender wall ms: 41.5
+grid (cards) one-row patch InlineToken renders: 0
+kanban by status mount wall ms: 3212.9
+kanban by status mount profiler ms: 2917.4
+kanban by status InlineToken renders at mount: 0
+kanban by status rows in DOM: 10000
+kanban by status one-row patch rerender wall ms: 1155.5
+kanban by status one-row patch InlineToken renders: 0
+table mount wall ms: 497.2
+table rows in DOM: 51
+table cell renders at mount: 300
+table one-cell patch rerender wall ms: 295.3
+table one-cell patch cell renders: 300
+list: linkIndex objects refresh (same data, new array) rerender wall ms: 20.5
+list: linkIndex objects refresh InlineToken renders: 50
