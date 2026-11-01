@@ -1,0 +1,108 @@
+// AUDIT SCRATCH (delete before finishing): ui.json writers outside the save queue, open-on-start, palette vs popovers.
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+
+vi.mock('@/api/client', async (orig) => ({
+  ...(await orig<typeof import('@/api/client')>()),
+  api: (await import('@/test/mockApi')).mockApi(),
+}))
+
+import { api, ConflictError } from '@/api/client'
+import type { UiState } from '@/api/types'
+import { resetPinned, useUiStore, pinnedActions } from '@/shell/usePinned'
+import { patchGraphUi, resetGraphUi } from '@/graph/useGraphUi'
+import { saveRemindersEnabled as setReminders } from '@/settings/sections/Notifications'
+import { applyOpenOnStart } from '@/nav/startup'
+import { useTabs } from '@/nav/tabs'
+import { CommandPalette } from '@/palette/CommandPalette'
+import { usePalette } from '@/palette/usePalette'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+
+const mocked = vi.mocked(api)
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const base = (): UiState => ({ pinned: [], sections: [], allNotesLayout: 'list' })
+
+beforeEach(() => {
+  resetPinned()
+  resetGraphUi()
+  useTabs.getState().reset()
+  usePalette.getState().hide()
+  for (const fn of Object.values(mocked)) vi.mocked(fn).mockClear()
+})
+
+describe('audit: ui.json writers that bypass the save queue', () => {
+  test('a graph customization edit is reverted on screen by a pin save that lands within 400 ms', async () => {
+    useUiStore.setState({ ui: base(), revision: 'r1', loaded: true })
+    // The server answers the pin with its whole state: no graph key saved yet.
+    mocked.patchUi.mockImplementation(async (patch) => ({ ui: { ...base(), ...patch }, revision: 'r2' }))
+    patchGraphUi({ showMinimalNodes: true })
+    expect(useUiStore.getState().ui.graph).toEqual({ showMinimalNodes: true })
+    await pinnedActions.pin({ kind: 'type', id: 'page' })
+    const afterPin = useUiStore.getState().ui.graph
+    await sleep(450)
+    const afterFlush = useUiStore.getState().ui.graph
+    console.log('AUDIT graph ui right after pin save:', afterPin, '; after the graph flush:', afterFlush)
+    expect(afterPin).toBeUndefined() // reverted
+    expect(afterFlush).toEqual({ showMinimalNodes: true })
+  })
+
+  test('Notifications writes ui.json outside the queue: its 409 path replaces the local ui with the server copy, dropping a pin still being saved', async () => {
+    useUiStore.setState({ ui: base(), revision: 'r1', loaded: true })
+    let release: () => void = () => undefined
+    const pinGate = new Promise<void>((r) => (release = r))
+    mocked.patchUi.mockImplementation(async (patch, opts) => {
+      if ('pinned' in patch) {
+        await pinGate
+        return { ui: { ...base(), ...patch }, revision: 'r3' }
+      }
+      // reminders: the server already has r2 (another window), so r1 is stale
+      if (opts.baseRevision === 'r1') throw new ConflictError('r2')
+      return { ui: { ...base(), ...patch }, revision: 'r4' }
+    })
+    mocked.ui.mockResolvedValue({ ui: base(), revision: 'r2' })
+    const pin = pinnedActions.pin({ kind: 'type', id: 'page' })
+    expect(useUiStore.getState().ui.pinned).toEqual([{ kind: 'type', id: 'page' }])
+    await setReminders(false)
+    const duringPin = useUiStore.getState().ui.pinned
+    release()
+    await pin
+    console.log('AUDIT pinned while the pin save was still in flight, after the reminders toggle:', duringPin, '; after:', useUiStore.getState().ui.pinned)
+    expect(duringPin).toEqual([])
+  })
+})
+
+describe('audit: open on start', () => {
+  test('"specificObject" with a persistent active tab adds a tab on every start', () => {
+    const t = useTabs.getState()
+    t.open({ kind: 'object', path: 'Pages/A.md' })
+    t.togglePersistent(useTabs.getState().activeId!)
+    applyOpenOnStart({ mode: 'specificObject', path: 'Pages/B.md' })
+    // The user closes B's tab and quits; next start:
+    useTabs.getState().close(useTabs.getState().activeId!)
+    applyOpenOnStart({ mode: 'specificObject', path: 'Pages/B.md' })
+    console.log('AUDIT tabs after two starts:', useTabs.getState().tabs.length)
+    expect(useTabs.getState().tabs.length).toBe(2)
+  })
+})
+
+describe('audit: palette vs popovers', () => {
+  test('Ctrl+K does nothing while any Radix popover (tab menu, spaces menu, date picker) is open', async () => {
+    render(
+      <>
+        <Popover open>
+          <PopoverTrigger asChild>
+            <button type="button">menu</button>
+          </PopoverTrigger>
+          <PopoverContent>a popover</PopoverContent>
+        </Popover>
+        <CommandPalette onOpenTarget={() => undefined} onToggleSidebar={() => undefined} onToggleRightPanel={() => undefined} onShowRightPanel={() => undefined} />
+      </>,
+    )
+    await screen.findByText('a popover')
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+    })
+    console.log('AUDIT palette open after Ctrl+K with a popover open:', usePalette.getState().open)
+    expect(usePalette.getState().open).toBe(false)
+  })
+})

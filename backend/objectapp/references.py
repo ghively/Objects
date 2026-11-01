@@ -30,6 +30,8 @@ its link index (`Space.links`) and the search index; nothing is written except b
 from __future__ import annotations
 
 import re
+import threading
+from collections import OrderedDict
 from dataclasses import asdict, replace
 from typing import TYPE_CHECKING, Any
 
@@ -146,10 +148,42 @@ def _mention_re(names: list[str]) -> re.Pattern[str] | None:
     return re.compile(rf"(?<!\w)(?:{alts})(?!\w)", re.IGNORECASE)
 
 
-def _excluded_ranges(body: str) -> list[tuple[int, int]]:
-    """Where a mention can't be: wikilinks, Markdown links and code."""
-    ranges = [(s, e) for _t, s, e in wikilink_spans(body)]
-    ranges.extend(code_ranges(body))
+_SCAN_CACHE_MAX = 4_000
+_scan_cache: OrderedDict[tuple[str, str], tuple[list[tuple[str, int, int]], list[tuple[int, int]]]]
+_scan_cache = OrderedDict()
+_scan_lock = threading.Lock()
+
+
+def _scan_body(
+    path: str, version: str, body: str
+) -> tuple[list[tuple[str, int, int]], list[tuple[int, int]]]:
+    """``(wikilink_spans(body), code_ranges(body))``, remembered per ``(path, version)``.
+
+    Both walk `relink._segments` over the whole body; a hub with 214 referrers had each
+    referrer's body re-parsed per link and again for its mentions (audit 2026-11-01 B6,
+    420 passes). The version is the file's content hash, so entries never go stale.
+    """
+    key = (path, version)
+    with _scan_lock:
+        hit = _scan_cache.get(key)
+        if hit is not None:
+            _scan_cache.move_to_end(key)
+            return hit
+    scan = (wikilink_spans(body), code_ranges(body))
+    with _scan_lock:
+        _scan_cache[key] = scan
+        if len(_scan_cache) > _SCAN_CACHE_MAX:
+            _scan_cache.popitem(last=False)
+    return scan
+
+
+def _excluded_ranges(
+    body: str, scan: tuple[list[tuple[str, int, int]], list[tuple[int, int]]] | None = None
+) -> list[tuple[int, int]]:
+    """Where a mention can't be: wikilinks, Markdown links and code (`scan`: `_scan_body`)."""
+    spans, code = scan if scan is not None else (wikilink_spans(body), code_ranges(body))
+    ranges = [(s, e) for _t, s, e in spans]
+    ranges.extend(code)
     if "](" in body or "<" in body:
         ranges.extend((m.start(), m.end()) for m in _MD_LINK_RE.finditer(body))
     return ranges
@@ -254,15 +288,16 @@ def _indent_width(prefix: str) -> int:
     return len(prefix.expandtabs(4))
 
 
-def _ancestors(body: str, offset: int) -> list[str]:
+def _ancestors(body: str, offset: int, code: list[tuple[int, int]] | None = None) -> list[str]:
     """The first lines of the blocks enclosing the line at ``offset``, outermost first.
 
     Enclosing blocks are open ``toggle`` and ``indent`` containers (their first
     block is the parent; a ``group`` or ``columns`` is no parent) and, inside the
     innermost container, the list items with less indentation above the line.
-    Container comments inside code are ignored.
+    Container comments inside code are ignored (`code`: the body's `code_ranges`).
     """
-    code = code_ranges(body)
+    if code is None:
+        code = code_ranges(body)
     link_ls = body.rfind("\n", 0, offset) + 1
     # (name, first line bounds or None, region start) of each open container.
     stack: list[list[Any]] = []
@@ -347,11 +382,11 @@ def backlink_entries(space: Space, path: str) -> list[dict[str, Any]]:
                 raw = space._raw.get(src)
             if raw is not None:
                 body = raw.of.body
-                spans = wikilink_spans(body)
+                spans, code = _scan_body(src, version_of(raw.data), body)
                 for i, (target, _s, _e) in enumerate(spans):
                     if resolve(target, src) == path:
                         ctx = _backlink_context(body, spans, i)
-                        ancestors = _ancestors(body, spans[i][1])
+                        ancestors = _ancestors(body, spans[i][1], code)
                         if ancestors:
                             ctx["ancestors"] = ancestors
                         contexts.append(ctx)
@@ -362,11 +397,14 @@ def backlink_entries(space: Space, path: str) -> list[dict[str, Any]]:
 # -- unlinked mentions -----------------------------------------------------------
 
 
-def _occurrences(body: str, pattern: re.Pattern[str]) -> list[dict[str, Any]]:
+def _occurrences(
+    body: str, pattern: re.Pattern[str], path: str | None = None, version: str | None = None
+) -> list[dict[str, Any]]:
     found = list(pattern.finditer(body))
     if not found:
         return []
-    excluded = _excluded_ranges(body)
+    scan = _scan_body(path, version, body) if path is not None and version is not None else None
+    excluded = _excluded_ranges(body, scan)
     out: list[dict[str, Any]] = []
     for m in found:
         start, end = m.start(), m.end()
@@ -413,14 +451,11 @@ def unlinked_mentions(
     if candidates is None:
         sources = list(raws.items())
     else:
-        # The index trails the scan by its debounce: also scan every object whose
-        # indexed version isn't its current one, so a fresh edit is never missed.
-        stored = index._stored() if index is not None else {}
-        sources = [
-            (p, raw)
-            for p, raw in raws.items()
-            if p in candidates or stored.get(p) != version_of(raw.data)
-        ]
+        # The index trails the scan by its debounce: also scan every object whose change
+        # it hasn't applied yet, so a fresh edit is never missed. (Hashing every object
+        # to compare versions cost 40 ms per request at 5,000 objects, audit 2026-11-01 B6.)
+        pending = index.pending_paths() if index is not None else set()
+        sources = [(p, raw) for p, raw in raws.items() if p in candidates or p in pending]
     entries: list[tuple[tuple[str, str, str], dict[str, Any]]] = []
     for src, raw in sources:
         if src == path:
@@ -431,15 +466,13 @@ def unlinked_mentions(
         if _role(space, s) not in CAN_BE_UNLINKED_MENTION:
             continue
         body = raw.of.body
-        occ = _occurrences(body, pattern)
+        if pattern.search(body) is None:
+            continue
+        version = version_of(raw.data)
+        occ = _occurrences(body, pattern, src, version)
         if occ:
             key = (s.title.casefold(), s.title, src)
-            entries.append(
-                (
-                    key,
-                    {"path": src, "version": version_of(raw.data), "occurrences": occ},
-                )
-            )
+            entries.append((key, {"path": src, "version": version, "occurrences": occ}))
     entries.sort(key=lambda e: e[0])
     return [e for _k, e in entries]
 

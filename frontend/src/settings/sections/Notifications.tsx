@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { api, ConflictError } from '@/api/client'
 import { Icon } from '@/components/Icon'
-import { reloadUi, useUiStore } from '@/shell/usePinned'
+import { enqueueUiSave, loadUi, useUiStore } from '@/shell/usePinned'
 import { SaveError, SectionHeader, SwitchRow, errorText } from '../controls'
 
 export const NOTIFICATIONS_TEXT = {
@@ -18,26 +18,31 @@ const T = NOTIFICATIONS_TEXT
 
 export const NOTIFICATIONS_SEARCH: string[] = [T.activate, T.limitsHeading]
 
-/** Write `ui.json` `reminders.enabled` with the store's revision; one reload and retry on a 409. */
-export async function saveRemindersEnabled(enabled: boolean): Promise<void> {
-  const before = useUiStore.getState()
-  useUiStore.setState({ ui: { ...before.ui, reminders: { enabled } } })
-  try {
-    let res
+/**
+ * Write `ui.json` `reminders.enabled` after the `ui.json` saves queued before it (the sidebar's,
+ * the calendar's), with the revision the last one returned; one reload and retry on a 409. Only
+ * `reminders` is ours to touch: the rest of the local ui may hold another writer's unsaved edit.
+ */
+export function saveRemindersEnabled(enabled: boolean): Promise<void> {
+  const before = useUiStore.getState().ui.reminders
+  useUiStore.setState({ ui: { ...useUiStore.getState().ui, reminders: { enabled } } })
+  return enqueueUiSave(async () => {
     try {
-      res = await api.patchUi({ reminders: { enabled } }, { baseRevision: before.revision })
+      let res
+      try {
+        res = await api.patchUi({ reminders: { enabled } }, { baseRevision: useUiStore.getState().revision })
+      } catch (e) {
+        if (!(e instanceof ConflictError)) throw e
+        const fresh = await api.ui()
+        res = await api.patchUi({ reminders: { enabled } }, { baseRevision: fresh?.revision ?? '' })
+      }
+      useUiStore.setState({ revision: res?.revision ?? useUiStore.getState().revision })
     } catch (e) {
-      if (!(e instanceof ConflictError)) throw e
-      const fresh = await api.ui()
-      useUiStore.setState({ ui: { ...(fresh?.ui ?? before.ui), reminders: { enabled } }, revision: fresh?.revision ?? '' })
-      res = await api.patchUi({ reminders: { enabled } }, { baseRevision: fresh?.revision ?? '' })
+      const cur = useUiStore.getState().ui
+      useUiStore.setState({ ui: { ...cur, reminders: before ?? { enabled: !enabled } } })
+      throw e
     }
-    useUiStore.setState({ revision: res?.revision ?? useUiStore.getState().revision })
-  } catch (e) {
-    const cur = useUiStore.getState().ui
-    useUiStore.setState({ ui: { ...cur, reminders: before.ui.reminders ?? { enabled: !enabled } } })
-    throw e
-  }
+  })
 }
 
 export function NotificationsSection() {
@@ -45,7 +50,7 @@ export function NotificationsSection() {
   const enabled = useUiStore((s) => s.ui.reminders?.enabled ?? true)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
-    if (!loaded) void reloadUi()
+    if (!loaded) void loadUi()
   }, [loaded])
   return (
     <div>

@@ -18,6 +18,7 @@ import type { BoardActions } from './canvasTypes'
 import type { BoardDoc } from './flowMapping'
 import { fromFlowChange } from './flowMapping'
 import { History } from './history'
+import { mergeBoards } from './merge'
 import {
   emptyBoard,
   isCircuitLabel,
@@ -33,13 +34,15 @@ export type { BoardDoc }
 
 /** Store-internal actions the canvas and `useBoard` use (not part of the sub-lane contract). */
 export interface CanvasActions {
-  /** A document from the server (first load or external reload): replaces the doc and forgets every step. */
+  /** A document from the server (first load or external reload): replaces the doc; the steps are rebased onto it. */
   load(doc: BoardDoc): void
-  /** The board after a merge: replaces it without marking it dirty and restarts the history. */
+  /** The board after a merge: replaces it without marking it dirty; the steps are rebased onto it. */
   replaceBoard(board: WhiteboardData): void
-  /** Strokes from the ink file (first load or the ink doc's own merge): no step, not dirty. */
+  /** Strokes from the ink file (first load or the ink doc's own merge): no step, not dirty, the steps rebased. */
   loadStrokes(strokes: InkStroke[]): void
   setReadOnly(reason: string | null): void
+  /** The ink file can't be written: no edit (clear, undo, redo, ink select) touches the strokes. */
+  setInkReadOnly(readOnly: boolean): void
   setInkTool(tool: InkToolState | null): void
   /** A node drag starts: frames take the nodes wholly inside them (containment at drag start). */
   beginDrag(ids: string[], opts?: { duplicate?: boolean }): void
@@ -64,6 +67,8 @@ export interface BoardState {
   memory: WhiteboardBoardToolMemory
   /** Set when the board file can't be written (unreadable or from a newer version). */
   readOnlyReason: string | null
+  /** Set when the ink file can't be written; the strokes then stay as loaded (see `setInkReadOnly`). */
+  inkReadOnly: boolean
   canUndo: boolean
   canRedo: boolean
   /** Bumped by every local change to the board / the strokes (what to save). */
@@ -125,6 +130,32 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
 
     const ids = (given?: string[]) => given ?? get().selection
 
+    /**
+     * `doc` replaces the current document from outside (a reload, a merge, the ink file): each
+     * history step keeps its own changes, replayed onto `doc` (boards by a three-way merge,
+     * strokes by id), so the undo history survives.
+     */
+    const rebase = (doc: BoardDoc) => {
+      history.rebase(doc, (step, old) => ({
+        board:
+          doc.board === old.board
+            ? step.board
+            : step.board === old.board
+              ? doc.board
+              : keepRemoteDeletes(old.board, doc.board, mergeBoards(old.board, step.board, doc.board)),
+        strokes:
+          doc.strokes === old.strokes
+            ? step.strokes
+            : step.strokes === old.strokes
+              ? doc.strokes
+              : rebaseStrokes(old.strokes as InkStroke[], step.strokes as InkStroke[], doc.strokes as InkStroke[]),
+      }))
+    }
+
+    /** A history step to show: with the ink read-only, the strokes stay as they are. */
+    const keepInk = (step: BoardDoc, current: BoardDoc): BoardDoc =>
+      get().inkReadOnly && step.strokes !== current.strokes ? { ...step, strokes: current.strokes } : step
+
     const remember = (patch: Partial<WhiteboardBoardToolMemory>) => {
       const memory = { ...get().memory, ...patch }
       set({ memory })
@@ -151,9 +182,10 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       },
       undo() {
         if (get().readOnlyReason) return
-        const doc = history.undo()
-        if (!doc) return
+        const step = history.undo()
+        if (!step) return
         const prev = get().doc
+        const doc = keepInk(step, prev)
         set({
           doc,
           boardSeq: doc.board !== prev.board ? get().boardSeq + 1 : get().boardSeq,
@@ -164,9 +196,10 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       },
       redo() {
         if (get().readOnlyReason) return
-        const doc = history.redo()
-        if (!doc) return
+        const step = history.redo()
+        if (!step) return
         const prev = get().doc
+        const doc = keepInk(step, prev)
         set({
           doc,
           boardSeq: doc.board !== prev.board ? get().boardSeq + 1 : get().boardSeq,
@@ -272,7 +305,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
         const s = get()
         if (!isEditable(s)) return
         const board = A.clearBoard(s.doc.board)
-        const strokes = s.doc.strokes.length ? [] : s.doc.strokes
+        const strokes = s.doc.strokes.length && !s.inkReadOnly ? [] : s.doc.strokes
         commit({ board, strokes }, 'clear')
         set({ selection: [], editingId: null })
       },
@@ -294,14 +327,14 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       },
       setStrokes(next, label) {
         const s = get()
-        if (!isEditable(s)) return
+        if (!isEditable(s) || s.inkReadOnly) return
         commit({ ...s.doc, strokes: next }, label)
       },
     }
 
     const canvas: CanvasActions = {
       load(doc) {
-        history.reset(doc)
+        rebase(doc)
         set({
           doc,
           selection: get().selection.filter((id) => id in doc.board.nodes || id in doc.board.edges),
@@ -309,10 +342,10 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
         })
       },
       replaceBoard(board) {
-        // Every older step lacks the other window's merged changes, so undoing to one would
-        // delete them on the next save: the history restarts here, as on an external reload.
+        // Every older step is rebased onto the merged board, so undoing one doesn't delete the
+        // other window's merged changes on the next save.
         const doc = { ...get().doc, board }
-        history.reset(doc)
+        rebase(doc)
         set({
           doc,
           selection: get().selection.filter((id) => id in board.nodes || id in board.edges),
@@ -321,12 +354,16 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       },
       loadStrokes(strokes) {
         const doc = { ...get().doc, strokes }
-        // Strokes arrive once the ink file loads: every older step would otherwise undo them away.
-        history.reset(doc)
+        // Strokes arrive once the ink file loads: every older step is rebased onto them, so undo
+        // neither drops them nor loses the steps made before.
+        rebase(doc)
         set({ doc, ...sync() })
       },
       setReadOnly(reason) {
         set({ readOnlyReason: reason, ...(reason ? { editingId: null } : {}) })
+      },
+      setInkReadOnly(readOnly) {
+        if (get().inkReadOnly !== readOnly) set({ inkReadOnly: readOnly })
       },
       setInkTool(tool) {
         set(tool ? { inkTool: tool, tool: 'select' } : { inkTool: null })
@@ -403,6 +440,7 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       editingId: null,
       memory: opts.memory ?? {},
       readOnlyReason: null,
+      inkReadOnly: false,
       canUndo: false,
       canRedo: false,
       boardSeq: 0,
@@ -412,6 +450,53 @@ export function createBoardStore(opts: CreateBoardStoreOptions = {}): BoardStore
       canvas,
     }
   })
+}
+
+/**
+ * A history step replayed onto a reloaded board (`merged`): nodes, edges and blocks that were in
+ * the board the step was taken against (`old`) but are gone from the reloaded one were deleted
+ * elsewhere, and undo or redo must not bring them back (`mergeBoards` lets a local change win,
+ * which suits a save but not a step of history). Edges left without an end go too; a block still
+ * used by a remaining node or edge stays, so the board stays valid.
+ */
+function keepRemoteDeletes(old: WhiteboardData, loaded: WhiteboardData, merged: WhiteboardData): WhiteboardData {
+  const gone = (rec: 'nodes' | 'edges' | 'blocks') =>
+    Object.keys(old[rec] ?? {}).filter((id) => !(id in (loaded[rec] ?? {})) && id in (merged[rec] ?? {}))
+  const nodes = gone('nodes')
+  const edges = gone('edges')
+  const blocks = gone('blocks')
+  if (nodes.length + edges.length + blocks.length === 0) return merged
+  const out: WhiteboardData = {
+    ...merged,
+    nodes: { ...merged.nodes },
+    edges: { ...merged.edges },
+    blocks: { ...merged.blocks },
+  }
+  for (const id of nodes) delete out.nodes[id]
+  for (const id of edges) delete out.edges[id]
+  for (const [id, e] of Object.entries(out.edges)) {
+    if (!out.nodes[e.source] || !out.nodes[e.target]) delete out.edges[id]
+  }
+  const used = new Set(
+    [...Object.values(out.nodes), ...Object.values(out.edges)].map((o) => o.blockId).filter((id) => id !== undefined),
+  )
+  for (const id of blocks) if (!used.has(id)) delete out.blocks[id]
+  return out
+}
+
+/**
+ * The strokes of a history step replayed onto newly loaded ones, by id (as the ink module's
+ * `mergeStrokes`; snapshots share stroke objects, so a stroke changed in the step is a new object):
+ * strokes the step removed stay removed, ones it added or changed are kept.
+ */
+function rebaseStrokes(base: readonly InkStroke[], step: readonly InkStroke[], loaded: readonly InkStroke[]): InkStroke[] {
+  const baseById = new Map(base.map((s) => [s.id, s]))
+  const stepIds = new Set(step.map((s) => s.id))
+  const changed = new Map(step.filter((s) => baseById.has(s.id) && baseById.get(s.id) !== s).map((s) => [s.id, s]))
+  const out = loaded.filter((s) => !baseById.has(s.id) || stepIds.has(s.id)).map((s) => changed.get(s.id) ?? s)
+  const have = new Set(out.map((s) => s.id))
+  for (const s of step) if (!baseById.has(s.id) && !have.has(s.id)) out.push(s)
+  return out
 }
 
 function moveBy(board: WhiteboardData, ids: string[], dx: number, dy: number): WhiteboardData {

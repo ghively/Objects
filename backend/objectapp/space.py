@@ -28,6 +28,7 @@ import random
 import re
 import shutil
 import threading
+from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta, tzinfo
@@ -59,15 +60,17 @@ from .frontmatter import (
     rename_key,
     replace_in_value,
     set_keys,
+    take_parsed,
 )
 from .ids import new_ulid
 from .collections import CollectionDef, SaveCollectionResult
+from . import fmcache
 from .dailynotes import FILE_NAME_TAKEN, DailyNoteExists, build_index, day_of, parse_day
 from .jsonstore import DefinitionUnreadable, JsonStore
 from .localtime import SystemTz, from_local, to_local
 from .queries import DEFAULT_NAME as DEFAULT_QUERY_NAME
 from .queries import LIMIT_SIZES, MAX_SEARCH_TERMS, QueryDef, query_type_ids
-from .objfile import ObjectFile, join_object
+from .objfile import ObjectFile, join_object, split_object
 from .rows import member_of
 from .propvalues import (
     KIND_TRANSFORMS,
@@ -77,19 +80,35 @@ from .propvalues import (
     encode_updates,
     encode_value,
 )
-from .spaceconfig import space_fields
+from .spaceconfig import SPACE_REL, space_fields
 from .recurrence import week_start_of
 from .taskhook import TaskResult, on_status_change
 from .linkindex import LinkIndex
-from .relink import relink_frontmatter, replace_wikilinks, rewrite_tag_lists, wikilink_targets
-from .resolver import Resolver, link_candidates
+from .relink import (
+    code_ranges,
+    relink_frontmatter,
+    replace_wikilinks,
+    rewrite_tag_lists,
+    wikilink_targets,
+)
+from .resolver import Resolver, link_candidates, link_names
 from .roles import role_of
 from .templates import TemplateError, creation_variable, expand_title, resolve_date_variable
-from .textfile import atomic_write, create_new, encode_like, move_no_overwrite, retry_os
+from .textfile import (
+    _write_temp,
+    atomic_write,
+    create_new,
+    decode,
+    encode_like,
+    move_no_overwrite,
+    retry_os,
+)
 from .trash import Trash, TrashItem
 from .typedefs import (
+    DEFAULT_TYPE,
     SYSTEM_KEYS,
     RawObject,
+    has_undecodable,
     infer_types_from,
     is_ignored,
     iter_object_paths,
@@ -256,6 +275,7 @@ _RESERVED_STEMS = frozenset(
 
 
 _LINK_UNSAFE_RE = re.compile(r"[\[\]#]")
+_SURROGATE_RE = re.compile("[\ud800-\udfff]")
 # A title that can't be a wikilink target as it is (it would end the target early).
 _LINK_BREAKING_RE = re.compile(r"[\[\]|#\n]")
 
@@ -282,6 +302,9 @@ def safe_filename(title: str) -> str:
     # `[`, `]` and `#` are legal in file names but end a wikilink's target, so
     # the path form of a link (see `Space._link_text`) must never contain them.
     title = _LINK_UNSAFE_RE.sub("", str(title or ""))
+    # A lone surrogate (JSON allows "\udc80") is no character: on Linux it would become a
+    # file name that isn't UTF-8. It is replaced, as a decoder replaces a bad byte.
+    title = _SURROGATE_RE.sub("\ufffd", title)
     m = _ILLEGAL_FILENAME_RE.search(title)
     stem = clean(title[: m.start()] if m else title)
     if not stem:
@@ -300,8 +323,9 @@ def unique_path(root: Path, folder: str, stem: str, same_as: str | None = None) 
     folder = folder.strip("/")
     base = Path(root) / folder if folder else Path(root)
     try:
-        taken = {p.name.lower() for p in base.iterdir()} if base.is_dir() else set()
-    except OSError:
+        # Names only (no Path per entry): a restore of a type calls this once per object.
+        taken = {name.lower() for name in os.listdir(base)}
+    except OSError:  # no such folder (yet), or unreadable
         taken = set()
     own = None
     if same_as:
@@ -315,6 +339,20 @@ def unique_path(root: Path, folder: str, stem: str, same_as: str | None = None) 
         if name.lower() not in taken or name.lower() == own:
             return f"{folder}/{name}" if folder else name
         n += 1
+
+
+_MAX_COMPONENT = 255
+
+
+def _component_too_long(part: str) -> bool:
+    """Whether one path component is longer than the file system allows.
+
+    NTFS allows 255 UTF-16 code units per name (a character outside the BMP is two);
+    Linux and macOS file systems allow 255 bytes (of UTF-8).
+    """
+    if os.name == "nt":
+        return len(part.encode("utf-16-le", "surrogatepass")) > 2 * _MAX_COMPONENT
+    return len(part.encode("utf-8", "surrogateescape")) > _MAX_COMPONENT
 
 
 def _same_file(a: Path, b: Path) -> bool:
@@ -378,11 +416,14 @@ class SpaceChange:
     """A change to the space's in-memory scan, for `Space.add_listener` listeners.
 
     ``kind`` is ``'object'`` (``path`` is the object's space path; it may be gone
-    now) or ``'types'`` (a type definition changed; ``path`` is None).
+    now) or ``'types'`` (a type definition changed; ``path`` is None and
+    ``type_id`` names the type when the change knows it, so an index can
+    limit its work to that type's members).
     """
 
     kind: str
     path: str | None
+    type_id: str | None = field(default=None, compare=False)
 
 
 def _names_key(s: ObjectSummary | None) -> tuple | None:
@@ -644,11 +685,18 @@ def _fold(value: Any) -> str:
 
 @dataclass
 class _TypeOp:
-    """One rewrite every file of a type gets: ``fn(src, rel) -> src``."""
+    """One rewrite every file of a type gets: ``fn(src, rel, fm) -> src``.
 
-    fn: Callable[[str, str], str]
+    ``fm`` is ``src`` parsed (the caller has it already: the scan's values, or the
+    write's), so an op never parses the frontmatter itself.
+    """
+
+    fn: Callable[[str, str, dict], str]
     confirm: bool
     """True when it removes values (the save then needs ``confirm``)."""
+    applies: Callable[[dict, str], bool]
+    """``applies(fm, rel)``: whether ``fn`` would change the file, from its values alone
+    (the plan runs this under the lock; ``fn``'s YAML round trip runs per file outside it)."""
 
 
 def version_of(data: bytes) -> str:
@@ -699,21 +747,85 @@ def _yaml_single_quoted(text: str) -> str:
 _link_candidates = link_candidates
 
 
+class _TypeList(list):
+    """`Space.types`: a list that tells the space whenever it is changed in place."""
+
+    def __init__(self, items: Iterable[TypeDefinition], changed: Callable[[], None]) -> None:
+        super().__init__(items)
+        self._changed = changed
+
+
+def _notifying(name: str) -> Callable[..., Any]:
+    method = getattr(list, name)
+
+    def wrapper(self: _TypeList, *args: Any, **kwargs: Any) -> Any:
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            self._changed()
+
+    wrapper.__name__ = name
+    return wrapper
+
+
+for _name in (
+    "append", "extend", "insert", "remove", "pop", "clear", "sort", "reverse",
+    "__setitem__", "__delitem__", "__iadd__", "__imul__",
+):
+    setattr(_TypeList, _name, _notifying(_name))
+
+
 class Space:
     @property
+    def types(self) -> list[TypeDefinition]:
+        """The space's types; assigning or changing it in place drops the `_type_id` lookup."""
+        return self._types
+
+    @types.setter
+    def types(self, value: Iterable[TypeDefinition]) -> None:
+        self._types = _TypeList(value, self._forget_type_ids)
+        self._forget_type_ids()
+
+    def _forget_type_ids(self) -> None:
+        self._type_ids = None
+
+    @property
     def name(self) -> str:
-        """``.capacities/space.json``'s ``name``, else the folder name (re-read on every access)."""
-        return space_fields(self.root)["name"]
+        """``.capacities/space.json``'s ``name``, else the folder name.
+
+        Re-read only when the file's stat (times, size, inode) changed since the last
+        access, so an edit made outside the app is still seen at once.
+        """
+        try:
+            st = os.stat(self._space_json)
+            key: tuple | None = (st.st_mtime_ns, st.st_ctime_ns, st.st_size, st.st_ino)
+        except OSError:
+            key = None
+        cached = self._name_cache
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        name = space_fields(self.root)["name"]
+        self._name_cache = (key, name)
+        return name
 
     def __init__(self, root: Path) -> None:
         self.root = Path(root).resolve()
+        self._space_json = os.fspath(self.root / SPACE_REL)
+        self._name_cache: tuple[tuple | None, str] | None = None
+        """(`space.json`'s stat key, the name read with it) for `name`."""
         self._lock = threading.RLock()
         self._raw: dict[str, RawObject] = {}
         self._summaries: dict[str, ObjectSummary] = {}
+        self._checked_rels: set[str] = set()
+        """Known object paths that passed `_rel`'s full check since their last rescan."""
         self._listeners: list[Callable[[SpaceChange], None]] = []
         self._names_rev = 0
         """Bumped whenever the set of link names changes (see `_names_changed`)."""
+        self._name_changes: deque[tuple[int, frozenset[str] | None]] = deque(maxlen=512)
+        """(`_names_rev`, the folded link names that change touched; None when unknown)."""
         self._resolver: Resolver | None = None
+        self._types_saving: set[str] = set()
+        """Types whose `save_type` is rewriting objects outside the lock (no other type write then)."""
         self._links = LinkIndex(self)
         self._listeners.append(self._links.on_change)
         self.own_writes: dict[str, str] = {}
@@ -725,8 +837,8 @@ class Space:
         """The only source of "now" for stamps, the Task hook and the calendar (tests set it)."""
         self.tz: tzinfo = SystemTz()
         """The local zone (DST-aware) that turns instants into local days (tests set it)."""
-        self.before_write: Callable[[str, bytes], None] | None = None
-        """M8 version history: called as ``before_write(rel, current_bytes)`` inside the lock
+        self.before_write: Callable[[str, bytes, str | None], None] | None = None
+        """M8 version history: called as ``before_write(rel, current_bytes, object_id)``
         right before the app replaces an existing file (never on create, never on read).
         Errors it raises are logged and never stop the write (see `_call_before_write`)."""
         for rel in iter_object_paths(self.root):
@@ -748,10 +860,15 @@ class Space:
         """Type id -> the revision of its file when the in-memory copy was loaded or written."""
         for rel, raw in self._raw.items():
             self._summaries[rel] = self._summarize(raw)
+        # The frontmatter cache is written once here, outside any lock (startup only), so a
+        # later start in this process finds nothing dirty and writes nothing; after this,
+        # only the cache's own timer and interpreter exit write it (never a request thread).
+        fmcache.for_root(self.root).flush()
         self.collections: dict[str, CollectionDef] = {}
         """Collection id -> definition (unreadable files included, read-only)."""
-        for cid, data, _rev, err in self.store("collections").list():
-            self.collections[cid] = self._load_collection(cid, data, err)
+        self._collections_loaded: dict[str, tuple[str, CollectionDef]] = {}
+        """Collection id -> (its file's revision, the definition parsed from it)."""
+        self.reload_collections()
         self.purge_expired(datetime.now(UTC))
 
     # -- types --------------------------------------------------------------
@@ -865,12 +982,39 @@ class Space:
                 self.collections[collection_id] = self._load_collection(collection_id, data, error)
 
     def reload_collections(self) -> None:
-        """Re-read every collection file (the list route does this, so it is never stale)."""
+        """Re-read the collection files that changed (the list route does this, so it is never stale).
+
+        Every file is read and hashed; one is parsed again only when its revision differs
+        from the one its in-memory definition was loaded at (and that definition is still
+        the one in `collections`), so external edits, additions and removals all show.
+        """
         with self._lock:
-            found = {}
-            for cid, data, _rev, err in self.store("collections").list():
-                found[cid] = self._load_collection(cid, data, err)
+            loaded = self._collections_loaded
+            known = {
+                cid: rev
+                for cid, (rev, c) in loaded.items()
+                if self.collections.get(cid) is c
+            }
+            found: dict[str, CollectionDef] = {}
+            fresh: dict[str, tuple[str, CollectionDef]] = {}
+            for cid, data, rev, err in self.store("collections").list(known):
+                if cid in known and known[cid] == rev:
+                    c = self.collections[cid]
+                else:
+                    c = self._load_collection(cid, data, err)
+                found[cid] = c
+                fresh[cid] = (rev, c)
             self.collections = found
+            self._collections_loaded = fresh
+
+    def collections_with_revisions(self) -> list[tuple[CollectionDef, str]]:
+        """`reload_collections`, then every collection with its file's revision, sorted as
+        `list_collections` (one read of each file in all)."""
+        with self._lock:
+            self.reload_collections()
+            return [
+                (c, self._collections_loaded[c.id][0]) for c in self.list_collections()
+            ]
 
     def list_collections(self) -> list[CollectionDef]:
         with self._lock:
@@ -1069,13 +1213,17 @@ class Space:
                 return Skip(rel, f"The file could not be written: {exc.strerror or exc}")
         raise AssertionError("unreachable")
 
-    def _call_before_write(self, rel: str, data: bytes) -> None:
-        """Run the `before_write` hook (M8 history) for ``rel``'s current bytes; never raises."""
+    def _call_before_write(self, rel: str, data: bytes, object_id: str | None = None) -> None:
+        """Run the `before_write` hook (M8 history) for ``rel``'s current bytes; never raises.
+
+        ``object_id`` is the object's id when the caller already knows it, so the history
+        store needn't parse the frontmatter again (re-measured after the audit fix pass).
+        """
         hook = self.before_write
         if hook is None:
             return
         try:
-            hook(rel, data)
+            hook(rel, data, object_id)
         except Exception:  # noqa: BLE001 - history must never stop a save
             _log.exception("The pre-write hook failed for %s", rel)
 
@@ -1450,41 +1598,65 @@ class Space:
         collection_ids: list[str] | None = None,
         paths: list[str] | None = None,
         search: tuple[list[str], str] | None = None,
+        preview: bool = True,
     ):
         """The objects in scope as `rows.Row`s (decoded values, links, preview), sorted by path."""
         from .rows import build_rows
 
-        return build_rows(self, type_ids, collection_ids, paths, search)
+        return build_rows(self, type_ids, collection_ids, paths, search, preview)
 
     def type_by_id(self, type_id: str) -> TypeDefinition | None:
         return next((t for t in self.types if t.id == type_id), None)
 
     def _type_id(self, type_name: str) -> str:
-        """The id of the type `type_name` names: by name, then id, then former names."""
-        lowered = type_name.lower()
-        for match in (
-            lambda t: t.name.lower() == lowered,
-            lambda t: t.id.lower() == lowered,
-            lambda t: lowered in (f.lower() for f in t.formerNames),
-        ):
-            for t in self.types:
-                if match(t):
-                    return t.id
-        return slug(type_name)
+        """The id of the type `type_name` names: by name, then id, then former names.
+
+        Case-insensitive; answered from a lookup built once per change of `types`.
+        """
+        lookup = self._type_ids
+        if lookup is None:
+            lookup = {}
+            # Lowest priority first, so a name overrides an id overrides a former name,
+            # and within one kind the first type in `types` wins.
+            for t in reversed(self.types):
+                for f in t.formerNames:
+                    lookup[f.lower()] = t.id
+            for kind in ("id", "name"):
+                for t in reversed(self.types):
+                    lookup[getattr(t, kind).lower()] = t.id
+            self._type_ids = lookup
+        found = lookup.get(type_name.lower())
+        return found if found is not None else slug(type_name)
 
     # -- paths --------------------------------------------------------------
 
     def _rel(self, path: str) -> str:
-        """Normalise a space-relative path; reject anything outside the space."""
+        """Normalise a space-relative path; reject anything outside the space.
+
+        A path the space already knows in exactly this spelling, and that passed the
+        full check (``resolve()``, which costs ~46 µs) since it was last rescanned, is
+        answered from `_checked_rels`; `rescan_file` forgets it first, so a file replaced
+        on disk (say, by a symlink out of the space) is checked again.
+        """
+        if path in self._checked_rels and path in self._summaries:
+            return path
         rel = PurePosixPath(str(path).replace("\\", "/"))
         if rel.is_absolute() or ".." in rel.parts or not rel.parts:
             raise ValueError(f"Path is outside the space: {path!r}")
         if is_ignored(rel) or rel.name.startswith(".") or rel.suffix.lower() != ".md":
             raise ValueError(f"Not an object path: {path!r}")
-        full = (self.root / rel).resolve()
+        if any(_component_too_long(part) for part in rel.parts):
+            raise ValueError(f"Path component too long: {path!r}")
+        try:
+            full = (self.root / rel).resolve()
+        except OSError as exc:  # e.g. ENAMETOOLONG: a bad path, not a file-system fault
+            raise ValueError(f"Not an object path: {path!r}") from exc
         if not full.is_relative_to(self.root):
             raise ValueError(f"Path is outside the space: {path!r}")
-        return rel.as_posix()
+        out = rel.as_posix()
+        if out in self._summaries:
+            self._checked_rels.add(out)
+        return out
 
     def abspath(self, path: str) -> Path:
         return self.root / self._rel(path)
@@ -1557,6 +1729,11 @@ class Space:
         untouched line's bytes are kept; the replace re-checks the version.
         ``now`` is the write's instant for the stamp (default: `Space.clock`).
         Without ``history`` the write takes no version-history snapshot (`before_write`).
+
+        The lock is held for the read and the edit, released while the history
+        snapshot and the temp file are written and synced (the slow part; reads go
+        on meanwhile), and taken again for the version re-check, the replace and
+        the rescan, so a write since the read still surfaces as a conflict.
         """
         rel = self._rel(rel)
         full = self.root / rel
@@ -1572,39 +1749,96 @@ class Space:
             of = edit(raw.of, dict(raw.fm))
             if of is None or join_object(of) == join_object(raw.of):
                 return current
+            stamped: dict[str, str] | None = None
             if stamp:
                 insert_first = None if _str_or_none(raw.fm.get("id")) else {"id": new_ulid()}
-                fm_src = set_keys(
-                    of.frontmatter_src or "",
-                    {"lastUpdated": now_stamp(now or self.clock())},
-                    insert_first=insert_first,
-                )
+                stamps = {"lastUpdated": now_stamp(now or self.clock())}
+                if of.frontmatter_src == raw.of.frontmatter_src:
+                    stamped = {**(insert_first or {}), **stamps}  # the only frontmatter change
+                fm_src = set_keys(of.frontmatter_src or "", stamps, insert_first=insert_first)
                 of = replace(of, frontmatter_src=fm_src)
+            elif of.frontmatter_src == raw.of.frontmatter_src:
+                stamped = {}
             # Untouched lines keep their own bytes (and line endings) from the original.
-            data = encode_like(raw.data, join_object(of))
+            text = join_object(of)
+            data = encode_like(raw.data, text)
             new_version = version_of(data)
+            self.own_writes[rel] = new_version
 
-            def unchanged_on_disk() -> None:
+        def forget() -> None:
+            if self.own_writes.get(rel) == new_version:
+                del self.own_writes[rel]
+
+        try:
+            if history:
+                self._call_before_write(rel, raw.data, _str_or_none(raw.fm.get("id")))
+            tmp = _write_temp(full, data, keep_mode=True)  # written and fsynced beside the file
+        except BaseException:
+            forget()
+            raise
+        with self._lock:
+            try:
                 # Re-check right before the replace: an external write since the
                 # read above must surface as a conflict, never be overwritten.
                 try:
-                    now = version_of(full.read_bytes())
+                    on_disk = version_of(full.read_bytes())
                 except OSError as exc:
                     raise KeyError(rel) from exc
-                if now != current:
-                    raise Conflict(now)
-
-            if history:
-                self._call_before_write(rel, raw.data)
-            self.own_writes[rel] = new_version
-            try:
-                atomic_write(full, data, check=unchanged_on_disk)
+                if on_disk != current:
+                    raise Conflict(on_disk)
+                retry_os(lambda: os.replace(tmp, full))
             except BaseException:
-                if self.own_writes.get(rel) == new_version:
-                    del self.own_writes[rel]
+                try:
+                    os.unlink(tmp)
+                except FileNotFoundError:
+                    pass
+                forget()
                 raise
-            self.rescan_file(rel)
+            fresh = self._raw_after_write(rel, data, text, raw, stamped)
+            if fresh is None:
+                self.rescan_file(rel)
+            else:
+                if fresh.of.frontmatter_src is not None:
+                    # The next `read_raw` of this file (the next save, a rescan) finds its
+                    # new frontmatter parsed instead of parsing it again.
+                    fmcache.for_root(self.root).put(rel, fresh.of.frontmatter_src, fresh.fm)
+                self._rescan_with(rel, fresh)
             return new_version
+
+    @staticmethod
+    def _raw_after_write(
+        rel: str, data: bytes, text: str, before: RawObject, stamped: dict[str, str] | None
+    ) -> RawObject | None:
+        """What `read_raw` would give for the file `_write` just wrote, without reading it.
+
+        ``stamped`` holds the frontmatter keys `_write` itself set when the edit left the
+        frontmatter alone (``{}`` when nothing changed there), so ``before``'s parsed values
+        are reused instead of parsing the YAML again. None means "re-read the file"
+        (anything unusual: undecodable text, a changed frontmatter that doesn't parse).
+        """
+        if has_undecodable(text) or decode(data).text != text:
+            return None
+        of = split_object(text)
+        if not of.fm_ok:
+            return None
+        if stamped is not None and ("id" not in stamped or "id" in before.fm):
+            # In the file's order: stamped keys already there were set in place, a new
+            # `lastUpdated` was appended. A newly inserted id (once per object: first, or
+            # last in a flow-style mapping) is left to the parse below.
+            fm = {**before.fm, **stamped}
+        elif of.frontmatter_src is None:
+            fm = {}
+        else:
+            try:
+                # An edit that checked its result by parsing it hands that parse on.
+                fm = take_parsed(of.frontmatter_src)
+            except FrontmatterError:
+                return None
+        t = fm.get("type")
+        type_name = t.strip() if isinstance(t, str) and t.strip() else DEFAULT_TYPE
+        return RawObject(
+            path=rel, data=data, of=of, fm=fm, readOnly=False, typeName=type_name
+        )
 
     def touch(self, path: str, now: datetime | None = None) -> tuple[str, str]:
         """Set only the object's ``lastUpdated`` to ``now``; return ``(base, version)``.
@@ -2030,8 +2264,7 @@ class Space:
         or that resolve to another object with the same title, don't.
         """
         names = {_fold(old_title), _fold(PurePosixPath(rel).stem), _fold(rel[:-3])}
-        with self._lock:
-            raws = list(self._raw.values())
+        raws = self._mentioning(names)
         out: dict[str, set[str]] = {}
         for raw in raws:
             text = (raw.of.frontmatter_src or "") + raw.of.body
@@ -2054,8 +2287,7 @@ class Space:
         ones that change to their old object's unambiguous link text.
         """
         names = {_fold(new_title), _fold(safe_filename(new_title))}
-        with self._lock:
-            raws = list(self._raw.values())
+        raws = self._mentioning(names)
         out: dict[str, dict[str, str]] = {}
         for raw in raws:
             text = (raw.of.frontmatter_src or "") + raw.of.body
@@ -2071,6 +2303,16 @@ class Space:
             if found:
                 out[raw.path] = found
         return out
+
+    def _mentioning(self, names: set[str]) -> list[RawObject]:
+        """The objects holding a link whose target text folds to one of ``names`` (by path).
+
+        The link index's candidates (audit 2026-11-01 P4): the callers then check each
+        file's links exactly instead of scanning every file in the space.
+        """
+        candidates = self._links.mentioning(names)
+        with self._lock:
+            return [self._raw[p] for p in sorted(candidates) if p in self._raw]
 
     @staticmethod
     def _relink_edit(targets: set[str], new_text: str) -> Edit:
@@ -2129,8 +2371,10 @@ class Space:
         self.own_writes.pop(rel, None)
         with self._lock:
             self._raw.pop(rel, None)
-            if self._summaries.pop(rel, None) is not None:
-                self._names_changed()
+            gone = self._summaries.pop(rel, None)
+            self._checked_rels.discard(rel)
+            if gone is not None:
+                self._names_changed(gone, None)
             self._fire(SpaceChange("object", rel))
         self.rescan_file(new_rel)
 
@@ -2170,8 +2414,9 @@ class Space:
         if t is None:
             return {}
         names = {_fold(old_title), _fold(PurePosixPath(rel).stem), _fold(rel[:-3])}
+        candidates = self._links.mentioning(names)  # a board's links count as body links
         with self._lock:
-            boards = [p for p, s in self._summaries.items() if s.type == t.id]
+            boards = sorted(p for p, s in self._summaries.items() if s.type == t.id and p in candidates)
         out: dict[str, set[str]] = {}
         for md in boards:
             with self._lock:
@@ -2228,7 +2473,10 @@ class Space:
         def edit(of: ObjectFile, _fm: dict) -> ObjectFile | None:
             src = set_keys(of.frontmatter_src or "", {"title": new_title})
             body = of.body
+            code = code_ranges(body)  # a `# Old title` line inside a fence is not the heading
             for m in _HEADING_RE.finditer(body):
+                if any(s <= m.start() < e for s, e in code):
+                    continue
                 if m.group(1).strip() == old_title:
                     body = body[: m.start()] + f"# {new_title}" + body[m.end() :]
                     break
@@ -2497,7 +2745,7 @@ class Space:
             if src_text is None:
                 new = set_keys(f"type: {_yaml_single_quoted(name)}\n", {"title": title})
             elif isinstance(fm.get("type"), str):
-                new = replace_in_value(src_text, "type", lambda _v: name)
+                new = replace_in_value(src_text, "type", lambda _v: name, parsed=fm)
             else:
                 new = set_keys(src_text, {"type": SingleQuotedScalarString(name)})
             sets: dict[str, Any] = {}
@@ -2592,6 +2840,7 @@ class Space:
         if t.readOnlyReason or type_revision(self.root, t.id):
             return False
         try:
+            self._check_type_free(t.id)
             write_type_json(self.root, t, "")
         except (RevisionConflict, TypeReadOnly):
             return False
@@ -2962,6 +3211,14 @@ class Space:
                 meta.pop("typeTrashId")
             if collection_trash_id is None:
                 meta.pop("collectionTrashId")
+            unregister = (
+                summary is not None and summary.template and summary.id and type_trash_id is None
+            )
+            if unregister:
+                # Restore puts the template back where it was in the type's `templates`.
+                registration = self._template_registration(summary.type, summary.id)
+                if registration is not None:
+                    meta["template"] = registration
             whiteboard = self._is_whiteboard(rel)
             meta_file = self.trash.object_meta_file(item.id)
             self.trash.write_json(meta_file, meta)
@@ -2984,7 +3241,7 @@ class Space:
                     meta_file.unlink(missing_ok=True)
                     self.rescan_file(rel)
                     raise
-            if summary is not None and summary.template and summary.id and type_trash_id is None:
+            if unregister:
                 self.unregister_template(summary.type, summary.id)
             return item
 
@@ -3056,12 +3313,49 @@ class Space:
         new = copy.deepcopy(t)
         new.templates = templates
         try:
+            self._check_type_free(t.id)
             write_type_json(self.root, new, type_revision(self.root, t.id))
         except (RevisionConflict, TypeReadOnly):
             return False
         self.types = [new if x.id == t.id else x for x in self.types]
         self._types_changed(t.id)
         return True
+
+    def _template_registration(self, type_id: str, template_id: str) -> dict[str, Any] | None:
+        """A template's place in its type's ``templates`` (kept in its trash meta), or None."""
+        t = self.type_by_id(type_id)
+        if t is None:
+            return None
+        ids = list(t.templates.get("ids") or [])
+        default = t.templates.get("defaultTemplateId") == template_id
+        if template_id not in ids and not default:
+            return None
+        return {"index": ids.index(template_id) if template_id in ids else None, "default": default}
+
+    def _register_template(self, path: str, registration: dict[str, Any]) -> None:
+        """Put a restored template back in its type's ``templates`` (see `delete_object`).
+
+        Its id returns to its old position in ``ids`` (or the end) and it becomes the
+        default again unless another template is by now.
+        """
+        with self._lock:
+            summary = self._summaries.get(path)
+            if summary is None or not summary.id or not summary.template:
+                return
+            t = self.type_by_id(summary.type)
+            if t is None or t.readOnlyReason:
+                return
+            ids = list(t.templates.get("ids") or [])
+            if summary.id not in ids:
+                index = registration.get("index")
+                at = min(index, len(ids)) if isinstance(index, int) and index >= 0 else len(ids)
+                ids.insert(at, summary.id)
+            default = t.templates.get("defaultTemplateId")
+            if registration.get("default") and default is None:
+                default = summary.id
+            templates = {**t.templates, "ids": ids, "defaultTemplateId": default}
+            if templates != t.templates:
+                self._save_templates_field(t, templates)
 
     def unregister_template(self, type_id: str, template_id: str) -> bool:
         """Drop a template's id from its type's ``templates``; True when the type was written."""
@@ -3208,6 +3502,7 @@ class Space:
 
     def _save_type(self, t: TypeDefinition) -> bool:
         try:
+            self._check_type_free(t.id)
             write_type_json(self.root, t, type_revision(self.root, t.id))
         except (RevisionConflict, TypeReadOnly):
             return False
@@ -3223,6 +3518,7 @@ class Space:
         records them so a restore puts them back.
         """
         with self._lock:
+            self._check_type_free(type_def.id)
             trash_id = new_ulid()
             folder = self.trash.type_dir(trash_id)
             folder.mkdir(parents=True, exist_ok=True)
@@ -3409,9 +3705,18 @@ class Space:
                 if other.id not in type_ids:
                     type_ids.append(other.id)
         self.trash.remove_type(trash_id)
-        # Objects whose type was unknown while it was in the trash resolve again.
-        for rel in list(self._raw):
-            self.rescan_file(rel)
+        # Objects whose type was unknown while it was in the trash resolve again: only the
+        # ones whose summary no longer matches what their type name resolves to are
+        # rescanned, not the whole space (audit 2026-11-01 B10).
+        known = {t.id for t in self.types}
+        for rel, raw in list(self._raw.items()):
+            summary = self._summaries.get(rel)
+            if (
+                summary is None
+                or summary.type not in known
+                or summary.type != self._type_id(raw.typeName)
+            ):
+                self.rescan_file(rel)
         return paths, type_ids
 
     def _restore_object_entry(self, trash_id: str, meta: dict) -> str:
@@ -3426,6 +3731,9 @@ class Space:
         else:
             path = self._restore_file(original, data)
         self.trash.remove_object(trash_id)
+        registration = meta.get("template")
+        if isinstance(registration, dict):
+            self._register_template(path, registration)
         return path
 
     def _restore_whiteboard(self, trash_id: str, original: str, data: bytes) -> str:
@@ -3707,19 +4015,24 @@ class Space:
             members = self._type_members(old.id) if ops else []
             raws = {rel: self._raw[rel] for rel in members if rel in self._raw}
 
-            def run(src: str, rel: str, only_confirm: bool = False) -> str:
+            def run(src: str, rel: str, fm: dict) -> str:
+                parsed = src  # the source `fm` holds; re-parsed only after an op changed it
                 for op in ops:
-                    if op.confirm or not only_confirm:
-                        src = op.fn(src, rel)
+                    if src != parsed:
+                        fm = take_parsed(src) if src else {}
+                        parsed = src
+                    src = op.fn(src, rel, fm)
                 return src
 
+            # The plan only asks each op whether it applies (values already parsed); the
+            # rewrites themselves run per file outside the lock.
             to_write: list[str] = []
             affected = 0
             for rel, raw in raws.items():
-                src = raw.of.frontmatter_src or ""
-                if run(src, rel, only_confirm=True) != src:
+                hits = [op for op in ops if op.applies(raw.fm, rel)]
+                if any(op.confirm for op in hits):
                     affected += 1
-                if run(src, rel) != src:
+                if hits:
                     to_write.append(rel)
             if (deletes_property or affected) and not confirm:
                 raise ConfirmRequired(
@@ -3730,32 +4043,49 @@ class Space:
 
             # The rewritten files are rescanned as they are written, so they must
             # already resolve to the edited type (a renamed type by its new name).
+            self._check_type_free(new.id, current)
+            self._types_saving.add(new.id)
             self.types = [new if x.id == new.id else x for x in self.types]
             self._types_changed(new.id)
-            try:
-                rewritten, skipped = self._apply_type_ops(to_write, run)
+        # The files are rewritten outside the lock (each `_write` takes it for its own
+        # file), so reads go on meanwhile; `_types_saving` keeps other type writes out.
+        try:
+            rewritten, skipped = self._apply_type_ops(to_write, run)
+            with self._lock:
                 revision = write_type_json(self.root, new, current)
-            except BaseException:
+                self._loaded_revisions[new.id] = revision  # else the next refresh reloads it
+                self._sort_types()
+        except BaseException:
+            with self._lock:
                 self.types = [mem if x.id == new.id else x for x in self.types]
                 self._types_changed(new.id)
                 for rel in members:
                     self.rescan_file(rel)
-                raise
-            self._sort_types()
-            return SaveTypeResult(new, rewritten, skipped, revision)
+            raise
+        finally:
+            with self._lock:
+                self._types_saving.discard(new.id)
+        return SaveTypeResult(new, rewritten, skipped, revision)
+
+    def _check_type_free(self, type_id: str, revision: str | None = None) -> None:
+        """Raise `RevisionConflict` while a `save_type` of ``type_id`` is still rewriting files."""
+        if type_id in self._types_saving:
+            raise RevisionConflict(
+                type_revision(self.root, type_id) if revision is None else revision
+            )
 
     def _apply_type_ops(
-        self, to_write: list[str], run: Callable[[str, str], str]
+        self, to_write: list[str], run: Callable[[str, str, dict], str]
     ) -> tuple[list[str], list[Skip]]:
-        """Rewrite each file with ``run(src, rel)`` (unstamped); (rewritten, skipped)."""
+        """Rewrite each file with ``run(src, rel, fm)`` (unstamped); (rewritten, skipped)."""
         rewritten: list[str] = []
         skipped: list[Skip] = []
         for rel in to_write:
             wrote: list[bool] = []
 
-            def edit(of: ObjectFile, _fm: dict, rel=rel, wrote=wrote) -> ObjectFile | None:
+            def edit(of: ObjectFile, fm: dict, rel=rel, wrote=wrote) -> ObjectFile | None:
                 src = of.frontmatter_src or ""
-                out = run(src, rel)
+                out = run(src, rel, fm)
                 wrote.append(out != src)
                 return replace(of, frontmatter_src=out) if out != src else None
 
@@ -3791,7 +4121,7 @@ class Space:
             ):
                 former.append(old.name)
             new.formerNames = former
-            ops.append(_TypeOp(self._type_line_op(old.name, new.name), confirm=False))
+            ops.append(self._type_line_op(old.name, new.name))
 
         ids = [p.id for p in new.propertyDefinitions]
         keys = [p.key for p in new.propertyDefinitions]
@@ -3815,7 +4145,7 @@ class Space:
             if old.basic:
                 raise InvalidValue(BASIC_LOCKED)
             deletes_property = True
-            ops.append(_TypeOp(self._delete_key_op(p.key), confirm=True))
+            ops.append(self._delete_key_op(p.key))
 
         for p in new.propertyDefinitions:
             before = old_by_id.get(p.id)
@@ -3886,25 +4216,28 @@ class Space:
                 raise InvalidValue(f"No object has the id {object_id!r}")
 
     @staticmethod
-    def _type_line_op(old_name: str, new_name: str) -> Callable[[str, str], str]:
+    def _type_line_op(old_name: str, new_name: str) -> _TypeOp:
         folded = old_name.lower()
 
-        def fn(src: str, _rel: str) -> str:
-            value = parse_fm(src).get("type") if src else None
-            if not isinstance(value, str) or value.strip().lower() != folded:
+        def applies(fm: dict, _rel: str) -> bool:
+            value = fm.get("type")
+            return isinstance(value, str) and value.strip().lower() == folded
+
+        def fn(src: str, rel: str, fm: dict) -> str:
+            if not src or not applies(fm, rel):
                 return src
             return replace_in_value(
-                src, "type", lambda v: new_name if v.strip().lower() == folded else v
+                src, "type", lambda v: new_name if v.strip().lower() == folded else v, parsed=fm
             )
 
-        return fn
+        return _TypeOp(fn, confirm=False, applies=applies)
 
     @staticmethod
-    def _delete_key_op(key: str) -> Callable[[str, str], str]:
-        def fn(src: str, _rel: str) -> str:
+    def _delete_key_op(key: str) -> _TypeOp:
+        def fn(src: str, _rel: str, _fm: dict) -> str:
             return delete_keys(src, [key]) if src else src
 
-        return fn
+        return _TypeOp(fn, confirm=True, applies=lambda fm, _rel: key in fm)
 
     @staticmethod
     def _label_ops(before: PropertyDefinition, p: PropertyDefinition) -> list[_TypeOp]:
@@ -3924,15 +4257,23 @@ class Space:
 
         if deleted or collapse:
 
-            def remove(src: str, _rel: str) -> str:
-                raw = parse_fm(src).get(key) if src else None
+            def removal(raw: Any) -> tuple[list, list, bool] | None:
+                """(items, kept, squash) when the value loses something, else None."""
                 if raw is None:
-                    return src
+                    return None
                 items = [i for i in (raw if isinstance(raw, list) else [raw]) if i is not None]
                 kept = [i for i in items if _fold(i) not in deleted]
                 squash = collapse and isinstance(raw, list) and len(kept) >= 2
                 if not squash and len(kept) == len(items):
+                    return None
+                return items, kept, squash
+
+            def remove(src: str, _rel: str, fm: dict) -> str:
+                raw = fm.get(key) if src else None
+                plan = removal(raw)
+                if plan is None:
                     return src
+                _items, kept, squash = plan
                 if squash:
                     value: Any = kept[0]
                 elif not kept:
@@ -3946,16 +4287,23 @@ class Space:
                     value = kept[0]
                 return set_keys(src, {key: value})
 
-            ops.append(_TypeOp(remove, confirm=True))
+            ops.append(
+                _TypeOp(remove, confirm=True, applies=lambda fm, _rel: removal(fm.get(key)) is not None)
+            )
 
         if renamed:
 
-            def rename(src: str, _rel: str) -> str:
-                if not src or key not in parse_fm(src):
-                    return src
-                return replace_in_value(src, key, lambda v: renamed.get(_fold(v), v))
+            def renames(fm: dict, _rel: str) -> bool:
+                raw = fm.get(key)
+                items = raw if isinstance(raw, list) else [raw]
+                return any(isinstance(i, str) and _fold(i) in renamed for i in items)
 
-            ops.append(_TypeOp(rename, confirm=False))
+            def rename(src: str, rel: str, fm: dict) -> str:
+                if not src or not renames(fm, rel):
+                    return src
+                return replace_in_value(src, key, lambda v: renamed.get(_fold(v), v), parsed=fm)
+
+            ops.append(_TypeOp(rename, confirm=False, applies=renames))
         return ops
 
     def _entity_op(self, before: PropertyDefinition, p: PropertyDefinition) -> _TypeOp | None:
@@ -3985,15 +4333,23 @@ class Space:
                 return True
             return fixed is not None and summary.id not in fixed
 
-        def fn(src: str, rel: str) -> str:
-            raw = parse_fm(src).get(key) if src else None
+        def removal(raw: Any, rel: str) -> tuple[list, list, bool] | None:
+            """(items, kept, squash) when the value loses a link, else None."""
             if raw is None:
-                return src
+                return None
             items = [i for i in (raw if isinstance(raw, list) else [raw]) if i is not None]
             kept = [i for i in items if not breaks_rules(i, rel)]
             squash = collapse and isinstance(raw, list) and len(kept) >= 2
             if not squash and len(kept) == len(items):
+                return None
+            return items, kept, squash
+
+        def fn(src: str, rel: str, fm: dict) -> str:
+            raw = fm.get(key) if src else None
+            plan = removal(raw, rel)
+            if plan is None:
                 return src
+            _items, kept, squash = plan
             if not kept:
                 value: Any = None
             elif squash or not isinstance(raw, list):
@@ -4005,7 +4361,7 @@ class Space:
                     return out
             return set_keys(src, {key: value})
 
-        return _TypeOp(fn, confirm=True)
+        return _TypeOp(fn, confirm=True, applies=lambda fm, rel: removal(fm.get(key), rel) is not None)
 
     def delete_type(self, type_id: str, confirm: bool = False) -> TrashItem:
         """Move a type, its objects and templates to the trash.
@@ -4048,6 +4404,7 @@ class Space:
 
     def _commit_type(self, t: TypeDefinition, base_revision: str) -> str:
         """Write a type's JSON and put it in memory; return the new revision."""
+        self._check_type_free(t.id, base_revision)
         revision = write_type_json(self.root, t, base_revision)
         self._loaded_revisions[t.id] = revision
         if any(x.id == t.id for x in self.types):
@@ -4130,8 +4487,7 @@ class Space:
                 if encoded is not None:
                     to_write.append(rel)
 
-            def run(fm_src: str, _rel: str) -> str:
-                fm = parse_fm(fm_src) if fm_src else {}
+            def run(fm_src: str, _rel: str, fm: dict) -> str:
                 if dst.key in fm:
                     return fm_src
                 encoded, _ = converted(fm)
@@ -4324,26 +4680,40 @@ class Space:
         Every exit tells the listeners (`add_listener`) about the path, and a
         change to the names links resolve by invalidates the resolver.
         """
+        # The file may have been replaced on disk: check its path in full again.
+        self._checked_rels.discard(path)
         rel = self._rel(path)
         full = self.root / rel
         with self._lock:
-            before = self._summaries.get(rel)
             raw: RawObject | None = None
             if full.is_file():
                 try:
                     raw = read_raw(self.root, rel)
                 except OSError:
                     raw = None
+            self._rescan_with(rel, raw)
+
+    def _rescan_with(self, rel: str, raw: RawObject | None) -> None:
+        """`rescan_file` given what the file holds (None: it is gone; see `_raw_after_write`)."""
+        with self._lock:
+            before = self._summaries.get(rel)
             if raw is None:
                 self._raw.pop(rel, None)
                 self._summaries.pop(rel, None)
+                self._checked_rels.discard(rel)
             else:
                 self._raw[rel] = raw
-                if self._type_id(raw.typeName) not in {t.id for t in self.types}:
+                # A template never makes a type (`infer_types_from` skips it), so one whose
+                # type stays unknown would re-infer every file on each rescan for nothing.
+                template = not raw.readOnly and raw.fm.get("template") not in (None, "")
+                if not template and self._type_id(raw.typeName) not in {
+                    t.id for t in self.types
+                }:
                     self._merge_types(infer_types_from(self._raw.values()))
                 self._summaries[rel] = self._summarize(raw)
-            if _names_key(before) != _names_key(self._summaries.get(rel)):
-                self._names_changed()
+            after = self._summaries.get(rel)
+            if _names_key(before) != _names_key(after):
+                self._names_changed(before, after)
             self._fire(SpaceChange("object", rel))
 
     # -- change listeners -------------------------------------------------------
@@ -4373,13 +4743,43 @@ class Space:
                 _log.exception("A space change listener failed on %s", change)
 
     def _types_changed(self, type_id: str | None = None) -> None:
-        """Tell the listeners that a type definition changed (``type_id`` is informative)."""
-        self._fire(SpaceChange("types", None))
+        """Tell the listeners that a type definition changed (``type_id`` when known)."""
+        self._forget_type_ids()
+        self._fire(SpaceChange("types", None, type_id))
 
-    def _names_changed(self) -> None:
-        """The set of link names changed: rebuild the resolver on its next use."""
+    def _names_changed(
+        self, before: ObjectSummary | None = None, after: ObjectSummary | None = None
+    ) -> None:
+        """The set of link names changed: move the resolver along, or drop it.
+
+        ``before`` and ``after`` are the one object's summaries around the change: the
+        resolver is replaced by `Resolver.updated` and the link index learns which link
+        names it touched (`_names_since`). Without them the resolver is rebuilt on its
+        next use and every link re-resolved.
+        """
         self._names_rev += 1
-        self._resolver = None
+        if before is None and after is None:
+            self._resolver = None
+            self._name_changes.append((self._names_rev, None))
+            return
+        names = frozenset().union(*(link_names(s) for s in (before, after) if s is not None))
+        r = self._resolver
+        if r is not None:
+            self._resolver = r.updated(before, after)
+        self._name_changes.append((self._names_rev, names))
+
+    def _names_since(self, rev: int) -> frozenset[str] | None:
+        """The folded link names changed since `_names_rev` was ``rev``; None when unknown."""
+        out: set[str] = set()
+        seen = rev
+        for r, names in self._name_changes:
+            if r <= rev:
+                continue
+            if r != seen + 1 or names is None:
+                return None
+            seen = r
+            out |= names
+        return frozenset(out) if seen == self._names_rev else None
 
     # -- links --------------------------------------------------------------
 

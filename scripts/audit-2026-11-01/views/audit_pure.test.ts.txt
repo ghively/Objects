@@ -1,0 +1,107 @@
+import { describe, expect, test } from 'vitest'
+import type { PropertyDef, Row, TypeDef } from '@/api/types'
+import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
+import { useSettings } from '@/settings/useSettings'
+import { groupRows, valueForGroup, type GroupCtx } from './group'
+import { matchFilter, type FilterCtx } from './filter'
+import { csvValue } from '@/types/ImportCsvDialog'
+import { parseNumberInput } from '@/properties/format'
+import { parseCsv } from '@/lib/csvParse'
+import { propertyChoices } from './properties'
+import { kanbanGroupBy } from './layouts/KanbanLayout'
+
+const now = new Date(2026, 9, 23, 12, 0)
+const R = (path: string, values: Row['values'] = {}, summary: Partial<Row['summary']> = {}, type = 'page'): Row =>
+  row({ summary: objectSummary({ path, type, ...summary }), values })
+
+describe('audit: grouping', () => {
+  test('A1 tag group id takes a same-titled non-tag object id (collision in tagIdsToTitles)', () => {
+    const page = typeDef({ id: 'page', propertyDefinitions: [propertyDef({ id: 'tags', type: 'entity_tags' })] })
+    const ctx: GroupCtx = {
+      types: [page],
+      collections: [],
+      // DataView fills this from EVERY object with an id, not only tags.
+      tagIdsToTitles: { TAGID: 'Work', PAGEID: 'Work' },
+      now,
+    }
+    const rows = [R('Pages/A.md', {}, { tags: ['Work'] })]
+    const g = groupRows(rows, { groups: [{ propertyId: 'tags', option: 'default' }] }, { groups: [{ id: 'TAGID', isHidden: true, isClosed: false }] }, ctx)
+    // The group was hidden by its tag id, but it is keyed by the page's id now, so it shows again.
+    expect(g.groups.map((x) => x.id)).toEqual(['PAGEID'])
+    expect(g.hidden).toEqual([])
+  })
+
+  test('A2 multi-type kanban: shared key with different kinds writes a label array into a text property', () => {
+    const a = typeDef({ id: 'a', propertyDefinitions: [propertyDef({ id: 'status', type: 'label', options: { isArray: false, set: [{ id: 'o1', text: 'Done', color: null, icon: null }] } })] })
+    const b = typeDef({ id: 'b', propertyDefinitions: [propertyDef({ id: 'status', type: 'text' })] })
+    const viewTypes = [a, b]
+    const groupBy = kanbanGroupBy(null, { viewTypes })!
+    const choices = propertyChoices(viewTypes)
+    const groupDef = choices.find((c) => c.key === groupBy.groups[0].propertyId)!.def
+    const rows = [R('A/x.md', { status: ['Done'] }, {}, 'a'), R('B/y.md', { status: 'Done' }, {}, 'b')]
+    const ctx: GroupCtx = { types: viewTypes, viewTypeIds: ['a', 'b'], collections: [], tagIdsToTitles: {}, now }
+    const { groups } = groupRows(rows, groupBy, undefined, ctx)
+    // The B row (text "Done") lands in Other, not in Done.
+    expect(groups.find((g) => g.id === 'other')?.rows.map((r) => r.summary.path)).toEqual(['B/y.md'])
+    const done = groups.find((g) => g.label === 'Done')!
+    const change = valueForGroup(groupBy, done, groupDef, { row: rows[1], from: groups.find((g) => g.id === 'other') })
+    // Dropping the B row into "Done" writes a YAML list into B's plain-text property.
+    expect(change).toEqual({ key: 'status', value: ['Done'] })
+  })
+
+  test('A3 text group label is truncated at 500 chars and a drop writes the truncated text', () => {
+    const page = typeDef({ id: 'page', propertyDefinitions: [propertyDef({ id: 'note', type: 'text' })] })
+    const long = 'x'.repeat(600)
+    const ctx: GroupCtx = { types: [page], collections: [], tagIdsToTitles: {}, now }
+    const gb = { groups: [{ propertyId: 'note', option: 'default' }] }
+    const { groups } = groupRows([R('P/a.md', { note: long }), R('P/b.md', { note: 'short' })], gb, undefined, ctx)
+    const g = groups.find((x) => x.rows[0].summary.path === 'P/a.md')!
+    expect(g.label.length).toBe(500)
+    const change = valueForGroup(gb, g, page.propertyDefinitions[0], { row: groups[1].rows[0], from: groups[1] })
+    expect((change!.value as string).length).toBe(500)
+  })
+
+  test('A4 a text value "other" collides with the Other group id', () => {
+    const page = typeDef({ id: 'page', propertyDefinitions: [propertyDef({ id: 'note', type: 'text' })] })
+    const ctx: GroupCtx = { types: [page], collections: [], tagIdsToTitles: {}, now }
+    const { groups } = groupRows([R('P/a.md', { note: 'other' }), R('P/b.md', {})], { groups: [{ propertyId: 'note', option: 'default' }] }, undefined, ctx)
+    expect(groups.map((g) => g.id)).toEqual(['other', 'other'])
+  })
+})
+
+describe('audit: filters across zones', () => {
+  test('B1 "is today" follows the Time zone setting (Kiritimati +14)', () => {
+    useSettings.setState({ settings: { ...useSettings.getState().settings, timeZone: 'Pacific/Kiritimati' } })
+    try {
+      const page = typeDef({ id: 'page', propertyDefinitions: [propertyDef({ id: 'due', type: 'datetime' })] })
+      const ctx: FilterCtx = { types: [page], collections: [], tagIdsToTitles: {}, now: new Date('2026-11-01T12:00:00Z') }
+      const f = { type: 'filter' as const, propertyId: 'due', option: 'is', referenceValue: { relative: 'today' as const } }
+      expect(matchFilter(R('P/a.md', { due: { start: '2026-11-02', resolution: 'day' } }), f, ctx)).toBe(true)
+      expect(matchFilter(R('P/b.md', { due: { start: '2026-11-01', resolution: 'day' } }), f, ctx)).toBe(false)
+    } finally {
+      useSettings.setState({ settings: { ...useSettings.getState().settings, timeZone: null } })
+    }
+  })
+})
+
+describe('audit: CSV import parsing', () => {
+  const pct: PropertyDef = propertyDef({ id: 'share', type: 'number', options: { numberFormat: { type: 'percentage', options: {} } } })
+  test('C1 a percentage column imports 25 as 2500% while the cell reads 25 as 25%', () => {
+    // What the NumberCell stores for a typed "25" on a percentage property: 0.25
+    const cellStores = parseNumberInput('25', pct.options.numberFormat)! / 100
+    expect(cellStores).toBe(0.25)
+    expect(csvValue(pct, '25')).toBe(25)
+    expect(csvValue(pct, '25%')).toBe(0.25)
+  })
+  test('C2 a single-select relation keeps the whole cell, a multi one splits on every comma', () => {
+    const many = propertyDef({ id: 'author', type: 'entity', options: { isArray: true } })
+    expect(csvValue(many, 'Smith, John')).toEqual([{ target: 'Smith', path: null }, { target: 'John', path: null }])
+  })
+  test('C3 text values keep surrounding whitespace, other kinds are trimmed', () => {
+    expect(csvValue(propertyDef({ id: 'n', type: 'text' }), '  hello  ')).toBe('  hello  ')
+    expect(csvValue(propertyDef({ id: 'n', type: 'entity_tags' }), '  a , b ')).toEqual(['a', 'b'])
+  })
+  test('C4 parseCsv: text after a closing quote is appended silently', () => {
+    expect(parseCsv('"a"x,b')).toEqual({ rows: [['ax', 'b']], error: false })
+  })
+})

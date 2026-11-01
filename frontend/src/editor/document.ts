@@ -17,7 +17,7 @@ import { getExtensionField, type AnyExtension, type Editor, type JSONContent } f
 import { OrderedList, TaskItem } from '@tiptap/extension-list'
 import { TableKit } from '@tiptap/extension-table'
 import { Markdown } from '@tiptap/markdown'
-import type { Node as PMNode } from '@tiptap/pm/model'
+import type { Node as PMNode, Schema } from '@tiptap/pm/model'
 import StarterKit from '@tiptap/starter-kit'
 import {
   classifyEmbedLine,
@@ -40,7 +40,7 @@ import { BlockSelection } from './extensions/blockSelection'
 import { FileDrop } from './extensions/fileDrop'
 import { RawBlock } from './extensions/rawBlock'
 import { SlashMenu } from './extensions/slashMenu'
-import { TaskListCommonMark } from './extensions/taskListMarkdown'
+import { TaskListCommonMark, withTaskItems } from './extensions/taskListMarkdown'
 import { Wikilink } from './extensions/wikilink'
 import { BlockOptions, optionApplies } from './nodes/blockOptions'
 import { Bookmark, bookmarkMarkdown } from './nodes/bookmark'
@@ -63,10 +63,13 @@ import { M8Keys } from './shortcuts'
 import { withTextEscapes } from './textEscapes'
 import { NbspEntity, withLinkForms } from './extensions/linkForms'
 import { RecordAudio } from './media/recordAudio'
+import { LazyTable } from './table/LazyTable'
 
 export type EditorExtensionOptions = {
   /** `false` leaves out the "1. " input rule (`EditorSettings.disableNumberedListTransformation`). */
   numberedListInputRule?: boolean
+  /** The editor holds one paragraph (a Text property cell): pasted text is never read as Markdown blocks. */
+  singleParagraph?: boolean
 }
 
 /**
@@ -114,7 +117,7 @@ export function withoutRegistryKeys<T extends AnyExtension>(ext: T): T {
  */
 const RegistryStarterKit = StarterKit.extend({
   addExtensions() {
-    return (this.parent?.() ?? []).map(withoutRegistryKeys).map(withTextEscapes).map(withLinkForms)
+    return (this.parent?.() ?? []).map(withoutRegistryKeys).map(withTextEscapes).map(withLinkForms).map(withTaskItems)
   },
 })
 
@@ -131,7 +134,8 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
     withoutRegistryKeys(CodeBlock),
     withoutRegistryKeys(TaskListCommonMark),
     withoutRegistryKeys(TaskItem.configure({ nested: true })),
-    TableKit.configure({ table: { resizable: false } }),
+    TableKit.configure({ table: false }),
+    LazyTable.configure({ resizable: false }),
     Markdown,
     BlockSource,
     BlockOptions,
@@ -157,7 +161,7 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
     DataViewEmbed,
     RecordAudio,
     SlashMenu,
-    BlockSelection,
+    BlockSelection.configure({ markdownPaste: !opts.singleParagraph }),
     M8Keys,
     FileDrop,
   ]
@@ -172,9 +176,10 @@ const edges = new WeakMap<Editor, Edges>()
 
 /**
  * A `Key:: value` field line (kept raw). The `::` is followed by a blank or the
- * line end, so `std::vector` or `a::b` in text is not one.
+ * line end, so `std::vector` or `a::b` in text is not one; `Key\:: value` is
+ * the escaped text the editor writes for a typed one (`escapeLineStarts`).
  */
-const FIELD_LINE = /^[^\s:][^:\n]*::(?:[ \t]|$)/m
+const FIELD_LINE = /^[^\s:][^:\n]*(?<!\\)::(?:[ \t]|$)/m
 const RAW_KINDS = new Set(['html', 'def', 'raw', 'text'])
 const CONTAINERS = new Set(['toggle', 'group', 'columns', 'indent'])
 /** Leaf types whose Markdown this module writes itself (`customMarkdown`). */
@@ -207,6 +212,7 @@ const NODE_KIND: Record<string, string> = {
 function contentKey(md: string): string {
   return md
     .replace(/\r\n?/g, '\n')
+    .replace(/\[X\]/g, '[x]') // a done box either way
     .replace(/^[ \t]*(?:>[ \t]?)+/gm, '')
     .replace(/^[ \t]*(?:[*+-]|\d{1,9}[.)])[ \t]+/gm, '')
     .replace(/[\s*_`~\\#=+-]/g, '')
@@ -249,17 +255,84 @@ function sourceToNode(editor: Editor, block: SourceBlock, options?: readonly Opt
   }
   const md = editor.markdown
   if (!md || RAW_KINDS.has(block.kind) || FIELD_LINE.test(block.raw)) return rawNode(block.raw)
+  const cache = parseCacheOf(editor)
+  const key = block.kind + '\0' + block.raw
+  const hit = cache.map.get(key)
+  if (hit) {
+    // Most recently used last; a copy, since the caller adds its attributes.
+    cache.map.delete(key)
+    cache.map.set(key, hit)
+    return { ...hit, attrs: hit.attrs ? { ...hit.attrs } : undefined }
+  }
+  const node = parseSourceBlock(editor, block)
+  remember(cache, key, node, block.raw.length)
+  return { ...node, attrs: node.attrs ? { ...node.attrs } : undefined }
+}
+
+function parseSourceBlock(editor: Editor, block: SourceBlock): JSONContent {
+  const md = editor.markdown!
   try {
     const parsed = md.parse(block.raw.replace(/\r\n?/g, '\n'))
     const nodes = parsed.content ?? []
     if (nodes.length !== 1) return rawNode(block.raw)
     const node = nodes[0]
     editor.schema.nodeFromJSON(node).check()
-    const regenerated = md.serialize({ type: 'doc', content: [node] })
+    // Did the parse lose anything? Plain text needs no serializing to tell (F9).
+    const plain = plainTextOf(node)
+    const regenerated = plain ?? md.serialize({ type: 'doc', content: [node] })
     if (contentKey(regenerated) !== contentKey(block.raw)) return rawNode(block.raw)
     return node
   } catch {
     return rawNode(block.raw)
+  }
+}
+
+/**
+ * The text of a paragraph or heading made of unmarked text (and hard breaks)
+ * whose serialized form differs from it only by backslash escapes and the
+ * heading marks, which `contentKey` ignores; null for anything else (marks,
+ * atoms, characters the serializer encodes: entities, dollars, a non-breaking
+ * space; or a line starting like a list item or a quote, which `contentKey`
+ * would strip from the bare text but not from the escaped form).
+ */
+function plainTextOf(node: JSONContent): string | null {
+  if (node.type !== 'paragraph' && node.type !== 'heading') return null
+  let text = ''
+  for (const n of node.content ?? []) {
+    if (n.type === 'hardBreak') text += '\n'
+    else if (n.type === 'text' && !n.marks?.length) text += n.text ?? ''
+    else return null
+  }
+  return /[&<>$\u00a0]/.test(text) || /^[ \t]*(?:[*+-]|\d{1,9}[.)]|>)(?:[ \t]|$)/m.test(text) ? null : text
+}
+
+/**
+ * Parsed blocks by kind and source, per schema (audit F9). A body opened
+ * again (a tab switched to, a reload after an outside change) skips the
+ * parse, check and serialize of every block it still shares with an earlier
+ * load. Least recently used entries go once the sources held pass the cap.
+ */
+const PARSE_CACHE_BYTES = 8 * 1024 * 1024
+type ParseCache = { map: Map<string, JSONContent>; bytes: number }
+const parseCaches = new WeakMap<Schema, ParseCache>()
+
+function parseCacheOf(editor: Editor): ParseCache {
+  let cache = parseCaches.get(editor.schema)
+  if (!cache) {
+    cache = { map: new Map(), bytes: 0 }
+    parseCaches.set(editor.schema, cache)
+  }
+  return cache
+}
+
+function remember(cache: ParseCache, key: string, node: JSONContent, size: number): void {
+  if (size > PARSE_CACHE_BYTES / 4) return
+  cache.map.set(key, node)
+  cache.bytes += size
+  for (const [k] of cache.map) {
+    if (cache.bytes <= PARSE_CACHE_BYTES) break
+    cache.map.delete(k)
+    cache.bytes -= k.length - 1 - k.indexOf('\0')
   }
 }
 
@@ -333,17 +406,26 @@ function loadContainer(editor: Editor, node: Extract<TreeNode, { kind: 'containe
   return { type: node.name, attrs, content: loaded.content.length ? loaded.content : [placeholder()] }
 }
 
-/** Replace the editor's document with `body`. The load is not undoable and fires no update. */
-export function loadBody(editor: Editor, body: string): void {
+type ParsedBody = { content: JSONContent[]; leading: string; trailing: string }
+
+/**
+ * The nodes for `body`'s blocks, each stamped with its source, with the blank
+ * lines before the first block and after the last. Used by `loadBody` and for
+ * pasted Markdown (`extensions/blockSelection.ts`).
+ */
+export function parseBody(editor: Editor, body: string): ParsedBody {
   const blocks = splitBlocks(body)
   let leading = ''
   let trailing = ''
   if (blocks.length && blocks[0].kind === 'space') leading = blocks.shift()!.raw
   if (blocks.length && blocks[blocks.length - 1].kind === 'space') trailing = blocks.pop()!.raw
-
   const loaded = loadList(editor, buildTree(blocks))
-  leading += loaded.leading
-  const content = loaded.content
+  return { content: loaded.content, leading: leading + loaded.leading, trailing }
+}
+
+/** Replace the editor's document with `body`. The load is not undoable and fires no update. */
+export function loadBody(editor: Editor, body: string): void {
+  const { content, leading, trailing } = parseBody(editor, body)
   if (content.length === 0) content.push({ type: 'paragraph' })
 
   const doc = editor.schema.nodeFromJSON({ type: 'doc', content })
@@ -539,11 +621,14 @@ export function serializeBody(editor: Editor): string {
   const { leading, trailing, eol, final } = loaded ?? { leading: '', trailing: '', eol: '\n', final: '' }
   const blocks: EditorBlock[] = []
   if (leading) blocks.push({ raw: leading, markdown: leading, kind: 'space' })
-  editor.state.doc.forEach((node) => {
+  const { doc } = editor.state
+  doc.forEach((node, _offset, index) => {
     const entry = nodeEntry(editor, node, eol)
     if (entry) blocks.push(entry)
+    // The blank lines after the last block are `trailing` (the load leaves the last node none);
+    // a node that became last through a join or a move drops the ones it carried.
     const after = node.attrs.blockTrailing as string | null | undefined
-    if (after) blocks.push({ raw: after, markdown: after, kind: 'space' })
+    if (after && index < doc.childCount - 1) blocks.push({ raw: after, markdown: after, kind: 'space' })
   })
   if (trailing) blocks.push({ raw: trailing, markdown: trailing, kind: 'space' })
   const out = serializeWithPreservation(blocks, loaded ? eol : undefined)

@@ -5,20 +5,72 @@
  * is shown as escaped source text. `trust: false` keeps `\href`, `\url`,
  * `\includegraphics` and friends inert.
  *
- * The stylesheet is bundled locally (its font URLs are relative to the CSS
- * file, so Vite copies the fonts into the build); no network request is made.
+ * KaTeX (448 KB with its stylesheet) loads on the first formula, not with the
+ * app (audit 2026-11-01 F1). Until it has loaded, `renderMath` returns the
+ * escaped source in a `math-pending` span and starts the load; the views
+ * re-render through `useMathReady` once it is there, with the same output as
+ * before. The stylesheet is bundled locally (its font URLs are relative to the
+ * CSS file, so Vite copies the fonts into the build); no network request is made.
  */
-import katex from 'katex'
-import 'katex/dist/katex.min.css'
+import { useEffect, useState } from 'react'
+import type katexType from 'katex'
+
+type Katex = typeof katexType
 
 export type RenderMathOptions = { display: boolean }
+
+let katex: Katex | null = null
+let loading: Promise<void> | null = null
+const listeners = new Set<() => void>()
+
+/** Load KaTeX and its stylesheet once; resolved when `renderMath` renders for real. */
+export function loadMath(): Promise<void> {
+  if (katex) return Promise.resolve()
+  loading ??= Promise.all([import('katex'), import('katex/dist/katex.min.css')]).then(([mod]) => {
+    katex = mod.default
+    for (const fn of listeners) fn()
+  })
+  return loading
+}
+
+/** Has KaTeX loaded? */
+export function mathReady(): boolean {
+  return katex !== null
+}
+
+/** Run `fn` when KaTeX has loaded (never when it already has); returns the unsubscribe. */
+function onMathReady(fn: () => void): () => void {
+  listeners.add(fn)
+  return () => listeners.delete(fn)
+}
+
+/** True once KaTeX has loaded; a view using it re-renders then. */
+export function useMathReady(): boolean {
+  const [ready, setReady] = useState(mathReady)
+  useEffect(() => {
+    if (ready) return
+    if (mathReady()) {
+      setReady(true)
+      return
+    }
+    return onMathReady(() => setReady(true))
+  }, [ready])
+  return ready
+}
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 }
 
-/** The formula as HTML (KaTeX's HTML and MathML), safe to set as `innerHTML`. */
+/**
+ * The formula as HTML (KaTeX's HTML and MathML), safe to set as `innerHTML`.
+ * Before KaTeX has loaded: the source text, and the load is started.
+ */
 export function renderMath(text: string, opts: RenderMathOptions): string {
+  if (!katex) {
+    void loadMath()
+    return `<span class="math-pending">${escapeHtml(text)}</span>`
+  }
   try {
     return katex.renderToString(text, {
       displayMode: opts.display,

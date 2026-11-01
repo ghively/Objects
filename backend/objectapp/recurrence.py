@@ -19,8 +19,8 @@ reads it from `ui.json`).
 from __future__ import annotations
 
 import calendar
+import math
 from datetime import date, datetime, timedelta, tzinfo
-
 from pathlib import Path
 
 from .localtime import from_local, to_local
@@ -183,9 +183,134 @@ def _back_day(rule: RepeatRule, anchor: date, d: date, k: int, week_start: WeekS
     raise ValueError(f"unknown unit {unit!r}")
 
 
+def _newest_window(rule: RepeatRule, end: date, limit: int) -> date | None:
+    """A day such that [day, end] holds at least `limit` scheduled dates of a fixed-pattern
+    rule (when the schedule has that many), or None when the rule has no fixed pattern."""
+    interval = _plain_interval_days(rule)
+    if interval is not None:
+        days = interval * limit
+    elif rule.on is None and rule.unit == "weekday":
+        days = 7 * ((limit + 4) // 5) + 7
+    else:
+        return None
+    try:
+        return end - timedelta(days=days)
+    except OverflowError:
+        return date.min
+
+
 def _ended(rule: RepeatRule, d: DateLike, tz: tzinfo) -> bool:
     until = rule.until_date
     return until is not None and _local_day(d, tz) > until
+
+
+def _plain_interval_days(rule: RepeatRule) -> int | None:
+    """The fixed day interval of a plain ``every N days/weeks`` rule, else None."""
+    if rule.on is not None or rule.every < 1:
+        return None
+    if rule.unit == "day":
+        return rule.every
+    if rule.unit == "week":
+        return 7 * rule.every
+    return None
+
+
+def _jump_to_before(
+    rule: RepeatRule, current: DateLike, target: date, tz: tzinfo, week_start: WeekStart
+) -> DateLike:
+    """The latest date of `current`'s forward series whose local day is before `target`.
+
+    Arithmetic for the rules whose series is a fixed pattern of days (``every N
+    days``, ``every N weeks``, ``every weekday``): the same date successive `step`s
+    would reach, found in O(1) instead of a step per day (audit 2026-11-01 B8: a
+    daily task dated 2021 made every calendar month 229 ms; one dated 1800, 1.6 s).
+    Other rules (months and years clamp from the previous result, ``on`` rules are
+    anchored) return `current`, and the caller steps as before. `until` is not
+    consulted: the caller's first step past the result checks it, as it would have
+    at the first ended date (every later one is ended too).
+    """
+    cur_day = _local_day(current, tz)
+    if target <= cur_day:
+        return current
+    interval = _plain_interval_days(rule)
+    if interval is not None:
+        k = (target - cur_day - timedelta(days=1)).days // interval
+        if k <= 0:
+            return current
+        return _on_day(current, cur_day + timedelta(days=k * interval), tz)
+    if rule.on is None and rule.unit == "weekday":
+        last = target - timedelta(days=1)
+        while last.weekday() >= 5:
+            last -= timedelta(days=1)
+        if last <= cur_day:
+            return current
+        return _on_day(current, last, tz)
+    found: date | None = None
+    if rule.every >= 1 and rule.on is not None:
+        found = _anchored_jump(rule, cur_day, target, week_start)
+    elif rule.every >= 1 and rule.unit in ("month", "year"):
+        found = _clamped_jump(rule, cur_day, target)
+    if found is not None and cur_day < found < target:
+        return _on_day(current, found, tz)
+    return current
+
+
+def _anchored_jump(rule: RepeatRule, cur_day: date, target: date, week_start: WeekStart) -> date | None:
+    """The last date of an anchored rule's series from `cur_day` before `target`, or None.
+
+    The series is every matching date after `cur_day` in the periods ``k * every``
+    from `cur_day`'s (each step counts from a date in such a period), so the periods
+    are searched back from the one `target` falls in. None when none of the last
+    `_MAX_PERIODS` periods matches: the caller steps (and fails) as before.
+    """
+    if rule.unit == "week":
+        units = (_week_anchor(target, week_start) - _week_anchor(cur_day, week_start)).days // 7
+    elif rule.unit == "month":
+        units = (target.year * 12 + target.month) - (cur_day.year * 12 + cur_day.month)
+    elif rule.unit == "year":
+        units = target.year - cur_day.year
+    else:
+        return None
+    top = units // rule.every
+    for k in range(top, max(top - _MAX_PERIODS, -1), -1):
+        for cand in reversed(_period(rule, cur_day, k, week_start)):
+            if cand < target:
+                return cand if cand > cur_day else None
+    return None
+
+
+def _clamped_jump(rule: RepeatRule, cur_day: date, target: date) -> date | None:
+    """A date of a plain month/year rule's series from `cur_day`, in a month before `target`'s.
+
+    Each step clamps to the new month's last day from the previous result, so the
+    day after ``k`` steps is the smallest of `cur_day`'s day and every visited
+    month's length (`_clamped_day`).
+    """
+    n = rule.every * (12 if rule.unit == "year" else 1)
+    base = cur_day.year * 12 + cur_day.month - 1
+    k = (target.year * 12 + target.month - 1 - base) // n - 1
+    if k <= 0:
+        return None
+    year, month = divmod(base + k * n, 12)
+    day = _clamped_day(cur_day, n, k) if cur_day.day > 28 else cur_day.day
+    return date(year, month + 1, day)
+
+
+def _clamped_day(start: date, n: int, k: int) -> int:
+    """The day of month after `k` steps of `n` months from `start`, each clamped."""
+    day = start.day
+    base = start.year * 12 + start.month - 1
+    cycle = 12 // math.gcd(n, 12)  # steps until the month of the year comes round again
+    for j in range(1, min(k, cycle) + 1):
+        year, month = divmod(base + j * n, 12)
+        if month + 1 != 2:
+            day = min(day, calendar.monthrange(year, month + 1)[1])  # the same every year
+            continue
+        # February: 29 days in leap years only, so walk its visits to the first common year.
+        while j <= k and day > 28:
+            day = min(day, 29 if calendar.isleap((base + j * n) // 12) else 28)
+            j += cycle
+    return day
 
 
 def next_date(
@@ -219,7 +344,7 @@ def _next_date(
         base = _local_day(completed_at, tz)
         nxt: DateLike = _on_day(current, _step_day(rule, base, week_start), tz)
     else:
-        nxt = step(rule, current, tz, week_start)
+        nxt = step(rule, _jump_to_before(rule, current, today, tz, week_start), tz, week_start)
         steps = 1
         while _local_day(nxt, tz) < today and steps < _MAX_STEPS:
             nxt = step(rule, nxt, tz, week_start)
@@ -242,7 +367,7 @@ def occurrences(
     if rule.mode != "dueDate" or limit <= 0:
         return []
     out: list[DateLike] = []
-    d = current
+    d = _jump_to_before(rule, current, start, tz, week_start)
     for _ in range(_MAX_STEPS):
         try:
             d = step(rule, d, tz, week_start)
@@ -258,6 +383,42 @@ def occurrences(
     return out
 
 
+def scheduled_days(
+    rule: RepeatRule,
+    current: DateLike,
+    start: date,
+    end: date,
+    tz: tzinfo,
+    limit: int = 100_000,
+) -> list[date] | None:
+    """The local days of ``scheduled_between(rule, current, start, end, tz, limit=limit)``
+    for a fixed-pattern rule (every N days or weeks, every weekday), counted without
+    building a date per step; None for any other rule, and for a history reaching more
+    than `_MAX_STEPS` // 2 days back from `current` (where the walk back stops early).
+
+    A timed date's day is taken to stay the same day at each step, as `_jump_to_before` does.
+    """
+    interval = _plain_interval_days(rule)
+    weekday = rule.on is None and rule.unit == "weekday"
+    if interval is None and not weekday:
+        return None
+    if end < start or limit <= 0:
+        return []
+    cur = _local_day(current, tz).toordinal()
+    if cur - start.toordinal() > _MAX_STEPS // 2:
+        return None
+    until = rule.until_date
+    hi = min(end, until).toordinal() if until is not None else end.toordinal()
+    lo = start.toordinal()
+    if interval is not None:
+        first = cur + -((cur - lo) // interval) * interval  # the first day >= lo on the grid
+        ords: range | list[int] = range(first, hi + 1, interval)
+    else:
+        # date.fromordinal(n).weekday() == (n + 6) % 7; the current day counts on a weekend.
+        ords = [n for n in range(lo, hi + 1) if (n + 6) % 7 < 5 or n == cur]
+    return [date.fromordinal(n) for n in ords[:limit]]
+
+
 def scheduled_between(
     rule: RepeatRule,
     current: DateLike,
@@ -266,6 +427,7 @@ def scheduled_between(
     tz: tzinfo,
     week_start: WeekStart = "monday",
     limit: int = 10_000,
+    newest: bool = False,
 ) -> list[DateLike]:
     """Every scheduled date whose local day is in [start, end], oldest first.
 
@@ -275,14 +437,29 @@ def scheduled_between(
     rule's interval counted back from `current`, month and year steps
     clamped, our choice). `until` ends the schedule; the rule's mode is not
     consulted (the caller decides whether a completion-mode rule has a
-    schedule). At most the oldest `limit` dates.
+    schedule). At most the oldest `limit` dates, or the newest with `newest`
+    (the catch-up log's cap; for a fixed-interval rule only the tail of the
+    range is walked).
     """
     if end < start or limit <= 0:
         return []
+    if newest:
+        window = _newest_window(rule, end, limit)
+        if window is not None and window > start:
+            start = window
+        return scheduled_between(rule, current, start, end, tz, week_start, _MAX_STEPS)[-limit:]
     cur_day = _local_day(current, tz)
     before: list[DateLike] = []
     if cur_day > start:
         d_day, k = cur_day, 0
+        if cur_day > end:
+            # Skip the dates after the range: a fixed-interval rule counts the steps,
+            # a weekday rule walks back from the day after `end` (audit 2026-11-01 B8).
+            interval = _plain_interval_days(rule)
+            if interval is not None:
+                k = max(0, -((end - cur_day).days // interval) - 1)  # ceil(gap / interval) - 1
+            elif rule.on is None and rule.unit == "weekday":
+                d_day = end + timedelta(days=1)
         for _ in range(_MAX_STEPS):
             k += 1
             try:
@@ -298,7 +475,7 @@ def scheduled_between(
     if start <= cur_day <= end and not _ended(rule, current, tz):
         out.append(current)
     if cur_day < end:
-        d: DateLike = current
+        d: DateLike = _jump_to_before(rule, current, start, tz, week_start)
         for _ in range(_MAX_STEPS):
             if len(out) >= limit:
                 break

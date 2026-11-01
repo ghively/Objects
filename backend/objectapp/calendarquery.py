@@ -80,8 +80,11 @@ def _parse_range(from_day: Any, to_day: Any) -> tuple[date, date]:
 
 
 class _Query:
-    def __init__(self, space: Space, start: date, end: date) -> None:
+    def __init__(
+        self, space: Space, start: date, end: date, notes: tuple[dict[str, str], list]
+    ) -> None:
         self.space = space
+        self.notes = notes
         self.start = start
         self.end = end
         self.tz = space.tz
@@ -99,6 +102,8 @@ class _Query:
                 "references": [],
                 "timeline": [],
             }
+        # The paths whose summaries the answer carries: the daily notes, tasks and dated
+        # objects (the client reads their types); the other lists get rows by path.
         self.mentioned: set[str] = set()
         self._instant_days: dict[str, date | None] = {}
         self._day_offsets: dict[date, timedelta | None] = {}
@@ -205,14 +210,13 @@ class _Query:
     def add(self, d: date, section: str, entry: Any) -> None:
         self.days[d.isoformat()][section].append(entry)
 
-    def daily_notes(self) -> list[dict[str, Any]]:
-        index, duplicates = self.space.daily_notes()
-        raws = self.space._raw
+    def daily_notes(self, fms: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+        index, duplicates = self.notes
         for day, path in index.items():
-            if day in self.days and path in raws:
+            if day in self.days and path in fms:
                 self.days[day]["dailyNote"] = {
                     "path": path,
-                    "reviewed": _is_true(raws[path].fm.get("reviewed")),
+                    "reviewed": _is_true(fms[path].get("reviewed")),
                 }
                 self.mentioned.add(path)
         warnings = []
@@ -234,7 +238,6 @@ class _Query:
         if key is not None:
             entry["key"] = key
         self._timeline.append((dt, _KIND_ORDER[kind], path, key or "", entry))
-        self.mentioned.add(path)
 
     def finish_timeline(self) -> None:
         for dt, _k, _p, _key, entry in sorted(self._timeline, key=lambda t: t[:4]):
@@ -246,10 +249,8 @@ class _Query:
         updated = self.instant_day(fm.get("lastUpdated"))
         if created is not None and self.in_range(created):
             self.add(created, "created", path)
-            self.mentioned.add(path)
         if updated is not None and updated != created and self.in_range(updated):
             self.add(updated, "updated", path)
-            self.mentioned.add(path)
 
     def dated_properties(self, t: TypeDefinition, daily: bool) -> list[PropertyDefinition]:
         """The date properties of ``t`` that put objects under "Objects with this date"."""
@@ -365,16 +366,15 @@ def _utc_text(dt: datetime) -> str:
     return utc.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _day_links(q: _Query, space: Space) -> None:
+def _day_links(q: _Query, space: Space, summaries: dict[str, Any]) -> None:
     """Fill each day's ``backlinks`` and ``references`` from the link index."""
     links = space.links
-    index, duplicates = space.daily_notes()
+    index, duplicates = q.notes
     notes: dict[str, set[str]] = {}
     for day, path in index.items():
         notes.setdefault(day, set()).add(path)
     for day, paths in duplicates:
         notes.setdefault(day, set()).update(paths)
-    summaries = space._summaries
 
     def order(p: str) -> tuple[str, str, str]:
         s = summaries.get(p)
@@ -392,8 +392,6 @@ def _day_links(q: _Query, space: Space) -> None:
         entry["references"] = [
             {"path": p, "count": refs[p]} for p in sorted(refs, key=order) if p in summaries
         ]
-        q.mentioned.update(backlinks)
-        q.mentioned.update(r["path"] for r in entry["references"])
 
 
 def _summary_dict(summary: Any) -> dict[str, Any]:
@@ -428,45 +426,50 @@ def calendar_range(space: Space, from_day: Any, to_day: Any) -> dict[str, Any]:
     """The ``CalendarRange`` for the local days ``from_day`` through ``to_day`` (inclusive).
 
     Raises `InvalidValue` for a malformed day, ``from_day > to_day`` or more
-    than `MAX_DAYS` days. Reads only memory.
+    than `MAX_DAYS` days. Reads only memory, holding the space lock only to take a
+    snapshot (a write replaces a `RawObject` and its ``fm``; it never changes them).
     """
     start, end = _parse_range(from_day, to_day)
     with space._lock:
-        q = _Query(space, start, end)
-        warnings = q.daily_notes()
+        notes = space.daily_notes()
         daily_type = space.daily_note_type()
-        daily_id = daily_type.id if daily_type is not None else None
-        types: dict[str, TypeDefinition | None] = {}
-        dated_props: dict[str, list[PropertyDefinition]] = {}
-        for path in sorted(space._raw):
-            summary = space._summaries.get(path)
-            if summary is None or summary.template is not None:
+        types_by_id: dict[str, TypeDefinition] = {}
+        for t in space.types:
+            types_by_id.setdefault(t.id, t)  # the first of an id, as `type_by_id`
+        all_summaries = dict(space._summaries)
+        objects = [
+            (path, summary, space._raw[path].fm)
+            for path in sorted(space._raw)
+            if (summary := all_summaries.get(path)) is not None and summary.template is None
+        ]
+    daily_id = daily_type.id if daily_type is not None else None
+    q = _Query(space, start, end, notes)
+    warnings = q.daily_notes({path: fm for path, _s, fm in objects})
+    types: dict[str, TypeDefinition | None] = {}
+    dated_props: dict[str, list[PropertyDefinition]] = {}
+    for path, summary, fm in objects:
+        daily = daily_id is not None and summary.type == daily_id
+        if summary.type not in types:
+            t = types[summary.type] = types_by_id.get(summary.type)
+            dated_props[summary.type] = q.dated_properties(t, daily) if t else []
+        t = types[summary.type]
+        try:
+            if not daily:
+                q.stamps(path, fm)
+            if t is None:
                 continue
-            fm = space._raw[path].fm
-            daily = daily_id is not None and summary.type == daily_id
-            if summary.type not in types:
-                t = types[summary.type] = space.type_by_id(summary.type)
-                dated_props[summary.type] = q.dated_properties(t, daily) if t else []
-            t = types[summary.type]
-            try:
-                if not daily:
-                    q.stamps(path, fm)
-                if t is None:
-                    continue
-                q.dated(path, dated_props[summary.type], fm)
-                if is_task_type(t):
-                    q.task(path, t, fm)
-            except (OverflowError, OSError, ValueError):
-                # A date at the edge of what datetime (or the OS's zone data) can
-                # hold: skip this object rather than fail the whole range.
-                log.warning("Calendar: skipped %s (a date out of range)", path)
-        q.finish_timeline()
-        _day_links(q, space)
-        summaries = {
-            p: _summary_dict(space._summaries[p])
-            for p in sorted(q.mentioned)
-            if p in space._summaries
-        }
+            q.dated(path, dated_props[summary.type], fm)
+            if is_task_type(t):
+                q.task(path, t, fm)
+        except (OverflowError, OSError, ValueError):
+            # A date at the edge of what datetime (or the OS's zone data) can
+            # hold: skip this object rather than fail the whole range.
+            log.warning("Calendar: skipped %s (a date out of range)", path)
+    q.finish_timeline()
+    _day_links(q, space, all_summaries)
+    summaries = {
+        p: _summary_dict(all_summaries[p]) for p in sorted(q.mentioned) if p in all_summaries
+    }
     return {
         "from": start.isoformat(),
         "to": end.isoformat(),

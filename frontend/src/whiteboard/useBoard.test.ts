@@ -43,6 +43,20 @@ async function advance(ms: number) {
 }
 
 describe('useBoard', () => {
+  // Review fix 2026-11-01 #3: the stream's reconnect resync re-checks the board's revision.
+  test('a resync after the stream reconnected reloads a board whose file changed meanwhile', async () => {
+    const { client, store } = await setup()
+    expect(client.board).toHaveBeenCalledTimes(1)
+    client.board.mockResolvedValue({ path: PATH, board: board([node({ id: 'a', position: { x: 500, y: 0 } })]), revision: 'rev-2' })
+    act(() => emit({ kind: 'types', path: '*', version: null }))
+    await waitFor(() => expect(store.getState().doc.board.nodes.a.position).toEqual({ x: 500, y: 0 }))
+    // The same revision again: fetched, nothing reloaded.
+    const seq = store.getState().boardSeq
+    act(() => emit({ kind: 'types', path: '*', version: null }))
+    await waitFor(() => expect(client.board).toHaveBeenCalledTimes(3))
+    expect(store.getState().boardSeq).toBe(seq)
+  })
+
   test('open, pan, zoom and select save nothing', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const { client, store, hook } = await setup()
@@ -115,18 +129,22 @@ describe('useBoard', () => {
     act(() => store.getState().actions.nudge(30, 0, ['a']))
     await advance(SAVE_DELAY_MS + 10)
     await waitFor(() => expect(client.saveBoard).toHaveBeenCalledTimes(2))
-    // The merge restarts the history: nothing older (without b) can be undone to.
-    expect(store.getState().canUndo).toBe(false)
+    // The merge rebases the history: every older step now has b too.
+    expect(store.getState().canUndo).toBe(true)
     act(() => store.getState().actions.nudge(10, 0, ['a']))
     await advance(SAVE_DELAY_MS + 10)
     await waitFor(() => expect(client.saveBoard).toHaveBeenCalledTimes(3))
     act(() => store.getState().actions.undo())
-    expect(store.getState().canUndo).toBe(false)
     await advance(SAVE_DELAY_MS + 10)
     await waitFor(() => expect(client.saveBoard).toHaveBeenCalledTimes(4))
     const saved = client.saveBoard.mock.calls[3][1]
     expect(saved.nodes.b).toBeDefined()
     expect(saved.nodes.a.position).toEqual({ x: 30, y: 0 })
+    // The step made before the merge is kept, rebased: undoing it keeps b.
+    act(() => store.getState().actions.undo())
+    expect(store.getState().canUndo).toBe(false)
+    expect(store.getState().doc.board.nodes.a.position).toEqual({ x: 0, y: 0 })
+    expect(store.getState().doc.board.nodes.b).toBeDefined()
   })
 
   test('a refused save (422) shows a toast', async () => {
@@ -177,7 +195,8 @@ describe('useBoard', () => {
     await waitFor(() => expect(hook.result.current.toast).toBe('Changed elsewhere. Reloaded.'))
     expect(client.saveBoard).toHaveBeenCalledTimes(2)
     expect(Object.keys(store.getState().doc.board.nodes)).toEqual(['z'])
-    expect(store.getState().canUndo).toBe(false)
+    // The nudge stays undoable, rebased onto the reloaded board.
+    expect(store.getState().canUndo).toBe(true)
   })
 
   test('read-only board disables editing and shows the reason', async () => {
@@ -199,7 +218,7 @@ describe('useBoard', () => {
     await waitFor(() => expect(store.getState().readOnlyReason).toBe('Unreadable now.'))
   })
 
-  test('external whiteboard event reloads and clears history when nothing is pending', async () => {
+  test('external whiteboard event reloads, keeping the undo history, when nothing is pending', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const client = mockWhiteboardApi(board([node({ id: 'a' })]), 'rev-1')
     const { store } = await setup(client)
@@ -212,7 +231,12 @@ describe('useBoard', () => {
     client.board.mockResolvedValue({ path: PATH, board: remote, revision: 'rev-ext' })
     await act(async () => emit({ kind: 'whiteboard' as ChangeEvent['kind'], version: 'rev-ext' }))
     await waitFor(() => expect(store.getState().doc.board.nodes.n2).toBeDefined())
-    expect(store.getState().canUndo).toBe(false)
+    // The nudge made before the reload is still undoable, rebased onto the reloaded board.
+    expect(store.getState().canUndo).toBe(true)
+    act(() => store.getState().actions.undo())
+    expect(store.getState().doc.board.nodes.n2).toBeDefined()
+    expect(store.getState().doc.board.nodes.a.position).toEqual(board([node({ id: 'a' })]).nodes.a.position)
+    act(() => store.getState().actions.redo())
 
     // Pending local edits: the event is left for the next save's 409 to merge.
     act(() => store.getState().actions.nudge(30, 0, ['a']))
@@ -222,6 +246,24 @@ describe('useBoard', () => {
     // Another board's event is ignored.
     await act(async () => emit({ kind: 'whiteboard' as ChangeEvent['kind'], path: 'Whiteboards/Other.md', version: 'x' }))
     expect(client.board).not.toHaveBeenCalled()
+  })
+
+  test('flush against a failing server tries once, not a burst (unmount, tab switch, pagehide)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const client = mockWhiteboardApi(board([node({ id: 'a', position: { x: 0, y: 0 } })]), 'rev-1')
+    client.saveBoard.mockRejectedValue(new ApiError(500, 'boom'))
+    const hook = renderHook(() => useBoard(PATH, client))
+    await waitFor(() => expect(hook.result.current.status).toBe('ready'))
+    act(() => hook.result.current.store.getState().actions.nudge(30, 0, ['a']))
+    await advance(SAVE_DELAY_MS + 10) // the scheduled save fails; a retry is pending
+    const before = client.saveBoard.mock.calls.length
+    expect(before).toBe(1)
+    await act(async () => hook.result.current.flush())
+    expect(client.saveBoard.mock.calls.length - before).toBe(1)
+    hook.unmount()
+    await advance(50)
+    expect(client.saveBoard.mock.calls.length - before).toBeLessThanOrEqual(2)
   })
 
   test('the same board open twice in this window (page and peek) sees its own saves', async () => {

@@ -3,8 +3,8 @@
  * header and body editor (formatted or raw), with the `…` menu. `mode='inline'` (M4: the
  * calendar's daily note) renders only the body editor and its autosave.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { api, ConflictError } from '@/api/client'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { api, ConflictError, isResync } from '@/api/client'
 import type { ObjectDetail, ObjectSummary, RenameResult, TypeDef, UpdateResult } from '@/api/types'
 import { CollectionPicker } from '@/collections/CollectionPicker'
 import { Icon } from '@/components/Icon'
@@ -22,7 +22,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Editor } from '@/editor/Editor'
-import { RawMode } from '@/editor/RawMode'
+import { RecoveryDialog } from '@/editor/RecoveryDialog'
+import { dropUnsaved, keptUnsaved } from '@/editor/unsaved'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { FindBar } from '@/find/FindBar'
 import { useFind } from '@/find/useFind'
@@ -57,8 +58,10 @@ import { useMerge } from '@/merge/useMerge'
 import { usePresentation } from '@/present/usePresentation'
 import { CompletionLog } from '@/tasks/CompletionLog'
 import { TaskStatsSection } from '@/tasks/TaskStatsSection'
-import { useAddToWhiteboard } from '@/whiteboard/AddToWhiteboardDialog'
 import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
+
+// Raw mode (CodeMirror) loads when first switched to, not with the shell (audit 2026-11-01 F1).
+const RawMode = lazy(() => import('@/editor/RawMode').then((m) => ({ default: m.RawMode })))
 
 installWikilinkPresenter()
 installLinkPicker()
@@ -172,6 +175,17 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   }, [])
   /** An external change that collided with unsaved edits, awaiting keep-mine / take-theirs. */
   const [pending, setPending] = useState<{ mine: string; theirs: ObjectDetail } | null>(null)
+  /** Edits kept when this object was last left unsaved (`editor/unsaved.ts`), offered on open. */
+  const [recovery, setRecovery] = useState<{ kept: string; onDisk: string; error: string | null } | null>(null)
+  /** Set while "Save changes" is writing the kept text. */
+  const [savingKept, setSavingKept] = useState(false)
+  const savingKeptRef = useRef(false)
+  /** Mirrors `recovery` for `reconcile`. */
+  const recoveryRef = useRef(recovery)
+  recoveryRef.current = recovery
+  /** The shown object's id, when known (kept unsaved text is tied to it). */
+  const objectIdRef = useRef<string | null>(null)
+  objectIdRef.current = detail?.summary.path === path ? detail.summary.id : null
   // Subscribe so the type chip and properties pick up types once the index loads.
   useLinkIndex((s) => s.revision)
 
@@ -242,6 +256,17 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         h?.reload(theirs.body, theirs.version)
         setDetail(theirs)
         adoptVersion(theirs.version)
+        // The recovery dialog compares the kept text with what is on disk: show the
+        // new version, or close it when the file now holds the kept text.
+        if (recoveryRef.current) {
+          const kept = keptUnsaved(path, theirs.summary.id)
+          if (kept === null || kept === theirs.body) {
+            if (kept !== null) dropUnsaved(path, theirs.summary.id)
+            setRecovery(null)
+          } else {
+            setRecovery({ kept, onDisk: theirs.body, error: null })
+          }
+        }
         unblockRef.current()
         return
       }
@@ -333,6 +358,12 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
 
   useEffect(() => {
     return api.onChange((e) => {
+      // The stream reconnected: whatever happened meanwhile is unknown, so re-check the version
+      // on disk (`reconcile` carries on when it is still ours).
+      if (isResync(e, 'types')) {
+        enqueue(false)
+        return
+      }
       if (e.path !== path) return
       if (e.kind === 'deleted') {
         editorRef.current?.hold()
@@ -370,10 +401,72 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     setPending(null)
     pendingRef.current = false
     if (!p) return
+    // Their version replaces my edits: any text kept from them is stale too.
+    dropUnsaved(path, p.theirs.summary.id)
     h?.reload(p.theirs.body, p.theirs.version)
     setDetail(p.theirs)
     adoptVersion(p.theirs.version)
     unblockRef.current()
+  }
+
+  /** Offer the edits kept for this object, if any differ from what is on disk. */
+  const offerKept = useCallback(
+    (d: ObjectDetail) => {
+      const kept = keptUnsaved(path, d.summary.id)
+      if (kept === null) return
+      if (kept === d.body) dropUnsaved(path, d.summary.id)
+      else setRecovery({ kept, onDisk: d.body, error: null })
+    },
+    [path],
+  )
+
+  /** "Save changes": write the kept text over the version on disk and show it. */
+  const saveKept = async () => {
+    const r = recovery
+    const h = editorRef.current
+    // One save at a time: a second click would send the same text on the same version.
+    if (!r || savingKeptRef.current) return
+    savingKeptRef.current = true
+    setSavingKept(true)
+    h?.hold()
+    try {
+      const res = await api.saveBody(path, r.kept, versionRef.current)
+      dropUnsaved(path, objectIdRef.current)
+      setRecovery(null)
+      h?.reload(r.kept, res.version)
+      setDetail((d) => (d ? { ...d, body: r.kept, version: res.version } : d))
+      adoptVersion(res.version)
+    } catch (err) {
+      if (err instanceof ConflictError) {
+        // Changed again meanwhile: show the newest version and ask again.
+        try {
+          const d = await api.object(path)
+          h?.reload(d.body, d.version)
+          setDetail(d)
+          adoptVersion(d.version)
+          if (d.body === r.kept) {
+            // The file already holds the kept text: nothing left to recover.
+            dropUnsaved(path, d.summary.id)
+            setRecovery(null)
+          } else {
+            setRecovery({ kept: r.kept, onDisk: d.body, error: null })
+          }
+        } catch {
+          /* gone or unreadable: keep asking with what we have */
+        }
+      } else {
+        setRecovery({ ...r, error: 'Could not save the changes.' })
+      }
+      void h?.resume(versionRef.current)
+    } finally {
+      savingKeptRef.current = false
+      setSavingKept(false)
+    }
+  }
+
+  const discardKept = () => {
+    dropUnsaved(path, objectIdRef.current)
+    setRecovery(null)
   }
 
   useEffect(() => {
@@ -381,6 +474,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     blockedRef.current = false
     pendingRef.current = false
     setPending(null)
+    setRecovery(null)
     if (renamedToRef.current === path) {
       // Our own rename: keep showing the object while its new path loads.
       renamedToRef.current = null
@@ -407,12 +501,13 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         if (!alive) return
         setDetail(d)
         adoptVersion(d.version)
+        offerKept(d)
       })
       .catch((e: unknown) => alive && setError(e instanceof Error ? e.message : String(e)))
     return () => {
       alive = false
     }
-  }, [path, adoptVersion, markDeleted])
+  }, [path, adoptVersion, markDeleted, offerKept])
 
   const toggleRaw = async () => {
     // Save everything first (and wait for saves already in flight or queued),
@@ -713,7 +808,11 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
                 {summary && <TextStatsMenu getMarkdown={getMarkdown} summary={summary} dailyNote={dailyNote} />}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-            <DropdownMenuItem disabled={!summary || isTemplate} onSelect={() => useAddToWhiteboard.getState().open(path)}>
+            <DropdownMenuItem
+              disabled={!summary || isTemplate}
+              // The dialog's module (and the whiteboard code behind it) loads on first use.
+              onSelect={() => void import('@/whiteboard/AddToWhiteboardDialog').then((m) => m.useAddToWhiteboard.getState().open(path))}
+            >
               <Icon name="ph-chalkboard-simple" size={14} />
               {OBJECT_M8_TEXT.addToWhiteboard}
             </DropdownMenuItem>
@@ -823,6 +922,19 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
     }
   }, [mode, autoFocus, hasDetail])
 
+  const recoveryDialog = (
+    <RecoveryDialog
+      open={recovery !== null}
+      path={path}
+      kept={recovery?.kept ?? ''}
+      onDisk={recovery?.onDisk ?? ''}
+      error={recovery?.error}
+      saving={savingKept}
+      onSave={() => void saveKept()}
+      onDiscard={discardKept}
+    />
+  )
+
   const overlays = (
     <>
       {footer && <div className="absolute right-4 bottom-4">{footer}</div>}
@@ -834,6 +946,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
         onKeepMine={keepMine}
         onTakeTheirs={takeTheirs}
       />
+      {recoveryDialog}
       {typeEditor.dialog}
       <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} />
       {exportOpen && <ExportDialog open onOpenChange={setExportOpen} path={path} prepare={settle} />}
@@ -880,7 +993,16 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
   )
 
   if (mode === 'inline') {
+    // Emptiness from the editor's DOM first: any text, or any block but a paragraph (an image,
+    // a divider, an embed: each writes Markdown of its own), means not empty, with no
+    // serialising of the body (this ran twice per keystroke, on input and keyup). Only a
+    // document of textless paragraphs is serialised.
     const checkEmpty = () => {
+      const pm = inlineRef.current?.querySelector('.ProseMirror')
+      if (pm && ((pm.textContent ?? '').trim() !== '' || [...pm.children].some((c) => c.tagName !== 'P'))) {
+        setBodyEmpty(false)
+        return
+      }
       const b = editorRef.current?.getBody()
       if (b != null) setBodyEmpty(b.trim() === '')
     }
@@ -912,6 +1034,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
                 readOnly={readOnly || deleted}
                 onSaved={adoptVersion}
                 onConflict={onConflict}
+                objectId={detail.summary.path === path ? detail.summary.id : undefined}
                 controlRef={editorRef}
               />
             </div>
@@ -925,6 +1048,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
           onKeepMine={keepMine}
           onTakeTheirs={takeTheirs}
         />
+        {recoveryDialog}
       </div>
     )
   }
@@ -1013,15 +1137,18 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
             )}
             <div className="text-[17px]">
               {raw ? (
-                <RawMode
-                  path={path}
-                  text={detail.body}
-                  version={version}
-                  readOnly={readOnly}
-                  onSaved={adoptVersion}
-                  onConflict={onConflict}
-                  controlRef={editorRef}
-                />
+                <Suspense fallback={null}>
+                  <RawMode
+                    path={path}
+                    text={detail.body}
+                    version={version}
+                    readOnly={readOnly}
+                    onSaved={adoptVersion}
+                    onConflict={onConflict}
+                    objectId={detail.summary.path === path ? detail.summary.id : undefined}
+                    controlRef={editorRef}
+                  />
+                </Suspense>
               ) : (
                 <Editor
                   path={path}
@@ -1030,6 +1157,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
                   readOnly={readOnly}
                   onSaved={adoptVersion}
                   onConflict={onConflict}
+                  objectId={detail.summary.path === path ? detail.summary.id : undefined}
                   controlRef={editorRef}
                 />
               )}

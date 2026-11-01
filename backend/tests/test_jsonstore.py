@@ -90,6 +90,65 @@ def test_new_id_unique_slug(space_dir: Path):
     assert held.new_id("Inbox") == "inbox-3"
 
 
+@pytest.mark.parametrize(
+    "name",
+    ["日本語", "ü", "데이터", "ⅷ", "ａｂｃ", "é" * 150, "x" * 300, "!!!"],
+    ids=["cjk", "umlaut", "hangul", "roman-numeral", "fullwidth", "long-accented", "long-ascii", "symbols"],
+)
+def test_store_accepts_every_id_slug_makes(space_dir: Path, name: str):
+    """Audit 2026-11-01 #3: a non-Latin collection or query name used to 500 at `path`."""
+    from objectapp.typedefs import slug
+
+    store = _store(space_dir)
+    cid = store.new_id(name)
+    assert cid == slug(name)
+    rev = store.write(cid, {"id": cid, "name": name}, "")
+    assert store.read(cid) == ({"id": cid, "name": name}, rev)
+    assert [i for i, *_ in store.list()] == [cid]
+
+
+def test_store_rejects_unsafe_and_over_long_ids(space_dir: Path):
+    store = _store(space_dir)
+    for bad in ["", ".", "..", "a..", "a/b", "a\\b", "-a", "_a", "a b", "x" * 101, "日本語/x"]:
+        with pytest.raises(ValueError):
+            store.path(bad)
+    assert store.path("x" * 100).name == "x" * 100 + ".json"
+
+
+def test_ui_patch_does_not_overwrite_an_external_edit(space_dir: Path, monkeypatch):
+    """Audit 2026-11-01: `write_ui_patch` replaced the file without re-checking it."""
+    from objectapp import textfile, uistate
+
+    space = Space(space_dir)
+    _ui, revision = uistate.patch_ui(space, {"pinned": ["a"]}, None)
+    path = space_dir / ".capacities" / "ui.json"
+    external = [b'{"pinned": ["external"], "sections": ["ext"]}\n']
+
+    def racing(target, data, check=None):
+        if Path(target) == path:  # an editor saves between the read and the replace
+            path.write_bytes(external[-1])
+        textfile.atomic_write(target, data, check=check)
+
+    monkeypatch.setattr(uistate, "atomic_write", racing)
+    with pytest.raises(RevisionConflict):
+        uistate.patch_ui(space, {"allNotesLayout": "grid"}, revision)
+    assert path.read_bytes() == external[-1]
+    external.append(b'{"pinned": ["external", "again"]}\n')
+    with pytest.raises(RevisionConflict):  # a patch without a base revision re-checks too
+        uistate.patch_ui(space, {"allNotesLayout": "grid"}, None)
+    assert path.read_bytes() == external[-1]
+
+
+def test_collection_with_a_non_latin_name_is_created(space_dir: Path):
+    space, c, _pub = _client(space_dir)
+    with c:
+        r = c.post("/api/collections", json={"name": "日本語"})
+        assert r.status_code == 201, r.text
+        assert r.json()["id"] == "日本語"
+        assert (space_dir / ".capacities" / "collections" / "日本語.json").is_file()
+        assert [x.name for x in Space(space_dir).list_collections()] == ["日本語"]
+
+
 def test_get_views_defaults_without_writing(space_dir: Path):
     _space, c, _pub = _client(space_dir)
     with c:

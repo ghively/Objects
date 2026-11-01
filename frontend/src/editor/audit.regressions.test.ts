@@ -9,8 +9,10 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { afterEach, describe, expect, test } from 'vitest'
 import { formatAnnotation, makeOption, parseAnnotation } from './annotations'
 import { editorExtensions, loadBody, serializeBody } from './document'
-import { turnInto } from './extensions/blockSelection'
+import { blockSelectionRange, blocksSource, deleteBlocks, duplicateBlocks, selectBlocks, turnInto } from './extensions/blockSelection'
+import { isWikilinkTarget, wikilinkMarkdown, wikilinkTargetFor } from './extensions/wikilink'
 import { moveBlockTo } from './handles/dragMove'
+import { codeFence } from './preserve'
 
 const editors: TiptapEditor[] = []
 afterEach(() => {
@@ -87,10 +89,150 @@ describe('dragging a block', () => {
     expect(saved.startsWith('C\n\nA\n\nB')).toBe(true)
   })
 
+  test.each([
+    ['A\n\nB\n\nC\n', 'C\n\nA\n\nB\n'],
+    ['A\n\nB\n\nC', 'C\n\nA\n\nB'],
+    ['A\n\nB\n\nC\n\n', 'C\n\nA\n\nB\n\n'],
+  ])('moving the last block of %j to the top keeps the end of the body (audit 2026-11-01)', (body, saved) => {
+    const editor = headless(body)
+    moveBlockTo(editor, topPos(editor, 'C'), 0)
+    expect(serializeBody(editor)).toBe(saved)
+  })
+
+  test('joining two paragraphs leaves no blank line at the end', () => {
+    const editor = headless('A\n\nB\n')
+    editor.commands.setTextSelection(find(editor, 'B').pos + 1)
+    editor.commands.joinBackward()
+    expect(serializeBody(editor)).toBe('AB\n')
+  })
+
   test('a heading directly followed by its paragraph stays as written', () => {
     const body = '# H\nText\n\nP\n'
     const editor = headless(body)
     expect(serializeBody(editor)).toBe(body)
+  })
+})
+
+/** Paste `text` as `text/plain` at the selection (a real paste event, not `pasteText`, which pastes as plain text). */
+function paste(editor: TiptapEditor, text: string): void {
+  const event = new Event('paste', { bubbles: true, cancelable: true }) as Event & { clipboardData: unknown }
+  event.clipboardData = { getData: (type: string) => (type === 'text/plain' ? text : ''), types: ['text/plain'], files: [] }
+  editor.view.dom.dispatchEvent(event)
+}
+
+describe('pasting Markdown text (audit 2026-11-01 #8)', () => {
+  test('a copied list pasted back is a list again, with its bytes', () => {
+    const editor = headless('* a\n* b\n\nP\n')
+    selectBlocks(editor, 0)
+    const copied = blocksSource(editor)
+    expect(copied).toBe('* a\n* b')
+    editor.commands.setTextSelection(find(editor, 'P').pos + 2)
+    paste(editor, copied)
+    const out = saveAndReload(editor)
+    expect(shape(editor)).toEqual([
+      ['bulletList', 'ab'],
+      ['paragraph', 'P'],
+      ['bulletList', 'ab'],
+    ])
+    expect(out.saved).toBe('* a\n* b\n\nP\n* a\n* b\n')
+    expect(out.reloaded).toEqual(shape(editor))
+  })
+
+  test('cut and paste keeps the blocks', () => {
+    const editor = headless('- a\n- b\n\nP\n')
+    selectBlocks(editor, 0)
+    const copied = blocksSource(editor)
+    deleteBlocks(editor)
+    expect(serializeBody(editor)).toBe('P\n')
+    editor.commands.setTextSelection(2)
+    editor.commands.splitBlock()
+    paste(editor, copied)
+    expect(shape(editor)).toEqual([
+      ['paragraph', 'P'],
+      ['bulletList', 'ab'],
+    ])
+    expect(serializeBody(editor)).toBe('P\n- a\n- b\n')
+  })
+
+  test('a list, a heading and a table from elsewhere come in as those blocks', () => {
+    const editor = headless('Hello\n\nb\n')
+    editor.commands.setTextSelection(find(editor, 'b').pos + 2)
+    paste(editor, '- one\n- two\n\n# Head\n\n| a | b |\n|---|---|\n| 1 | 2 |\n')
+    const out = saveAndReload(editor)
+    expect(shape(editor)).toEqual([
+      ['paragraph', 'Hello'],
+      ['paragraph', 'b'],
+      ['bulletList', 'onetwo'],
+      ['heading', 'Head'],
+      ['table', 'ab12'],
+    ])
+    expect(out.saved).toBe('Hello\n\nb\n\n- one\n- two\n\n# Head\n\n| a   | b   |\n| --- | --- |\n| 1   | 2   |\n')
+    expect(out.reloaded).toEqual(shape(editor))
+  })
+
+  test('a fenced block pasted into the middle of a paragraph splits it', () => {
+    const editor = headless('ab\n')
+    editor.commands.setTextSelection(2)
+    paste(editor, '```js\ncode\n```')
+    expect(shape(editor)).toEqual([
+      ['paragraph', 'a'],
+      ['codeBlock', 'code'],
+      ['paragraph', 'b'],
+    ])
+    expect(serializeBody(editor)).toBe('a\n\n```js\ncode\n```\n\nb\n')
+  })
+
+  test('pasted inline Markdown joins the paragraph', () => {
+    const editor = headless('Hello world\n')
+    editor.commands.setTextSelection(7)
+    paste(editor, 'a **b** c')
+    expect(shape(editor)).toEqual([['paragraph', 'Hello a b cworld']])
+    expect(serializeBody(editor)).toBe('Hello a **b** cworld\n')
+  })
+
+  test('plain prose pastes as before, one paragraph per line', () => {
+    const editor = headless('Hello world\n\nb\n')
+    editor.commands.setTextSelection(7)
+    paste(editor, 'line1\nline2\n\npara2')
+    expect(shape(editor)).toEqual([
+      ['paragraph', 'Hello line1'],
+      ['paragraph', 'line2'],
+      ['paragraph', 'para2world'],
+      ['paragraph', 'b'],
+    ])
+  })
+
+  // Review fix 2026-11-01 #5.
+  test('a lone backtick or asterisk is not Markdown: prose pastes one paragraph per line', () => {
+    const editor = headless('P\n')
+    editor.commands.setTextSelection(2)
+    paste(editor, "it's a `tick\nnext line * here")
+    expect(shape(editor)).toEqual([
+      ['paragraph', "Pit's a `tick"],
+      ['paragraph', 'next line * here'],
+    ])
+    // A closed code span, a strong pair or a link still is.
+    const rich = headless('P\n')
+    rich.commands.setTextSelection(2)
+    paste(rich, 'x `y` **z** [l](http://e.com)')
+    expect(serializeBody(rich)).toBe('Px `y` **z** [l](http://e.com)\n')
+  })
+
+  test('a list pasted into a table cell stays plain text, every marker kept', () => {
+    const editor = headless('| a | b |\n|---|---|\n| 1 | 2 |\n')
+    const cell = find(editor, '1')
+    editor.commands.setTextSelection(cell.pos + 1)
+    paste(editor, '- x\n- y')
+    expect(shape(editor)).toEqual([['table', 'ab- x- y12']])
+    expect(serializeBody(editor)).toContain('- x<br>- y1')
+  })
+
+  test('paste as plain text is left alone', () => {
+    const editor = headless('P\n')
+    editor.commands.setTextSelection(2)
+    ;(globalThis as { ClipboardEvent?: unknown }).ClipboardEvent ??= class extends Event {}
+    editor.view.pasteText('- a\n- b')
+    expect(shape(editor).map(([t]) => t)).toEqual(['paragraph', 'paragraph'])
   })
 })
 
@@ -101,6 +243,30 @@ describe('code blocks', () => {
     const { saved, reloaded } = saveAndReload(editor)
     expect(reloaded).toEqual([['codeBlock', 'foo\n```\nbar']])
     expect(saved).toBe('````\nfoo\n```\nbar\n````\n')
+  })
+
+  test.each([
+    ['\n~~~', '~~~~\ncode\n~~~\n~~~~\n', 'code\n~~~'],
+    ['\n```', '~~~\ncode\n```\n~~~\n', 'code\n```'],
+    ['Z', '~~~\ncodeZ\n~~~\n', 'codeZ'],
+  ])('a tilde-fenced block keeps its fence when %j is typed inside (audit 2026-11-01 #6)', (typed, saved, text) => {
+    const editor = headless('~~~\ncode\n~~~\n')
+    append(editor, 'code', typed)
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved)
+    expect(out.reloaded).toEqual([['codeBlock', text]])
+  })
+
+  test('an edited tilde-fenced block keeps its info string and indented closing fence', () => {
+    const editor = headless('~~~ js \nx\n  ~~~~\n')
+    append(editor, 'x', 'Z')
+    expect(serializeBody(editor)).toBe('~~~ js \nxZ\n  ~~~~\n')
+  })
+
+  test('codeFence counts runs of the fence character only', () => {
+    expect(codeFence('a\n~~~\nb', '~')).toBe('~~~~')
+    expect(codeFence('a\n```\nb', '~')).toBe('~~~')
+    expect(codeFence('a\n~~~\nb')).toBe('```')
   })
 
   test('a new code block with a ```` line gets a longer fence', () => {
@@ -257,6 +423,151 @@ describe('minor drift on edited lines', () => {
     expect(serializeBody(editor)).toBe(saved)
   })
 
+  // End review of the second audit fix pass: a hard break in an item's second paragraph.
+  test.each([
+    ['- a\n\n  para\\\n    cont\n', 'cont', '- a\n\n  para\\\n    contZ\n'],
+    ['- a\n\n  para\\\n  cont\n', 'cont', '- a\n\n  para\\\n  contZ\n'],
+    ['- a\n\n  para\\\n  cont\n', 'a', '- aZ\n\n  para\\\n  cont\n'],
+    ['1. a\n\n   para\\\n   cont\n', 'cont', '1. a\n\n   para\\\n   contZ\n'],
+  ])('a hard break in a list item\'s second paragraph is kept (%j, %s)', (body, needle, saved) => {
+    const editor = headless(body)
+    append(editor, needle, 'Z')
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved)
+    expect(out.reloaded).toEqual(shape(editor))
+  })
+
+  test.each(
+    ['- a\n\n  para\n', '1. a\n\n   para\n', '- a\n\n  para\n- b\n', '- a\n  - b\n\n    para\n'].flatMap((body) =>
+      ['cont', ' one', '  two', '    four', '      six', '\ttab'].map((line) => [line, body]),
+    ),
+  )('a continuation line %j after Shift-Enter in a later paragraph of %j reloads exactly', (line, body) => {
+    const editor = headless(body)
+    const f = find(editor, 'para')
+    editor.commands.setTextSelection(f.pos + f.node.nodeSize - 1)
+    editor.commands.setHardBreak()
+    editor.view.dispatch(editor.state.tr.insertText(line))
+    const saved = serializeBody(editor)
+    const text = (e: TiptapEditor) => find(e, 'para').node.textContent.replaceAll(String.fromCharCode(0xa0), ' ')
+    const reloaded = headless(saved)
+    expect(text(reloaded)).toBe('para' + line.replace('\t', ' '))
+    expect(serializeBody(reloaded)).toBe(saved)
+  })
+
+  test('Shift-Enter at the end of a list item is saved as a hard break (audit 2026-11-01)', () => {
+    const editor = headless('- a\n- b\n')
+    editor.commands.setTextSelection(find(editor, 'b').pos + 2)
+    editor.commands.setHardBreak()
+    editor.view.dispatch(editor.state.tr.insertText('cont'))
+    const saved = serializeBody(editor)
+    expect(saved).toBe('- a\n- b  \n  cont\n')
+    let breaks = 0
+    headless(saved).state.doc.descendants((n) => {
+      if (n.type.name === 'hardBreak') breaks++
+    })
+    expect(breaks).toBe(1)
+  })
+
+  // Audit 2026-11-01 leftover: the loader strips the leading blanks of a line after a hard break
+  // in a list item (all of four or more, two of fewer), and an ordered or to-do item's new
+  // continuation line gained blanks on reload. A run of four or more is written `&nbsp;` + rest.
+  const BODIES: Record<string, string> = {
+    paragraph: 'b\n',
+    bullet: '- a\n- b\n',
+    ordered: '1. a\n2. b\n',
+    wide: '9. a\n10. b\n',
+    todo: '- [ ] b\n',
+    nested: '- a\n  - b\n',
+  }
+  test.each(
+    Object.keys(BODIES).flatMap((where) =>
+      ['cont', ' one', '  two', '   three', '    four', '      six', '\ttab'].map((line) => [line, where]),
+    ),
+  )('a continuation line %j after Shift-Enter in a %s item reloads exactly', (line, where) => {
+    const body = BODIES[where]
+    const editor = headless(body)
+    editor.commands.setTextSelection(find(editor, 'b').pos + 2)
+    editor.commands.setHardBreak()
+    editor.view.dispatch(editor.state.tr.insertText(line))
+    const saved = serializeBody(editor)
+    const text = (e: TiptapEditor) => find(e, 'b').node.textContent.replaceAll(String.fromCharCode(0xa0), ' ')
+    const reloaded = headless(saved)
+    // In an item a leading tab is kept as `&nbsp;`, as on a paragraph's first line.
+    expect(text(reloaded)).toBe('b' + (where === 'paragraph' ? line : line.replace('\t', ' ')))
+    expect(saved.startsWith(body.slice(0, -1))).toBe(true) // the untouched lines are unchanged
+    expect(serializeBody(reloaded)).toBe(saved) // and it saves back the same
+  })
+
+  // Audit 2026-11-01 leftover: the serializer's `>` line between a paragraph and a nested quote
+  // (which interrupts it anyway) was added to an otherwise untouched quote.
+  test.each([
+    ['> a\n> > b\n> c\n', 'a', '> aZ\n> > b\n> c\n'],
+    ['> a\n> > b\n> c\n', 'c', '> a\n> > b\n> cZ\n'],
+    ['> a\n> > b\n', 'a', '> aZ\n> > b\n'],
+    ['> a\n> > b\n', 'b', '> a\n> > bZ\n'],
+    ['> a\n> > # H\n> > b\n', 'b', '> a\n> > # H\n> > bZ\n'],
+    ['> x\n> a\n> > > b\n', 'a', '> x\n> aZ\n> > > b\n'],
+  ])('editing one line of a nested blockquote changes only that line (%j, %s)', (body, needle, saved) => {
+    const before = shape(headless(body))
+    const editor = headless(body)
+    append(editor, needle, 'Z')
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved)
+    expect(out.reloaded).toEqual(shape(editor))
+    expect(before.length).toBe(out.reloaded.length)
+  })
+
+  // End review of the second audit fix pass: a quote inside a list item was rewritten on an
+  // unrelated edit (a bare `  >` line added, a lazy line given the inner quote's marker).
+  test.each([
+    ['- item\n  > q1\n  > > q2\n', 'item', '- itemZ\n  > q1\n  > > q2\n'],
+    ['- item\n  > q1\n  > > q2\n', 'q1', '- item\n  > q1Z\n  > > q2\n'],
+    ['- item\n  > > q2\n  > q3\n', 'item', '- itemZ\n  > > q2\n  > q3\n'],
+    ['- item\n  > > q2\n  > q3\n', 'q2', '- item\n  > > q2\n  > q3Z\n'],
+    ['1. item\n   > q1\n   > > q2\n2. next\n', 'next', '1. item\n   > q1\n   > > q2\n2. nextZ\n'],
+  ])('a quote inside a list item keeps its lines when another line is edited (%j, %s)', (body, needle, saved) => {
+    const before = shape(headless(body))
+    const editor = headless(body)
+    append(editor, needle, 'Z')
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved)
+    expect(out.reloaded).toEqual(shape(editor))
+    expect(before.length).toBe(out.reloaded.length)
+  })
+
+  test('a paragraph split inside a quote keeps its blank `>` line', () => {
+    const editor = headless('> ab\n> > c\n')
+    const f = find(editor, 'ab')
+    editor.commands.setTextSelection(f.pos + 2)
+    editor.commands.splitBlock()
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe('> a\n>\n> b\n> > c\n')
+    expect(out.reloaded).toEqual(shape(editor))
+  })
+
+  test('a nested quote added under a paragraph is still saved', () => {
+    const editor = headless('> a\n\nafter\n')
+    const f = find(editor, 'a')
+    const { schema } = editor
+    const inner = schema.nodes.blockquote.create(null, schema.nodes.paragraph.create(null, schema.text('n')))
+    editor.view.dispatch(editor.state.tr.insert(f.pos + f.node.nodeSize, inner))
+    const out = saveAndReload(editor)
+    expect(out.reloaded).toEqual(shape(editor))
+  })
+
+  test('a tab-indented sibling item is kept when another item is edited (audit 2026-11-01)', () => {
+    const editor = headless('- a\n   - b\n\t- c\n')
+    append(editor, 'a', 'Z')
+    expect(serializeBody(editor)).toBe('- aZ\n   - b\n\t- c\n')
+  })
+
+  test('a table row with a pipe in a code span is kept when another row is edited (audit 2026-11-01)', () => {
+    const body = '| a | b |\n|---|---|\n| [[x]] | `c|d` |\n| 1 | 2 |\n'
+    const editor = headless(body)
+    append(editor, '1', 'Z')
+    expect(serializeBody(editor)).toBe('| a | b |\n|---|---|\n| [[x]] | `c|d` |\n| 1Z | 2 |\n')
+  })
+
   test('an edited blockquote line keeps its marker', () => {
     const editor = headless('> a\n> b\n')
     append(editor, 'b', 'X')
@@ -287,6 +598,169 @@ describe('lines with ::', () => {
 
   test.each(['Status:: Active', 'Owner:: [[Ada]]', 'Due date::'])('%j stays a raw field line', (line) => {
     expect(shape(headless(line + '\n')).map(([t]) => t)).toEqual(['rawBlock'])
+  })
+})
+
+/** Every task item's checked state, in document order. */
+function checks(editor: TiptapEditor): boolean[] {
+  const out: boolean[] = []
+  editor.state.doc.descendants((n) => {
+    if (n.type.name === 'taskItem') out.push(n.attrs.checked as boolean)
+  })
+  return out
+}
+
+describe('to-do lists with [X] or plain items (audit 2026-11-01, Gene: accept both)', () => {
+  test('an uppercase [X] loads as a done task list and keeps its bytes', () => {
+    const body = '* [ ] a\n* [X] b\n'
+    const editor = headless(body)
+    expect(shape(editor)).toEqual([['taskList', 'ab']])
+    expect(checks(editor)).toEqual([false, true])
+    expect(serializeBody(editor)).toBe(body)
+    append(editor, 'a', 'Z')
+    expect(serializeBody(editor)).toBe('* [ ] aZ\n* [X] b\n')
+  })
+
+  test.each([
+    ['- [ ] a\n- plain\n', [false]],
+    ['- plain\n- [ ] a\n', [false]],
+    ['- [X] done\n- plain\n  - [x] nested\n', [true, true]],
+  ])('%j loads as a bullet list with task items', (body, checked) => {
+    const editor = headless(body)
+    expect(shape(editor).map(([t]) => t)).toEqual(['bulletList'])
+    expect(checks(editor)).toEqual(checked)
+    expect(serializeBody(editor)).toBe(body)
+  })
+
+  test('editing one item of a mixed list changes only its line', () => {
+    const editor = headless('- [ ] a\n- plain\n  - [x] nested\n')
+    append(editor, 'plain', 'Z')
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe('- [ ] a\n- plainZ\n  - [x] nested\n')
+    expect(out.reloaded).toEqual([['bulletList', 'aplainZnested']])
+  })
+
+  test('a to-do list followed by a paragraph after a blank line is still one list', () => {
+    const editor = headless('- [ ] a\n- [x] b\n\nAfter\n')
+    expect(shape(editor)).toEqual([
+      ['taskList', 'ab'],
+      ['paragraph', 'After'],
+    ])
+  })
+})
+
+describe('duplicating a block (audit 2026-11-01)', () => {
+  test('the copy carries no block id', () => {
+    const editor = headless('para ^abc123\n\nX\n')
+    selectBlocks(editor, 0)
+    expect(duplicateBlocks(editor)).toBe(true)
+    expect(shape(editor)).toEqual([
+      ['paragraph', 'para ^abc123'],
+      ['paragraph', 'para'],
+      ['paragraph', 'X'],
+    ])
+    expect(serializeBody(editor)).toBe('para ^abc123\n\npara\n\nX\n')
+    // The copies are the block selection.
+    expect(blockSelectionRange(editor.state)?.blocks.map((b) => b.node.textContent)).toEqual(['para'])
+  })
+
+  test('ids on several items of a duplicated list are all dropped', () => {
+    const editor = headless('- a ^aaaaaa\n- b ^bbbbbb\n')
+    selectBlocks(editor, 0)
+    duplicateBlocks(editor)
+    expect(serializeBody(editor)).toBe('- a ^aaaaaa\n- b ^bbbbbb\n\n- a\n- b\n')
+  })
+})
+
+describe('wikilink targets (audit 2026-11-01)', () => {
+  test.each([
+    ['A|B', '[[A]]'],
+    ['A]]B', '[[AB]]'],
+    ['A#B', '[[AB]]'],
+    ['Plain title', '[[Plain title]]'],
+  ])('a link to %j is written unambiguously as %s', (target, saved) => {
+    expect(wikilinkMarkdown(target, null)).toBe(saved)
+    const editor = headless('x\n')
+    editor.commands.setTextSelection(2)
+    editor.commands.insertContent({ type: 'wikilink', attrs: { target, label: null } })
+    const out = serializeBody(editor)
+    expect(out).toBe('x' + saved + '\n')
+    const links: string[] = []
+    headless(out).state.doc.descendants((n) => {
+      if (n.type.name === 'wikilink') links.push(n.attrs.target as string)
+    })
+    expect(links).toEqual([saved.slice(2, -2)])
+  })
+
+  test('a label may hold a pipe', () => {
+    expect(wikilinkMarkdown('A', 'l|m')).toBe('[[A|l|m]]')
+  })
+
+  test('wikilinkTargetFor links an object by path when its title cannot be a target', () => {
+    expect(wikilinkTargetFor({ title: 'Plain', path: 'Pages/Plain.md' })).toBe('Plain')
+    expect(wikilinkTargetFor({ title: 'A|B', path: 'Pages/A.md' })).toBe('Pages/A')
+  })
+
+  test('isWikilinkTarget tells the pickers when to pass the path form', () => {
+    expect(isWikilinkTarget('Plain')).toBe(true)
+    expect(['A|B', 'A]B', 'A[B', 'A#B', 'A\nB', ' '].map(isWikilinkTarget)).toEqual([false, false, false, false, false, false])
+  })
+})
+
+describe('loading the same source twice (audit 2026-11-01 F9: parsed blocks are cached)', () => {
+  test('a body opened again loads the same, saves the same bytes and shares no node attributes', () => {
+    const body = '# H\n\nPlain text.\n\n1\\. not a list\n\n- a\n- b\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n> q\n'
+    const first = headless(body)
+    const second = headless(body)
+    expect(shape(second)).toEqual(shape(first))
+    expect(shape(second).map(([t]) => t)).toEqual(['heading', 'paragraph', 'paragraph', 'bulletList', 'table', 'blockquote'])
+    expect(serializeBody(second)).toBe(body)
+    // An edit in one editor leaves the other's load untouched.
+    append(second, 'Plain', 'Z')
+    expect(serializeBody(second)).toBe(body.replace('Plain text.', 'Plain text.Z'))
+    expect(serializeBody(first)).toBe(body)
+    expect(serializeBody(headless(body))).toBe(body)
+  })
+})
+
+describe('math blocks (audit 2026-11-01)', () => {
+  test.each([
+    ['x\n$$\ny', '$$\nx\n\\$$\ny\n$$\n'],
+    ['x $$', '$$\nx \\$$\n$$\n'],
+  ])('a formula containing %j at a line end stays one block', (text, saved) => {
+    const editor = headless('$$\nx\n$$\n')
+    editor.view.dispatch(editor.state.tr.setNodeAttribute(0, 'text', text))
+    expect(serializeBody(editor)).toBe(saved)
+    const again = headless(saved)
+    expect(shape(again)).toEqual([['mathBlock', '']])
+    expect(again.state.doc.firstChild!.attrs.text).toBe(text)
+    expect(serializeBody(again)).toBe(saved)
+  })
+})
+
+describe('typed field and footnote definition lines (audit 2026-11-01)', () => {
+  test.each([
+    ['Key:: value', 'Key\\:: value'],
+    ['[^1]: footnote', '\\[^1\\]: footnote'],
+  ])('%j typed stays a paragraph', (text, saved) => {
+    const editor = headless('P\n')
+    setParagraph(editor, text)
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved + '\n')
+    expect(out.reloaded).toEqual([['paragraph', text]])
+    const again = headless(out.saved)
+    append(again, 'e', 'Z')
+    expect(serializeBody(again)).toBe(saved + 'Z\n')
+  })
+
+  test('a footnote reference in text keeps its brackets', () => {
+    const editor = headless('P\n')
+    setParagraph(editor, 'a [^1] b')
+    expect(serializeBody(editor)).toBe('a [^1] b\n')
+  })
+
+  test('a field line in a file still loads raw', () => {
+    expect(shape(headless('Key:: value\n')).map(([t]) => t)).toEqual(['rawBlock'])
   })
 })
 
@@ -383,6 +857,28 @@ describe('plain text that looks like Markdown', () => {
       expect(serializeBody(editor)).toBe(text + '\n')
     },
   )
+
+  test.each([
+    ['    four spaces', '&nbsp;   four spaces'],
+    ['\tTabbed', '&nbsp;Tabbed'],
+    ['  \t mixed', '&nbsp; \t mixed'],
+  ])('a paragraph starting with %j stays a paragraph (audit 2026-11-01 #7)', (text, saved) => {
+    const editor = headless('P\n')
+    setParagraph(editor, text)
+    const out = saveAndReload(editor)
+    expect(out.saved).toBe(saved + '\n')
+    expect(out.reloaded).toEqual([['paragraph', String.fromCharCode(0xa0) + text.slice(1)]])
+    // Reloaded and edited again, the line keeps that form.
+    const again = headless(out.saved)
+    append(again, 'e', 'Z')
+    expect(serializeBody(again)).toBe(saved + 'Z\n')
+  })
+
+  test('a later line of a paragraph may be indented', () => {
+    const editor = headless('P\n')
+    setParagraph(editor, 'a\n    b')
+    expect(serializeBody(editor)).toBe('a  \n    b\n')
+  })
 
   test('typing into a paragraph that starts with an escape keeps it', () => {
     const editor = headless('\\# not a heading\n\nP\n')

@@ -63,8 +63,8 @@ def router(ctx: ApiContext) -> APIRouter:
             )
         except FileNotFoundError:
             return _error(404, f"Not a space folder: {req.path}")
-        except OSError as exc:
-            return _error(500, f"The folder could not be deleted: {exc.strerror or exc}")
+        except OSError as exc:  # 503 like the app's other file-system failures, never a bare 500
+            return _error(503, f"The folder could not be deleted: {exc.strerror or exc}")
         return {"trashed": trashed}
 
     return r

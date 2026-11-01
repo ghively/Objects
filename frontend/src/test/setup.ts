@@ -1,9 +1,16 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterEach, beforeEach } from 'vitest'
+import { resetUnsaved } from '@/editor/unsaved'
 
 afterEach(() => {
   cleanup()
+})
+
+// Edits kept by an editor that a test left unsaved (e.g. unmounted with the conflict
+// dialog open) would be offered to the next test that opens the same path.
+beforeEach(() => {
+  resetUnsaved()
 })
 
 // jsdom lacks ResizeObserver, which Radix ScrollArea and Tooltip use.

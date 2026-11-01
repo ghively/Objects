@@ -4,8 +4,10 @@
  * `@tiptap/markdown` backslash-escapes inline delimiters (`*`, `_`, `` ` ``,
  * `[`, `~`) in text, but not what only means something at the start of a line
  * or in a heading: `# x`, `- x`, `1. x`, `2024. was good`, `---`, a `===` line
- * after a hard break, `$$` (a math block), a `$b$` pair (inline math) and a
- * heading's trailing ` #` (a closing sequence). Text typed or pasted with any
+ * after a hard break, `$$` (a math block), a `$b$` pair (inline math), a
+ * heading's trailing ` #` (a closing sequence), a first line indented four
+ * columns (an indented code block) and a `Key:: value` field line. Text typed
+ * or pasted with any
  * of those came back as another block. These escapes are added to paragraphs
  * and headings, and only where the text would otherwise be read differently.
  */
@@ -60,8 +62,12 @@ export function escapeLineStarts(md: string): string {
   return md
     .split('\n')
     .map((line, i) => {
+      // A first line indented four columns (a tab, or four spaces) would be an
+      // indented code block; a non-breaking space keeps the indent readable.
+      let m = /^[ \t]+/.exec(line)
+      if (m && i === 0 && (m[0].includes('\t') || m[0].length >= 4)) return '&nbsp;' + line.slice(1)
       // An ATX heading: `#` to `######` then a space or the end of the line.
-      let m = /^( {0,3})#{1,6}(?=[ \t]|$)/.exec(line)
+      m = /^( {0,3})#{1,6}(?=[ \t]|$)/.exec(line)
       if (m) return m[1] + '\\' + line.slice(m[1].length)
       // A bullet item (`*` is escaped already).
       m = /^( {0,3})[-+](?=[ \t]|$)/.exec(line)
@@ -74,6 +80,9 @@ export function escapeLineStarts(md: string): string {
       if (m && (i > 0 || (line.match(/-/g) ?? []).length >= 3)) return m[1] + '\\' + line.slice(m[1].length)
       m = /^( {0,3})=+[ \t]*$/.exec(line)
       if (m && i > 0) return m[1] + '\\' + line.slice(m[1].length)
+      // A `Key:: value` field line (kept raw on load, `document.ts` `FIELD_LINE`).
+      m = /^([^\s:][^:]*)::(?=[ \t]|$)/.exec(line)
+      if (m) return m[1] + '\\' + line.slice(m[1].length)
       return line
     })
     .join('\n')

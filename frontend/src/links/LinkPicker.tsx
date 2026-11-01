@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { create } from 'zustand'
 import type { ObjectSummary } from '@/api/types'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { setWikilinkTrigger } from '@/editor/extensions/wikilink'
+import { setWikilinkTrigger, wikilinkTargetFor } from '@/editor/extensions/wikilink'
 import { setObjectEmbedPicker } from '@/editor/nodes/objectEmbed'
 import { TypeChip } from '@/shell/Sidebar'
 import { cn } from '@/lib/utils'
@@ -140,10 +140,14 @@ export function LinkPicker() {
       editor
         .chain()
         .focus()
-        .insertContentAt(at, [{ type: 'wikilink', attrs: { target: o.title, label: null } }])
+        .insertContentAt(at, [{ type: 'wikilink', attrs: { target: wikilinkTargetFor(o), label: null } }])
         .run()
     } else {
-      editor.commands.focus()
+      // Cancelled: the `[[` stays, as in Capacities, whose link dropdown searches text typed
+      // inline after it; the query typed here goes back after the brackets, as if typed there.
+      const brackets = mode === 'link' && editor.state.doc.textBetween(range.from, range.to, '\0', '\0') === '[['
+      if (brackets && query) editor.chain().focus().insertContentAt(range.to, { type: 'text', text: query }).run()
+      else editor.commands.focus()
     }
     hide()
   }

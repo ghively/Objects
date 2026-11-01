@@ -39,7 +39,14 @@ from .frontmatter import (
 )
 from .localtime import to_local
 from .propvalues import InvalidValue, decode_value
-from .recurrence import next_date, scheduled_between, step, week_start_of
+from .recurrence import (
+    _on_day,
+    next_date,
+    scheduled_between,
+    scheduled_days,
+    step,
+    week_start_of,
+)
 from .reminders import REMINDERS_KEY, supports_reminders
 from .taskhook import (
     DONE,
@@ -140,11 +147,15 @@ def _safe_shift(d: date, days: int) -> date:
 def _missed(
     rule: RepeatRule, current: DateLike, today: date, tz: tzinfo, week_start: str, limit: int
 ) -> list[DateLike]:
-    """The scheduled dates from ``current`` up to yesterday, oldest first (by due date only)."""
+    """The newest `limit` scheduled dates from ``current`` up to yesterday, oldest first
+    (by due date only). Capacities shows at most 99 missed occurrences (`OVERDUE_CAP`);
+    Gene: the most recent ones (audit 2026-11-01)."""
     cur_day = _day(current, tz)
     if rule.mode != "dueDate" or cur_day >= today:
         return []
-    return scheduled_between(rule, current, cur_day, today - _ONE_DAY, tz, week_start, limit)
+    return scheduled_between(
+        rule, current, cur_day, today - _ONE_DAY, tz, week_start, limit, newest=True
+    )
 
 
 def overdue_info(state: TaskState, now: datetime, tz: tzinfo, week_start: str) -> dict[str, Any]:
@@ -154,7 +165,7 @@ def overdue_info(state: TaskState, now: datetime, tz: tzinfo, week_start: str) -
     if state.current is not None:
         missed = _missed(state.rule, state.current, today, tz, week_start, OVERDUE_CAP + 1)
     capped = len(missed) > OVERDUE_CAP
-    missed = missed[:OVERDUE_CAP]
+    missed = missed[-OVERDUE_CAP:]
     return {
         "count": len(missed),
         "capped": capped,
@@ -203,7 +214,9 @@ def plan_occurrence(
         return [current], next_date(rule, current, now, today, tz, week_start)
     if catch_up == "advanceOne":
         return [current], _step_once(rule, current, tz, week_start)
-    missed = _missed(rule, current, today, tz, week_start, 10_000)
+    # At most the 99 most recent missed occurrences are logged (Capacities' cap; a daily
+    # task dated 1800 otherwise wrote a 10,001-line log).
+    missed = _missed(rule, current, today, tz, week_start, OVERDUE_CAP)
     nxt = next_date(rule, current, now, today, tz, week_start)
     if catch_up == "catchUpBeforeNow":
         return [missed[-1] if missed else current], nxt
@@ -252,6 +265,28 @@ def _schedule(
     return scheduled_between(rule, current, start, end, tz, ws, limit=100_000)
 
 
+def _history(
+    rule: RepeatRule, current: DateLike | None, start: date, end: date, tz: tzinfo, ws: str
+) -> list[tuple[date, DateLike | None]]:
+    """``(local day, scheduled date)`` of `_schedule`; the date only for the last days.
+
+    An old daily task has tens of thousands of days in its history, but only the
+    last `GRID_PAST` can be cells: the others' dates are not built (None), their
+    days come from the rule's pattern (audit 2026-11-01: 0.98 s for one dated 1800).
+    """
+    if current is None or rule.mode != "dueDate" or end < start:
+        return []
+    days = scheduled_days(rule, current, start, end, tz, limit=100_000)
+    if days is None or len(days) <= GRID_PAST:
+        return [(_day(d, tz), d) for d in _schedule(rule, current, start, end, tz, ws)]
+    first = days[-GRID_PAST]
+    tail = {_day(d, tz): d for d in _schedule(rule, current, first, days[-1], tz, ws)}
+    return [
+        (day, tail.get(day) or (_on_day(current, day, tz) if day >= first else None))
+        for day in days
+    ]
+
+
 def task_stats(
     rule: RepeatRule,
     current: DateLike | None,
@@ -283,12 +318,12 @@ def task_stats(
     period = _PERIOD_DAYS.get(rule.unit, 31) * max(1, rule.every)
 
     occ: dict[date, _Occ] = dict(logged)
-    scheduled_days: set[date] = set()
-    for d in _schedule(rule, current, start, today, tz, week_start):
-        day = _day(d, tz)
-        scheduled_days.add(day)
+    on_schedule: set[date] = set()
+    for day, d in _history(rule, current, start, today, tz, week_start):
+        on_schedule.add(day)
         if day not in occ:
-            occ[day] = _Occ(day, format_scheduled(d), "missed" if day < today else "future")
+            scheduled = format_scheduled(d) if d is not None else ""  # never a cell, see `_history`
+            occ[day] = _Occ(day, scheduled, "missed" if day < today else "future")
     future: list[_Occ] = []
     ahead = _safe_shift(today, period * (GRID_FUTURE + 1) + 7)
     for d in _schedule(rule, current, _safe_shift(today, 1), ahead, tz, week_start):
@@ -312,7 +347,7 @@ def task_stats(
     completed = sum(o.state == "completed" for o in resolved)
     against = sum(o.state in ("skipped", "missed") for o in resolved)
     rate = completed / (completed + against) if completed + against else None
-    at_risk = today in scheduled_days and today not in logged and streak > 0
+    at_risk = today in on_schedule and today not in logged and streak > 0
 
     past = [o for o in ordered if o.day <= today]
     later = sorted([*(o for o in ordered if o.day > today), *future], key=lambda o: o.day)

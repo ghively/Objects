@@ -1,9 +1,11 @@
+import errno
 import hashlib
+import os
 from pathlib import Path
 
 import pytest
 
-from objectapp.space import ObjectSummary, Space
+from objectapp.space import Conflict, ObjectSummary, Space, version_of
 from objectapp.typedefs import infer_types_from, iter_object_paths, read_raw
 from objectapp.typemodel import load_types
 
@@ -151,6 +153,22 @@ def test_paths_outside_space_rejected(space_dir):
         s.read("../outside.md")
 
 
+def test_over_long_path_component_is_a_value_error(space_dir, monkeypatch):
+    # Audit 2026-11-01 #4b: the routes map ValueError to 400; an OSError would be a 503.
+    s = Space(space_dir)
+    with pytest.raises(ValueError):
+        s._rel("Pages/" + "a" * 300 + ".md")
+    with pytest.raises(ValueError):
+        s.read("a" * 256 + "/Alpha.md")
+
+    def resolve(self, strict=False):  # what some Python builds and Windows do
+        raise OSError(errno.ENAMETOOLONG, "File name too long")
+
+    monkeypatch.setattr(type(Path()), "resolve", resolve)
+    with pytest.raises(ValueError):
+        s._rel("Pages/Alpha.md")
+
+
 def test_resolve_same_folder_first(space_dir):
     s = Space(space_dir)
     assert s.resolve("Alpha", "Pages/x.md") == "Pages/Alpha.md"
@@ -201,3 +219,98 @@ def test_open_never_writes(space_dir):
     for t in s2.types:
         s2.list(t.id)
     assert _hashes(space_dir) == before
+
+
+def test_a_read_does_not_wait_for_a_saves_fsync(space_dir, monkeypatch):
+    # Audit 2026-11-01 B11: the lock is released while the temp file is synced.
+    import threading
+    import time
+
+    s = Space(space_dir)
+    rel = "People/Ada Lovelace.md"
+    base = s.read(rel)[2]
+    in_fsync = threading.Event()
+
+    def slow_fsync(fd):
+        in_fsync.set()
+        time.sleep(0.4)
+
+    monkeypatch.setattr(os, "fsync", slow_fsync)
+    waits: list[float] = []
+
+    def save() -> None:
+        s.save_body(rel, "A new body\n", base)
+
+    writer = threading.Thread(target=save)
+    writer.start()
+    assert in_fsync.wait(5)
+    t0 = time.perf_counter()
+    listed = s.list()
+    waits.append(time.perf_counter() - t0)
+    writer.join(10)
+    assert not writer.is_alive()
+    assert listed and waits[0] < 0.2, waits
+    assert s.read(rel)[0].body == "A new body\n"
+    assert s.get(rel).title == "Ada Lovelace"
+    # The conflict guarantee survived the split: a write between the read and the
+    # replace is seen and nothing is overwritten.
+    full = space_dir / rel
+    original = full.read_bytes()
+
+    def external_edit(fd):
+        full.write_bytes(original.replace(b"A new body", b"Someone else's body"))
+
+    monkeypatch.setattr(os, "fsync", external_edit)
+    with pytest.raises(Conflict):
+        s.save_body(rel, "Mine\n", version_of(original))
+    assert b"Someone else's body" in full.read_bytes()
+    assert not list(full.parent.glob("*.tmp"))
+
+
+def test_a_write_rescans_from_what_it_wrote_without_reading_the_file_again(space_dir, monkeypatch):
+    # Audit 2026-11-01 B1: `_write` reads the file once; the rescan reuses the written object.
+    from objectapp import space as space_mod
+    from objectapp.frontmatter import parse_fm
+
+    s = Space(space_dir)
+    reads: list[str] = []
+    rescans: list[str] = []
+    real_read, real_parse = space_mod.read_raw, space_mod.parse_fm
+    parses: list[str] = []
+
+    def spy_read(root, rel):
+        reads.append(rel)
+        return real_read(root, rel)
+
+    def spy_parse(src):
+        parses.append(src)
+        return real_parse(src)
+
+    monkeypatch.setattr(space_mod, "read_raw", spy_read)
+    monkeypatch.setattr(space_mod, "parse_fm", spy_parse)
+    monkeypatch.setattr(Space, "rescan_file", lambda self, path: rescans.append(path))
+    rel = "People/Ada Lovelace.md"
+
+    def same_as_disk(rel: str = rel) -> None:
+        assert s._raw[rel] == real_read(space_dir, rel)
+        assert s._summaries[rel] == s._summarize(real_read(space_dir, rel))
+
+    # A body save: `_write` reads the file once and the frontmatter only gets the stamp,
+    # so nothing is parsed or re-read for the rescan.
+    s.save_body(rel, "New body\n", s.cached_version(rel))
+    assert reads == [rel] and parses == [] and rescans == []
+    same_as_disk()
+    assert s.get(rel).lastUpdated != "2026-01-10T08:00:00.000Z"
+    # A property edit changes the frontmatter: parsed from what was written, not re-read.
+    reads.clear()
+    s.update_properties(rel, {"description": "A new description"}, s.cached_version(rel))
+    assert rescans == []
+    same_as_disk()
+    assert s.get(rel).description == "A new description"
+    # A file without frontmatter gets a fence block with the stamp and an id.
+    bare = "Pages/Notes.md"
+    s.save_body(bare, "Body of a bare page\n", s.cached_version(bare))
+    assert rescans == []
+    same_as_disk(bare)
+    assert s.get(bare).id and s.get(bare).lastUpdated
+    assert parse_fm(s._raw[bare].of.frontmatter_src)["id"] == s.get(bare).id

@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react'
+import { act, fireEvent, render } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 import { EdgeLabel } from './EdgeLabel'
 
@@ -19,6 +19,16 @@ function renderLabel(over: Partial<Parameters<typeof EdgeLabel>[0]> = {}) {
 }
 
 describe('EdgeLabel', () => {
+  test('the typed label commits when the edge unmounts before blur (it left the viewport)', async () => {
+    const { props, container, unmount } = renderLabel({ text: '', editing: true, selected: true })
+    const input = container.querySelector('input')!
+    fireEvent.change(input, { target: { value: 'new label' } })
+    unmount()
+    await act(async () => {})
+    expect(props.onCommit).toHaveBeenCalledTimes(1)
+    expect(props.onCommit).toHaveBeenCalledWith('new label')
+  })
+
   test('sits at the midpoint with the reference label attributes', () => {
     const { box } = renderLabel({ selected: true })
     expect(box!.textContent).toBe('uplink')

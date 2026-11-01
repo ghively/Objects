@@ -179,6 +179,117 @@ describe('DataView multi-select (Task 18)', () => {
     expect(selectedTitles()).toEqual([])
   })
 
+  test('Escape with a dialog open closes the dialog, not the selection', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await startSelecting(user, 'A')
+    await user.click(screen.getByRole('button', { name: 'Delete objects' }))
+    await screen.findByRole('alertdialog')
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(selectedTitles()).toEqual(['A'])
+  })
+
+  test('deselecting the last row leaves "Select multiple"', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await startSelecting(user, 'B')
+    await user.click(screen.getByText('B'))
+    expect(screen.queryByTestId('selection-bar')).toBeNull()
+    // A click opens the peek again.
+    await user.click(screen.getByText('C'))
+    expect(usePeek.getState().path).toBe('Pages/C.md')
+  })
+
+  test('bulk delete goes past a failing row, reports the count and keeps only the failed rows selected', async () => {
+    mocked.deleteObject.mockImplementation(async (path) => {
+      if (path === 'Pages/B.md') throw new Error('Locked.')
+      return { trashId: 't' }
+    })
+    const user = userEvent.setup()
+    render(<Harness />)
+    await startSelecting(user, 'A')
+    await user.click(screen.getByText('B'))
+    await user.click(screen.getByText('C'))
+    await user.click(screen.getByRole('button', { name: 'Delete objects' }))
+    const dialog = await screen.findByRole('alertdialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Delete 3 objects' }))
+    await waitFor(() => expect(mocked.deleteObject).toHaveBeenCalledTimes(3))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('1 of 3 objects could not be deleted. Locked.')
+    expect(selectedTitles()).toEqual(['B'])
+  })
+
+  test('the row menu moves focus with the arrow keys, Home and End, and opens the submenu with Right', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.pointer({ keys: '[MouseRight]', target: rowEl('B') })
+    const menu = await screen.findByTestId('row-menu')
+    const item = (name: string) => within(menu).getByRole('menuitem', { name })
+    expect(item('Select multiple')).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(item('Open in side panel')).toHaveFocus()
+    await user.keyboard('{End}')
+    expect(item('Delete Object')).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(item('Select multiple')).toHaveFocus()
+    await user.keyboard('{ArrowUp}')
+    expect(item('Delete Object')).toHaveFocus()
+    await user.keyboard('{Home}')
+    await user.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}')
+    expect(item('Change type')).toHaveFocus()
+    await user.keyboard('{ArrowRight}')
+    const sub = await within(menu).findByRole('menu', { name: 'Change type' })
+    expect(within(sub).getByRole('menuitem', { name: 'Book' })).toHaveFocus()
+    await user.keyboard('{ArrowLeft}')
+    expect(within(menu).queryByRole('menu', { name: 'Change type' })).toBeNull()
+    expect(item('Change type')).toHaveFocus()
+    // Enter activates the focused item.
+    await user.keyboard('{Home}{Enter}')
+    expect(screen.queryByTestId('row-menu')).toBeNull()
+    expect(selectedTitles()).toEqual(['B'])
+  })
+
+  test('Tab keeps focus in the row menu, as in the app\'s Radix menus', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.pointer({ keys: '[MouseRight]', target: rowEl('B') })
+    const menu = await screen.findByTestId('row-menu')
+    const first = within(menu).getByRole('menuitem', { name: 'Select multiple' })
+    expect(first).toHaveFocus()
+    await user.keyboard('{Tab}')
+    expect(first).toHaveFocus()
+    await user.keyboard('{Shift>}{Tab}{/Shift}')
+    expect(first).toHaveFocus()
+    expect(screen.getByTestId('row-menu')).toBeInTheDocument()
+  })
+
+  // A tooltip is no overlay: Escape still clears the selection.
+  test('Escape clears the selection while a tooltip is shown', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await startSelecting(user, 'A')
+    const tip = document.createElement('div')
+    tip.setAttribute('data-radix-popper-content-wrapper', '')
+    tip.innerHTML = '<div role="tooltip">Hint</div>'
+    document.body.appendChild(tip)
+    try {
+      await user.keyboard('{Escape}')
+      expect(screen.queryByTestId('selection-bar')).toBeNull()
+    } finally {
+      tip.remove()
+    }
+  })
+
+  test('Escape closes the row menu and returns focus to the row', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.pointer({ keys: '[MouseRight]', target: rowEl('B') })
+    await screen.findByTestId('row-menu')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByTestId('row-menu')).toBeNull()
+    expect(within(rowEl('B')).getByRole('button')).toHaveFocus()
+  })
+
   test('test table and card rows show the selection', async () => {
     const user = userEvent.setup()
     const { unmount } = render(<Harness layout="table" />)

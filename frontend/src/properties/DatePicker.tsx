@@ -296,7 +296,7 @@ function TimeInput({ label, point, onChange }: { label: string; point: string; o
         if (!m || !valid) return
         onChange(fromWallClock(new Date(d.getFullYear(), d.getMonth(), d.getDate(), +m[1], +m[2])).toISOString())
       }}
-      className="h-8 w-28 shrink-0 rounded-md border border-line bg-raised px-2 text-[14px] text-fg outline-none [color-scheme:dark]"
+      className="h-8 w-28 shrink-0 rounded-md border border-line bg-raised px-2 text-[14px] text-fg outline-none"
     />
   )
 }

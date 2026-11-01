@@ -1,0 +1,73 @@
+import { act, render, screen } from '@testing-library/react'
+import { useState } from 'react'
+import { describe, expect, test, vi } from 'vitest'
+import type { Row, ViewState } from '@/api/types'
+import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
+
+vi.mock('@/api/client', async (orig) => ({
+  ...(await orig<typeof import('@/api/client')>()),
+  api: (await import('@/test/mockApi')).mockApi(),
+}))
+
+import { useLinkIndex } from '@/links/linkIndex'
+import { DataView } from './DataView'
+import { emptyFilterGroup } from './model'
+
+const N = 2000
+const PAGE = typeDef({
+  id: 'page',
+  propertyDefinitions: [
+    propertyDef({ id: 'title', type: 'entity_title', name: 'Title' }),
+    propertyDef({ id: 'note', type: 'text', name: 'Note' }),
+    propertyDef({ id: 'qty', type: 'number', name: 'Qty' }),
+    propertyDef({ id: 'done', type: 'boolean', name: 'Done' }),
+    propertyDef({ id: 'status', type: 'label', name: 'Status', options: { set: [{ id: 'o1', text: 'Todo', color: null, icon: null }] } }),
+    propertyDef({ id: 'due', type: 'datetime', name: 'Due' }),
+  ],
+})
+const mk = (i: number): Row =>
+  row({
+    summary: objectSummary({ path: `P/${i}.md`, type: 'page', title: `Row ${i}`, createdAt: new Date(2026, 0, 1 + (i % 300)).toISOString() }),
+    values: { note: `n${i}`, qty: i, done: i % 2 === 0, status: ['Todo'], due: { start: '2026-10-01', resolution: 'day' } },
+    version: 'v1',
+  })
+const ROWS = Array.from({ length: N }, (_, i) => mk(i))
+
+let setRowsOuter: ((r: Row[]) => void) | null = null
+function Harness({ layout }: { layout: 'list' | 'table' }) {
+  const [rows, setRows] = useState(ROWS)
+  setRowsOuter = setRows
+  const [state, setState] = useState<ViewState>({
+    viewDefinition: { dataViewLayout: layout },
+    filterGroup: { ...emptyFilterGroup(), elements: [{ type: 'filter', propertyId: 'qty', option: 'greaterEqual', referenceValue: 0 }] },
+    sorts: [{ propertyId: 'note', option: 'ascending' }],
+    groupBy: null,
+  })
+  return <DataView rows={rows} types={[PAGE]} scope={{ typeIds: ['page'] }} state={state} onState={setState} layouts={['list', 'table']} patchRow={(p, r) => setRows((cur) => cur.map((x) => (x.summary.path === p ? r : x)))} />
+}
+
+const timed = (label: string, fn: () => void) => {
+  const t0 = performance.now()
+  fn()
+  const ms = performance.now() - t0
+  console.log(`${label}: ${ms.toFixed(0)} ms`)
+  return ms
+}
+
+describe('audit: DataView render cost (jsdom)', () => {
+  test('list and table: first render and one patched row', () => {
+    // 5,000 objects in the link index, as DataView's ctx reads them.
+    useLinkIndex.setState({ objects: Array.from({ length: 5000 }, (_, i) => objectSummary({ path: `O/${i}.md`, id: `id${i}`, title: `O ${i}` })), loaded: true })
+    for (const layout of ['list', 'table'] as const) {
+      const r = timed(`${layout}: first render (${N} rows, 50 visible)`, () => { render(<Harness layout={layout} />) })
+      expect(r).toBeGreaterThan(0)
+      for (let k = 0; k < 3; k++) {
+        timed(`${layout}: re-render after one patchRow`, () => {
+          act(() => setRowsOuter!(ROWS.map((x, i) => (i === 7 ? { ...x, values: { ...x.values, qty: 1000 + k } } : x))))
+        })
+      }
+      screen.getAllByText(/Row 7/)
+      document.body.innerHTML = ''
+    }
+  }, 120000)
+})

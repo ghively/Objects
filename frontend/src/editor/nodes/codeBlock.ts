@@ -16,8 +16,11 @@
 import { CodeBlock as BaseCodeBlock } from '@tiptap/extension-code-block'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
+import { Decoration, type DecorationSet } from '@tiptap/pm/view'
 import { ReactNodeViewRenderer } from '@tiptap/react'
+import { buildDecorations, updateDecorations, type DecorationVisitor } from '../extensions/incrementalDecorations'
 import type { Option } from '../annotations'
+import { codeFence } from '../preserve'
 import { CodeBlockView } from '../code/CodeBlockView'
 import { codeHighlightPlugin } from '../code/highlight'
 import '../../theme/codeSyntax.css'
@@ -29,14 +32,22 @@ export function isLockedCodeBlock(node: PMNode): boolean {
   return opts.some((o) => o.key === 'lock' && o.value === true)
 }
 
+/** The locked code blocks, kept as node decorations so a transaction need not scan the document. */
+const lockedVisitor: DecorationVisitor = (node, pos, decos) => {
+  if (isLockedCodeBlock(node)) decos.push(Decoration.node(pos, pos + node.nodeSize, {}, { locked: true }))
+  return node.type.name !== 'codeBlock' && !node.isTextblock
+}
+
+/** The text ranges of the locked code blocks of `state` (from the lock plugin's state, else a scan). */
+function lockedRanges(state: EditorState): [number, number][] {
+  const set = CodeBlockLockKey.getState(state) ?? buildDecorations(state.doc, lockedVisitor)
+  return set.find().map((d) => [d.from + 1, d.to - 1])
+}
+
 /** Whether `tr` changes text strictly inside a locked code block of `state`. */
 export function touchesLockedCode(tr: Transaction, state: EditorState): boolean {
   if (!tr.docChanged) return false
-  const locked: [number, number][] = []
-  state.doc.descendants((node, pos) => {
-    if (isLockedCodeBlock(node)) locked.push([pos + 1, pos + node.nodeSize - 1])
-    return node.type.name !== 'codeBlock'
-  })
+  const locked = lockedRanges(state)
   if (!locked.length) return false
   let hit = false
   tr.steps.forEach((step, i) => {
@@ -50,18 +61,10 @@ export function touchesLockedCode(tr: Transaction, state: EditorState): boolean 
   return hit
 }
 
-export const CodeBlockLockKey = new PluginKey('codeBlockLock')
+export const CodeBlockLockKey = new PluginKey<DecorationSet>('codeBlockLock')
 
-/**
- * The fence for `text`: three backticks, or one more than the longest run of
- * backticks that starts a line inside (CommonMark: such a line would
- * otherwise close the block early).
- */
-export function codeFence(text: string): string {
-  let longest = 0
-  for (const m of text.matchAll(/^ {0,3}(`{3,})/gm)) longest = Math.max(longest, m[1].length)
-  return '`'.repeat(Math.max(3, longest + 1))
-}
+/** The fence for `text` (`preserve.ts`): three backticks, or more when a line inside would close it. */
+export { codeFence }
 
 export const CodeBlock = BaseCodeBlock.extend({
   renderMarkdown: (node, h) => {
@@ -79,8 +82,12 @@ export const CodeBlock = BaseCodeBlock.extend({
   addProseMirrorPlugins() {
     return [
       ...(this.parent?.() ?? []),
-      new Plugin({
+      new Plugin<DecorationSet>({
         key: CodeBlockLockKey,
+        state: {
+          init: (_, state) => buildDecorations(state.doc, lockedVisitor),
+          apply: (tr, old) => updateDecorations(old, tr, lockedVisitor),
+        },
         filterTransaction: (tr, state) => !touchesLockedCode(tr, state),
       }),
       codeHighlightPlugin(this.name),

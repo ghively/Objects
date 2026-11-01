@@ -120,6 +120,22 @@ describe('external changes', () => {
     expect(mocked.object).not.toHaveBeenCalled()
   })
 
+  // Review fix 2026-11-01 #3: the stream's reconnect resync (`types` with path `*`) reaches the
+  // open editor, which re-checks its version instead of staying stale until a 409.
+  test('a resync after the stream reconnected reloads a clean editor whose file changed meanwhile', async () => {
+    const { editor } = await openPage()
+    onDisk = detail(THEIRS, 'v2')
+    emit({ kind: 'types', path: '*', version: null, origin: null })
+    await waitFor(() => expect(serializeBody(editor)).toBe(THEIRS))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(mocked.saveBody).not.toHaveBeenCalled()
+    // Nothing changed on disk: the resync fetches once and keeps the editor as it is.
+    mocked.object.mockClear()
+    emit({ kind: 'types', path: '*', version: null, origin: null })
+    await waitFor(() => expect(mocked.object).toHaveBeenCalledTimes(1))
+    expect(serializeBody(editor)).toBe(THEIRS)
+  })
+
   test('a file deleted and restored with the same bytes clears the banner and saves again', async () => {
     const { editor } = await openPage()
     emit({ kind: 'deleted', path: PATH, version: null })

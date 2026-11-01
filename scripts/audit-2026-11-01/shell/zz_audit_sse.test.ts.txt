@@ -1,0 +1,71 @@
+// AUDIT SCRATCH (delete before finishing): SSE reconnect behaviour of api/client.ts with a fake EventSource.
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+
+type Listener = (e: unknown) => void
+
+class FakeEventSource {
+  static instances: FakeEventSource[] = []
+  url: string
+  listeners = new Map<string, Set<Listener>>()
+  onopen: Listener | null = null
+  onerror: Listener | null = null
+  closed = false
+  constructor(url: string) {
+    this.url = url
+    FakeEventSource.instances.push(this)
+  }
+  addEventListener(type: string, cb: Listener) {
+    if (!this.listeners.has(type)) this.listeners.set(type, new Set())
+    this.listeners.get(type)!.add(cb)
+  }
+  removeEventListener(type: string, cb: Listener) {
+    this.listeners.get(type)?.delete(cb)
+  }
+  dispatch(type: string, data?: string) {
+    for (const cb of this.listeners.get(type) ?? []) cb({ data })
+    if (type === 'open') this.onopen?.({})
+    if (type === 'error') this.onerror?.({})
+  }
+  close() {
+    this.closed = true
+  }
+}
+
+beforeEach(() => {
+  FakeEventSource.instances = []
+  vi.stubGlobal('EventSource', FakeEventSource)
+  vi.resetModules()
+})
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+describe('audit: SSE reconnect', () => {
+  test('after the stream drops and reconnects, listeners get no resync and nothing refetches', async () => {
+    const { api } = await import('@/api/client')
+    const seen: unknown[] = []
+    api.onChange((e) => seen.push(e))
+    const es = FakeEventSource.instances[0]
+    expect(es).toBeDefined()
+    // What the client listens for on the EventSource:
+    expect([...es.listeners.keys()]).toEqual(['change'])
+    expect(es.onerror).toBeNull()
+    expect(es.onopen).toBeNull()
+    // The server restarts (or the laptop sleeps): the browser fires error, then reconnects (open).
+    es.dispatch('error')
+    es.dispatch('open')
+    // An event published while disconnected is gone (the hub has no replay, no Last-Event-ID).
+    expect(seen).toEqual([])
+  })
+
+  test('a malformed or foreign-origin event is handled; own-origin echo dropped', async () => {
+    const { api, CLIENT_ID } = await import('@/api/client')
+    const seen: unknown[] = []
+    api.onChange((e) => seen.push(e))
+    const es = FakeEventSource.instances[0]
+    es.dispatch('change', JSON.stringify({ kind: 'changed', path: 'a.md', version: 'v2', origin: CLIENT_ID }))
+    es.dispatch('change', JSON.stringify({ kind: 'changed', path: 'b.md', version: 'v2', origin: 'other' }))
+    es.dispatch('change', 'not json')
+    expect(seen).toEqual([{ kind: 'changed', path: 'b.md', version: 'v2', origin: 'other' }])
+  })
+})

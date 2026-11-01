@@ -16,7 +16,7 @@
  * - Pending changes are flushed on unmount and on `pagehide`.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, ConflictError, ReadOnlyError } from '@/api/client'
+import { api, ConflictError, isResync, ReadOnlyError } from '@/api/client'
 import { whiteboardApi, type WhiteboardApi } from '@/api/whiteboardClient'
 import type { WhiteboardData } from '@/api/whiteboardTypes'
 import { announceSave, onLocalSave } from './localSaves'
@@ -178,7 +178,7 @@ class BoardSaver {
     this.onToast(`${WB.saveFailed.text}${reason}`)
   }
 
-  /** The server copy replaces everything here (history cleared). */
+  /** The server copy replaces the board here (the undo steps are rebased onto it). */
   reload(board: WhiteboardData, revision: string, readOnlyReason: string | null): void {
     const s = this.store.getState()
     s.canvas.load({ board, strokes: s.doc.strokes })
@@ -187,6 +187,11 @@ class BoardSaver {
     s.canvas.setReadOnly(readOnlyReason)
   }
 
+  /**
+   * Saves what is pending now, waiting for the save in flight first. One failed attempt ends it
+   * (the retry timer it set, or the next edit, tries again): a server that is down must not get a
+   * burst of PUTs on unmount, a tab switch or `pagehide`.
+   */
   async flush(): Promise<void> {
     if (this.timer) {
       clearTimeout(this.timer)
@@ -196,6 +201,7 @@ class BoardSaver {
       if (this.inFlight) await this.inFlight
       else if (!this.readOnly && this.store.getState().boardSeq !== this.savedSeq) await this.save()
       else return
+      if (this.failures > 0) return
     }
   }
 }
@@ -255,6 +261,8 @@ export function useBoard(
     }
     const offChange = api.onChange((e) => {
       if ((e.kind as string) === 'whiteboard' && e.path === path) changedElsewhere(e.version)
+      // The stream reconnected: the board may have changed meanwhile; the revision check decides.
+      else if (isResync(e, 'types')) changedElsewhere(null)
     })
     const offLocal = onLocalSave((e) => {
       if (e.source !== saver && e.path === path) changedElsewhere(e.version)

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { REMINDER_NOTICE, ReminderMenu } from './ReminderMenu'
@@ -48,5 +48,20 @@ describe('ReminderMenu', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reminder: No reminder' }))
     await userEvent.click(screen.getByRole('menuitemradio', { name: '5 minutes before' }))
     expect(screen.queryByText(REMINDER_NOTICE)).toBeNull()
+  })
+
+  it('the Time field follows a remote change unless it is being edited', async () => {
+    const onChange = vi.fn()
+    const { rerender } = render(<ReminderMenu value="on the day at 09:00" resolution="day" onChange={onChange} />)
+    const input = screen.getByLabelText('Time') as HTMLInputElement
+    expect(input.value).toBe('09:00')
+    rerender(<ReminderMenu value="on the day at 15:00" resolution="day" onChange={onChange} />)
+    expect(input.value).toBe('15:00')
+    // While the field has focus a remote change waits; it applies on blur.
+    act(() => input.focus())
+    rerender(<ReminderMenu value="on the day at 18:00" resolution="day" onChange={onChange} />)
+    expect(input.value).toBe('15:00')
+    act(() => input.blur())
+    expect((screen.getByLabelText('Time') as HTMLInputElement).value).toBe('18:00')
   })
 })

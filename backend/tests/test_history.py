@@ -180,7 +180,8 @@ def test_history_lives_in_state_dir(client, space, clock):
     assert len(index) == 1
     entry = index[0]
     assert set(entry) >= {"id", "at", "rel", "files"}
-    assert entry["rel"] == PAGE and entry["files"] == [entry["id"] + ".md"]
+    # The first version is stored whole, gzipped (audit 2026-11-01: cheap snapshots).
+    assert entry["rel"] == PAGE and entry["files"] == [entry["id"] + ".md.gz"]
     assert (key_dir / entry["files"][0]).is_file()
 
 
@@ -207,8 +208,48 @@ def test_prune_at_200(tmp_path, m8_space_dir):
     assert first not in {v["id"] for v in versions}
     assert versions[-1]["number"] == 1
     assert store.content(PAGE, versions[-1]["id"])["text"].endswith("1")
+    for v in versions:  # every kept version still reads back, deltas included
+        assert store.content(PAGE, v["id"])["text"].endswith(str(v["number"]))
     folder = next((store.dir).iterdir())
-    assert len([p for p in folder.iterdir() if p.suffix == ".md"]) == MAX_VERSIONS
+    index = json.loads((folder / "index.json").read_bytes())
+    assert len(index) == MAX_VERSIONS
+    stored = {name for e in index for name in e["files"]}
+    assert {p.name for p in folder.iterdir()} == stored | {"index.json"}  # no orphan files
+
+
+def test_snapshot_parses_once_and_reads_nothing_for_an_object(m8_space_dir, monkeypatch):
+    """Audit 2026-11-01 B1: `snapshot` parsed the frontmatter 3x and read the file twice."""
+    from objectapp import history
+
+    store = HistoryStore(m8_space_dir)
+    data = (m8_space_dir / PAGE).read_bytes()
+    parses, reads = [], []
+    real_fm_of, real_read = history._fm_of, history._read
+    monkeypatch.setattr(history, "_fm_of", lambda d: parses.append(d) or real_fm_of(d))
+    monkeypatch.setattr(history, "_read", lambda p: reads.append(p) or real_read(p))
+    for i in range(3):
+        vid = store.snapshot(PAGE, data + str(i).encode(), T0 + timedelta(minutes=6 * i))
+        assert vid
+    assert len(parses) == 3  # one per snapshot: the bytes being kept are the file's
+    # The object file itself is never re-read (only the history's own files are).
+    assert all(p.is_relative_to(store.dir) for p in reads)
+    # A caller that already knows the id spares the parse too.
+    parses.clear()
+    object_id = parse_fm(split_object(decode(data).text).frontmatter_src)["id"]
+    assert store.snapshot(PAGE, data, T0 + timedelta(minutes=30), object_id=object_id)
+    assert parses == []
+    assert len(store.versions(PAGE)) == 4  # all under one key
+
+
+def test_a_save_through_the_space_hands_the_id_to_the_snapshot(client, space, monkeypatch):
+    """Re-measured after the fix pass: the hook parsed the frontmatter once per rewritten file."""
+    from objectapp import history
+
+    parses = []
+    real_fm_of = history._fm_of
+    monkeypatch.setattr(history, "_fm_of", lambda d: parses.append(d) or real_fm_of(d))
+    _save_body(client, PAGE, "Saved with the id known.\n")
+    assert parses == []
 
 
 def test_history_follows_rename_by_id(client, space, clock):
@@ -233,7 +274,7 @@ def test_object_without_id_keyed_by_path(client, space, clock):
     store = HistoryStore(space.root)
     vid = store.snapshot(rel, (space.root / rel).read_bytes(), T0)
     key = "path-" + hashlib.sha1(rel.encode()).hexdigest()[:16]
-    assert (store.dir / key / f"{vid}.md").is_file()
+    assert (store.dir / key / f"{vid}.md.gz").is_file()
     # A stamped save inserts an id; the earlier version is still listed for the object.
     clock.advance(minutes=6)
     _save_body(client, rel, "Now with an id.\n")
@@ -406,9 +447,69 @@ def test_relink_and_property_writes_snapshot_referrers(client, space, clock):
 
 
 def test_hook_failure_never_stops_a_write(client, space, monkeypatch):
-    def boom(rel, data):
+    def boom(rel, data, object_id=None):
         raise OSError("disk full")
 
     space.before_write = boom
     _save_body(client, PAGE, "Still saved.\n")
     assert "Still saved." in (space.root / PAGE).read_text(encoding="utf-8")
+
+
+def test_versions_keeps_one_rebuilt_version_in_memory(tmp_path):
+    """End review 2: `versions()` kept every rebuilt version (404 MB for a 2 MB x 200 file)."""
+    import tracemalloc
+
+    root = tmp_path / "space"
+    (root / "Pages").mkdir(parents=True)
+    store = HistoryStore(root)
+    rel = "Pages/Hub.md"
+    body = bytearray(b"x" * 1_000_000)
+    for i in range(100):
+        body[i * 100 : i * 100 + 10] = b"edit%06d" % i
+        data = b"---\nid: 01JC8M80000000000000000099\ntitle: Hub\n---\n" + bytes(body)
+        assert store.snapshot(rel, data, T0 + timedelta(minutes=6 * i))
+    (root / rel).write_bytes(data)
+    tracemalloc.start()
+    try:
+        versions = store.versions(rel)
+        _cur, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert len(versions) == 100
+    assert {v["title"] for v in versions} == {"Hub"}
+    assert peak < 8_000_000, peak  # a few rebuilt copies, not one per version
+
+
+def test_a_corrupt_gzip_version_reads_as_unreadable(tmp_path):
+    """End review 2: a `.md.gz` whose deflate stream is damaged raised `zlib.error` (a 500)."""
+    import gzip
+    import zlib
+
+    from objectapp.history import VersionNotFound
+
+    root = tmp_path / "space"
+    (root / "Pages").mkdir(parents=True)
+    store = HistoryStore(root)
+    rel = "Pages/Hub.md"
+    data = b"---\nid: 01JC8M80000000000000000098\ntitle: Hub\n---\n" + bytes(range(256)) * 40
+    vid = store.snapshot(rel, data, T0)
+    (root / rel).write_bytes(data)
+    path = next(store.dir.iterdir()) / f"{vid}.md.gz"
+    packed = path.read_bytes()
+    for i in range(10, len(packed) - 8):  # the first flip that breaks the deflate stream itself
+        bad = bytearray(packed)
+        bad[i] ^= 0xFF
+        try:
+            gzip.decompress(bytes(bad))
+        except zlib.error:
+            break
+        except (OSError, EOFError, ValueError):
+            continue
+    else:
+        pytest.fail("no single flipped byte gives zlib.error")
+    path.write_bytes(bytes(bad))
+    versions = store.versions(rel)
+    assert [v["id"] for v in versions] == [vid]
+    assert versions[0]["title"] is None  # like any version whose bytes are gone
+    with pytest.raises(VersionNotFound):
+        store.content(rel, vid)

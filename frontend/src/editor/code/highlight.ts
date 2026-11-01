@@ -10,56 +10,93 @@
  * language changes, debounced (`HIGHLIGHT_DEBOUNCE_MS`); in between, the old
  * decorations are mapped through the edit so nothing flickers. Blocks above
  * `MAX_HIGHLIGHT_CHARS` are left plain (our choice, keeps typing responsive).
+ *
+ * A grammar is loaded and registered the first time a block in its language
+ * is seen (audit 2026-11-01 F1: the grammars are 180 KB the app's entry does
+ * not need); until then the block is plain, and the plugin highlights it as
+ * soon as the grammar is there.
  */
+import type { LanguageFn } from 'highlight.js'
 import hljs from 'highlight.js/lib/core'
-import bash from 'highlight.js/lib/languages/bash'
-import c from 'highlight.js/lib/languages/c'
-import cpp from 'highlight.js/lib/languages/cpp'
-import csharp from 'highlight.js/lib/languages/csharp'
-import css from 'highlight.js/lib/languages/css'
-import diff from 'highlight.js/lib/languages/diff'
-import dockerfile from 'highlight.js/lib/languages/dockerfile'
-import go from 'highlight.js/lib/languages/go'
-import graphql from 'highlight.js/lib/languages/graphql'
-import ini from 'highlight.js/lib/languages/ini'
-import java from 'highlight.js/lib/languages/java'
-import javascript from 'highlight.js/lib/languages/javascript'
-import json from 'highlight.js/lib/languages/json'
-import kotlin from 'highlight.js/lib/languages/kotlin'
-import latex from 'highlight.js/lib/languages/latex'
-import lua from 'highlight.js/lib/languages/lua'
-import makefile from 'highlight.js/lib/languages/makefile'
-import markdown from 'highlight.js/lib/languages/markdown'
-import nginx from 'highlight.js/lib/languages/nginx'
-import php from 'highlight.js/lib/languages/php'
-import powershell from 'highlight.js/lib/languages/powershell'
-import python from 'highlight.js/lib/languages/python'
-import r from 'highlight.js/lib/languages/r'
-import ruby from 'highlight.js/lib/languages/ruby'
-import rust from 'highlight.js/lib/languages/rust'
-import scss from 'highlight.js/lib/languages/scss'
-import sql from 'highlight.js/lib/languages/sql'
-import swift from 'highlight.js/lib/languages/swift'
-import typescript from 'highlight.js/lib/languages/typescript'
-import xml from 'highlight.js/lib/languages/xml'
-import yaml from 'highlight.js/lib/languages/yaml'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { languageOf } from './languages'
 
-const GRAMMARS = {
-  bash, c, cpp, csharp, css, diff, dockerfile, go, graphql, ini, java, javascript, json, kotlin, latex, lua,
-  makefile, markdown, nginx, php, powershell, python, r, ruby, rust, scss, sql, swift, typescript, xml, yaml,
-}
-for (const [name, grammar] of Object.entries(GRAMMARS)) {
-  if (!hljs.getLanguage(name)) hljs.registerLanguage(name, grammar)
+type GrammarModule = { default: LanguageFn }
+
+/** The grammars our language list names (`languages.ts` `hljs`), each loaded on demand. */
+const LOADERS: Record<string, () => Promise<GrammarModule>> = {
+  bash: () => import('highlight.js/lib/languages/bash'),
+  c: () => import('highlight.js/lib/languages/c'),
+  cpp: () => import('highlight.js/lib/languages/cpp'),
+  csharp: () => import('highlight.js/lib/languages/csharp'),
+  css: () => import('highlight.js/lib/languages/css'),
+  diff: () => import('highlight.js/lib/languages/diff'),
+  dockerfile: () => import('highlight.js/lib/languages/dockerfile'),
+  go: () => import('highlight.js/lib/languages/go'),
+  graphql: () => import('highlight.js/lib/languages/graphql'),
+  ini: () => import('highlight.js/lib/languages/ini'),
+  java: () => import('highlight.js/lib/languages/java'),
+  javascript: () => import('highlight.js/lib/languages/javascript'),
+  json: () => import('highlight.js/lib/languages/json'),
+  kotlin: () => import('highlight.js/lib/languages/kotlin'),
+  latex: () => import('highlight.js/lib/languages/latex'),
+  lua: () => import('highlight.js/lib/languages/lua'),
+  makefile: () => import('highlight.js/lib/languages/makefile'),
+  markdown: () => import('highlight.js/lib/languages/markdown'),
+  nginx: () => import('highlight.js/lib/languages/nginx'),
+  php: () => import('highlight.js/lib/languages/php'),
+  powershell: () => import('highlight.js/lib/languages/powershell'),
+  python: () => import('highlight.js/lib/languages/python'),
+  r: () => import('highlight.js/lib/languages/r'),
+  ruby: () => import('highlight.js/lib/languages/ruby'),
+  rust: () => import('highlight.js/lib/languages/rust'),
+  scss: () => import('highlight.js/lib/languages/scss'),
+  sql: () => import('highlight.js/lib/languages/sql'),
+  swift: () => import('highlight.js/lib/languages/swift'),
+  typescript: () => import('highlight.js/lib/languages/typescript'),
+  xml: () => import('highlight.js/lib/languages/xml'),
+  yaml: () => import('highlight.js/lib/languages/yaml'),
 }
 
 export const HIGHLIGHT_DEBOUNCE_MS = 150
 export const MAX_HIGHLIGHT_CHARS = 200_000
 
-/** The highlight.js grammars registered here. */
+const loads = new Map<string, Promise<boolean>>()
+const loadListeners = new Set<() => void>()
+
+/** Load and register the grammar `name` once; true when it is registered (false for one we do not ship). */
+export function loadGrammar(name: string): Promise<boolean> {
+  if (hljs.getLanguage(name)) return Promise.resolve(true)
+  const loader = LOADERS[name]
+  if (!loader) return Promise.resolve(false)
+  let load = loads.get(name)
+  if (!load) {
+    load = loader()
+      .then((mod) => {
+        if (!hljs.getLanguage(name)) hljs.registerLanguage(name, mod.default)
+        for (const fn of loadListeners) fn()
+        return true
+      })
+      .catch(() => false)
+    loads.set(name, load)
+  }
+  return load
+}
+
+/** Run `fn` each time a grammar has loaded; returns the unsubscribe. */
+function onGrammarLoaded(fn: () => void): () => void {
+  loadListeners.add(fn)
+  return () => loadListeners.delete(fn)
+}
+
+/** The grammars we ship (loaded or not). */
+export function knownGrammars(): string[] {
+  return Object.keys(LOADERS)
+}
+
+/** The highlight.js grammars registered so far. */
 export function registeredGrammars(): string[] {
   return hljs.listLanguages()
 }
@@ -123,16 +160,23 @@ function tokensFromHtml(html: string): Token[] {
   return out.filter((t) => t.className.trim())
 }
 
-/** The grammar for a fence language, or null when it stays plain. */
+/** The grammar for a fence language (loaded or still to load), or null when it stays plain. */
 export function grammarOf(language: string | null | undefined): string | null {
   const g = languageOf(language).hljs
-  return g && hljs.getLanguage(g) ? g : null
+  return g && g in LOADERS ? g : null
 }
 
-/** The highlighted runs of `text` in `language` ([] when plain, unknown or too long). */
+/**
+ * The highlighted runs of `text` in `language` ([] when plain, unknown or too
+ * long, and until the grammar has loaded, which this starts).
+ */
 export function highlightTokens(text: string, language: string | null | undefined): Token[] {
   const grammar = grammarOf(language)
   if (!grammar || !text || text.length > MAX_HIGHLIGHT_CHARS) return []
+  if (!hljs.getLanguage(grammar)) {
+    void loadGrammar(grammar)
+    return []
+  }
   try {
     return tokensFromHtml(hljs.highlight(text, { language: grammar, ignoreIllegals: true }).value)
   } catch {
@@ -146,8 +190,11 @@ const cache = new WeakMap<PMNode, Token[]>()
 function nodeTokens(node: PMNode): Token[] {
   let tokens = cache.get(node)
   if (!tokens) {
-    tokens = highlightTokens(node.textContent, String(node.attrs.language ?? ''))
-    cache.set(node, tokens)
+    const language = String(node.attrs.language ?? '')
+    tokens = highlightTokens(node.textContent, language)
+    // A block waiting for its grammar is not remembered as plain.
+    const grammar = grammarOf(language)
+    if (!grammar || hljs.getLanguage(grammar)) cache.set(node, tokens)
   }
   return tokens
 }
@@ -170,7 +217,8 @@ export const CodeHighlightKey = new PluginKey<DecorationSet>('codeHighlight')
 /**
  * The decoration plugin. The initial document and a loaded body are highlighted
  * at once; after an edit the old decorations are mapped and a fresh pass runs after the debounce,
- * delivered as a meta-only transaction (no document change, nothing saved).
+ * delivered as a meta-only transaction (no document change, nothing saved). A grammar that
+ * arrives later brings a fresh pass too.
  */
 export function codeHighlightPlugin(typeName = 'codeBlock', debounceMs = HIGHLIGHT_DEBOUNCE_MS): Plugin<DecorationSet> {
   return new Plugin<DecorationSet>({
@@ -193,20 +241,25 @@ export function codeHighlightPlugin(typeName = 'codeBlock', debounceMs = HIGHLIG
     view(view) {
       let timer: ReturnType<typeof setTimeout> | null = null
       let destroyed = false
+      const refresh = () => {
+        if (destroyed) return
+        const tr = view.state.tr.setMeta(CodeHighlightKey, highlightDecorations(view.state.doc, typeName))
+        tr.setMeta('addToHistory', false)
+        view.dispatch(tr)
+      }
+      const unsubscribe = onGrammarLoaded(refresh)
       return {
         update(v, prev) {
           if (v.state.doc.eq(prev.doc)) return
           if (timer) clearTimeout(timer)
           timer = setTimeout(() => {
             timer = null
-            if (destroyed) return
-            const tr = view.state.tr.setMeta(CodeHighlightKey, highlightDecorations(view.state.doc, typeName))
-            tr.setMeta('addToHistory', false)
-            view.dispatch(tr)
+            refresh()
           }, debounceMs)
         },
         destroy() {
           destroyed = true
+          unsubscribe()
           if (timer) clearTimeout(timer)
         },
       }

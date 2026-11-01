@@ -1,8 +1,9 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import type { Collection, Filter, FilterGroup, PropertyDef, Row, TypeDef } from '@/api/types'
 import { collection, objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
 import { FILTER_OPTIONS, filterIsValid, filterOptionsFor, matchFilter, matchGroup, applyFilters, rowValue, type FilterCtx } from './filter'
 import { resolveRelative } from './dates'
+import { groupRows } from './group'
 
 const now = new Date(2026, 9, 23, 12, 0)
 
@@ -405,5 +406,40 @@ describe('backlinks filter (M5)', () => {
     expect(paths(applyFilters(rows, group('and', f('backlinks', 'contains', [])), bctx))).toEqual(['a', 'b', 'c'])
     // Unknown operators stay invalid.
     expect(filterIsValid(f('backlinks', 'is', 'x'), { person })).toBe(false)
+  })
+})
+
+describe('filter and group passes read the zone once per instant (audit 2026-11-01 P7)', () => {
+  // The zone is read through `Intl.DateTimeFormat.formatToParts`; the previous code resolved the
+  // reference range and the value's day boundaries per row (several reads each).
+  const dates = Array.from({ length: 200 }, (_, i) => `2026-${String(1 + (i % 12)).padStart(2, '0')}-${String(1 + (i % 28)).padStart(2, '0')}T09:00:00Z`)
+  const rows = dates.map((d, i) => R(`d${i}`, { due: { start: d, resolution: 'time' } }))
+  const count = (fn: () => void): number => {
+    const spy = vi.spyOn(Intl.DateTimeFormat.prototype, 'formatToParts')
+    try {
+      fn()
+      return spy.mock.calls.length
+    } finally {
+      spy.mockRestore()
+    }
+  }
+
+  // 200 rows over 84 distinct instants (lcm of 12 months and 28 days).
+  const DISTINCT = 84
+
+  test('two date filters over 200 rows read the zone once per distinct instant plus the two ranges', () => {
+    const fg = group('and', f('due', 'isAfter', { relative: 'today' }), f('due', 'isOnOrBefore', { relative: 'inOneMonth' }))
+    const before = paths(rows.filter((r) => matchGroup(r, fg, ctx())))
+    // Each range resolves once (a handful of reads); before, every row read it again, 1,600+ in all.
+    expect(count(() => applyFilters(rows, fg, ctx()))).toBeLessThan(DISTINCT + 40)
+    // Same answers as the per-row path.
+    expect(paths(applyFilters(rows, fg, ctx()))).toEqual(before)
+    expect(before.length).toBeGreaterThan(0)
+  })
+
+  test('grouping 200 rows by day reads the zone once per distinct instant, plus now', () => {
+    const by = { groups: [{ propertyId: 'due', option: 'day' }] }
+    expect(count(() => groupRows(rows, by, undefined, ctx()))).toBeLessThanOrEqual(DISTINCT + 1)
+    expect(groupRows(rows, by, undefined, ctx()).groups.length).toBe(DISTINCT)
   })
 })

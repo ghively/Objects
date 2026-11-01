@@ -1,0 +1,20 @@
+PropertyPanel 40 props mount wall ms: 319.6
+PropertyPanel 40 props mount profiler ms: 186.5
+PropertyPanel one value change rerender wall ms: 45.2
+PropertyPanel one value change profiler ms: 34
+Backlinks 500 wall ms to first paint: 1309
+Backlinks 500 profiler ms: 684.3
+Backlinks entries in DOM: 500
+Backlinks 500: linkIndex revision bump rerender wall ms: 369
+Backlinks 500: linkIndex revision bump profiler ms: 317.2
+filterGraph 5000 nodes / 10000 links best-of-3 ms: 2.5
+visible nodes / links: 5000 / 5000
+GraphCanvas 5000 mount wall ms (graph build + seed, layout in worker): 148.5
+fa2 layouts started after mount: 1
+GraphCanvas: linkIndex objects refresh (same data) rerender wall ms: 83.4
+GraphCanvas: layouts restarted by that refresh: 1
+DayView 500 tasks wall ms to rows: 449.5
+DayView 500 tasks profiler ms: 377.3
+DayView rows in DOM: 50
+MonthView 31 notes wall ms to cards: 71.5
+MonthView profiler ms: 59.3

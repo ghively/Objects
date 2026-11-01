@@ -1,9 +1,9 @@
 // The table's calculation footer: the short label and the value per column; an empty column
-// offers "Calculate" on hover.
-import { useState } from 'react'
+// offers "Calculate" on hover. The results are computed once per rows/calculations change.
+import { useMemo, useState } from 'react'
 import type { PropertyDef, Row, TableColumn, ViewState } from '@/api/types'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { CALC_KINDS, CALC_LABELS, calculate } from '../calc'
+import { CALC_KINDS, CALC_LABELS, calculate, type CalcResult } from '../calc'
 import type { FilterCtx } from '../filter'
 
 export interface CalcFooterProps {
@@ -19,9 +19,9 @@ export interface CalcFooterProps {
   sticky: Record<string, number>
 }
 
-type CellProps = Pick<CalcFooterProps, 'rows' | 'state' | 'onState' | 'ctx' | 'typeId'> & { col: TableColumn; def: PropertyDef }
+type CellProps = Pick<CalcFooterProps, 'state' | 'onState' | 'typeId'> & { col: TableColumn; def: PropertyDef; result: CalcResult | null }
 
-function CalcCell({ col, def, rows, state, onState, ctx, typeId }: CellProps) {
+function CalcCell({ col, def, result, state, onState, typeId }: CellProps) {
   const [open, setOpen] = useState(false)
   const calcs = state.viewDefinition.calculations ?? []
   const current = calcs.find((c) => c.propertyId === col.id)
@@ -35,7 +35,6 @@ function CalcCell({ col, def, rows, state, onState, ctx, typeId }: CellProps) {
     setOpen(false)
   }
   if (kinds.length === 0) return null
-  const result = current ? calculate(rows, col.id, current.kind, ctx) : null
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -70,7 +69,14 @@ function CalcCell({ col, def, rows, state, onState, ctx, typeId }: CellProps) {
   )
 }
 
-export function CalcFooter({ columns, defs, widths, sticky, ...rest }: CalcFooterProps) {
+export function CalcFooter({ columns, defs, widths, sticky, rows, ctx, ...rest }: CalcFooterProps) {
+  const calcs = rest.state.viewDefinition.calculations
+  // One pass over the rows per column with a calculation, redone only when they or the rows change.
+  const results = useMemo(() => {
+    const out: Record<string, CalcResult> = {}
+    for (const c of calcs ?? []) if (defs[c.propertyId]) out[c.propertyId] = calculate(rows, c.propertyId, c.kind, ctx, c.structureId)
+    return out
+  }, [rows, calcs, defs, ctx])
   return (
     <div role="row" data-testid="calc-footer" className="flex h-8 border-t border-line">
       {columns.map((c) => {
@@ -83,7 +89,7 @@ export function CalcFooter({ columns, defs, widths, sticky, ...rest }: CalcFoote
             style={{ width: `${widths[c.id] ?? c.colWidth}rem`, ...(left !== undefined ? { position: 'sticky', left: `${left}rem`, zIndex: 1 } : {}) }}
             className="h-full shrink-0 border-r border-line bg-app"
           >
-            {def && <CalcCell col={c} def={def} {...rest} />}
+            {def && <CalcCell col={c} def={def} result={results[c.id] ?? null} {...rest} />}
           </div>
         )
       })}

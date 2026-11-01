@@ -9,10 +9,14 @@
  * - `hold()` / `resume()` let the owner pause saving while it resolves an external change.
  * - Any other failure (a file locked by another program, the server gone) sets
  *   `saveError` and retries with a growing delay until a save succeeds.
+ * - `leave()` (the editor leaving an object or unmounting) saves pending edits; edits
+ *   that can't be saved (saving is paused, or the save fails after the object was
+ *   left) are kept in `unsaved.ts` and offered when the object opens again.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api, ConflictError, ReadOnlyError } from '@/api/client'
 import type { FindControl } from './extensions/findInPage'
+import { dropUnsaved, keepUnsaved } from './unsaved'
 
 export const AUTOSAVE_DELAY_MS = 1000
 /** First retry delay after a failed save; it doubles up to `AUTOSAVE_RETRY_MAX_MS`. */
@@ -28,12 +32,17 @@ export type AutosaveOptions = {
   getBody: () => string | null
   onSaved: (version: string) => void
   onConflict?: (currentVersion: string) => void
+  /** The id of the object at `path`, when known: kept unsaved text is tied to it (`unsaved.ts`). */
+  objectId?: string | null
 }
 
 export function useAutosave(opts: AutosaveOptions) {
   const optsRef = useRef(opts)
+  /** The object id last seen at each path this editor showed (kept text is tied to it). */
+  const idsRef = useRef(new Map<string, string | null>())
   useLayoutEffect(() => {
     optsRef.current = opts
+    if (opts.objectId !== undefined) idsRef.current.set(opts.path, opts.objectId)
   })
 
   const versionRef = useRef(opts.version)
@@ -49,6 +58,8 @@ export function useAutosave(opts: AutosaveOptions) {
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retryDelayRef = useRef(AUTOSAVE_RETRY_MS)
   const [saveError, setSaveError] = useState<string | null>(null)
+  /** False once the editor using this hook has unmounted. */
+  const aliveRef = useRef(true)
 
   const clearRetry = useCallback(() => {
     if (retryTimerRef.current !== null) {
@@ -86,10 +97,20 @@ export function useAutosave(opts: AutosaveOptions) {
             savedBodyRef.current = body
             retryDelayRef.current = AUTOSAVE_RETRY_MS
             setSaveError(null)
+            // What is on disk is now newer than any text kept for this object
+            // earlier (e.g. by a settle while saving was paused): offering that
+            // again would revert these edits.
+            dropUnsaved(path, idsRef.current.get(path))
             optsRef.current.onSaved(res.version)
           }
         } catch (err) {
-          if (err instanceof ConflictError) {
+          if (!aliveRef.current || optsRef.current.path !== path) {
+            // The editor has left this object: nobody is there to resolve a conflict
+            // or see a retry, so keep the text to offer when the object opens again:
+            // the text asked for on leaving, when it is newer than this save's.
+            const q = queuedRef.current
+            keepUnsaved(path, q?.path === path && q.body !== null ? q.body : body, idsRef.current.get(path))
+          } else if (err instanceof ConflictError) {
             pausedRef.current = true
             setSaveError(null)
             optsRef.current.onConflict?.(err.currentVersion)
@@ -157,13 +178,29 @@ export function useAutosave(opts: AutosaveOptions) {
   )
 
   /**
+   * While saving is paused (a conflict being resolved, a read-only file), unsaved edits
+   * can't be written; keep them for the next open. `settle` runs this too: a space switch
+   * settles every editor and then reloads the page, which never runs an unmount.
+   */
+  const keepIfPaused = useCallback((path?: string): boolean => {
+    const o = optsRef.current
+    if (!pausedRef.current || o.readOnly) return false
+    const body = o.getBody()
+    if (body !== null && savedBodyRef.current !== null && body !== savedBodyRef.current) {
+      keepUnsaved(path ?? o.path, body, idsRef.current.get(path ?? o.path))
+    }
+    return true
+  }, [])
+
+  /**
    * Save now and resolve only once nothing is left to save: any save already in
    * flight, and any save queued behind it, has finished.
    */
   const settle = useCallback(async (): Promise<void> => {
+    keepIfPaused()
     await flush()
     while (runningRef.current) await runningRef.current
-  }, [flush])
+  }, [flush, keepIfPaused])
   useLayoutEffect(() => {
     flushRef.current = flush
   }, [flush])
@@ -220,18 +257,36 @@ export function useAutosave(opts: AutosaveOptions) {
 
   const isPending = useCallback(() => timerRef.current !== null, [])
 
-  useEffect(
-    () => () => {
+  /**
+   * The editor is leaving `path` (switching objects or unmounting): save pending
+   * edits under it. While saving is paused (a conflict being resolved, a read-only
+   * file) they can't be saved, so they are kept to be offered on the next open.
+   */
+  const leave = useCallback(
+    (path?: string): Promise<void> => {
+      if (keepIfPaused(path)) {
+        cancel()
+        return Promise.resolve()
+      }
+      return flush(path)
+    },
+    [cancel, flush, keepIfPaused],
+  )
+
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
       cancel()
       clearRetry()
-    },
-    [cancel, clearRetry],
-  )
+    }
+  }, [cancel, clearRetry])
 
   return {
     schedule,
     flush,
     settle,
+    leave,
     markLoaded,
     cancel,
     hold,

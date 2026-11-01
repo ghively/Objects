@@ -6,7 +6,7 @@
  */
 import type { DeviceSettings } from '@/api/types'
 import { useCalendar } from '@/calendar/useCalendar'
-import { useTabs } from './tabs'
+import { sameTarget, tabTarget, useTabs, type Target } from './tabs'
 
 export type OpenOnStart = DeviceSettings['openOnStart'][string]
 
@@ -22,9 +22,16 @@ export function applyOpenOnStart(choice: OpenOnStart | undefined): void {
     case 'calendar':
       tabs.open({ kind: 'calendar' })
       return
-    case 'specificObject':
-      if (choice.path) tabs.open({ kind: 'object', path: choice.path })
+    case 'specificObject': {
+      if (!choice.path) return
+      const target: Target = { kind: 'object', path: choice.path }
+      // A tab already showing it is activated; else the active tab navigates to it, even a
+      // persistent one, so a start never stacks a new tab behind it (audit 2026-11-01).
+      const shown = tabs.tabs.find((t) => sameTarget(tabTarget(t), target))
+      if (shown) tabs.activate(shown.id)
+      else tabs.open(target, { inPlace: true })
       return
+    }
     case 'lastOpenedPage':
       return
   }

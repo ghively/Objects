@@ -80,7 +80,7 @@ describe('DataViewEmbedView', () => {
     expect(await within(embed).findByText('Alpha book')).toBeInTheDocument()
     expect(within(embed).queryByText('Beta book')).toBeNull()
     expect(within(embed).getByTestId('data-view-embed-title')).toHaveTextContent('Reading')
-    expect(mocked.rows).toHaveBeenCalledWith({ collectionIds: ['c1'] })
+    expect(mocked.rows).toHaveBeenCalledWith({ collectionIds: ['c1'], preview: false })
     // Rendering writes nothing.
     expect(serializeBody(editor)).toBe(body)
 

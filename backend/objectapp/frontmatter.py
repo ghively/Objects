@@ -21,13 +21,15 @@ from __future__ import annotations
 import io
 import json
 import re
+import threading
 from collections.abc import Callable, Iterable
 from typing import Any
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
-from ruamel.yaml.constructor import SafeConstructor
+from ruamel.yaml.constructor import ConstructorError, SafeConstructor
 from ruamel.yaml.error import YAMLError
+from ruamel.yaml.nodes import MappingNode
 from ruamel.yaml.scalarstring import (
     DoubleQuotedScalarString,
     LiteralScalarString,
@@ -46,6 +48,7 @@ __all__ = [
     "rename_key",
     "replace_in_value",
     "set_keys",
+    "take_parsed",
 ]
 
 # Strings that a YAML 1.1/1.2 resolver would read as a timestamp. The export
@@ -67,8 +70,26 @@ class FlowList(list):
     """
 
 
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+_MERGE_MESSAGE = "Frontmatter uses a merge key (<<), which can't be edited in place"
+
+
+def _has_top_level_merge(node: Any) -> bool:
+    return isinstance(node, MappingNode) and any(k.tag == _MERGE_TAG for k, _v in node.value)
+
+
 class _PlainConstructor(SafeConstructor):
-    """Safe constructor that keeps timestamps as their source text."""
+    """Safe constructor that keeps timestamps as their source text.
+
+    A merge key at the top level (``<<: *anchor``) is refused: the merged-in keys
+    have no lines of their own, so none of the line-splicing edits below could
+    work on the file (the round-trip loader reports the same via ``data.merge``).
+    """
+
+    def construct_document(self, node: Any) -> Any:
+        if _has_top_level_merge(node):
+            raise ConstructorError(None, None, _MERGE_MESSAGE, node.start_mark)
+        return super().construct_document(node)
 
 
 _PlainConstructor.add_constructor(
@@ -77,18 +98,35 @@ _PlainConstructor.add_constructor(
 )
 
 
+# One YAML instance of each kind per thread: constructing one costs about as much as
+# parsing a typical frontmatter (audit 2026-11-01, B3). `load` and `dump` reset the
+# instance's reader, scanner and emitter afterwards; one that failed mid-parse is
+# dropped (`_discard_yaml`) rather than trusted again.
+_local = threading.local()
+
+
 def _plain_yaml() -> YAML:
-    y = YAML(typ="safe", pure=True)
-    y.Constructor = _PlainConstructor
+    y = getattr(_local, "plain", None)
+    if y is None:
+        y = YAML(typ="safe", pure=True)
+        y.Constructor = _PlainConstructor
+        _local.plain = y
     return y
 
 
 def _rt_yaml() -> YAML:
-    y = YAML(typ="rt")
-    y.preserve_quotes = True
-    y.width = 4096
-    y.indent(mapping=2, sequence=4, offset=2)
+    y = getattr(_local, "rt", None)
+    if y is None:
+        y = YAML(typ="rt")
+        y.preserve_quotes = True
+        y.width = 4096
+        y.indent(mapping=2, sequence=4, offset=2)
+        _local.rt = y
     return y
+
+
+def _discard_yaml(kind: str) -> None:
+    setattr(_local, kind, None)
 
 
 def _plain(value: Any) -> Any:
@@ -117,7 +155,13 @@ def parse_fm(src: str) -> dict:
     try:
         data = _plain_yaml().load(src)
     except YAMLError as exc:
+        _discard_yaml("plain")
         raise FrontmatterError(str(exc)) from exc
+    except RecursionError as exc:
+        # ruamel's composer recurses per nesting level: `[[[[…` 500 deep is a bad file,
+        # not a crash of the whole space.
+        _discard_yaml("plain")
+        raise FrontmatterError("Frontmatter is nested too deeply") from exc
     if data is None:
         return {}
     if not isinstance(data, dict):
@@ -129,11 +173,17 @@ def _load_rt(src: str) -> CommentedMap | None:
     try:
         data = _rt_yaml().load(src)
     except YAMLError as exc:
+        _discard_yaml("rt")
         raise FrontmatterError(str(exc)) from exc
+    except RecursionError as exc:
+        _discard_yaml("rt")
+        raise FrontmatterError("Frontmatter is nested too deeply") from exc
     if data is None:
         return None
     if not isinstance(data, CommentedMap):
         raise FrontmatterError(f"Frontmatter is a {type(data).__name__}, not a mapping")
+    if data.merge:
+        raise FrontmatterError(_MERGE_MESSAGE)
     return data
 
 
@@ -326,9 +376,11 @@ def _key_token_end(line: str, col: int) -> int:
                     continue
                 return j + 1
             j += 1
-        return len(line)
+        return len(line.rstrip("\r\n"))
     m = re.compile(r":(?=[ \t\r\n]|$)").search(line, col)
-    return m.start() if m else len(line)
+    # An explicit key (`? status` on its own line) has no `:` on the line: the token
+    # ends before the line break, which must stay.
+    return m.start() if m else len(line.rstrip("\r\n"))
 
 
 def _render_key(key: str) -> str:
@@ -358,7 +410,16 @@ def rename_key(src: str, old: str, new: str) -> str:
     row, col = data.lc.key(old)
     line = lines[row]
     lines[row] = line[:col] + _render_key(new) + line[_key_token_end(line, col) :]
-    return "".join(lines)
+    out = "".join(lines)
+    expected = {(new if k == old else k): v for k, v in parse_fm(src).items()}
+    try:
+        if parse_fm(out) == expected:
+            return out
+    except FrontmatterError:
+        pass
+    # The key's line couldn't be spliced (an unusual key form): re-render the key
+    # at the end instead of returning something that doesn't read back.
+    return set_keys(delete_keys(src, [old]), {new: data[old]})
 
 
 # -- in-place value edits --------------------------------------------------------
@@ -513,7 +574,9 @@ def _encode_item(new: str, style: str, indent: str) -> str:
     return "'" + new.replace("'", "''") + "'"
 
 
-def replace_in_value(src: str, key: str, fn: Callable[[str], str]) -> str:
+def replace_in_value(
+    src: str, key: str, fn: Callable[[str], str], parsed: dict | None = None
+) -> str:
     """Apply ``fn`` to each scalar of one key's value, replacing only what changed.
 
     Works on a scalar, a flow list, a block list or a block scalar (each of its
@@ -526,11 +589,25 @@ def replace_in_value(src: str, key: str, fn: Callable[[str], str]) -> str:
     need quoting...) is re-rendered whole, on the key's own lines only. An
     absent key, or no change, returns ``src`` itself. Raises `FrontmatterError`
     when ``src`` or the result is not valid YAML.
+
+    ``parsed`` is `parse_fm` of ``src`` when the caller has it (spares a parse). With it,
+    a value written on its key's one line at the top level (``type: 'Book'``) is edited
+    from the text alone, without the round-trip parse, and the result is checked by one
+    plain parse, which `take_parsed` then hands on instead of a parse of its own.
     """
+    if parsed is not None:
+        if key not in parsed:
+            return src
+        expected = _map_strings(parsed[key], fn)
+        if expected == parsed[key]:
+            return src
+        out = _replace_on_one_line(src, key, fn)
+        if out is not None and _reads_back_as(out, {**parsed, key: expected}):
+            return out
     data = _load_rt(src)
     if data is None or key not in data:
         return src
-    before = parse_fm(src)
+    before = parsed if parsed is not None else parse_fm(src)
     expected = _map_strings(before[key], fn)
     if expected == before[key]:
         return src
@@ -540,7 +617,10 @@ def replace_in_value(src: str, key: str, fn: Callable[[str], str]) -> str:
             after = parse_fm(out)
         except FrontmatterError:
             return False
-        return after.keys() == before.keys() and after[key] == expected
+        if after.keys() == before.keys() and after[key] == expected:
+            _remember_parsed(out, after)
+            return True
+        return False
 
     if not data.fa.flow_style():
         out = _replace_in_place(src, data, key, fn)
@@ -556,6 +636,90 @@ def replace_in_value(src: str, key: str, fn: Callable[[str], str]) -> str:
     if not reads_back(out):
         raise FrontmatterError(f"Rewriting {key!r} broke its value")
     return out
+
+
+_PARSED_KEEP = 8
+_parsed: dict[str, dict] = {}
+"""Source -> its `parse_fm`, kept by the edit that checked it, for `take_parsed` (a few)."""
+_parsed_lock = threading.Lock()
+
+
+def _remember_parsed(src: str, fm: dict) -> None:
+    """Keep ``fm`` (a parse of ``src`` that nothing else holds) for one `take_parsed`."""
+    with _parsed_lock:
+        _parsed.pop(src, None)
+        _parsed[src] = fm
+        while len(_parsed) > _PARSED_KEEP:
+            del _parsed[next(iter(_parsed))]
+
+
+def take_parsed(src: str) -> dict:
+    """`parse_fm` of ``src``: the parse an edit just checked its result with, else a new one.
+
+    A kept parse is handed out once (it is then the caller's to change); a second call
+    parses again. Raises `FrontmatterError` as `parse_fm`.
+    """
+    with _parsed_lock:
+        fm = _parsed.pop(src, None)
+    return fm if fm is not None else parse_fm(src)
+
+
+def _reads_back_as(out: str, expected: dict) -> bool:
+    """Whether ``out`` parses to exactly ``expected`` (the parse is kept for `take_parsed`)."""
+    try:
+        after = parse_fm(out)
+    except FrontmatterError:
+        return False
+    if after != expected:
+        return False
+    _remember_parsed(out, after)
+    return True
+
+
+_ONE_LINE_STOP = frozenset("|>&*!{?-#")
+
+
+def _replace_on_one_line(src: str, key: str, fn: Callable[[str], str]) -> str | None:
+    """`_replace_in_place` from the text alone, for a value on its key's only line.
+
+    The key must start exactly one line, at column 0, written plain, and its value
+    (scalars, or a flow list) must end on that line. Anything else is None (the
+    round-trip path then does it); the caller checks the result by parsing it.
+    """
+    if not _rt_yaml_key_plain(key):
+        return None
+    lines = _lines(src)
+    prefix = key + ":"
+    rows = [
+        i
+        for i, line in enumerate(lines)
+        if line.startswith(prefix) and line[len(prefix) : len(prefix) + 1] in (" ", "\t")
+    ]
+    if len(rows) != 1:
+        return None
+    row = rows[0]
+    line = lines[row]
+    body = line.rstrip("\r\n")
+    rest = body[len(prefix) :].strip()
+    if not rest or rest[0] in _ONE_LINE_STOP:
+        return None
+    if rest[0] == "[" and not rest.endswith("]"):
+        return None  # a flow list running on to the next line
+    if rest[0] in "'\"":
+        start = body.index(rest[0], len(prefix))
+        end = _quoted_end(body, start)
+        if end != len(body.rstrip(" \t")) or end - start < 2 or body[end - 1] != rest[0]:
+            return None  # runs on to the next line, or more follows it (a comment...)
+    nxt = lines[row + 1] if row + 1 < len(lines) else ""
+    if nxt[:1] in (" ", "\t"):
+        return None  # a continuation or a nested value below
+    items = _scan_items(body, len(prefix))
+    if not items:
+        return None
+    text, changed = _edit_items(body, items, fn, multiline_plain=False)
+    if not changed:
+        return None
+    return "".join(lines[:row]) + text + line[len(body) :] + "".join(lines[row + 1 :])
 
 
 def _map_strings(value: Any, fn: Callable[[str], str]) -> Any:
@@ -616,6 +780,16 @@ def _replace_in_place(
             while e > s and text[e - 1] in " \t\r":
                 e -= 1
             items = ([(s, e, "plain")] if e > s else []) + _scan_block_scalar(text, start_at)
+    text, changed = _edit_items(text, items, fn, multiline_plain)
+    if not changed:
+        return None
+    return head + text + tail
+
+
+def _edit_items(
+    text: str, items: list[_ItemSpan], fn: Callable[[str], str], multiline_plain: bool
+) -> tuple[str, bool]:
+    """``text`` with ``fn`` applied to each item it changes, each in its own style."""
     changed = False
     for s, e, style in reversed(items):
         raw = text[s:e]
@@ -635,9 +809,7 @@ def _replace_in_place(
             encoded = _encode_item(new, style, indent)
         text = text[:s] + encoded + text[e:]
         changed = True
-    if not changed:
-        return None
-    return head + text + tail
+    return text, changed
 
 
 def remove_items(src: str, key: str, drop: Callable[[str], bool]) -> str | None:

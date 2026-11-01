@@ -13,6 +13,8 @@ export type RawModeProps = {
   version: string
   onSaved: (version: string) => void
   onConflict?: (currentVersion: string) => void
+  /** The object's id, when known (see `useAutosave`). */
+  objectId?: string | null
   readOnly?: boolean
   /** Optional control handle for external-change and conflict handling (Task 10). */
   controlRef?: Ref<BodyEditorHandle | null>
@@ -34,7 +36,7 @@ const rawTheme = EditorView.theme(
  * debounced, conflict-safe `saveBody` as the formatted editor. Find in page works here too:
  * the handle's `find` is a CodeMirror adapter (`find/rawFind.ts`) the find bar drives.
  */
-export function RawMode({ path, text, version, onSaved, onConflict, readOnly = false, controlRef }: RawModeProps) {
+export function RawMode({ path, text, version, onSaved, onConflict, objectId, readOnly = false, controlRef }: RawModeProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const loadedRef = useRef<{ path: string; text: string } | null>(null)
@@ -48,6 +50,7 @@ export function RawMode({ path, text, version, onSaved, onConflict, readOnly = f
     getBody: () => (viewRef.current ? viewRef.current.state.sliceDoc() : null),
     onSaved,
     onConflict,
+    objectId,
   })
   const autosaveRef = useRef(autosave)
   autosaveRef.current = autosave
@@ -60,7 +63,7 @@ export function RawMode({ path, text, version, onSaved, onConflict, readOnly = f
     })
     viewRef.current = view
     return () => {
-      void autosaveRef.current.flush()
+      void autosaveRef.current.leave()
       view.destroy()
       viewRef.current = null
     }

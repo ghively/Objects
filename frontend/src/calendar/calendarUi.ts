@@ -4,9 +4,13 @@
 // state is fetched and the same edit is re-applied to it once (never a blind overwrite).
 import { api, ConflictError } from '@/api/client'
 import type { CalendarUi, UiState } from '@/api/types'
-import { enqueueUiSave, pendingUiSaves, useUiStore } from '@/shell/usePinned'
+import { showToast } from '@/editor/media/upload'
+import { enqueueUiSave, pendingUiSaves, reloadUi, useUiStore } from '@/shell/usePinned'
 
 export type CalendarDaily = CalendarUi['daily']
+
+/** The toast after a `ui.json` save of the calendar settings failed (Capacities' "Could not save …" form). */
+export const CALENDAR_SAVE_FAILED = 'Could not save the calendar settings'
 
 const EMPTY_DAILY: CalendarDaily = {}
 
@@ -44,15 +48,23 @@ async function save(edit: CalendarEdit): Promise<void> {
   }
 }
 
-/** Apply `edit` to `ui.calendar` now and save it after the edits before it. */
-function enqueue(edit: CalendarEdit): Promise<void> {
+/** Apply `edit` to `ui.calendar` now and save it after the edits before it; a failure says so and reloads. */
+async function enqueue(edit: CalendarEdit): Promise<void> {
   const cur = useUiStore.getState().ui
   useUiStore.setState({ ui: { ...cur, calendar: edit(calendarOf(cur)) } })
-  return enqueueUiSave(() =>
-    save(edit).catch((e: unknown) => {
-      console.warn('Could not save the calendar settings:', e)
-    }),
+  const saved = await enqueueUiSave(() =>
+    save(edit).then(
+      () => true,
+      (e: unknown) => {
+        console.warn('Could not save the calendar settings:', e)
+        return false
+      },
+    ),
   )
+  if (!saved) {
+    showToast(CALENDAR_SAVE_FAILED)
+    await reloadUi()
+  }
 }
 
 /** Merge `patch` into `ui.calendar.daily` now and save it after the edits before it. */
@@ -63,4 +75,18 @@ export function saveCalendarDaily(patch: Partial<CalendarDaily>): Promise<void> 
 /** Set `ui.calendar.weekStart` and/or `hideCalendarSidebar`, keeping the rest of `calendar`. */
 export function saveCalendarUi(patch: Partial<Pick<CalendarUi, 'weekStart' | 'hideCalendarSidebar'>>): Promise<void> {
   return enqueue((cal) => ({ ...cal, ...patch }))
+}
+
+/** Whether the calendar sidebar is open (`ui.calendar.hideCalendarSidebar` absent or false). */
+export function useCalendarSidebarOpen(): boolean {
+  return useUiStore((s) => s.ui.calendar?.hideCalendarSidebar) !== true
+}
+
+/**
+ * Show or hide the calendar sidebar ("Toggle calendar sidebar"), saved to `ui.json`. Here, not in
+ * `CalendarPage`, so the shell's shortcut needs none of the calendar page's code at start.
+ */
+export function toggleCalendarSidebar(): Promise<void> {
+  const hidden = useUiStore.getState().ui.calendar?.hideCalendarSidebar === true
+  return saveCalendarUi({ hideCalendarSidebar: !hidden })
 }

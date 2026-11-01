@@ -180,6 +180,40 @@ describe('board store', () => {
     expect(s.getState().doc.strokes).toEqual([stroke('s1')])
   })
 
+  test('a read-only ink file keeps its strokes out of every edit: clear, undo, redo and ink-select', () => {
+    const b = board([node({ id: 'a', blockId: 'b1' })], [], { b1: textBlock('hi') })
+    const s = createBoardStore({ doc: { board: b, strokes: [stroke('s1')] } })
+    const a = s.getState().actions
+    a.setStrokes([stroke('s1'), stroke('s2')], 'draw') // while the ink file was writable
+    expect(s.getState().strokesSeq).toBe(1)
+    s.getState().canvas.setInkReadOnly(true)
+    expect(s.getState().inkReadOnly).toBe(true)
+    const strokes = s.getState().doc.strokes
+    // Ink-select moves, erases and new strokes are refused.
+    a.setStrokes([stroke('s1')], 'erase')
+    expect(s.getState().doc.strokes).toBe(strokes)
+    // "Clear Whiteboard" clears the board but not the ink.
+    a.clearBoard()
+    expect(s.getState().doc.board.nodes).toEqual({})
+    expect(s.getState().doc.strokes).toBe(strokes)
+    // Undo and redo step through the board's changes and leave the strokes as they are.
+    a.undo() // the clear
+    expect(Object.keys(s.getState().doc.board.nodes)).toEqual(['a'])
+    expect(s.getState().doc.strokes).toBe(strokes)
+    a.undo() // the stroke drawn while writable: the board doesn't change, the ink stays
+    expect(s.getState().doc.strokes).toBe(strokes)
+    a.redo()
+    a.redo()
+    expect(s.getState().doc.board.nodes).toEqual({})
+    expect(s.getState().doc.strokes).toBe(strokes)
+    expect(s.getState().strokesSeq).toBe(1)
+    // Writable again: strokes change as before.
+    s.getState().canvas.setInkReadOnly(false)
+    a.setStrokes([], 'erase')
+    expect(s.getState().doc.strokes).toEqual([])
+    expect(s.getState().strokesSeq).toBe(2)
+  })
+
   test('locked board is view only; unlock still works', () => {
     const s = storeWith(board([node({ id: 'a' })], [], {}, { locked: true }))
     const a = s.getState().actions
@@ -240,6 +274,49 @@ describe('board store', () => {
     const s = createBoardStore({ onMemory })
     s.getState().actions.setTool('hand')
     expect(onMemory).toHaveBeenLastCalledWith(expect.objectContaining({ lastUsedTool: 'hand', lastPointerTool: 'hand' }))
+  })
+
+  test('loading strokes keeps the steps made before, rebased onto the loaded strokes', () => {
+    const s = storeWith(board([node({ id: 'a', position: { x: 0, y: 0 } })]))
+    s.getState().actions.nudge(30, 0, ['a'])
+    s.getState().actions.setStrokes([stroke('mine')], 'draw')
+    s.getState().canvas.loadStrokes([stroke('file'), s.getState().doc.strokes[0] as InkStroke])
+    expect(s.getState().canUndo).toBe(true)
+    s.getState().actions.undo()
+    // The stroke drawn here is undone; the one from the file stays.
+    expect(s.getState().doc.strokes.map((x) => (x as InkStroke).id)).toEqual(['file'])
+    s.getState().actions.undo()
+    expect(s.getState().doc.board.nodes.a.position).toEqual({ x: 0, y: 0 })
+    expect(s.getState().doc.strokes.map((x) => (x as InkStroke).id)).toEqual(['file'])
+    expect(s.getState().canUndo).toBe(false)
+    s.getState().actions.redo()
+    s.getState().actions.redo()
+    expect(s.getState().doc.strokes.map((x) => (x as InkStroke).id)).toEqual(['file', 'mine'])
+  })
+
+  test('an external board load keeps the steps made before', () => {
+    const s = storeWith(board([node({ id: 'a', position: { x: 0, y: 0 } })]))
+    s.getState().actions.nudge(30, 0, ['a'])
+    const cur = s.getState().doc.board
+    s.getState().canvas.load({ board: { ...cur, nodes: { ...cur.nodes, b: node({ id: 'b' }) } }, strokes: [] })
+    s.getState().actions.undo()
+    expect(s.getState().doc.board.nodes.a.position).toEqual({ x: 0, y: 0 })
+    expect(s.getState().doc.board.nodes.b).toBeDefined()
+  })
+
+  test('undo after a reload does not bring back a node another window deleted', () => {
+    const s = storeWith(
+      board([node({ id: 'a', position: { x: 0, y: 0 } }), node({ id: 'b' })], [edge({ id: 'e', source: 'a', target: 'b' })]),
+    )
+    s.getState().actions.nudge(30, 0, ['a'])
+    const cur = s.getState().doc.board
+    const nodes = { ...cur.nodes }
+    delete nodes.a
+    s.getState().canvas.load({ board: { ...cur, nodes, edges: {} }, strokes: [] })
+    s.getState().actions.undo()
+    expect(s.getState().doc.board.nodes.a).toBeUndefined()
+    expect(s.getState().doc.board.edges.e).toBeUndefined()
+    expect(s.getState().doc.board.nodes.b).toBeDefined()
   })
 
   test('loading strokes from the ink file is not an undo step', () => {

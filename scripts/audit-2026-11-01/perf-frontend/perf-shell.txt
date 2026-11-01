@@ -1,0 +1,23 @@
+startup wall ms (mock api, jsdom): 1782.9
+startup profiler ms: 933.3
+startup commits: 8
+startup api calls: {"space":3,"objects":1,"collections":1,"queries":1,"ui":1,"settings":1,"onChange":3}
+startup ObjectIcon renders: 0
+startup pins in DOM: 100
+event#0 wall ms (incl. 150ms debounce + 50ms settle): 460.4
+event#0 profiler ms: 212.3
+event#0 commits: 2
+event#0 api calls delta: {"space":1,"objects":1}
+event#0 ObjectIcon (pin row) renders: 0
+event#1 wall ms (incl. 150ms debounce + 50ms settle): 351.8
+event#1 profiler ms: 114.2
+event#1 commits: 2
+event#1 api calls delta: {"space":1,"objects":1}
+event#1 ObjectIcon (pin row) renders: 0
+event#2 wall ms (incl. 150ms debounce + 50ms settle): 442.7
+event#2 profiler ms: 214
+event#2 commits: 2
+event#2 api calls delta: {"space":1,"objects":1}
+event#2 ObjectIcon (pin row) renders: 0
+objects payload JSON bytes (5000 summaries): 1408121
+listeners registered: 3

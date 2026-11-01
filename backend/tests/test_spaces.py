@@ -318,6 +318,26 @@ def test_startup_parser_error_message(state: Path, capsys):
     assert "Pass --space PATH the first time." in capsys.readouterr().err
 
 
+def test_startup_on_a_taken_port_exits_with_a_message(
+    blocks_space_dir: Path, state: Path, monkeypatch, capsys
+):
+    """Audit 2026-11-01: a second launch must not open a window on a URL it doesn't serve."""
+    import socket
+
+    opened: list[str] = []
+    monkeypatch.setattr(launcher.webbrowser, "open", opened.append)
+    with socket.socket() as taken:
+        taken.bind(("127.0.0.1", 0))
+        taken.listen()
+        port = taken.getsockname()[1]
+        with pytest.raises(SystemExit) as exc:
+            launcher.main(["--space", str(blocks_space_dir), "--port", str(port), "--browser"])
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert f"port {port} is already in use" in err and "--port" in err
+    assert opened == []
+
+
 def test_startup_writes_only_registry_outside_space(
     blocks_space_dir: Path, state: Path, monkeypatch
 ):

@@ -12,12 +12,13 @@ import type {
   PropertyType,
   Row,
   StatusCategory,
+  TypeDef,
 } from '@/api/types'
 import { formatNumber } from '@/properties/format'
 import { STATUS_CATEGORIES, optionCategory } from '@/tasks/statusCategory'
 import { wallClock } from '@/lib/zonedTime'
-import { dateSpan } from './dates'
-import { displayTitle, findDef, rowValue, type FilterCtx } from './filter'
+import { wallStart } from './dates'
+import { defIn, displayTitle, findDef, rowValue, typeMap, type FilterCtx } from './filter'
 
 export interface GroupOption {
   key: string
@@ -106,6 +107,32 @@ type Config = DataViewDefinition['groupByConfig']
 
 export const OTHER_ID = 'other'
 const TEXT_MAX = 500
+// Ids made from values (texts, aliases, linked titles, unknown tags) carry a prefix, so a value
+// "other" is not the Other group and no two kinds of value share an id.
+const TEXT_ID = 'text:'
+const ALIAS_ID = 'alias:'
+const LINK_ID = 'link:'
+const TAG_ID = 'tag:'
+const VALUE_PREFIXES = [TEXT_ID, ALIAS_ID, LINK_ID, TAG_ID]
+
+/** A saved group-config entry's id matches a group's id, or the bare value a view saved before ids carried a prefix. */
+function sameGroupId(saved: string, id: string): boolean {
+  if (saved === id) return true
+  const prefix = VALUE_PREFIXES.find((p) => id.startsWith(p))
+  return prefix !== undefined && saved === id.slice(prefix.length)
+}
+
+/** The saved `groupByConfig.groups` entry for the group `id` (also by its legacy bare id), if any. */
+export function findGroupConfig<T extends { id: string }>(groups: T[] | undefined, id: string): T | undefined {
+  return groups?.find((x) => x.id === id) ?? groups?.find((x) => sameGroupId(x.id, id))
+}
+
+/** Where the group `id` sits in the saved order, or -1. */
+export function groupConfigIndex(groups: { id: string }[] | undefined, id: string): number {
+  if (!groups) return -1
+  const exact = groups.findIndex((x) => x.id === id)
+  return exact >= 0 ? exact : groups.findIndex((x) => sameGroupId(x.id, id))
+}
 
 const DATE_LABELS: Record<string, string> = {
   overdue: 'Overdue',
@@ -218,14 +245,45 @@ function dateOf(row: Row, propertyId: string): DateValue | null {
   return (v as DateValue | null | undefined) ?? null
 }
 
+/** A text group: the whole text is the id (and what a drop writes); only the label is cut. */
 const textBucket = (s: string): Bucket[] => {
-  const t = s.trim().slice(0, TEXT_MAX)
-  return t ? [{ id: t, label: t, sort: t }] : []
+  const t = s.trim()
+  return t ? [{ id: TEXT_ID + t, label: t.slice(0, TEXT_MAX), sort: t }] : []
+}
+
+/** The text a text group stands for: its id without the prefix, which `textBucket` set to the whole text. */
+const groupText = (group: Group) => (group.isOther ? '' : group.id.startsWith(TEXT_ID) ? group.id.slice(TEXT_ID.length) : group.label)
+
+/** What one `groupRows` call computes once and every row reads. */
+interface Scratch {
+  /** Tag title → tag object id (the inverse of `ctx.tagIdsToTitles`). */
+  tagsByTitle: Map<string, string>
+  /** `ctx.now` as a wall-clock carrier (the relative and scheduled buckets). */
+  nowWall: Date
+  /** A date value's start as a carrier, remembered per start text (`wallStart` reads the zone once per instant). */
+  wallOf(v: DateValue | null): Date | null
+}
+
+function scratchFor(ctx: GroupCtx): Scratch {
+  const tagsByTitle = new Map<string, string>()
+  for (const [id, title] of Object.entries(ctx.tagIdsToTitles)) tagsByTitle.set(title, id)
+  const walls = new Map<string, Date | null>()
+  const wallOf = (v: DateValue | null): Date | null => {
+    if (!v || typeof v !== 'object' || !v.start) return null
+    const key = `${v.resolution === 'time' ? 't' : 'd'}${v.start}`
+    let at = walls.get(key)
+    if (at === undefined) {
+      at = wallStart(v)
+      walls.set(key, at)
+    }
+    return at
+  }
+  return { tagsByTitle, nowWall: wallClock(ctx.now), wallOf }
 }
 
 /** The groups a row belongs to for one entry; none means "Other". */
 /** `null` drops the row from every group (a number outside its range). */
-function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type' | 'options'>, ctx: GroupCtx): Bucket[] | null {
+function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type' | 'options'>, ctx: GroupCtx, scratch: Scratch): Bucket[] | null {
   const v = rowValue(row, entry.propertyId)
   switch (def.type) {
     case 'boolean':
@@ -260,10 +318,8 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
       })
       return out
     }
-    case 'entity_tags': {
-      const byTitle = Object.fromEntries(Object.entries(ctx.tagIdsToTitles).map(([id, t]) => [t, id]))
-      return (row.summary.tags ?? []).map((t) => ({ id: byTitle[t] ?? t, label: t, sort: t }))
-    }
+    case 'entity_tags':
+      return (row.summary.tags ?? []).map((t) => ({ id: scratch.tagsByTitle.get(t) ?? TAG_ID + t, label: t, sort: t }))
     case 'entity_collections': {
       const out: Bucket[] = []
       for (const name of row.summary.collections ?? []) {
@@ -280,7 +336,7 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
       return t ? [{ id: t.id, label: t.name, sort: t.name }] : []
     }
     case 'entity_aliases':
-      return (row.summary.aliases ?? []).map((a) => ({ id: a, label: a, sort: a }))
+      return (row.summary.aliases ?? []).map((a) => ({ id: ALIAS_ID + a, label: a, sort: a }))
     case 'number': {
       if (typeof v !== 'number' || Number.isNaN(v)) return []
       if (entry.option !== 'range') {
@@ -304,8 +360,8 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
     case 'datetimeSimple':
     case 'entity_createdAt':
     case 'entity_lastUpdated': {
-      const span = dateSpan(dateOf(row, entry.propertyId))
-      return span ? [dateBucket(wallClock(span.start), entry.option, wallClock(ctx.now))] : []
+      const at = scratch.wallOf(dateOf(row, entry.propertyId))
+      return at ? [dateBucket(at, entry.option, scratch.nowWall)] : []
     }
     case 'entity_title':
       return textBucket(displayTitle(row))
@@ -315,7 +371,7 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
         const out: Bucket[] = []
         for (const m of s.matchAll(/\[\[([^\]|#]+)/g)) {
           const t = m[1].trim()
-          if (t && !out.some((b) => b.id === t)) out.push({ id: t, label: t, sort: t })
+          if (t && !out.some((b) => b.id === LINK_ID + t)) out.push({ id: LINK_ID + t, label: t, sort: t })
         }
         return out
       }
@@ -324,6 +380,18 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
     default:
       return textBucket(typeof v === 'string' ? v : '')
   }
+}
+
+/** Whether `row` groups under `def`: its type is the grouping's (if named) and defines the key as the same kind, or not at all. */
+function sameKind(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'>, type: TypeDef | undefined): boolean {
+  if (entry.structureId && row.summary.type !== entry.structureId) return false
+  const own = defIn(type, entry.propertyId)
+  return !own || own.type === def.type
+}
+
+/** Whether a kanban drop may write `def`'s value on `row` (see `sameKind`): a row of a type with the key as another kind is refused. */
+export function canDropRow(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'>, types: TypeDef[]): boolean {
+  return sameKind(row, entry, def, types.find((t) => t.id === row.summary.type))
 }
 
 const cmpSort = (a: number | string, b: number | string): number =>
@@ -365,8 +433,12 @@ export function groupRows(
     byId.set('true', { id: 'true', label: 'Checked', rows: [], sort: 0, created: Infinity })
     byId.set('false', { id: 'false', label: 'Unchecked', rows: [], sort: 1, created: Infinity })
   }
+  const byType = typeMap(ctx.types)
+  const scratch = scratchFor(ctx)
   for (const row of rows) {
-    const buckets = entry.structureId && row.summary.type !== entry.structureId ? [] : rowBuckets(row, entry, def, ctx)
+    // A row of another type than the grouping's, or one whose type has the key as another kind
+    // (text where the view's definition is a label), can't be bucketed: it sits in Other.
+    const buckets = !sameKind(row, entry, def, byType[row.summary.type]) ? [] : rowBuckets(row, entry, def, ctx, scratch)
     if (!buckets) continue
     if (!buckets.length) {
       other.rows.push(row)
@@ -388,7 +460,7 @@ export function groupRows(
   let list = [...byId.values()]
   if (config?.hideEmptyGroups) list = list.filter((g) => g.rows.length > 0)
   const manualPos = (id: string) => {
-    const i = (config?.groups ?? []).findIndex((x) => x.id === id)
+    const i = groupConfigIndex(config?.groups, id)
     return i < 0 ? Infinity : i
   }
   const cmp: Record<GroupSortOption, (a: Entry, b: Entry) => number> = {
@@ -426,7 +498,7 @@ export function groupRows(
   const groups: Group[] = []
   const hidden: Group[] = []
   for (const g of ordered) {
-    const c = config?.groups?.find((x) => x.id === g.id)
+    const c = findGroupConfig(config?.groups, g.id)
     if (c ? c.isHidden : !!config?.hideByDefault) hidden.push(g)
     else groups.push(g)
   }
@@ -513,8 +585,8 @@ export function valueForGroup(
       return { key, value }
     }
     case 'textBlock':
-      return entry.option === 'entity' ? null : { key, value: group.isOther ? '' : group.label }
+      return entry.option === 'entity' ? null : { key, value: groupText(group) }
     default:
-      return { key, value: group.isOther ? '' : group.label }
+      return { key, value: groupText(group) }
   }
 }

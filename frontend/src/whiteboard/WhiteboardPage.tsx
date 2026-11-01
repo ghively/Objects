@@ -13,7 +13,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { NodeToolbar, Panel } from '@xyflow/react'
-import { api, ConflictError } from '@/api/client'
+import { api, ConflictError, isResync } from '@/api/client'
+import type { ObjectDetail } from '@/api/types'
 import { whiteboardApi, type WhiteboardApi } from '@/api/whiteboardClient'
 import type { MdStamp, WhiteboardBoardToolMemory, WhiteboardSaveResult } from '@/api/whiteboardTypes'
 import { Icon } from '@/components/Icon'
@@ -109,6 +110,12 @@ export function WhiteboardPage({
   })
 
   // ---- ink: the ink file feeds the store's strokes; stroke edits go back to the ink doc ----
+  // While the ink file is read-only, no store edit (clear, undo, redo, ink select) may change the
+  // strokes, or the store would diverge from the file (the ink doc ignores the change).
+  const inkReadOnly = !!inkDoc.readOnlyReason
+  useEffect(() => {
+    store.getState().canvas.setInkReadOnly(inkReadOnly)
+  }, [inkReadOnly, store])
   const sentRef = useRef<InkStroke[] | null>(null)
   useEffect(() => {
     const strokes = inkDoc.strokes
@@ -148,19 +155,36 @@ export function WhiteboardPage({
   const [notesToast, setNotesToast] = useState<string | null>(null)
   const notesRef = useRef<BodyEditorHandle | null>(null)
 
+  // Bumped by every local change of the `.md` (a Notes save, an adopted stamp, a rename, a
+  // conflict reload) and every detail request: an answer to a request older than either is stale
+  // (a GET ordered before a Notes save that has since landed) and must not replace newer state.
+  const localSeqRef = useRef(0)
+  const detailSeqRef = useRef(0)
   const loadDetail = useCallback(async () => {
-    try {
-      const d = await api.object(path)
+    const run = async (again: boolean): Promise<void> => {
+      const seq = ++detailSeqRef.current
+      const local = localSeqRef.current
+      try {
+        const d = await api.object(path)
+        setHasDetail(true)
+        if (seq !== detailSeqRef.current) return
+        // Older than a local change of the `.md`: ask once more, so a change made elsewhere
+        // (a new title) shows now instead of waiting for the next event.
+        if (local !== localSeqRef.current) return again ? undefined : run(true)
+        apply(d)
+      } catch {
+        /* the board still opens; rename and delete wait for the title */
+      }
+    }
+    const apply = (d: ObjectDetail) => {
       versionRef.current = d.version
       setTitle(d.summary.title)
-      setHasDetail(true)
       // Notes with unsaved edits keep them when the body changed on disk; their next save
       // meets the revision check and `onNotesConflict` settles it.
       const h = notesRef.current
       if (!(h && h.isDirty() && d.body !== h.savedBody())) setNotes({ body: d.body, version: d.version })
-    } catch {
-      /* the board still opens; rename and delete wait for the title */
     }
+    return run(false)
   }, [path])
 
   useEffect(() => {
@@ -170,6 +194,10 @@ export function WhiteboardPage({
   useEffect(
     () =>
       api.onChange((e) => {
+        if (isResync(e, 'types')) {
+          void loadDetail() // the stream reconnected: the title and notes may have changed meanwhile
+          return
+        }
         if (e.path !== path) return
         if (e.kind === 'deleted') {
           deletedRef.current = true
@@ -196,6 +224,7 @@ export function WhiteboardPage({
   }, [flush])
 
   const onNotesSaved = useCallback((version: string) => {
+    localSeqRef.current++
     versionRef.current = version
     setNotes((n) => ({ body: notesRef.current?.savedBody() ?? n?.body ?? '', version }))
   }, [])
@@ -207,6 +236,7 @@ export function WhiteboardPage({
    */
   const adoptMdVersion = useCallback(({ mdVersion: version, mdBaseVersion: base }: MdStamp) => {
     if (!version || !base || base !== versionRef.current) return
+    localSeqRef.current++
     versionRef.current = version
     setNotes((n) => (n ? { body: notesRef.current?.savedBody() ?? n.body, version } : n))
   }, [])
@@ -218,6 +248,7 @@ export function WhiteboardPage({
   const onNotesConflict = useCallback(async () => {
     try {
       const d = await api.object(path)
+      localSeqRef.current++
       versionRef.current = d.version
       setTitle(d.summary.title)
       const h = notesRef.current
@@ -251,6 +282,7 @@ export function WhiteboardPage({
     async (next: string) => {
       await flushAll()
       const res = await api.renameObject(path, next, versionRef.current)
+      localSeqRef.current++
       versionRef.current = res.version
       setNotes((n) => (n ? { ...n, version: res.version } : n))
       setTitle(next)

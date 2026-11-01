@@ -76,7 +76,7 @@ describe('QueryPage', () => {
     setup()
     const { unmount } = render(<QueryPage id="q1" />)
     expect(await screen.findByText('Alpha')).toBeInTheDocument()
-    await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['server'] }))
+    await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['server'], preview: false }))
     unmount()
     setup(Q(), [])
     render(<QueryPage id="q1" />)

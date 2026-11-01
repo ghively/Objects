@@ -1,10 +1,9 @@
 // The Calendar page: the chrome over the view chosen in `useCalendar`, and the calendar sidebar
 // (the mini month) at its right edge, open unless `ui.calendar.hideCalendarSidebar`.
 import type { Target } from '@/nav/tabs'
-import { useUiStore } from '@/shell/usePinned'
 import { CalendarChrome } from './CalendarChrome'
 import { CalendarSidePanel } from './CalendarSidePanel'
-import { saveCalendarUi } from './calendarUi'
+import { toggleCalendarSidebar, useCalendarSidebarOpen } from './calendarUi'
 import { rangeFor } from './dates'
 import { DayView } from './DayView'
 import { MonthView } from './MonthView'
@@ -12,19 +11,11 @@ import { ThreeDaysView } from './ThreeDaysView'
 import { WeekView } from './WeekView'
 import { useCalendar, useWeekStart } from './useCalendar'
 
+// The sidebar switch lives in `calendarUi` (the shell's shortcut uses it without this page's code).
+export { toggleCalendarSidebar, useCalendarSidebarOpen }
+
 export interface CalendarPageProps {
   onOpenTarget: (t: Target) => void
-}
-
-/** Whether the calendar sidebar is open (`ui.calendar.hideCalendarSidebar` absent or false). */
-export function useCalendarSidebarOpen(): boolean {
-  return useUiStore((s) => s.ui.calendar?.hideCalendarSidebar) !== true
-}
-
-/** Show or hide the calendar sidebar ("Toggle calendar sidebar"), saved to `ui.json`. */
-export function toggleCalendarSidebar(): Promise<void> {
-  const hidden = useUiStore.getState().ui.calendar?.hideCalendarSidebar === true
-  return saveCalendarUi({ hideCalendarSidebar: !hidden })
 }
 
 export function CalendarPage({ onOpenTarget }: CalendarPageProps) {

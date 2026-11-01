@@ -15,6 +15,7 @@
   --bg-hover-2: #28272b;
   --border-subtle: #2d2c31;
   --danger: #cd1e46;
+  --warning: #fcbb00; /* text-amber-400 in Capacities' dark themes ("Scheduled after deadline") */
   --text: #f4f4f5;
   --text-muted: #9a9aa0;
   --accent-today: #ff0000;

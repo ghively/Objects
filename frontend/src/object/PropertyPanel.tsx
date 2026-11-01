@@ -1,4 +1,4 @@
-import { Fragment, useState, type ReactNode } from 'react'
+import { Fragment, memo, useMemo, useRef, useState, type ReactNode } from 'react'
 import type {
   DateValue,
   EntityRef,
@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useLinkIndex } from '@/links/linkIndex'
 import { AddPropertyMenu, BASIC_TYPE_INFO } from '@/properties/AddPropertyMenu'
-import { cellForDef } from '@/properties/cellFor'
+import { cellForDef, FRONTMATTER_KINDS } from '@/properties/cellFor'
 import { propertyIsEmpty } from '@/properties/format'
 import { kindIcon } from '@/properties/kinds'
 import { PropertyMenu } from '@/properties/PropertyMenu'
@@ -281,6 +281,106 @@ function Row({
   )
 }
 
+/** The handlers every property row gets from the panel (stable across renders). */
+interface RowHandlers {
+  onChange(key: string, value: unknown): void
+  onChangeMany?(updates: Record<string, unknown>, remove?: string[]): void
+  onSetReminder?(key: string, remind: string | null): void
+  onDefChange(next: PropertyDef): Promise<unknown>
+  onTypeChange(next: TypeDef): Promise<unknown> | void
+  onOpenTag?(name: string): void
+  onOpenObject?(path: string): void
+  onChangeType?(): void
+  setMenuFor(id: string | null): void
+  setSettingsFor(id: string | null): void
+  setDeleteFor(id: string | null): void
+}
+
+interface PropertyRowProps {
+  def: PropertyDef
+  value: unknown
+  readOnly: boolean
+  frontmatter?: Record<string, unknown>
+  /** The type, when its definitions can be edited here (the row's PropertyMenu and settings). */
+  type?: TypeDef
+  menuOpen: boolean
+  typeId?: string
+  path?: string
+  handlers: RowHandlers
+}
+
+/** Equal JSON-like values (a cell's value is rebuilt from the frontmatter on every render). */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+  if (Array.isArray(a) !== Array.isArray(b)) return false
+  const ak = Object.keys(a)
+  const bk = Object.keys(b)
+  if (ak.length !== bk.length) return false
+  return ak.every((k) => sameValue((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
+}
+
+/** One property's label and cell: re-renders only when its own definition, value or state changes. */
+const PropertyRow = memo(
+  function PropertyRow({ def, value, readOnly, frontmatter, type, menuOpen, typeId, path, handlers: h }: PropertyRowProps) {
+    const Cell = cellForDef(def)
+    const menu = type
+      ? {
+          open: menuOpen,
+          onOpenChange: (o: boolean) => h.setMenuFor(o ? def.id : null),
+          content: (
+            <PropertyMenu
+              type={type}
+              def={def}
+              onSave={(next) => h.onTypeChange(next)}
+              onEditProperty={() => {
+                h.setMenuFor(null)
+                h.setSettingsFor(def.id)
+              }}
+              onDelete={() => {
+                h.setMenuFor(null)
+                h.setDeleteFor(def.id)
+              }}
+            />
+          ),
+        }
+      : undefined
+    return (
+      <Row label={def.name} icon={def.icon ?? kindIcon(def.type)} menu={menu}>
+        {Cell ? (
+          <Cell
+            def={def}
+            value={value}
+            readOnly={readOnly}
+            onChange={(next: unknown) => h.onChange(def.key, next)}
+            frontmatter={frontmatter}
+            onChangeMany={readOnly ? undefined : h.onChangeMany}
+            onSetReminder={readOnly ? undefined : h.onSetReminder}
+            onDefChange={h.onDefChange}
+            onOpenTag={h.onOpenTag}
+            onOpenObject={h.onOpenObject}
+            onChangeType={h.onChangeType}
+            typeId={typeId}
+            path={path}
+            onOpenSettings={type ? () => h.setSettingsFor(def.id) : undefined}
+          />
+        ) : null}
+      </Row>
+    )
+  },
+  (a, b) =>
+    a.def === b.def &&
+    sameValue(a.value, b.value) &&
+    a.readOnly === b.readOnly &&
+    // Only the kinds whose cell reads sibling keys re-render for another key's change.
+    (!FRONTMATTER_KINDS.has(a.def.type) || sameValue(a.frontmatter, b.frontmatter)) &&
+    a.type === b.type &&
+    a.menuOpen === b.menuOpen &&
+    a.typeId === b.typeId &&
+    a.path === b.path &&
+    a.handlers === b.handlers,
+)
+
 /** Left-side property list: one editable cell per property of the object's type. */
 export function PropertyPanel({
   type,
@@ -319,64 +419,50 @@ export function PropertyPanel({
   }
   const external = externalKeys(type, frontmatter)
 
-  const onDefChange = async (next: PropertyDef) => {
-    if (!type || !onTypeChange) return
-    await onTypeChange({
-      ...type,
-      propertyDefinitions: type.propertyDefinitions.map((d) => (d.id === next.id ? next : d)),
-    })
-  }
+  // The handlers rows get are stable (they read the newest props through `latest`), so a value
+  // change re-renders only its own row, whatever handlers the parent passes per render.
+  const latest = useRef({ type, onChange, onChangeMany, onSetReminder, onTypeChange, onOpenTag, onOpenObject, onChangeType })
+  latest.current = { type, onChange, onChangeMany, onSetReminder, onTypeChange, onOpenTag, onOpenObject, onChangeType }
+  const has = { onChangeMany: !!onChangeMany, onSetReminder: !!onSetReminder, onOpenTag: !!onOpenTag, onOpenObject: !!onOpenObject, onChangeType: !!onChangeType }
+  const handlers = useMemo<RowHandlers>(
+    () => ({
+      onChange: (key, next) => latest.current.onChange?.(key, next),
+      onChangeMany: has.onChangeMany ? (u, r) => latest.current.onChangeMany?.(u, r) : undefined,
+      onSetReminder: has.onSetReminder ? (key, remind) => latest.current.onSetReminder?.(key, remind) : undefined,
+      // Resolves the save's result (null when it failed), so a new label is applied only once saved.
+      onDefChange: async (next) => {
+        const { type: t, onTypeChange: save } = latest.current
+        if (!t || !save) return null
+        return save({ ...t, propertyDefinitions: t.propertyDefinitions.map((d) => (d.id === next.id ? next : d)) })
+      },
+      onTypeChange: (next) => latest.current.onTypeChange?.(next),
+      onOpenTag: has.onOpenTag ? (name) => latest.current.onOpenTag?.(name) : undefined,
+      onOpenObject: has.onOpenObject ? (path) => latest.current.onOpenObject?.(path) : undefined,
+      onChangeType: has.onChangeType ? () => latest.current.onChangeType?.() : undefined,
+      setMenuFor,
+      setSettingsFor,
+      setDeleteFor,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only whether each handler is given matters
+    [has.onChangeMany, has.onSetReminder, has.onOpenTag, has.onOpenObject, has.onChangeType],
+  )
 
-  const renderRow = (def: PropertyDef) => {
-    const Cell = cellForDef(def)
-    const value = cellValue(def, frontmatter, links, summary, backlinks)
-    // Without a type definition (M1 inference) the row is a plain read-only value.
-    const ro = !!readOnly || !typed || !onChange
-    const menu =
-      canEditType && typed && type
-        ? {
-            open: menuFor === def.id,
-            onOpenChange: (o: boolean) => setMenuFor(o ? def.id : null),
-            content: (
-              <PropertyMenu
-                type={type}
-                def={def}
-                onSave={(next) => onTypeChange?.(next)}
-                onEditProperty={() => {
-                  setMenuFor(null)
-                  setSettingsFor(def.id)
-                }}
-                onDelete={() => {
-                  setMenuFor(null)
-                  setDeleteFor(def.id)
-                }}
-              />
-            ),
-          }
-        : undefined
-    return (
-      <Row label={def.name} icon={def.icon ?? kindIcon(def.type)} menu={menu}>
-        {Cell ? (
-          <Cell
-            def={def}
-            value={value}
-            readOnly={ro}
-            onChange={(next: unknown) => onChange?.(def.key, next)}
-            frontmatter={frontmatter}
-            onChangeMany={ro ? undefined : onChangeMany}
-            onSetReminder={ro ? undefined : onSetReminder}
-            onDefChange={onDefChange}
-            onOpenTag={onOpenTag}
-            onOpenObject={onOpenObject}
-            onChangeType={onChangeType}
-            typeId={type?.id ?? summary?.type}
-            path={summary?.path}
-            onOpenSettings={canEditType && typed && type ? () => setSettingsFor(def.id) : undefined}
-          />
-        ) : null}
-      </Row>
-    )
-  }
+  // Without a type definition (M1 inference) the row is a plain read-only value.
+  const ro = !!readOnly || !typed || !onChange
+  const editDefs = canEditType && typed && !!type
+  const renderRow = (def: PropertyDef) => (
+    <PropertyRow
+      def={def}
+      value={cellValue(def, frontmatter, links, summary, backlinks)}
+      readOnly={ro}
+      frontmatter={frontmatter}
+      type={editDefs ? type : undefined}
+      menuOpen={menuFor === def.id}
+      typeId={type?.id ?? summary?.type}
+      path={summary?.path}
+      handlers={handlers}
+    />
+  )
 
   return (
     <aside

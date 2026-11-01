@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from objectapp.propvalues import InvalidValue
 from objectapp.server import create_app
-from objectapp.space import ConfirmRequired, ReadOnly, Skip, Space
+from objectapp.space import ConfirmRequired, ReadOnly, Skip, Space, SpaceChange
 from objectapp.typemodel import (
     LabelOption,
     PropertyDefinition,
@@ -794,3 +794,133 @@ def test_badly_shaped_options_in_a_type_file_are_normalised_on_load(space_dir: P
     assert members.options["allowedTypes"] == []
     assert members.options["fixedSet"] == []
     assert "numberFormat" not in members.options
+
+
+def test_save_type_rewrites_files_without_holding_the_space_lock(space_dir: Path, monkeypatch):
+    # Audit 2026-11-01 P5: the plan runs under the lock; each rewrite takes it for its own
+    # file only, so a reader on another thread gets in between two files.
+    import threading
+
+    for i in range(6):
+        _write(
+            space_dir / "Tasks" / f"Task {i}.md",
+            f"---\ntype: 'Task'\ntitle: Task {i}\nstatus: Not Started\n---\n",
+        )
+    space = Space(space_dir)
+    acquired: list[bool] = []
+    real = Space._rewrite_other
+
+    def spy(self, rel, edit, stamp=False):
+        got: list[bool] = []
+
+        def reader() -> None:
+            ok = self._lock.acquire(timeout=2)
+            got.append(ok)
+            if ok:
+                self._lock.release()
+
+        th = threading.Thread(target=reader)
+        th.start()
+        th.join()
+        acquired.extend(got)
+        return real(self, rel, edit, stamp)
+
+    monkeypatch.setattr(Space, "_rewrite_other", spy)
+    t = _edit(space, "task")
+    for opt in t.prop("status").options["set"]:
+        if opt["text"] == "Not Started":
+            opt["text"] = "Todo"
+    result = _save(space, t)
+    assert len(result.rewritten) == 7
+    assert acquired and all(acquired)
+    texts = [o["text"] for o in space.type_by_id("task").prop("status").options["set"]]
+    assert "Todo" in texts and "Not Started" not in texts
+    assert type_revision(space.root, "task") == result.revision
+
+
+def test_other_type_writes_wait_out_a_running_save(space_dir: Path, monkeypatch):
+    # While `save_type` rewrites outside the lock, a template registration or another
+    # type save of that type is refused (409) instead of racing the JSON write.
+    space = Space(space_dir)
+    seen: dict[str, object] = {}
+    real = Space._apply_type_ops
+
+    def during(self, to_write, run):
+        seen["templates"] = self._save_templates_field(self.type_by_id("task"), {"ids": ["x"]})
+        try:
+            self._commit_type(self.type_by_id("task"), type_revision(self.root, "task"))
+        except RevisionConflict as exc:
+            seen["commit"] = exc
+        return real(self, to_write, run)
+
+    monkeypatch.setattr(Space, "_apply_type_ops", during)
+    t = _edit(space, "task")
+    for opt in t.prop("status").options["set"]:
+        if opt["text"] == "Not Started":
+            opt["text"] = "Todo"
+    result = _save(space, t)
+    assert result.rewritten == ["Tasks/Write docs.md"]
+    assert seen["templates"] is False and isinstance(seen["commit"], RevisionConflict)
+    assert space._types_saving == set()
+    assert space.type_by_id("task").templates.get("ids", []) == []
+
+
+def test_type_save_plans_from_the_scanned_frontmatter_without_parsing_again(
+    space_dir: Path, monkeypatch
+):
+    # Audit 2026-11-01 B10: the ops take the parsed values the space already holds.
+    from objectapp import space as space_mod
+
+    for i in range(5):
+        _write(
+            space_dir / "Tasks" / f"Task {i}.md",
+            f"---\ntype: 'Task'\ntitle: Task {i}\nstatus: Not Started\n---\n",
+        )
+    space = Space(space_dir)
+    parses: list[str] = []
+    real = space_mod.parse_fm
+    round_trips: list[str] = []
+    real_replace, real_set = space_mod.replace_in_value, space_mod.set_keys
+
+    def spy(src):
+        parses.append(src)
+        return real(src)
+
+    def spy_replace(src, key, fn):
+        round_trips.append(key)
+        return real_replace(src, key, fn)
+
+    def spy_set(src, updates, insert_first=None):
+        round_trips.append(str(sorted(updates)))
+        return real_set(src, updates, insert_first=insert_first)
+
+    monkeypatch.setattr(space_mod, "parse_fm", spy)
+    monkeypatch.setattr(space_mod, "replace_in_value", spy_replace)
+    monkeypatch.setattr(space_mod, "set_keys", spy_set)
+    t = _edit(space, "task")
+    status = t.prop("status")
+    status.options["set"] = [o for o in status.options["set"] if o["text"] != "Not Started"]
+    with pytest.raises(ConfirmRequired) as info:
+        _save(space, t)
+    assert info.value.affected == 6
+    # The plan asks each op whether it applies: no YAML is parsed or rewritten for it.
+    assert parses == [] and round_trips == []
+    result = _save(space, t, confirm=True)
+    assert len(result.rewritten) == 6
+    assert all("Not Started" not in (space_dir / rel).read_text() for rel in result.rewritten)
+
+
+def test_save_type_records_the_new_revision_so_refresh_type_is_quiet(space_dir: Path):
+    # Audit 2026-11-01 fix pass: `save_type` wrote the JSON but never recorded its revision,
+    # so the `refresh_type` that `GET /api/types` runs right after a save reloaded the file and
+    # fired a second `types` change for a type that hadn't changed since.
+    space = Space(space_dir)
+    t = _edit(space, "task")
+    t.description = "Edited"
+    result = _save(space, t)
+    changes: list[SpaceChange] = []
+    space.add_listener(changes.append)
+    mem, revision = space.refresh_type("task")
+    assert revision == result.revision
+    assert mem is not None and mem.description == "Edited"
+    assert changes == []

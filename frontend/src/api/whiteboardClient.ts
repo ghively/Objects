@@ -1,4 +1,5 @@
 import { announceLocalChange, api, ApiError, CLIENT_ID, ReadOnlyError, RevisionConflictError } from './client'
+import { announceSave } from '@/whiteboard/localSaves'
 import type {
   BoardResponse,
   CreatedWhiteboard,
@@ -84,7 +85,11 @@ export const whiteboardApi = {
 
   /**
    * `PUT /api/whiteboard`. `baseRevision` `''` creates the file. 409 → `RevisionConflictError(currentRevision)`.
-   * M9: when the save stamped the board `.md`, this window hears a `changed` for it.
+   * M9: when the save stamped the board `.md`, this window hears a `changed` for it. The save is
+   * also announced to the views of the board open in this window (`localSaves`), since the
+   * server's `whiteboard` event for it carries our `CLIENT_ID` and is dropped as an echo: so a
+   * board saved outside a board hook ("Add to whiteboard", "Turn into whiteboard") shows up in
+   * them. A view that made the save sees its own revision in it and ignores it.
    */
   async saveBoard(path: string, board: WhiteboardData, baseRevision: string): Promise<WhiteboardSaveResult> {
     const res = await request<WhiteboardSaveResult>(
@@ -92,6 +97,7 @@ export const whiteboardApi = {
       json('PUT', { path, board, baseRevision, clientId: CLIENT_ID }),
     )
     if (res?.mdVersion) announceLocalChange(path, res.mdVersion)
+    if (res?.revision !== undefined) announceSave({ path, version: res.revision, source: whiteboardApi })
     return res
   },
 
@@ -109,17 +115,15 @@ export const whiteboardApi = {
   },
 
   /**
-   * `PUT /api/ui` with `{patch: {whiteboard}}`. Sent directly because `UiPatch` has no
-   * `whiteboard` key until Task 13 (it may switch this to `api.patchUi`). 409 → `RevisionConflictError`.
+   * `PUT /api/ui` with `{patch: {whiteboard}}` through `api.patchUi`, so the save is announced to
+   * this window as a local `ui` event like every other `ui.json` write. 409 → `RevisionConflictError`.
+   * The caller keeps `useUiStore.revision` current (see `useWhiteboardSettings`).
    */
   async saveSettings(
     settings: WhiteboardSettings,
     baseRevision: string,
   ): Promise<{ settings: WhiteboardSettings; revision: string }> {
-    const res = await request<{ ui: Record<string, unknown>; revision: string }>(
-      `${BASE}/ui`,
-      json('PUT', { patch: { whiteboard: settings }, baseRevision, clientId: CLIENT_ID }),
-    )
+    const res = await api.patchUi({ whiteboard: settings }, { baseRevision })
     return { settings: settingsOf(res?.ui?.whiteboard), revision: res?.revision ?? '' }
   },
 }

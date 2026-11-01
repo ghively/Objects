@@ -2,10 +2,12 @@ import '@/whiteboard/test/flowEnv'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { api } from '@/api/client'
+import type { ChangeEvent } from '@/api/types'
 import type { WhiteboardData } from '@/api/whiteboardTypes'
 import { useVersionHistory } from '@/history/useVersionHistory'
 import { useTabs } from '@/nav/tabs'
 import { useDeleteRequest } from '@/object/DeleteObjectDialog'
+import { objectDetail, objectSummary } from '@/test/mockApi'
 import type { BoardMenuProps, ToolboxProps } from './canvasTypes'
 import { OBJECT_DRAG_MIME } from './dnd'
 import type { WhiteboardHost } from './host'
@@ -132,6 +134,26 @@ afterEach(() => {
 })
 
 describe('WhiteboardPage', () => {
+  // Review fix 2026-11-01 #3: the stream's reconnect resync reloads the board's title and notes.
+  test('a resync after the stream reconnected reloads the title', async () => {
+    const listeners: ((e: ChangeEvent) => void)[] = []
+    vi.mocked(api).onChange.mockImplementation((cb) => {
+      listeners.push(cb)
+      return () => undefined
+    })
+    try {
+      await renderPage()
+      await waitFor(() => expect(listeners.length).toBeGreaterThan(0))
+      vi.mocked(api).object.mockResolvedValueOnce(objectDetail({ summary: objectSummary({ path: PATH, title: 'Renamed on disk' }), version: 'v2' }))
+      act(() => {
+        for (const cb of listeners) cb({ kind: 'types', path: '*', version: null, origin: null })
+      })
+      expect(await screen.findByText('Renamed on disk')).toBeInTheDocument()
+    } finally {
+      vi.mocked(api).onChange.mockImplementation(() => () => undefined)
+    }
+  })
+
   test('read-only board disables editing and shows the reason', async () => {
     const { plugin } = fakeInk()
     const { client } = await renderPage({ board: board([node({ id: 'a' })]), ink: plugin, readOnlyReason: 'This whiteboard was saved by a newer version of Object.' })
@@ -179,6 +201,23 @@ describe('WhiteboardPage', () => {
     await waitFor(() => expect(client.saveBoard).toHaveBeenCalledTimes(2))
     expect(Object.keys(client.saveBoard.mock.calls[1][1].nodes)).toEqual(['a'])
     expect(screen.getByRole('button', { name: 'undo' })).toBeDisabled()
+  })
+
+  test('clear whiteboard with a read-only ink file clears the board and leaves the ink alone', async () => {
+    const { plugin, doc } = fakeInk([stroke('s1')])
+    doc.readOnlyReason = 'foreign'
+    const b = board([node({ id: 'a' })])
+    const { client } = await renderPage({ board: b, ink: plugin })
+    await waitFor(() => expect(screen.getByTestId('ink-layer').dataset.strokes).toBe('1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Whiteboard' }))
+    await waitFor(() => expect(client.saveBoard).toHaveBeenCalledTimes(1))
+    expect(client.saveBoard.mock.calls[0][1].nodes).toEqual({})
+    // The strokes stay as the file has them: nothing for the ink doc to save, nothing to undo away.
+    expect(doc.save).not.toHaveBeenCalled()
+    expect(screen.getByTestId('ink-layer').dataset.strokes).toBe('1')
+    fireEvent.click(screen.getByRole('button', { name: 'undo' }))
+    expect(doc.save).not.toHaveBeenCalled()
+    expect(screen.getByTestId('ink-layer').dataset.strokes).toBe('1')
   })
 
   test('stroke and node changes share one history', async () => {
