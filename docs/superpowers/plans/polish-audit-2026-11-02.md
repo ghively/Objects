@@ -84,6 +84,43 @@ compared control by control. Saved references: `docs/ui-reference/01-calendar-da
 Method note: one stray click in this pass collapsed the sidebar's Object Types section; it was expanded
 again right away. Nothing was created, edited or deleted, so no scratch page was needed.
 
+## Third pass: a well-used space (structure only, no note content kept)
+
+Gene pointed Claude at a second space used for about a year (27 object types, 144 daily notes, 102 tags,
+184 pages). Read-only; nothing from it is stored in the repo. What it shows about real use:
+
+19. **Types are buckets, not schemas.** Of 19 custom types, 14 have only Title, Tags and Content. Types with
+    properties: Server (IP Address, Roles, Primary Function, Departments, Operating System, all Text),
+    Person, Organization, Place, Meeting, Project (Status and Category are Object properties pointing at the
+    Tag type; Project also relates to Servers and Software), Key (relates to Servers and Scripts). Object's
+    import and templates should treat "Object -> Tag" relations as first-class (status or category as a tag).
+20. **Tags are flat facets**: 102, mostly used once; client/org ("Ecard" 15), technology (Linux 5, Wifi 5),
+    status words ("Complete" 7, "In Progress" 2) and a few with 0 uses. The Tags type page lists them as
+    chips with counts.
+21. **Daily notes are the inbox.** Most are short: a few lines, a list of links to objects filed elsewhere
+    (Prompt, Meeting, Script), or pasted tables and code blocks. 29 of 144 are nearly empty. Filing happens by
+    linking or creating the object from the note, which then appears in the day's "Created Today" list.
+22. **Collections hang under their type** in the sidebar (Emails > Backup Reports; Pages > Backup Report,
+    Evidence & Reports), as Object now does.
+23. **Cards are masonry**: columns of variable height, each showing the object's tags and the start of its
+    body (bullets, tables, links, code, inline `#tags`). Object's card layout should be checked against this.
+24. **Table layout on a type's All tab**: row numbers, then Title, Tags, Cover image, Icon, Description,
+    Content (a "N words" chip with an expand icon), Last updated, Created at.
+25. **Type page `...` menu**: New from Template >, New Collection, Pin to Sidebar (Ctrl Shift *), Object Type
+    Settings, Export (Ctrl E), Import (Ctrl I). Daily Notes has tabs Overview | All | Unreviewed and a "Go to
+    today" button where other types have a split New button.
+26. **Peek** shows the type pill, Collections chip, title, Tags, the property table, the body, a Backlinks
+    section (each hit shows its parent block and the source's type), and a "6 / 26" prev/next stepper.
+27. **Object Types settings** (Settings > Object Types): "Custom object types" and "Basic object types" tile
+    grids plus Create; each type page has Icon, Name, Plural, Color, Description, Properties (Title, Tags,
+    Content fixed; Add Property), Templates, and a Configuration block: Page layout (Standard | Index card |
+    Profile | Encyclopedia), Wide layout, Cover image mode and display, Default card view, Default list view
+    (up to three right-hand properties), Default link view, Delete Object Type. Settings has a "Search
+    settings" field and four groups: Account, General, Space, Integrations.
+
+Gene's note: this space holds plaintext credentials in some daily notes and pages. Nothing was copied; worth
+scrubbing before any of it is imported into Object.
+
 ## Not yet poked
 
 Tasks page, Graph, Trash, typing behaviour (slash menu, `[[` picker, @mentions, markdown shortcuts, block
