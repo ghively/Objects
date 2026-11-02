@@ -306,15 +306,21 @@ unless marked. Order is a suggestion, highest value first.
 | C14 keyboard-hint footer ("up/down to navigate, Esc to abort, Enter to select") | done for the slash menu, New menu, link picker and search palette (the palette adds new tab and side panel) | `cbc84d3` |
 | B7 "Link to a date" presets | done: In a week, A week ago added. Capacities' live list also names "Time" and "Now"; Object keeps its own "Today - date link" and "Now - timestamp" (reference strings), not renamed | `54a10c7` |
 | B8 `@` picker | partly: `@` at the start of a word opens the existing object picker (a dialog), `[[` kept; the live app's inline popover with recents and per-type rows is still open | `f698888` |
+| C18 object `...` menu shortcut hints | done for Find in page (Ctrl F), Present (Ctrl Alt P), Delete (Ctrl Backspace), read from the shortcut registry; the menu's order was already set to Capacities' sections on 2026-10-29. Export, Import and Pin to Sidebar have no registered key yet | `2dd693e` |
+| C15 space switcher Search field | done: a Search field heads the list (replacing the "Spaces" heading) and filters by name | `d112222` |
+| C17 Pin to Sidebar on a type's context menu; label capitalised ("Pin to Sidebar") everywhere | done | `553a88c` |
+| Sidebar: Graph below the object types, beside Trash | done (a second "Space" navigation landmark); "Add Section" still sits under Pinned, the live app puts it under the types | `7cfd501` |
 
 Checked and already present in Object (so not backlog): Add Section, Graph customization options, the Shortcuts
 sheet (Settings), slash menu groups and strings (taken from Capacities' own app), unlinked mentions.
+Checked and also present: Wall cards are already masonry, the peek has the "N / total" stepper, the type page `...` menu has Pin, Collection, Import and settings.
 Checked and still open: sidebar "Sort Manually | Sort Alphabetically" on the Object Types header (types are always
-alphabetical), Help & Resources section, New menu as an anchored popover with a Search field, the search palette
+alphabetical), Help & Resources section (links to Capacities' web pages), New menu as an anchored popover with a Search field, the search palette
 as one list, the Overview tab's hidden-section picker, masonry cards, Table "Content" word-count column.
 
-Gate after these four commits: back end 1463 passed (1 pre-existing failure, `test_static_files_are_gzipped`,
-also fails without these changes); front end 2318 passed; `tsc` clean; lint warnings only (pre-existing); build ok.
+Gate after these eight commits: back end 1463 passed (1 pre-existing failure, `test_static_files_are_gzipped`,
+also fails without these changes); front end 2321 passed; `tsc` clean; lint warnings only (pre-existing); build ok.
+The app was also started on a copy of the imported wiki space and the sidebar checked in the browser pane.
 
 ## Not yet poked
 
