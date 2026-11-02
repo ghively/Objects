@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { useCollections } from '@/collections/useCollections'
 import { Icon, IconOrEmoji, iconName } from '@/components/Icon'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu'
+import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { CreateCollectionDialog } from '@/collections/CollectionDialogs'
+import { ImportCsvDialog } from '@/types/ImportCsvDialog'
+import { TypeContextMenu } from './TypeContextMenu'
 import type { TypeDef } from '@/api/types'
 import type { Target } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
@@ -218,6 +216,9 @@ export function Sidebar({
   // A type's collections sit under its row, as in Capacities' `objects` sidebar block.
   const { collections } = useCollections()
   const [collapsed, toggleCollapsed] = useCollapsedTypes()
+  // The type menu's "New Collection" and "Import" open their dialogs here.
+  const [collectionFor, setCollectionFor] = useState<TypeDef | null>(null)
+  const [importFor, setImportFor] = useState<TypeDef | null>(null)
   const byType = useMemo(() => {
     const map = new Map<string, typeof collections>()
     for (const c of collections) {
@@ -317,18 +318,14 @@ export function Sidebar({
                   )}
                 </div>
               </ContextMenuTrigger>
-              <ContextMenuContent className="border-line bg-raised text-fg">
-                <ContextMenuItem onSelect={() => onOpenTypeSettings?.(t)}>
-                  <Icon name="ph-gear" size={14} />
-                  Object Type Settings
-                </ContextMenuItem>
-                {!t.basic && (
-                  <ContextMenuItem variant="destructive" onSelect={() => onDeleteType?.(t)}>
-                    <Icon name="ph-trash" size={14} />
-                    Delete object type
-                  </ContextMenuItem>
-                )}
-              </ContextMenuContent>
+              <TypeContextMenu
+                type={t}
+                onOpenTarget={onOpenTarget}
+                onOpenTypeSettings={onOpenTypeSettings}
+                onDeleteType={onDeleteType}
+                onNewCollection={setCollectionFor}
+                onImport={setImportFor}
+              />
             </ContextMenu>
             {own.length > 0 && !folded && (
               <ul aria-label={`${t.pluralName} collections`} className="mt-0.5 mb-1 flex flex-col gap-px">
@@ -427,6 +424,16 @@ export function Sidebar({
           </button>
         </div>
       </ScrollArea>
+
+      {collectionFor && (
+        <CreateCollectionDialog
+          open
+          onOpenChange={(o) => !o && setCollectionFor(null)}
+          typeId={collectionFor.id}
+          onCreated={(c) => onOpenTarget?.({ kind: 'collection', id: c.id }, {})}
+        />
+      )}
+      {importFor && <ImportCsvDialog type={importFor} open onOpenChange={(o) => !o && setImportFor(null)} />}
 
       <footer className="flex items-center gap-1 py-2 text-fg-muted">
         <button type="button" disabled aria-label="Profile" className="flex size-8 items-center justify-center rounded-md disabled:opacity-60">
