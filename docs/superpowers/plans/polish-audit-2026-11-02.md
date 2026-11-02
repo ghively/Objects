@@ -118,7 +118,7 @@ Gene pointed Claude at a second space used for about a year (27 object types, 14
     (up to three right-hand properties), Default link view, Delete Object Type. Settings has a "Search
     settings" field and four groups: Account, General, Space, Integrations.
 
-Gene's note: this space holds plaintext credentials in some daily notes and pages. Nothing was copied; worth
+Note: this space holds plaintext credentials in some daily notes and pages. Nothing was copied; worth
 scrubbing before any of it is imported into Object.
 
 ## Not yet poked
