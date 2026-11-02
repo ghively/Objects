@@ -634,8 +634,10 @@ export function DataView(props: DataViewProps) {
       className={cn('mx-auto flex w-full flex-col gap-2', props.embedded ? 'max-w-[50rem]' : 'max-w-5xl', props.compact && 'gap-1')}
     >
       {(props.heading || !toolbarSlot) && (
-        <div data-toolbar-row="" className="flex items-center justify-between gap-2">
-          {props.heading ? <div className="min-w-0 flex-1">{props.heading}</div> : <span className="flex-1" />}
+        // Wraps: in a narrow column (the Calendar's Three days) the heading keeps its own line's
+        // width and the toolbar drops below it, instead of being laid over it.
+        <div data-toolbar-row="" className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          {props.heading ? <div className="min-w-0 flex-auto">{props.heading}</div> : <span className="flex-1" />}
           {!toolbarSlot && toolbar}
         </div>
       )}
