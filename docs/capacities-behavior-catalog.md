@@ -13,9 +13,9 @@ Companion: `docs/superpowers/plans/polish-audit-2026-11-02.md` (what differed fr
 | Settings (all pages) | done (section 1) |
 | Sidebar footer: Shortcuts panel (section 2), Add Section, type gallery | done (sections 2-3) |
 | Sidebar rest, top bar, search, New menu | done (sections 4, 8) |
-| Tab context menu | pending |
+| Tab and sidebar context menus, Overview tab, collection page, outline | done (section 9) |
 | Views: layouts, filter, sort, group, Overview | pending |
-| Object page: header, properties, side panel | done (section 5); backlinks, unlinked mentions, outline pending |
+| Object page: header, properties, side panel | done (section 5); outline and stats in section 9; backlinks and unlinked mentions pending |
 | Editor: block menu, selection toolbar, slash, @ | done (section 6); embeds, tables, columns, code, math pending |
 | Graph, Trash, Explore panel, shortcuts | done (section 7); export and import dialogs pending |
 
@@ -227,3 +227,25 @@ Object's "new object type" flow has none of the starter templates; each would pr
     Sidebar, Object Type Settings, Export, Import); a split "New" button.
 - **Wall cards** show: the type label, the icon and title, the description, then one row per card-view property
   with its icon and value or "Empty" (Collaborators, Time frame, Status on Projects).
+
+## 9. Overview tab, collections, outline, context menus
+
+- **Overview tab** (type pages): sections stacked vertically. "Recently Opened": a horizontally scrolling row
+  of cards with an expand icon at the right (opens the All tab); "Collections": a tile per collection (name and
+  "N entries") with a "+ Collection" button at the right. A gear at the right of the tab strip opens "Visible
+  Sections" (All, Recently Opened, Collections; the last two marked "Overview only") and "Hidden Sections":
+  smart sections "Not in any collection", "Not tagged", "No backlinks", and one per collection. Any can be
+  moved into view. The "Not in any collection / Not tagged / No backlinks" sections are cleanup tools.
+- **Collection page**: opens in a peek: collection icon + name, the full view toolbar (count, Filter, Sort,
+  Group, layout, Customize), search, `...`, a split New button, expand; under the header a chip of the parent
+  type ("Projects"); the cards; a "+ New Object" row; a stepper through the type's collections ("1 / 3").
+- **Outline popover** (hover the dash column at the right edge, in a peek or full page): tabs "Outline" and
+  "Stats" and a pin button. Outline lists headings indented by level with an active marker on the left; click
+  scrolls. Stats: Words, Sentences, Paragraphs, Characters, Created At, Last Updated.
+- **Tab context menu** (right-click a type tab): Pin to Sidebar, Pin Tab, Object Type Settings, Import (Ctrl+I).
+- **Sidebar type context menu**: Open >, Create <Type>, New from Template >, New Collection, Pin to Sidebar,
+  Object Type Settings, Import.
+- **Editor content seen in real notes**: a strikethrough run of text, an "Icon" block (a small icon chip in front
+  of a paragraph, made with `()` Space), tables with a header row, tags row with colored chips, inline code.
+- **Note**: opening an object and selecting text may touch its "Last Updated" (one object showed the current
+  time after being opened; others untouched showed old dates).
