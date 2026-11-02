@@ -9,6 +9,10 @@ Take the current state from `docs/superpowers/plans/remaining-work.md` and `git 
 - **Out of scope by the spec:** AI, network integrations, accounts, mobile, telemetry.
 - **Pending:** Gene's hand-checks, all milestones (`plans/m1-acceptance.md` to `plans/m9-acceptance.md`, all unchecked).
 
+## Polish backlog (2026-11-02)
+
+Start from `docs/superpowers/plans/polish-audit-2026-11-02.md` ("Consolidated backlog") and use `docs/object-behavior-catalog.md` as the behaviour reference (labels, order, shortcuts, menus). Keep unlinked mentions working. Do one item per commit with a test; run the full gate before each commit.
+
 ## The next step, in order
 
 1. **Merge `ccr-bcf6e946-bf8moc`** (the 2026-11-01 audit fixes) into `master` and re-gate on Windows; then **fix what Gene's hand-checks find** (both audit lists and M9 are done).
