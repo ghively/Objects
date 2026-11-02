@@ -1,6 +1,8 @@
 /**
- * The `[[` link picker: typing `[[` in the editor opens it; it fuzzy-matches
- * object titles and replaces the brackets with a `[[Title]]` wikilink.
+ * The `[[` / `@` link picker: typing `[[` (or `@` at the start of a word) in the editor opens it, as a
+ * popover under the caret (as in the live app). With nothing typed it lists the recently opened
+ * objects, then a row per type that lists that type's objects; typing fuzzy-matches object titles.
+ * Choosing replaces the brackets with a `[[Title]]` wikilink.
  *
  * In `embed` mode (M7, the editor's `pickObjectEmbed()`) the chosen object is
  * inserted as an embedded object block (`![[Title]]`) instead of a link.
@@ -9,11 +11,13 @@ import type { Editor } from '@tiptap/core'
 import { Selection } from '@tiptap/pm/state'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { create } from 'zustand'
-import type { ObjectSummary } from '@/api/types'
+import type { ObjectSummary, TypeDef } from '@/api/types'
+import { Icon } from '@/components/Icon'
 import { KeyHints } from '@/components/KeyHints'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { setWikilinkTrigger, wikilinkTargetFor } from '@/editor/extensions/wikilink'
 import { setObjectEmbedPicker } from '@/editor/nodes/objectEmbed'
+import { useRecent } from '@/nav/recent'
 import { TypeChip } from '@/shell/Sidebar'
 import { cn } from '@/lib/utils'
 import { ensureLinkIndex, typeOf, useLinkIndex } from './linkIndex'
@@ -105,6 +109,8 @@ function takeTypedAhead(editor: Editor | null, range: { from: number; to: number
 /** What opens the picker: `[[`, or `@` at the start of a word. */
 const isOpener = (text: string) => text === '[[' || text === '@'
 
+type Row = { kind: 'object'; o: ObjectSummary } | { kind: 'type'; t: TypeDef; count: number }
+
 export function LinkPicker() {
   const { editor, range, mode, hide } = useLinkPicker()
   const objects = useLinkIndex((s) => s.objects)
@@ -122,7 +128,48 @@ export function LinkPicker() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const matches = useMemo(() => fuzzyMatch(query, objects), [query, objects])
+  const recentPaths = useRecent((s) => s.paths)
+  const types = useLinkIndex((s) => s.types)
+  const [typeFilter, setTypeFilter] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (open) setTypeFilter(null)
+  }, [open])
+
+  const rows: Row[] = useMemo(() => {
+    const filterType = typeFilter ? types.find((t) => t.id === typeFilter) : undefined
+    if (filterType) {
+      const own = objects.filter((o) => o.type === filterType.id)
+      return fuzzyMatch(query, own, 30).map((o) => ({ kind: 'object' as const, o }))
+    }
+    if (query.trim()) return fuzzyMatch(query, objects).map((o) => ({ kind: 'object' as const, o }))
+    const byPath = new Map(objects.map((o) => [o.path, o]))
+    const recent = recentPaths.map((p) => byPath.get(p)).filter((o): o is ObjectSummary => !!o).slice(0, 6)
+    const counts = new Map<string, number>()
+    for (const o of objects) counts.set(o.type, (counts.get(o.type) ?? 0) + 1)
+    const typeRows = types
+      .filter((t) => counts.has(t.id))
+      .sort((a, b) => a.pluralName.localeCompare(b.pluralName, undefined, { sensitivity: 'base' }))
+      .map((t) => ({ kind: 'type' as const, t, count: counts.get(t.id) ?? 0 }))
+    const head: Row[] = [...recent.map((o) => ({ kind: 'object' as const, o })), ...typeRows]
+    // No recents and no types to browse: the first few objects, as before.
+    return head.length ? head : fuzzyMatch('', objects).map((o) => ({ kind: 'object' as const, o }))
+  }, [query, objects, types, typeFilter, recentPaths])
+  // Under the caret (the picker's range start); centred when the editor can't say.
+  const anchor = useRef({
+    getBoundingClientRect: () => new DOMRect(0, 0, 0, 0),
+  })
+  anchor.current.getBoundingClientRect = () => {
+    try {
+      if (editor && range && !editor.isDestroyed) {
+        const c = editor.view.coordsAtPos(Math.min(range.from, editor.state.doc.content.size))
+        return new DOMRect(c.left, c.top, 0, c.bottom - c.top)
+      }
+    } catch {
+      // fall through
+    }
+    return new DOMRect(window.innerWidth / 2 - 160, window.innerHeight * 0.22, 0, 0)
+  }
 
   const choose = (o: ObjectSummary | undefined) => {
     if (!editor || !range || editor.isDestroyed) return hide()
@@ -156,65 +203,103 @@ export function LinkPicker() {
     hide()
   }
 
+  const pickRow = (row: Row | undefined) => {
+    if (!row) return choose(undefined)
+    if (row.kind === 'type') {
+      setTypeFilter(row.t.id)
+      setQuery('')
+      setActive(0)
+      return
+    }
+    choose(row.o)
+  }
+  const heading = typeFilter ? types.find((t) => t.id === typeFilter) : undefined
+
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && choose(undefined)}>
-      <DialogContent
-        showCloseButton={false}
-        className="top-[22%] w-[520px] max-w-[calc(100vw-32px)] translate-y-0 gap-0 rounded-xl border-line bg-raised p-0"
+    <Popover open={open} onOpenChange={(v) => !v && choose(undefined)}>
+      <PopoverAnchor virtualRef={anchor} />
+      <PopoverContent
+        align="start"
+        sideOffset={6}
+        role="dialog"
+        aria-label={mode === 'embed' ? 'Embed an object' : 'Link to an object'}
         onOpenAutoFocus={(e) => {
           e.preventDefault()
           inputRef.current?.focus()
         }}
+        // Focus moving (the editor keeps and regains it while typing ahead) is not a dismissal; a click
+        // outside or Escape is.
+        onFocusOutside={(e) => e.preventDefault()}
+        className="w-[min(340px,calc(100vw-32px))] gap-0 overflow-hidden rounded-xl border-line bg-raised p-0"
       >
-        <DialogTitle className="sr-only">{mode === 'embed' ? 'Embed an object' : 'Link to an object'}</DialogTitle>
-        <input
-          ref={inputRef}
-          aria-label="Search objects"
-          placeholder={mode === 'embed' ? 'Embed…' : 'Link to…'}
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            setActive(0)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') {
-              e.preventDefault()
-              setActive((i) => Math.min(i + 1, matches.length - 1))
-            } else if (e.key === 'ArrowUp') {
-              e.preventDefault()
-              setActive((i) => Math.max(i - 1, 0))
-            } else if (e.key === 'Enter') {
-              e.preventDefault()
-              choose(matches[active])
-            }
-          }}
-          className="h-12 w-full border-b border-line bg-transparent px-4 text-[15px] outline-none placeholder:text-fg-muted"
-        />
+        <div className="flex items-center gap-2 border-b border-line px-3">
+          {heading && <TypeChip type={heading} size={20} />}
+          <input
+            ref={inputRef}
+            aria-label="Search objects"
+            placeholder={heading ? heading.pluralName : mode === 'embed' ? 'Embed…' : 'Link to…'}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setActive(0)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setActive((i) => Math.min(i + 1, rows.length - 1))
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setActive((i) => Math.max(i - 1, 0))
+              } else if (e.key === 'Enter') {
+                e.preventDefault()
+                pickRow(rows[active])
+              } else if (e.key === 'ArrowRight' && rows[active]?.kind === 'type') {
+                e.preventDefault()
+                pickRow(rows[active])
+              } else if (e.key === 'Backspace' && !query && typeFilter) {
+                e.preventDefault()
+                setTypeFilter(null)
+                setActive(0)
+              }
+            }}
+            className="h-11 min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-fg-muted"
+          />
+        </div>
         <ul role="listbox" aria-label="Objects" className="max-h-[320px] overflow-auto p-1.5">
-          {matches.length === 0 && <li className="px-3 py-2 text-fg-muted italic">No matching objects</li>}
-          {matches.map((o, i) => {
-            const type = typeOf(o.type)
+          {rows.length === 0 && <li className="px-3 py-2 text-fg-muted italic">No matching objects</li>}
+          {rows.map((row, i) => {
+            const type = row.kind === 'object' ? typeOf(row.o.type) : row.t
             return (
-              <li key={o.path} role="option" aria-selected={i === active}>
+              <li key={row.kind === 'object' ? row.o.path : `type:${row.t.id}`} role="option" aria-selected={i === active}>
                 <button
                   type="button"
                   onMouseEnter={() => setActive(i)}
-                  onClick={() => choose(o)}
+                  onClick={() => pickRow(row)}
                   className={cn(
                     'flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-[15px]',
                     i === active && 'bg-hover-2',
                   )}
                 >
                   {type && <TypeChip type={type} size={20} />}
-                  <span className="min-w-0 flex-1 truncate">{o.title}</span>
-                  {type && <span className="text-[13px] text-fg-muted">{type.name}</span>}
+                  {row.kind === 'object' ? (
+                    <>
+                      <span className="min-w-0 flex-1 truncate">{row.o.title}</span>
+                      {type && <span className="text-[13px] text-fg-muted">{type.name}</span>}
+                    </>
+                  ) : (
+                    <>
+                      <span className="min-w-0 flex-1 truncate">{row.t.pluralName}</span>
+                      <span className="text-[13px] text-fg-muted tabular-nums">{row.count}</span>
+                      <Icon name="ph-caret-right" size={12} />
+                    </>
+                  )}
                 </button>
               </li>
             )
           })}
         </ul>
         <KeyHints />
-      </DialogContent>
-    </Dialog>
+      </PopoverContent>
+    </Popover>
   )
 }

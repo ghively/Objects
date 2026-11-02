@@ -1,8 +1,8 @@
 import { Editor as TiptapEditor } from '@tiptap/core'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ObjectSummary } from '@/api/types'
-import { objectSummary } from '@/test/mockApi'
+import { objectSummary, typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig<typeof import('@/api/client')>()),
@@ -11,6 +11,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import { editorExtensions, loadBody, serializeBody } from '@/editor/document'
+import { useRecent } from '@/nav/recent'
 import { fuzzyMatch, installLinkPicker, LinkPicker, useLinkPicker } from './LinkPicker'
 import { resetLinkIndex } from './linkIndex'
 
@@ -177,4 +178,61 @@ import { wikilinkTargetFor } from '@/editor/extensions/wikilink'
 test('test picker targets a title with a pipe by its path', () => {
   expect(wikilinkTargetFor({ title: 'A|B', path: 'Pages/A|B.md' })).toBe('Pages/A|B')
   expect(wikilinkTargetFor({ title: 'Plain', path: 'Pages/Plain.md' })).toBe('Plain')
+})
+
+// Seen in the live app: the `@` picker opens under the caret with the recently opened objects first,
+// then a row per type that lists that type's objects.
+describe('picker rows', () => {
+  const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true })
+  const PERSON = typeDef({ id: 'person', name: 'Person', pluralName: 'People' })
+  const ADA = objectSummary({ path: 'People/Ada Lovelace.md', type: 'person', title: 'Ada Lovelace' })
+  const NOTES = objectSummary({ path: 'Pages/Notes.md', type: 'page', title: 'Notes' })
+  const PLAN = objectSummary({ path: 'Pages/Plan.md', type: 'page', title: 'Plan' })
+  let editor: TiptapEditor
+
+  beforeEach(() => {
+    resetLinkIndex()
+    useRecent.setState({ paths: ['Pages/Plan.md', 'gone/Missing.md'] })
+    mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE, PERSON] })
+    mocked.objects.mockResolvedValue([ADA, NOTES, PLAN])
+    mocked.resolve.mockResolvedValue(null)
+    installLinkPicker()
+    editor = new TiptapEditor({ extensions: editorExtensions() })
+    loadBody(editor, 'Hello \n')
+    const end = editor.state.doc.firstChild!.nodeSize - 1
+    act(() => useLinkPicker.getState().show(editor, { from: end, to: end }))
+  })
+
+  afterEach(() => {
+    editor.destroy()
+    useLinkPicker.getState().hide()
+    useRecent.setState({ paths: [] })
+  })
+
+  const names = () => screen.getAllByRole('option').map((o) => o.textContent)
+
+  test('an empty query lists the recent objects, then a row per type', async () => {
+    render(<LinkPicker />)
+    await screen.findByRole('option', { name: /People/ })
+    const rows = names()
+    expect(rows[0]).toContain('Plan') // recent; a path that no longer exists is skipped
+    expect(rows.filter((r) => r?.includes('Missing'))).toHaveLength(0)
+    expect(rows.slice(1).map((r) => r?.replace(/\d+$/, ''))).toEqual(['Pages', 'People'])
+  })
+
+  test('picking a type row lists its objects; Backspace in the empty box goes back', async () => {
+    render(<LinkPicker />)
+    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    fireEvent.click(within(await screen.findByRole('option', { name: /Pages/ })).getByRole('button'))
+    await waitFor(() => expect(names().map((n) => n?.replace(/Page$/, ''))).toEqual(['Notes', 'Plan']))
+    fireEvent.keyDown(input, { key: 'Backspace' })
+    await waitFor(() => expect(names()[0]).toContain('Plan'))
+    expect(names().some((n) => n?.includes('People'))).toBe(true)
+  })
+
+  test('the picker opens as a popover at the caret, not a centred dialog', async () => {
+    render(<LinkPicker />)
+    const pop = await screen.findByRole('dialog', { name: 'Link to an object' })
+    expect(pop).toHaveAttribute('data-slot', 'popover-content')
+  })
 })
