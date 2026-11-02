@@ -63,6 +63,11 @@ describe('NewObjectMenu', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
+  test('shows the keyboard hints under the list', () => {
+    render(<NewObjectMenu open onOpenChange={() => {}} />)
+    expect(screen.getByRole('note', { name: 'Keyboard hints' })).toHaveTextContent('↑↓ to navigate')
+  })
+
   test('test ctrl-click opens new tab', async () => {
     const user = userEvent.setup()
     useTabs.getState().open({ kind: 'type', typeId: 'project' })

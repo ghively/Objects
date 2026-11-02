@@ -17,6 +17,7 @@ import { api } from '@/api/client'
 import type { SpaceEntry } from '@/api/types'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Icon } from '@/components/Icon'
+import { KeyHints } from '@/components/KeyHints'
 import { useCalendar } from '@/calendar/useCalendar'
 import { createAndOpen } from '@/create/createAndOpen'
 import { useLinkIndex } from '@/links/linkIndex'
@@ -148,7 +149,14 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
 
   const other: PaletteMode = mode === 'search' ? 'actions' : 'search'
   const footer = (
-    <div className="flex items-center justify-end border-t border-line px-2 py-1.5">
+    <div className="flex items-center justify-between border-t border-line">
+      <KeyHints
+        bare
+        extra={[
+          { keys: 'Ctrl ↵', label: PALETTE_TEXT.inNewTab },
+          { keys: 'Shift ↵', label: PALETTE_TEXT.inSidePanel },
+        ]}
+      />
       <button
         type="button"
         onClick={() => usePalette.getState().show(other)}

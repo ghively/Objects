@@ -163,13 +163,6 @@
   color: var(--text-muted);
 }
 
-.slash-menu-footer {
-  padding: 6px 12px;
-  border-top: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
 .slash-menu-url {
   padding: 8px;
 }
@@ -182,4 +175,22 @@
   background: var(--bg-panel);
   color: var(--text);
   outline: none;
+}
+
+.key-hints {
+  display: flex;
+  gap: 12px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.key-hints-bare {
+  border-top: 0;
+}
+
+.key-hint-keys {
+  font-variant-numeric: tabular-nums;
 }

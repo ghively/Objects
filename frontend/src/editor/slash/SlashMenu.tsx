@@ -20,6 +20,7 @@ import { useLinkIndex } from '@/links/linkIndex'
 import { useSettings } from '@/settings/useSettings'
 import { closeSlashMenu, registerSlashKeyHandler, useSlashMenu } from '../extensions/slashMenu'
 import { filterSections, hasRealMatch, slashSections, SLASH_TEXT, type SlashItem, type SlashView } from './slashItems'
+import { KeyHints } from '@/components/KeyHints'
 import '../handles/handles.css'
 
 function position(rect: DOMRect | null): CSSProperties {
@@ -196,7 +197,7 @@ export function SlashMenu({ editor }: { editor: Editor }) {
           </div>
         ))}
       </div>
-      <div className="slash-menu-footer">{SLASH_TEXT.footer}</div>
+      <KeyHints />
     </div>,
     document.body,
   )

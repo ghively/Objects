@@ -16,6 +16,8 @@ export const PALETTE_TEXT = {
   emptyDescription: 'Try a different term, or remove filters to widen the search.',
   onlyPartialResults: 'Your content in not fully indexed yet. Search results might not return all matches.',
   clearFilter: 'Clear filter',
+  inNewTab: 'in new tab', // dropdowns.toOpenInNewTab
+  inSidePanel: 'in side panel', // dropdowns.toOpenInSidepanel
   switchToActions: 'Switch to actions',
   switchToSearch: 'Switch to search',
   createNewWithTitle: (structureTitle: string, title: string) => `Create new ${structureTitle} with title "${title}"`,

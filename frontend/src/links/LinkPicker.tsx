@@ -10,6 +10,7 @@ import { Selection } from '@tiptap/pm/state'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { create } from 'zustand'
 import type { ObjectSummary } from '@/api/types'
+import { KeyHints } from '@/components/KeyHints'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { setWikilinkTrigger, wikilinkTargetFor } from '@/editor/extensions/wikilink'
 import { setObjectEmbedPicker } from '@/editor/nodes/objectEmbed'
@@ -209,6 +210,7 @@ export function LinkPicker() {
             )
           })}
         </ul>
+        <KeyHints />
       </DialogContent>
     </Dialog>
   )
