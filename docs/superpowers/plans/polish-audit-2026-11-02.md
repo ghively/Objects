@@ -157,6 +157,33 @@ Object's own; "Object has" is `backend/objectapp/typemodel.py` (`BASIC_MEDIA_TYP
     Tag); Project has Status (Object -> Tag), Time frame, Collaborators. The calendar's Tasks section groups
     tasks by status chips (Next Up, Someday/Maybe, In Progress) with a due-date column and a "N open" count.
 
+## Fifth pass: how the notes are actually written
+
+Read from the Work space's 144 daily notes (text) and several Personal daily notes (rendered, in the peek).
+No note content is kept here.
+
+32. **A daily note is often a title line plus object links.** Each link sits on its own line as an object
+    chip: the object's type icon, then its title underlined (a Page, a Prompt, a Config). Linking from the
+    day is how things get filed; the day is a pointer, the object holds the content.
+33. **Pasted AI output is common**: long runs of paragraphs with emoji section markers and emoji bullets
+    (check marks, warnings), headings often just bold or emoji-led lines, not heading blocks. The editor has
+    to keep these as plain paragraphs and bullets and stay fast with 1,000+ word notes; pasted tables and code
+    blocks also appear.
+34. **Inline date chip**: a date in running text renders as a boxed chip ("Last update resets on <date>").
+    Object's editor should render a date mention the same way.
+35. **Block handle**: hovering a block shows `+` and a six-dot grip at its left edge (insert below, drag).
+36. **Daily note peek header**: Reviewed checkbox, a "Calendar" button (jump to that day), `...`, expand.
+    The peek stepper counts in the list's sort order ("10 / 78").
+37. **Shape of the notes (Work, 144)**: median about 150 characters; about 1 in 10 empty; 16 hold URLs, 9
+    mention ticket ids (OPS-n), few use raw `[[ ]]` or `#tags` as text (linking is done with the picker, so
+    the Markdown form seen in an export is not how they were typed).
+38. **Pro-gated features appear as upsells**: a Query-backed tab ("Untitled") on Daily Notes shows blurred
+    cards and a "Get Object Pro" card; Tasks and Explore show a rocket badge. Object has no paywall; show
+    these as normal features.
+
+Not studied: typing flows themselves (slash menu, `[[` picker, @mentions, paste behaviour), since that needs
+an editable scratch page; only rendered results were read.
+
 ## Not yet poked
 
 Tasks page, Graph, Trash, typing behaviour (slash menu, `[[` picker, @mentions, markdown shortcuts, block
