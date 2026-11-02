@@ -121,6 +121,42 @@ Gene pointed Claude at a second space used for about a year (27 object types, 14
 Note: this space holds plaintext credentials in some daily notes and pages. Nothing was copied; worth
 scrubbing before any of it is imported into Object.
 
+## Fourth pass: Capacities' built-in types, and a third space (Personal)
+
+Read from Settings > Object Types in two spaces. Basic types cannot be edited in Capacities. Fields below are
+Capacities' own; "Object has" is `backend/objectapp/typemodel.py` (`BASIC_MEDIA_TYPES`, task fields).
+
+28. **Built-in types and their fields** (beyond Title, Tags, Notes/Content, Description where listed):
+    - Page: Aliases, Cover image, Icon, Description, Last updated, Created at.
+    - Daily Note: Reviewed (checkbox); the type config has a "Hide reviewing" switch.
+    - Task: Status (label), Date, Deadline, Priority (label), Context, Completed (date time). Config: Default
+      link view and "Task Management Settings"; Settings > Task management can hide tasks per space.
+    - Tag: Aliases, Description, Icon, Color.
+    - Query: Icon, Title, Description.
+    - AI Chat: Title, Description, Tags, Context (Object -> Pages).
+    - File: Icon, File, Description, Created at, Last updated, MIME type, File size.
+    - Image: Image file, Description, Source, MIME type, File size, Width, Height, Created at,
+      Category (label), Colors (label).
+    - PDF: Icon, Preview Image, Source, PDF file, Description, Created at, Last updated, Number of Pages,
+      File size, Table of Contents (checkbox), Document type (label), Topic (label), MIME type.
+    - Weblink: Preview Image, Description, URL, Iframe URL, Domain, Category (label), Topic (label),
+      Created at. Its Default link view is "Small Card" with a Reset button.
+    - Audio: Icon, Audio file, Description, Duration, MIME type, File size, URL, Origin, Category (label),
+      Created at.
+    - Table, Video, Whiteboard exist too (Table seen in Work; not opened).
+29. **Gaps in Object's media types**: PDF lacks Number of Pages, Table of Contents, Document type, Topic;
+    Image lacks Category and Colors; Weblink lacks Category and Topic; Audio lacks Duration, Origin, Category.
+    The label-type fields (Category, Topic, Document type, Colors) are new to Object: label sets that the
+    user can edit.
+30. **Object Types page layout**: basic and custom tiles are separate grids; in Personal, Task, Query, AI
+    Chat, Audio, PDF, Tag, Image, Weblink, Page, File and Daily Note are all "basic", so which types are
+    basic depends on the space.
+31. **Personal space**: 20 types (Prompt, Docker, Project, Email, Idea, Place, Person, Organization, Artist,
+    Album custom; the rest basic), 78 daily notes, 101 pages, 30 tags. Same pattern as Work: most custom
+    types are Title/Tags/Content only; Album has Artist (text), Cover image and a single select (Object ->
+    Tag); Project has Status (Object -> Tag), Time frame, Collaborators. The calendar's Tasks section groups
+    tasks by status chips (Next Up, Someday/Maybe, In Progress) with a due-date column and a "N open" count.
+
 ## Not yet poked
 
 Tasks page, Graph, Trash, typing behaviour (slash menu, `[[` picker, @mentions, markdown shortcuts, block
