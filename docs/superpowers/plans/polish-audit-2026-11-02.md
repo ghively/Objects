@@ -1,0 +1,62 @@
+# UI polish audit, 2026-11-02
+
+Gene asked to check every button and interaction against Capacities. Method: Claude drove Gene's own
+Capacities tab (Microsoft Edge, the CPI space, 1912x901) through the browser tool's CDP attach, read-only:
+opened menus, popovers and views and closed them without choosing anything; nothing was created or
+changed, and the view was put back to Day afterwards. Object was then opened at the same width and
+compared control by control. Saved references: `docs/ui-reference/01-calendar-day.png`,
+`02-calendar-three-days.png`.
+
+## Fixed (commits on `master`, not yet pushed)
+
+| Area | Capacities | Object before | Now |
+|---|---|---|---|
+| Empty daily note | one placeholder | two placeholders drawn over each other ("Start your daily note" + "Write your text or search for blocks...") | one; the editor can be told not to draw its own |
+| Section headings in narrow columns | heading intact, toolbar beside or below | toolbar overprinted the heading ("Task", "Cre...ay") | the heading row wraps; the toolbar drops to its own line |
+| Three days | day header + daily note only, no month sidebar | plus Tasks, Created, Backlinks sections in every column | daily notes only (as `02-calendar-three-days.png`) |
+| Month sidebar and its switch | Day view only | every view | Day view only |
+| Top bar in a narrow window | stays one line | "Three days" wrapped; Today arrows overprinted the month header | no wrapping; clips instead of colliding |
+| Daily note header (Day) | pill: Reviewed checkbox + `...` | Reviewed up by the title; `...` offered only Open as Page / Open in new tab / Delete | pill holds Reviewed and the note's full object menu (Present, Export, Version History, Object Type Settings, Delete, ...) |
+| Calendar section toolbars | layout picker, settings menu with only Calculations, `+`; count outside list layout | count, Filter, Sort, Group by, Layout, Customize (7 controls) | compact toolbar for Calendar sections only |
+| Sidebar, collections | a type's collections listed under it | none | listed under each type, foldable, remembered |
+| Sidebar, type context menu | Open >, Create X, New from Template >, New Collection, Pin to Sidebar >, Object Type Settings, Import | Object Type Settings, Delete | all but Pin to Sidebar (see below); Import is Object's CSV import |
+
+## Backlog (observed, not done)
+
+1. **New menu**: Capacities opens a popover anchored under the New button, with a "Search" field, the types
+   in recent-use order, and a footer "up/down to navigate, Esc to abort, Enter to select". Object opens a
+   centred modal with an alphabetical list.
+2. **Search palette**: placeholder "Search for content and actions, or paste from clipboard" with an info
+   icon; recents grouped "Today" / "Earlier" with each item's type at the right; footer lists Ctrl+Enter
+   (new tab) and Shift+Enter (side panel); content and actions are one list. Object has "Search content",
+   an empty state until objects are opened, and a separate "Switch to actions" mode.
+3. **Month view**: a Jan-Dec strip with the current month highlighted above the cards, and a "+ New Object"
+   row under them. Object shows the cards only.
+4. **Multi-day views (Week, Three days)**: for an existing note Capacities puts Reviewed, an expand icon and
+   `...` on the date row. Object shows nothing there.
+5. **Tasks section**: the `+` is the last control inside the toolbar pill; Object draws it outside, left of
+   the pill.
+6. **Type menu, "Pin to Sidebar >"**: submenu of the sidebar sections ("In Progress", "Pinned") with
+   checkboxes. Object has pinning on other menus (`PinMenuItems`) but built from dropdown primitives, not
+   the context-menu ones.
+7. **Sidebar type row**: Capacities shows the count and a `...` button on hover/active; Object shows the
+   count always and no `...`.
+8. **Object `...` menu order and entries**: Capacities: Wide Layout, Open >, Use Template >, Object Type
+   Settings, Share, Present (Ctrl Alt P), Export (Ctrl E), Import (Ctrl I), Version History, Text Stats >,
+   Copy >, Delete Object (Ctrl Backspace). Object has the same actions in another order, no Share, Import
+   or Copy >, and no shortcut hints beside most.
+9. **Type page, All tab**: a "+ New Object" row under the cards; cards show an "Empty" tags row when there
+   are none.
+10. **Empty daily note**: Capacities shows "Tags" and "Text" placeholders. Only the empty state was seen;
+    what happens on focus is unknown.
+11. **Quick-create chips**: Capacities shows Task, Meeting, Project (a chosen set); Object shows every type
+    plus an eye toggle. Probably a Settings choice in Capacities; not checked.
+12. **Workspace switcher**: Capacities: popover with a "Search" field, the spaces with a check on the
+    current one, and "+ Create space". Object: a "Spaces" header instead of a search field, the list with
+    a check, then "Space settings", "Add space" and "Open folder..." (the folder entries are local-app
+    needs Capacities doesn't have; the search field is the gap).
+
+## Not yet poked
+
+Tasks page, Graph, Settings, the object page header and property area, the peek, whiteboards, the side
+panel, the tab context menu, row context menus in lists and tables, drag and drop, keyboard shortcuts.
