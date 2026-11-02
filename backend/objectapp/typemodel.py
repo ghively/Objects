@@ -916,6 +916,41 @@ def _task_field_defs() -> list[PropertyDefinition]:
     ]  # fmt: skip
 
 
+# Fields Capacities' basic media types define beyond the ones we store (key -> name, kind).
+# Label fields start with no options; the user edits the set.
+_MEDIA_EXTRA_FIELDS: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "PDF": (
+        ("numberOfPages", "Number of Pages", "number"),
+        ("tableOfContents", "Table of Contents", "boolean"),
+        ("documentType", "Document type", "label"),
+        ("topic", "Topic", "label"),
+    ),
+    "Image": (("category", "Category", "label"), ("colors", "Colors", "label")),
+    "Weblink": (("category", "Category", "label"), ("topic", "Topic", "label")),
+    "Audio": (
+        ("duration", "Duration", "number"),
+        ("origin", "Origin", "text"),
+        ("category", "Category", "label"),
+    ),
+}
+
+
+def _media_field_defs(name: str) -> list[PropertyDefinition]:
+    out = []
+    for key, label, kind in _MEDIA_EXTRA_FIELDS.get(name, ()):
+        options: dict[str, Any] = {"isArray": key == "colors", "set": []} if kind == "label" else {}
+        out.append(
+            PropertyDefinition.from_json(
+                {
+                    "id": key, "key": key, "name": label, "type": kind, "description": "",
+                    "icon": {"type": "iconify", "val": PROPERTY_ICONS[kind]},
+                    "visibility": "alwaysShow", "options": options,
+                }
+            )
+        )  # fmt: skip
+    return out
+
+
 def is_task_type(t: TypeDefinition | None) -> bool:
     """True for the basic Task type."""
     return t is not None and t.basic and _basic_name(t.name) == "Task"
@@ -926,10 +961,16 @@ def topup_task_type(t: TypeDefinition) -> TypeDefinition:
 
     Each missing key of ``status``, ``priority``, ``date``, ``deadline``,
     ``completed``, ``repeat``, ``remind`` and ``occurrenceLog`` is appended after the existing
-    properties; a key the type already defines keeps its own definition and
+    properties (the basic PDF, Image, Weblink and Audio types likewise get the fields
+    Capacities defines for them, in ``_MEDIA_EXTRA_FIELDS``); a key the type already defines keeps its own definition and
     options. Any other type comes back untouched. Never writes: the fields reach
     ``task.json`` the first time the type is persisted.
     """
+    media = _basic_name(t.name) if t.basic else None
+    if media in _MEDIA_EXTRA_FIELDS:
+        have = {p.key for p in t.propertyDefinitions}
+        t.propertyDefinitions.extend(p for p in _media_field_defs(media) if p.key not in have)
+        return t
     if not is_task_type(t):
         return t
     have = {p.key for p in t.propertyDefinitions}
