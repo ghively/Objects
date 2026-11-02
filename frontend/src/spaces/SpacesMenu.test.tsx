@@ -75,7 +75,8 @@ function row(list: HTMLElement, name: string): HTMLElement {
 describe('SpacesMenu', () => {
   test('test spaces menu lists spaces, marks current and missing', async () => {
     const { user, list } = await openMenu()
-    expect(screen.getByText('Spaces')).toBeInTheDocument()
+    // Seen in the live app: a Search field heads the list, in place of a heading.
+    expect(screen.getByRole('textbox', { name: 'Search spaces' })).toHaveAttribute('placeholder', 'Search')
     const rows = within(list).getAllByTestId('space-row')
     expect(rows.map((r) => r.textContent)).toEqual(['Work', '🏠Home', 'Gone'])
     expect(row(list, 'Work')).toHaveAttribute('data-current', 'true')
@@ -101,6 +102,15 @@ describe('SpacesMenu', () => {
     ]) {
       expect(inReference(s), s).toBe(true)
     }
+  })
+
+  test('typing in the Search field filters the spaces by name', async () => {
+    const { user, list } = await openMenu()
+    await user.type(screen.getByRole('textbox', { name: 'Search spaces' }), 'ho')
+    expect(within(list).getAllByTestId('space-row').map((r) => r.textContent)).toEqual(['🏠Home'])
+    await user.clear(screen.getByRole('textbox', { name: 'Search spaces' }))
+    await user.type(screen.getByRole('textbox', { name: 'Search spaces' }), 'zzz')
+    expect(within(list).queryAllByTestId('space-row')).toHaveLength(0)
   })
 
   test('test rename current space patches space.json', async () => {

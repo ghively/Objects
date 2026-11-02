@@ -204,6 +204,7 @@ export function SpacesMenu({ children }: SpacesMenuProps) {
   confirming.current = removing !== null || deleting !== null
   const [folderOpen, setFolderOpen] = useState(false)
   const [folder, setFolder] = useState('')
+  const [filter, setFilter] = useState('')
 
   const reload = async () => {
     try {
@@ -219,6 +220,7 @@ export function SpacesMenu({ children }: SpacesMenuProps) {
     setRenaming(null)
     setFolderOpen(false)
     setFolder('')
+    setFilter('')
     void useSpaceInfo.getState().ensure()
     void reload()
   }, [open])
@@ -288,9 +290,15 @@ export function SpacesMenu({ children }: SpacesMenuProps) {
             if (renaming) e.preventDefault()
           }}
         >
-          <div className="px-2 pt-1 pb-1.5 text-[12px] font-semibold text-fg-muted">{T.heading}</div>
+          <input
+            aria-label="Search spaces"
+            placeholder="Search"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="mb-1.5 h-8 w-full rounded-md border border-line bg-transparent px-2 text-[14px] outline-none placeholder:text-fg-muted focus:border-fg-muted"
+          />
           <ul className="flex flex-col gap-0.5" aria-label={T.heading}>
-            {spaces.map((entry) => (
+            {spaces.filter((s) => s.name.toLowerCase().includes(filter.trim().toLowerCase())).map((entry) => (
               <SpaceRow
                 key={entry.path}
                 entry={entry}
