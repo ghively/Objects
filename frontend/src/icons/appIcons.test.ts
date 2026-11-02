@@ -27,7 +27,8 @@ describe('app icons subset', () => {
   test('the checked-in file is what the generator writes (deterministic)', async () => {
     const { generate } = await generator()
     const { text } = await generate()
-    const current = readFileSync(join(process.cwd(), 'src', 'icons', 'appIcons.ts'), 'utf8')
+    // Git may check the file out with CRLF (Windows autocrlf); the generator always writes LF.
+    const current = readFileSync(join(process.cwd(), 'src', 'icons', 'appIcons.ts'), 'utf8').replace(/\r\n/g, '\n')
     expect(current).toBe(text)
     // Small: the point of the subset.
     expect(text.length).toBeLessThan(200_000)
