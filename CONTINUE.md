@@ -4,8 +4,8 @@ Everything needed to resume is in this repo. Rules and layout: `CLAUDE.md`. Wher
 
 ## Status
 
-Take the current state from `docs/superpowers/plans/remaining-work.md` and `git log`; this file doesn't track it. As of 2026-11-01:
-- **Built:** M1–M9 are built, reviewed, fixed and gated, all on `master`. M8 covers every Object feature M4–M7 had deferred, local only; M9 the audit's completeness gaps. The 2026-11-01 full audit's fixes (bugs and optimization) are on `ccr-bcf6e946-bf8moc`, to be merged.
+Take the current state from `docs/superpowers/plans/remaining-work.md` and `git log`; this file doesn't track it. As of 2026-11-02:
+- **Built:** M1–M9 are built, reviewed, fixed and gated, all on `master`. M8 covers every Object feature M4–M7 had deferred, local only; M9 the audit's completeness gaps. The 2026-11-01 full audit's fixes (bugs and optimization) are merged (PR #4).
 - **Out of scope by the spec:** AI, network integrations, accounts, mobile, telemetry.
 - **Pending:** Gene's hand-checks, all milestones (`plans/m1-acceptance.md` to `plans/m9-acceptance.md`, all unchecked).
 
@@ -15,7 +15,7 @@ Start from `docs/superpowers/plans/polish-audit-2026-11-02.md` ("Consolidated ba
 
 ## The next step, in order
 
-1. **Merge `ccr-bcf6e946-bf8moc`** (the 2026-11-01 audit fixes) into `master` and re-gate on Windows; then **fix what Gene's hand-checks find** (both audit lists and M9 are done).
+1. **Work the open list** at the top of `docs/superpowers/plans/remaining-work.md` (polish backlog, Gene's decisions), then **fix what Gene's hand-checks find** (both audit lists and M9 are done; the audit branch is merged).
    - Do one finding per commit, each with a regression test that fails before the fix.
 2. **Gate.** Run `uv run pytest backend/tests -q` and `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build`. Run `scripts/m1_roundtrip.py` on a copy of `backend/tests/fixtures/space-sample`, and `scripts/m2_acceptance.py` through `m9_acceptance.py` on `space-sample` and `space-v1` (they copy the space themselves). Then start the app on a scratch copy and look at what changed.
 3. **Write it down.** Update `remaining-work.md` and `HANDOFF.md`, commit and push.

@@ -323,6 +323,57 @@ Gate after these eight commits: back end 1463 passed (1 pre-existing failure, `t
 also fails without these changes); front end 2321 passed; `tsc` clean; lint warnings only (pre-existing); build ok.
 The app was also started on a copy of the imported wiki space and the sidebar checked in the browser pane.
 
+## Remaining tasks (end of the 2026-11-02 session)
+
+Everything not done, with the behaviour to match (catalog section in brackets) and a rough size (S: one component and a test; M: several files; L: a feature). Fix one per commit with a failing-first test; run the full gate before each commit. Unlinked mentions stay.
+
+**Editor** (catalog 2, 6)
+1. Selection toolbar to the live set: Bold, Italic, Strikethrough, Underline, lists, Link, Code, TeX, color, `+`, `@` (AI left out per the spec). M.
+2. Block-handle menu: Hierarchy, List, To-do, Quote, Toggle, Group, Turn into..., Copy, Duplicate, Remove, with key hints. M.
+3. Block-selection bar at the bottom: "N blocks . M words", formatting buttons, Turn blocks into, Tag, Move, delete, close. M.
+4. Markdown shortcuts: confirm each with real key events (`|` quote, `>` toggle, `a)` and `i)` lists, `()` icon block, combinable); the debugger-typed test in the live app was inconclusive. S each.
+5. Focus mode while typing (chrome fades until the pointer moves). S.
+6. Rem-based editor sizing from a 15.5px root and a text-size setting. M.
+7. Settings > Editor options Object lacks: spellcheck language, Always create inline links, Hide object type settings outside of settings, Highlight Style, startup per-space choice. M.
+
+**Shell and menus** (catalog 4, 8, 9)
+8. Sidebar Object Types header `...`: Sort Manually | Sort Alphabetically, with drag reordering for manual. M.
+9. "Add Section" under the types; Help & Resources section (links to Object's pages; check the no-network rule first). S.
+10. Search palette as one list: Today/Earlier groups, type at the right, Ctrl+Enter new tab, Shift+Enter side panel. M.
+11. Object menu: Export, Import and Pin key hints (need registry entries), Share, Copy > submenu. S.
+12. `@` picker: "Collection" badge on collection rows. S.
+13. Tab context menu: Pin Tab. S.
+
+**Views and pages** (catalog 5, 8, 9)
+14. Table layout "Content" column ("N words" chip with an expand icon); row numbers. S.
+15. Overview tab: the gear with Visible and Hidden Sections incl. "Not in any collection", "Not tagged", "No backlinks". M.
+16. Tags type page: chips with counts. S.
+17. Peek: property-pane toggle position and behaviour; Backlinks entries as embedded references with hover actions. M.
+
+**Calendar** (catalog 10)
+18. Month strip Jan-Dec and "+ New Object"; Week view weekday colors and "+ Daily Note"; multi-day Reviewed/expand/`...`; Tasks `+` inside the pill; empty daily-note placeholders. M.
+
+**Data model** (catalog 1, 3; items 27-29)
+19. Label-type properties with an editable option set on the media types (the fields exist; editing their options is the gap). M.
+20. Type settings: Page layout (Standard | Index card | Profile | Encyclopedia), Wide default, cover image mode and display, default card/list/link view. Check what already exists first. M.
+21. "Add new object type" starter gallery (Meetings, People, Projects, Atomic notes, Definitions, Books, Films, TV series, Podcasts, Days, Weeks, Months, Organizations, Areas). M.
+22. Object -> Tag relations as first-class status/category, including the wiki import. M.
+
+**Export and import** (catalog 1, 10)
+23. Export dialog: PDF styles (Notes; Essay and Academic are Pro/Experimental), options, Markdown options (subpages zip, media, H1 title, wikilinks), Word and Latex. L.
+24. Import: migration guides per tool. S.
+
+**Settings pages** (catalog 1)
+25. Language (decimal separator), Date & Time (time zone, format, start of week), Offline & Sync (index recalculation, media loading), Space Settings. Check what Object has. S-M.
+
+**Decisions and housekeeping**
+26. Decide which Pro-gated features to unlock (Tasks, Queries, task actions, version history, extended search, focus mode); unlinked mentions is decided.
+27. Decide whether the Object how-to guides ship as built-in seeds.
+28. Investigate `test_static_files_are_gzipped` (fails on Windows `master`, also before these changes).
+29. Gene's hands-on checks, M1-M9 (256 items), and wiki-import follow-ups (see `remaining-work.md`).
+
+**Still to look at in Object** (the "Not yet poked" list below).
+
 ## Not yet poked
 
 Opened but only partly read, or never opened (all would need a scratch view or a second scratch page to look at
