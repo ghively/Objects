@@ -14,6 +14,7 @@ from objectapp.typemodel import (
     TypeReadOnly,
     load_types,
     system_property_defs,
+    topup_task_type,
     type_revision,
     write_type_json,
 )
@@ -469,3 +470,53 @@ def test_topup_not_applied_to_other_types(calendar_space_dir):
         assert [p.key for p in t.propertyDefinitions] == [
             p["key"] for p in stored["propertyDefinitions"]
         ], tid
+
+
+# -- media types: the fields Object defines beyond ours (polish audit item 29) ----
+
+
+def _media(name: str, keys=()):
+    return TypeDefinition.from_json(
+        {
+            "schemaVersion": 2, "id": name.lower(), "name": name, "pluralName": name + "s",
+            "folder": name + "s", "basic": True, "icon": {"type": "iconify", "val": "ph-cube"},
+            "color": "gray",
+            "propertyDefinitions": [
+                {"id": k, "key": k, "name": k, "type": "text", "description": "",
+                 "icon": {"type": "iconify", "val": "ph-text-align-left"},
+                 "visibility": "alwaysShow", "options": {}}
+                for k in keys
+            ],
+        }
+    )  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    "name,expected",
+    [
+        ("PDF", {"numberOfPages": "number", "tableOfContents": "boolean",
+                 "documentType": "label", "topic": "label"}),
+        ("Image", {"category": "label", "colors": "label"}),
+        ("Weblink", {"category": "label", "topic": "label"}),
+        ("Audio", {"duration": "number", "origin": "text", "category": "label"}),
+    ],
+)  # fmt: skip
+def test_topup_adds_object_media_fields(name, expected):
+    t = topup_task_type(_media(name))
+    for key, kind in expected.items():
+        assert t.prop(key) is not None and t.prop(key).type == kind, key
+    n = len(t.propertyDefinitions)
+    topup_task_type(t)
+    assert len(t.propertyDefinitions) == n  # idempotent
+
+
+def test_topup_media_keeps_an_existing_definition():
+    t = topup_task_type(_media("Image", keys=("category",)))
+    assert [p.key for p in t.propertyDefinitions].count("category") == 1
+    assert t.prop("category").type == "text"  # the stored one wins
+
+
+def test_topup_leaves_a_custom_type_named_like_a_media_type_alone():
+    t = _media("PDF")
+    t.basic = False
+    assert topup_task_type(t).prop("topic") is None
