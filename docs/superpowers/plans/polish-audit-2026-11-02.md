@@ -316,7 +316,7 @@ sheet (Settings), slash menu groups and strings (taken from Capacities' own app)
 Checked and also present: Wall cards are already masonry, the peek has the "N / total" stepper, the type page `...` menu has Pin, Collection, Import and settings.
 Checked and still open: sidebar "Sort Manually | Sort Alphabetically" on the Object Types header (types are always
 alphabetical), Help & Resources section (links to Capacities' web pages), New menu as an anchored popover with a Search field, the search palette
-as one list, the Overview tab's hidden-section picker, masonry cards, Table "Content" word-count column.
+as one list, the Overview tab's hidden-section picker, the Table "Content" word-count column, "Add Section" under the types.
 
 Gate after these eight commits: back end 1463 passed (1 pre-existing failure, `test_static_files_are_gzipped`,
 also fails without these changes); front end 2321 passed; `tsc` clean; lint warnings only (pre-existing); build ok.
