@@ -31,6 +31,7 @@ import { useFind } from '@/find/useFind'
 import { installLinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, typeOf, useLinkIndex, ensureLinkIndex } from '@/links/linkIndex'
 import { installWikilinkPresenter } from '@/links/wikilinkPresenter'
+import { formatKeys, keysFor } from '@/lib/shortcuts'
 import { cn } from '@/lib/utils'
 import { canGoBack, usePeek, useTabs, type Target } from '@/nav/tabs'
 import { ReferencesSection } from '@/references/ReferencesSection'
@@ -145,6 +146,14 @@ export const OBJECT_M9_TEXT = {
   /** `EntityMenu.duplicateObject.text` */
   duplicate: 'Duplicate',
 } as const
+
+/** A menu row's keys, as Capacities draws them ("Ctrl Alt P", "Ctrl ⌫"): the registry's first key. */
+function MenuKeys({ id }: { id: string }) {
+  const keys = keysFor(id)
+  if (!keys.length) return null
+  const text = formatKeys(keys[0]).split('+').map((k) => (k === 'Backspace' ? '⌫' : k)).join(' ')
+  return <DropdownMenuShortcut>{text}</DropdownMenuShortcut>
+}
 
 function ToolButton({ label, icon, onClick, pressed }: { label: string; icon: string; onClick?: () => void; pressed?: boolean }) {
   return (
@@ -769,7 +778,7 @@ export function ObjectView({
             <DropdownMenuItem onSelect={() => useFind.getState().open(path)}>
               <Icon name="ph-magnifying-glass" size={14} />
               {FIND_IN_PAGE_MENU_ITEM}
-              <DropdownMenuShortcut>Ctrl F</DropdownMenuShortcut>
+              <MenuKeys id="findInPage" />
             </DropdownMenuItem>
             <PinMenuItems pin={{ kind: 'object', path, id: summary?.id }} />
             <DropdownMenuItem
@@ -781,6 +790,7 @@ export function ObjectView({
             >
               <Icon name="ph-presentation" size={14} />
               {OBJECT_M8_TEXT.present}
+              <MenuKeys id="openPresentationMode" />
             </DropdownMenuItem>
             <DropdownMenuItem disabled={!summary} onSelect={() => setExportOpen(true)}>
               <Icon name="ph-export" size={14} />
@@ -887,6 +897,7 @@ export function ObjectView({
             >
               <Icon name="ph-trash" size={14} />
               {DELETE_OBJECT_TEXT.action}
+              <MenuKeys id="deleteCurrentPage" />
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
