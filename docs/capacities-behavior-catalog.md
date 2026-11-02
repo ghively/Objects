@@ -12,11 +12,12 @@ Companion: `docs/superpowers/plans/polish-audit-2026-11-02.md` (what differed fr
 |---|---|
 | Settings (all pages) | done (section 1) |
 | Sidebar footer: Shortcuts panel (section 2), Add Section, type gallery | done (sections 2-3) |
-| Sidebar rest, top bar, tabs, search, New menu | pending |
+| Sidebar rest, top bar, search, New menu | done (sections 4, 8) |
+| Tab context menu | pending |
 | Views: layouts, filter, sort, group, Overview | pending |
-| Object page: header, properties, side panel, backlinks | pending |
-| Editor: block menu, selection toolbar, embeds, tables | pending |
-| Graph, Trash, Explore, shortcuts, export dialog | pending |
+| Object page: header, properties, side panel | done (section 5); backlinks, unlinked mentions, outline pending |
+| Editor: block menu, selection toolbar, slash, @ | done (section 6); embeds, tables, columns, code, math pending |
+| Graph, Trash, Explore panel, shortcuts | done (section 7); export and import dialogs pending |
 
 ## 1. Settings
 
@@ -156,3 +157,73 @@ Object's "new object type" flow has none of the starter templates; each would pr
 - The calendar's Tasks rows (Pro): circle checkbox, title, status chip with a dropdown (Next Up, Someday/Maybe,
   In Progress), a due-date chip (red when overdue, with a calendar icon), a priority pill (!, !!, !!!) and a
   `...` row menu. Section toolbar: "N open" count, layout picker, settings, snooze-style arrow, `+`.
+
+## 5. Object page and peek
+
+- **Peek** (click an object in a list): a modal over the page. Header buttons top right: a focus/AI sparkle
+  toggle, `...` (the object menu, section 6), expand (open as full page). Top left: a toggle that shows the
+  property pane. Bottom right: a stepper "N / total" with previous and next through the list you came from.
+  Daily Notes add a Reviewed checkbox and a "Calendar" button (jump to that day).
+- **Full page**: the same content, with the property pane docked on the left (Status, Time frame,
+  Collaborators... one block per property, each "Empty" when unset) and the outline as a column of short
+  dashes at the right edge (hover opens the outline popover). The browser tab title is the object title.
+- **Header**, top to bottom: type pill (icon + name; click to change type), a relation button, then any
+  property surfaced in the header (a Status chip such as "In Progress"), a "Collections" chip; the title in
+  large bold; the Description property as a paragraph under the title; a "Tags" row of colored tag chips with a
+  small list icon; a divider; the body.
+- **Property value editors**:
+  - Date: a chip; click opens a picker: an input with an info icon, presets (Yesterday, Today, Tomorrow, In 1
+    week, In 2 weeks), month and year dropdowns, a month grid with the chosen day as a pill, toggles
+    "Include Time" and "End Date", Remove, Cancel, Confirm. The chip has an `x` to clear and an expand icon.
+  - Object property (for example Status or Category pointing at Tag): a dropdown arrow on the property header;
+    click opens "Search or Create" with an expand-to-search button, then a list of the target objects as
+    colored chips each with a checkbox (multi-select). Two tag objects with the same title are different
+    objects with their own colors.
+  - Text, number, checkbox, label: not opened in this pass.
+- **Tags** are objects of the Tag type with a color; the chip uses that color.
+
+## 6. Editor chrome and menus
+
+- **Selection toolbar** (appears above selected text): Bold, Italic, Strikethrough, Underline, bulleted list,
+  numbered/to-do list, Link, Code, TeX formula, color/highlight, `+`, `@` mention, AI sparkle **(Pro)**.
+- **Block handle**: hovering a block shows `+` (insert below) and a six-dot grip at its left. Clicking the grip
+  selects the block and opens a menu: Hierarchy (current level, submenu), List >, To-do, Quote, Toggle, Group
+  (Ctrl+G), AI assistant... **(Pro)**, Turn into..., Copy >, Duplicate (Ctrl+D), Remove (Backspace).
+- **Block selection bar** (bottom of the page while blocks are selected): left "N block(s) . M words" with a
+  stats dropdown; middle: Bold, Italic, Strikethrough, Underline, Hierarchy dropdown, list dropdown, toggle,
+  quote, to-do, icon dropdown, color dropdown; right: "Turn blocks into" dropdown, "Tag" dropdown, "Move"
+  dropdown, delete (red), AI **(Pro)**, close.
+- **Inline code** renders as a purple monospace token with a tinted background; **tables** are bordered with a
+  header row; a text block placeholder reads "Text"; the title placeholder "Title".
+- **Slash menu**, **@ picker**, **markdown shortcuts**: see audit items 41-43 and section 2.
+- **Object `...` menu**: see audit item 44. **Delete** asks for confirmation then moves to Trash (30 days).
+- **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves.
+
+## 7. Graph, Trash, Explore, Help
+
+- **Graph**: a force-directed canvas; one dot per object, colored by its type color, bigger when more linked;
+  links drawn as thin lines. Top right: a count pill (objects shown), a document icon and a history icon.
+  Bottom right: zoom out, a zoom dropdown (Page Fit, 5% ... 300%), zoom in, download (image), and a settings
+  dropdown: Show tags network, Filter object types, Exclude object types, Show completed tasks, Hide objects
+  with many links, Hide dates, Hide indirect links.
+- **Trash**: a list of deleted objects, "Empty Trash", 30-day retention, and "object types and collections cannot
+  be restored completely".
+- **Explore** **(Pro)** as a side panel: tabs "Explore" with two cards (AI Chat, Search), "Relevant Content"
+  (objects related to the page you are on) with "Find More". Toggled with Ctrl+Shift+Right; the tooltip reads
+  "Hide sidepanel".
+- **Help & Resources** (sidebar): First Steps, Ask a Question, Documentation, What's New, Feedback.
+- **Theme toggle** in the sidebar footer switches dark and light immediately (it persists).
+
+## 8. Search, New menu, view toolbar
+
+- **Search palette**: see audit backlog item 2 (placeholder text, Today/Earlier groups, type at the right).
+- **New menu**: popover with Search; types in recent-use order; Pro types badged; footer hints.
+- **View toolbar** (type pages, `All` tab): count pill, Filter, Sort, Group by, a layout dropdown, Customize.
+  - Layouts: List, Wall (cards), Kanban, Gallery, Table, Embed.
+  - Filter popover: "where" row builder with "Filter" and "Filter group" buttons. Sort popover: "+ Sort".
+    Group by: a "Group by" button. Customize: "Card view" and "Calculations".
+  - Tab strip: Overview | All | custom tabs (a Query-backed one is Pro) | `+` to add a tab.
+  - Type page header: type icon + plural name; search icon; `...` (New from Template >, New Collection, Pin to
+    Sidebar, Object Type Settings, Export, Import); a split "New" button.
+- **Wall cards** show: the type label, the icon and title, the description, then one row per card-view property
+  with its icon and value or "Empty" (Collaborators, Time frame, Status on Projects).
