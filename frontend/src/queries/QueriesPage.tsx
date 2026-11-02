@@ -24,7 +24,7 @@ export const QUERIES_TEXT = {
   emptyTitle: 'No queries',
   emptyBody: 'Queries you create in this database will appear here.',
   open: 'Open',
-  pin: 'Pin to sidebar',
+  pin: 'Pin to Sidebar',
   delete: 'Delete',
 }
 

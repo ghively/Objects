@@ -34,7 +34,7 @@ import { QUERY_ICON } from '@/lib/defIcons'
 export const QUERY_TEXT = {
   edit: 'Edit query',
   closeEditor: 'Close editor',
-  pinToSidebar: 'Pin to sidebar',
+  pinToSidebar: 'Pin to Sidebar',
   pinToType: 'Pin to object type',
   unpinFromType: 'Unpin from object type',
   pinToDashboard: 'Pin to dashboard',
