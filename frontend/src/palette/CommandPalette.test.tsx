@@ -81,6 +81,16 @@ beforeEach(() => {
 })
 
 describe('shortcuts', () => {
+  test('the footer lists the keys: navigate, abort, select, new tab, side panel', async () => {
+    const { user } = setup()
+    await user.keyboard('{Control>}k{/Control}')
+    await screen.findByPlaceholderText('Search content')
+    const hints = screen.getByRole('note', { name: 'Keyboard hints' })
+    for (const t of ['↑↓ to navigate', 'Esc to abort', '↵ to select', 'Ctrl ↵ in new tab', 'Shift ↵ in side panel']) {
+      expect(hints).toHaveTextContent(t)
+    }
+  })
+
   test('Ctrl+K and Ctrl+P open search (Object), also with focus in the editor; no key opens actions; Esc closes', async () => {
     const { user } = setup()
     const editor = document.createElement('div')

@@ -60,7 +60,6 @@ export const SLASH_TEXT = {
   structure: 'Create an object', // CreateDropdown.sections.structure.label
   dates: 'Link to a date', // CreateDropdown.sections.dates.label
   reuse: 'Reuse any content', // ControlDropdown.reuseContent.heading
-  footer: 'press "/" to search', // ControlDropdown.structure.slashCommand
   noResults: 'No results', // AppSettings.search.noResults
   pasteUrl: 'Paste URL', // EntityPicker.link.placeholder
   withEmptyTitle: (structureTitle: string) => `Create ${structureTitle}`, // ControlDropdown.structure.withEmptyTitle

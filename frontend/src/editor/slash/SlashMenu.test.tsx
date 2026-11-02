@@ -67,7 +67,7 @@ describe('<SlashMenu>', () => {
       'Link to a date',
       'Reuse any content',
     ])
-    expect(within(menu).getByText('press "/" to search')).toBeInTheDocument()
+    expect(within(menu).getByRole('note', { name: 'Keyboard hints' })).toHaveTextContent('↑↓ to navigate')
     expect(within(menu).getByRole('option', { name: /Create Page/ })).toBeInTheDocument()
 
     type(editor, 'head')

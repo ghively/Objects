@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEve
 import type { ObjectSummary, TypeDef } from '@/api/types'
 import { whiteboardApi } from '@/api/whiteboardClient'
 import { Icon } from '@/components/Icon'
+import { KeyHints } from '@/components/KeyHints'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
@@ -238,6 +239,7 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
             </li>
           ))}
         </ul>
+        <KeyHints />
       </DialogContent>
     </Dialog>
   )
