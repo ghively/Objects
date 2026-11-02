@@ -305,7 +305,7 @@ unless marked. Order is a suggestion, highest value first.
 | A1, A2 media fields (PDF, Image, Weblink, Audio) | done: added in memory like the Task fields, a stored definition wins, never written on read | `5f9215d` |
 | C14 keyboard-hint footer ("up/down to navigate, Esc to abort, Enter to select") | done for the slash menu, New menu, link picker and search palette (the palette adds new tab and side panel) | `cbc84d3` |
 | B7 "Link to a date" presets | done: In a week, A week ago added. Capacities' live list also names "Time" and "Now"; Object keeps its own "Today - date link" and "Now - timestamp" (reference strings), not renamed | `54a10c7` |
-| B8 `@` picker | partly: `@` at the start of a word opens the existing object picker (a dialog), `[[` kept; the live app's inline popover with recents and per-type rows is still open | `f698888` |
+| B8 `@` picker | done: `@` at the start of a word (and `[[`) opens a popover at the caret: recent objects first, then a row per type with its count and a chevron that lists the type's objects (Backspace goes back), typing fuzzy-matches titles, keyboard-hint footer; the live "Collection" badge on collection rows is not built | `f4c6a89` |
 | C18 object `...` menu shortcut hints | done for Find in page (Ctrl F), Present (Ctrl Alt P), Delete (Ctrl Backspace), read from the shortcut registry; the menu's order was already set to Capacities' sections on 2026-10-29. Export, Import and Pin to Sidebar have no registered key yet | `2dd693e` |
 | C15 space switcher Search field | done: a Search field heads the list (replacing the "Spaces" heading) and filters by name | `d112222` |
 | C17 Pin to Sidebar on a type's context menu; label capitalised ("Pin to Sidebar") everywhere | done | `553a88c` |
