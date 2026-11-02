@@ -56,7 +56,37 @@ compared control by control. Saved references: `docs/01-calendar-day.png`,
     a check, then "Space settings", "Add space" and "Open folder..." (the folder entries are local-app
     needs Object doesn't have; the search field is the gap).
 
+## Second pass: object page, editor, Settings (read-only)
+
+13. **Editor sizing**: Object sizes the editor in `rem` from a 15.5px root (no zoom, DPR 1). Full-page
+    People guide: H2 20.34px/700, body 15.5px on a 23.25px line, a 705px text column. Object's editor uses a
+    fixed 17px base and has no text-size setting; a rem-based scale plus a setting would match.
+14. **Object page header**: type pill (e.g. "Person") + a "Collections" chip above the title, emoji icons in
+    the title, a "Tags" row under it, then the body. Properties live in a side pane (Contact, Category,
+    "Add Property", each "Empty" when unset); the outline is a dash ladder at the right edge.
+15. **Settings > Editor** (all missing from Object): Disable spellcheck; Spellcheck language
+    (Experimental); Always open as full page; Always create inline links; backlink display (Only block with
+    backlink / Full path above); Hide object type settings outside of settings; Hide outliner lines; Toggle
+    style (Toggle | Bullet); Hide App Menu; When Object starts (space on this device: Last opened | Specific;
+    per space: Where I left off | Calendar | Calendar today | Specific object); Highlight Style (Default |
+    Minimal); Default state for backlink sections.
+16. **Other Settings pages**: Language; Date & Time (time zone list, date formatting); Offline & Sync
+    (sync status, content downloaded, Recalculate content index, local storage size, media loading Everything |
+    Required only, Clear media cache, cloud media usage); Import Content (migration guides per app); Space
+    Settings; Object Types; Task management; Integrations (Calendar, Task actions, API, Web Extension, Email,
+    Telegram, WhatsApp, Readwise, Kindle, Raycast). Cloud-only ones (Account, Billing, sync, integrations)
+    have no Object equivalent by design.
+17. **Sidebar footer**: Graph, Trash, "Help & Resources" (First Steps, Ask a Question, Documentation, What's
+    New, Feedback); profile, settings, theme icons along the bottom.
+18. **How-to guides**: Object ships guide objects ("How to Use This People Object", Meeting, Project).
+    Imported into the wiki-organized space as How-to-tagged objects and used as type descriptions.
+
+Method note: one stray click in this pass collapsed the sidebar's Object Types section; it was expanded
+again right away. Nothing was created, edited or deleted, so no scratch page was needed.
+
 ## Not yet poked
 
-Tasks page, Graph, Settings, the object page header and property area, the peek, whiteboards, the side
-panel, the tab context menu, row context menus in lists and tables, drag and drop, keyboard shortcuts.
+Tasks page, Graph, Trash, typing behaviour (slash menu, `[[` picker, @mentions, markdown shortcuts, block
+handles, selection toolbar), whiteboards, the side panel, the tab context menu, row context menus in lists
+and tables, drag and drop, keyboard shortcuts. Typing tests need the one scratch page Gene allowed; not
+created yet.
