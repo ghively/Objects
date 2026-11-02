@@ -13,6 +13,7 @@ Companion: `docs/superpowers/plans/polish-audit-2026-11-02.md` (what differed fr
 | Settings (all pages) | done (section 1) |
 | Sidebar footer: Shortcuts panel (section 2), Add Section, type gallery | done (sections 2-3) |
 | Sidebar rest, top bar, search, New menu | done (sections 4, 8) |
+| Calendar Month and Week views, backlinks, Export dialog | done (section 10) |
 | Tab and sidebar context menus, Overview tab, collection page, outline | done (section 9) |
 | Views: layouts, filter, sort, group, Overview | pending |
 | Object page: header, properties, side panel | done (section 5); outline and stats in section 9; backlinks and unlinked mentions pending |
@@ -249,3 +250,33 @@ Object's "new object type" flow has none of the starter templates; each would pr
   of a paragraph, made with `()` Space), tables with a header row, tags row with colored chips, inline code.
 - **Note**: opening an object and selecting text may touch its "Last Updated" (one object showed the current
   time after being opened; others untouched showed old dates).
+
+## 10. Calendar views, backlinks, export, blocks
+
+- **Month view**: header "Nov 2026" at the left, the view switcher (Month, Week, Three days, Day) centered,
+  "< Today >" at the right; below, a strip Jan to Dec with the current month highlighted; then one card per
+  existing daily note of that month (type label, title, Reviewed checkbox, Tags row, then the note's content:
+  to-dos, bullets, code/time rows), and a "+ New Object" row. An empty month shows "No daily notes created for
+  this month. You can change this by creating a new object." Clicking a month in the strip jumps there; the tab
+  title becomes the month's first day.
+- **Week view**: a single column of days. Each day: the weekday name colored by weekday (Sunday red, Monday amber
+  with a red "Today" pill, Tuesday pink, Wednesday green, Thursday orange, Friday blue), the date as a large
+  title, "Week 45", then the note or a "+ Daily Note" button. No month sidebar.
+- **Backlinks** (bottom of an object, a "Backlinks" pill with a count and a collapse toggle): each backlink is an
+  embedded reference, not a link list. A task shows as a task row (circle checkbox, title, status chip with a
+  dropdown, date icon, priority pill) plus the line that links here ("Parent project: <object chip>"); other
+  objects show the linking block with its parent context. A leading radio-dot marks each reference; hovering shows
+  small action icons (expand, `...`, and three more at the right). Unlinked Mentions **(Pro)** is separate.
+- **Inline tag**: a `#tag` typed in a paragraph renders as a colored chip in the text.
+- **Export dialog** (object `...` > Export, Ctrl+E): a modal with format tiles PDF, Markdown, Microsoft Word,
+  Latex. PDF: Style cards (Notes: matches the page's styling; Essay and Academic, both Pro + Experimental),
+  Options (Include embedded content; Include outline; Hide empty properties, on by default; Show type labels),
+  Format (A4 | Letter), Properties (All properties, with a per-property list), and an Export button.
+  Markdown: "Export folder containing all subpages" (zip), Include media, Include title as heading 1, Links as
+  wikilinks. Word and Latex tiles were not opened.
+- **Table block** (slash > Table): a 2 column by 3 row empty table with a rounded border, header row styling,
+  and cells that edit in place. Two Columns, Code, Math, Toggle, Group and Horizontal line could not be inserted
+  reliably through the debugger (typing after a table failed), so their look is only known from real notes
+  (code and math: see section 6; the shortcut sheet in section 2 lists their keyboard behavior).
+- **Delete** of a page from the list or the peek `...` menu uses the same confirmation as before and the object
+  goes to Trash.
