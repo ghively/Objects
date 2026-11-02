@@ -184,6 +184,40 @@ No note content is kept here.
 Not studied: typing flows themselves (slash menu, `[[` picker, @mentions, paste behaviour), since that needs
 an editable scratch page; only rendered results were read.
 
+## Sixth pass: the editor, driven on one scratch page
+
+One Page was created in the Personal space, typed in, and deleted (it is in Trash, kept 30 days; Trash says
+"Objects will be kept in trash for 30 days"; Empty Trash was not touched). Typing went through the browser
+debugger, which makes list shortcuts unreliable to judge, so treat "did not convert" below as unconfirmed.
+
+39. **New menu**: a popover under New with a Search field, types in recent-use order (Pro types show a rocket
+    badge), footer "up/down to navigate, Esc to abort, Enter to select". Typing "Page" + Enter creates the
+    object and opens it in a peek with the title focused. Type pill + "Collections" chip above the title, then
+    "Tags" and a "Text" placeholder.
+40. **While typing, the chrome fades**: the top bar, tabs and the peek's header buttons disappear until the
+    pointer moves (a focus mode). Object keeps them visible.
+41. **Slash menu** ("Create a block", a scrolling list with the same footer hints), in order:
+    Create a block: Standard, Small, Heading 1-4, Bullet list, Alphabetical list, Numbered list, Roman list,
+    Quote block, To-do, Toggle, Icon, Group, Math, Code, Horizontal line, Two Columns, Table.
+    Create an object: New <each type in the space>, New Date, New Tag, New Tweet.
+    Link to a date: Time, Now, Today, Tomorrow, Yesterday, In a week, A week ago.
+    Use the AI Assistant: Ask AI about this block, Add tags to block using AI (both Pro).
+42. **`@` picker** (not `[[`; `[[` stayed literal text): lists recent objects with their type icon and a
+    "Collection" badge on collections, then one row per type with a `>` to browse its objects; typing
+    filters; same footer hints.
+43. **Markdown input**: `# ` became a heading block; a backtick pair became an inline code token (monospace,
+    purple, tinted background). `- `, `1. `, `[] `, `> ` and `**bold**`/`*ital*`/`~~strike~~` stayed literal in
+    this run (unconfirmed, see above). Whether Capacities converts them with real key events is still open.
+44. **Object `...` menu on a Page**: Open >, Find in Page (Ctrl F), Use Template >, Pin to Sidebar
+    (Ctrl Shift *), Change Type >, Object Type Settings, Share, Present (Ctrl Alt P), Export (Ctrl E),
+    Import (Ctrl I), Version History (Pro), Text Stats >, Copy >, Duplicate, Merge Into Object >,
+    Delete Object (Ctrl Backspace). Delete asks "Delete this object? Deletes it everywhere." with the
+    object chip and a red "Delete 1 object" button, then the object sits in Trash.
+    Object lacks Merge Into Object, Change Type > as a submenu check, Find in Page's shortcut hint, and
+    most shortcut hints (see item 8).
+45. **Trash page**: "Go to today"-style header, an "Empty Trash" button, the trashed objects listed,
+    a 30-day retention note, and a warning that object types and collections cannot be restored.
+
 ## Not yet poked
 
 Tasks page, Graph, Trash, typing behaviour (slash menu, `[[` picker, @mentions, markdown shortcuts, block
