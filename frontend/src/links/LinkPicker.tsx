@@ -95,12 +95,15 @@ function takeTypedAhead(editor: Editor | null, range: { from: number; to: number
   if (mode !== 'link' || !editor || !range || editor.isDestroyed) return ''
   const { doc, selection } = editor.state
   if (!selection.empty || selection.from <= range.to || selection.from > doc.content.size) return ''
-  if (doc.textBetween(range.from, range.to, '\0', '\0') !== '[[') return ''
+  if (!isOpener(doc.textBetween(range.from, range.to, '\0', '\0'))) return ''
   const typed = doc.textBetween(range.to, selection.from, '\n', '\0')
   if (!typed || /[\n\0]/.test(typed)) return ''
   editor.commands.deleteRange({ from: range.to, to: selection.from })
   return typed
 }
+
+/** What opens the picker: `[[`, or `@` at the start of a word. */
+const isOpener = (text: string) => text === '[[' || text === '@'
 
 export function LinkPicker() {
   const { editor, range, mode, hide } = useLinkPicker()
@@ -136,8 +139,8 @@ export function LinkPicker() {
         .run()
     } else if (o) {
       const text = editor.state.doc.textBetween(range.from, range.to, '\0', '\0')
-      // Only replace the brackets if they are still where the trigger saw them.
-      const at = text === '[[' ? range : { from: range.to, to: range.to }
+      // Only replace the brackets (or the `@`) if they are still where the trigger saw them.
+      const at = isOpener(text) ? range : { from: range.to, to: range.to }
       editor
         .chain()
         .focus()
@@ -146,7 +149,7 @@ export function LinkPicker() {
     } else {
       // Cancelled: the `[[` stays, as in Capacities, whose link dropdown searches text typed
       // inline after it; the query typed here goes back after the brackets, as if typed there.
-      const brackets = mode === 'link' && editor.state.doc.textBetween(range.from, range.to, '\0', '\0') === '[['
+      const brackets = mode === 'link' && isOpener(editor.state.doc.textBetween(range.from, range.to, '\0', '\0'))
       if (brackets && query) editor.chain().focus().insertContentAt(range.to, { type: 'text', text: query }).run()
       else editor.commands.focus()
     }
