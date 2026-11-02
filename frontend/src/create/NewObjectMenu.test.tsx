@@ -42,25 +42,40 @@ beforeEach(() => {
   })
 })
 
-async function pickType(user: ReturnType<typeof userEvent.setup>, name: string) {
-  expect(screen.getByRole('textbox', { name: 'Search Object Types' })).toBeInTheDocument()
-  await user.click(screen.getByRole('option', { name: name }))
-  return screen.getByRole('textbox', { name: 'Search or Create' })
-}
-
 describe('NewObjectMenu', () => {
-  test(`test NewObjectMenu type step then "New 'Foo'" calls createObject(typeId,{title:'Foo'}) and opens it`, async () => {
+  // Seen in the live app (v1.72.7): the New menu is a popover under the New button with a "Search"
+  // field and the types; picking a type creates and opens an object of it at once (no second step).
+  test('picking a type creates an untitled object of it and closes the menu', async () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
     render(<NewObjectMenu open onOpenChange={onOpenChange} />)
-    const search = await pickType(user, 'Project')
-    expect(screen.getByRole('option', { name: 'New Untitled' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Apollo' })).toBeInTheDocument()
-    await user.type(search, 'Foo')
-    await user.click(screen.getByRole('option', { name: "New 'Foo'" }))
-    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('project', { title: 'Foo' }))
-    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'project/Foo.md' }))
+    await user.click(screen.getByRole('option', { name: 'Project' }))
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('project', {}))
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'project/Untitled.md' }))
     expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  test('typing filters the types; Enter creates the first match', async () => {
+    const user = userEvent.setup()
+    render(<NewObjectMenu open onOpenChange={() => undefined} />)
+    expect(screen.getByRole('textbox', { name: 'Search Object Types' })).toHaveAttribute('placeholder', 'Search')
+    await user.keyboard('proj')
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Project'])
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('project', {}))
+  })
+
+  test('the types follow the sidebar order and the menu opens under the New button', () => {
+    const btn = document.createElement('button')
+    btn.setAttribute('data-new-button', '')
+    document.body.appendChild(btn)
+    try {
+      render(<NewObjectMenu open onOpenChange={() => undefined} />)
+      expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Page', 'Project', 'Task', 'Whiteboard'])
+      expect(screen.getByRole('dialog')).toHaveAttribute('data-slot', 'popover-content')
+    } finally {
+      btn.remove()
+    }
   })
 
   test('shows the keyboard hints under the list', () => {
@@ -84,19 +99,17 @@ describe('NewObjectMenu', () => {
   // Regression (2026-10-27): a click on a type option moved focus off the search box, so
   // typing a title and pressing Enter in step 2 did nothing. These type with the keyboard only,
   // never clicking the box (user.type would click it first and hide the bug).
-  test('after clicking a type, the "Search or Create" box has focus and Enter creates with the typed title', async () => {
+  test('the search box has focus on open; arrows and Enter pick a type without the mouse', async () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
     render(<NewObjectMenu open onOpenChange={onOpenChange} />)
     expect(screen.getByRole('textbox', { name: 'Search Object Types' })).toHaveFocus()
-    await user.click(screen.getByRole('option', { name: 'Page' }))
-    expect(screen.getByRole('textbox', { name: 'Search or Create' })).toHaveFocus()
-    await user.keyboard('  Network map  {Enter}')
-    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('page', { title: 'Network map' }))
+    await user.keyboard('{ArrowDown}{Enter}')
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('project', {}))
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 
-  test('New → Whiteboard (clicked) → typed title → Enter creates the whiteboard with that title', async () => {
+  test('New → Whiteboard creates a whiteboard at once', async () => {
     const user = userEvent.setup()
     const create = vi
       .spyOn(whiteboardApi, 'createWhiteboard')
@@ -104,9 +117,7 @@ describe('NewObjectMenu', () => {
     try {
       render(<NewObjectMenu open onOpenChange={() => undefined} />)
       await user.click(screen.getByRole('option', { name: 'Whiteboard' }))
-      expect(screen.getByRole('textbox', { name: 'Search or Create' })).toHaveFocus()
-      await user.keyboard('Network map{Enter}')
-      await waitFor(() => expect(create).toHaveBeenCalledWith('Network map'))
+      await waitFor(() => expect(create).toHaveBeenCalledWith(undefined))
       expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Whiteboards/Network map.md' })
     } finally {
       create.mockRestore()

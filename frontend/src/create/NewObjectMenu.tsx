@@ -1,7 +1,9 @@
 /**
- * "+ New" (and Ctrl+U): step 1 picks a type ("Search Object Types"), step 2 creates or finds an
- * object of it ("Search or Create"): "New '<q>'" (or "New Untitled") creates one, an existing
- * object opens. Modifier keys pick where it opens (see `createAndOpen`).
+ * "+ New" (and Ctrl+U): a popover under the New button (seen in the live app, v1.72.7) with a "Search"
+ * field and the object types in the sidebar's order; picking a type creates an untitled object of it and
+ * opens it at once. Modifier keys pick where it opens (see `createAndOpen`). Given a `typeId`, it starts
+ * at the second step instead ("Search or Create"): "New '<q>'" (or "New Untitled") creates one, an
+ * existing object of the type opens.
  *
  * M6: "Whiteboard" is always offered in step 1, also before the space has the type (its
  * definition is written by the first create); a new whiteboard goes through `POST /api/whiteboards`.
@@ -11,7 +13,7 @@ import type { ObjectSummary, TypeDef } from '@/api/types'
 import { whiteboardApi } from '@/api/whiteboardClient'
 import { Icon } from '@/components/Icon'
 import { KeyHints } from '@/components/KeyHints'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { ObjectIcon } from '@/object/ObjectHeader'
@@ -21,6 +23,7 @@ import { createAndOpen, openObject, type OpenMods } from './createAndOpen'
 
 export const NEW_OBJECT_TEXT = {
   searchTypes: 'Search Object Types',
+  searchPlaceholder: 'Search', // the live popover's field
   searchOrCreate: 'Search or Create',
   newUntitled: 'New Untitled',
   newNamed: (q: string) => `New '${q}'`,
@@ -85,6 +88,11 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
   const [error, setError] = useState<string | null>(null)
   const busy = useRef(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  // The popover opens under the sidebar's New button (also from Ctrl+U); a corner when it is hidden.
+  const anchor = useRef({
+    getBoundingClientRect: () =>
+      document.querySelector('[data-new-button]')?.getBoundingClientRect() ?? new DOMRect(8, 8, 0, 0),
+  })
 
   useEffect(() => {
     if (open) {
@@ -122,8 +130,28 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
     return [create, ...found]
   }, [q, typeId, types, objects])
 
+  const createOf = async (id: string, kind: TypeDef | undefined, title: string, m: OpenMods) => {
+    if (busy.current) return
+    busy.current = true
+    try {
+      if (isWhiteboardType(kind)) {
+        const res = await whiteboardApi.createWhiteboard(title || undefined)
+        openObject(res.path, m, id)
+        void invalidateLinkIndex()
+      } else {
+        await createAndOpen(id, title ? { title } : {}, m)
+      }
+      onOpenChange(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      busy.current = false
+    }
+  }
+
   const pick = async (item: Item, m: OpenMods) => {
     if (item.kind === 'type') {
+      if (!initialTypeId) return createOf(item.type.id, item.type, '', m)
       setTypeId(item.type.id)
       setQuery('')
       setActive(0)
@@ -134,22 +162,7 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
       openObject(item.object.path, m, item.object.type)
       return
     }
-    if (!typeId || busy.current) return
-    busy.current = true
-    try {
-      if (isWhiteboardType(type)) {
-        const res = await whiteboardApi.createWhiteboard(q || undefined)
-        openObject(res.path, m, typeId)
-        void invalidateLinkIndex()
-      } else {
-        await createAndOpen(typeId, q ? { title: q } : {}, m)
-      }
-      onOpenChange(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      busy.current = false
-    }
+    if (typeId) await createOf(typeId, type, q, m)
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -170,22 +183,26 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        showCloseButton={false}
-        className="top-[20%] w-[min(520px,calc(100vw-32px))] translate-y-0 gap-0 overflow-hidden rounded-xl border-line bg-raised-2 p-0 text-fg"
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverAnchor virtualRef={anchor} />
+      <PopoverContent
+        align="start"
+        sideOffset={6}
+        role="dialog"
+        aria-label="New object"
+        onOpenAutoFocus={(e) => {
+          e.preventDefault()
+          inputRef.current?.focus()
+        }}
+        className="w-[min(300px,calc(100vw-32px))] gap-0 overflow-hidden rounded-xl border-line bg-raised-2 p-0 text-fg"
       >
-        <DialogTitle className="sr-only">New object</DialogTitle>
-        <DialogDescription className="sr-only">
-          {typeId ? NEW_OBJECT_TEXT.searchOrCreate : NEW_OBJECT_TEXT.searchTypes}
-        </DialogDescription>
         <div className="flex items-center gap-2 border-b border-line px-3">
           {type ? <TypeChip type={type} size={22} /> : <Icon name="ph-magnifying-glass" size={16} />}
           <input
             ref={inputRef}
             autoFocus
             aria-label={typeId ? NEW_OBJECT_TEXT.searchOrCreate : NEW_OBJECT_TEXT.searchTypes}
-            placeholder={typeId ? NEW_OBJECT_TEXT.searchOrCreate : NEW_OBJECT_TEXT.searchTypes}
+            placeholder={typeId ? NEW_OBJECT_TEXT.searchOrCreate : NEW_OBJECT_TEXT.searchPlaceholder}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value)
@@ -240,7 +257,7 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
           ))}
         </ul>
         <KeyHints />
-      </DialogContent>
-    </Dialog>
+      </PopoverContent>
+    </Popover>
   )
 }
