@@ -360,6 +360,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={() => onNew?.()}
+          data-new-button=""
           className="flex h-[42px] flex-1 items-center gap-2 rounded-xl border border-[var(--chrome-btn-border)] bg-raised px-3 text-[15px] font-medium hover:bg-hover"
         >
           <Icon name="ph-plus" size={16} />
