@@ -52,7 +52,7 @@ export type WikilinkAttrs = { target: string; label: string | null }
  */
 export type WikilinkPresenter = (dom: HTMLElement, attrs: WikilinkAttrs) => (() => void) | void
 
-/** Called after `[[` is typed; `range` covers the two brackets. */
+/** Called after `[[` (or an `@` at the start of a word) is typed; `range` covers the typed characters. */
 export type WikilinkTrigger = (editor: Editor, range: { from: number; to: number }) => void
 
 let presenter: WikilinkPresenter | null = null
@@ -147,6 +147,19 @@ export const Wikilink = Node.create({
         key: triggerKey,
         props: {
           handleTextInput(view, from, to, text) {
+            if (trigger && text === '@' && from === to) {
+              // Seen in the live app: `@` at the start of a block or after a space opens the picker
+              // (not inside a word, so an email address stays text).
+              const $from = view.state.doc.resolve(from)
+              const prev = $from.parentOffset === 0 ? '' : view.state.doc.textBetween(from - 1, from, '\0', '\0')
+              if (prev === '' || /\s/.test(prev)) {
+                const fire = trigger
+                setTimeout(() => {
+                  if (!editor.isDestroyed) fire(editor, { from, to: from + 1 })
+                }, 0)
+              }
+              return false
+            }
             if (!trigger || text !== '[' || from !== to || from < 1) return false
             const before = view.state.doc.textBetween(from - 1, from, '\0', '\0')
             if (before !== '[') return false

@@ -108,6 +108,48 @@ describe('[[ trigger', () => {
     expect(editor.state.doc.textContent).toBe('Hello [[')
   })
 
+  /** Type `@` at the end of the first paragraph; the text before it decides whether the picker opens. */
+  async function typeAt(before: string): Promise<number | null> {
+    loadBody(editor, before + '\n')
+    const view = editor.view
+    const end = editor.state.doc.firstChild!.nodeSize - 1
+    editor.commands.insertContentAt(end, '@')
+    view.someProp('handleTextInput', (f) => f(view, end, end, '@', () => view.state.tr))
+    await new Promise((r) => setTimeout(r, 20))
+    return useLinkPicker.getState().range ? end : null
+  }
+
+  // Seen in the live app: `@` opens the object picker (recents, then a row per type).
+  test('typing @ after a space opens the picker and choosing replaces the @ with a link', async () => {
+    const end = await typeAt('Hello ')
+    expect(end).not.toBeNull()
+    expect(useLinkPicker.getState().range).toEqual({ from: end, to: end! + 1 })
+    render(<LinkPicker />)
+    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    await screen.findByText('Ada Lovelace')
+    fireEvent.change(input, { target: { value: 'ada' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(serializeBody(editor)).toBe('Hello [[Ada Lovelace]]\n')
+  })
+
+  test('typing @ at the start of a block opens the picker', async () => {
+    expect(await typeAt('')).not.toBeNull()
+  })
+
+  test('an @ inside a word (an email address) does not open the picker', async () => {
+    expect(await typeAt('mail ada')).toBeNull()
+  })
+
+  test('cancelling the picker leaves the @ and the query typed in it', async () => {
+    await typeAt('Hello ')
+    render(<LinkPicker />)
+    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    fireEvent.change(input, { target: { value: 'ada' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    await waitFor(() => expect(useLinkPicker.getState().range).toBeNull())
+    expect(editor.state.doc.textContent).toBe('Hello @ada')
+  })
+
   test('test link picker embed mode inserts an object embed', async () => {
     // The editor's pickObjectEmbed() opens the picker in embed mode at the cursor.
     loadBody(editor, 'First\n\nSecond\n')
