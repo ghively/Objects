@@ -1,4 +1,4 @@
-// Pin menu items for a `…` menu: "Pin to sidebar" / "Unpin from space", and the "Pin to..."
+// Pin menu items for a `…` menu: "Pin to Sidebar" / "Unpin from space", and the "Pin to..."
 // submenu listing "Pinned" and every custom section, each checked when the item is in it.
 import { Icon } from '@/components/Icon'
 import {
@@ -13,7 +13,7 @@ import { PINNED_TEXT } from './pinText'
 import { usePinned, type PinTarget } from './usePinned'
 
 export const PIN_MENU_TEXT = {
-  pinToSidebar: 'Pin to sidebar',
+  pinToSidebar: 'Pin to Sidebar',
   unpinFromSpace: PINNED_TEXT.unpinFromSpace,
   pinTo: 'Pin to...',
 }
@@ -61,7 +61,7 @@ export function PinToMenu({ pin }: { pin: PinTarget }) {
   )
 }
 
-/** "Pin to sidebar" / "Unpin from space" followed by "Pin to...". */
+/** "Pin to Sidebar" / "Unpin from space" followed by "Pin to...". */
 export function PinMenuItems({ pin }: { pin: PinTarget }) {
   const { isPinned, pin: doPin, unpin } = usePinned()
   const ref = refOf(pin)

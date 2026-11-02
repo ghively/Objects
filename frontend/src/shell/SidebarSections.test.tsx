@@ -143,7 +143,7 @@ describe('SidebarSections', () => {
       </DropdownMenu>,
     )
     await user.click(screen.getByText('menu'))
-    await user.click(await screen.findByRole('menuitem', { name: 'Pin to sidebar' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Pin to Sidebar' }))
     await waitFor(() => expect(mocked.patchUi).toHaveBeenCalled())
     expect(mocked.ensureId).toHaveBeenCalledWith('Servers/Atlas.md')
     expect(mocked.ensureId.mock.invocationCallOrder[0]).toBeLessThan(mocked.patchUi.mock.invocationCallOrder[0])

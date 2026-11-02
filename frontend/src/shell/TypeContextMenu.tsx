@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/context-menu'
 import { createAndOpen } from '@/create/createAndOpen'
 import { COLLECTION_ICON } from '@/lib/defIcons'
+import { PIN_MENU_TEXT } from './PinToMenu'
+import { usePinned } from './usePinned'
 import { useTabs, type Target } from '@/nav/tabs'
 import { isDailyNoteType } from '@/object/ObjectHeader'
 import { IMPORT_CSV_TEXT } from '@/types/ImportCsvDialog'
@@ -75,6 +77,19 @@ export interface TypeContextMenuProps {
   onImport?: (type: TypeDef) => void
 }
 
+/** "Pin to Sidebar" / "Unpin from space" for the type itself (the live menu has it after New Collection). */
+function PinTypeItem({ type }: { type: TypeDef }) {
+  const { isPinned, pin, unpin } = usePinned()
+  const ref = { kind: 'type' as const, id: type.id }
+  const pinned = isPinned(ref)
+  return (
+    <ContextMenuItem onSelect={() => void (pinned ? unpin(ref) : pin(ref))}>
+      <Icon name={pinned ? 'ph-push-pin-slash' : 'ph-push-pin'} size={14} />
+      {pinned ? PIN_MENU_TEXT.unpinFromSpace : PIN_MENU_TEXT.pinToSidebar}
+    </ContextMenuItem>
+  )
+}
+
 export function TypeContextMenu({ type, onOpenTarget, onOpenTypeSettings, onDeleteType, onNewCollection, onImport }: TypeContextMenuProps) {
   const creatable = canCreateFromMenu(type)
   return (
@@ -116,6 +131,7 @@ export function TypeContextMenu({ type, onOpenTarget, onOpenTypeSettings, onDele
         <Icon name={COLLECTION_ICON} size={14} />
         {TYPE_MENU_TEXT.newCollection}
       </ContextMenuItem>
+      <PinTypeItem type={type} />
       <ContextMenuSeparator />
       <ContextMenuItem onSelect={() => onOpenTypeSettings?.(type)}>
         <Icon name="ph-gear" size={14} />
