@@ -298,6 +298,24 @@ unless marked. Order is a suggestion, highest value first.
   imported wiki space).
 - Scrub credentials found in the Work and Personal spaces before any of it is imported or shared.
 
+## Progress on the backlog (updated 2026-11-02, commits on `master`, not pushed)
+
+| Backlog item | State | Commit |
+|---|---|---|
+| A1, A2 media fields (PDF, Image, Weblink, Audio) | done: added in memory like the Task fields, a stored definition wins, never written on read | `5f9215d` |
+| C14 keyboard-hint footer ("up/down to navigate, Esc to abort, Enter to select") | done for the slash menu, New menu, link picker and search palette (the palette adds new tab and side panel) | `cbc84d3` |
+| B7 "Link to a date" presets | done: In a week, A week ago added. Capacities' live list also names "Time" and "Now"; Object keeps its own "Today - date link" and "Now - timestamp" (reference strings), not renamed | `54a10c7` |
+| B8 `@` picker | partly: `@` at the start of a word opens the existing object picker (a dialog), `[[` kept; the live app's inline popover with recents and per-type rows is still open | `f698888` |
+
+Checked and already present in Object (so not backlog): Add Section, Graph customization options, the Shortcuts
+sheet (Settings), slash menu groups and strings (taken from Capacities' own app), unlinked mentions.
+Checked and still open: sidebar "Sort Manually | Sort Alphabetically" on the Object Types header (types are always
+alphabetical), Help & Resources section, New menu as an anchored popover with a Search field, the search palette
+as one list, the Overview tab's hidden-section picker, masonry cards, Table "Content" word-count column.
+
+Gate after these four commits: back end 1463 passed (1 pre-existing failure, `test_static_files_are_gzipped`,
+also fails without these changes); front end 2318 passed; `tsc` clean; lint warnings only (pre-existing); build ok.
+
 ## Not yet poked
 
 Opened but only partly read, or never opened (all would need a scratch view or a second scratch page to look at
