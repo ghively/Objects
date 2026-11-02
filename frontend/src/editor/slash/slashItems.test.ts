@@ -95,6 +95,8 @@ describe('slash items', () => {
       ['Today', "Add a link to today's daily note"],
       ['Tomorrow', "Add a link to tomorrow's daily note"],
       ['Yesterday', "Add a link to yesterday's daily note"],
+      ['In a week', 'Add a link to the daily note a week from today'],
+      ['A week ago', 'Add a link to the daily note of a week ago'],
       ['Today - date link', "Add a link to today's date."],
       ['Now – timestamp', 'Add a timestamp with the current time'],
     ])
@@ -195,6 +197,8 @@ describe('object and date items', () => {
     expect(run('today')).toBe('Hello[[2026-10-27]]\n')
     expect(run('tomorrow')).toBe('Hello[[2026-10-28]]\n')
     expect(run('yesterday')).toBe('Hello[[2026-10-26]]\n')
+    expect(run('inAWeek')).toBe('Hello[[2026-11-03]]\n')
+    expect(run('aWeekAgo')).toBe('Hello[[2026-10-20]]\n')
     // M8: "Today - date link" inserts a date token.
     expect(run('dateLink')).toBe('Hello<time datetime="2026-10-27">2026-10-27</time>\n')
     expect(run('timestamp')).toBe('Hello2:05 PM\n')
