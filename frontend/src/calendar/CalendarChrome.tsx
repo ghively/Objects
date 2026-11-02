@@ -109,12 +109,15 @@ export function CalendarChrome({ weekStart, rightPanelOpen, onToggleRightPanel, 
   const sidebarTip = rightPanelOpen ? HIDE_SIDEBAR : SHOW_SIDEBAR
 
   return (
-    <div className="grid h-[72px] shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 px-5">
-      <div className="min-w-0 truncate text-[17px] font-semibold text-fg" data-testid="calendar-period-title">
+    // The title and the right-hand group take equal shares (so the view switch stays centred) but
+    // never shrink below their content: in a narrow window the row clips instead of printing the
+    // switch's labels or the Today buttons over one another.
+    <div className="flex h-[72px] shrink-0 items-center gap-4 overflow-hidden px-5">
+      <div className="min-w-0 flex-1 basis-0 truncate text-[17px] font-semibold text-fg" data-testid="calendar-period-title">
         {title}
       </div>
 
-      <div role="group" aria-label="Calendar view" className="flex items-center rounded-xl border border-line p-1">
+      <div role="group" aria-label="Calendar view" className="flex shrink-0 items-center rounded-xl border border-line p-1">
         {VIEW_TABS.map((t) => (
           <button
             key={t.view}
@@ -123,7 +126,7 @@ export function CalendarChrome({ weekStart, rightPanelOpen, onToggleRightPanel, 
             aria-pressed={view === t.view}
             onClick={() => setView(t.view)}
             className={cn(
-              'h-9 rounded-lg px-4 text-[16px] font-medium',
+              'h-9 rounded-lg px-4 text-[16px] font-medium whitespace-nowrap',
               view === t.view ? 'bg-hover-2 text-fg' : 'text-fg hover:bg-hover',
             )}
           >
@@ -132,7 +135,7 @@ export function CalendarChrome({ weekStart, rightPanelOpen, onToggleRightPanel, 
         ))}
       </div>
 
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex flex-1 basis-0 items-center justify-end gap-2 [&>*]:shrink-0">
         <div className="flex items-center rounded-xl border border-line p-1">
           <button
             type="button"
@@ -161,19 +164,22 @@ export function CalendarChrome({ weekStart, rightPanelOpen, onToggleRightPanel, 
             <Icon name="ph-caret-right" size={16} />
           </button>
         </div>
-        <button
-          type="button"
-          aria-label={sidebarTip}
-          title={sidebarTip}
-          aria-pressed={rightPanelOpen}
-          onClick={onToggleRightPanel}
-          className={cn(
-            'flex size-10 items-center justify-center rounded-xl border border-line text-fg hover:bg-hover',
-            rightPanelOpen && 'bg-hover',
-          )}
-        >
-          <Icon name="ph-calendar-blank" size={18} />
-        </button>
+        {/* The month sidebar belongs to the Day view only (Object hides it, and its switch, in the others). */}
+        {view === 'day' && (
+          <button
+            type="button"
+            aria-label={sidebarTip}
+            title={sidebarTip}
+            aria-pressed={rightPanelOpen}
+            onClick={onToggleRightPanel}
+            className={cn(
+              'flex size-10 items-center justify-center rounded-xl border border-line text-fg hover:bg-hover',
+              rightPanelOpen && 'bg-hover',
+            )}
+          >
+            <Icon name="ph-calendar-blank" size={18} />
+          </button>
+        )}
       </div>
     </div>
   )

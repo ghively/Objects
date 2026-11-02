@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { calendarDay, calendarRange } from '@/test/mockApi'
@@ -124,6 +124,17 @@ describe('CalendarChrome', () => {
     expect(hide).toHaveAttribute('aria-pressed', 'true')
     await user.click(hide)
     expect(onToggleRightPanel).toHaveBeenCalledTimes(2)
+  })
+
+  test('the view switch and the Today group never wrap or shrink, so a narrow window cannot overprint them', () => {
+    render(<CalendarChrome weekStart="sunday" rightPanelOpen onToggleRightPanel={vi.fn()} onOpenTarget={vi.fn()} />)
+    const group = screen.getByRole('group', { name: 'Calendar view' })
+    expect(group.className).toContain('shrink-0')
+    for (const b of within(group).getAllByRole('button')) expect(b.className).toContain('whitespace-nowrap')
+    // The title and the right-hand group share the spare width equally and may clip, not collide.
+    const row = group.parentElement as HTMLElement
+    expect(row.className).toContain('overflow-hidden')
+    expect(screen.getByTestId('calendar-period-title').className).toContain('min-w-0')
   })
 
   test("shift+today opens today's daily note", async () => {

@@ -1,5 +1,6 @@
-// The Calendar page: the chrome over the view chosen in `useCalendar`, and the calendar sidebar
-// (the mini month) at its right edge, open unless `ui.calendar.hideCalendarSidebar`.
+// The Calendar page: the chrome over the view chosen in `useCalendar`, and in the Day view the
+// calendar sidebar (the mini month) at its right edge, open unless `ui.calendar.hideCalendarSidebar`.
+// The other views (Month, Week, Three days) have no sidebar, as in Object.
 import type { Target } from '@/nav/tabs'
 import { CalendarChrome } from './CalendarChrome'
 import { CalendarSidePanel } from './CalendarSidePanel'
@@ -54,7 +55,7 @@ export function CalendarPage({ onOpenTarget }: CalendarPageProps) {
           {body}
         </div>
       </div>
-      {sidebarOpen && (
+      {sidebarOpen && view === 'day' && (
         <aside aria-label="Calendar sidebar" className="h-full w-[26rem] shrink-0 overflow-auto border-l border-line">
           <CalendarSidePanel />
         </aside>
