@@ -61,20 +61,25 @@ describe('Sidebar', () => {
     await user.click(screen.getByRole('button', { name: 'Trash' }))
     expect(onOpenTrash).toHaveBeenCalledTimes(1)
 
-    // A custom type: settings and delete.
+    // A custom type: the Object menu (TypeContextMenu.test.tsx covers each entry), with delete last.
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Servers' }))
     let menu = await screen.findByRole('menu')
     expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
+      'Open',
+      'Create Server',
+      'New from Template',
+      'New Collection',
       'Object Type Settings',
+      'Import CSV',
       'Delete object type',
     ])
     await user.click(within(menu).getByRole('menuitem', { name: 'Delete object type' }))
     expect(onDeleteType).toHaveBeenCalledWith(expect.objectContaining({ id: 'server' }))
 
-    // A basic type: settings only.
+    // A basic type: no delete.
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Pages' }))
     menu = await screen.findByRole('menu')
-    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Object Type Settings'])
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).not.toContain('Delete object type')
     await user.click(within(menu).getByRole('menuitem', { name: 'Object Type Settings' }))
     expect(onOpenTypeSettings).toHaveBeenCalledWith(expect.objectContaining({ id: 'page' }))
   })
