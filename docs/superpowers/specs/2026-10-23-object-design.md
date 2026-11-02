@@ -20,12 +20,13 @@ It's a new code base: we write our own code to match Capacities rather than ship
 **In:**
 - **Objects and types:** everything Capacities does with objects, object types, properties, collections, tags, daily notes, tasks, queries, the calendar, the graph, whiteboards, search, backlinks, templates, the command palette, tabs and side panels, and settings that apply locally.
 - **Freehand pen drawing** on whiteboards with Wacom pressure. This is Gene's addition; Capacities doesn't have it.
+- **AI assistant** (added 2026-11-02, M10): chat, block and tag helpers, run through the user's Claude Code CLI; it never writes on its own. Plan: `plans/2026-11-02-m10-ai-assistant.md`.
 
 **Out:**
 - anything that only exists because of the cloud: accounts, login, billing and Pro gating, sync, sharing and publishing, mobile
-- integrations (Readwise, Kindle, calendar feeds, Telegram, WhatsApp, email)
-- AI features (a Claude Code agent comes later)
 - telemetry
+
+**Later (wanted, lower priority, each needs its own spec change):** integrations (calendar feeds, task actions, the API, email, Readwise, Kindle, Telegram, WhatsApp, Raycast).
 
 Pro-only features are simply available.
 
@@ -130,7 +131,7 @@ Body = the object's blocks, as Markdown.
 
 ## 7. Done when
 
-1. Every feature in §3 works against a local space folder, with no network access needed.
+1. Every feature in §3 works against a local space folder, with no network access needed (the AI assistant, M10, needs the user's Claude Code and its own network access).
 2. A test space built from a copy of Gene's CPI export opens and behaves like his CPI space did. The copy stays outside the repo, because it holds work data.
 3. Files stay readable Markdown. Editing one thing changes only that thing in the file.
 4. Side by side with Capacities, Gene judges the look and feel faithful.
