@@ -293,6 +293,13 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
         block('yesterday', 'Yesterday', "Add a link to yesterday's daily note", 'ph-calendar-minus', (e) =>
           insertLink(e, addDayStr(today(), -1)),
         ),
+        // Seen in the live app (v1.72.7); the descriptions are ours.
+        block('inAWeek', 'In a week', 'Add a link to the daily note a week from today', 'ph-calendar-plus', (e) =>
+          insertLink(e, addDayStr(today(), 7)),
+        ),
+        block('aWeekAgo', 'A week ago', 'Add a link to the daily note of a week ago', 'ph-calendar-minus', (e) =>
+          insertLink(e, addDayStr(today(), -7)),
+        ),
         block('dateLink', 'Today - date link', "Add a link to today's date.", 'ph-calendar-check', (e) =>
           insertDateToken(e, today()),
         ),
