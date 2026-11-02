@@ -1,4 +1,5 @@
-import { useEffect, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCollections } from '@/collections/useCollections'
 import { Icon, IconOrEmoji, iconName } from '@/components/Icon'
 import {
   ContextMenu,
@@ -12,7 +13,7 @@ import type { Target } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
 import { WorkspaceSections } from './SidebarSections'
 import { chipStyle } from './typeColor'
-import { QUERY_ICON } from '@/lib/defIcons'
+import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { usePalette } from '@/palette/usePalette'
 import { useSettings } from '@/settings/useSettings'
 import { toggleDarkMode } from '@/theme/shortcuts'
@@ -49,6 +50,35 @@ export interface SidebarProps {
   tasksActive?: boolean
   /** Highlights the "Graph" entry. */
   graphActive?: boolean
+  /** Highlights the collection row of the open collection's page. */
+  activeCollectionId?: string | null
+}
+
+const COLLAPSED_KEY = 'object.sidebar.collapsedTypes'
+
+/** Which types have their collections folded away: kept per browser, never required. */
+function useCollapsedTypes(): [Set<string>, (typeId: string) => void] {
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(COLLAPSED_KEY)
+      return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+    } catch {
+      return new Set()
+    }
+  })
+  const toggle = useCallback((typeId: string) => {
+    setCollapsed((cur) => {
+      const next = new Set(cur)
+      if (!next.delete(typeId)) next.add(typeId)
+      try {
+        localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]))
+      } catch {
+        // storage can be blocked; the fold then lasts until reload
+      }
+      return next
+    })
+  }, [])
+  return [collapsed, toggle]
 }
 
 /** The footer theme button's tooltips: the mode it switches to (`SpaceOverview.setDarkMode`, `.setLightMode`). */
@@ -178,12 +208,26 @@ export function Sidebar({
   calendarActive,
   tasksActive,
   graphActive,
+  activeCollectionId,
 }: SidebarProps) {
   // "Tasks" is hidden while the space hides task management (`space.json` `hideTaskManagement`).
   const hideTasks = useSpaceInfo((s) => s.space?.hideTaskManagement ?? false)
   useEffect(() => {
     void useSpaceInfo.getState().ensure()
   }, [])
+  // A type's collections sit under its row, as in Capacities' `objects` sidebar block.
+  const { collections } = useCollections()
+  const [collapsed, toggleCollapsed] = useCollapsedTypes()
+  const byType = useMemo(() => {
+    const map = new Map<string, typeof collections>()
+    for (const c of collections) {
+      for (const id of c.typeIds) map.set(id, [...(map.get(id) ?? []), c])
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
+    }
+    return map
+  }, [collections])
   // "Queries" sits among the types where a type of that name would be, in the by-name order.
   type Entry = { kind: 'type'; type: TypeDef } | { kind: 'queries' }
   const entries: Entry[] = [
@@ -233,25 +277,45 @@ export function Sidebar({
             )
           }
           const t = entry.type
+          const own = byType.get(t.id) ?? []
+          const folded = collapsed.has(t.id)
           return (
           <li key={t.id}>
             <ContextMenu>
               <ContextMenuTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => onOpenType?.(t)}
-                  aria-current={activeTypeId === t.id ? 'page' : undefined}
-                  className={cn(
-                    'flex h-[36px] w-full items-center gap-2 rounded-lg px-1.5 text-left text-[15px] font-medium hover:bg-hover',
-                    activeTypeId === t.id && 'bg-hover',
+                <div className="group/type relative">
+                  <button
+                    type="button"
+                    onClick={() => onOpenType?.(t)}
+                    aria-current={activeTypeId === t.id ? 'page' : undefined}
+                    className={cn(
+                      'flex h-[36px] w-full items-center gap-2 rounded-lg px-1.5 text-left text-[15px] font-medium hover:bg-hover',
+                      own.length > 0 && 'pr-8',
+                      activeTypeId === t.id && 'bg-hover',
+                    )}
+                  >
+                    <TypeChip type={t} />
+                    <span className="min-w-0 flex-1 truncate">{t.pluralName}</span>
+                    {counts && counts[t.id] !== undefined && (
+                      <span className="text-[13px] text-fg-muted tabular-nums">{counts[t.id]}</span>
+                    )}
+                  </button>
+                  {own.length > 0 && (
+                    <button
+                      type="button"
+                      aria-label={folded ? 'Show collections' : 'Hide collections'}
+                      aria-expanded={!folded}
+                      title={folded ? `Show ${own.length} collections` : 'Hide collections'}
+                      onClick={() => toggleCollapsed(t.id)}
+                      className={cn(
+                        'absolute top-1/2 right-1 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg',
+                        !folded && 'opacity-0 group-hover/type:opacity-100 focus-visible:opacity-100',
+                      )}
+                    >
+                      <Icon name={folded ? 'ph-caret-right' : 'ph-caret-down'} size={12} />
+                    </button>
                   )}
-                >
-                  <TypeChip type={t} />
-                  <span className="min-w-0 flex-1 truncate">{t.pluralName}</span>
-                  {counts && counts[t.id] !== undefined && (
-                    <span className="text-[13px] text-fg-muted tabular-nums">{counts[t.id]}</span>
-                  )}
-                </button>
+                </div>
               </ContextMenuTrigger>
               <ContextMenuContent className="border-line bg-raised text-fg">
                 <ContextMenuItem onSelect={() => onOpenTypeSettings?.(t)}>
@@ -266,6 +330,27 @@ export function Sidebar({
                 )}
               </ContextMenuContent>
             </ContextMenu>
+            {own.length > 0 && !folded && (
+              <ul aria-label={`${t.pluralName} collections`} className="mt-0.5 mb-1 flex flex-col gap-px">
+                {own.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={(e) => onOpenTarget?.({ kind: 'collection', id: c.id }, { newTab: e.ctrlKey || e.metaKey })}
+                      aria-current={activeCollectionId === c.id ? 'page' : undefined}
+                      title={c.description || c.name}
+                      className={cn(
+                        'flex h-[30px] w-full items-center gap-2 rounded-lg pr-2 pl-[38px] text-left text-[14px] text-fg-muted hover:bg-hover hover:text-fg',
+                        activeCollectionId === c.id && 'bg-hover text-fg',
+                      )}
+                    >
+                      <Icon name={COLLECTION_ICON} size={14} />
+                      <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </li>
           )
         })}
