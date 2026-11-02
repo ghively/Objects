@@ -12,6 +12,8 @@ Updated 2026-11-02. You are continuing "Object", a local, Markdown-backed recrea
 
 **2026-11-02 polish audit:** `docs/object-behavior-catalog.md` records how Object actually behaves (read live, three spaces); `docs/superpowers/plans/polish-audit-2026-11-02.md` lists the differences, the fixes made and a consolidated backlog (A-H). Unlinked mentions must be kept (already in M5). Several local commits on `master` are not pushed; push only when Gene says so.
 
+**AI (2026-11-02):** in scope as M10, through the Claude Code CLI; plan `docs/superpowers/plans/2026-11-02-m10-ai-assistant.md`, not built. Integrations come later at lower priority.
+
 **Next:** work the open list at the top of `docs/superpowers/plans/remaining-work.md` and the polish audit's "Remaining tasks"; then Gene's hands-on checks, M1-M9. The audit fix pass (PR #4) and M9 (PR #3) are merged; `master` is the only branch to work on, and it is pushed (2026-11-02).
 
 | Milestone | Scope | Plan |

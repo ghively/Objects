@@ -366,8 +366,12 @@ Everything not done, with the behaviour to match (catalog section in brackets) a
 **Settings pages** (catalog 1)
 25. Language (decimal separator), Date & Time (time zone, format, start of week), Offline & Sync (index recalculation, media loading), Space Settings. Check what Object has. S-M.
 
+**AI and integrations**
+30. **M10, the AI assistant** (L): the plan is written, not built (`2026-11-02-m10-ai-assistant.md`): Settings > AI Assistant, AI Chat panel and chat objects, block/slash/toolbar entries, tags and property auto-fill, chat shortcuts. Three small questions for Gene are listed in the plan.
+31. **Integrations, later** (each L, lower priority): calendar feeds, task actions, local API with tokens, email capture, Readwise, Kindle, Telegram, WhatsApp, Raycast, web extension.
+
 **Decisions and housekeeping**
-26. **Decided (Gene, 2026-11-02): unlock all Pro features, nothing gated.** The spec already said so ("Pro-only features are simply available"). Checked: Object has no gating, badge or upsell anywhere, and Tasks, Queries, version history, extended search, focus mode and unlinked mentions all exist. Do not copy Object's rocket badges, blurred previews or "Get Object Pro" cards. Left out by the spec because they need the cloud or a network, not because of Pro: AI (assistant, chat, AI block menu entries; a Claude Code agent comes later), integrations (calendar feeds, task actions that send to other apps, Readwise, Kindle, Telegram, WhatsApp, email, Raycast, the API) and accounts. If Gene wants any of those, it is a spec change first.
+26. **Decided (Gene, 2026-11-02): unlock all Pro features, nothing gated.** The spec already said so ("Pro-only features are simply available"). Checked: Object has no gating, badge or upsell anywhere, and Tasks, Queries, version history, extended search, focus mode and unlinked mentions all exist. Do not copy Object's rocket badges, blurred previews or "Get Object Pro" cards. Update the same day: **AI is now in scope** (M10, through the Claude Code CLI; `2026-11-02-m10-ai-assistant.md`) and the integrations are wanted later at lower priority; accounts, sync, sharing and mobile stay out.
 27. Decide whether the Object how-to guides ship as built-in seeds.
 28. Investigate `test_static_files_are_gzipped` (fails on Windows `master`, also before these changes).
 29. Gene's hands-on checks, M1-M9 (256 items), and wiki-import follow-ups (see `remaining-work.md`).

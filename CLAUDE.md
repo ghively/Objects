@@ -12,7 +12,7 @@
 - **Gene checks each milestone hands-on** before the next one's results are relied on.
 - **Parallelize by file ownership.** See `docs/superpowers/build-process.md`.
 - Never write on read: opening a space must not modify `.md` files. Property edits change only their own lines. Deletes go to the trash and are restorable. Preserve CRLF/BOM and write atomically.
-- **Pro features are unlocked, nothing is gated** (Gene, 2026-11-02; the spec already says "Pro-only features are simply available"): Tasks, Queries, version history, extended search, focus mode, unlinked mentions and the rest are plain features. No Pro badge, upsell, blurred preview or limit anywhere. Still out by the spec, because they need the cloud or a network: AI, integrations (calendar feeds, Readwise, Kindle, Telegram, WhatsApp, email, Raycast, the API), accounts and sync.
+- **Pro features are unlocked, nothing is gated** (Gene, 2026-11-02; the spec already says "Pro-only features are simply available"): Tasks, Queries, version history, extended search, focus mode, unlinked mentions and the rest are plain features. No Pro badge, upsell, blurred preview or limit anywhere. **AI is in scope** (M10, run through the Claude Code CLI; plan `docs/superpowers/plans/2026-11-02-m10-ai-assistant.md`). Integrations (calendar feeds, Readwise, Kindle, Telegram, WhatsApp, email, Raycast, the API) are wanted later at lower priority. Out for good: accounts, sync, sharing, mobile, telemetry.
 - **Unlinked mentions stay**: never remove or hide them, and test any change near references, the object page or search.
 - Commits end with a `Co-Authored-By:` trailer for the model that made them.
 
