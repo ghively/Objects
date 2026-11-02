@@ -22,7 +22,7 @@ Backend: Python, run with `uv` (`uv run pytest backend/tests -q`). Frontend: Typ
 ## Where things are
 
 - Spec: `docs/superpowers/specs/2026-10-23-object-design.md`
-- Plans, acceptance checklists and status: `docs/superpowers/plans/` (`remaining-work.md` is the status page; M1–M8 are built)
+- Plans, acceptance checklists and status: `docs/superpowers/plans/` (`remaining-work.md` is the status page; M1–M9 are built)
 - How milestones are built: `docs/superpowers/build-process.md`; the build workflow scripts: `scripts/workflows/` (see `CONTINUE.md` for which is which)
 - How Capacities actually behaves (read live, three spaces): `docs/capacities-behavior-catalog.md`; the 2026-11-02 differences and backlog: `docs/superpowers/plans/polish-audit-2026-11-02.md`
 - Visual reference: `docs/ui-reference/`; reverse-engineering notes: `docs/capacities-re-findings.md`

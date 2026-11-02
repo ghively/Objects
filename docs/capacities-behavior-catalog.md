@@ -8,6 +8,8 @@ Companion: `docs/superpowers/plans/polish-audit-2026-11-02.md` (what differed fr
 
 ## Coverage checklist
 
+The full list of what is still unseen is in `docs/superpowers/plans/polish-audit-2026-11-02.md` ("Not yet poked").
+
 | Area | Status |
 |---|---|
 | Settings (all pages) | done (section 1) |
@@ -16,10 +18,10 @@ Companion: `docs/superpowers/plans/polish-audit-2026-11-02.md` (what differed fr
 | Calendar Month and Week views, backlinks, Export dialog | done (section 10) |
 | Unlinked mentions | Pro in Capacities, not opened; Object's own is built (section 11) |
 | Tab and sidebar context menus, Overview tab, collection page, outline | done (section 9) |
-| Views: layouts, filter, sort, group, Overview | pending |
-| Object page: header, properties, side panel | done (section 5); outline and stats in section 9; backlinks and unlinked mentions pending |
-| Editor: block menu, selection toolbar, slash, @ | done (section 6); embeds, tables, columns, code, math pending |
-| Graph, Trash, Explore panel, shortcuts | done (section 7); export and import dialogs pending |
+| Views: layouts, toolbar, Overview | done (sections 8, 9); the filter, sort and group editors' inner screens and Customize were not opened (they would change a saved view) |
+| Object page: header, properties, side panel | done (section 5); outline and stats in section 9; backlinks in section 10; unlinked mentions: Pro-only, not seen (section 11) |
+| Editor: block menu, selection toolbar, slash, @ | done (section 6); the default table in section 10; Two Columns, Code, Math, Toggle, Group, Horizontal line could not be inserted through the debugger (not seen) |
+| Graph, Trash, Explore panel, shortcuts | done (section 7); export dialog in section 10 (PDF, Markdown; Word and Latex not opened); import dialog not opened |
 
 ## 1. Settings
 
