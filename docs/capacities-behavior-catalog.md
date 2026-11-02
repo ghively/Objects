@@ -14,6 +14,7 @@ Companion: `docs/superpowers/plans/polish-audit-2026-11-02.md` (what differed fr
 | Sidebar footer: Shortcuts panel (section 2), Add Section, type gallery | done (sections 2-3) |
 | Sidebar rest, top bar, search, New menu | done (sections 4, 8) |
 | Calendar Month and Week views, backlinks, Export dialog | done (section 10) |
+| Unlinked mentions | Pro in Capacities, not opened; Object's own is built (section 11) |
 | Tab and sidebar context menus, Overview tab, collection page, outline | done (section 9) |
 | Views: layouts, filter, sort, group, Overview | pending |
 | Object page: header, properties, side panel | done (section 5); outline and stats in section 9; backlinks and unlinked mentions pending |
@@ -280,3 +281,16 @@ Object's "new object type" flow has none of the starter templates; each would pr
   (code and math: see section 6; the shortcut sheet in section 2 lists their keyboard behavior).
 - **Delete** of a page from the list or the peek `...` menu uses the same confirmation as before and the object
   goes to Trash.
+
+## 11. Unlinked mentions (kept in Object)
+
+Capacities shows an "Unlinked Mentions" section under Backlinks on an object's page, **Pro only**; it lists text
+elsewhere that matches this object's title or an alias without being a link ("Unlinked name matches", section
+label "Mentions"; an alias counts as a mention of the original object). Settings > Editor > "Default state for
+backlink sections" has Backlinks Open | Closed and Unlinked Mentions Open | Closed | Hidden. It could not be
+opened in the account seen (not Pro), so its look is not recorded here.
+
+Object builds it in full, unlocked (M5): `backend/objectapp/references.py` (matching on Unicode word
+boundaries, titles and aliases of at least a minimum length, longest name first, linking a mention from the
+list), `frontend/src/references/` and the Editor settings. **Gene wants this kept**; it is a ground rule in
+`CLAUDE.md`.

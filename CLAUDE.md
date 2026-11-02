@@ -12,6 +12,7 @@
 - **Gene checks each milestone hands-on** before the next one's results are relied on.
 - **Parallelize by file ownership.** See `docs/superpowers/build-process.md`.
 - Never write on read: opening a space must not modify `.md` files. Property edits change only their own lines. Deletes go to the trash and are restorable. Preserve CRLF/BOM and write atomically.
+- **Unlinked mentions stay** (Gene, 2026-11-02): Capacities gates them behind Pro; Object keeps them. Never remove or hide them, and test any change near references, the object page or search.
 - Commits end with a `Co-Authored-By:` trailer for the model that made them.
 
 ## Stack and commands
@@ -23,5 +24,6 @@ Backend: Python, run with `uv` (`uv run pytest backend/tests -q`). Frontend: Typ
 - Spec: `docs/superpowers/specs/2026-10-23-object-design.md`
 - Plans, acceptance checklists and status: `docs/superpowers/plans/` (`remaining-work.md` is the status page; M1–M8 are built)
 - How milestones are built: `docs/superpowers/build-process.md`; the build workflow scripts: `scripts/workflows/` (see `CONTINUE.md` for which is which)
+- How Capacities actually behaves (read live, three spaces): `docs/capacities-behavior-catalog.md`; the 2026-11-02 differences and backlog: `docs/superpowers/plans/polish-audit-2026-11-02.md`
 - Visual reference: `docs/ui-reference/`; reverse-engineering notes: `docs/capacities-re-findings.md`
 - Capacities reference material (behaviour, labels, CSS values; never copy its code): `reference/` in this repo (a trimmed subset: models, English strings, CSS). On Gene's machine the full unpacked app is also in the git-ignored `.reference/`, and older plans and the build script's rules say `.reference/`; in a clone, read `reference/` instead.

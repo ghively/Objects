@@ -94,7 +94,7 @@ Gene pointed Claude at a second space used for about a year (27 object types, 14
     Person, Organization, Place, Meeting, Project (Status and Category are Object properties pointing at the
     Tag type; Project also relates to Servers and Software), Key (relates to Servers and Scripts). Object's
     import and templates should treat "Object -> Tag" relations as first-class (status or category as a tag).
-20. **Tags are flat facets**: 102, mostly used once; client/org ("Ecard" 15), technology (Linux 5, Wifi 5),
+20. **Tags are flat facets**: 102, mostly used once; client or organization names (the biggest used 15 times), technology (Linux 5, Wifi 5),
     status words ("Complete" 7, "In Progress" 2) and a few with 0 uses. The Tags type page lists them as
     chips with counts.
 21. **Daily notes are the inbox.** Most are short: a few lines, a list of links to objects filed elsewhere
@@ -178,8 +178,9 @@ No note content is kept here.
     mention ticket ids (OPS-n), few use raw `[[ ]]` or `#tags` as text (linking is done with the picker, so
     the Markdown form seen in an export is not how they were typed).
 38. **Pro-gated features appear as upsells**: a Query-backed tab ("Untitled") on Daily Notes shows blurred
-    cards and a "Get Capacities Pro" card; Tasks and Explore show a rocket badge. Object has no paywall; show
-    these as normal features.
+    cards and a "Get Capacities Pro" card; Tasks and Explore show a rocket badge. Object has no paywall. Whether Pro-gated
+    Capacities features (Tasks, Queries, AI, unlinked mentions, version history) should all be unlocked in Object
+    is Gene's call; only unlinked mentions is confirmed (see "Keep" below).
 
 Not studied: typing flows themselves (slash menu, `[[` picker, @mentions, paste behaviour), since that needs
 an editable scratch page; only rendered results were read.
@@ -218,9 +219,90 @@ debugger, which makes list shortcuts unreliable to judge, so treat "did not conv
 45. **Trash page**: "Go to today"-style header, an "Empty Trash" button, the trashed objects listed,
     a 30-day retention note, and a warning that object types and collections cannot be restored.
 
+## Consolidated backlog (everything above, in one list, 2026-11-02)
+
+Full behaviour is in `docs/capacities-behavior-catalog.md`; item numbers refer to this file. Status: **open**
+unless marked. Order is a suggestion, highest value first.
+
+**Keep (Gene's explicit requirements)**
+- **Unlinked mentions stay.** Object already has them (M5: `backend/objectapp/references.py`,
+  `frontend/src/references/`, setting "Default state for backlink sections" with Open | Closed | Hidden).
+  Capacities gates them behind Pro; Object keeps them free. Any change to references, the object page or
+  search must not remove or hide them. Add a regression test per change that touches that code.
+
+**A. Data model (built-in types and fields)** (items 28, 29)
+1. PDF: Number of Pages, Table of Contents (checkbox), Document type (label), Topic (label).
+2. Image: Category (label), Colors (label). Weblink: Category, Topic. Audio: Duration, Origin, Category.
+3. Label-type properties with an editable option set on built-in types.
+4. Type settings: Page layout (Standard | Index card | Profile | Encyclopedia), Wide layout default, cover
+   image mode and display, default card view, default list view (3 right-hand properties), default link view
+   (Weblink defaults to Small Card with a Reset) (item 27). Check which Object already has before building.
+5. "Add new object type" starter gallery: Meetings, People, Projects, Atomic notes, Definitions, Books, Films,
+   TV series, Podcasts, Days, Weeks, Months, Organizations, Areas (catalog section 3).
+6. Object -> Tag relations as first-class "status/category as a tag" (item 19), including the wiki import.
+
+**B. Editor** (items 33-35, 39-43; catalog sections 2, 6)
+7. Slash menu: the four groups and their order, "Create an object" rows per type (+ New Date), "Link to a
+   date" presets (Time, Now, Today, Tomorrow, Yesterday, In a week, A week ago), footer hints.
+8. `@` picker: recents with type icon and Collection badge, per-type rows with `>` to browse, filter on typing.
+9. Selection toolbar (B I S U, lists, link, code, TeX, color, `+`, `@`), block-handle menu (Hierarchy, List,
+   To-do, Quote, Toggle, Group, Turn into, Copy, Duplicate, Remove), bottom block-selection bar with the
+   "N blocks . M words" stats.
+10. Markdown shortcuts incl. `|` quote, `>` toggle, `a)` and `i)` lists, `()` icon block, combinable (catalog
+    section 2); confirm each with real key events.
+11. Inline date chip; inline tag chip; inline code token style; Icon block; emoji-heavy pasted content.
+12. Focus mode while typing (chrome fades) and "Always open as full page" / "Always create inline links" /
+    "Disable automatic detection of numbered lists" / spellcheck settings (item 15).
+13. Rem-based editor sizing from a 15.5px root and a text-size setting (item 13).
+
+**C. Shell, menus, palettes** (backlog 1-12 above; catalog sections 4, 8, 9)
+14. New menu popover with Search and footer hints (backlog 1). Search palette (backlog 2).
+15. Space switcher with a Search field (backlog 12). Sidebar type row hover count and `...` (backlog 7).
+16. Object Types header `...`: Sort Manually | Sort Alphabetically; `+` opens the starter gallery.
+17. Add Section form (icon + name). Pin to Sidebar submenu (backlog 6). Tab context menu (Pin to Sidebar,
+    Pin Tab, Object Type Settings, Import).
+18. Object `...` menu order, Share, Import, Copy >, Merge Into Object >, Change Type >, Text Stats >, shortcut
+    hints (backlog 8, item 44).
+19. Shortcuts panel (the arrow icon at the sidebar footer) with the full grouped list (catalog section 2);
+    Object's registry is `frontend/src/lib/shortcuts.ts`.
+20. Help & Resources sidebar section; Graph settings list (Show tags network, Filter / Exclude object types,
+    Show completed tasks, Hide objects with many links, Hide dates, Hide indirect links) and zoom presets.
+
+**D. Views and pages** (items 23-26; catalog sections 5, 8, 9)
+21. Masonry cards; Wall cards with property rows and "Empty" placeholders; Tags type page chips with counts.
+22. Table "Content" word-count column; row numbers; type page `...` menu (New from Template, New Collection,
+    Pin to Sidebar, Object Type Settings, Export, Import) and tab `+`.
+23. Overview tab: Recently Opened row, Collections tiles, "+ Collection", gear with Visible/Hidden sections
+    incl. smart sections "Not in any collection", "Not tagged", "No backlinks".
+24. Collection page in a peek with the parent-type chip and "+ New Object"; peek property pane toggle and
+    "N / total" stepper; outline popover with Outline | Stats and a pin button; Stats fields.
+25. Date picker (presets, Include Time, End Date, Remove, Cancel, Confirm); Object-property picker
+    ("Search or Create", multi-select chips).
+
+**E. Calendar** (backlog 3-5, 10; catalog section 10)
+26. Month strip Jan-Dec and "+ New Object"; Week view's weekday colors and "+ Daily Note"; multi-day
+    Reviewed/expand/`...`; Tasks `+` inside the pill; empty daily-note placeholders.
+
+**F. Settings** (items 15, 16; catalog section 1)
+27. Editor options not yet in Object; Language (decimal separator); Date & Time (time zone, formatting, start of
+    week); Offline & Sync (content index recalculation, media loading); Full Export options; Space Settings.
+
+**G. Export and import** (catalog section 10)
+28. Export dialog: PDF styles and options, Markdown options (subpages zip, media, H1 title, wikilinks), Word,
+    Latex. Import: starter migration guides per tool.
+
+**H. Decisions for Gene**
+- Which Pro-gated Capacities features to unlock in Object (Tasks, Queries, AI assistant, task actions, version
+  history, extended search, focus mode); unlinked mentions is already decided: keep.
+- Whether the Capacities how-to guides should ship as built-in seeds in the Object app (currently only in the
+  imported wiki space).
+- Scrub credentials found in the Work and Personal spaces before any of it is imported or shared.
+
 ## Not yet poked
 
-Tasks page, Graph, Trash, typing behaviour (slash menu, `[[` picker, @mentions, markdown shortcuts, block
-handles, selection toolbar), whiteboards, the side panel, the tab context menu, row context menus in lists
-and tables, drag and drop, keyboard shortcuts. Typing tests need the one scratch page Gene allowed; not
-created yet.
+Opened but only partly read, or never opened (all would need a scratch view or a second scratch page to look at
+safely): filter, sort and group editors; Customize card view and calculations; the Tasks page, Queries, AI
+Chat, Explore panel contents (Pro-gated); Weblink and PDF viewers; image and file objects; Two Columns, Code,
+Math, Toggle, Group and Horizontal line blocks (could not be inserted through the debugger); the Word and Latex
+export tabs; Unlinked Mentions in Capacities (Pro; Object's own implementation is in M5); Three days view in
+the second and third spaces; whiteboards (none in the spaces seen); drag and drop; the Android and web clients.

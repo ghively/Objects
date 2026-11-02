@@ -10,6 +10,8 @@ Updated 2026-10-29. You are continuing "Object", a local, Markdown-backed recrea
 
 **The 2026-11-01 full audit (bugs and optimization) is fixed, every item, in two passes,** on branch `ccr-bcf6e946-bf8moc` (Linux cloud container): `docs/superpowers/plans/audit-2026-11-01.md` holds the findings, Gene's answers and the before/after numbers; the repro scripts are in `scripts/audit-2026-11-01/`. Headlines: opening a 5,000-object space warm 6 s → 0.6 s, a rename 4 s → 0.4 s, type saves no longer block reads for seconds, the kanban pages, the entry bundle 3.4 MB → 273 KB, and sixteen data-loss or security bugs closed.
 
+**2026-11-02 polish audit:** `docs/capacities-behavior-catalog.md` records how Capacities actually behaves (read live, three spaces); `docs/superpowers/plans/polish-audit-2026-11-02.md` lists the differences, the fixes made and a consolidated backlog (A-H). Unlinked mentions must be kept (already in M5). Several local commits on `master` are not pushed; push only when Gene says so.
+
 **Next:** merge `ccr-bcf6e946-bf8moc` into `master` (pull request open) and re-gate on Windows (as M9 was), then Gene's hands-on checks, M1–M9. One question for Gene: should the object page title commit on Escape, as table title cells now do?
 
 **Branch:** M1–M9 are on `master` (M9 merged as pull request #3 on 2026-10-29). The audit fix pass is on `ccr-bcf6e946-bf8moc`, restarted from `master` at `8a3c8fb`, until it is merged.
