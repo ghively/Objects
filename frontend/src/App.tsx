@@ -344,6 +344,7 @@ export default function App() {
                 calendarActive={target?.kind === 'calendar'}
                 tasksActive={target?.kind === 'tasks'}
                 graphActive={target?.kind === 'graph'}
+                activeCollectionId={target?.kind === 'collection' ? target.id : null}
               />
             </ErrorBoundary>
           )}
