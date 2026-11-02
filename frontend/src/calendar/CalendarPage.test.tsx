@@ -65,6 +65,26 @@ describe('CalendarPage', () => {
     expect(useUiStore.getState().ui.calendar?.hideCalendarSidebar).toBe(true)
   })
 
+  test.each(['month', 'week', 'rolling'] as const)(
+    'the %s view has no calendar sidebar and no switch for it (the Day view\'s only)',
+    (view) => {
+      useCalendar.setState({ view, anchor: TODAY })
+      render(<CalendarPage onOpenTarget={vi.fn()} />)
+      expect(screen.queryByRole('complementary', { name: 'Calendar sidebar' })).toBeNull()
+      expect(screen.queryByRole('button', { name: /calendar sidebar/i })).toBeNull()
+    },
+  )
+
+  test('back in the Day view the sidebar and its switch return', () => {
+    useCalendar.setState({ view: 'rolling', anchor: TODAY })
+    const { rerender } = render(<CalendarPage onOpenTarget={vi.fn()} />)
+    expect(screen.queryByRole('complementary', { name: 'Calendar sidebar' })).toBeNull()
+    act(() => useCalendar.setState({ view: 'day' }))
+    rerender(<CalendarPage onOpenTarget={vi.fn()} />)
+    expect(screen.getByRole('complementary', { name: 'Calendar sidebar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Hide calendar sidebar' })).toBeInTheDocument()
+  })
+
   test('test a saved hidden sidebar stays hidden', () => {
     useUiStore.setState((s) => ({ ui: { ...s.ui, calendar: { weekStart: 'sunday', daily: {}, hideCalendarSidebar: true } } }))
     render(<CalendarPage onOpenTarget={vi.fn()} />)

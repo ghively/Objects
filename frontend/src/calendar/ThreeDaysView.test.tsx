@@ -37,18 +37,18 @@ describe('ThreeDaysView', () => {
     expect(screen.getAllByTestId('today-pill')).toHaveLength(1)
     expect(within(columns()[1]).getByTestId('today-pill')).toBeInTheDocument()
     expect(within(columns()[0]).getAllByText('Week 43')).toHaveLength(1)
-    // The sections, without the chips and the filter tabs.
-    await waitFor(() => expect(within(columns()[1]).getByText('A')).toBeInTheDocument())
-    expect(within(columns()[1]).getByTestId('section-tasks')).toBeInTheDocument()
-    expect(within(columns()[1]).getByText('Created Today')).toBeInTheDocument()
-    expect(within(columns()[0]).getByText('Created Yesterday')).toBeInTheDocument()
-    expect(within(columns()[0]).getByText('No tasks on this day')).toBeInTheDocument()
+    // Each column is the header over its daily note slot and nothing else (the reference and
+    // Capacities show no Tasks / Created / Backlinks sections here: they are the Day view's).
+    await waitFor(() => expect(screen.getAllByTestId('daily-note-slot')).toHaveLength(3))
+    expect(screen.queryByTestId('day-sections')).toBeNull()
+    expect(screen.queryByTestId('section-tasks')).toBeNull()
+    expect(screen.queryByText('Created Today')).toBeNull()
+    expect(screen.queryByText('No tasks on this day')).toBeNull()
     expect(screen.queryByRole('tablist', { name: 'Day sections' })).toBeNull()
     expect(screen.queryByTestId('quick-create')).toBeNull()
-    for (const s of screen.getAllByTestId('day-sections')) expect(s.querySelector('[data-testid="daily-note-slot"]')).toBeNull()
-    // One range, one rows call for the three days.
+    // One range for the three days, and no rows call: no section needs one.
     expect(mocked.calendar).toHaveBeenCalledTimes(1)
-    expect(mocked.rows).toHaveBeenCalledTimes(1)
+    expect(mocked.rows).not.toHaveBeenCalled()
     expect(screen.getByTestId('three-days-view').className).toContain('divide-x')
   })
 
