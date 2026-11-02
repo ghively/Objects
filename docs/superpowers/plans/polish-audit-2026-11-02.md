@@ -180,7 +180,7 @@ No note content is kept here.
 38. **Pro-gated features appear as upsells**: a Query-backed tab ("Untitled") on Daily Notes shows blurred
     cards and a "Get Capacities Pro" card; Tasks and Explore show a rocket badge. Object has no paywall. Whether Pro-gated
     Capacities features (Tasks, Queries, AI, unlinked mentions, version history) should all be unlocked in Object
-    is Gene's call; only unlinked mentions is confirmed (see "Keep" below).
+    is decided on 2026-11-02: all unlocked, nothing gated (see item 26).
 
 Not studied: typing flows themselves (slash menu, `[[` picker, @mentions, paste behaviour), since that needs
 an editable scratch page; only rendered results were read.
@@ -292,8 +292,8 @@ unless marked. Order is a suggestion, highest value first.
     Latex. Import: starter migration guides per tool.
 
 **H. Decisions for Gene**
-- Which Pro-gated Capacities features to unlock in Object (Tasks, Queries, AI assistant, task actions, version
-  history, extended search, focus mode); unlinked mentions is already decided: keep.
+- ~~Which Pro-gated Capacities features to unlock~~ Decided 2026-11-02: all unlocked, nothing gated (item 26). AI and
+  the network integrations stay out by the spec.
 - Whether the Capacities how-to guides should ship as built-in seeds in the Object app (currently only in the
   imported wiki space).
 - Scrub credentials found in the Work and Personal spaces before any of it is imported or shared.
@@ -367,7 +367,7 @@ Everything not done, with the behaviour to match (catalog section in brackets) a
 25. Language (decimal separator), Date & Time (time zone, format, start of week), Offline & Sync (index recalculation, media loading), Space Settings. Check what Object has. S-M.
 
 **Decisions and housekeeping**
-26. Decide which Pro-gated features to unlock (Tasks, Queries, task actions, version history, extended search, focus mode); unlinked mentions is decided.
+26. **Decided (Gene, 2026-11-02): unlock all Pro features, nothing gated.** The spec already said so ("Pro-only features are simply available"). Checked: Object has no gating, badge or upsell anywhere, and Tasks, Queries, version history, extended search, focus mode and unlinked mentions all exist. Do not copy Capacities' rocket badges, blurred previews or "Get Capacities Pro" cards. Left out by the spec because they need the cloud or a network, not because of Pro: AI (assistant, chat, AI block menu entries; a Claude Code agent comes later), integrations (calendar feeds, task actions that send to other apps, Readwise, Kindle, Telegram, WhatsApp, email, Raycast, the API) and accounts. If Gene wants any of those, it is a spec change first.
 27. Decide whether the Capacities how-to guides ship as built-in seeds.
 28. Investigate `test_static_files_are_gzipped` (fails on Windows `master`, also before these changes).
 29. Gene's hands-on checks, M1-M9 (256 items), and wiki-import follow-ups (see `remaining-work.md`).
