@@ -101,7 +101,8 @@ describe('Sidebar', () => {
     const onOpenTarget = vi.fn()
     const { rerender } = render(<Sidebar types={TYPES} onOpenTarget={onOpenTarget} />)
     const nav = screen.getByRole('navigation', { name: /main/i })
-    const graph = within(nav).getByRole('button', { name: 'Graph' })
+    const lower = screen.getByRole('navigation', { name: 'Space' })
+    const graph = within(lower).getByRole('button', { name: 'Graph' })
     expect(graph).toBeEnabled()
     expect(graph.querySelector('[data-icon="ph-graph"]')).not.toBeNull()
     expect(graph).not.toHaveAttribute('aria-current')
@@ -112,7 +113,11 @@ describe('Sidebar', () => {
     await user.hover(graph)
     expect(screen.queryByText(/arrives in M5/)).toBeNull()
     rerender(<Sidebar types={TYPES} onOpenTarget={onOpenTarget} graphActive />)
-    expect(within(nav).getByRole('button', { name: 'Graph' })).toHaveAttribute('aria-current', 'page')
+    expect(within(lower).getByRole('button', { name: 'Graph' })).toHaveAttribute('aria-current', 'page')
+    // Seen in the live app: Graph and Trash sit together below the object types, not in the top list.
+    expect(within(nav).queryByRole('button', { name: 'Graph' })).toBeNull()
+    expect(within(lower).getByRole('button', { name: 'Trash' })).toBeInTheDocument()
+    expect(nav.compareDocumentPosition(lower) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(within(nav).getByRole('button', { name: 'Calendar' })).not.toHaveAttribute('aria-current')
   })
 

@@ -83,7 +83,7 @@ describe('M5 mounts in the app', () => {
     const user = userEvent.setup()
     render(<App />)
     const strip = screen.getByRole('tablist', { name: 'Tabs' })
-    const nav = screen.getByRole('navigation', { name: /main/i })
+    const nav = screen.getByRole('navigation', { name: 'Space' })
 
     await user.click(within(nav).getByRole('button', { name: 'Graph' }))
     expect(await screen.findByTestId('graph-page')).toBeInTheDocument()

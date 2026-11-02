@@ -161,7 +161,7 @@ function SectionHeader({
   )
 }
 
-/** A live entry of the main nav (All notes, Calendar, Tasks, Graph); Ctrl+click opens a new tab. */
+/** A live entry of the sidebar's navigation (All notes, Calendar, Tasks; Graph below the types); Ctrl+click opens a new tab. */
 function MainNavButton({
   icon,
   label,
@@ -397,32 +397,21 @@ export function Sidebar({
             onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
           />
         )}
-        <MainNavButton
-          icon="ph-graph"
-          label="Graph"
-          active={graphActive}
-          onClick={(e) => onOpenTarget?.({ kind: 'graph' }, { newTab: e.ctrlKey || e.metaKey })}
-        />
       </nav>
 
       <ScrollArea className="min-h-0 flex-1">
         {/* The custom sections, Pinned and the object types, in `ui.workspaceOrder` (M9). */}
         <WorkspaceSections onOpenTarget={onOpenTarget} objects={objectTypes} />
 
-        <div className="pb-3">
-          <button
-            type="button"
-            onClick={() => onOpenTrash?.()}
-            aria-current={trashActive ? 'page' : undefined}
-            className={cn(
-              'flex h-[36px] w-full items-center gap-2 rounded-lg px-2 text-left text-[15px] font-medium text-fg-muted hover:bg-hover hover:text-fg',
-              trashActive && 'bg-hover text-fg',
-            )}
-          >
-            <Icon name="ph-trash" size={16} />
-            Trash
-          </button>
-        </div>
+        <nav aria-label="Space" className="flex flex-col gap-0.5 pb-3">
+          <MainNavButton
+            icon="ph-graph"
+            label="Graph"
+            active={graphActive}
+            onClick={(e) => onOpenTarget?.({ kind: 'graph' }, { newTab: e.ctrlKey || e.metaKey })}
+          />
+          <MainNavButton icon="ph-trash" label="Trash" active={trashActive} onClick={() => onOpenTrash?.()} />
+        </nav>
       </ScrollArea>
 
       {collectionFor && (
