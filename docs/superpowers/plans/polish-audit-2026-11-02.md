@@ -309,13 +309,14 @@ unless marked. Order is a suggestion, highest value first.
 | C18 object `...` menu shortcut hints | done for Find in page (Ctrl F), Present (Ctrl Alt P), Delete (Ctrl Backspace), read from the shortcut registry; the menu's order was already set to Capacities' sections on 2026-10-29. Export, Import and Pin to Sidebar have no registered key yet | `2dd693e` |
 | C15 space switcher Search field | done: a Search field heads the list (replacing the "Spaces" heading) and filters by name | `d112222` |
 | C17 Pin to Sidebar on a type's context menu; label capitalised ("Pin to Sidebar") everywhere | done | `553a88c` |
+| New menu (backlog 1, C14) | done: a popover under the New button with a "Search" field, the types in the sidebar's order (alphabetical here), the keyboard-hint footer; picking a type creates an untitled object of it at once, as in the live app (the old second step, "Search or Create" with a typed title, remains only when a `typeId` is passed). Correction: backlog item 1 said "recent-use order"; the live order is the sidebar's | `HEAD` of the New-menu commit |
 | Sidebar: Graph below the object types, beside Trash | done (a second "Space" navigation landmark); "Add Section" still sits under Pinned, the live app puts it under the types | `7cfd501` |
 
 Checked and already present in Object (so not backlog): Add Section, Graph customization options, the Shortcuts
 sheet (Settings), slash menu groups and strings (taken from Capacities' own app), unlinked mentions.
 Checked and also present: Wall cards are already masonry, the peek has the "N / total" stepper, the type page `...` menu has Pin, Collection, Import and settings.
 Checked and still open: sidebar "Sort Manually | Sort Alphabetically" on the Object Types header (types are always
-alphabetical), Help & Resources section (links to Capacities' web pages), New menu as an anchored popover with a Search field, the search palette
+alphabetical), Help & Resources section (links to Capacities' web pages), the search palette
 as one list, the Overview tab's hidden-section picker, the Table "Content" word-count column, "Add Section" under the types.
 
 Gate after these eight commits: back end 1463 passed (1 pre-existing failure, `test_static_files_are_gzipped`,
