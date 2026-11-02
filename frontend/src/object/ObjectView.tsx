@@ -4,6 +4,7 @@
  * calendar's daily note) renders only the body editor and its autosave.
  */
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { api, ConflictError, isResync } from '@/api/client'
 import type { ObjectDetail, ObjectSummary, RenameResult, TypeDef, UpdateResult } from '@/api/types'
 import { CollectionPicker } from '@/collections/CollectionPicker'
@@ -75,6 +76,13 @@ export interface ObjectViewProps {
   autoFocus?: boolean
   /** Called with each version this view adopts (load, saves, reloads). */
   onVersion?: (version: string) => void
+  /**
+   * Inline only: an element the owner provides for the object's `…` menu (the same menu as the
+   * page's), drawn into it. The Calendar's Daily note header holds it beside Reviewed.
+   */
+  menuSlot?: HTMLElement | null
+  /** Called after this view deleted the object (the owner drops it: the calendar shows "+ Daily Note"). */
+  onDeleted?: () => void
   /** Peek only: open the object as a page in the current tab. */
   onExpand?: () => void
   /** Called after an action that should dismiss the peek (e.g. open in new tab). */
@@ -153,7 +161,18 @@ function ToolButton({ label, icon, onClick, pressed }: { label: string; icon: st
   )
 }
 
-export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholder, autoFocus, onVersion }: ObjectViewProps) {
+export function ObjectView({
+  path,
+  mode,
+  onExpand,
+  onDismiss,
+  footer,
+  placeholder,
+  autoFocus,
+  onVersion,
+  menuSlot,
+  onDeleted,
+}: ObjectViewProps) {
   const [detail, setDetail] = useState<ObjectDetail | null>(null)
   const [version, setVersion] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -544,6 +563,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
       setUndoError(null)
       markDeleted(true)
       void invalidateLinkIndex()
+      onDeleted?.()
     } catch (err) {
       void editorRef.current?.resume(versionRef.current)
       if (err instanceof ConflictError) {
@@ -710,36 +730,8 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
       </>
     ) : null
 
-  const toolbar = (
-    <div className="flex items-center justify-between px-3.5 pt-3.5">
-      <button
-        type="button"
-        aria-label={panelOpen ? 'Hide properties' : 'Show properties'}
-        title={panelOpen ? 'Hide properties' : 'Show properties'}
-        aria-pressed={panelOpen}
-        onClick={() => setPanelOpen((v) => !v)}
-        className="flex size-10 items-center justify-center rounded-[11px] border border-[var(--float-btn-border)] bg-[var(--float-bg)] p-[3px] text-fg"
-      >
-        <span
-          className={cn(
-            'flex size-full items-center justify-center rounded-lg hover:bg-hover',
-            panelOpen && 'bg-line hover:bg-line',
-          )}
-        >
-          <Icon name="ph-sidebar-simple" size={17} />
-        </span>
-      </button>
-      <div className="flex min-w-0 items-center gap-2">
-      <FindBar path={path} editorRef={editorRef} />
-      <div className="flex h-10 shrink-0 items-center gap-0.5 rounded-xl border border-[var(--float-border)] bg-[var(--float-bg)] px-1">
-        {mode === 'page' && (
-          <ToolButton
-            label={focusOn ? OBJECT_M8_TEXT.leaveFocusMode : OBJECT_M8_TEXT.enterFocusMode}
-            icon={focusOn ? 'ph-arrows-in-simple' : 'ph-frame-corners'}
-            pressed={focusOn}
-            onClick={() => useFocusMode.getState().toggle()}
-          />
-        )}
+  // The `…` menu: in the page and peek toolbar, and (inline mode) in a slot the owner provides.
+  const objectMenu = (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -898,6 +890,39 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+  )
+
+  const toolbar = (
+    <div className="flex items-center justify-between px-3.5 pt-3.5">
+      <button
+        type="button"
+        aria-label={panelOpen ? 'Hide properties' : 'Show properties'}
+        title={panelOpen ? 'Hide properties' : 'Show properties'}
+        aria-pressed={panelOpen}
+        onClick={() => setPanelOpen((v) => !v)}
+        className="flex size-10 items-center justify-center rounded-[11px] border border-[var(--float-btn-border)] bg-[var(--float-bg)] p-[3px] text-fg"
+      >
+        <span
+          className={cn(
+            'flex size-full items-center justify-center rounded-lg hover:bg-hover',
+            panelOpen && 'bg-line hover:bg-line',
+          )}
+        >
+          <Icon name="ph-sidebar-simple" size={17} />
+        </span>
+      </button>
+      <div className="flex min-w-0 items-center gap-2">
+      <FindBar path={path} editorRef={editorRef} />
+      <div className="flex h-10 shrink-0 items-center gap-0.5 rounded-xl border border-[var(--float-border)] bg-[var(--float-bg)] px-1">
+        {mode === 'page' && (
+          <ToolButton
+            label={focusOn ? OBJECT_M8_TEXT.leaveFocusMode : OBJECT_M8_TEXT.enterFocusMode}
+            icon={focusOn ? 'ph-arrows-in-simple' : 'ph-frame-corners'}
+            pressed={focusOn}
+            onClick={() => useFocusMode.getState().toggle()}
+          />
+        )}
+        {objectMenu}
         {onExpand && <ToolButton label="Open as page" icon="ph-arrows-out-simple" onClick={onExpand} />}
       </div>
       </div>
@@ -1041,15 +1066,9 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
             </div>
           </>
         )}
-        <ConflictDialog
-          open={pending !== null}
-          path={path}
-          mine={pending?.mine ?? ''}
-          theirs={pending?.theirs.body ?? ''}
-          onKeepMine={keepMine}
-          onTakeTheirs={takeTheirs}
-        />
-        {recoveryDialog}
+        {/* The conflict and recovery dialogs, and the ones the `…` menu opens (delete, export, ...). */}
+        {overlays}
+        {menuSlot && summary && createPortal(objectMenu, menuSlot)}
       </div>
     )
   }

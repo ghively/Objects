@@ -28,6 +28,8 @@ export interface CustomizeMenuProps {
   extraPages?: CustomizePage[]
   /** The type id calculations apply to when the view spans one type. */
   structureId?: string
+  /** A reduced menu: only Calculations (the Calendar sections', as in Capacities). */
+  only?: 'calcs'
 }
 
 const SELECT = 'h-7 max-w-full rounded-md border border-line bg-raised px-1.5 text-[13px] text-fg outline-none'
@@ -44,7 +46,7 @@ function Item({ icon, children, onClick, trailing }: { icon?: string; children: 
   )
 }
 
-export function CustomizeMenu({ state, onState, choices, groups, hidden, layouts, extraPages = [], structureId }: CustomizeMenuProps) {
+export function CustomizeMenu({ state, onState, choices, groups, hidden, layouts, extraPages = [], structureId, only }: CustomizeMenuProps) {
   const [page, setPage] = useState<string | null>(null)
   const def = state.viewDefinition
   const setDef = (patch: Partial<DataViewDefinition>) => onState({ ...state, viewDefinition: { ...def, ...patch } })
@@ -130,6 +132,16 @@ export function CustomizeMenu({ state, onState, choices, groups, hidden, layouts
   if (page === 'calcs') {
     const calcs = def.calculations ?? []
     return <Calculations back={back('Calculations')} calcs={calcs} choices={choices} structureId={structureId} onChange={(c) => setDef({ calculations: c })} />
+  }
+
+  if (only === 'calcs') {
+    return (
+      <div className="flex w-64 flex-col p-1">
+        <Item icon="ph-sigma" onClick={() => setPage('calcs')} trailing={<Icon name="ph-caret-right" size={14} />}>
+          Calculations
+        </Item>
+      </div>
+    )
   }
 
   return (

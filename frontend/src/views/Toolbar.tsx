@@ -16,6 +16,11 @@ import { SortEditor } from './SortEditor'
 const NARROW_PX = 480
 
 export interface ToolbarProps {
+  /**
+   * The Calendar sections' toolbar (Capacities): the layout picker and a settings menu holding only
+   * Calculations, no Filter, Sort or Group by; the count only when the layout is not a list.
+   */
+  compact?: boolean
   count: number
   state: ViewState
   onState(next: ViewState): void
@@ -92,33 +97,39 @@ export function Toolbar(p: ToolbarProps) {
   return (
     <div ref={ref} data-testid="toolbar" className="ml-auto flex shrink-0 justify-end">
       <div className="flex items-center gap-0.5 rounded-lg border border-line bg-raised px-1 py-0.5 text-[13px]">
-        <span title={p.count === 1 ? '1 entry' : `${p.count} entries`} className="px-1.5 text-fg-muted">
-          {p.count}
-        </span>
-        <Popover>
-          <PillButton label="Filter" icon="ph-funnel-simple" active={hasFilter} dim={!!hint} title={hint ?? 'Filter'} />
-          <PopoverContent align="end" className="w-auto max-w-[95vw] border-line bg-raised p-0">
-            <FilterEditor
-              group={state.filterGroup}
-              onChange={(g) => onState({ ...state, filterGroup: g })}
-              choices={p.choices}
-              types={p.types}
-              collections={p.collections}
-            />
-          </PopoverContent>
-        </Popover>
-        <Popover>
-          <PillButton label="Sort" icon="ph-sort-ascending" active={state.sorts.length > 0} dim={!!hint} title={hint ?? 'Sort'} />
-          <PopoverContent align="end" className="w-auto border-line bg-raised p-0">
-            <SortEditor sorts={state.sorts} onChange={(s) => onState({ ...state, sorts: s })} choices={p.choices} />
-          </PopoverContent>
-        </Popover>
-        <Popover>
-          <PillButton label="Group by" icon="ph-square-split-vertical" active={!!state.groupBy?.groups?.length} />
-          <PopoverContent align="end" className="w-auto border-line bg-raised p-0">
-            <GroupEditor groupBy={state.groupBy} onChange={(g) => onState({ ...state, groupBy: g })} choices={p.choices} />
-          </PopoverContent>
-        </Popover>
+        {!(p.compact && layout === 'list') && (
+          <span title={p.count === 1 ? '1 entry' : `${p.count} entries`} className="px-1.5 text-fg-muted">
+            {p.count}
+          </span>
+        )}
+        {!p.compact && (
+          <>
+            <Popover>
+              <PillButton label="Filter" icon="ph-funnel-simple" active={hasFilter} dim={!!hint} title={hint ?? 'Filter'} />
+              <PopoverContent align="end" className="w-auto max-w-[95vw] border-line bg-raised p-0">
+                <FilterEditor
+                  group={state.filterGroup}
+                  onChange={(g) => onState({ ...state, filterGroup: g })}
+                  choices={p.choices}
+                  types={p.types}
+                  collections={p.collections}
+                />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PillButton label="Sort" icon="ph-sort-ascending" active={state.sorts.length > 0} dim={!!hint} title={hint ?? 'Sort'} />
+              <PopoverContent align="end" className="w-auto border-line bg-raised p-0">
+                <SortEditor sorts={state.sorts} onChange={(s) => onState({ ...state, sorts: s })} choices={p.choices} />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PillButton label="Group by" icon="ph-square-split-vertical" active={!!state.groupBy?.groups?.length} />
+              <PopoverContent align="end" className="w-auto border-line bg-raised p-0">
+                <GroupEditor groupBy={state.groupBy} onChange={(g) => onState({ ...state, groupBy: g })} choices={p.choices} />
+              </PopoverContent>
+            </Popover>
+          </>
+        )}
         {!narrow && p.layouts.length > 1 && (
           <Popover>
             <PillButton label="Layout" icon={activeLayout.icon}>
@@ -153,6 +164,7 @@ export function Toolbar(p: ToolbarProps) {
               groups={p.groups}
               hidden={p.hidden}
               layouts={narrow ? p.layouts : undefined}
+              only={p.compact ? 'calcs' : undefined}
               extraPages={p.extraPages}
               structureId={p.structureId}
             />
