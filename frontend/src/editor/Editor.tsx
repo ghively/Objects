@@ -54,13 +54,28 @@ export type EditorProps = {
   objectId?: string | null
   /** Optional control handle for external-change and conflict handling (Task 10). */
   controlRef?: Ref<BodyEditorHandle | null>
+  /**
+   * Draw the editor's own empty-body placeholder (default). The inline view (a daily note) draws
+   * its own text instead; two at once would be laid over each other. Read when the editor opens.
+   */
+  ownPlaceholder?: boolean
 }
 
 /**
  * Formatted block editor for an object's body. Unedited blocks are saved
  * byte-for-byte; saves happen 1000 ms after the last change and on blur.
  */
-export function Editor({ path, body, version, readOnly, onSaved, onConflict, objectId, controlRef }: EditorProps) {
+export function Editor({
+  path,
+  body,
+  version,
+  readOnly,
+  onSaved,
+  onConflict,
+  objectId,
+  controlRef,
+  ownPlaceholder = true,
+}: EditorProps) {
   const autosaveRef = useRef<ReturnType<typeof useAutosave> | null>(null)
   const disableSpellcheck = useSettings((s) => s.settings.disableSpellcheck)
   const disableNumbered = useSettings((s) => s.settings.disableNumberedListTransformation)
@@ -68,7 +83,7 @@ export function Editor({ path, body, version, readOnly, onSaved, onConflict, obj
   const [extensions] = useState(() => [
     ...editorExtensions({ numberedListInputRule: !disableNumbered }),
     FindInPage,
-    EmptyPlaceholder,
+    ...(ownPlaceholder ? [EmptyPlaceholder] : []),
   ])
 
   const editor = useEditor({

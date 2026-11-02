@@ -87,4 +87,27 @@ describe('inline view emptiness', () => {
     keystrokes(pm, 1)
     expect(screen.getByTestId('inline-placeholder')).toHaveTextContent('Start your daily note')
   })
+
+  test('an empty body shows one placeholder: the view\'s, not the editor\'s laid over it', async () => {
+    const pm = await mount('')
+    keystrokes(pm, 1)
+    expect(screen.getByTestId('inline-placeholder')).toBeInTheDocument()
+    // The editor's own "Write your text or search for blocks..." is off while the view has one.
+    expect(pm.querySelector('[data-placeholder]')).toBeNull()
+    expect(pm.querySelector('.is-editor-empty')).toBeNull()
+  })
+
+  test('an inline view without a placeholder of its own keeps the editor\'s', async () => {
+    mocked.object.mockResolvedValue(detail(''))
+    const utils = render(<ObjectView path={PATH} mode="inline" />)
+    const pm = await waitFor(() => {
+      const el = utils.container.querySelector('.ProseMirror') as HTMLElement | null
+      expect(el).toBeTruthy()
+      return el!
+    })
+    expect(screen.queryByTestId('inline-placeholder')).toBeNull()
+    expect(pm.querySelector('p.is-editor-empty')?.getAttribute('data-placeholder')).toBe(
+      'Write your text or search for blocks...',
+    )
+  })
 })

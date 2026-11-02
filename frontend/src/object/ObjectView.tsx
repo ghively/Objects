@@ -1036,6 +1036,7 @@ export function ObjectView({ path, mode, onExpand, onDismiss, footer, placeholde
                 onConflict={onConflict}
                 objectId={detail.summary.path === path ? detail.summary.id : undefined}
                 controlRef={editorRef}
+                ownPlaceholder={!placeholder}
               />
             </div>
           </>
