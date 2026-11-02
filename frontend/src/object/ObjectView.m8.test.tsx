@@ -79,7 +79,7 @@ describe('ObjectView M8', () => {
     const names = within(menu)
       .getAllByRole('menuitem')
       .map((i) => i.textContent)
-    for (const n of ['Version History', 'Merge into object', 'Present', 'Add to whiteboard']) expect(names).toContain(n)
+    for (const n of ['Version History', 'Merge into object', 'Present', 'Add to whiteboard']) expect(names.some((x) => x.startsWith(n))).toBe(true)
     expect(names).not.toContain('Merge into tag')
 
     await user.click(within(menu).getByRole('menuitem', { name: 'Version History' }))
@@ -88,7 +88,7 @@ describe('ObjectView M8', () => {
     await user.click(within(menu).getByRole('menuitem', { name: 'Merge into object' }))
     expect(useMerge.getState().source).toBe('Pages/Notes.md')
     ;({ user, menu } = await openMenu())
-    await user.click(within(menu).getByRole('menuitem', { name: 'Present' }))
+    await user.click(within(menu).getByRole('menuitem', { name: /^Present/ }))
     expect(usePresentation.getState().path).toBe('Pages/Notes.md')
     ;({ user, menu } = await openMenu())
     await user.click(within(menu).getByRole('menuitem', { name: 'Add to whiteboard' }))

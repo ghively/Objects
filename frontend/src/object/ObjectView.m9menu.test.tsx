@@ -79,12 +79,21 @@ describe('ObjectView … menu (M9)', () => {
     const user = userEvent.setup()
     const menu = await openMenu(user)
     const n = names(menu)
-    const at = (s: string) => n.indexOf(s)
+    const at = (s: string) => n.findIndex((x) => x === s || x.startsWith(s + 'Ctrl'))
     expect(at('Text Stats')).toBe(at('Version History') + 1)
     expect(at('Export')).toBe(at('Present') + 1)
     // Object's sections: present, export … then version history, text stats (Gene, 2026-10-29).
     expect(at('Export')).toBeLessThan(at('Version History'))
     expect(at('Duplicate')).toBe(at('Merge into object') - 1)
+  })
+
+  test('rows show their shortcut: Find, Present and Delete', async () => {
+    const user = userEvent.setup()
+    const menu = await openMenu(user)
+    const row = (label: string) => within(menu).getAllByRole('menuitem').find((i) => i.textContent?.startsWith(label))!
+    expect(row('Find in page')).toHaveTextContent('Ctrl F')
+    expect(row('Present')).toHaveTextContent('Ctrl Alt P')
+    expect(row('Delete')).toHaveTextContent('Ctrl ⌫')
   })
 
   test('test duplicate opens the copy', async () => {

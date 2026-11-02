@@ -86,7 +86,7 @@ describe('delete', () => {
     const user = userEvent.setup()
     await openPage()
     const menu = await openMore(user)
-    const del = within(menu).getByRole('menuitem', { name: 'Delete Object' })
+    const del = within(menu).getByRole('menuitem', { name: /^Delete Object/ })
     await user.click(del)
     const dialog = await screen.findByRole('alertdialog')
     expect(within(dialog).getByText('Delete this object?')).toBeInTheDocument()
@@ -105,7 +105,7 @@ describe('delete', () => {
   test('Go back returns to the previous target', async () => {
     const user = userEvent.setup()
     await openPage()
-    await user.click(within(await openMore(user)).getByRole('menuitem', { name: 'Delete Object' }))
+    await user.click(within(await openMore(user)).getByRole('menuitem', { name: /^Delete Object/ }))
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete Object' }))
     const banner = await screen.findByRole('status', { name: 'Deleted content' })
     await user.click(within(banner).getByRole('button', { name: 'Go back' }))
