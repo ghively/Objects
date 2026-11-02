@@ -349,9 +349,11 @@ export interface DaySectionsProps {
   onChanged?(): void
   /** Show the Daily note section (the Day view; Three days shows its own slot). */
   showDailyNote?: boolean
+  /** The Daily note header pill's extra control, left of its `…` menu (the Day view's Reviewed). */
+  dailyNoteExtra?: ReactNode
 }
 
-export function DaySections({ day, today, calendarDay, rows, filter = 'all', onChanged, showDailyNote = true }: DaySectionsProps) {
+export function DaySections({ day, today, calendarDay, rows, filter = 'all', onChanged, showDailyNote = true, dailyNoteExtra }: DaySectionsProps) {
   const types = useLinkIndex((s) => s.types)
   const typesById = useMemo(() => Object.fromEntries(types.map((t) => [t.id, t])) as Record<string, TypeDef>, [types])
   const daily = useCalendarDaily()
@@ -462,6 +464,7 @@ export function DaySections({ day, today, calendarDay, rows, filter = 'all', onC
     types,
     layouts: SECTION_LAYOUTS,
     compact: true,
+    toolbarCompact: true,
     embedded: true,
     patchRow: rows.patchRow,
     loading: rows.loading,
@@ -488,6 +491,7 @@ export function DaySections({ day, today, calendarDay, rows, filter = 'all', onC
           day={day}
           note={calendarDay?.dailyNote ?? null}
           heading
+          headerExtra={dailyNoteExtra}
           onChanged={onChanged}
           collapsed={!!daily.hideDailyNote}
           onToggleCollapsed={() => void saveCalendarDaily({ hideDailyNote: !daily.hideDailyNote })}

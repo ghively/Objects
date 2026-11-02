@@ -1,4 +1,5 @@
-// The Day view: header (with Reviewed), quick-create chips, filter tabs and the day's sections in
+// The Day view: header, quick-create chips, filter tabs and the day's sections (the Daily note's
+// header pill holds Reviewed and the note's `…` menu) in
 // one scrolling column at Object's `.main-content-width` (50rem). One `api.calendar` range for
 // the day and one `api.rows` call per load of it.
 import { useEffect, useMemo, useState } from 'react'
@@ -33,15 +34,18 @@ export function DayView({ day }: DayViewProps) {
   const note = cd?.dailyNote ?? null
   return (
     <div data-testid="day-view" data-day={day} className="mx-auto flex w-full max-w-[50rem] flex-col gap-5 px-6 pt-10 pb-24">
-      <DayHeader
-        day={day}
-        today={today}
-        weekStart={weekStart}
-        aside={<ReviewedButton note={note} version={note ? rows.byPath.get(note.path)?.version : undefined} onWritten={reload} />}
-      />
+      <DayHeader day={day} today={today} weekStart={weekStart} />
       <QuickCreateChips day={day} calendarDay={cd} summaries={data?.summaries ?? {}} onCreated={reload} />
       <DayTabs tabs={tabs} active={active} onSelect={setFilter} />
-      <DaySections day={day} today={today} calendarDay={cd} rows={rows} filter={active} onChanged={reload} />
+      <DaySections
+        day={day}
+        today={today}
+        calendarDay={cd}
+        rows={rows}
+        filter={active}
+        onChanged={reload}
+        dailyNoteExtra={<ReviewedButton note={note} version={note ? rows.byPath.get(note.path)?.version : undefined} onWritten={reload} />}
+      />
     </div>
   )
 }

@@ -113,6 +113,8 @@ export interface DataViewProps {
   /** Embedded in a page body (50rem wide) rather than a full page. */
   embedded?: boolean
   compact?: boolean
+  /** The reduced toolbar of the Calendar sections: layout, Calculations (see `Toolbar`). */
+  toolbarCompact?: boolean
   pipeline?: Pipeline
   pausedHint?: string
   /** Replaces the "nothing here" block when the view has no rows (queries: "No content found"). */
@@ -585,6 +587,7 @@ export function DataView(props: DataViewProps) {
   const toolbarSlot = useContext(ToolbarSlot)
   const toolbar = (
     <Toolbar
+      compact={props.toolbarCompact}
       count={total}
       state={state}
       onState={(s) => {

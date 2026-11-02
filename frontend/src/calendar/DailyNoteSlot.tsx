@@ -1,19 +1,10 @@
 // A day's daily note: the inline body editor when the note exists, else the outlined "+ Daily Note"
 // button, which creates it (`POST /api/daily-notes`) and shows the editor focused. A 409 (a note
 // for the day already exists) shows that note. Opening the calendar never creates a note.
-import { useEffect, useRef, useState } from 'react'
-import { api, ConflictError, DailyNoteExistsError } from '@/api/client'
+import { useEffect, useState, type ReactNode } from 'react'
+import { api, DailyNoteExistsError } from '@/api/client'
 import { Icon } from '@/components/Icon'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { invalidateLinkIndex } from '@/links/linkIndex'
-import { useTabs } from '@/nav/tabs'
-import { DeleteObjectDialog } from '@/object/DeleteObjectDialog'
 import { ObjectView } from '@/object/ObjectView'
 import type { Day } from './dates'
 
@@ -24,12 +15,6 @@ export const DAILY_NOTE_TEXT = {
   create: 'Daily Note',
   /** `components.RootDailyNote.placeholder` */
   placeholder: 'Start your daily note',
-  /** `components.RootDailyNote.openAsPage` */
-  openAsPage: 'Open as Page',
-  openInNewTab: 'Open in new tab',
-  delete: 'Delete',
-  /** Our string. */
-  more: 'Daily note options',
 }
 
 export interface DailyNoteSlotProps {
@@ -38,21 +23,23 @@ export interface DailyNoteSlotProps {
   note: { path: string } | null
   /** Show the "Daily note" heading with its `…` menu (the Day view; the multi-day views don't). */
   heading?: boolean
-  /** A note was created (or found) here: the owner reloads its range. */
+  /** A note was created (or found, or deleted) here: the owner reloads its range. */
   onChanged?(): void
   /** Heading collapsed (`ui.calendar.daily.hideDailyNote`); the heading toggles it when given. */
   collapsed?: boolean
   onToggleCollapsed?(): void
+  /** Heading only: drawn in the header's pill, left of the `…` menu (the Day view's Reviewed). */
+  headerExtra?: ReactNode
 }
 
-export function DailyNoteSlot({ day, note, heading, onChanged, collapsed, onToggleCollapsed }: DailyNoteSlotProps) {
+export function DailyNoteSlot({ day, note, heading, onChanged, collapsed, onToggleCollapsed, headerExtra }: DailyNoteSlotProps) {
   /** A note this slot created or found by a 409, shown before the range reload brings it. */
   const [local, setLocal] = useState<{ day: Day; path: string } | null>(null)
   const [focus, setFocus] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const versionRef = useRef<string | undefined>(undefined)
+  /** Where the note's own `…` menu (the object page's, in full) is drawn: the header pill. */
+  const [menuSlot, setMenuSlot] = useState<HTMLElement | null>(null)
 
   useEffect(() => {
     setError(null)
@@ -84,19 +71,6 @@ export function DailyNoteSlot({ day, note, heading, onChanged, collapsed, onTogg
     }
   }
 
-  const remove = async () => {
-    if (!path) return
-    try {
-      await api.deleteObject(path, versionRef.current ? { baseVersion: versionRef.current } : {})
-    } catch (e) {
-      if (e instanceof ConflictError) throw new Error('The note changed on disk. Try again.', { cause: e })
-      throw e
-    }
-    setLocal(null)
-    void invalidateLinkIndex()
-    onChanged?.()
-  }
-
   const body = path ? (
     <ObjectView
       key={path}
@@ -104,8 +78,10 @@ export function DailyNoteSlot({ day, note, heading, onChanged, collapsed, onTogg
       mode="inline"
       placeholder={DAILY_NOTE_TEXT.placeholder}
       autoFocus={focus}
-      onVersion={(v) => {
-        versionRef.current = v
+      menuSlot={heading ? menuSlot : null}
+      onDeleted={() => {
+        setLocal(null)
+        onChanged?.()
       }}
     />
   ) : (
@@ -134,37 +110,13 @@ export function DailyNoteSlot({ day, note, heading, onChanged, collapsed, onTogg
       <div className="flex h-10 items-center justify-between gap-2">
         <SectionHeading label={DAILY_NOTE_TEXT.heading} collapsed={collapsed} onToggle={onToggleCollapsed} />
         {path && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label={DAILY_NOTE_TEXT.more}
-                title={DAILY_NOTE_TEXT.more}
-                className="flex size-9 items-center justify-center rounded-lg border border-line text-fg-muted hover:bg-hover hover:text-fg"
-              >
-                <Icon name="ph-dots-three" size={16} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 border-line bg-raised">
-              <DropdownMenuItem onSelect={() => useTabs.getState().open({ kind: 'object', path })}>
-                <Icon name="ph-arrows-out-simple" size={14} />
-                {DAILY_NOTE_TEXT.openAsPage}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => useTabs.getState().open({ kind: 'object', path }, { newTab: true })}>
-                <Icon name="ph-arrow-square-out" size={14} />
-                {DAILY_NOTE_TEXT.openInNewTab}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
-                <Icon name="ph-trash" size={14} />
-                {DAILY_NOTE_TEXT.delete}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div data-testid="daily-note-pill" className="flex h-9 items-center gap-0.5 rounded-xl border border-line pr-1 pl-1">
+            {headerExtra}
+            <div ref={setMenuSlot} data-testid="daily-note-menu-slot" className="flex items-center" />
+          </div>
         )}
       </div>
       {!collapsed && body}
-      <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={remove} />
     </section>
   )
 }

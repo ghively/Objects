@@ -107,8 +107,9 @@ export function ReviewedButton({
       disabled={busy || !version}
       onClick={() => void toggle()}
       className={cn(
-        'flex h-7 items-center gap-1.5 rounded-lg border px-2 text-[13px] transition-colors',
-        checked ? 'border-transparent bg-hover text-fg' : 'border-line text-fg-muted hover:bg-hover hover:text-fg',
+        // Borderless: it sits inside the Daily note header's pill, beside the `…` menu.
+        'flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium text-fg transition-colors hover:bg-hover',
+        checked && 'bg-hover',
       )}
     >
       <span
