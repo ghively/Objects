@@ -51,10 +51,13 @@ function setup(clip: Partial<Clipboard> | undefined = { readText: async () => ''
   return user
 }
 
-// Capacities lists no key for the action palette: open it as its switch button does.
-async function openActions(_user: ReturnType<typeof userEvent.setup>) {
+// Content and actions are one list: open the palette and type to reach an action. `q` empty shows
+// the clipboard offers. (`show('actions')` opens the same list; Capacities lists no key for it.)
+async function openActions(user: ReturnType<typeof userEvent.setup>, q = '') {
   act(() => usePalette.getState().show('actions'))
-  return screen.findByPlaceholderText(PALETTE_TEXT.placeholderActions)
+  const input = await screen.findByPlaceholderText(PALETTE_TEXT.placeholder)
+  if (q) await user.type(input, q)
+  return input
 }
 
 beforeEach(() => {
@@ -91,7 +94,7 @@ describe('action palette, M8 actions', () => {
       spaceEntry({ path: '/spaces/Gone', name: 'Gone', missing: true }),
     ])
     const user = setup()
-    await openActions(user)
+    await openActions(user, 'open space')
     const row = await screen.findByText('Open space "Work"')
     expect(screen.queryByText('Open space "Home"')).toBeNull()
     expect(screen.queryByText('Open space "Gone"')).toBeNull()
@@ -104,12 +107,12 @@ describe('action palette, M8 actions', () => {
     const toggle = vi.fn()
     setFocusToggleForTests(toggle)
     const user = setup()
-    await openActions(user)
+    await openActions(user, 'settings')
     await user.click(screen.getByText(ACTION_TEXT.openSettings))
     expect(useSettingsModal.getState().isOpen).toBe(true)
 
     useSettingsModal.getState().close()
-    await openActions(user)
+    await openActions(user, 'focus')
     await user.click(screen.getByText(ACTION_TEXT.toggleFocusMode))
     expect(toggle).toHaveBeenCalledTimes(1)
   })
@@ -117,13 +120,13 @@ describe('action palette, M8 actions', () => {
   test('toggle focus mode is left out while focus mode is not built', async () => {
     setFocusToggleForTests(null)
     const user = setup()
-    await openActions(user)
+    await openActions(user, 'focus')
     expect(screen.queryByText(ACTION_TEXT.toggleFocusMode)).toBeNull()
   })
 
   test('open extended search opens an empty search page', async () => {
     const user = setup()
-    await openActions(user)
+    await openActions(user, 'extended')
     await user.click(screen.getByText(ACTION_TEXT.openEmptyLocalSpaceQuery))
     expect(currentTarget(useTabs.getState())).toMatchObject({ kind: 'search' })
   })
