@@ -1,20 +1,24 @@
 /**
  * The block menu (Task 12), opened by clicking a block's drag handle (the
- * block is then the block selection). Capacities' BlockMenu sections, in its
- * order (reference check 2026-10-28, 2e; labels from the English strings):
+ * block is then the block selection). Capacities' live block menu (catalog
+ * section 6, read 2026-11-02; labels from the English strings), in its order:
  *
- * 1. "Hierarchy (<current>)" ▸, "List" ▸, "To-do", "Icon" ▸, "Quote",
- *    "Toggle", "Group" (`BlockStyleMenu`);
- * 2. "Insert block above", "Insert block below";
- * 3. (Capacities' "Launch AI assistant with block selection": no AI in Object)
- * 4. "Turn into..." ▸ (the types, a to-do's "Turn into task object", "Turn into
- *    whiteboard"), "Copy" ▸ ("Copy blocks", "Copy as Markdown", "Copy block
- *    reference" for one block), "Duplicate", "Remove" (red trash).
+ * 1. "Hierarchy (<current>)" ▸, "List" ▸, "To-do", "Quote", "Toggle",
+ *    "Group" (Ctrl+G) (`BlockStyleMenu` without its "Icon" row);
+ * 2. (Capacities' "AI assistant...": M10, not here yet)
+ *    "Turn into..." ▸ (the object picker: the types, a to-do's "Turn into
+ *    task object", "Turn into whiteboard"), "Copy" ▸ ("Copy blocks", "Copy as
+ *    Markdown", "Copy block reference" for one block), "Duplicate" (Ctrl+D),
+ *    "Remove" (Backspace, red trash).
+ *
+ * The bundle's "Icon" ▸ and "Insert block above / below" rows are not in the
+ * live menu: the block-selection bar's icon dropdown sets icons, and the `+`
+ * handle and Alt+Enter / Alt+Shift+Enter insert blocks.
  *
  * A last section holds Object's own rows that nothing else reaches
- * (`BlockStyleExtras`: Color, Standout, Indent, Unindent). Several selected
- * blocks show "<n> selected" on top. Rows show their shortcut keys from the
- * registry.
+ * (`BlockStyleExtras` without Color, which the selection bar has: Alignment,
+ * Standout, Indent, Unindent). Several selected blocks show "<n> selected" on
+ * top. Rows show their shortcut keys from the registry.
  */
 import type { Editor } from '@tiptap/core'
 import type { ReactNode } from 'react'
@@ -42,7 +46,6 @@ import {
   copyBlocksAsMarkdown,
   deleteBlocks,
   duplicateBlocks,
-  insertBlock,
   targetRange,
   type TurnIntoKind,
 } from '../extensions/blockSelection'
@@ -129,9 +132,38 @@ export interface BlockMenuProps {
   anchor: { left: number; top: number; width: number; height: number } | null
 }
 
+/**
+ * The object picker behind "Turn into..." (and the block-selection bar's "Turn blocks into"): the
+ * writable types, "Turn into whiteboard" when no type is the whiteboard one, and a to-do's "Turn
+ * into task object". Render inside a dropdown menu's content.
+ */
+export function TurnIntoObjectItems({ editor, todo }: { editor: Editor; todo: boolean }) {
+  const types = useLinkIndex((s) => s.types).filter((t: TypeDef) => !t.readOnlyReason)
+  return (
+    <>
+      {types.map((t) => (
+        <DropdownMenuItem
+          key={t.id}
+          onSelect={() => run(() => (isWhiteboardType(t) ? turnIntoWhiteboard(editor) : turnIntoObject(editor, t.id)))}
+        >
+          <TypeChip type={t} size={18} />
+          {t.name}
+        </DropdownMenuItem>
+      ))}
+      {!types.some(isWhiteboardType) && (
+        <Row onSelect={() => run(() => turnIntoWhiteboard(editor))}>{BLOCK_MENU_TEXT.turnIntoWhiteboard}</Row>
+      )}
+      {todo && (
+        <Row shortcut="turnBlockIntoTaskObject" onSelect={() => run(() => turnTodoIntoTask(editor))}>
+          {BLOCK_MENU_TEXT.turnIntoTaskObject}
+        </Row>
+      )}
+    </>
+  )
+}
+
 export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps) {
   const close = () => onOpenChange(false)
-  const types = useLinkIndex((s) => s.types).filter((t: TypeDef) => !t.readOnlyReason)
   const todo = open && hasTodoAt(editor)
   const selected = open ? (blockSelectionRange(editor.state)?.blocks.length ?? 0) : 0
   const targetCount = open ? (targetRange(editor.state)?.blocks.length ?? 0) : 0
@@ -153,14 +185,7 @@ export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="bottom" className="min-w-[220px]" onCloseAutoFocus={(e) => e.preventDefault()}>
         {selected > 1 && <DropdownMenuLabel className="text-muted-foreground">{BLOCK_MENU_TEXT.selected(selected)}</DropdownMenuLabel>}
-        <BlockStyleMenu editor={editor} onDone={close} />
-        <DropdownMenuSeparator />
-        <Row icon="ph-rows-plus-top" shortcut="insertBlockAbove" onSelect={() => insertBlock(editor, 'above')}>
-          {BLOCK_MENU_TEXT.insertAbove}
-        </Row>
-        <Row icon="ph-rows-plus-bottom" shortcut="insertBlockBelow" onSelect={() => insertBlock(editor, 'below')}>
-          {BLOCK_MENU_TEXT.insertBelow}
-        </Row>
+        <BlockStyleMenu editor={editor} onDone={close} icon={false} />
         <DropdownMenuSeparator />
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
@@ -169,23 +194,7 @@ export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps
             {shortcutHint('turnIntoObject') && <DropdownMenuShortcut>{shortcutHint('turnIntoObject')}</DropdownMenuShortcut>}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="max-h-[420px] overflow-auto">
-            {types.map((t) => (
-              <DropdownMenuItem
-                key={t.id}
-                onSelect={() => run(() => (isWhiteboardType(t) ? turnIntoWhiteboard(editor) : turnIntoObject(editor, t.id)))}
-              >
-                <TypeChip type={t} size={18} />
-                {t.name}
-              </DropdownMenuItem>
-            ))}
-            {!types.some(isWhiteboardType) && (
-              <Row onSelect={() => run(() => turnIntoWhiteboard(editor))}>{BLOCK_MENU_TEXT.turnIntoWhiteboard}</Row>
-            )}
-            {todo && (
-              <Row shortcut="turnBlockIntoTaskObject" onSelect={() => run(() => turnTodoIntoTask(editor))}>
-                {BLOCK_MENU_TEXT.turnIntoTaskObject}
-              </Row>
-            )}
+            <TurnIntoObjectItems editor={editor} todo={todo} />
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuSub>
@@ -215,7 +224,7 @@ export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps
           {BLOCK_MENU_TEXT.remove}
         </Row>
         <DropdownMenuSeparator />
-        <BlockStyleExtras editor={editor} />
+        <BlockStyleExtras editor={editor} color={false} />
       </DropdownMenuContent>
     </DropdownMenu>
   )
