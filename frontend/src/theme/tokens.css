@@ -271,6 +271,18 @@ body,
   height: 100%;
 }
 
+/* Object's root: 15.5px from 640px up (design.css), so rem sizes match its own. */
+@media (min-width: 640px) {
+  html {
+    font-size: 96.875%;
+  }
+}
+
+/* "Hide object type settings outside of settings" (`settings/DeviceSettingsFollower.tsx`). */
+html[data-hide-structure-settings] [data-structure-setting] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: var(--app-font);

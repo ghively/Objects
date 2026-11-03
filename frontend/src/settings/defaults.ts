@@ -35,4 +35,10 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
     footerLeft: '',
     footerRight: '',
   }),
+  // Polish 2026-11-03
+  zoom: 1,
+  spellCheckLang: null,
+  alwaysCreateInlineLinks: false,
+  hideStructureSettings: false,
+  highlightStyle: 'default',
 }) as DeviceSettings

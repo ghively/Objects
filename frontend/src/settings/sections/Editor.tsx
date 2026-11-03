@@ -13,6 +13,7 @@ import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { LINK_VIEWS } from '@/types/CardViewSettings'
 import { OptionCards, SaveError, SecondaryButton, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
+import { normalizeLanguageTag } from '@/settings/spellcheck'
 import { useSettingsTypes } from './ObjectTypes'
 
 export const EDITOR_TEXT = {
@@ -77,6 +78,30 @@ export const EDITOR_TEXT = {
     showBlockContainingBacklink: 'Only block with backlink',
     showFullPathAbove: 'Full path above',
   },
+  // Polish 2026-11-03: EditorSettings.spellCheckLang.*
+  spellCheckLang: 'Spellcheck language',
+  // our string, adapted from EditorSettings.spellCheckLang.description (Object shows no reference list of tags)
+  spellCheckLangDescription:
+    'Specify the language for spell checking. Only one language can be spell checked at the same time, and support depends on your browser and operating system. Examples are "fr" or "de-CH": the first part names the language, the optional second part a region.',
+  spellCheckLangPlaceholder: 'e.g. "en-GB"...',
+  spellCheckLangInvalid: 'Invalid language tag...',
+  experimental: 'Experimental', // general.experimental
+  // EditorSettings.alwaysCreateInlineLinks.*
+  inlineLinks: 'Always create inline links',
+  inlineLinksDescription:
+    'With this setting, linking to other objects will always default to creating an inline link, even at the start of an empty block.',
+  // EditorSettings.hideStructureSettings.*
+  hideStructure: 'Hide object type settings outside of settings',
+  hideStructureDescription:
+    'Hide all buttons and options to edit properties and other object type settings in the UI. You can still edit them from the settings.',
+  // EditorSettings.highlightStyle.*
+  highlightStyle: 'Highlight Style',
+  highlightStyleDescription:
+    'Choose how highlight blocks and their notes are displayed — with a coloured rail and a distinct notes section, or minimally as plain text.',
+  highlightStyles: {
+    default: { name: 'Default', description: 'Highlights show a coloured rail, with their notes as a smaller, distinct section.' },
+    minimal: { name: 'Minimal', description: 'No rail — the highlight blends in as plain text.' },
+  },
 } as const
 
 const T = EDITOR_TEXT
@@ -87,7 +112,12 @@ export const EDITOR_SEARCH: string[] = [
   T.toggleStyleBullet,
   T.disableNumbered,
   T.disableSpellcheck,
+  T.spellCheckLang,
   T.fullPage,
+  T.inlineLinks,
+  T.hideStructure,
+  T.highlightStyle,
+  ...Object.values(T.highlightStyles).map((s) => s.name),
   T.inlineIcons,
   T.outliner,
   T.openOnStart,
@@ -136,6 +166,56 @@ function HiddenTypes({ value, onChange }: { value: string[]; onChange(next: stri
       <SecondaryButton disabled={value.length === 0} onClick={() => onChange([])}>
         {T.clearAll}
       </SecondaryButton>
+    </div>
+  )
+}
+
+/**
+ * "Spellcheck language": a tag field, saved (normalised) on Enter or blur; an empty field saves
+ * `null` (the device's language); a bad tag shows Object's "Invalid language tag..." and is not
+ * saved.
+ */
+function SpellCheckLangInput({ value, onSave }: { value: string | null; onSave(next: string | null): void }) {
+  const [text, setText] = useState(value ?? '')
+  const [invalid, setInvalid] = useState(false)
+  useEffect(() => setText(value ?? ''), [value])
+  const commit = () => {
+    if (!text.trim()) {
+      setInvalid(false)
+      if (value !== null) onSave(null)
+      return
+    }
+    const tag = normalizeLanguageTag(text)
+    if (!tag) {
+      setInvalid(true)
+      return
+    }
+    setInvalid(false)
+    setText(tag)
+    if (tag !== value) onSave(tag)
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      <input
+        aria-label={T.spellCheckLang}
+        aria-invalid={invalid || undefined}
+        placeholder={T.spellCheckLangPlaceholder}
+        value={text}
+        spellCheck={false}
+        onChange={(e) => {
+          setText(e.target.value)
+          setInvalid(false)
+        }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            commit()
+          }
+        }}
+        className="h-8 w-full max-w-[240px] rounded-md border border-line bg-raised px-2 text-[14px] text-fg outline-none focus:border-fg-muted"
+      />
+      {invalid && <p className="text-[13px] text-[var(--danger)]">{T.spellCheckLangInvalid}</p>}
     </div>
   )
 }
@@ -263,13 +343,36 @@ export function EditorSection() {
         checked={settings.disableSpellcheck}
         onChange={(v) => set({ disableSpellcheck: v })}
       />
+      <SettingGroup
+        title={T.spellCheckLang}
+        help={
+          <>
+            <span className="mr-1.5 inline-flex rounded border border-line px-1 text-[11px] font-medium text-fg-muted">{T.experimental}</span>
+            {T.spellCheckLangDescription}
+          </>
+        }
+      >
+        <SpellCheckLangInput value={settings.spellCheckLang ?? null} onSave={(spellCheckLang) => set({ spellCheckLang })} />
+      </SettingGroup>
       <SwitchRow title={T.fullPage} help={T.fullPageDescription} checked={settings.alwaysOpenAsFullPage} onChange={(v) => set({ alwaysOpenAsFullPage: v })} />
+      <SwitchRow
+        title={T.inlineLinks}
+        help={T.inlineLinksDescription}
+        checked={!!settings.alwaysCreateInlineLinks}
+        onChange={(v) => set({ alwaysCreateInlineLinks: v })}
+      />
       {/* The switch shows the icons: on means `hideEntityIconsOnInlineLinks: false`. */}
       <SwitchRow
         title={T.inlineIcons}
         help={T.inlineIconsDescription}
         checked={!settings.hideEntityIconsOnInlineLinks}
         onChange={(v) => set({ hideEntityIconsOnInlineLinks: !v })}
+      />
+      <SwitchRow
+        title={T.hideStructure}
+        help={T.hideStructureDescription}
+        checked={!!settings.hideStructureSettings}
+        onChange={(v) => set({ hideStructureSettings: v })}
       />
       <SwitchRow title={T.outliner} help={T.outlinerDescription} checked={settings.hideOutlinerLines} onChange={(v) => set({ hideOutlinerLines: v })} />
       <SettingGroup title={T.openOnStart} help={T.openOnStartDescription}>
@@ -322,6 +425,20 @@ export function EditorSection() {
             ))}
           </select>
         )}
+      </SettingGroup>
+      {/* Object has no highlight blocks yet (they come from web and PDF highlights): the choice is
+          stored and put on `<html data-highlight-style>` for when they exist. */}
+      <SettingGroup title={T.highlightStyle} help={T.highlightStyleDescription}>
+        <OptionCards
+          label={T.highlightStyle}
+          value={settings.highlightStyle ?? 'default'}
+          options={(['default', 'minimal'] as const).map((v) => ({
+            value: v,
+            label: T.highlightStyles[v].name,
+            description: T.highlightStyles[v].description,
+          }))}
+          onChange={(highlightStyle) => set({ highlightStyle })}
+        />
       </SettingGroup>
       <SettingGroup title={T.backlinkSections} help={T.backlinkSectionsDescription}>
         {SECTION_KEYS.map((k) => (

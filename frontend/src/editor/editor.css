@@ -2,9 +2,14 @@
 /* Spacing and heading scale follow Object's .editor-prose: a block stack of
    .44em plus 9px, larger gaps before headings (in the body's em; each heading's
    value is divided by its own font-size) and .42em after one. */
+/* The note body: 1rem (15.5px at Object's root) times the text size setting
+   (`settings/zoom.ts`); Object's body is 15.5px on a 23.25px line. */
+.object-body-text {
+  font-size: calc(1rem * var(--app-zoom, 1));
+}
 .object-editor {
   outline: none;
-  line-height: 1.647; /* 28px at 17px */
+  line-height: 1.5; /* 23.25px at 15.5px */
   min-height: 4rem;
   white-space: pre-wrap;
   word-wrap: break-word;

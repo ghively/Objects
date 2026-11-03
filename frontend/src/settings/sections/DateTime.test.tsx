@@ -21,6 +21,17 @@ beforeEach(() => {
 })
 
 describe('DateTimeSection', () => {
+  test('test date formatting shows a live preview of now', async () => {
+    const user = userEvent.setup()
+    useSettings.setState({ settings: { ...settingsDefaults, twentyFourHourTime: true } })
+    render(<DateTimeSection />)
+    const preview = screen.getByRole('status', { name: 'Preview' })
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Date formatting' })).getByRole('radio', { name: 'year-month-day (ISO 8601)' }))
+    expect(preview.textContent).toMatch(/^\d{4}-\d{2}-\d{2}, \d{2}:\d{2}$/)
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Date formatting' })).getByRole('radio', { name: 'day-month-year' }))
+    expect(preview.textContent).toMatch(/^\d{2}-\d{2}-\d{4}, \d{2}:\d{2}$/)
+  })
+
   test('test start of the week patches ui.json calendar keys together', async () => {
     const user = userEvent.setup()
     mocked.ui.mockResolvedValue({
