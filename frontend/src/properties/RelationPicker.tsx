@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { EntityRef, ObjectSummary, PropertyDef } from '@/api/types'
+import { api } from '@/api/client'
+import type { EntityRef, ObjectSummary, PropertyDef, TypeDef } from '@/api/types'
 import { IconOrEmoji, Icon } from '@/components/Icon'
 import { fuzzyMatch } from '@/links/LinkPicker'
 import { ensureLinkIndex, typeOf, useLinkIndex } from '@/links/linkIndex'
+import { tagStyle, themeColor } from '@/theme/palette'
 
 const LIMIT = 50
 
@@ -17,6 +19,9 @@ export interface RelationPickerProps {
 }
 
 export const RELATION_PICKER_TEXT = {
+  search: 'Search for objects',
+  // searchOrCreate: a relation to the Tag type (catalog section 5)
+  searchOrCreate: 'Search or Create',
   nothingFound: 'Nothing found',
   nothingToSelect: 'Nothing to select in this set. Search the whole database to add objects to the set.',
   editProperty: 'Edit Property',
@@ -39,15 +44,27 @@ export function relationCandidates(def: PropertyDef, objects: ObjectSummary[]): 
   )
 }
 
+/** The basic Tag type. */
+export function isTagType(type: TypeDef | undefined): boolean {
+  return !!type?.basic && type.name.toLowerCase() === 'tag'
+}
+
 /**
  * "Search for objects": the objects of the property's allowed types (only the fixed set, under
  * "Selection set", when there is one). Two objects with the same title show their folder.
  * Values are `EntityRef`s with the picked object's path.
+ *
+ * Item 22, a relation to the Tag type only (Capacities' Object -> Tag "Status" or "Category"):
+ * "Search or Create", each tag a chip in its own colour, and "Create 'x'" makes the Tag object
+ * (`api.ensureTag`) and picks it.
  */
 export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }: RelationPickerProps) {
   const objects = useLinkIndex((s) => s.objects)
   const [query, setQuery] = useState('')
+  const [creating, setCreating] = useState(false)
   const multi = def.options.isArray ?? true
+  const allowed = def.options.allowedTypes ?? []
+  const tagsOnly = allowed.length === 1 && isTagType(typeOf(allowed[0]))
 
   useEffect(() => {
     void ensureLinkIndex()
@@ -64,8 +81,8 @@ export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }
     [query, candidates],
   )
 
-  const isSelected = (o: ObjectSummary) => value.some((v) => v.path === o.path)
-  const pick = (o: ObjectSummary) => {
+  const isSelected = (o: Pick<ObjectSummary, 'path'>) => value.some((v) => v.path === o.path)
+  const pick = (o: Pick<ObjectSummary, 'path' | 'title'>) => {
     const ref: EntityRef = { target: o.title, path: o.path }
     if (multi) {
       onChange(isSelected(o) ? value.filter((v) => v.path !== o.path) : [...value, ref])
@@ -75,19 +92,40 @@ export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }
     onClose?.()
   }
 
+  const q = query.trim()
+  const canCreate =
+    tagsOnly && !def.options.hasFixedSet && q !== '' && !candidates.some((o) => o.title.toLowerCase() === q.toLowerCase())
+  const create = async () => {
+    if (!canCreate || creating) return
+    setCreating(true)
+    try {
+      const { path } = await api.ensureTag(q)
+      setQuery('')
+      pick({ path, title: q })
+    } catch {
+      // The tag couldn't be made; the query stays so the user can try again.
+    } finally {
+      setCreating(false)
+    }
+  }
+
   return (
     <div className="flex max-h-[20rem] w-72 flex-col">
       <div className="border-b border-line p-1.5">
         <input
-          aria-label="Search for objects"
-          placeholder="Search for objects"
+          aria-label={tagsOnly ? RELATION_PICKER_TEXT.searchOrCreate : RELATION_PICKER_TEXT.search}
+          placeholder={tagsOnly ? RELATION_PICKER_TEXT.searchOrCreate : RELATION_PICKER_TEXT.search}
           value={query}
           autoFocus
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && shown[0]) {
+            if (e.key !== 'Enter') return
+            if (shown[0]) {
               e.preventDefault()
               pick(shown[0])
+            } else if (canCreate) {
+              e.preventDefault()
+              void create()
             }
           }}
           className="h-7 w-full rounded bg-transparent px-1.5 text-[14px] text-fg outline-none placeholder:text-fg-muted"
@@ -116,10 +154,22 @@ export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }
               }}
               className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-[14px] hover:bg-hover"
             >
-              <span className="shrink-0 text-fg-muted">
-                <IconOrEmoji icon={o.icon ?? type?.icon ?? null} size={14} fallback="ph-file-text" />
-              </span>
-              <span className="min-w-0 truncate text-fg">{o.title}</span>
+              {tagsOnly ? (
+                <span
+                  data-tag-chip={themeColor(o.color)}
+                  className="min-w-0 truncate rounded-md px-1.5 py-[1px] text-[13px]"
+                  style={tagStyle(o.color)}
+                >
+                  {o.title}
+                </span>
+              ) : (
+                <>
+                  <span className="shrink-0 text-fg-muted">
+                    <IconOrEmoji icon={o.icon ?? type?.icon ?? null} size={14} fallback="ph-file-text" />
+                  </span>
+                  <span className="min-w-0 truncate text-fg">{o.title}</span>
+                </>
+              )}
               {dup && <span className="min-w-0 truncate text-[12px] text-fg-muted">{folderOf(o.path)}</span>}
               {selected && (
                 <span className="ml-auto shrink-0 text-fg-muted">
@@ -129,7 +179,22 @@ export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }
             </div>
           )
         })}
-        {shown.length === 0 && (
+        {canCreate && (
+          <div
+            role="option"
+            aria-selected={false}
+            tabIndex={-1}
+            onClick={() => void create()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void create()
+            }}
+            className="flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-[14px] text-fg hover:bg-hover"
+          >
+            <Icon name="ph-plus" size={14} />
+            {`Create '${q}'`}
+          </div>
+        )}
+        {shown.length === 0 && !canCreate && (
           <p className="px-2 py-1 text-[13px] text-fg-muted">
             {def.options.hasFixedSet && candidates.length === 0
               ? RELATION_PICKER_TEXT.nothingToSelect
