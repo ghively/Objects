@@ -186,7 +186,8 @@ export function ObjectView({
   const [version, setVersion] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [raw, setRaw] = useState(false)
-  const [panelOpen, setPanelOpen] = useState(true)
+  /** The pane toggled in this view; until then the object's own `hideProperties` decides. */
+  const [paneToggled, setPaneToggled] = useState<boolean | null>(null)
   const [deleted, setDeleted] = useState(false)
   /** The Trash entry of this window's own delete ("Undo Delete"). */
   const [trashId, setTrashId] = useState<string | null>(null)
@@ -681,6 +682,14 @@ export function ObjectView({
     }
     void writes.updateProperties(updates)
   }
+  // Polish item 17: the pane toggle is per object (Object's `ComponentData.hideProperties`):
+  // hiding saves `hideProperties: true`, showing removes the key. Read-only: this view only.
+  const panelOpen = paneToggled ?? detail?.frontmatter.hideProperties !== true
+  const togglePanel = () => {
+    const next = !panelOpen
+    setPaneToggled(next)
+    if (!propsReadOnly && detail) writeProperties({ hideProperties: next ? null : true })
+  }
   const onTypeChange = (next: TypeDef) => typeEditor.save(next)
   const onOpenTag = (name: string) => void openTag(name).catch(() => undefined)
   const onOpenObject = (p: string) => useTabs.getState().open({ kind: 'object', path: p })
@@ -910,7 +919,7 @@ export function ObjectView({
         aria-label={panelOpen ? 'Hide properties' : 'Show properties'}
         title={panelOpen ? 'Hide properties' : 'Show properties'}
         aria-pressed={panelOpen}
-        onClick={() => setPanelOpen((v) => !v)}
+        onClick={togglePanel}
         className="flex size-10 items-center justify-center rounded-[11px] border border-[var(--float-btn-border)] bg-[var(--float-bg)] p-[3px] text-fg"
       >
         <span
