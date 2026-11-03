@@ -904,7 +904,7 @@ export function ObjectView({
   )
 
   const toolbar = (
-    <div className="flex items-center justify-between px-3.5 pt-3.5">
+    <div data-typing-fade="" className="flex items-center justify-between px-3.5 pt-3.5">
       <button
         type="button"
         aria-label={panelOpen ? 'Hide properties' : 'Show properties'}
