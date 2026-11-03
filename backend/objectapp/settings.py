@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import math
+import re
 import threading
 import zoneinfo
 from pathlib import Path
@@ -74,7 +75,17 @@ DEFAULTS: dict[str, Any] = {
     # Polish 2026-11-03: Capacities' desktop zoom factor (electron-settings.ts `zoom`); scales the
     # rem-based UI and editor text from the 15.5px root.
     "zoom": 1.0,
+    # Capacities' `editorSettings` (component.model.ts): the spellcheck language tag (None: the
+    # device's), the link and type-settings switches, and the highlight block style.
+    "spellCheckLang": None,
+    "alwaysCreateInlineLinks": False,
+    "hideStructureSettings": False,
+    "highlightStyle": "default",
 }
+
+# A BCP 47 language tag as Capacities' `normalizeLanguageTag` accepts it ("fr", "de-CH", "en_GB",
+# "es-419"), at most 35 characters.
+_LANGUAGE_TAG = re.compile(r"[A-Za-z]{2,3}(?:[-_](?:[A-Za-z]{2}|\d{3})(?:[-_][A-Za-z0-9]{1,8})*)?")
 
 # `setZoomLevel` steps by 0.05 and stops at 1.5 (in) and 0.6 (out).
 ZOOM_MIN = 0.6
@@ -92,6 +103,7 @@ _CHOICES: dict[str, tuple[str, ...]] = {
     "decimalSeparator": ("automatic", "dot", "comma"),
     "backlinkContentView": ("inline", "smallCard", "wideCard", "embed"),
     "nestedBacklinkView": ("showBlockContainingBacklink", "showFullPathAbove"),
+    "highlightStyle": ("default", "minimal"),
 }
 _BOOLS = frozenset(k for k, v in DEFAULTS.items() if isinstance(v, bool))
 _OPEN_ON_START_MODES = ("lastOpenedPage", "today", "calendar", "specificObject")
@@ -140,6 +152,10 @@ def _valid(key: str, value: Any) -> bool:
         )
     if key == "startupSpacePath":
         return value is None or isinstance(value, str)
+    if key == "spellCheckLang":
+        return value is None or (
+            isinstance(value, str) and len(value) <= 35 and _LANGUAGE_TAG.fullmatch(value) is not None
+        )
     if key == "openOnStart":
         if not isinstance(value, dict):
             return False

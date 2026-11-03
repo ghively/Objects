@@ -278,6 +278,11 @@ body,
   }
 }
 
+/* "Hide object type settings outside of settings" (`settings/DeviceSettingsFollower.tsx`). */
+html[data-hide-structure-settings] [data-structure-setting] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: var(--app-font);
