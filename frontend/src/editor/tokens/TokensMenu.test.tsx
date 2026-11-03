@@ -82,20 +82,20 @@ describe('TokensMenu', () => {
       .getAllByRole('button')
       .map((b) => b.getAttribute('aria-label'))
     expect(names).toEqual(TOKENS_MENU_ITEMS)
-    // Object's tokensMenu.* strings, verbatim.
+    // The live app's order (catalog section 6); Object's tokensMenu.* strings, verbatim.
     expect(TOKENS_MENU_ITEMS).toEqual([
       'Bold',
       'Italic',
-      'Underline',
       'Strikethrough',
+      'Underline',
+      'Bullet list',
+      'To-do',
+      'Link',
       'Code',
       'Formula',
-      'Link',
       'Highlight text',
-      'Turn Into',
       'Create object from text selection.',
       'Link existing object with text selection.',
-      'Search for content matching your selection',
     ])
 
     fireEvent.click(within(bar()).getByRole('button', { name: 'Highlight text' }))
@@ -174,10 +174,21 @@ describe('TokensMenu', () => {
     expect(serializeBody(editor)).toBe('Thanks to [[Ada Lovelace|Ada]] for the notes\n')
   })
 
-  test('test search for selection opens extended search', () => {
-    setup('Look up quarterly planning soon\n', 'quarterly planning')
-    fireEvent.click(within(bar()).getByRole('button', { name: TOKENS_MENU_TEXT.search }))
-    expect(currentTarget(useTabs.getState())).toMatchObject({ kind: 'search', q: 'quarterly planning' })
+  test('bullet list and to-do turn the block and back to text', () => {
+    const editor = setup('Buy milk today\n', 'milk')
+    fireEvent.click(within(bar()).getByRole('button', { name: 'Bullet list' }))
+    expect(serializeBody(editor)).toBe('- Buy milk today\n')
+    select(editor, 'milk')
+    expect(within(bar()).getByRole('button', { name: 'Bullet list' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(bar()).getByRole('button', { name: 'Bullet list' }))
+    expect(serializeBody(editor)).toBe('Buy milk today\n')
+
+    select(editor, 'milk')
+    fireEvent.click(within(bar()).getByRole('button', { name: 'To-do' }))
+    expect(serializeBody(editor)).toBe('- [ ] Buy milk today\n')
+    select(editor, 'milk')
+    fireEvent.click(within(bar()).getByRole('button', { name: 'To-do' }))
+    expect(serializeBody(editor)).toBe('Buy milk today\n')
   })
 
   test('marks toggle and formula wraps the selection', () => {
