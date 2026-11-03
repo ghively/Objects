@@ -262,3 +262,47 @@ def test_html_escapes_markup_in_content(root: Path):
         h = _get(c, path=PAGE, format="html").text
     assert "<script>" not in h and "&lt;script&gt;" in h
     assert re.search(r"<title>&lt;b&gt;x&lt;/b&gt;</title>", h)
+
+
+# -- review fixes (2026-11-03) ---------------------------------------------------------------
+
+
+def test_heading_keeps_a_trailing_hash_that_is_part_of_the_text():
+    texts = [b.text for b in parse_blocks("# Learn C#\n## Issue #\n### Closed ###\n") if b.kind == "heading"]
+    assert texts == ["Learn C#", "Issue", "Closed"]
+
+
+def test_pdf_uses_the_monospace_type_font():
+    from objectapp.exportdoc import _FONTS
+
+    # Every non-default font a type can have (typemodel: sans-serif, serif, monospace) has a stack.
+    assert {"serif", "monospace"} <= set(_FONTS)
+
+
+def test_latex_math_cannot_read_or_write_files(root: Path):
+    body = r"Inline $\input{secret}$ here" + "\n\n$$\n" + r"\immediate\write18{x}" + "\n$$\n"
+    (root / "Pages" / "Math.md").write_bytes(b"---\ntitle: Math\n---\n" + body.encode())
+    with _client(root) as c:
+        tex = _get(c, path="Pages/Math.md", format="latex").text
+    assert r"\input" not in tex and r"\immediate" not in tex and r"\write18" not in tex
+    assert r"\backslash input" in tex
+
+
+def test_zip_links_back_to_the_root_where_it_lands(root: Path):
+    target = root / "Pages" / "Embedded target.md"
+    target.write_bytes(target.read_bytes() + b"\nSee [[Report]].\n")
+    with _client(root) as c:
+        r = _get(c, path=PAGE, subpages="1", wikilinks="0")
+    zf = zipfile.ZipFile(io.BytesIO(r.content))
+    assert "[Report](../Report.md)" in zf.read("Pages/Embedded target.md").decode("utf-8-sig")
+
+
+def test_zip_root_moves_aside_when_a_subpage_has_its_name(root: Path):
+    (root / "Report.md").write_bytes(b"---\ntitle: Top report\n---\nAt the top.\n")
+    page = root / "Pages" / "Report.md"
+    page.write_bytes(page.read_bytes() + b"\r\n![[Top report]]\r\n")
+    with _client(root) as c:
+        r = _get(c, path=PAGE, subpages="1")
+    names = set(zipfile.ZipFile(io.BytesIO(r.content)).namelist())
+    assert {"Report.md", "Pages/Report.md"} <= names
+    assert zipfile.ZipFile(io.BytesIO(r.content)).read("Report.md").endswith(b"At the top.\n")
