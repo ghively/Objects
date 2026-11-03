@@ -167,7 +167,7 @@ from . import (
 from .apictx import ApiContext
 from .appstate import state_dir
 from .collections import CollectionDef
-from .export import content_disposition, export_object_to_file
+from .export import ExportOptions, content_disposition, export_object_to_file, export_properties
 from .jsonstore import (
     DefinitionUnreadable,
     default_views,
@@ -1133,14 +1133,62 @@ def create_app(
             status_code=201,
         )
 
-    @api.get("/object/export")
-    def export(path: str, media: str = Query(default="0")):
+    @api.get("/object/export/properties")
+    def export_props(path: str):
         try:
-            out = export_object_to_file(space, path, media == "1")
+            return export_properties(space, path)
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
             return _error(404, f"No object at {path!r}")
+
+    @api.get("/object/export")
+    def export(
+        path: str,
+        media: str = Query(default="0"),
+        format: str = Query(default="md"),
+        subpages: str = Query(default="0"),
+        titleH1: str = Query(default="0"),
+        wikilinks: str = Query(default="1"),
+        style: str = Query(default="notes"),
+        paper: str = Query(default="A4"),
+        embedded: str = Query(default="1"),
+        outline: str = Query(default="0"),
+        hideEmpty: str = Query(default="1"),
+        typeLabels: str = Query(default="0"),
+        hide: str = Query(default=""),
+    ):
+        opts = ExportOptions(
+            format=format,
+            media=media == "1",
+            subpages=subpages == "1",
+            title_h1=titleH1 == "1",
+            wikilinks=wikilinks != "0",
+            style=style if style in ("notes", "essay", "academic") else "notes",
+            paper="Letter" if paper.lower() == "letter" else "A4",
+            embedded=embedded != "0",
+            outline=outline == "1",
+            hide_empty=hideEmpty != "0",
+            type_labels=typeLabels == "1",
+            hidden=frozenset(k for k in hide.split(",") if k),
+        )
+        try:
+            out = export_object_to_file(space, path, opts.media, opts)
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {path!r}")
+        if opts.format == "html":
+            # The PDF: a page the dialog prints in a frame. Shown, not downloaded; no scripts.
+            return Response(
+                out.data,
+                media_type=out.media_type,
+                headers={
+                    "X-Content-Type-Options": "nosniff",
+                    "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+                    "Cache-Control": "no-store",
+                },
+            )
         headers = {
             "Content-Disposition": content_disposition(out.filename),
             "X-Content-Type-Options": "nosniff",
