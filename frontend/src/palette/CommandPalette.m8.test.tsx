@@ -41,7 +41,7 @@ function setup() {
 
 async function openSearch(user: ReturnType<typeof userEvent.setup>) {
   await user.keyboard('{Control>}k{/Control}')
-  return screen.findByPlaceholderText(PALETTE_TEXT.placeholderSearch)
+  return screen.findByPlaceholderText(PALETTE_TEXT.placeholder)
 }
 
 beforeEach(() => {

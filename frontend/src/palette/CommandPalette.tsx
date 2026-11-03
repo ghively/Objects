@@ -1,22 +1,22 @@
 /**
  * The command palette: Ctrl+P or Ctrl+K "Search this space" (Capacities' `openSearchPalette`
- * keys, read from `lib/shortcuts.ts`). Capacities lists no key for "Open action palette"; it is
- * reached with the palette's switch button. The shortcut is caught on the window in the capture
- * phase, so it works with the caret in the editor, while no other modal dialog is open (the
- * object peek excepted). Esc closes.
+ * keys, read from `lib/shortcuts.ts`). Content and actions are one list (`SearchView`; polish
+ * audit backlog 2): there is no separate action mode or switch button any more, and the store's
+ * `actions` mode (the unbound "Open action palette" key) opens the same list. The shortcut is
+ * caught on the window in the capture phase, so it works with the caret in the editor, while no
+ * other modal dialog is open (the object peek excepted). Esc closes.
  *
  * M8: the search view's "Open in extended search" row and Ctrl/Cmd+Shift+Enter (our key; plain
  * Shift+Enter stays M7's "open in the side panel") close the palette and open the extended search
  * page with what was typed.
  *
- * M8 (Task 17): the action palette adds "Open extended search", "Open settings", "Toggle focus
- * mode", "Open space "…"" for each other registered space, and the clipboard group (`paste.ts`).
+ * M8 (Task 17): the actions add "Open extended search", "Open settings", "Toggle focus mode",
+ * "Open space "…"" for each other registered space, and the clipboard group (`paste.ts`).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '@/api/client'
 import type { SpaceEntry } from '@/api/types'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { Icon } from '@/components/Icon'
 import { KeyHints } from '@/components/KeyHints'
 import { useCalendar } from '@/calendar/useCalendar'
 import { createAndOpen } from '@/create/createAndOpen'
@@ -24,7 +24,6 @@ import { useLinkIndex } from '@/links/linkIndex'
 import { keysFor, matches } from '@/lib/shortcuts'
 import { currentTarget, usePeek, useTabs, type OpenOptions, type Target } from '@/nav/tabs'
 import type { ActionContext } from './actions'
-import { ActionsView } from './ActionsView'
 import { openExtendedSearch } from '@/search/openSearch'
 import { PALETTE_TEXT } from './searchOptions'
 import { SearchView } from './SearchView'
@@ -80,14 +79,13 @@ export function paletteShortcut(e: KeyboardEvent): PaletteMode | null {
 
 export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPanel, onShowRightPanel }: CommandPaletteProps) {
   const open = usePalette((s) => s.open)
-  const mode = usePalette((s) => s.mode)
   const types = useLinkIndex((s) => s.types)
   const hasObjectOpen = useTabs((s) => currentTarget(s)?.kind === 'object')
   const [spaces, setSpaces] = useState<SpaceEntry[]>([])
 
-  // The registry, read each time the action palette opens ("Open space …").
+  // The registry, read each time the palette opens ("Open space …").
   useEffect(() => {
-    if (!open || mode !== 'actions') return
+    if (!open) return
     let live = true
     api.spaces().then(
       (list) => live && setSpaces(list ?? []),
@@ -96,7 +94,7 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
     return () => {
       live = false
     }
-  }, [open, mode])
+  }, [open])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -147,9 +145,9 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
     [types, hasObjectOpen, onOpenTarget, onShowRightPanel, onToggleSidebar, onToggleRightPanel, spaces],
   )
 
-  const other: PaletteMode = mode === 'search' ? 'actions' : 'search'
+  // The keys of an object row (Capacities' footer); an action row runs on any Enter.
   const footer = (
-    <div className="flex items-center justify-between border-t border-line">
+    <div className="border-t border-line">
       <KeyHints
         bare
         extra={[
@@ -157,14 +155,6 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
           { keys: 'Shift ↵', label: PALETTE_TEXT.inSidePanel },
         ]}
       />
-      <button
-        type="button"
-        onClick={() => usePalette.getState().show(other)}
-        className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[13px] text-fg-muted hover:bg-hover"
-      >
-        <Icon name="ph-arrows-left-right" size={14} />
-        {mode === 'search' ? PALETTE_TEXT.switchToActions : PALETTE_TEXT.switchToSearch}
-      </button>
     </div>
   )
 
@@ -175,15 +165,9 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
         showCloseButton={false}
         className="top-[18%] w-[min(640px,calc(100vw-32px))] max-w-none translate-y-0 gap-0 overflow-hidden rounded-xl border-line bg-raised-2 p-0 text-fg sm:max-w-none"
       >
-        <DialogTitle className="sr-only">{mode === 'search' ? PALETTE_TEXT.searchTitle : PALETTE_TEXT.actionsTitle}</DialogTitle>
-        <DialogDescription className="sr-only">
-          {mode === 'search' ? PALETTE_TEXT.placeholderSearch : PALETTE_TEXT.placeholderActions}
-        </DialogDescription>
-        {mode === 'search' ? (
-          <SearchView key="search" onDone={hide} footer={footer} onOpenExtendedSearch={toExtendedSearch} />
-        ) : (
-          <ActionsView key="actions" context={context} onDone={hide} footer={footer} />
-        )}
+        <DialogTitle className="sr-only">{PALETTE_TEXT.searchTitle}</DialogTitle>
+        <DialogDescription className="sr-only">{PALETTE_TEXT.placeholder}</DialogDescription>
+        <SearchView onDone={hide} footer={footer} onOpenExtendedSearch={toExtendedSearch} actions={context} />
       </DialogContent>
     </Dialog>
   )

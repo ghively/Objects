@@ -2,6 +2,7 @@
  * The action palette's items. Pure: the caller supplies the effects.
  */
 import type { Icon, SpaceEntry, TypeDef } from '@/api/types'
+import { nameMatches } from './searchOptions'
 
 /** Capacities' strings, verbatim (`CommandPalette.actions.options.*`, `shortcuts.*.name`). */
 export const ACTION_TEXT = {
@@ -85,4 +86,14 @@ export function buildActions(ctx: ActionContext): Action[] {
     }
   }
   return out
+}
+
+/**
+ * The actions whose label matches `query` (the palette's name match), in list order. None for an
+ * empty query: the palette shows the recent objects then (our choice).
+ */
+export function matchActions(actions: readonly Action[], query: string): Action[] {
+  const q = query.trim()
+  if (!q) return []
+  return actions.filter((a) => nameMatches(q, a.label))
 }
