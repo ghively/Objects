@@ -118,17 +118,18 @@ export function Editor({
     editor?.setEditable(!readOnly, false)
   }, [editor, readOnly])
 
-  // The object this editor shows, for the block references it copies (M8).
-  useEffect(() => {
-    if (!editor) return
-    setEditorObject(editor, { path })
-    return () => setEditorObject(editor, null)
-  }, [editor, path])
-
   // A space switch flushes every open editor's pending save first (read-only ones resolve at once).
   const settleRef = useRef(autosave.settle)
   settleRef.current = autosave.settle
   useEffect(() => registerFlusher(() => settleRef.current()), [])
+
+  // The object this editor shows, for the block references it copies (M8), and its pending-save
+  // flush (a block move to another object saves this one first).
+  useEffect(() => {
+    if (!editor) return
+    setEditorObject(editor, { path, flush: () => settleRef.current() })
+    return () => setEditorObject(editor, null)
+  }, [editor, path])
 
   // Load the body when the object or its on-disk text changes. A body equal to
   // what this editor just saved is our own write echoing back: keep the doc.

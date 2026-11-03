@@ -140,15 +140,23 @@ export function pageType(types: readonly TypeDef[]): TypeDef | undefined {
   )
 }
 
+/** The path of `day`'s daily note, creating the note when there is none. */
+export async function ensureDailyNote(day: string = todayYmd()): Promise<string> {
+  try {
+    return (await api.createDailyNote(day)).path
+  } catch (e) {
+    if (e instanceof DailyNoteExistsError && e.reason === 'exists' && e.path) return e.path
+    throw e
+  }
+}
+
 /** Append `text` to today's daily note, creating the note when there is none. */
 export async function addToDailyNote(text: string, today: string = todayYmd()): Promise<string> {
-  let path: string
-  try {
-    path = (await api.createDailyNote(today)).path
-  } catch (e) {
-    if (e instanceof DailyNoteExistsError && e.reason === 'exists' && e.path) path = e.path
-    else throw e
-  }
+  return appendToDailyNote(await ensureDailyNote(today), text)
+}
+
+/** Append `text` to the daily note at `path` (read from disk, then saved) with the toast. */
+export async function appendToDailyNote(path: string, text: string): Promise<string> {
   const detail = await api.object(path)
   await api.saveBody(path, appendToBody(detail.body, text), detail.version)
   showToast(PASTE_TEXT.addedToDailyNote)

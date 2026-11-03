@@ -7,10 +7,11 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
-import { api } from '@/api/client'
+import { api, DailyNoteExistsError } from '@/api/client'
 import { addDays, todayYmd } from '@/calendar/dates'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { blockSelectionRange, selectBlocks } from '../extensions/blockSelection'
+import { setEditorObject } from '../nodes/blockRef'
 import { BLOCK_BAR_ITEMS, BLOCK_BAR_TEXT, BlockSelectionBar } from './BlockSelectionBar'
 
 const editors: TiptapEditor[] = []
@@ -214,6 +215,52 @@ describe('<BlockSelectionBar>', () => {
     select(editor, 0)
     fireEvent.click(within(await openMenu('Move')).getByRole('menuitem', { name: 'Tomorrow' }))
     await waitFor(() => expect(api.createDailyNote).toHaveBeenCalledWith(addDays(today, 1)))
+  })
+
+  test("moving to today's note from today's note itself moves the blocks to the end here, with no write", async () => {
+    const today = todayYmd()
+    const editor = mounted(BODY)
+    setEditorObject(editor, { path: `DailyNotes/${today}.md` })
+    vi.mocked(api.createDailyNote).mockRejectedValueOnce(new DailyNoteExistsError('exists', `DailyNotes/${today}.md`))
+    render(<BlockSelectionBar editor={editor} />)
+    select(editor, 0)
+    fireEvent.click(within(await openMenu('Move')).getByRole('menuitem', { name: 'Today' }))
+    await waitFor(() => expect(serializeBody(editor)).toBe('Three\n\nFour five six\n\nOne two\n'))
+    await act(async () => {})
+    expect(api.saveBody).not.toHaveBeenCalled()
+  })
+
+  test("the last blocks of today's note stay where they are", async () => {
+    const today = todayYmd()
+    const editor = mounted(BODY)
+    setEditorObject(editor, { path: `DailyNotes/${today}.md` })
+    vi.mocked(api.createDailyNote).mockClear()
+    vi.mocked(api.createDailyNote).mockRejectedValueOnce(new DailyNoteExistsError('exists', `DailyNotes/${today}.md`))
+    render(<BlockSelectionBar editor={editor} />)
+    select(editor, 1, 2)
+    fireEvent.click(within(await openMenu('Move')).getByRole('menuitem', { name: 'Today' }))
+    await waitFor(() => expect(api.createDailyNote).toHaveBeenCalled())
+    await act(async () => {})
+    expect(serializeBody(editor)).toBe(BODY)
+    expect(api.saveBody).not.toHaveBeenCalled()
+  })
+
+  test("moving to another note saves this note's pending edits first", async () => {
+    const editor = mounted(BODY)
+    const order: string[] = []
+    const flush = vi.fn(async () => {
+      order.push('flush')
+    })
+    setEditorObject(editor, { path: 'Pages/Source.md', flush })
+    vi.mocked(api.saveBody).mockImplementationOnce(async (path: string) => {
+      order.push(`save ${path}`)
+      return { version: 'v2' } as never
+    })
+    render(<BlockSelectionBar editor={editor} />)
+    select(editor, 0)
+    fireEvent.click(within(await openMenu('Move')).getByRole('menuitem', { name: 'Today' }))
+    await waitFor(() => expect(serializeBody(editor)).toBe('Three\n\nFour five six\n'))
+    expect(order).toEqual(['flush', `save DailyNotes/${todayYmd()}.md`])
   })
 
   test('a failed move keeps the blocks', async () => {
