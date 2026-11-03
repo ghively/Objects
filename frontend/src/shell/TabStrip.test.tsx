@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 vi.mock('@/api/client', async (orig) => ({
@@ -6,8 +6,11 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
-import { resetLinkIndex } from '@/links/linkIndex'
-import { useTabs, type Target } from '@/nav/tabs'
+import { api } from '@/api/client'
+import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { currentTarget, useTabs, type Target } from '@/nav/tabs'
+import { typeDef } from '@/test/mockApi'
+import { resetPinned } from './usePinned'
 import { TabStrip } from './TabStrip'
 
 const typeT = (typeId: string): Target => ({ kind: 'type', typeId })
@@ -17,6 +20,7 @@ beforeEach(() => {
   localStorage.clear()
   useTabs.getState().reset()
   resetLinkIndex()
+  resetPinned()
 })
 
 afterEach(() => {
@@ -72,6 +76,31 @@ describe('TabStrip', () => {
     fireEvent.contextMenu(tabs()[0])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Close tab' }))
     expect(s().tabs).toHaveLength(1)
+  })
+
+  test("a type tab's menu: Pin to Sidebar, Pin tab, Object Type Settings, Import (Ctrl I), Close tab", async () => {
+    const PAGES = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', revision: 'r1' })
+    vi.mocked(api).ui.mockResolvedValue({ ui: { pinned: [], sections: [], allNotesLayout: 'list' }, revision: 'u0' })
+    vi.mocked(api).onChange.mockReturnValue(() => undefined)
+    vi.mocked(api).patchUi.mockImplementation(async (patch) => ({ ui: { pinned: [], sections: [], allNotesLayout: 'list', ...patch }, revision: 'u1' }))
+    useLinkIndex.setState({ types: [PAGES], objects: [], loaded: true })
+    s().open(typeT('page'))
+    render(<TabStrip space={null} />)
+    fireEvent.contextMenu(tabs()[0])
+    const items = screen.getAllByRole('menuitem').map((i) => i.textContent)
+    expect(items).toEqual(['Pin to Sidebar', 'Pin tab', 'Object Type Settings', 'ImportCtrl I', 'Close tab'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pin to Sidebar' }))
+    await waitFor(() => expect(vi.mocked(api).patchUi).toHaveBeenCalledWith({ pinned: [{ kind: 'type', id: 'page' }] }, expect.anything()))
+    fireEvent.contextMenu(tabs()[0])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Object Type Settings' }))
+    expect(currentTarget(s())).toEqual({ kind: 'typeSettings', typeId: 'page' })
+  })
+
+  test('a non-type tab keeps the plain menu', () => {
+    s().open({ kind: 'calendar' })
+    render(<TabStrip space={null} />)
+    fireEvent.contextMenu(tabs()[0])
+    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Pin tab', 'Close tab'])
   })
 
   test('test tabs are 60 to 200 px wide with a 5 px gap (reference)', () => {
