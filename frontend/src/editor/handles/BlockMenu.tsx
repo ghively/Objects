@@ -132,9 +132,38 @@ export interface BlockMenuProps {
   anchor: { left: number; top: number; width: number; height: number } | null
 }
 
+/**
+ * The object picker behind "Turn into..." (and the block-selection bar's "Turn blocks into"): the
+ * writable types, "Turn into whiteboard" when no type is the whiteboard one, and a to-do's "Turn
+ * into task object". Render inside a dropdown menu's content.
+ */
+export function TurnIntoObjectItems({ editor, todo }: { editor: Editor; todo: boolean }) {
+  const types = useLinkIndex((s) => s.types).filter((t: TypeDef) => !t.readOnlyReason)
+  return (
+    <>
+      {types.map((t) => (
+        <DropdownMenuItem
+          key={t.id}
+          onSelect={() => run(() => (isWhiteboardType(t) ? turnIntoWhiteboard(editor) : turnIntoObject(editor, t.id)))}
+        >
+          <TypeChip type={t} size={18} />
+          {t.name}
+        </DropdownMenuItem>
+      ))}
+      {!types.some(isWhiteboardType) && (
+        <Row onSelect={() => run(() => turnIntoWhiteboard(editor))}>{BLOCK_MENU_TEXT.turnIntoWhiteboard}</Row>
+      )}
+      {todo && (
+        <Row shortcut="turnBlockIntoTaskObject" onSelect={() => run(() => turnTodoIntoTask(editor))}>
+          {BLOCK_MENU_TEXT.turnIntoTaskObject}
+        </Row>
+      )}
+    </>
+  )
+}
+
 export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps) {
   const close = () => onOpenChange(false)
-  const types = useLinkIndex((s) => s.types).filter((t: TypeDef) => !t.readOnlyReason)
   const todo = open && hasTodoAt(editor)
   const selected = open ? (blockSelectionRange(editor.state)?.blocks.length ?? 0) : 0
   const targetCount = open ? (targetRange(editor.state)?.blocks.length ?? 0) : 0
@@ -165,23 +194,7 @@ export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps
             {shortcutHint('turnIntoObject') && <DropdownMenuShortcut>{shortcutHint('turnIntoObject')}</DropdownMenuShortcut>}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="max-h-[420px] overflow-auto">
-            {types.map((t) => (
-              <DropdownMenuItem
-                key={t.id}
-                onSelect={() => run(() => (isWhiteboardType(t) ? turnIntoWhiteboard(editor) : turnIntoObject(editor, t.id)))}
-              >
-                <TypeChip type={t} size={18} />
-                {t.name}
-              </DropdownMenuItem>
-            ))}
-            {!types.some(isWhiteboardType) && (
-              <Row onSelect={() => run(() => turnIntoWhiteboard(editor))}>{BLOCK_MENU_TEXT.turnIntoWhiteboard}</Row>
-            )}
-            {todo && (
-              <Row shortcut="turnBlockIntoTaskObject" onSelect={() => run(() => turnTodoIntoTask(editor))}>
-                {BLOCK_MENU_TEXT.turnIntoTaskObject}
-              </Row>
-            )}
+            <TurnIntoObjectItems editor={editor} todo={todo} />
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuSub>

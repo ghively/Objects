@@ -10,6 +10,7 @@ import { createFindControl, FindInPage } from './extensions/findInPage'
 import { BlockHandles } from './handles/BlockHandles'
 import { GroupBlocksKey } from './handles/groupKey'
 import { setEditorObject } from './nodes/blockRef'
+import { BlockSelectionBar } from './selectionBar/BlockSelectionBar'
 import { TokensMenu } from './tokens/TokensMenu'
 import { SlashMenu } from './slash/SlashMenu'
 import { useAutosave, type BodyEditorHandle } from './useAutosave'
@@ -183,6 +184,7 @@ export function Editor({
       {editor && !readOnly && <BlockHandles editor={editor} />}
       {editor && !readOnly && <SlashMenu editor={editor} />}
       {editor && !readOnly && <TokensMenu editor={editor} path={path} />}
+      {editor && !readOnly && <BlockSelectionBar editor={editor} />}
     </>
   )
 }
