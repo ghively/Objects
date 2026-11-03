@@ -7,6 +7,7 @@ import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { saveCalendarUi } from '@/calendar/calendarUi'
 import { useWeekStart } from '@/calendar/useCalendar'
+import { formatDate } from '@/properties/format'
 import { useSettings } from '@/settings/useSettings'
 import { OptionCards, SaveError, SecondaryButton, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
 
@@ -33,6 +34,7 @@ export const DATE_TIME_TEXT = {
   timeZoneReset: 'Set to local time zone', // DateAndTimeSettings.timeZone.resetButton
   timeZoneSearch: 'Search time zones', // our string
   noResults: 'No results', // AppSettings.search.noResults
+  preview: 'Preview', // Object's `preview` string, as the live preview's accessible name
 } as const
 
 const T = DATE_TIME_TEXT
@@ -177,6 +179,10 @@ export function DateTimeSection() {
           options={FORMATS.map((f) => ({ value: f, label: T.formats[f] }))}
           onChange={(dateFormatting) => set({ dateFormatting })}
         />
+        {/* Object shows a live preview of the chosen formatting: now, as dates display. */}
+        <p role="status" aria-label={T.preview} className="text-[13px] text-fg-muted">
+          {formatDate({ start: new Date().toISOString(), resolution: 'time' })}
+        </p>
       </SettingGroup>
       <SettingGroup title={T.timeZone} help={T.timeZoneDescription}>
         <TimeZoneSelect value={zone} onSelect={(z) => set({ timeZone: z === device ? null : z })} />
