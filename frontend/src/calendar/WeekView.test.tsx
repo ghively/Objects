@@ -61,6 +61,17 @@ describe('WeekView', () => {
     expect(blocks()[6].getAttribute('data-day')).toBe('2026-10-25')
   })
 
+  test('test week colours each weekday and puts the note pill on the date row of days with a note', async () => {
+    setDay('2026-10-20', { dailyNote: { path: 'DailyNotes/2026-10-20.md', reviewed: true } })
+    render(<WeekView anchor={TODAY} weekStart="sunday" />)
+    const colours = blocks().map((b) => within(b).getByTestId('day-weekday').className.match(/text-(\w+)-500/)?.[1])
+    // Sunday red, Monday yellow, Tuesday pink, Wednesday green, Thursday orange, Friday blue, Saturday purple.
+    expect(colours).toEqual(['red', 'yellow', 'pink', 'green', 'orange', 'blue', 'purple'])
+    const pill = await within(blocks()[2]).findByTestId('day-note-pill')
+    expect(within(pill).getByRole('checkbox', { name: 'Reviewed' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getAllByTestId('day-note-pill')).toHaveLength(1)
+  })
+
   test('test week scrolls the anchor day into view', async () => {
     const { rerender } = render(<WeekView anchor={TODAY} weekStart="sunday" />)
     expect(scrolled).toEqual(['week-2026-10-23'])
