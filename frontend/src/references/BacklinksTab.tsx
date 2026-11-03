@@ -13,6 +13,7 @@
  */
 import { useState, type MouseEvent, type ReactNode } from 'react'
 import type { BacklinkEntry, BodyContext, ObjectSummary } from '@/api/types'
+import { Icon } from '@/components/Icon'
 import { cn } from '@/lib/utils'
 import { stemOf, typeOf, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
@@ -107,11 +108,17 @@ export function BacklinkContext({
   view,
   nestedView,
   onOpen,
+  path,
+  list,
 }: {
   context: BodyContext
   view: BacklinkContentView
   nestedView: NestedBacklinkView
   onOpen(e: MouseEvent): void
+  /** The linking object: shows the hover actions. */
+  path?: string
+  /** The pager list for Expand. */
+  list?: string[]
 }) {
   const ancestors = ancestorsOf(context)
   const [mode, setMode] = useState<NestedBacklinkView | null>(null)
@@ -129,7 +136,7 @@ export function BacklinkContext({
     </button>
   )
   return (
-    <div data-backlink-block="" className="flex flex-col gap-0.5">
+    <div data-backlink-block="" className="group/ref flex flex-col gap-0.5">
       {ancestors.length > 0 && (
         <div role="group" aria-label={REFERENCES_TEXT.nestedView} className="flex gap-0.5 self-end text-[11px] text-fg-muted">
           {option('showBlockContainingBacklink', REFERENCES_TEXT.showBlockContainingBacklink)}
@@ -145,16 +152,52 @@ export function BacklinkContext({
           ))}
         </div>
       )}
-      <button
-        type="button"
-        data-backlink-context=""
-        data-backlink-view={view}
-        onClick={onOpen}
-        style={full ? { marginLeft: ancestors.length * 12 } : undefined}
-        className={cn('text-left hover:bg-hover', VIEW_CLASS[view])}
-      >
-        <HighlightedContext context={context.context} start={context.start} end={context.end} />
-      </button>
+      <div className="flex min-w-0 items-start gap-1.5" style={full ? { marginLeft: ancestors.length * 12 } : undefined}>
+        {/* Object marks each embedded reference with a leading dot. */}
+        <span data-reference-dot="" aria-hidden className="mt-[9px] size-2 shrink-0 rounded-full border border-fg-muted" />
+        <button
+          type="button"
+          data-backlink-context=""
+          data-backlink-view={view}
+          onClick={onOpen}
+          className={cn('min-w-0 flex-1 text-left hover:bg-hover', VIEW_CLASS[view])}
+        >
+          <HighlightedContext context={context.context} start={context.start} end={context.end} />
+        </button>
+        {path && <ReferenceActions path={path} list={list ?? [path]} />}
+      </div>
+    </div>
+  )
+}
+
+/** Our string: the hover actions' group name. */
+const REFERENCE_ACTIONS = 'Reference actions'
+
+/**
+ * The small icons that show while a reference is hovered (Object shows expand, `…` and more;
+ * ours: Expand (the peek), "Open in new tab" and "Open in side panel" (`EntityMenu.*` strings).
+ */
+function ReferenceActions({ path, list }: { path: string; list: string[] }) {
+  const action = (label: string, icon: string, run: () => void) => (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={run}
+      className="flex size-6 items-center justify-center rounded text-fg-muted hover:bg-hover hover:text-fg"
+    >
+      <Icon name={icon} size={14} />
+    </button>
+  )
+  return (
+    <div
+      role="group"
+      aria-label={REFERENCE_ACTIONS}
+      className="flex shrink-0 items-center gap-0.5 opacity-0 focus-within:opacity-100 group-hover/ref:opacity-100"
+    >
+      {action('Expand', 'ph-arrows-out-simple', () => usePeek.getState().peek(path, list))}
+      {action('Open in new tab', 'ph-arrow-square-out', () => useTabs.getState().open({ kind: 'object', path }, { newTab: true }))}
+      {action('Open in side panel', 'ph-sidebar-simple', () => useTabs.getState().openInSidepanel({ kind: 'object', path }))}
     </div>
   )
 }
@@ -202,6 +245,8 @@ export function BacklinksTab({
                     view={view}
                     nestedView={nestedView}
                     onOpen={(e) => openReference(entry.path, e, list)}
+                    path={entry.path}
+                    list={list}
                   />
                 ))}
               </div>

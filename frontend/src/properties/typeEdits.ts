@@ -47,13 +47,15 @@ export const RESERVED_KEYS: ReadonlySet<string> = new Set([
   'wideCoverImage',
   'coverImageOffset',
   'defaultPageViewId',
+  // the property-pane toggle (Object's `hideProperties`)
+  'hideProperties',
 ])
 
 /**
  * M9: the per-object layout keys (`ObjectFrontmatterLayout`) and the page view key
  * (`defaultPageViewId`, round-tripped as it is); never shown as properties.
  */
-export const LAYOUT_KEYS: readonly string[] = ['wideLayoutMode', 'wideCoverImage', 'coverImageOffset', 'defaultPageViewId']
+export const LAYOUT_KEYS: readonly string[] = ['wideLayoutMode', 'wideCoverImage', 'coverImageOffset', 'defaultPageViewId', 'hideProperties']
 
 /** System kinds and the key (which is also the id) of their system property. */
 export const SYSTEM_KEYS: Readonly<Partial<Record<PropertyType, string>>> = {

@@ -163,7 +163,7 @@ describe('ReferencesSection (M8 settings)', () => {
       'Project notes',
       'Phase one',
     ])
-    expect(within(top).queryByRole('group')).toBeNull()
+    expect(within(top).queryByRole('group', { name: 'Default display of nested backlinks' })).toBeNull()
     // "Backlink content view" sets how the block renders.
     expect(top.querySelector('[data-backlink-context]')).toHaveAttribute('data-backlink-view', 'wideCard')
   })

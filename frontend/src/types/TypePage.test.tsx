@@ -177,11 +177,43 @@ describe('TypePage', () => {
     expect(screen.queryByRole('button', { name: 'Hide Queries' })).toBeNull()
     await user.click(await screen.findByRole('button', { name: 'Hide Recently Opened' }))
     expect(screen.getByText('Hidden Sections')).toBeInTheDocument()
-    expect(within(screen.getByTestId('hidden-section')).getByText('Recently Opened (Overview only)')).toBeInTheDocument()
+    expect(within(screen.getAllByTestId('hidden-section')[0]).getByText('Recently Opened (Overview only)')).toBeInTheDocument()
     expect(screen.getAllByTestId('visible-section')).toHaveLength(4)
     await user.click(screen.getByRole('button', { name: 'Show Recently Opened' }))
-    expect(screen.queryByText('Hidden Sections')).not.toBeInTheDocument()
+    expect(screen.queryByText('Recently Opened (Overview only)', { selector: '[data-testid="hidden-section"] *' })).not.toBeInTheDocument()
     expect(screen.getAllByTestId('visible-section')).toHaveLength(5)
+  })
+
+  test('the Customize Overview gear sits at the right of the tab strip', async () => {
+    load(views({ activeTab: 'overview' }))
+    render(<TypePage type={TASK} />)
+    const gear = await screen.findByRole('button', { name: 'Customize Overview' })
+    expect(gear.closest('[data-toolbar-row]')).not.toBeNull()
+    expect(gear).not.toHaveTextContent('Customize Overview')
+  })
+
+  test('Hidden Sections offers the smart sections and the type\'s collections, and shows one', async () => {
+    const user = userEvent.setup()
+    mocked.collections.mockResolvedValue([collection({ id: 'c1', name: 'Backlog', typeIds: ['task'] })])
+    load(views({ activeTab: 'overview' }, ['recentlyAccessed', 'collections', 'queries'], ['collection:c1']))
+    render(<TypePage type={TASK} />)
+    await user.click(await screen.findByRole('button', { name: 'Customize Overview' }))
+    expect(screen.getByText('Hidden Sections')).toBeInTheDocument()
+    const hidden = await screen.findAllByTestId('hidden-section')
+    expect(hidden.map((e) => e.querySelector('.truncate')?.textContent)).toEqual(['Backlog', 'Not in any collection', 'Not tagged', 'No backlinks'])
+    expect(within(hidden[3]).getByText('All objects that are not linked in any other content.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show No backlinks' }))
+    await waitFor(() => expect(lastSaved()[1].dashboard.sections.at(-1)).toEqual({ key: 'noBacklinks', collapsed: false }))
+  })
+
+  test('the Tag type\'s Overview lists the tags as chips with counts', async () => {
+    const TAG = typeDef({ id: 'tag', name: 'Tag', pluralName: 'Tags', propertyDefinitions: [TITLE] })
+    const linux = objectSummary({ path: 'Tags/Linux.md', type: 'tag', title: 'Linux' })
+    useLinkIndex.setState({ types: [TASK, TAG], objects: [...ROWS.map((r) => ({ ...r.summary, tags: ['Linux'] })), linux], loaded: true })
+    load(views({ activeTab: 'overview' }, ['collections']))
+    render(<TypePage type={TAG} />)
+    const chips = await screen.findByTestId('tag-chips')
+    expect(within(chips).getByTestId('tag-chip')).toHaveTextContent('Linux4')
   })
 
   test('Add a section lists the queries of the type under "Queries & Views"', async () => {
