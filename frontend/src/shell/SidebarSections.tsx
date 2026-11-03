@@ -255,8 +255,9 @@ function SortableBlock({ id, label, children }: { id: string; label: string; chi
 }
 
 /**
- * The sidebar's top-level blocks (custom sections, Pinned with "Add Section", the object types)
- * in `ui.workspaceOrder`, each draggable by its handle; a drop saves the new order.
+ * The sidebar's top-level blocks (custom sections, Pinned, the object types) in
+ * `ui.workspaceOrder`, each draggable by its handle; a drop saves the new order. "Add Section"
+ * follows them.
  */
 export function WorkspaceSections({ onOpenTarget, objects }: { onOpenTarget?: OpenTarget; objects: ReactNode }) {
   const { sections } = usePinned()
@@ -274,14 +275,8 @@ export function WorkspaceSections({ onOpenTarget, objects }: { onOpenTarget?: Op
   }
   const render = (id: string) => {
     if (id === WORKSPACE_OBJECTS) return objects
-    if (id === WORKSPACE_PINNED) {
-      return (
-        <>
-          <PinnedSection onOpenTarget={onOpenTarget} />
-          <AddSection />
-        </>
-      )
-    }
+    if (id === WORKSPACE_PINNED) return <PinnedSection onOpenTarget={onOpenTarget} />
+
     const section = sections.find((x) => x.id === id)
     return section ? <Section section={section} onOpenTarget={onOpenTarget} /> : null
   }
@@ -296,6 +291,9 @@ export function WorkspaceSections({ onOpenTarget, objects }: { onOpenTarget?: Op
           </SortableBlock>
         ))}
       </SortableContext>
+      {/* Under the object types, as in Capacities (their default place is last); our choice: after
+          every block, whatever the order. */}
+      <AddSection />
     </DndContext>
   )
 }
