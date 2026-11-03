@@ -10,7 +10,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { createAndOpen, type OpenMods } from '@/create/createAndOpen'
 import { useLinkIndex } from '@/links/linkIndex'
-import { useTabs } from '@/nav/tabs'
+import { usePeek, useTabs } from '@/nav/tabs'
+import { useGlobalShortcut } from '@/lib/shortcuts'
 import { templateName } from '@/object/UseTemplateMenu'
 import { cn } from '@/lib/utils'
 import { PinMenuItems } from '@/shell/PinToMenu'
@@ -367,6 +368,11 @@ export function TypePage({ type }: { type: TypeDef }) {
   const [importOpen, setImportOpen] = useState(false)
   // Daily notes and whiteboards aren't created from a title, so they take no CSV (our choice).
   const canImport = !type.readOnlyReason && !isDailyNoteType(type) && !isWhiteboardType(type)
+  // Ctrl+I (`openImportMenu`), the key the type tab's Import item shows: this type's CSV import.
+  // Not while typing (the registry skips editable targets) or while a peek holds the keys.
+  useGlobalShortcut('openImportMenu', () => {
+    if (canImport && usePeek.getState().path === null) setImportOpen(true)
+  })
 
   const titleCtx = useTitleCtx(indexTypes)
   const ctx = useMemo(
