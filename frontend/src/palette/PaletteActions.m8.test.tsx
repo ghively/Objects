@@ -36,10 +36,17 @@ function stubClipboard(clip: Partial<Clipboard> | undefined) {
   Object.defineProperty(navigator, 'clipboard', { value: clip, configurable: true })
 }
 
-function setup(clip: Partial<Clipboard> | undefined = { readText: async () => '' }) {
+/** `navigator.permissions` answering `clipboard-read` with `state`; null removes the API. */
+function stubPermission(state: PermissionState | null) {
+  const permissions = state === null ? undefined : { query: vi.fn(async () => ({ state }) as PermissionStatus) }
+  Object.defineProperty(navigator, 'permissions', { value: permissions, configurable: true })
+}
+
+function setup(clip: Partial<Clipboard> | undefined = { readText: async () => '' }, permission: PermissionState | null = 'granted') {
   const user = userEvent.setup()
   // After userEvent.setup(), which installs its own clipboard stub.
   stubClipboard(clip)
+  stubPermission(permission)
   render(
     <CommandPalette
       onOpenTarget={(t, o) => useTabs.getState().open(t, o)}
@@ -157,12 +164,33 @@ describe('action palette, clipboard group', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  test('clipboard denied offers nothing', async () => {
-    const user = setup({
+  test.each(['prompt', 'denied', null] as const)(
+    'clipboard-read %s: opening does not read; a Clipboard row reads it when picked',
+    async (permission) => {
+      const readText = vi.fn(async () => 'one\n\ntwo')
+      const user = setup({ readText }, permission)
+      await openActions(user)
+      const row = await screen.findByText(PASTE_TEXT.readClipboard)
+      expect(readText).not.toHaveBeenCalled()
+      expect(screen.queryByText(PASTE_TEXT.denied)).toBeNull()
+      await user.click(row)
+      expect(await screen.findByText(PASTE_TEXT.addToDailyNote)).toBeTruthy()
+      expect(readText).toHaveBeenCalledTimes(1)
+      expect(screen.queryByText(PASTE_TEXT.readClipboard)).toBeNull()
+    },
+  )
+
+  test('an empty-query open never shows the denied line; a refused read the user asked for does', async () => {
+    const refuse = {
       read: async () => Promise.reject(new DOMException('denied', 'NotAllowedError')),
       readText: async () => Promise.reject(new DOMException('denied', 'NotAllowedError')),
-    })
+    }
+    // Granted, but the read fails anyway: no denied line on open, the row offers a retry.
+    const user = setup(refuse, 'granted')
     await openActions(user)
+    const row = await screen.findByText(PASTE_TEXT.readClipboard)
+    expect(screen.queryByText(PASTE_TEXT.denied)).toBeNull()
+    await user.click(row)
     expect(await screen.findByText(PASTE_TEXT.denied)).toBeTruthy()
     expect(screen.queryByText(PASTE_TEXT.addToDailyNote)).toBeNull()
     expect(screen.queryByText(PASTE_TEXT.upload)).toBeNull()

@@ -11,7 +11,10 @@
  * - files or an image: "Upload" (copied to `Attachments/`; no image object is created, as media
  *   are attachments in our model; our choice).
  *
- * A denied clipboard read shows "Clipboard access was denied." (our string) and offers nothing.
+ * The palette reads the clipboard as it opens only when `clipboard-read` is already granted;
+ * otherwise it shows one "Clipboard" row (`quickActions.analyzeClipboardIdle`) that reads it when
+ * picked. A refused read the user asked for shows "Clipboard access was denied." (our string)
+ * and offers nothing.
  */
 import { api, DailyNoteExistsError } from '@/api/client'
 import type { TypeDef } from '@/api/types'
@@ -32,7 +35,25 @@ export const PASTE_TEXT = {
   createPageFromMd: 'Create page',
   createPageWithBlocks: 'Create new page with content',
   denied: 'Clipboard access was denied.', // our string
+  /** `quickActions.analyzeClipboardIdle`: the row that reads the clipboard when picked. */
+  readClipboard: 'Clipboard',
 } as const
+
+/**
+ * Whether the clipboard may be read without asking: `clipboard-read` is `granted`. Anything else
+ * (prompt, denied, a browser without the Permissions API or without that permission name) is not.
+ */
+export async function clipboardReadGranted(
+  perms: Permissions | undefined = globalThis.navigator?.permissions,
+): Promise<boolean> {
+  if (!perms || typeof perms.query !== 'function') return false
+  try {
+    const status = await perms.query({ name: 'clipboard-read' as PermissionName })
+    return status.state === 'granted'
+  } catch {
+    return false
+  }
+}
 
 export type ClipboardContent =
   | { kind: 'denied' }
