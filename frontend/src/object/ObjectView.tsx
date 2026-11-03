@@ -31,7 +31,7 @@ import { useFind } from '@/find/useFind'
 import { installLinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, typeOf, useLinkIndex, ensureLinkIndex } from '@/links/linkIndex'
 import { installWikilinkPresenter } from '@/links/wikilinkPresenter'
-import { formatKeys, keysFor } from '@/lib/shortcuts'
+import { formatKeys, isEditableTarget, keysFor, matches } from '@/lib/shortcuts'
 import { cn } from '@/lib/utils'
 import { canGoBack, usePeek, useTabs, type Target } from '@/nav/tabs'
 import { ReferencesSection } from '@/references/ReferencesSection'
@@ -41,6 +41,9 @@ import { ChangeTypeDialog } from './ChangeTypeDialog'
 import { ConflictDialog } from './ConflictDialog'
 import { DeleteObjectDialog, DELETE_OBJECT_TEXT, useDeleteRequest } from './DeleteObjectDialog'
 import { PinMenuItems } from '@/shell/PinToMenu'
+import { pinnedActions, useUiStore } from '@/shell/usePinned'
+import { ImportCsvDialog } from '@/types/ImportCsvDialog'
+import { wikilinkMarkdown } from '@/editor/extensions/wikilink'
 import { DeletedBanner } from './DeletedBanner'
 import { ExportDialog } from './ExportDialog'
 import { TextStatsMenu } from './TextStatsMenu'
@@ -147,6 +150,32 @@ export const OBJECT_M9_TEXT = {
   duplicate: 'Duplicate',
 } as const
 
+/** The menu's Import and Copy > rows (reference strings). */
+export const OBJECT_MENU_TEXT = {
+  /** `EntityMenu.openImportMenu.text` */
+  import: 'Import',
+  /** `ActionItems.copy.title` */
+  copy: 'Copy',
+  /** `EntityMenu.copyEntityReference.text` */
+  copyReference: 'Copy object reference',
+  /** `EntityMenu.copyEntityReference.copied` */
+  referenceCopied: 'Link to object copied',
+  /** `EntityMenu.exportMarkdownToClipboard.text` */
+  copyAsMarkdown: 'Copy as Markdown',
+  /** `EntityMenu.exportMarkdownToClipboard.snackbarText` */
+  markdownCopied: 'Markdown export written to clipboard',
+} as const
+
+/** Write `text` to the clipboard, then toast `done`. */
+async function copyText(text: string, done: string): Promise<void> {
+  try {
+    await navigator.clipboard?.writeText(text)
+    showToast(done)
+  } catch (e) {
+    showToast(e instanceof Error ? e.message : String(e))
+  }
+}
+
 /** A menu row's keys, as Capacities draws them ("Ctrl Alt P", "Ctrl ⌫"): the registry's first key. */
 function MenuKeys({ id }: { id: string }) {
   const keys = keysFor(id)
@@ -196,6 +225,7 @@ export function ObjectView({
   const [undoError, setUndoError] = useState<string | null>(null)
   const [changeTo, setChangeTo] = useState<TypeDef | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   /** Mirrors `deleted` for the change listener (which must not wait for a render). */
   const deletedRef = useRef(false)
   const markDeleted = useCallback((v: boolean) => {
@@ -676,6 +706,37 @@ export function ObjectView({
   /** Properties and the title can't be written while the file is gone. */
   const propsReadOnly = readOnly || deleted
 
+  // The menu's page keys for the active view (as Ctrl+F): Ctrl+E Export and Ctrl+I Import outside
+  // the editor (inside it they are code and italic), Ctrl+Shift+* pins or unpins anywhere.
+  const pageKeysRef = useRef({ summary, type })
+  pageKeysRef.current = { summary, type }
+  useEffect(() => {
+    if (mode === 'inline') return
+    const onKeyDown = (e: KeyboardEvent) => {
+      const peekPath = usePeek.getState().path
+      if (mode === 'page' ? peekPath !== null : peekPath !== path) return
+      const { summary: s, type: t } = pageKeysRef.current
+      if (!s) return
+      if (matches(e, keysFor('toggleFavorite')) || (e.key === '*' && (e.ctrlKey || e.metaKey) && !e.altKey)) {
+        e.preventDefault()
+        const pinnedNow = !!s.id && useUiStore.getState().ui.pinned.some((p) => p.kind === 'object' && p.id === s.id)
+        if (pinnedNow && s.id) void pinnedActions.unpin({ kind: 'object', id: s.id })
+        else void pinnedActions.pin({ kind: 'object', path, id: s.id })
+        return
+      }
+      if (isEditableTarget(e.target)) return
+      if (matches(e, keysFor('openExportMenu'))) {
+        e.preventDefault()
+        setExportOpen(true)
+      } else if (t && matches(e, keysFor('openImportMenu'))) {
+        e.preventDefault()
+        setImportOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mode, path])
+
   const writeProperties = (updates: Record<string, unknown>) => {
     if ('tags' in updates && Array.isArray(updates.tags)) {
       ensureNewTags(detail?.summary.tags ?? [], updates.tags as string[])
@@ -789,7 +850,7 @@ export function ObjectView({
               {FIND_IN_PAGE_MENU_ITEM}
               <MenuKeys id="findInPage" />
             </DropdownMenuItem>
-            <PinMenuItems pin={{ kind: 'object', path, id: summary?.id }} />
+            <PinMenuItems pin={{ kind: 'object', path, id: summary?.id }} shortcut={<MenuKeys id="toggleFavorite" />} />
             <DropdownMenuItem
               disabled={!summary}
               onSelect={() => {
@@ -804,6 +865,13 @@ export function ObjectView({
             <DropdownMenuItem disabled={!summary} onSelect={() => setExportOpen(true)}>
               <Icon name="ph-export" size={14} />
               {OBJECT_M9_TEXT.export}
+              <MenuKeys id="openExportMenu" />
+            </DropdownMenuItem>
+            {/* Our choice: Object's import is the type's CSV import (Capacities' page import menu was not seen). */}
+            <DropdownMenuItem disabled={!type || propsReadOnly} onSelect={() => setImportOpen(true)}>
+              <Icon name="ph-download-simple" size={14} />
+              {OBJECT_MENU_TEXT.import}
+              <MenuKeys id="openImportMenu" />
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem disabled={!summary} onSelect={() => useVersionHistory.getState().open(path)}>
@@ -817,6 +885,25 @@ export function ObjectView({
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="border-line bg-raised">
                 {summary && <TextStatsMenu getMarkdown={getMarkdown} summary={summary} dailyNote={dailyNote} />}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={!summary}>
+                <Icon name="ph-copy" size={14} />
+                {OBJECT_MENU_TEXT.copy}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="border-line bg-raised">
+                <DropdownMenuItem
+                  onSelect={() => summary && void copyText(wikilinkMarkdown(summary.title, null), OBJECT_MENU_TEXT.referenceCopied)}
+                >
+                  <Icon name="ph-link" size={14} />
+                  {OBJECT_MENU_TEXT.copyReference}
+                </DropdownMenuItem>
+                {/* Our choice: the body's Markdown, as saved (no title heading). */}
+                <DropdownMenuItem onSelect={() => void copyText(getMarkdown(), OBJECT_MENU_TEXT.markdownCopied)}>
+                  <Icon name="ph-markdown-logo" size={14} />
+                  {OBJECT_MENU_TEXT.copyAsMarkdown}
+                </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuItem
@@ -995,6 +1082,7 @@ export function ObjectView({
       {typeEditor.dialog}
       <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} />
       {exportOpen && <ExportDialog open onOpenChange={setExportOpen} path={path} prepare={settle} />}
+      {importOpen && type && <ImportCsvDialog type={type} open onOpenChange={setImportOpen} />}
       {summary && (
         <Dialog open={collectionsOpen} onOpenChange={setCollectionsOpen}>
           <DialogContent className="w-auto border-line bg-raised p-0 text-fg sm:max-w-none">

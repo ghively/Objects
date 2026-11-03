@@ -182,7 +182,7 @@ describe('Sidebar', () => {
     const section = screen.getByRole('region', { name: 'Object Types' })
     const items = within(section)
       .getAllByRole('button')
-      .filter((b) => b.getAttribute('aria-label') !== 'Create object type')
+      .filter((b) => !['Create object type', 'Object Types options'].includes(b.getAttribute('aria-label') ?? ''))
     expect(items.map((b) => b.textContent?.trim())).toEqual([
       'DailyNotes',
       'Pages',

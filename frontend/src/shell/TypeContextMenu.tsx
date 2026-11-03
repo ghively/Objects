@@ -78,7 +78,7 @@ export interface TypeContextMenuProps {
 }
 
 /** "Pin to Sidebar" / "Unpin from space" for the type itself (the live menu has it after New Collection). */
-function PinTypeItem({ type }: { type: TypeDef }) {
+export function PinTypeItem({ type }: { type: TypeDef }) {
   const { isPinned, pin, unpin } = usePinned()
   const ref = { kind: 'type' as const, id: type.id }
   const pinned = isPinned(ref)

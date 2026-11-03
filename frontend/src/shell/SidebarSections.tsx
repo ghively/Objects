@@ -15,7 +15,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { api, ConflictError } from '@/api/client'
+import { api, ConflictError, type UiPatch } from '@/api/client'
 import type { Icon as IconValue, SidebarSection } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
@@ -178,22 +178,27 @@ export function workspaceBlocks(order: unknown, sectionIds: string[]): string[] 
 }
 
 /** Save `workspaceOrder` (optimistic, after the `ui.json` saves before it; a 409 re-applies it once to the fresh state). */
-export async function saveWorkspaceOrder(order: string[]): Promise<void> {
+export function saveWorkspaceOrder(order: string[]): Promise<void> {
+  return saveSidebarUi({ workspaceOrder: order })
+}
+
+/** Save top-level `ui.json` keys of the sidebar (optimistic, queued; a 409 re-applies them once to the fresh state). */
+export async function saveSidebarUi(patch: UiPatch): Promise<void> {
   const cur = useUiStore.getState().ui
-  useUiStore.setState({ ui: { ...cur, workspaceOrder: order } })
+  useUiStore.setState({ ui: { ...cur, ...patch } })
   const saved = await enqueueUiSave(async () => {
     try {
       const base = useUiStore.getState()
       try {
-        const res = await api.patchUi({ workspaceOrder: order }, { baseRevision: base.revision })
+        const res = await api.patchUi(patch, { baseRevision: base.revision })
         useUiStore.setState({ revision: res?.revision ?? useUiStore.getState().revision })
       } catch (e) {
         if (!(e instanceof ConflictError)) throw e
         const fresh = await api.ui()
-        const res = await api.patchUi({ workspaceOrder: order }, { baseRevision: fresh?.revision ?? '' })
+        const res = await api.patchUi(patch, { baseRevision: fresh?.revision ?? '' })
         // Another writer's unsaved edits are in the local ui, not in `fresh`: keep them.
         const rest = pendingUiSaves() === 1 && fresh?.ui ? fresh.ui : useUiStore.getState().ui
-        useUiStore.setState({ ui: { ...rest, workspaceOrder: order }, revision: res?.revision ?? fresh?.revision ?? '' })
+        useUiStore.setState({ ui: { ...rest, ...patch }, revision: res?.revision ?? fresh?.revision ?? '' })
       }
       return true
     } catch (e) {
@@ -250,8 +255,9 @@ function SortableBlock({ id, label, children }: { id: string; label: string; chi
 }
 
 /**
- * The sidebar's top-level blocks (custom sections, Pinned with "Add Section", the object types)
- * in `ui.workspaceOrder`, each draggable by its handle; a drop saves the new order.
+ * The sidebar's top-level blocks (custom sections, Pinned, the object types) in
+ * `ui.workspaceOrder`, each draggable by its handle; a drop saves the new order. "Add Section"
+ * follows them.
  */
 export function WorkspaceSections({ onOpenTarget, objects }: { onOpenTarget?: OpenTarget; objects: ReactNode }) {
   const { sections } = usePinned()
@@ -269,14 +275,8 @@ export function WorkspaceSections({ onOpenTarget, objects }: { onOpenTarget?: Op
   }
   const render = (id: string) => {
     if (id === WORKSPACE_OBJECTS) return objects
-    if (id === WORKSPACE_PINNED) {
-      return (
-        <>
-          <PinnedSection onOpenTarget={onOpenTarget} />
-          <AddSection />
-        </>
-      )
-    }
+    if (id === WORKSPACE_PINNED) return <PinnedSection onOpenTarget={onOpenTarget} />
+
     const section = sections.find((x) => x.id === id)
     return section ? <Section section={section} onOpenTarget={onOpenTarget} /> : null
   }
@@ -291,6 +291,9 @@ export function WorkspaceSections({ onOpenTarget, objects }: { onOpenTarget?: Op
           </SortableBlock>
         ))}
       </SortableContext>
+      {/* Under the object types, as in Capacities (their default place is last); our choice: after
+          every block, whatever the order. */}
+      <AddSection />
     </DndContext>
   )
 }
