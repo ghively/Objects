@@ -48,6 +48,9 @@ const OUR_STRINGS = new Set<string>([
   LANGUAGE_TEXT.info,
   DATE_TIME_TEXT.timeZoneMismatch,
   DATE_TIME_TEXT.timeZoneSearch,
+  // Polish 2026-11-03
+  APPEARANCE_TEXT.textSize,
+  APPEARANCE_TEXT.textSizeDescription,
 ])
 
 function leaves(o: unknown): string[] {

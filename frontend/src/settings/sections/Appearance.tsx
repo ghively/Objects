@@ -1,9 +1,12 @@
 // "Appearance": theme mode, the light and the dark theme, the app font and the monochrome colour
-// switches. Every change is a device setting (`useSettings().patch`).
+// switches, and the text size (Object's desktop zoom, `zoom.ts`). Every change is a device
+// setting (`useSettings().patch`).
 import { useState } from 'react'
 import type { DeviceSettings } from '@/api/types'
+import { Icon } from '@/components/Icon'
 import { useSettings } from '@/settings/useSettings'
-import { OptionCards, SaveError, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
+import { nextZoom, validZoom, zoomPercent } from '@/settings/zoom'
+import { OptionCards, SaveError, SecondaryButton, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
 
 export const APPEARANCE_TEXT = {
   heading: 'Appearance', // AppearanceSettings.heading
@@ -35,6 +38,12 @@ export const APPEARANCE_TEXT = {
   monoTypeLabelsDescription: 'Enable to have all type labels in the same color.',
   monoTags: 'Monochrome tags', // AppearanceSettings.colors.monochromeTags.heading
   monoTagsDescription: 'Enable to have all tags in the same color.',
+  // Object sets this from the desktop app's View menu (Electron.Menu.view.*); a browser has no such menu, so it lives here (our choice).
+  textSize: 'Text size', // our string
+  textSizeDescription: 'Make the text of your notes larger or smaller.', // our string
+  zoomIn: 'Zoom in', // Electron.Menu.view.zoomIn
+  zoomOut: 'Zoom out', // Electron.Menu.view.zoomOut
+  resetZoom: 'Reset zoom', // Electron.Menu.view.resetZoom
 } as const
 
 const T = APPEARANCE_TEXT
@@ -51,7 +60,34 @@ export const APPEARANCE_SEARCH: string[] = [
   T.colors,
   T.monoTypeLabels,
   T.monoTags,
+  T.textSize,
+  T.zoomIn,
+  T.zoomOut,
+  T.resetZoom,
 ]
+
+const ZOOM_BUTTON =
+  'inline-flex size-8 items-center justify-center rounded-md border border-line bg-raised text-fg hover:bg-hover disabled:opacity-60'
+
+/** Zoom out, the current size, zoom in, and Reset zoom (Object's steps, `zoom.ts`). */
+function TextSize({ zoom, onChange }: { zoom: number; onChange(next: number): void }) {
+  const out = nextZoom(zoom, 'out')
+  const into = nextZoom(zoom, 'in')
+  return (
+    <div role="group" aria-label={T.textSize} className="flex items-center gap-2">
+      <button type="button" aria-label={T.zoomOut} title={T.zoomOut} disabled={out === zoom} onClick={() => onChange(out)} className={ZOOM_BUTTON}>
+        <Icon name="ph-minus" size={14} />
+      </button>
+      <span className="w-12 text-center text-[14px] text-fg tabular-nums">{zoomPercent(zoom)}</span>
+      <button type="button" aria-label={T.zoomIn} title={T.zoomIn} disabled={into === zoom} onClick={() => onChange(into)} className={ZOOM_BUTTON}>
+        <Icon name="ph-plus" size={14} />
+      </button>
+      <SecondaryButton disabled={zoom === 1} onClick={() => onChange(1)}>
+        {T.resetZoom}
+      </SecondaryButton>
+    </div>
+  )
+}
 
 export function AppearanceSection() {
   const settings = useSettings((s) => s.settings)
@@ -114,6 +150,9 @@ export function AppearanceSection() {
         checked={settings.monochromeTags}
         onChange={(monochromeTags) => set({ monochromeTags })}
       />
+      <SettingGroup title={T.textSize} help={T.textSizeDescription}>
+        <TextSize zoom={validZoom(settings.zoom) ? settings.zoom : 1} onChange={(zoom) => set({ zoom })} />
+      </SettingGroup>
       <SaveError error={error} />
     </div>
   )

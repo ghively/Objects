@@ -315,6 +315,9 @@ export interface DeviceSettings {
   relatedContentHiddenTypes: string[]
   nestedBacklinkView: 'showBlockContainingBacklink' | 'showFullPathAbove'
   presentation: PresentationSettings
+  // ---- Polish 2026-11-03 ----
+  /** Text size: Object's desktop zoom factor, 0.6–1.5 (`settings/zoom.ts`). */
+  zoom: number
 }
 
 /** M8 `DeviceSettings.language`. */

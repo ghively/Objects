@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import math
 import threading
 import zoneinfo
 from pathlib import Path
@@ -70,7 +71,14 @@ DEFAULTS: dict[str, Any] = {
         "footerLeft": "",
         "footerRight": "",
     },
+    # Polish 2026-11-03: Object's desktop zoom factor (electron-settings.ts `zoom`); scales the
+    # rem-based UI and editor text from the 15.5px root.
+    "zoom": 1.0,
 }
+
+# `setZoomLevel` steps by 0.05 and stops at 1.5 (in) and 0.6 (out).
+ZOOM_MIN = 0.6
+ZOOM_MAX = 1.5
 
 _CHOICES: dict[str, tuple[str, ...]] = {
     "themeMode": ("light", "dark"),
@@ -123,6 +131,13 @@ def _valid(key: str, value: Any) -> bool:
         return isinstance(value, str) and value in _CHOICES[key]
     if key in _BOOLS:
         return isinstance(value, bool)
+    if key == "zoom":
+        return (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(value)
+            and ZOOM_MIN <= value <= ZOOM_MAX
+        )
     if key == "startupSpacePath":
         return value is None or isinstance(value, str)
     if key == "openOnStart":

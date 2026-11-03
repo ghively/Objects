@@ -1057,7 +1057,7 @@ export function ObjectView({
                 This object's file was deleted or moved on disk. Edits here aren't saved.
               </div>
             )}
-            <div className="relative text-[17px]" onInput={checkEmpty} onKeyUp={checkEmpty} onBlur={checkEmpty}>
+            <div className="object-body-text relative" onInput={checkEmpty} onKeyUp={checkEmpty} onBlur={checkEmpty}>
               {placeholder && bodyEmpty && (
                 <div aria-hidden data-testid="inline-placeholder" className="pointer-events-none absolute top-0 left-0 text-fg-muted">
                   {placeholder}
@@ -1166,7 +1166,7 @@ export function ObjectView({
                 This object's file was deleted or moved on disk. Edits here aren't saved.
               </div>
             )}
-            <div className="text-[17px]">
+            <div className="object-body-text">
               {raw ? (
                 <Suspense fallback={null}>
                   <RawMode

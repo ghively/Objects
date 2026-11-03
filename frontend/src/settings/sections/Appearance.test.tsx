@@ -66,4 +66,28 @@ describe('AppearanceSection', () => {
       monochromeTags: true,
     })
   })
+
+  test('test text size zooms in and out in 5% steps and resets', async () => {
+    const user = userEvent.setup()
+    render(<AppearanceSection />)
+    const group = screen.getByRole('group', { name: 'Text size' })
+    expect(within(group).getByText('100%')).toBeInTheDocument()
+    expect(within(group).getByRole('button', { name: 'Reset zoom' })).toBeDisabled()
+    await user.click(within(group).getByRole('button', { name: 'Zoom in' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ zoom: 1.05 }, expect.anything())
+    expect(within(group).getByText('105%')).toBeInTheDocument()
+    await user.click(within(group).getByRole('button', { name: 'Zoom out' }))
+    await user.click(within(group).getByRole('button', { name: 'Zoom out' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ zoom: 0.95 }, expect.anything())
+    await user.click(within(group).getByRole('button', { name: 'Reset zoom' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ zoom: 1 }, expect.anything())
+  })
+
+  test('test text size buttons stop at the ends of the range', () => {
+    useSettings.setState({ settings: { ...settingsDefaults, zoom: 1.45 } })
+    render(<AppearanceSection />)
+    const group = screen.getByRole('group', { name: 'Text size' })
+    expect(within(group).getByRole('button', { name: 'Zoom in' })).toBeDisabled()
+    expect(within(group).getByRole('button', { name: 'Zoom out' })).toBeEnabled()
+  })
 })
