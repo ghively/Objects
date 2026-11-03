@@ -8,6 +8,7 @@ import { useSettings } from '@/settings/useSettings'
 import { editorExtensions, loadBody, serializeBody } from './document'
 import { createFindControl, FindInPage } from './extensions/findInPage'
 import { BlockHandles } from './handles/BlockHandles'
+import { GroupBlocksKey } from './handles/groupKey'
 import { setEditorObject } from './nodes/blockRef'
 import { TokensMenu } from './tokens/TokensMenu'
 import { SlashMenu } from './slash/SlashMenu'
@@ -83,6 +84,7 @@ export function Editor({
   const [extensions] = useState(() => [
     ...editorExtensions({ numberedListInputRule: !disableNumbered }),
     FindInPage,
+    GroupBlocksKey,
     ...(ownPlaceholder ? [EmptyPlaceholder] : []),
   ])
 

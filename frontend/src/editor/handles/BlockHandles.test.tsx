@@ -123,22 +123,18 @@ describe('<BlockHandles>', () => {
         .filter((n) => !(n instanceof Element && n.getAttribute('data-slot') === 'dropdown-menu-shortcut'))
         .map((n) => n.textContent ?? '')
         .join('')
-    // Capacities' block menu (reference check 2026-10-28, 2e), then our kept rows.
+    // Capacities' live block menu (catalog section 6), then our kept rows.
     expect(within(menu).getAllByRole('menuitem').map(label)).toEqual([
       'Hierarchy (Standard)',
       'List',
       'To-do',
-      'Icon',
       'Quote',
       'Toggle',
       'Group',
-      'Insert block above',
-      'Insert block below',
       'Turn into...',
       'Copy',
       'Duplicate',
       'Remove',
-      'Color',
       'Alignment', // M9
       'Standout',
       'Indent',
@@ -149,11 +145,9 @@ describe('<BlockHandles>', () => {
         .getAllByRole('menuitem')
         .find((m) => label(m) === name)!
         .querySelector('[data-slot="dropdown-menu-shortcut"]')?.textContent
-    expect(hint('Insert block above')).toBe('Alt+Shift+Enter')
-    expect(hint('Insert block below')).toBe('Alt+Enter')
+    expect(hint('Group')).toBe('Ctrl+G')
     expect(hint('Duplicate')).toBe('Ctrl+D')
     expect(hint('Remove')).toBe('Backspace')
-    expect(hint('Group')).toBeUndefined()
 
     fireEvent.click(within(menu).getByRole('menuitem', { name: /^Duplicate/ }))
     expect(serializeBody(editor)).toBe('Hello\n\nWorld\n\nWorld\n')
