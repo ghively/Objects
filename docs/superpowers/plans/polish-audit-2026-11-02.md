@@ -311,6 +311,7 @@ unless marked. Order is a suggestion, highest value first.
 | C17 Pin to Sidebar on a type's context menu; label capitalised ("Pin to Sidebar") everywhere | done | `553a88c` |
 | New menu (backlog 1, C14) | done: a popover under the New button with a "Search" field, the types in the sidebar's order (alphabetical here), the keyboard-hint footer; picking a type creates an untitled object of it at once, as in the live app (the old second step, "Search or Create" with a typed title, remains only when a `typeId` is passed). Correction: backlog item 1 said "recent-use order"; the live order is the sidebar's | `243805f` |
 | Sidebar: Graph below the object types, beside Trash | done (a second "Space" navigation landmark); "Add Section" still sits under Pinned, the live app puts it under the types | `7cfd501` |
+| Selection toolbar (remaining task 1) | done: Bold, Italic, Strikethrough, Underline, Bullet list, To-do, Link, Code, Formula, Highlight text, `+` (create object), `@` (link existing), in the live order; the list buttons toggle the block's list; Turn Into and Search left the toolbar (not in the live app); the second list icon was read as To-do (our choice); AI waits for M10 | `c57464c` |
 
 Checked and already present in Object (so not backlog): Add Section, Graph customization options, the Shortcuts
 sheet (Settings), slash menu groups and strings (taken from Object's own app), unlinked mentions.
@@ -328,7 +329,7 @@ The app was also started on a copy of the imported wiki space and the sidebar ch
 Everything not done, with the behaviour to match (catalog section in brackets) and a rough size (S: one component and a test; M: several files; L: a feature). Fix one per commit with a failing-first test; run the full gate before each commit. Unlinked mentions stay.
 
 **Editor** (catalog 2, 6)
-1. Selection toolbar to the live set: Bold, Italic, Strikethrough, Underline, lists, Link, Code, TeX, color, `+`, `@` (AI left out per the spec). M.
+1. ~~Selection toolbar to the live set~~ done (`c57464c`).
 2. Block-handle menu: Hierarchy, List, To-do, Quote, Toggle, Group, Turn into..., Copy, Duplicate, Remove, with key hints. M.
 3. Block-selection bar at the bottom: "N blocks . M words", formatting buttons, Turn blocks into, Tag, Move, delete, close. M.
 4. Markdown shortcuts: confirm each with real key events (`|` quote, `>` toggle, `a)` and `i)` lists, `()` icon block, combinable); the debugger-typed test in the live app was inconclusive. S each.
