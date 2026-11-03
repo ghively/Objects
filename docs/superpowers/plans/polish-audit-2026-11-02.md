@@ -324,6 +324,24 @@ Gate after these eight commits: back end 1463 passed (1 pre-existing failure, `t
 also fails without these changes); front end 2321 passed; `tsc` clean; lint warnings only (pre-existing); build ok.
 The app was also started on a copy of the imported wiki space and the sidebar checked in the browser pane.
 
+## 2026-11-03: the parallel pass
+
+Remaining tasks 2-25 (less 9's Help & Resources and 24, which link to Capacities' web pages) and 28, built in nine lanes in git worktrees, merged, reviewed once, fixed once, gated (`remaining-work.md` has the gate numbers). Commits per lane:
+
+| Lane | Items | Commits | Notes and our choices |
+|---|---|---|---|
+| Block menus | 2, 3 | `d4fcfe4`, `23c5c3a` | Block menu in the live order plus Object's Alignment, Standout, Indent; Ctrl+G binds Group with blocks selected; "Turn into..." is the object picker (reference check 2e). Bottom block-selection bar replaces the "N blocks" pill; Move to Today, Tomorrow or a new page. Tag dropdown skipped (no block tags in Markdown). |
+| Editor typing | 4, 5 | `21479a6`, `9404905` | `>` is now toggle and `|` quote; `a)`, `i)`, `()`, `[]` added; marks combine before the Space. `()` uses `ph-star` (Capacities uses the last block icon). Chrome fades while typing with Capacities' `.glass-chrome-fade` values. |
+| Settings | 6, 7, 25 | `21c9941`, `578a914`, `f94f166` | 15.5px root (96.875%); text size is the desktop zoom factor, stored as device `zoom`, scales the note body only. Spellcheck language, Always create inline links (off: `@` in an empty block makes an object block), Hide object type settings, Highlight Style (stored, nothing to style yet). Offline & Sync page holds Recalculate content index. |
+| Shell | 8, 9 (Add Section), 11, 13 | `c278e5c`, `3054c33`, `3db82fa`, `831f596` | Manual type order in `ui.json` (`objectsSectionSortOption`, `workspace.objects.ids`); alphabetical when unset. Object menu key hints, Import, Copy > submenu; no Share. Item 12 skipped: collections are not linkable in Object. |
+| Palette | 10 | `b81d26b`, `44692ff` | One list; recents Today/Earlier (the recent store keeps `openedAt`); actions after content when typing; Ctrl+Enter, Shift+Enter. |
+| Views | 14-17 | `f976c5e`, `3af4753`, `e5e0a6d`, `2f0efa5`, `679d3d7` | Table "N words" chip and row numbers (backend word count, regex approximation); Overview gear with hidden sections; tag chips with counts; `hideProperties` frontmatter key (Capacities' `ComponentData.hideProperties`); backlink hover actions Expand, new tab, side panel. |
+| Calendar | 18 | `30ef2e0`, `a9deaae`, `7dbcbaf` | Tasks `+` inside the pill; Month strip and "+ New Object" (makes the daily note); date-row pill with Reviewed, Open as Page, `...`. Empty daily-note placeholders skipped. |
+| Data model | 19-22 | `7b0d110`, `31906cc`, `026a6bf`, `8602caf` | Media label sets get Capacities' options; 14-template gallery (`templateKey` on the type, property kinds our choice); Object -> Tag is an entity property limited to Tag, with a tag picker and chips. Item 20 already built; Default list view skipped (not in the reference). |
+| Export | 23, 28 | `ba43e66`, `9ebcd8b`, `f8d1f85` | PDF (printable page, Notes/Essay/Academic), Markdown options, Word (`zipfile` writer), LaTeX. Gzip test fixed (compared newline-translated text). |
+
+Review fixes: `8b66d59` (export: monospace font key, headings ending in `#`, LaTeX file commands in math, zip root placement and links back to it), `76401a4` (Move to the open daily note moves in place; other moves flush autosave first), `0dacbad` (`()` icons only where they save; list combinations lost their icon), `f4a227a` (Ctrl+I on a type page), `13e7972` (clipboard read on palette open only when already permitted), `4052227` (icon subset regenerated), `28e2ce7` (api mock).
+
 ## Remaining tasks (end of the 2026-11-02 session)
 
 Everything not done, with the behaviour to match (catalog section in brackets) and a rough size (S: one component and a test; M: several files; L: a feature). Fix one per commit with a failing-first test; run the full gate before each commit. Unlinked mentions stay.

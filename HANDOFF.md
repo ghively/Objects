@@ -14,7 +14,9 @@ Updated 2026-11-02. You are continuing "Object", a local, Markdown-backed recrea
 
 **AI (2026-11-02):** in scope as M10, through the Claude Code CLI; plan `docs/superpowers/plans/2026-11-02-m10-ai-assistant.md`, not built. Integrations come later at lower priority.
 
-**Next:** work the open list at the top of `docs/superpowers/plans/remaining-work.md` and the polish audit's "Remaining tasks"; then Gene's hands-on checks, M1-M9. The audit fix pass (PR #4) and M9 (PR #3) are merged; `master` is the only branch to work on, and it is pushed (2026-11-02).
+**2026-11-03:** the polish backlog is built (nine parallel lanes, one review, one fix pass, full gate green); see `remaining-work.md`. Not pushed.
+
+**Next:** Gene's decisions and the short open list at the top of `docs/superpowers/plans/remaining-work.md`; then Gene's hands-on checks, M1-M9. The audit fix pass (PR #4) and M9 (PR #3) are merged; `master` is the only branch to work on, and it is pushed (2026-11-02).
 
 | Milestone | Scope | Plan |
 |---|---|---|
