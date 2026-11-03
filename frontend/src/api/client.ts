@@ -160,6 +160,41 @@ export interface LinkMentionInput {
   baseVersion: string
 }
 
+/** `api.exportObjectUrl` options (polish item 23); only `media` is required (Markdown). */
+export interface ExportUrlOptions {
+  media: boolean
+  format?: 'md' | 'html' | 'docx' | 'latex'
+  subpages?: boolean
+  titleH1?: boolean
+  wikilinks?: boolean
+  style?: 'notes' | 'essay' | 'academic'
+  paper?: 'A4' | 'Letter'
+  embedded?: boolean
+  outline?: boolean
+  hideEmpty?: boolean
+  typeLabels?: boolean
+  /** Deselected property keys. */
+  hide?: string[]
+}
+
+/** A property the Export dialog lists. */
+export interface ExportProperty {
+  key: string
+  name: string
+  empty: boolean
+}
+
+/** The export route's query: booleans as `1`/`0`, `hide` comma-separated, unset keys left out. */
+function exportParams(path: string, opts: ExportUrlOptions): Record<string, string | undefined> {
+  const { media, hide, ...rest } = opts
+  const out: Record<string, string | undefined> = { path, media: media ? '1' : '0' }
+  for (const [k, v] of Object.entries(rest)) {
+    if (v !== undefined) out[k] = typeof v === 'boolean' ? (v ? '1' : '0') : v
+  }
+  out.hide = hide?.join(',')
+  return out
+}
+
 const BASE = '/api'
 
 /** A 409 from the spaces routes is not a revision conflict: keep the server's message. */
@@ -496,9 +531,18 @@ export const api = {
     return res
   },
 
-  /** M9: the same-origin download URL of an object's export: its `.md`, or a zip with its media. */
-  exportObjectUrl(path: string, opts: { media: boolean }): string {
-    return `${BASE}/object/export${qs({ path, media: opts.media ? '1' : '0' })}`
+  /**
+   * M9: the same-origin download URL of an object's export: its `.md`, or a zip with its media.
+   * Polish item 23: `format` (`html` is the printable PDF page, `docx`, `latex`) and the
+   * dialog's other options; booleans are sent as `1`/`0`, `hide` as comma-separated keys.
+   */
+  exportObjectUrl(path: string, opts: ExportUrlOptions): string {
+    return `${BASE}/object/export${qs(exportParams(path, opts))}`
+  },
+
+  /** Polish item 23: the properties the Export dialog lists (`{key, name, empty}`, type order). */
+  async exportProperties(path: string): Promise<ExportProperty[]> {
+    return request<ExportProperty[]>(`/object/export/properties${qs({ path })}`)
   },
 
   /** Create an object. `templateId`: an id, `null` for the type's default, `"none"` for no template. */
