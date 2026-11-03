@@ -39,12 +39,26 @@ import { mountReferencedIn } from '../blockref/ReferencedIn'
 /** `BlockMenu.copyBlockReference.copied` */
 export const BLOCK_REFERENCE_COPIED = 'Block reference copied'
 
-/** The object an editor shows, for the reference it copies (`Editor.tsx` sets it). */
-const editorObjects = new WeakMap<Editor, { path: string; title?: string | null }>()
+/**
+ * The object an editor shows, for the reference it copies (`Editor.tsx` sets it), and how to
+ * save its pending edits now (`flush`, the editor's autosave settle), for moves out of it.
+ */
+type EditorObject = { path: string; title?: string | null; flush?: () => Promise<void> }
+const editorObjects = new WeakMap<Editor, EditorObject>()
 
-export function setEditorObject(editor: Editor, object: { path: string; title?: string | null } | null): void {
+export function setEditorObject(editor: Editor, object: EditorObject | null): void {
   if (object) editorObjects.set(editor, object)
   else editorObjects.delete(editor)
+}
+
+/** The path of the object this editor shows, or null when unknown. */
+export function editorObjectPath(editor: Editor): string | null {
+  return editorObjects.get(editor)?.path ?? null
+}
+
+/** Save this editor's pending edits now (resolves at once when it has no autosave). */
+export async function flushEditorObject(editor: Editor): Promise<void> {
+  await editorObjects.get(editor)?.flush?.()
 }
 
 /** The title a reference to this editor's object uses: the given title, the index's, else the file stem. */
