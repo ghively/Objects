@@ -15,6 +15,7 @@
  */
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
+import { DeviceSettingsFollower } from '@/settings/DeviceSettingsFollower'
 import { applyTheme } from '@/theme/applyTheme'
 import { useThemeShortcuts } from '@/theme/shortcuts'
 import { useGlobalShortcut } from '@/lib/shortcuts'
@@ -69,6 +70,7 @@ export function GlobalOverlays() {
   return (
     <>
       <ThemeFollower />
+      <DeviceSettingsFollower />
       <SettingsOverlays />
       <CreateSpaceDialog />
       <SpaceSwitchOverlay />

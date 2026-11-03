@@ -35,4 +35,6 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
     footerLeft: '',
     footerRight: '',
   }),
+  // Polish 2026-11-03
+  zoom: 1,
 }) as DeviceSettings

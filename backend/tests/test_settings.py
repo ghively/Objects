@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from test_settings_m8 import M8_DEFAULTS
+from test_settings_polish import POLISH_DEFAULTS
 
 from objectapp import settings
 from objectapp.server import create_app
@@ -35,6 +36,8 @@ CONTRACT_DEFAULTS = {
     "startupSpacePath": None,
     # M8 Task 2 added its keys; `test_settings_m8.py` checks them.
     **M8_DEFAULTS,
+    # Polish 2026-11-03; `test_settings_polish.py` checks them.
+    **POLISH_DEFAULTS,
 }
 
 

@@ -271,6 +271,13 @@ body,
   height: 100%;
 }
 
+/* Capacities' root: 15.5px from 640px up (index36682.css), so rem sizes match its own. */
+@media (min-width: 640px) {
+  html {
+    font-size: 96.875%;
+  }
+}
+
 body {
   margin: 0;
   font-family: var(--app-font);
