@@ -293,6 +293,8 @@ function defaults(): Api {
       const title = copy.slice(copy.lastIndexOf('/') + 1).replace(/\.md$/, '')
       return { path: copy, version: 'v1', summary: objectSummary({ path: copy, title }) }
     },
+    exportProperties: async () => [],
+    typeGallery: async () => [],
     exportObjectUrl: (path: string, opts: { media: boolean }) =>
       `/api/object/export?path=${encodeURIComponent(path)}&media=${opts.media ? 1 : 0}`,
     createDailyNote: async (date: string) => ({ path: `DailyNotes/${date}.md`, version: 'v1', typeIds: [] }),
