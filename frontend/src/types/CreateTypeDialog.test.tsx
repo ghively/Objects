@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { TypeDef } from '@/api/types'
+import type { TypeDef, TypeTemplate } from '@/api/types'
 import { typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
@@ -26,11 +26,82 @@ beforeEach(() => {
   useLinkIndex.setState({ types: [], objects: [], loaded: true })
 })
 
+const GALLERY: TypeTemplate[] = [
+  {
+    key: 'meeting',
+    section: 'useCases',
+    name: 'Meeting',
+    pluralName: 'Meetings',
+    description: 'Capture conversations with attendees and a date.',
+    icon: { type: 'iconify', val: 'ph-users-three' },
+    color: 'orange',
+    properties: [{ name: 'Date', type: 'datetime' }, { name: 'Notes', type: 'blocks' }],
+    added: true,
+  },
+  {
+    key: 'film',
+    section: 'media',
+    name: 'Film',
+    pluralName: 'Films',
+    description: 'Collect films you watch and want to remember.',
+    icon: { type: 'iconify', val: 'ph-film-strip' },
+    color: 'red',
+    properties: [
+      { name: 'Genre', type: 'label' },
+      { name: 'Notes', type: 'blocks' },
+    ],
+    added: false,
+  },
+]
+
+function withGallery() {
+  ;(api as unknown as { typeGallery: () => Promise<TypeTemplate[]> }).typeGallery = vi.fn(async () => GALLERY)
+}
+
+describe('CreateTypeDialog gallery (item 21)', () => {
+  test('lists the templates under their sections; "Added" for one the space has', async () => {
+    withGallery()
+    render(<CreateTypeDialog open />)
+    expect(screen.getByRole('heading', { name: 'Add new object type' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Create your own/ })).toBeInTheDocument()
+    const media = await screen.findByRole('group', { name: 'Media' })
+    expect(within(media).getByRole('button', { name: /Film/ })).toBeInTheDocument()
+    const useCases = screen.getByRole('group', { name: 'Use cases' })
+    expect(within(useCases).getByRole('button', { name: /Meeting/ })).toHaveTextContent('Added')
+  })
+
+  test('a template shows its properties and creates the type from it', async () => {
+    withGallery()
+    const user = userEvent.setup()
+    const onCreated = vi.fn()
+    mocked.createType.mockImplementationOnce(async () => typeDef({ id: 'film', name: 'Film' }))
+    render(<CreateTypeDialog open onCreated={onCreated} />)
+    await user.click(await screen.findByRole('button', { name: /Film/ }))
+    expect(screen.getByRole('heading', { name: 'Film' })).toBeInTheDocument()
+    expect(screen.getByText('Collect films you watch and want to remember.')).toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Properties' })).toHaveTextContent('Genre')
+    await user.click(screen.getByRole('button', { name: 'Create object type' }))
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1))
+    expect(mocked.createType.mock.calls[0][0]).toMatchObject({ template: 'film' })
+    expect(useLinkIndex.getState().types.map((t) => t.id)).toEqual(['film'])
+  })
+
+  test('an added template cannot be created again', async () => {
+    withGallery()
+    const user = userEvent.setup()
+    render(<CreateTypeDialog open />)
+    await user.click(await screen.findByRole('button', { name: /Meeting/ }))
+    expect(screen.getByRole('button', { name: 'Added' })).toBeDisabled()
+  })
+})
+
 describe('CreateTypeDialog', () => {
   test('test create button disabled until both fields filled; submit calls createType then opens typeSettings tab', async () => {
+    withGallery()
     const user = userEvent.setup()
     const onCreated = vi.fn((t: TypeDef) => useTabs.getState().open({ kind: 'typeSettings', typeId: t.id }))
     render(<CreateTypeDialog open onCreated={onCreated} />)
+    await user.click(screen.getByRole('button', { name: /Create your own/ }))
     expect(screen.getByRole('heading', { name: 'Create your object type' })).toBeInTheDocument()
     expect(screen.getByText('Do I need a new type?')).toBeInTheDocument()
 
