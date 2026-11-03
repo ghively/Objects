@@ -38,7 +38,11 @@ export const SECTION_TEXT = {
   queriesEmptyBody: 'Queries you create in this database will appear here.',
   createQuery: 'Create query',
   inNoCollection: 'Not in any collection',
+  /** `DatabaseDashboard.sections.inNoCollection.description` */
+  inNoCollectionDescription: 'All objects not yet organized in a collection.',
   notTagged: 'Not tagged',
+  /** `DatabaseDashboard.sections.notTagged.description` */
+  notTaggedDescription: 'All objects that do not have a top-level tag.',
   noBacklinks: 'No backlinks',
   noBacklinksDescription: 'All objects that are not linked in any other content.',
   unreviewed: 'Unreviewed',
@@ -57,8 +61,8 @@ const BUILTIN_META: Record<BuiltinKey, { label: string; icon: string; inFullView
   recentlyAccessed: { label: SECTION_TEXT.recentlyAccessed, icon: 'ph-clock-clockwise', inFullView: false },
   collections: { label: SECTION_TEXT.collections, icon: COLLECTION_ICON, inFullView: false },
   queries: { label: SECTION_TEXT.queries, icon: QUERY_ICON, inFullView: false },
-  inNoCollection: { label: SECTION_TEXT.inNoCollection, icon: 'ph-placeholder', inFullView: true },
-  notTagged: { label: SECTION_TEXT.notTagged, icon: 'ph-tag', inFullView: true },
+  inNoCollection: { label: SECTION_TEXT.inNoCollection, icon: 'ph-placeholder', inFullView: true, description: SECTION_TEXT.inNoCollectionDescription },
+  notTagged: { label: SECTION_TEXT.notTagged, icon: 'ph-tag', inFullView: true, description: SECTION_TEXT.notTaggedDescription },
   noBacklinks: { label: SECTION_TEXT.noBacklinks, icon: 'ph-line-segment', inFullView: true, description: SECTION_TEXT.noBacklinksDescription },
   unreviewed: { label: SECTION_TEXT.unreviewed, icon: 'ph-check-circle', inFullView: false, description: SECTION_TEXT.unreviewedDescription },
 }

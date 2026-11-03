@@ -127,7 +127,10 @@ export function CustomizeOverview({
   ctx,
   update,
   addable: addableOverride,
+  gear = false,
 }: {
+  /** The type page's trigger: a gear at the right of the tab strip (Object). */
+  gear?: boolean
   type?: TypeDef
   sections: RenderedSection[]
   ctx: SectionCtx
@@ -144,7 +147,10 @@ export function CustomizeOverview({
   const hidden = hiddenSections(sections)
   const addable = addableOverride ?? (type ? addableSections(type, sections, ctx) : [])
   const queryItems = addable.filter((s) => isQueryKey(s.key))
-  const otherItems = addable.filter((s) => !isQueryKey(s.key))
+  // Object lists the smart sections ("Not in any collection", "Not tagged", "No backlinks") and
+  // the collections not shown under "Hidden Sections", each one click from view; "Add a section"
+  // keeps the queries.
+  const hiddenAll = [...hidden, ...addable.filter((s) => !isQueryKey(s.key) && !hidden.some((h) => h.key === s.key))]
 
   const onDragEnd = (e: DragEndEvent) => {
     if (!e.over || e.active.id === e.over.id) return
@@ -156,13 +162,24 @@ export function CustomizeOverview({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="flex h-7 items-center gap-1.5 rounded-md border border-line bg-raised px-2 text-[13px] text-fg-muted hover:bg-hover hover:text-fg"
-        >
-          <Icon name="ph-sliders-horizontal" size={14} />
-          {SECTION_TEXT.customize}
-        </button>
+        {gear ? (
+          <button
+            type="button"
+            aria-label={SECTION_TEXT.customize}
+            title={SECTION_TEXT.customize}
+            className="flex size-7 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"
+          >
+            <Icon name="ph-gear" size={16} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="flex h-7 items-center gap-1.5 rounded-md border border-line bg-raised px-2 text-[13px] text-fg-muted hover:bg-hover hover:text-fg"
+          >
+            <Icon name="ph-sliders-horizontal" size={14} />
+            {SECTION_TEXT.customize}
+          </button>
+        )}
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 border-line bg-raised p-1.5 text-fg">
         <div className={heading}>{SECTION_TEXT.visibleSections}</div>
@@ -173,10 +190,13 @@ export function CustomizeOverview({
             ))}
           </SortableContext>
         </DndContext>
-        {hidden.length > 0 && <div className={heading}>{SECTION_TEXT.hiddenSections}</div>}
-        {hidden.map((s) => (
-          <div key={s.key} data-testid="hidden-section" className="flex h-8 items-center gap-2 rounded-md px-2 text-[14px] hover:bg-hover">
-            <span className="min-w-0 flex-1 truncate">{`${s.label}${s.inFullView ? '' : SECTION_TEXT.dashboardOnly}`}</span>
+        {hiddenAll.length > 0 && <div className={heading}>{SECTION_TEXT.hiddenSections}</div>}
+        {hiddenAll.map((s) => (
+          <div key={s.key} data-testid="hidden-section" className="flex min-h-8 items-center gap-2 rounded-md px-2 py-1 text-[14px] hover:bg-hover">
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate">{`${s.label}${s.inFullView ? '' : SECTION_TEXT.dashboardOnly}`}</span>
+              {s.description && <span className="text-[12px] leading-tight text-fg-muted">{s.description}</span>}
+            </span>
             <button
               type="button"
               aria-label={`Show ${s.label}`}
@@ -193,20 +213,7 @@ export function CustomizeOverview({
         </button>
         {adding && (
           <div>
-            {addable.length === 0 && <p className="px-2 py-1 text-[13px] text-fg-muted">{SECTION_TEXT.sectionEmpty}</p>}
-            {otherItems.map((s) => (
-              <button
-                key={s.key}
-                type="button"
-                aria-label={`Add ${s.label}`}
-                title={s.description}
-                onClick={() => update((v) => showSection(v, sections, s))}
-                className={item}
-              >
-                <IconOrEmoji icon={s.ownIcon} fallback={s.icon} size={14} />
-                <span className="truncate">{`${s.label}${s.inFullView ? '' : SECTION_TEXT.dashboardOnly}`}</span>
-              </button>
-            ))}
+            {queryItems.length === 0 && <p className="px-2 py-1 text-[13px] text-fg-muted">{SECTION_TEXT.sectionEmpty}</p>}
             {queryItems.length > 0 && <div className={heading}>{SECTION_TEXT.queriesAndViews}</div>}
             {queryItems.map((s) => (
               <button key={s.key} type="button" aria-label={`Add ${s.label}`} onClick={() => update((v) => showSection(v, sections, s))} className={item}>
@@ -265,14 +272,12 @@ function SectionHeading({
 export function TypeOverview({
   type,
   sections,
-  ctx,
   search,
   update,
   onCreateCollection,
 }: {
   type: TypeDef
   sections: RenderedSection[]
-  ctx: SectionCtx
   search: string
   update(edit: ViewsEdit): void
   onCreateCollection?(): void
@@ -289,9 +294,6 @@ export function TypeOverview({
 
   return (
     <div className="flex flex-col gap-8 pt-2">
-      <div className="flex justify-end">
-        <CustomizeOverview type={type} sections={sections} ctx={ctx} update={update} />
-      </div>
       {visible.length === 0 && <p className="py-4 text-center text-[14px] text-fg-muted">{SECTION_TEXT.sectionEmpty}</p>}
       {visible.map((s) => {
         const heading = <SectionHeading section={s} type={type} sections={sections} update={update} />
