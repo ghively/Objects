@@ -180,7 +180,8 @@ _CANNOT_DUPLICATE = "This object can't be duplicated."
 # M9 per-object layout keys (`ComponentData.wideLayoutMode`, `entity.data.wideCoverImage`,
 # `coverImageOffset`'s `offset`): absent means the type's default (offset 50); `None` removes.
 _COVER_OFFSET = "coverImageOffset"
-_LAYOUT_BOOL_KEYS = frozenset({"wideLayoutMode", "wideCoverImage"})
+# Polish item 17: `hideProperties` (`ComponentData.hideProperties`), the property-pane toggle.
+_LAYOUT_BOOL_KEYS = frozenset({"wideLayoutMode", "wideCoverImage", "hideProperties"})
 _LAYOUT_KEYS = _LAYOUT_BOOL_KEYS | {_COVER_OFFSET}
 # `DATE_TEMPLATE_VARIABLES` (date.model.ts); `DatetimeProperty.variable` is "Set only on templates".
 _CREATION_VARIABLES = ("day", "week", "month", "year")
