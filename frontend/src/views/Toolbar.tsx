@@ -33,6 +33,8 @@ export interface ToolbarProps {
   pausedHint?: string
   extraPages?: CustomizePage[]
   structureId?: string
+  /** The pill's last control (the Calendar Tasks section's `+`). */
+  end?: ReactNode
 }
 
 function PillButton({
@@ -170,6 +172,7 @@ export function Toolbar(p: ToolbarProps) {
             />
           </PopoverContent>
         </Popover>
+        {p.end}
       </div>
     </div>
   )

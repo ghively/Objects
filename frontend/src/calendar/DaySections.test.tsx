@@ -188,6 +188,15 @@ describe('DaySections', () => {
     expect(mocked.createObject).toHaveBeenCalledWith('task', { values: { date: day('2026-10-25') } })
   })
 
+  test("test tasks + is the last control inside the toolbar pill", async () => {
+    render(<DayView day="2026-10-25" />)
+    await screen.findByText('No tasks on this day')
+    const toolbar = within(tasksSection()).getByTestId('toolbar')
+    const add = within(toolbar).getByRole('button', { name: 'Add to tasks' })
+    const buttons = within(toolbar).getAllByRole('button')
+    expect(buttons[buttons.length - 1]).toBe(add)
+  })
+
   test('test created and updated sections use saved layout and persist changes to ui.calendar.daily', async () => {
     const user = userEvent.setup()
     const grid: ViewState = { viewDefinition: { dataViewLayout: 'grid' }, filterGroup: emptyFilterGroup(), sorts: [], groupBy: null }
