@@ -5,12 +5,14 @@
  * and the main view's property panel; the page centres itself (the content column is `mx-auto`).
  * None of those parts' own state is touched, so leaving shows each exactly as it was before.
  * Off an object (any other tab target) focus mode leaves again with "Focus mode is not available
- * here" (our rule). Binds `toggleFocusMode` (Mod-Shift-m).
+ * here" (our rule). Binds `toggleFocusMode` (Mod-Shift-m). Also mounts the always-on fade while
+ * typing (`TypingFade.tsx`).
  */
 import { useEffect } from 'react'
 import { useGlobalShortcut } from '@/lib/shortcuts'
 import { currentTarget, useTabs } from '@/nav/tabs'
 import { FocusTimer } from './FocusTimer'
+import { TypingFade } from './TypingFade'
 import { FOCUS_TEXT, useFocusMode } from './useFocusMode'
 
 /** The `<html>` attribute set while focus mode is on. */
@@ -72,6 +74,7 @@ export function FocusMode() {
   return (
     <>
       <FocusTimer show={shown} />
+      <TypingFade />
       {notice && (
         <div
           role="status"
