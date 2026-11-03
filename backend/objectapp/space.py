@@ -3894,7 +3894,12 @@ class Space:
         return TypeDefinition.from_json(data, fallback_id=type_id) if isinstance(data, dict) else None
 
     def create_type(
-        self, name: str, plural_name: str, icon: Any = None, color: str | None = None
+        self,
+        name: str,
+        plural_name: str,
+        icon: Any = None,
+        color: str | None = None,
+        template: str | None = None,
     ) -> TypeDefinition:
         """Create and save a new object type.
 
@@ -3903,7 +3908,23 @@ class Space:
         the folder comes from the plural name. Neither changes afterwards. The
         folder is created with the type's first object. Raises `InvalidValue`
         for a missing name or plural, a name in use, or a bad icon or colour.
+
+        Polish item 21: with ``template`` (a gallery key, `typetemplates`), the
+        template's properties replace "Content", its name, plural, description,
+        icon and colour fill whatever isn't given, and the key is stored as
+        ``templateKey`` (Object's `RootStructure.templateKey`).
         """
+        tpl = None
+        if template is not None:
+            from .typetemplates import get_template
+
+            tpl = get_template(template)
+            if tpl is None:
+                raise InvalidValue(f"Unknown object type template {template!r}")
+            name = name or tpl.name
+            plural_name = plural_name or tpl.pluralName
+            icon = icon if icon is not None else tpl.icon
+            color = color or tpl.color
         name = " ".join(str(name or "").split())
         plural = " ".join(str(plural_name or "").split())
         if not name or not plural:
@@ -3925,13 +3946,20 @@ class Space:
             type_id, n = base, 2
             while type_id in taken:
                 type_id, n = f"{base}-{n}", n + 1
-            content = PropertyDefinition(
-                id=new_ulid(),
-                key="content",
-                name="Content",
-                type="blocks",
-                icon=Icon("iconify", PROPERTY_ICONS["blocks"]),
-            )
+            if tpl is not None:
+                from .typetemplates import build_template
+
+                custom = build_template(tpl.key, self.types)
+            else:
+                custom = [
+                    PropertyDefinition(
+                        id=new_ulid(),
+                        key="content",
+                        name="Content",
+                        type="blocks",
+                        icon=Icon("iconify", PROPERTY_ICONS["blocks"]),
+                    )
+                ]
             t = TypeDefinition(
                 id=type_id,
                 name=name,
@@ -3939,8 +3967,11 @@ class Space:
                 folder=safe_filename(plural),
                 icon=parsed,
                 color=color,
-                propertyDefinitions=[*system_property_defs(), content],
+                propertyDefinitions=[*system_property_defs(), *custom],
             )
+            if tpl is not None:
+                t.description = tpl.description
+                t.extra["templateKey"] = tpl.key
             write_type_json(self.root, t, "")
             self.types.append(t)
             self._sort_types()
