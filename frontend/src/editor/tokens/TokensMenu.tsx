@@ -1,16 +1,18 @@
 /**
  * The text-selection toolbar (`tokensMenu.*`), shown above a non-empty text
- * selection: Bold, Italic, Underline, Strikethrough, Code, Formula, Link,
- * "Highlight text" (the colour panel, `ColorMenu`), "Turn Into", "Create
- * object from text selection.", "Link existing object with text selection."
- * and "Search for content matching your selection".
+ * selection, in the live app's order (catalog section 6): Bold, Italic,
+ * Strikethrough, Underline, Bullet list, To-do, Link, Code, Formula,
+ * "Highlight text" (the colour panel, `ColorMenu`), `+` ("Create object from
+ * text selection.") and `@` ("Link existing object with text selection.").
+ * The AI sparkle is left out until M10. The two list buttons turn the block
+ * into that list and back to text (the catalog read the second icon as
+ * numbered or to-do; To-do is our choice).
  *
  * - Create: pick a type ("Search Object Types"); a new object of it is titled
  *   with the selection, the selection becomes `[[Title]]`, and the object opens
  *   where the click's modifier keys say (`createAndOpen`).
  * - Link existing: pick an object; the selection becomes a link to it, keeping
  *   the selected words as the label when they differ from the title (our choice).
- * - Search: opens the extended search page with the selected text.
  * - The `highlightText` shortcut is not the panel: as in Capacities it toggles
  *   the last-used colour on the selection (`nodes/textStyle`).
  *
@@ -23,12 +25,13 @@ import { NodeSelection, TextSelection } from '@tiptap/pm/state'
 import {
   BoldIcon,
   CodeIcon,
-  FilePlusIcon,
+  AtSignIcon,
   HighlighterIcon,
   ItalicIcon,
-  Link2Icon,
   LinkIcon,
-  SearchIcon,
+  ListChecksIcon,
+  ListIcon,
+  PlusIcon,
   SigmaIcon,
   StrikethroughIcon,
   UnderlineIcon,
@@ -40,11 +43,9 @@ import { createAndOpen, type OpenMods } from '@/create/createAndOpen'
 import { cn } from '@/lib/utils'
 import { ensureLinkIndex, typeOf, useLinkIndex } from '@/links/linkIndex'
 import { fuzzyMatch, fuzzyScore } from '@/links/LinkPicker'
-import { openExtendedSearch } from '@/search/openSearch'
 import { TypeChip } from '@/shell/Sidebar'
 import { blockSelectionRange, turnInto } from '../extensions/blockSelection'
 import { wikilinkTargetFor } from '../extensions/wikilink'
-import { TURN_INTO_ITEMS } from '../handles/BlockMenu'
 import { ColorMenu, COLOR_MENU_TEXT } from './ColorMenu'
 import './tokens.css'
 
@@ -56,12 +57,12 @@ export const TOKENS_MENU_TEXT = {
   strikethrough: 'Strikethrough', // tokensMenu.strikethrough.name
   code: 'Code', // tokensMenu.code.name
   formula: 'Formula', // tokensMenu.math.name
+  bullet: 'Bullet list', // ControlDropdown.custom.block_bullet.name
+  todo: 'To-do', // ControlDropdown.custom.block_todo.name
   link: 'Link', // tokensMenu.link.name
   highlight: COLOR_MENU_TEXT.title, // tokensMenu.color.name
-  turnInto: 'Turn Into', // tokensMenu.turnInto.name
   create: 'Create object from text selection.', // tokensMenu.create
   reuse: 'Link existing object with text selection.', // tokensMenu.reuse
-  search: 'Search for content matching your selection', // tokensMenu.search
   searchTypes: 'Search Object Types', // AddPropertyMenu.searchTypes
   searchObjects: 'Search objects', // our string
   noObjects: 'No matching objects', // our string (as the link picker)
@@ -74,21 +75,21 @@ export const TOKENS_MENU_TEXT = {
 export const TOKENS_MENU_ITEMS: readonly string[] = [
   TOKENS_MENU_TEXT.bold,
   TOKENS_MENU_TEXT.italic,
-  TOKENS_MENU_TEXT.underline,
   TOKENS_MENU_TEXT.strikethrough,
+  TOKENS_MENU_TEXT.underline,
+  TOKENS_MENU_TEXT.bullet,
+  TOKENS_MENU_TEXT.todo,
+  TOKENS_MENU_TEXT.link,
   TOKENS_MENU_TEXT.code,
   TOKENS_MENU_TEXT.formula,
-  TOKENS_MENU_TEXT.link,
   TOKENS_MENU_TEXT.highlight,
-  TOKENS_MENU_TEXT.turnInto,
   TOKENS_MENU_TEXT.create,
   TOKENS_MENU_TEXT.reuse,
-  TOKENS_MENU_TEXT.search,
 ]
 
 export type TokensMenuProps = { editor: Editor | null; path: string }
 
-type Panel = 'color' | 'turnInto' | 'create' | 'reuse' | 'link' | null
+type Panel = 'color' | 'create' | 'reuse' | 'link' | null
 
 /** The selected text, or `null` when the selection is not a non-empty text range the toolbar acts on. */
 export function selectionText(editor: Editor): string | null {
@@ -141,12 +142,10 @@ export function linkSelectionToObject(editor: Editor, object: Pick<ObjectSummary
   return linkSelectionTo(editor, wikilinkTargetFor(object), text.trim())
 }
 
-/** "Search for content matching your selection": the extended search with the selected text. */
-export function searchForSelection(editor: Editor): boolean {
-  const text = selectionText(editor)
-  if (text === null) return false
-  openExtendedSearch(text.trim())
-  return true
+/** The list buttons: the block becomes a `kind` list, or text again when it is one already. */
+export function toggleListFromSelection(editor: Editor, kind: 'bullet' | 'todo'): boolean {
+  const active = editor.isActive(kind === 'bullet' ? 'bulletList' : 'taskList')
+  return turnInto(editor, active ? 'text' : kind)
 }
 
 /** "Formula": the selected text becomes an inline formula. */
@@ -167,14 +166,12 @@ function ToolButton({
   pressed,
   onClick,
   children,
-  wide,
 }: {
   label: string
   active?: boolean
   pressed?: boolean
   onClick: (e: MouseEvent<HTMLButtonElement>) => void
   children: ReactNode
-  wide?: boolean
 }) {
   return (
     <button
@@ -184,7 +181,7 @@ function ToolButton({
       aria-pressed={pressed}
       aria-expanded={active}
       data-active={pressed || active || undefined}
-      className={cn('tokens-button', wide && 'tokens-button-wide')}
+      className="tokens-button"
       // Keep the editor's selection and focus.
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
@@ -445,27 +442,33 @@ export function TokensMenu({ editor }: TokensMenuProps) {
           <ItalicIcon aria-hidden />
         </ToolButton>
         <ToolButton
-          label={TOKENS_MENU_TEXT.underline}
-          pressed={editor.isActive('underline')}
-          onClick={run(() => editor.chain().focus().toggleUnderline().run())}
-        >
-          <UnderlineIcon aria-hidden />
-        </ToolButton>
-        <ToolButton
           label={TOKENS_MENU_TEXT.strikethrough}
           pressed={editor.isActive('strike')}
           onClick={run(() => editor.chain().focus().toggleStrike().run())}
         >
           <StrikethroughIcon aria-hidden />
         </ToolButton>
+        <ToolButton
+          label={TOKENS_MENU_TEXT.underline}
+          pressed={editor.isActive('underline')}
+          onClick={run(() => editor.chain().focus().toggleUnderline().run())}
+        >
+          <UnderlineIcon aria-hidden />
+        </ToolButton>
+        <ToolButton label={TOKENS_MENU_TEXT.bullet} pressed={editor.isActive('bulletList')} onClick={run(() => toggleListFromSelection(editor, 'bullet'))}>
+          <ListIcon aria-hidden />
+        </ToolButton>
+        <ToolButton label={TOKENS_MENU_TEXT.todo} pressed={editor.isActive('taskList')} onClick={run(() => toggleListFromSelection(editor, 'todo'))}>
+          <ListChecksIcon aria-hidden />
+        </ToolButton>
+        <ToolButton label={TOKENS_MENU_TEXT.link} pressed={editor.isActive('link')} active={panel === 'link'} onClick={() => toggle('link')}>
+          <LinkIcon aria-hidden />
+        </ToolButton>
         <ToolButton label={TOKENS_MENU_TEXT.code} pressed={editor.isActive('code')} onClick={run(() => editor.chain().focus().toggleCode().run())}>
           <CodeIcon aria-hidden />
         </ToolButton>
         <ToolButton label={TOKENS_MENU_TEXT.formula} onClick={run(() => selectionToFormula(editor))}>
           <SigmaIcon aria-hidden />
-        </ToolButton>
-        <ToolButton label={TOKENS_MENU_TEXT.link} pressed={editor.isActive('link')} active={panel === 'link'} onClick={() => toggle('link')}>
-          <LinkIcon aria-hidden />
         </ToolButton>
         <ToolButton
           label={TOKENS_MENU_TEXT.highlight}
@@ -476,18 +479,11 @@ export function TokensMenu({ editor }: TokensMenuProps) {
           <HighlighterIcon aria-hidden />
         </ToolButton>
         <span className="tokens-divider" aria-hidden />
-        <ToolButton label={TOKENS_MENU_TEXT.turnInto} wide active={panel === 'turnInto'} onClick={() => toggle('turnInto')}>
-          {TOKENS_MENU_TEXT.turnInto}
-        </ToolButton>
-        <span className="tokens-divider" aria-hidden />
         <ToolButton label={TOKENS_MENU_TEXT.create} active={panel === 'create'} onClick={() => toggle('create')}>
-          <FilePlusIcon aria-hidden />
+          <PlusIcon aria-hidden />
         </ToolButton>
         <ToolButton label={TOKENS_MENU_TEXT.reuse} active={panel === 'reuse'} onClick={() => toggle('reuse')}>
-          <Link2Icon aria-hidden />
-        </ToolButton>
-        <ToolButton label={TOKENS_MENU_TEXT.search} onClick={run(() => searchForSelection(editor))}>
-          <SearchIcon aria-hidden />
+          <AtSignIcon aria-hidden />
         </ToolButton>
       </div>
       {panel === 'color' && (
@@ -496,25 +492,6 @@ export function TokensMenu({ editor }: TokensMenuProps) {
         </div>
       )}
       {panel === 'link' && <LinkPanel editor={editor} onClose={() => setPanel(null)} />}
-      {panel === 'turnInto' && (
-        <div className="tokens-panel" role="menu" aria-label={TOKENS_MENU_TEXT.turnInto}>
-          {TURN_INTO_ITEMS.map((item) => (
-            <button
-              key={item.kind}
-              type="button"
-              role="menuitem"
-              className="tokens-list-row"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                turnInto(editor, item.kind)
-                setPanel(null)
-              }}
-            >
-              {item.name}
-            </button>
-          ))}
-        </div>
-      )}
       {panel === 'create' && (
         <PickerPanel<TypeDef>
           label={TOKENS_MENU_TEXT.create}

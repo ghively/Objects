@@ -73,7 +73,7 @@ function run(action: () => Promise<boolean>): void {
   })
 }
 
-/** The tokens menu's "Turn Into" items: name (Capacities' key), kind, and the shortcut id whose keys the row shows. */
+/** The "Turn Into" items (`tokensMenu.turnInto.name`): name (Capacities' key), kind, and the shortcut id whose keys the row shows. */
 export const TURN_INTO_ITEMS: readonly { kind: TurnIntoKind; name: string; shortcut?: string }[] = [
   { kind: 'text', name: 'Text' }, // blocks.TextBlock.name
   { kind: 'H1', name: 'Heading 1', shortcut: 'heading1' }, // ControlDropdown.custom.block_H1.name

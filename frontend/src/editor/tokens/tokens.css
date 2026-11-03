@@ -43,9 +43,6 @@
 .tokens-button[data-active] {
   background: var(--bg-hover);
 }
-.tokens-button-wide {
-  padding: 0 8px;
-}
 .tokens-divider {
   width: 1px;
   height: 18px;
