@@ -74,7 +74,7 @@ export function TopBar({
   const name = info?.name || spaceName
   const sidepanelLabel = rightPanelOpen ? TOP_BAR_TEXT.hideSidepanel : TOP_BAR_TEXT.showSidepanel
   return (
-    <header className="flex h-[42px] shrink-0 items-center gap-1 bg-app pr-2 pl-2.5 text-fg">
+    <header data-typing-fade="" className="flex h-[42px] shrink-0 items-center gap-1 bg-app pr-2 pl-2.5 text-fg">
       <div className="flex w-[348px] shrink-0 items-center justify-between">
         <SpacesMenu>
           <button
