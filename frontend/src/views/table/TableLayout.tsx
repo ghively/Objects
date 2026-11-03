@@ -9,6 +9,7 @@ import type { PropertyDef, Row, TableColumn, TableViewConfig, TypeDef } from '@/
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cellValue } from '@/object/PropertyPanel'
+import { plainText, textStats, TEXT_STATS_TEXT } from '@/object/textStats'
 import { useTypeEditor } from '@/object/useTypeEditor'
 import { useTabs } from '@/nav/tabs'
 import { cellForDef } from '@/properties/cellFor'
@@ -169,8 +170,48 @@ function TitleCell({ row, onRename, onOpen }: { row: Row; onRename(row: Row, tit
 
 const openObject = (path: string) => useTabs.getState().open({ kind: 'object', path })
 
+/** The row-number column at the left, in rem (our choice). */
+export const ROW_NUMBER_WIDTH = 2.5
+
+/** "N words" (`textStats.wordCount`, the plural pair). */
+export const wordsLabel = (n: number) => `${n.toLocaleString()} ${n === 1 ? TEXT_STATS_TEXT.word[0] : TEXT_STATS_TEXT.word[1]}`
+
+/**
+ * A content (`blocks`) column: an "N words" chip and an expand icon that opens the object, as
+ * Capacities' table shows its Content column. The type's first content property is the body.
+ */
+function ContentCell({ words, onExpand }: { words: number; onExpand(e: ReactMouseEvent): void }) {
+  return (
+    <div className="group/content flex min-w-0 flex-1 items-center gap-1">
+      <span className="inline-flex shrink-0 items-center rounded-md bg-hover px-1.5 text-[12px] text-fg-muted">{wordsLabel(words)}</span>
+      <button
+        type="button"
+        aria-label="Expand"
+        title="Expand"
+        onClick={onExpand}
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-fg-muted opacity-0 hover:bg-hover hover:text-fg focus-visible:opacity-100 group-hover/content:opacity-100"
+      >
+        <Icon name="ph-arrows-out-simple" size={14} />
+      </button>
+    </div>
+  )
+}
+
+/** A content property's words: the body's (the row's `words`) for the main one, else its own Markdown's. */
+function contentWords(def: PropertyDef, row: Row, mainContent: string | undefined): number {
+  if (def.key === mainContent) return row.words ?? 0
+  const v = row.values[def.key]
+  return typeof v === 'string' && v ? textStats(plainText(v)).words : 0
+}
+
 interface TableRowProps {
   row: Row
+  /** 1-based, within the row's group. */
+  index: number
+  /** The key of the type's first content property (the body), if it has one. */
+  mainContent: string | undefined
+  /** Whether the row-number column is sticky (some columns are pinned). */
+  pinned: boolean
   columns: TableColumn[]
   defs: Record<string, PropertyDef>
   config: TableViewConfig
@@ -186,7 +227,7 @@ interface TableRowProps {
 }
 
 /** One row of cells; re-renders only when its row, the columns, their widths or its selection change. */
-const TableRow = memo(function TableRow({ row, columns, defs, config, widths, sticky, selected, canEditType, onOpen, rename, commit, onDefChange, openSettings }: TableRowProps) {
+const TableRow = memo(function TableRow({ row, index, mainContent, pinned, columns, defs, config, widths, sticky, selected, canEditType, onOpen, rename, commit, onDefChange, openSettings }: TableRowProps) {
   const cellStyle = (c: TableColumn): CSSProperties => ({
     width: `${widths[c.id] ?? c.colWidth}rem`,
     ...(sticky[c.id] !== undefined ? { position: 'sticky', left: `${sticky[c.id]}rem`, zIndex: 1 } : {}),
@@ -199,6 +240,13 @@ const TableRow = memo(function TableRow({ row, columns, defs, config, widths, st
       style={{ minHeight: TABLE_ROW_HEIGHT }}
       className={cn('flex border-b border-line hover:bg-hover/40', selected && 'bg-[var(--block-selection-bg)]')}
     >
+      <div
+        role="rowheader"
+        style={{ width: `${ROW_NUMBER_WIDTH}rem`, ...(pinned ? { position: 'sticky', left: 0, zIndex: 1 } : {}) }}
+        className="flex shrink-0 items-center justify-end border-r border-line bg-app px-2 text-[12px] tabular-nums text-fg-muted"
+      >
+        {index}
+      </div>
       {columns.map((c) => {
         const def = defs[c.id]
         const wrapped = isWrapped(config, c.id)
@@ -218,6 +266,8 @@ const TableRow = memo(function TableRow({ row, columns, defs, config, widths, st
           >
             {def?.type === 'entity_title' ? (
               <TitleCell row={row} onRename={rename} onOpen={(e) => onOpen(row, e)} />
+            ) : def?.type === 'blocks' ? (
+              <ContentCell words={contentWords(def, row, mainContent)} onExpand={(e) => onOpen(row, e)} />
             ) : def && Cell ? (
               <div className="min-w-0 flex-1">
                 <Cell
@@ -282,7 +332,8 @@ export function TableLayout(props: TableLayoutProps) {
     if (config?.pinnedColumnIndex === undefined) return out
     const offs = leftOffsets(columns, widths)
     columns.forEach((c, i) => {
-      if (i <= (config.pinnedColumnIndex as number)) out[c.id] = offs[i]
+      // After the row-number column, which is pinned with them.
+      if (i <= (config.pinnedColumnIndex as number)) out[c.id] = ROW_NUMBER_WIDTH + offs[i]
     })
     return out
   }, [columns, widths, config?.pinnedColumnIndex])
@@ -395,12 +446,18 @@ export function TableLayout(props: TableLayoutProps) {
   }
 
   const canEditType = !type.basic && !type.readOnlyReason
-  const total = columns.reduce((n, c) => n + (widths[c.id] ?? c.colWidth), 0)
+  const total = ROW_NUMBER_WIDTH + columns.reduce((n, c) => n + (widths[c.id] ?? c.colWidth), 0)
+  const mainContent = type.propertyDefinitions.find((d) => d.type === 'blocks')?.key
+  const pinned = config.pinnedColumnIndex !== undefined
+  const gutterStyle: CSSProperties = { width: `${ROW_NUMBER_WIDTH}rem`, ...(pinned ? { position: 'sticky', left: 0, zIndex: 2 } : {}) }
 
-  const renderRow = (row: Row) => (
+  const renderRow = (row: Row, i: number) => (
     <TableRow
       key={row.summary.path}
       row={row}
+      index={i + 1}
+      mainContent={mainContent}
+      pinned={pinned}
       columns={columns}
       defs={defs}
       config={config}
@@ -428,6 +485,7 @@ export function TableLayout(props: TableLayoutProps) {
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext items={columns.filter((c) => c.type !== 'entity_title').map((c) => c.id)} strategy={horizontalListSortingStrategy}>
               <div role="row" className="flex border-b border-line">
+                <div aria-hidden style={gutterStyle} className="h-8 shrink-0 border-r border-line bg-app" />
                 {columns.map((c) => {
                   const def = defs[c.id]
                   if (!def) return null
@@ -476,6 +534,7 @@ export function TableLayout(props: TableLayoutProps) {
             typeId={type.id}
             widths={widths}
             sticky={sticky}
+            gutter={<div aria-hidden style={gutterStyle} className="h-full shrink-0 border-r border-line bg-app" />}
           />
         </div>
       </div>
