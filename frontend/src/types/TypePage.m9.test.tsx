@@ -102,6 +102,30 @@ describe('TypePage Import CSV (Task 19)', () => {
     expect(await screen.findByText('Batch import to collection')).toBeInTheDocument()
   })
 
+  test('Ctrl+I (openImportMenu) opens the CSV import, as the tab menu says, but not while typing', async () => {
+    const user = userEvent.setup()
+    render(<TypePage type={BOOK} />)
+    await screen.findByText('Alpha')
+    const field = document.createElement('input')
+    document.body.appendChild(field)
+    field.focus()
+    await user.keyboard('{Control>}i{/Control}')
+    expect(screen.queryByText('Batch import to collection')).toBeNull()
+    field.remove()
+    document.body.focus()
+    await user.keyboard('{Control>}i{/Control}')
+    expect(await screen.findByText('Batch import to collection')).toBeInTheDocument()
+  })
+
+  test('Ctrl+I does nothing on a type that takes no CSV', async () => {
+    const user = userEvent.setup()
+    const daily = typeDef({ id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes', basic: true, revision: 'r1' })
+    render(<TypePage type={daily} />)
+    await screen.findByRole('button', { name: 'More' })
+    await user.keyboard('{Control>}i{/Control}')
+    expect(screen.queryByText('Batch import to collection')).toBeNull()
+  })
+
   test('test no import csv for daily notes', async () => {
     const user = userEvent.setup()
     const daily = typeDef({ id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes', basic: true, revision: 'r1' })
