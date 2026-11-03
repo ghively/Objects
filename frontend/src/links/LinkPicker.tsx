@@ -6,6 +6,10 @@
  *
  * In `embed` mode (M7, the editor's `pickObjectEmbed()`) the chosen object is
  * inserted as an embedded object block (`![[Title]]`) instead of a link.
+ *
+ * Linking at the start of an empty block (the block holds only the `[[` or `@`) makes an object
+ * block too, as in Capacities, unless the `alwaysCreateInlineLinks` setting is on
+ * (`EditorSettings.alwaysCreateInlineLinks`).
  */
 import type { Editor } from '@tiptap/core'
 import { Selection } from '@tiptap/pm/state'
@@ -18,11 +22,22 @@ import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { setWikilinkTrigger, wikilinkTargetFor } from '@/editor/extensions/wikilink'
 import { setObjectEmbedPicker } from '@/editor/nodes/objectEmbed'
 import { useRecent } from '@/nav/recent'
+import { useSettings } from '@/settings/useSettings'
 import { TypeChip } from '@/shell/Sidebar'
 import { cn } from '@/lib/utils'
 import { ensureLinkIndex, typeOf, useLinkIndex } from './linkIndex'
 
 export type LinkPickerMode = 'link' | 'embed'
+
+/** True when choosing should make an object block: the trigger is all an otherwise empty paragraph holds. */
+export function blockLinkAt(editor: Editor, range: { from: number; to: number }): boolean {
+  if (useSettings.getState().settings.alwaysCreateInlineLinks) return false
+  const text = editor.state.doc.textBetween(range.from, range.to, '\0', '\0')
+  if (!isOpener(text)) return false
+  const $from = editor.state.doc.resolve(range.from)
+  const block = $from.parent
+  return block.type.name === 'paragraph' && $from.parentOffset === 0 && block.content.size === range.to - range.from && block.textContent === text
+}
 
 interface PickerState {
   editor: Editor | null
@@ -184,6 +199,8 @@ export function LinkPicker() {
         })
         .insertObjectEmbed(o.title)
         .run()
+    } else if (o && blockLinkAt(editor, range)) {
+      editor.chain().focus().deleteRange(range).insertObjectEmbed(o.title).run()
     } else if (o) {
       const text = editor.state.doc.textBetween(range.from, range.to, '\0', '\0')
       // Only replace the brackets (or the `@`) if they are still where the trigger saw them.

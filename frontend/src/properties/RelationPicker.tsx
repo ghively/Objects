@@ -203,7 +203,7 @@ export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }
         )}
       </div>
       {onOpenSettings && (
-        <div className="border-t border-line p-1">
+        <div data-structure-setting="" className="border-t border-line p-1">
           <button
             type="button"
             onClick={onOpenSettings}

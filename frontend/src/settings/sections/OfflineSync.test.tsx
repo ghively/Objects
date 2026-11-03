@@ -1,5 +1,5 @@
-// M9 Task 16: "Recalculate content index" in Space Settings (Capacities keeps it under
-// Offline & Sync; Object has no such section).
+// M9 Task 16: "Recalculate content index"; polish 2026-11-03 moved it from Space Settings to
+// Offline & Sync, where Capacities keeps it.
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -12,7 +12,7 @@ vi.mock('@/api/client', async (orig) => ({
 import { api } from '@/api/client'
 import type { SpaceInfo } from '@/api/types'
 import { resetSpaceInfo } from '@/settings/useSpaceInfo'
-import { REINDEX_POLL_MS, SPACE_SETTINGS_TEXT, SpaceSettingsSection } from './SpaceSettings'
+import { OFFLINE_SYNC_TEXT, OfflineSyncSection, REINDEX_POLL_MS } from './OfflineSync'
 
 const mocked = vi.mocked(api)
 const SPACE: SpaceInfo = { name: 'Lab', root: '/spaces/Lab', types: [], icon: null, description: null, hideTaskManagement: false, revision: 's1' }
@@ -34,14 +34,14 @@ beforeEach(() => {
 describe('Recalculate content index', () => {
   test('test button calls reindex', async () => {
     const user = userEvent.setup()
-    render(<SpaceSettingsSection />)
+    render(<OfflineSyncSection />)
     await user.click(screen.getByRole('button', { name: BUTTON }))
     await waitFor(() => expect(mocked.reindex).toHaveBeenCalledTimes(1))
   })
 
   test('test indexing state strings while partial', async () => {
     const user = userEvent.setup()
-    render(<SpaceSettingsSection />)
+    render(<OfflineSyncSection />)
     await waitFor(() => expect(mocked.search).toHaveBeenCalled())
     expect(screen.queryByText(HEADING)).toBeNull()
 
@@ -59,16 +59,27 @@ describe('Recalculate content index', () => {
 
   test('test indexing state shows when search is already partial on open', async () => {
     mocked.search.mockResolvedValue({ results: [], partial: true })
-    render(<SpaceSettingsSection />)
+    render(<OfflineSyncSection />)
     expect(await screen.findByText(HEADING)).toBeInTheDocument()
   })
 
   test('test strings verbatim', () => {
-    expect(SPACE_SETTINGS_TEXT.reindexButton).toBe(BUTTON)
-    expect(SPACE_SETTINGS_TEXT.reindexDescription).toBe(DESCRIPTION)
-    expect(SPACE_SETTINGS_TEXT.reindexingHeading).toBe(HEADING)
-    expect(SPACE_SETTINGS_TEXT.reindexingDescription).toBe(RUNNING)
-    render(<SpaceSettingsSection />)
+    expect(OFFLINE_SYNC_TEXT.reindexButton).toBe(BUTTON)
+    expect(OFFLINE_SYNC_TEXT.reindexDescription).toBe(DESCRIPTION)
+    expect(OFFLINE_SYNC_TEXT.reindexingHeading).toBe(HEADING)
+    expect(OFFLINE_SYNC_TEXT.reindexingDescription).toBe(RUNNING)
+    render(<OfflineSyncSection />)
     expect(screen.getByText(DESCRIPTION)).toBeInTheDocument()
+  })
+})
+
+describe('Offline & Sync', () => {
+  test('test the section keeps only the local parts', () => {
+    render(<OfflineSyncSection />)
+    expect(screen.getByRole('heading', { level: 2, name: 'Offline & Sync' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Offline' })).toBeInTheDocument()
+    // No cloud: no sync status, media loading or cloud media storage.
+    expect(screen.queryByText('Sync')).toBeNull()
+    expect(screen.queryByText('Media loading')).toBeNull()
   })
 })

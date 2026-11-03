@@ -12,6 +12,7 @@ import { DATE_TIME_SEARCH, DATE_TIME_TEXT, DateTimeSection } from './sections/Da
 import { EDITOR_SEARCH, EDITOR_TEXT, EditorSection } from './sections/Editor'
 import { LANGUAGE_SEARCH, LANGUAGE_TEXT, LanguageSection } from './sections/Language'
 import { NOTIFICATIONS_SEARCH, NOTIFICATIONS_TEXT, NotificationsSection } from './sections/Notifications'
+import { OFFLINE_SYNC_SEARCH, OFFLINE_SYNC_TEXT, OfflineSyncSection } from './sections/OfflineSync'
 import { OBJECT_TYPES_SEARCH, OBJECT_TYPES_TEXT, ObjectTypesSection } from './sections/ObjectTypes'
 import { SPACE_SETTINGS_SEARCH, SPACE_SETTINGS_TEXT, SpaceSettingsSection } from './sections/SpaceSettings'
 import { TASK_MANAGEMENT_SEARCH, TASK_MANAGEMENT_TEXT, TaskManagementSection } from './sections/TaskManagement'
@@ -42,6 +43,14 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
   { id: 'editor', group: 'general', label: EDITOR_TEXT.heading, icon: 'ph-text-aa', search: EDITOR_SEARCH, Component: EditorSection },
   { id: 'dateTime', group: 'general', label: DATE_TIME_TEXT.heading, icon: 'ph-calendar-blank', search: DATE_TIME_SEARCH, Component: DateTimeSection },
   { id: 'language', group: 'general', label: LANGUAGE_TEXT.heading, icon: 'ph-translate', search: LANGUAGE_SEARCH, Component: LanguageSection },
+  {
+    id: 'offlineSync',
+    group: 'general',
+    label: OFFLINE_SYNC_TEXT.heading,
+    icon: 'ph-arrows-clockwise',
+    search: OFFLINE_SYNC_SEARCH,
+    Component: OfflineSyncSection,
+  },
   {
     id: 'notifications',
     group: 'general',

@@ -329,6 +329,17 @@ export interface DeviceSettings {
   relatedContentHiddenTypes: string[]
   nestedBacklinkView: 'showBlockContainingBacklink' | 'showFullPathAbove'
   presentation: PresentationSettings
+  // ---- Polish 2026-11-03 ----
+  /** Text size: Capacities' desktop zoom factor, 0.6–1.5 (`settings/zoom.ts`). */
+  zoom: number
+  /** Spellcheck language tag ("en-GB"); `null` = the device's. Sets `<html lang>`. */
+  spellCheckLang: string | null
+  /** `@` at the start of an empty block makes an inline link, not an object block. */
+  alwaysCreateInlineLinks: boolean
+  /** Hide the type-settings and property-editing entry points outside Settings. */
+  hideStructureSettings: boolean
+  /** How highlight blocks show (none exist in Object yet; stored only). */
+  highlightStyle: 'default' | 'minimal'
 }
 
 /** M8 `DeviceSettings.language`. */

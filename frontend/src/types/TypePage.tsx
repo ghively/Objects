@@ -500,7 +500,7 @@ export function TypePage({ type }: { type: TypeDef }) {
                 Save as query
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={() => useTabs.getState().open({ kind: 'typeSettings', typeId: type.id })}>
+            <DropdownMenuItem data-structure-setting="" onClick={() => useTabs.getState().open({ kind: 'typeSettings', typeId: type.id })}>
               <Icon name="ph-gear" size={14} />
               Object Type Settings
             </DropdownMenuItem>

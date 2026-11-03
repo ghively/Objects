@@ -8,6 +8,7 @@ export type SettingsSectionId =
   | 'editor'
   | 'dateTime'
   | 'language'
+  | 'offlineSync'
   | 'notifications'
   | 'space'
   | 'objectTypes'
