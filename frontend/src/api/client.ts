@@ -45,6 +45,7 @@ import type {
   TasksUi,
   TrashItem,
   TypeDef,
+  TypeTemplate,
   UiState,
   UpdateResult,
   UploadedAttachment,
@@ -626,7 +627,19 @@ export const api = {
     return request<{ purged: number }>(`/trash${qs({ clientId: CLIENT_ID })}`, { method: 'DELETE' })
   },
 
-  async createType(input: { name: string; pluralName: string; icon?: Icon; color?: string }): Promise<TypeDef> {
+  /** The "Add new object type" gallery (item 21). */
+  typeGallery(): Promise<TypeTemplate[]> {
+    return request<TypeTemplate[]>('/type-gallery')
+  },
+
+  /** Create a type; with `template` (a gallery key) the server fills in what isn't given. */
+  async createType(input: {
+    name: string
+    pluralName: string
+    icon?: Icon
+    color?: string
+    template?: string
+  }): Promise<TypeDef> {
     const res = await request<TypeDef>('/types', json('POST', { ...input, clientId: CLIENT_ID }))
     emitLocal([typesEvent(res.id, res.revision ?? null)])
     return res

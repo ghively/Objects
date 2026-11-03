@@ -213,6 +213,20 @@ export interface TypeDef {
   [extra: string]: unknown
 }
 
+/** One template of the "Add new object type" gallery (`GET /api/type-gallery`, item 21). */
+export interface TypeTemplate {
+  key: string
+  section: 'useCases' | 'research' | 'media' | 'planningAndReflection' | null
+  name: string
+  pluralName: string
+  description: string
+  icon: Icon
+  color: string
+  properties: { name: string; type: PropertyType }[]
+  /** The space already has a type made from (or named like) it. */
+  added: boolean
+}
+
 export interface ObjectSummary {
   path: string
   id: string | null

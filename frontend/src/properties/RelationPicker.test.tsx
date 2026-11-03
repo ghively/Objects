@@ -1,9 +1,11 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PropertyDef } from '@/api/types'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { objectSummary, propertyDef, typeDef } from '@/test/mockApi'
+import { api } from '@/api/client'
+import { RelationCell } from './cells/RelationCell'
 import { RelationPicker } from './RelationPicker'
 
 vi.mock('@/api/client', async (orig) => ({
@@ -130,5 +132,53 @@ describe('RelationPicker', () => {
       screen.getByText('Nothing to select in this set. Search the whole database to add objects to the set.'),
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit Property' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Object -> Tag relations (item 22)', () => {
+  const TAGS = [
+    objectSummary({ path: 'Tags/In Progress.md', id: 'id-t1', type: 'tag', title: 'In Progress', color: 'bg-blue' }),
+    objectSummary({ path: 'Tags/Complete.md', id: 'id-t2', type: 'tag', title: 'Complete', color: 'bg-green' }),
+  ]
+  const statusDef = () =>
+    propertyDef({ id: 'p2', key: 'status', name: 'Status', type: 'entity', options: { isArray: false, allowedTypes: ['tag'] } })
+
+  beforeEach(() => {
+    useLinkIndex.setState({
+      types: [typeDef({ id: 'tag', name: 'Tag', basic: true })],
+      objects: TAGS,
+      loaded: true,
+    })
+  })
+
+  it('shows the linked tags as chips in their own colour', () => {
+    render(<RelationCell def={statusDef()} value={[{ target: 'In Progress', path: 'Tags/In Progress.md' }]} onChange={vi.fn()} />)
+    const chip = screen.getByText('In Progress').closest('[data-tag-chip]') as HTMLElement
+    expect(chip).not.toBeNull()
+    expect(chip.getAttribute('data-tag-chip')).toBe('blue')
+  })
+
+  it('the picker is "Search or Create": tags as coloured chips, and a new tag is created and picked', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const ensure = vi.mocked(api.ensureTag)
+    ensure.mockResolvedValueOnce({ path: 'Tags/On Hold.md', created: true })
+    render(<RelationPicker def={statusDef()} value={[]} onChange={onChange} />)
+    expect(screen.getByRole('textbox', { name: 'Search or Create' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Complete/ }).querySelector('[data-tag-chip="green"]')).not.toBeNull()
+    await user.type(screen.getByRole('textbox', { name: 'Search or Create' }), 'On Hold')
+    await user.click(screen.getByRole('option', { name: "Create 'On Hold'" }))
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith([{ target: 'On Hold', path: 'Tags/On Hold.md' }]))
+    expect(ensure).toHaveBeenCalledWith('On Hold')
+  })
+
+  it('offers no create for an existing tag or a relation to other types', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<RelationPicker def={statusDef()} value={[]} onChange={vi.fn()} />)
+    await user.type(screen.getByRole('textbox', { name: 'Search or Create' }), 'complete')
+    expect(screen.queryByRole('option', { name: /Create/ })).toBeNull()
+    unmount()
+    render(<RelationPicker def={relDef({ isArray: true, allowedTypes: ['person'] })} value={[]} onChange={vi.fn()} />)
+    expect(screen.getByRole('textbox', { name: 'Search for objects' })).toBeInTheDocument()
   })
 })
