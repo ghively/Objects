@@ -27,6 +27,8 @@ __all__ = [
     "body_preview",
     "build_rows",
     "cached_preview",
+    "cached_word_count",
+    "word_count",
 ]
 
 MIN_TERM = 2
@@ -41,6 +43,8 @@ class Row:
     values: dict[str, Any]
     links: dict[str, list[str | None]]
     preview: str
+    #: Words in the body (the table's "Content" column), with or without the preview.
+    words: int = 0
 
 
 # -- body preview ---------------------------------------------------------------------
@@ -137,6 +141,57 @@ def body_preview(body: str, limit: int = 280) -> str:
     if text[len(cut)] != " " and " " in cut:
         cut = cut[: cut.rindex(" ")]
     return cut.rstrip() + "…"
+
+
+# -- word count -------------------------------------------------------------------------
+#
+# The table's "Content" column shows "N words" for every row, so this runs over whole
+# bodies: a few whole-string substitutions and one findall, no per-line loop. Code is
+# counted (Object counts a code block's text); comments, math, fence lines, link
+# targets, HTML tags and M8 block ids are not.
+
+_WC_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+_WC_MATH_RE = re.compile(r"^[ \t]*\$\$.*?\$\$[ \t]*$", re.S | re.M)
+_WC_FENCE_RE = re.compile(r"^[ \t]*(?:```|~~~).*$", re.M)
+_WC_LINK_TARGET_RE = re.compile(r"\]\([^)]*\)")
+_WC_WIKI_TARGET_RE = re.compile(r"\[\[[^\[\]|]*\|")
+_WC_BLOCK_ID_RE = re.compile(r" \^[a-z0-9]{6}[ \t]*$", re.M)
+# A word: letters or digits, joined by hyphens or apostrophes ("well-known", "don't").
+_WC_WORD_RE = re.compile(r"\w+(?:[-‐‑'’]\w+)*")
+
+
+def word_count(body: str) -> int:
+    """The words of a Markdown body, Markdown syntax left out (our approximation of
+    Object's word-segment count; the page's Text stats count with `Intl.Segmenter`)."""
+    if not body:
+        return 0
+    s = _WC_COMMENT_RE.sub(" ", body)
+    s = _WC_MATH_RE.sub(" ", s)
+    s = _WC_FENCE_RE.sub(" ", s)
+    s = _WC_LINK_TARGET_RE.sub("] ", s)
+    s = _WC_WIKI_TARGET_RE.sub("[[", s)
+    s = _WC_BLOCK_ID_RE.sub("", s)
+    s = _TAG_RE.sub(" ", s)
+    return len(_WC_WORD_RE.findall(s))
+
+
+_words_cache: OrderedDict[tuple[str, str], int] = OrderedDict()
+
+
+def cached_word_count(path: str, version: str, body: str) -> int:
+    """`word_count(body)`, remembered per ``(path, version)`` like `cached_preview`."""
+    key = (path, version)
+    with _preview_lock:
+        hit = _words_cache.get(key)
+        if hit is not None:
+            _words_cache.move_to_end(key)
+            return hit
+    n = word_count(body)
+    with _preview_lock:
+        _words_cache[key] = n
+        if len(_words_cache) > _PREVIEW_CACHE_MAX:
+            _words_cache.popitem(last=False)
+    return n
 
 
 _PREVIEW_CACHE_MAX = 20_000
@@ -296,4 +351,5 @@ def _row(space: Space, raw: RawObject, summary: ObjectSummary, preview: bool = T
         values=values,
         links=links,
         preview=cached_preview(raw.path, version, raw.of.body) if preview else "",
+        words=cached_word_count(raw.path, version, raw.of.body),
     )

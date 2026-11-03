@@ -501,6 +501,8 @@ export interface Row {
   links: Record<string, (string | null)[]>
   /** Plain text of the body, Markdown stripped, at most 280 characters. */
   preview: string
+  /** Words in the body (the table's "Content" column); absent from an older server. */
+  words?: number
 }
 
 export type Layout = 'list' | 'grid' | 'wall' | 'table' | 'embed' | 'kanban' | 'gallery'
