@@ -516,6 +516,56 @@ def test_topup_media_keeps_an_existing_definition():
     assert t.prop("category").type == "text"  # the stored one wins
 
 
+@pytest.mark.parametrize(
+    "name,key,first,count",
+    [
+        ("PDF", "documentType", ("academic-paper", "Academic paper"), 15),
+        ("PDF", "topic", ("ai-ml", "AI/ML"), 20),
+        ("Image", "category", ("book-page", "Book Page"), 27),
+        ("Image", "colors", ("beige", "Beige"), 21),
+        ("Weblink", "category", ("about", "About"), 31),
+        ("Weblink", "topic", ("academic", "Academic"), 29),
+        ("Audio", "category", ("ambient", "Ambient"), 10),
+    ],
+)  # fmt: skip
+def test_topup_media_labels_get_object_option_sets(name, key, first, count):
+    """Item 19: the label fields start with Object's own sets (ids and en-US texts)."""
+    p = topup_task_type(_media(name)).prop(key)
+    opts = p.options["set"]
+    assert len(opts) == count
+    assert (opts[0]["id"], opts[0]["text"]) == first
+    assert len({o["id"] for o in opts}) == count
+    assert all(o["color"] for o in opts)
+
+
+def test_topup_media_colors_label_uses_matching_theme_colours():
+    opts = {o["id"]: o for o in topup_task_type(_media("Image")).prop("colors").options["set"]}
+    assert opts["blue"]["color"] == "blue" and opts["gray"]["color"] == "gray"
+
+
+def test_media_label_set_is_editable_through_save_type(space_dir):
+    """A basic media type's label set can be edited (options added, renamed, removed)."""
+    import copy as _copy
+
+    from objectapp.space import Space
+    from objectapp.typemodel import type_revision as _rev
+
+    types = space_dir / ".object" / "types"
+    Space(space_dir)  # first open: writes the inferred types
+    (types / "pdf.json").write_text(json.dumps(_media("PDF").to_json()), encoding="utf-8")
+    sp = Space(space_dir)
+    t = _copy.deepcopy(sp.type_by_id("pdf"))
+    topic = t.prop("topic")
+    topic.options["set"] = [
+        {**topic.options["set"][0], "text": "Machine learning"},
+        {"id": "networking", "text": "Networking", "color": "blue", "icon": None},
+    ]
+    sp.save_type(t, _rev(space_dir, "pdf"))
+    stored = json.loads((types / "pdf.json").read_text(encoding="utf-8"))
+    saved = next(p for p in stored["propertyDefinitions"] if p["key"] == "topic")
+    assert [o["text"] for o in saved["options"]["set"]] == ["Machine learning", "Networking"]
+
+
 def test_topup_leaves_a_custom_type_named_like_a_media_type_alone():
     t = _media("PDF")
     t.basic = False
