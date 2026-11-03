@@ -87,6 +87,15 @@ describe('Sidebar workspaceOrder', () => {
     expect(workspaceBlocks('bad', [])).toEqual(['pinned', 'objects'])
   })
 
+  test('"Add Section" sits under the object types, after every block, not under Pinned', async () => {
+    render(<Sidebar types={[SERVER]} />)
+    await waitFor(() => expect(blocks()).toEqual(['S1', 'S2', 'pinned', 'objects']))
+    const add = screen.getByRole('button', { name: 'Add Section' })
+    expect(add.closest('[data-workspace-block]')).toBeNull()
+    const types = document.querySelector('[data-workspace-block="objects"]') as HTMLElement
+    expect(types.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   test('a section added after the order was saved appears above Pinned', () => {
     expect(workspaceBlocks(['S1', 'pinned', 'objects'], ['S1', 'S2'])).toEqual(['S1', 'S2', 'pinned', 'objects'])
     expect(workspaceBlocks(['objects', 'pinned', 'S1'], ['S1', 'S2', 'S3'])).toEqual(['objects', 'S2', 'S3', 'pinned', 'S1'])
