@@ -53,7 +53,8 @@ Routes (all JSON):
   announces ``created`` per path and ``types`` per type); ``422`` when a
   saved type now has the trashed type's id or name;
   ``DELETE /api/trash/{id}`` and ``DELETE /api/trash`` -> ``{purged}``; ``404``.
-- ``POST /api/types`` ``{name, pluralName, icon?, color?, clientId?}`` -> ``201 TypeDef``;
+- ``POST /api/types`` ``{name, pluralName, icon?, color?, template?, clientId?}`` -> ``201 TypeDef``
+  (``template``: a gallery key, polish item 21; ``GET /api/type-gallery`` lists the gallery);
   ``422``. Announces ``types``.
 - ``PUT /api/types/{id}`` ``{type, baseRevision, confirm?, clientId?}`` ->
   ``{type, rewritten, skipped}`` (``type.revision`` is the new revision);
@@ -363,6 +364,7 @@ class CreateTypeRequest(BaseModel):
     pluralName: str = ""
     icon: Any = None
     color: str | None = None
+    template: str | None = None
     clientId: str | None = None
 
 
@@ -1568,10 +1570,18 @@ def create_app(
         announce(ChangeEvent("queries", query_id, None, origin=clientId))
         return {"trashId": trash_id}
 
+    @api.get("/type-gallery")
+    def type_gallery():
+        from .typetemplates import template_catalog
+
+        return template_catalog(list(space.types))
+
     @api.post("/types", status_code=201)
     def create_type(req: CreateTypeRequest):
         try:
-            t = space.create_type(req.name, req.pluralName, icon=req.icon, color=req.color)
+            t = space.create_type(
+                req.name, req.pluralName, icon=req.icon, color=req.color, template=req.template
+            )
         except InvalidValue as exc:
             return _error(422, str(exc))
         announce(ChangeEvent("types", t.id, None, origin=req.clientId))
