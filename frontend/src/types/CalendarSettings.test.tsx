@@ -127,7 +127,7 @@ describe('DailyNote Overview', () => {
       })
     mocked.rows.mockResolvedValue([note('2026-10-20', false), note('2026-10-22', true), note('2026-10-24', false)])
     const sections = buildSections(DAILYNOTE, defaultViews(), { collections: [], queries: [] })
-    render(<TypeOverview type={DAILYNOTE} sections={sections} ctx={{ collections: [], queries: [] }} search="" update={vi.fn()} />)
+    render(<TypeOverview type={DAILYNOTE} sections={sections} search="" update={vi.fn()} />)
     const section = screen.getByRole('region', { name: 'Unreviewed' })
     await waitFor(() => expect(within(section).getByText('2026-10-24')).toBeInTheDocument())
     expect(within(section).queryByText('2026-10-22')).not.toBeInTheDocument()

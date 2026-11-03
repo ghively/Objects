@@ -1,6 +1,6 @@
 // The table's calculation footer: the short label and the value per column; an empty column
 // offers "Calculate" on hover. The results are computed once per rows/calculations change.
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { PropertyDef, Row, TableColumn, ViewState } from '@/api/types'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CALC_KINDS, CALC_LABELS, calculate, type CalcResult } from '../calc'
@@ -17,6 +17,8 @@ export interface CalcFooterProps {
   widths: Record<string, number>
   /** Left offsets (rem) of pinned columns, by column id. */
   sticky: Record<string, number>
+  /** The cell under the row-number column. */
+  gutter?: ReactNode
 }
 
 type CellProps = Pick<CalcFooterProps, 'state' | 'onState' | 'typeId'> & { col: TableColumn; def: PropertyDef; result: CalcResult | null }
@@ -69,7 +71,7 @@ function CalcCell({ col, def, result, state, onState, typeId }: CellProps) {
   )
 }
 
-export function CalcFooter({ columns, defs, widths, sticky, rows, ctx, ...rest }: CalcFooterProps) {
+export function CalcFooter({ columns, defs, widths, sticky, rows, ctx, gutter, ...rest }: CalcFooterProps) {
   const calcs = rest.state.viewDefinition.calculations
   // One pass over the rows per column with a calculation, redone only when they or the rows change.
   const results = useMemo(() => {
@@ -79,6 +81,7 @@ export function CalcFooter({ columns, defs, widths, sticky, rows, ctx, ...rest }
   }, [rows, calcs, defs, ctx])
   return (
     <div role="row" data-testid="calc-footer" className="flex h-8 border-t border-line">
+      {gutter}
       {columns.map((c) => {
         const def = defs[c.id]
         const left = sticky[c.id]

@@ -122,8 +122,9 @@ describe('TableLayout', () => {
     }
     render(<Harness init={base({ tableConfigs: { page: cfg } })} />)
     const [title, note, amount] = screen.getAllByRole('columnheader')
-    expect(title).toHaveStyle({ position: 'sticky', left: '0px' })
-    expect(note).toHaveStyle({ position: 'sticky', left: '160px' })
+    // After the 2.5rem row-number column, pinned with them.
+    expect(title).toHaveStyle({ position: 'sticky', left: '40px' })
+    expect(note).toHaveStyle({ position: 'sticky', left: '200px' })
     expect(amount).not.toHaveStyle({ position: 'sticky' })
   })
 
@@ -278,5 +279,42 @@ describe('TableLayout', () => {
     render(<Harness rows={[ro]} />)
     expect(screen.getByLabelText('Note')).toHaveAttribute('readonly')
     expect(screen.getByLabelText(/^Title of /)).toHaveAttribute('readonly')
+  })
+})
+
+describe('TableLayout Content column and row numbers (polish item 14)', () => {
+  const NOTE = typeDef({
+    id: 'page',
+    name: 'Page',
+    pluralName: 'Pages',
+    propertyDefinitions: [
+      propertyDef({ id: 'title', type: 'entity_title', name: 'Title' }),
+      propertyDef({ id: 'content', type: 'blocks', name: 'Content' }),
+      propertyDef({ id: 'extra', type: 'blocks', name: 'Extra' }),
+    ],
+  })
+  const rows = [
+    { ...mk('Pages/Alpha.md', { extra: 'two **words**' }), words: 12 },
+    { ...mk('Pages/Beta.md'), words: 1 },
+  ]
+  const cellOf = (c: HTMLElement, path: string, col: string) =>
+    c.querySelector(`[role="row"][data-path="${path}"] [role="cell"][data-col="${col}"]`) as HTMLElement
+
+  test('the main content column shows an "N words" chip of the body with an expand button', () => {
+    const { container } = render(<Harness types={[NOTE]} rows={rows} />)
+    const alpha = cellOf(container, 'Pages/Alpha.md', 'content')
+    expect(within(alpha).getByText('12 words')).toBeInTheDocument()
+    expect(within(alpha).getByRole('button', { name: 'Expand' })).toBeInTheDocument()
+    expect(within(cellOf(container, 'Pages/Beta.md', 'content')).getByText('1 word')).toBeInTheDocument()
+    // A second content property counts its own Markdown.
+    expect(within(cellOf(container, 'Pages/Alpha.md', 'extra')).getByText('2 words')).toBeInTheDocument()
+  })
+
+  test('each row starts with its number', () => {
+    const { container } = render(<Harness types={[NOTE]} rows={rows} />)
+    const numbers = [...container.querySelectorAll('[role="row"][data-path] [role="rowheader"]')].map((c) => c.textContent)
+    expect(numbers).toEqual(['1', '2'])
+    // The header row keeps only the property headers.
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Title', 'Content', 'Extra'])
   })
 })

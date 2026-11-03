@@ -38,7 +38,7 @@ import {
 } from './dashboardSections'
 import { SectionView, searchRows } from './SectionView'
 import { orderTemplates, templateKey, templatesAllowed } from './TemplateManager'
-import { TypeOverview } from './TypeOverview'
+import { CustomizeOverview, TypeOverview } from './TypeOverview'
 import { useDefinitions } from './useDefinitions'
 import { useTypeViews, type ViewsEdit } from './useTypeViews'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
@@ -544,6 +544,8 @@ export function TypePage({ type }: { type: TypeDef }) {
             />
           ))}
         </nav>
+        {/* Capacities: the gear at the right of the tabs opens Visible and Hidden Sections. */}
+        {views && !noOverview && <CustomizeOverview gear type={type} sections={sections} ctx={ctx} update={update} />}
         {/* The All or section tab's toolbar renders here, right-aligned (see `ToolbarSlot`). */}
         <div ref={setToolbarSlot} data-testid="toolbar-slot" className="ml-auto flex min-w-0 flex-1 justify-end" />
       </div>
@@ -553,7 +555,6 @@ export function TypePage({ type }: { type: TypeDef }) {
           <TypeOverview
             type={type}
             sections={sections}
-            ctx={ctx}
             search={search}
             update={update}
             onCreateCollection={() => setCreateCollectionOpen(true)}

@@ -51,6 +51,8 @@ SYSTEM_KEYS = frozenset(
         # M9 per-object layout (Capacities' wideLayoutMode, wideCoverImage, coverImageOffset)
         # and page view (defaultPageViewId, kept as it is)
         "wideLayoutMode", "wideCoverImage", "coverImageOffset", "defaultPageViewId",
+        # the property-pane toggle (Capacities' hideProperties; polish item 17)
+        "hideProperties",
     }
 )
 
@@ -60,7 +62,7 @@ SYSTEM_KEYS = frozenset(
 _UNINFERRED_KEYS = frozenset(
     {"id", "type", "template", "title", "icon", "iconColor", "description", "aliases",
      "createdAt", "lastUpdated", "wideLayoutMode", "wideCoverImage", "coverImageOffset",
-     "defaultPageViewId"}
+     "defaultPageViewId", "hideProperties"}
 )
 
 _ICONS = {

@@ -296,3 +296,29 @@ def test_rows_route_preview_flag(space_dir):
         bare = client.post("/api/rows", json={"typeIds": ["task"], "preview": False}).json()["rows"]
     assert any(r["preview"] for r in full)
     assert all(r["preview"] == "" for r in bare)
+
+
+def test_word_count_counts_body_words_without_markup():
+    from objectapp.rows import word_count
+
+    body = (
+        "# Heading here\n"
+        "<!-- a comment that does not count -->\n"
+        "- one [linked text](https://example.com/a/b) and [[Some Page|alias]]\n"
+        "```python\n"
+        "```\n"
+        "$$\nx = 1\n$$\n"
+        "A well-known don't word. ^abc123\n"
+    )
+    # Heading here (2), one linked text and alias (5), A well-known don't word (4)
+    assert word_count(body) == 11
+    assert word_count("") == 0
+
+
+def test_rows_carry_word_count_with_and_without_preview(space_dir):
+    space = Space(space_dir)
+    for preview in (True, False):
+        rows = space.rows(["task"], preview=preview)
+        assert rows
+        assert all(isinstance(r.words, int) for r in rows)
+        assert any(r.words > 0 for r in rows)
