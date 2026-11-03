@@ -748,6 +748,10 @@ export interface UiState {
   whiteboard?: WhiteboardSettings
   /** M9: the sidebar's top-level section order (`RootSpace.workspaceOrder`): 'objects', 'pinned', section ids. */
   workspaceOrder?: string[]
+  /** The sidebar's Object Types sort (`RootSpace.objectsSectionSortOption`); unset sorts alphabetically. */
+  objectsSectionSortOption?: 'alphabetical' | 'manual'
+  /** `RootSpace.workspace`: the `objects` section's `ids` are the manual Object Types order (type ids, 'queries'). */
+  workspace?: { objects?: { ids?: string[] } }
   [extra: string]: unknown
 }
 

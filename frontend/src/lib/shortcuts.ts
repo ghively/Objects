@@ -492,7 +492,19 @@ export const POLISH_SHORTCUTS: ShortcutDef[] = [
   def('groupBlocks', 'block', 'Group selected blocks or ungroup selected group block', ['Mod-g'], 'editor', V, true),
 ]
 
+/**
+ * The object `…` menu's page keys (Object's ids and names, verbatim; keys from its shortcut
+ * table). Handled by `object/ObjectView.tsx` for the active view, outside editable targets for
+ * Mod-e and Mod-i (in the editor they stay code and italic, as in Object).
+ */
+export const OBJECT_MENU_SHORTCUTS: ShortcutDef[] = [
+  def('openExportMenu', 'page', 'Open export menu of current page', ['Mod-e'], 'global', V, false),
+  def('openImportMenu', 'page', 'Open import menu of current page', ['Mod-i'], 'global', V, false),
+  def('toggleFavorite', 'page', 'Add/remove current page to/from favorites', ['Mod-Shift-*'], 'global', V, false),
+]
+
 registerShortcuts(EXISTING_SHORTCUTS)
 registerShortcuts(M7_SHORTCUTS)
 registerShortcuts(M8_SHORTCUTS)
 registerShortcuts(POLISH_SHORTCUTS)
+registerShortcuts(OBJECT_MENU_SHORTCUTS)

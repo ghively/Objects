@@ -148,7 +148,7 @@ describe('ObjectView … menu (M9)', () => {
       clicked.push({ href: this.getAttribute('href') ?? '', download: this.download })
     })
     let menu = await openMenu(user)
-    await user.click(within(menu).getByRole('menuitem', { name: 'Export' }))
+    await user.click(within(menu).getByRole('menuitem', { name: /^Export/ }))
     let dialog = await screen.findByRole('dialog', { name: EXPORT_TEXT.heading })
     expect(within(dialog).getByText('Format')).toBeInTheDocument()
     expect(within(dialog).getByText('Markdown')).toBeInTheDocument()
@@ -166,7 +166,7 @@ describe('ObjectView … menu (M9)', () => {
 
     await user.click(screen.getByRole('button', { name: 'More' }))
     menu = await screen.findByRole('menu')
-    await user.click(within(menu).getByRole('menuitem', { name: 'Export' }))
+    await user.click(within(menu).getByRole('menuitem', { name: /^Export/ }))
     dialog = await screen.findByRole('dialog', { name: EXPORT_TEXT.heading })
     await user.click(within(dialog).getByRole('switch', { name: 'Include media' }))
     await user.click(within(dialog).getByRole('button', { name: 'Export' }))

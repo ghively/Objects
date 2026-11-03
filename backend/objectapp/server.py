@@ -436,7 +436,7 @@ class SaveQueryRequest(BaseModel):
 _UI_PATCH_KEYS = frozenset(
     {
         "pinned", "sections", "allNotesLayout", "calendar", "tasks", "reminders", "graph",
-        "whiteboard", "workspaceOrder",
+        "whiteboard", "workspaceOrder", "objectsSectionSortOption", "workspace",
     }
 )  # fmt: skip
 # RootSpace.model.ts `GraphViewCustomization`, verbatim.
@@ -715,6 +715,26 @@ def _ui_problem(patch: dict[str, Any]) -> str | None:
             return "workspaceOrder must be a list of section ids."
         if len(set(order)) != len(order):
             return "workspaceOrder lists a section twice."
+    # The Object Types sort (`RootSpace.objectsSectionSortOption`) and its manual order, kept
+    # as the `objects` section's ids in `RootSpace.workspace`.
+    if "objectsSectionSortOption" in patch and patch["objectsSectionSortOption"] not in (
+        "alphabetical",
+        "manual",
+    ):
+        return "objectsSectionSortOption must be 'alphabetical' or 'manual'."
+    if "workspace" in patch:
+        ws = patch["workspace"]
+        if not isinstance(ws, dict):
+            return "workspace must be an object."
+        unknown = sorted(set(ws) - {"objects"})
+        if unknown:
+            return f"Cannot patch: {', '.join(f'workspace.{k}' for k in unknown)}"
+        objects = ws.get("objects", {})
+        ids = objects.get("ids", []) if isinstance(objects, dict) else None
+        if not isinstance(ids, list) or not all(isinstance(x, str) for x in ids):
+            return "workspace.objects.ids must be a list of ids."
+        if len(set(ids)) != len(ids):
+            return "workspace.objects.ids lists an id twice."
     return None
 
 
