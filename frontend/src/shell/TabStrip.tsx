@@ -9,7 +9,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { SpaceInfo, TypeDef } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuShortcut, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { formatKeys, keysFor } from '@/lib/shortcuts'
+import { ImportCsvDialog } from '@/types/ImportCsvDialog'
+import { canCreateFromMenu, PinTypeItem, TYPE_MENU_TEXT } from './TypeContextMenu'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { cn } from '@/lib/utils'
 import { byPathOf, stemOf, useLinkIndex } from '@/links/linkIndex'
@@ -133,9 +136,25 @@ function ScrollButton({ label, icon, onClick }: { label: string; icon: string; o
   )
 }
 
+/** `EntityMenu.openImportMenu.text` */
+const IMPORT_TEXT = 'Import'
+
+/** "Ctrl I" beside Import, as the object menu draws its keys. */
+function ImportKeys() {
+  const keys = keysFor('openImportMenu')
+  if (!keys.length) return null
+  return <ContextMenuShortcut>{formatKeys(keys[0]).split('+').join(' ')}</ContextMenuShortcut>
+}
+
 function TabItem({ tab, active, space }: { tab: Tab; active: boolean; space: SpaceInfo | null }) {
   const { activate, close, togglePersistent, pin, unpin } = useTabs.getState()
+  const types = useSpaceTypes(space)
+  const target = tabTarget(tab)
+  const tabType = target?.kind === 'type' ? types.find((t) => t.id === target.typeId) : undefined
+  const [importFor, setImportFor] = useState<TypeDef | null>(null)
   return (
+    <>
+    {importFor && <ImportCsvDialog type={importFor} open onOpenChange={(o) => !o && setImportFor(null)} />}
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
@@ -174,6 +193,8 @@ function TabItem({ tab, active, space }: { tab: Tab; active: boolean; space: Spa
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className="border-line bg-raised text-fg">
+        {/* A type tab, as in Object: Pin to Sidebar, Pin tab, Object Type Settings, Import (Ctrl I). */}
+        {tabType && <PinTypeItem type={tabType} />}
         {tab.pinned ? (
           <ContextMenuItem onSelect={() => unpin(tab.id)}>
             <Icon name="ph-push-pin-slash" size={15} />
@@ -185,6 +206,21 @@ function TabItem({ tab, active, space }: { tab: Tab; active: boolean; space: Spa
             Pin tab
           </ContextMenuItem>
         )}
+        {tabType && (
+          <>
+            <ContextMenuItem onSelect={() => useTabs.getState().open({ kind: 'typeSettings', typeId: tabType.id })}>
+              <Icon name="ph-gear" size={15} />
+              {TYPE_MENU_TEXT.settings}
+            </ContextMenuItem>
+            {canCreateFromMenu(tabType) && (
+              <ContextMenuItem onSelect={() => setImportFor(tabType)}>
+                <Icon name="ph-download-simple" size={15} />
+                {IMPORT_TEXT}
+                <ImportKeys />
+              </ContextMenuItem>
+            )}
+          </>
+        )}
         {!tab.pinned && (
           <ContextMenuItem onSelect={() => close(tab.id)}>
             <Icon name="ph-x" size={15} />
@@ -193,6 +229,7 @@ function TabItem({ tab, active, space }: { tab: Tab; active: boolean; space: Spa
         )}
       </ContextMenuContent>
     </ContextMenu>
+    </>
   )
 }
 
