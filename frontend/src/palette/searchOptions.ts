@@ -6,10 +6,17 @@ import type { TypeDef } from '@/api/types'
 
 /** Object's `CommandPalette.*` strings, verbatim (the typo in `onlyPartialResults` included). */
 export const PALETTE_TEXT = {
+  /** `CommandPalette.search.placeholder`: the palette's one input (content and actions). */
+  placeholder: 'Search for content and actions, or paste from clipboard',
+  /** `CommandPalette.search.placeholderSearch`: the extended search page's input. */
   placeholderSearch: 'Search content',
-  placeholderActions: 'Search for actions',
-  recentlyOpened: 'Recently Opened',
-  allActions: 'All actions',
+  /** `DateOptions.today.title` / `DateOptions.earlier.title`: the recent objects' groups. */
+  today: 'Today',
+  earlier: 'Earlier',
+  /** `CommandPalette.actions.label`: shown at the right of an action row, where content shows its type. */
+  actionLabel: 'Action',
+  /** Our string: the info icon's tooltip beside the input. */
+  info: 'Type to search your content and actions. Type a type or tag name to filter; Ctrl+Shift+Enter opens extended search.',
   emptyRecentsTitle: 'Nothing here yet',
   emptyRecentsDescription: 'Objects you open will show up here for quick access.',
   emptyTitle: (query: string) => `No results for "${query}"`,
@@ -18,16 +25,12 @@ export const PALETTE_TEXT = {
   clearFilter: 'Clear filter',
   inNewTab: 'in new tab', // dropdowns.toOpenInNewTab
   inSidePanel: 'in side panel', // dropdowns.toOpenInSidepanel
-  switchToActions: 'Switch to actions',
-  switchToSearch: 'Switch to search',
   createNewWithTitle: (structureTitle: string, title: string) => `Create new ${structureTitle} with title "${title}"`,
   structureFilter: (structureName: string) => `Only search for type "${structureName}"`,
   structureFilterExclude: (structureName: string) => `Exclude type "${structureName}"`,
   tagFilter: (tagName: string) => `Only search content tagged with "${tagName}"`,
   /** `shortcuts.openSearchPalette.name`: the dialog's accessible title. */
   searchTitle: 'Search this space',
-  /** `shortcuts.CommandPalette.name`. */
-  actionsTitle: 'Open action palette',
 } as const
 
 /** The palette's active filters: type ids to include and exclude, and a tag name. */

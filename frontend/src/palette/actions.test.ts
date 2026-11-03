@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { spaceEntry, typeDef } from '@/test/mockApi'
-import { buildActions, type ActionContext } from './actions'
+import { buildActions, matchActions, type ActionContext } from './actions'
 
 function ctx(partial: Partial<ActionContext> = {}): ActionContext {
   return {
@@ -93,5 +93,24 @@ describe('buildActions', () => {
 
   test('no focus mode action without a toggle', () => {
     expect(buildActions(ctx({ toggleFocusMode: null })).some((a) => a.id === 'toggleFocusMode')).toBe(false)
+  })
+})
+
+describe('matchActions', () => {
+  const labels = (q: string) => matchActions(buildActions(ctx()), q).map((a) => a.label)
+
+  test('an empty query lists none (the palette shows recents then)', () => {
+    expect(labels('')).toEqual([])
+    expect(labels('   ')).toEqual([])
+  })
+
+  test('matches a label by prefix, word prefixes or a substring, in list order', () => {
+    expect(labels('create')).toEqual(['Create Page', 'Create Person'])
+    expect(labels('cr pe')).toEqual(['Create Person'])
+    expect(labels('cal')).toEqual(['Open calendar'])
+    expect(labels('Toggle')).toEqual(['Toggle left sidebar', 'Toggle right sidepanel'])
+    expect(labels('graph')).toEqual(['Open global graph'])
+    expect(labels('alendar')).toEqual(['Open calendar'])
+    expect(labels('zzz')).toEqual([])
   })
 })
