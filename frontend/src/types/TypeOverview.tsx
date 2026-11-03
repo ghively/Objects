@@ -38,7 +38,9 @@ import {
   type RenderedSection,
   type SectionCtx,
 } from './dashboardSections'
+import { isTagType } from '@/object/ObjectHeader'
 import { queryRecommendations } from './queryRecommendations'
+import { TagChips } from './TagChips'
 import { SectionView } from './SectionView'
 import type { ViewsEdit } from './useTypeViews'
 
@@ -294,6 +296,7 @@ export function TypeOverview({
 
   return (
     <div className="flex flex-col gap-8 pt-2">
+      {isTagType(type) && <TagChips />}
       {visible.length === 0 && <p className="py-4 text-center text-[14px] text-fg-muted">{SECTION_TEXT.sectionEmpty}</p>}
       {visible.map((s) => {
         const heading = <SectionHeading section={s} type={type} sections={sections} update={update} />
