@@ -38,6 +38,7 @@ import {
 } from './extensions/blockSource'
 import { BlockSelection } from './extensions/blockSelection'
 import { FileDrop } from './extensions/fileDrop'
+import { MarkdownShortcuts } from './extensions/markdownShortcuts'
 import { RawBlock } from './extensions/rawBlock'
 import { SlashMenu } from './extensions/slashMenu'
 import { TaskListCommonMark, withTaskItems } from './extensions/taskListMarkdown'
@@ -164,6 +165,7 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
     BlockSelection.configure({ markdownPaste: !opts.singleParagraph }),
     M8Keys,
     FileDrop,
+    MarkdownShortcuts.configure({ numbered }),
   ]
 }
 
