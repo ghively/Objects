@@ -395,10 +395,39 @@ function ColorList({ editor, kind, current }: { editor: Editor; kind: ColorKind;
   )
 }
 
+/** "Color" ▸ "Text color" ▸ / "Background color" ▸. */
+function ColorSub({ editor, current }: { editor: Editor; current: string | null }) {
+  const subClass = 'max-h-[420px] overflow-auto'
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>{T.color}</DropdownMenuSubTrigger>
+      <DropdownMenuSubContent>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>{T.textColor}</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className={subClass}>
+            <ColorList editor={editor} kind="text" current={current} />
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>{T.backgroundColor}</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className={subClass}>
+            <ColorList editor={editor} kind="bg" current={current} />
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  )
+}
+
 export interface BlockStyleMenuProps {
   editor: Editor
   /** Called after an icon is picked or removed (the picker is not a menu item, so the menu stays open). */
   onDone?: () => void
+  /**
+   * Show the "Icon" row (default). Object's live block menu has none (catalog section 6): the
+   * block menu leaves it out, the block-selection bar's icon dropdown sets block icons.
+   */
+  icon?: boolean
 }
 
 /** The registry's first key for `id`, formatted for display (empty when it has none). */
@@ -413,7 +442,7 @@ function Shortcut({ id }: { id: string }) {
 }
 
 /** Object's first block-menu section; render inside a `DropdownMenuContent`. */
-export function BlockStyleMenu({ editor, onDone }: BlockStyleMenuProps) {
+export function BlockStyleMenu({ editor, onDone, icon = true }: BlockStyleMenuProps) {
   const style = currentBlockStyle(editor)
   const iconValue: IconValue | null = style.icon
     ? { type: isIconifyId(style.icon) ? 'iconify' : 'emoji', val: style.icon }
@@ -461,21 +490,23 @@ export function BlockStyleMenu({ editor, onDone }: BlockStyleMenuProps) {
         <Shortcut id="toDo" />
         <Check on={style.list === 'todo'} />
       </DropdownMenuItem>
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger>
-          <RowIcon icon="ph-smiley" />
-          {T.icon}
-        </DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className="p-0">
-          <IconPicker
-            value={iconValue}
-            onChange={(next) => {
-              setBlocksIcon(editor, next ? next.val : null)
-              onDone?.()
-            }}
-          />
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
+      {icon && (
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <RowIcon icon="ph-smiley" />
+            {T.icon}
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="p-0">
+            <IconPicker
+              value={iconValue}
+              onChange={(next) => {
+                setBlocksIcon(editor, next ? next.val : null)
+                onDone?.()
+              }}
+            />
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      )}
       <DropdownMenuItem onSelect={() => setQuote(editor, !style.quote)}>
         <RowIcon icon="ph-quotes" />
         {T.quote}
@@ -490,6 +521,7 @@ export function BlockStyleMenu({ editor, onDone }: BlockStyleMenuProps) {
       <DropdownMenuItem onSelect={() => toggleGroupBlocks(editor)}>
         <RowIcon icon="ph-arrows-in" />
         {T.group}
+        <Shortcut id="groupBlocks" />
       </DropdownMenuItem>
     </>
   )
@@ -502,29 +534,12 @@ export function BlockStyleMenu({ editor, onDone }: BlockStyleMenuProps) {
  * block alignment has no keys, so this is its one entry point; shown only when a
  * target block takes `align`), the quote's standout layout, and indenting non-list blocks.
  */
-export function BlockStyleExtras({ editor }: { editor: Editor }) {
+export function BlockStyleExtras({ editor, color = true }: { editor: Editor; color?: boolean }) {
   const style = currentBlockStyle(editor)
   const align = currentAlignment(editor)
-  const subClass = 'max-h-[420px] overflow-auto'
   return (
     <>
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger>{T.color}</DropdownMenuSubTrigger>
-        <DropdownMenuSubContent>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>{T.textColor}</DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className={subClass}>
-              <ColorList editor={editor} kind="text" current={style.color} />
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>{T.backgroundColor}</DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className={subClass}>
-              <ColorList editor={editor} kind="bg" current={style.color} />
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
+      {color && <ColorSub editor={editor} current={style.color} />}
       {align && (
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>{T.alignment}</DropdownMenuSubTrigger>
