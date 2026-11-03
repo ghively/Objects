@@ -60,7 +60,7 @@ function setup(p = props()) {
 
 async function openSearch(user: ReturnType<typeof userEvent.setup>) {
   await user.keyboard('{Control>}k{/Control}')
-  return screen.findByPlaceholderText(PALETTE_TEXT.placeholderSearch)
+  return screen.findByPlaceholderText(PALETTE_TEXT.placeholder)
 }
 
 function deferred<T>() {
@@ -72,11 +72,12 @@ function deferred<T>() {
 beforeEach(() => {
   for (const f of Object.values(mocked)) (f as { mockClear?: () => void }).mockClear?.()
   mocked.search.mockReset()
+  mocked.search.mockResolvedValue({ results: [], partial: false })
   mocked.createObject.mockClear()
   usePalette.setState({ open: false, mode: 'search' })
   usePeek.getState().close()
   useTabs.getState().reset()
-  useRecent.setState({ paths: [] })
+  useRecent.setState({ paths: [], openedAt: {} })
   useLinkIndex.setState({ types: [PAGE, PERSON, TASK, TAG], objects: [ALPHA, BEA, WORK, TODO], loaded: true })
 })
 
@@ -84,7 +85,7 @@ describe('shortcuts', () => {
   test('the footer lists the keys: navigate, abort, select, new tab, side panel', async () => {
     const { user } = setup()
     await user.keyboard('{Control>}k{/Control}')
-    await screen.findByPlaceholderText('Search content')
+    await screen.findByPlaceholderText(PALETTE_TEXT.placeholder)
     const hints = screen.getByRole('note', { name: 'Keyboard hints' })
     for (const t of ['↑↓ to navigate', 'Esc to abort', '↵ to select', 'Ctrl ↵ in new tab', 'Shift ↵ in side panel']) {
       expect(hints).toHaveTextContent(t)
@@ -100,11 +101,11 @@ describe('shortcuts', () => {
     expect(document.activeElement).toBe(editor)
 
     await user.keyboard('{Control>}k{/Control}')
-    expect(await screen.findByPlaceholderText('Search content')).toBeInTheDocument()
+    expect(await screen.findByPlaceholderText(PALETTE_TEXT.placeholder)).toBeInTheDocument()
     expect(usePalette.getState()).toMatchObject({ open: true, mode: 'search' })
 
     await user.keyboard('{Escape}')
-    await waitFor(() => expect(screen.queryByPlaceholderText('Search content')).toBeNull())
+    await waitFor(() => expect(screen.queryByPlaceholderText(PALETTE_TEXT.placeholder)).toBeNull())
     expect(usePalette.getState().open).toBe(false)
 
     // Ctrl+P with the caret in the editor too (and the browser's print is prevented).
@@ -114,7 +115,7 @@ describe('shortcuts', () => {
       editor.dispatchEvent(ev)
     })
     expect(ev.defaultPrevented).toBe(true)
-    expect(await screen.findByPlaceholderText('Search content')).toBeInTheDocument()
+    expect(await screen.findByPlaceholderText(PALETTE_TEXT.placeholder)).toBeInTheDocument()
     expect(usePalette.getState()).toMatchObject({ open: true, mode: 'search' })
     expect(paletteShortcut(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true, shiftKey: true }))).toBeNull()
     expect(paletteShortcut(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true }))).toBe('search')
@@ -168,28 +169,45 @@ describe('shortcuts', () => {
     expect(usePalette.getState().open).toBe(false)
   })
 
-  test('the footer switches modes', async () => {
+  test('one list: no mode switch; the placeholder names content and actions; opening "actions" shows the same list', async () => {
     const { user } = setup()
-    await openSearch(user)
-    await user.click(screen.getByRole('button', { name: /Switch to actions/ }))
-    expect(await screen.findByPlaceholderText('Search for actions')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /Switch to search/ }))
-    expect(await screen.findByPlaceholderText('Search content')).toBeInTheDocument()
+    const input = await openSearch(user)
+    expect(input).toHaveAttribute('placeholder', 'Search for content and actions, or paste from clipboard')
+    expect(screen.queryByRole('button', { name: /Switch to/ })).toBeNull()
+    expect(document.querySelector('[data-palette-info]')).not.toBeNull()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(usePalette.getState().open).toBe(false))
+    act(() => usePalette.getState().show('actions'))
+    expect(await screen.findByPlaceholderText(PALETTE_TEXT.placeholder)).toBeInTheDocument()
   })
 })
 
 describe('search mode', () => {
-  test('empty query lists recently opened objects; empty recents state', async () => {
-    useRecent.setState({ paths: ['People/Bea.md', 'Gone/Missing.md', 'Pages/Alpha.md'] })
+  test('empty query lists recent objects in Today / Earlier groups, type at the right; no actions; empty recents state', async () => {
+    const now = Date.now()
+    useRecent.setState({
+      paths: ['People/Bea.md', 'Gone/Missing.md', 'Tasks/Todo.md', 'Pages/Alpha.md'],
+      // Alpha was stored before open times existed: Earlier.
+      openedAt: { 'People/Bea.md': now, 'Gone/Missing.md': now, 'Tasks/Todo.md': now - 3 * 86_400_000 },
+    })
     const { user } = setup()
     await openSearch(user)
-    const group = screen.getByText('Recently Opened').closest('[cmdk-group]') as HTMLElement
-    const items = within(group).getAllByRole('option')
-    expect(items.map((i) => i.textContent)).toEqual(['BeaPerson', 'AlphaPage'])
+    const today = screen.getByText('Today').closest('[cmdk-group]') as HTMLElement
+    expect(within(today).getAllByRole('option').map((i) => i.textContent)).toEqual(['BeaPerson'])
+    const earlier = screen.getByText('Earlier').closest('[cmdk-group]') as HTMLElement
+    expect(within(earlier).getAllByRole('option').map((i) => i.textContent)).toEqual(['TodoTask', 'AlphaPage'])
+    // The type name is the row's last, right-hand element.
+    const bea = within(today).getByRole('option')
+    expect(bea.lastElementChild?.textContent).toBe('Person')
+    expect(document.querySelector('[data-action]')).toBeNull()
     expect(mocked.search).not.toHaveBeenCalled()
 
     await user.keyboard('{Escape}')
-    useRecent.setState({ paths: [] })
+    useRecent.setState({ paths: ['People/Bea.md'], openedAt: { 'People/Bea.md': now } })
+    await openSearch(user)
+    expect(screen.queryByText('Earlier')).toBeNull()
+    await user.keyboard('{Escape}')
+    useRecent.setState({ paths: [], openedAt: {} })
     await openSearch(user)
     expect(screen.getByText('Nothing here yet')).toBeInTheDocument()
     expect(screen.getByText('Objects you open will show up here for quick access.')).toBeInTheDocument()
@@ -287,6 +305,41 @@ describe('search mode', () => {
     const tab = useTabs.getState().tabs.find((t) => t.id === useTabs.getState().activeId)!
     expect(tab.sidepanel?.find((e) => e.isOpen)?.target).toEqual({ kind: 'object', path: 'Pages/Alpha.md' })
     expect(useTabs.getState().tabs).toHaveLength(2)
+  })
+
+  test('a recent row: enter opens, ctrl+enter in a new tab, shift+enter in the side panel', async () => {
+    useRecent.setState({ paths: ['Pages/Alpha.md'], openedAt: { 'Pages/Alpha.md': Date.now() } })
+    const { user } = setup()
+    await openSearch(user)
+    await user.keyboard('{Enter}')
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Pages/Alpha.md' })
+    expect(useTabs.getState().tabs).toHaveLength(1)
+
+    await openSearch(user)
+    await user.keyboard('{Control>}{Enter}{/Control}')
+    expect(usePalette.getState().open).toBe(false)
+    expect(useTabs.getState().tabs).toHaveLength(2)
+
+    await openSearch(user)
+    await user.keyboard('{Shift>}{Enter}{/Shift}')
+    const tab = useTabs.getState().tabs.find((t) => t.id === useTabs.getState().activeId)!
+    expect(tab.sidepanel?.find((e) => e.isOpen)?.target).toEqual({ kind: 'object', path: 'Pages/Alpha.md' })
+    expect(useTabs.getState().tabs).toHaveLength(2)
+  })
+
+  test('content and actions in one list: results first, then matching actions labelled "Action"', async () => {
+    mocked.search.mockResolvedValue({ results: [searchResult({ path: 'Pages/Alpha.md', title: 'Calendar notes' })], partial: false })
+    const { user } = setup()
+    const input = await openSearch(user)
+    await user.type(input, 'calendar')
+    await screen.findByText('Calendar notes')
+    const rows = screen.getAllByRole('option')
+    const resultAt = rows.findIndex((r) => r.hasAttribute('data-search-result'))
+    const actionAt = rows.findIndex((r) => r.getAttribute('data-action') === 'openCalendar')
+    expect(resultAt).toBe(0)
+    expect(actionAt).toBeGreaterThan(resultAt)
+    expect(rows[actionAt].textContent).toBe('Open calendarAction')
+    expect(rows.some((r) => r.textContent?.startsWith('Create Person'))).toBe(false)
   })
 
   test('a Task result opens in the peek on plain Enter', async () => {
@@ -388,92 +441,108 @@ describe('search mode', () => {
   })
 })
 
-describe('action mode', () => {
-  async function openActions(_user: ReturnType<typeof userEvent.setup>) {
-    act(() => usePalette.getState().show('actions'))
-    return screen.findByPlaceholderText(PALETTE_TEXT.placeholderActions)
+describe('actions in the list', () => {
+  /** Open the palette, type `q`, and return the action row `id` once it shows. */
+  async function findAction(user: ReturnType<typeof userEvent.setup>, q: string, id: string): Promise<HTMLElement> {
+    const input = await openSearch(user)
+    await user.type(input, q)
+    return waitFor(() => {
+      const el = document.querySelector(`[data-action="${id}"]`)
+      if (!el) throw new Error(`no action ${id}`)
+      return el as HTMLElement
+    })
   }
 
-  function action(id: string): HTMLElement {
-    const el = document.querySelector(`[data-action="${id}"]`)
-    if (!el) throw new Error(`no action ${id}`)
-    return el as HTMLElement
+  function actionLabels(): string[] {
+    return [...document.querySelectorAll('[data-action]')].map((o) => o.querySelector('[data-action-label]')?.textContent ?? '')
   }
 
-  test("actions list and each action's effect", async () => {
+  test('typing lists the matching actions in their order, each with "Action" at the right', async () => {
+    const { user } = setup()
+    const input = await openSearch(user)
+    await user.type(input, 'create')
+    await waitFor(() => expect(actionLabels()).toEqual(['Create Page', 'Create Person', 'Create Tag', 'Create Task']))
+    for (const row of document.querySelectorAll('[data-action]')) expect(row.lastElementChild?.textContent).toBe('Action')
+    await user.clear(input)
+    await user.type(input, 'toggle')
+    await waitFor(() => expect(actionLabels()).toEqual(['Toggle focus mode', 'Toggle left sidebar', 'Toggle right sidepanel']))
+  })
+
+  test('a matching action keeps "No results" away; no match at all shows it', async () => {
+    const { user } = setup()
+    const input = await openSearch(user)
+    await user.type(input, 'settings')
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled())
+    await waitFor(() => expect(actionLabels()).toEqual(['Open settings']))
+    expect(screen.queryByText('No results for "settings"')).toBeNull()
+    await user.clear(input)
+    await user.type(input, 'zzz')
+    expect(await screen.findByText('No results for "zzz"')).toBeInTheDocument()
+  })
+
+  test('actions are left out while a type or tag filter is set', async () => {
+    const { user } = setup()
+    const input = await openSearch(user)
+    await user.type(input, 'peo')
+    await user.click(await screen.findByText('Only search for type "Person"'))
+    await user.type(input, 'calendar')
+    await waitFor(() => expect(mocked.search).toHaveBeenLastCalledWith('calendar', expect.objectContaining({ types: ['person'] })))
+    expect(document.querySelector('[data-action]')).toBeNull()
+  })
+
+  test("each action's effect", async () => {
     const { user, p } = setup()
-    await openActions(user)
-    expect(screen.getByText('All actions')).toBeInTheDocument()
-    const labels = screen.getAllByRole('option').map((o) => o.textContent)
-    expect(labels).toEqual([
-      'Create Page',
-      'Create Person',
-      'Create Tag',
-      'Create Task',
-      'Open calendar',
-      'Open today',
-      'Open extended search',
-      'Open global graph',
-      'Open settings',
-      'Toggle focus mode', // M8 Task 17 (CommandPalette.actions.options.toggleFocusMode)
-      'Toggle left sidebar',
-      'Toggle right sidepanel',
-    ])
-
-    await user.click(action('openCalendar'))
+    await user.click(await findAction(user, 'calendar', 'openCalendar'))
     expect(usePalette.getState().open).toBe(false)
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'calendar' })
 
     useCalendar.setState({ view: 'month', anchor: '2001-01-01' })
-    await openActions(user)
-    await user.click(action('openToday'))
+    await user.click(await findAction(user, 'today', 'openToday'))
     expect(useCalendar.getState()).toMatchObject({ view: 'day', anchor: todayYmd() })
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'calendar' })
     expect(mocked.createDailyNote).not.toHaveBeenCalled()
 
-    await openActions(user)
-    await user.click(action('openGlobalGraph'))
+    await user.click(await findAction(user, 'global graph', 'openGlobalGraph'))
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'graph' })
 
-    await openActions(user)
-    await user.click(action('toggleLeftSidebar'))
+    await user.click(await findAction(user, 'left sidebar', 'toggleLeftSidebar'))
     expect(p.onToggleSidebar).toHaveBeenCalledTimes(1)
 
-    await openActions(user)
-    await user.click(action('toggleSidepanel'))
+    await user.click(await findAction(user, 'right sidepanel', 'toggleSidepanel'))
     expect(p.onToggleRightPanel).toHaveBeenCalledTimes(1)
 
     useFocusMode.setState({ on: false })
-    await openActions(user)
-    await user.click(action('toggleFocusMode'))
+    await user.click(await findAction(user, 'focus', 'toggleFocusMode'))
     expect(usePalette.getState().open).toBe(false)
     expect(useFocusMode.getState().on).toBe(true)
     useFocusMode.getState().leave()
 
-    await openActions(user)
-    await user.click(action('create:person'))
+    await user.click(await findAction(user, 'create person', 'create:person'))
     await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('person', {}))
     expect(mocked.createObject).toHaveBeenCalledTimes(1)
   })
 
-  test('typing filters actions', async () => {
+  test('Enter runs the selected action', async () => {
     const { user } = setup()
-    const input = await openActions(user)
-    await user.type(input, 'calendar')
-    const labels = screen.getAllByRole('option').map((o) => o.textContent)
-    expect(labels).toContain('Open calendar')
-    expect(labels).not.toContain('Create Person')
+    const input = await openSearch(user)
+    await user.type(input, 'open calendar')
+    await waitFor(() => expect(actionLabels()).toEqual(['Open calendar']))
+    // Results come first; with none, the action is the first row.
+    await waitFor(() => expect(screen.getAllByRole('option')[0]).toHaveAttribute('data-action', 'openCalendar'))
+    await user.keyboard('{Enter}')
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'calendar' })
   })
 
   test('open graph view only offered with an object open', async () => {
     const { user, p } = setup()
-    await openActions(user)
+    const input = await openSearch(user)
+    await user.type(input, 'graph view')
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled())
     expect(document.querySelector('[data-action="openGraphView"]')).toBeNull()
     await user.keyboard('{Escape}')
 
     act(() => useTabs.getState().open({ kind: 'object', path: 'Pages/Alpha.md' }))
-    await openActions(user)
-    await user.click(action('openGraphView'))
+    await user.click(await findAction(user, 'graph view', 'openGraphView'))
     expect(p.onShowRightPanel).toHaveBeenCalledTimes(1)
   })
 })
@@ -481,19 +550,17 @@ describe('action mode', () => {
 test('palette strings match reference', () => {
   const strings = fs.readFileSync(path.resolve(__dirname, STRINGS_FILE), 'utf8')
   const verbatim = [
+    PALETTE_TEXT.placeholder,
     PALETTE_TEXT.placeholderSearch,
-    PALETTE_TEXT.placeholderActions,
-    PALETTE_TEXT.recentlyOpened,
-    PALETTE_TEXT.allActions,
+    PALETTE_TEXT.today,
+    PALETTE_TEXT.earlier,
+    PALETTE_TEXT.actionLabel,
     PALETTE_TEXT.emptyRecentsTitle,
     PALETTE_TEXT.emptyRecentsDescription,
     PALETTE_TEXT.emptyDescription,
     PALETTE_TEXT.onlyPartialResults,
     PALETTE_TEXT.clearFilter,
-    PALETTE_TEXT.switchToActions,
-    PALETTE_TEXT.switchToSearch,
     PALETTE_TEXT.searchTitle,
-    PALETTE_TEXT.actionsTitle,
     ACTION_TEXT.openCalendar,
     ACTION_TEXT.openToday,
     ACTION_TEXT.openGlobalGraph,
@@ -502,6 +569,11 @@ test('palette strings match reference', () => {
     ACTION_TEXT.toggleSidepanel,
   ]
   for (const s of verbatim) expect(strings, s).toContain(`s:\`${s}\``)
+  // The keys, so a same-worded string elsewhere can't pass for them.
+  expect(strings).toContain('placeholder:{t:0,b:{t:2,i:[{t:3}],s:`Search for content and actions, or paste from clipboard`}}')
+  expect(strings).toContain('earlier:{title:{t:0,b:{t:2,i:[{t:3}],s:`Earlier`}}}')
+  expect(strings).toContain('today:{title:{t:0,b:{t:2,i:[{t:3}],s:`Today`}}}')
+  expect(strings).toContain('actions:{label:{t:0,b:{t:2,i:[{t:3}],s:`Action`}}')
   // Interpolated strings: their literal pieces, in order.
   const pieces = [
     'v:`No results for "`},{t:4,k:`query`}',

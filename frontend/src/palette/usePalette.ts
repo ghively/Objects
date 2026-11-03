@@ -1,4 +1,7 @@
-/** The command palette's open state and mode (not persisted). */
+/**
+ * The command palette's open state and mode (not persisted). Both modes show the same list,
+ * content and actions together; the mode only tells which key opened it (Ctrl+K toggles).
+ */
 import { create } from 'zustand'
 
 export type PaletteMode = 'search' | 'actions'
