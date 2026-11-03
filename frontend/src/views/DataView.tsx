@@ -115,6 +115,8 @@ export interface DataViewProps {
   compact?: boolean
   /** The reduced toolbar of the Calendar sections: layout, Calculations (see `Toolbar`). */
   toolbarCompact?: boolean
+  /** Drawn as the toolbar pill's last control (the Calendar Tasks section's `+`). */
+  toolbarEnd?: ReactNode
   pipeline?: Pipeline
   pausedHint?: string
   /** Replaces the "nothing here" block when the view has no rows (queries: "No content found"). */
@@ -603,6 +605,7 @@ export function DataView(props: DataViewProps) {
       pausedHint={props.pausedHint}
       extraPages={customizePages}
       structureId={viewTypes.length === 1 ? viewTypes[0].id : undefined}
+      end={props.toolbarEnd}
     />
   )
 

@@ -7,6 +7,7 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
+import { useTabs } from '@/nav/tabs'
 import { taskRow } from '@/tasks/taskFixtures'
 import { taskEntry } from '@/test/mockApi'
 import { listeners, mocked, pageRow, resetDayMocks, setDay, setRows, TODAY } from './dayFixtures'
@@ -65,6 +66,31 @@ describe('ThreeDaysView', () => {
     expect(mocked.createDailyNote).toHaveBeenCalledWith('2026-10-24')
     await waitFor(() => expect(container.querySelector('[data-object-path="DailyNotes/2026-10-24.md"]')).not.toBeNull())
     expect(within(columns()[1]).getByRole('button', { name: 'Daily Note' })).toBeInTheDocument()
+  })
+
+  test('test multi-day date row holds Reviewed, expand and the note menu for an existing note', async () => {
+    const user = userEvent.setup()
+    useTabs.setState({ open: vi.fn() } as never)
+    setDay('2026-10-22', { dailyNote: { path: 'DailyNotes/2026-10-22.md', reviewed: false } })
+    render(<ThreeDaysView anchor={TODAY} weekStart="sunday" />)
+    const col = columns()[0]
+    const pill = await within(col).findByTestId('day-note-pill')
+    // On the date row (in the header), in order: Reviewed, expand, `…`.
+    expect(within(col).getByTestId('day-header').contains(pill)).toBe(true)
+    await waitFor(() => expect(within(pill).getByRole('button', { name: 'More' })).toBeInTheDocument())
+    const controls = Array.from(pill.querySelectorAll('button'))
+    expect(controls.map((c) => c.getAttribute('aria-label'))).toEqual(['Reviewed', 'Open as Page', 'More'])
+    // Days without a note have none.
+    expect(within(columns()[1]).queryByTestId('day-note-pill')).toBeNull()
+    expect(within(columns()[2]).queryByTestId('day-note-pill')).toBeNull()
+    // Reviewed writes with the note's loaded version.
+    const reviewed = within(pill).getByRole('checkbox', { name: 'Reviewed' })
+    await waitFor(() => expect(reviewed).toBeEnabled())
+    await user.click(reviewed)
+    expect(mocked.updateProperties).toHaveBeenCalledWith('DailyNotes/2026-10-22.md', { reviewed: true }, 'v1')
+    // Expand opens the note as a page.
+    await user.click(within(pill).getByRole('button', { name: 'Open as Page' }))
+    expect(useTabs.getState().open).toHaveBeenCalledWith({ kind: 'object', path: 'DailyNotes/2026-10-22.md' }, { via: 'link' })
   })
 
   test('test views reload when a daily note is created elsewhere', async () => {

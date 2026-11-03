@@ -520,9 +520,9 @@ export function DaySections({ day, today, calendarDay, rows, filter = 'all', onC
                         </span>
                       )}
                     </div>
-                    <TasksAddMenu onCreate={() => void createTask()} onMove={(to) => void moveAll(to)} />
                   </div>
                 }
+                toolbarEnd={<TasksAddMenu onCreate={() => void createTask()} onMove={(to) => void moveAll(to)} />}
               />
               {toast && (
                 <p role="status" className="text-[13px] text-fg-muted">
@@ -672,7 +672,8 @@ function TasksAddMenu({ onCreate, onMove }: { onCreate(): void; onMove(to: Day):
           type="button"
           aria-label={SECTIONS_TEXT.add}
           title={SECTIONS_TEXT.add}
-          className="flex size-7 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"
+          // A pill button like the toolbar's own (`PillButton`): it sits last inside the pill.
+          className="flex h-7 items-center rounded-md px-1.5 text-fg-muted hover:bg-hover hover:text-fg"
         >
           <Icon name="ph-plus" size={16} />
         </button>
