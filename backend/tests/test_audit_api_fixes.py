@@ -273,7 +273,9 @@ def test_static_files_are_gzipped(m8_space_dir: Path, tmp_path: Path, monkeypatc
         for name in ("", "index.html", "app.js"):
             r = c.get(f"/{name}", headers={"accept-encoding": "gzip"})
             assert r.status_code == 200 and r.headers.get("content-encoding") == "gzip", name
-        assert c.get("/index.html", headers={"accept-encoding": "gzip"}).text == (static / "index.html").read_text()
+        # Bytes, not text: write_text writes CRLF on Windows and read_text folds it back to LF,
+        # while the server (rightly) serves the file's bytes unchanged.
+        assert c.get("/index.html", headers={"accept-encoding": "gzip"}).content == (static / "index.html").read_bytes()
         assert "content-encoding" not in c.get("/tiny.css", headers={"accept-encoding": "gzip"}).headers
 
 
