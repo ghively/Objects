@@ -17,6 +17,26 @@ import { useSettings } from '@/settings/useSettings'
 import { toggleDarkMode } from '@/theme/shortcuts'
 import { useSettingsModal } from '@/settings/useSettingsModal'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
+import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useUiStore } from './usePinned'
+import {
+  orderTypeEntries,
+  saveTypeOrder,
+  SORT_ALPHABETICALLY,
+  SORT_MANUALLY,
+  sortTypesAlphabetically,
+  sortTypesManually,
+  typeSortOf,
+  TYPES_MENU_LABEL,
+  type TypeSort,
+} from './typeOrder'
 
 export interface SidebarProps {
   types: TypeDef[]
@@ -189,6 +209,57 @@ function MainNavButton({
   )
 }
 
+/** The Queries entry's id in the manual Object Types order. */
+const QUERIES_ENTRY = 'queries'
+
+type DragProps = Record<string, unknown>
+
+/** One row of the type list; in manual sort it drags (its button carries the drag listeners). */
+function TypeEntryItem({ id, sortable, children }: { id: string; sortable: boolean; children: (drag: DragProps) => ReactNode }) {
+  if (!sortable) return <li data-type-entry={id}>{children({})}</li>
+  return <SortableTypeEntry id={id}>{children}</SortableTypeEntry>
+}
+
+function SortableTypeEntry({ id, children }: { id: string; children: (drag: DragProps) => ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  return (
+    <li
+      ref={setNodeRef}
+      data-type-entry={id}
+      style={{ transform: transform ? `translate3d(0, ${Math.round(transform.y)}px, 0)` : undefined, transition }}
+      className={cn(isDragging && 'relative z-10 opacity-70')}
+    >
+      {children({ ...attributes, ...listeners })}
+    </li>
+  )
+}
+
+/** The Object Types header `...`: Sort Manually | Sort Alphabetically, the current one checked. */
+function ObjectTypesMenu({ sort, onManual, onAlphabetical }: { sort: TypeSort; onManual(): void; onAlphabetical(): void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={TYPES_MENU_LABEL}
+          title={TYPES_MENU_LABEL}
+          className="flex size-6 items-center justify-center rounded-md text-fg-muted opacity-0 group-hover/sh:opacity-100 hover:bg-hover hover:text-fg focus-visible:opacity-100 data-[state=open]:opacity-100"
+        >
+          <Icon name="ph-dots-three" size={14} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="border-line bg-raised text-fg">
+        <DropdownMenuCheckboxItem checked={sort === 'manual'} onCheckedChange={() => sort !== 'manual' && onManual()}>
+          {SORT_MANUALLY}
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem checked={sort === 'alphabetical'} onCheckedChange={() => sort !== 'alphabetical' && onAlphabetical()}>
+          {SORT_ALPHABETICALLY}
+        </DropdownMenuCheckboxItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 export function Sidebar({
   types,
   activeTypeId,
@@ -229,41 +300,35 @@ export function Sidebar({
     }
     return map
   }, [collections])
-  // "Queries" sits among the types where a type of that name would be, in the by-name order.
-  type Entry = { kind: 'type'; type: TypeDef } | { kind: 'queries' }
-  const entries: Entry[] = [
-    ...types.map((type): Entry => ({ kind: 'type', type })),
-    { kind: 'queries' as const },
-  ].sort((a, b) => {
-    const name = (e: Entry) => (e.kind === 'type' ? e.type.pluralName : QUERIES_LABEL)
-    return name(a).localeCompare(name(b), undefined, { sensitivity: 'base' })
-  })
-  // The object types and the Queries entry: the `objects` block of `workspaceOrder`.
-  const objectTypes = (
-    <section aria-labelledby="sb-types">
-      <SectionHeader
-        id="sb-types"
-        action={
-          <button
-            type="button"
-            aria-label="Create object type"
-            title="Create object type"
-            onClick={() => onCreateType?.()}
-            className="flex size-6 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"
-          >
-            <Icon name="ph-plus" size={14} />
-          </button>
-        }
-      >
-        Object Types
-      </SectionHeader>
-      <ul className="flex flex-col gap-0.5 pb-2">
-        {entries.map((entry) => {
-          if (entry.kind === 'queries') {
-            return (
-              <li key="queries">
+  // The order: by name ("Queries" among the types where a type of that name would be), or the
+  // manual order (`ui.objectsSectionSortOption`, `ui.workspace.objects.ids`).
+  const ui = useUiStore((st) => st.ui)
+  const sort = typeSortOf(ui)
+  const names: Record<string, string> = { [QUERIES_ENTRY]: QUERIES_LABEL }
+  for (const t of types) names[t.id] = t.pluralName
+  const order = orderTypeEntries(Object.keys(names), names, sort, ui.workspace?.objects?.ids)
+  const manual = sort === 'manual'
+  const typeSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  const onTypeDragEnd = (e: DragEndEvent) => {
+    const from = order.indexOf(String(e.active.id))
+    const to = e.over ? order.indexOf(String(e.over.id)) : -1
+    if (from < 0 || to < 0 || from === to) return
+    void saveTypeOrder(arrayMove(order, from, to))
+  }
+  const typeById = new Map(types.map((t) => [t.id, t]))
+  const list = (
+    <ul className="flex flex-col gap-0.5 pb-2">
+      {order.map((id) => {
+        if (id === QUERIES_ENTRY) {
+          return (
+            <TypeEntryItem key={id} id={id} sortable={manual}>
+              {(drag) => (
                 <button
                   type="button"
+                  {...drag}
                   onClick={(e) => onOpenTarget?.({ kind: 'queries' }, { newTab: e.ctrlKey || e.metaKey })}
                   aria-current={queriesActive ? 'page' : undefined}
                   className={cn(
@@ -274,19 +339,24 @@ export function Sidebar({
                   <TypeChip type={QUERIES_CHIP} size={22} />
                   <span className="min-w-0 flex-1 truncate">{QUERIES_LABEL}</span>
                 </button>
-              </li>
-            )
-          }
-          const t = entry.type
-          const own = byType.get(t.id) ?? []
-          const folded = collapsed.has(t.id)
-          return (
-          <li key={t.id}>
+              )}
+            </TypeEntryItem>
+          )
+        }
+        const t = typeById.get(id)
+        if (!t) return null
+        const own = byType.get(t.id) ?? []
+        const folded = collapsed.has(t.id)
+        return (
+          <TypeEntryItem key={t.id} id={t.id} sortable={manual}>
+            {(drag) => (
+            <>
             <ContextMenu>
               <ContextMenuTrigger asChild>
                 <div className="group/type relative">
                   <button
                     type="button"
+                    {...drag}
                     onClick={() => onOpenType?.(t)}
                     aria-current={activeTypeId === t.id ? 'page' : undefined}
                     className={cn(
@@ -348,10 +418,44 @@ export function Sidebar({
                 ))}
               </ul>
             )}
-          </li>
-          )
-        })}
-      </ul>
+            </>
+            )}
+          </TypeEntryItem>
+        )
+      })}
+    </ul>
+  )
+  // The object types and the Queries entry: the `objects` block of `workspaceOrder`.
+  const objectTypes = (
+    <section aria-labelledby="sb-types">
+      <SectionHeader
+        id="sb-types"
+        action={
+          <div className="flex items-center gap-0.5">
+            <ObjectTypesMenu sort={sort} onManual={() => void sortTypesManually(order)} onAlphabetical={() => void sortTypesAlphabetically()} />
+            <button
+              type="button"
+              aria-label="Create object type"
+              title="Create object type"
+              onClick={() => onCreateType?.()}
+              className="flex size-6 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"
+            >
+              <Icon name="ph-plus" size={14} />
+            </button>
+          </div>
+        }
+      >
+        Object Types
+      </SectionHeader>
+      {manual ? (
+        <DndContext id="object-types-order" sensors={typeSensors} collisionDetection={closestCenter} onDragEnd={onTypeDragEnd}>
+          <SortableContext items={order} strategy={verticalListSortingStrategy}>
+            {list}
+          </SortableContext>
+        </DndContext>
+      ) : (
+        list
+      )}
     </section>
   )
   return (
