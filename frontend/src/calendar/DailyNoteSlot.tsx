@@ -30,9 +30,23 @@ export interface DailyNoteSlotProps {
   onToggleCollapsed?(): void
   /** Heading only: drawn in the header's pill, left of the `…` menu (the Day view's Reviewed). */
   headerExtra?: ReactNode
+  /** Without the heading: where the note's `…` menu is drawn (the multi-day views' date row). */
+  menuSlot?: HTMLElement | null
+  /** Each version the note's editor adopts (the multi-day Reviewed writes with it). */
+  onVersion?(version: string): void
 }
 
-export function DailyNoteSlot({ day, note, heading, onChanged, collapsed, onToggleCollapsed, headerExtra }: DailyNoteSlotProps) {
+export function DailyNoteSlot({
+  day,
+  note,
+  heading,
+  onChanged,
+  collapsed,
+  onToggleCollapsed,
+  headerExtra,
+  menuSlot: ownerMenuSlot,
+  onVersion,
+}: DailyNoteSlotProps) {
   /** A note this slot created or found by a 409, shown before the range reload brings it. */
   const [local, setLocal] = useState<{ day: Day; path: string } | null>(null)
   const [focus, setFocus] = useState(false)
@@ -78,7 +92,8 @@ export function DailyNoteSlot({ day, note, heading, onChanged, collapsed, onTogg
       mode="inline"
       placeholder={DAILY_NOTE_TEXT.placeholder}
       autoFocus={focus}
-      menuSlot={heading ? menuSlot : null}
+      menuSlot={heading ? menuSlot : (ownerMenuSlot ?? null)}
+      onVersion={onVersion}
       onDeleted={() => {
         setLocal(null)
         onChanged?.()
