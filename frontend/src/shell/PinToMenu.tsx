@@ -1,5 +1,6 @@
 // Pin menu items for a `…` menu: "Pin to Sidebar" / "Unpin from space", and the "Pin to..."
 // submenu listing "Pinned" and every custom section, each checked when the item is in it.
+import type { ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
 import {
   DropdownMenuCheckboxItem,
@@ -61,8 +62,8 @@ export function PinToMenu({ pin }: { pin: PinTarget }) {
   )
 }
 
-/** "Pin to Sidebar" / "Unpin from space" followed by "Pin to...". */
-export function PinMenuItems({ pin }: { pin: PinTarget }) {
+/** "Pin to Sidebar" / "Unpin from space" (with an optional key hint) followed by "Pin to...". */
+export function PinMenuItems({ pin, shortcut }: { pin: PinTarget; shortcut?: ReactNode }) {
   const { isPinned, pin: doPin, unpin } = usePinned()
   const ref = refOf(pin)
   const pinned = !!ref && isPinned(ref)
@@ -71,6 +72,7 @@ export function PinMenuItems({ pin }: { pin: PinTarget }) {
       <DropdownMenuItem onSelect={() => (pinned && ref ? void unpin(ref) : void doPin(pin))}>
         <Icon name={pinned ? 'ph-push-pin-slash' : 'ph-push-pin'} size={14} />
         {pinned ? PIN_MENU_TEXT.unpinFromSpace : PIN_MENU_TEXT.pinToSidebar}
+        {shortcut}
       </DropdownMenuItem>
       <PinToMenu pin={pin} />
     </>
