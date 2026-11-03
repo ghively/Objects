@@ -917,7 +917,7 @@ def _task_field_defs() -> list[PropertyDefinition]:
 
 
 # Fields Capacities' basic media types define beyond the ones we store (key -> name, kind).
-# Label fields start with no options; the user edits the set.
+# Label fields start with Capacities' option set (`_MEDIA_LABEL_SETS`); the user edits it.
 _MEDIA_EXTRA_FIELDS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "PDF": (
         ("numberOfPages", "Number of Pages", "number"),
@@ -935,10 +935,99 @@ _MEDIA_EXTRA_FIELDS: dict[str, tuple[tuple[str, str, str], ...]] = {
 }
 
 
+# Capacities' option sets for those label fields: (option id, en-US text), from
+# ``components.Media{PDF,Image,WebResource,Audio}.propertyDefinitions.media_*.set``, in the
+# order of their ids. Option colours are not in the reference: our choice (round-robin, and for
+# Image "Colors" the theme colour of the same name where there is one).
+_MEDIA_LABEL_SETS: dict[tuple[str, str], tuple[tuple[str, str], ...]] = {
+    ("PDF", "documentType"): (
+        ("academic-paper", "Academic paper"), ("article", "Article"), ("book", "Book"),
+        ("educational-material", "Educational material"),
+        ("financial-document", "Financial document"), ("form", "Form"),
+        ("legal-document", "Legal document"), ("letter", "Letter"), ("manual", "Manual"),
+        ("marketing-material", "Marketing material"), ("other", "Other"),
+        ("policy-document", "Policy document"), ("presentation", "Presentation"),
+        ("report", "Report"), ("scanned-document", "Scanned document"),
+    ),
+    ("PDF", "topic"): (
+        ("ai-ml", "AI/ML"), ("arts-culture", "Arts & culture"), ("business", "Business"),
+        ("design", "Design"), ("education", "Education"), ("finance", "Finance"),
+        ("government", "Government"), ("history", "History"), ("legal", "Legal"),
+        ("marketing", "Marketing"), ("medicine", "Medicine"), ("operations", "Operations"),
+        ("other", "Other"), ("personal", "Personal"), ("policy", "Policy"),
+        ("product", "Product"), ("programming", "Programming"), ("research", "Research"),
+        ("science", "Science"), ("technology", "Technology"),
+    ),
+    ("Image", "category"): (
+        ("book-page", "Book Page"), ("business-card", "Business Card"), ("code", "Code"),
+        ("cover", "Cover"), ("diagram", "Diagram"), ("document", "Document"),
+        ("handwritten-note", "Handwritten Note"), ("illustration", "Illustration"),
+        ("infographic", "Infographic"), ("logo-icon", "Logo/Icon"), ("map", "Map"),
+        ("medical", "Medical"), ("meme", "Meme"), ("other", "Other"), ("painting", "Painting"),
+        ("photo-animal", "Photo (Animal)"), ("photo-architecture", "Photo (Architecture)"),
+        ("photo-event", "Photo (Event)"), ("photo-food", "Photo (Food)"),
+        ("photo-nature", "Photo (Nature)"), ("photo-object", "Photo (Object)"),
+        ("photo-people", "Photo (People)"), ("receipt", "Receipt"),
+        ("scientific", "Scientific"), ("screenshot", "Screenshot"),
+        ("ui-mockup", "UI Mockup"), ("whiteboard", "Whiteboard"),
+    ),
+    ("Image", "colors"): (
+        ("beige", "Beige"), ("black", "Black"), ("blue", "Blue"), ("brown", "Brown"),
+        ("cyan", "Cyan"), ("fuchsia", "Fuchsia"), ("gold", "Gold"), ("gray", "Gray"),
+        ("green", "Green"), ("indigo", "Indigo"), ("magenta", "Magenta"),
+        ("orange", "Orange"), ("pink", "Pink"), ("purple", "Purple"), ("red", "Red"),
+        ("tan", "Tan"), ("teal", "Teal"), ("turquoise", "Turquoise"), ("violet", "Violet"),
+        ("white", "White"), ("yellow", "Yellow"),
+    ),
+    ("Weblink", "category"): (
+        ("about", "About"), ("app", "App"), ("article", "Article"), ("audio", "Audio"),
+        ("blog-post", "Blog Post"), ("code", "Code"), ("course", "Course"),
+        ("documentation", "Documentation"), ("event", "Event"),
+        ("forum-thread", "Forum Thread"), ("guide", "Guide"), ("how-to", "How-To"),
+        ("image-gallery", "Image Gallery"), ("infographic", "Infographic"),
+        ("marketplace", "Marketplace"), ("news", "News"), ("other", "Other"),
+        ("podcast", "Podcast"), ("portfolio", "Portfolio"), ("product", "Product"),
+        ("profile", "Profile"), ("q-and-a", "Q&A"), ("recipe", "Recipe"),
+        ("repository", "Repository"), ("service", "Service"), ("shop", "Shop"),
+        ("social-post", "Social Post"), ("tool", "Tool"), ("tutorial", "Tutorial"),
+        ("video", "Video"), ("webinar", "Webinar"),
+    ),
+    ("Weblink", "topic"): (
+        ("academic", "Academic"), ("ai-ml", "AI/ML"), ("art", "Art"), ("business", "Business"),
+        ("creative", "Creative"), ("current-events", "Current Events"), ("design", "Design"),
+        ("education", "Education"), ("entertainment", "Entertainment"),
+        ("finance", "Finance"), ("fitness", "Fitness"), ("food", "Food"),
+        ("gaming", "Gaming"), ("health", "Health"), ("learning", "Learning"),
+        ("lifestyle", "Lifestyle"), ("marketing", "Marketing"), ("media", "Media"),
+        ("news", "News"), ("other", "Other"), ("politics", "Politics"),
+        ("productivity", "Productivity"), ("programming", "Programming"),
+        ("research", "Research"), ("science", "Science"), ("technology", "Technology"),
+        ("tools", "Tools"), ("travel", "Travel"), ("wellness", "Wellness"),
+    ),
+    ("Audio", "category"): (
+        ("ambient", "Ambient"), ("dictation", "Dictation"), ("interview", "Interview"),
+        ("lecture", "Lecture"), ("meeting", "Meeting"), ("music", "Music"), ("other", "Other"),
+        ("phone-call", "Phone Call"), ("podcast", "Podcast"), ("voice-memo", "Voice Memo"),
+    ),
+}  # fmt: skip
+
+
+def _media_label_set(name: str, key: str) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for i, (oid, text) in enumerate(_MEDIA_LABEL_SETS.get((name, key), ())):
+        color = THEME_COLORS[(i + 7) % len(THEME_COLORS)]
+        if key == "colors" and oid in THEME_COLORS:
+            color = oid
+        out.append({"id": oid, "text": text, "color": color, "icon": None})
+    return out
+
+
 def _media_field_defs(name: str) -> list[PropertyDefinition]:
     out = []
     for key, label, kind in _MEDIA_EXTRA_FIELDS.get(name, ()):
-        options: dict[str, Any] = {"isArray": key == "colors", "set": []} if kind == "label" else {}
+        options: dict[str, Any] = (
+            {"isArray": key == "colors", "set": _media_label_set(name, key)} if kind == "label" else {}
+        )
         out.append(
             PropertyDefinition.from_json(
                 {
