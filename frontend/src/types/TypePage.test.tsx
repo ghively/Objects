@@ -206,6 +206,16 @@ describe('TypePage', () => {
     await waitFor(() => expect(lastSaved()[1].dashboard.sections.at(-1)).toEqual({ key: 'noBacklinks', collapsed: false }))
   })
 
+  test('the Tag type\'s Overview lists the tags as chips with counts', async () => {
+    const TAG = typeDef({ id: 'tag', name: 'Tag', pluralName: 'Tags', propertyDefinitions: [TITLE] })
+    const linux = objectSummary({ path: 'Tags/Linux.md', type: 'tag', title: 'Linux' })
+    useLinkIndex.setState({ types: [TASK, TAG], objects: [...ROWS.map((r) => ({ ...r.summary, tags: ['Linux'] })), linux], loaded: true })
+    load(views({ activeTab: 'overview' }, ['collections']))
+    render(<TypePage type={TAG} />)
+    const chips = await screen.findByTestId('tag-chips')
+    expect(within(chips).getByTestId('tag-chip')).toHaveTextContent('Linux4')
+  })
+
   test('Add a section lists the queries of the type under "Queries & Views"', async () => {
     const user = userEvent.setup()
     const q = query({ id: 'q1', name: 'Open tasks', definition: { ...query({ id: 'x' }).definition, structures: [{ id: 'task' }] } })
