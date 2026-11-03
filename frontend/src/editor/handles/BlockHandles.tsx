@@ -7,8 +7,8 @@
  * `+` inserts an empty paragraph below (Shift-click: above) and opens the `/`
  * menu in it. Clicking the drag handle selects the block and opens the block
  * menu; dragging it moves the block (ProseMirror's drag of a node selection).
- * While two or more blocks are selected a pill shows "{count} blocks"
- * (`EditorPanel.selectionStats.blocks`).
+ * The block count of a selection is the block-selection bar's
+ * (`selectionBar/BlockSelectionBar.tsx`).
  */
 import type { Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
@@ -16,7 +16,7 @@ import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import { createPortal } from 'react-dom'
 import { Icon } from '@/components/Icon'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { blockSelectionRange, insertBlock, selectBlocks } from '../extensions/blockSelection'
+import { insertBlock, selectBlocks } from '../extensions/blockSelection'
 import { openSlashMenu } from '../extensions/slashMenu'
 import { BLOCK_PARENTS, leafBlockAt } from '../nodes/blockOptions'
 import { BlockMenu } from './BlockMenu'
@@ -69,8 +69,6 @@ const HANDLE_WIDTH = 40
 export function BlockHandles({ editor }: { editor: Editor }) {
   const [hover, setHover] = useState<Hover | null>(null)
   const [menu, setMenu] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
-  const [selected, setSelected] = useState(0)
-  const [editorRect, setEditorRect] = useState<DOMRect | null>(null)
   const overHandles = useRef(false)
   const menuOpen = menu !== null
 
@@ -97,14 +95,10 @@ export function BlockHandles({ editor }: { editor: Editor }) {
     }
   }, [editor, menuOpen])
 
-  // A change to the document or a scroll moves blocks: drop the handles; track the selection count.
+  // A change to the document or a scroll moves blocks: drop the handles.
   useEffect(() => {
     const onTransaction = ({ transaction }: { transaction: { docChanged: boolean } }) => {
       if (transaction.docChanged && !menuOpen) setHover(null)
-      const range = blockSelectionRange(editor.state)
-      const count = range ? range.blocks.length : 0
-      setSelected(count)
-      setEditorRect(count >= 2 ? editor.view.dom.getBoundingClientRect() : null)
     }
     const onScroll = () => {
       if (!menuOpen) setHover(null)
@@ -205,20 +199,6 @@ export function BlockHandles({ editor }: { editor: Editor }) {
           }
         }}
       />
-      {selected >= 2 &&
-        createPortal(
-          <div
-            className="block-selection-pill"
-            role="status"
-            style={{
-              left: editorRect ? editorRect.left + editorRect.width / 2 : '50%',
-              bottom: 24,
-            }}
-          >
-            {HANDLE_TEXT.blocks(selected)}
-          </div>,
-          document.body,
-        )}
     </>
   )
 }

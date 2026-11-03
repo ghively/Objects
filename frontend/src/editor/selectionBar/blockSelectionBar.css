@@ -1,0 +1,62 @@
+/*
+ * The block-selection bar (Capacities' editor panel). Tokens only. Its size, padding and shadow are
+ * our choice (the data views' selection bar: 40px tall, 8px corners), centred under the editor.
+ */
+.block-selection-bar {
+  position: fixed;
+  /* With the block handles: above a peek's dialog (z-50). */
+  z-index: 50;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100vw - 32px);
+  height: 40px;
+  padding: 0 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: var(--text);
+  box-shadow: var(--card-shadow);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+.block-bar-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.block-bar-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.block-bar-button:hover,
+.block-bar-button[data-state='open'],
+.block-bar-button[aria-pressed='true'] {
+  background: var(--bg-hover);
+}
+
+.block-bar-delete {
+  color: var(--label-text-red);
+}
+
+.block-bar-divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--border-subtle);
+}

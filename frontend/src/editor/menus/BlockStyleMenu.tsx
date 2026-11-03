@@ -338,12 +338,12 @@ export function indentRow(editor: Editor, dir: 1 | -1): boolean {
   return dir === 1 ? editor.commands.indentBlock() : editor.commands.unindentBlock()
 }
 
-function Check({ on }: { on: boolean }) {
+export function Check({ on }: { on: boolean }) {
   return <CheckIcon className="ml-auto size-4" style={{ visibility: on ? 'visible' : 'hidden' }} aria-hidden />
 }
 
 /** A row's left icon: a Phosphor icon, or Capacities' text icon (`a)`, `i)`). */
-function RowIcon({ icon, alt, color }: { icon: string | null; alt?: string; color?: string }) {
+export function RowIcon({ icon, alt, color }: { icon: string | null; alt?: string; color?: string }) {
   if (!icon) {
     return (
       <span aria-hidden className="inline-flex w-4 justify-center text-xs text-muted-foreground">
@@ -378,7 +378,7 @@ function Swatch({ kind, color }: { kind: ColorKind; color: (typeof BLOCK_COLORS)
   )
 }
 
-function ColorList({ editor, kind, current }: { editor: Editor; kind: ColorKind; current: string | null }) {
+export function ColorList({ editor, kind, current }: { editor: Editor; kind: ColorKind; current: string | null }) {
   return (
     <>
       <DropdownMenuItem onSelect={() => setBlockColor(editor, kind, null)}>
