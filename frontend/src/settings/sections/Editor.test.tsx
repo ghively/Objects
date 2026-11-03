@@ -157,4 +157,50 @@ describe('EditorSection', () => {
     await user.click(within(g).getByRole('radio', { name: 'Full path above' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ nestedBacklinkView: 'showFullPathAbove' }, expect.anything())
   })
+
+  test('test always create inline links and hide object type settings switches patch settings', async () => {
+    const user = userEvent.setup()
+    render(<EditorSection />)
+    for (const [label, key] of [
+      ['Always create inline links', 'alwaysCreateInlineLinks'],
+      ['Hide object type settings outside of settings', 'hideStructureSettings'],
+    ] as const) {
+      const sw = screen.getByRole('switch', { name: label })
+      expect(sw).toHaveAttribute('aria-checked', 'false')
+      await user.click(sw)
+      expect(mocked.patchSettings).toHaveBeenLastCalledWith({ [key]: true }, expect.anything())
+    }
+    expect(
+      screen.getByText('With this setting, linking to other objects will always default to creating an inline link, even at the start of an empty block.'),
+    ).toBeInTheDocument()
+  })
+
+  test('test highlight style offers default and minimal', async () => {
+    const user = userEvent.setup()
+    render(<EditorSection />)
+    const g = screen.getByRole('radiogroup', { name: 'Highlight Style' })
+    expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Default', 'Minimal'])
+    expect(within(g).getByRole('radio', { name: 'Default' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(g).getByText('No rail — the highlight blends in as plain text.')).toBeInTheDocument()
+    await user.click(within(g).getByRole('radio', { name: 'Minimal' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ highlightStyle: 'minimal' }, expect.anything())
+  })
+
+  test('test spellcheck language saves a normalised tag and refuses a bad one', async () => {
+    const user = userEvent.setup()
+    render(<EditorSection />)
+    const input = screen.getByRole('textbox', { name: 'Spellcheck language' })
+    expect(input).toHaveAttribute('placeholder', 'e.g. "en-GB"...')
+    await user.type(input, 'english{Enter}')
+    expect(screen.getByText('Invalid language tag...')).toBeInTheDocument()
+    expect(mocked.patchSettings).not.toHaveBeenCalled()
+    await user.clear(input)
+    await user.type(input, 'de_ch{Enter}')
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ spellCheckLang: 'de-CH' }, expect.anything())
+    expect(input).toHaveValue('de-CH')
+    expect(screen.queryByText('Invalid language tag...')).not.toBeInTheDocument()
+    await user.clear(input)
+    await user.tab()
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ spellCheckLang: null }, expect.anything())
+  })
 })

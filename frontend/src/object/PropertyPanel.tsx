@@ -18,6 +18,7 @@ import { propertyIsEmpty } from '@/properties/format'
 import { kindIcon } from '@/properties/kinds'
 import { PropertyMenu } from '@/properties/PropertyMenu'
 import { DeletePropertySection, PropertySettings } from '@/properties/PropertySettings'
+import { useSettings } from '@/settings/useSettings'
 import { LAYOUT_KEYS, removeProperty } from '@/properties/typeEdits'
 import type { TypeEditor } from './useTypeEditor'
 
@@ -250,6 +251,8 @@ function Row({
   menu?: { open: boolean; onOpenChange(open: boolean): void; content: ReactNode }
   children: ReactNode
 }) {
+  // "Hide object type settings outside of settings": the label stays, its menu goes.
+  const hideMenu = useSettings((s) => s.settings.hideStructureSettings)
   const heading = (
     <>
       <IconOrEmoji icon={icon} size={15} fallback="ph-note-blank" />
@@ -258,7 +261,7 @@ function Row({
   )
   return (
     <div className="px-1" data-property-row={label}>
-      {menu ? (
+      {menu && !hideMenu ? (
         <Popover open={menu.open} onOpenChange={menu.onOpenChange}>
           <PopoverTrigger asChild>
             <button
@@ -516,6 +519,7 @@ export function PropertyPanel({
         <PopoverTrigger asChild>
           <button
             type="button"
+            data-structure-setting=""
             disabled={!canEditType || !!type?.basic}
             title={type?.basic ? BASIC_TYPE_INFO : undefined}
             className="mt-5 flex items-center gap-2 px-1 text-[15px] text-fg-muted opacity-15 transition-opacity group-hover/panel:opacity-100 hover:text-fg disabled:hover:text-fg-muted"

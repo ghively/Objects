@@ -51,6 +51,7 @@ const OUR_STRINGS = new Set<string>([
   // Polish 2026-11-03
   APPEARANCE_TEXT.textSize,
   APPEARANCE_TEXT.textSizeDescription,
+  EDITOR_TEXT.spellCheckLangDescription,
 ])
 
 function leaves(o: unknown): string[] {
