@@ -4,7 +4,10 @@ Object's entity "Export" offers Markdown with the option "Include media" ("Adds 
 images to the zip."). An Object file already is Markdown with wikilinks, so the export is the
 file's own bytes; with media it is a zip of ``<stem>.md`` plus every image and attachment the
 file references, each at its space-relative path (so the file's links still resolve inside
-the zip). Its other formats and options are not offered (our choice).
+the zip). Polish item 23 adds the dialog's other choices (`ExportOptions`): Markdown with
+subpages (a zip of the embedded objects, followed to any depth), the title as heading 1 and
+links as paths instead of wikilinks; and the PDF (a printable page), Word and LaTeX formats,
+built by `exportdoc`.
 
 A referenced file is one named by ``coverImage``, a Markdown image or link
 (``![alt](path)``, ``[text](path)``) or a wikilink (``![[path]]``) outside code. Each is
@@ -23,27 +26,35 @@ from __future__ import annotations
 
 import io
 import os
+import posixpath
 import re
 import tempfile
 import time
 import zipfile
+from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote
 
+from .exportdoc import Doc, parse_blocks, render_docx, render_html, render_latex
 from .media import Attachment, NotServed, attachment_path, list_attachments
-from .relink import code_ranges, wikilink_targets
+from .relink import code_ranges, wikilink_spans, wikilink_targets
 from .typedefs import read_raw
 
 if TYPE_CHECKING:
     from .space import Space
+    from .typemodel import TypeDefinition
 
 __all__ = [
+    "FORMATS",
     "Export",
+    "ExportOptions",
+    "build_doc",
     "content_disposition",
     "export_dir",
     "export_object",
     "export_object_to_file",
+    "export_properties",
     "referenced_media",
 ]
 
@@ -142,42 +153,212 @@ def _find_attachment(attachments: list[Attachment], path: str) -> str | None:
     return None
 
 
+def _lookup(root: Path, candidate: str, cache: dict) -> str | None:
+    """The servable file ``candidate`` names (space-relative), or None. ``cache`` holds the
+    attachment list once it was needed."""
+    try:
+        full = attachment_path(root, candidate)
+    except FileNotFoundError:
+        if "attachments" not in cache:
+            cache["attachments"] = list_attachments(root)
+        found = _find_attachment(cache["attachments"], candidate)
+        if found is None:
+            return None
+        try:
+            full = attachment_path(root, found)
+        except (FileNotFoundError, NotServed, OSError, ValueError):
+            return None
+    except (NotServed, OSError, ValueError):
+        return None
+    return full.relative_to(root).as_posix()
+
+
 def referenced_media(root: Path, rel: str, fm: dict, body: str) -> list[str]:
     """The existing, servable files ``rel`` references, as space-relative POSIX paths."""
     root = Path(root).resolve()
     out: list[str] = []
-    attachments: list[Attachment] | None = None
+    cache: dict = {}
     for candidate in _candidates(rel, fm, body):
-        try:
-            full = attachment_path(root, candidate)
-        except FileNotFoundError:
-            if attachments is None:
-                attachments = list_attachments(root)
-            found = _find_attachment(attachments, candidate)
-            if found is None:
-                continue
-            try:
-                full = attachment_path(root, found)
-            except (FileNotFoundError, NotServed, OSError, ValueError):
-                continue
-        except (NotServed, OSError, ValueError):
-            continue
-        real = full.relative_to(root).as_posix()
-        if real not in out:
+        real = _lookup(root, candidate, cache)
+        if real is not None and real not in out:
             out.append(real)
     return out
 
 
-def _write_zip(space: Space, rel: str, stem: str, out) -> None:
-    """The media zip of ``rel`` into the binary file object ``out`` (attachments streamed)."""
-    raw = read_raw(space.root, rel)
+def _media_resolver(root: Path, rel: str):
+    """``target -> space-relative file or None``, read as `referenced_media` reads a path."""
+    root = Path(root).resolve()
+    folder = PurePosixPath(rel).parent.as_posix()
+    cache: dict = {}
+
+    def resolve(target: str) -> str | None:
+        target = unquote(target.strip())
+        if not target or _SCHEME_RE.match(target):
+            return None
+        tries = [target] + ([f"{folder}/{target}"] if folder != "." and not target.startswith("/") else [])
+        for t in tries:
+            found = _lookup(root, t, cache)
+            if found is not None:
+                return found
+        return None
+
+    return resolve
+
+
+@dataclass(frozen=True)
+class ExportOptions:
+    """The dialog's choices (`entity.settings.export.options.*`, `typesetPdf.mode.*`).
+
+    Markdown: ``subpages`` ("Export folder containing all subpages"), ``media``, ``title_h1``
+    ("Include title as heading 1") and ``wikilinks`` ("Links as wikilinks"; on by default,
+    our choice, so the default export is the file's own bytes). PDF: ``style``, ``paper``,
+    ``embedded``, ``outline``, ``hide_empty`` (on by default, as Object), ``type_labels``
+    and ``hidden`` (deselected property keys). Word and LaTeX use the property choices.
+    """
+
+    format: str = "md"
+    media: bool = False
+    subpages: bool = False
+    title_h1: bool = False
+    wikilinks: bool = True
+    style: str = "notes"
+    paper: str = "A4"
+    embedded: bool = True
+    outline: bool = False
+    hide_empty: bool = True
+    type_labels: bool = False
+    hidden: frozenset[str] = field(default_factory=frozenset)
+
+
+FORMATS = ("md", "html", "docx", "latex")
+_DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+_FM_RE = re.compile(r"^---[ \t]*\r?\n(?:.*?\r?\n)?---[ \t]*(?:\r?\n|$)", re.S)
+_WIKI_PARTS = re.compile(r"^!?\[\[([^\[\]|#\n]+)(#[^\[\]|\n]*)?(?:\|([^\[\]\n]*))?\]\]$")
+_DATA_VIEW = re.compile(r"^(collection|query):")
+_NOT_EXPORTED = {"entity_title", "entity_icon", "entity_backlinks"}
+
+
+def _title(raw, rel: str) -> str:
+    t = raw.fm.get("title")
+    return t.strip() if isinstance(t, str) and t.strip() else PurePosixPath(rel).stem
+
+
+def _is_object_target(target: str) -> bool:
+    ext = PurePosixPath(target).suffix.lower()
+    return not _DATA_VIEW.match(target) and (ext in ("", ".md") or len(ext) > 9)
+
+
+def _subpages(space: Space, rel: str) -> list[str]:
+    """The objects ``rel`` embeds (``![[Object]]``), and theirs in turn, in order (our
+    reading of Object's "linked subpages": embedded objects, followed to any depth)."""
+    out: list[str] = []
+    seen = {rel}
+    queue = [rel]
+    while queue:
+        cur = queue.pop(0)
+        try:
+            body = read_raw(space.root, cur).of.body
+        except (OSError, ValueError):
+            continue
+        for target, start, _end in wikilink_spans(body):
+            if not body.startswith("!", start) or not _is_object_target(target):
+                continue
+            found = space.resolve(target.strip(), cur)
+            if found and found not in seen and (space.root / found).is_file():
+                seen.add(found)
+                out.append(found)
+                queue.append(found)
+    return out
+
+
+def _markdown(space: Space, rel: str, opts: ExportOptions, zip_path: str) -> bytes:
+    """The ``.md`` of ``rel`` with the Markdown options applied; its own bytes by default.
+
+    ``zip_path`` is where the file lands in the export, which relative links start from.
+    BOM, newlines and frontmatter are kept as they are.
+    """
+    data = (space.root / rel).read_bytes()
+    if not opts.title_h1 and opts.wikilinks:
+        return data
+    bom = data.startswith(b"\xef\xbb\xbf")
+    text = data[3 if bom else 0 :].decode("utf-8", "surrogateescape")
+    nl = "\r\n" if "\r\n" in text else "\n"
+    m = _FM_RE.match(text)
+    head, body = (text[: m.end()], text[m.end() :]) if m else ("", text)
+    if not opts.wikilinks:
+        body = _paths_for_wikilinks(space, rel, body, PurePosixPath(zip_path).parent.as_posix())
+    if opts.title_h1:
+        title = _title(read_raw(space.root, rel), rel)
+        first = body.lstrip("\r\n").split("\n", 1)[0].rstrip("\r")
+        if first.strip() != f"# {title}":
+            body = f"# {title}{nl}{nl}" + body.lstrip("\r\n")
+    out = (head + body).encode("utf-8", "surrogateescape")
+    return (b"\xef\xbb\xbf" if bom else b"") + out
+
+
+def _paths_for_wikilinks(space: Space, rel: str, body: str, from_folder: str) -> str:
+    """``[[Title]]`` as ``[Title](path)`` ("Export links as [[title]] instead of [title](path)").
+
+    The path is relative to ``from_folder`` and URL-encoded; an embedded file stays an image or
+    link to its file; a link that resolves to nothing becomes its text (our choice).
+    """
+    media = _media_resolver(space.root, rel)
+
+    def rel_url(target_rel: str) -> str:
+        p = posixpath.relpath(target_rel, from_folder or ".")
+        return quote(p, safe="/")
+
+    parts: list[str] = []
+    last = 0
+    for target, start, end in wikilink_spans(body):
+        m = _WIKI_PARTS.match(body[start:end])
+        if m is None:
+            continue
+        embed = body.startswith("!", start)
+        target = target.strip()
+        label = (m.group(3) or "").strip()
+        if _DATA_VIEW.match(target):
+            continue
+        if _is_object_target(target):
+            found = space.resolve(target, rel)
+            text = label or target.rsplit("/", 1)[-1].removesuffix(".md")
+            new = f"[{text}]({rel_url(found)})" if found else text
+        else:
+            found = media(target)
+            text = label or (target.rsplit("/", 1)[-1] if not embed else "")
+            new = f"{'!' if embed else ''}[{text}]({rel_url(found)})" if found else (label or target)
+        parts.append(body[last:start])
+        parts.append(new)
+        last = end
+    parts.append(body[last:])
+    return "".join(parts)
+
+
+def _write_zip(space: Space, rel: str, stem: str, out, opts: ExportOptions | None = None) -> None:
+    """The zip of ``rel`` into the binary file object ``out`` (attachments streamed): its
+    ``.md`` at the top, with subpages at their space-relative paths and, with ``media``,
+    every file they reference."""
+    opts = opts or ExportOptions(media=True)
+    files = [(rel, f"{stem}.md")] + [(p, p) for p in (_subpages(space, rel) if opts.subpages else [])]
+    written: set[str] = set()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, strict_timestamps=False) as zf:
-        zf.writestr(f"{stem}.md", raw.data)
-        for item in referenced_media(space.root, rel, raw.fm, raw.of.body):
-            try:
-                zf.write(space.root / item, item)
-            except OSError:
-                continue  # gone or unreadable since it was found: skipped like a missing one
+        for src, dest in files:
+            if dest in written:
+                continue
+            written.add(dest)
+            zf.writestr(dest, _markdown(space, src, opts, dest))
+        if not opts.media:
+            return
+        for src, _dest in files:
+            raw = read_raw(space.root, src)
+            for item in referenced_media(space.root, src, raw.fm, raw.of.body):
+                if item in written:
+                    continue
+                written.add(item)
+                try:
+                    zf.write(space.root / item, item)
+                except OSError:
+                    continue  # gone or unreadable since it was found: skipped like a missing one
 
 
 def _object_rel(space: Space, path: str) -> str:
@@ -187,31 +368,122 @@ def _object_rel(space: Space, path: str) -> str:
     return rel
 
 
-def export_object(space: Space, path: str, media: bool) -> Export:
+def _type_of(space: Space, raw) -> TypeDefinition | None:
+    return next((t for t in space.types if t.name == raw.typeName), None)
+
+
+def _is_empty(value: Any) -> bool:
+    return value is None or value == "" or value == [] or value == {}
+
+
+_ISO_RE = re.compile(r"^(\d{4}-\d\d-\d\d)T(\d\d:\d\d)(?::\d\d(?:\.\d+)?)?(?:Z|[+-]\d\d:?\d\d)?$")
+
+
+def _value_text(value: Any) -> str:
+    """A property value as one line of Markdown (links stay ``[[...]]`` for the renderers)."""
+    if isinstance(value, bool):
+        return "Yes" if value else "No"  # our string
+    if isinstance(value, list):
+        return ", ".join(t for t in (_value_text(v) for v in value) if t)
+    if isinstance(value, dict):
+        return ", ".join(f"{k}: {_value_text(v)}" for k, v in value.items() if not _is_empty(v))
+    text = str(value)
+    m = _ISO_RE.match(text)
+    if m:
+        return f"{m.group(1)} {m.group(2)}"
+    return text.replace("\r\n", " ").replace("\n", " ")
+
+
+def export_properties(space: Space, path: str) -> list[dict[str, Any]]:
+    """The properties the dialog's "Properties" list offers: ``{key, name, empty}`` in the
+    type's order (title, icon and backlinks are the page itself, not properties)."""
+    rel = _object_rel(space, path)
+    raw = read_raw(space.root, rel)
+    tdef = _type_of(space, raw)
+    if tdef is None:
+        return []
+    return [
+        {"key": p.key, "name": p.name, "empty": _is_empty(raw.fm.get(p.key))}
+        for p in tdef.propertyDefinitions
+        if p.type not in _NOT_EXPORTED
+    ]
+
+
+def build_doc(space: Space, rel: str, opts: ExportOptions) -> Doc:
+    """The object at ``rel`` as an `exportdoc.Doc` (title, type, shown properties, blocks)."""
+    raw = read_raw(space.root, rel)
+    tdef = _type_of(space, raw)
+    props: list[tuple[str, str]] = []
+    for p in tdef.propertyDefinitions if tdef else []:
+        if p.type in _NOT_EXPORTED or p.key in opts.hidden:
+            continue
+        value = raw.fm.get(p.key)
+        if opts.hide_empty and _is_empty(value):
+            continue
+        props.append((p.name, "" if _is_empty(value) else _value_text(value)))
+    blocks = parse_blocks(raw.of.body, _media_resolver(space.root, rel))
+    for b in blocks:
+        if b.kind != "embed" or not opts.embedded:
+            continue
+        found = space.resolve(b.src, rel)
+        if not found or found == rel or not (space.root / found).is_file():
+            continue
+        child = read_raw(space.root, found)
+        b.title = _title(child, found) if not b.title or b.title == b.src else b.title
+        # One level: an embed inside the embedded object shows as its title (our choice).
+        b.children = parse_blocks(child.of.body, _media_resolver(space.root, found))
+    return Doc(_title(raw, rel), raw.typeName if tdef else "", props, blocks)
+
+
+def export_object(space: Space, path: str, media: bool, options: ExportOptions | None = None) -> Export:
     """The export of the object at ``path``, in memory. Writes nothing.
 
-    Raises `ValueError` (not an object path, 400) and `KeyError` (no such file, 404).
-    The route uses `export_object_to_file`, which never holds the zip in memory.
+    Raises `ValueError` (not an object path or an unknown format, 400) and `KeyError`
+    (no such file, 404). The route uses `export_object_to_file`, which never holds a zip
+    in memory.
     """
+    opts = options or ExportOptions(media=media)
+    if opts.format not in FORMATS:
+        raise ValueError(f"Unknown export format {opts.format!r}")
     rel = _object_rel(space, path)
     stem = PurePosixPath(rel).stem
-    if not media:
-        return Export((space.root / rel).read_bytes(), f"{stem}.md", "text/markdown; charset=utf-8")
+    if opts.format == "html":
+        tdef = _type_of(space, read_raw(space.root, rel))
+        page = render_html(
+            build_doc(space, rel, opts),
+            style=opts.style,
+            paper=opts.paper,
+            outline=opts.outline,
+            type_label=opts.type_labels,
+            font=tdef.font if tdef else "sans-serif",
+        )
+        return Export(page.encode("utf-8"), f"{stem}.html", "text/html; charset=utf-8")
+    if opts.format == "docx":
+        data = render_docx(build_doc(space, rel, opts), type_label=opts.type_labels)
+        return Export(data, f"{stem}.docx", _DOCX_TYPE)
+    if opts.format == "latex":
+        tex = render_latex(build_doc(space, rel, opts), type_label=opts.type_labels)
+        return Export(tex.encode("utf-8"), f"{stem}.tex", "application/x-tex; charset=utf-8")
+    if not (opts.media or opts.subpages):
+        return Export(_markdown(space, rel, opts, f"{stem}.md"), f"{stem}.md", "text/markdown; charset=utf-8")
     buf = io.BytesIO()
-    _write_zip(space, rel, stem, buf)
+    _write_zip(space, rel, stem, buf, opts)
     return Export(buf.getvalue(), f"{stem}.zip", "application/zip")
 
 
-def export_object_to_file(space: Space, path: str, media: bool) -> Export:
-    """The export of the object at ``path``; with ``media``, as a temporary zip ``file``.
+def export_object_to_file(
+    space: Space, path: str, media: bool, options: ExportOptions | None = None
+) -> Export:
+    """The export of the object at ``path``; a zip as a temporary ``file``.
 
-    Without ``media`` it is the ``.md`` bytes (``data``), as `export_object`. With it, the
-    zip is written to a new file in `export_dir` and returned as ``Export.file`` (``data``
-    empty): the caller sends that file and then calls `Export.cleanup`. Writes nothing in
-    the space. Raises `ValueError` (400) and `KeyError` (404), as `export_object`.
+    A single file (``.md``, ``.html``, ``.docx``, ``.tex``) is ``data``, as `export_object`.
+    A zip (media or subpages) is written to a new file in `export_dir` and returned as
+    ``Export.file`` (``data`` empty): the caller sends that file and then calls
+    `Export.cleanup`. Writes nothing in the space. Raises as `export_object`.
     """
-    if not media:
-        return export_object(space, path, False)
+    opts = options or ExportOptions(media=media)
+    if opts.format != "md" or not (opts.media or opts.subpages):
+        return export_object(space, path, opts.media, opts)
     rel = _object_rel(space, path)
     stem = PurePosixPath(rel).stem
     folder = export_dir()
@@ -221,7 +493,7 @@ def export_object_to_file(space: Space, path: str, media: bool) -> Export:
     out = Export(b"", f"{stem}.zip", "application/zip", file=Path(name))
     try:
         with os.fdopen(fd, "wb") as f:
-            _write_zip(space, rel, stem, f)
+            _write_zip(space, rel, stem, f, opts)
     except BaseException:
         out.cleanup()
         raise
