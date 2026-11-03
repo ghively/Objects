@@ -1,8 +1,9 @@
 // M8 Task 9: focus mode hides the shell's chrome and restores it; objects only.
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { FOCUS_ATTR, FocusMode } from './FocusMode'
+import { TYPING_ATTR } from './TypingFade'
 import { FOCUS_TEXT, NO_TIMER, useFocusMode } from './useFocusMode'
 
 function Chrome() {
@@ -96,5 +97,19 @@ describe('FocusMode', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'M', ctrlKey: true, shiftKey: true, bubbles: true }))
     })
     expect(useFocusMode.getState().on).toBe(true)
+  })
+
+  test('also fades the chrome while typing, on any tab and with focus mode off', () => {
+    useTabs.getState().open({ kind: 'trash' })
+    render(
+      <>
+        <FocusMode />
+        <div className="ProseMirror" data-testid="ed" />
+      </>,
+    )
+    fireEvent.keyDown(screen.getByTestId('ed'), { key: 'a' })
+    expect(document.documentElement.hasAttribute(TYPING_ATTR)).toBe(true)
+    fireEvent.mouseMove(document, { clientX: 3, clientY: 4 })
+    expect(document.documentElement.hasAttribute(TYPING_ATTR)).toBe(false)
   })
 })
