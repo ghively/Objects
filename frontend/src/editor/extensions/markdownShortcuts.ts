@@ -97,12 +97,22 @@ export const MarkdownShortcuts = Extension.create<MarkdownShortcutsOptions>({
 
           let c = chain().deleteRange(range)
           if (marks.heading) c = c.setHierarchy(`H${marks.heading}` as Hierarchy)
-          // An icon on the text block itself; in a list it goes on the item (below).
-          if (marks.icon && !marks.list) c = c.setBlockOption('icon', BLOCK_ICON_DEFAULT, blockPos)
+          // An icon on the text block itself; in a list it goes on the item (below). A block icon
+          // is saved only on a top-level text block, never inside a quote, so a quote skips it
+          // (the quote is still made) rather than show an icon that is lost on save.
+          if (marks.icon && !marks.list && !marks.quote) c = c.setBlockOption('icon', BLOCK_ICON_DEFAULT, blockPos)
           if (marks.quote) c = c.wrapIn('blockquote')
           if (marks.list) c = c.setListType(marks.list)
           if (marks.icon && marks.list)
-            c = c.command(({ tr, commands }) => (listItemAt(tr) ? commands.setListItemOptions({ icon: BLOCK_ICON_DEFAULT }) : true))
+            c = c.command(({ tr, commands }) => {
+              if (!listItemAt(tr)) return true
+              // The item's comment goes at the end of its first line; keep the caret before it,
+              // so what is typed next comes before the comment (`- Text <!-- item: … -->`).
+              const caret = tr.selection.from
+              commands.setListItemOptions({ icon: BLOCK_ICON_DEFAULT })
+              tr.setSelection(TextSelection.create(tr.doc, caret))
+              return true
+            })
           if (marks.toggle) {
             let caret = 0
             c = c

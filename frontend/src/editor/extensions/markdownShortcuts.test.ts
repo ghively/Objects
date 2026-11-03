@@ -175,6 +175,39 @@ describe('combined shortcuts (Space only after the last one)', () => {
     expect(pathTo(ed, '>1. x')).toEqual(['paragraph'])
   })
 
+  test('"|()" makes a quote without an icon (a quoted paragraph cannot save one)', () => {
+    const ed = fresh()
+    type(ed, '|() Q')
+    expect(pathTo(ed, 'Q')).toEqual(['blockquote', 'paragraph'])
+    expect(optionsOf(ed, 'paragraph')).toEqual([])
+    expect(ed.state.doc.textContent).toBe('Q')
+  })
+
+  /** Every block option and list-item option in the doc, by node type. */
+  function allOptions(ed: TiptapEditor): string[] {
+    const out: string[] = []
+    ed.state.doc.descendants((node) => {
+      for (const attr of ['blockOptions', 'options']) {
+        for (const o of (node.attrs[attr] as Option[] | null | undefined) ?? []) {
+          out.push(`${node.type.name}:${o.key}=${String(o.value)}`)
+        }
+      }
+    })
+    return out.sort()
+  }
+
+  test.each(['() ', '|() ', '>() ', '-() ', '[]() ', 'a)() ', '#() ', '##() ', '>#() ', '|-() ', '>|() ', '>[]() ', '|#() '])(
+    '"%s" shows only what saves: the typed block round-trips through the Markdown',
+    (prefix) => {
+      const ed = fresh()
+      type(ed, `${prefix}Text`)
+      const reloaded = fresh()
+      loadBody(reloaded, serializeBody(ed))
+      expect(allOptions(reloaded)).toEqual(allOptions(ed))
+      expect(pathTo(reloaded, 'Text')).toEqual(pathTo(ed, 'Text'))
+    },
+  )
+
   test('a toggle typed this way saves as a toggle container', () => {
     const ed = fresh()
     type(ed, '># Title')
