@@ -271,10 +271,13 @@ def _subpages(space: Space, rel: str) -> list[str]:
     return out
 
 
-def _markdown(space: Space, rel: str, opts: ExportOptions, zip_path: str) -> bytes:
+def _markdown(
+    space: Space, rel: str, opts: ExportOptions, zip_path: str, placed: dict[str, str] | None = None
+) -> bytes:
     """The ``.md`` of ``rel`` with the Markdown options applied; its own bytes by default.
 
-    ``zip_path`` is where the file lands in the export, which relative links start from.
+    ``zip_path`` is where the file lands in the export, which relative links start from;
+    ``placed`` maps a space path to where it lands when that is not its own path.
     BOM, newlines and frontmatter are kept as they are.
     """
     data = (space.root / rel).read_bytes()
@@ -286,7 +289,7 @@ def _markdown(space: Space, rel: str, opts: ExportOptions, zip_path: str) -> byt
     m = _FM_RE.match(text)
     head, body = (text[: m.end()], text[m.end() :]) if m else ("", text)
     if not opts.wikilinks:
-        body = _paths_for_wikilinks(space, rel, body, PurePosixPath(zip_path).parent.as_posix())
+        body = _paths_for_wikilinks(space, rel, body, PurePosixPath(zip_path).parent.as_posix(), placed)
     if opts.title_h1:
         title = _title(read_raw(space.root, rel), rel)
         first = body.lstrip("\r\n").split("\n", 1)[0].rstrip("\r")
@@ -296,7 +299,9 @@ def _markdown(space: Space, rel: str, opts: ExportOptions, zip_path: str) -> byt
     return (b"\xef\xbb\xbf" if bom else b"") + out
 
 
-def _paths_for_wikilinks(space: Space, rel: str, body: str, from_folder: str) -> str:
+def _paths_for_wikilinks(
+    space: Space, rel: str, body: str, from_folder: str, placed: dict[str, str] | None = None
+) -> str:
     """``[[Title]]`` as ``[Title](path)`` ("Export links as [[title]] instead of [title](path)").
 
     The path is relative to ``from_folder`` and URL-encoded; an embedded file stays an image or
@@ -322,7 +327,7 @@ def _paths_for_wikilinks(space: Space, rel: str, body: str, from_folder: str) ->
         if _is_object_target(target):
             found = space.resolve(target, rel)
             text = label or target.rsplit("/", 1)[-1].removesuffix(".md")
-            new = f"[{text}]({rel_url(found)})" if found else text
+            new = f"[{text}]({rel_url((placed or {}).get(found, found))})" if found else text
         else:
             found = media(target)
             text = label or (target.rsplit("/", 1)[-1] if not embed else "")
@@ -339,14 +344,18 @@ def _write_zip(space: Space, rel: str, stem: str, out, opts: ExportOptions | Non
     ``.md`` at the top, with subpages at their space-relative paths and, with ``media``,
     every file they reference."""
     opts = opts or ExportOptions(media=True)
-    files = [(rel, f"{stem}.md")] + [(p, p) for p in (_subpages(space, rel) if opts.subpages else [])]
+    subpages = _subpages(space, rel) if opts.subpages else []
+    # The root sits at the top, unless a subpage already has that name: then at its own path.
+    main = f"{stem}.md" if f"{stem}.md" not in subpages else rel
+    files = [(rel, main)] + [(p, p) for p in subpages]
+    placed = {rel: main}
     written: set[str] = set()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, strict_timestamps=False) as zf:
         for src, dest in files:
             if dest in written:
                 continue
             written.add(dest)
-            zf.writestr(dest, _markdown(space, src, opts, dest))
+            zf.writestr(dest, _markdown(space, src, opts, dest, placed))
         if not opts.media:
             return
         for src, _dest in files:

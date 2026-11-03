@@ -88,7 +88,7 @@ class Doc:
 # Reading Markdown
 
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})\s*([^`\s]*)")
-_HEADING = re.compile(r"^ {0,3}(#{1,6})\s+(.*?)\s*#*\s*$")
+_HEADING = re.compile(r"^ {0,3}(#{1,6})\s+(.*?)(?:\s+#+)?\s*$")
 _HR = re.compile(r"^ {0,3}([-*_])(?:\s*\1){2,}\s*$")
 _COMMENT = re.compile(r"^ {0,3}<!--.*-->\s*$")
 _ITEM = re.compile(r"^([ \t]*)([-*+]|\d+[.)])\s+(?:\[([ xX])\]\s+)?(.*)$")
@@ -401,7 +401,7 @@ hr{border:0;border-top:1px solid #d0d4da}
 
 _FONTS = {
     "serif": "Georgia,'Times New Roman',serif",
-    "mono": "Consolas,'Courier New',monospace",
+    "monospace": "Consolas,'Courier New',monospace",
 }
 
 
@@ -765,11 +765,20 @@ def tex_escape(s: str) -> str:
     return "".join(_TEX_ESC.get(c, c) for c in s)
 
 
+# TeX commands that read or write files: a note's math must not do that when the .tex is compiled.
+_TEX_FILE_CMDS = re.compile(r"\\(input|include|includeonly|openin|openout|read|write|immediate|special)(?![A-Za-z])")
+
+
+def _tex_math(text: str) -> str:
+    """Math text for the .tex, with file-reading or -writing commands made harmless (our choice)."""
+    return _TEX_FILE_CMDS.sub(lambda m: "\\backslash " + m.group(1), text)
+
+
 def _tex_runs(text: str) -> str:
     out = []
     for r in parse_inline(text):
         if r.math:
-            out.append(f"${r.text}$")
+            out.append(f"${_tex_math(r.text)}$")
             continue
         s = tex_escape(r.text)
         if r.code:
@@ -820,7 +829,7 @@ def _tex_blocks(blocks: list[Block]) -> list[str]:
         elif b.kind == "code":
             out.append("\\begin{verbatim}\n" + b.text.replace("\\end{verbatim}", "\\end {verbatim}") + "\n\\end{verbatim}")
         elif b.kind == "math":
-            out.append("\\[\n" + b.text + "\n\\]")
+            out.append("\\[\n" + _tex_math(b.text) + "\n\\]")
         elif b.kind == "hr":
             out.append("\\noindent\\rule{\\linewidth}{0.4pt}\n")
         elif b.kind == "table" and b.rows:
