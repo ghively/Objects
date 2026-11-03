@@ -483,6 +483,16 @@ export function sharesKeyByDesign(a: string, b: string): boolean {
 /** The ids only bound while presenting (the plan: "the last three only while presenting"). */
 export const PRESENTATION_ONLY_IDS: readonly string[] = ['exitPresentationMode', 'nextPresentationSlide', 'previousPresentationSlide']
 
+/**
+ * Keys added by the 2026-11-02 polish pass. `groupBlocks` (Ctrl+G, the key Object's block
+ * menu shows next to "Group"; name `shortcuts.groupBlocks.name`) is bound in
+ * `editor/handles/groupKey.ts`, with blocks selected only.
+ */
+export const POLISH_SHORTCUTS: ShortcutDef[] = [
+  def('groupBlocks', 'block', 'Group selected blocks or ungroup selected group block', ['Mod-g'], 'editor', V, true),
+]
+
 registerShortcuts(EXISTING_SHORTCUTS)
 registerShortcuts(M7_SHORTCUTS)
 registerShortcuts(M8_SHORTCUTS)
+registerShortcuts(POLISH_SHORTCUTS)

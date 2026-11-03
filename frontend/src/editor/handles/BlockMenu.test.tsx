@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test } from 'vitest'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { selectBlocks } from '../extensions/blockSelection'
 import { BlockMenu, TURN_INTO_ITEMS } from './BlockMenu'
+import { GroupBlocksKey } from './groupKey'
 
 const editors: TiptapEditor[] = []
 afterEach(() => {
@@ -46,6 +47,13 @@ async function pick(editor: TiptapEditor, i: number, item: string, sub?: RegExp)
   view.unmount()
 }
 
+/** A row's text without its shortcut hint and hidden check mark. */
+const label = (el: Element) =>
+  Array.from(el.childNodes)
+    .filter((n) => !(n instanceof Element && (n.getAttribute('aria-hidden') === 'true' || n.getAttribute('data-slot') === 'dropdown-menu-shortcut')))
+    .map((n) => n.textContent ?? '')
+    .join('')
+
 const BODY = 'One\n\n<!-- block: color=bg-red align=center -->\nTwo\n\nThree\n'
 
 describe('<BlockMenu>', () => {
@@ -68,40 +76,36 @@ describe('<BlockMenu>', () => {
     ])
   })
 
-  test("the block menu has Object's sections, labels and Hierarchy order", async () => {
+  test("the block menu has Object's live set, in its order, with key hints", async () => {
     const editor = headless(BODY)
     selectBlocks(editor, blockPos(editor, 0))
     renderMenu(editor)
     const menu = await screen.findByRole('menu')
-    const names = within(menu)
-      .getAllByRole('menuitem')
-      .map((el) => el.textContent ?? '')
-    const starts = (label: string) => names.findIndex((n) => n.startsWith(label))
-    const order = [
+    const rows = within(menu).getAllByRole('menuitem')
+    const names = rows.map((el) => label(el))
+    // Object's live block menu (catalog section 6), then Object's own rows (no other entry point).
+    expect(names).toEqual([
       'Hierarchy (Standard)',
       'List',
       'To-do',
-      'Icon',
       'Quote',
       'Toggle',
       'Group',
-      'Insert block above',
-      'Insert block below',
       'Turn into...',
       'Copy',
       'Duplicate',
       'Remove',
-      'Color', // ours, kept: nothing else removes a block colour
-      'Standout',
-      'Indent',
-      'Unindent',
-    ]
-    const at = order.map(starts)
-    expect(at.every((i) => i >= 0)).toBe(true)
-    expect([...at].sort((a, b) => a - b)).toEqual(at)
-    // Gone: Object has no "Turn Into" type list, Move up/down or Remove style here.
-    expect(names.some((n) => /^(Turn Into|Move up|Move down|Remove style|Delete)/.test(n))).toBe(false)
-    expect(within(menu).getAllByRole('separator')).toHaveLength(3)
+      'Alignment', // ours (M9): block alignment's one entry point
+      'Standout', // ours
+      'Indent', // ours
+      'Unindent', // ours
+    ])
+    // Key hints from the registry: Group Ctrl+G, Duplicate Ctrl+D, Remove Backspace.
+    const hintOf = (name: string) => rows[names.indexOf(name)].querySelector('[data-slot="dropdown-menu-shortcut"]')?.textContent
+    expect(hintOf('Group')).toMatch(/^(Ctrl\+G|⌘G)$/)
+    expect(hintOf('Duplicate')).toMatch(/^(Ctrl\+D|⌘D)$/)
+    expect(hintOf('Remove')).toBe('Backspace')
+    expect(within(menu).getAllByRole('separator')).toHaveLength(2)
 
     const hierarchy = await openSub(menu, /^Hierarchy/)
     expect(within(hierarchy).getAllByRole('menuitem').map((m) => (m.textContent ?? '').replace(/(Ctrl|Alt|Mod|⌘).*$/, ''))).toEqual([
@@ -163,11 +167,25 @@ describe('<BlockMenu>', () => {
     )
     await pick(plain, 2, 'Remove')
     expect(serializeBody(plain)).toBe(BODY)
+  })
 
-    await pick(plain, 1, 'Insert block above')
-    plain.commands.insertContent('Above')
-    await pick(plain, 0, 'Insert block below')
-    plain.commands.insertContent('Below')
-    expect(serializeBody(plain)).toBe('One\n\nBelow\n\nAbove\n\n<!-- block: color=bg-red align=center -->\nTwo\n\nThree\n')
+  test('Ctrl+G groups the selected blocks, and ungroups them again', () => {
+    const editor = new TiptapEditor({ extensions: [...editorExtensions(), GroupBlocksKey] })
+    loadBody(editor, BODY)
+    editors.push(editor)
+    selectBlocks(editor, blockPos(editor, 0))
+    const press = () =>
+      editor.view.someProp('handleKeyDown', (f) =>
+        f(editor.view, new KeyboardEvent('keydown', { key: 'g', code: 'KeyG', ctrlKey: true, bubbles: true, cancelable: true })),
+      )
+    expect(press()).toBe(true)
+    expect(serializeBody(editor)).toBe('<!-- group -->\nOne\n<!-- /group -->\n\n<!-- block: color=bg-red align=center -->\nTwo\n\nThree\n')
+    editor.commands.setTextSelection(3)
+    selectBlocks(editor, blockPos(editor, 0))
+    expect(press()).toBe(true)
+    expect(serializeBody(editor)).toBe(BODY)
+    // Without a block selection the key is left alone.
+    editor.commands.setTextSelection(2)
+    expect(press()).toBeFalsy()
   })
 })
