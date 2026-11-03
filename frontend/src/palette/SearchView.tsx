@@ -2,7 +2,9 @@
  * The search palette's one list, content and actions together (Capacities' "Search for content and
  * actions, or paste from clipboard"; polish audit backlog 2):
  *
- * - empty query: the clipboard's offers (`paste.ts`), then the recently opened objects grouped
+ * - empty query: the clipboard's offers (`paste.ts`), or, when `clipboard-read` is not already
+ *   granted, one "Clipboard" row that reads it when picked (no read, so no browser prompt, on
+ *   open), then the recently opened objects grouped
  *   "Today" / "Earlier" by when they were last opened (an entry stored before open times existed
  *   counts as Earlier), each with its type at the right;
  * - a query: the server's results (debounced 100 ms, the previous request aborted, stale answers
@@ -37,7 +39,7 @@ import { setObjectDragData } from '@/shell/objectDrag'
 import { TypeChip } from '@/shell/Sidebar'
 import { buildActions, matchActions, type Action, type ActionContext } from './actions'
 import { Highlight, MatchedTitle } from './Highlight'
-import { PASTE_TEXT, pasteActions, readClipboard, type ClipboardContent, type PasteAction } from './paste'
+import { clipboardReadGranted, PASTE_TEXT, pasteActions, readClipboard, type ClipboardContent, type PasteAction } from './paste'
 import {
   applyOption,
   buildSearchOptions,
@@ -63,9 +65,16 @@ export interface SearchViewProps {
   onOpenExtendedSearch?(q: string): void
   /** What the actions act on; without it no actions are listed. */
   actions?: ActionContext
-  /** Reads the clipboard when the view opens (tests replace it). */
+  /** Reads the clipboard (tests replace it). */
   readClip?: () => Promise<ClipboardContent>
+  /** Whether the clipboard may be read on open without asking (tests replace it). */
+  clipGranted?: () => Promise<boolean>
 }
+
+/** The clipboard as the palette knows it; `ask`: not read yet, the "Clipboard" row reads it. */
+type ClipState = ClipboardContent | { kind: 'ask' }
+
+const CLIPBOARD_VALUE = 'paste:read'
 
 /** `CommandPalette.options.LocalSpaceQuery`, verbatim. */
 export const OPEN_IN_EXTENDED_SEARCH = 'Open in extended search'
@@ -73,7 +82,7 @@ const EXTENDED_VALUE = 'extended-search'
 
 interface Row {
   value: string
-  kind: 'paste' | 'recent' | 'result' | 'action' | 'option' | 'extended'
+  kind: 'paste' | 'clipboard' | 'recent' | 'result' | 'action' | 'option' | 'extended'
   path?: string
   typeId?: string
   option?: SearchOption
@@ -107,7 +116,7 @@ export function openedToday(ms: number | undefined, now: Date = new Date()): boo
 const rowClass = 'menu-row gap-2 rounded-lg text-[15px]'
 const rightLabelClass = 'shrink-0 text-[13px] text-fg-muted'
 
-export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: actionContext, readClip = readClipboard }: SearchViewProps) {
+export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: actionContext, readClip = readClipboard, clipGranted = clipboardReadGranted }: SearchViewProps) {
   const types = useLinkIndex((s) => s.types)
   const objects = useLinkIndex((s) => s.objects)
   const recentPaths = useRecent((s) => s.paths)
@@ -118,7 +127,7 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: acti
   const [response, setResponse] = useState<{ q: string; filters: SearchFilters; res: SearchResponse } | null>(null)
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [clip, setClip] = useState<ClipboardContent>({ kind: 'empty' })
+  const [clip, setClip] = useState<ClipState>({ kind: 'empty' })
   const mods = useRef<OpenMods>({})
   const seq = useRef(0)
   const busy = useRef(false)
@@ -127,18 +136,42 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: acti
     void ensureLinkIndex()
   }, [])
 
-  // The clipboard, read once as the palette opens (M8's paste offers).
+  // The clipboard as the palette opens (M8's paste offers): read only when `clipboard-read` is
+  // already granted, so opening never prompts. Otherwise, or when that read fails anyway, the
+  // "Clipboard" row reads it on request; only a refusal of that read shows the denied line.
   const readRef = useRef(readClip)
+  const liveRef = useRef(true)
   useEffect(() => {
-    let live = true
-    readRef.current().then(
-      (c) => live && setClip(c),
-      () => live && setClip({ kind: 'denied' }),
-    )
+    liveRef.current = true
+    const ask: ClipState = { kind: 'ask' }
+    clipGranted()
+      .then((granted): Promise<ClipState> => (granted ? readRef.current() : Promise.resolve(ask)))
+      .then(
+        (c) => {
+          if (liveRef.current) setClip(c.kind === 'denied' ? ask : c)
+        },
+        () => {
+          if (liveRef.current) setClip(ask)
+        },
+      )
     return () => {
-      live = false
+      liveRef.current = false
     }
+    // Once, as the palette opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /** The "Clipboard" row: read now, at the user's request. An empty clipboard keeps the row. */
+  const readClipNow = () => {
+    readRef.current().then(
+      (c) => {
+        if (liveRef.current) setClip(c.kind === 'empty' ? { kind: 'ask' } : c)
+      },
+      () => {
+        if (liveRef.current) setClip({ kind: 'denied' })
+      },
+    )
+  }
 
   const q = query.trim()
 
@@ -184,7 +217,8 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: acti
   const allActions = useMemo(() => (actionContext ? buildActions(actionContext) : []), [actionContext])
   const actions = useMemo(() => (hasFilters(filters) ? [] : matchActions(allActions, q)), [allActions, q, filters])
 
-  const pastes = useMemo(() => (q ? [] : pasteActions(clip, types)), [q, clip, types])
+  const pastes = useMemo(() => (q || clip.kind === 'ask' ? [] : pasteActions(clip, types)), [q, clip, types])
+  const askClip = !q && clip.kind === 'ask'
 
   const recents = useMemo(() => {
     const today: ObjectSummary[] = []
@@ -212,6 +246,7 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: acti
 
   const rows: Row[] = useMemo(() => {
     const out: Row[] = []
+    if (askClip) out.push({ value: CLIPBOARD_VALUE, kind: 'clipboard' })
     for (const a of pastes) out.push({ value: a.id, kind: 'paste', paste: a })
     for (const o of [...recents.today, ...recents.earlier]) out.push({ value: `recent:${o.path}`, kind: 'recent', path: o.path, typeId: o.type })
     for (const r of results ?? []) out.push({ value: `result:${r.path}`, kind: 'result', path: r.path, typeId: r.type })
@@ -219,10 +254,11 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: acti
     options.forEach((o, i) => out.push({ value: `option:${i}:${o.label}`, kind: 'option', option: o }))
     if (q && onOpenExtendedSearch) out.push({ value: EXTENDED_VALUE, kind: 'extended' })
     return out
-  }, [pastes, recents, results, actions, options, q, onOpenExtendedSearch])
+  }, [askClip, pastes, recents, results, actions, options, q, onOpenExtendedSearch])
 
-  // Keep the first row selected whenever the rows change.
-  const firstValue = rows[0]?.value ?? ''
+  // Keep the first row selected whenever the rows change. The "Clipboard" row is picked only on
+  // purpose, so Enter on an empty query still opens the first recent object.
+  const firstValue = (rows.find((r) => r.kind !== 'clipboard') ?? rows[0])?.value ?? ''
   useEffect(() => {
     setValue(firstValue)
   }, [firstValue, rows.length])
@@ -255,6 +291,10 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: acti
     if (row.kind === 'action' && row.action) {
       onDone()
       row.action.run()
+      return
+    }
+    if (row.kind === 'clipboard') {
+      readClipNow()
       return
     }
     if (row.kind === 'paste' && row.paste) {
@@ -404,6 +444,21 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: acti
           <div data-clipboard-denied="" className="px-3 py-1.5 text-[13px] text-fg-muted">
             {PASTE_TEXT.denied}
           </div>
+        )}
+        {askClip && (
+          <CommandGroup>
+            <CommandItem
+              value={CLIPBOARD_VALUE}
+              data-clipboard-read=""
+              onSelect={() => pick({ value: CLIPBOARD_VALUE, kind: 'clipboard' })}
+              className={rowClass}
+            >
+              <span className="inline-flex size-5 items-center justify-center text-fg-muted">
+                <Icon name="ph-clipboard" size={16} />
+              </span>
+              <span className="min-w-0 flex-1 truncate">{PASTE_TEXT.readClipboard}</span>
+            </CommandItem>
+          </CommandGroup>
         )}
         {pastes.length > 0 && (
           <CommandGroup data-paste-group="">

@@ -17,6 +17,7 @@ import {
   firstHeading,
   pasteActions,
   pastedUrl,
+  clipboardReadGranted,
   readClipboard,
   urlTitle,
 } from './paste'
@@ -56,6 +57,7 @@ describe('paste strings', () => {
     ]) {
       expect(src).toContain('s:`' + s + '`')
     }
+    expect(src).toContain('analyzeClipboardIdle:{t:0,b:{t:2,i:[{t:3}],s:`' + PASTE_TEXT.readClipboard + '`')
     expect(src).toContain('{t:4,k:`count`},{t:3,v:` blocks`}')
   })
 })
@@ -83,6 +85,18 @@ describe('reading the clipboard', () => {
     const denied = { read: async () => Promise.reject(new DOMException('no', 'NotAllowedError')) } as unknown as Clipboard
     expect(await readClipboard(denied)).toEqual({ kind: 'denied' })
     expect(await readClipboard(undefined)).toEqual({ kind: 'denied' })
+  })
+})
+
+describe('the clipboard-read permission', () => {
+  test('granted only when the Permissions API says granted; unsupported or failing is not granted', async () => {
+    const perms = (state: PermissionState) => ({ query: async () => ({ state }) }) as unknown as Permissions
+    expect(await clipboardReadGranted(perms('granted'))).toBe(true)
+    expect(await clipboardReadGranted(perms('prompt'))).toBe(false)
+    expect(await clipboardReadGranted(perms('denied'))).toBe(false)
+    expect(await clipboardReadGranted(undefined)).toBe(false)
+    const throws = { query: async () => Promise.reject(new TypeError('clipboard-read is not a permission name')) } as unknown as Permissions
+    expect(await clipboardReadGranted(throws)).toBe(false)
   })
 })
 
