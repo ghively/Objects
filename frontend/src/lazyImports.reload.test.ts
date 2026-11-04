@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { registerFlusher } from '@/lib/flush'
 import {
   CHUNK_RELOAD_MARK,
+  FLUSH_TIMEOUT_MS,
   OBJECT_UPDATED_TEXT,
+  UNSAVED_MAY_BE_LOST_TEXT,
   __resetChunkReloadForTests,
   chunkReloadDeps,
   guardImport,
@@ -72,6 +74,63 @@ describe('a lazily loaded chunk that fails', () => {
     await settle()
     expect(flusher).toHaveBeenCalledTimes(1)
     expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  test('a flush that fails shows the toast instead of reloading', async () => {
+    flusher.mockImplementation(async () => {
+      throw new Error('save failed')
+    })
+    void guardImport(() => Promise.reject(chunkError()))
+    await settle()
+    await settle()
+    expect(flusher).toHaveBeenCalledTimes(1)
+    expect(reload).not.toHaveBeenCalled()
+    expect(document.querySelector('[role="status"]')?.textContent).toContain(OBJECT_UPDATED_TEXT)
+    // The Reload button tries the flush again; when that succeeds, it reloads.
+    flusher.mockImplementation(async () => {})
+    const button = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Reload')!
+    button.click()
+    await settle()
+    await settle()
+    expect(flusher).toHaveBeenCalledTimes(2)
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  test('when the retried flush fails too, the toast warns first and the button then reloads', async () => {
+    flusher.mockImplementation(async () => {
+      throw new Error('save failed')
+    })
+    void guardImport(() => Promise.reject(chunkError()))
+    await settle()
+    await settle()
+    const button = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Reload')!
+    button.click()
+    await settle()
+    await settle()
+    expect(flusher).toHaveBeenCalledTimes(2)
+    expect(reload).not.toHaveBeenCalled()
+    expect(document.querySelector('[role="status"]')?.textContent).toContain(UNSAVED_MAY_BE_LOST_TEXT)
+    button.click()
+    await settle()
+    await settle()
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  test('a flush that never settles shows the toast after 5 s', async () => {
+    vi.useFakeTimers()
+    try {
+      flusher.mockImplementation(() => new Promise<void>(() => {}))
+      void guardImport(() => Promise.reject(chunkError()))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(flusher).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(FLUSH_TIMEOUT_MS - 1)
+      expect(document.querySelector('[role="status"]')).toBeNull()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(reload).not.toHaveBeenCalled()
+      expect(document.querySelector('[role="status"]')?.textContent).toContain(OBJECT_UPDATED_TEXT)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   test('a marker older than 60 s allows another automatic reload', async () => {

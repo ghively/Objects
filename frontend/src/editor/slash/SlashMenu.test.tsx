@@ -161,6 +161,30 @@ describe('typing / opens the menu only at the start of a block or after whitespa
     expect(isOpen(editor)).toBe(false)
   })
 
+  test('openSlashMenu in a code block leaves nothing behind for a later mid-word /', () => {
+    const editor = mounted('```\nab\n```\n')
+    render(<SlashMenu editor={editor} />)
+    expect(editor.state.doc.child(0).type.name).toBe('codeBlock')
+    const at = editor.state.selection.from
+    act(() => openSlashMenu(editor))
+    expect(isOpen(editor)).toBe(false)
+    // Later: the / goes away, the block becomes plain text, and a / is typed by hand straight
+    // after the word, at the very position the earlier call used.
+    act(() => {
+      editor.view.dispatch(editor.state.tr.delete(at, at + 1))
+    })
+    act(() => {
+      editor.commands.setNode('paragraph')
+    })
+    act(() => {
+      editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, at)))
+    })
+    expect(editor.state.doc.child(0).type.name).toBe('paragraph')
+    type(editor, '/')
+    expect(isOpen(editor)).toBe(false)
+    expect(screen.queryByRole('listbox', { name: '/' })).toBeNull()
+  })
+
   test('/ at the start of a block opens the menu', async () => {
     const editor = mounted('Hello\n')
     render(<SlashMenu editor={editor} />)
