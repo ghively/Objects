@@ -170,3 +170,37 @@ describe('TypeSettings', () => {
     expect(mocked.saveType.mock.invocationCallOrder[0]).toBeLessThan(mocked.deleteObject.mock.invocationCallOrder[0])
   })
 })
+
+// Polish item 20: "Default list view", the layout a type page with no saved views opens in.
+describe('TypeSettings default list view', () => {
+  test('it lists the type page layouts and shows the built-in default while unset', () => {
+    render(<TypeSettings typeId="project" />)
+    const select = screen.getByRole('combobox', { name: 'Default list view' })
+    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'List',
+      'Gallery',
+      'Wall',
+      'Table',
+      'Embed',
+      'Kanban',
+    ])
+    expect(select).toHaveValue('list')
+    expect(PROJECT).not.toHaveProperty('defaultDataViewLayout')
+  })
+
+  test('choosing a layout saves only that key', async () => {
+    const user = userEvent.setup()
+    render(<TypeSettings typeId="project" />)
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Default list view' }), 'table')
+    await waitFor(() => expect(mocked.saveType).toHaveBeenCalledTimes(1))
+    const { defaultDataViewLayout, ...rest } = savedType()
+    expect(defaultDataViewLayout).toBe('table')
+    expect(rest).toEqual(PROJECT)
+  })
+
+  test('a chosen layout shows as selected', () => {
+    useLinkIndex.setState({ types: [{ ...PROJECT, defaultDataViewLayout: 'wall' }, PAGE] })
+    render(<TypeSettings typeId="project" />)
+    expect(screen.getByRole('combobox', { name: 'Default list view' })).toHaveValue('wall')
+  })
+})

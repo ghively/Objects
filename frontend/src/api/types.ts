@@ -206,6 +206,9 @@ export interface TypeDef {
   hideFromCalendarSidebar?: boolean
   /** M4, our key on the DailyNote type: hide the Reviewed flag. */
   hideReviewing?: boolean
+  /** Polish item 20, our key: the "Default list view", the layout a type page with no saved
+   *  views opens in. Absent: the built-in default. */
+  defaultDataViewLayout?: Layout
   /** API only: set when the type file can't be read. */
   readOnlyReason: string | null
   /** API only: sha256 of the type file, `''` if unsaved. */

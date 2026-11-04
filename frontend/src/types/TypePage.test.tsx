@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { Row, Views } from '@/api/types'
+import type { Row, TypeDef, Views } from '@/api/types'
 import { collection, defaultViews, objectSummary, propertyDef, query, row, typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
@@ -445,5 +445,31 @@ describe('TypePage', () => {
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Create collection' }))
     await waitFor(() => expect(mocked.createCollection).toHaveBeenCalledWith('New Collection', ['task']))
     await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'collection', id: 'new-collection' }))
+  })
+})
+
+// Polish item 20: the type's "Default list view".
+describe('TypePage default list view', () => {
+  const TABLE_TASK: TypeDef = { ...TASK, defaultDataViewLayout: 'table' }
+
+  test('a type page with no saved views opens in the chosen layout', async () => {
+    load(views(), '')
+    render(<TypePage type={TABLE_TASK} />)
+    expect(await screen.findByRole('table')).toBeInTheDocument()
+  })
+
+  test('a saved view still wins', async () => {
+    load(views(), 'r0')
+    render(<TypePage type={TABLE_TASK} />)
+    await screen.findByTestId('data-view')
+    await screen.findByText('Alpha')
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
+
+  test('without the setting the page opens as before', async () => {
+    load(views(), '')
+    render(<TypePage type={TASK} />)
+    await screen.findByText('Alpha')
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 })

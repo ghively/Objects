@@ -3979,6 +3979,12 @@ class Space:
             self.types.append(t)
             self._sort_types()
             self._types_changed(t.id)
+            if tpl is not None:
+                # The template's saved query (polish item 21); a blank type gets none.
+                from .typetemplates import template_query
+
+                qname, definition, view = template_query(tpl.key, t)
+                self.create_query(qname, definition, view)
             return t
 
     def sync_problem(
