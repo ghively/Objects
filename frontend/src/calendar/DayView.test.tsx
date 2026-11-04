@@ -107,7 +107,11 @@ describe('DayView', () => {
     render(<DayView day={TODAY} />)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('October 23, 2026')
     expect(await screen.findByText('No tasks today')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Daily Note' })).toBeInTheDocument()
+    // No note yet: the note's placeholder rows (Tags, the body placeholder), no create button.
+    const slot = screen.getByTestId('daily-note-slot')
+    expect(within(slot).getByRole('button', { name: 'Edit Tags' })).toHaveTextContent('Tags')
+    expect(within(slot).getByTestId('daily-note-placeholder')).toHaveTextContent('Start your daily note')
+    expect(within(slot).queryByRole('button', { name: 'Daily Note' })).toBeNull()
     expect(screen.queryByRole('checkbox', { name: 'Reviewed' })).toBeNull()
     await waitFor(() => expect(screen.getByTestId('quick-create')).toBeInTheDocument())
     // Visiting the calendar creates nothing.
