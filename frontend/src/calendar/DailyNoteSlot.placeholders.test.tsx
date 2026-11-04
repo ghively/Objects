@@ -94,6 +94,33 @@ describe('DailyNoteSlot: an empty day', () => {
     await waitFor(() => expect(container.querySelector('[data-object-path="DailyNotes/2026-10-23.md"]')).not.toBeNull())
   })
 
+  test('adding a tag when the day already has a note (409) adds it to that note, keeping its tags', async () => {
+    const user = userEvent.setup()
+    const path = 'DailyNotes/Older/2026-10-23.md'
+    mocked.createDailyNote.mockRejectedValueOnce(new DailyNoteExistsError('exists', path))
+    mocked.object.mockResolvedValue(
+      objectDetail({ summary: objectSummary({ path, type: 'dailynote', tags: ['home'] }), body: 'Morning.\n', version: 'v7' }),
+    )
+    const { container } = render(<DailyNoteSlot day={TODAY} note={null} heading />)
+    await user.click(screen.getByRole('button', { name: 'Edit Tags' }))
+    await user.type(await screen.findByRole('textbox', { name: 'Search for tags' }), 'work{Enter}')
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith(path, { tags: ['home', 'work'] }, 'v7'))
+    expect(mocked.updateProperties).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(container.querySelector(`[data-object-path="${path}"]`)).not.toBeNull())
+  })
+
+  test('a tag write that fails after the note was created shows an error', async () => {
+    const user = userEvent.setup()
+    mocked.updateProperties.mockRejectedValueOnce(new Error('disk full'))
+    const { container } = render(<DailyNoteSlot day={TODAY} note={null} heading />)
+    await user.click(screen.getByRole('button', { name: 'Edit Tags' }))
+    await user.type(await screen.findByRole('textbox', { name: 'Search for tags' }), 'work{Enter}')
+    await waitFor(() => expect(mocked.createDailyNote).toHaveBeenCalledWith(TODAY))
+    expect(await screen.findByRole('alert')).toHaveTextContent('disk full')
+    // The note was made: it opens all the same.
+    await waitFor(() => expect(container.querySelector('[data-object-path="DailyNotes/2026-10-23.md"]')).not.toBeNull())
+  })
+
   test('typing when the day already has a note (409) opens that note with the text', async () => {
     const user = userEvent.setup()
     mocked.createDailyNote.mockRejectedValueOnce(new DailyNoteExistsError('exists', 'DailyNotes/Older/2026-10-23.md'))
@@ -103,6 +130,73 @@ describe('DailyNoteSlot: an empty day', () => {
     await waitFor(() => expect(container.querySelector('[data-object-path="DailyNotes/Older/2026-10-23.md"]')).not.toBeNull())
     const editor = await waitFor(() => pmEditor(container))
     await waitFor(() => expect(serializeBody(editor).trim()).toBe('Hi'))
+  })
+
+  test('typed text is inserted literally, never parsed as HTML or Markdown', async () => {
+    const user = userEvent.setup()
+    // All of it is typed before the note's editor is ready, so the draft hands it over in one go.
+    let finishLoad!: () => void
+    mocked.object.mockImplementationOnce(
+      (path: string) =>
+        new Promise((resolve) => {
+          finishLoad = () => resolve(objectDetail({ summary: objectSummary({ path, type: 'dailynote' }), body: '', version: 'v1' }))
+        }),
+    )
+    const { container } = render(<DailyNoteSlot day={TODAY} note={null} heading />)
+    screen.getByRole('textbox', { name: DAILY_NOTE_TEXT.heading }).focus()
+    await user.keyboard('<b>x</b> **y**')
+    await waitFor(() => expect(mocked.object).toHaveBeenCalled())
+    finishLoad()
+    const editor = await waitFor(() => pmEditor(container))
+    await waitFor(() => expect(editor.getText()).toBe('<b>x</b> **y**'))
+    expect(container.querySelector('.ProseMirror strong, .ProseMirror b')).toBeNull()
+  })
+
+  test('text typed while a slow create is in flight all arrives', async () => {
+    const user = userEvent.setup()
+    let finishCreate!: () => void
+    mocked.createDailyNote.mockImplementationOnce(
+      (date: string) =>
+        new Promise((resolve) => {
+          finishCreate = () => resolve({ path: `DailyNotes/${date}.md`, version: 'v1', typeIds: [] })
+        }),
+    )
+    let finishLoad!: () => void
+    mocked.object.mockImplementationOnce(
+      (path: string) =>
+        new Promise((resolve) => {
+          finishLoad = () => resolve(objectDetail({ summary: objectSummary({ path, type: 'dailynote' }), body: '', version: 'v1' }))
+        }),
+    )
+    const { container } = render(<DailyNoteSlot day={TODAY} note={null} heading />)
+    const draft = screen.getByRole('textbox', { name: DAILY_NOTE_TEXT.heading })
+    draft.focus()
+    await user.keyboard('Hel')
+    await waitFor(() => expect(mocked.createDailyNote).toHaveBeenCalledTimes(1))
+    finishCreate()
+    // The note exists but its editor is still loading: keep typing.
+    await waitFor(() => expect(mocked.object).toHaveBeenCalled())
+    await user.keyboard('lo')
+    finishLoad()
+    const editor = await waitFor(() => pmEditor(container))
+    await waitFor(() => expect(editor.getText()).toBe('Hello'))
+    await user.keyboard(' world')
+    await waitFor(() => expect(editor.getText()).toBe('Hello world'))
+    expect(mocked.createDailyNote).toHaveBeenCalledTimes(1)
+  })
+
+  test('on a 409 the typed text goes at the end of the existing note', async () => {
+    const user = userEvent.setup()
+    const path = 'DailyNotes/Older/2026-10-23.md'
+    mocked.createDailyNote.mockRejectedValueOnce(new DailyNoteExistsError('exists', path))
+    mocked.object.mockResolvedValue(
+      objectDetail({ summary: objectSummary({ path, type: 'dailynote' }), body: 'Morning.\n', version: 'v5' }),
+    )
+    const { container } = render(<DailyNoteSlot day={TODAY} note={null} heading />)
+    screen.getByRole('textbox', { name: DAILY_NOTE_TEXT.heading }).focus()
+    await user.keyboard('Hi')
+    const editor = await waitFor(() => pmEditor(container))
+    await waitFor(() => expect(serializeBody(editor).trim()).toBe('Morning.\n\nHi'))
   })
 
   test('the multi-day views keep the "+ Daily Note" button', () => {

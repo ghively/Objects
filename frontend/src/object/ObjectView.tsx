@@ -3,6 +3,7 @@
  * header and body editor (formatted or raw), with the `…` menu. `mode='inline'` (M4: the
  * calendar's daily note) renders only the body editor and its autosave.
  */
+import type { Editor as TiptapEditor, JSONContent } from '@tiptap/core'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { api, ConflictError, isResync } from '@/api/client'
@@ -78,8 +79,13 @@ export interface ObjectViewProps {
   placeholder?: string
   /** Inline only: focus the editor once the object has loaded. */
   autoFocus?: boolean
-  /** Inline only, with `autoFocus`: text typed before the object existed, inserted at the caret. */
-  initialText?: string
+  /**
+   * Inline only, with `autoFocus`: text typed before the object existed, inserted as plain text
+   * (never parsed as Markdown or HTML) at the end of the body, in a paragraph of its own when the
+   * body already has content. A function is called once, when the editor is ready (or the load
+   * failed), so the owner can hand over everything typed up to that moment.
+   */
+  initialText?: string | (() => string | undefined)
   /** Called with each version this view adopts (load, saves, reloads). */
   onVersion?: (version: string) => void
   /**
@@ -181,6 +187,24 @@ function ToolButton({ label, icon, onClick, pressed }: { label: string; icon: st
       <Icon name={icon} size={17} />
     </button>
   )
+}
+
+/**
+ * Put `text` at the end of the body as plain text nodes (each line a paragraph; never parsed as
+ * Markdown or HTML), into the empty paragraph of an empty body, else after the existing content,
+ * and leave the caret after it with the editor focused.
+ */
+function appendPlainText(ed: TiptapEditor, text: string) {
+  const paragraphs: JSONContent[] = text
+    .split(/\r?\n/)
+    .map((line) => ({ type: 'paragraph', content: line ? [{ type: 'text', text: line }] : [] }))
+  const { doc } = ed.state
+  const only = doc.childCount === 1 ? doc.firstChild : null
+  const empty = only !== null && only.type.name === 'paragraph' && only.content.size === 0
+  const range = empty ? { from: 0, to: doc.content.size } : doc.content.size
+  ed.chain().insertContentAt(range, paragraphs).focus('end').run()
+  // The focus command defers DOM focus a frame; take it now so the next keystroke lands here.
+  ed.view.focus()
 }
 
 export function ObjectView({
@@ -1030,20 +1054,30 @@ export function ObjectView({
   }, [loadedBody])
   const focusedRef = useRef(false)
   const hasDetail = detail !== null
+  const loadFailed = error !== null && !hasDetail
   useEffect(() => {
-    if (mode !== 'inline' || !autoFocus || !hasDetail || focusedRef.current) return
-    const el = inlineRef.current?.querySelector<HTMLElement>('.ProseMirror')
-    if (el) {
+    if (mode !== 'inline' || !autoFocus || focusedRef.current) return
+    if (loadFailed) {
+      // Let the owner show this view (and its error) in place of whatever it drew meanwhile.
       focusedRef.current = true
+      if (typeof initialText === 'function') initialText()
+      return
+    }
+    if (!hasDetail) return
+    const el = inlineRef.current?.querySelector<HTMLElement>('.ProseMirror')
+    if (!el) return
+    focusedRef.current = true
+    const text = typeof initialText === 'function' ? initialText() : initialText
+    const ed = (el as HTMLElement & { editor?: TiptapEditor }).editor
+    if (text && ed) {
+      appendPlainText(ed, text)
+      setBodyEmpty(false)
+    } else {
       el.focus()
-      if (initialText) {
-        const ed = (el as HTMLElement & { editor?: { commands: { insertContent(text: string): boolean } } }).editor
-        if (ed?.commands.insertContent(initialText)) setBodyEmpty(false)
-      }
     }
     // `initialText` is read once, with the first focus.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, autoFocus, hasDetail])
+  }, [mode, autoFocus, hasDetail, loadFailed])
 
   const recoveryDialog = (
     <RecoveryDialog
