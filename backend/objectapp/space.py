@@ -3995,7 +3995,8 @@ class Space:
         self, key: str, t: TypeDefinition
     ) -> tuple[str, dict[str, Any], dict[str, Any]] | None:
         """Template ``key``'s (name, definition, view) over the new type ``t``, checked as
-        `create_query` would; None (with a warning) when it can't be built."""
+        `create_query` would; None (with a warning) when it can't be built, and None when a
+        query of that name already targets ``t.id``."""
         from .typetemplates import TEMPLATE_QUERIES, template_query
 
         try:
@@ -4010,6 +4011,12 @@ class Space:
                 spec.name if spec else key,
                 exc,
             )
+            return None
+        # A type deleted and re-added under the same id finds its query still there
+        # (deleting a type leaves its queries alone): don't make a second one.
+        if any(
+            q.name == qname and t.id in query_type_ids(q.definition) for q in self.list_queries()
+        ):
             return None
         return qname, definition, view
 
