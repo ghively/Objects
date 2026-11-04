@@ -3972,20 +3972,53 @@ class Space:
                 color=color,
                 propertyDefinitions=[*system_property_defs(), *custom],
             )
+            query = None
             if tpl is not None:
                 t.description = tpl.description
                 t.extra["templateKey"] = tpl.key
+                # Built and checked before the type is written, so a query that can't be
+                # made never leaves a half-created type: the type is made without it.
+                query = self._template_query(tpl.key, t)
             write_type_json(self.root, t, "")
             self.types.append(t)
             self._sort_types()
             self._types_changed(t.id)
-            if tpl is not None:
+            if query is not None:
                 # The template's saved query (polish item 21); a blank type gets none.
-                from .typetemplates import template_query
-
-                qname, definition, view = template_query(tpl.key, t)
-                self.create_query(qname, definition, view)
+                try:
+                    self.create_query(*query)
+                except Exception:  # the type exists now: never fail its creation
+                    _log.warning("Could not save the query %r of type %s", query[0], t.id, exc_info=True)
             return t
+
+    def _template_query(
+        self, key: str, t: TypeDefinition
+    ) -> tuple[str, dict[str, Any], dict[str, Any]] | None:
+        """Template ``key``'s (name, definition, view) over the new type ``t``, checked as
+        `create_query` would; None (with a warning) when it can't be built, and None when a
+        query of that name already targets ``t.id``."""
+        from .typetemplates import TEMPLATE_QUERIES, template_query
+
+        try:
+            qname, definition, view = template_query(key, t)
+            q = QueryDef.from_json({"name": qname, "definition": definition, "view": view}, "")
+            self._check_query_definition(q.definition, {t.id})
+        except (KeyError, InvalidValue) as exc:
+            spec = TEMPLATE_QUERIES.get(key)
+            _log.warning(
+                "Type %s is created without its query %r: %s",
+                t.id,
+                spec.name if spec else key,
+                exc,
+            )
+            return None
+        # A type deleted and re-added under the same id finds its query still there
+        # (deleting a type leaves its queries alone): don't make a second one.
+        if any(
+            q.name == qname and t.id in query_type_ids(q.definition) for q in self.list_queries()
+        ):
+            return None
+        return qname, definition, view
 
     def sync_problem(
         self,
