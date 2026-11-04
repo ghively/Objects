@@ -17,7 +17,7 @@
  * icon is (an emoji as text, an Iconify id through M2's `Icon`). The block style
  * menu sets the options on the item at the caret (Task 26).
  */
-import { Node, type MarkdownToken } from '@tiptap/core'
+import { Extension, Node, type MarkdownToken } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type Transaction } from '@tiptap/pm/state'
 import { Decoration, type DecorationSet } from '@tiptap/pm/view'
@@ -196,6 +196,31 @@ const itemVisitor: DecorationVisitor = (node, pos, decos) => {
   }
   return !node.isTextblock
 }
+
+/**
+ * An item with options and no text (`- <!-- item: icon=ph-star -->`): its text
+ * opens with the comment, which Markdown reads as an HTML comment block, and the
+ * list item drops that, so the item loaded as a raw block. A block-level line
+ * that opens with an item comment is read as a paragraph instead (its inline
+ * content, the comment and anything after it on the line, as usual). Outside a
+ * list such a line is already kept raw by the loader before Markdown parsing.
+ */
+export const ListItemOptionsLine = Extension.create({
+  name: 'listItemOptionsLine',
+
+  markdownTokenizer: {
+    name: 'listItemOptionsLine',
+    level: 'block',
+    // Never interrupts a paragraph (the comment ending a text line is inline).
+    start: () => -1,
+    tokenize(src: string, _tokens: unknown[], helpers: { inlineTokens: (src: string) => unknown[] }) {
+      if (!parseItemComment(src)) return undefined
+      const nl = src.indexOf('\n')
+      const line = nl < 0 ? src : src.slice(0, nl)
+      return { type: 'paragraph', raw: nl < 0 ? src : src.slice(0, nl + 1), text: line, tokens: helpers.inlineTokens(line) }
+    },
+  } as never,
+})
 
 export const ListItemOptions = Node.create({
   name: 'listItemOptions',

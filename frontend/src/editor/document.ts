@@ -57,7 +57,7 @@ import { BlockRef } from './nodes/blockRef'
 import { DataViewEmbed, dataViewEmbedMarkdown } from './nodes/dataViewEmbed'
 import { DateToken } from './nodes/dateToken'
 import { Indent } from './nodes/indent'
-import { ListItemOptions } from './nodes/listItemOptions'
+import { ListItemOptions, ListItemOptionsLine } from './nodes/listItemOptions'
 import { Highlight, TextColor } from './nodes/textStyle'
 import { blockRefMarkdown } from './blocks'
 import { M8Keys } from './shortcuts'
@@ -157,6 +157,7 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
     Highlight,
     DateToken,
     ListItemOptions,
+    ListItemOptionsLine,
     Indent,
     BlockRef,
     DataViewEmbed,
