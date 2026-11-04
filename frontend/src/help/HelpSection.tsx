@@ -1,12 +1,13 @@
 // The sidebar's "Help & Resources" section, under Graph and Trash: Keyboard shortcuts (the
 // Shortcuts sheet), Getting started and Markdown reference (bundled texts shown read-only). The
 // heading folds the section; the fold is kept per browser. Local only: no link leaves the app.
-import { lazy, Suspense, useState } from 'react'
+import { Suspense, useState } from 'react'
 import { Icon } from '@/components/Icon'
+import { lazyWithReload } from '@/lib/lazyReload'
 import { useSettingsModal } from '@/settings/useSettingsModal'
 import { HELP_TEXT, readHelpCollapsed, writeHelpCollapsed, type HelpDoc } from './helpText'
 
-const HelpDialog = lazy(() => import('@/help/HelpDialog'))
+const HelpDialog = lazyWithReload(() => import('@/help/HelpDialog'))
 
 function HelpRow({ icon, label, onClick }: { icon: string; label: string; onClick(): void }) {
   return (
