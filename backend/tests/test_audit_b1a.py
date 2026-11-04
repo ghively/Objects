@@ -44,7 +44,7 @@ def test_trash_object_without_meta_is_listed_and_restored_into_the_root(space_di
     assert listed[0].originalPath == "Alpha.md"
 
     result = reopened.restore(item.id)
-    assert result == {"paths": ["Alpha.md"], "typeIds": []}
+    assert result == {"paths": ["Alpha.md"], "typeIds": [], "queryIds": []}
     assert (space_dir / "Alpha.md").read_bytes() == before
     assert reopened.get("Alpha.md").title == "Alpha"
     assert reopened.list_trash() == []
