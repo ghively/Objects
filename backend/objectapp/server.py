@@ -1672,8 +1672,18 @@ def create_app(
             data["propertyDefinitions"], list
         ):
             return _error(422, "propertyDefinitions must be a list")
-        if DEFAULT_LAYOUT_KEY in data and data[DEFAULT_LAYOUT_KEY] not in DATA_VIEW_LAYOUTS:
-            return _error(422, f"Unknown default list view {data[DEFAULT_LAYOUT_KEY]!r}")
+        if DEFAULT_LAYOUT_KEY in data:
+            if data[DEFAULT_LAYOUT_KEY] is None:
+                # null unsets it: the file then has no line for it.
+                del data[DEFAULT_LAYOUT_KEY]
+            else:
+                # Only a changed value is checked, so a stored unknown one never blocks
+                # saving the type's other settings.
+                current = space.type_by_id(type_id)
+                stored = current.extra.get(DEFAULT_LAYOUT_KEY) if current is not None else None
+                layout = data[DEFAULT_LAYOUT_KEY]
+                if layout != stored and layout not in DATA_VIEW_LAYOUTS:
+                    return _error(422, f"Unknown default list view {layout!r}")
         for entry in data.get("propertyDefinitions") or []:
             if isinstance(entry, dict) and "options" in entry:
                 bad = option_shape_problems(entry["options"])
