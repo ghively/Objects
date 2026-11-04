@@ -61,28 +61,51 @@ export function DailyNoteSlot({
   /** Where the note's own `…` menu (the object page's, in full) is drawn: the header pill. */
   const [menuSlot, setMenuSlot] = useState<HTMLElement | null>(null)
 
-  /** The empty day's body placeholder: what was typed in it while the note was being created. */
+  /** The empty day's body placeholder: what is typed in it before the note's editor is ready. */
   const draftRef = useRef<HTMLDivElement | null>(null)
   const [draftEmpty, setDraftEmpty] = useState(true)
-  /** That text, handed to the new note's editor once. */
-  const [initialText, setInitialText] = useState<string | undefined>(undefined)
+  /**
+   * The note exists but its editor isn't ready yet: the draft stays shown (and keeps taking
+   * keystrokes) while the note's view loads hidden; the editor then takes the whole text.
+   */
+  const [handover, setHandover] = useState(false)
+  const handoverRef = useRef(false)
+  const draftBoxRef = useRef<HTMLDivElement | null>(null)
+  const noteBoxRef = useRef<HTMLDivElement | null>(null)
   const busyRef = useRef(false)
   const placeholders = emptyPlaceholders ?? !!heading
+
+  const handoverOn = (on: boolean) => {
+    handoverRef.current = on
+    setHandover(on)
+  }
 
   useEffect(() => {
     setError(null)
     setFocus(false)
     setDraftEmpty(true)
-    setInitialText(undefined)
+    handoverOn(false)
     if (draftRef.current) draftRef.current.textContent = ''
   }, [day])
+
+  /**
+   * Called once by the note's editor when it is ready (or its load failed): swap the views in
+   * the DOM at once, so no keystroke lands between, and hand over everything typed so far.
+   */
+  const takeDraft = () => {
+    const text = draftRef.current?.textContent || undefined
+    if (draftBoxRef.current) draftBoxRef.current.hidden = true
+    if (noteBoxRef.current) noteBoxRef.current.hidden = false
+    handoverOn(false)
+    return text
+  }
 
   const localPath = local && local.day === day ? local.path : null
   const path = note?.path ?? localPath
 
   /** Create the day's note now (never before the user clicks, types or tags); `tags` go in with it. */
   const create = async (opts: { tags?: string[] } = {}) => {
-    if (busyRef.current) return
+    if (busyRef.current || handoverRef.current) return
     busyRef.current = true
     setBusy(true)
     setError(null)
@@ -107,7 +130,8 @@ export function DailyNoteSlot({
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       if (made) {
-        setInitialText(draftRef.current?.textContent || undefined)
+        // From the placeholder rows, the draft stays until the note's editor takes its text.
+        if (draftRef.current) handoverOn(true)
         setLocal({ day, path: made })
         setFocus(true)
       }
@@ -117,78 +141,85 @@ export function DailyNoteSlot({
     }
   }
 
-  const body = path ? (
+  const showDraft = placeholders && (!path || handover)
+  const errorLine = error && (
+    <p role="alert" className="mt-1 text-[13px] text-danger">
+      {error}
+    </p>
+  )
+
+  // One fragment with fixed slots, so the draft keeps its DOM (and what was typed in it) while
+  // the note's view loads, hidden, beside it.
+  const body = (
     <>
-      <ObjectView
-        key={path}
-        path={path}
-        mode="inline"
-        placeholder={DAILY_NOTE_TEXT.placeholder}
-        autoFocus={focus}
-        initialText={initialText}
-        menuSlot={heading ? menuSlot : (ownerMenuSlot ?? null)}
-        onVersion={onVersion}
-        onDeleted={() => {
-          setLocal(null)
-          onChanged?.()
-        }}
-      />
-      {/* The note opened, but a tag chosen before it existed didn't reach it. */}
-      {error && (
-        <p role="alert" className="mt-1 text-[13px] text-danger">
-          {error}
-        </p>
+      {path && (
+        <div ref={noteBoxRef} hidden={handover}>
+          <ObjectView
+            key={path}
+            path={path}
+            mode="inline"
+            placeholder={DAILY_NOTE_TEXT.placeholder}
+            autoFocus={focus}
+            initialText={handover ? takeDraft : undefined}
+            menuSlot={heading ? menuSlot : (ownerMenuSlot ?? null)}
+            onVersion={onVersion}
+            onDeleted={() => {
+              setLocal(null)
+              onChanged?.()
+            }}
+          />
+          {/* The note opened, but a tag chosen before it existed didn't reach it. */}
+          {errorLine}
+        </div>
+      )}
+      {showDraft && (
+        // No note yet: the note's placeholder rows. Nothing is written until a click, a keystroke or a tag.
+        <div ref={draftBoxRef} data-testid="daily-note-empty" className="relative w-full">
+          <HeaderTags className="mb-2" tags={[]} readOnly={busy || handover} onChange={(next) => void create({ tags: next })} />
+          <div className="object-body-text relative">
+            <div
+              ref={draftRef}
+              role="textbox"
+              aria-label={DAILY_NOTE_TEXT.heading}
+              aria-multiline
+              contentEditable
+              suppressContentEditableWarning
+              tabIndex={0}
+              onMouseDown={() => void create()}
+              onInput={(e) => {
+                setDraftEmpty((e.currentTarget.textContent ?? '') === '')
+                void create()
+              }}
+              className="min-h-[1.5em] outline-none"
+            />
+            {draftEmpty && (
+              <div aria-hidden data-testid="daily-note-placeholder" className="pointer-events-none absolute top-0 left-0 text-fg-muted">
+                {DAILY_NOTE_TEXT.placeholder}
+              </div>
+            )}
+          </div>
+          {!path && errorLine}
+        </div>
+      )}
+      {!path && !placeholders && (
+        <div className="flex flex-col items-start gap-1">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void create()}
+            className="flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[15px] text-fg hover:bg-hover"
+          >
+            <Icon name="ph-plus" size={15} />
+            {DAILY_NOTE_TEXT.create}
+          </button>
+          {error && (
+            <p role="alert" className="text-[13px] text-danger">
+              {error}
+            </p>
+          )}
+        </div>
       )}
     </>
-  ) : placeholders ? (
-    // No note yet: the note's placeholder rows. Nothing is written until a click, a keystroke or a tag.
-    <div data-testid="daily-note-empty" className="relative w-full">
-      <HeaderTags className="mb-2" tags={[]} readOnly={busy} onChange={(next) => void create({ tags: next })} />
-      <div className="object-body-text relative">
-        <div
-          ref={draftRef}
-          role="textbox"
-          aria-label={DAILY_NOTE_TEXT.heading}
-          aria-multiline
-          contentEditable
-          suppressContentEditableWarning
-          tabIndex={0}
-          onMouseDown={() => void create()}
-          onInput={(e) => {
-            setDraftEmpty((e.currentTarget.textContent ?? '') === '')
-            void create()
-          }}
-          className="min-h-[1.5em] outline-none"
-        />
-        {draftEmpty && (
-          <div aria-hidden data-testid="daily-note-placeholder" className="pointer-events-none absolute top-0 left-0 text-fg-muted">
-            {DAILY_NOTE_TEXT.placeholder}
-          </div>
-        )}
-      </div>
-      {error && (
-        <p role="alert" className="mt-1 text-[13px] text-danger">
-          {error}
-        </p>
-      )}
-    </div>
-  ) : (
-    <div className="flex flex-col items-start gap-1">
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void create()}
-        className="flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[15px] text-fg hover:bg-hover"
-      >
-        <Icon name="ph-plus" size={15} />
-        {DAILY_NOTE_TEXT.create}
-      </button>
-      {error && (
-        <p role="alert" className="text-[13px] text-danger">
-          {error}
-        </p>
-      )}
-    </div>
   )
 
   if (!heading) return <div data-testid="daily-note-slot" data-day={day}>{body}</div>

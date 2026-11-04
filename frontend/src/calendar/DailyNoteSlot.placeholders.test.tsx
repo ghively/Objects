@@ -132,6 +132,73 @@ describe('DailyNoteSlot: an empty day', () => {
     await waitFor(() => expect(serializeBody(editor).trim()).toBe('Hi'))
   })
 
+  test('typed text is inserted literally, never parsed as HTML or Markdown', async () => {
+    const user = userEvent.setup()
+    // All of it is typed before the note's editor is ready, so the draft hands it over in one go.
+    let finishLoad!: () => void
+    mocked.object.mockImplementationOnce(
+      (path: string) =>
+        new Promise((resolve) => {
+          finishLoad = () => resolve(objectDetail({ summary: objectSummary({ path, type: 'dailynote' }), body: '', version: 'v1' }))
+        }),
+    )
+    const { container } = render(<DailyNoteSlot day={TODAY} note={null} heading />)
+    screen.getByRole('textbox', { name: DAILY_NOTE_TEXT.heading }).focus()
+    await user.keyboard('<b>x</b> **y**')
+    await waitFor(() => expect(mocked.object).toHaveBeenCalled())
+    finishLoad()
+    const editor = await waitFor(() => pmEditor(container))
+    await waitFor(() => expect(editor.getText()).toBe('<b>x</b> **y**'))
+    expect(container.querySelector('.ProseMirror strong, .ProseMirror b')).toBeNull()
+  })
+
+  test('text typed while a slow create is in flight all arrives', async () => {
+    const user = userEvent.setup()
+    let finishCreate!: () => void
+    mocked.createDailyNote.mockImplementationOnce(
+      (date: string) =>
+        new Promise((resolve) => {
+          finishCreate = () => resolve({ path: `DailyNotes/${date}.md`, version: 'v1', typeIds: [] })
+        }),
+    )
+    let finishLoad!: () => void
+    mocked.object.mockImplementationOnce(
+      (path: string) =>
+        new Promise((resolve) => {
+          finishLoad = () => resolve(objectDetail({ summary: objectSummary({ path, type: 'dailynote' }), body: '', version: 'v1' }))
+        }),
+    )
+    const { container } = render(<DailyNoteSlot day={TODAY} note={null} heading />)
+    const draft = screen.getByRole('textbox', { name: DAILY_NOTE_TEXT.heading })
+    draft.focus()
+    await user.keyboard('Hel')
+    await waitFor(() => expect(mocked.createDailyNote).toHaveBeenCalledTimes(1))
+    finishCreate()
+    // The note exists but its editor is still loading: keep typing.
+    await waitFor(() => expect(mocked.object).toHaveBeenCalled())
+    await user.keyboard('lo')
+    finishLoad()
+    const editor = await waitFor(() => pmEditor(container))
+    await waitFor(() => expect(editor.getText()).toBe('Hello'))
+    await user.keyboard(' world')
+    await waitFor(() => expect(editor.getText()).toBe('Hello world'))
+    expect(mocked.createDailyNote).toHaveBeenCalledTimes(1)
+  })
+
+  test('on a 409 the typed text goes at the end of the existing note', async () => {
+    const user = userEvent.setup()
+    const path = 'DailyNotes/Older/2026-10-23.md'
+    mocked.createDailyNote.mockRejectedValueOnce(new DailyNoteExistsError('exists', path))
+    mocked.object.mockResolvedValue(
+      objectDetail({ summary: objectSummary({ path, type: 'dailynote' }), body: 'Morning.\n', version: 'v5' }),
+    )
+    const { container } = render(<DailyNoteSlot day={TODAY} note={null} heading />)
+    screen.getByRole('textbox', { name: DAILY_NOTE_TEXT.heading }).focus()
+    await user.keyboard('Hi')
+    const editor = await waitFor(() => pmEditor(container))
+    await waitFor(() => expect(serializeBody(editor).trim()).toBe('Morning.\n\nHi'))
+  })
+
   test('the multi-day views keep the "+ Daily Note" button', () => {
     render(<DailyNoteSlot day={TODAY} note={null} />)
     expect(screen.getByRole('button', { name: 'Daily Note' })).toBeInTheDocument()
