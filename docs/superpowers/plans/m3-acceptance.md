@@ -31,7 +31,7 @@ Run the app on a scratch copy of `space-sample` first (`npm run build`, then `uv
 
 - [ ] Task type page, All tab: each of the six full-view layouts (list, grid, wall, table, embed, kanban) renders.
 - [ ] A filter group `status includes Done OR done is selected`, a sort, and group by status work.
-- [ ] Overview sections show and can be collapsed, reordered and removed. A type with no saved views starts with Recently Opened, Collections and Queries plus the "All" tab; "Not in any collection" and "Not tagged" come from "Add a section"; Collections and Queries can't be removed (reference: `builtInDashboardSections`, reference-check section 6). Views already saved keep their sections.
+- [ ] Overview sections show and can be collapsed, reordered and removed. A type with no saved views starts with Recently Opened, Collections and Queries plus the "All" tab; "Not in any collection" and "Not tagged" come from "Add a section"; Collections and Queries can't be removed (reference-check section 6). Views already saved keep their sections.
 - [ ] Table: resize a column, pin, hide, wrap, a Sum calculation, inline edit of a label and a date.
 - [ ] An external edit in VS Code updates the table row.
 - [ ] Kanban: drag a task between status columns; "+" in a column creates a task with that status.
@@ -41,7 +41,7 @@ Run the app on a scratch copy of `space-sample` first (`npm run build`, then `uv
 
 ### CPI copy
 
-- [ ] Each type page opens with its default layout; Weblinks shows the grid cards of `docs/04-collection-weblinks-cards.png`.
+- [ ] Each type page opens with its default layout; Weblinks shows grid cards.
 - [ ] A membership edit's `git diff` is the `collections:` line plus `lastUpdated` (plus `id:` on an object that had none); view changes touch only `.object/`.
 - [ ] A type page with 1,000+ objects stays responsive (filter edit under 200 ms, measured in DevTools).
-- [ ] Side by side with Object, these look and read the same: the toolbar pill, filter popover, table, cards, kanban, type-page tabs, collection page, query builder, and the sidebar's Pinned, custom sections and Queries entry.
+- [ ] Against the behaviour catalog, these look and read the same: the toolbar pill, filter popover, table, cards, kanban, type-page tabs, collection page, query builder, and the sidebar's Pinned, custom sections and Queries entry.

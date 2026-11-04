@@ -12,7 +12,7 @@ import {
   sharesKeyByDesign,
 } from './shortcuts'
 
-// id → [category, scope, `shortcuts.<id>.name` (verbatim from the reference strings), keys]
+// id → [category, scope, name, keys]
 const TABLE: Record<string, [string, string, string, string[]]> = {
   copyBlockReference: ['block', 'editor', 'Copy block reference', ['Mod-AltCtrl-l']],
   turnIntoObject: ['block', 'editor', 'Turn into object', ['i']],
@@ -39,7 +39,7 @@ const TABLE: Record<string, [string, string, string, string[]]> = {
 }
 
 describe('M8 shortcuts', () => {
-  test('test new shortcut ids exist with reference names and categories', () => {
+  test('test new shortcut ids exist with their names and categories', () => {
     const registered = new Map(allShortcuts().map((d) => [d.id, d]))
     expect(M8_SHORTCUTS.map((d) => d.id).sort()).toEqual(Object.keys(TABLE).sort())
     for (const [id, [category, scope, name, keys]] of Object.entries(TABLE)) {
@@ -48,7 +48,7 @@ describe('M8 shortcuts', () => {
       expect(d?.category, id).toBe(category)
       expect(d?.scope, id).toBe(scope)
       expect(d?.name, id).toBe(name)
-      // Every key is checked against Object's shortcut table (reference-check-2026-10-28 §1).
+      // Every key is checked against the shortcut table (reference-check-2026-10-28 §1).
       expect(d?.provisional, id).toBe(false)
       expect(d?.bound, id).toBe(true)
       expect(keysFor(id)).toEqual(keys)

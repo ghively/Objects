@@ -1,5 +1,5 @@
 /**
- * Quick-create on a connector drop (M8, `Whiteboard.quickCreate.*`). Dropping a connector on
+ * Quick-create on a connector drop (M8). Dropping a connector on
  * empty canvas opens this menu at the drop point: "Objects" ("Create Object", "Link Object" and
  * "Link {name}" for each type), "Shapes" (the shape picker's shapes), then "Nothing" (the
  * connector keeps a point end there) and "Remove" (the connector is dropped). Escape or a click

@@ -1,7 +1,6 @@
 // Three days ("rolling"): the anchor with the day before and after, as three equal columns split by
-// 1 px dividers (`02-calendar-three-days.png`). Each column is the small day header over its daily
-// note slot (`MultiDayDay`), and nothing else: the Tasks, Created and Backlinks sections are the Day view's (the
-// reference and Object show none here). One `api.calendar` range for the three days.
+// 1 px dividers. Each column is the small day header over its daily
+// note slot (`MultiDayDay`), and nothing else: the Tasks, Created and Backlinks sections are the Day view's. One `api.calendar` range for the three days.
 import { useMemo } from 'react'
 import { rangeFor, todayYmd, type Day, type WeekStart } from './dates'
 import { MultiDayDay } from './MultiDayDay'

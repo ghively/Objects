@@ -2,7 +2,7 @@
 // day), then the month's daily notes as grid cards (M3's grid layout) in date order, loaded with one
 // `api.rows({paths})` call per range load, and a "+ New Object" row under them. No cell calendar.
 // With no notes in the month the cards are replaced by "No daily notes created for this month."
-// (`components.RootDailyNote.emptyStates.month`) and the empty-state hint.
+// and the empty-state hint.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, DailyNoteExistsError } from '@/api/client'
 import type { Layout, Row, ViewState } from '@/api/types'
@@ -18,11 +18,10 @@ import { useCalendar } from './useCalendar'
 import { useCalendarRange } from './useCalendarRange'
 
 export const MONTH_TEXT = {
-  /** `components.RootDailyNote.emptyStates.month` */
   empty: 'No daily notes created for this month.',
-  /** `DataViewEmptyState.description` (Object shows it under the month's empty line) */
+  /** Shown under the month's empty line. */
   emptyHint: 'You can change this by creating a new object.',
-  /** As read live in Object's Month view (the reference's `newObject` is "New object"). */
+  /** Capitalised in the Month view ("New Object", not "New object"). */
   newObject: 'New Object',
   /** Our string: the month strip's accessible name. */
   months: 'Months',

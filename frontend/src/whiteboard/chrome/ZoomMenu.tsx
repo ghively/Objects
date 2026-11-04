@@ -1,7 +1,7 @@
 /**
  * The zoom control (bottom right; our choice of position): Zoom out, the current percentage
  * opening the zoom menu ("Zoom in", "Zoom out", "Zoom to fit", "Zoom to selection",
- * "Zoom to 100%" and Object's presets), Zoom in.
+ * "Zoom to 100%" and the presets), Zoom in.
  */
 import { Icon } from '@/components/Icon'
 import type { ZoomCommand, ZoomMenuProps } from '../canvasTypes'

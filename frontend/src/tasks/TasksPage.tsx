@@ -26,7 +26,7 @@ import { DEFAULT_TASK_SECTION, TASK_SECTIONS, TASK_SECTION_KEYS, isTaskSectionKe
 
 export const TASKS_TEXT = {
   heading: 'Tasks',
-  createTask: 'Create task', // our string: the reference's Tasks page has no header button
+  createTask: 'Create task', // our string
   resetView: 'Reset view', // our string
   resetHint: 'Go back to the section’s original view.', // our string
 }

@@ -104,7 +104,7 @@ describe('RelationPicker', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it("empty states use Object's strings and Edit Property opens the settings", async () => {
+  it("empty states use the expected strings and Edit Property opens the settings", async () => {
     const user = userEvent.setup()
     const onOpenSettings = vi.fn()
     const { unmount } = render(

@@ -38,35 +38,26 @@ import { TargetLabel } from '@/shell/TabStrip'
 export const SIDEPANEL_ENTRY_MIME = 'application/x-object-sidepanel-entry'
 
 export const SIDEPANEL_TEXT = {
-  /** `RenderSidepanel.tabList` */
   tabList: 'Browse sidepanel tabs',
-  /** `RenderSidepanel.createNewSidepanelEntry` */
   newEntry: 'New Sidepanel Tab',
-  /** `RenderSidepanel.swapWithMainWindow.button` / `.tooltip` */
   swap: 'Swap',
   swapTooltip: 'Drag onto the main content to swap.',
-  /** `CrossSurfaceTabDrag.sidepanelEntryNotSupportedForMainSwap` */
   swapNotSupported: 'This side panel tab cannot be swapped into the main panel.',
-  /** `EntityMenu.navigateToEntity` */
   openAsPage: 'Open as page',
-  /** `RenderSidepanel.openSidepanelMenu` */
   menu: 'Open sidepanel menu',
   /** our strings */
   moveTo: (n: number) => `Move to area ${n}`,
   close: 'Close',
   back: 'Back',
   forward: 'Forward',
-  /** `RenderSidepanel.emptyState.title` */
   emptyTitle: 'Explore',
-  /** our string, adapted from `RenderSidepanel.emptyState.description` (no AI chat) */
+  /** our string (no AI chat) */
   emptyDescription: 'Open relevant content or view the graph view to expand the context of your work.',
   /** `LocalGraphPanel`'s heading (M5) */
   graph: 'Graph View',
-  /** `SpaceTab.doubleClickToPersist` */
   doubleClickToPersist: 'Double click to make tab persistent.',
-  /** `EditorSettings.backlinkSectionsDefault.backlinks` */
   backlinks: REFERENCES_TEXT.backlinksPanelTitle,
-  /** `RenderSidepanel.backlinks.tooltip`, its Markdown bold as a plain first line */
+  /** The backlinks tooltip, its bold heading as a plain first line */
   backlinksTooltip: 'Backlinks & Mentions\n\nShows the backlinks and mentions of the object in the main window.',
 }
 

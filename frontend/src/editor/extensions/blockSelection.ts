@@ -425,7 +425,7 @@ function toText(editor: Editor): boolean {
   return editor.commands.setHierarchy('Base')
 }
 
-/** "Turn Into" (`tokensMenu.turnInto.name`): one of Text, Heading 1-4, Small, a list, To-do, Toggle, Quote block, Code. */
+/** "Turn Into": one of Text, Heading 1-4, Small, a list, To-do, Toggle, Quote block, Code. */
 export function turnInto(editor: Editor, kind: TurnIntoKind): boolean {
   switch (kind) {
     case 'text':

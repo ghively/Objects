@@ -44,9 +44,9 @@ Object's Python backend (about 21k lines in `backend/objectapp/`) already covers
 | Links/backlinks | `linkindex.py`, `relink.py` | `internal/links` |
 | File watcher | `watcher.py` (watchdog, debounced) | `internal/watcher` |
 | Version history | `history.py`, snapshots outside the space | git commits inside the space |
-| Delete/restore | `trash.py`, Object-style trash | git delete commit |
+| Delete/restore | `trash.py`, restorable trash | git delete commit |
 | Multi-space | `spaces.py` | `internal/spaces` |
-| Saved queries / views | `queries.py`, `collections.py` (Object model) | DQL + saved views |
+| Saved queries / views | `queries.py`, `collections.py` (Object's model) | DQL + saved views |
 
 What KiwiFS has no equivalent for, and Object depends on: object types and type definitions, typed properties and their values, collections, tasks, daily notes, whiteboards, templates, reminders, block references, the Object UI. Those make up most of Object's code.
 
@@ -54,7 +54,7 @@ What KiwiFS has no equivalent for, and Object depends on: object types and type 
 
 1. **"Never write on read."** Opening a folder with KiwiFS runs `git init` if there is no `.git`, writes `.gitattributes`, and sets `core.autocrlf=false` in the repo config, even when `.git` already exists (`versioning/git.go:53-95`). It also creates `.kiwi/`. The watcher then commits every external edit. Pointed at an existing folder, or at Gene's export copy, it changes that folder on open.
 2. **Deletes go to the trash and can be restored.** KiwiFS has no trash, only git history.
-3. **Object's model defines the data model.** KiwiFS's model is "pages + frontmatter + folders". Adopting it as the backend would mean re-expressing Object's types and properties on top of it, which the ground rules forbid.
+3. **Object's own model defines the data model.** KiwiFS's model is "pages + frontmatter + folders". Adopting it as the backend would mean re-expressing Object's types and properties on top of it, which the ground rules forbid.
 4. **Out of scope by the spec:** vector embeddings through cloud providers, webhooks, OIDC/auth, share links and publishing, S3/NFS, importers from Notion/Postgres/etc. (network integrations, accounts, sharing).
 5. **Stack:** Go plus the `git` CLI, against Object's Python + `uv`. Replacing the backend means rewriting about 21k lines of tested Python in Go, or running two servers.
 6. **License:** BSL 1.1 is fine for internal use, but copied code keeps its license notice. Porting ideas is free; copying code is not unencumbered.
@@ -72,7 +72,7 @@ What KiwiFS has no equivalent for, and Object depends on: object types and type 
 | **Opt-in git history** (commit per save, blame, diff) as an alternative to `history.py` snapshots | Line-level diff and blame, and audit for agent edits | Only opt-in, only when the folder is already a repo; never `git init` on open | Medium |
 | **Local semantic search** (ONNX MiniLM + sqlite-vec, in the cache folder) | "Find related" and fuzzy recall | Borderline: counts as AI; local only | Medium |
 | **Agent-safe edits:** drafts with diff/merge, refactor plan → apply → revert | Lets an agent propose changes that Gene reviews | Agent milestone | Medium-large |
-| **Content health:** broken links, orphans, stale pages | Cheap with `linkindex.py` already there | Not a Object feature; would be an addition | Small |
+| **Content health:** broken links, orphans, stale pages | Cheap with `linkindex.py` already there | Not an Object feature; would be an addition | Small |
 | WebDAV mount | Edit the space as a mapped drive | Weak: the folder is already local | Skip |
 | NFS/S3/FUSE, webhooks, OIDC, share links, cloud embedders, 19 importers | none locally | Out of scope | Skip |
 
@@ -80,4 +80,4 @@ What KiwiFS has no equivalent for, and Object depends on: object types and type 
 
 - Whether KiwiFS preserves a UTF-8 BOM on its frontmatter splice path (not checked).
 - Runtime behaviour on Windows (nothing was run; the Windows `procattr` file suggests it is supported).
-- How well DQL would map onto Object's query filters (not compared in depth; Object's query model follows Object, so DQL would at most be an extra power-user surface).
+- How well DQL would map onto Object's query filters (not compared in depth; Object's query model is its own, so DQL would at most be an extra power-user surface).

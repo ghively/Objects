@@ -1,9 +1,9 @@
-// The "Repeat" row of the Task date picker (`DatePicker.recurrence`): the presets of
-// `DatePicker.recurrencePreset.*` in an inline list (no portal, so a pick never dismisses the
+// The "Repeat" row of the Task date picker: the presets
+// in an inline list (no portal, so a pick never dismisses the
 // picker's popover), and "Custom" for the Custom repeat panel. Writes the canonical `repeat` text.
 // M8: "Weekly on {day}", "Monthly on day {date}" and "Yearly on {date}" write the anchored `on`
 // forms (`every week on fri`); "Remove recurrence" (and "No repeat") ask first when the task has
-// an occurrence history (`DatePicker.recurrenceRemoveConfirm.*`, shown in place, as Custom is).
+// an occurrence history (shown in place, as Custom is).
 import { useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { describeRepeat, formatRepeat, localDayOf, parseRepeat, presetOn } from './repeat'

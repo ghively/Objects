@@ -1,6 +1,6 @@
 # Object
 
-A local, Markdown-backed recreation of [Object](https://object.io): the same UI and object model, stored as a folder of plain `.md` files on your own disk, with no cloud.
+A local, Markdown-backed notes app with its own object model, stored as a folder of plain `.md` files on your own disk, with no cloud.
 
 - **Objects and types:** every property kind, templates, tags as objects, trash.
 - **Views:** list, grid, wall, table, kanban, gallery and embed, with filters, sorts and group-by; collections and saved queries.
@@ -9,7 +9,7 @@ A local, Markdown-backed recreation of [Object](https://object.io): the same UI 
 - **Whiteboards:** with pressure-sensitive pen ink.
 - **Editor:** a block editor that writes plain Markdown and never rewrites what you didn't edit; light and dark themes; version history.
 
-Opening a space never modifies its files, edits change only their own lines, and deletes go to a restorable trash.
+Opening a space never modifies its files, edits change only their own lines, and deletes go to a restorable trash. A space keeps its metadata in `.object/` and its search cache in `.object-cache/`; spaces made before 2026-11-04 are migrated to these folders automatically on open.
 
 ## Run it
 
@@ -34,4 +34,4 @@ uv run python scripts/m8_acceptance.py backend/tests/fixtures/space-sample
 
 Rules for contributors (human or agent) are in `CLAUDE.md`. Status is in `docs/superpowers/plans/remaining-work.md`. To pick the work up, read `HANDOFF.md`.
 
-Object is a trademark of its owners. Object is an independent, local-only reimplementation, and its application code is written from scratch. `reference/` holds a trimmed copy of Object's English strings, CSS and design notes. It is used only to match labels, values and behaviour, and none of its code is shipped. Keep this repository private.
+Object's application code is written from scratch. Keep this repository private.

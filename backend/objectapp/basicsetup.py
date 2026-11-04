@@ -1,9 +1,9 @@
 """M8 "Start with basic setup": the Person, Meeting, Project and Book object types.
 
-Object's onboarding offers "Start with basic setup" ("Includes people, meetings,
+Onboarding offers "Start with basic setup" ("Includes people, meetings,
 projects, and books."). Its names, plural names, descriptions, property names and
-label options are the en-US strings ``components.{person,meeting,project,book}.*``;
-the trimmed reference does not hold the types' property kinds, icons or colours, so
+label options are fixed en-US strings;
+the design notes do not give the types' property kinds, icons or colours, so
 those are **our choice** (listed for Gene in the M8 plan, Task 8):
 
 - Person: Picture (the cover image), Category (multi label), Organizations
@@ -43,8 +43,8 @@ __all__ = ["BASIC_TYPE_IDS", "basic_types", "write_basic_types"]
 
 BASIC_TYPE_IDS = ("person", "meeting", "project", "book")
 
-# The Project "Status" options and their colours (our choice). It is a plain label: Object
-# sets ``isStatus`` (and option ``statusCategory``) only on the basic Task status.
+# The Project "Status" options and their colours (our choice). It is a plain label: only
+# the basic Task status sets ``isStatus`` (and option ``statusCategory``).
 _PROJECT_STATUS = (
     ("Planned", "yellow"),
     ("In Progress", "blue"),

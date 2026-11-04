@@ -24,7 +24,7 @@ const refOf = (t: PinTarget): PinRef | null => {
   return t
 }
 
-/** "Pin to..." (`ObjectMenu.pinToWorkspaceSection`): picking toggles membership of that section. */
+/** "Pin to...": picking toggles membership of that section. */
 export function PinToMenu({ pin }: { pin: PinTarget }) {
   const { sections, isPinned, pin: doPin, unpin } = usePinned()
   const ref = refOf(pin)

@@ -12,14 +12,10 @@ import { saveCalendarDaily, useCalendarDaily } from './calendarUi'
 import type { Day } from './dates'
 
 export const CHIPS_TEXT = {
-  /** `CalendarDaily.objectsOfDay.create` */
   create: (object: string) => `Create ${object} linked to this day.`,
-  /** `CalendarDaily.objectsOfDay.createObjects` */
   createObjects:
     'Create an object with the date property set to this day. You can remove an object type from this list in the settings of that object type.',
-  /** `CalendarDaily.objectsOfDay.hideCreateObjects` */
   hide: 'Click to hide these buttons.',
-  /** `CalendarDaily.objectsOfDay.showCreateObjects` */
   show: 'Click to show options to create objects for this day.',
 }
 

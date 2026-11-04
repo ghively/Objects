@@ -439,7 +439,7 @@ _UI_PATCH_KEYS = frozenset(
         "whiteboard", "workspaceOrder", "objectsSectionSortOption", "workspace",
     }
 )  # fmt: skip
-# RootSpace.model.ts `GraphViewCustomization`, verbatim.
+# The graph view customisation keys.
 _GRAPH_LIST_KEYS = ("filterStructureIds", "excludeStructureIds")
 _GRAPH_BOOL_KEYS = (
     "showCompletedTasks",
@@ -1779,7 +1779,7 @@ def create_app(
         return _display_safe(list_images(space.root))
 
     async def _upload_body(request: Request) -> bytes | None:
-        """The uploaded bytes, or None once they exceed Object's 100 MiB limit (413)."""
+        """The uploaded bytes, or None once they exceed the 100 MiB limit (413)."""
         limit = media.MAX_ATTACHMENT_BYTES
         declared = request.headers.get("content-length", "")
         if declared.isdigit() and int(declared) > limit:

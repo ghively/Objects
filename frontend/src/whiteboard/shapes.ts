@@ -1,7 +1,6 @@
 /**
- * Shape geometry for the 12 Object whiteboard shapes (`whiteboardShapes`).
- * The trimmed reference has the shape names but not their drawing, so the outlines are our
- * choice: each is a closed SVG path inside its `w × h` box, drawn with absolute `M`/`L`/`C`/`Q`
+ * Shape geometry for the 12 whiteboard shapes (`SHAPES`).
+ * The outlines are our choice: each is a closed SVG path inside its `w × h` box, drawn with absolute `M`/`L`/`C`/`Q`
  * commands only (no arcs), so every coordinate stays inside the box and flips are a plain mirror.
  */
 import type { WhiteboardShape } from '@/api/whiteboardTypes'

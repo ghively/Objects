@@ -67,6 +67,7 @@ from .collections import CollectionDef, SaveCollectionResult
 from . import fmcache
 from .dailynotes import FILE_NAME_TAKEN, DailyNoteExists, build_index, day_of, parse_day
 from .jsonstore import DefinitionUnreadable, JsonStore
+from .legacy import migrate_legacy_folders
 from .localtime import SystemTz, from_local, to_local
 from .queries import DEFAULT_NAME as DEFAULT_QUERY_NAME
 from .queries import LIMIT_SIZES, MAX_SEARCH_TERMS, QueryDef, query_type_ids
@@ -170,20 +171,20 @@ _NOT_COPIED_KINDS = frozenset(
     {"entity_title", "entity_type", "entity_createdAt", "entity_lastUpdated",
      "entity_collections", "entity_backlinks"}
 )  # fmt: skip
-# M9 duplicate: the roles of `structureHeuristicsBackbone.ts` `cannotBeDuplicatedInUI` that
+# M9 duplicate: the roles that can't be duplicated that
 # our types can have (see `roles.py`), and the refusal (our string).
 _NOT_DUPLICATED_ROLES = frozenset(
     {"MediaImage", "MediaWebResource", "MediaPDF", "MediaAudio", "MediaFile", "MediaTweet",
      "RootDailyNote"}
 )  # fmt: skip
 _CANNOT_DUPLICATE = "This object can't be duplicated."
-# M9 per-object layout keys (`ComponentData.wideLayoutMode`, `entity.data.wideCoverImage`,
+# M9 per-object layout keys (`wideLayoutMode`, `wideCoverImage`,
 # `coverImageOffset`'s `offset`): absent means the type's default (offset 50); `None` removes.
 _COVER_OFFSET = "coverImageOffset"
-# Polish item 17: `hideProperties` (`ComponentData.hideProperties`), the property-pane toggle.
+# Polish item 17: `hideProperties`, the property-pane toggle.
 _LAYOUT_BOOL_KEYS = frozenset({"wideLayoutMode", "wideCoverImage", "hideProperties"})
 _LAYOUT_KEYS = _LAYOUT_BOOL_KEYS | {_COVER_OFFSET}
-# `DATE_TEMPLATE_VARIABLES` (date.model.ts); `DatetimeProperty.variable` is "Set only on templates".
+# The date template variables; a datetime property's variable is "Set only on templates".
 _CREATION_VARIABLES = ("day", "week", "month", "year")
 # M9: how often a whiteboard save may re-stamp its `.md` (`Space.touch`; our choice).
 _TOUCH_INTERVAL = timedelta(seconds=60)
@@ -282,7 +283,7 @@ _LINK_BREAKING_RE = re.compile(r"[\[\]|#\n]")
 
 
 def safe_filename(title: str) -> str:
-    """The file stem for a title, as Object's export names files.
+    """The file stem for a title, as an export names files.
 
     The title up to its first character that is illegal in a Windows file name,
     with whitespace collapsed and leading and trailing dots and spaces stripped
@@ -630,7 +631,7 @@ def unique_key(name: str, taken: Iterable[str]) -> str:
     return f"{base}_{n}"
 
 
-# Object's en-US texts.
+# The en-US texts.
 BASIC_LOCKED = "Properties of basic object types cannot be edited."
 NO_TRANSFORMATIONS = (
     "This property type cannot be changed. If you need to change it, please add a ticket "
@@ -811,6 +812,7 @@ class Space:
 
     def __init__(self, root: Path) -> None:
         self.root = Path(root).resolve()
+        migrate_legacy_folders(self.root)  # older folder names, renamed once
         self._space_json = os.fspath(self.root / SPACE_REL)
         self._name_cache: tuple[tuple | None, str] | None = None
         """(`space.json`'s stat key, the name read with it) for `name`."""
@@ -1847,7 +1849,7 @@ class Space:
         ``base`` is the version on disk the stamp started from (read under the lock) and
         ``version`` the version after it: equal when nothing was written. M9: a
         whiteboard's canvas or ink save stamps its ``.md`` (``lastUpdated`` is
-        component-level in Object). A stamp under `_TOUCH_INTERVAL` old is left as it
+        component-level). A stamp under `_TOUCH_INTERVAL` old is left as it
         is (our choice), as is a read-only file; the write takes no version-history
         snapshot (our choice). Raises `KeyError`, `ValueError` and `Conflict` (an
         external write during the stamp).
@@ -2136,7 +2138,7 @@ class Space:
             ("coverImage" in sets and sets["coverImage"] != fm.get("coverImage"))
             or "coverImage" in removals
         ):
-            # A new cover image drops the old one's position (Object's `referenceImageId`).
+            # A new cover image drops the old one's position (``referenceImageId``).
             removals.append(_COVER_OFFSET)
         in_place: dict[str, str] = {}
         if hook is not None:
@@ -2948,14 +2950,14 @@ class Space:
         The copy is the source's bytes (line endings and BOM included) except for a
         new ``id``, ``title: <Title> (Copy)``, fresh ``createdAt`` and ``lastUpdated``
         (``now``, default `Space.clock`) and a first ``# <Title>`` heading, which
-        becomes ``# <Title> (Copy)``. The title rule is Object's
-        (``${title || 'Untitled'} (Copy)``). Besides the new file, the targets of its
+        becomes ``# <Title> (Copy)``. The title rule is
+        ``${title || 'Untitled'} (Copy)``. Besides the new file, the targets of its
         synced (two-way) relations gain ``[[<Title> (Copy)]]`` in their counterpart
         property, as for any relation edit (Gene, 2026-10-29); ``synced`` lists them.
 
         Raises `KeyError` (no such file), `ValueError` (not an object path) and
-        `InvalidValue` for what Object doesn't duplicate (daily notes and media,
-        its ``cannotBeDuplicatedInUI``), templates, whiteboards (their sidecars would
+        `InvalidValue` for what can't be duplicated (daily notes and media),
+        templates, whiteboards (their sidecars would
         need copying too; our choice) and read-only files.
         """
         rel = self._rel(path)
@@ -3913,7 +3915,7 @@ class Space:
         Polish item 21: with ``template`` (a gallery key, `typetemplates`), the
         template's properties replace "Content", its name, plural, description,
         icon and colour fill whatever isn't given, and the key is stored as
-        ``templateKey`` (Object's `RootStructure.templateKey`).
+        ``templateKey`` (the template it was made from).
         """
         tpl = None
         if template is not None:
@@ -3985,7 +3987,7 @@ class Space:
         p: PropertyDefinition,
         types: dict[str, TypeDefinition] | None = None,
     ) -> str | None:
-        """Why ``p`` of ``t`` can't sync with its ``propertySyncing`` targets (Object's text).
+        """Why ``p`` of ``t`` can't sync with its ``propertySyncing`` targets (the user-facing text).
 
         Syncing needs an entity property that is multi-select without a fixed
         set, on a non-basic type, whose ``allowedTypes`` is exactly the
@@ -4450,7 +4452,7 @@ class Space:
     def change_property_kind(
         self, type_id: str, pid: str, to_type: str, base_revision: str
     ) -> ChangeKindResult:
-        """Change a property's kind as Object does: by adding a new property.
+        """Change a property's kind: by adding a new property.
 
         The new definition goes right after the old one, with the same name,
         icon, description and visibility, a new id and a new unique key. Each
@@ -4550,7 +4552,7 @@ class Space:
         type JSONs are written last.
 
         Raises `KeyError`, `TypeReadOnly`, `RevisionConflict` and
-        `InvalidValue` with Object's texts when syncing isn't allowed.
+        `InvalidValue` with the user-facing texts when syncing isn't allowed.
         """
         with self._lock:
             src_t, current = self._editable_type(type_id)
@@ -4596,7 +4598,7 @@ class Space:
 
             lookup = {x.id: x for x in self.types}
             lookup[src_t.id] = src_t
-            # Validate the source with a placeholder link (Object's texts).
+            # Validate the source with a placeholder link (same texts).
             probe = copy.deepcopy(p)
             probe.options.pop("propertySyncing", None)
             problem = self.sync_problem(src_t, probe, lookup)

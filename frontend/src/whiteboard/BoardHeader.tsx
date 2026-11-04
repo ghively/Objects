@@ -1,6 +1,6 @@
 /**
  * The board title over the canvas, top left (`.whiteboard-title-fade`; the placement is our
- * choice, the trimmed reference has no whiteboard screenshot). Click to rename; Enter or blur
+ * choice). Click to rename; Enter or blur
  * commits, Escape cancels. The board `…` menu sits beside it.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'

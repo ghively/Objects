@@ -1,6 +1,6 @@
 /**
- * A whiteboard object, as a page or in the peek: always full width (Object's `wideLayoutMode`,
- * "The canvas owns the page"). The canvas with the title overlay top left, the toolbox bottom
+ * A whiteboard object, as a page or in the peek: always full width
+ * ("The canvas owns the page"). The canvas with the title overlay top left, the toolbox bottom
  * centre (with the ink plugin's pen group), the zoom menu bottom right, the selection toolbar
  * over the selection, the read-only banner, the delete flow as `ObjectView` has it and
  * "Clear Whiteboard" (board and ink, one undo step).
@@ -451,7 +451,7 @@ export function WhiteboardPage({
 }
 
 /**
- * The board's "Notes" (`components.RootWhiteboard.propertyDefinitions.RootWhiteboard_notes.name`):
+ * The board's "Notes":
  * a bar under the canvas that opens M1's body editor on the board's `.md` body (collapsed by
  * default; the bar and its height are our choice).
  */

@@ -52,8 +52,8 @@ const BUTTON =
 /**
  * The pen group of the whiteboard toolbox (Gene's addition; our strings): Pen, Highlighter and
  * Eraser toggles, and for the drawing tools a colour row and the width choices. Clicking the
- * active tool turns ink off. The keys D, Shift+D and E (ours: P and M are Object's Triangle
- * and move menu) are handled by the canvas shortcuts.
+ * active tool turns ink off. The keys D, Shift+D and E (ours: P and M are Triangle
+ * and the move menu) are handled by the canvas shortcuts.
  */
 export function InkToolbar({ value, readOnly, onChange }: InkToolbarProps) {
   // Remember the colour and widths while ink is off, so turning it back on keeps them.

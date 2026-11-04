@@ -8,7 +8,7 @@ import { api, CLIENT_ID, ConflictError } from '@/api/client'
 import type { Icon, PinRef, SidebarSection, UiState } from '@/api/types'
 import { showToast } from '@/editor/media/upload'
 
-/** The toast after a `ui.json` save of the sidebar failed (Object's "Could not save …" form). */
+/** The toast after a `ui.json` save of the sidebar failed ("Could not save …" form). */
 export const SIDEBAR_SAVE_FAILED = 'Could not save the sidebar'
 
 interface UiStore {

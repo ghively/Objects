@@ -1,6 +1,6 @@
 /**
  * "Delete this object type?": moves the type, its objects and its templates to the app's Trash
- * (restorable for 30 days), so Object's "This can't be undone." is not shown.
+ * (restorable for 30 days), so "This can't be undone." is not shown.
  */
 import { useState } from 'react'
 import { api } from '@/api/client'

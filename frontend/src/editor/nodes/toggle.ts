@@ -7,7 +7,7 @@
  *   - [ ] Patch the hosts
  *   <!-- /toggle -->
  *
- * `open` is a container option (`toggle.isOpen`; absent = closed).
+ * `open` is a container option (absent = closed).
  *
  * The node view draws a caret before the toggle's first child (rotated when
  * open; `--editor-toggle`, or `--editor-toggle-empty` when the toggle has no

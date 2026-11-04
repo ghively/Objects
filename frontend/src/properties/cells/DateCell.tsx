@@ -18,7 +18,7 @@ export function isTaskDate(def: PropertyDef, typeId: string | null | undefined):
   return t ? t.basic && t.name.toLowerCase() === 'task' : typeId.toLowerCase() === 'task'
 }
 
-/** Object's `DATE_TEMPLATE_VARIABLES` and their `DatetimeCell.templateVariable.*` labels. */
+/** The date template variables and their labels. */
 const TEMPLATE_VARIABLES = [
   ['day', 'Day of creation'],
   ['week', 'Week of creation'],

@@ -1,7 +1,7 @@
 """M9 Task 2: duplicate an object (``POST /api/object/duplicate``).
 
-Object's "Duplicate" (``EntityMenu.duplicateObject``) names the copy
-``<Title> (Copy)`` (``general.copy.noun``). The copy is the source's bytes except
+"Duplicate" names the copy
+``<Title> (Copy)``. The copy is the source's bytes except
 for a new ``id``, the ``title``, fresh ``createdAt``/``lastUpdated`` and a first
 ``# <Title>`` heading; it goes in the same folder under a free name.
 """

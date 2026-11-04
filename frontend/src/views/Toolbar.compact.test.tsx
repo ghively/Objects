@@ -1,4 +1,4 @@
-// The Calendar sections' toolbar (Object): layout picker and a settings menu with only
+// The Calendar sections' toolbar: layout picker and a settings menu with only
 // Calculations; no Filter, Sort or Group by; the count only outside the list layout.
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

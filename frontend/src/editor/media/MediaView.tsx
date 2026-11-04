@@ -3,16 +3,16 @@
  * web link block (bookmark).
  *
  * - image: `<img>` from `api.fileUrl` (or the URL as written for `http(s)`);
- *   a failed load shows `RenderImage.loadingError`. Resizable, alignable, caption.
+ *   a failed load shows an error line. Resizable, alignable, caption.
  * - PDF: an `<iframe>` of `api.fileUrl` at `height` (default 600 px, our
  *   value) with a bottom handle writing `height`; resizable, alignable, caption.
  * - audio: `<audio controls>`; caption.
  * - video: `<video controls>`; resizable width, alignable, caption.
  * - file: a card with a file icon by extension, the name, the size (from
- *   `api.attachments()`), "Open {type} on system" (`EntityMenu.openMediaOnSystem`)
- *   and "Download {mediaType}" (`EntityMenu.downloadMedia.text`); caption.
+ *   `api.attachments()`), "Open {type} on system"
+ *   and "Download {mediaType}"; caption.
  * - a missing attachment shows "File not found." (our string).
- * Every block has a `…` menu with "Remove Block" (`EntityMenu.deleteEntityBlock.text`).
+ * Every block has a `…` menu with "Remove Block".
  *
  * The bookmark is a card with the link title, the domain and the URL, opened
  * in the system browser; nothing is fetched.
@@ -27,7 +27,7 @@ import type { AttachmentKind, Option } from '../annotations'
 import { EmbedMenu, ResizableEmbed, type EmbedMenuItem, type ResizableEmbedProps } from './ResizableEmbed'
 import { cachedAttachments, decodeMarkdownPath, findAttachment, isExternalUrl, showToast } from './upload'
 
-/** `RenderImage.loadingError`, verbatim. */
+/** The image load error. */
 export const IMAGE_ERROR = 'This image could not be loaded. Please try again or delete the object.'
 /** Our string. */
 export const FILE_NOT_FOUND = 'File not found.'

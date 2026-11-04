@@ -2,7 +2,7 @@
  * The `connector` edge: the path for its connection (unset = cornered), its line's dash array,
  * colour and tips, an invisible wide hit stroke (React Flow's interaction path), and the label at
  * the path midpoint. Double-click adds a label text block (`addEdgeLabel`) and edits it; an
- * emptied label removes its block ("cleared again if the text is empty", `whiteboard.model.ts`);
+ * emptied label removes its block (cleared again if the text is empty);
  * a deprecated `label` string renders and becomes a block when edited. Adding the block and
  * committing its text are one undo step.
  */

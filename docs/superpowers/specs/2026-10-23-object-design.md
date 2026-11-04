@@ -5,21 +5,19 @@ Working name: **Object**.
 
 ## 1. What we're building
 
-**A local Object.** It's a new desktop app that recreates the Object app as faithfully as possible (its screens, interactions, object model and settings) and stores everything in a local Markdown folder instead of Object's cloud. Gene can change any of it later.
+**A local, Markdown-backed notes app.** It's a new desktop app with its own object model (objects, types, properties, collections, tags, daily notes, tasks, queries, whiteboards) that stores everything in a local Markdown folder, with no cloud. Gene can change any of it later.
 
 Two sources define it:
-1. **The UI:** Gene's screenshots (`docs/`) plus Object's shipped front end (unpacked to `docs/design-notes`). Its CSS gives the exact design tokens, and its English UI text (`dist/defaultLocale*.js`) gives every menu label and option name.
-2. **The data model:** Object's own model definitions, recovered from the installer (`docs/design-notes` §3 and `docs/design-notes`). Everything the app lets you configure is in scope, not only what an export shows.
+1. **The UI:** the behaviour catalog (`docs/behavior-catalog.md`) and the look and feel in §5 give every screen, menu label, option name and design token.
+2. **The data model:** §3 below. Everything the app lets you configure is in scope, not only what an export shows.
 
-`.reference/` is git-ignored and never committed.
-
-It's a new code base: we write our own code to match Object rather than shipping or patching theirs.
+It's a new code base, written from scratch.
 
 ## 2. Scope
 
 **In:**
-- **Objects and types:** everything Object does with objects, object types, properties, collections, tags, daily notes, tasks, queries, the calendar, the graph, whiteboards, search, backlinks, templates, the command palette, tabs and side panels, and settings that apply locally.
-- **Freehand pen drawing** on whiteboards with Wacom pressure. This is Gene's addition; Object doesn't have it.
+- **Objects and types:** objects, object types, properties, collections, tags, daily notes, tasks, queries, the calendar, the graph, whiteboards, search, backlinks, templates, the command palette, tabs and side panels, and settings that apply locally.
+- **Freehand pen drawing** on whiteboards with Wacom pressure. This is Gene's addition.
 - **AI assistant** (added 2026-11-02, M10): chat, block and tag helpers, run through the user's Claude Code CLI; it never writes on its own. Plan: `plans/2026-11-02-m10-ai-assistant.md`.
 
 **Out:**
@@ -28,11 +26,11 @@ It's a new code base: we write our own code to match Object rather than shipping
 
 **Later (wanted, lower priority, each needs its own spec change):** integrations (calendar feeds, task actions, the API, email, Readwise, Kindle, Telegram, WhatsApp, Raycast).
 
-Pro-only features are simply available.
+Every feature is simply available; nothing is gated behind a paid tier.
 
-## 3. Data model (Object's model, faithfully)
+## 3. Data model
 
-| Object concept | Must support |
+| Concept | Must support |
 |---|---|
 | **Object type** (Structure) | name, plural name, icon, colour, description; ordered property definitions; layout `profile` / `indexCard` / `encyclopedia`, wide mode, cover crop; how objects of the type render elsewhere (inline, small card, wide card, embed, page) with per-view settings; default view; templates; calendar options |
 | **Property kinds** | text, rich text block, simple table, number (formats: number, currency, percentage, progress; decimals, thousands separator), checkbox, URL, date and date+time (with ranges, `time`/`day` resolution, constraints), relation to objects (single or multiple, limited to chosen types, fixed set, property syncing), label (single or multiple, options with colour and icon, can act as **status** with categories not-started / in-progress / blocked / done), blocks. Per property: icon, description, visibility (always / hide when empty / hidden), searchable |
@@ -46,22 +44,22 @@ Pro-only features are simply available.
 | **Tasks** | ordinary objects of a task type: status label, priority low/medium/high, due date, **recurrence** (every N day/week/month/year, by due date or completion date), reminders |
 | **Whiteboards** | grid of 30 px; blocks (text and objects), 12 shapes, frames, points, logic-circuit gates; connectors straight/cornered/curved, solid/dashed/dotted, end markers none/arrow/dot/double; plus our freehand ink |
 
-During implementation the builder reads the design notes files and the UI strings for each feature, and copies the **behaviour and options**, not the code.
+During implementation the builder takes each feature's **behaviour and options** from this table and the behaviour catalog.
 
 ## 4. How it's stored (Markdown folder)
 
-A **space** is a folder; the app can hold several spaces and switch between them, as Object does. The layout extends Object's own Markdown export:
+A **space** is a folder; the app can hold several spaces and switch between them. The layout is plain Markdown files in type folders, plus an app-data folder:
 
 ```
 My Space/
-  .object/                 app data, readable JSON/YAML, safe to version
+  .object/                     app data, readable JSON/YAML, safe to version
     space.json                 space name, icon, settings
     types/<type>.json          one object-type definition each (properties, card/link view settings, templates…)
     views/<typeId>.json        a type page's saved views (Overview, All, section tabs)   [amended M3]
     collections/<id>.json      collection definitions and their views                   [amended M3]
     queries/<id>.json          saved queries                                            [amended M3]
     ui.json                    sidebar order, pinned items, custom sidebar sections, open tabs
-  .object-cache/           search index (derived, rebuildable)
+  .object-cache/               search index (derived, rebuildable)
   Tasks/Standalone GUI.md      one object = one Markdown file in its type's folder
   DailyNotes/2026-10-23.md
   Tags/Networking.md
@@ -96,12 +94,13 @@ Body = the object's blocks, as Markdown.
 
 **Rules:**
 - **Body blocks** that plain Markdown can express are written as plain Markdown. Block options Markdown can't express (toggles, colours, columns, standout quotes, embed view settings, alphabetical/roman lists) are kept with a small inline annotation, so the file still reads cleanly in any editor. The annotation syntax is the builder's choice.
-- **Links** are `[[Title]]`. Renaming an object renames its file and updates the links to it, as Object does.
+- **Links** are `[[Title]]`. Renaming an object renames its file and updates the links to it.
 - **Files outside the app:** if a file is edited elsewhere, the app picks up the change. Saving never rewrites parts of a file that weren't edited.
+- **Older spaces:** spaces made before 2026-11-04 keep their app data under an older folder name; the app renames it to `.object/` (and the cache to `.object-cache/`) once, automatically, on open, and changes no `.md` file. [amended 2026-11-04]
 
 ## 5. Look and feel
 
-- Match the screenshots and Object's shipped CSS: Inter at a 15px base, the measured dark palette, radii, soft layered shadows, the Phosphor icons. Light mode is included, since Object has it and the CSS defines it.
+- Match the behaviour catalog and the design tokens: Inter at a 15px base, the measured dark palette, radii, soft layered shadows, the Phosphor icons. Light mode is included.
 - **Interactions to copy:**
   - the peek modal with its pager
   - the `…` menus and their groupings
@@ -112,11 +111,11 @@ Body = the object's blocks, as Markdown.
   - the three-area side panel
   - the calendar views and mini month
   - hover states and keyboard shortcuts
-- **The test:** Gene puts the two apps side by side, and they should feel like the same app.
+- **The test:** Gene walks through the behaviour catalog in the app, and every screen should match it.
 
 ## 6. How it's built (my call)
 
-- **Front end:** React + TypeScript + Tailwind + shadcn/ui (restyled to Object's tokens). Tiptap for the block editor. A force-graph library for the graph. A canvas library for whiteboards, with `perfect-freehand` for pen ink.
+- **Front end:** React + TypeScript + Tailwind + shadcn/ui (restyled to the app's own design tokens). Tiptap for the block editor. A force-graph library for the graph. A canvas library for whiteboards, with `perfect-freehand` for pen ink.
 - **Back end:** a small local Python service on `127.0.0.1` that reads and writes the space folder and keeps a SQLite search index.
 - **Window:** its own app window (pywebview). Runs with one command; an installer comes later.
 - **Order:** built and shown in milestones, roughly:
@@ -126,7 +125,7 @@ Body = the object's blocks, as Markdown.
   4. calendar, daily notes and tasks
   5. search, graph, backlinks
   6. whiteboards and pen
-  7. polish against the screenshots
+  7. polish against the behaviour catalog
   Gene sees each one running before the next starts.
 
 ## 7. Done when
@@ -134,5 +133,5 @@ Body = the object's blocks, as Markdown.
 1. Every feature in §3 works against a local space folder, with no network access needed (the AI assistant, M10, needs the user's Claude Code and its own network access).
 2. A test space built from a copy of Gene's CPI export opens and behaves like his CPI space did. The copy stays outside the repo, because it holds work data.
 3. Files stay readable Markdown. Editing one thing changes only that thing in the file.
-4. Side by side with Object, Gene judges the look and feel faithful.
+4. Against the behaviour catalog, Gene judges the look and feel right.
 5. The Wacom pen draws pressure-sensitive ink on whiteboards.

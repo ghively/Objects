@@ -1,6 +1,6 @@
-// "Completion Log" (`components.RootTask.occurrenceLog.*`) under "Task Stats": the recurring task's
+// "Completion Log" under "Task Stats": the recurring task's
 // occurrence log, newest first, each entry its scheduled date and action ("Completed", "Skipped",
-// "Excused"). An entry can be deleted after the reference confirm ("Delete completion log entry");
+// "Excused"). An entry can be deleted after a confirm ("Delete completion log entry");
 // the owner writes the remaining log lines (an unparseable line is never listed and always kept),
 // so the file changes only by that entry's line. Deleting the last line removes the key.
 import { useState } from 'react'
@@ -18,16 +18,16 @@ import {
 import { formatDate } from '@/properties/format'
 
 export const COMPLETION_LOG_TEXT = {
-  heading: 'Completion Log', // components.RootTask.occurrenceLog.heading
-  deleteTitle: 'Delete completion log entry', // components.RootTask.occurrenceLog.deleteEntry.title
-  deleteDescription: 'This log entry will be permanently removed from the completion history.', // …deleteEntry.description
-  cancel: 'Cancel', // general.cancel
-  delete: 'Delete', // general.delete
+  heading: 'Completion Log',
+  deleteTitle: 'Delete completion log entry',
+  deleteDescription: 'This log entry will be permanently removed from the completion history.',
+  cancel: 'Cancel',
+  delete: 'Delete',
 } as const
 
 const T = COMPLETION_LOG_TEXT
 
-/** `components.RootTask.habitStats.cellState.*` for the logged actions. */
+/** For the logged actions. */
 const ACTION_LABEL = { completed: 'Completed', skipped: 'Skipped', excused: 'Excused' } as const
 type LoggedAction = keyof typeof ACTION_LABEL
 

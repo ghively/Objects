@@ -1,5 +1,4 @@
-/* Media blocks (Task 11). Spacing from Object's index CSS: an entity block
-   (`.EntityBlock.block-outer.embed`) sits `--ep-stack` (.2em) below the block
+/* Media blocks (Task 11). An embedded block sits `--ep-stack` (.2em) below the block
    before it; the radius is --border-radius-base (.5rem). Colours are tokens. */
 .object-editor .media-block {
   margin-block-start: 0.2em;

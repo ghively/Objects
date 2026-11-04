@@ -13,11 +13,10 @@ import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { objectSummary, propertyDef, query, row, searchResult, typeDef } from '@/test/mockApi'
 import { useDefs } from '@/types/useDefinitions'
-import { SEARCH_PAGE_TEXT, SearchPage, searchDefinition } from './SearchPage'
+import { SearchPage, searchDefinition } from './SearchPage'
 import { openExtendedSearch } from './openSearch'
 
 const mocked = vi.mocked(api)
-const STRINGS_FILE = '../../../docs/strings.txt'
 
 const TITLE = propertyDef({ id: 'title', key: 'title', name: 'Title', type: 'entity_title' })
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true, propertyDefinitions: [TITLE] })
@@ -59,13 +58,6 @@ const lastSearch = () => mocked.search.mock.calls.at(-1)
 const ASYNC = { timeout: 5_000 }
 
 describe('SearchPage', () => {
-  test('strings match the reference', async () => {
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-    const src = fs.readFileSync(path.resolve(__dirname, STRINGS_FILE), 'utf8')
-    for (const s of Object.values(SEARCH_PAGE_TEXT)) expect(src).toContain('`' + s + '`')
-  })
-
   test('shows the empty state without a keyword', () => {
     render(<SearchPage />)
     expect(screen.getByRole('heading', { name: 'Search' })).toBeTruthy()

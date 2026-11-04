@@ -28,7 +28,7 @@ export interface CustomizeMenuProps {
   extraPages?: CustomizePage[]
   /** The type id calculations apply to when the view spans one type. */
   structureId?: string
-  /** A reduced menu: only Calculations (the Calendar sections', as in Object). */
+  /** A reduced menu: only Calculations (the Calendar sections'). */
   only?: 'calcs'
 }
 

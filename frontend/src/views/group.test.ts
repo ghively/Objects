@@ -302,7 +302,7 @@ describe('task groupings (M4)', () => {
     expect(groups.some((g) => g.isOther)).toBe(false)
   })
 
-  test('category group labels match reference', () => {
+  test('category group labels', () => {
     const { groups } = groupRows([], cat, undefined, tctx())
     expect(labels(groups)).toEqual(['Not started', 'In progress', 'Blocked', 'Done'])
   })

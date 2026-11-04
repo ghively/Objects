@@ -1,7 +1,7 @@
 /**
  * Whiteboard copy and paste through the system clipboard (M8). A copied selection is written as
  * plain text: `object-whiteboard-v1:` + JSON of the selected nodes, the edges between them and
- * the blocks they use (our prefix; Object writes `object-whiteboard-v1:`). A paste gets
+ * the blocks they use (our prefix). A paste gets
  * fresh ids for every node, edge and block, sits one grid step (30 px) down and right of the
  * originals (another 30 px for each further paste of the same clipboard; our choice), loses its
  * per-node lock (as Duplicate) and lands on top. Pasted plain text becomes a text block, a pasted
@@ -12,7 +12,7 @@ import type { WhiteboardBlock, WhiteboardData, WhiteboardEdge, WhiteboardNode, W
 import { createFromTool, createWeblink, newId } from './actions'
 import { GRID, nextContentZ, nextFrameZ, normalizeWeblinkUrl } from './model'
 
-/** Our clipboard prefix (Object's is `object-whiteboard-v1:`). */
+/** Our clipboard prefix. */
 export const CLIPBOARD_PREFIX = 'object-whiteboard-v1:'
 
 /** Offset of a paste from the copied nodes: one grid step. */

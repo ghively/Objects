@@ -64,7 +64,7 @@
   pointer-events: none;
 }
 
-/* The slash menu: Object's CreateMenu is w-[22rem] in the editor, its list max-h-72 (18rem). */
+/* The slash menu: 22rem wide in the editor, its list at most 18rem high. */
 .slash-menu {
   z-index: 50;
   pointer-events: auto;
@@ -131,7 +131,7 @@
   white-space: nowrap;
 }
 
-/* The description: a right-hand icon whose tooltip it is, shown on hover (Object's `visibility: hover`). */
+/* The description: a right-hand icon whose tooltip it is, shown on hover. */
 .slash-menu-description {
   display: inline-flex;
   flex: none;

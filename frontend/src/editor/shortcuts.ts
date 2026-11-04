@@ -1,11 +1,11 @@
 /**
- * The editor's shortcuts. The ids, names (`shortcuts.<id>.name`), categories
- * (`shortcuts.categories.text` / `.block`) and keys live in the one registry,
+ * The editor's shortcuts. The ids, names, categories
+ * and keys live in the one registry,
  * `lib/shortcuts.ts`; this module registers the editor-scope ones (again: the
  * registry keeps one entry per id, so this is idempotent) and turns them into
  * a ProseMirror key map through `keysFor(id)`, so correcting a key in the
- * registry needs no other edit. The keys are Object's (its shortcut table;
- * reference-check-2026-10-28 §1); an id with no key there has none here.
+ * registry needs no other edit. The keys follow the shortcut table
+ * (reference-check-2026-10-28 §1); an id with no key there has none here.
  */
 import { Extension, type Editor } from '@tiptap/core'
 import { M7_SHORTCUTS, M8_SHORTCUTS, allShortcuts, isMacPlatform, keysFor, registerShortcuts, type ShortcutDef } from '@/lib/shortcuts'

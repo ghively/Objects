@@ -87,9 +87,9 @@ Use a copy outside the repo, with `git init` and a base commit done there.
 - [ ] All 13 types migrate (Weblinks and Files as basic types), and each type's settings open.
 - [ ] A property edit gives a one-line `git diff` (plus `lastUpdated`).
 - [ ] A rename relinks and shows the count.
-- [ ] Side by side with Object: Object Type Settings look and read the same.
-- [ ] Side by side with Object: the property menus (add property, kind change, number format, label options) look and read the same.
-- [ ] Side by side with Object: the page layouts look and read the same.
+- [ ] Against the behaviour catalog: Object Type Settings look and read the same.
+- [ ] Against the behaviour catalog: the property menus (add property, kind change, number format, label options) look and read the same.
+- [ ] Against the behaviour catalog: the page layouts look and read the same.
 
 Step-10 lists from the CPI copy, and what was done about them:
 

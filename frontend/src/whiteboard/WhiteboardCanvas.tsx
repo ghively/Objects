@@ -1,6 +1,6 @@
 // colour-literals: content palette
 /**
- * The canvas: React Flow (the React sibling of the Vue Flow canvas Object uses) over the
+ * The canvas: React Flow over the
  * board store. Pan and zoom (2 % to 400 %), the 30 px dotted grid, snap to grid and to nodes,
  * marquee and Shift multi-select, tool placement (click = default size, drag = a box snapped
  * with `snapBox`), connections, frames dragging what is inside them, Alt-drag duplicate,

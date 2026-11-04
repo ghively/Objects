@@ -93,12 +93,12 @@ These are the gaps the lanes reported. Each is fixed and tested.
 
 Each fix has a test that failed before it and passes after.
 
-- **Remove date lost a recurring task's history (fixed 2026-10-28).** "Remove date" removed `occurrenceLog` in the same write without asking. With a non-empty log it now asks first: "Remove date?", "This recurring task already has completed or skipped occurrences. Removing the date will discard its history.", "Keep date" / "Remove date". All four strings are the reference's own `DatePicker.dateRemoveConfirm.*`, so no "our choice" is needed (the dialog has the same shape as Repeat's "Remove recurrence?"). Test: `DatePicker.test.tsx` "test remove date asks first when the recurring task has history".
+- **Remove date lost a recurring task's history (fixed 2026-10-28).** "Remove date" removed `occurrenceLog` in the same write without asking. With a non-empty log it now asks first: "Remove date?", "This recurring task already has completed or skipped occurrences. Removing the date will discard its history.", "Keep date" / "Remove date". All four strings are fixed UI text, so no "our choice" is needed (the dialog has the same shape as Repeat's "Remove recurrence?"). Test: `DatePicker.test.tsx` "test remove date asks first when the recurring task has history".
 - **The permanent space delete's re-check was ineffective (fixed 2026-10-28).** It compared the folder's identity within one request. The 428 now returns the folder's identity token (`folder`: `st_dev:st_ino`). `DeleteSpaceDialog` sends it back with `permanent: true`, and the route answers 409, deleting nothing, when the folder at the path is another one. The in-request re-check stays. Tests: `test_spaces_m8.py` `test_permanent_delete_refuses_folder_replaced_after_428` and `test_permanent_delete_with_matching_token_deletes`, plus `DeleteSpaceDialog.test.tsx` and `client.m8.test.ts`.
-- **Checkbox menu label (fixed 2026-10-28).** The recurring task's checkbox menu says "Excuse" (`RootTaskCheckbox.menu.excuseRecurrence`) with its tooltip. "Excuse for {date}" stays only on the overdue dialog's button.
-- **Completion Log UI (fixed 2026-10-28).** "Completion Log" (`components.RootTask.occurrenceLog.heading`) now sits under Task Stats and lists the entries newest first: the scheduled date and Completed, Skipped or Excused, with the action time as the tooltip. Each entry has a delete button. It asks "Delete completion log entry" / "This log entry will be permanently removed from the completion history.", with "Cancel" / "Delete" (`general.*`; the reference gives no buttons for this dialog). It then writes the remaining lines through `updateProperties`. Unparseable lines are kept. Deleting the last line removes the key. On the back end, a text value written over a literal block (`|-`) now keeps the block style, so the file changes only by that entry's line, plus the `lastUpdated` stamp every property edit writes. Tests: `test_tasks_api.py` `test_delete_log_entry_changes_only_its_line` (CRLF file, byte diff), `CompletionLog.test.tsx`, `ObjectView.m8.test.tsx`.
+- **Checkbox menu label (fixed 2026-10-28).** The recurring task's checkbox menu says "Excuse" with its tooltip. "Excuse for {date}" stays only on the overdue dialog's button.
+- **Completion Log UI (fixed 2026-10-28).** "Completion Log" now sits under Task Stats and lists the entries newest first: the scheduled date and Completed, Skipped or Excused, with the action time as the tooltip. Each entry has a delete button. It asks "Delete completion log entry" / "This log entry will be permanently removed from the completion history.", with "Cancel" / "Delete" (the generic buttons; none were specified for this dialog). It then writes the remaining lines through `updateProperties`. Unparseable lines are kept. Deleting the last line removes the key. On the back end, a text value written over a literal block (`|-`) now keeps the block style, so the file changes only by that entry's line, plus the `lastUpdated` stamp every property edit writes. Tests: `test_tasks_api.py` `test_delete_log_entry_changes_only_its_line` (CRLF file, byte diff), `CompletionLog.test.tsx`, `ObjectView.m8.test.tsx`.
 - **The overdue check used the device's zone (fixed 2026-10-28).** `maybeOverdue` now takes today from `zonedToday()` and a time date's day in the setting's zone, as `calendar/dates.ts` `todayYmd` does. Test: `taskActions.test.ts` "test maybe overdue uses the time zone setting" (Los Angeles and Kiritimati on different days at the same instant).
-- **Red test: the palette's actions list (fixed 2026-10-28).** The 12th action, "Toggle focus mode", came with `957f5ac` (feat(palette)). It belongs: Task 17 lists it and the reference has `CommandPalette.actions.options.toggleFocusMode`. The test now expects it and checks what it does.
+- **Red test: the palette's actions list (fixed 2026-10-28).** The 12th action, "Toggle focus mode", came with `957f5ac` (feat(palette)). It belongs: Task 17 lists it and it is a standard palette action. The test now expects it and checks what it does.
 - **Flaky test: the search page results (fixed 2026-10-28).** The test waited for the debounced search and the chained row load with the testing library's 1 s default, then read the rows synchronously. It now waits for each step (up to 5 s) and checks rows, order and snippet in one `waitFor`. The checks are unchanged. With the row load delayed by 1.2 s, the old test fails and the new one passes.
 - **Timing noise: the 1MB split (fixed 2026-10-28).** The test now does one full warm-up run, then asserts that the best of 5 timed runs is under 300 ms. The threshold is unchanged.
 
@@ -117,7 +117,7 @@ What the walkthrough found:
   - the `^ab12cd` id chip
   - the indent container
   - the blue list item
-  - the formula table (Total 5; `=A1/0` shows "Value", Object's error label, for Gene to compare)
+  - the formula table (Total 5; `=A1/0` shows "Value", the error label, for Gene to compare)
   - highlighted Python and JS
   - the date token
 - Media board shows:
@@ -157,7 +157,7 @@ These are the "our choice" items from the plan's Global Constraints and from eac
 - **Storage forms:**
   - the occurrence log (`occurrenceLog`, one `<scheduled> <action> <at>` line each; a garbage line is kept and ignored)
   - the `reminders` map
-  - inline HTML `<span data-color>` / `<mark data-color>` (a bare `<mark>` reads as `bg-amber`, Object's `FALLBACK_HIGHLIGHT_COLOR`; the highlight shortcut toggles the last-used colour: reference check 2026-10-28, section 4)
+  - inline HTML `<span data-color>` / `<mark data-color>` (a bare `<mark>` reads as `bg-amber`, the fallback highlight colour; the highlight shortcut toggles the last-used colour: reference check 2026-10-28, section 4)
   - `<time datetime>` date tokens
   - `<!-- indent -->` containers
   - `<!-- item: … -->` item comments
@@ -202,11 +202,11 @@ These are the "our choice" items from the plan's Global Constraints and from eac
   - The slide-splitting rule. Empty and hidden properties are left off the title slide.
   - The last slide shown is remembered.
   - Leaving full screen ends the presentation.
-  - Left out: "Remove Object watermark" and "Block properties".
+  - Left out: the watermark row and "Block properties".
 - **Search and palette:**
   - The extended search key is **Ctrl/Cmd+Shift+Enter**, because plain Shift+Enter already opens a result in the side panel (M7).
   - Save as Query keeps a tag filter only if the tag object exists.
-  - The "Open space" label uses straight quotes, as the reference does.
+  - The "Open space" label uses straight quotes.
   - URLs are pasted as bookmark pages.
 - **References:**
   - The nested backlink default is "Show block containing backlink".
@@ -258,16 +258,16 @@ Run these on his CPI copy outside the repo, with `git init` and a first commit d
 
 ### Shortcut keys
 
-- [x] The new ids' keys were compared with Object's shortcut table (`reference-check-2026-10-28.md` §1) and corrected:
+- [x] The new ids' keys were compared with the shortcut table (`reference-check-2026-10-28.md` §1) and corrected:
   - `copyBlockReference` Ctrl+Alt+L (⌃⌘L on macOS)
-  - `turnIntoObject` I with blocks selected; `turnIntoTask` no key (Object: `()` + Space only); `turnBlockIntoTaskObject` Ctrl+Shift+T
+  - `turnIntoObject` I with blocks selected; `turnIntoTask` no key (only `()` + Space); `turnBlockIntoTaskObject` Ctrl+Shift+T
   - `highlightText` Ctrl+Shift+H (matched already)
   - `toggleFocusMode` Ctrl+Shift+M
   - `openPresentationMode` Ctrl+Alt+P (⌃⌘P on macOS)
   - `whiteboardResize*` Ctrl(+Shift)+Arrows
 - [ ] Still ours, for Gene: Tab/Shift-Tab indent in any block, extended search Ctrl/Cmd+Shift+Enter.
 
-### Every "our choice", against Object
+### Every "our choice", against the behaviour catalog
 
 - [ ] The storage forms: the occurrence log, the `reminders` map, inline HTML styles, date tokens, `indent`, item comments, `collection:`/`query:` embeds, board `media`/`weblink`, recordings as `.weba`.
 - [ ] The overdue threshold (two or more) and the catch-up readings.
@@ -284,7 +284,7 @@ Run these on his CPI copy outside the repo, with `git init` and a first commit d
 - [ ] URLs pasted as bookmark pages.
 - [ ] The inspector's Stats.
 - [ ] Quick-create "Nothing".
-- [ ] The formula row numbering, and "Value" for an error. (Row numbering from 1 at the header row matches Object's `ZQ`; `$` absolute references, whole-column ranges `A:A` and the one-`=` rule now follow it too: reference check 2026-10-28, section 4.)
+- [ ] The formula row numbering, and "Value" for an error. (Row numbering from 1 at the header row is settled; `$` absolute references, whole-column ranges `A:A` and the one-`=` rule now follow too: reference check 2026-10-28, section 4.)
 - [ ] The Turn-into embed view.
 - [ ] The typed-date phrases.
 - [ ] Ink tilt and partial erase.

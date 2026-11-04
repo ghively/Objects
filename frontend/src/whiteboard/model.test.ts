@@ -5,68 +5,50 @@ import * as M from './model'
 import { OBJECT_DRAG_MIME, mayCarryObject, readDroppedObject } from './dnd'
 import { DOTTED_PLAN, NETWORK_MAP, board, node, textBlock } from './test/boards'
 
-const MODEL = readFileSync(
-  path.resolve(import.meta.dirname, '../../../docs/design-notes'),
-  'utf8',
-)
-
-/** The string items of a reference `export const <name> = [ ... ] as const` list (spreads are skipped). */
-function refList(name: string): string[] {
-  const m = new RegExp(`export const ${name}[^=]*= \\[([\\s\\S]*?)\\]`).exec(MODEL)
-  if (!m) throw new Error(`no ${name} in the reference model`)
-  return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1])
-}
-
-function refNumber(name: string): string {
-  const m = new RegExp(`export const ${name} = ([^\\n]+)`).exec(MODEL)
-  if (!m) throw new Error(`no ${name} in the reference model`)
-  return m[1].trim()
-}
+const SHAPES_EXPECTED = [
+  'rectangle', 'roundedRectangle', 'ellipse', 'diamond', 'triangle', 'triangleDown', 'star', 'parallelogram',
+  'bubble', 'blockArrow', 'blockArrowLeft', 'heart',
+]
+const CIRCUIT_EXPECTED = ['not', 'and', 'nand', 'or', 'nor', 'xor', 'xnor', 'high', 'low']
 
 describe('whiteboard model', () => {
-  test('test constants match the reference model', () => {
+  test('test the model constants', () => {
     expect(M.GRID).toBe(30)
-    expect(refNumber('WHITEBOARD_GRID_SIZE')).toBe('30')
     expect(M.GRID_HALF).toBe(15)
     expect([M.DEFAULT_NODE_WIDTH, M.DEFAULT_NODE_HEIGHT]).toEqual([420, 60])
     expect([M.AUTO_MIN_WIDTH, M.AUTO_MAX_WIDTH, M.AUTO_MAX_HEIGHT]).toEqual([420, 480, 420])
-    expect(refNumber('WHITEBOARD_AUTO_MAX_WIDTH')).toBe('480')
-    expect(refNumber('WHITEBOARD_AUTO_MAX_HEIGHT')).toBe('420')
-    expect(M.LINK_BLOCK_MIN_WIDTH).toBe(Number(refNumber('WHITEBOARD_LINK_BLOCK_MIN_WIDTH')))
+    expect(M.LINK_BLOCK_MIN_WIDTH).toBe(360)
     expect([M.MIN_BLOCK_WIDTH, M.MIN_BLOCK_HEIGHT]).toEqual([40, 30])
     expect([M.MIN_SHAPE_WIDTH, M.MIN_SHAPE_HEIGHT]).toEqual([90, 90])
     expect([M.DEFAULT_CIRCUIT_WIDTH, M.DEFAULT_CIRCUIT_HEIGHT]).toEqual([90, 90])
     expect([M.DEFAULT_FRAME_WIDTH, M.DEFAULT_FRAME_HEIGHT]).toEqual([480, 420])
     expect(M.CONTENT_Z_MIN).toBe(1)
-    // The CSS values, not the model's 40 (see the plan's reference inconsistencies).
+    // The CSS values, not the model's 40 (what renders).
     expect([M.EMBED_CAPTION_HEIGHT, M.EMBED_CAPTION_GAP]).toEqual([30, 6])
     expect([M.ZOOM_MIN, M.ZOOM_MAX]).toEqual([0.02, 4])
-    expect(refNumber('WHITEBOARD_ZOOM_MIN')).toBe('0.02')
-    expect(refNumber('WHITEBOARD_ZOOM_MAX')).toBe('4')
     expect([...M.ZOOM_PRESETS]).toEqual([0.05, 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3])
-    expect(refNumber('WHITEBOARD_ZOOM_LEVELS')).toBe('[0.05, 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const')
 
-    expect([...M.NODE_KINDS]).toEqual(refList('whiteboardNodeKinds'))
-    expect([...M.SHAPES]).toEqual(refList('whiteboardShapes'))
+    expect([...M.NODE_KINDS]).toEqual(['block', 'shape', 'point', 'frame'])
+    expect([...M.SHAPES]).toEqual(SHAPES_EXPECTED)
     expect(M.SHAPES).toHaveLength(12)
-    expect([...M.PICKER_SHAPES]).toEqual(refList('whiteboardPickerShapes'))
+    expect([...M.PICKER_SHAPES]).toEqual(['rectangle', 'ellipse', 'diamond', 'parallelogram', 'triangle', 'star', 'bubble', 'blockArrow', 'heart'])
     expect(M.PICKER_SHAPES).toHaveLength(9)
-    expect([...M.SHAPE_MENU_TOOLS]).toEqual(refList('whiteboardShapeMenuTools'))
-    expect([...M.CIRCUIT_LABELS]).toEqual(refList('whiteboardCircuitLabels'))
+    expect([...M.SHAPE_MENU_TOOLS]).toEqual(['line', 'arrow', 'rectangle', 'ellipse', 'diamond', 'parallelogram', 'triangle', 'star', 'bubble', 'blockArrow', 'heart'])
+    expect([...M.CIRCUIT_LABELS]).toEqual(CIRCUIT_EXPECTED)
     expect(Object.values(M.CIRCUIT_TEXT)).toEqual(['NOT', 'AND', 'NAND', 'OR', 'NOR', 'XOR', 'XNOR', 'HIGH', 'LOW'])
-    expect([...M.MARKERS]).toEqual(refList('whiteboardMarkers'))
-    expect([...M.PICKER_MARKERS]).toEqual(refList('whiteboardPickerMarkers'))
-    expect([...M.CONNECTIONS]).toEqual(refList('whiteboardEdgeConnections'))
-    expect([...M.LINES]).toEqual(refList('whiteboardEdgeLines'))
-    expect([...M.POINTER_TOOLS]).toEqual(refList('whiteboardPointerTools'))
+    expect([...M.MARKERS]).toEqual(['none', 'arrow', 'arrowClosed', 'dot', 'double'])
+    expect([...M.PICKER_MARKERS]).toEqual(['none', 'arrow', 'dot', 'double'])
+    expect([...M.CONNECTIONS]).toEqual(['straight', 'cornered', 'curved'])
+    expect([...M.LINES]).toEqual(['solid', 'dashed', 'dotted'])
+    expect([...M.POINTER_TOOLS]).toEqual(['select', 'hand'])
 
-    // Tools: the reference order, media tools included (M8).
-    const media = refList('whiteboardMediaTools')
+    // Tools: the toolbox order, media tools included (M8).
+    const media = ['image', 'pdf', 'audio', 'file', 'weblink']
     expect([...M.MEDIA_TOOLS]).toEqual(media)
     expect(media).toEqual(['image', 'pdf', 'audio', 'file', 'weblink'])
     expect([...M.TOOLS]).toEqual([
-      'select', 'hand', 'text', 'link', 'create', ...media, 'line', 'arrow', ...refList('whiteboardShapes'),
-      ...refList('whiteboardCircuitLabels'), 'frame',
+      'select', 'hand', 'text', 'link', 'create', ...media, 'line', 'arrow', ...SHAPES_EXPECTED,
+      ...CIRCUIT_EXPECTED, 'frame',
     ])
     expect([...M.PICKER_TOOLS]).toEqual(['link', 'create', ...media])
     expect([...M.ONE_SHOT_TOOLS]).toEqual(['text', ...M.SHAPES, ...M.CIRCUIT_LABELS, 'frame', 'line', 'arrow', 'link', 'create', ...media])
@@ -100,8 +82,6 @@ describe('whiteboard model', () => {
     expect(M.dasharray('solid')).toBeUndefined()
     expect(M.dasharray('dashed')).toBe('8 8')
     expect(M.dasharray('dotted')).toBe('0 10')
-    expect(MODEL).toContain("WHITEBOARD_EDGE_DOTTED_DASHARRAY = '0 10'")
-    expect(MODEL).toContain("WHITEBOARD_EDGE_DASHED_DASHARRAY = '8 8'")
     expect(M.rememberedEdgeStyle(undefined, undefined)).toEqual({})
     expect(M.rememberedEdgeStyle('curved', undefined)).toEqual({ connection: 'curved' })
     expect(M.rememberedEdgeStyle('straight', 'dotted')).toEqual({ connection: 'straight', line: 'dotted' })

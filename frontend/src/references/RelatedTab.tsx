@@ -1,5 +1,5 @@
 /**
- * The Related Content tab: our lexical stand-in for Object's semantic related content (objects
+ * The Related Content tab: a lexical stand-in for semantic related content (objects
  * sharing this one's strongest terms). "Show more" asks for 20 more.
  */
 import type { ObjectSummary, RelatedEntry } from '@/api/types'

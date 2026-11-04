@@ -31,6 +31,7 @@ from typing import Any
 
 from .appstate import state_dir
 from .jsonstore import dump_json
+from .legacy import has_legacy_metadata
 from .space import safe_filename
 from .spaceconfig import MAX_NAME_LENGTH, space_fields
 from .textfile import atomic_write
@@ -328,8 +329,10 @@ def _is_space_folder(path: Path) -> bool:
         return (
             path.is_dir()
             and not path.is_symlink()
-            and (path / ".object").is_dir()
-            and not (path / ".object").is_symlink()
+            and (
+                ((path / ".object").is_dir() and not (path / ".object").is_symlink())
+                or has_legacy_metadata(path)
+            )
         )
     except OSError:  # a path the OS can't even stat (too long) is no space folder
         return False

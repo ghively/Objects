@@ -1,6 +1,6 @@
 """M9 Task 3: export an object (``GET /api/object/export?path=&media=0|1``).
 
-Object's "Export" with the Markdown format and the "Include media" option ("Adds files
+The "Export" with the Markdown format and the "Include media" option ("Adds files
 and images to the zip."). ``media=0`` downloads the ``.md`` exactly as on disk; ``media=1``
 a zip of ``<stem>.md`` plus the images and attachments it references, at their
 space-relative paths. Exporting writes nothing.

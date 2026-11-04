@@ -1,5 +1,5 @@
 /**
- * Pure helpers over one tab's side-panel entries (Object's `SidepanelEntry` list). The panel has
+ * Pure helpers over one tab's side-panel entries. The panel has
  * three areas stacked top to bottom; each area holds entries (its "sidepanel tabs"), one of them
  * open. `nav/tabs.ts` applies these to the active tab.
  */
@@ -10,15 +10,15 @@ export type PanelArea = SidepanelEntry['panelArea']
 export const AREAS: readonly PanelArea[] = ['area1', 'area2', 'area3']
 
 /**
- * The panel's width as a share of the main column plus the panel (Object's `sidepanelWidth`,
- * default `45%`, dragged between 10 % and 90 %, back to 45 % on a double click on the resizer).
+ * The panel's width as a share of the main column plus the panel (default
+ * `45%`, dragged between 10 % and 90 %, back to 45 % on a double click on the resizer).
  */
 export const DEFAULT_SIDEPANEL_FRACTION = 0.45
 export const MIN_SIDEPANEL_FRACTION = 0.1
 export const MAX_SIDEPANEL_FRACTION = 0.9
-/** Areas 2 and 3 are this many px high by default (Object's `area2Size || 220`). */
+/** Areas 2 and 3 are this many px high by default. */
 export const DEFAULT_AREA_SIZE = 220
-/** No area, area 1 included, gets lower than this (Object's `nV = 120`). */
+/** No area, area 1 included, gets lower than this. */
 export const MIN_AREA_SIZE = 120
 /** How many targets an entry remembers for its own back and forward. */
 export const ENTRY_HISTORY_LIMIT = 30
@@ -254,7 +254,7 @@ export function cleanLayout(v: unknown): SidepanelLayout | undefined {
   const l = v as Record<string, unknown>
   const out: SidepanelLayout = {}
   const num = (k: keyof SidepanelLayout) => (typeof l[k] === 'number' && Number.isFinite(l[k]) ? (l[k] as number) : undefined)
-  // Before the reference values the width was px and the area sizes fractions: those are dropped.
+  // In the older shape the width was px and the area sizes fractions: those are dropped.
   const width = num('width')
   if (width !== undefined && width > 0 && width <= 1) out.width = width
   for (const k of ['area2Size', 'area3Size'] as const) {

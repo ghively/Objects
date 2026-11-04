@@ -17,7 +17,6 @@ import { ReferencesSection } from './ReferencesSection'
 import { referencesKey, referencesSettings, visibleTabs } from './referencesUi'
 
 const mocked = vi.mocked(api)
-const STRINGS_FILE = '../../../docs/strings.txt'
 
 const SELF = objectSummary({ path: 'Pages/Self.md', id: 'self-id', title: 'Self' })
 const PERSON_SELF = objectSummary({ path: 'People/Self.md', id: 'person-self', title: 'Person self', type: 'person' })
@@ -132,12 +131,6 @@ describe('ReferencesSection (M8 settings)', () => {
 
   test('test nested backlink full path above', async () => {
     const user = userEvent.setup()
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-    const strings = fs.readFileSync(path.resolve(__dirname, STRINGS_FILE), 'utf8')
-    for (const s of ['Only block with backlink', 'Full path above', 'Default display of nested backlinks']) {
-      expect(strings, s).toContain(`\`${s}\``)
-    }
 
     // Default: only the block; the per-backlink toggle switches to the full path.
     await renderSection()

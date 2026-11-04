@@ -78,7 +78,7 @@ describe('block selection', () => {
     cursorIn(editor, 'C three')
     expect(getBlockSelection(editor.state)).toBeNull()
 
-    // Alt-Down (Object) moves the selection; Alt-Shift-Down too (on the same level).
+    // Alt-Down moves the selection; Alt-Shift-Down too (on the same level).
     selectBlocks(editor, blockPos(editor, 2))
     press(editor, 'ArrowDown', { alt: true })
     expect(serializeBody(editor)).toBe('A *one*  \n\n<!-- block: small -->\nB _two_\n\nD four\n\nC three\n')

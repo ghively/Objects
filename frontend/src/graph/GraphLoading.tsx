@@ -1,4 +1,4 @@
-// The step lines shown while the graph loads and lays out (`GraphViewModal.loading.steps.*`).
+// The step lines shown while the graph loads and lays out.
 
 export const LOADING_STEPS = [
   'Reading objects',

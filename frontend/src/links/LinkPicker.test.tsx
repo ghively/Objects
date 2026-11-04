@@ -83,7 +83,7 @@ describe('[[ trigger', () => {
     return end
   }
 
-  // Audit 2026-11-01 (unconfirmed): a cancelled picker leaves the `[[`. Kept, as Object: its
+  // Audit 2026-11-01 (unconfirmed): a cancelled picker leaves the `[[`. Kept on purpose: the
   // link dropdown searches the text typed inline after `[[`, and dismissing it leaves that text
   // (the slash menu here does the same with `/`). The query typed in the picker is put back too.
   test('cancelling the picker leaves the [[ and the query typed in it', async () => {

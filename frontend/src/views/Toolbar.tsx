@@ -17,7 +17,7 @@ const NARROW_PX = 480
 
 export interface ToolbarProps {
   /**
-   * The Calendar sections' toolbar (Object): the layout picker and a settings menu holding only
+   * The Calendar sections' toolbar: the layout picker and a settings menu holding only
    * Calculations, no Filter, Sort or Group by; the count only when the layout is not a list.
    */
   compact?: boolean

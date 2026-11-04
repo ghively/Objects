@@ -1,5 +1,5 @@
 /**
- * `columns` and `column`: Object's `GridBlock` ("Two Columns"). In the file:
+ * `columns` and `column`: the columns block ("Two Columns"). In the file:
  *
  *   <!-- columns widths=40,60 -->
  *   Left side text.

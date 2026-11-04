@@ -9,10 +9,10 @@ import pytest
 
 from objectapp import settings
 
-# Object's desktop zoom factor (electron-settings.ts `zoom`, default 1.0).
+# The desktop zoom factor (default 1.0).
 POLISH_DEFAULTS = {
     "zoom": 1.0,
-    # Object's editorSettings (component.model.ts UserPersonalData).
+    # Editor settings.
     "spellCheckLang": None,
     "alwaysCreateInlineLinks": False,
     "hideStructureSettings": False,
@@ -34,7 +34,7 @@ def test_polish_defaults(state: Path):
 
 
 @pytest.mark.parametrize("value", [0.6, 0.65, 1, 1.0, 1.25, 1.5])
-def test_zoom_accepts_object_range(state: Path, value):
+def test_zoom_accepts_the_supported_range(state: Path, value):
     merged, _ = settings.patch({"zoom": value}, "")
     assert merged["zoom"] == value
 

@@ -382,7 +382,7 @@ export function TypePage({ type }: { type: TypeDef }) {
   const sections = useMemo(() => (views ? buildSections(type, views, ctx) : []), [type, views, ctx])
   const tabs = tabSections(sections)
 
-  // The basic Task type has no Overview (Object's `hideDashboard`): All plus section tabs,
+  // The basic Task type has no Overview: All plus section tabs,
   // All by default, and a saved `overview` falls back to All.
   const noOverview = isBasicTaskType(type)
   const home: TabKey = noOverview ? 'all' : 'overview'
@@ -550,7 +550,7 @@ export function TypePage({ type }: { type: TypeDef }) {
             />
           ))}
         </nav>
-        {/* Object: the gear at the right of the tabs opens Visible and Hidden Sections. */}
+        {/* The gear at the right of the tabs opens Visible and Hidden Sections. */}
         {views && !noOverview && <CustomizeOverview gear type={type} sections={sections} ctx={ctx} update={update} />}
         {/* The All or section tab's toolbar renders here, right-aligned (see `ToolbarSlot`). */}
         <div ref={setToolbarSlot} data-testid="toolbar-slot" className="ml-auto flex min-w-0 flex-1 justify-end" />

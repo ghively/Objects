@@ -1,5 +1,5 @@
 /**
- * "Record audio" (`CreateDropdown.recordAudio.*`): record from the microphone
+ * "Record audio": record from the microphone
  * into an attachment and embed it at the cursor (no transcription).
  *
  * `recordAudio(editor)` asks for the microphone (`getUserMedia({audio: true})`),

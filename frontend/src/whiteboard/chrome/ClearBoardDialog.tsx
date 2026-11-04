@@ -1,4 +1,4 @@
-/** "Clear Whiteboard" confirmation (`EntityMenu.clearWhiteboard.modal.*`). */
+/** "Clear Whiteboard" confirmation. */
 import {
   AlertDialog,
   AlertDialogCancel,

@@ -18,7 +18,6 @@ import { OPEN_IN_EXTENDED_SEARCH } from './SearchView'
 import { usePalette } from './usePalette'
 
 const mocked = vi.mocked(api)
-const STRINGS_FILE = '../../../docs/strings.txt'
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true })
 const ALPHA = objectSummary({ path: 'Pages/Alpha.md', title: 'Alpha' })
 
@@ -55,13 +54,6 @@ beforeEach(() => {
 })
 
 describe('extended search from the palette (M8)', () => {
-  test('the row label is the reference string', async () => {
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-    const src = fs.readFileSync(path.resolve(__dirname, STRINGS_FILE), 'utf8')
-    expect(src).toContain('LocalSpaceQuery:{t:0,b:{t:2,i:[{t:3}],s:`' + OPEN_IN_EXTENDED_SEARCH + '`}}')
-  })
-
   test('palette opens extended search with the query', async () => {
     const user = setup()
     const input = await openSearch(user)

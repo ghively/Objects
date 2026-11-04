@@ -1,6 +1,5 @@
 /* The tokens menu (text-selection toolbar), its colour panel, the date token
-   chip, and the M8 indent / list-item styles (Task 26). The trimmed reference
-   has no CSS for these: the values are our choice, built on the app's tokens
+   chip, and the M8 indent / list-item styles (Task 26). The values are our choice, built on the app's tokens
    and M7's menu look. */
 
 .tokens-menu {

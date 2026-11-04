@@ -1,6 +1,6 @@
 /**
- * Board actions: pure `(board, …) -> board` functions the store wraps. They follow the rules of
- * Object's `whiteboard.model.ts` (defaults, z order, frame titles, remembered edge style, gates
+ * Board actions: pure `(board, …) -> board` functions the store wraps. They follow the whiteboard
+ * rules (defaults, z order, frame titles, remembered edge style, gates
  * as a rectangle plus label). A function that changes nothing returns the board it was given.
  * Functions that create something take an optional `id` so the caller can select it afterwards.
  */
@@ -318,7 +318,7 @@ export function createEntity(
 
 /**
  * A media node (M8): a block node whose block is `{type: 'media', path}`, at its kind's default
- * size (`MEDIA_DEFAULT_SIZE`) centred on `at` and snapped to the grid. `headless` is Object's
+ * size (`MEDIA_DEFAULT_SIZE`) centred on `at` and snapped to the grid. `headless` is the
  * flag for a media primitive placed from the media tool (no caption bar, fills its frame).
  */
 export function createMedia(
@@ -837,7 +837,7 @@ export function wrapInFrame(
 // ---- M8: node lock, keyboard resize, entity views, quick-create on connector drop ----
 
 /**
- * Locks or unlocks nodes (Object's per-node `locked`, independent of the board's lock). A
+ * Locks or unlocks nodes (the per-node `locked`, independent of the board's lock). A
  * locked node can't be moved, resized or deleted until it is unlocked. Unlocking removes the key.
  */
 export function setNodesLocked(board: WhiteboardData, ids: Iterable<string>, locked: boolean): WhiteboardData {

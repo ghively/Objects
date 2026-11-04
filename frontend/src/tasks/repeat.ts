@@ -119,7 +119,7 @@ export function parseRepeat(text: unknown): RepeatRule | null {
   if (every < 1) return null
   let on: RepeatOn | null = null
   if (onText !== undefined) {
-    // by due date only: Object's completionDate rule has only an interval
+    // by due date only: the completion-date rule has only an interval
     if (after) return null
     on = parseOn(unit, onText)
     if (!on) return null
@@ -128,7 +128,7 @@ export function parseRepeat(text: unknown): RepeatRule | null {
   return on ? { ...rule, on } : rule
 }
 
-/** `1st`, `2nd`, `3rd`, `4th`, `11th`, `22nd` (`DatePicker.recurrenceCustom.ordinalSuffix.*`). */
+/** `1st`, `2nd`, `3rd`, `4th`, `11th`, `22nd`. */
 export function ordinal(n: number): string {
   const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'
   return `${n}${suffix}`
@@ -191,7 +191,7 @@ export function presetOn(unit: 'week' | 'month' | 'year', d: Date): RepeatOn {
 const sameOn = (a: RepeatOn | undefined, b: RepeatOn): boolean => !!a && formatOn(a) === formatOn(b)
 
 /**
- * The picker's preset name for a rule (`DatePicker.recurrencePreset.*`): "Daily", "Weekly on
+ * The picker's preset name for a rule: "Daily", "Weekly on
  * {day}", "Monthly on day {date}", "Yearly on {date}", "Every weekday"; anything else (every N > 1,
  * after completion, an end date, an `on` that isn't the date's own) is "Custom". `date` is the
  * task's date (its start). M4's plain `every week` names the same preset as `every week on {day}`.

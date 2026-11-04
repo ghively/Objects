@@ -1,5 +1,5 @@
 // The Tag type's page lists every tag as a coloured chip with its number of uses (the audit's
-// reading of Object's Tags page, 2026-11-02). Counts come from the link index's summaries:
+// reading of the Tags page, 2026-11-02). Counts come from the link index's summaries:
 // an object uses a tag when its `tags` holds the tag's title (case-insensitively); templates
 // don't count.
 import { useMemo } from 'react'

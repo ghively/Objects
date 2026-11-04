@@ -12,13 +12,12 @@ export const meta = {
 const { plan: PLAN, base: BASE, backend: BACK, frontend: FRONT, integrate: INTEG, milestone: MS } = args
 const REPO = args.repo || 'the current working directory (the repository root)'
 const RULES = `
-Repository: ${REPO} (git repo). Plan: ${PLAN}. Spec: docs/superpowers/specs/2026-10-23-object-design.md. Visual reference: docs/README.md and its PNGs.
+Repository: ${REPO} (git repo). Plan: ${PLAN}. Spec: docs/superpowers/specs/2026-10-23-object-design.md.
 Rules:
 - Read the plan's header sections (Global Constraints, API contract if present, Review Focus, File Structure) and YOUR task section fully before writing code. Follow interfaces exactly (names, signatures, fields): other agents build against them in parallel.
 - TDD as the plan's steps say: failing tests first, run, implement, run green. Also keep ALL existing tests green (uv run pytest backend/tests -q; cd frontend && npx vitest run).
 - Toolchain: Python via uv, Node via npm in frontend/. Use Bash with absolute paths.
-- Commit only your own task's files with the plan's commit message, ending with a blank line and "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Another agent may be committing concurrently: on index.lock, wait and retry. Never git add -A; add explicit paths. Never commit .reference/, *.exe, Object*.zip, node_modules, dist.
-- .reference/ is Object's unpacked app and design notes source: read for behaviour, option names, labels and CSS values only; never copy its code.
+- Commit only your own task's files with the plan's commit message, ending with a blank line and "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Another agent may be committing concurrently: on index.lock, wait and retry. Never git add -A; add explicit paths. Never commit *.exe, *.zip, node_modules, dist.
 - Never read or modify C:\\Git\\wiki. Never put real CPI data in the repo; fixtures are synthetic.
 - If a plan step is impossible as written, make the smallest sensible deviation and report it.`
 
@@ -40,7 +39,7 @@ async function buildTask(n) {
   if (args.perTaskReview === false) return { n, impl }
   for (let round = 1; round <= 3; round++) {
     const review = await agent(`${RULES}\n\nYou are an adversarial reviewer of Task ${n} of the plan, just implemented (builder summary: ${JSON.stringify(impl)}).
-Read Task ${n} and the code it produced (git log/show). Run its tests and the full suites yourself. Check every step is done, interfaces exactly as specified, tests assert what the plan says (not weakened), Global Constraints held (127.0.0.1, never write on read, minimal diffs, conflicts, atomic writes, no network), Review Focus items owned by this task are tested, and Object fidelity where the task names labels/options.
+Read Task ${n} and the code it produced (git log/show). Run its tests and the full suites yourself. Check every step is done, interfaces exactly as specified, tests assert what the plan says (not weakened), Global Constraints held (127.0.0.1, never write on read, minimal diffs, conflicts, atomic writes, no network), Review Focus items owned by this task are tested, and fidelity to the spec where the task names labels/options.
 Fail only for real defects (critical/important). Default to fail if tests do not pass when you run them.`,
       { label: `task${n}:review${round}`, phase: 'Build', schema: VERDICT })
     if (!review) return { n, impl }
@@ -66,7 +65,7 @@ phase('Review')
 const LENSES = [
   { key: 'correctness', p: 'correctness and integration: frontend and backend agree on every route and field; all tests pass; crash paths, unhandled errors, races in concurrent property writes, renames and type edits; the app works end to end (start it against a fixture copy and drive the API).' },
   { key: 'file-safety', p: 'file safety: prove or disprove with throwaway probes in a temp copy of the fixture space (do not commit them) that opening never writes .md files; property edits change only their lines; rename relink changes only link text in only linking files; change type, type rename, option rename and kind change cascades touch only what they must; deletes go to trash and are restorable; conflicts never overwrite; CRLF/BOM preserved.' },
-  { key: 'fidelity', p: 'faithfulness to Object: compare property editors, add-property menu, Object Type Settings, pickers, chips, colours and labels against .reference (locale strings in strings.txt, CSS in design.css, models) and docs/. Report concrete mismatches with exact labels/values that this milestone should already have.' },
+  { key: 'fidelity', p: 'faithfulness to the design spec and behaviour catalog: compare property editors, add-property menu, Object Type Settings, pickers, chips, colours and labels against the spec and the behaviour catalog (docs/behavior-catalog.md). Report concrete mismatches with exact labels/values that this milestone should already have.' },
 ]
 const reviews = await parallel(LENSES.map(l => () => agent(`${RULES}\n\nReview the WHOLE ${MS} build (all commits on master after ${BASE}) through one lens: ${l.p}\nReport only real issues with a concrete fix. Do not edit or commit anything.`,
   { label: `review:${l.key}`, phase: 'Review', schema: VERDICT })))

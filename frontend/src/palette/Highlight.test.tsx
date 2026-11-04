@@ -41,7 +41,7 @@ describe('MatchedTitle', () => {
     expect(container.textContent).toBe('Alpha')
   })
 
-  test('uses the semibold search-highlight variant (Object `search-highlights-bold`)', () => {
+  test('uses the semibold search-highlight variant (`search-highlights-bold`)', () => {
     const { container } = render(<MatchedTitle title="Alpha" matches={[[0, 3]]} />)
     expect(container.querySelector('.search-highlights.search-highlights-bold > b')?.textContent).toBe('Alp')
   })

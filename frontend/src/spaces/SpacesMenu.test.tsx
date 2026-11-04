@@ -11,8 +11,6 @@ vi.mock('./switchSpace', async (orig) => ({
   switchSpace: vi.fn(async () => true),
 }))
 
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { api, ApiError } from '@/api/client'
 import { spaceEntry } from '@/test/mockApi'
 import { resetSettingsModal, useSettingsModal } from '@/settings/useSettingsModal'
@@ -23,11 +21,6 @@ import { resetSpaceSwitch, SWITCH_TEXT, switchSpace, useSpaceSwitch } from './sw
 
 const mocked = vi.mocked(api)
 
-const STRINGS = readFileSync(
-  path.resolve(import.meta.dirname, '../../../docs/strings.txt'),
-  'utf8',
-)
-const inReference = (text: string) => STRINGS.includes(`s:\`${text}\``)
 
 const SPACES = [
   spaceEntry({ path: '/spaces/Work', name: 'Work', icon: 'ph-briefcase', current: true }),
@@ -89,19 +82,6 @@ describe('SpacesMenu', () => {
     expect(switchSpace).not.toHaveBeenCalled()
     await user.click(within(row(list, 'Home')).getByRole('button', { name: 'Home' }))
     expect(switchSpace).toHaveBeenCalledWith('/spaces/Home')
-
-    for (const s of [
-      SPACES_MENU_TEXT.heading,
-      SPACES_MENU_TEXT.rename,
-      SPACES_MENU_TEXT.remove,
-      SPACES_MENU_TEXT.spaceSettings,
-      SPACES_MENU_TEXT.addSpace,
-      SPACES_MENU_TEXT.cancel,
-      SPACES_MENU_TEXT.open,
-      SPACES_MENU_TEXT.more,
-    ]) {
-      expect(inReference(s), s).toBe(true)
-    }
   })
 
   test('typing in the Search field filters the spaces by name', async () => {

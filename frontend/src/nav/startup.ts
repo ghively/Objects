@@ -1,5 +1,5 @@
 /**
- * "When this space opens" (`EditorSettings.openOnStart.*`): what the active tab shows once a space
+ * "When this space opens": what the active tab shows once a space
  * has loaded its tabs. `lastOpenedPage` ("Where I left off", the default) keeps the restored tabs;
  * `today` ("Calendar today") opens the Calendar's Day view on today; `calendar` opens the Calendar;
  * `specificObject` opens that object in the active tab.

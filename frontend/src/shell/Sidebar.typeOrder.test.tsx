@@ -1,6 +1,6 @@
 // Polish item 8: the Object Types header `...` menu (Sort Manually | Sort Alphabetically) and drag
 // reordering of the types in manual mode, saved to `ui.objectsSectionSortOption` and
-// `ui.workspace.objects.ids` (RootSpace's names).
+// `ui.workspace.objects.ids`.
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { DragEndEvent } from '@dnd-kit/core'

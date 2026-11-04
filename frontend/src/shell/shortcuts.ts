@@ -1,7 +1,7 @@
 /**
- * The tab shortcuts (`shortcuts.categories.navigation`): close, open, cycle, the tab menu, back and
- * forward; and the panel shortcuts (`shortcuts.categories.global`): the side panel, the left
- * sidebar and the calendar sidebar. Their keys are Object's (in `lib/shortcuts.ts`); `App`
+ * The tab shortcuts: close, open, cycle, the tab menu, back and
+ * forward; and the panel shortcuts: the side panel, the left
+ * sidebar and the calendar sidebar. Their keys are in `lib/shortcuts.ts`; `App`
  * binds them with `useTabShortcuts()` and `usePanelShortcuts()`. Back/forward (Ctrl+←/→, Ctrl+[/])
  * and the panel keys (Ctrl+Shift+←/→) stay out of text fields and editors, where those keys move
  * and select by word.
@@ -37,7 +37,7 @@ export function useTabShortcuts(): void {
   useGlobalShortcut('closeTab', closeActiveTab)
   useGlobalShortcut('openNewTab', () => useTabs.getState().newTab())
   useGlobalShortcut('navigateTabs', cycleTabs, { allowInEditable: true })
-  // "Toggle tab menu when multiple tabs are open" (shortcuts.openTabList.name).
+  // "Toggle tab menu when multiple tabs are open".
   useGlobalShortcut('openTabList', () => {
     const menu = useTabMenu.getState()
     if (menu.open) menu.setOpen(false)

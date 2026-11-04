@@ -17,7 +17,7 @@ export interface RelationCellProps extends CellProps<EntityRef[] | null> {
 
 /**
  * A relation (`entity`): chips of the linked objects; a click on the cell opens the RelationPicker.
- * A linked Tag object (Object's Object -> Tag "Status" or "Category", item 22) is a chip in the
+ * A linked Tag object (Object -> Tag "Status" or "Category", item 22) is a chip in the
  * tag's own colour, like its tag chips.
  */
 export function RelationCell({ def, value, readOnly, density, inTable, onChange, onOpenObject, onOpenSettings }: RelationCellProps) {

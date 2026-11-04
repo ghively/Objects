@@ -78,7 +78,7 @@ describe('SidePanel', () => {
     const regions = within(panel()).getAllByRole('region')
     expect(regions.map((r) => r.getAttribute('aria-label'))).toEqual(['Side panel area 1', 'Side panel area 2', 'Side panel area 3'])
     expect(within(area(2)).getByText('page A2.md')).toBeInTheDocument()
-    // Object: 45 % of the main column plus the panel; areas 2 and 3 are 220 px, area 1 the rest (120 px at least).
+    // 45 % of the main column plus the panel; areas 2 and 3 are 220 px, area 1 the rest (120 px at least).
     expect(panel().style.width).toBe('45%')
     expect(panel().className).toContain('shrink-0')
     expect(screen.getByTestId('sidepanel-area2').style.flex).toBe('0 0 220px')

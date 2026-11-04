@@ -131,7 +131,7 @@ export function SwitchRow({
   )
 }
 
-/** An outlined secondary button (the reference's settings buttons). */
+/** An outlined secondary button, as the settings buttons are. */
 export function SecondaryButton({ children, onClick, disabled }: { children: ReactNode; onClick(): void; disabled?: boolean }) {
   return (
     <button

@@ -1,9 +1,9 @@
 /* Formatted editor surface. Colours come from the theme tokens. */
-/* Spacing and heading scale follow Object's .editor-prose: a block stack of
+/* Spacing and heading scale: a block stack of
    .44em plus 9px, larger gaps before headings (in the body's em; each heading's
    value is divided by its own font-size) and .42em after one. */
-/* The note body: 1rem (15.5px at Object's root) times the text size setting
-   (`settings/zoom.ts`); Object's body is 15.5px on a 23.25px line. */
+/* The note body: 1rem (15.5px at the root) times the text size setting
+   (`settings/zoom.ts`); the body is 15.5px on a 23.25px line. */
 .object-body-text {
   font-size: calc(1rem * var(--app-zoom, 1));
 }
@@ -34,7 +34,7 @@
 .object-editor ul[data-type='taskList'] li > div { flex: 1; }
 .object-editor blockquote {
   border-left: 3px solid var(--editor-quote-line);
-  padding-block: 6px; /* Object's .quote>.block-middle */
+  padding-block: 6px;
   padding-left: 1.125rem;
   color: inherit;
 }
@@ -100,7 +100,7 @@
 }
 
 /* ---- M8 plain rendering (Task 25; Tasks 26, 27 and 30 add the real views).
-   Values are ours unless noted: the trimmed reference has no rule for these. */
+   Values are ours unless noted. */
 
 /* Inline colour and highlight: the colour itself is the mark's inline style
    (menus/colors.ts tokens); a highlight gets the block colour's radius. */

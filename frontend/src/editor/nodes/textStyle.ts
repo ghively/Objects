@@ -5,8 +5,8 @@
  *   <mark data-color="bg-yellow">…</mark>    `highlight`, a background colour
  *   <mark>…</mark>                           read as `bg-amber` and written back bare
  *
- * `bg-amber` is Object's `FALLBACK_HIGHLIGHT_COLOR` (`colorThemes.ts`).
- * The `highlightText` shortcut does what Object's Mod-Shift-h does: a
+ * `bg-amber` is `FALLBACK_HIGHLIGHT_COLOR`.
+ * The `highlightText` shortcut (Mod-Shift-h): a
  * selection that has a colour loses it, otherwise it gets the last-used
  * colour (`textHighlightColorLastUsed`, text or background), else `bg-amber`.
  *
@@ -50,7 +50,7 @@ export function textColorOpen(color: string): string {
   return `<span data-color="text-${color}">`
 }
 
-/** Object's `FALLBACK_HIGHLIGHT_COLOR`: a bare `<mark>`, and the highlight shortcut's first colour. */
+/** `FALLBACK_HIGHLIGHT_COLOR`: a bare `<mark>`, and the highlight shortcut's first colour. */
 export const FALLBACK_HIGHLIGHT_COLOR = 'bg-amber'
 /** The theme colour name of `FALLBACK_HIGHLIGHT_COLOR`. */
 export const FALLBACK_HIGHLIGHT = 'amber'
@@ -103,8 +103,8 @@ export function setHighlightTextHandler(fn: HighlightHandler | null): void {
 }
 
 /**
- * Object's Mod-Shift-h on a text selection: `color: current ? null :
- * lastUsed || 'bg-amber'`. A run has one colour in Object, so a selection
+ * Mod-Shift-h on a text selection: `color: current ? null :
+ * lastUsed || 'bg-amber'`. A run has one colour, so a selection
  * with a text colour or a highlight loses both; otherwise it gets the
  * last-used colour.
  */

@@ -7,7 +7,7 @@
  *   ` ^id` left out). A change to the source file (the SSE change stream) fetches it again.
  * - A click opens the source (as a link) and scrolls to the block (`scrollToBlock`).
  * - A reference that sits inside its own rendering (directly, or through another embedded block
- *   or object) shows `RenderBlockReference.recursiveRendering.info` instead.
+ *   or object) shows a "referencing itself" note instead.
  * - A block or object that can't be found shows "Block not found." (our string).
  */
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
@@ -20,7 +20,7 @@ import { blockClient, type BlockInfo } from './blockClient'
 import './blockref.css'
 
 export const BLOCK_REF_TEXT = {
-  recursive: 'This block reference seems to be referencing itself either directly or through another embedded object.', // RenderBlockReference.recursiveRendering.info
+  recursive: 'This block reference seems to be referencing itself either directly or through another embedded object.',
   notFound: 'Block not found.', // our string
 }
 

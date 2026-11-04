@@ -1,7 +1,7 @@
-/* Code block (Task 9). Values from Object's index CSS: `.CodeBlock.block-outer`
-   (margin-block 4px, padding-block 3px), `.cm-editor` (radius-base, the code font
+/* Code block (Task 9). The block has margin-block 4px and padding-block 3px; the
+   editor area (radius-base, the code font
    stack, `--code-text`), the language chrome in `--code-bg`, and the hover bar
-   (`group-hover/CodeBlock:opacity-100`). */
+   (shown on hover). */
 .object-editor .code-block {
   position: relative;
   margin-block: 4px;
@@ -132,8 +132,7 @@
 .code-block-lang-item:hover,
 .code-block-lang-item[aria-selected='true'] { background: var(--bg-hover-2); }
 
-/* Horizontal line (Object's `.editor-prose .HorizontalLineBlock.block-outer`:
-   padding-block 2px around a 1px rule in `horizontalLineColor`). Kept here because
+/* Horizontal line (padding-block 2px around a 1px rule in `horizontalLineColor`). Kept here because
    `horizontalRule` has no node module of its own and `editor.css` belongs to Task 8. */
 .object-editor.ProseMirror hr,
 .object-editor .ProseMirror hr {
@@ -145,8 +144,8 @@
 }
 .object-editor.ProseMirror hr.ProseMirror-selectednode { outline: 2px solid var(--block-selection-border); outline-offset: 3px; }
 
-/* Syntax highlighting (M8 Task 29). highlight.js's `hljs-*` classes onto Object's `--code-*`
-   syntax tokens (theme/codeSyntax.css, all four themes), following Object's own `tok-*` rules
+/* Syntax highlighting (M8 Task 29). highlight.js's `hljs-*` classes onto the `--code-*`
+   syntax tokens (theme/codeSyntax.css, all four themes), one rule per token kind
    (keyword, atom/bool, regex/escape, inserted/literal, deleted/string, number, variableName,
    typeName, className, propertyName, operator, comment, meta, punctuation, heading, emphasis,
    strong, link). Which hljs scope takes which token is our choice where CodeMirror's names differ.

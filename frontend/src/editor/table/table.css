@@ -1,5 +1,5 @@
-/* Simple tables (Object's SimpleTableBlock). Cell padding is Object's
-   --p-table-cell-x / --p-table-cell-y (.375rem, design.css). The displayed
+/* Simple tables. Cell padding is
+   --p-table-cell-x / --p-table-cell-y (.375rem). The displayed
    header role follows the table's options (TableMenu.tsx: data-cell-header);
    the file's header row is unchanged. */
 

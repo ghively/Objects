@@ -1,5 +1,5 @@
 /* Block references (M8; our choice of look, in the theme's tokens): the referenced block inside a
-   quiet frame with its source's title under it, as Object's `.EntityBlock.block-reference`. */
+   quiet frame with its source's title under it. */
 .object-editor .block-ref {
   color: inherit;
   border-left: none;

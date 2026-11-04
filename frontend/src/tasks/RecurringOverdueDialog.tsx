@@ -1,4 +1,4 @@
-// The overdue catch-up dialog (`RecurringTaskOverdueModal.*`): a recurring task with two or more
+// The overdue catch-up dialog: a recurring task with two or more
 // missed occurrences asks which one the checkbox, "Skip" or "Excuse" acts on. Each choice is a
 // button "Mark as done for {date}" / "Skip to {date}" / "Excuse for {date}" with its hint; Excuse
 // offers only the first two choices (our choice). The dates are our reading of the hint strings:

@@ -13,8 +13,8 @@ sidecars beside it: ``<stem>.whiteboard.json`` (the canvas) and ``<stem>.ink.svg
   quiet.
 - M9 (Gene reversed M6's "never the ``.md``"): after the sidecar, the save stamps the ``.md``'s
   ``lastUpdated`` through `Space.touch`: only that line, at most once a minute, with no
-  version-history snapshot (both our choice). ``lastUpdated`` is component-level in
-  Object and the canvas is component data; no client code proving the bump was found.
+  version-history snapshot (both our choice). ``lastUpdated`` is component-level and
+  the canvas is component data.
 
 Revisions are the sha256 of the file's bytes (`space.version_of`).
 """
@@ -66,7 +66,7 @@ __all__ = [
 
 WHITEBOARD_TYPE_ID = "whiteboard"
 
-# Object's user-level whiteboard settings (component.model.ts), stored in ui.json.
+# User-level whiteboard settings, stored in ui.json.
 WHITEBOARD_UI_KEYS = (
     "isSnappingToGrid",
     "isSnappingToNodes",
@@ -75,7 +75,7 @@ WHITEBOARD_UI_KEYS = (
     "isEngineeringMode",
 )
 
-# Our string (no Object original).
+# Our string.
 _UI_PROBLEM = "whiteboard must be an object of true/false settings."
 
 
@@ -118,10 +118,10 @@ def _system_prop(
 
 
 def whiteboard_type_json() -> dict[str, Any]:
-    """The basic Whiteboard type (``basicStructures.ts`` ``RootWhiteboard``) as type JSON.
+    """The basic Whiteboard type (``RootWhiteboard``) as type JSON.
 
     Name "Whiteboard", plural "Whiteboards", icon ``ph-presentation``, colour ``gray`` (our
-    name for Object's ``neutral``), full width (``wideLayoutMode``: "The canvas owns the
+    name for ``neutral``), full width (``wideLayoutMode``: "The canvas owns the
     page"); its properties are the system ones ``RootWhiteboard`` lists (title, description,
     icon, tags, last updated, created at). The Canvas and Notes are the sidecar and the body.
     """

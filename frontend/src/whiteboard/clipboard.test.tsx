@@ -124,7 +124,7 @@ describe('whiteboard clipboard', () => {
     expect(line.edges.map((e) => e.id)).toEqual(['line'])
     expect(selectionPayload(sample(), [])).toBeNull()
     expect(parsePayload(serializePayload(line))).toEqual(line)
-    expect(parsePayload('object-whiteboard-v1:{}')).toBeNull()
+    expect(parsePayload('other-whiteboard-v1:{}')).toBeNull()
     expect(parsePayload(CLIPBOARD_PREFIX + '{not json')).toBeNull()
 
     // The browser's own copy event carries it too (no permission needed), and cancels the fallback.

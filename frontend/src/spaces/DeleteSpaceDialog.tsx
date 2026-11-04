@@ -21,12 +21,12 @@ import {
 import { Button } from '@/components/ui/button'
 
 export const DELETE_SPACE_TEXT = {
-  menuItem: 'Delete space', // DeleteHandler.space.fullDeleteButton
-  heading: 'Delete this space?', // DeleteHandler.space.heading
-  description: 'Deletes the space and everything in it.', // DeleteHandler.space.description
-  confirm: 'Delete space', // DeleteHandler.space.fullDeleteButton
-  warning: "This can't be undone.", // DeleteHandler.space.warning
-  cancel: 'Cancel', // general.cancel
+  menuItem: 'Delete space',
+  heading: 'Delete this space?',
+  description: 'Deletes the space and everything in it.',
+  confirm: 'Delete space',
+  warning: "This can't be undone.",
+  cancel: 'Cancel',
   currentHint: 'Switch to another space to delete this one.', // our string
 } as const
 

@@ -225,7 +225,7 @@ class Attachment(TypedDict):
 
 
 MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024
-"""Object's upload limit (``EntityPicker.uploadLimitSize``: 100 MiB)."""
+"""The upload limit: 100 MiB."""
 
 UPLOAD_LIMIT_DETAIL = (
     "You can only upload files up to 100 MiB in size. "

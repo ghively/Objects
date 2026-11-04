@@ -1,5 +1,5 @@
 // "Query Recommendations": ready-made queries an Overview offers while it has no query sections.
-// Titles are Object's (`queryRecommendations.*`): "Kanban by {property}", "Filter {property} is
+// Titles: "Kanban by {property}", "Filter {property} is
 // empty", "Filter {property} by" (one item per option), and for booleans "Checked" / "Unchecked".
 import type { Filter, Layout, PropertyDef, QueryDefinition, TypeDef } from '@/api/types'
 import { emptyFilterGroup } from '@/views/model'

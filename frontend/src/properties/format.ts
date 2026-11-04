@@ -1,4 +1,4 @@
-// Display formatting for property values: numbers (with Object's number formats and
+// Display formatting for property values: numbers (with the number formats and
 // separators), dates, emptiness and placeholders.
 //
 // M8: the "Language" setting picks the locale "Localized" dates use, the "Decimal separator"
@@ -80,7 +80,7 @@ function numberParts(v: number, fmt: NumberFormat): Intl.NumberFormatPart[] {
 }
 
 /**
- * A number as its property shows it. With no format it is the plain number, as in Object.
+ * A number as its property shows it. With no format it is the plain number.
  * `separators.isGroupingThousands` (default on) keeps the thousands separators; a comma radix
  * (`separators.isRadixComma` or the "Decimal separator" setting) swaps `,` and `.` (`1.234,5`).
  */
@@ -158,7 +158,7 @@ type DateFormatting = DeviceSettings['dateFormatting']
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
-/** A numeric date in the order of `DateAndTimeSettings.dateFormatting.option*`. */
+/** A numeric date in the order of the date formatting option. */
 function numericDate(y: number, m: number, d: number, order: Exclude<DateFormatting, 'localized'>): string {
   if (order === 'DMY') return `${pad(d)}-${pad(m)}-${y}`
   if (order === 'MDY') return `${pad(m)}/${pad(d)}/${y}`
@@ -209,7 +209,7 @@ function blank(v: unknown): boolean {
 }
 
 /**
- * Whether a property counts as empty (for "Hide when empty"), with Object's quirks: number 0
+ * Whether a property counts as empty (for "Hide when empty"), with these quirks: number 0
  * and boolean false are empty, and created at, last updated and backlinks are always empty.
  */
 export function propertyIsEmpty(def: Pick<PropertyDef, 'type'>, value: unknown): boolean {
@@ -233,7 +233,7 @@ export function propertyIsEmpty(def: Pick<PropertyDef, 'type'>, value: unknown):
 }
 
 /** The text an empty cell shows: the property's description, else "Empty". */
-/** An empty value's placeholder: the description, else "Empty"; none in a table cell (blank, as in Object). */
+/** An empty value's placeholder: the description, else "Empty"; none in a table cell (blank). */
 export function placeholderFor(def: Pick<PropertyDef, 'description'>, density?: 'panel' | 'table'): string {
   if (density === 'table') return ''
   return def.description?.trim() || 'Empty'

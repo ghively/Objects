@@ -48,10 +48,10 @@ SYSTEM_KEYS = frozenset(
         "height", "source",
         # DailyNote
         "date", "reviewed",
-        # M9 per-object layout (Object's wideLayoutMode, wideCoverImage, coverImageOffset)
+        # M9 per-object layout (wideLayoutMode, wideCoverImage, coverImageOffset)
         # and page view (defaultPageViewId, kept as it is)
         "wideLayoutMode", "wideCoverImage", "coverImageOffset", "defaultPageViewId",
-        # the property-pane toggle (Object's hideProperties; polish item 17)
+        # the property-pane toggle (hideProperties; polish item 17)
         "hideProperties",
     }
 )

@@ -1,7 +1,6 @@
 /**
- * The footer under Object's keyboard-driven menus (slash menu, `@` picker, New menu, search):
- * "↑↓ to navigate  Esc to abort  ↵ to select". Strings are `ControlDropdown`'s `toNavigate`,
- * `toAbort`, `toSelect`, `toOpenInNewTab` and `toOpenInSidepanel`.
+ * The footer under the keyboard-driven menus (slash menu, `@` picker, New menu, search):
+ * "↑↓ to navigate  Esc to abort  ↵ to select".
  */
 export interface KeyHint {
   keys: string

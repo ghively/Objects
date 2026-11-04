@@ -1,6 +1,6 @@
 // The right panel's mini month: Month ▾ Year ▾ with ‹ › around a 6×7 grid. Today is a filled red
 // rounded square, the selected day a neutral one, days outside the month are muted, and a small dot
-// marks each day that has a daily note (our marker: Object's is in no screenshot).
+// marks each day that has a daily note (our marker).
 import { useMemo, useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'

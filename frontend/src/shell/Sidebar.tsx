@@ -99,7 +99,7 @@ function useCollapsedTypes(): [Set<string>, (typeId: string) => void] {
   return [collapsed, toggle]
 }
 
-/** The footer theme button's tooltips: the mode it switches to (`SpaceOverview.setDarkMode`, `.setLightMode`). */
+/** The footer theme button's tooltips: the mode it switches to. */
 export const SET_DARK_MODE = 'Dark mode'
 export const SET_LIGHT_MODE = 'Light mode'
 
@@ -123,23 +123,23 @@ function ThemeButton() {
   )
 }
 
-/** The footer gear's tooltip (`SpaceOverview.settings.tooltip`). */
+/** The footer gear's tooltip. */
 export const SETTINGS_TOOLTIP = 'Settings'
 
-/** The square search button's tooltip (`shortcuts.openSearchPalette.name`). */
+/** The square search button's tooltip. */
 export const SEARCH_THIS_SPACE = 'Search this space'
 
 /** The sidebar entry for the All notes view. */
 export const ALL_NOTES_LABEL = 'All notes'
 
-/** The sidebar entry for the query list (the reference's `RootQuery.pluralName`). */
+/** The sidebar entry for the query list. */
 export const QUERIES_LABEL = 'Queries'
 
 export function byPluralName(a: TypeDef, b: TypeDef): number {
   return a.pluralName.localeCompare(b.pluralName, undefined, { sensitivity: 'base' })
 }
 
-/** The sidebar "Queries" entry's tile: RootQuery's icon in a type-chip tile (green, as in the reference). */
+/** The sidebar "Queries" entry's tile: the query icon in a type-chip tile (green). */
 const QUERIES_CHIP: Pick<TypeDef, 'icon' | 'color'> = { icon: { type: 'iconify', val: QUERY_ICON }, color: 'green' }
 
 export function TypeChip({ type, size = 22 }: { type: Pick<TypeDef, 'icon' | 'color'>; size?: number }) {
@@ -284,7 +284,7 @@ export function Sidebar({
   useEffect(() => {
     void useSpaceInfo.getState().ensure()
   }, [])
-  // A type's collections sit under its row, as in Object's `objects` sidebar block.
+  // A type's collections sit under its row in the object types block.
   const { collections } = useCollections()
   const [collapsed, toggleCollapsed] = useCollapsedTypes()
   // The type menu's "New Collection" and "Import" open their dialogs here.

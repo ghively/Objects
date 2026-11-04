@@ -1,6 +1,6 @@
 // colour-literals: content palette
 // How graph nodes and edges look. Sizes, the reduced-node styling and the tag colouring are our
-// values (the reference has no node size formula, colours or reduced-node drawing); colours come
+// values; colours come
 // from M2's theme palette.
 import type { GraphNode, TypeDef } from '@/api/types'
 import { themeColor, type ThemeColor } from '@/theme/palette'
@@ -13,9 +13,9 @@ export function nodeSize(degree: number): number {
   return Math.min(NODE_MAX_SIZE, NODE_MIN_SIZE + 2 * Math.sqrt(Math.max(0, degree)))
 }
 
-/** A reduced node (an object a filter left in only to carry links, Object's `isReducedNode`)
- *  is drawn de-emphasised: at the smallest size, in gray, unlabelled until hovered. Our choice:
- *  the reference does not show how Object draws them. */
+/** A reduced node (an object a filter left in only to carry links)
+ *  is drawn de-emphasised: at the smallest size, in gray, unlabelled until hovered. This styling is our own
+ *  choice. */
 export const REDUCED_NODE_SIZE = NODE_MIN_SIZE
 export const REDUCED_NODE_COLOR: ThemeColor = 'gray'
 

@@ -1,9 +1,9 @@
 /**
- * The math block's node view (Object's `MathBlock`): the formula rendered
+ * The math block's node view: the formula rendered
  * with KaTeX in display mode, one row per blank-line-separated part
  * (`renderDisplayMath`); clicking it opens an editing panel with the TeX
- * source and a live preview, "Close" (`blocks.MathBlock.closeEditor`) and the
- * hint "↵ to insert above/below" (`blocks.MathBlock.insertNewBlock`).
+ * source and a live preview, "Close" and the
+ * hint "↵ to insert above/below".
  *
  * In the panel, Enter inserts a new paragraph (above when the caret is at the
  * very start of the source, else below) and closes; Shift+Enter is a line

@@ -133,7 +133,7 @@ describe('App, M7 tabs', () => {
     key('Tab', { ctrlKey: true })
     expect(s().activeId).toBe(b)
 
-    // navigateBack / navigateForward (Object: Mod+Left or Mod+[ / Mod+Right or Mod+]) stay in the tab.
+    // navigateBack / navigateForward (Mod+Left or Mod+[ / Mod+Right or Mod+]) stay in the tab.
     s().activate(a)
     key('ArrowLeft', { ctrlKey: true })
     expect(currentTarget(s())).toEqual({ kind: 'trash' })
@@ -147,7 +147,7 @@ describe('App, M7 tabs', () => {
     key('ArrowLeft', { altKey: true })
     expect(currentTarget(s())).toEqual({ kind: 'allNotes' })
 
-    // openTabList (Object: Mod+Shift+Up) toggles the tab menu.
+    // openTabList (Mod+Shift+Up) toggles the tab menu.
     key('ArrowUp', { ctrlKey: true, shiftKey: true })
     expect(useTabMenu.getState().open).toBe(true)
     expect(await screen.findByRole('textbox', { name: 'Search tabs' })).toBeInTheDocument()

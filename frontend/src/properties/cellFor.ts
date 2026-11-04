@@ -95,7 +95,7 @@ export function cellFor(type: PropertyType): CellComponent | null {
   return CELLS[type] ?? null
 }
 
-/** Object's basic media fields: system definitions (id equals key) shown read-only. */
+/** The basic media fields: system definitions (id equals key) shown read-only. */
 export const MEDIA_FIELD_KEYS: ReadonlySet<string> = new Set([
   'url',
   'domain',

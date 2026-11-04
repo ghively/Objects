@@ -42,16 +42,15 @@ export const BUILDER_TEXT = {
   limit: 'Limit',
   noLimit: 'No limit',
   paused: PAUSED_HINT,
-  /** `components.RootQuery.queryBuilder.releaseConstraintTooltip` */
   releaseConstraintTooltip:
     'Turn into a normal query and remove the single type constraint. Opens the query as a page and removes this tab from the type dashboard.',
-  /** Our string: the release button's accessible name (Object shows only the tooltip). */
+  /** Our string: the release button's accessible name (the tooltip is the visible hint). */
   releaseConstraint: 'Release type constraint',
 }
 
 /**
- * A query shown as a tab on a type's dashboard whose only type is that type (Object's
- * `singleStructureQueryInfo`, computed, never stored) is constrained to it: the type can't be
+ * A query shown as a tab on a type's dashboard whose only type is that type (computed,
+ * never stored) is constrained to it: the type can't be
  * changed there until it is released.
  */
 export function isSingleTypeQuery(def: QueryDefinition, typeId: string): boolean {

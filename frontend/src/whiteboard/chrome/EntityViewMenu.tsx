@@ -1,7 +1,7 @@
 /**
- * The entity node "View" menu (M8, `Whiteboard.control.view`): switches an embedded object
- * between M7's four views, "Link block", "Small card", "Wide card" and "Embed"
- * (`structureViewTypes.*.name`). The choice is the entity block's optional `view` key (our key);
+ * The entity node "View" menu (M8): switches an embedded object
+ * between M7's four views, "Link block", "Small card", "Wide card" and "Embed".
+ * The choice is the entity block's optional `view` key (our key);
  * a block without one shows the small card, as before M8.
  */
 import type { WhiteboardBlock, WhiteboardEntityView, WhiteboardNode } from '@/api/whiteboardTypes'
@@ -11,7 +11,7 @@ import type { BoardActions } from '../canvasTypes'
 import { WB } from '../strings'
 import { MenuRow, PopoverMenu } from './controls'
 
-/** The four views in Object's order, with their names and icons (icons our choice). */
+/** The four views in menu order, with their names and icons (icons our choice). */
 export const ENTITY_VIEWS: { view: WhiteboardEntityView; label: string; icon: string }[] = [
   { view: 'inline', label: WB.viewInline.text, icon: 'ph-link-simple' },
   { view: 'smallCard', label: WB.viewSmallCard.text, icon: 'ph-cards' },

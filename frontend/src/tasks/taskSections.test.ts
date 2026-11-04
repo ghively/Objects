@@ -30,7 +30,7 @@ const paths = (key: keyof typeof TASK_SECTIONS) => sectionRows(key, ROWS, TASK_T
 
 describe('taskSections', () => {
   test('test sections titles and descriptions match reference', () => {
-    // In the reference's tab order: Inbox, Today, Scheduled, Status, Context, Tags, Open, Deadline,
+    // In tab order: Inbox, Today, Scheduled, Status, Context, Tags, Open, Deadline,
     // Recurring, Reminders, Completed, then All.
     const want: Record<string, [string, string]> = {
       inbox: ['Inbox', 'All tasks that have no status or have not been scheduled'],

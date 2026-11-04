@@ -1,4 +1,4 @@
-"""Object types, v2: the full Object-shaped type model and its lossless migration.
+"""Object types, v2: the full type model and its lossless migration.
 
 A type lives in ``.object/types/<id>.json``. M1 wrote a simplified shape
 ("v1": no ``schemaVersion``); `TypeDefinition.from_json` reads both and keeps
@@ -70,7 +70,7 @@ THEME_COLORS = (
     "red",
 )
 
-# Default property icons, as Object's `propertyIcons`.
+# Default property icons per property kind.
 PROPERTY_ICONS = {
     "text": "ph-text-align-left",
     "textBlock": "ph-text-align-left",
@@ -124,7 +124,7 @@ _OPTIONAL_SYSTEM_DEFS = {
 
 BASIC_TYPE_NAMES = ("Page", "Tag", "Task", "DailyNote", "Whiteboard")
 
-# Object's media types: their fields become read-only system definitions.
+# The basic media types: their fields become read-only system definitions.
 BASIC_MEDIA_TYPES: dict[str, dict[str, str]] = {
     "Weblink": {"url": "url", "domain": "text", "iframeUrl": "url", "previewImage": "url"},
     "File": {"mimeType": "text", "fileSize": "number", "source": "text"},
@@ -196,7 +196,7 @@ _STATUS_CATEGORIES = {
     "done": "done",
     "complete": "done",
 }
-# Object's colours for the basic Task status options.
+# The colours of the basic Task status options.
 _STATUS_COLORS = {
     "not started": "red",
     "next up": "yellow",
@@ -316,7 +316,7 @@ def _option_id(text: str, taken: set[str]) -> str:
 
 
 def label_options(texts: Iterable[str], status: bool = False) -> list[dict[str, Any]]:
-    """Option JSON for observed label texts, coloured round-robin (status: Object's colours)."""
+    """Option JSON for observed label texts, coloured round-robin (status: the status colours)."""
     out: list[dict[str, Any]] = []
     taken: set[str] = set()
     for i, text in enumerate(texts):
@@ -491,7 +491,7 @@ def _system_def(spec: tuple[str, str, str, str], extra_options: dict | None = No
 
 
 def system_property_defs(include_type: bool = False) -> list[PropertyDefinition]:
-    """Fresh system definitions in Object's order (``type`` last, when asked for)."""
+    """Fresh system definitions in display order (``type`` last, when asked for)."""
     defs = [_system_def(s) for s in _SYSTEM_DEFS]
     if include_type:
         defs.append(_system_def(_TYPE_DEF))
@@ -865,7 +865,7 @@ _TASK_PRIORITY = (("low", "Low", "amber"), ("medium", "Medium", "orange"), ("hig
 
 
 def _task_field_defs() -> list[PropertyDefinition]:
-    """Fresh definitions of Object's `RootTask` fields (`basicStructures.ts`), plus
+    """Fresh definitions of the basic Task fields, plus
     our hidden ``repeat``, ``remind`` and (M8) ``occurrenceLog`` text fields, in the order
     they are appended."""
 
@@ -916,8 +916,8 @@ def _task_field_defs() -> list[PropertyDefinition]:
     ]  # fmt: skip
 
 
-# Fields Object's basic media types define beyond the ones we store (key -> name, kind).
-# Label fields start with Object's option set (`_MEDIA_LABEL_SETS`); the user edits it.
+# Fields the basic media types define beyond the ones we store (key -> name, kind).
+# Label fields start with a built-in option set (`_MEDIA_LABEL_SETS`); the user edits it.
 _MEDIA_EXTRA_FIELDS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "PDF": (
         ("numberOfPages", "Number of Pages", "number"),
@@ -935,9 +935,8 @@ _MEDIA_EXTRA_FIELDS: dict[str, tuple[tuple[str, str, str], ...]] = {
 }
 
 
-# Object's option sets for those label fields: (option id, en-US text), from
-# ``components.Media{PDF,Image,WebResource,Audio}.propertyDefinitions.media_*.set``, in the
-# order of their ids. Option colours are not in the reference: our choice (round-robin, and for
+# The option sets for those label fields: (option id, en-US text), in the
+# order of their ids. Option colours are our choice (round-robin, and for
 # Image "Colors" the theme colour of the same name where there is one).
 _MEDIA_LABEL_SETS: dict[tuple[str, str], tuple[tuple[str, str], ...]] = {
     ("PDF", "documentType"): (
@@ -1051,7 +1050,7 @@ def topup_task_type(t: TypeDefinition) -> TypeDefinition:
     Each missing key of ``status``, ``priority``, ``date``, ``deadline``,
     ``completed``, ``repeat``, ``remind`` and ``occurrenceLog`` is appended after the existing
     properties (the basic PDF, Image, Weblink and Audio types likewise get the fields
-    Object defines for them, in ``_MEDIA_EXTRA_FIELDS``); a key the type already defines keeps its own definition and
+    defined for them, in ``_MEDIA_EXTRA_FIELDS``); a key the type already defines keeps its own definition and
     options. Any other type comes back untouched. Never writes: the fields reach
     ``task.json`` the first time the type is persisted.
     """

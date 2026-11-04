@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Open a space folder in a native window that looks like Object. Browse objects by type in the sidebar, open an object as a page or peek, and edit its body in a formatted editor. Saving changes only what was edited.
+**Goal:** Open a space folder in a native window that matches the design spec. Browse objects by type in the sidebar, open an object as a page or peek, and edit its body in a formatted editor. Saving changes only what was edited.
 
 **Architecture:**
 - **Back end:** a Python FastAPI service (`127.0.0.1:8790`) owns the space folder. It does file scanning, frontmatter round-trips (ruamel.yaml), atomic writes, conflict detection and file watching (pushed to the UI over Server-Sent Events).
@@ -11,7 +11,7 @@
 
 **Tech Stack:** Python 3.13, uv, FastAPI, uvicorn, ruamel.yaml, watchdog, pywebview, pytest · Node 24, Vite, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Tiptap 3, `marked` (lexer), CodeMirror 6, Vitest.
 
-**Spec:** `docs/superpowers/specs/2026-10-23-object-design.md` (read §3–§5 before starting). Visual reference: `docs/README.md` and its screenshots. Object source of truth for behaviour and option names: `.reference/` (git-ignored; read for behaviour, never copy code).
+**Spec:** `docs/superpowers/specs/2026-10-23-object-design.md` (read §3–§5 before starting). Behaviour and option names: the behaviour catalog (`docs/behavior-catalog.md`) and the design spec.
 
 ## Roadmap (one plan per milestone, written when the previous one is accepted)
 
@@ -23,7 +23,7 @@
 | 4 | calendar (day / three days / week / month, mini month), daily notes, tasks (status categories, priority, due, recurrence, reminders) |
 | 5 | SQLite FTS index, Ctrl+K command palette, backlinks + unlinked mentions, global and local graph |
 | 6 | whiteboards (blocks, 12 shapes, frames, circuits, connectors) + Wacom freehand ink |
-| 7 | remaining block options (toggles, colours, columns, math, media embeds), light mode, side-by-side polish against Object |
+| 7 | remaining block options (toggles, colours, columns, math, media embeds), light mode, side-by-side polish against the design spec |
 
 ## Global Constraints
 
@@ -36,7 +36,7 @@
   - `id`, a 26-character ULID, inserted as the first frontmatter key, only if absent
 - **Line endings** (LF or CRLF), a UTF-8 BOM and the presence or absence of a trailing newline are preserved exactly.
 - **Space app data** lives in `<space>/.object/`; the derived cache in `<space>/.object-cache/`. The scanner ignores both, plus any dot-folder.
-- **Theme tokens** come from `docs/README.md`: `--bg-app #0d0c10`, `--bg-panel #151418`, `--bg-raised #1a1a1d`, `--bg-raised-2 #212024`, `--bg-hover #232326`, `--bg-hover-2 #28272b`, `--border #2d2c31`, `--danger #cd1e46`. Font: Inter at a 15px base; radii 2/4/6/8/12/16/24px.
+- **Theme tokens** (the design spec's dark theme): `--bg-app #0d0c10`, `--bg-panel #151418`, `--bg-raised #1a1a1d`, `--bg-raised-2 #212024`, `--bg-hover #232326`, `--bg-hover-2 #28272b`, `--border #2d2c31`, `--danger #cd1e46`. Font: Inter at a 15px base; radii 2/4/6/8/12/16/24px.
 - **No real CPI data in the repo.** Test fixtures are synthetic. The manual acceptance space is a copy of the export **outside** the repo.
 
 ## Review Focus
@@ -391,7 +391,7 @@ frontend/
   3. Assert that no file's bytes changed.
   4. Then, for 10 objects, replace one word in the first paragraph line of the body, PUT that body, and print `git diff --stat`. (Editor-side preservation is already covered by the Task 7 and 8 tests; this pass checks the server's write path.)
 - [ ] **Step 2:** Run it against `backend/tests/fixtures/space-sample`. Expected: "0 files changed" on the no-edit pass, and one body line + `lastUpdated` (+ `id`) per edited file.
-- [ ] **Step 3:** Gene copies `Object (2026-10-23 16-27-39).zip`, extracts it **outside the repo** (for example `C:\Users\genehively\Object Spaces\CPI\`), and runs `git init` there so diffs are visible. Then `uv run objectapp --space <that folder>`.
+- [ ] **Step 3:** Gene copies his work export (a `.zip`), extracts it **outside the repo** (for example `C:\Users\genehively\Object Spaces\CPI\`), and runs `git init` there so diffs are visible. Then `uv run objectapp --space <that folder>`.
 - [ ] **Step 4:** Manual checks, recorded in `m1-acceptance.md`:
   - the sidebar shows the 13 CPI types
   - an object opens in the peek, and the pager works

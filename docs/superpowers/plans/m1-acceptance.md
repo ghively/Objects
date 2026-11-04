@@ -69,7 +69,7 @@ What the numbers show:
 
 ## Manual checks (Steps 3–4, for Gene)
 
-- [ ] Copy `Object (2026-10-23 16-27-39).zip` and extract it **outside the repo**, e.g. `C:\Users\genehively\Object Spaces\CPI\`.
+- [ ] Copy the work export zip and extract it **outside the repo**, e.g. `C:\Users\genehively\Object Spaces\CPI\`.
 - [ ] Run `git init`, then `git add -A`, then `git commit -m base` in that folder so diffs are visible.
 - [ ] (Optional) Run `uv run python scripts/m1_roundtrip.py "<that folder>"` from the repo. It works on its own temporary copy.
 - [ ] Run `uv run objectapp --space "<that folder>"`. A 1440x900 window opens.
@@ -77,7 +77,7 @@ What the numbers show:
 - [ ] An object opens in the peek, and the pager works.
 - [ ] Editing a paragraph changes only that line in `git diff` (plus `lastUpdated`, and `id` if it was missing).
 - [ ] An edit in VS Code while the app is open reloads in the app.
-- [ ] Side by side with `docs/01-*.png` and `05-*.png`, the shell and peek look right.
+- [ ] Side by side with the behaviour catalog, the shell and peek look right.
 
 Notes from the manual run:
 

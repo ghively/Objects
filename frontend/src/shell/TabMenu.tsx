@@ -1,5 +1,5 @@
 /**
- * The "Tab menu" (`SpaceHeader.tabList`): a searchable list of the open tabs. Typing filters by
+ * The "Tab menu": a searchable list of the open tabs. Typing filters by
  * title, the arrow keys move the highlight, Enter activates. Opened by its button in the tab strip
  * or by the `openTabList` shortcut (through `useTabMenu`).
  */

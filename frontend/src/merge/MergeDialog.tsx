@@ -1,5 +1,5 @@
 /**
- * The "Merge into" dialog (M8 Task 6; `EntityMenu.mergeObject.*` / `EntityMenu.mergeTag.*`).
+ * The "Merge into" dialog (M8 Task 6).
  * Mounted once in `shell/GlobalOverlays.tsx`; `useMerge.open(path)` (the object's `…` menu,
  * "Merge into object" / "Merge into tag") opens it.
  *
@@ -39,7 +39,6 @@ export interface MergeStrings {
   errorTooLargeDescription(limit: number): string
 }
 
-/** `EntityMenu.mergeObject.*` */
 export const MERGE_OBJECT: MergeStrings = {
   submenuTitle: 'Merge into',
   preparing: 'Loading…',
@@ -56,7 +55,6 @@ export const MERGE_OBJECT: MergeStrings = {
     `Merging is limited to ${limit} references. You can still merge a smaller object into this one, or remove some references first.`,
 }
 
-/** `EntityMenu.mergeTag.*` */
 export const MERGE_TAG: MergeStrings = {
   submenuTitle: 'Merge into',
   preparing: 'Loading…',

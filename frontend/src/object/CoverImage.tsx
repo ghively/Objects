@@ -3,9 +3,9 @@
  * width; `crop` fixes the height with `object-fit: cover`, otherwise the image keeps its natural
  * height. Hovering offers "Pick cover image" (the image picker), "Toggle wide cover image",
  * "Reposition cover image" (cropped covers only: the offset moves only a cropped image) and
- * "Remove cover image" (`CoverImageManager.*`).
+ * "Remove cover image".
  *
- * M9 reposition (`RenderCoverImage.*`): the offset is a y percent, 0–100 (default 50), drawn as
+ * M9 reposition: the offset is a y percent, 0–100 (default 50), drawn as
  * `object-position: 0% <offset>%`. While repositioning, "Drag image to reposition" shows; a drag
  * sets offset = start − dy / rendered height × 100, clamped; "Save" (or a click outside) writes
  * it, "Cancel" restores. An unmoved save writes nothing (our choice); the offset is rounded to a
@@ -18,7 +18,7 @@ import { ImagePicker } from '@/components/ImagePicker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
-/** Reference strings: `CoverImageManager.*`, `RenderCoverImage.*`. */
+/** The cover image strings. */
 export const COVER_TEXT = {
   pick: 'Pick cover image',
   remove: 'Remove cover image',

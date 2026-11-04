@@ -865,7 +865,7 @@ class SearchIndex:
     def similar(self, path: str, limit: int) -> list[tuple[str, float]]:
         """Objects sharing ``path``'s strongest terms (tf-idf), best first; never ``path`` itself.
 
-        Our lexical stand-in for Object's semantic related content.
+        A lexical stand-in for semantic related content.
         """
         if not self.ready.is_set() or limit <= 0:
             return []

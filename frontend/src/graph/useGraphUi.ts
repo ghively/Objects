@@ -1,4 +1,4 @@
-// `ui.graph`: the saved `GraphViewCustomization`. Edits are optimistic and saved debounced 400 ms
+// `ui.graph`: the saved graph filters. Edits are optimistic and saved debounced 400 ms
 // as the whole merged value (the server replaces top-level keys), through the one `ui.json` save
 // queue (`enqueueUiSave`) so a pin or calendar save never lands between a graph edit and its
 // save with a stale revision. On a 409 the fresh `ui.json` is fetched, the pending edits are
@@ -11,7 +11,7 @@ import { showToast } from '@/editor/media/upload'
 import { enqueueUiSave, loadUi, reloadUi, useUiStore } from '@/shell/usePinned'
 
 export const SAVE_DELAY_MS = 400
-/** The toast after a `ui.json` save of the graph settings failed (Object's "Could not save …" form). */
+/** The toast after a `ui.json` save of the graph settings failed ("Could not save …" form). */
 export const GRAPH_SAVE_FAILED = 'Could not save the graph settings'
 
 const EMPTY: GraphCustomization = {}

@@ -1,17 +1,16 @@
 /**
- * The one shortcut registry. Every entry carries Object's shortcut id (`shortcuts.<id>` in the
- * strings file), its category (`shortcuts.categories.<category>`), its English name
- * (`shortcuts.<id>.name`, verbatim unless marked "our string") and its keys.
+ * The one shortcut registry. Every entry carries a shortcut id, its category, its English name
+ * (catalogued unless marked "our string") and its keys.
  *
  * Keys are written `Mod-Shift-k`: modifiers `Mod` (Ctrl on Windows/Linux, Cmd on macOS), `Ctrl`,
- * `Meta`, `Alt`, `AltCtrl` (Alt on Windows/Linux, Ctrl on macOS: Object's Ctrl+Alt+L / ⌃⌘L
+ * `Meta`, `Alt`, `AltCtrl` (Alt on Windows/Linux, Ctrl on macOS: the Ctrl+Alt+L / ⌃⌘L
  * pattern), `Shift`, then one key: a letter, a digit, a punctuation character, or a
  * `KeyboardEvent.key` name (`Escape`, `ArrowUp`, `Enter`, `Tab`, `Backspace`, `Delete`, `Space`).
  *
- * The keys are Object's own (its shortcut table, `shortcuts36682.js` `var ex={…}`, checked in
- * `docs/superpowers/plans/reference-check-2026-10-28.md` §1). An id Object lists no key for
+ * The keys follow the shortcut table checked in
+ * `docs/superpowers/plans/reference-check-2026-10-28.md` §1. An id the table lists no key for
  * has `keys: []` and the Shortcuts sheet leaves it out. `provisional: true` marks a key that is
- * ours (no Object key to check against). `bound: false` entries are display-only: their
+ * ours (no table key to check against). `bound: false` entries are display-only: their
  * handlers live elsewhere (M1–M6 code), and they are registered so the Shortcuts sheet lists them
  * and the collision test sees them.
  */
@@ -21,7 +20,7 @@ export type ShortcutScope = 'global' | 'editor' | 'calendar' | 'table' | 'whiteb
 
 export interface ShortcutDef {
   id: string
-  /** `shortcuts.categories.<category>`: block, text, navigation, global, page, calendar, whiteboard, … */
+  /** The category: block, text, navigation, global, page, calendar, whiteboard, … */
   category: string
   name: string
   keys: string[]
@@ -31,7 +30,7 @@ export interface ShortcutDef {
   bound?: boolean
 }
 
-/** `shortcuts.categories.*` labels (verbatim). */
+/** The category labels. */
 export const CATEGORY_LABELS: Record<string, string> = {
   block: 'Block editing',
   calendar: 'Calendar',
@@ -244,9 +243,9 @@ export function useGlobalShortcut(
 
 // ---- the registered shortcuts ----
 
-/** Checked against Object's shortcut table (reference-check-2026-10-28 §1). */
+/** Checked against the shortcut table (reference-check-2026-10-28 §1). */
 const V = false
-/** Object-only keys: Object has no such action to check against. */
+/** Object-only keys: the table has no such action to check against. */
 const OURS = true
 
 const def = (
@@ -260,7 +259,7 @@ const def = (
 ): ShortcutDef => (bound === undefined ? { id, category, name, keys, scope, provisional } : { id, category, name, keys, scope, provisional, bound })
 
 /**
- * M7's shortcuts (the plan's "Shortcut keys" table), with Object's keys. Ids Object lists
+ * M7's shortcuts (the plan's "Shortcut keys" table), with the table's keys. Ids it lists
  * no key for (`heading1`-`heading4`, `toDo`, `toggle`, `textAlign*`: markdown only) have none.
  */
 export const M7_SHORTCUTS: ShortcutDef[] = [
@@ -317,31 +316,29 @@ export const M7_SHORTCUTS: ShortcutDef[] = [
   def('closeTab', 'navigation', 'Close current tab', ['Mod-w'], 'global', V),
   def('openNewTab', 'navigation', 'Open new tab', ['Mod-t'], 'global', V),
   def('navigateTabs', 'navigation', 'Navigate tabs', ['Ctrl-Tab'], 'global', V),
-  // Object's Ctrl+Shift+A is `toggleChecklistMenu`, not the tab menu.
+  // Ctrl+Shift+A is not the tab menu (it is reserved for a checklist menu).
   def('openTabList', 'navigation', 'Toggle tab menu when multiple tabs are open', ['Mod-Shift-ArrowUp'], 'global', V),
   def('navigateBack', 'navigation', 'Navigate back', ['Mod-ArrowLeft', 'Mod-['], 'global', V),
   def('navigateForward', 'navigation', 'Navigate forward', ['Mod-ArrowRight', 'Mod-]'], 'global', V),
 
   def('toggleSidepanel', 'global', 'Toggle right sidepanel', ['Mod-Shift-ArrowRight'], 'global', V),
   def('toggleLeftSidebar', 'global', 'Toggle left sidebar', ['Mod-Shift-ArrowLeft'], 'global', V),
-  // Object's Ctrl+Shift+Y is `openMinigame`.
   def('toggleCalendarSidebar', 'global', 'Toggle calendar sidebar', ['Mod-Alt-s'], 'global', V),
   def('toggleDarkMode', 'global', 'Toggle dark mode', ['Mod-Shift-l'], 'global', V),
-  // Also docs/design-notes binds Settings to CmdOrCtrl+,.
   def('openSettings', 'global', 'Open settings', ['Mod-,'], 'global', V),
   def('toggleShortcutsMenu', 'global', 'Show/hide shortcuts menu', ['Mod-Shift-b'], 'global', V),
 ]
 
 /**
  * M1–M6 bindings, display-only (`bound: false`): their handlers stay where they are. The keys are
- * the built ones (our choices where no reference exists, as each module notes).
+ * the built ones (our choices where the table has none, as each module notes).
  */
 export const EXISTING_SHORTCUTS: ShortcutDef[] = [
-  // M5, palette/CommandPalette.tsx (it reads these keys). Object: search is Ctrl+P or Ctrl+K;
-  // it lists no key for the action palette (reached from the palette's switch button).
+  // M5, palette/CommandPalette.tsx (it reads these keys). Search is Ctrl+P or Ctrl+K;
+  // there is no key for the action palette (reached from the palette's switch button).
   def('openSearchPalette', 'global', 'Search this space', ['Mod-p', 'Mod-k'], 'global', false, false),
   def('openCommandPalette', 'global', 'Open action palette', [], 'global', false, false),
-  // M5, object/ObjectView.tsx (no Object id: our id and our string)
+  // M5, object/ObjectView.tsx (our id and our string)
   def('findInPage', 'page', 'Find in page', ['Mod-f'], 'global', false, false),
   // M1–M3, App.tsx (outside editable targets)
   def('openAddEntityMenu', 'global', 'Add new content', ['Mod-u'], 'global', false, false),
@@ -373,7 +370,7 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
     false,
     false,
   ),
-  // M6, whiteboard/shortcuts.ts keyToCommand (Object's whiteboard table)
+  // M6, whiteboard/shortcuts.ts keyToCommand (the whiteboard table)
   def('whiteboardSelect', 'whiteboard', 'Select tool', ['v'], 'whiteboard', false, false),
   def('whiteboardHand', 'whiteboard', 'Hand tool', ['h'], 'whiteboard', false, false),
   def('whiteboardText', 'whiteboard', 'Text', ['t'], 'whiteboard', false, false),
@@ -383,8 +380,8 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   def('whiteboardLine', 'whiteboard', 'Line', ['l'], 'whiteboard', false, false),
   def('whiteboardArrow', 'whiteboard', 'Arrow', ['Shift-l'], 'whiteboard', false, false),
   def('whiteboardFrame', 'whiteboard', 'Frame', ['f'], 'whiteboard', false, false),
-  // Pen, highlighter and eraser are Object's own (no Object id): our ids, our strings, our
-  // keys. They avoid Object's letters (P is Triangle, M opens the move menu).
+  // Pen, highlighter and eraser are Object's own: our ids, our strings, our
+  // keys. They avoid the taken letters (P is Triangle, M opens the move menu).
   def('whiteboardPen', 'whiteboard', 'Pen', ['d'], 'whiteboard', OURS, false),
   def('whiteboardHighlighter', 'whiteboard', 'Highlighter', ['Shift-d'], 'whiteboard', OURS, false),
   def('whiteboardEraser', 'whiteboard', 'Eraser', ['e'], 'whiteboard', OURS, false),
@@ -419,8 +416,7 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
 ]
 
 /**
- * M8's shortcuts (the plan's "Shortcut keys (new ids, provisional)" table; names
- * `shortcuts.<id>.name`, verbatim). Every key is provisional. Editor ones are bound by Task 25
+ * M8's shortcuts (the plan's "Shortcut keys (new ids, provisional)" table). Every key is provisional. Editor ones are bound by Task 25
  * (`editor/shortcuts.ts`), focus and presentation ones by Task 9, whiteboard ones by Task 21.
  * `exitPresentationMode`, `nextPresentationSlide` and `previousPresentationSlide` are active only
  * while presenting (scope `presentation` is not a scope here: they are global, and only the
@@ -431,7 +427,7 @@ export const M8_SHORTCUTS: ShortcutDef[] = [
   def('copyBlockReference', 'block', 'Copy block reference', ['Mod-AltCtrl-l'], 'editor', V, true),
   // `I` with blocks selected (typing `i` in text stays typing).
   def('turnIntoObject', 'block', 'Turn into object', ['i'], 'editor', V, true),
-  // No key in Object: its only trigger is the markdown `()` + Space.
+  // No key: its only trigger is the markdown `()` + Space.
   def('turnIntoTask', 'block', 'Turn into task', [], 'editor', V, true),
   def('turnBlockIntoTaskObject', 'block', 'Turn block into task object', ['Mod-Shift-t'], 'editor', V, true),
   def('highlightText', 'text', 'Highlight text selection', ['Mod-Shift-h'], 'editor', V, true),
@@ -462,7 +458,7 @@ export const M8_SHORTCUTS: ShortcutDef[] = [
 ]
 
 /**
- * Ids that share a key by design, as in Object: the handlers tell them apart (a text
+ * Ids that share a key by design: the handlers tell them apart (a text
  * selection or blocks selected; the cursor in a to-do or a toggle).
  */
 export const SHARED_KEY_IDS: readonly (readonly string[])[] = [
@@ -484,8 +480,8 @@ export function sharesKeyByDesign(a: string, b: string): boolean {
 export const PRESENTATION_ONLY_IDS: readonly string[] = ['exitPresentationMode', 'nextPresentationSlide', 'previousPresentationSlide']
 
 /**
- * Keys added by the 2026-11-02 polish pass. `groupBlocks` (Ctrl+G, the key Object's block
- * menu shows next to "Group"; name `shortcuts.groupBlocks.name`) is bound in
+ * Keys added by the 2026-11-02 polish pass. `groupBlocks` (Ctrl+G, the key the block
+ * menu shows next to "Group") is bound in
  * `editor/handles/groupKey.ts`, with blocks selected only.
  */
 export const POLISH_SHORTCUTS: ShortcutDef[] = [
@@ -493,9 +489,9 @@ export const POLISH_SHORTCUTS: ShortcutDef[] = [
 ]
 
 /**
- * The object `…` menu's page keys (Object's ids and names, verbatim; keys from its shortcut
+ * The object `…` menu's page keys (ids, names and keys from the shortcut
  * table). Handled by `object/ObjectView.tsx` for the active view, outside editable targets for
- * Mod-e and Mod-i (in the editor they stay code and italic, as in Object).
+ * Mod-e and Mod-i (in the editor they stay code and italic).
  */
 export const OBJECT_MENU_SHORTCUTS: ShortcutDef[] = [
   def('openExportMenu', 'page', 'Open export menu of current page', ['Mod-e'], 'global', V, false),

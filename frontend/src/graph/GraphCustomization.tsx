@@ -1,5 +1,4 @@
-// The graph's "Customize" popover: the `GraphViewCustomization` filters with Object's labels
-// (`GraphViewCustomization.*`). Shared by the global graph and the local graph panel.
+// The graph's "Customize" popover: the graph filters and their labels. Shared by the global graph and the local graph panel.
 import type { GraphCustomization as Custom, TypeDef } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'

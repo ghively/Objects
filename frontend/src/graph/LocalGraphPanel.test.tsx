@@ -95,7 +95,7 @@ describe('LocalGraphPanel', () => {
     expect(localStorage.getItem(HOPS_KEY)).toBe('1')
   })
 
-  test('maximum distance runs 1–5 one step at a time, default 1 (Object hops)', async () => {
+  test('maximum distance runs 1–5 one step at a time, default 1 (hops)', async () => {
     const user = userEvent.setup()
     render(<LocalGraphPanel path="Charles.md" />)
     await sigmaReady()

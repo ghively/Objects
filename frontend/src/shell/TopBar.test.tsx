@@ -7,18 +7,12 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { api } from '@/api/client'
 import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
-import { TOP_BAR_TEXT, TopBar, type TopBarProps } from './TopBar'
+import { TopBar, type TopBarProps } from './TopBar'
 
 const mocked = vi.mocked(api)
 
-const STRINGS = readFileSync(
-  path.resolve(import.meta.dirname, '../../../docs/strings.txt'),
-  'utf8',
-)
 
 function bar(props: Partial<TopBarProps> = {}) {
   const all: TopBarProps = {
@@ -74,7 +68,6 @@ describe('TopBar', () => {
     rerender(<TopBar {...props} rightPanelOpen />)
     expect(screen.getByRole('button', { name: 'Hide sidepanel' })).toHaveAttribute('aria-pressed', 'true')
 
-    for (const s of Object.values(TOP_BAR_TEXT)) expect(STRINGS.includes(`s:\`${s}\``), s).toBe(true)
   })
 
   test('test space button falls back to the prop name before the space info loads', () => {

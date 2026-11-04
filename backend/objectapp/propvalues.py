@@ -7,7 +7,7 @@ kind's empty value. `encode_value` validates an API value and returns what
 (so the first edit of an exported value changes only the value).
 `convert_value` implements `KIND_TRANSFORMS` for a property's kind change.
 
-Value forms (spec section 4, the shapes Object's Markdown export uses):
+Value forms (spec section 4, the shapes a Markdown export uses):
 
 ==================  ==========================================  ============================
 kind                on disk                                     API value

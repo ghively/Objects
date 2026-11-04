@@ -1,4 +1,4 @@
-// "N days left" / "Missed" beside a task's deadline (`RootTaskDeadlinePicker.*`), and "Scheduled
+// "N days left" / "Missed" beside a task's deadline, and "Scheduled
 // after deadline" when the task's date is after it.
 import type { DateValue } from '@/api/types'
 import { cn } from '@/lib/utils'

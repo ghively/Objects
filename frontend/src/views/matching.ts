@@ -1,4 +1,4 @@
-// Create-matches-filter (Object): the values a new object gets so that it shows up in the
+// Create-matches-filter: the values a new object gets so that it shows up in the
 // filtered view it was created from.
 import type { Collection, DateValue, EntityRef, Filter, FilterGroup, TypeDef } from '@/api/types'
 import { useLinkIndex } from '@/links/linkIndex'

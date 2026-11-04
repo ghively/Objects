@@ -1,5 +1,5 @@
 /**
- * Ink UI strings. Freehand ink is Gene's addition with no Object original, so every string
+ * Ink UI strings. Freehand ink is Gene's addition, so every string
  * here is "our string".
  */
 export const INK_STRINGS = {

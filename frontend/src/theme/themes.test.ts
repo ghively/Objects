@@ -1,5 +1,5 @@
 // Light, Light Dimmed and Dark Dimmed (themes.css) against the dark default (tokens.css) and
-// Object's themes.ts + colors.ts, through the M7 plan's token table.
+// the expected values, through the M7 plan's token table.
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
 import { THEME_COLORS } from './palette'
@@ -28,7 +28,7 @@ const theme = (t: (typeof THEMES)[number]) => block(themesCss, `html[data-theme=
 /** Layout and font tokens: the same in every theme, so the theme blocks leave them alone. */
 const NOT_COLOUR = /^--(radius-|object-font-|app-font$|page-content-width$|cover-crop-height$|profile-|infobox-width$)/
 
-// colors.ts values used below.
+// Palette values used below.
 const gray = {
   0: 'oklch(1.0000 0.0001 263.28)',
   25: 'oklch(0.9916 0.0016 67.00)',
@@ -52,12 +52,18 @@ const gray = {
   850: 'oklch(0.2574 0.0056 285.92)',
   900: 'oklch(0.2191 0.0058 285.84)',
 } as const
+/** The colour palette's tones the themes use. */
+const TONES: Record<string, Record<number, string>> = {
+  blue: { 200: 'oklch(0.8823 0.0571 254.14)', 400: 'oklch(0.7137 0.1435 254.63)', 650: 'oklch(0.5035 0.1579 264.41)' },
+  teal: { 100: 'oklch(0.9526 0.0498 180.90)', 800: 'oklch(0.3652 0.0444 191.00)' },
+  red: { 50: 'oklch(0.9705 0.0129 17.04)', 850: 'oklch(0.3803 0.0737 21.10)' },
+  rose: { 300: 'oklch(0.8097 0.1061 11.61)', 500: 'oklch(0.6345 0.2004 15.44)' },
+  green: { 400: 'oklch(0.8003 0.1820 151.73)', 500: 'oklch(0.6981 0.1758 150.49)' },
+}
 const colourTone = (name: string, tone: number): string => {
-  const src = readFileSync(`${process.cwd()}/../docs/design-notes`, 'utf8')
-  const body = src.slice(src.indexOf(`  ${name}: {`))
-  const m = body.slice(0, body.indexOf('  },')).match(new RegExp(`\\b${tone}: '([^']+)'`))
-  if (!m) throw new Error(`no ${name} ${tone}`)
-  return m[1]
+  const v = TONES[name]?.[tone]
+  if (!v) throw new Error(`no ${name} ${tone}`)
+  return v
 }
 
 describe('themes', () => {
@@ -71,7 +77,7 @@ describe('themes', () => {
     }
   })
 
-  test('test light token values follow themes.ts', () => {
+  test('test light token values follow the token table', () => {
     const light = theme('light')
     const lightDimmed = theme('lightDimmed')
     const darkDimmed = theme('darkDimmed')
@@ -117,7 +123,7 @@ describe('themes', () => {
       ['--label-text-gray', gray[600], gray[600], gray[500]],
       ['--label-border-rose', colourTone('rose', 300), colourTone('rose', 300), colourTone('rose', 500)],
       ['--line-green', colourTone('green', 500), colourTone('green', 500), colourTone('green', 400)],
-      // Object's `text-amber-600 dark:text-amber-400` ("Scheduled after deadline").
+      // `text-amber-600 dark:text-amber-400` ("Scheduled after deadline").
       ['--warning', '#dd7400', '#dd7400', '#fcbb00'],
     ]
     for (const [token, l, ld, dd] of rows) {
@@ -152,9 +158,9 @@ describe('themes', () => {
     expect(strip(tokensCss)).toMatch(/body \{[^}]*font-family: var\(--app-font\);/)
   })
 
-  test('test search and find-in-page highlights follow Object in all four themes', () => {
-    // storing36682.js: light bg #fef08a4b + yellow 900 text; dark bg #fddf472c + yellow 100 text.
-    // design.css ::highlight(find-in-page) #facc1573, find-in-page-active #f97316b3.
+  test('test search and find-in-page highlights are set in all four themes', () => {
+    // Light bg #fef08a4b + yellow 900 text; dark bg #fddf472c + yellow 100 text.
+    // ::highlight(find-in-page) #facc1573, find-in-page-active #f97316b3.
     const yellow900 = 'oklch(0.3495 0.0387 62.84)'
     const yellow100 = 'oklch(0.9729 0.0693 103.22)'
     const expected = {

@@ -4,14 +4,14 @@
  * `api.rows({paths})` call, then drawn with M3's `ObjectCard` in its view:
  * the `view` option, else the type's `defaultViewType`, else `smallCard`.
  *
- * A `…` menu offers "Change Block View" (`EntityMenu.groups.view.text`) with
- * "Link block", "Small card", "Wide card", "Embed" (`structureViewTypes.*.name`),
- * writing `view`, and "Remove Block" (`EntityMenu.deleteEntityBlock.text`).
+ * A `…` menu offers "Change Block View" with
+ * "Link block", "Small card", "Wide card", "Embed",
+ * writing `view`, and "Remove Block".
  * Clicking the card opens the object as a link (`via: 'link'`). An unresolved
  * target shows the muted `[[target]]` chip, as M1's unresolved wikilinks.
  *
  * M8: a task-role object (the basic Task type) in the Link block view shows M4's
- * `TaskCheckbox` before its token, as Object's task embeds do.
+ * `TaskCheckbox` before its token, as task embeds do.
  */
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { useEffect, useState, type MouseEvent } from 'react'
@@ -25,7 +25,7 @@ import { ObjectCard, type CardView } from '@/views/cards/ObjectCard'
 import type { Option } from '../annotations'
 import { EmbedMenu, ResizableEmbed } from '../media/ResizableEmbed'
 
-/** The four views and their names (`structureViewTypes.*.name`), in Object's order. */
+/** The four views and their names, in menu order. */
 export const EMBED_VIEWS: { view: CardView; name: string }[] = [
   { view: 'inline', name: 'Link block' },
   { view: 'smallCard', name: 'Small card' },

@@ -1,9 +1,9 @@
-// "Custom repeat" (`DatePicker.recurrenceCustom.*`): Every N and a unit, "Based on" (Scheduled
+// "Custom repeat": Every N and a unit, "Based on" (Scheduled
 // date / Completed date, with their tooltips), "Ends" (Never / On date (inclusive)), Cancel, Save.
 // It renders in place inside the date picker (a portaled dialog would dismiss the picker's popover).
 // M8: the "On" row (by scheduled date only): weekday chips for weeks; "The {day}", "{pos} {day}",
 // "Last day", "Last {day}" for months; "{month} {day}", "{weekday} of {month}" for years. The
-// choices are the task day's own (our choice, as Object's picker derives them from the date).
+// choices are the task day's own (our choice: the picker derives them from the date).
 import { useState } from 'react'
 import type { RepeatRule } from './taskContract'
 import {
@@ -42,7 +42,7 @@ export interface CustomRepeatDialogProps {
   onCancel(): void
 }
 
-/** The "On" label of an anchored month or year rule (`DatePicker.recurrenceCustom.*`). */
+/** The "On" label of an anchored month or year rule. */
 export function onLabel(on: RepeatOn): string {
   const month = 'month' in on && on.month ? monthName(on.month) : null
   let base: string

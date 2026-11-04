@@ -17,23 +17,23 @@ import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { switchSpace } from './switchSpace'
 
 export const CREATE_SPACE_TEXT = {
-  title: 'Create new space', // OnboardingSpace.heading
-  intro: 'Name your space', // OnboardingSpace.intro
-  namePlaceholder: 'Name', // OnboardingSpace.namePlaceholder
+  title: 'Create new space',
+  intro: 'Name your space',
+  namePlaceholder: 'Name',
   location: 'Location', // our string
-  explainHeading: 'Do I need a new space?', // OnboardingSpace.explain.heading
-  explainText: 'Only if this work should stay isolated. You cannot link notes across spaces.', // OnboardingSpace.explain.text
-  cancel: 'Cancel', // general.cancel
-  create: 'Create space', // components.RootSpace.create
+  explainHeading: 'Do I need a new space?',
+  explainText: 'Only if this work should stay isolated. You cannot link notes across spaces.',
+  cancel: 'Cancel',
+  create: 'Create space',
   exists: 'A folder with that name already exists here.', // our string
   created: 'Space created. Switch to it now?', // our string
   switchNow: 'Switch space', // our string
   later: 'Later', // our string
-  howToStart: 'How do you want to start?', // OnboardingSpace.howToStart.heading
-  basicLabel: 'Start with basic setup', // OnboardingSpace.howToStart.basicSetup.label
-  basicDescription: 'Includes people, meetings, projects, and books.', // OnboardingSpace.howToStart.basicSetup.description
-  blankLabel: 'Start with a blank space', // OnboardingSpace.howToStart.blankSpace.label
-  blankDescription: 'Add object types when you need them.', // OnboardingSpace.howToStart.blankSpace.description
+  howToStart: 'How do you want to start?',
+  basicLabel: 'Start with basic setup',
+  basicDescription: 'Includes people, meetings, projects, and books.',
+  blankLabel: 'Start with a blank space',
+  blankDescription: 'Add object types when you need them.',
 } as const
 
 const T = CREATE_SPACE_TEXT

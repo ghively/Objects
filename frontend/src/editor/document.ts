@@ -67,7 +67,7 @@ import { RecordAudio } from './media/recordAudio'
 import { LazyTable } from './table/LazyTable'
 
 export type EditorExtensionOptions = {
-  /** `false` leaves out the "1. " input rule (`EditorSettings.disableNumberedListTransformation`). */
+  /** `false` leaves out the "1. " input rule. */
   numberedListInputRule?: boolean
   /** The editor holds one paragraph (a Text property cell): pasted text is never read as Markdown blocks. */
   singleParagraph?: boolean
@@ -90,7 +90,7 @@ const REGISTRY_OWNED_KEYS: Record<string, (key: string) => boolean> = {
   taskList: (k) => k === 'Mod-Shift-9',
   listItem: (k) => k === 'Tab' || k === 'Shift-Tab',
   taskItem: (k) => k === 'Tab' || k === 'Shift-Tab',
-  // Not a registry action, but Object's Ctrl+Shift+B is "Show/hide shortcuts menu".
+  // Not a registry action: Ctrl+Shift+B is reserved for "Show/hide shortcuts menu".
   blockquote: (k) => k === 'Mod-Shift-b' || k === 'Mod-Shift-B',
 }
 

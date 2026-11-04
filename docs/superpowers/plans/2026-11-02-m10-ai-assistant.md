@@ -1,15 +1,15 @@
 # Object, Milestone 10: the AI assistant. Plan (not built)
 
-**Decided by Gene, 2026-11-02:** AI is in scope; the other Object Pro integrations are wanted "eventually" at lower priority (see "Later"). **The AI runs through the Claude Code CLI** installed on his PC, not an API key and not a local model. Pro features are unlocked and nothing is gated (`CLAUDE.md`).
+**Decided by Gene, 2026-11-02:** AI is in scope; the other integrations are wanted "eventually" at lower priority (see "Later"). **The AI runs through the Claude Code CLI** installed on his PC, not an API key and not a local model. Pro features are unlocked and nothing is gated (`CLAUDE.md`).
 
-**Goal.** The AI features Object shows in its UI, working on the local space through the user's own Claude Code:
-1. **Settings > AI Assistant:** a "Hide AI features" switch (hides every AI entry, as Object does), plus where `claude` is (auto-found on PATH, overridable) and an optional model.
+**Goal.** The AI features the behaviour catalog lists, working on the local space through the user's own Claude Code:
+1. **Settings > AI Assistant:** a "Hide AI features" switch (hides every AI entry), plus where `claude` is (auto-found on PATH, overridable) and an optional model.
 2. **AI Chat:** the Explore side panel's "AI Chat" card opens a chat with **Relevant Content** under it. A chat is saved as an object of the basic **AI Chat** type (Title, Description, Tags, Context = the pages it was about), so chats are ordinary Markdown files, searchable and linkable.
 3. **Block and text entries:** "Ask AI about this block" and "Add tags to block using AI" in the slash menu; "AI assistant..." in the block-handle menu; the AI sparkle in the selection toolbar and the block-selection bar.
 4. **Object-level:** add tags using AI; auto-fill empty properties from the page.
 5. **Chat shortcuts** (catalog section 2): copy message Ctrl+Alt+C, replace context, append message Ctrl+Alt+A, append message to the daily note, retry Ctrl+Alt+R, close chat Ctrl+Alt+X, rephrase Ctrl+Alt+U.
 
-Behaviour, labels and shortcuts: `docs/object-behavior-catalog.md` (sections 2, 6, 7, 8). Only the entries were seen live (AI is Pro and the account is Basic), so the chat window's own look is **ours** and must be marked "our choice" in the acceptance doc.
+Behaviour, labels and shortcuts: `docs/behavior-catalog.md` (sections 2, 6, 7, 8). The catalog records only the entry points, so the chat window's own look is **ours** and must be marked "our choice" in the acceptance doc.
 
 ## Architecture
 
@@ -32,7 +32,7 @@ Behaviour, labels and shortcuts: `docs/object-behavior-catalog.md` (sections 2, 
 
 1. May the assistant read the whole space folder with `Read`, or only the pages in Context? [Only Context pages: the runner passes their text and sets the working directory to an empty temp folder.]
 2. Exclude marked pages from AI entirely? [Yes: pages tagged or flagged "Exclude from AI" are never sent, and the runner refuses them.]
-3. Is a chat saved as an AI Chat object by default, or only when the user presses Save? [Saved by default, as in Object.]
+3. Is a chat saved as an AI Chat object by default, or only when the user presses Save? [Saved by default.]
 
 ## Later (lower priority, after M10): integrations
 
@@ -40,4 +40,4 @@ Wanted eventually (catalog section 1 has each one's UI): calendar feeds (read ev
 
 ## Not decided yet
 
-Whether the chat window follows Object's Explore layout exactly (not visible without Pro) or our own: the plan builds our own and records it as "our choice".
+Whether the chat window follows a fixed Explore layout or our own: the catalog does not describe it, so the plan builds our own and records it as "our choice".

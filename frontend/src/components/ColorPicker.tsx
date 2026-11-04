@@ -8,7 +8,7 @@ export interface ColorPickerProps {
   className?: string
 }
 
-/** Object's 18 theme colours as swatches, in menu order. There is no "none" option. */
+/** The 18 theme colours as swatches, in menu order. There is no "none" option. */
 export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   const current = value ? themeColor(value) : null
   return (

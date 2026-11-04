@@ -1,5 +1,5 @@
 /**
- * The floating inspector (M8, Object's `FloatingInspector.*`), top right over the canvas:
+ * The floating inspector (M8), top right over the canvas:
  * - "Outline": the headings in the board's text blocks, in reading order; a click zooms to the
  *   block. Empty: "No headings in this page".
  * - "Frames": the frames in reading order; a click zooms to the frame; dragging a row (or
@@ -7,7 +7,7 @@
  *   Empty: "No frames on this whiteboard".
  * - "Stats": counts of nodes by kind, connectors, words and ink strokes (our choice of stats).
  * - "Pin" / "Unpin": a pinned inspector opens with the board (kept per viewer in localStorage).
- * The toggle button and its placement are our choice (the trimmed reference has no screenshot).
+ * The toggle button and its placement are our choice.
  */
 import { useMemo, useState, type DragEvent, type KeyboardEvent } from 'react'
 import type { WhiteboardData } from '@/api/whiteboardTypes'

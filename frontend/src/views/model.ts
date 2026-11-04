@@ -1,5 +1,5 @@
 // The view model: layouts, defaults and the layout constants shared by every data view.
-// Labels, icons and flags come from the reference's layout table; `gallery` has no Object
+// Labels, icons and flags come from the layout table; `gallery` has no catalogued
 // label (no picker offers it), so its label is ours and only used in tooltips and tests.
 import type { Layout, SmallCardViewConfig, TypeDef, ViewState, FilterGroup } from '@/api/types'
 

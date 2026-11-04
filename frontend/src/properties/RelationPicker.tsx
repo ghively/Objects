@@ -54,7 +54,7 @@ export function isTagType(type: TypeDef | undefined): boolean {
  * "Selection set", when there is one). Two objects with the same title show their folder.
  * Values are `EntityRef`s with the picked object's path.
  *
- * Item 22, a relation to the Tag type only (Object's Object -> Tag "Status" or "Category"):
+ * Item 22, a relation to the Tag type only (Object -> Tag "Status" or "Category"):
  * "Search or Create", each tag a chip in its own colour, and "Create 'x'" makes the Tag object
  * (`api.ensureTag`) and picks it.
  */

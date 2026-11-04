@@ -76,7 +76,7 @@ def test_basic_setup_writes_four_types(tmp_path: Path, state: Path):
     assert person.prop("projects").options["allowedTypes"] == ["project"]
     assert person.prop("organizations").options["allowedTypes"] == []
     status = loaded["project"].prop("status").options
-    # Object sets isStatus only on the basic Task status; Project's is a plain label.
+    # Only the basic Task status sets isStatus; Project's is a plain label.
     assert "isStatus" not in status
     assert [o["text"] for o in status["set"]] == ["Planned", "In Progress", "On Hold", "Completed"]
     assert all("statusCategory" not in o for o in status["set"])

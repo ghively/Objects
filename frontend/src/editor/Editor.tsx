@@ -17,7 +17,7 @@ import { useAutosave, type BodyEditorHandle } from './useAutosave'
 import './editor.css'
 import './handles/handles.css'
 
-/** The empty-body placeholder (`components.RootSpace.text.main.placeholder`). */
+/** The empty-body placeholder. */
 export const EDITOR_PLACEHOLDER = 'Write your text or search for blocks...'
 
 /** Shows the placeholder on an editable body that is one empty paragraph. */

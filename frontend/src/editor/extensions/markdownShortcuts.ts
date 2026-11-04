@@ -1,6 +1,6 @@
 /**
- * Object's Markdown shortcuts that the built-in input rules do not cover, and their
- * combinations. Object's Shortcuts panel (`shortcuts.markdown.description`): "These are
+ * The Markdown shortcuts that the built-in input rules do not cover, and their
+ * combinations. The Shortcuts panel: "These are
  * markdown shortcuts that work at the start of a block. They can also be combined, but the Space
  * must only be used after the final command. Example: ">#Space" will create a heading 1 with a
  * toggle."
@@ -10,7 +10,7 @@
  *
  * One rule reads the whole run of marks before the Space. A run that is a single bullet, number or
  * heading mark is left to the built-in rules (StarterKit's), which already convert it; everything
- * else is handled here, so `> ` makes a toggle (Object) rather than StarterKit's quote, and
+ * else is handled here, so `> ` makes a toggle rather than StarterKit's quote, and
  * `[] ` a to-do list like the menus make. The marks apply inside out: heading, icon, quote, list,
  * toggle (a toggle holds whatever the other marks made). A run with two marks of one kind (two
  * lists, two headings) is not a shortcut and stays text (our choice).
@@ -21,8 +21,7 @@ import type { Hierarchy, ListType } from '../nodes/blockOptions'
 import { listItemAt } from '../nodes/listItemOptions'
 
 /**
- * The icon `()` gives a block. Object uses the last block icon the user picked
- * (`lastUsedBlockIcon`, a synced user setting); Object keeps no such setting, so this one icon
+ * The icon `()` gives a block. Object keeps no last-used block icon setting, so this one icon
  * (our choice).
  */
 export const BLOCK_ICON_DEFAULT = 'ph-star'

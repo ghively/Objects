@@ -222,7 +222,7 @@ def _empty_filter_group() -> dict[str, Any]:
 def default_views(t: TypeDefinition) -> dict[str, Any]:
     """The Views of a type page that has none saved yet.
 
-    Object's initial built-in sections (``builtInDashboardSections``): Recently Opened,
+    The initial built-in sections: Recently Opened,
     Collections and Queries, with the "All" tab. "Not in any collection" and "Not tagged" are
     not initial; "Add a section" offers them. Saved views are never rewritten to match.
     """

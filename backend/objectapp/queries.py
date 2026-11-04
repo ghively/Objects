@@ -24,7 +24,7 @@ __all__ = [
 
 DEFAULT_NAME = "New Query"
 LIMIT_SIZES = (1, 3, 5, 10, 25, 50)
-"""The result limits Object offers."""
+"""The result limits offered."""
 MAX_SEARCH_TERMS = 5
 
 _API_ONLY = ("revision", "readOnlyReason")

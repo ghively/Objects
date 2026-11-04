@@ -1,4 +1,4 @@
-// The filter engine: Object's operators per property kind, and pure matchers over rows.
+// The filter engine: the operators per property kind, and pure matchers over rows.
 // Nested AND/OR groups; an empty group passes; an invalid filter is ignored. A filter group is
 // compiled once per pass (`applyFilters`): the type map, each filter's validity and definitions,
 // a date filter's reference range and the day of every instant are computed once, not per row.
@@ -80,7 +80,7 @@ const DATE: FilterOption[] = [
   o('endIsOnOrBefore', 'ends on or before'),
   o('endIsOnOrAfter', 'ends on or after'),
 ]
-// The Task date's own operators (`convolution.filter.options.dateTime.*`): offered only on a date
+// The Task date's own operators: offered only on a date
 // that supports reminders, which is the Task `date` alone. They need no reference value.
 export const TASK_DATE_OPTIONS: FilterOption[] = [
   o('isRecurring', 'is recurring'),
@@ -93,7 +93,7 @@ const RANGE_ONLY = new Set(DATE.map((x) => x.key).filter((k) => /^(start|end)/.t
 const SIMPLE_DATE = DATE.filter((x) => !RANGE_ONLY.has(x.key))
 const BLOCKS: FilterOption[] = [o('isNotEmpty', 'is not empty'), o('isEmpty', 'is empty')]
 
-/** Every operator per kind, in the reference's order with its labels. */
+/** Every operator per kind, in menu order with its labels. */
 export const FILTER_OPTIONS: Record<PropertyType, FilterOption[]> = {
   text: TEXT,
   url: TEXT,

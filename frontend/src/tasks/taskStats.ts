@@ -1,4 +1,4 @@
-// Formatting for the "Task Stats" section (`components.RootTask.habitStats.*`): the server
+// Formatting for the "Task Stats" section: the server
 // computes the numbers (`GET /api/tasks/stats`); these helpers only name them.
 import type { TaskStats } from './taskContract'
 
@@ -17,7 +17,7 @@ export const STATS_TEXT = {
   startToday: 'Start today',
 } as const
 
-/** `components.RootTask.habitStats.cellState.*`: each grid cell's tooltip. */
+/** Each grid cell's tooltip. */
 export const CELL_STATE_LABEL: Record<CellState, string> = {
   completed: 'Completed',
   excused: 'Excused',

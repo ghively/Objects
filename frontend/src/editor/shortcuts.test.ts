@@ -34,7 +34,7 @@ function press(editor: TiptapEditor, key: string, mods: { ctrl?: boolean; shift?
 }
 
 describe('editor shortcuts', () => {
-  test('every editor id of the key table is registered as text or block editing, with Object\' keys', () => {
+  test('every editor id of the key table is registered as text or block editing, with the expected keys', () => {
     expect(EDITOR_SHORTCUT_IDS).toEqual([
       'bold', 'italic', 'underline', 'strikethrough', 'codeToken', 'mathToken',
       'heading1', 'heading2', 'heading3', 'heading4', 'toDo', 'toggle', 'toggleCodeBlock', 'toggleMathBlock',
@@ -46,8 +46,8 @@ describe('editor shortcuts', () => {
       'indentBlocks', 'unindentBlocks', 'toggleTodoInBlockWithCursor', 'toggleToggleInBlockWithCursor',
       'insertBlockAbove', 'insertBlockBelow',
     ])
-    // Object's shortcut table (reference-check-2026-10-28 §1), Windows column; [] = none listed.
-    const OBJECT: Record<string, string[]> = {
+    // The expected shortcut table (reference-check-2026-10-28 §1), Windows column; [] = none listed.
+    const EXPECTED: Record<string, string[]> = {
       mathToken: ['Mod-m'],
       heading1: [], heading2: [], heading3: [], heading4: [], toDo: [], toggle: [],
       textAlignLeft: [], textAlignCenter: [], textAlignRight: [],
@@ -63,16 +63,16 @@ describe('editor shortcuts', () => {
       moveDownBlockWithCursorOnSameLevel: ['Alt-Shift-ArrowDown'],
       toggleToggleInBlockWithCursor: ['Mod-Enter', 'Mod-Shift-Enter'],
     }
-    for (const [id, keys] of Object.entries(OBJECT)) expect(keysFor(id), id).toEqual(keys)
+    for (const [id, keys] of Object.entries(EXPECTED)) expect(keysFor(id), id).toEqual(keys)
     const registered = new Map(allShortcuts().map((d) => [d.id, d]))
     for (const def of EDITOR_SHORTCUTS) {
       const r = registered.get(def.id)!
       expect(r.scope).toBe('editor')
       expect(r.provisional, def.id).toBe(false)
       expect(['text', 'block']).toContain(r.category)
-      if (!(def.id in OBJECT)) expect(r.keys.length, def.id).toBeGreaterThan(0)
+      if (!(def.id in EXPECTED)) expect(r.keys.length, def.id).toBeGreaterThan(0)
     }
-    // shortcuts.<id>.name, verbatim
+    // the catalogued names
     expect(registered.get('heading1')!.name).toBe('Turn selected blocks into heading 1')
     expect(registered.get('mathToken')!.name).toBe('Format as TeX-formula')
     expect(registered.get('insertBlockBelow')!.name).toBe('Insert block below and set cursor there')
@@ -83,7 +83,7 @@ describe('editor shortcuts', () => {
   test('editor shortcuts come from the registry and a changed key takes effect', () => {
     const original = allShortcuts().find((d) => d.id === 'textAlignCenter')!
     try {
-      // Object lists no key for text alignment.
+      // Text alignment has no key.
       let editor = headless('Hello\n\nWorld\n')
       expect(press(editor, 'e', { ctrl: true, shift: true })).toBe(false)
       expect(serializeBody(editor)).toBe('Hello\n\nWorld\n')
@@ -99,7 +99,7 @@ describe('editor shortcuts', () => {
     }
   })
 
-  test('headings, to-do, toggle and alignment have no key (Object: markdown only)', () => {
+  test('headings, to-do, toggle and alignment have no key (markdown only)', () => {
     const editor = headless('Hello\n\nWorld\n')
     for (const [k, mods] of [
       ['2', { ctrl: true, alt: true }],

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Object types and properties work as they do in Object:
+**Goal:** Object types and properties work as the design spec and behaviour catalog describe:
 - Object Type Settings, applied to the object page (layout, font, wide mode, cover image).
 - Every property kind, edited in the property panel and written to frontmatter with minimal diffs.
 - Title edit with rename-with-relink, change type, create, and delete to a restorable trash.
@@ -12,14 +12,14 @@
 **Architecture:**
 - **Two parallel tracks.** **backend** (`backend/**`, `scripts/**`) and **frontend** (`frontend/**`) never touch the same file. The frontend builds against the **API contract** below and mocks it in tests. **integrate** (Task 20) adds fixtures and runs end to end.
 - **Back end:** a v2 type model with lossless migration; a per-kind value codec; one safe write engine (`Space._write`) for every write; a trash for objects and types; ChangeEvent kinds `renamed` and `types`.
-- **Front end:** pure formatting; one cell per kind; Object's menus and strings; a property panel whose writes are serialized with the body autosave; Object Type Settings; the page layouts; the lifecycle UI.
+- **Front end:** pure formatting; one cell per kind; the specified menus and strings; a property panel whose writes are serialized with the body autosave; Object Type Settings; the page layouts; the lifecycle UI.
 
 **Tech Stack:** as M1. Front-end additions: shadcn `input textarea popover command checkbox switch select context-menu alert-dialog`, `@dnd-kit/core` + `@dnd-kit/sortable`, and `@iconify-json/vscode-icons` (offline, next to M1's `@iconify-json/ph`). No new Python dependencies.
 
 **Spec:** `docs/superpowers/specs/2026-10-23-object-design.md` §3–§4.
-- Reference for behaviour and names only (never copy code): `docs/design-notes{property,component,date,blocks}.model.ts`, `util/{structureHeuristicsBackbone,colorThemes,basicStructures,propertyHelper}.ts`.
-- **en-US UI strings: `docs/strings.txt`.** `defaultLocale36682.js` is only d3-format's number locale. Quoted strings below come from that bundle; take any others from it too.
-- Behaviour not in the strings: grep the renderer bundle (`useSyncedSpacePreferences36682.js` holds AddPropertyMenu, the number-format menu and the progress ring; `storing36682.js` holds the basic structures and the number formatter). Layout sizes: `design.css`.
+- Reference for behaviour and names: the behaviour catalog (`docs/behavior-catalog.md`) and the design spec.
+- **en-US UI strings:** the quoted strings below are the app's labels; take any others from the behaviour catalog.
+- Behaviour not in the strings (the Add property menu, the number-format menu, the progress ring, the basic structures and the number formatter) and layout sizes: as specified in the tasks below and the design spec.
 
 ## Roadmap (one plan per milestone, written when the previous one is accepted)
 
@@ -31,7 +31,7 @@
 | 4 | calendar (day / three days / week / month, mini month), daily notes, tasks (status categories, priority, due, recurrence, reminders); type calendar options |
 | 5 | SQLite FTS index, Ctrl+K command palette, backlinks + unlinked mentions, global and local graph; per-property searchable |
 | 6 | whiteboards (blocks, 12 shapes, frames, circuits, connectors) + Wacom freehand ink |
-| 7 | remaining block options (toggles, colours, columns, math, media embeds), media objects (Image, PDF, Audio, Video, Weblink, File behaviour), light mode, side-by-side polish against Object |
+| 7 | remaining block options (toggles, colours, columns, math, media embeds), media objects (Image, PDF, Audio, Video, Weblink, File behaviour), light mode, side-by-side polish against the design spec |
 
 ## Global Constraints
 
@@ -81,10 +81,10 @@
   | cleared | `key: null` if the key exists, else nothing | `null` / `[]` |
 - **System properties** are definitions whose id equals their key, in this order: `title, collections, description, createdAt, lastUpdated, tags, icon, aliases`, plus `type`, `backlinks` and `coverImage` when added, and `color` on Tag. Collections are display-only until M3; backlinks show a count until M5.
 - **Types.**
-  - **Basic types:** Page, Tag, Task and DailyNote, plus Object's media types when the space has objects of them (`Weblink`, `File`, `Image`, `PDF`, `Audio`, `Video`, `Tweet`, matched by name case-insensitively). Their media fields become system definitions (read-only cells) and their media behaviour comes in M7.
+  - **Basic types:** Page, Tag, Task and DailyNote, plus the media types when the space has objects of them (`Weblink`, `File`, `Image`, `PDF`, `Audio`, `Video`, `Tweet`, matched by name case-insensitively). Their media fields become system definitions (read-only cells) and their media behaviour comes in M7.
   - **On a basic type**, adding, removing or re-kinding a property, changing its key or `isArray`, renaming the type and deleting it are refused (422, "Properties of basic object types cannot be edited."). Allowed: label options (add, rename, recolour, re-icon, reorder, delete), property name, icon, description and visibility, number format, date constraints, type icon, colour and description, templates, and the layout settings.
   - Page and Tag always exist. Tag: folder `Tags` (the folder is created by the first tag, never on open), icon `ph-tag`, no templates.
-  - **Status mode** exists only on Task's built-in `status` label (`isStatus: true`), as in Object's basic Task structure. Users cannot turn other labels into status labels.
+  - **Status mode** exists only on Task's built-in `status` label (`isStatus: true`), part of the basic Task structure. Users cannot turn other labels into status labels.
   - An object finds its type through `type: '<Name>'`: matched against the type's name, then its id, then its `formerNames` (case-insensitively). Renaming a type rewrites the `type:` lines and keeps the old name in `formerNames`, so a skipped file still resolves.
   - `folder` is fixed when the type is created (from `pluralName`). Renaming the type or its plural never moves files or templates.
 - **File names.**
@@ -95,10 +95,10 @@
   - They are excluded from `list()`, the resolver, counts and inference.
   - Load discovers them: a type's template list is its `templates.ids` order, followed (in memory, never written on open) by discovered templates of that type not in `ids`. `defaultTemplateId` comes only from the type JSON.
   - Allowed for Page, custom types and Task; DailyNote templates come in M4.
-- **Trash.** This is the app's own trash in `.object/trash/`, as in Object's SpaceTrashMenu ("Trash is empty", "Empty Trash"). It is **not** the Windows Recycle Bin; nothing is sent there.
+- **Trash.** This is the app's own trash in `.object/trash/`, with a space trash menu ("Trash is empty", "Empty Trash"). It is **not** the Windows Recycle Bin; nothing is sent there.
   - An object goes to `.object/trash/<ulid>.md` plus `<ulid>.json` `{id, kind:'object', originalPath, title, type, deletedAt, typeTrashId?}`.
   - A type goes to `.object/trash/types/<ulid>/` with `type.json`, its template files, and `manifest.json` `{id, kind:'type', typeId, name, deletedAt, objectTrashIds, allowedTypesRefs}`. Its objects become object entries with `typeTrashId`.
-  - Entries are purged after 30 days, when the space opens. This is safer than Object's hard delete, so our delete dialogs say the items move to the Trash.
+  - Entries are purged after 30 days, when the space opens. This is safer than a hard delete, so our delete dialogs say the items move to the Trash.
 - **Colours.**
   - 18, in this order: `gray rose pink fuchsia purple violet indigo blue sky cyan teal emerald green lime yellow amber orange red`.
   - Names are capitalised, except sky = "Light blue".
@@ -242,7 +242,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
 - [ ] **Step 2:** Run `uv run pytest backend/tests/test_typemodel.py -q`. Expected: FAIL.
 - [ ] **Step 3: Implement.**
   - **v1 detection:** a type with no `schemaVersion` is v1.
-  - **Migration:** keep `id` and `key`. Take default icons from Object's `propertyIcons`. Insert the missing system defs and set `basic`. Write the backup first, then the JSON (`indent=2`, `ensure_ascii=False`, LF, trailing newline).
+  - **Migration:** keep `id` and `key`. Take default icons from the per-kind icon table (`KIND_META`). Insert the missing system defs and set `basic`. Write the backup first, then the JSON (`indent=2`, `ensure_ascii=False`, LF, trailing newline).
   - **Inferred labels:** options are the distinct observed values, coloured round-robin.
   - **Status categories** (Task `status` only):
 
@@ -472,13 +472,13 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
 **Interfaces:**
 - Consumes: Tasks 2, 3 and 5.
 - Produces:
-  - `Space.change_property_kind(type_id, pid, to_type, base_revision) -> ChangeKindResult(type, newPropertyId, rewritten, skipped, lossy)`, as Object does ("creates a new property of the new type and will match your existing property values as best as possible…"):
-    - `to_type` must be in `KIND_TRANSFORMS[from]`, else 422 with Object's `noTransformations` text.
+  - `Space.change_property_kind(type_id, pid, to_type, base_revision) -> ChangeKindResult(type, newPropertyId, rewritten, skipped, lossy)`, as the dialog text says ("creates a new property of the new type and will match your existing property values as best as possible…"):
+    - `to_type` must be in `KIND_TRANSFORMS[from]`, else 422 with the "no transformations available" text.
     - A new definition is inserted right after the old one: same name, icon and description, a new id, and a new unique key (`budget` → `budget_`… by the key rule); entity → label builds the option set from the values.
     - Each object with a value gets the converted value under the new key (an unstamped rewrite; one added line). `lossy` counts values that converted lossily.
     - The old property and its values stay, so the user can check the result and delete it.
   - `Space.set_property_sync(type_id, pid, target_pid|None, create_name=None, base_revision) -> SyncResult(types, rewritten, skipped)`:
-    - Allowed only when both properties are entity, multi-select (`isArray`), without a fixed set, on non-basic types, and the source's `allowedTypes` is exactly the target's type. Otherwise 422 with `syncing.multiSelectOnly.info` or `syncing.notAllowed.info`.
+    - Allowed only when both properties are entity, multi-select (`isArray`), without a fixed set, on non-basic types, and the source's `allowedTypes` is exactly the target's type. Otherwise 422 with the matching explanation (multi-select only, or not allowed).
     - `create_name` creates the counterpart ('Create property "X" for "Y"'): an entity property on the linked type with `allowedTypes: [type_id]`, `isArray: true`, and `propertySyncing` pointing back.
     - Both type JSONs get each other's id in `propertySyncing.propertyIds`.
     - Backfill ("Synchronizing"): for every existing link A1 → B1, `[[A1]]` is added to B1's counterpart value (unstamped). `target_pid: null` unlinks both sides and rewrites nothing.
@@ -607,7 +607,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
   - `expand_title(title, created) -> str`: expands `{date:FMT}` using the dayjs subset `YYYY YY MMMM MMM MM M DD D dddd ddd HH mm`; any other letter inside `FMT` → `TemplateError`.
   - `resolve_date_variable('day'|'week'|'month'|'year', created) -> str`
     - Day gives a date; week (Monday–Sunday), month and year give a `start -> end` range.
-    - Templates store the variable as `{creation:<var>}`. It is valid only on `datetime` properties (whose values are date links in Object); on `datetimeSimple` it is a `TemplateError`.
+    - Templates store the variable as `{creation:<var>}`. It is valid only on `datetime` properties (whose values are date links); on `datetimeSimple` it is a `TemplateError`.
   - `Space.create_template(type_id, name="New template")`: creates `Templates/<folder segment>/<name>.md` with `id`, `type: '<Name>'` and `template: <name>`, and appends the id to `templates.ids` (a type save).
   - `Space.list_templates(type_id)`: discovered templates as in Global Constraints; a template without an `id` gets one (`ensure_id`) when it is registered, applied or made default, never on open.
   - `Space.apply_template(path, template_id, base_version) -> str`
@@ -746,13 +746,13 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
 **Interfaces:**
 - Consumes: Task 11.
 - Produces:
-  - `KIND_META: Record<PropertyType, {name, description, icon}>`: names and descriptions from `propertyTypes.<type>.*`; icons from Object's `propertyIcons`. `datetime` and `datetimeSimple` both read "Date time"; only `datetime` is ever created.
-  - `ADD_PROPERTY_ITEMS`, as the bundle builds AddPropertyMenu: the items whose key is in its order list, sorted by it. That gives 15 items: Text (`textBlock`), Content (`blocks`), Tags, Label, **Object Select** (with a submenu, below), Checkbox, Date time, Number, Title, Description, **Cover Image**, Icon, Created at, Last updated, Aliases.
+  - `KIND_META: Record<PropertyType, {name, description, icon}>`: names, descriptions and icons per kind, as listed in the design spec. `datetime` and `datetimeSimple` both read "Date time"; only `datetime` is ever created.
+  - `ADD_PROPERTY_ITEMS`, the Add property menu's items in this order. That gives 15 items: Text (`textBlock`), Content (`blocks`), Tags, Label, **Object Select** (with a submenu, below), Checkbox, Date time, Number, Title, Description, **Cover Image**, Icon, Created at, Last updated, Aliases.
     - "Object Select" ("Link to objects of a specific type.") opens "Search Object Types" listing the types allowed as relation targets: Page, Tag, the media types the space has, and custom types; not Task or DailyNote. Picking one creates a multi-select entity property bound to that type.
-    - "Single select" and the tag-multi keys are in the bundle's order list, but this bundle builds no item for them, so neither do we.
+    - "Single select" and the tag-multi kinds get no item.
     - Cover Image ("A single select image property.") adds the `coverImage` system property.
-    - `text`, `url`, `simpleTableBlock` and `datetimeSimple` cannot be added, as in Object; they come from migration, inference and "Change property type", and are fully editable.
-  - `CURRENCIES: {code, name, symbol}[]`: in the bundle's menu order (EUR, USD, GBP, CNY, JPY…), deduplicated (TWD and XAF appear twice).
+    - `text`, `url`, `simpleTableBlock` and `datetimeSimple` cannot be added; they come from migration, inference and "Change property type", and are fully editable.
+  - `CURRENCIES: {code, name, symbol}[]`: in menu order (EUR, USD, GBP, CNY, JPY…), each code once.
   - `formatNumber(v, fmt?)`: honours `isGroupingThousands` (default on) and `isRadixComma` (swaps the group and decimal separators).
   - `progressFraction(v, fmt) = clamp(v / steps, 0, 1)`.
   - `parseNumberInput(s, fmt?) -> number|null|undefined`: `''` gives null; NaN gives undefined, which callers ignore; with `isRadixComma`, `1.234,5` parses as 1234.5.
@@ -885,9 +885,9 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
   - `PropertyPanel({type, frontmatter, links, summary, readOnly, onChange, onTypeChange})`:
     - Rows render `cellFor(def.type)`.
     - `hideWhenEmpty` uses `propertyIsEmpty`; `hidden` rows collapse under "Hidden (N)".
-    - Keys without a definition show read-only under the bundle's `RenderProperties.additional` heading.
+    - Keys without a definition show read-only under a separate heading.
     - A new label option from LabelMenu: `onTypeChange(next)` (awaited `useTypeEditor.save`), **then** `onChange` with the value.
-  - `ObjectHeader({summary, type, readOnly, onRename, onPropertiesChange, onOpenTag})`, in Object's order:
+  - `ObjectHeader({summary, type, readOnly, onRename, onPropertiesChange, onOpenTag})`, in this order:
     - Cover image (Task 18 renders it), icon, title, description, tags.
     - Hover actions "Add icon", "Add cover image", "Add description", "Add aliases" for whichever is empty; each writes through `updateProperties`.
     - The icon opens IconPicker (with "Remove"). On a Tag object a colour swatch next to the icon opens ColorPicker (`color`).
@@ -941,7 +941,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
   - `<PropertyMenu>`:
     - The header has an editable icon and name, saved on blur.
     - Items: "Format" (number properties only); "Visibility" with "Always Show", "Hide When Empty" and "Hidden"; "Edit Property"; "Delete".
-    - System kinds hide items as Object does.
+    - System kinds hide the items that don't apply to them.
   - `<AddPropertyMenu>`:
     - Title "Add Property", search placeholder "Search Properties", `ADD_PROPERTY_ITEMS` with the Object Select submenu.
     - System properties the type already has are hidden. On a basic type the menu is disabled.
@@ -953,7 +953,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
     - Kind-specific sections:
       - Number: Type, Decimals ("+ Enforce", a 0–5 stepper, delete), Progress (Steps, Color), Separators ("Grouping thousands", "Separator comma").
       - Dates: Time and Range, each Optional / Required / Disallowed with its follow-ups, and "Default" (Now / Custom, writing `startTimeDefault` / `endTimeDefault`; Now removes the key).
-      - Relation: "Linked object type", "Single or Multi-Select", "Enable fixed set" (picking an object without an `id` calls `api.ensureId` first), "Two-way linking". Changes to the first three are collected and saved by "Apply changes" (its explanation text, then the 428 confirm). "Two-way linking" offers the linked type's eligible properties and 'Create property "X" for "Y"' (`setSync`); when not allowed it shows `syncing.multiSelectOnly.info` or `syncing.notAllowed.info` instead.
+      - Relation: "Linked object type", "Single or Multi-Select", "Enable fixed set" (picking an object without an `id` calls `api.ensureId` first), "Two-way linking". Changes to the first three are collected and saved by "Apply changes" (its explanation text, then the 428 confirm). "Two-way linking" offers the linked type's eligible properties and 'Create property "X" for "Y"' (`setSync`); when not allowed it shows the explanation why instead.
       - Label: "Single or Multi-Select" (multi→single goes through the 428 confirm), "Label set".
     - Visibility.
     - "Change property type": shows the explanation, offers only `allowedKindChanges` (or `noTransformations`), behind the checkbox "I understand the process and know that some data might be lost."; calls `changeKind` and then opens the new property.
@@ -986,7 +986,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
 **Interfaces:**
 - Consumes: Tasks 14–16.
 - Produces:
-  - `<TypeSettings typeId />`, in Object's order. Edits save immediately (400 ms debounce and on blur) through `useTypeEditor`.
+  - `<TypeSettings typeId />`, in this order. Edits save immediately (400 ms debounce and on blur) through `useTypeEditor`.
     1. The breadcrumb "Object Types / <name>".
     2. Icon, Name, "Plural of name", Color, Description. (A Name change renames the type everywhere, Task 5; it is disabled on basic types.)
     3. "Properties": a sortable list, plus the basic-type info box.
@@ -1001,7 +1001,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
     - Name and "Plural of name", both required.
     - The tip "Do I need a new type?".
     - The button "Create object type".
-  - `<DeleteTypeDialog type />`: "Delete this object type?" / "Moves the type, all its objects and its templates to the Trash. You can restore them from there for 30 days." / "Delete object type". (Object's "This can't be undone." doesn't apply: our delete is restorable.)
+  - `<DeleteTypeDialog type />`: "Delete this object type?" / "Moves the type, all its objects and its templates to the Trash. You can restore them from there for 30 days." / "Delete object type". (No "This can't be undone.": our delete is restorable.)
   - `SidebarProps` adds `onNew`, `onCreateType`, `onOpenTypeSettings`, `onDeleteType` and `onOpenTrash`:
     - "+ New" is enabled.
     - "Object Types" gets a `+`.
@@ -1031,7 +1031,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
 **Interfaces:**
 - Consumes: Tasks 11, 14 and 15.
 - Produces:
-  - `<PageLayout type summary header properties body />` applies the type's page settings. Class names, widths and heights are taken from `design.css` and checked side by side in acceptance:
+  - `<PageLayout type summary header properties body />` applies the type's page settings. Class names, widths and heights are as follows, checked side by side in acceptance:
     - `viewDesign`: Standard (null) puts the properties under the header; `indexCard` puts them in a bordered card under the header; `profile` shows the cover or icon as a large round image beside the title, with the properties in a side column; `encyclopedia` puts the properties in a right-hand infobox next to the body.
     - `wideLayoutMode` removes the content max-width.
     - `font` sets the title and body font family (sans-serif, serif, monospace).
@@ -1146,5 +1146,5 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
   - a property edit gives a one-line `git diff`
   - a rename relinks and shows the count
   - the step-10 lists from `m2_acceptance.py` on the copy, and what was done about them
-  - side by side with Object, the Object Type Settings, the property menus and the page layouts look and read the same
+  - against the design spec and behaviour catalog, the Object Type Settings, the property menus and the page layouts look and read as specified
 - [ ] **Step 6:** Commit `chore: milestone 2 acceptance`.

@@ -1,42 +1,44 @@
 # Object behavior catalog
 
-Everything observed by driving a live Object session (v1.72.7, Microsoft Edge, 1912x901, dark theme),
-read-only except one scratch Page that was created and trashed. Source for fidelity work; not a copy of
-Object's code. No note content or account data is recorded here. Pro-gated features are marked **(Pro)**.
+What Object does, or is meant to do: labels, menus, shortcuts, options and their order. This is the reference
+for fidelity work; when a label, an order or a shortcut is in question, this file and the design spec
+(`docs/superpowers/specs/2026-10-23-object-design.md`) settle it. Every feature is available; nothing is gated.
+Items that need an account or a cloud service are listed for completeness and marked **(out of scope)** or
+**(later)**, following the ground rules in `CLAUDE.md`.
 
-Companion: `docs/superpowers/plans/polish-audit-2026-11-02.md` (what differed from Object and what was fixed).
+Companion: `docs/superpowers/plans/polish-audit-2026-11-02.md` (where Object differed from this catalog and what
+was fixed).
 
 ## Coverage checklist
 
-The full list of what is still unseen is in `docs/superpowers/plans/polish-audit-2026-11-02.md` ("Not yet poked").
+The list of what this catalog does not yet specify is in `docs/superpowers/plans/polish-audit-2026-11-02.md`
+("Not yet poked").
 
 | Area | Status |
 |---|---|
-| Settings (all pages) | done (section 1) |
-| Sidebar footer: Shortcuts panel (section 2), Add Section, type gallery | done (sections 2-3) |
-| Sidebar rest, top bar, search, New menu | done (sections 4, 8) |
-| Calendar Month and Week views, backlinks, Export dialog | done (section 10) |
-| Unlinked mentions | Pro in Object, not opened; Object's own is built (section 11) |
-| Tab and sidebar context menus, Overview tab, collection page, outline | done (section 9) |
-| Views: layouts, toolbar, Overview | done (sections 8, 9); the filter, sort and group editors' inner screens and Customize were not opened (they would change a saved view) |
-| Object page: header, properties, side panel | done (section 5); outline and stats in section 9; backlinks in section 10; unlinked mentions: Pro-only, not seen (section 11) |
-| Editor: block menu, selection toolbar, slash, @ | done (section 6); the default table in section 10; Two Columns, Code, Math, Toggle, Group, Horizontal line could not be inserted through the debugger (not seen) |
-| Graph, Trash, Explore panel, shortcuts | done (section 7); export dialog in section 10 (PDF, Markdown; Word and Latex not opened); import dialog not opened |
+| Settings (all pages) | specified (section 1) |
+| Sidebar footer: Shortcuts panel (section 2), Add Section, type gallery | specified (sections 2-3) |
+| Sidebar rest, top bar, search, New menu | specified (sections 4, 8) |
+| Calendar Month and Week views, backlinks, Export dialog | specified (section 10) |
+| Unlinked mentions | built in Object (section 11); its look is Object's own |
+| Tab and sidebar context menus, Overview tab, collection page, outline | specified (section 9) |
+| Views: layouts, toolbar, Overview | specified (sections 8, 9); the inner screens of the filter, sort and group editors and Customize are not specified yet |
+| Object page: header, properties, side panel | specified (section 5); outline and stats in section 9; backlinks in section 10; unlinked mentions in section 11 |
+| Editor: block menu, selection toolbar, slash, @ | specified (section 6); the default table in section 10; the look of Two Columns, Code, Math, Toggle, Group and Horizontal line blocks is not specified yet |
+| Graph, Trash, Explore panel, shortcuts | specified (section 7); export dialog in section 10 (PDF, Markdown; Word and LaTeX options not specified yet); the import dialog is not specified yet |
 
 ## 1. Settings
 
 A two-pane modal: left nav with a "Search settings" field, right pane for the chosen page. Groups:
-Account, General, Space, Integrations. Footer of the nav: "Built with love in Europe", version, Diagnostics,
-Reload.
+Account, General, Space, Integrations. Footer of the nav: version, Diagnostics, Reload.
 
-**Account**: Account; Password & Authentication (change password with "Logout on all other devices",
-two-factor with backup codes, authenticator options, list of active sessions with a Logout each and a
-"Current Session" marker); Subscription & Billing (plan cards: Object Pro, Object Believer).
+**Account** **(out of scope)**: account, password and authentication, active sessions, subscription and billing.
+Object has no accounts.
 
 **General**
 - Appearance: Light theme (Light, Light Dimmed), Dark theme (Dark, Dark Dimmed), App icon (colored icon per
   device).
-- AI Assistant **(Pro)**: "Hide AI features" switch.
+- AI Assistant: "Hide AI features" switch.
 - Editor: Disable spellcheck; Spellcheck language (Experimental); Always open as full page (Alt+Shift click
   opens the preview instead); Always create inline links; Show object type icon for inline object links;
   Disable automatic detection of numbered lists (so `1. ` at block start converts by default); Default
@@ -45,18 +47,17 @@ two-factor with backup codes, authenticator options, list of active sessions wit
   starts (Space on this device: Last opened space | Specific space; When this space opens, per space and per
   device: Where I left off | Calendar | Calendar today | Specific object); Highlight Style (Default with a
   rail and notes section | Minimal); Default state for backlink sections (Backlinks Open | Closed; Unlinked
-  Mentions **(Pro)** Open | Closed | Hidden); Backlink content view (Embed default).
+  Mentions Open | Closed | Hidden); Backlink content view (Embed default).
 - Language: interface language list (English, English UK, Deutsch, Francais, Espanol, Dutch, Portugues BR,
   Magyar, Italian); Decimal separator (Automatic | Dot | Comma).
 - Date & Time: Time zone (list); Date formatting with a live preview (Localized | ISO 8601; date order
   Automatic | day-month-year | month/day/year); Time format (24 hours | 12 hours); Start of the week
   (Monday | Sunday).
-- Offline & Sync: sync status ("All updates from other devices received", last update time); Offline
-  (content downloaded state, Content / Calculations / Media content / Media content calculations per space);
+- Offline & Sync: sync status and cloud media storage are **(out of scope)** (no sync). The local parts apply:
   "Recalculate content index"; Local Storage (size estimate); Media loading (Everything | Required only);
-  Clear media cache; Cloud Media Storage (uploaded total, plan limit).
-- Import Content: migration guides (Notion, Obsidian, Evernote, Apple Notes, Tana, Other tool); Bulk import
-  "Start importing" (upload files, review mappings).
+  Clear media cache.
+- Import Content: migration guides per source tool (Notion, Obsidian, Evernote, Apple Notes, Tana, Other tool);
+  Bulk import "Start importing" (upload files, review mappings).
 - Full Export: Automated Full Exports (desktop app only); Manual Full Export with Spaces (All Spaces) and
   options Include media, Links as wikilinks (`[[title]]`), Include title as heading 1; "Export All Spaces".
 
@@ -66,18 +67,18 @@ two-factor with backup codes, authenticator options, list of active sessions wit
   Plural, Color, Description, Properties (Add Property), Templates (New Template), Configuration (see the
   audit doc item 27), Delete Object Type. Basic types' properties cannot be edited. Field lists per built-in
   type are in audit item 28.
-- Task management **(Pro)**: "Hide Task Management" per space.
+- Task management: "Hide Task Management" per space.
 
-**Integrations**
-- Calendar Integrations **(Pro)**; Task actions **(Pro)**.
-- Object API **(Pro)**: scoped API tokens per space (name, masked token, space, last used, Delete) and
-  "New API token"; Developer settings: "Show developer information" (IDs and developer details in the UI).
-- Web Extension: Chrome, Edge, Safari, Firefox capture extension; Web Highlights **(Pro)**.
-- Email: send to a Object address from a verified account; subject becomes the heading, `#tags` in the
+**Integrations** **(later)**
+- Calendar Integrations; Task actions.
+- API: scoped API tokens per space (name, masked token, space, last used, Delete) and "New API token";
+  Developer settings: "Show developer information" (IDs and developer details in the UI).
+- Web Extension: Chrome, Edge, Safari, Firefox capture extension; Web Highlights.
+- Email: send to a capture address from a verified account; subject becomes the heading, `#tags` in the
   subject become tags; per-account "Default space"; Add email account; Remove.
 - Telegram and WhatsApp: connect via link or QR code; messages, photos, links and voice notes land in the
   daily note; `#` tags in captions.
-- Readwise **(Pro)** one-way sync; Kindle **(Pro)** import-only; Raycast.
+- Readwise one-way sync; Kindle import-only; Raycast.
 
 ## 2. Keyboard shortcuts (the "Shortcuts" panel, share icon at the sidebar's bottom right)
 
@@ -85,9 +86,9 @@ Opened from the arrow icon next to the theme toggle; a scrolling list grouped Ge
 Markdown, Block editing, Page, Navigation, Calendar, AI Assistant, Table, Date picker, PDF viewer, Weblink.
 Ctrl means Cmd on Mac. "Shift" is written as Shift here.
 
-**General**: Open settings Ctrl+, | Create new task **(Pro)** Ctrl+Shift+T | Add new content Ctrl+U | Search
-this space Ctrl+P or Ctrl+K | Open extended search **(Pro)** Ctrl+Shift+P | Toggle dark mode Ctrl+Shift+L |
-Toggle focus mode **(Pro)** Ctrl+Shift+M | Toggle left sidebar Ctrl+Shift+Left | Toggle right side panel
+**General**: Open settings Ctrl+, | Create new task Ctrl+Shift+T | Add new content Ctrl+U | Search
+this space Ctrl+P or Ctrl+K | Open extended search Ctrl+Shift+P | Toggle dark mode Ctrl+Shift+L |
+Toggle focus mode Ctrl+Shift+M | Toggle left sidebar Ctrl+Shift+Left | Toggle right side panel
 Ctrl+Shift+Right | Toggle side panel entry list Ctrl+Shift+Down | Toggle media sidebar Ctrl+Alt+Right | Close
 current tab Ctrl+W | Toggle tab menu when several tabs are open Ctrl+Shift+Up | Undo Ctrl+Z | Redo Ctrl+Shift+Z
 or Ctrl+Y | Go to Calendar Ctrl+Alt+H (press twice to jump to today) | Open Explore Ctrl+J | Open Explore in the
@@ -127,7 +128,7 @@ side panel (Shift+Click) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+
 **Calendar**: Month M | Week W | 3 days rolling R | Day D | Today T | Previous/next day, week or month
 Left/Right | Toggle calendar sidebar Ctrl+Alt+S.
 
-**AI Assistant** **(Pro)**: open; copy message Ctrl+Alt+C; replace context; append message Ctrl+Alt+A; append to daily
+**AI Assistant**: open; copy message Ctrl+Alt+C; replace context; append message Ctrl+Alt+A; append to daily
 note; retry Ctrl+Alt+R; close chat Ctrl+Alt+X; rephrase Ctrl+Alt+U.
 
 **Table**: expand selection in four directions (Shift+arrows) | fill selected cells Ctrl+resize | insert
@@ -146,9 +147,9 @@ A popover: "Add new object type", "Create your own", then template groups with a
 - Media: Books (authors, rating, genre), Films, TV series, Podcasts.
 - Planning and reflection: Days (energy, mood, what stood out), Weeks, Months.
 - Organizations, Areas (areas of responsibility).
-Object's "new object type" flow has none of the starter templates; each would pre-fill properties.
+Each starter template pre-fills the new type's properties.
 
-## 4. Sidebar details seen so far
+## 4. Sidebar details
 
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
@@ -156,9 +157,9 @@ Object's "new object type" flow has none of the starter templates; each would pr
   a `+` (the gallery above) on hover.
 - "Add Section" opens a small form: "Group pages and collections under a named heading in your space
   overview." with an Icon picker, Section Name and Create.
-- Bottom row: profile icon (menu: name, email, plan "Object Basic", Logout), settings gear, theme toggle,
-  Shortcuts icon.
-- The calendar's Tasks rows (Pro): circle checkbox, title, status chip with a dropdown (Next Up, Someday/Maybe,
+- Bottom row: settings gear, theme toggle, Shortcuts icon. (A profile menu with account and plan is
+  **(out of scope)**.)
+- The calendar's Tasks rows: circle checkbox, title, status chip with a dropdown (Next Up, Someday/Maybe,
   In Progress), a due-date chip (red when overdue, with a calendar icon), a priority pill (!, !!, !!!) and a
   `...` row menu. Section toolbar: "N open" count, layout picker, settings, snooze-style arrow, `+`.
 
@@ -183,20 +184,20 @@ Object's "new object type" flow has none of the starter templates; each would pr
     click opens "Search or Create" with an expand-to-search button, then a list of the target objects as
     colored chips each with a checkbox (multi-select). Two tag objects with the same title are different
     objects with their own colors.
-  - Text, number, checkbox, label: not opened in this pass.
+  - Text, number, checkbox, label: not specified yet.
 - **Tags** are objects of the Tag type with a color; the chip uses that color.
 
 ## 6. Editor chrome and menus
 
 - **Selection toolbar** (appears above selected text): Bold, Italic, Strikethrough, Underline, bulleted list,
-  numbered/to-do list, Link, Code, TeX formula, color/highlight, `+`, `@` mention, AI sparkle **(Pro)**.
+  numbered/to-do list, Link, Code, TeX formula, color/highlight, `+`, `@` mention, AI sparkle.
 - **Block handle**: hovering a block shows `+` (insert below) and a six-dot grip at its left. Clicking the grip
   selects the block and opens a menu: Hierarchy (current level, submenu), List >, To-do, Quote, Toggle, Group
-  (Ctrl+G), AI assistant... **(Pro)**, Turn into..., Copy >, Duplicate (Ctrl+D), Remove (Backspace).
+  (Ctrl+G), AI assistant..., Turn into..., Copy >, Duplicate (Ctrl+D), Remove (Backspace).
 - **Block selection bar** (bottom of the page while blocks are selected): left "N block(s) . M words" with a
   stats dropdown; middle: Bold, Italic, Strikethrough, Underline, Hierarchy dropdown, list dropdown, toggle,
   quote, to-do, icon dropdown, color dropdown; right: "Turn blocks into" dropdown, "Tag" dropdown, "Move"
-  dropdown, delete (red), AI **(Pro)**, close.
+  dropdown, delete (red), AI, close.
 - **Inline code** renders as a purple monospace token with a tinted background; **tables** are bordered with a
   header row; a text block placeholder reads "Text"; the title placeholder "Title".
 - **Slash menu**, **@ picker**, **markdown shortcuts**: see audit items 41-43 and section 2.
@@ -212,7 +213,7 @@ Object's "new object type" flow has none of the starter templates; each would pr
   with many links, Hide dates, Hide indirect links.
 - **Trash**: a list of deleted objects, "Empty Trash", 30-day retention, and "object types and collections cannot
   be restored completely".
-- **Explore** **(Pro)** as a side panel: tabs "Explore" with two cards (AI Chat, Search), "Relevant Content"
+- **Explore** as a side panel: tabs "Explore" with two cards (AI Chat, Search), "Relevant Content"
   (objects related to the page you are on) with "Find More". Toggled with Ctrl+Shift+Right; the tooltip reads
   "Hide sidepanel".
 - **Help & Resources** (sidebar): First Steps, Ask a Question, Documentation, What's New, Feedback.
@@ -221,12 +222,12 @@ Object's "new object type" flow has none of the starter templates; each would pr
 ## 8. Search, New menu, view toolbar
 
 - **Search palette**: see audit backlog item 2 (placeholder text, Today/Earlier groups, type at the right).
-- **New menu**: popover with Search; types in recent-use order; Pro types badged; footer hints.
+- **New menu**: popover with Search; types in recent-use order; footer hints.
 - **View toolbar** (type pages, `All` tab): count pill, Filter, Sort, Group by, a layout dropdown, Customize.
   - Layouts: List, Wall (cards), Kanban, Gallery, Table, Embed.
   - Filter popover: "where" row builder with "Filter" and "Filter group" buttons. Sort popover: "+ Sort".
     Group by: a "Group by" button. Customize: "Card view" and "Calculations".
-  - Tab strip: Overview | All | custom tabs (a Query-backed one is Pro) | `+` to add a tab.
+  - Tab strip: Overview | All | custom tabs (including Query-backed ones) | `+` to add a tab.
   - Type page header: type icon + plural name; search icon; `...` (New from Template >, New Collection, Pin to
     Sidebar, Object Type Settings, Export, Import); a split "New" button.
 - **Wall cards** show: the type label, the icon and title, the description, then one row per card-view property
@@ -249,10 +250,9 @@ Object's "new object type" flow has none of the starter templates; each would pr
 - **Tab context menu** (right-click a type tab): Pin to Sidebar, Pin Tab, Object Type Settings, Import (Ctrl+I).
 - **Sidebar type context menu**: Open >, Create <Type>, New from Template >, New Collection, Pin to Sidebar,
   Object Type Settings, Import.
-- **Editor content seen in real notes**: a strikethrough run of text, an "Icon" block (a small icon chip in front
+- **Editor content in real notes**: a strikethrough run of text, an "Icon" block (a small icon chip in front
   of a paragraph, made with `()` Space), tables with a header row, tags row with colored chips, inline code.
-- **Note**: opening an object and selecting text may touch its "Last Updated" (one object showed the current
-  time after being opened; others untouched showed old dates).
+- **Note**: opening an object and selecting text must not change its "Last Updated"; only a real edit does.
 
 ## 10. Calendar views, backlinks, export, blocks
 
@@ -269,30 +269,29 @@ Object's "new object type" flow has none of the starter templates; each would pr
   embedded reference, not a link list. A task shows as a task row (circle checkbox, title, status chip with a
   dropdown, date icon, priority pill) plus the line that links here ("Parent project: <object chip>"); other
   objects show the linking block with its parent context. A leading radio-dot marks each reference; hovering shows
-  small action icons (expand, `...`, and three more at the right). Unlinked Mentions **(Pro)** is separate.
+  small action icons (expand, `...`, and three more at the right). Unlinked Mentions is a separate section
+  (section 11).
 - **Inline tag**: a `#tag` typed in a paragraph renders as a colored chip in the text.
 - **Export dialog** (object `...` > Export, Ctrl+E): a modal with format tiles PDF, Markdown, Microsoft Word,
-  Latex. PDF: Style cards (Notes: matches the page's styling; Essay and Academic, both Pro + Experimental),
+  Latex. PDF: Style cards (Notes: matches the page's styling; Essay and Academic, both Experimental),
   Options (Include embedded content; Include outline; Hide empty properties, on by default; Show type labels),
   Format (A4 | Letter), Properties (All properties, with a per-property list), and an Export button.
   Markdown: "Export folder containing all subpages" (zip), Include media, Include title as heading 1, Links as
-  wikilinks. Word and Latex tiles were not opened.
+  wikilinks. The Word and Latex options are not specified yet.
 - **Table block** (slash > Table): a 2 column by 3 row empty table with a rounded border, header row styling,
-  and cells that edit in place. Two Columns, Code, Math, Toggle, Group and Horizontal line could not be inserted
-  reliably through the debugger (typing after a table failed), so their look is only known from real notes
-  (code and math: see section 6; the shortcut sheet in section 2 lists their keyboard behavior).
+  and cells that edit in place. The look of Two Columns, Code, Math, Toggle, Group and Horizontal line blocks is
+  not specified beyond section 6 (code and math) and the shortcut sheet in section 2 (keyboard behavior).
 - **Delete** of a page from the list or the peek `...` menu uses the same confirmation as before and the object
   goes to Trash.
 
 ## 11. Unlinked mentions (kept in Object)
 
-Object shows an "Unlinked Mentions" section under Backlinks on an object's page, **Pro only**; it lists text
-elsewhere that matches this object's title or an alias without being a link ("Unlinked name matches", section
-label "Mentions"; an alias counts as a mention of the original object). Settings > Editor > "Default state for
-backlink sections" has Backlinks Open | Closed and Unlinked Mentions Open | Closed | Hidden. It could not be
-opened in the account seen (not Pro), so its look is not recorded here.
+An "Unlinked Mentions" section sits under Backlinks on an object's page; it lists text elsewhere that matches
+this object's title or an alias without being a link ("Unlinked name matches", section label "Mentions"; an
+alias counts as a mention of the original object). Settings > Editor > "Default state for backlink sections"
+has Backlinks Open | Closed and Unlinked Mentions Open | Closed | Hidden.
 
-Object builds it in full, unlocked (M5): `backend/objectapp/references.py` (matching on Unicode word
+Object builds it in full (M5): `backend/objectapp/references.py` (matching on Unicode word
 boundaries, titles and aliases of at least a minimum length, longest name first, linking a mention from the
 list), `frontend/src/references/` and the Editor settings. **Gene wants this kept**; it is a ground rule in
 `CLAUDE.md`.

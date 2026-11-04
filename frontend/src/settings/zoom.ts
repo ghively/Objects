@@ -1,8 +1,8 @@
 /**
- * The text size: Object's desktop zoom factor (electron-settings.ts `zoom`, default 1.0), with its
- * steps (`setZoomLevel`: ±0.05, refusing a step that reaches 1.5 going in or 0.6 going out).
+ * The text size: a zoom factor (default 1.0), with its
+ * steps (±0.05, refusing a step that reaches 1.5 going in or 0.6 going out).
  * Object runs in a browser, so instead of zooming the window it scales the note body: the root is
- * Object's 15.5px (`tokens.css`), the body is `calc(1rem * var(--app-zoom))` (`editor.css`
+ * 15.5px (`tokens.css`), the body is `calc(1rem * var(--app-zoom))` (`editor.css`
  * `.object-body-text`) and everything inside it is in `em` (our choice: the chrome keeps its size).
  * `applyZoom` sets `--app-zoom` on `<html>` and caches it in `localStorage` `object.zoom`, which
  * `index.html` reads before the first paint.

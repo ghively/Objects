@@ -1,6 +1,6 @@
 /**
- * The command palette: Ctrl+P or Ctrl+K "Search this space" (Object's `openSearchPalette`
- * keys, read from `lib/shortcuts.ts`). Content and actions are one list (`SearchView`; polish
+ * The command palette: Ctrl+P or Ctrl+K "Search this space" (keys
+ * read from `lib/shortcuts.ts`). Content and actions are one list (`SearchView`; polish
  * audit backlog 2): there is no separate action mode or switch button any more, and the store's
  * `actions` mode (the unbound "Open action palette" key) opens the same list. The shortcut is
  * caught on the window in the capture phase, so it works with the caret in the editor, while no
@@ -145,7 +145,7 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
     [types, hasObjectOpen, onOpenTarget, onShowRightPanel, onToggleSidebar, onToggleRightPanel, spaces],
   )
 
-  // The keys of an object row (Object's footer); an action row runs on any Enter.
+  // The keys of an object row (the footer); an action row runs on any Enter.
   const footer = (
     <div className="border-t border-line">
       <KeyHints

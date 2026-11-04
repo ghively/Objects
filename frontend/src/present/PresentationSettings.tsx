@@ -1,9 +1,9 @@
 /**
- * "Presentation settings" (`PresentationSettings.*`): the Preferences switches ("Hide cover image",
+ * "Presentation settings": the Preferences switches ("Hide cover image",
  * "Hide progress indicator", "Hide title in header") and the Footer texts ("Left footer", "Right
  * footer"), saved to the device settings' `presentation` key (`PUT /api/settings`).
  *
- * Left out (listed for Gene): "Remove Object watermark" (we draw no watermark) and "Block
+ * Left out (listed for Gene): a watermark toggle (we draw no watermark) and "Block
  * properties" (our model has no block properties).
  */
 import { useEffect, useState } from 'react'

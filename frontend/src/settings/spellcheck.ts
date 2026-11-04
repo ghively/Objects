@@ -1,8 +1,7 @@
 /**
- * "Spellcheck language": a BCP 47 tag ("fr", "de-CH"). Normalised the way Object's
- * `normalizeLanguageTag` does (underscores to dashes, language lower case, region upper case);
- * `undefined` for anything else. On the web Object hands the tag to the browser
- * (`webSpellCheckLang`); Object puts it on `<html lang>`, which the browser's spellchecker follows.
+ * "Spellcheck language": a BCP 47 tag ("fr", "de-CH"). Normalised
+ * (underscores to dashes, language lower case, region upper case);
+ * `undefined` for anything else. Object puts it on `<html lang>`, which the browser's spellchecker follows.
  */
 export function normalizeLanguageTag(code: string | null | undefined): string | undefined {
   if (!code) return undefined

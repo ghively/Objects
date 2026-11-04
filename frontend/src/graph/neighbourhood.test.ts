@@ -60,7 +60,7 @@ describe('neighbourhood', () => {
     }
     expect(neighbourhood(data, 0, 2, false, {}).size).toBe(leaves + 2)
     expect([...neighbourhood(data, 0, 2, false, { hideLargeNodes: true })].sort((x, y) => x - y)).toEqual([0, 1])
-    // The centre itself, when large, isn't expanded either (Object checks every walked node).
+    // The centre itself, when large, isn't expanded either (every walked node is checked).
     expect([...neighbourhood(data, 1, 1, false, { hideLargeNodes: true })]).toEqual([1])
   })
 

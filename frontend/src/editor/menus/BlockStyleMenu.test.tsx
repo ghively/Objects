@@ -69,25 +69,25 @@ async function click(item: string, editor: TiptapEditor) {
 }
 
 describe('BlockStyleMenu', () => {
-  test("lists Object's first block-menu section, then our kept rows", () => {
+  test('lists the first block-menu section, then our kept rows', () => {
     renderMenu(headless('Hello world\n', 'Hello'))
     expect(screen.getAllByRole('menuitem').map(label)).toEqual([
-      'Hierarchy (Standard)', // blocksMenu.hierarchy.title (+ the current level)
+      'Hierarchy (Standard)',
       'List',
       'To-do',
       'Icon',
-      'Quote', // ActionItems.setBlockQuoteInterface.title
+      'Quote',
       'Toggle',
-      'Group', // ActionItems.groupBlocks.title
+      'Group',
       'Color',
-      'Alignment', // M9: EditorPanel.shortLabels.alignment (a paragraph takes `align`)
+      'Alignment', // M9 (a paragraph takes `align`)
       'Standout',
-      'Indent', // tokensMenu.indent.shortName
-      'Unindent', // tokensMenu.unindent.shortName
+      'Indent',
+      'Unindent',
     ])
   })
 
-  test('colour menu lists 18 text and 18 background colours with reference names', async () => {
+  test('colour menu lists 18 text and 18 background colours with their names', async () => {
     const editor = headless('Hello world\n', 'Hello')
       renderMenu(editor)
     const color = await openSub('Color')
@@ -135,7 +135,7 @@ describe('BlockStyleMenu', () => {
     const editor = headless('Hello world\n\nAfter.\n', 'Hello')
       let view = renderMenu(editor)
     let menu = await openSub(/^Hierarchy/)
-    // Object's order: Standard, Small, Heading 1–4.
+    // Order: Standard, Small, Heading 1–4.
     expect(within(menu).getAllByRole('menuitem').map(label)).toEqual([
       'Standard',
       'Small',

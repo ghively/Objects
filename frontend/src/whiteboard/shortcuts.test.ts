@@ -31,7 +31,7 @@ describe('keyToCommand', () => {
     // Duplicate
     expect(keyToCommand(k('d', { ctrlKey: true }), sel)).toEqual({ type: 'duplicate' })
     // Nudge
-    // Object: 1 px, 30 px with Shift or while snap to grid is on.
+    // 1 px, 30 px with Shift or while snap to grid is on.
     expect(keyToCommand(k('ArrowLeft'), sel)).toEqual({ type: 'nudge', dx: -1, dy: 0 })
     expect(keyToCommand(k('ArrowDown'), sel)).toEqual({ type: 'nudge', dx: 0, dy: 1 })
     expect(keyToCommand(k('ArrowDown'), { ...sel, gridSnap: true })).toEqual({ type: 'nudge', dx: 0, dy: 30 })
@@ -65,7 +65,7 @@ describe('keyToCommand', () => {
     expect(keyToCommand(k('Delete'), sel)).toEqual({ type: 'delete' })
     expect(keyToCommand(k('Backspace'), sel)).toEqual({ type: 'delete' })
     // Pen group (Gene's)
-    // Object's own ink tools: D, Shift+D, E (P is Object's Triangle, M its move menu).
+    // Object's own ink tools: D, Shift+D, E (P is Triangle, M the move menu).
     expect(keyToCommand(k('d'))).toEqual({ type: 'ink', tool: 'pen' })
     expect(keyToCommand(k('D', { shiftKey: true }))).toEqual({ type: 'ink', tool: 'highlighter' })
     expect(keyToCommand(k('e'))).toEqual({ type: 'ink', tool: 'eraser' })
@@ -131,7 +131,7 @@ describe('keyToCommand', () => {
         expect(keyToCommand(e, sel), `${id} ${spec}`).toEqual(cmd)
       }
     }
-    // Object's whiteboard table (reference-check-2026-10-28 §1).
+    // The whiteboard table (reference-check-2026-10-28 §1).
     expect(keysFor('whiteboardArrow')).toEqual(['Shift-l'])
     expect(keysFor('whiteboardTriangle')).toEqual(['p'])
     expect(keysFor('whiteboardBringToFront')).toEqual([']'])

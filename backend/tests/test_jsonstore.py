@@ -155,7 +155,7 @@ def test_get_views_defaults_without_writing(space_dir: Path):
         body = c.get("/api/views/task").json()
     assert body["revision"] == ""
     keys = [s["key"] for s in body["views"]["dashboard"]["sections"]]
-    # Object's initial sections; "Not in any collection" and "Not tagged" come from "Add a section".
+    # The initial sections; "Not in any collection" and "Not tagged" come from "Add a section".
     assert keys == ["recentlyAccessed", "collections", "queries"]
     assert body["views"]["activeTab"] == "all"
     assert body["views"]["all"]["viewDefinition"] == {"dataViewLayout": "list"}

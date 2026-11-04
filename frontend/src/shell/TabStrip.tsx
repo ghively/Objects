@@ -1,9 +1,9 @@
 /**
  * The tab strip in the top bar (moved out of `App.tsx` in M7). Non-persistent tabs show their title
  * in italic and navigate in place; a double click makes a tab persistent (and back). Pinned tabs
- * sort first and can't be closed: no close button and no "Close tab" item (Object refuses to
- * close a pinned tab on every path). A context menu pins, unpins and closes; tabs are 60 to 200 px
- * wide with a 5 px gap (Object's `oW`, `aW`, `sW`); scroll buttons appear when the tabs
+ * sort first and can't be closed: no close button and no "Close tab" item (a pinned tab is
+ * never closed, on every path). A context menu pins, unpins and closes; tabs are 60 to 200 px
+ * wide with a 5 px gap; scroll buttons appear when the tabs
  * overflow; the "Tab menu" button opens the searchable tab list.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -57,7 +57,6 @@ export function useTargetTitle(space: SpaceInfo | null): (target: Target | null)
         case 'graph':
           return 'Graph'
         case 'search':
-          // `LocalSpaceQuery.heading`
           return 'Search'
         case 'trash':
           return 'Trash'
@@ -136,7 +135,6 @@ function ScrollButton({ label, icon, onClick }: { label: string; icon: string; o
   )
 }
 
-/** `EntityMenu.openImportMenu.text` */
 const IMPORT_TEXT = 'Import'
 
 /** "Ctrl I" beside Import, as the object menu draws its keys. */
@@ -193,7 +191,7 @@ function TabItem({ tab, active, space }: { tab: Tab; active: boolean; space: Spa
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className="border-line bg-raised text-fg">
-        {/* A type tab, as in Object: Pin to Sidebar, Pin tab, Object Type Settings, Import (Ctrl I). */}
+        {/* A type tab: Pin to Sidebar, Pin tab, Object Type Settings, Import (Ctrl I). */}
         {tabType && <PinTypeItem type={tabType} />}
         {tab.pinned ? (
           <ContextMenuItem onSelect={() => unpin(tab.id)}>

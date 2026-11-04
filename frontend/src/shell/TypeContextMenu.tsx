@@ -1,4 +1,4 @@
-// A type row's context menu in the sidebar, as in Object: Open ›, Create <Type>,
+// A type row's context menu in the sidebar: Open ›, Create <Type>,
 // New from Template ›, New Collection, Object Type Settings, Import, Delete object type.
 import { useEffect, useState } from 'react'
 import { api } from '@/api/client'

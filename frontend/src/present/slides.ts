@@ -1,7 +1,7 @@
 /**
  * Slides for an object's presentation: a title slide (title, cover image, description, the visible
  * properties) and then the body, cut into a new slide at each top-level H1 or H2 heading and each
- * top-level horizontal line (our choice; the splitting rule is not in the trimmed reference).
+ * top-level horizontal line (our choice).
  *
  * The heading opens its slide; the horizontal line itself is dropped. Content inside containers
  * (toggles, columns, groups, indented blocks) never splits. A slide with only blank text is left

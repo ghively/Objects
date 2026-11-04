@@ -197,7 +197,7 @@ def _summary_dict(summary: ObjectSummary) -> dict[str, Any]:
 
 
 def tabs_for(space: Space, summary: ObjectSummary) -> list[str]:
-    """The references tabs ``summary``'s object offers, in Object's order."""
+    """The references tabs ``summary``'s object offers, in display order."""
     if summary.template is not None:
         return []
     role = _role(space, summary)

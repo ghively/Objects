@@ -1,5 +1,5 @@
 /**
- * The object's header, in Object's order: type chip, icon (and a Tag's colour swatch), title,
+ * The object's header, in this order: type chip, icon (and a Tag's colour swatch), title,
  * description, aliases and tags. Hovering offers "Add icon", "Add cover image", "Add description"
  * and "Add aliases" for whichever is empty. Every edit writes through `onPropertiesChange` (the
  * view's serialized `updateProperties`); the title commits through `onRename`.

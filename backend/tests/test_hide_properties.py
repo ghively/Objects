@@ -1,4 +1,4 @@
-"""Polish item 17: the per-object ``hideProperties`` flag (Object's ``ComponentData.hideProperties``).
+"""Polish item 17: the per-object ``hideProperties`` flag.
 
 The object page's and peek's property-pane toggle saves it like the M9 layout keys: a bool,
 ``null`` removes the key, it is never inferred as a property and never a new property's key.

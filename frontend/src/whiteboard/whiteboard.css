@@ -1,14 +1,11 @@
 /*
- * Whiteboard canvas styles. Values come from Object's shipped CSS
- * (docs/design.css, `.whiteboard-canvas` and its Vue Flow rules);
- * the selectors are ours, on React Flow's `react-flow__*` classes. Imported by
+ * Whiteboard canvas styles. The selectors are ours, on React Flow's `react-flow__*` classes. Imported by
  * WhiteboardCanvas.tsx together with `@xyflow/react/dist/base.css`.
  */
 
 .whiteboard-canvas {
   /*
-   * Object's theme tokens, which its CSS reads but sets at runtime (not in the trimmed
-   * reference), mapped onto ours (our choice): bg-back is the window background, bg-base the
+   * Canvas tokens, mapped onto ours (our choice): bg-back is the window background, bg-base the
    * content panel, bg-front a raised card, border-base our subtle border. The selection colour
    * and the strong line colour have no sampled value; flagged for Gene in m6-acceptance.md.
    */
@@ -23,7 +20,7 @@
   --type-label-border-red: var(--label-border-red);
   --radius-base: 8px;
 
-  /* Reference values. */
+  /* Canvas sizes. */
   --whiteboard-auto-min-width: 420px;
   --whiteboard-auto-max-width: 480px;
   --whiteboard-auto-max-height: 420px;
@@ -149,7 +146,7 @@
 .whiteboard-canvas:not([data-tool='select']):not([data-tool='hand']):not([data-tool='locked']) .react-flow__pane {
   cursor: crosshair;
 }
-.whiteboard-canvas[data-tool='select'] .react-flow__node:not(.react-flow__node-objectPoint):not(.react-flow__node-objectFrame:not(.selected)):not(:has([data-whiteboard-editing])) {
+.whiteboard-canvas[data-tool='select'] .react-flow__node:not(.react-flow__node-boardPoint):not(.react-flow__node-boardFrame:not(.selected)):not(:has([data-whiteboard-editing])) {
   cursor: grab;
 }
 .whiteboard-canvas .react-flow__node.dragging {
@@ -178,22 +175,22 @@
 
 /* ---- node rings ---- */
 
-.whiteboard-canvas .react-flow__node:not(.react-flow__node-objectPoint) .whiteboard-node-frame {
+.whiteboard-canvas .react-flow__node:not(.react-flow__node-boardPoint) .whiteboard-node-frame {
   border-radius: var(--whiteboard-node-radius);
   box-shadow: 0 0 0 var(--whiteboard-node-ring) var(--whiteboard-node-color-ring, var(--color-border-base));
 }
-.whiteboard-canvas .react-flow__node.selected:not(.react-flow__node-objectPoint) .whiteboard-node-frame {
+.whiteboard-canvas .react-flow__node.selected:not(.react-flow__node-boardPoint) .whiteboard-node-frame {
   box-shadow: 0 0 0 var(--whiteboard-node-ring) var(--color-border-block-selection);
 }
 .whiteboard-canvas .react-flow__node.selected:has([data-whiteboard-editing]) .whiteboard-node-frame {
   box-shadow: 0 0 0 var(--whiteboard-node-ring) var(--whiteboard-node-color-ring, var(--color-border-base));
 }
-/* M8 media primitives (reference CSS `[data-whiteboard-media-primitive]`): no resting ring, the
+/* M8 media primitives (`[data-whiteboard-media-primitive]`): no resting ring, the
    selection ring only when selected; the image covers the frame. */
-.whiteboard-canvas .react-flow__node:not(.react-flow__node-objectPoint) .whiteboard-node-frame[data-whiteboard-media-primitive] {
+.whiteboard-canvas .react-flow__node:not(.react-flow__node-boardPoint) .whiteboard-node-frame[data-whiteboard-media-primitive] {
   box-shadow: none;
 }
-.whiteboard-canvas .react-flow__node.selected:not(.react-flow__node-objectPoint) .whiteboard-node-frame[data-whiteboard-media-primitive] {
+.whiteboard-canvas .react-flow__node.selected:not(.react-flow__node-boardPoint) .whiteboard-node-frame[data-whiteboard-media-primitive] {
   box-shadow: 0 0 0 3px var(--color-border-block-selection);
 }
 .whiteboard-canvas .whiteboard-node-surface {
@@ -213,25 +210,25 @@
 }
 
 /* Shapes: the SVG outline takes the ring colour; selected shapes use the selection colour. */
-.whiteboard-canvas .react-flow__node-objectShape .whiteboard-shape-surface polygon,
-.whiteboard-canvas .react-flow__node-objectShape .whiteboard-shape-surface path {
+.whiteboard-canvas .react-flow__node-boardShape .whiteboard-shape-surface polygon,
+.whiteboard-canvas .react-flow__node-boardShape .whiteboard-shape-surface path {
   stroke: var(--whiteboard-node-color-ring, var(--color-border-base));
   stroke-width: var(--whiteboard-node-ring);
 }
-.whiteboard-canvas .react-flow__node-objectShape.selected .whiteboard-shape-surface polygon,
-.whiteboard-canvas .react-flow__node-objectShape.selected .whiteboard-shape-surface path {
+.whiteboard-canvas .react-flow__node-boardShape.selected .whiteboard-shape-surface polygon,
+.whiteboard-canvas .react-flow__node-boardShape.selected .whiteboard-shape-surface path {
   stroke: var(--color-border-block-selection);
 }
 
 /* Frames: dashed 3px border. */
-.whiteboard-canvas .react-flow__node-objectFrame .whiteboard-shape-surface {
+.whiteboard-canvas .react-flow__node-boardFrame .whiteboard-shape-surface {
   box-shadow: none;
   border-width: var(--whiteboard-node-ring);
   border-style: dashed;
   border-color: var(--whiteboard-node-color-ring, var(--color-border-base));
   border-radius: var(--whiteboard-node-radius);
 }
-.whiteboard-canvas .react-flow__node-objectFrame.selected .whiteboard-shape-surface {
+.whiteboard-canvas .react-flow__node-boardFrame.selected .whiteboard-shape-surface {
   border-color: var(--color-border-block-selection);
 }
 
@@ -242,8 +239,8 @@
 .whiteboard-shape-surface[data-circuit-bit='0'] {
   --whiteboard-circuit-ring: var(--type-label-border-red);
 }
-.whiteboard-canvas .react-flow__node-objectShape .whiteboard-shape-surface[data-circuit-bit] polygon,
-.whiteboard-canvas .react-flow__node-objectShape .whiteboard-shape-surface[data-circuit-bit] path {
+.whiteboard-canvas .react-flow__node-boardShape .whiteboard-shape-surface[data-circuit-bit] polygon,
+.whiteboard-canvas .react-flow__node-boardShape .whiteboard-shape-surface[data-circuit-bit] path {
   stroke: var(--whiteboard-circuit-ring) !important;
 }
 

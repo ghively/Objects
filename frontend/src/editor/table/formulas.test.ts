@@ -31,8 +31,8 @@ function calc(expr: string, grid = GRID): number | string {
 }
 
 describe('formulas', () => {
-  test('test formula statements list matches reference', () => {
-    // blocks.simpleTable.formulas.statements.*, verbatim.
+  test('test formula statements list', () => {
+    // The formula statements.
     expect(FORMULA_STATEMENTS).toEqual([
       { name: 'ABS', description: 'Get absolute value' },
       { name: 'AVG', description: 'Calculate average of values' },
@@ -167,7 +167,7 @@ describe('formulas', () => {
     expect(results[0][1] && value(results[0][1])).toBe('Value')
   })
 
-  test('absolute references, whole-column ranges and the one-= rule (Object reference)', () => {
+  test('absolute references, whole-column ranges and the one-= rule', () => {
     // $ marks read as the plain reference.
     expect(calc('=$B$2+B$3+$B4')).toBe(60)
     expect(calc('=SUM($B$2:$B$4)')).toBe(60)

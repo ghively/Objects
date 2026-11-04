@@ -9,7 +9,7 @@
  * - A block reference is a line that is exactly `![[<Title>#^<id>]]`
  *   (optionally `|label`), loaded as the block atom `blockRef`.
  *
- * `copyBlockReference()` (`BlockMenu.copyBlockReference.*`): ensures the block
+ * `copyBlockReference()`: ensures the block
  * at the cursor has an id (a fresh, collision-free one is written onto it),
  * copies `![[<Title>#^<id>]]` and toasts "Block reference copied". It works on
  * text blocks: a paragraph, a heading, a list item (the id ends the item's first
@@ -36,7 +36,7 @@ import { leafBlockAt } from './blockOptions'
 import { BlockRefView } from '../blockref/BlockRefView'
 import { mountReferencedIn } from '../blockref/ReferencedIn'
 
-/** `BlockMenu.copyBlockReference.copied` */
+/** The toast after a copy. */
 export const BLOCK_REFERENCE_COPIED = 'Block reference copied'
 
 /**

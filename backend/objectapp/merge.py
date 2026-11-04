@@ -1,4 +1,4 @@
-"""Merge an object (or a tag) into another (M8 Task 6, `EntityMenu.mergeObject.*` / `mergeTag.*`).
+"""Merge an object (or a tag) into another (M8 Task 6).
 
 "Single values already set on “{targetName}” stay. Lists are combined with “{sourceName}”, and
 empty properties are filled from there. Content is added on." So `merge_objects`:

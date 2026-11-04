@@ -1,6 +1,5 @@
 /**
- * The code block's languages (our list: Object's own list is not in the
- * trimmed reference set). `id` is what goes after the opening fence, `label`
+ * The code block's languages (our list). `id` is what goes after the opening fence, `label`
  * is shown in the "Select language" picker, `ext` names a downloaded file.
  * Plain text is the empty language (a bare fence).
  *

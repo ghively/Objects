@@ -92,7 +92,7 @@ export const KNOWN_OPTIONS: readonly KnownOption[] = (
     { key: 'layout', value: /^grid$/, appliesTo: ['columns'] },
     // M8: "Show details" on an embedded collection or query (`showDataViewDetails`).
     { key: 'details', value: 'flag', appliesTo: ['dataView'] },
-    // M9: the embed's own view (`EntityBlock.localDataViewInfo`): one line of JSON holding
+    // M9: the embed's own view: one line of JSON holding
     // `{viewDefinition, filterGroup, sorts, groupBy}`, written after the first view change.
     { key: 'localDataViewInfo', value: /^\{[^\r\n]*\}$/, appliesTo: ['dataView'], quoted: true },
   ] as Omit<KnownOption, 'order'>[]

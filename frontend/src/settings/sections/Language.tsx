@@ -8,24 +8,23 @@ import { useSettings } from '@/settings/useSettings'
 import { OptionCards, SaveError, SectionHeader, SettingGroup, errorText } from '../controls'
 
 export const LANGUAGE_TEXT = {
-  heading: 'Language', // LanguageSettings.heading
+  heading: 'Language',
   // our string: Object has no translations, so the language only sets the formatting locale.
   info: "Object's interface is in English; the language sets how dates and numbers are formatted.",
-  changeLanguage: 'Change your language', // LanguageSettings.changeLanguage.heading
-  changeLanguageDescription: 'You can change the language of the application interface.', // LanguageSettings.changeLanguage.explanation
-  decimalSeparator: 'Decimal separator', // LanguageSettings.decimalSeparator.heading
+  changeLanguage: 'Change your language',
+  changeLanguageDescription: 'You can change the language of the application interface.',
+  decimalSeparator: 'Decimal separator',
   decimalSeparatorDescription:
-    'Choose the decimal separator for numbers. The decimal separator separates the whole number part from the fractional part.', // LanguageSettings.decimalSeparator.explanation
+    'Choose the decimal separator for numbers. The decimal separator separates the whole number part from the fractional part.',
   separators: {
     automatic: 'Automatic',
     dot: 'Dot',
     comma: 'Comma',
-  }, // LanguageSettings.decimalSeparator.options.*
+  },
 } as const
 
 /**
- * The languages in Object's order (`languageKeys`) with their names and flags
- * (`languageObjects[key].name` / `.icon`, general.model.ts).
+ * The languages in menu order with their names and flags.
  */
 export const LANGUAGES: readonly { value: SettingsLanguage; name: string; flag: string }[] = [
   { value: 'en', name: 'English', flag: '🇺🇸' },

@@ -60,7 +60,7 @@ export const PROPERTY_TYPES: readonly PropertyType[] = [
 ]
 
 /**
- * The kinds a property can be changed to (Object's "Change property type"). Changing the kind
+ * The kinds a property can be changed to ("Change property type"). Changing the kind
  * creates a new property and keeps the old one (Task 6). A kind is never listed as its own target.
  */
 export const KIND_TRANSFORMS: Readonly<Record<PropertyType, readonly PropertyType[]>> = {
@@ -330,7 +330,7 @@ export interface DeviceSettings {
   nestedBacklinkView: 'showBlockContainingBacklink' | 'showFullPathAbove'
   presentation: PresentationSettings
   // ---- Polish 2026-11-03 ----
-  /** Text size: Object's desktop zoom factor, 0.6–1.5 (`settings/zoom.ts`). */
+  /** Text size: the desktop zoom factor, 0.6–1.5 (`settings/zoom.ts`). */
   zoom: number
   /** Spellcheck language tag ("en-GB"); `null` = the device's. Sets `<html lang>`. */
   spellCheckLang: string | null
@@ -742,21 +742,21 @@ export interface UiState {
   tasks?: TasksUi
   /** M4: the reminder scheduler switch (default on). */
   reminders?: { enabled: boolean }
-  /** M5: the graph's filters (`GraphViewCustomization`). */
+  /** M5: the graph's filters. */
   graph?: GraphCustomization
-  /** M6: the whiteboard "Canvas display" settings (Object's user-level names). */
+  /** M6: the whiteboard "Canvas display" settings (user-level names). */
   whiteboard?: WhiteboardSettings
-  /** M9: the sidebar's top-level section order (`RootSpace.workspaceOrder`): 'objects', 'pinned', section ids. */
+  /** M9: the sidebar's top-level section order: 'objects', 'pinned', section ids. */
   workspaceOrder?: string[]
-  /** The sidebar's Object Types sort (`RootSpace.objectsSectionSortOption`); unset sorts alphabetically. */
+  /** The sidebar's Object Types sort; unset sorts alphabetically. */
   objectsSectionSortOption?: 'alphabetical' | 'manual'
-  /** `RootSpace.workspace`: the `objects` section's `ids` are the manual Object Types order (type ids, 'queries'). */
+  /** The `objects` section's `ids` are the manual Object Types order (type ids, 'queries'). */
   workspace?: { objects?: { ids?: string[] } }
   [extra: string]: unknown
 }
 
 /**
- * M9: the per-object layout keys in an object's frontmatter (Object's `wideLayoutMode`,
+ * M9: the per-object layout keys in an object's frontmatter (`wideLayoutMode`,
  * `wideCoverImage`, `coverImageOffset`). Absent means the type's default (offset 50); `null`
  * in a write removes the key.
  */
@@ -895,7 +895,7 @@ export interface TaskResult {
 
 export interface CalendarUi {
   weekStart: 'sunday' | 'monday'
-  /** M7: the calendar's right sidebar is closed (Object's `RootSpaceData.calendar` key). */
+  /** M7: the calendar's right sidebar is closed. */
   hideCalendarSidebar?: boolean
   daily: {
     hideDailyNote?: boolean
@@ -1043,7 +1043,7 @@ export interface GraphData {
   tagged: number[]
 }
 
-/** `GraphViewCustomization` (RootSpace.model.ts), keys verbatim. */
+/** The graph's filters, keys as stored in `ui.json`. */
 export interface GraphCustomization {
   filterStructureIds?: string[]
   excludeStructureIds?: string[]

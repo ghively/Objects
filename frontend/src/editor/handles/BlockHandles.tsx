@@ -1,8 +1,8 @@
 /**
  * Block handles (Task 12), one overlay per editor: hovering any block (top
  * level or inside a container) shows a drag handle (`ph-dots-six-vertical`)
- * and a `+` (`ph-plus`) at its left, with Object's tooltips
- * (`RenderBlock.dragHandleTooltip`, `.plusHandleTooltip`, the `<b>` drawn bold).
+ * and a `+` (`ph-plus`) at its left, with their tooltips
+ * (the `<b>` drawn bold).
  *
  * `+` inserts an empty paragraph below (Shift-click: above) and opens the `/`
  * menu in it. Clicking the drag handle selects the block and opens the block
@@ -24,13 +24,13 @@ import { startBlockDrag } from './dragMove'
 import './handles.css'
 
 export const HANDLE_TEXT = {
-  drag: '<b>Drag</b> to move block around\n\n<b>Click</b> to show block options', // RenderBlock.dragHandleTooltip
-  plus: '<b>Click</b> to insert block below\n\n<b>Shift-click</b> to insert block above', // RenderBlock.plusHandleTooltip
-  /** EditorPanel.selectionStats.blocks: "{count} block | {count} blocks" */
+  drag: '<b>Drag</b> to move block around\n\n<b>Click</b> to show block options',
+  plus: '<b>Click</b> to insert block below\n\n<b>Shift-click</b> to insert block above',
+  /** "{count} block | {count} blocks" */
   blocks: (count: number) => `${count} ${count === 1 ? 'block' : 'blocks'}`,
 }
 
-/** Object's tooltip markup (`<b>…</b>`, blank lines) as React nodes. */
+/** Tooltip markup (`<b>…</b>`, blank lines) as React nodes. */
 export function richText(s: string): ReactNode {
   return s.split(/(<b>.*?<\/b>)/).map((part, i) => {
     const bold = /^<b>(.*)<\/b>$/.exec(part)

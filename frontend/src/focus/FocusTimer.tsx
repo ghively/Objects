@@ -1,5 +1,5 @@
 /**
- * The focus timer (`ComponentHeader.focusMode.timer.*`): a floating control shown while focus
+ * The focus timer: a floating control shown while focus
  * mode is on or a session runs, and the "Focus time completed" dialog. Its placement (bottom
  * right of the window) is our choice. It reads and drives `useFocusMode`; nothing here writes a file.
  */

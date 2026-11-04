@@ -1,6 +1,6 @@
 // colour-literals: content palette
 /**
- * Shape fill and border colours. Values from Object's `colorThemes.ts` `colorValues`:
+ * Shape fill and border colours (`COLOR_VALUES`):
  * `bgDark`/`borderDark` in dark mode, `bgLight`/`borderLight` in light mode. `isDarkMode()` reads
  * the `dark` class on `<html>`, which `theme/applyTheme.ts` sets for the Dark and Dark Dimmed themes.
  */
@@ -35,7 +35,7 @@ export const COLOR_VALUES: Record<WhiteboardThemeColor, ColorValue> = {
   red: { bgLight: '#FFE9EA', borderLight: '#FDA5A5', bgDark: '#4A2D33', borderDark: '#F87171' },
 }
 
-/** The ring of a node with no `borderColor` (reference CSS `var(--color-border-base)`). */
+/** The ring of a node with no `borderColor` (`var(--color-border-base)`). */
 export const DEFAULT_RING = 'var(--color-border-base)'
 
 export function isDarkMode(): boolean {
@@ -68,7 +68,7 @@ export function fillStyle(bg: WhiteboardFillColor | string | undefined, dark = i
 }
 
 /**
- * A node's border colour as the reference's `--whiteboard-node-color-ring` custom property (the
+ * A node's border colour as the `--whiteboard-node-color-ring` custom property (the
  * ring rules in `whiteboard.css` fall back to `DEFAULT_RING`), plus `borderColor`/`stroke`.
  */
 export function borderStyle(theme: WhiteboardThemeColor | string | undefined, dark = isDarkMode()): CSSProperties {
@@ -77,7 +77,7 @@ export function borderStyle(theme: WhiteboardThemeColor | string | undefined, da
   return { ['--whiteboard-node-color-ring' as string]: v, borderColor: v, stroke: v } as CSSProperties
 }
 
-/** A connector's colour as the reference's `--whiteboard-edge-color` custom property. */
+/** A connector's colour as the `--whiteboard-edge-color` custom property. */
 export function edgeColorStyle(theme: WhiteboardThemeColor | string | undefined, dark = isDarkMode()): CSSProperties {
   const v = borderValue(theme, dark)
   return v ? ({ ['--whiteboard-edge-color' as string]: v } as CSSProperties) : {}

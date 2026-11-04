@@ -1,7 +1,6 @@
-# Source material kept local, never committed
+# Installers and archives kept local, never committed
 *.exe
-Object*.zip
-docs/03-settings-account.png
+/*.zip
 
 # Local tooling state
 .remember/
@@ -10,11 +9,10 @@ docs/03-settings-account.png
 # Build and runtime
 node_modules/
 dist/
-!docs/design-notes
 .venv/
 __pycache__/
 *.pyc
 .vault-copy/
 
-# Object reference material (recovered from the installer); never commit
+# Local reference material; never commit
 .reference/

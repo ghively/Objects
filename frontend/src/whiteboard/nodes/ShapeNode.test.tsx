@@ -38,7 +38,7 @@ describe('ShapeNode', () => {
       expect(el).toHaveAttribute('data-shape', shape)
       expect(el.style.transform).toBe('rotate(30deg)')
       expect(el).toHaveAttribute('data-flip-x')
-      // Border: the reference ring custom property carries the theme colour (dark mode value).
+      // Border: the ring custom property carries the theme colour (dark mode value).
       expect(el.style.getPropertyValue('--whiteboard-node-color-ring')).toBe('#F87171')
       const path = el.querySelector('svg path')!
       expect(path.getAttribute('d')).toBe(shapePath(shape, 120, 90, { flipX: true, flipY: false }))

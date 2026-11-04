@@ -1,10 +1,9 @@
-"""The "Add new object type" gallery: Object's type templates (polish item 21).
+"""The "Add new object type" gallery: the starter type templates (polish item 21).
 
-Object offers starter types from its `ObjectStudio` gallery. Their names, plural
-names, descriptions, property names, property descriptions and label options are the
-en-US strings ``components.<key>.*``; the type's ``templateKey`` is Object's
-`RootStructure.templateKey` ("Blueprint key this object type was created from, e.g.
-`person`"). The trimmed reference does not hold the templates' property kinds, icons,
+The gallery offers starter types. Their names, plural names, descriptions, property
+names, property descriptions and label options are fixed en-US strings; the type's
+``templateKey`` is the key of the template it was created from (e.g. ``person``).
+The design notes do not give the templates' property kinds, icons,
 colours, the gallery's grouping of the first and last rows, or their saved queries, so
 those are **our choice**:
 
@@ -40,7 +39,7 @@ __all__ = ["TEMPLATE_KEYS", "TypeTemplate", "build_template", "template_catalog"
 @dataclass(frozen=True)
 class TypeTemplate:
     key: str
-    """Object's template key (``components.<key>``), stored as the type's ``templateKey``."""
+    """The template key, stored as the type's ``templateKey``."""
     section: str | None
     """Gallery group: ``useCases`` (our choice), ``research``, ``media``,
     ``planningAndReflection`` or None."""
@@ -178,7 +177,7 @@ def _area():
     return [_b()._prop("content", "Content", "blocks")]
 
 
-# In the gallery's order (catalog section 3). Strings: Object's `components.<key>`.
+# In the gallery's order (catalog section 3).
 _TEMPLATES: tuple[TypeTemplate, ...] = (
     TypeTemplate("meeting", "useCases", "Meeting", "Meetings",
                  "Capture conversations with attendees and a date.",

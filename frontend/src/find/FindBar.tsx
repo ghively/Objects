@@ -17,7 +17,7 @@ export interface FindBarProps {
   editorRef: RefObject<BodyEditorHandle | null>
 }
 
-/** UI strings: `FindInPage.*` verbatim, except those marked "our string". */
+/** UI strings; those marked "our string" are additions. */
 export const FIND_TEXT = {
   searchPlaceholder: 'Find',
   matchCase: 'Match case',

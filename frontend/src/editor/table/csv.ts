@@ -1,5 +1,5 @@
 /**
- * "Export as CSV" (`blocks.simpleTable.export`): the table as RFC 4180 CSV,
+ * "Export as CSV": the table as RFC 4180 CSV,
  * each cell as the table shows it (a formula as its value, an error as its
  * title), rows joined with CRLF. The file is named `<object title>.csv` and is
  * saved through a temporary object URL (no server round trip).

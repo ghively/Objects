@@ -1,4 +1,4 @@
-// "Task Stats" (`components.RootTask.habitStats.*`) under the property panel of a recurring Task:
+// "Task Stats" under the property panel of a recurring Task:
 // Streak (with "At risk" / "Keep it up" / "Start today"), Best, Completions (All-time), Completion
 // rate ("Completed vs skipped or missed") and the occurrence grid (the last 26 scheduled
 // occurrences and the next 4), each cell's state name its tooltip. The server computes everything

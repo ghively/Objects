@@ -1,6 +1,5 @@
 /**
- * The object's "Export" dialog (M9; polish item 23, catalog section 10; Object's
- * `entity.settings.export.*`): format tiles PDF, Markdown, Microsoft Word and Latex.
+ * The object's "Export" dialog (M9; polish item 23, catalog section 10): format tiles PDF, Markdown, Microsoft Word and Latex.
  *
  * - PDF: Style cards Notes, Essay and Academic (all available, nothing gated), Options
  *   (Include embedded content, Include outline, Hide empty properties on by default, Show type
@@ -9,7 +8,7 @@
  *   "Save as PDF" in the print dialog writes the file (our choice: no PDF library, no network).
  * - Markdown: Export folder containing all subpages (zip), Include media, Include title as
  *   heading 1, Links as wikilinks (on by default: the file's own form; our choice).
- * - Microsoft Word (.docx) and Latex (.tex): Object's tabs were not seen; they take the
+ * - Microsoft Word (.docx) and Latex (.tex): they take the
  *   Properties list and Hide empty properties / Show type labels (our choice).
  *
  * Markdown is the format selected on open (our choice: Object's own file format).
@@ -26,45 +25,45 @@ import { showToast } from '@/editor/media/upload'
 import { downloadUrl } from '@/lib/download'
 import { cn } from '@/lib/utils'
 
-/** Reference strings (`entity.settings.*`; keys in the comments). */
+/** The export dialog's strings. */
 export const EXPORT_TEXT = {
-  heading: 'Export', // export.heading
-  format: 'Format', // export.format.text
-  pdf: 'PDF', // pdf.description
-  markdown: 'Markdown', // md.description
-  word: 'Microsoft Word', // docx.description
-  latex: 'Latex', // latex.description
-  style: 'Style', // typesetPdf.mode.text
-  notes: 'Notes', // typesetPdf.mode.notes
+  heading: 'Export',
+  format: 'Format',
+  pdf: 'PDF',
+  markdown: 'Markdown',
+  word: 'Microsoft Word',
+  latex: 'Latex',
+  style: 'Style',
+  notes: 'Notes',
   notesDescription: 'A PDF that matches the styling of the current page, including colors and embeds.',
-  essay: 'Essay', // typesetPdf.mode.essay
+  essay: 'Essay',
   essayDescription: 'A single-column typeset PDF for reading and sharing. This is a layout, not a citation style.',
-  academic: 'Academic', // typesetPdf.mode.academic
+  academic: 'Academic',
   academicDescription:
     'A compact two-column typeset PDF with numbered headings. This is a layout, not a journal submission format.',
-  options: 'Options', // export.options.heading
-  includeEmbedded: 'Include embedded content', // export.options.includeEmbedded.text
+  options: 'Options',
+  includeEmbedded: 'Include embedded content',
   includeEmbeddedDescription: "Embeds are included. Tags, queries, and collections aren't (PDF).",
-  includeOutline: 'Include outline', // export.options.includeOutline.text
+  includeOutline: 'Include outline',
   includeOutlineDescription: 'Adds an outline of all headings at the top.',
-  hideEmptyProperties: 'Hide empty properties', // export.options.hideEmptyProperties.text
-  showTypeLabels: 'Show type labels', // export.options.showTypeLabels.text
-  includeTreedown: 'Export folder containing all subpages', // export.options.includeTreedown.text
+  hideEmptyProperties: 'Hide empty properties',
+  showTypeLabels: 'Show type labels',
+  includeTreedown: 'Export folder containing all subpages',
   includeTreedownDescription: 'Also exports linked subpages as a zip.',
-  includeMedia: 'Include media', // export.options.includeMedia.text
+  includeMedia: 'Include media',
   includeMediaDescription: 'Adds files and images to the zip.',
-  includeTitleAsHeading: 'Include title as heading 1', // export.options.includeTitleAsHeading.text
+  includeTitleAsHeading: 'Include title as heading 1',
   includeTitleAsHeadingDescription: 'Starts each item with its title as H1.',
-  asWikiLink: 'Links as wikilinks', // export.options.asWikiLink.text
+  asWikiLink: 'Links as wikilinks',
   asWikiLinkDescription: 'Export links as [[title]] instead of [title](path).',
-  paper: 'Format', // export.format.text (the A4 | Letter row)
+  paper: 'Format', // the A4 | Letter row
   a4: 'A4', // our string
   letter: 'Letter', // our string
-  properties: 'Properties', // export.properties.heading
-  propertiesDescription: 'Deselect properties to hide them from the export.', // export.properties.description
-  allProperties: 'All properties', // export.properties.toggleAll
-  button: 'Export', // export.button
-  success: 'The export is ready and will be downloaded.', // export.success
+  properties: 'Properties',
+  propertiesDescription: 'Deselect properties to hide them from the export.',
+  allProperties: 'All properties',
+  button: 'Export',
+  success: 'The export is ready and will be downloaded.',
 } as const
 
 export type ExportFormat = 'pdf' | 'md' | 'docx' | 'latex'

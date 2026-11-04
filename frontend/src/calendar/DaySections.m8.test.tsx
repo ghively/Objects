@@ -84,7 +84,7 @@ describe('Day view: Backlinks, Date references, Timeline', () => {
     for (const p of ['Pages/Linker.md', 'Pages/Mentions.md', 'Meetings/Standup.md', 'Pages/Fresh.md']) expect(paths).toContain(p)
   })
 
-  test('test empty states use reference strings', async () => {
+  test('test empty states use their strings', async () => {
     setDayM8(TODAY, { backlinks: [], references: [], timeline: [] })
     render(<DayView day={TODAY} />)
     expect(await within(await screen.findByTestId('section-backlinks')).findByText('No backlinks')).toBeInTheDocument()

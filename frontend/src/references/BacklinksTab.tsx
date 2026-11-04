@@ -153,7 +153,7 @@ export function BacklinkContext({
         </div>
       )}
       <div className="flex min-w-0 items-start gap-1.5" style={full ? { marginLeft: ancestors.length * 12 } : undefined}>
-        {/* Object marks each embedded reference with a leading dot. */}
+        {/* Each embedded reference has a leading dot. */}
         <span data-reference-dot="" aria-hidden className="mt-[9px] size-2 shrink-0 rounded-full border border-fg-muted" />
         <button
           type="button"
@@ -174,8 +174,7 @@ export function BacklinkContext({
 const REFERENCE_ACTIONS = 'Reference actions'
 
 /**
- * The small icons that show while a reference is hovered (Object shows expand, `…` and more;
- * ours: Expand (the peek), "Open in new tab" and "Open in side panel" (`EntityMenu.*` strings).
+ * The small icons that show while a reference is hovered (Expand (the peek), "Open in new tab" and "Open in side panel").
  */
 function ReferenceActions({ path, list }: { path: string; list: string[] }) {
   const action = (label: string, icon: string, run: () => void) => (

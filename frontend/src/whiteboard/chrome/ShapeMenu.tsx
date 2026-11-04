@@ -1,7 +1,7 @@
 /**
- * The toolbox's shape menu: Object's `whiteboardShapeMenuTools` in order (Line, Arrow, then
+ * The toolbox's shape menu: `SHAPE_MENU_TOOLS` in order (Line, Arrow, then
  * the nine picker shapes). Rounded rectangle, Triangle down and the left block arrow stay
- * renderable for existing boards but are not offered, as in Object.
+ * renderable for existing boards but are not offered.
  */
 import type { WhiteboardShapeMenuTool, WhiteboardTool } from '@/api/whiteboardTypes'
 import { SHAPE_MENU_TOOLS } from '../model'

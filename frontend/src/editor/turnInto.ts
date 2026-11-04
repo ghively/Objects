@@ -1,15 +1,15 @@
 /**
  * Turn a block into an object, a task, a Task object or a whiteboard (M8).
  *
- * - `turnIntoObject` ("Turn into object", `HighlightMenu.turnIntoObject.label`): the block's text
+ * - `turnIntoObject` ("Turn into object"): the block's text
  *   becomes the title of a new object of type `typeId` (default: the Page type, our choice), its
  *   children the body, and the block becomes `![[Title]]` shown as a Link block (`view=inline`,
  *   our choice).
  * - `turnIntoTask` ("Turn into task"): the same with the Task type.
- * - `turnTodoIntoTask` ("Turn into task object", `components.RootTask.turnBlockIntoTaskObject`): a
+ * - `turnTodoIntoTask` ("Turn into task object"): a
  *   to-do becomes a Task titled with its text, status Done when it was checked; with a block
  *   selection, every to-do in it (our choice). Not a to-do: nothing happens.
- * - `turnIntoWhiteboard` ("Turn into whiteboard", `Whiteboard.turnInto.action`): the selected
+ * - `turnIntoWhiteboard` ("Turn into whiteboard"): the selected
  *   blocks become a new board (`whiteboard/turnInto.ts`' `turnBlocksIntoWhiteboard`), titled with
  *   the first block's text (our choice), and are replaced by an embed of it.
  *
@@ -33,7 +33,6 @@ import { showToast } from './media/upload'
 
 export type TurnIntoOptions = { pos?: number }
 
-/** `Whiteboard.turnInto.failed` */
 export const TURN_INTO_WHITEBOARD_FAILED = 'Could not create whiteboard'
 
 const LISTS = new Set(['bulletList', 'orderedList', 'taskList'])

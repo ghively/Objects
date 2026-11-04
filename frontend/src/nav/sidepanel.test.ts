@@ -99,7 +99,7 @@ describe('side panel entries', () => {
     expect(entries[0].history).toEqual([obj('A.md'), obj('B.md'), obj('D.md')])
   })
 
-  test('test layout helpers: width share 10 to 90 %, areas 220 px by default and 120 px at least (reference)', () => {
+  test('test layout helpers: width share 10 to 90 %, areas 220 px by default and 120 px at least', () => {
     expect(clampWidthFraction(0.05)).toBe(0.1)
     expect(clampWidthFraction(0.95)).toBe(0.9)
     expect(clampWidthFraction(0.3)).toBe(0.3)
@@ -108,7 +108,7 @@ describe('side panel entries', () => {
     expect(areaSizes(undefined, ['area1', 'area2', 'area3'])).toEqual({ area2: 220, area3: 220 })
     expect(areaSizes({ area2Size: 300 }, ['area1', 'area2'])).toEqual({ area2: 300 })
     expect(areaSizes({ area3Size: 50 }, ['area2', 'area3'])).toEqual({ area3: 120 })
-    // Saved before the reference values (px width, fractional heights): dropped.
+    // Saved in the older shape (px width, fractional heights): dropped.
     expect(cleanLayout({ width: 500, area2Size: 0.4, area3Size: 260 })).toEqual({ area3Size: 260 })
     expect(cleanLayout({ width: 0.3 })).toEqual({ width: 0.3 })
   })

@@ -64,14 +64,14 @@ Back end and whiteboard:
 - **The saving window** (`5b69828`) now sees its own `.md` stamp (`announceLocalChange`).
 - **Export with media** (`90a0bd1`) includes short-name embeds (`![[photo.png]]`), resolved as the editor does: exact, case-insensitive, then by file name.
 - **Time-zone-less `lastUpdated`** (`f1cdb4b`) is read in the space's time zone by the stamp throttle; a stamp in the future no longer blocks the bump.
-- **Basic Project Status** (`a16e652`) is a plain label in new spaces: Object sets `isStatus` only on the Task status. Existing type JSON is not rewritten. New Project types lose "By category" grouping, as in Object.
+- **Basic Project Status** (`a16e652`) is a plain label in new spaces: `isStatus` is set only on the Task status. Existing type JSON is not rewritten. New Project types lose "By category" grouping.
 - **`defaultPageViewId`** (`86a9c7d`, `a6a7efb`) is never inferred or shown as a property.
 
 Front end:
 - **Shift-click in a grouped view** (`3d46450`) selects the on-screen range only.
 - **Import CSV:** blank lines are not imported (`6b88504`); the drop zone accepts a dropped file (`9728d26`).
 - **Sidebar:** a section added after the order was saved appears above Pinned (`cc941e1`); the reorder handle is inside the sidebar's visible area and keyboard reorder moves past the tall Object Types block (`16125b5`).
-- **Bulk delete dialog** (`e83e32a`): Object's "Delete?" and "Review the items below, then confirm.", with the selected titles listed.
+- **Bulk delete dialog** (`e83e32a`): "Delete?" and "Review the items below, then confirm.", with the selected titles listed.
 - **Stats and Text Stats** refresh "Last updated" after a property write (`f717d36`).
 - **The page inspector** sits below a shown cover, clear of its buttons (`4b5c2e0`).
 - **`[[` picker** (`669cafa`): characters typed after `[[` before the picker takes focus become its query (body and property cells). Not reproduced in jsdom; fixed from the code and covered by a simulation.
@@ -83,26 +83,26 @@ Front end:
 Each is marked "our choice" or "our string" in the plan or by the lane that built it.
 
 - **Whiteboard "Last updated":** the bump is throttled to 60 s and takes no version-history snapshot; a read-only `.md` is not stamped.
-- **Duplicate:** refused for whiteboards (ours), templates and read-only files, besides Object's daily notes and media; message "This object can't be duplicated." (ours); the copy opens in the current tab; from a row it opens in the peek. The targets of the copy's synced (two-way) relations gain a link to the copy (Gene, 2026-10-29).
+- **Duplicate:** refused for whiteboards (ours), templates and read-only files, besides daily notes and media; message "This object can't be duplicated." (ours); the copy opens in the current tab; from a row it opens in the peek. The targets of the copy's synced (two-way) relations gain a link to the copy (Gene, 2026-10-29).
 - **Export:** Markdown only, with "Include media"; the `.md` at the zip root, media at their space-relative paths; icon `ph-export`.
-- **Cover:** `referenceImageId` dropped (the offset is cleared when the image changes); reposition offered only for cropped covers; offset rounded to whole percent; the hover buttons are icons with Object's labels as tooltips.
+- **Cover:** `referenceImageId` dropped (the offset is cleared when the image changes); reposition offered only for cropped covers; offset rounded to whole percent; the hover buttons are icons with their labels as tooltips.
 - **Inspector:** a toggle button "Inspector" (ours), only on the full page, not in the peek; Outline leaves out headings inside embeds; `plainText` counts one paragraph per non-empty Markdown line.
-- **Encyclopedia design:** the cover and title span the full width above the body and its info box, as before M9 (Gene, 2026-10-29; Object puts a non-wide cover above the content column only).
-- **Object `…` menu order:** Present, Export, then Version History, Text Stats, as in Object (Gene, 2026-10-29).
+- **Encyclopedia design:** the cover and title span the full width above the body and its info box, as before M9 (Gene, 2026-10-29; the alternative puts a non-wide cover above the content column only).
+- **Object `…` menu order:** Present, Export, then Version History, Text Stats (Gene, 2026-10-29).
 - **Wide layout item** sits just above "Raw Markdown"; hidden for index card and whiteboard objects.
 - **Text property:** Enter, Shift+Enter, Escape and leaving end the edit; no slash menu or block handles in it.
 - **Embedded views:** saved 300 ms after the last change; a read-only editor keeps changes in memory; toggling "Show details" alone never writes `localDataViewInfo`.
-- **Alignment:** the block-menu submenu (after "Color") is a superset of Object, which offers alignment only for table cells; table-cell alignment sets the whole column (GFM has only column alignment); "left" removes the option.
+- **Alignment:** the block-menu submenu (after "Color") also offers alignment outside table cells; table-cell alignment sets the whole column (GFM has only column alignment); "left" removes the option.
 - **Date variables:** the picker sits at the top of the date popover; "Template variable" is its accessible label only.
-- **Recalculate content index:** in Space settings (Object: Offline & Sync › Offline); polls every 1 s.
+- **Recalculate content index:** in Space settings; polls every 1 s.
 - **Row menu:** Change type is a submenu of types; Copy object reference copies `[[Title]]`; Shift-click selects without "Select multiple"; Ctrl-click still opens a new tab; the selection bar has "Clear selection" (ours).
 - **Bulk change type** runs the one-object dialog once per object. Not built: bulk Edit property, Edit tags, Export.
-- **Import CSV:** 1000-row limit (Object's value not found); header row on by default; no template; labels take existing options only; tags, aliases and multi-entity cells split on commas; a new collection is named after the file; strings "Column {n}", "Import into", "Title" are ours.
-- **Query tabs:** "Edit query" on a type's query tab is ours; "Release type constraint" is the button's accessible name (Object has only the tooltip).
+- **Import CSV:** 1000-row limit (our choice); header row on by default; no template; labels take existing options only; tags, aliases and multi-entity cells split on commas; a new collection is named after the file; strings "Column {n}", "Import into", "Title" are ours.
+- **Query tabs:** "Edit query" on a type's query tab is ours; "Release type constraint" is the button's accessible name (the tooltip is the visible label).
 - **Sidebar order:** dragged by a grip handle ("Reorder {name}", ours); sections missing from the saved order keep their default place.
-- **Searchable toggle:** not built (Gene's answer); `isNotSearchable` stays file-only, as in Object.
-- **Custom label as status:** not offered, as in Object (guard test). The basic Project type no longer seeds `isStatus` (fix pass).
-- **Default collection, `defaultPageViewId`:** no UI in Object to match (a hidden read-only flag; a key of the page-design studio Object doesn't have). Both keys round-trip and are never shown or inferred as properties.
+- **Searchable toggle:** not built (Gene's answer); `isNotSearchable` stays file-only.
+- **Custom label as status:** not offered (guard test). The basic Project type no longer seeds `isStatus` (fix pass).
+- **Default collection, `defaultPageViewId`:** no UI (a hidden read-only flag; a key of the page-design studio Object doesn't have). Both keys round-trip and are never shown or inferred as properties.
 
 ## Gene's hand-run checks
 
@@ -110,9 +110,9 @@ On a copy of the CPI export outside the repo, with `git init` done there:
 - [ ] Opening the space, exporting and reading stats change nothing (`git status` clean).
 - [ ] Duplicate a page, a task and a tag: the copies are named "<Title> (Copy)" and the source is untouched. Duplicating an object with a two-way relation: the related objects link the copy too. The menu offers no Duplicate on a daily note, template or whiteboard.
 - [ ] Export a page as Markdown, then with "Include media": the zip opens, and images and attachments are inside (including `![[name.png]]` short-name embeds).
-- [ ] Text Stats in the `…` menu and the inspector's Stats tab agree with Object on the same note (words, sentences, paragraphs, characters).
+- [ ] Text Stats in the `…` menu and the inspector's Stats tab give the expected counts on the same note (words, sentences, paragraphs, characters).
 - [ ] The page inspector: the Outline jumps to headings, and Pin/Unpin is remembered.
-- [ ] Wide layout / Normal layout per object overrides the type. Toggling the wide cover and repositioning the cover (drag, Save, Cancel) look like Object. A new cover image resets the position.
+- [ ] Wide layout / Normal layout per object overrides the type. Toggling the wide cover and repositioning the cover (drag, Save, Cancel) look as the behaviour catalog describes. A new cover image resets the position.
 - [ ] Content property: the full block editor works in the property panel. A note edited there reloads identically.
 - [ ] Text property: `[[` opens the picker, links show as chips, and renaming the target updates the link.
 - [ ] Template date variables: "Day/Week/Month/Year of creation" on a template's date property; a new object from it gets the right date or range.
@@ -124,5 +124,5 @@ On a copy of the CPI export outside the repo, with `git init` done there:
 - [ ] Sidebar sections: drag to reorder, restart, and the order is kept.
 - [ ] "Recalculate content index" runs and the indexing state shows.
 - [ ] Draw on a whiteboard: its "Last updated" moves, at most once a minute. The board's Notes still save.
-- [ ] Every rule in "Rules the build chose", against Object.
+- [ ] Every rule in "Rules the build chose", against the behaviour catalog.
 - [ ] The side-by-side look of every M9 screen in Light and Dark.

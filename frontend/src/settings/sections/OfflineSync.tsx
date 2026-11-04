@@ -1,7 +1,7 @@
 // "Offline & Sync", keeping only its local part: Object stores everything as files on this
 // device and has no cloud, so the sync status, content download state, media loading, media cache
 // and cloud media storage have nothing to show. What stays is "Recalculate content index"
-// (`POST /api/search/reindex`), which Object keeps here (M9 put it in Space Settings).
+// (`POST /api/search/reindex`), which lives here (M9 put it in Space Settings).
 import { useEffect, useState } from 'react'
 import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
@@ -9,17 +9,17 @@ import { Button } from '@/components/ui/button'
 import { SaveError, SectionHeader, SettingGroup, errorText } from '../controls'
 
 export const OFFLINE_SYNC_TEXT = {
-  heading: 'Offline & Sync', // OfflineSyncSettings.heading
-  // our string, adapted from OfflineSyncSettings.description (no cloud here)
+  heading: 'Offline & Sync',
+  // our string (no cloud here)
   description: 'Your content is stored as Markdown files on this device and is always available offline.',
-  offline: 'Offline', // OfflineSyncSettings.sections.offline.heading
-  // our string, adapted from OfflineSyncSettings.sections.offline.description
+  offline: 'Offline',
+  // our string
   offlineDescription: 'Object reads your notes from the space folder and keeps an index of them for search, backlinks and views.',
-  reindexButton: 'Recalculate content index', // ContentLoadingStateIndicator.recomputeBacklinkIndex.button
+  reindexButton: 'Recalculate content index',
   reindexDescription:
-    'If some of your views are inconsistent or search results are not returning content, you can reindex your notes. This is usually not needed, only use it if you are having issues.', // ContentLoadingStateIndicator.recomputeBacklinkIndex.description
-  reindexingHeading: 'Content is being indexed', // ContentLoadingStateIndicator.recomputingBacklinkIndex.heading
-  reindexingDescription: 'Your notes are getting analyzed for search, backlinking, and your content views.', // ContentLoadingStateIndicator.recomputingBacklinkIndex.description
+    'If some of your views are inconsistent or search results are not returning content, you can reindex your notes. This is usually not needed, only use it if you are having issues.',
+  reindexingHeading: 'Content is being indexed',
+  reindexingDescription: 'Your notes are getting analyzed for search, backlinking, and your content views.',
 } as const
 
 const T = OFFLINE_SYNC_TEXT
@@ -31,7 +31,7 @@ export const REINDEX_POLL_MS = 1000
 
 /**
  * "Recalculate content index": drops and rebuilds the search index in the background. While
- * search reports `partial` (the rebuild, or the start-up sync) the row shows Object's
+ * search reports `partial` (the rebuild, or the start-up sync) the row shows the
  * "Content is being indexed" state and the button waits. It only reads and asks; it writes no file.
  */
 function ReindexRow() {

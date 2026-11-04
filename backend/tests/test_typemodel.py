@@ -129,7 +129,7 @@ def test_migrate_v1_preserves_every_property():
     assert keys[: len(SYSTEM_ORDER)] == SYSTEM_ORDER
     assert keys[len(SYSTEM_ORDER) :] == ["status", "owner", "due"]
     assert out["basic"] is True  # Task
-    # default icons come from Object's propertyIcons
+    # default icons per property kind
     assert props["due"]["icon"] == {"type": "iconify", "val": "ph-calendar"}
     assert props["owner"]["icon"] == {"type": "iconify", "val": "ph-file-text"}
     # round trip is stable
@@ -472,7 +472,7 @@ def test_topup_not_applied_to_other_types(calendar_space_dir):
         ], tid
 
 
-# -- media types: the fields Object defines beyond ours (polish audit item 29) ----
+# -- media types: the extra built-in fields beyond ours (polish audit item 29) ----
 
 
 def _media(name: str, keys=()):
@@ -501,7 +501,7 @@ def _media(name: str, keys=()):
         ("Audio", {"duration": "number", "origin": "text", "category": "label"}),
     ],
 )  # fmt: skip
-def test_topup_adds_object_media_fields(name, expected):
+def test_topup_adds_the_extra_media_fields(name, expected):
     t = topup_task_type(_media(name))
     for key, kind in expected.items():
         assert t.prop(key) is not None and t.prop(key).type == kind, key
@@ -528,8 +528,8 @@ def test_topup_media_keeps_an_existing_definition():
         ("Audio", "category", ("ambient", "Ambient"), 10),
     ],
 )  # fmt: skip
-def test_topup_media_labels_get_object_option_sets(name, key, first, count):
-    """Item 19: the label fields start with Object's own sets (ids and en-US texts)."""
+def test_topup_media_labels_get_the_built_in_option_sets(name, key, first, count):
+    """Item 19: the label fields start with the built-in sets (ids and en-US texts)."""
     p = topup_task_type(_media(name)).prop(key)
     opts = p.options["set"]
     assert len(opts) == count

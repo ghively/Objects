@@ -1,10 +1,10 @@
 /**
- * The group block's node view (Object's `GroupBlock`): a box around its
- * blocks with Object's block radius, its `color` (none by default: the
+ * The group block's node view: a box around its
+ * blocks with the block radius, its `color` (none by default: the
  * neutral `--bg-raised-2` fill) and `align`. On hover an "Ungroup" button
- * (`ActionItems.ungroupBlocks.title`) replaces the group by its blocks
+ * replaces the group by its blocks
  * (`ungroupAt`, as `unwrapGroup`). The
- * placeholder "Box heading..." (`blocks.GroupBlock.placeholder`) on an empty
+ * placeholder "Box heading..." on an empty
  * first child comes from a decoration in `nodes/group.ts`.
  */
 import { NodeViewContent, NodeViewWrapper, type NodeViewProps } from '@tiptap/react'

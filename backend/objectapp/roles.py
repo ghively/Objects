@@ -1,11 +1,10 @@
-"""Object's structure roles for our types, and the role lists M5 needs.
+"""Structure roles for our types, and the role lists M5 needs.
 
-Object decides per structure (``RootPage``, ``RootEntity``, ``MediaImage`` …)
+Each structure role (``RootPage``, ``RootEntity``, ``MediaImage`` …) decides
 whether an object has a references section, unlinked mentions, backlinks or a
-graph view (``structureHeuristicsBackbone.ts``). Our basic types map onto those
-roles; every other type is a ``RootEntity`` (Object's custom object types).
-The lists below are the reference lists restricted to the roles we have
-(``RootWhiteboard`` is the reference's ``...whiteboard(config)`` entry, M6).
+graph view. Our basic types map onto those roles; every other type is a
+``RootEntity`` (custom object types). The lists below hold the roles we have
+(``RootWhiteboard`` since M6).
 """
 
 from __future__ import annotations
@@ -112,7 +111,7 @@ NO_GRAPH_SUPPORT: frozenset[str] = frozenset()
 
 
 def role_of(t: TypeDefinition | None) -> str:
-    """The Object structure role of objects of type ``t`` (``RootEntity`` for custom types)."""
+    """The structure role of objects of type ``t`` (``RootEntity`` for custom types)."""
     if t is None or not t.basic:
         return "RootEntity"
     name = _basic_name(t.name)

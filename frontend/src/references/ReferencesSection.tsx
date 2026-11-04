@@ -6,7 +6,7 @@
  * and closed state are remembered per object (`referencesUi.ts`). "All" stacks the other tabs'
  * content in tab order, each under its label.
  *
- * M8 settings (`EditorSettings.backlinkSectionsDefault.*`): a section set to "Hidden" loses its tab,
+ * M8 settings: a section set to "Hidden" loses its tab,
  * Related Content is dropped for the types in "Hide related content for object types", and with no
  * per-object state yet a "Closed" section's part of All starts collapsed (every shown section
  * "Closed": the whole section starts closed). Any change made on the object (tab, hide, a part's

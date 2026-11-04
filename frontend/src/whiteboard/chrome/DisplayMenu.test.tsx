@@ -4,7 +4,7 @@ import { expect, test, vi } from 'vitest'
 import { DEFAULT_SETTINGS } from '../model'
 import { DisplayMenu } from './DisplayMenu'
 
-test("test display menu switches call onSettings with Object's keys", async () => {
+test('test display menu switches call onSettings with their setting keys', async () => {
   const user = userEvent.setup()
   const onSettings = vi.fn()
   render(<DisplayMenu settings={{ ...DEFAULT_SETTINGS }} onSettings={onSettings} />)

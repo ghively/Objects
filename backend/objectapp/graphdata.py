@@ -4,7 +4,7 @@ Nodes are every non-template object whose role has graph support (all of ours,
 see `roles.NO_GRAPH_SUPPORT`), in path order. ``links`` holds the distinct
 undirected pairs of the link index as node indexes (flat ``[a0, b0, …]``,
 ``a < b``); ``linkDirs`` gives each pair's direction (1: a links to b, 2: b
-links to a, 3: both), which Object's graph rules need to tell a node's own
+links to a, 3: both), which the graph rules need to tell a node's own
 links from its backlinks; ``tagged`` holds ``(object, tag)`` pairs the same
 way. Each node
 carries its ``degree`` (distinct linked neighbours) and the flags the client's

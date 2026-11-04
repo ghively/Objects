@@ -37,46 +37,34 @@ import { formatInZone, zonedParts } from '@/lib/zonedTime'
 import { zonedWallToInstant } from '@/lib/zonedShell'
 
 export const SECTIONS_TEXT = {
-  /** `CalendarDaily.all.heading` */
   all: 'All',
-  /** `CalendarDaily.dailyNote.heading` */
   dailyNote: 'Daily note',
-  /** `CalendarDaily.tasks.heading` */
   tasks: 'Tasks',
   /** Our short tab label for "Objects with this date". */
   datesTab: 'Dates',
-  /** `CalendarDaily.objectsOfDay.heading` */
   dated: 'Objects with this date',
-  /** `CalendarDaily.tasks.emptyStateToday` / `.emptyState` */
   noTasksToday: 'No tasks today',
   noTasksOnDay: 'No tasks on this day',
-  /** M3's empty state line (`EmptyState.objects.description`). */
+  /** M3's empty state line. */
   emptyHint: 'You can change this by creating a new object.',
-  /** `CalendarDaily.tasks.stats*` */
   statsToday: (open: number, done: number) => `${open} open, ${done} done`,
   statsFuture: (n: number) => `${n} open`,
   statsPast: (n: number) => `${n} done`,
-  /** `components.RootTask.overdueWithCount` */
   overdue: (n: number) => `Overdue (${n})`,
-  /** `DateGroups.today.title` (the group after Overdue on today). */
+  /** The group after Overdue on today. */
   todayGroup: 'Today',
-  /** `components.Sidebar.tasks.createTask` */
   createTask: 'Create task',
-  /** `CalendarDaily.moveAllTasksTo` */
   moveAll: 'Move all open tasks to',
   today: 'Today',
   tomorrow: 'Tomorrow',
-  /** Our string (no Object original). */
+  /** Our string. */
   pickDate: 'Pick a date',
   /** Our string. */
   add: 'Add to tasks',
-  /** `CalendarDaily.backlinksToThisDay.*` (M8) */
   backlinks: 'Backlinks',
   noBacklinks: 'No backlinks',
-  /** `CalendarDaily.references.*` */
   references: 'Date references',
   noReferences: 'No references',
-  /** `CalendarDaily.timeline.*` */
   timeline: 'Timeline',
   timelineCreated: 'Created',
   noTimeline: 'No date references.',
@@ -86,7 +74,7 @@ export const SECTIONS_TEXT = {
   moveConflict: (n: number) => `${n} ${n === 1 ? 'task' : 'tasks'} changed elsewhere and ${n === 1 ? 'was' : 'were'} not moved.`,
 }
 
-/** "Created Today" / "Created Yesterday" / "Created on This Day" (`components.RootDailyNote.created*`). */
+/** "Created Today" / "Created Yesterday" / "Created on This Day". */
 export function createdLabel(day: Day, today: Day): string {
   if (day === today) return 'Created Today'
   if (day === addDays(today, -1)) return 'Created Yesterday'

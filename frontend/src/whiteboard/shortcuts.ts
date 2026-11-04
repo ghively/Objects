@@ -1,8 +1,8 @@
 /**
- * Whiteboard shortcut keys: Object's (its whiteboard shortcut table and canvas key handler;
+ * Whiteboard shortcut keys (the whiteboard shortcut table;
  * reference-check-2026-10-28 §1), the same as the `whiteboard*` entries of `lib/shortcuts.ts`.
  * Pen (D), highlighter (Shift+D) and eraser (E) are Object's own tools and keys; they avoid
- * Object's P (Triangle) and M (move menu). Pure: `keyToCommand(e, ctx)` maps a key event to a
+ * P (Triangle) and M (move menu). Pure: `keyToCommand(e, ctx)` maps a key event to a
  * command, or null. Keys typed into an editor or input never reach the canvas. Letters match
  * `event.key` (the typed letter, whatever the layout).
  */
@@ -49,12 +49,12 @@ export interface ShortcutContext {
   gridSnap?: boolean
 }
 
-/** Nudge distances (Object): 1 px, and 30 px (one grid cell) with Shift or while snap to grid is on. */
+/** Nudge distances: 1 px, and 30 px (one grid cell) with Shift or while snap to grid is on. */
 export const NUDGE = 1
 export const NUDGE_FAR = GRID
 
 /**
- * Keyboard resize (M8, `whiteboardResize` / `whiteboardResizeLarge`, Object's Mod-Arrow and
+ * Keyboard resize (M8, `whiteboardResize` / `whiteboardResizeLarge`, Mod-Arrow and
  * Mod-Shift-Arrow): the nudge steps. Right and Down grow, Left and Up shrink ("Grows or shrinks
  * from the right or bottom edge").
  */

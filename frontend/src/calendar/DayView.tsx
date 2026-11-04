@@ -1,6 +1,6 @@
 // The Day view: header, quick-create chips, filter tabs and the day's sections (the Daily note's
 // header pill holds Reviewed and the note's `…` menu) in
-// one scrolling column at Object's `.main-content-width` (50rem). One `api.calendar` range for
+// one scrolling column at the main content width (50rem). One `api.calendar` range for
 // the day and one `api.rows` call per load of it.
 import { useEffect, useMemo, useState } from 'react'
 import type { Target } from '@/nav/tabs'

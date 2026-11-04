@@ -463,7 +463,7 @@ def test_ui_accepts_calendar_tasks_reminders_keys(calendar_space_dir: Path):
 
 
 def test_ui_accepts_tasks_all_tab(calendar_space_dir: Path):
-    # The Tasks page's "All" tab (Object's `allContent`, after Completed).
+    # The Tasks page's "All" tab (after Completed).
     space = _space(calendar_space_dir)
     with TestClient(create_app(space, None, watch=False)) as c:
         rev = c.get("/api/ui").json()["revision"]

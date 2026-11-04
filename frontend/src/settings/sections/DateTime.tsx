@@ -12,29 +12,29 @@ import { useSettings } from '@/settings/useSettings'
 import { OptionCards, SaveError, SecondaryButton, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
 
 export const DATE_TIME_TEXT = {
-  heading: 'Date & Time', // DateAndTimeSettings.heading
-  description: 'Manage your preferences for how time and dates get displayed.', // DateAndTimeSettings.description
-  startOfWeek: 'Start of the week', // DateAndTimeSettings.startOfWeek.label
+  heading: 'Date & Time',
+  description: 'Manage your preferences for how time and dates get displayed.',
+  startOfWeek: 'Start of the week',
   startOfWeekDescription: 'Select whether a week should start on a Monday or on a Sunday.',
-  monday: 'Monday', // DateAndTimeSettings.startOfWeek.optionMonday
-  sunday: 'Sunday', // DateAndTimeSettings.startOfWeek.optionSunday
-  twentyFour: '24-hour time', // DateAndTimeSettings.twentyFourHourTime.label
+  monday: 'Monday',
+  sunday: 'Sunday',
+  twentyFour: '24-hour time',
   twentyFourDescription: 'Displays time in 24-hour time format (e.g. 16:24).',
-  dateFormatting: 'Date formatting', // DateAndTimeSettings.dateFormatting.label
+  dateFormatting: 'Date formatting',
   dateFormattingDescription: 'Choose between date formatting based on your language or explicit formatting.',
   formats: {
     localized: 'Localized',
     DMY: 'day-month-year',
     MDY: 'month/day/year',
     YMD: 'year-month-day (ISO 8601)',
-  }, // DateAndTimeSettings.dateFormatting.*
-  timeZone: 'Time zone', // DateAndTimeSettings.timeZone.label
-  timeZoneDescription: 'Select your preferred time zone.', // DateAndTimeSettings.timeZone.description
-  timeZoneMismatch: 'Your time zone in Object does not match the time zone of your device.', // our string, adapted from DateAndTimeSettings.timeZone.missmatch
-  timeZoneReset: 'Set to local time zone', // DateAndTimeSettings.timeZone.resetButton
+  },
+  timeZone: 'Time zone',
+  timeZoneDescription: 'Select your preferred time zone.',
+  timeZoneMismatch: 'Your time zone in Object does not match the time zone of your device.', // our string
+  timeZoneReset: 'Set to local time zone',
   timeZoneSearch: 'Search time zones', // our string
-  noResults: 'No results', // AppSettings.search.noResults
-  preview: 'Preview', // Object's `preview` string, as the live preview's accessible name
+  noResults: 'No results',
+  preview: 'Preview', // the live preview's accessible name
 } as const
 
 const T = DATE_TIME_TEXT
@@ -179,7 +179,7 @@ export function DateTimeSection() {
           options={FORMATS.map((f) => ({ value: f, label: T.formats[f] }))}
           onChange={(dateFormatting) => set({ dateFormatting })}
         />
-        {/* Object shows a live preview of the chosen formatting: now, as dates display. */}
+        {/* A live preview of the chosen formatting: now, as dates display. */}
         <p role="status" aria-label={T.preview} className="text-[13px] text-fg-muted">
           {formatDate({ start: new Date().toISOString(), resolution: 'time' })}
         </p>

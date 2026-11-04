@@ -94,7 +94,7 @@ describe('CustomRepeatDialog', () => {
     }
   })
 
-  it('the on choices follow the day and the strings of the reference', async () => {
+  it('the on choices follow the day and the expected strings', async () => {
     // 2026-10-13 is the 2nd Tuesday; 2026-09-30 is the last day and the last Wednesday.
     const { unmount } = render(<CustomRepeatDialog initial={null} day="2026-10-13" onSave={() => {}} onCancel={() => {}} />)
     await userEvent.selectOptions(screen.getByLabelText('Unit'), 'month')

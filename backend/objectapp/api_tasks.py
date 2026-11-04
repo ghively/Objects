@@ -148,7 +148,7 @@ def _missed(
     rule: RepeatRule, current: DateLike, today: date, tz: tzinfo, week_start: str, limit: int
 ) -> list[DateLike]:
     """The newest `limit` scheduled dates from ``current`` up to yesterday, oldest first
-    (by due date only). Object shows at most 99 missed occurrences (`OVERDUE_CAP`);
+    (by due date only). At most 99 missed occurrences are shown (`OVERDUE_CAP`);
     Gene: the most recent ones (audit 2026-11-01)."""
     cur_day = _day(current, tz)
     if rule.mode != "dueDate" or cur_day >= today:
@@ -214,7 +214,7 @@ def plan_occurrence(
         return [current], next_date(rule, current, now, today, tz, week_start)
     if catch_up == "advanceOne":
         return [current], _step_once(rule, current, tz, week_start)
-    # At most the 99 most recent missed occurrences are logged (Object's cap; a daily
+    # At most the 99 most recent missed occurrences are logged (the display cap; a daily
     # task dated 1800 otherwise wrote a 10,001-line log).
     missed = _missed(rule, current, today, tz, week_start, OVERDUE_CAP)
     nxt = next_date(rule, current, now, today, tz, week_start)

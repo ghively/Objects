@@ -1,5 +1,5 @@
 /**
- * Table commands for the table menus (Object's `SimpleTableBlock`): the
+ * Table commands for the table menus: the
  * "Header row" / "Header column" switches, the row, column and cell items and
  * "Delete table".
  *
@@ -251,7 +251,7 @@ export function columnAlignment(doc: PMNode, tablePos: number, col: number): Cel
 }
 
 /**
- * Object's table-cell "Alignment" (`textAlignment` on the cell's text). A GFM table aligns
+ * The table-cell "Alignment" (`textAlignment` on the cell's text). A GFM table aligns
  * whole columns, so Object sets it on the column of the cell (our choice): every cell of the
  * column gets `align`, which writes the separator line's marker. Left is the default and
  * removes the marker. Only the separator line changes in the file.

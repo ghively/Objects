@@ -82,7 +82,7 @@ afterEach(() => {
 })
 
 describe('TasksPage', () => {
-  test('test tabs in the reference order with Inbox the default tab', async () => {
+  test('test tabs in order with Inbox the default tab', async () => {
     render(<TasksPage />)
     expect(tab('Inbox')).toHaveAttribute('aria-selected', 'true')
     const names = screen.getAllByRole('tab').map((t) => t.textContent)

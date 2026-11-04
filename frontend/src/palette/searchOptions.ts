@@ -4,16 +4,16 @@
  */
 import type { TypeDef } from '@/api/types'
 
-/** Object's `CommandPalette.*` strings, verbatim (the typo in `onlyPartialResults` included). */
+/** The palette's strings (the typo in `onlyPartialResults` kept on purpose). */
 export const PALETTE_TEXT = {
-  /** `CommandPalette.search.placeholder`: the palette's one input (content and actions). */
+  /** The palette's one input (content and actions). */
   placeholder: 'Search for content and actions, or paste from clipboard',
-  /** `CommandPalette.search.placeholderSearch`: the extended search page's input. */
+  /** The extended search page's input. */
   placeholderSearch: 'Search content',
-  /** `DateOptions.today.title` / `DateOptions.earlier.title`: the recent objects' groups. */
+  /** The recent objects' groups. */
   today: 'Today',
   earlier: 'Earlier',
-  /** `CommandPalette.actions.label`: shown at the right of an action row, where content shows its type. */
+  /** Shown at the right of an action row, where content shows its type. */
   actionLabel: 'Action',
   /** Our string: the info icon's tooltip beside the input. */
   info: 'Type to search your content and actions. Type a type or tag name to filter; Ctrl+Shift+Enter opens extended search.',
@@ -23,13 +23,13 @@ export const PALETTE_TEXT = {
   emptyDescription: 'Try a different term, or remove filters to widen the search.',
   onlyPartialResults: 'Your content in not fully indexed yet. Search results might not return all matches.',
   clearFilter: 'Clear filter',
-  inNewTab: 'in new tab', // dropdowns.toOpenInNewTab
-  inSidePanel: 'in side panel', // dropdowns.toOpenInSidepanel
+  inNewTab: 'in new tab',
+  inSidePanel: 'in side panel',
   createNewWithTitle: (structureTitle: string, title: string) => `Create new ${structureTitle} with title "${title}"`,
   structureFilter: (structureName: string) => `Only search for type "${structureName}"`,
   structureFilterExclude: (structureName: string) => `Exclude type "${structureName}"`,
   tagFilter: (tagName: string) => `Only search content tagged with "${tagName}"`,
-  /** `shortcuts.openSearchPalette.name`: the dialog's accessible title. */
+  /** The dialog's accessible title. */
   searchTitle: 'Search this space',
 } as const
 
@@ -61,7 +61,7 @@ function words(s: string): string[] {
 }
 
 /**
- * Our fuzzy name match (Object's matcher is not in the trimmed reference): case-insensitive,
+ * Our fuzzy name match: case-insensitive,
  * the query is a prefix of the name, or every query word is a prefix of a word of the name, or
  * (3+ characters) a substring of it.
  */

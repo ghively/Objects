@@ -1,9 +1,9 @@
 """M9 Task 4: template date variables, per-object layout keys and ``workspaceOrder``.
 
-- ``{creation:day|week|month|year}`` on a ``datetime`` property (Object's
-  ``DatetimeProperty.variable``, "Set only on templates") is accepted only on a template.
+- ``{creation:day|week|month|year}`` on a ``datetime`` property (its
+  variable, "Set only on templates") is accepted only on a template.
 - ``wideLayoutMode`` / ``wideCoverImage`` (bool) and ``coverImageOffset`` (0-100) are
-  per-object frontmatter keys (``ComponentData``); ``null`` removes the key, and a new
+  per-object frontmatter keys; ``null`` removes the key, and a new
   ``coverImage`` drops the offset in the same write (``RenderCoverImage``).
 - ``PUT /api/ui`` takes ``workspaceOrder`` (``RootSpace.workspaceOrder``).
 """
@@ -240,7 +240,7 @@ def test_layout_keys_not_inferred_as_properties(tmp_path: Path):
 
 
 def test_default_page_view_id_not_inferred_as_a_property(tmp_path: Path):
-    # Object's per-object ``defaultPageViewId`` (component.model.ts) round-trips as a key.
+    # The per-object ``defaultPageViewId`` round-trips as a key.
     root = tmp_path / "space"
     (root / "Gadgets").mkdir(parents=True)
     (root / "Gadgets" / "One.md").write_text(

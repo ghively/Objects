@@ -1,7 +1,7 @@
 [project]
 name = "objectapp"
 version = "0.1.0"
-description = "A local, file-based object workspace with a Object-style UI"
+description = "A local, file-based object workspace with an object-based UI"
 authors = [
     { name = "Gene Hively", email = "ghively@cpicardgroup.com" }
 ]

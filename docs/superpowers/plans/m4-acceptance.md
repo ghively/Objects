@@ -64,15 +64,15 @@ Run `npm run build`, then `uv run objectapp --space <copy of backend/tests/fixtu
 
 ### Calendar
 
-- [ ] All four views (Day, Three days, Week, Month); the pager, Today, Shift+Today and the arrow keys in each view. M, W, R, D, T and ←/→ are Object's calendar keys (its shortcut table; `reference-check-2026-10-28.md` §1). ↑/↓ (previous/next higher unit) have no key in Object's table; they stay ours until Gene decides.
+- [ ] All four views (Day, Three days, Week, Month); the pager, Today, Shift+Today and the arrow keys in each view. M, W, R, D, T and ←/→ are the calendar keys (`reference-check-2026-10-28.md` §1). ↑/↓ (previous/next higher unit) have no key in the shortcut table; they stay ours until Gene decides.
 - [ ] The mini month: month and year dropdowns, today, the daily-note dots; the Day header and week numbers around a Sunday and the year boundary.
 - [ ] "+ Daily Note", typing in the inline note, the Reviewed button, an external edit of the note in VS Code appearing in the page, a daily note template.
 - [ ] The Day sections and tabs, quick-create chips (including a `createOnce` type and a hidden type), a dated object with a range on each of its days, "Move all open tasks to".
-- [ ] Three days: should empty sections ("No tasks on this day") be hidden, as in `02-calendar-three-days.png`? (Task 14 shows them.)
+- [ ] Three days: should empty sections ("No tasks on this day") be hidden? (Task 14 shows them.)
 
 ### Tasks
 
-- [ ] The Tasks page: the Status tab as list and kanban, a drag between categories, the Today, Inbox, Deadline, Scheduled, Recurring, Reminders and Completed tabs, quick add, the Task type page without an Overview tab. The tabs run Inbox, Today, Scheduled, Status, Context, Tags, Open, Deadline, Recurring, Reminders, Completed, All, and Inbox is the default tab (reference: RootTask `builtInDashboardSections`, `defaultSection: 'tasksInbox'`, reference-check section 6).
+- [ ] The Tasks page: the Status tab as list and kanban, a drag between categories, the Today, Inbox, Deadline, Scheduled, Recurring, Reminders and Completed tabs, quick add, the Task type page without an Overview tab. The tabs run Inbox, Today, Scheduled, Status, Context, Tags, Open, Deadline, Recurring, Reminders, Completed, All, and Inbox is the default tab (reference-check section 6).
 - [ ] A task with Repeat (daily, weekday, custom by completion, with an end date) completed twice.
 - [ ] A reminder set a minute ahead fires one Windows notification while the app is open, and none once the task is done.
 - [ ] A reminder set to a time already past stays silent, also across a restart.
@@ -84,11 +84,11 @@ Run `npm run build`, then `uv run objectapp --space <copy of backend/tests/fixtu
 - [ ] Opening the Calendar and Tasks changes no file.
 - [ ] Completing a recurring task: the `git diff` is the status, date and completed lines plus `lastUpdated`.
 - [ ] A month with 5,000+ objects switches views without a visible stall.
-- [ ] Side by side with Object:
-  - [ ] the Day view and Three days, against the `01`/`02` screenshots
+- [ ] Against the behaviour catalog:
+  - [ ] the Day view and Three days, against the behaviour catalog
   - [ ] the mini month
   - [ ] the pager and the segmented control
   - [ ] the Tasks page
   - [ ] the Week view (stacked days) and the Month view (daily-note card list)
-  - [ ] the daily-note marker in the mini month, which this plan designed without a reference; note what Object does differently so a fix pass can follow
+  - [ ] the daily-note marker in the mini month, which this plan designed on its own; note what should differ so a fix pass can follow
 - [ ] Reminders: one banner per reminder, none after quitting the app, one catch-up after reopening within 12 hours.

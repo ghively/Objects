@@ -1,6 +1,6 @@
 // Polish item 17: the property-pane toggle (top left of the content column, in the page and the
 // peek) hides the pane for that object and remembers it in the object's `hideProperties` key
-// (Object's `ComponentData.hideProperties`).
+// (`hideProperties` in the frontmatter).
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'

@@ -9,11 +9,8 @@ import { ObjectView } from '@/object/ObjectView'
 import type { Day } from './dates'
 
 export const DAILY_NOTE_TEXT = {
-  /** `CalendarDaily.dailyNote.heading` */
   heading: 'Daily note',
-  /** `components.RootDailyNote.name` */
   create: 'Daily Note',
-  /** `components.RootDailyNote.placeholder` */
   placeholder: 'Start your daily note',
 }
 

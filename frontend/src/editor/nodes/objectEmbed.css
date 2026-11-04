@@ -1,5 +1,5 @@
-/* Embedded objects (Task 11). Object's `.EntityBlock.block-outer.{inline,
-   smallCard,wideCard,embed}` sit `--ep-stack` (.2em) below the block before. */
+/* Embedded objects (Task 11). All four views (inline, small card, wide card,
+   embed) sit `--ep-stack` (.2em) below the block before. */
 .object-editor .object-embed {
   margin-block-start: 0.2em;
   position: relative;

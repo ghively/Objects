@@ -1,5 +1,5 @@
 // The right-click menu of a row in a data view (type page, its sections, a query, a collection):
-// Object's DataView context menu. Labels are `EntityMenu.*`. The actions that need a dialog
+// the data view's context menu. The actions that need a dialog
 // (change type, delete) or the view's selection are handed in by the view (`RowMenuCtx`).
 import { api } from '@/api/client'
 import type { Row, TypeDef } from '@/api/types'
@@ -22,21 +22,13 @@ export interface RowMenuItem {
 }
 
 export const ROW_MENU_TEXT = {
-  /** `EntityMenu.selectMultiple.text` */
   selectMultiple: 'Select multiple',
-  /** `EntityMenu.openInSidepanel` */
   openInSidepanel: 'Open in side panel',
-  /** `EntityMenu.openInTab` */
   openInTab: 'Open in new tab',
-  /** `EntityMenu.changeType.text` */
   changeType: 'Change type',
-  /** `EntityMenu.copyEntityReference.text` */
   copyReference: 'Copy object reference',
-  /** `EntityMenu.copyEntityReference.copied` */
   copied: 'Link to object copied',
-  /** `EntityMenu.duplicateObject.text` */
   duplicate: 'Duplicate',
-  /** `EntityMenu.deleteEntity.text` */
   delete: 'Delete Object',
 }
 
@@ -72,7 +64,7 @@ export async function copyReference(row: Row): Promise<void> {
 
 const byPluralName = (a: TypeDef, b: TypeDef) => a.pluralName.localeCompare(b.pluralName)
 
-/** The common items, in Object's order. A view appends its own (a collection's) after these. */
+/** The common items, in menu order. A view appends its own (a collection's) after these. */
 export function commonRowMenu(row: Row, ctx: RowMenuCtx): RowMenuItem[] {
   const s = row.summary
   const type = ctx.types.find((t) => t.id === s.type)

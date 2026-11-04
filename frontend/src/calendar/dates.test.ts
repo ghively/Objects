@@ -33,7 +33,7 @@ describe('dates', () => {
     want.forEach((c, i) => {
       expect(weekdayColor(i + 1)).toBe(`text-${c}-500 dark:text-${c}-400`)
     })
-    // 2026-10-23 is a Friday (blue in 01-calendar-day.png).
+    // 2026-10-23 is a Friday.
     expect(weekdayColor(isoWeekday('2026-10-23'))).toContain('blue')
   })
 

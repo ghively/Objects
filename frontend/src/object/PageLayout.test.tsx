@@ -204,7 +204,7 @@ describe('narrow layouts', () => {
     return { ...r, drawn }
   }
 
-  test('test the width rule: the properties sit beside from the container md breakpoint, 768 px (reference)', () => {
+  test('test the width rule: the properties sit beside from the container md breakpoint, 768 px', () => {
     expect(PROPERTY_PANEL_WIDTH).toBe(370)
     expect(PROPERTIES_BESIDE_WIDTH).toBe(768)
     expect(propertiesBeside(null)).toBe(true)
@@ -236,7 +236,7 @@ describe('narrow layouts', () => {
     expect((container.querySelector('[data-page-layout]') as HTMLElement).dataset.properties).toBe('inline')
   })
 
-  test('test profile and encyclopedia keep their placement from 768 px and go inline below (reference isMd)', () => {
+  test('test profile and encyclopedia keep their placement from 768 px and go inline below', () => {
     for (const [design, variant] of [
       ['encyclopedia', 'infobox'],
       ['profile', 'column'],

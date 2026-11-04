@@ -9,7 +9,7 @@ import { currentTarget, useTabs, type Target } from '@/nav/tabs'
 import { formatMonthTitle, todayYmd, weekNumber, type CalendarView, type WeekStart } from './dates'
 import { useCalendar, type StepKey } from './useCalendar'
 
-/** Labels (`RenderWeek.*`) and tooltips (`shortcuts.setViewTo*.name`), in the control's order. */
+/** Labels and tooltips, in the control's order. */
 const VIEW_TABS: { view: CalendarView; label: string; tooltip: string }[] = [
   { view: 'month', label: 'Month', tooltip: 'Go to monthly view' },
   { view: 'week', label: 'Week', tooltip: 'Go to weekly view' },
@@ -18,9 +18,7 @@ const VIEW_TABS: { view: CalendarView; label: string; tooltip: string }[] = [
 ]
 
 /**
- * Calendar shortcut keys. The trimmed reference has the shortcut ids and names
- * (`shortcuts.setViewTo*`, `goToToday`) but not their key bindings (the bundle that holds them is
- * not in `reference/`), so these keys are ours: one letter per view, T for today.
+ * Calendar shortcut keys (ours): one letter per view, T for today (`goToToday`).
  */
 const VIEW_KEYS: Record<string, CalendarView> = { m: 'month', w: 'week', r: 'rolling', d: 'day' }
 const TODAY_KEY = 't'
@@ -164,7 +162,7 @@ export function CalendarChrome({ weekStart, rightPanelOpen, onToggleRightPanel, 
             <Icon name="ph-caret-right" size={16} />
           </button>
         </div>
-        {/* The month sidebar belongs to the Day view only (Object hides it, and its switch, in the others). */}
+        {/* The month sidebar belongs to the Day view only (it and its switch are hidden in the others). */}
         {view === 'day' && (
           <button
             type="button"

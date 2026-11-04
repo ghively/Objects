@@ -1,8 +1,8 @@
 /**
- * "Add to whiteboard" (`Whiteboard.addTo.action`, M8 Task 22): pick a board, or "New whiteboard"
- * (`addToNewWhiteboard.title`), and the object is placed on it as an entity node right of the
+ * "Add to whiteboard" (M8 Task 22): pick a board, or "New whiteboard",
+ * and the object is placed on it as an entity node right of the
  * board's existing content (`placeObjectOnBoard`). Creating a board that fails shows
- * "Could not create whiteboard" (`Whiteboard.turnInto.failed`). A board can't be added to itself
+ * "Could not create whiteboard". A board can't be added to itself
  * (our choice: it isn't listed). Mounted once in `shell/GlobalOverlays.tsx`; `useAddToWhiteboard`
  * opens it (the object menu, and `addObjectToWhiteboard`, which waits for the outcome).
  */
@@ -19,9 +19,7 @@ import { create } from 'zustand'
 import { isWhiteboardType } from './isWhiteboard'
 import { placeObjectOnBoard, TURN_INTO_FAILED } from './turnInto'
 
-/** `Whiteboard.addTo.action` */
 export const ADD_TO_WHITEBOARD = 'Add to whiteboard'
-/** `CommandPalette.actions.addToNewWhiteboard.title` */
 export const NEW_WHITEBOARD = 'New whiteboard'
 /** Our strings. */
 export const SEARCH_WHITEBOARDS = 'Search whiteboards'

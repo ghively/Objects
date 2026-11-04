@@ -1,19 +1,19 @@
 # UI polish audit, 2026-11-02
 
-Gene asked to check every button and interaction against Object. Method: Claude drove Gene's own
-Object tab (Microsoft Edge, the CPI space, 1912x901) through the browser tool's CDP attach, read-only:
-opened menus, popovers and views and closed them without choosing anything; nothing was created or
-changed, and the view was put back to Day afterwards. Object was then opened at the same width and
-compared control by control. Saved references: `docs/01-calendar-day.png`,
-`02-calendar-three-days.png`.
+Gene asked to check every button and interaction against the behaviour catalog
+(`docs/behavior-catalog.md`). Method: Claude read the target behaviour in Microsoft Edge (the CPI space,
+1912x901) through the browser tool's CDP attach, read-only: opened menus, popovers and views and closed
+them without choosing anything; nothing was created or changed, and the view was put back to Day
+afterwards. Object was then opened at the same width and compared control by control; the "Catalog"
+column below is the expected behaviour.
 
 ## Fixed (commits on `master`, not yet pushed)
 
-| Area | Object | Object before | Now |
+| Area | Catalog | Object before | Now |
 |---|---|---|---|
 | Empty daily note | one placeholder | two placeholders drawn over each other ("Start your daily note" + "Write your text or search for blocks...") | one; the editor can be told not to draw its own |
 | Section headings in narrow columns | heading intact, toolbar beside or below | toolbar overprinted the heading ("Task", "Cre...ay") | the heading row wraps; the toolbar drops to its own line |
-| Three days | day header + daily note only, no month sidebar | plus Tasks, Created, Backlinks sections in every column | daily notes only (as `02-calendar-three-days.png`) |
+| Three days | day header + daily note only, no month sidebar | plus Tasks, Created, Backlinks sections in every column | daily notes only (as the catalog describes) |
 | Month sidebar and its switch | Day view only | every view | Day view only |
 | Top bar in a narrow window | stays one line | "Three days" wrapped; Today arrows overprinted the month header | no wrapping; clips instead of colliding |
 | Daily note header (Day) | pill: Reviewed checkbox + `...` | Reviewed up by the title; `...` offered only Open as Page / Open in new tab / Delete | pill holds Reviewed and the note's full object menu (Present, Export, Version History, Object Type Settings, Delete, ...) |
@@ -23,7 +23,7 @@ compared control by control. Saved references: `docs/01-calendar-day.png`,
 
 ## Backlog (observed, not done)
 
-1. **New menu**: Object opens a popover anchored under the New button, with a "Search" field, the types
+1. **New menu**: the catalog has a popover anchored under the New button, with a "Search" field, the types
    in recent-use order, and a footer "up/down to navigate, Esc to abort, Enter to select". Object opens a
    centred modal with an alphabetical list.
 2. **Search palette**: placeholder "Search for content and actions, or paste from clipboard" with an info
@@ -32,33 +32,33 @@ compared control by control. Saved references: `docs/01-calendar-day.png`,
    an empty state until objects are opened, and a separate "Switch to actions" mode.
 3. **Month view**: a Jan-Dec strip with the current month highlighted above the cards, and a "+ New Object"
    row under them. Object shows the cards only.
-4. **Multi-day views (Week, Three days)**: for an existing note Object puts Reviewed, an expand icon and
+4. **Multi-day views (Week, Three days)**: for an existing note the catalog puts Reviewed, an expand icon and
    `...` on the date row. Object shows nothing there.
 5. **Tasks section**: the `+` is the last control inside the toolbar pill; Object draws it outside, left of
    the pill.
 6. **Type menu, "Pin to Sidebar >"**: submenu of the sidebar sections ("In Progress", "Pinned") with
    checkboxes. Object has pinning on other menus (`PinMenuItems`) but built from dropdown primitives, not
    the context-menu ones.
-7. **Sidebar type row**: Object shows the count and a `...` button on hover/active; Object shows the
+7. **Sidebar type row**: the catalog shows the count and a `...` button on hover/active; Object shows the
    count always and no `...`.
-8. **Object `...` menu order and entries**: Object: Wide Layout, Open >, Use Template >, Object Type
+8. **Object `...` menu order and entries**: catalog: Wide Layout, Open >, Use Template >, Object Type
    Settings, Share, Present (Ctrl Alt P), Export (Ctrl E), Import (Ctrl I), Version History, Text Stats >,
    Copy >, Delete Object (Ctrl Backspace). Object has the same actions in another order, no Share, Import
    or Copy >, and no shortcut hints beside most.
 9. **Type page, All tab**: a "+ New Object" row under the cards; cards show an "Empty" tags row when there
    are none.
-10. **Empty daily note**: Object shows "Tags" and "Text" placeholders. Only the empty state was seen;
+10. **Empty daily note**: the catalog shows "Tags" and "Text" placeholders. Only the empty state was seen;
     what happens on focus is unknown.
-11. **Quick-create chips**: Object shows Task, Meeting, Project (a chosen set); Object shows every type
-    plus an eye toggle. Probably a Settings choice in Object; not checked.
-12. **Workspace switcher**: Object: popover with a "Search" field, the spaces with a check on the
+11. **Quick-create chips**: the catalog shows Task, Meeting, Project (a chosen set); Object shows every type
+    plus an eye toggle. Probably a Settings choice; not checked.
+12. **Workspace switcher**: catalog: popover with a "Search" field, the spaces with a check on the
     current one, and "+ Create space". Object: a "Spaces" header instead of a search field, the list with
     a check, then "Space settings", "Add space" and "Open folder..." (the folder entries are local-app
-    needs Object doesn't have; the search field is the gap).
+    needs the catalog doesn't cover; the search field is the gap).
 
 ## Second pass: object page, editor, Settings (read-only)
 
-13. **Editor sizing**: Object sizes the editor in `rem` from a 15.5px root (no zoom, DPR 1). Full-page
+13. **Editor sizing**: the catalog sizes the editor in `rem` from a 15.5px root (no zoom, DPR 1). Full-page
     People guide: H2 20.34px/700, body 15.5px on a 23.25px line, a 705px text column. Object's editor uses a
     fixed 17px base and has no text-size setting; a rem-based scale plus a setting would match.
 14. **Object page header**: type pill (e.g. "Person") + a "Collections" chip above the title, emoji icons in
@@ -67,7 +67,7 @@ compared control by control. Saved references: `docs/01-calendar-day.png`,
 15. **Settings > Editor** (all missing from Object): Disable spellcheck; Spellcheck language
     (Experimental); Always open as full page; Always create inline links; backlink display (Only block with
     backlink / Full path above); Hide object type settings outside of settings; Hide outliner lines; Toggle
-    style (Toggle | Bullet); Hide App Menu; When Object starts (space on this device: Last opened | Specific;
+    style (Toggle | Bullet); Hide App Menu; When the app starts (space on this device: Last opened | Specific;
     per space: Where I left off | Calendar | Calendar today | Specific object); Highlight Style (Default |
     Minimal); Default state for backlink sections.
 16. **Other Settings pages**: Language; Date & Time (time zone list, date formatting); Offline & Sync
@@ -78,7 +78,7 @@ compared control by control. Saved references: `docs/01-calendar-day.png`,
     have no Object equivalent by design.
 17. **Sidebar footer**: Graph, Trash, "Help & Resources" (First Steps, Ask a Question, Documentation, What's
     New, Feedback); profile, settings, theme icons along the bottom.
-18. **How-to guides**: Object ships guide objects ("How to Use This People Object", Meeting, Project).
+18. **How-to guides**: the catalog's starter spaces ship guide objects ("How to Use This People Object", Meeting, Project).
     Imported into the wiki-organized space as How-to-tagged objects and used as type descriptions.
 
 Method note: one stray click in this pass collapsed the sidebar's Object Types section; it was expanded
@@ -121,10 +121,10 @@ Gene pointed Claude at a second space used for about a year (27 object types, 14
 Note: this space holds plaintext credentials in some daily notes and pages. Nothing was copied; worth
 scrubbing before any of it is imported into Object.
 
-## Fourth pass: Object's built-in types, and a third space (Personal)
+## Fourth pass: the built-in types, and a third space (Personal)
 
-Read from Settings > Object Types in two spaces. Basic types cannot be edited in Object. Fields below are
-Object's own; "Object has" is `backend/objectapp/typemodel.py` (`BASIC_MEDIA_TYPES`, task fields).
+Read from Settings > Object Types in two spaces. Basic types cannot be edited there. Fields below are
+the catalog's; "Object has" is `backend/objectapp/typemodel.py` (`BASIC_MEDIA_TYPES`, task fields).
 
 28. **Built-in types and their fields** (beyond Title, Tags, Notes/Content, Description where listed):
     - Page: Aliases, Cover image, Icon, Description, Last updated, Created at.
@@ -178,8 +178,8 @@ No note content is kept here.
     mention ticket ids (OPS-n), few use raw `[[ ]]` or `#tags` as text (linking is done with the picker, so
     the Markdown form seen in an export is not how they were typed).
 38. **Pro-gated features appear as upsells**: a Query-backed tab ("Untitled") on Daily Notes shows blurred
-    cards and a "Get Object Pro" card; Tasks and Explore show a rocket badge. Object has no paywall. Whether Pro-gated
-    Object features (Tasks, Queries, AI, unlinked mentions, version history) should all be unlocked in Object
+    cards and an upgrade card; Tasks and Explore show a rocket badge. Object has no paywall. Whether Pro-gated
+    features (Tasks, Queries, AI, unlinked mentions, version history) should all be unlocked in Object
     is decided on 2026-11-02: all unlocked, nothing gated (see item 26).
 
 Not studied: typing flows themselves (slash menu, `[[` picker, @mentions, paste behaviour), since that needs
@@ -208,7 +208,7 @@ debugger, which makes list shortcuts unreliable to judge, so treat "did not conv
     filters; same footer hints.
 43. **Markdown input**: `# ` became a heading block; a backtick pair became an inline code token (monospace,
     purple, tinted background). `- `, `1. `, `[] `, `> ` and `**bold**`/`*ital*`/`~~strike~~` stayed literal in
-    this run (unconfirmed, see above). Whether Object converts them with real key events is still open.
+    this run (unconfirmed, see above). Whether they convert with real key events is still open.
 44. **Object `...` menu on a Page**: Open >, Find in Page (Ctrl F), Use Template >, Pin to Sidebar
     (Ctrl Shift *), Change Type >, Object Type Settings, Share, Present (Ctrl Alt P), Export (Ctrl E),
     Import (Ctrl I), Version History (Pro), Text Stats >, Copy >, Duplicate, Merge Into Object >,
@@ -221,13 +221,13 @@ debugger, which makes list shortcuts unreliable to judge, so treat "did not conv
 
 ## Consolidated backlog (everything above, in one list, 2026-11-02)
 
-Full behaviour is in `docs/object-behavior-catalog.md`; item numbers refer to this file. Status: **open**
+Full behaviour is in `docs/behavior-catalog.md`; item numbers refer to this file. Status: **open**
 unless marked. Order is a suggestion, highest value first.
 
 **Keep (Gene's explicit requirements)**
 - **Unlinked mentions stay.** Object already has them (M5: `backend/objectapp/references.py`,
   `frontend/src/references/`, setting "Default state for backlink sections" with Open | Closed | Hidden).
-  Object gates them behind Pro; Object keeps them free. Any change to references, the object page or
+  The catalog marks them Pro; Object keeps them free. Any change to references, the object page or
   search must not remove or hide them. Add a regression test per change that touches that code.
 
 **A. Data model (built-in types and fields)** (items 28, 29)
@@ -292,9 +292,9 @@ unless marked. Order is a suggestion, highest value first.
     Latex. Import: starter migration guides per tool.
 
 **H. Decisions for Gene**
-- ~~Which Pro-gated Object features to unlock~~ Decided 2026-11-02: all unlocked, nothing gated (item 26). AI and
+- ~~Which Pro-gated features to unlock~~ Decided 2026-11-02: all unlocked, nothing gated (item 26). AI and
   the network integrations stay out by the spec.
-- Whether the Object how-to guides should ship as built-in seeds in the Object app (currently only in the
+- Whether the how-to guides should ship as built-in seeds in the Object app (currently only in the
   imported wiki space).
 - Scrub credentials found in the Work and Personal spaces before any of it is imported or shared.
 
@@ -304,20 +304,20 @@ unless marked. Order is a suggestion, highest value first.
 |---|---|---|
 | A1, A2 media fields (PDF, Image, Weblink, Audio) | done: added in memory like the Task fields, a stored definition wins, never written on read | `5f9215d` |
 | C14 keyboard-hint footer ("up/down to navigate, Esc to abort, Enter to select") | done for the slash menu, New menu, link picker and search palette (the palette adds new tab and side panel) | `cbc84d3` |
-| B7 "Link to a date" presets | done: In a week, A week ago added. Object's live list also names "Time" and "Now"; Object keeps its own "Today - date link" and "Now - timestamp" (reference strings), not renamed | `54a10c7` |
+| B7 "Link to a date" presets | done: In a week, A week ago added. The catalog's list also names "Time" and "Now"; Object keeps its own "Today - date link" and "Now - timestamp", not renamed | `54a10c7` |
 | B8 `@` picker | done: `@` at the start of a word (and `[[`) opens a popover at the caret: recent objects first, then a row per type with its count and a chevron that lists the type's objects (Backspace goes back), typing fuzzy-matches titles, keyboard-hint footer; the live "Collection" badge on collection rows is not built | `f4c6a89` |
-| C18 object `...` menu shortcut hints | done for Find in page (Ctrl F), Present (Ctrl Alt P), Delete (Ctrl Backspace), read from the shortcut registry; the menu's order was already set to Object's sections on 2026-10-29. Export, Import and Pin to Sidebar have no registered key yet | `2dd693e` |
+| C18 object `...` menu shortcut hints | done for Find in page (Ctrl F), Present (Ctrl Alt P), Delete (Ctrl Backspace), read from the shortcut registry; the menu's order was already set to the catalog's sections on 2026-10-29. Export, Import and Pin to Sidebar have no registered key yet | `2dd693e` |
 | C15 space switcher Search field | done: a Search field heads the list (replacing the "Spaces" heading) and filters by name | `d112222` |
 | C17 Pin to Sidebar on a type's context menu; label capitalised ("Pin to Sidebar") everywhere | done | `553a88c` |
-| New menu (backlog 1, C14) | done: a popover under the New button with a "Search" field, the types in the sidebar's order (alphabetical here), the keyboard-hint footer; picking a type creates an untitled object of it at once, as in the live app (the old second step, "Search or Create" with a typed title, remains only when a `typeId` is passed). Correction: backlog item 1 said "recent-use order"; the live order is the sidebar's | `243805f` |
-| Sidebar: Graph below the object types, beside Trash | done (a second "Space" navigation landmark); "Add Section" still sits under Pinned, the live app puts it under the types | `7cfd501` |
-| Selection toolbar (remaining task 1) | done: Bold, Italic, Strikethrough, Underline, Bullet list, To-do, Link, Code, Formula, Highlight text, `+` (create object), `@` (link existing), in the live order; the list buttons toggle the block's list; Turn Into and Search left the toolbar (not in the live app); the second list icon was read as To-do (our choice); AI waits for M10 | `c57464c` |
+| New menu (backlog 1, C14) | done: a popover under the New button with a "Search" field, the types in the sidebar's order (alphabetical here), the keyboard-hint footer; picking a type creates an untitled object of it at once, as the catalog describes (the old second step, "Search or Create" with a typed title, remains only when a `typeId` is passed). Correction: backlog item 1 said "recent-use order"; the catalog's order is the sidebar's | `243805f` |
+| Sidebar: Graph below the object types, beside Trash | done (a second "Space" navigation landmark); "Add Section" still sits under Pinned, the catalog puts it under the types | `7cfd501` |
+| Selection toolbar (remaining task 1) | done: Bold, Italic, Strikethrough, Underline, Bullet list, To-do, Link, Code, Formula, Highlight text, `+` (create object), `@` (link existing), in the catalog's order; the list buttons toggle the block's list; Turn Into and Search left the toolbar (not in the catalog); the second list icon was read as To-do (our choice); AI waits for M10 | `c57464c` |
 
 Checked and already present in Object (so not backlog): Add Section, Graph customization options, the Shortcuts
-sheet (Settings), slash menu groups and strings (taken from Object's own app), unlinked mentions.
+sheet (Settings), slash menu groups and strings (as catalogued), unlinked mentions.
 Checked and also present: Wall cards are already masonry, the peek has the "N / total" stepper, the type page `...` menu has Pin, Collection, Import and settings.
 Checked and still open: sidebar "Sort Manually | Sort Alphabetically" on the Object Types header (types are always
-alphabetical), Help & Resources section (links to Object's web pages), the search palette
+alphabetical), Help & Resources section (links to external help pages), the search palette
 as one list, the Overview tab's hidden-section picker, the Table "Content" word-count column, "Add Section" under the types.
 
 Gate after these eight commits: back end 1463 passed (1 pre-existing failure, `test_static_files_are_gzipped`,
@@ -326,18 +326,18 @@ The app was also started on a copy of the imported wiki space and the sidebar ch
 
 ## 2026-11-03: the parallel pass
 
-Remaining tasks 2-25 (less 9's Help & Resources and 24, which link to Object's web pages) and 28, built in nine lanes in git worktrees, merged, reviewed once, fixed once, gated (`remaining-work.md` has the gate numbers). Commits per lane:
+Remaining tasks 2-25 (less 9's Help & Resources and 24, which link to external web pages) and 28, built in nine lanes in git worktrees, merged, reviewed once, fixed once, gated (`remaining-work.md` has the gate numbers). Commits per lane:
 
 | Lane | Items | Commits | Notes and our choices |
 |---|---|---|---|
-| Block menus | 2, 3 | `d4fcfe4`, `23c5c3a` | Block menu in the live order plus Object's Alignment, Standout, Indent; Ctrl+G binds Group with blocks selected; "Turn into..." is the object picker (reference check 2e). Bottom block-selection bar replaces the "N blocks" pill; Move to Today, Tomorrow or a new page. Tag dropdown skipped (no block tags in Markdown). |
-| Editor typing | 4, 5 | `21479a6`, `9404905` | `>` is now toggle and `|` quote; `a)`, `i)`, `()`, `[]` added; marks combine before the Space. `()` uses `ph-star` (Object uses the last block icon). Chrome fades while typing with Object's `.glass-chrome-fade` values. |
+| Block menus | 2, 3 | `d4fcfe4`, `23c5c3a` | Block menu in the catalog's order plus Object's Alignment, Standout, Indent; Ctrl+G binds Group with blocks selected; "Turn into..." is the object picker (reference check 2e). Bottom block-selection bar replaces the "N blocks" pill; Move to Today, Tomorrow or a new page. Tag dropdown skipped (no block tags in Markdown). |
+| Editor typing | 4, 5 | `21479a6`, `9404905` | `>` is now toggle and `|` quote; `a)`, `i)`, `()`, `[]` added; marks combine before the Space. `()` uses `ph-star` (the catalog uses the last block icon). Chrome fades while typing with the catalog's fade timing. |
 | Settings | 6, 7, 25 | `21c9941`, `578a914`, `f94f166` | 15.5px root (96.875%); text size is the desktop zoom factor, stored as device `zoom`, scales the note body only. Spellcheck language, Always create inline links (off: `@` in an empty block makes an object block), Hide object type settings, Highlight Style (stored, nothing to style yet). Offline & Sync page holds Recalculate content index. |
 | Shell | 8, 9 (Add Section), 11, 13 | `c278e5c`, `3054c33`, `3db82fa`, `831f596` | Manual type order in `ui.json` (`objectsSectionSortOption`, `workspace.objects.ids`); alphabetical when unset. Object menu key hints, Import, Copy > submenu; no Share. Item 12 skipped: collections are not linkable in Object. |
 | Palette | 10 | `b81d26b`, `44692ff` | One list; recents Today/Earlier (the recent store keeps `openedAt`); actions after content when typing; Ctrl+Enter, Shift+Enter. |
-| Views | 14-17 | `f976c5e`, `3af4753`, `e5e0a6d`, `2f0efa5`, `679d3d7` | Table "N words" chip and row numbers (backend word count, regex approximation); Overview gear with hidden sections; tag chips with counts; `hideProperties` frontmatter key (Object's `ComponentData.hideProperties`); backlink hover actions Expand, new tab, side panel. |
+| Views | 14-17 | `f976c5e`, `3af4753`, `e5e0a6d`, `2f0efa5`, `679d3d7` | Table "N words" chip and row numbers (backend word count, regex approximation); Overview gear with hidden sections; tag chips with counts; `hideProperties` frontmatter key; backlink hover actions Expand, new tab, side panel. |
 | Calendar | 18 | `30ef2e0`, `a9deaae`, `7dbcbaf` | Tasks `+` inside the pill; Month strip and "+ New Object" (makes the daily note); date-row pill with Reviewed, Open as Page, `...`. Empty daily-note placeholders skipped. |
-| Data model | 19-22 | `7b0d110`, `31906cc`, `026a6bf`, `8602caf` | Media label sets get Object's options; 14-template gallery (`templateKey` on the type, property kinds our choice); Object -> Tag is an entity property limited to Tag, with a tag picker and chips. Item 20 already built; Default list view skipped (not in the reference). |
+| Data model | 19-22 | `7b0d110`, `31906cc`, `026a6bf`, `8602caf` | Media label sets get the catalogued options; 14-template gallery (`templateKey` on the type, property kinds our choice); Object -> Tag is an entity property limited to Tag, with a tag picker and chips. Item 20 already built; Default list view skipped (not in the catalog). |
 | Export | 23, 28 | `ba43e66`, `9ebcd8b`, `f8d1f85` | PDF (printable page, Notes/Essay/Academic), Markdown options, Word (`zipfile` writer), LaTeX. Gzip test fixed (compared newline-translated text). |
 
 Review fixes: `8b66d59` (export: monospace font key, headings ending in `#`, LaTeX file commands in math, zip root placement and links back to it), `76401a4` (Move to the open daily note moves in place; other moves flush autosave first), `0dacbad` (`()` icons only where they save; list combinations lost their icon), `f4a227a` (Ctrl+I on a type page), `13e7972` (clipboard read on palette open only when already permitted), `4052227` (icon subset regenerated), `28e2ce7` (api mock).
@@ -350,14 +350,14 @@ Everything not done, with the behaviour to match (catalog section in brackets) a
 1. ~~Selection toolbar to the live set~~ done (`c57464c`).
 2. Block-handle menu: Hierarchy, List, To-do, Quote, Toggle, Group, Turn into..., Copy, Duplicate, Remove, with key hints. M.
 3. Block-selection bar at the bottom: "N blocks . M words", formatting buttons, Turn blocks into, Tag, Move, delete, close. M.
-4. Markdown shortcuts: confirm each with real key events (`|` quote, `>` toggle, `a)` and `i)` lists, `()` icon block, combinable); the debugger-typed test in the live app was inconclusive. S each.
+4. Markdown shortcuts: confirm each with real key events (`|` quote, `>` toggle, `a)` and `i)` lists, `()` icon block, combinable); the debugger-typed test was inconclusive. S each.
 5. Focus mode while typing (chrome fades until the pointer moves). S.
 6. Rem-based editor sizing from a 15.5px root and a text-size setting. M.
 7. Settings > Editor options Object lacks: spellcheck language, Always create inline links, Hide object type settings outside of settings, Highlight Style, startup per-space choice. M.
 
 **Shell and menus** (catalog 4, 8, 9)
 8. Sidebar Object Types header `...`: Sort Manually | Sort Alphabetically, with drag reordering for manual. M.
-9. "Add Section" under the types; Help & Resources section (links to Object's pages; check the no-network rule first). S.
+9. "Add Section" under the types; Help & Resources section (links to external help pages; check the no-network rule first). S.
 10. Search palette as one list: Today/Earlier groups, type at the right, Ctrl+Enter new tab, Shift+Enter side panel. M.
 11. Object menu: Export, Import and Pin key hints (need registry entries), Share, Copy > submenu. S.
 12. `@` picker: "Collection" badge on collection rows. S.
@@ -390,12 +390,12 @@ Everything not done, with the behaviour to match (catalog section in brackets) a
 31. **Integrations, later** (each L, lower priority): calendar feeds, task actions, local API with tokens, email capture, Readwise, Kindle, Telegram, WhatsApp, Raycast, web extension.
 
 **Decisions and housekeeping**
-26. **Decided (Gene, 2026-11-02): unlock all Pro features, nothing gated.** The spec already said so ("Pro-only features are simply available"). Checked: Object has no gating, badge or upsell anywhere, and Tasks, Queries, version history, extended search, focus mode and unlinked mentions all exist. Do not copy Object's rocket badges, blurred previews or "Get Object Pro" cards. Update the same day: **AI is now in scope** (M10, through the Claude Code CLI; `2026-11-02-m10-ai-assistant.md`) and the integrations are wanted later at lower priority; accounts, sync, sharing and mobile stay out.
-27. Decide whether the Object how-to guides ship as built-in seeds.
+26. **Decided (Gene, 2026-11-02): unlock every feature, nothing gated.** The spec already said so ("Every feature is simply available; nothing is gated behind a paid tier"). Checked: Object has no gating, badge or upsell anywhere, and Tasks, Queries, version history, extended search, focus mode and unlinked mentions all exist. Do not add rocket badges, blurred previews or upgrade cards. Update the same day: **AI is now in scope** (M10, through the Claude Code CLI; `2026-11-02-m10-ai-assistant.md`) and the integrations are wanted later at lower priority; accounts, sync, sharing and mobile stay out.
+27. Decide whether the how-to guides ship as built-in seeds.
 28. Investigate `test_static_files_are_gzipped` (fails on Windows `master`, also before these changes).
 29. Gene's hands-on checks, M1-M9 (256 items), and wiki-import follow-ups (see `remaining-work.md`).
 
-**Still to look at in Object** (the "Not yet poked" list below).
+**Still to look at for the catalog** (the "Not yet poked" list below).
 
 ## Not yet poked
 
@@ -403,5 +403,5 @@ Opened but only partly read, or never opened (all would need a scratch view or a
 safely): filter, sort and group editors; Customize card view and calculations; the Tasks page, Queries, AI
 Chat, Explore panel contents (Pro-gated); Weblink and PDF viewers; image and file objects; Two Columns, Code,
 Math, Toggle, Group and Horizontal line blocks (could not be inserted through the debugger); the Word and Latex
-export tabs; Unlinked Mentions in Object (Pro; Object's own implementation is in M5); Three days view in
+export tabs; Unlinked Mentions as catalogued (Object's own implementation is in M5); Three days view in
 the second and third spaces; whiteboards (none in the spaces seen); drag and drop; the Android and web clients.

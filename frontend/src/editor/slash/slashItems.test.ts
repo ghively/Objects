@@ -46,12 +46,12 @@ const TYPES = [typeDef({ id: 'page', name: 'Page', basic: true }), typeDef({ id:
 const ctx = (query = '', extra: Partial<SlashContext> = {}): SlashContext => ({ query, types: TYPES, twentyFourHourTime: false, ...extra })
 
 describe('slash items', () => {
-  test('slash menu sections and item names match reference', () => {
+  test('slash menu sections and item names', () => {
     const sections = slashSections(ctx())
     expect(sections.map((s) => s.label)).toEqual(['Create a block', 'Create an object', 'Link to a date', 'Reuse any content'])
-    // Object's CreateMenu order (reference check 2026-10-28, 2d).
+    // The menu order (reference check 2026-10-28, 2d).
     expect(sections[0].items.map((i) => [i.name, i.description ?? null])).toEqual([
-      ['Standard', 'Turn block into a standard text block'], // ControlDropdown.custom.block_Base.*
+      ['Standard', 'Turn block into a standard text block'],
       ['Small', 'Turn block into a small text block'],
       ['Heading 1', 'Block with a heading level 1'],
       ['Heading 2', 'Block with a heading level 2'],
@@ -66,7 +66,7 @@ describe('slash items', () => {
       ['Toggle', 'Add a toggle to this block'],
       ['Icon', 'Add an icon to this block'],
       ['Group', 'A layout element to group multiple blocks into one container'],
-      ['Record audio', 'Record audio and embed it at the cursor.'], // CreateDropdown.recordAudio.*
+      ['Record audio', 'Record audio and embed it at the cursor.'],
       ['Math', 'A display style math block'],
       ['Code', 'A code block'],
       ['Horizontal line', 'A horizontal line to separate different sections'],
@@ -74,7 +74,7 @@ describe('slash items', () => {
       ['Table', 'A simple block for tabular content'],
       ['Create bookmark', null], // ours: Object's only way to insert a bookmark
     ])
-    // Object's icons (`bke`, `Ze`).
+    // The expected icons.
     expect(Object.fromEntries(sections[0].items.map((i) => [i.id, i.icon]))).toMatchObject({
       Base: 'ph-text-t',
       S: 'ph-text-aa',
@@ -254,13 +254,13 @@ describe('m8 typed dates and reuse items', () => {
   })
 })
 
-describe('search-only items (Object reference)', () => {
+describe('search-only items', () => {
   test('colour items and Mermaid Diagram appear only while searching', () => {
     const ids = (q: string) => slashSections(ctx(q))[0].items.map((i) => i.id)
     expect(ids('')).not.toContain('mermaid')
     expect(ids('').some((id) => id.startsWith('color:'))).toBe(false)
     expect(ids('b')).toContain('mermaid')
-    // 18 backgrounds, then 18 text colours, named by colorThemes.theme-*.
+    // 18 backgrounds, then 18 text colours.
     expect(COLOR_ITEMS).toHaveLength(36)
     expect(COLOR_ITEMS[0].name).toBe('Gray background')
     expect(COLOR_ITEMS[18].name).toBe('Gray text')

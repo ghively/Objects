@@ -1,6 +1,6 @@
 """Exporting one object (M9): its ``.md`` as it is, or a zip with the media it references.
 
-Object's entity "Export" offers Markdown with the option "Include media" ("Adds files and
+The object's "Export" offers Markdown with the option "Include media" ("Adds files and
 images to the zip."). An Object file already is Markdown with wikilinks, so the export is the
 file's own bytes; with media it is a zip of ``<stem>.md`` plus every image and attachment the
 file references, each at its space-relative path (so the file's links still resolve inside
@@ -212,7 +212,7 @@ class ExportOptions:
     Markdown: ``subpages`` ("Export folder containing all subpages"), ``media``, ``title_h1``
     ("Include title as heading 1") and ``wikilinks`` ("Links as wikilinks"; on by default,
     our choice, so the default export is the file's own bytes). PDF: ``style``, ``paper``,
-    ``embedded``, ``outline``, ``hide_empty`` (on by default, as Object), ``type_labels``
+    ``embedded``, ``outline``, ``hide_empty`` (on by default), ``type_labels``
     and ``hidden`` (deselected property keys). Word and LaTeX use the property choices.
     """
 
@@ -250,7 +250,7 @@ def _is_object_target(target: str) -> bool:
 
 def _subpages(space: Space, rel: str) -> list[str]:
     """The objects ``rel`` embeds (``![[Object]]``), and theirs in turn, in order (our
-    reading of Object's "linked subpages": embedded objects, followed to any depth)."""
+    reading of "linked subpages": embedded objects, followed to any depth)."""
     out: list[str] = []
     seen = {rel}
     queue = [rel]

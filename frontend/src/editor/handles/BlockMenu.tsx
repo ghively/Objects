@@ -1,11 +1,11 @@
 /**
  * The block menu (Task 12), opened by clicking a block's drag handle (the
- * block is then the block selection). Object's live block menu (catalog
+ * block is then the block selection). The block menu (catalog
  * section 6, read 2026-11-02; labels from the English strings), in its order:
  *
  * 1. "Hierarchy (<current>)" ▸, "List" ▸, "To-do", "Quote", "Toggle",
  *    "Group" (Ctrl+G) (`BlockStyleMenu` without its "Icon" row);
- * 2. (Object's "AI assistant...": M10, not here yet)
+ * 2. ("AI assistant...": M10, not here yet)
  *    "Turn into..." ▸ (the object picker: the types, a to-do's "Turn into
  *    task object", "Turn into whiteboard"), "Copy" ▸ ("Copy blocks", "Copy as
  *    Markdown", "Copy block reference" for one block), "Duplicate" (Ctrl+D),
@@ -55,18 +55,18 @@ import { copyBlockReference } from '../nodes/blockRef'
 import { hasTodoAt, turnIntoObject, turnIntoWhiteboard, turnTodoIntoTask } from '../turnInto'
 
 export const BLOCK_MENU_TEXT = {
-  insertAbove: 'Insert block above', // BlockMenu.insertAbove
-  insertBelow: 'Insert block below', // BlockMenu.insertBelow
-  turnInto: 'Turn into...', // ActionItems.turnBlocksInto.title
-  copy: 'Copy', // ActionItems.copy.title
-  copyBlocks: 'Copy blocks', // ActionItems.copyBlocks.title
-  copyAsMarkdown: 'Copy as Markdown', // ActionItems.copyBlocksAsMarkdown.title
-  copyBlockReference: 'Copy block reference', // ActionItems.copyBlockReference.title
-  duplicate: 'Duplicate', // ActionItems.duplicateBlocks.title
-  remove: 'Remove', // ActionItems.deleteBlocks.title
-  selected: (n: number) => `${n} selected`, // blocksMenu.blocksSelected
-  turnIntoTaskObject: 'Turn into task object', // components.RootTask.turnBlockIntoTaskObject
-  turnIntoWhiteboard: 'Turn into whiteboard', // Whiteboard.turnInto.action
+  insertAbove: 'Insert block above',
+  insertBelow: 'Insert block below',
+  turnInto: 'Turn into...',
+  copy: 'Copy',
+  copyBlocks: 'Copy blocks',
+  copyAsMarkdown: 'Copy as Markdown',
+  copyBlockReference: 'Copy block reference',
+  duplicate: 'Duplicate',
+  remove: 'Remove',
+  selected: (n: number) => `${n} selected`,
+  turnIntoTaskObject: 'Turn into task object',
+  turnIntoWhiteboard: 'Turn into whiteboard',
 }
 
 /** Run an async block action; a part another task hasn't built yet shows "Not available yet". */
@@ -76,10 +76,10 @@ function run(action: () => Promise<boolean>): void {
   })
 }
 
-/** The "Turn Into" items (`tokensMenu.turnInto.name`): name (Object's key), kind, and the shortcut id whose keys the row shows. */
+/** The "Turn Into" items: name, kind, and the shortcut id whose keys the row shows. */
 export const TURN_INTO_ITEMS: readonly { kind: TurnIntoKind; name: string; shortcut?: string }[] = [
-  { kind: 'text', name: 'Text' }, // blocks.TextBlock.name
-  { kind: 'H1', name: 'Heading 1', shortcut: 'heading1' }, // ControlDropdown.custom.block_H1.name
+  { kind: 'text', name: 'Text' },
+  { kind: 'H1', name: 'Heading 1', shortcut: 'heading1' },
   { kind: 'H2', name: 'Heading 2', shortcut: 'heading2' },
   { kind: 'H3', name: 'Heading 3', shortcut: 'heading3' },
   { kind: 'H4', name: 'Heading 4', shortcut: 'heading4' },
@@ -91,7 +91,7 @@ export const TURN_INTO_ITEMS: readonly { kind: TurnIntoKind; name: string; short
   { kind: 'todo', name: 'To-do', shortcut: 'toDo' }, // block_todo
   { kind: 'toggle', name: 'Toggle', shortcut: 'toggle' }, // block_toggle
   { kind: 'quote', name: 'Quote block' }, // block_quote
-  { kind: 'code', name: 'Code', shortcut: 'toggleCodeBlock' }, // blocks.CodeBlock.name
+  { kind: 'code', name: 'Code', shortcut: 'toggleCodeBlock' },
 ]
 
 /** The registry's first key for `id`, formatted for display (empty when it has none). */

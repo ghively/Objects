@@ -1,5 +1,5 @@
 /**
- * The extended search page (Object's `LocalSpaceQuery`): heading "Search", a query box, the
+ * The extended search page: heading "Search", a query box, the
  * "Text matches only" toggle (`mode=fullText`: body matches only), M5's type and tag filters, and
  * the results in M3's data view (list by default; the other layouts on offer). "Save as Query"
  * turns the search into a saved query and opens it.
@@ -32,7 +32,7 @@ import { STANDARD_LAYOUTS } from '@/views/model'
 import { useRows } from '@/views/useRows'
 import './searchPage.css'
 
-/** Object's `LocalSpaceQuery.*` strings, verbatim. */
+/** The search page's strings. */
 export const SEARCH_PAGE_TEXT = {
   heading: 'Search',
   emptyState: 'Enter a search keyword to show content from your space.',

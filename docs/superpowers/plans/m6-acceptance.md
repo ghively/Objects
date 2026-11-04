@@ -54,7 +54,7 @@ Back end:
   - A whiteboard's new stem must be free for all three names. The sidecars move after the `.md`. If they can't move, the `.md` goes back and the title change stands, as when a file is locked.
   - Renaming any object also relinks every board file that links to it by its old name, using the same rule as `.md` referrers. Those board files are listed in `relinked`, and the server announces `whiteboard` for them, not `changed`.
 - **Change type is refused.** `changetype.type_category` returns `whiteboard` for the basic Whiteboard type, so M2's existing 422 messages refuse changing a board's type and changing an object to a board.
-- **Whiteboard is a basic type.** It is in `BASIC_TYPE_NAMES` with the icon `ph-presentation`. `roles.py` maps it to `RootWhiteboard`, which is in all four of M5's role lists, as the reference's `...whiteboard(config)` spreads say.
+- **Whiteboard is a basic type.** It is in `BASIC_TYPE_NAMES` with the icon `ph-presentation`. `roles.py` maps it to `RootWhiteboard`, which is in all four of M5's role lists.
 - **Ink files are not images.** `media.py` neither lists nor serves `<stem>.ink.svg` when `<stem>.md` sits beside it.
 - **Boards are in backlinks and search.**
   - New module `whiteboardindex.py` reads the board read-only, for both indexes.
@@ -99,7 +99,7 @@ Things noticed for Gene:
 ### Items the lane tasks left for Gene
 
 - **Our choices in Task 7:**
-  - `whiteboard.css` uses blue for the selection colour and text-muted for the strong line colour; neither is a reference value.
+  - `whiteboard.css` uses blue for the selection colour and text-muted for the strong line colour; neither is a catalog value (our choice).
   - `saveSettings` still sends `PUT /api/ui` itself. It works the same as `api.patchUi`, but it emits no local `ui` event.
 - **Task 9:**
   - The camera and tool-memory key is the board path.
@@ -117,7 +117,7 @@ Things noticed for Gene:
   - The tip drawings are ours.
   - Escape saves a label.
 - **Task 12:**
-  - These strings have no Object original: "Choose pointer tool", "Choose shape", "Choose gate", "Order", "Nothing found", "Open as page", "Whiteboard tools", "Selection", "Zoom".
+  - These strings are our own: "Choose pointer tool", "Choose shape", "Choose gate", "Order", "Nothing found", "Open as page", "Whiteboard tools", "Selection", "Zoom".
   - Two buttons on the board page are named "More options".
   - Tip "None" writes `'none'`.
 - **Task 5:** `InkStroke` has an optional `colorName` (the theme name behind the hex, written to `data-color`).
@@ -167,7 +167,7 @@ Run `npm run build`, then `uv run objectapp --space <copy of backend/tests/fixtu
 - [ ] Undo and redo across nodes and ink.
 - [ ] Boards in backlinks and search: an object embedded on a board lists the board in its references, and a word typed in a board text block finds the board in Ctrl+K.
 
-### Side by side with Object (the trimmed reference has no whiteboard screenshot; judge by eye)
+### Against the behaviour catalog (judge by eye)
 
 - [ ] The toolbox position and contents.
 - [ ] The zoom control.
@@ -182,7 +182,7 @@ Run `npm run build`, then `uv run objectapp --space <copy of backend/tests/fixtu
 
 ### Decisions made without a reference
 
-- [ ] The shortcut keys are Object's own (its whiteboard table and canvas key handler; `reference-check-2026-10-28.md` §1): V, H, T, L, Shift+L (arrow), R, O, P (triangle), F, ] and [ (front and back), Ctrl+] and Ctrl+[, Ctrl+G (wrap in frame), Ctrl+Arrow (resize), and a nudge of 1 px, or 30 px with Shift or while snap to grid is on. Pen D, highlighter Shift+D and eraser E are ours: Object-only tools, kept off Object's P (triangle) and M (move menu).
+- [ ] The shortcut keys follow the whiteboard shortcut table (`reference-check-2026-10-28.md` §1): V, H, T, L, Shift+L (arrow), R, O, P (triangle), F, ] and [ (front and back), Ctrl+] and Ctrl+[, Ctrl+G (wrap in frame), Ctrl+Arrow (resize), and a nudge of 1 px, or 30 px with Shift or while snap to grid is on. Pen D, highlighter Shift+D and eraser E are ours: Object-only tools, kept off P (triangle) and M (move menu).
 - [ ] Frames dragging their contents.
 - [ ] 9 of the 12 shapes in the picker.
 - [ ] Board edits don't bump `lastUpdated`.

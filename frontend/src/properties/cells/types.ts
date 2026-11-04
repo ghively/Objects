@@ -14,7 +14,7 @@ export interface CellProps<T> {
   readOnly?: boolean
   /** `table`: a compact one-line rendering for a table cell (truncated, smaller pills); default `panel`. */
   density?: 'panel' | 'table'
-  /** In a table (wrapped or not): an empty value shows no placeholder, as in Object. */
+  /** In a table (wrapped or not): an empty value shows no placeholder. */
   inTable?: boolean
   onChange(next: T): void | Promise<boolean | void>
 }

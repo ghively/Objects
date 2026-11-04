@@ -5,13 +5,13 @@ Everything needed to resume is in this repo. Rules and layout: `CLAUDE.md`. Wher
 ## Status
 
 Take the current state from `docs/superpowers/plans/remaining-work.md` and `git log`; this file doesn't track it. As of 2026-11-02:
-- **Built:** M1–M9 are built, reviewed, fixed and gated, all on `master`. M8 covers every Object feature M4–M7 had deferred, local only; M9 the audit's completeness gaps. The 2026-11-01 full audit's fixes (bugs and optimization) are merged (PR #4).
+- **Built:** M1–M9 are built, reviewed, fixed and gated, all on `master`. M8 covers every feature M4–M7 had deferred, local only; M9 the audit's completeness gaps. The 2026-11-01 full audit's fixes (bugs and optimization) are merged (PR #4).
 - **Out of scope by the spec:** AI, network integrations, accounts, mobile, telemetry.
 - **Pending:** Gene's hand-checks, all milestones (`plans/m1-acceptance.md` to `plans/m9-acceptance.md`, all unchecked).
 
 ## Polish backlog (2026-11-02)
 
-Start from `docs/superpowers/plans/polish-audit-2026-11-02.md` ("Consolidated backlog") and use `docs/object-behavior-catalog.md` as the behaviour reference (labels, order, shortcuts, menus). Keep unlinked mentions working. Do one item per commit with a test; run the full gate before each commit.
+Start from `docs/superpowers/plans/polish-audit-2026-11-02.md` ("Consolidated backlog") and use `docs/behavior-catalog.md` as the behaviour reference (labels, order, shortcuts, menus). Keep unlinked mentions working. Do one item per commit with a test; run the full gate before each commit.
 
 ## The next step, in order
 
@@ -35,10 +35,14 @@ Build workflows (they need the Workflow tool) are in `scripts/workflows/`:
 
 The saved copies are reference versions: edit the plan paths and milestone list before reusing them. Keep the machine awake for the whole run. To pause, stop the workflow and relaunch with the same script and `resumeFromRunId` in the same session; completed agents replay from cache. A session usage limit or a container restart stops the run, and a resume recovers it.
 
-## Reference material
+## Behaviour reference
 
-`reference/` holds a trimmed subset of Object's design notes (`design-notes`), English UI strings (`docs/strings.txt`) and CSS (`docs/design.css`). Read it for behaviour, labels and values only. It was recovered from the Object desktop installer, which is not in the repo (`*.exe` and `Object*.zip` are git-ignored). If work needs another file from the full unpacked app (`.reference/` on Gene's PC), add that single file under `reference/` at the same relative path. The guessed values listed in `HANDOFF.md` are the main candidates.
+`docs/behavior-catalog.md` (labels, menus, shortcuts, order) and the design spec (`docs/superpowers/specs/2026-10-23-object-design.md`) are the reference for behaviour, labels and values. The guessed values listed in `HANDOFF.md` are the ones neither settles yet.
+
+## On-disk format
+
+A space keeps its metadata in `.object/` (types, collections, queries, UI state, trash) and its rebuildable cache in `.object-cache/`. Spaces made before 2026-11-04 used older folder names; they are renamed to these once, automatically, on open, and no `.md` file is changed.
 
 ## Out of scope (by design)
 
-Accounts, login, billing, sync, sharing, mobile, integrations, AI features (a Claude Code agent comes later), telemetry, importing Object data, migrating `C:\Git\wiki`.
+Accounts, login, billing, sync, sharing, mobile, integrations, AI features (a Claude Code agent comes later), telemetry, migrating `C:\Git\wiki`.

@@ -1,12 +1,12 @@
 /**
  * The object page's layout, from the type's page settings:
- * - `viewDesign` Standard (`null`): the properties in the left panel (as Object's current
- *   object page and the visual reference), the header and body in the content column.
+ * - `viewDesign` Standard (`null`): the properties in the left panel (as on the current
+ *   object page), the header and body in the content column.
  *   `indexCard`: the properties in a bordered card under the header. `profile`: the cover (or
  *   icon) as a large round image beside the title, the properties in a side column.
  *   `encyclopedia`: the properties in a right-hand infobox next to the body.
- * - `wideLayoutMode` removes the content max-width (Standard only: Object's setting "will not
- *   make any difference for encyclopedia, profile, or index card designs"). M9: the object's own
+ * - `wideLayoutMode` removes the content max-width (Standard only: the setting makes no
+ *   difference for encyclopedia, profile, or index card designs). M9: the object's own
  *   `wideLayoutMode` / `wideCoverImage` (frontmatter) override the type's; `coverImageOffset`
  *   positions a cropped cover.
  * - `font` sets the title and body font family.
@@ -14,13 +14,12 @@
  * The page and the peek share this layout; the peek is narrower, so its gutters are too.
  * - M9: the floating inspector (Outline, Stats; `PageInspector`) top right over the content, when
  *   `inspector` is given. Encyclopedia: the cover and title span the full width above the body and
- *   its infobox (Gene, 2026-10-29, over Object's cover-above-the-content-column).
+ *   its infobox (Gene, 2026-10-29, over a cover above the content column).
  *
  * Narrow widths: below the container's md breakpoint (`PROPERTIES_BESIDE_WIDTH`, 768 px) the
  * Standard, Profile and Encyclopedia properties move inline under the header (drawn as the `card`
- * variant). Object shows Profile's and Encyclopedia's property sidebar only from md
- * (`PropertiesSidebar`, `isMd`). Whether Object's Standard design has a property sidebar at all
- * is open (reference-check section 5): Standard keeps its left panel here until Gene checks.
+ * variant). Profile's and Encyclopedia's property sidebar shows only from md. Standard keeps its
+ * left panel here until Gene checks.
  */
 import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import { api } from '@/api/client'
@@ -40,7 +39,7 @@ export type PanelVariant = 'side' | 'card' | 'column' | 'infobox'
 /** The Standard left property panel's width (`PropertyPanel`'s `side` variant). */
 export const PROPERTY_PANEL_WIDTH = 370
 /**
- * The layout width from which the properties sit beside the content: Object's container `md`
+ * The layout width from which the properties sit beside the content: the container's `md`
  * breakpoint (768 px), from which Profile and Encyclopedia show their property sidebar.
  */
 export const PROPERTIES_BESIDE_WIDTH = 768

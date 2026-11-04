@@ -23,9 +23,9 @@ const TAGS = propertyDef({ id: 'tags', key: 'tags', name: 'Tags', type: 'entity_
 const NOTE = typeDef({ id: 'note', name: 'Note', propertyDefinitions: [TAGS] })
 const PLAIN = typeDef({ id: 'plain', name: 'Plain' })
 
-/** Object's initial sections (the server's `default_views`). */
+/** The initial sections (the server's `default_views`). */
 const DEFAULTS = ['recentlyAccessed', 'collections', 'queries'] as const
-/** The default set before the reference check: still what older saved views hold. */
+/** The older default set: still what older saved views hold. */
 const OLD = ['recentlyAccessed', 'collections', 'queries', 'inNoCollection', 'notTagged'] as const
 
 function views(keys: readonly string[] = DEFAULTS, removed: string[] = []): Views {
@@ -129,7 +129,7 @@ describe('section edits', () => {
     expect(back.dashboard.sections.map((s) => s.key)).toEqual(['collections', 'queries', 'inNoCollection', 'notTagged', 'recentlyAccessed'])
   })
 
-  test('Collections and Queries cannot be removed (reference canBeRemoved: false)', () => {
+  test('Collections and Queries cannot be removed', () => {
     expect(canRemoveSection('collections')).toBe(false)
     expect(canRemoveSection('queries')).toBe(false)
     expect(canRemoveSection('recentlyAccessed')).toBe(true)
@@ -139,7 +139,7 @@ describe('section edits', () => {
     expect(removeSection(v, buildSections(NOTE, v, ctx()), 'queries')).toBe(v)
   })
 
-  test('Not in any collection and Not tagged are offered in Add a section, not shown by default (reference)', () => {
+  test('Not in any collection and Not tagged are offered in Add a section, not shown by default', () => {
     const v = views()
     const built = buildSections(NOTE, v, ctx())
     expect(addableSections(NOTE, built, ctx()).map((s) => s.key)).toEqual(['inNoCollection', 'notTagged', 'noBacklinks'])

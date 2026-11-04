@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 import { KeyHints } from './KeyHints'
 
 describe('<KeyHints>', () => {
-  test("shows Object's footer: navigate, abort, select", () => {
+  test("shows the footer: navigate, abort, select", () => {
     render(<KeyHints />)
     const bar = screen.getByRole('note', { name: 'Keyboard hints' })
     expect(bar).toHaveTextContent('↑↓ to navigate')

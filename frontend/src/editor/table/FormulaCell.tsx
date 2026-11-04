@@ -2,7 +2,7 @@
  * Formula cells. A table cell whose text starts with `=` shows the value its
  * formula computes (`formulas.ts`), or the error's title with its message as
  * the tooltip. While the caret is in the cell it shows the `=…` text instead,
- * with "Formula" (`blocks.simpleTable.formulas.editor.placeholder`) after a
+ * with "Formula" after a
  * bare `=` and the statements list under the cell, filtered by the name being
  * typed ("No options found" when none matches). A statement is picked with a
  * click, or with ArrowUp/ArrowDown and Enter/Tab while a name is typed; it

@@ -1,6 +1,6 @@
 /**
- * The theme's shortcut: `toggleDarkMode` ("Toggle dark mode", `shortcuts.toggleDarkMode.name`;
- * Object's key Ctrl+Shift+L / ⇧⌘L, defined once in `lib/shortcuts.ts`). Toggling flips the
+ * The theme's shortcut: `toggleDarkMode` ("Toggle dark mode";
+ * key Ctrl+Shift+L / ⇧⌘L, defined once in `lib/shortcuts.ts`). Toggling flips the
  * device setting `themeMode` through `useSettings().patch`; `GlobalOverlays` applies the result.
  */
 import { M7_SHORTCUTS, registerShortcuts, useGlobalShortcut } from '@/lib/shortcuts'

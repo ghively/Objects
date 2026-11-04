@@ -205,7 +205,7 @@ def test_permanent_delete_os_failure_is_503(tmp_path: Path, state: Path, monkeyp
     assert other.is_dir()
 
 
-def test_permanent_recheck_refuses_folder_that_lost_object(
+def test_permanent_recheck_refuses_folder_that_lost_its_metadata(
     tmp_path: Path, state: Path, monkeypatch
 ):
     current = _space(tmp_path, "current")
