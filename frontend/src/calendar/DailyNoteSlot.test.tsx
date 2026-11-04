@@ -28,7 +28,7 @@ describe('DailyNoteSlot', () => {
   test('test + Daily Note creates for the day and shows the editor; 409 opens the existing note', async () => {
     const user = userEvent.setup()
     const onChanged = vi.fn()
-    const { container, rerender } = render(<DailyNoteSlot day={TODAY} note={null} heading onChanged={onChanged} />)
+    const { container, rerender } = render(<DailyNoteSlot day={TODAY} note={null} heading emptyPlaceholders={false} onChanged={onChanged} />)
     expect(screen.getByText('Daily note')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Daily Note' }))
     expect(mocked.createDailyNote).toHaveBeenCalledWith(TODAY)
@@ -44,7 +44,7 @@ describe('DailyNoteSlot', () => {
 
     // Another day: a 409 shows the note that already exists.
     mocked.createDailyNote.mockRejectedValueOnce(new DailyNoteExistsError('exists', 'DailyNotes/Older/2026-10-24.md'))
-    rerender(<DailyNoteSlot day="2026-10-24" note={null} heading onChanged={onChanged} />)
+    rerender(<DailyNoteSlot day="2026-10-24" note={null} heading emptyPlaceholders={false} onChanged={onChanged} />)
     await user.click(screen.getByRole('button', { name: 'Daily Note' }))
     await waitFor(() => expect(container.querySelector('[data-object-path="DailyNotes/Older/2026-10-24.md"]')).not.toBeNull())
     expect(mocked.object).toHaveBeenCalledWith('DailyNotes/Older/2026-10-24.md')
@@ -56,7 +56,7 @@ describe('DailyNoteSlot', () => {
     mocked.createDailyNote.mockRejectedValueOnce(
       new DailyNoteExistsError('A file with that name already exists.', 'DailyNotes/2026-11-01.md', 'nameTaken'),
     )
-    const { container } = render(<DailyNoteSlot day="2026-11-01" note={null} heading onChanged={onChanged} />)
+    const { container } = render(<DailyNoteSlot day="2026-11-01" note={null} heading emptyPlaceholders={false} onChanged={onChanged} />)
     await user.click(screen.getByRole('button', { name: 'Daily Note' }))
     expect(await screen.findByText('A file with that name already exists.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Daily Note' })).toBeInTheDocument()
