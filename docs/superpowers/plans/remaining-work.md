@@ -6,7 +6,7 @@ Status as of 2026-11-04. **All nine milestones are built, reviewed, fixed and ga
 0. **M10, the AI assistant** (planned 2026-11-02, not built): `2026-11-02-m10-ai-assistant.md`; three small questions for Gene at its end.
 1. **Polish backlog: done** (2026-11-04). Built: local Help & Resources (shortcuts, Getting started, Markdown reference; no external links), empty daily-note placeholders (Day view), Default list view type setting, a saved query per starter template, the empty icon list item fix, Wall card details. Closed by Gene: the per-tool import guides, the `@` picker's Collection badge (collections stay unlinkable), block tags. Open question: deleting a type leaves its saved queries in `.object/queries/` pointing at the deleted type id.
 2. **Decisions for Gene:** (decided 2026-11-02: all Pro features are unlocked, nothing gated; AI is in, through the Claude Code CLI, planned as M10; the integrations come later at lower priority); whether the how-to guides ship as built-in seeds; scrub the plaintext credentials found in his Work and Personal source spaces before any import.
-3. **Gene's hands-on checking** (M1-M9 acceptance docs, 256 unchecked items), and the fixes it produces. **Settled 2026-10-28:** the Standard design shows properties in the side column; they go inline below 768 px.
+3. **Gene's hands-on checking** (M1-M9 acceptance docs, 255 unchecked items), and the fixes it produces. **Settled 2026-10-28:** the Standard design shows properties in the side column; they go inline below 768 px.
 4. **Not yet catalogued** (needs a scratch view or approval): filter, sort and group editors, Customize card view, Tasks page, Queries, Weblink and PDF viewers, image and file objects, Two Columns/Code/Math/Toggle/Group/Horizontal line blocks, Word and Latex export, Three days view in the other spaces, drag and drop, markdown list shortcuts with real key events.
 5. ~~One known test failure on Windows~~ fixed 2026-11-03 (`ba43e66`): the gzip test compared newline-translated text; it now compares bytes.
 6. **Wiki import follow-ups** (outside the repo, in Gene's `ObjectSpaces` folder): review the 10 "possible secrets" pages listed in `ai-pass/review.md`; the wiki copy is a snapshot (refresh = recopy and AI-reread only new or changed pages).
@@ -111,7 +111,7 @@ The synthetic fixture spaces are `space-sample`, `space-v1`, `space-calendar`, `
 ## What is left
 
 0. **Both audit lists are done:** 2026-10-28 (bugs fixed, completeness gaps built as M9) and 2026-11-01 (bugs and optimization, every item, fixed on `ccr-bcf6e946-bf8moc`; merge it). One open question for Gene: should the object page title also commit on Escape, as table title cells now do?
-1. **Gene's hands-on checks, M1–M9:** 256 unchecked items. Run them on a copy of the CPI export kept outside the repo, with `git init` there: `npm run build` in `frontend/`, then `uv run objectapp --space <copy>`. These can only be checked on his Windows machine:
+1. **Gene's hands-on checks, M1–M9:** 255 unchecked items. Run them on a copy of the CPI export kept outside the repo, with `git init` there: `npm run build` in `frontend/`, then `uv run objectapp --space <copy>`. These can only be checked on his Windows machine:
    - the pywebview window
    - Windows toast reminders
    - Wacom pressure and tilt
