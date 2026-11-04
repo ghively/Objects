@@ -397,6 +397,10 @@ Everything not done, with the behaviour to match (catalog section in brackets) a
 
 **Still to look at for the catalog** (the "Not yet poked" list below).
 
+## 2026-11-04: the last open items
+
+Built: 9 (Help & Resources, local only: shortcuts sheet, Getting started, Markdown reference), 18 (empty daily-note placeholders, Day view), 20 (Default list view, `defaultDataViewLayout`), 21 (one saved query per starter template), the empty icon list item loading as a raw block, Wall card details. Closed by Gene: 24 (import guides), 12 (Collection badge), the block-selection bar's Tag dropdown. Details and gate: `remaining-work.md`, "2026-11-04".
+
 ## Not yet poked
 
 Opened but only partly read, or never opened (all would need a scratch view or a second scratch page to look at
