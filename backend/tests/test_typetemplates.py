@@ -224,6 +224,28 @@ def test_a_template_query_with_a_missing_option_still_creates_the_type(
     assert "Lost projects" in caplog.text
 
 
+def test_re_adding_a_deleted_template_type_does_not_duplicate_its_query(tmp_path: Path):
+    space_dir = tmp_path / "s"
+    space_dir.mkdir()
+    sp = Space(space_dir)
+    t = sp.create_type("", "", template="book")
+    sp.delete_type(t.id, confirm=True)
+    # Deleting a type leaves its queries where they are (they still name its id).
+    assert [q["name"] for q in _queries(space_dir)] == ["Currently reading"]
+    again = sp.create_type("", "", template="book")
+    assert again.id == t.id
+    assert [q["name"] for q in _queries(space_dir)] == ["Currently reading"]
+
+
+def test_a_same_named_query_of_another_type_does_not_block_the_template_query(tmp_path: Path):
+    space_dir = tmp_path / "s"
+    space_dir.mkdir()
+    sp = Space(space_dir)
+    sp.create_query("Currently reading", {"structures": [{"id": "page"}]})
+    sp.create_type("", "", template="book")
+    assert [q["name"] for q in _queries(space_dir)] == ["Currently reading"] * 2
+
+
 def test_a_template_query_the_space_refuses_still_creates_the_type(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
