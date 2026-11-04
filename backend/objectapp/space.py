@@ -3518,7 +3518,10 @@ class Space:
         The type JSON and templates go to ``trash/types/<ulid>/``; each object
         becomes an object entry with ``typeTrashId``. Other types' relation
         properties that allowed this type stop allowing it; ``allowedTypesRefs``
-        records them so a restore puts them back.
+        records them so a restore puts them back. A saved query that targets
+        only this type moves to ``queries/<id>.json`` in the same folder
+        (``queries`` lists the ids); one that targets other types too loses
+        this type from its ``structures``, recorded in ``queryStructureRefs``.
         """
         with self._lock:
             self._check_type_free(type_def.id)
@@ -3529,6 +3532,8 @@ class Space:
             templates = [p for p in self._templates_of(type_def.id) if p not in objects]
             object_ids: list[str] = []
             refs: list[dict[str, str]] = []
+            queries: list[str] = []
+            query_refs: list[dict[str, Any]] = []
             deleted_at = now_stamp()
             manifest = {
                 "id": trash_id,
@@ -3539,12 +3544,15 @@ class Space:
                 "objectTrashIds": object_ids,
                 "allowedTypesRefs": refs,
                 "templates": templates,
+                "queries": queries,
+                "queryStructureRefs": query_refs,
             }
             # The manifest goes first, so a failure partway (a locked file) never
             # strands the type and its templates in the trash with no way back.
             self.trash.write_json(folder / "manifest.json", manifest)
             try:
                 self._trash_type_files(type_def, folder, trash_id, objects, templates, object_ids, refs)
+                self._trash_type_queries(type_def.id, folder, queries, query_refs)
             except BaseException:
                 try:
                     if not (folder / "type.json").exists():
@@ -3614,6 +3622,130 @@ class Space:
                 other.propertyDefinitions = changed.propertyDefinitions
                 refs.extend({"typeId": other.id, "propertyId": p.id} for p in touched)
 
+    def _trash_type_queries(
+        self,
+        type_id: str,
+        folder: Path,
+        queries: list[str],
+        query_refs: list[dict[str, Any]],
+    ) -> None:
+        """`trash_type`'s saved queries: move the ones only for ``type_id``, trim the others.
+
+        A query whose ``structures`` are all ``type_id`` moves, bytes unchanged, to
+        ``folder/queries/<id>.json``. One that names other types too is saved without
+        ``type_id`` (an ordinary checked write); each removed structure is recorded with
+        its position. Unreadable files and queries with no structures are left alone.
+        """
+        store = self.store("queries")
+        for qid, data, revision, error in store.list():
+            if data is None or error is not None:
+                continue
+            definition = data.get("definition")
+            structures = definition.get("structures") if isinstance(definition, dict) else None
+            if not isinstance(structures, list) or not structures:
+                continue
+            ids = [s.get("id") if isinstance(s, dict) else None for s in structures]
+            if type_id not in ids:
+                continue
+            if all(i == type_id for i in ids):
+                rel = store.rel(qid)
+                dest = folder / "queries" / f"{qid}.json"
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                previous = self.own_writes.get(rel)
+                self.own_writes[rel] = ""
+                try:
+                    move_no_overwrite(store.path(qid), dest)
+                except BaseException:
+                    if previous is None:
+                        self.own_writes.pop(rel, None)
+                    else:
+                        self.own_writes[rel] = previous
+                    raise
+                queries.append(qid)
+                continue
+            removed = [
+                {"queryId": qid, "index": n, "structure": s}
+                for n, (s, i) in enumerate(zip(structures, ids, strict=True))
+                if i == type_id
+            ]
+            changed = copy.deepcopy(data)
+            changed["definition"]["structures"] = [
+                s for s, i in zip(structures, ids, strict=True) if i != type_id
+            ]
+            try:
+                store.write(qid, changed, revision)
+            except (RevisionConflict, ReadOnly):
+                continue  # edited meanwhile: left as it is
+            query_refs.extend(removed)
+
+    def _restore_type_queries(self, folder: Path, manifest: dict) -> list[str]:
+        """Put a trashed type's queries back and re-add it to the queries it was removed from.
+
+        A trashed query returns under its id (bytes unchanged), or under a fresh id
+        when that one has been taken meanwhile. Returns the ids of the queries changed.
+        """
+        store = self.store("queries")
+        changed: list[str] = []
+        for qid in manifest.get("queries") or []:
+            src = folder / "queries" / f"{qid}.json"
+            if not isinstance(qid, str) or not src.is_file():
+                continue
+            data = src.read_bytes()
+            target = qid
+            for _attempt in range(100):
+                try:
+                    live = store.path(target)
+                except ValueError:
+                    target = store.new_id(DEFAULT_QUERY_NAME)
+                    continue
+                rel = store.rel(target)
+                self.own_writes[rel] = version_of(data)
+                try:
+                    move_no_overwrite(src, live)
+                    break
+                except FileExistsError:
+                    self.own_writes.pop(rel, None)
+                    target = store.new_id(qid)
+                except BaseException:
+                    self.own_writes.pop(rel, None)
+                    raise
+            else:
+                continue
+            changed.append(target)
+        by_query: dict[str, list[dict[str, Any]]] = {}
+        for ref in manifest.get("queryStructureRefs") or []:
+            if isinstance(ref, dict) and isinstance(ref.get("queryId"), str):
+                by_query.setdefault(ref["queryId"], []).append(ref)
+        for qid, refs in by_query.items():
+            try:
+                data, revision = store.read(qid)
+            except (DefinitionUnreadable, ValueError):
+                continue
+            definition = data.get("definition") if data else None
+            structures = definition.get("structures") if isinstance(definition, dict) else None
+            if not isinstance(structures, list):
+                continue  # deleted or reshaped meanwhile
+            present = {s.get("id") for s in structures if isinstance(s, dict)}
+            new = list(structures)
+            for ref in sorted(refs, key=lambda r: r.get("index") or 0):
+                s = ref.get("structure")
+                if not isinstance(s, dict) or s.get("id") in present:
+                    continue
+                index = ref.get("index")
+                at = index if isinstance(index, int) and 0 <= index <= len(new) else len(new)
+                new.insert(at, s)
+                present.add(s.get("id"))
+            if new == structures:
+                continue
+            updated = copy.deepcopy(data)
+            updated["definition"]["structures"] = new
+            try:
+                store.write(qid, updated, revision)
+            except (RevisionConflict, ReadOnly):
+                continue
+            changed.append(qid)
+        return changed
+
     def list_trash(self) -> list[TrashItem]:
         """Every trash entry, newest first."""
         with self._lock:
@@ -3655,8 +3787,13 @@ class Space:
                     "Rename or delete it first, then restore."
                 )
 
-    def _restore_type_entry(self, trash_id: str, manifest: dict) -> tuple[list[str], list[str]]:
-        """Restore a trashed type's definition, templates and relation refs; (paths, typeIds)."""
+    def _restore_type_entry(
+        self, trash_id: str, manifest: dict
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Restore a trashed type's definition, templates, queries and relation refs.
+
+        Returns (paths, typeIds, queryIds).
+        """
         folder = self.trash.type_dir(trash_id)
         type_id = str(manifest.get("typeId", ""))
         type_ids = [type_id]
@@ -3707,6 +3844,7 @@ class Space:
                 other.propertyDefinitions = changed.propertyDefinitions
                 if other.id not in type_ids:
                     type_ids.append(other.id)
+        query_ids = self._restore_type_queries(folder, manifest)
         self.trash.remove_type(trash_id)
         # Objects whose type was unknown while it was in the trash resolve again: only the
         # ones whose summary no longer matches what their type name resolves to are
@@ -3720,7 +3858,7 @@ class Space:
                 or summary.type != self._type_id(raw.typeName)
             ):
                 self.rescan_file(rel)
-        return paths, type_ids
+        return paths, type_ids, query_ids
 
     def _restore_object_entry(self, trash_id: str, meta: dict) -> str:
         from .whiteboardtrash import sidecar_trash_dir
@@ -3765,12 +3903,12 @@ class Space:
         return target
 
     def restore(self, trash_id: str) -> dict[str, list[str]]:
-        """Restore a trash entry; return ``{paths, typeIds}`` of what came back.
+        """Restore a trash entry; return ``{paths, typeIds, queryIds}`` of what came back.
 
         An object returns to its original path (`` (2)`` on a collision); if its
-        type is in the trash, the type definition and templates come back with
-        it (not the type's other objects). A type entry restores the type, its
-        templates, its remaining objects and its ``allowedTypesRefs``.
+        type is in the trash, the type definition, templates and queries come back
+        with it (not the type's other objects). A type entry restores the type, its
+        templates, its queries, its remaining objects and its ``allowedTypesRefs``.
         Raises `KeyError` for an unknown id and `InvalidValue` when a saved type
         now has the trashed type's id or name (nothing is restored then).
         """
@@ -3779,14 +3917,15 @@ class Space:
             if meta is not None:
                 paths: list[str] = []
                 type_ids: list[str] = []
+                query_ids: list[str] = []
                 type_trash = meta.get("typeTrashId")
                 manifest = self.trash.manifest(type_trash) if type_trash else None
                 if manifest is not None:
                     self._check_type_restorable(type_trash, manifest)
                 obj_path = self._restore_object_entry(trash_id, meta)
                 if manifest is not None:
-                    paths, type_ids = self._restore_type_entry(type_trash, manifest)
-                return {"paths": [obj_path, *paths], "typeIds": type_ids}
+                    paths, type_ids, query_ids = self._restore_type_entry(type_trash, manifest)
+                return {"paths": [obj_path, *paths], "typeIds": type_ids, "queryIds": query_ids}
             manifest = self.trash.manifest(trash_id)
             if manifest is None:
                 collection = self.trash.collection_manifest(trash_id)
@@ -3802,8 +3941,8 @@ class Space:
                 ometa = self.trash.object_meta(oid)
                 if ometa is not None:
                     objects.append(self._restore_object_entry(oid, ometa))
-            paths, type_ids = self._restore_type_entry(trash_id, manifest)
-            return {"paths": [*objects, *paths], "typeIds": type_ids}
+            paths, type_ids, query_ids = self._restore_type_entry(trash_id, manifest)
+            return {"paths": [*objects, *paths], "typeIds": type_ids, "queryIds": query_ids}
 
     def purge(self, trash_id: str) -> int:
         """Delete a trash entry for good (a type with its objects); return how many entries went."""
@@ -4012,8 +4151,8 @@ class Space:
                 exc,
             )
             return None
-        # A type deleted and re-added under the same id finds its query still there
-        # (deleting a type leaves its queries alone): don't make a second one.
+        # A query of this name for this type id already there (one the user kept or
+        # edited back in): don't make a second one.
         if any(
             q.name == qname and t.id in query_type_ids(q.definition) for q in self.list_queries()
         ):
