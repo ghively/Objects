@@ -94,6 +94,33 @@ describe('DailyNoteSlot: an empty day', () => {
     await waitFor(() => expect(container.querySelector('[data-object-path="DailyNotes/2026-10-23.md"]')).not.toBeNull())
   })
 
+  test('adding a tag when the day already has a note (409) adds it to that note, keeping its tags', async () => {
+    const user = userEvent.setup()
+    const path = 'DailyNotes/Older/2026-10-23.md'
+    mocked.createDailyNote.mockRejectedValueOnce(new DailyNoteExistsError('exists', path))
+    mocked.object.mockResolvedValue(
+      objectDetail({ summary: objectSummary({ path, type: 'dailynote', tags: ['home'] }), body: 'Morning.\n', version: 'v7' }),
+    )
+    const { container } = render(<DailyNoteSlot day={TODAY} note={null} heading />)
+    await user.click(screen.getByRole('button', { name: 'Edit Tags' }))
+    await user.type(await screen.findByRole('textbox', { name: 'Search for tags' }), 'work{Enter}')
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith(path, { tags: ['home', 'work'] }, 'v7'))
+    expect(mocked.updateProperties).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(container.querySelector(`[data-object-path="${path}"]`)).not.toBeNull())
+  })
+
+  test('a tag write that fails after the note was created shows an error', async () => {
+    const user = userEvent.setup()
+    mocked.updateProperties.mockRejectedValueOnce(new Error('disk full'))
+    const { container } = render(<DailyNoteSlot day={TODAY} note={null} heading />)
+    await user.click(screen.getByRole('button', { name: 'Edit Tags' }))
+    await user.type(await screen.findByRole('textbox', { name: 'Search for tags' }), 'work{Enter}')
+    await waitFor(() => expect(mocked.createDailyNote).toHaveBeenCalledWith(TODAY))
+    expect(await screen.findByRole('alert')).toHaveTextContent('disk full')
+    // The note was made: it opens all the same.
+    await waitFor(() => expect(container.querySelector('[data-object-path="DailyNotes/2026-10-23.md"]')).not.toBeNull())
+  })
+
   test('typing when the day already has a note (409) opens that note with the text', async () => {
     const user = userEvent.setup()
     mocked.createDailyNote.mockRejectedValueOnce(new DailyNoteExistsError('exists', 'DailyNotes/Older/2026-10-23.md'))

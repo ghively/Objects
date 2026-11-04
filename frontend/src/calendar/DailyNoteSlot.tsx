@@ -88,19 +88,23 @@ export function DailyNoteSlot({
     setError(null)
     let made: string | null = null
     try {
-      const res = await api.createDailyNote(day)
-      made = res.path
-      if (opts.tags?.length) {
-        ensureNewTags([], opts.tags)
-        await api.updateProperties(res.path, { tags: opts.tags }, res.version)
-      }
-      void invalidateLinkIndex()
-    } catch (e) {
-      if (e instanceof DailyNoteExistsError && e.reason === 'exists' && e.path) {
+      try {
+        const res = await api.createDailyNote(day)
+        made = res.path
+        void invalidateLinkIndex()
+        if (opts.tags?.length) await addTags(res.path, opts.tags, [], res.version)
+      } catch (e) {
+        if (made || !(e instanceof DailyNoteExistsError && e.reason === 'exists' && e.path)) throw e
+        // The day already has a note: open it, with the chosen tags added to its own.
         made = e.path
-      } else if (!made) {
-        setError(e instanceof Error ? e.message : String(e))
+        if (opts.tags?.length) {
+          const existing = await api.object(e.path)
+          await addTags(e.path, opts.tags, existing.summary.tags ?? [], existing.version)
+        }
       }
+    } catch (e) {
+      // Creating failed (nothing opens), or the note opens but a chosen tag didn't reach it.
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       if (made) {
         setInitialText(draftRef.current?.textContent || undefined)
@@ -114,20 +118,28 @@ export function DailyNoteSlot({
   }
 
   const body = path ? (
-    <ObjectView
-      key={path}
-      path={path}
-      mode="inline"
-      placeholder={DAILY_NOTE_TEXT.placeholder}
-      autoFocus={focus}
-      initialText={initialText}
-      menuSlot={heading ? menuSlot : (ownerMenuSlot ?? null)}
-      onVersion={onVersion}
-      onDeleted={() => {
-        setLocal(null)
-        onChanged?.()
-      }}
-    />
+    <>
+      <ObjectView
+        key={path}
+        path={path}
+        mode="inline"
+        placeholder={DAILY_NOTE_TEXT.placeholder}
+        autoFocus={focus}
+        initialText={initialText}
+        menuSlot={heading ? menuSlot : (ownerMenuSlot ?? null)}
+        onVersion={onVersion}
+        onDeleted={() => {
+          setLocal(null)
+          onChanged?.()
+        }}
+      />
+      {/* The note opened, but a tag chosen before it existed didn't reach it. */}
+      {error && (
+        <p role="alert" className="mt-1 text-[13px] text-danger">
+          {error}
+        </p>
+      )}
+    </>
   ) : placeholders ? (
     // No note yet: the note's placeholder rows. Nothing is written until a click, a keystroke or a tag.
     <div data-testid="daily-note-empty" className="relative w-full">
@@ -195,6 +207,16 @@ export function DailyNoteSlot({
       {!collapsed && body}
     </section>
   )
+}
+
+/** Add `chosen` to a note's `existing` tags (no duplicates, ignoring case); writes only the tags. */
+async function addTags(path: string, chosen: readonly string[], existing: readonly string[], version: string) {
+  const had = new Set(existing.map((t) => t.toLowerCase()))
+  const added = chosen.filter((t) => !had.has(t.toLowerCase()))
+  if (!added.length) return
+  const next = [...existing, ...added]
+  ensureNewTags(existing, next)
+  await api.updateProperties(path, { tags: next }, version)
 }
 
 /** A section's bold heading; with `onToggle` it collapses and expands the section. */
