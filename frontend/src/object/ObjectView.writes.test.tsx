@@ -226,17 +226,32 @@ describe('serialized writes', () => {
     expect(mocked.updateProperties).toHaveBeenCalledWith(PATH, { stage: ['Blocked'] }, 'v1', undefined)
   })
 
-  test('test title commit on Enter calls renameObject; Esc reverts', async () => {
+  test('test title commits on Escape like Enter: saved through renameObject, field left', async () => {
     const user = userEvent.setup()
     useTabs.getState().open({ kind: 'object', path: PATH })
     await openPage()
     const title = screen.getByRole('textbox', { name: 'Title' })
 
-    // Esc reverts and writes nothing.
+    // Escape with no change writes nothing.
+    await user.click(title)
+    await user.keyboard('{Escape}')
+    expect(title).not.toHaveFocus()
+    expect(mocked.renameObject).not.toHaveBeenCalled()
+
+    // Escape keeps the typed text and saves it.
     await user.clear(title)
     await user.type(title, 'Draft{Escape}')
-    expect(title).toHaveValue('Notes')
-    expect(mocked.renameObject).not.toHaveBeenCalled()
+    expect(title).not.toHaveFocus()
+    expect(title).toHaveValue('Draft')
+    await waitFor(() => expect(mocked.renameObject).toHaveBeenCalledWith(PATH, 'Draft', 'v1'))
+    expect(mocked.renameObject).toHaveBeenCalledTimes(1)
+  })
+
+  test('test title commit on Enter calls renameObject', async () => {
+    const user = userEvent.setup()
+    useTabs.getState().open({ kind: 'object', path: PATH })
+    await openPage()
+    const title = screen.getByRole('textbox', { name: 'Title' })
 
     // Enter trims and commits; the tab follows the file to its new path.
     await user.clear(title)
