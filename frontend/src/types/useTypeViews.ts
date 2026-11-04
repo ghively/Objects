@@ -1,16 +1,32 @@
 // A type page's saved views (`.object/views/<typeId>.json`): optimistic updates with a
 // debounced save. A save carries the revision it was based on; on a 409 the stored views are
 // fetched, the pending edits are re-applied to them once, and the save is tried again.
+// A type page with no saved views (revision '') opens in the type's "Default list view"
+// (`defaultDataViewLayout`, polish item 20); once anything is saved, the saved layout wins.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ConflictError, isResync } from '@/api/client'
-import type { Views } from '@/api/types'
+import type { Layout, Views } from '@/api/types'
+import { FULL_VIEW_LAYOUTS } from '@/views/model'
 
 const SAVE_DELAY_MS = 300
 
 export type ViewsEdit = (v: Views) => Views
 
-export function useTypeViews(typeId: string): { views: Views | null; update(edit: ViewsEdit): void } {
+/** `views` with the All view in `layout`, when that is a layout the type page offers. */
+export function withDefaultLayout(views: Views, layout: unknown): Views {
+  if (!FULL_VIEW_LAYOUTS.includes(layout as Layout)) return views
+  return { ...views, all: { ...views.all, viewDefinition: { ...views.all.viewDefinition, dataViewLayout: layout as Layout } } }
+}
+
+export function useTypeViews(
+  typeId: string,
+  defaultLayout?: unknown,
+): { views: Views | null; update(edit: ViewsEdit): void } {
   const [views, setViews] = useState<Views | null>(null)
+  /** The views as loaded, before the default layout (re-applied when the setting changes). */
+  const loaded = useRef<Views | null>(null)
+  const layoutRef = useRef(defaultLayout)
+  layoutRef.current = defaultLayout
   const viewsRef = useRef<Views | null>(null)
   const revision = useRef('')
   const pending = useRef<ViewsEdit[]>([])
@@ -20,10 +36,18 @@ export function useTypeViews(typeId: string): { views: Views | null; update(edit
   idRef.current = typeId
 
   const adopt = useCallback((v: Views, rev: string) => {
-    viewsRef.current = v
+    loaded.current = v
+    const shown = rev === '' ? withDefaultLayout(v, layoutRef.current) : v
+    viewsRef.current = shown
     revision.current = rev
-    setViews(v)
+    setViews(shown)
   }, [])
+
+  // The setting changed while nothing is saved: show the new default.
+  useEffect(() => {
+    if (revision.current !== '' || !loaded.current || pending.current.length > 0 || saving.current) return
+    adopt(loaded.current, '')
+  }, [defaultLayout, adopt])
 
   const load = useCallback(async () => {
     const id = idRef.current
@@ -37,6 +61,7 @@ export function useTypeViews(typeId: string): { views: Views | null; update(edit
 
   useEffect(() => {
     viewsRef.current = null
+    loaded.current = null
     pending.current = []
     setViews(null)
     void load()

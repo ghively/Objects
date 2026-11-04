@@ -29,6 +29,8 @@ __all__ = [
     "BASIC_MEDIA_TYPES",
     "BASIC_TYPE_NAMES",
     "BUILTIN_TYPES",
+    "DATA_VIEW_LAYOUTS",
+    "DEFAULT_LAYOUT_KEY",
     "PROPERTY_ICONS",
     "THEME_COLORS",
     "Icon",
@@ -48,6 +50,13 @@ __all__ = [
 ]
 
 SCHEMA_VERSION = 2
+
+DEFAULT_LAYOUT_KEY = "defaultDataViewLayout"
+"""Polish item 20 (our key): the layout a type page without saved views opens in. Absent
+means the built-in default; it lives in `TypeDefinition.extra`, so an unset type's file
+never gains it."""
+DATA_VIEW_LAYOUTS = ("list", "grid", "wall", "table", "embed", "kanban")
+"""The layouts a type page's "All" view offers (the frontend's ``FULL_VIEW_LAYOUTS``)."""
 
 THEME_COLORS = (
     "gray",

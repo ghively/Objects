@@ -356,7 +356,7 @@ function QueryTabEditor({ type, queryId, onRelease }: { type: TypeDef; queryId: 
 
 /** The type page: header, the Overview / All / section tabs, and the active tab's view. */
 export function TypePage({ type }: { type: TypeDef }) {
-  const { views, update } = useTypeViews(type.id)
+  const { views, update } = useTypeViews(type.id, type.defaultDataViewLayout)
   const defs = useDefinitions()
   const indexTypes = useLinkIndex((s) => s.types)
   const [search, setSearch] = useState('')
