@@ -211,6 +211,8 @@ from .spaceconfig import patch as patch_space_config
 from .spaces import Registry, SpaceNameProblem, create_space, normalize
 from .typedefs import has_undecodable
 from .typemodel import (
+    DATA_VIEW_LAYOUTS,
+    DEFAULT_LAYOUT_KEY,
     RevisionConflict,
     TypeDefinition,
     TypeReadOnly,
@@ -1667,6 +1669,8 @@ def create_app(
             data["propertyDefinitions"], list
         ):
             return _error(422, "propertyDefinitions must be a list")
+        if DEFAULT_LAYOUT_KEY in data and data[DEFAULT_LAYOUT_KEY] not in DATA_VIEW_LAYOUTS:
+            return _error(422, f"Unknown default list view {data[DEFAULT_LAYOUT_KEY]!r}")
         for entry in data.get("propertyDefinitions") or []:
             if isinstance(entry, dict) and "options" in entry:
                 bad = option_shape_problems(entry["options"])
