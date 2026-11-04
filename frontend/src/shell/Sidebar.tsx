@@ -375,7 +375,7 @@ export function Sidebar({
                   {own.length > 0 && (
                     <button
                       type="button"
-                      aria-label={folded ? 'Show collections' : 'Hide collections'}
+                      aria-label={folded ? `Show ${t.pluralName} collections` : `Hide ${t.pluralName} collections`}
                       aria-expanded={!folded}
                       title={folded ? `Show ${own.length} collections` : 'Hide collections'}
                       onClick={() => toggleCollapsed(t.id)}
@@ -533,7 +533,7 @@ export function Sidebar({
       {importFor && <ImportCsvDialog type={importFor} open onOpenChange={(o) => !o && setImportFor(null)} />}
 
       <footer className="flex items-center gap-1 py-2 text-fg-muted">
-        <button type="button" disabled aria-label="Profile" className="flex size-8 items-center justify-center rounded-md disabled:opacity-60">
+        <button type="button" disabled aria-label="Profile" title="Profile" className="flex size-8 items-center justify-center rounded-md disabled:opacity-60">
           <Icon name="ph-user" size={17} />
         </button>
         <button
@@ -546,7 +546,7 @@ export function Sidebar({
           <Icon name="ph-gear" size={17} />
         </button>
         <ThemeButton />
-        <button type="button" disabled aria-label="Share" className="ml-auto flex size-8 items-center justify-center rounded-md disabled:opacity-60">
+        <button type="button" disabled aria-label="Share" title="Share" className="ml-auto flex size-8 items-center justify-center rounded-md disabled:opacity-60">
           <Icon name="ph-share-fat" size={17} />
         </button>
       </footer>

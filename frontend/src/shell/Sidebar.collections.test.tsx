@@ -58,8 +58,7 @@ describe('Sidebar collections', () => {
     const user = userEvent.setup()
     const { unmount } = render(<Sidebar types={TYPES} />)
     await screen.findByRole('list', { name: 'Tasks collections' })
-    const hide = screen.getAllByRole('button', { name: 'Hide collections' })
-    await user.click(hide[hide.length - 1]) // Tasks sorts after Servers
+    await user.click(screen.getByRole('button', { name: 'Hide Tasks collections' }))
     expect(screen.queryByRole('list', { name: 'Tasks collections' })).toBeNull()
     expect(screen.getByRole('list', { name: 'Servers collections' })).toBeInTheDocument()
     unmount()
@@ -67,7 +66,7 @@ describe('Sidebar collections', () => {
     render(<Sidebar types={TYPES} />)
     await screen.findByRole('list', { name: 'Servers collections' })
     expect(screen.queryByRole('list', { name: 'Tasks collections' })).toBeNull()
-    await user.click(screen.getByRole('button', { name: 'Show collections' }))
+    await user.click(screen.getByRole('button', { name: 'Show Tasks collections' }))
     await waitFor(() => expect(screen.getByRole('list', { name: 'Tasks collections' })).toBeInTheDocument())
   })
 
