@@ -8,12 +8,13 @@
  * to that component first. Escape closes it (the suggestion's own rule).
  */
 import { Extension, type Editor, type Range } from '@tiptap/core'
-import { PluginKey, TextSelection } from '@tiptap/pm/state'
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Suggestion, exitSuggestion } from '@tiptap/suggestion'
 import { create } from 'zustand'
 import type { SlashView } from '../slash/slashItems'
 
 export const slashMenuKey = new PluginKey('slashMenu')
+const openedAtKey = new PluginKey('slashMenuOpenedAt')
 
 export interface SlashMenuState {
   /** The editor the open menu belongs to. */
@@ -85,7 +86,13 @@ export function openSlashMenu(editor: Editor): void {
   const tr = state.tr.insertText('/', from)
   tr.setSelection(TextSelection.create(tr.doc, from + 1))
   editor.view.dispatch(tr)
+  // Where the menu may not open (a code block, say) nothing starts and no exit follows: drop the record.
+  if (!suggestionActive(editor.state)) openedAt.delete(editor)
   editor.view.focus()
+}
+
+function suggestionActive(state: Editor['state']): boolean {
+  return Boolean((slashMenuKey.getState(state) as { active?: boolean } | undefined)?.active)
 }
 
 const NO_SLASH_IN = new Set(['codeBlock', 'rawBlock'])
@@ -129,6 +136,16 @@ export const SlashMenu = Extension.create({
           onKeyDown: ({ event }) => {
             if (useSlashMenu.getState().editor !== editor) return false
             return keyHandlers.get(editor)?.(event) ?? false
+          },
+        }),
+      }),
+      // The record holds a position that is never mapped: any doc change that leaves the menu
+      // closed drops it, so a later `/` typed by hand at that spot follows the normal rule.
+      new Plugin({
+        key: openedAtKey,
+        view: () => ({
+          update: (view, prevState) => {
+            if (view.state.doc !== prevState.doc && !suggestionActive(view.state)) openedAt.delete(editor)
           },
         }),
       }),
