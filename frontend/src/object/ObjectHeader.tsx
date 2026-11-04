@@ -343,15 +343,37 @@ export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesCh
         </div>
       )}
 
-      <div className="mt-2" data-header-tags="">
-        <TagsCell
-          def={TAGS_DEF}
-          value={summary.tags}
-          readOnly={!editable}
-          onChange={setTags}
-          onOpenTag={(name) => (onOpenTag ? onOpenTag(name) : void openTag(name).catch(() => undefined))}
-        />
-      </div>
+      <HeaderTags tags={summary.tags} readOnly={!editable} onChange={setTags} onOpenTag={onOpenTag} />
     </header>
+  )
+}
+
+/**
+ * The header's "Tags" row on its own: the tag chips, or the muted "Tags" placeholder that opens the
+ * tag picker. The calendar's inline daily note draws it above the body, also for a day with no note yet.
+ */
+export function HeaderTags({
+  tags,
+  readOnly,
+  onChange,
+  onOpenTag,
+  className = 'mt-2',
+}: {
+  tags: string[]
+  readOnly?: boolean
+  onChange(next: string[]): void
+  onOpenTag?(name: string): void
+  className?: string
+}) {
+  return (
+    <div className={className} data-header-tags="">
+      <TagsCell
+        def={TAGS_DEF}
+        value={tags}
+        readOnly={readOnly}
+        onChange={onChange}
+        onOpenTag={(name) => (onOpenTag ? onOpenTag(name) : void openTag(name).catch(() => undefined))}
+      />
+    </div>
   )
 }

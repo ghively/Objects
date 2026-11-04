@@ -50,7 +50,7 @@ import { TextStatsMenu } from './TextStatsMenu'
 import { showToast } from '@/editor/media/upload'
 import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
-import { ensureNewTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
+import { ensureNewTags, HeaderTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
 import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type PanelVariant } from './PageLayout'
 import { PropertyPanel } from './PropertyPanel'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
@@ -78,6 +78,8 @@ export interface ObjectViewProps {
   placeholder?: string
   /** Inline only: focus the editor once the object has loaded. */
   autoFocus?: boolean
+  /** Inline only, with `autoFocus`: text typed before the object existed, inserted at the caret. */
+  initialText?: string
   /** Called with each version this view adopts (load, saves, reloads). */
   onVersion?: (version: string) => void
   /**
@@ -189,6 +191,7 @@ export function ObjectView({
   footer,
   placeholder,
   autoFocus,
+  initialText,
   onVersion,
   menuSlot,
   onDeleted,
@@ -1033,7 +1036,13 @@ export function ObjectView({
     if (el) {
       focusedRef.current = true
       el.focus()
+      if (initialText) {
+        const ed = (el as HTMLElement & { editor?: { commands: { insertContent(text: string): boolean } } }).editor
+        if (ed?.commands.insertContent(initialText)) setBodyEmpty(false)
+      }
     }
+    // `initialText` is read once, with the first focus.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, autoFocus, hasDetail])
 
   const recoveryDialog = (
@@ -1136,6 +1145,14 @@ export function ObjectView({
                 This object's file was deleted or moved on disk. Edits here aren't saved.
               </div>
             )}
+            {/* The header's Tags row (the inline view's only header row; the calendar shows the date). */}
+            <HeaderTags
+              className="mb-2"
+              tags={summary.tags}
+              readOnly={propsReadOnly}
+              onChange={(next) => writeProperties({ tags: next })}
+              onOpenTag={onOpenTag}
+            />
             <div className="object-body-text relative" onInput={checkEmpty} onKeyUp={checkEmpty} onBlur={checkEmpty}>
               {placeholder && bodyEmpty && (
                 <div aria-hidden data-testid="inline-placeholder" className="pointer-events-none absolute top-0 left-0 text-fg-muted">
