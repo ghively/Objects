@@ -19,7 +19,7 @@ export function WallLayout(props: LayoutProps) {
               {cols.map((rows, i) => (
                 <div key={i} data-testid="wall-column" className="flex min-w-0 flex-1 flex-col gap-y-3">
                   {rows.map((r) => (
-                    <CardItem key={r.summary.path} layout={props} row={r} />
+                    <CardItem key={r.summary.path} layout={props} row={r} variant="wall" />
                   ))}
                 </div>
               ))}

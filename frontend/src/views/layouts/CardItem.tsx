@@ -5,7 +5,20 @@ import { cardProperties } from '../cards/cardConfig'
 import { SmallCard } from '../cards/SmallCard'
 import { cn } from '@/lib/utils'
 
-export function CardItem({ layout, row, hide, className }: { layout: LayoutProps; row: Row; hide?: string[]; className?: string }) {
+export function CardItem({
+  layout,
+  row,
+  hide,
+  className,
+  variant,
+}: {
+  layout: LayoutProps
+  row: Row
+  hide?: string[]
+  className?: string
+  /** `wall`: the wall's card, with labelled property rows. */
+  variant?: 'wall'
+}) {
   const type = layout.typesById[row.summary.type]
   const props = type
     ? cardProperties(type, layout.state.viewDefinition)
@@ -18,6 +31,7 @@ export function CardItem({ layout, row, hide, className }: { layout: LayoutProps
       type={type}
       props={props}
       hide={hide}
+      variant={variant}
       onOpen={layout.onOpen}
       className={cn(className, selected && 'bg-[var(--block-selection-bg)]')}
       leading={extras?.leading}
