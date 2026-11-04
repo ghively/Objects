@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { ChangeKind, ObjectSummary, SpaceInfo, TypeDef } from '@/api/types'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -39,6 +39,7 @@ import { Sidebar } from '@/shell/Sidebar'
 import { TabStrip, useSpaceTypes } from '@/shell/TabStrip'
 import { usePanelShortcuts, useTabShortcuts } from '@/shell/shortcuts'
 import { isEditableTarget } from '@/lib/shortcuts'
+import { lazyWithReload } from '@/lib/lazyReload'
 import { applyOpenOnStart } from '@/nav/startup'
 import { prefetchOnIdle } from '@/nav/prefetch'
 import { useSettings } from '@/settings/useSettings'
@@ -55,12 +56,14 @@ import { TypePage } from '@/types/TypePage'
 const loadCalendarPage = () => import('@/calendar/CalendarPage')
 const loadGraphPage = () => import('@/graph/GraphPage')
 const loadLocalGraphPanel = () => import('@/graph/LocalGraphPanel')
-const CalendarPage = lazy(() => loadCalendarPage().then((m) => ({ default: m.CalendarPage })))
-const GraphPage = lazy(() => loadGraphPage().then((m) => ({ default: m.GraphPage })))
-const LocalGraphPanel = lazy(() => loadLocalGraphPanel().then((m) => ({ default: m.LocalGraphPanel })))
+// A chunk that fails to load (the app was rebuilt while this window was open) reloads the window
+// once (lazyWithReload); the idle prefetch below stays silent and leaves that to the real open.
+const CalendarPage = lazyWithReload(() => loadCalendarPage().then((m) => ({ default: m.CalendarPage })))
+const GraphPage = lazyWithReload(() => loadGraphPage().then((m) => ({ default: m.GraphPage })))
+const LocalGraphPanel = lazyWithReload(() => loadLocalGraphPanel().then((m) => ({ default: m.LocalGraphPanel })))
 // Warm those chunks once the shell is idle, so their first open costs no download.
 const PREFETCH = [loadGraphPage, loadLocalGraphPanel, loadCalendarPage]
-const TypeSettings = lazy(() => import('@/types/TypeSettings').then((m) => ({ default: m.TypeSettings })))
+const TypeSettings = lazyWithReload(() => import('@/types/TypeSettings').then((m) => ({ default: m.TypeSettings })))
 
 const REFRESH_DELAY_MS = 150
 /** Events after which the whole object list and the types are fetched again (a `changed` refreshes one summary). */
