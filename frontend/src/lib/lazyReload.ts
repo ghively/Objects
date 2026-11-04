@@ -3,7 +3,8 @@
  * chunk names are gone and a lazy `import()` fails (a 404, "Failed to fetch dynamically imported
  * module"). The window then reloads itself once, after every pending save is flushed. A second
  * failure within a minute (the marker in sessionStorage says a reload just happened) shows a toast
- * with a Reload button instead, so a broken build can never loop.
+ * with a Reload button instead, so a broken build can never loop. So does a flush that fails or
+ * takes longer than 5 s, so a reload never drops unsaved edits without the user choosing it.
  *
  * `guardImport` wraps a plain dynamic import, `lazyWithReload` a React.lazy one, and
  * `installChunkReload` (main.tsx) catches Vite's `vite:preloadError` and any chunk failure that
@@ -17,6 +18,27 @@ export const CHUNK_RELOAD_MARK = 'object:chunk-reload'
 export const CHUNK_RELOAD_WINDOW_MS = 60_000
 export const OBJECT_UPDATED_TEXT = 'Object was updated. Reload to continue.'
 export const RELOAD_LABEL = 'Reload'
+/** Shown when the Reload button's flush failed again; the next click reloads regardless. */
+export const UNSAVED_MAY_BE_LOST_TEXT = 'Some changes could not be saved. Reloading now may lose them.'
+/** How long a flush may take before the automatic reload gives way to the toast. */
+export const FLUSH_TIMEOUT_MS = 5_000
+
+/** Flush every pending save; true only when that finished without error within FLUSH_TIMEOUT_MS. */
+function flushInTime(): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => resolve(false), FLUSH_TIMEOUT_MS)
+    flushAll().then(
+      () => {
+        clearTimeout(timer)
+        resolve(true)
+      },
+      () => {
+        clearTimeout(timer)
+        resolve(false)
+      },
+    )
+  })
+}
 
 /** Seams for tests (jsdom cannot reload). */
 export const chunkReloadDeps = {
@@ -82,7 +104,27 @@ function showUpdatedToast(): void {
   button.textContent = RELOAD_LABEL
   button.style.fontWeight = '500'
   button.style.color = 'var(--accent, inherit)'
-  button.addEventListener('click', () => void flushAll().catch(() => undefined).then(() => chunkReloadDeps.reload()))
+  // The button flushes first. If that fails again, the toast says changes may be lost and the
+  // next click reloads anyway: the user asked for the reload.
+  let warned = false
+  let busy = false
+  button.addEventListener('click', () => {
+    if (busy) return
+    if (warned) {
+      chunkReloadDeps.reload()
+      return
+    }
+    busy = true
+    void flushInTime().then((ok) => {
+      busy = false
+      if (ok) {
+        chunkReloadDeps.reload()
+        return
+      }
+      warned = true
+      text.textContent = UNSAVED_MAY_BE_LOST_TEXT
+    })
+  })
   el.append(text, button)
   host.appendChild(el)
 }
@@ -98,8 +140,9 @@ export async function handleChunkLoadError(): Promise<void> {
     showUpdatedToast()
     return
   }
-  await flushAll().catch(() => undefined)
-  chunkReloadDeps.reload()
+  // Reload only when every pending save made it; otherwise let the user decide from the toast.
+  if (await flushInTime()) chunkReloadDeps.reload()
+  else showUpdatedToast()
 }
 
 const never = <T,>(): Promise<T> => new Promise<T>(() => {})
