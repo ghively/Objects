@@ -681,6 +681,118 @@ def test_delete_type_leaves_a_multi_type_query_without_it(space_dir: Path):
     assert stored["definition"]["structures"] == [{"id": "person"}, {"id": "server"}]
 
 
+def test_restore_brings_back_every_structure_of_a_type_listed_twice(space_dir: Path):
+    structures = [
+        {"id": "server", "label": "a"},
+        {"id": "person"},
+        {"id": "server", "label": "b"},
+    ]
+    query = {
+        "name": "Twice",
+        "definition": {
+            "structures": structures,
+            "filterGroup": {"type": "filterGroup", "operator": "and", "elements": []},
+            "sorts": [],
+            "groupBy": None,
+        },
+    }
+    live = _write(_query_file(space_dir, "twice"), json.dumps(query, indent=2) + "\n")
+    space = Space(space_dir)
+
+    item = space.delete_type("server", confirm=True)
+    stored = json.loads(live.read_text(encoding="utf-8"))
+    assert stored["definition"]["structures"] == [{"id": "person"}]
+
+    result = space.restore(item.id)
+    stored = json.loads(live.read_text(encoding="utf-8"))
+    assert stored["definition"]["structures"] == structures
+    assert result["queryIds"] == ["twice"]
+
+
+def test_a_type_delete_that_fails_after_moving_the_type_keeps_memory_in_step(
+    space_dir: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _write(_query_file(space_dir, "my-servers"), "").write_bytes(_SERVER_QUERY)
+    space = Space(space_dir)
+
+    def boom(*_args, **_kwargs):
+        raise OSError("locked")
+
+    monkeypatch.setattr(space, "_trash_type_queries", boom)
+    with pytest.raises(OSError):
+        space.delete_type("server", confirm=True)
+    monkeypatch.undo()
+
+    assert not _type_file(space_dir, "server").exists()
+    # Memory matches the disk: the type is gone, as a fresh open sees it.
+    assert space.type_by_id("server") is None
+    assert {t.id for t in space.types} == {t.id for t in Space(space_dir).types}
+    # The partial entry is in the trash and restores whole.
+    entry = next(i for i in space.list_trash() if i.kind == "type")
+    space.restore(entry.id)
+    assert space.type_by_id("server") is not None
+    assert _type_file(space_dir, "server").is_file()
+    assert (space_dir / "Servers" / "Alpha.md").is_file()
+
+
+def test_a_restore_whose_query_step_fails_can_be_retried(
+    space_dir: Path, monkeypatch: pytest.MonkeyPatch
+):
+    rack = _write(
+        space_dir / "Templates" / "Servers" / "Rack.md",
+        "---\ntype: 'Server'\ntemplate: Rack\ntitle: Rack\n---\n",
+    )
+    live = _write(_query_file(space_dir, "my-servers"), "")
+    live.write_bytes(_SERVER_QUERY)
+    space = Space(space_dir)
+    type_bytes = _type_file(space_dir, "server").read_bytes()
+    item = space.delete_type("server", confirm=True)
+    assert not rack.exists() and not live.exists()
+
+    original = Space._restore_type_queries
+
+    def boom(*_args, **_kwargs):
+        raise OSError("locked")
+
+    monkeypatch.setattr(space, "_restore_type_queries", boom)
+    with pytest.raises(OSError):
+        space.restore(item.id)
+    monkeypatch.setattr(space, "_restore_type_queries", original.__get__(space))
+
+    # The type is back; the entry is still in the trash with its query.
+    assert _type_file(space_dir, "server").read_bytes() == type_bytes
+    assert space.type_by_id("server") is not None
+    assert any(i.id == item.id for i in space.list_trash())
+
+    result = space.restore(item.id)
+    assert result["queryIds"] == ["my-servers"]
+    assert live.read_bytes() == _SERVER_QUERY
+    assert not any(i.id == item.id for i in space.list_trash())
+    # Nothing restored twice.
+    assert rack.is_file()
+    assert sorted(p.name for p in rack.parent.iterdir()) == ["Rack.md"]
+    assert (space_dir / "Servers" / "Alpha.md").is_file()
+    assert not (space_dir / "Servers" / "Alpha (2).md").exists()
+
+
+def test_a_restore_retried_after_the_type_file_was_copied_back_carries_on(
+    space_dir: Path,
+):
+    """The live type file already holds the trashed bytes: no "already exists" refusal."""
+    space = Space(space_dir)
+    type_bytes = _type_file(space_dir, "server").read_bytes()
+    item = space.delete_type("server", confirm=True)
+    stored = space.trash.type_dir(item.id) / "type.json"
+    _type_file(space_dir, "server").write_bytes(stored.read_bytes())
+
+    space = Space(space_dir)  # reopened: the type is loaded from its live file
+    space.restore(item.id)
+    assert _type_file(space_dir, "server").read_bytes() == type_bytes
+    assert not stored.exists()
+    assert not any(i.id == item.id for i in space.list_trash())
+    assert (space_dir / "Servers" / "Alpha.md").is_file()
+
+
 def test_delete_type_route_announces_its_queries(space_dir: Path):
     _write(_query_file(space_dir, "my-servers"), "").write_bytes(_SERVER_QUERY)
     app = create_app(Space(space_dir), None, watch=False)
