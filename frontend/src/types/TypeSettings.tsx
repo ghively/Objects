@@ -23,7 +23,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import type { Icon as IconValue, PropertyDef, TypeDef, TypeFont } from '@/api/types'
+import type { Icon as IconValue, Layout, PropertyDef, TypeDef, TypeFont } from '@/api/types'
 import { ColorPicker } from '@/components/ColorPicker'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
@@ -37,6 +37,7 @@ import { KIND_META, kindIcon } from '@/properties/kinds'
 import { PropertySettings } from '@/properties/PropertySettings'
 import { moveProperty } from '@/properties/typeEdits'
 import { TypeChip } from '@/shell/Sidebar'
+import { FULL_VIEW_LAYOUTS, LAYOUTS } from '@/views/model'
 import { CardViewSettings } from './CardViewSettings'
 import { isBasicDailyNote } from './dashboardSections'
 import { DeleteTypeDialog } from './DeleteTypeDialog'
@@ -72,6 +73,10 @@ export const TYPE_SETTINGS_TEXT = {
     'Choose whether cover images of objects of this type should be displayed as wide or small cover images by default. This setting only applies when the object type has a cover image property.',
   coverDisplay: 'Display of cover image',
   coverDisplayExplanation: 'Set how the cover image should be displayed.',
+  // Polish item 20 (our wording for the explanation).
+  defaultListView: 'Default list view',
+  defaultListViewExplanation:
+    'Choose the layout the object type page opens in. A view you have already changed on that page keeps its own layout.',
   calendar: 'Calendar',
   calendarSettings: 'Calendar Settings',
   calendarExplanation:
@@ -214,6 +219,21 @@ function Choice<T extends string>({
       ))}
     </select>
   )
+}
+
+const LIST_VIEWS: readonly { value: Layout; name: string }[] = FULL_VIEW_LAYOUTS.map((l) => ({
+  value: l,
+  name: LAYOUTS[l].label,
+}))
+
+// The basic media types whose page opens as a gallery when nothing is set (as the server's default views).
+const MEDIA_GRID_TYPES = new Set(['image', 'weblink', 'tweet'])
+
+/** The layout the type page opens in when nothing is saved: the setting, else the built-in default. */
+export function defaultListView(type: TypeDef): Layout {
+  const set = type.defaultDataViewLayout
+  if (set && FULL_VIEW_LAYOUTS.includes(set)) return set
+  return type.basic && MEDIA_GRID_TYPES.has(type.name.toLowerCase()) ? 'grid' : 'list'
 }
 
 type CreateInCalendar = 'enabled' | 'createOnce' | 'disabled'
@@ -520,6 +540,14 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
                     { value: 'contain', name: 'Display full image' },
                   ]}
                   onChange={(v) => patch({ cropCoverImage: v === 'cover' })}
+                />
+              </Field>
+              <Field label={TYPE_SETTINGS_TEXT.defaultListView} explanation={TYPE_SETTINGS_TEXT.defaultListViewExplanation}>
+                <Choice
+                  label={TYPE_SETTINGS_TEXT.defaultListView}
+                  value={defaultListView(type)}
+                  options={LIST_VIEWS}
+                  onChange={(defaultDataViewLayout) => patch({ defaultDataViewLayout })}
                 />
               </Field>
             </section>
