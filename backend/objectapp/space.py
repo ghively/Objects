@@ -428,6 +428,14 @@ class SpaceChange:
     type_id: str | None = field(default=None, compare=False)
 
 
+def _same_bytes(a: Path, b: Path) -> bool:
+    """True when both files exist and hold the same bytes."""
+    try:
+        return a.read_bytes() == b.read_bytes()
+    except OSError:
+        return False
+
+
 def _names_key(s: ObjectSummary | None) -> tuple | None:
     """What link resolution reads from a summary (None when the object is gone)."""
     if s is None:
@@ -3561,6 +3569,10 @@ class Space:
                         self.trash.write_json(folder / "manifest.json", manifest)
                 except OSError:
                     _log.exception("Could not record a partial type trash %s", trash_id)
+                try:
+                    self._resync_type_from_disk(type_def.id)
+                except Exception:
+                    _log.exception("Could not reload the type %s after a failed delete", type_def.id)
                 raise
             self.trash.write_json(folder / "manifest.json", manifest)
             self.types = [t for t in self.types if t.id != type_def.id]
@@ -3574,6 +3586,21 @@ class Space:
                 deletedAt=deleted_at,
                 objectCount=len(object_ids),
             )
+
+    def _resync_type_from_disk(self, type_id: str) -> None:
+        """Make the in-memory type ``type_id`` match its file again (after a partial delete).
+
+        Still on disk: reloaded from it. Gone (moved to the trash): dropped from memory,
+        and inferred again only if objects of it remain, as a fresh open would.
+        """
+        if type_revision(self.root, type_id):
+            self._loaded_revisions.pop(type_id, None)
+            self.refresh_type(type_id)
+            return
+        self.types = [t for t in self.types if t.id != type_id]
+        self._loaded_revisions.pop(type_id, None)
+        self._merge_types(infer_types_from(self._raw.values()))
+        self._types_changed(type_id)
 
     def _trash_type_files(
         self,
@@ -3779,6 +3806,8 @@ class Space:
         """
         type_id = str(manifest.get("typeId", ""))
         stored = self.trash.type_dir(trash_id) / "type.json"
+        if _same_bytes(stored, self.root / ".object" / "types" / f"{type_id}.json"):
+            return  # an earlier, interrupted restore already put this very file back
         try:
             data = json.loads(stored.read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -3808,10 +3837,13 @@ class Space:
         type_file = self.root / ".object" / "types" / f"{type_id}.json"
         stored = folder / "type.json"
         if stored.is_file():
-            if type_file.exists():
+            if _same_bytes(stored, type_file):
+                stored.unlink()  # put back by an earlier, interrupted restore: carry on
+            elif type_file.exists():
                 raise InvalidValue(f"An object type with the id {type_id} already exists.")
-            type_file.parent.mkdir(parents=True, exist_ok=True)
-            move_no_overwrite(stored, type_file)
+            else:
+                type_file.parent.mkdir(parents=True, exist_ok=True)
+                move_no_overwrite(stored, type_file)
         try:
             data = json.loads(type_file.read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -3839,6 +3871,8 @@ class Space:
             src = folder / "templates" / original
             if src.is_file():
                 paths.append(self._restore_file(original, src.read_bytes()))
+                # Placed: a retry after a later step fails must not place it twice.
+                src.unlink()
         for ref in manifest.get("allowedTypesRefs") or []:
             other = self.type_by_id(str(ref.get("typeId")))
             if other is None or other.readOnlyReason:
