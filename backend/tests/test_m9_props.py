@@ -5,7 +5,7 @@
 - ``wideLayoutMode`` / ``wideCoverImage`` (bool) and ``coverImageOffset`` (0-100) are
   per-object frontmatter keys; ``null`` removes the key, and a new
   ``coverImage`` drops the offset in the same write (``RenderCoverImage``).
-- ``PUT /api/ui`` takes ``workspaceOrder`` (``RootSpace.workspaceOrder``).
+- ``PUT /api/ui`` takes ``workspaceOrder`` (the space's own ``workspaceOrder``).
 """
 
 from __future__ import annotations

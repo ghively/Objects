@@ -718,8 +718,8 @@ def _ui_problem(patch: dict[str, Any]) -> str | None:
             return "workspaceOrder must be a list of section ids."
         if len(set(order)) != len(order):
             return "workspaceOrder lists a section twice."
-    # The Object Types sort (`RootSpace.objectsSectionSortOption`) and its manual order, kept
-    # as the `objects` section's ids in `RootSpace.workspace`.
+    # The Object Types sort (``ui.json`` ``objectsSectionSortOption``) and its manual order, kept
+    # as the `objects` section's ids in ``ui.json`` ``workspace``.
     if "objectsSectionSortOption" in patch and patch["objectsSectionSortOption"] not in (
         "alphabetical",
         "manual",
