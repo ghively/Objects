@@ -1,8 +1,7 @@
 /**
  * The references section's strings and its per-object view state.
  *
- * Capacities keeps `referencesSectionTab`/`referencesSectionClosed` on the object's own data
- * (`component.model.ts`); we never write an object file for view state, so it lives in
+ * The open tab and closed state are view state; we never write an object file for view state, so it lives in
  * `localStorage` under `object.references:<object id or path>`. Every access is wrapped in
  * try/catch: storage can be missing, full or blocked, and the section works without it.
  */
@@ -21,21 +20,15 @@ export const DEFAULT_REFERENCES_UI: ReferencesUi = { tab: 'all', closed: false }
 /** The tab ids in `ReferencesSectionTab` order. */
 export const REFERENCES_TABS: readonly ReferencesTab[] = ['all', 'backlinks', 'related', 'mentions', 'relatedTags']
 
-/** Strings: verbatim from Capacities' English strings unless marked "our string". */
+/** The section's strings. */
 export const REFERENCES_TEXT = {
-  /** `PageBacklinkSection.clickAgainToHide` */
   clickAgainToHide: 'Click again to hide',
-  /** `PageBacklinkSection.mentionsInText.label` */
   mentionsInText: 'Mentions in text',
   /** our string */
   via: (property: string) => `via ${property}`,
-  /** `PageBacklinkSection.emptyTitle` */
   backlinksEmptyTitle: 'No backlinks yet',
-  /** `PageBacklinkSection.emptyDescription` */
   backlinksEmptyDescription: 'Link to this object from another page to create a backlink.',
-  /** `textEditBar.link` */
   link: 'Link',
-  /** `PageBacklinkSection.linkCreated` */
   linkCreated: 'Link created',
   /** our string (as M3) */
   changedElsewhere: 'Changed elsewhere. Reloaded.',
@@ -43,40 +36,30 @@ export const REFERENCES_TEXT = {
   linkFailed: 'Could not create the link.',
   /** our string */
   mentionsEmpty: 'No unlinked mentions',
-  /** `PageBacklinkSection.relatedContent.showMore` */
   showMore: 'Show more',
-  /** `loadMore` (Capacities' paged lists); the backlinks list shows 50 at a time */
+  /** Paged lists; the backlinks list shows 50 at a time */
   loadMore: 'Load more',
-  /** `PageBacklinkSection.relatedContent.emptyTitle` */
   relatedEmptyTitle: 'No related content yet',
-  /** our string: Capacities' says "Semantically related…", which our lexical stand-in isn't */
+  /** our string: the stand-in is lexical, not semantic */
   relatedEmptyDescription: 'Objects that share words with this one will appear here.',
   /** our string */
   relatedTagsEmpty: 'No related tags',
-  /** `EditorSettings.defaultContextualBacklinkViewMode.label` (the per-backlink toggle's group name) */
+  /** The per-backlink toggle's group name */
   nestedView: 'Default display of nested backlinks',
-  /** `EditorSettings.defaultContextualBacklinkViewMode.showBlockContainingBacklink` */
   showBlockContainingBacklink: 'Only block with backlink',
-  /** `EditorSettings.defaultContextualBacklinkViewMode.showFullPathAbove` */
   showFullPathAbove: 'Full path above',
-  /** `RenderSidepanel.backlinks.noSupport.title` / `.description` */
   backlinksNoSupportTitle: 'Backlinks not available',
   backlinksNoSupportDescription: 'This content type does not support backlinks.',
-  /** `EditorSettings.backlinkSectionsDefault.backlinks` (the side-panel entry's title) */
+  /** The side-panel entry's title */
   backlinksPanelTitle: 'Backlinks',
 } as const
 
 /** Each tab's label and info tooltip. */
 export const TAB_META: Record<ReferencesTab, { label: string; info?: string }> = {
-  /** `PageBacklinkSection.all` */
   all: { label: 'All' },
-  /** `PageBacklinkSection.incoming`, `.incomingInfo` */
   backlinks: { label: 'Backlinks', info: 'Links to this object' },
-  /** `PageBacklinkSection.relatedContent.label`, `.info` */
   related: { label: 'Related Content', info: 'Similar objects' },
-  /** `PageBacklinkSection.unlinkedMentions.label`, `.info` */
   mentions: { label: 'Mentions', info: 'Unlinked name matches' },
-  /** `components.RootTag.relatedTags` */
   relatedTags: { label: 'Related tags' },
 }
 
@@ -137,7 +120,7 @@ export function saveReferencesUi(idOrPath: string, ui: ReferencesUi): void {
 
 // -- M8: the references settings ------------------------------------------------
 
-/** `EditorSettings.backlinkSectionsDefault.{open,closed,hidden}` */
+/** `DeviceSettings.backlinkSectionsDefault` values: open, closed or hidden. */
 export type SectionDefault = 'open' | 'closed' | 'hidden'
 export type BacklinkContentView = 'inline' | 'smallCard' | 'wideCard' | 'embed'
 export type NestedBacklinkView = 'showBlockContainingBacklink' | 'showFullPathAbove'

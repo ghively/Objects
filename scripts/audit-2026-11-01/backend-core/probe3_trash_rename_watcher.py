@@ -35,7 +35,7 @@ def check(name, cond, detail=""):
 
 
 def snap(root: Path) -> dict[str, str]:
-    return {p.relative_to(root).as_posix(): version_of(p.read_bytes()) for p in root.rglob("*") if p.is_file() and ".capacities" not in p.parts}
+    return {p.relative_to(root).as_posix(): version_of(p.read_bytes()) for p in root.rglob("*") if p.is_file() and ".object" not in p.parts}
 
 
 # --- trash -------------------------------------------------------------------------
@@ -148,10 +148,10 @@ def t_restore_orphan_meta():
     root = fresh()
     sp = Space(root)
     item = sp.delete_object("Pages/Alpha.md")
-    (root / ".capacities/trash" / f"{item.id}.json").unlink()
+    (root / ".object/trash" / f"{item.id}.json").unlink()
     sp2 = Space(root)
     items = sp2.list_trash()
-    check("orphan trash .md without meta is listed or recoverable", bool(items), f"items={items} orphan .md still at {(root / '.capacities/trash' / (item.id + '.md')).exists()}")
+    check("orphan trash .md without meta is listed or recoverable", bool(items), f"items={items} orphan .md still at {(root / '.object/trash' / (item.id + '.md')).exists()}")
 
 
 # --- rename / relink ---------------------------------------------------------------

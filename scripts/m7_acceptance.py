@@ -7,7 +7,7 @@ throw-away git repo, opens it twice and serves it with ``create_app(space, None,
 on a free ``127.0.0.1`` port, with ``OBJECT_STATE_DIR``, ``OBJECT_CACHE_DIR`` and
 ``OBJECT_FAKE_OPEN_FILE`` pointed at temporary paths outside the copy. The copy is registered
 in the (temporary) spaces registry first, as the launcher does. Snapshots skip ``.git`` and
-``.capacities-cache/``. Over HTTP it checks:
+``.object-cache/``. Over HTTP it checks:
 
  1. calling every M7 read route twice (``GET /api/space``, ``/api/settings``, ``/api/spaces``,
     ``/api/attachments`` and ``/api/file`` for one file of each kind the space has) changes
@@ -18,12 +18,12 @@ in the (temporary) spaces registry first, as the launcher does. Snapshots skip `
     returns each with the contract's headers; a ``Range`` request on the WAV is 206; an
     uploaded ``.html`` comes back as an octet-stream download; ``POST /api/attachments/open``
     records the PDF with the fake opener and refuses an ``.exe`` with 415;
- 3. ``PUT /api/space`` with a new name changes only ``.capacities/space.json`` (created when
+ 3. ``PUT /api/space`` with a new name changes only ``.object/space.json`` (created when
     absent); the folder name is unchanged; a stale revision is 409;
  4. ``PUT /api/settings`` writes only ``settings.json`` in the state dir; the space is
     unchanged;
  5. spaces: ``POST /api/spaces`` in a temporary location creates a folder holding only
-    ``.capacities/space.json``; a second create is 409 and leaves the folder byte-identical;
+    ``.object/space.json``; a second create is 409 and leaves the folder byte-identical;
     ``DELETE /api/spaces`` removes it from the list and the folder stays; a `SpaceHost` on a
     free port switches to it and ``GET /api/space`` reports its root;
  6. the editor round trip: ``OBJECT_ROUNDTRIP_SPACE=<copy> npx vitest run
@@ -195,7 +195,7 @@ def check_reads(run: Run, base: str) -> None:
     time.sleep(0.4)
     diff = changed_paths(before, snapshot(run.root))
     status = git(run.root, "status", "--porcelain", "-uall").strip()
-    created = [p for p in (".capacities/space.json",) if (run.root / p).exists() and p not in before]
+    created = [p for p in (".object/space.json",) if (run.root / p).exists() and p not in before]
     names = state_files()
     extra = extra_state(names, {"spaces.json"})
     ok_codes = all(c == {200} for c in codes.values())
@@ -274,7 +274,7 @@ def check_attachments(run: Run, base: str, fake_open: Path) -> None:
                f"open an .exe: {code2} {res2.get('detail') if isinstance(res2, dict) else res2}; "
                f"nothing launched: {after == opened}")
     code3, _ = run.http("GET", "/file", path="../outside.txt")
-    code4, _ = run.http("GET", "/file", path=".capacities/types/page.json")
+    code4, _ = run.http("GET", "/file", path=".object/types/page.json")
     run.report(code3 == 404 and code4 == 404, f"traversal {code3}, dot-folder {code4}")
     commit(run.root, "attachments")
 
@@ -282,14 +282,14 @@ def check_attachments(run: Run, base: str, fake_open: Path) -> None:
 def check_space(run: Run) -> None:
     print("\n3. PUT /api/space")
     _, info = run.http("GET", "/space")
-    had = (run.root / ".capacities/space.json").is_file()
+    had = (run.root / ".object/space.json").is_file()
     before = snapshot(run.root)
     new_name = f"{info['name']} (M7)"
     code, res = run.http("PUT", "/space", {"patch": {"name": new_name}, "baseRevision": info["revision"]})
     diff = changed_paths(before, snapshot(run.root))
-    stored = json.loads((run.root / ".capacities/space.json").read_text("utf-8")) if diff else {}
+    stored = json.loads((run.root / ".object/space.json").read_text("utf-8")) if diff else {}
     run.report(
-        code == 200 and res.get("name") == new_name and diff == [".capacities/space.json"]
+        code == 200 and res.get("name") == new_name and diff == [".object/space.json"]
         and stored.get("name") == new_name and run.root.is_dir() and Path(res.get("root", "")).name == run.root.name,
         f"{code}: name {res.get('name')!r}; files changed: {diff} ({'updated' if had else 'created'}); "
         f"folder still {run.root.name!r}",
@@ -327,7 +327,7 @@ def check_spaces(run: Run, tmp: Path) -> None:
     code, res = run.http("POST", "/spaces", {"name": "M7 second space", "location": str(location)})
     folder = Path(res.get("path", "")) if isinstance(res, dict) else Path()
     inside = sorted(p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file()) if code == 201 else []
-    run.report(code == 201 and folder.parent == location.resolve() and inside == [".capacities/space.json"],
+    run.report(code == 201 and folder.parent == location.resolve() and inside == [".object/space.json"],
                f"create: {code} {folder}; holds {inside}")
     snap = snapshot(folder) if folder.is_dir() else {}
     code2, res2 = run.http("POST", "/spaces", {"name": "M7 second space", "location": str(location)})
@@ -376,8 +376,8 @@ def check_spaces(run: Run, tmp: Path) -> None:
     # Opening a space with no type files writes the built-in Page and Tag types (M3's
     # typemodel.BUILTIN_TYPES); nothing else may change, and space.json keeps its bytes.
     added = changed_paths(snap, snapshot(folder))
-    stray = [p for p in added if not (p.startswith(".capacities/types/") and p.endswith(".json"))]
-    run.report(not stray and snapshot(folder).get(".capacities/space.json") == snap.get(".capacities/space.json"),
+    stray = [p for p in added if not (p.startswith(".object/types/") and p.endswith(".json"))]
+    run.report(not stray and snapshot(folder).get(".object/space.json") == snap.get(".object/space.json"),
                f"serving the new space wrote only built-in type files: {added}", *stray)
     commit(run.root, "spaces")
 
@@ -428,7 +428,7 @@ def main(argv: list[str] | None = None) -> int:
 
     tmp = Path(tempfile.mkdtemp(prefix="m7-acceptance-")).resolve()
     root = tmp / src.name
-    shutil.copytree(src, root, ignore=shutil.ignore_patterns(".git", ".capacities-cache"))
+    shutil.copytree(src, root, ignore=shutil.ignore_patterns(".git", ".object-cache"))
     os.environ["OBJECT_STATE_DIR"] = str(tmp / "state")
     os.environ["OBJECT_CACHE_DIR"] = str(tmp / "cache")
     fake_open = tmp / "opened.txt"

@@ -66,7 +66,7 @@ async function openMenu(user: ReturnType<typeof userEvent.setup>) {
 const row = (menu: HTMLElement, label: string) => within(menu).getAllByRole('menuitem').find((i) => i.textContent?.startsWith(label))!
 
 describe('object … menu key hints, Import and Copy', () => {
-  test('the registry has Capacities\' page keys', () => {
+  test('the registry has the page keys', () => {
     expect(keysFor('openExportMenu')).toEqual(['Mod-e'])
     expect(keysFor('openImportMenu')).toEqual(['Mod-i'])
     expect(keysFor('toggleFavorite')).toEqual(['Mod-Shift-*'])

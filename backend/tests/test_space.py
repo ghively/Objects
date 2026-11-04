@@ -71,7 +71,7 @@ def test_property_kinds_inferred(space_dir):
 
 
 def test_type_files_written_once(space_dir):
-    types_dir = space_dir / ".capacities" / "types"
+    types_dir = space_dir / ".object" / "types"
     assert not types_dir.exists()
     first, unreadable = load_types(space_dir)
     assert unreadable == []
@@ -209,7 +209,7 @@ def test_rescan_file(space_dir):
 
 
 def test_open_never_writes(space_dir):
-    s = Space(space_dir)  # may create .capacities/types on first load
+    s = Space(space_dir)  # may create .object/types on first load
     before = _hashes(space_dir)
     s2 = Space(space_dir)
     for summary in s2.list(None):

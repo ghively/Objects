@@ -1,6 +1,6 @@
 """Collections: model and creation rules (M3 Task 3).
 
-A collection lives in ``.capacities/collections/<id>.json`` (`JsonStore`). Unknown
+A collection lives in ``.object/collections/<id>.json`` (`JsonStore`). Unknown
 keys are kept. Membership is the object's ``collections:`` key (Task 4).
 """
 

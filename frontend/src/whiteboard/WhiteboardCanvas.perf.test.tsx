@@ -20,7 +20,7 @@ vi.mock('./nodes', async (orig) => {
     blockRenders++
     return <Orig {...p} />
   })
-  return { ...m, nodeTypes: { ...m.nodeTypes, capacitiesBlock: Counting } }
+  return { ...m, nodeTypes: { ...m.nodeTypes, boardBlock: Counting } }
 })
 
 let strokeBoxCalls = 0

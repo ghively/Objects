@@ -47,7 +47,7 @@ export const RESERVED_KEYS: ReadonlySet<string> = new Set([
   'wideCoverImage',
   'coverImageOffset',
   'defaultPageViewId',
-  // the property-pane toggle (Capacities' `hideProperties`)
+  // the property-pane toggle (`hideProperties`)
   'hideProperties',
 ])
 

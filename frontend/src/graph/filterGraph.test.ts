@@ -154,7 +154,7 @@ describe('filterGraph', () => {
     }
     const below = carriers(TAG_BACKLINK_LIMIT - 1)
     expect(linkStats(below).backlinks[0]).toBe(TAG_BACKLINK_LIMIT - 1)
-    // The centre tag itself still draws them (Capacities walks the centre's backlinks).
+    // The centre tag itself still draws them (the centre's backlinks are walked).
     const local = (data: GraphData) => filterGraph(data, { showTagsNetwork: true }, { kind: 'local', center: 0, hops: 1 })
     expect(local(below).tagLinks).toHaveLength(TAG_BACKLINK_LIMIT - 1)
     expect(local(carriers(TAG_BACKLINK_LIMIT)).tagLinks).toHaveLength(TAG_BACKLINK_LIMIT)

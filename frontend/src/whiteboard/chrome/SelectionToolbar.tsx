@@ -1,5 +1,5 @@
 /**
- * The selection toolbar (Capacities' `Whiteboard.control.*`), shown over the selection. With
+ * The selection toolbar, shown over the selection. With
  * nodes selected it offers what applies to them: "Color" (border; any node but a point), "Fill"
  * (shapes and frames), "Text alignment" (text blocks and shapes), "Flip" (shapes), "Align"
  * (two or more), the order controls, "Duplicate", "Wrap in new frame", "Add frame title" /
@@ -20,7 +20,7 @@ import { ChromeButton, hint, KEY_HINT, MenuRow, MenuSeparator, PopoverMenu } fro
 import { EdgeStyleMenu } from './EdgeStyleMenu'
 import { EntityViewMenu } from './EntityViewMenu'
 
-/** Our string: the order controls' menu (Capacities shows its four items; no group name in the reference). */
+/** Our string: the order controls' menu. */
 export const ORDER_LABEL = 'Order'
 
 type Align = NonNullable<WhiteboardTextBlock['align']>

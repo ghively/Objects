@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { documentLang, normalizeLanguageTag } from './spellcheck'
 
 describe('normalizeLanguageTag', () => {
-  test('test tags normalise like Capacities', () => {
+  test('test tags normalise to BCP 47 case', () => {
     expect(normalizeLanguageTag('fr')).toBe('fr')
     expect(normalizeLanguageTag('de-ch')).toBe('de-CH')
     expect(normalizeLanguageTag(' en_GB ')).toBe('en-GB')

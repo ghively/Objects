@@ -1,5 +1,5 @@
 /**
- * The search palette's one list, content and actions together (Capacities' "Search for content and
+ * The search palette's one list, content and actions together ("Search for content and
  * actions, or paste from clipboard"; polish audit backlog 2):
  *
  * - empty query: the clipboard's offers (`paste.ts`), or, when `clipboard-read` is not already
@@ -76,7 +76,7 @@ type ClipState = ClipboardContent | { kind: 'ask' }
 
 const CLIPBOARD_VALUE = 'paste:read'
 
-/** `CommandPalette.options.LocalSpaceQuery`, verbatim. */
+/** The extended search row's label. */
 export const OPEN_IN_EXTENDED_SEARCH = 'Open in extended search'
 const EXTENDED_VALUE = 'extended-search'
 

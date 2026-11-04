@@ -1,8 +1,8 @@
 /**
  * Offers edits that could not be saved when the object was last left (see
  * `unsaved.ts`): save them over the version on disk, or discard them. Both texts
- * are shown side by side. The wording follows Capacities' voice-note recovery
- * (`audioRecorder.recovery`: "Recover voice note", "…was kept locally before it
+ * are shown side by side. The wording follows the voice-note recovery
+ * ("Recover voice note", "…was kept locally before it
  * finished saving. You can save it … now.").
  */
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'

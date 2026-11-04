@@ -23,7 +23,7 @@ TASK = "Tasks/Write docs.md"
 def _define(root: Path, cid: str, name: str, type_ids: list[str], **extra) -> None:
     """Write a collection definition file (before the space opens)."""
     c = CollectionDef(id=cid, name=name, typeIds=list(type_ids))
-    path = root / ".capacities" / "collections" / f"{cid}.json"
+    path = root / ".object" / "collections" / f"{cid}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     data = {**c.to_json(), **extra}
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
@@ -138,7 +138,7 @@ def test_add_collection_changes_one_line(space_dir: Path):
     import shutil
 
     shutil.copytree(space_dir, other)
-    (other / ".capacities" / "collections").mkdir(exist_ok=True)
+    (other / ".object" / "collections").mkdir(exist_ok=True)
     fresh = Space(other)
     snap2 = (other / PAGE).read_bytes()
     fresh.update_properties(PAGE, {"collections": ["Tooling"]}, _version(fresh, PAGE))
@@ -314,9 +314,9 @@ def test_delete_collection_trashes_sole_members_only(space_dir: Path):
     assert "collections: [Other]\n" in text and "Tooling" not in text
     assert f"lastUpdated: {stamp}" in text  # unstamped
     assert [x["id"] for x in listed] == ["other"]
-    assert not (space_dir / ".capacities" / "collections" / "tooling.json").exists()
+    assert not (space_dir / ".object" / "collections" / "tooling.json").exists()
     manifest = json.loads(
-        (space_dir / ".capacities/trash/collections" / body["trashId"] / "manifest.json").read_text("utf-8")
+        (space_dir / ".object/trash/collections" / body["trashId"] / "manifest.json").read_text("utf-8")
     )
     assert manifest["kind"] == "collection" and manifest["collectionId"] == "tooling"
     assert manifest["removedFrom"][0]["path"] == PAGE and manifest["removedFrom"][0]["index"] == 0
@@ -328,7 +328,7 @@ def test_delete_collection_trashes_sole_members_only(space_dir: Path):
 
 def test_delete_collection_restore_byte_identical(space_dir: Path):
     sole, shared = _delete_setup(space_dir)
-    json_bytes = (space_dir / ".capacities/collections/tooling.json").read_bytes()
+    json_bytes = (space_dir / ".object/collections/tooling.json").read_bytes()
     space, c, published = _client(space_dir)
     with c:
         deleted = c.delete("/api/collections/tooling?confirm=true").json()
@@ -341,14 +341,14 @@ def test_delete_collection_restore_byte_identical(space_dir: Path):
     assert body["paths"] == [SERVER] and body["collectionIds"] == ["tooling"] and body["skipped"] == []
     assert (space_dir / SERVER).read_bytes() == sole
     assert (space_dir / PAGE).read_bytes() == shared
-    assert (space_dir / ".capacities/collections/tooling.json").read_bytes() == json_bytes
+    assert (space_dir / ".object/collections/tooling.json").read_bytes() == json_bytes
     assert sorted(x["id"] for x in listed) == ["other", "tooling"]
     assert trash == []
     kinds = {(e.kind, e.path) for e in published}
     assert ("collections", "tooling") in kinds and ("changed", PAGE) in kinds
     assert ("created", SERVER) in kinds
     assert space.get(PAGE).collections == ["Tooling", "Other"]
-    assert not (space_dir / ".capacities/trash/collections" / deleted["trashId"]).exists()
+    assert not (space_dir / ".object/trash/collections" / deleted["trashId"]).exists()
 
 
 def test_restore_after_member_edit_reinserts_at_index(space_dir: Path):
@@ -382,9 +382,9 @@ def test_delete_collection_reports_skipped_member(space_dir: Path):
     assert [s["path"] for s in body["skipped"]] == [PAGE] and body["skipped"][0]["reason"]
     assert body["removedFrom"] == []
     assert bad.read_bytes() == snap
-    assert not (space_dir / ".capacities/collections/tooling.json").exists()
+    assert not (space_dir / ".object/collections/tooling.json").exists()
     manifest = json.loads(
-        (space_dir / ".capacities/trash/collections" / body["trashId"] / "manifest.json").read_text("utf-8")
+        (space_dir / ".object/trash/collections" / body["trashId"] / "manifest.json").read_text("utf-8")
     )
     assert [s["path"] for s in manifest["skipped"]] == [PAGE]
 
@@ -395,7 +395,7 @@ def test_restore_refused_when_id_file_exists(space_dir: Path):
     with c:
         deleted = c.delete("/api/collections/tooling?confirm=true").json()
         assert space.store("collections").new_id("Tooling") == "tooling-2"
-        outside = space_dir / ".capacities/collections/tooling.json"
+        outside = space_dir / ".object/collections/tooling.json"
         outside.write_text('{"id": "tooling", "name": "Elsewhere", "typeIds": []}\n', encoding="utf-8")
         after_delete = {p: (space_dir / p).read_bytes() for p in _files(space_dir)}
         r = c.post(f"/api/trash/{deleted['trashId']}/restore")
@@ -406,12 +406,12 @@ def test_restore_refused_when_id_file_exists(space_dir: Path):
         r2 = c.post(f"/api/trash/{deleted['trashId']}/restore")
     assert r.status_code == 409 and r.json()["detail"] == "Its id is used by another definition."
     assert r2.status_code == 409 and r2.json()["detail"] == "A collection with this name already exists."
-    assert (space_dir / ".capacities/trash/collections" / deleted["trashId"]).is_dir()
+    assert (space_dir / ".object/trash/collections" / deleted["trashId"]).is_dir()
     assert not (space_dir / SERVER).exists()
     now = {p: (space_dir / p).read_bytes() for p in _files(space_dir)}
-    assert now.pop(".capacities/collections/tooling-2.json")
-    after_delete.pop(".capacities/collections/tooling.json")
-    now.pop(".capacities/collections/tooling.json", None)
+    assert now.pop(".object/collections/tooling-2.json")
+    after_delete.pop(".object/collections/tooling.json")
+    now.pop(".object/collections/tooling.json", None)
     assert now == after_delete
 
 
@@ -421,14 +421,14 @@ def test_purge_expired_covers_collections(space_dir: Path):
     with c:
         deleted = c.delete("/api/collections/tooling?confirm=true").json()
     tid = deleted["trashId"]
-    folder = space_dir / ".capacities/trash/collections" / tid
+    folder = space_dir / ".object/trash/collections" / tid
     assert (folder / "before" / "0.md").is_file()
     old = (datetime.now(UTC) - timedelta(days=31)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     manifest = folder / "manifest.json"
     data = json.loads(manifest.read_text("utf-8"))
     data["deletedAt"] = old
     manifest.write_text(json.dumps(data), encoding="utf-8")
-    trash_dir = space_dir / ".capacities" / "trash"
+    trash_dir = space_dir / ".object" / "trash"
     object_entries = [p for p in trash_dir.glob("*.json")]
     assert len(object_entries) == 1
     meta = json.loads(object_entries[0].read_text("utf-8"))

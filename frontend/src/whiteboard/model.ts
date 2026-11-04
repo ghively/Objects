@@ -1,6 +1,5 @@
 /**
- * Whiteboard constants and rules. Values and behaviour follow Capacities'
- * `whiteboard.model.ts` (reference/recovered-ts/src/shared-logic/models/); this is our own code.
+ * Whiteboard constants and rules.
  */
 import type {
   WhiteboardBlock,
@@ -434,8 +433,7 @@ export const MEDIA_TOOL_KIND = {
 } as const satisfies Record<Exclude<WhiteboardMediaTool, 'weblink'>, AttachmentKind>
 
 /**
- * A new media node's size by kind, on the grid (our choice; the trimmed reference has no
- * defaults): image and video 420 × 300, PDF 420 × 540, audio 420 × 90, file 360 × 90.
+ * A new media node's size by kind, on the grid (our choice): image and video 420 × 300, PDF 420 × 540, audio 420 × 90, file 360 × 90.
  */
 export const MEDIA_DEFAULT_SIZE: Record<AttachmentKind, { width: number; height: number }> = {
   image: { width: GRID * 14, height: GRID * 10 },

@@ -2,23 +2,11 @@
  * Object's Light, Light Dimmed and Dark Dimmed themes, plus the monochrome and font overrides.
  * The dark theme stays the default: `:root` in tokens.css (screenshot-measured values).
  *
- * Values are Capacities' own (reference/recovered-ts/src/shared-ui/styles/themes.ts, with the
- * oklch values of colors.ts written out), mapped onto our tokens as the M7 plan's token table says:
- *   --bg-app bg-back · --bg-panel bg-base · --bg-raised bg-front · --bg-raised-2 bg-el ·
- *   --bg-hover bg-front-hover · --bg-hover-2 bg-el-hover · --border-subtle border-front ·
- *   --border-chrome color-mix(border-front 80%, bg-back) · --text text-primary ·
- *   --text-muted, --text-section text-subtle · --primary-btn(-text) (bg|text)-button-primary ·
- *   --chrome-btn-border border-el-subtle · --float-* as --bg-raised / --border-subtle /
- *   --chrome-btn-border (our mapping) · --card-shadow the same in every theme (ours) ·
- *   --block-selection-*, --text-selection-bg (bg|border)-block-selection, bg-text-selection ·
- *   --editor-bullet content.bulletColor · --editor-bullet-nested text-subtle (ours) ·
- *   --editor-quote-line quoteLineColor · --editor-hr horizontalLineColor ·
- *   --editor-toggle(-empty|-outline) toggleColor(Empty|OutlineColor) · --code-* code.code-* ·
- *   --type-<c>-fg/-bg typeLabelText/typeLabelBg · --tag-bg/-text-<c> tagBg/tagText ·
- *   --label-bg/-text/-border-<c>, --line-<c> blockBg/tokenText/typeLabelBorder/bulletColor
- *   (the grayToneMappings for gray, colorToneMappings for the 17 colours).
+ * Values are the design's own palette (oklch values written out), mapped onto our tokens as the M7 plan's token table says.
+ * --float-* reuse --bg-raised / --border-subtle / --chrome-btn-border (our mapping); --card-shadow is
+ * the same in every theme (ours).
  * --focus-ring (shadcn's ring; ours) is border-el-hover. --danger and --accent-today are the same in
- * every theme. Search highlights (index36682.css + storing36682.js): light bg #fef08a4b with
+ * every theme. Search highlights: light bg #fef08a4b with
  * yellow 900 text, dark bg #fddf472c with yellow 100 text (Dark Dimmed uses the dark set). Find in
  * page (::highlight(find-in-page) / find-in-page-active): #facc1573, current #f97316b3, every theme.
  * Computed once with a throwaway script outside the repo; only this CSS is committed.
@@ -585,7 +573,7 @@ html[data-theme='darkDimmed'] {
   color-scheme: dark;
 }
 
-/* "Monochrome tags" and "Monochrome type labels" (AppearanceSettings.colors.*): every colour shows as gray.
+/* "Monochrome tags" and "Monochrome type labels": every colour shows as gray.
    After the theme blocks, so they win at equal specificity. */
 html[data-mono-tags] {
   --tag-bg-rose: var(--tag-bg-gray);
@@ -661,7 +649,7 @@ html[data-mono-type-labels] {
   --type-red-bg: var(--type-gray-bg);
 }
 
-/* AppearanceSettings.font.*: Sans Serif (the default, tokens.css), Serif, Monospace. */
+/* The app font: Sans Serif (the default, tokens.css), Serif, Monospace. */
 html[data-font='serif'] {
   --app-font: var(--object-font-serif);
 }

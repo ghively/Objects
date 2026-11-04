@@ -1,4 +1,4 @@
-"""The full-text search index (M5): SQLite FTS5 in the space's ``.capacities-cache/``.
+"""The full-text search index (M5): SQLite FTS5 in the space's ``.object-cache/``.
 
 Derived data only: deleting the cache loses nothing. One connection behind a
 lock; one thread syncs the index with the scan at start-up (re-indexing only
@@ -53,7 +53,7 @@ INDEX_FORMAT = 1
 """``PRAGMA user_version`` of the index; a mismatch rebuilds it."""
 DB_NAME = "search.sqlite"
 JOURNAL_NAME = DB_NAME + "-journal"
-CACHE_FOLDER = ".capacities-cache"
+CACHE_FOLDER = ".object-cache"
 MAX_LIMIT = 200
 DEBOUNCE_S = 0.2
 LOCK_TIMEOUT_S = 2.0
@@ -92,7 +92,7 @@ _RELATED_TERMS = 12
 
 
 def cache_dir_for(space: Space) -> Path:
-    """Where ``space``'s index lives: ``<space>/.capacities-cache``, or under ``OBJECT_CACHE_DIR``."""
+    """Where ``space``'s index lives: ``<space>/.object-cache``, or under ``OBJECT_CACHE_DIR``."""
     override = os.environ.get("OBJECT_CACHE_DIR")
     if override:
         digest = hashlib.sha256(str(space.root).encode("utf-8")).hexdigest()[:16]
@@ -865,7 +865,7 @@ class SearchIndex:
     def similar(self, path: str, limit: int) -> list[tuple[str, float]]:
         """Objects sharing ``path``'s strongest terms (tf-idf), best first; never ``path`` itself.
 
-        Our lexical stand-in for Capacities' semantic related content.
+        A lexical stand-in for semantic related content.
         """
         if not self.ready.is_set() or limit <= 0:
             return []

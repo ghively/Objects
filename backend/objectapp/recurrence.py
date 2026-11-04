@@ -7,7 +7,7 @@ Month and year steps clamp to the month's last day and always step from the
 previous result, so `occurrences` equals what successive completions produce.
 
 M8 custom rules (`rule.on`) are anchored instead (RFC 5545 BYDAY / BYMONTHDAY,
-as Capacities' `rrule` does): the next occurrence is the first date matching
+as `rrule` does): the next occurrence is the first date matching
 the rule strictly after the current one. Periods (weeks, months, years) count
 from the current date's period in steps of `every`; a period with no matching
 date (no 31st, no February 29) is skipped, not clamped. Weekly lists step

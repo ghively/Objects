@@ -1,5 +1,5 @@
 /**
- * The action palette's clipboard group (`CommandPalette.paste.*`, M8 Task 17).
+ * The action palette's clipboard group (M8 Task 17).
  *
  * What the clipboard holds decides the offers:
  * - text: "Add to today's daily note" (preview "1 block | {count} blocks"; appends to today's
@@ -12,7 +12,7 @@
  *   are attachments in our model; our choice).
  *
  * The palette reads the clipboard as it opens only when `clipboard-read` is already granted;
- * otherwise it shows one "Clipboard" row (`quickActions.analyzeClipboardIdle`) that reads it when
+ * otherwise it shows one "Clipboard" row that reads it when
  * picked. A refused read the user asked for shows "Clipboard access was denied." (our string)
  * and offers nothing.
  */
@@ -25,7 +25,7 @@ import { showToast } from '@/editor/media/upload'
 import { bookmarkMarkdown } from '@/editor/nodes/bookmark'
 import { invalidateLinkIndex } from '@/links/linkIndex'
 
-/** Capacities' strings, verbatim (`CommandPalette.paste.*`), plus our denial line. */
+/** The paste rows' strings, plus the denial line. */
 export const PASTE_TEXT = {
   addToDailyNote: "Add to today's daily note",
   blocks: (count: number) => (count === 1 ? '1 block' : `${count} blocks`),
@@ -35,7 +35,7 @@ export const PASTE_TEXT = {
   createPageFromMd: 'Create page',
   createPageWithBlocks: 'Create new page with content',
   denied: 'Clipboard access was denied.', // our string
-  /** `quickActions.analyzeClipboardIdle`: the row that reads the clipboard when picked. */
+  /** The row that reads the clipboard when picked. */
   readClipboard: 'Clipboard',
 } as const
 

@@ -1,6 +1,6 @@
 /**
- * "Canvas display": the five user-level switches under Capacities' own setting keys
- * (`component.model.ts` `whiteboard`: isSnappingToGrid, isSnappingToNodes, isShowingDots,
+ * "Canvas display": the five user-level switches under their setting keys
+ * (isSnappingToGrid, isSnappingToNodes, isShowingDots,
  * isZoomingOnScroll, isEngineeringMode).
  */
 import { useId } from 'react'

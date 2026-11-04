@@ -228,8 +228,8 @@ describe('quick-create on a connector drop', () => {
     expect(A.quickCreate(b, { nodeId: 'zz', at: { x: 0, y: 0 } }, { kind: 'none' })).toBe(b)
   })
 
-  test('test quick create strings come from the reference', () => {
-    expect(QUICK_CREATE_LINK_TYPED.ref).toBe('Whiteboard.quickCreate.linkTyped')
+  test('test quick create fills the typed link template', () => {
+    expect(QUICK_CREATE_LINK_TYPED.text).toBe('Link {name}')
     expect(quickCreateLinkTyped('Person')).toBe('Link Person')
   })
 })
@@ -278,7 +278,7 @@ describe('entity node View menu', () => {
 })
 
 describe('keyboard resize', () => {
-  test('test keyboard resize: Ctrl+Arrow, 1 px, 30 px with Shift or snap to grid (Capacities)', async () => {
+  test('test keyboard resize: Ctrl+Arrow, 1 px, 30 px with Shift or snap to grid', async () => {
     expect(keyToCommand({ key: 'ArrowRight', ctrlKey: true }, { hasSelection: true })).toEqual({ type: 'resize', dw: 1, dh: 0 })
     expect(keyToCommand({ key: 'ArrowRight', ctrlKey: true }, { hasSelection: true, gridSnap: true })).toEqual({ type: 'resize', dw: GRID, dh: 0 })
     expect(keyToCommand({ key: 'ArrowUp', metaKey: true, shiftKey: true }, { hasSelection: true })).toEqual({ type: 'resize', dw: 0, dh: -GRID })

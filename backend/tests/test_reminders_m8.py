@@ -132,7 +132,7 @@ def test_done_suppresses_only_tasks(m8_space_dir: Path):
 
 def _add_birthday(root: Path, supports: bool = True) -> None:
     """Give the fixture's Person type a ``birthday`` date (with ``supportsReminders`` when asked)."""
-    path = root / ".capacities/types/person.json"
+    path = root / ".object/types/person.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     data["propertyDefinitions"] = [p for p in data["propertyDefinitions"] if p["key"] != "birthday"]
     constraints = {"resolutionPreference": "day", "endTimeSettings": "notAllowed"}

@@ -1,6 +1,5 @@
 /**
- * KaTeX rendering for math blocks and inline formulas (Capacities' `MathBlock`
- * and inline math token). Never throws: invalid TeX comes back as KaTeX's
+ * KaTeX rendering for math blocks and inline formulas. Never throws: invalid TeX comes back as KaTeX's
  * error colouring (`throwOnError: false`), and anything KaTeX itself throws on
  * is shown as escaped source text. `trust: false` keeps `\href`, `\url`,
  * `\includegraphics` and friends inert.

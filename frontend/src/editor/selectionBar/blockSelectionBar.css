@@ -1,5 +1,5 @@
 /*
- * The block-selection bar (Capacities' editor panel). Tokens only. Its size, padding and shadow are
+ * The block-selection bar. Tokens only. Its size, padding and shadow are
  * our choice (the data views' selection bar: 40px tall, 8px corners), centred under the editor.
  */
 .block-selection-bar {

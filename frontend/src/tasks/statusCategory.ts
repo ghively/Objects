@@ -1,5 +1,5 @@
-// Status categories of a Task (Capacities' `LabelOption.statusCategory`): the four groups in their
-// order and labels (`RootTaskCheckbox.menu.statusGroup.*`), and what a row's status falls into.
+// Status categories of a Task: the four groups in their
+// order and labels, and what a row's status falls into.
 import type { LabelOption, PropertyDef, Row, StatusCategory, TypeDef } from '@/api/types'
 
 export const STATUS_CATEGORIES: readonly { key: StatusCategory; label: string }[] = [

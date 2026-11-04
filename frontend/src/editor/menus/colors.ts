@@ -2,10 +2,10 @@
  * Block colours (`color=text-<c>` / `color=bg-<c>` in a block annotation): the
  * menu order and the theme token for each.
  *
- * The order is Capacities' `themeColors` order (M2's `THEME_COLORS`). Block
+ * The order is M2's `THEME_COLORS`. Block
  * colours use the label tokens (Global Constraints, "Theme tokens"): text is
- * `--label-text-<c>` (Capacities' `blockText`), background is `--label-bg-<c>`
- * (`blockBg`) with Capacities' `.theme-option-bg-*` text colour, `--tag-text-<c>`.
+ * `--label-text-<c>`, background is `--label-bg-<c>` with the
+ * `--tag-text-<c>` text colour.
  */
 import { THEME_COLORS, type ThemeColor } from '@/theme/palette'
 
@@ -38,7 +38,7 @@ export function bgColorToken(color: ThemeColor): string {
   return `var(--label-bg-${color})`
 }
 
-/** The text colour that goes with a background colour (Capacities' `.theme-option-bg-*`). */
+/** The text colour that goes with a background colour. */
 export function bgTextToken(color: ThemeColor): string {
   return `var(--tag-text-${color})`
 }
@@ -57,8 +57,7 @@ function capitalised(color: ThemeColor): string {
 }
 
 /**
- * The menu name: "Blue text" / "Blue background" (`colorThemes.theme-text-<c>`,
- * `colorThemes.theme-bg-<c>`; sky is "Sky" here, not M2's "Light blue").
+ * The menu name: "Blue text" / "Blue background" (sky is "Sky" here, not M2's "Light blue").
  */
 export function colorMenuName(kind: ColorKind, color: ThemeColor): string {
   return `${capitalised(color)} ${kind === 'text' ? 'text' : 'background'}`

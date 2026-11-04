@@ -1,7 +1,7 @@
 /**
  * An embedded object (a block node whose block is `{type: 'entity', link: '[[Title]]'}`): the
- * 30 px caption bar (icon and title) 6 px above the node box (the reference CSS
- * `--whiteboard-embed-caption-height`/`-gap`), and the object as M3's small card. At least 360
+ * 30 px caption bar (icon and title) 6 px above the node box
+ * (`--whiteboard-embed-caption-height`/`-gap`), and the object as M3's small card. At least 360
  * wide. Double-click opens the object in the peek; Ctrl/Cmd+double-click in a new tab (our
  * choice, through the host). A link that resolves to nothing shows its text in the dangling style.
  * M8: the block's optional `view` (the selection toolbar's "View" menu) draws the object as M7's

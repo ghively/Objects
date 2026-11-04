@@ -1,5 +1,5 @@
 /**
- * `capacitiesPoint`: a free-standing connector end (size 0). It shows as a small dot while
+ * `boardPoint`: a free-standing connector end (size 0). It shows as a small dot while
  * selected (our choice: hidden otherwise, so line and arrow ends stay clean), can be dragged,
  * has no visible handles and takes no new connections ("Points never take arrows").
  */

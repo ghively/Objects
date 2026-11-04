@@ -65,7 +65,7 @@ function press(editor: TiptapEditor, spec: string): boolean {
 }
 
 describe('m8 editor shortcuts', () => {
-  test('the new ids are registered with their reference names and Capacities\' keys', () => {
+  test('the new ids are registered with their names and expected keys', () => {
     expect(M8_EDITOR_SHORTCUT_IDS).toEqual(['copyBlockReference', 'turnIntoObject', 'turnIntoTask', 'turnBlockIntoTaskObject', 'highlightText'])
     const registered = new Map(allShortcuts().map((d) => [d.id, d]))
     for (const def of M8_EDITOR_SHORTCUTS) {
@@ -75,13 +75,13 @@ describe('m8 editor shortcuts', () => {
       // The same entry as the registry's (no copy with its own keys).
       expect(r.keys).toEqual(def.keys)
     }
-    // Capacities' shortcut table (reference-check-2026-10-28 §1).
+    // The expected shortcut table (reference-check-2026-10-28 §1).
     expect(keysFor('copyBlockReference')).toEqual(['Mod-AltCtrl-l'])
     expect(keysFor('turnIntoObject')).toEqual(['i'])
     expect(keysFor('turnIntoTask')).toEqual([])
     expect(keysFor('turnBlockIntoTaskObject')).toEqual(['Mod-Shift-t'])
     expect(keysFor('highlightText')).toEqual(['Mod-Shift-h'])
-    // shortcuts.<id>.name, verbatim
+    // the catalogued names
     expect(registered.get('copyBlockReference')!.name).toBe('Copy block reference')
     expect(registered.get('highlightText')!.name).toBe('Highlight text selection')
     expect(registered.get('turnBlockIntoTaskObject')!.name).toBe('Turn block into task object')
@@ -133,7 +133,7 @@ describe('m8 editor shortcuts', () => {
     expect(writeText).toHaveBeenLastCalledWith(`![[Notes#^${id}]]`)
     expect(serializeBody(editor).match(/\^[a-z0-9]{6}/g)).toHaveLength(1)
 
-    // Highlight: the default toggles the last-used colour, bg-amber at first (Capacities); an installed handler wins.
+    // Highlight: the default toggles the last-used colour, bg-amber at first; an installed handler wins.
     const ed2 = headless('Mark this word\n')
     ed2.view.dispatch(ed2.state.tr.setSelection(TextSelection.create(ed2.state.doc, 6, 10)))
     expect(press(ed2, keysFor('highlightText')[0])).toBe(true)
@@ -157,7 +157,7 @@ describe('m8 editor shortcuts', () => {
     await Promise.resolve()
     expect(turnIntoObject).toHaveBeenCalledWith(editor)
     expect(turnTodoIntoTask).toHaveBeenCalledWith(editor)
-    // Turn into task has no key (Capacities: the markdown `()` + Space only); the old one is inert.
+    // Turn into task has no key (the markdown `()` + Space only); the old one is inert.
     press(editor, 'Mod-Alt-k')
     press(editor, 'Mod-Alt-o')
     press(editor, 'Mod-Alt-r')

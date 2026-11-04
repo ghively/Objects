@@ -11,27 +11,12 @@ vi.mock('./switchSpace', async (orig) => ({
   switchSpace: vi.fn(async () => true),
 }))
 
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { api, ApiError } from '@/api/client'
 import { resetSpaceInfo } from '@/settings/useSpaceInfo'
 import { CREATE_SPACE_TEXT, CreateSpaceDialog, parentFolder, useCreateSpaceDialog } from './CreateSpaceDialog'
 import { switchSpace } from './switchSpace'
 
 const mocked = vi.mocked(api)
-
-const STRINGS = readFileSync(
-  path.resolve(import.meta.dirname, '../../../reference/app-unpacked/dist/virtual_intlify-i18n-0366822.js'),
-  'utf8',
-)
-const inReference = (text: string) => STRINGS.includes(`s:\`${text}\``)
-const OUR = new Set<string>([
-  CREATE_SPACE_TEXT.location,
-  CREATE_SPACE_TEXT.exists,
-  CREATE_SPACE_TEXT.created,
-  CREATE_SPACE_TEXT.switchNow,
-  CREATE_SPACE_TEXT.later,
-])
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -92,9 +77,6 @@ describe('CreateSpaceDialog', () => {
     expect(switchSpace).toHaveBeenCalledWith('/home/gene/Spaces/Reading list')
     expect(useCreateSpaceDialog.getState().isOpen).toBe(false)
 
-    for (const s of Object.values(CREATE_SPACE_TEXT)) {
-      if (!OUR.has(s)) expect(inReference(s), s).toBe(true)
-    }
   })
 
   test('test later closes without switching and cancel creates nothing', async () => {

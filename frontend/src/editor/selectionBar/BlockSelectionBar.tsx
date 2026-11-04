@@ -1,16 +1,16 @@
 /**
- * The block-selection bar (Capacities' editor panel, catalog section 6): shown at the bottom of the
+ * The block-selection bar (catalog section 6): shown at the bottom of the
  * page while blocks are selected (one or more). Left, "N block(s) · M words" opening the selection's
  * text stats; middle, Bold, Italic, Strikethrough, Underline, the Hierarchy and List dropdowns,
  * Toggle, Quote, To-do, the Icon and Color dropdowns; right, "Turn blocks into" (the object picker
  * the block menu's "Turn into..." shows), "Move" (to today's or tomorrow's daily note, or a new page),
  * delete (red) and close.
  *
- * Left out: Capacities' "AI" button (M10) and its "Tag" dropdown, which tags blocks: Object's
+ * Left out: an "AI" button (M10) and a "Tag" dropdown, which tags blocks: Object's
  * Markdown has no block tags, and inventing them is out (CLAUDE.md: no invented schema).
  *
  * Every button acts on the selected blocks (the block menu's functions) and the block selection
- * stays, so several can be applied in turn. Strings are Capacities' (key in a comment) unless
+ * stays, so several can be applied in turn. Strings follow the behaviour catalog unless
  * marked "our string".
  */
 import type { Editor } from '@tiptap/core'
@@ -62,32 +62,32 @@ import './blockSelectionBar.css'
 
 export const BLOCK_BAR_TEXT = {
   toolbar: 'Block selection', // our string (the bar's accessible name)
-  /** `EditorPanel.selectionStats.blocks` and `textStats.wordCount` */
+  /** The block count and the word count. */
   count: (blocks: number, words: number) => `${HANDLE_TEXT.blocks(blocks)} · ${words} ${words === 1 ? 'word' : 'words'}`,
-  stats: TEXT_STATS_TEXT.header, // xRay.textStats.header
-  bold: 'Bold', // tokensMenu.bold.name
-  italic: 'Italic', // tokensMenu.italic.name
-  strikethrough: 'Strikethrough', // tokensMenu.strikethrough.name
-  underline: 'Underline', // tokensMenu.underline.name
-  hierarchy: T.hierarchy, // blocksMenu.hierarchy.title
-  list: T.list, // blocksMenu.list.title
-  toggle: T.toggle, // textEditBar.toggle
-  quote: T.quote, // textEditBar.quote
+  stats: TEXT_STATS_TEXT.header,
+  bold: 'Bold',
+  italic: 'Italic',
+  strikethrough: 'Strikethrough',
+  underline: 'Underline',
+  hierarchy: T.hierarchy,
+  list: T.list,
+  toggle: T.toggle,
+  quote: T.quote,
   todo: T.todo, // the block menu's own label
-  icon: T.icon, // ControlDropdown.custom.block_icon.name
-  color: T.color, // styles.color
-  colorText: 'Text', // ColorPicker.section.text
-  colorBackground: 'Background', // ColorPicker.section.background
-  turnInto: 'Turn blocks into', // EditorPanel.shortLabels.turnInto
-  move: 'Move', // EditorPanel.shortLabels.addTo
-  today: 'Today', // ActionItems.addToDailyNoteToday.title
-  todayHint: "Add selected elements to today's daily note", // ActionItems.addToDailyNoteToday.description
-  tomorrow: 'Tomorrow', // ActionItems.addToDailyNoteTomorrow.title
-  tomorrowHint: "Add selected elements to tomorrow's daily note", // ActionItems.addToDailyNoteTomorrow.description
-  newPage: 'New page', // ActionItems.addToNewPage.title
-  newPageHint: 'Create a new page with the selected elements', // ActionItems.addToNewPage.description
-  delete: 'Delete selected blocks', // ActionItems.deleteBlocks.shortcut.title
-  clear: 'Clear selection', // EditorPanel.clearSelection
+  icon: T.icon,
+  color: T.color,
+  colorText: 'Text',
+  colorBackground: 'Background',
+  turnInto: 'Turn blocks into',
+  move: 'Move',
+  today: 'Today',
+  todayHint: "Add selected elements to today's daily note",
+  tomorrow: 'Tomorrow',
+  tomorrowHint: "Add selected elements to tomorrow's daily note",
+  newPage: 'New page',
+  newPageHint: 'Create a new page with the selected elements',
+  delete: 'Delete selected blocks',
+  clear: 'Clear selection',
 }
 
 /** The bar's buttons after the count, in order (their accessible names). */

@@ -1,10 +1,10 @@
 /**
- * M6 whiteboard types: the board file (Capacities' `WhiteboardData` from `whiteboard.model.ts`,
+ * M6 whiteboard types: the board file (the board data,
  * plus our `blocks`), the board route's response and the user-level canvas display settings.
  * Unknown keys at every level are kept on read and on save, so each record allows extra keys.
  */
 
-/** Capacities' 18 theme colours (`colorThemes.ts` `themeColors`). */
+/** The 18 theme colours. */
 export type WhiteboardThemeColor =
   | 'gray'
   | 'rose'
@@ -25,7 +25,7 @@ export type WhiteboardThemeColor =
   | 'orange'
   | 'red'
 
-/** `colorThemes.ts` `backgroundColorThemes`: a shape's `fillColor`. */
+/** The background colours: a shape's `fillColor`. */
 export type WhiteboardFillColor = `bg-${WhiteboardThemeColor}`
 
 export type WhiteboardNodeKind = 'block' | 'shape' | 'point' | 'frame'
@@ -219,7 +219,7 @@ export interface CreatedWhiteboard {
   typeIds: string[]
 }
 
-/** `ui.json` key `whiteboard` (Capacities' user-level names; absent = the defaults). */
+/** `ui.json` key `whiteboard` (user-level names; absent = the defaults). */
 export interface WhiteboardSettings {
   isSnappingToGrid?: boolean
   isSnappingToNodes?: boolean

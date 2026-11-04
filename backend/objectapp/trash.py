@@ -1,4 +1,4 @@
-"""The app's own trash, in ``.capacities/trash/`` (not the OS recycle bin).
+"""The app's own trash, in ``.object/trash/`` (not the OS recycle bin).
 
 Layout:
 
@@ -116,7 +116,7 @@ def _load(path: Path) -> dict[str, Any] | None:
 
 class Trash:
     def __init__(self, root: Path) -> None:
-        self.dir = Path(root) / ".capacities" / "trash"
+        self.dir = Path(root) / ".object" / "trash"
         self.types_dir = self.dir / "types"
         self.collections_dir = self.dir / "collections"
         self.queries_dir = self.dir / "queries"
@@ -275,7 +275,7 @@ class Trash:
                 TrashItem(
                     id=tid,
                     kind="type",
-                    originalPath=f".capacities/types/{type_id}.json",
+                    originalPath=f".object/types/{type_id}.json",
                     title=str(manifest.get("name", type_id)),
                     type=type_id,
                     deletedAt=str(manifest.get("deletedAt", "")),
@@ -292,7 +292,7 @@ class Trash:
                 TrashItem(
                     id=cid,
                     kind="collection",
-                    originalPath=f".capacities/collections/{collection_id}.json",
+                    originalPath=f".object/collections/{collection_id}.json",
                     title=name,
                     type="",
                     deletedAt=str(manifest.get("deletedAt", "")),
@@ -311,7 +311,7 @@ class Trash:
                 TrashItem(
                     id=qid,
                     kind="query",
-                    originalPath=f".capacities/queries/{query_id}.json",
+                    originalPath=f".object/queries/{query_id}.json",
                     title=name,
                     type="",
                     deletedAt=self.query_deleted_at(qid),

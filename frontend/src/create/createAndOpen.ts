@@ -1,5 +1,5 @@
 /**
- * Create an object and open it where the modifier keys say (Capacities' rules):
+ * Create an object and open it where the modifier keys say:
  * - plain: the current tab (a Task opens in the peek, unless "Always open as full page" is on),
  * - Ctrl or Meta: a new tab,
  * - Alt+Shift: the peek,
@@ -24,7 +24,7 @@ export type OpenMode = 'current' | 'newTab' | 'peek' | 'sidepanel'
 
 /**
  * Tasks open in the peek by default; with "Always open as full page"
- * (`EditorSettings.alwaysOpenAsFullPage`) they open as a page.
+ * they open as a page.
  */
 function opensInPeek(typeId: string | null | undefined): boolean {
   if (!typeId) return false

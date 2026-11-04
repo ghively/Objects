@@ -1,16 +1,15 @@
 /**
- * The code block's node view (Capacities' `CodeBlock`): the code area in the
+ * The code block's node view: the code area in the
  * code tokens (`--code-bg`, `--code-border`, `--code-text`) and a bar shown on
  * hover or focus with:
- * - "Select language" (`blocks.CodeBlock.selectLanguage`): our language list;
+ * - "Select language": our language list;
  * - for `markdown` and `mermaid`, "Edit" / "Edit & Display" / "Display"
- *   (`blocks.CodeBlock.viewModeEdit`, `.viewModeSplit`, `.viewModeDisplay`),
  *   written as `preview=edit|split|display`; absent means "Display";
- * - "Wrap lines" (`blocks.CodeBlock.wrapText`, option `wrap`);
- * - "Lock editing" (`blocks.CodeBlock.lockEditing`, option `lock`: read-only
+ * - "Wrap lines" (option `wrap`);
+ * - "Lock editing" (option `lock`: read-only
  *   until unlocked; `codeBlock.ts` also refuses edits inside a locked block);
- * - "Copy to clipboard" (`blocks.CodeBlock.copySnippet`);
- * - "Download as file" (`blocks.CodeBlock.downloadSnippet`, a client-side download).
+ * - "Copy to clipboard";
+ * - "Download as file" (a client-side download).
  */
 import { NodeViewContent, NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { Check, ChevronDown, Copy, Download, Lock, LockOpen, WrapText } from 'lucide-react'

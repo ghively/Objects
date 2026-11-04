@@ -245,7 +245,7 @@ declare module '@tiptap/core' {
       setBlockOption: (key: string, value: string | true | null, pos?: number) => ReturnType
       /** Make the block at the selection a list of `type`, or no list (`null`). */
       setListType: (type: ListType | null) => ReturnType
-      /** Capacities' text hierarchy: Standard, Small or Heading 1-4. */
+      /** The text hierarchy: Standard, Small or Heading 1-4. */
       setHierarchy: (level: Hierarchy) => ReturnType
     }
   }

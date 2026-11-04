@@ -1,4 +1,4 @@
-// Polish item 6: rem-based editor sizing from Capacities' 15.5px root, and the text size (zoom).
+// Polish item 6: rem-based editor sizing from a 15.5px root, and the text size (zoom).
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, test } from 'vitest'
 import { applyZoom, nextZoom, ZOOM_CACHE_KEY, ZOOM_MAX, ZOOM_MIN, zoomPercent } from './zoom'
@@ -12,7 +12,7 @@ afterEach(() => {
   localStorage.clear()
 })
 
-describe('zoom steps (Capacities setZoomLevel)', () => {
+describe('zoom steps', () => {
   test('test zoom in and out step by 0.05 and reset goes to 1', () => {
     expect(nextZoom(1, 'in')).toBe(1.05)
     expect(nextZoom(1.05, 'out')).toBe(1)
@@ -21,7 +21,7 @@ describe('zoom steps (Capacities setZoomLevel)', () => {
   })
 
   test('test zoom stops before 1.5 going in and before 0.6 going out', () => {
-    // Capacities refuses the step that would reach 1.5 or 0.6.
+    // The step that would reach 1.5 or 0.6 is refused.
     expect(nextZoom(1.45, 'in')).toBe(1.45)
     expect(nextZoom(0.65, 'out')).toBe(0.65)
     expect(ZOOM_MIN).toBe(0.6)
@@ -52,8 +52,8 @@ describe('applyZoom', () => {
 })
 
 describe('root and editor sizing CSS', () => {
-  test('test the root is 15.5px from 640px up, like Capacities', () => {
-    // index36682.css: @media (min-width:640px){html{font-size:96.875%}}
+  test('test the root is 15.5px from 640px up', () => {
+    // @media (min-width:640px){html{font-size:96.875%}}
     expect(tokensCss).toMatch(/@media \(min-width: 640px\)\s*{\s*html\s*{\s*font-size: 96\.875%;/)
   })
 

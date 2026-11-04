@@ -1,5 +1,5 @@
 /**
- * A connector's label box at the path midpoint (the reference CSS `[data-whiteboard-edge-label]`
+ * A connector's label box at the path midpoint (the `[data-whiteboard-edge-label]`
  * rules in `whiteboard.css`). While editing it is a one-line input over the label's Markdown
  * (our choice: Task 10's `TextBlockEditor` belongs to another lane). Enter, Escape or blur
  * commits once; so does an unmount that comes first (the edge left the viewport mid-edit).

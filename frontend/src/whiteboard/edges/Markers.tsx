@@ -2,7 +2,7 @@
  * The SVG `<marker>` definitions for connector tips: arrow, dot and double arrow, one definition
  * per tip kind and colour in use (plus the selection colour, so a selected connector's tips
  * follow its stroke). `orient="auto-start-reverse"` lets one definition serve the start and the
- * end. The tip drawings are our choice (the trimmed reference has no marker drawing).
+ * end. The tip drawings are our choice.
  */
 import type { MarkerDefsProps } from '../canvasTypes'
 import { TIP_SHAPES, colorForKey, markerId, markersInUse } from './connectorStyle'

@@ -55,7 +55,6 @@ describe('Alignment in the block menu (M9)', () => {
   test('test alignment submenu labels verbatim', async () => {
     renderMenu(headless('Hello\n', 'Hello'))
     const menu = await openAlignment()
-    // EditorPanel.shortLabels.alignment; shortcuts.textAlignLeft/Center/Right.name
     expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent?.trim())).toEqual([
       'Align text left',
       'Text align center',

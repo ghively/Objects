@@ -172,7 +172,7 @@ describe('TypePage', () => {
     load(views({ activeTab: 'overview' }))
     render(<TypePage type={TASK} />)
     await user.click(await screen.findByRole('button', { name: 'Customize Overview' }))
-    // Collections and Queries can't be removed (reference `canBeRemoved: false`).
+    // Collections and Queries can't be removed.
     expect(screen.queryByRole('button', { name: 'Hide Collections' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Hide Queries' })).toBeNull()
     await user.click(await screen.findByRole('button', { name: 'Hide Recently Opened' }))

@@ -157,11 +157,11 @@ def test_values_that_do_not_survive_json_are_parsed_every_time(tmp_path: Path, m
 def test_no_cache_under_the_trash(space_dir: Path):
     space = Space(space_dir)
     item = space.delete_object("Pages/Alpha.md")
-    (space_dir / ".capacities" / "trash" / f"{item.id}.json").unlink()
+    (space_dir / ".object" / "trash" / f"{item.id}.json").unlink()
     assert [i.title for i in Space(space_dir).list_trash()] == ["Alpha"]
     fmcache.flush_all()
-    assert str(space_dir / ".capacities" / "trash") not in fmcache._caches
-    assert not (space_dir / ".capacities" / "trash" / ".capacities-cache").exists()
+    assert str(space_dir / ".object" / "trash") not in fmcache._caches
+    assert not (space_dir / ".object" / "trash" / ".object-cache").exists()
 
 
 def test_unwritable_cache_dir_falls_back_to_parsing(space_dir: Path, monkeypatch):

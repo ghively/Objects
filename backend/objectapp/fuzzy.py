@@ -1,4 +1,4 @@
-"""The search palette's title matcher (M5; our scorer, Capacities' is not in the reference).
+"""The search palette's title matcher (M5; our own scorer).
 
 `score(query, text)` ranks a title or alias against what was typed:
 exact 1000, prefix 800, every query word a word-prefix 600, substring 400,

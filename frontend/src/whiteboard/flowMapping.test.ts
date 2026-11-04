@@ -43,7 +43,7 @@ describe('toFlow / fromFlowChange', () => {
     const b = fixtureBoards()[0].board
     const { nodes, edges } = toFlow(b, new Set(['n-text']))
     const types = new Set(nodes.map((n) => n.type))
-    expect(types).toEqual(new Set(['capacitiesBlock', 'capacitiesShape', 'capacitiesFrame', 'capacitiesPoint']))
+    expect(types).toEqual(new Set(['boardBlock', 'boardShape', 'boardFrame', 'boardPoint']))
     for (const n of nodes) {
       const src = b.nodes[n.id]
       expect(n.data.node).toBe(src)

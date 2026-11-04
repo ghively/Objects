@@ -1,6 +1,6 @@
 """M9 Task 5: whiteboard edits bump the board's ``lastUpdated``.
 
-``lastUpdated`` is component-level in Capacities (``component.model.ts``) and the canvas is
+``lastUpdated`` is component-level and the canvas is
 component data, so a board or ink save also stamps the board's ``.md`` (Gene's choice,
 reversing M6). Only the ``lastUpdated`` line changes, at most once a minute (our choice),
 and the stamp takes no version-history snapshot (our choice). The save answers

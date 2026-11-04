@@ -1,5 +1,5 @@
 /**
- * `group`: a box around its blocks (Capacities' `GroupBlock`). In the file:
+ * `group`: a box around its blocks. In the file:
  *
  *   <!-- group color=bg-gray -->
  *   Box heading
@@ -10,8 +10,8 @@
  *
  * Task 10: the node view (`layout/GroupView.tsx`: the box, its colour and
  * alignment, "Ungroup"), the placeholder "Box heading..."
- * (`blocks.GroupBlock.placeholder`) on an empty first child, and `toggleGroup`
- * (`shortcuts.groupBlocks`: "Group selected blocks or ungroup selected group
+ * on an empty first child, and `toggleGroup`
+ * ("Group selected blocks or ungroup selected group
  * block").
  */
 import { Node, mergeAttributes } from '@tiptap/core'

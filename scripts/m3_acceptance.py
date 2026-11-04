@@ -15,9 +15,9 @@ free ``127.0.0.1`` port. Over HTTP it then checks:
  4. renaming "Tooling" to "Gear" rewrites only list items (``lastUpdated`` stays)
     and ``rewritten`` equals the set of changed files;
  5. delete "Gear" (428 without confirm, then confirmed with nothing skipped) and
-    restore it from the Trash: every file outside ``.capacities/`` is
+    restore it from the Trash: every file outside ``.object/`` is
     byte-identical to before the delete;
- 6. a views, a ui and a query write each change exactly one ``.capacities/`` file
+ 6. a views, a ui and a query write each change exactly one ``.object/`` file
     and no ``.md``; a second ``PUT /api/ui`` with the old revision is 409;
  7. ``POST /api/objects`` with ``values`` creates one file holding them;
  8. the M1 no-edit pass changes no file.
@@ -142,13 +142,13 @@ def check_rename(run: Run, a: dict, b: dict, tooling: dict) -> dict:
     return c
 
 
-def non_capacities(snap: dict[str, bytes]) -> dict[str, bytes]:
-    return {k: v for k, v in snap.items() if not k.startswith(".capacities/")}
+def outside_meta(snap: dict[str, bytes]) -> dict[str, bytes]:
+    return {k: v for k, v in snap.items() if not k.startswith(".object/")}
 
 
 def check_delete_restore(run: Run, a: dict, tooling: dict) -> None:
     print("\n5. Collection delete and restore")
-    before = non_capacities(snapshot(run.root))
+    before = outside_meta(snapshot(run.root))
     cid = tooling["id"]
     c428, _ = run.http("DELETE", f"/collections/{cid}")
     code, res = run.http("DELETE", f"/collections/{cid}", confirm="true")
@@ -158,17 +158,17 @@ def check_delete_restore(run: Run, a: dict, tooling: dict) -> None:
     _, trash = run.http("GET", "/trash")
     entry = next((t for t in trash if t.get("kind") == "collection" and t.get("collectionId") == cid), None)
     rcode, rres = run.http("POST", f"/trash/{entry['id']}/restore") if entry else (None, None)
-    after = non_capacities(snapshot(run.root))
+    after = outside_meta(snapshot(run.root))
     diff = changed_paths(before, after)
     line_ok = re.search(r"^collections: \[Other, Gear\]\s*$", run.text(a["path"]), re.M) is not None
     run.report(entry is not None and rcode == 200 and not diff and line_ok and not (rres or {}).get("skipped"),
-               "restored: every file outside .capacities/ is byte-identical, [Other, Gear] in its original order",
+               "restored: every file outside .object/ is byte-identical, [Other, Gear] in its original order",
                *([str(diff)] if diff else []))
 
 
-def only_capacities(run: Run, before: dict[str, bytes], expect_new: bool = False) -> tuple[bool, list[str]]:
+def only_meta(run: Run, before: dict[str, bytes], expect_new: bool = False) -> tuple[bool, list[str]]:
     diff = changed_paths(before, snapshot(run.root))
-    ok = len(diff) == 1 and diff[0].startswith(".capacities/") and not md_files(diff)
+    ok = len(diff) == 1 and diff[0].startswith(".object/") and not md_files(diff)
     return ok, diff
 
 
@@ -180,24 +180,24 @@ def check_definition_writes(run: Run) -> None:
     views["activeTab"] = "all"
     before = snapshot(run.root)
     code, _ = run.http("PUT", f"/views/{task['id']}", {"views": views, "baseRevision": got["revision"]})
-    ok, diff = only_capacities(run, before)
+    ok, diff = only_meta(run, before)
     run.report(code == 200 and ok, f"PUT /views/{task['id']} wrote {diff}")
 
     _, ui0 = run.http("GET", "/ui")
     before = snapshot(run.root)
     pin = {"kind": "type", "id": task["id"]}
     code, _ = run.http("PUT", "/ui", {"patch": {"pinned": [pin]}, "baseRevision": ui0["revision"]})
-    ok, diff = only_capacities(run, before)
+    ok, diff = only_meta(run, before)
     stale, _ = run.http("PUT", "/ui", {"patch": {"pinned": []}, "baseRevision": ui0["revision"]})
     run.report(code == 200 and ok and stale == 409, f"PUT /ui wrote {diff}; stale baseRevision is {stale}")
 
     before = snapshot(run.root)
     code, q = run.http("POST", "/queries", {"name": "Acceptance query"})
-    ok, diff = only_capacities(run, before)
+    ok, diff = only_meta(run, before)
     run.report(code == 201 and ok, f"POST /queries wrote {diff}")
     before = snapshot(run.root)
     scode, _ = run.http("PUT", f"/queries/{q['id']}", {"query": {**q, "description": "saved"}, "baseRevision": q["revision"]})
-    ok, diff = only_capacities(run, before)
+    ok, diff = only_meta(run, before)
     run.report(scode == 200 and ok, f"PUT /queries/{q['id']} wrote {diff}")
 
 

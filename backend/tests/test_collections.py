@@ -35,7 +35,7 @@ def test_create_collection_writes_one_file(space_dir: Path):
     body = r.json()
     assert body["id"] == "tooling" and body["name"] == "Tooling" and body["typeIds"] == ["server"]
     assert body["revision"] and body["readOnlyReason"] is None
-    assert _files(space_dir) - before == {".capacities/collections/tooling.json"}
+    assert _files(space_dir) - before == {".object/collections/tooling.json"}
     assert before - _files(space_dir) == set()
     assert [(e.kind, e.path) for e in published] == [("collections", "tooling")]
     assert space.collection_by_name("tooling").id == "tooling"
@@ -64,13 +64,13 @@ def test_unknown_type_422(space_dir: Path):
     with c:
         r = _create(c, "Ghosts", ["nope"])
     assert r.status_code == 422
-    assert not (space_dir / ".capacities" / "collections").exists()
+    assert not (space_dir / ".object" / "collections").exists()
     assert space.list_collections() == []
 
 
 def test_save_keeps_unknown_keys_and_checks_revision(space_dir: Path):
     _space, c, published = _client(space_dir)
-    path = space_dir / ".capacities" / "collections" / "tooling.json"
+    path = space_dir / ".object" / "collections" / "tooling.json"
     with c:
         made = _create(c).json()
         stored = json.loads(path.read_text("utf-8"))
@@ -127,7 +127,7 @@ def test_collection_by_former_name(space_dir: Path):
 
 
 def test_list_unreadable_collection_readonly(space_dir: Path):
-    path = space_dir / ".capacities" / "collections" / "bad.json"
+    path = space_dir / ".object" / "collections" / "bad.json"
     path.parent.mkdir(parents=True)
     path.write_bytes(b'{"id":')
     space, c, published = _client(space_dir)
@@ -154,7 +154,7 @@ def test_collection_default_views_pinned_only(space_dir: Path):
 
 def test_saved_unknown_type_kept_new_unknown_422(space_dir: Path):
     _space, c, _pub = _client(space_dir)
-    path = space_dir / ".capacities" / "collections" / "tooling.json"
+    path = space_dir / ".object" / "collections" / "tooling.json"
     with c:
         _create(c)
         # A type that has since been deleted stays in the stored typeIds.

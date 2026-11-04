@@ -3,7 +3,7 @@
 Usage: ``uv run python scripts/m1_roundtrip.py SPACE [--edits 10] [--keep]``
 
 1. Copies SPACE to a temporary folder (SPACE itself is never touched), lets
-   `Space` create ``.capacities/types/`` there, and commits the copy to a
+   `Space` create ``.object/types/`` there, and commits the copy to a
    throw-away git repo so changes show up in ``git diff``.
 2. Starts the API on a free ``127.0.0.1`` port.
 3. No-edit pass: for every object, GET it and PUT the identical body. Asserts
@@ -73,7 +73,7 @@ def snapshot(root: Path) -> dict[str, bytes]:
         p.relative_to(root).as_posix(): p.read_bytes()
         for p in root.rglob("*")
         if p.is_file() and ".git" not in p.relative_to(root).parts
-        and p.relative_to(root).parts[0] != ".capacities-cache"  # derived search cache (M5), like .git
+        and p.relative_to(root).parts[0] != ".object-cache"  # derived search cache (M5), like .git
     }
 
 
@@ -147,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
     server = None
     thread = None
     try:
-        space = Space(root)  # may create .capacities/types/ once; commit after that
+        space = Space(root)  # may create .object/types/ once; commit after that
         git(root, "init", "-q")
         git(root, "add", "-A")
         git(root, "-c", "user.name=m1", "-c", "user.email=m1@localhost", "commit", "-q", "-m", "base")

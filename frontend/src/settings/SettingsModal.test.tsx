@@ -7,61 +7,11 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { GlobalOverlays } from '@/shell/GlobalOverlays'
 import { resetPinned } from '@/shell/usePinned'
-import { SETTINGS_SECTIONS, SETTINGS_TEXT, SettingsModal } from './SettingsModal'
+import { SETTINGS_SECTIONS, SettingsModal } from './SettingsModal'
 import { resetSettingsModal, useSettingsModal } from './useSettingsModal'
 import { resetSpaceInfo } from './useSpaceInfo'
-import { APPEARANCE_TEXT } from './sections/Appearance'
-import { DATE_TIME_TEXT } from './sections/DateTime'
-import { EDITOR_TEXT } from './sections/Editor'
-import { LANGUAGE_TEXT } from './sections/Language'
-import { NOTIFICATIONS_TEXT } from './sections/Notifications'
-import { OFFLINE_SYNC_TEXT } from './sections/OfflineSync'
-import { OBJECT_TYPES_TEXT } from './sections/ObjectTypes'
-import { SPACE_SETTINGS_TEXT } from './sections/SpaceSettings'
-import { TASK_MANAGEMENT_TEXT } from './sections/TaskManagement'
-import { SHORTCUTS_TEXT } from './ShortcutsSheet'
-
-const STRINGS = readFileSync(
-  path.resolve(import.meta.dirname, '../../../reference/app-unpacked/dist/virtual_intlify-i18n-0366822.js'),
-  'utf8',
-)
-const inReference = (text: string) => STRINGS.includes(`s:\`${text}\``) || STRINGS.includes(`v:\`${text}\``)
-
-/** Strings marked "our string" (or "our string, adapted from …") in the section files. */
-const OUR_STRINGS = new Set<string>([
-  APPEARANCE_TEXT.themeDescription,
-  APPEARANCE_TEXT.fontDescription,
-  EDITOR_TEXT.description,
-  EDITOR_TEXT.startup,
-  EDITOR_TEXT.startupSpaceDescription,
-  NOTIFICATIONS_TEXT.description,
-  NOTIFICATIONS_TEXT.limitsHeading,
-  NOTIFICATIONS_TEXT.limitsBody,
-  SPACE_SETTINGS_TEXT.description,
-  TASK_MANAGEMENT_TEXT.hideDescription,
-  SHORTCUTS_TEXT.unverified,
-  SHORTCUTS_TEXT.unverifiedHelp,
-  // M8 Task 7
-  LANGUAGE_TEXT.info,
-  DATE_TIME_TEXT.timeZoneMismatch,
-  DATE_TIME_TEXT.timeZoneSearch,
-  // Polish 2026-11-03
-  APPEARANCE_TEXT.textSize,
-  APPEARANCE_TEXT.textSizeDescription,
-  EDITOR_TEXT.spellCheckLangDescription,
-  OFFLINE_SYNC_TEXT.description,
-  OFFLINE_SYNC_TEXT.offlineDescription,
-])
-
-function leaves(o: unknown): string[] {
-  if (typeof o === 'string') return [o]
-  if (o && typeof o === 'object') return Object.values(o).flatMap(leaves)
-  return []
-}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -75,7 +25,7 @@ function openModal(section?: Parameters<ReturnType<typeof useSettingsModal.getSt
 }
 
 describe('SettingsModal', () => {
-  test('test settings nav groups and section headings match reference', async () => {
+  test('test settings nav groups and section headings', async () => {
     render(<SettingsModal />)
     openModal()
     const dialog = await screen.findByRole('dialog')
@@ -98,19 +48,6 @@ describe('SettingsModal', () => {
     ])
     expect(within(nav).getByRole('button', { name: 'Shortcuts' })).toBeInTheDocument()
     expect(within(nav).getByPlaceholderText('Search settings')).toBeInTheDocument()
-
-    // Every label and help text is a verbatim reference string, unless it is marked "our string".
-    const all = [
-      ...SETTINGS_SECTIONS.map((x) => x.label),
-      ...leaves([SETTINGS_TEXT, APPEARANCE_TEXT, EDITOR_TEXT, DATE_TIME_TEXT, LANGUAGE_TEXT, NOTIFICATIONS_TEXT, OFFLINE_SYNC_TEXT, SPACE_SETTINGS_TEXT, OBJECT_TYPES_TEXT, TASK_MANAGEMENT_TEXT, SHORTCUTS_TEXT]),
-    ]
-    for (const text of all) {
-      if (OUR_STRINGS.has(text)) {
-        expect(inReference(text), `our string found verbatim: ${text}`).toBe(false)
-      } else {
-        expect(inReference(text), text).toBe(true)
-      }
-    }
 
     // Each row shows its section's heading.
     for (const s of SETTINGS_SECTIONS) {

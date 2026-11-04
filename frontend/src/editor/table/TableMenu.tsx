@@ -1,18 +1,18 @@
 /**
- * The table menus (Capacities' `SimpleTableBlock`), shown on a bar above a
+ * The table menus, shown on a bar above a
  * table while it is hovered or holds the cursor:
- * - "Edit table" (`blocks.simpleTable.optionsMenu.label`): the "Header row" and
+ * - "Edit table": the "Header row" and
  *   "Header column" switches (`showHeaderRow`, `showHeaderColumn`), "Clear cell
  *   contents" (`clearCellContents`, for the cell holding the cursor) and
  *   "Export as CSV" (`export`, `csv.ts`) and "Delete table" (`deleteTable`);
- * - "Edit row" (`rowMenu.label`): "Insert row above", "Insert row below",
+ * - "Edit row": "Insert row above", "Insert row below",
  *   "Delete row", "Clear row";
- * - "Edit column" (`colMenu.label`): "Insert column before", "Insert column
+ * - "Edit column": "Insert column before", "Insert column
  *   after", "Delete column", "Clear column", then "Sort column ascending" and
  *   "Sort column descending" (`sortColumnAscending`, `sortColumnDescending`;
  *   their place in the menu is our choice).
- * - "Alignment" (M9; `EditorPanel.shortLabels.alignment`): "Align text left", "Text align
- *   center", "Text align right" (`shortcuts.textAlign*.name`), Capacities' table-cell
+ * - "Alignment" (M9): "Align text left", "Text align
+ *   center", "Text align right", the table-cell
  *   alignment. A GFM table aligns columns, so it sets the column's alignment (the separator
  *   line's `:-:` / `-:`; our choice). Its place on the bar is our choice.
  * The row, column and alignment menus act on the cell holding the cursor.
@@ -70,7 +70,7 @@ import { formulaCellsPlugin } from './FormulaCell'
 import './table.css'
 
 /** Re-render on every editor transaction (selection moves included). */
-/** Capacities' alignment items, with the bar's icons. */
+/** The alignment items, with the bar's icons. */
 const ALIGN_ITEMS: readonly { align: CellAlign; name: string; Icon: typeof AlignLeft }[] = [
   { align: 'left', name: 'Align text left', Icon: AlignLeft },
   { align: 'center', name: 'Text align center', Icon: AlignCenter },

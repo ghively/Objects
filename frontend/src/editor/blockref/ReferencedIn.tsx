@@ -1,5 +1,5 @@
 /**
- * "Referenced in" (`BlockReferences.referencedIn`, M8): a block with an id that other objects
+ * "Referenced in" (M8): a block with an id that other objects
  * reference shows, after its text, the objects holding `![[<Title>#^<id>]]` or `[[<Title>#^<id>]]`
  * (`GET /api/block/references`). Nothing shows while there are none. Clicking one opens it.
  *
@@ -13,7 +13,7 @@ import { stemOf, summaryOf, useLinkIndex } from '@/links/linkIndex'
 import { blockClient } from './blockClient'
 import './blockref.css'
 
-export const REFERENCED_IN = 'Referenced in' // BlockReferences.referencedIn
+export const REFERENCED_IN = 'Referenced in'
 
 export function ReferencedIn({ path, id }: { path: string; id: string }) {
   const [paths, setPaths] = useState<string[]>([])

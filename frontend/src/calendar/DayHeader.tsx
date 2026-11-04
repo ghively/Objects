@@ -1,5 +1,5 @@
 // The Day header: the weekday in its colour, the Today pill (today only), the large date and the
-// muted "Week {n}" (`CalendarView.calendarWeek`). `size='sm'` is the multi-day views' header.
+// muted "Week {n}". `size='sm'` is the multi-day views' header.
 // `ReviewedButton` is the daily note's Reviewed flag shown beside it.
 import { useState, type ReactNode } from 'react'
 import { api, ConflictError } from '@/api/client'
@@ -11,7 +11,6 @@ import { formatLong, isoWeekday, weekNumber, weekdayColor, weekdayName, type Day
 export const DAY_TEXT = {
   today: 'Today',
   week: 'Week',
-  /** `components.RootDailyNote.propertyDefinitions.RootDailyNote_reviewed.name` */
   reviewed: 'Reviewed',
 }
 

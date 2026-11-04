@@ -6,7 +6,7 @@
  * with no match closes it too. An item's sub-view (icon picker, the bookmark
  * URL field) replaces the list.
  *
- * Capacities' CreateMenu: 22rem wide in the editor, the list at most 18rem
+ * The menu is 22rem wide in the editor, the list at most 18rem
  * (`max-h-72`) high; each icon in a bordered chip; a description is the
  * hover tooltip of a right-hand `ph-text-align-justify` icon, not a second line.
  */

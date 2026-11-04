@@ -1,7 +1,7 @@
 """A space: a folder of object files, scanned into summaries, types and a link index.
 
 Reading, listing, resolving and opening objects never write an object file.
-The only writes `Space` makes on its own are inside ``.capacities/`` (see
+The only writes `Space` makes on its own are inside ``.object/`` (see
 `typemodel.load_types`): the first-open type JSON, the one-time v1 type
 migration, and the built-in Page and Tag types when missing.
 
@@ -12,7 +12,7 @@ user's behalf use `Space._rewrite_other`, which retries once on a conflict and
 otherwise reports a `Skip` instead of overwriting.
 
 Objects are created with `Space.create_object` and deleted to the app's own
-trash (`trash.Trash`, in ``.capacities/trash/``) with `Space.delete_object`;
+trash (`trash.Trash`, in ``.object/trash/``) with `Space.delete_object`;
 types go there with `Space.trash_type`. Opening the space purges trash entries
 older than 30 days.
 """
@@ -67,6 +67,7 @@ from .collections import CollectionDef, SaveCollectionResult
 from . import fmcache
 from .dailynotes import FILE_NAME_TAKEN, DailyNoteExists, build_index, day_of, parse_day
 from .jsonstore import DefinitionUnreadable, JsonStore
+from .legacy import migrate_legacy_folders
 from .localtime import SystemTz, from_local, to_local
 from .queries import DEFAULT_NAME as DEFAULT_QUERY_NAME
 from .queries import LIMIT_SIZES, MAX_SEARCH_TERMS, QueryDef, query_type_ids
@@ -170,20 +171,20 @@ _NOT_COPIED_KINDS = frozenset(
     {"entity_title", "entity_type", "entity_createdAt", "entity_lastUpdated",
      "entity_collections", "entity_backlinks"}
 )  # fmt: skip
-# M9 duplicate: the roles of `structureHeuristicsBackbone.ts` `cannotBeDuplicatedInUI` that
+# M9 duplicate: the roles that can't be duplicated that
 # our types can have (see `roles.py`), and the refusal (our string).
 _NOT_DUPLICATED_ROLES = frozenset(
     {"MediaImage", "MediaWebResource", "MediaPDF", "MediaAudio", "MediaFile", "MediaTweet",
      "RootDailyNote"}
 )  # fmt: skip
 _CANNOT_DUPLICATE = "This object can't be duplicated."
-# M9 per-object layout keys (`ComponentData.wideLayoutMode`, `entity.data.wideCoverImage`,
+# M9 per-object layout keys (`wideLayoutMode`, `wideCoverImage`,
 # `coverImageOffset`'s `offset`): absent means the type's default (offset 50); `None` removes.
 _COVER_OFFSET = "coverImageOffset"
-# Polish item 17: `hideProperties` (`ComponentData.hideProperties`), the property-pane toggle.
+# Polish item 17: `hideProperties`, the property-pane toggle.
 _LAYOUT_BOOL_KEYS = frozenset({"wideLayoutMode", "wideCoverImage", "hideProperties"})
 _LAYOUT_KEYS = _LAYOUT_BOOL_KEYS | {_COVER_OFFSET}
-# `DATE_TEMPLATE_VARIABLES` (date.model.ts); `DatetimeProperty.variable` is "Set only on templates".
+# The date template variables; a datetime property's variable is "Set only on templates".
 _CREATION_VARIABLES = ("day", "week", "month", "year")
 # M9: how often a whiteboard save may re-stamp its `.md` (`Space.touch`; our choice).
 _TOUCH_INTERVAL = timedelta(seconds=60)
@@ -282,7 +283,7 @@ _LINK_BREAKING_RE = re.compile(r"[\[\]|#\n]")
 
 
 def safe_filename(title: str) -> str:
-    """The file stem for a title, as Capacities' export names files.
+    """The file stem for a title, as an export names files.
 
     The title up to its first character that is illegal in a Windows file name,
     with whitespace collapsed and leading and trailing dots and spaces stripped
@@ -630,7 +631,7 @@ def unique_key(name: str, taken: Iterable[str]) -> str:
     return f"{base}_{n}"
 
 
-# Capacities' en-US texts.
+# The en-US texts.
 BASIC_LOCKED = "Properties of basic object types cannot be edited."
 NO_TRANSFORMATIONS = (
     "This property type cannot be changed. If you need to change it, please add a ticket "
@@ -792,7 +793,7 @@ class Space:
 
     @property
     def name(self) -> str:
-        """``.capacities/space.json``'s ``name``, else the folder name.
+        """``.object/space.json``'s ``name``, else the folder name.
 
         Re-read only when the file's stat (times, size, inode) changed since the last
         access, so an edit made outside the app is still seen at once.
@@ -811,6 +812,7 @@ class Space:
 
     def __init__(self, root: Path) -> None:
         self.root = Path(root).resolve()
+        migrate_legacy_folders(self.root)  # older folder names, renamed once
         self._space_json = os.fspath(self.root / SPACE_REL)
         self._name_cache: tuple[tuple | None, str] | None = None
         """(`space.json`'s stat key, the name read with it) for `name`."""
@@ -940,7 +942,7 @@ class Space:
             return out
 
     def store(self, folder: str) -> JsonStore:
-        """The definition store of ``.capacities/<folder>/`` (``collections``, ``queries``, ``views``).
+        """The definition store of ``.object/<folder>/`` (``collections``, ``queries``, ``views``).
 
         Bound to this space's lock and ``own_writes`` so the watcher stays silent
         about the app's own writes.
@@ -1492,7 +1494,7 @@ class Space:
         definition: dict[str, Any] | None = None,
         view: dict[str, Any] | None = None,
     ) -> QueryDef:
-        """Create ``.capacities/queries/<id>.json``. No name: "New Query", ``titleIsCustom`` false."""
+        """Create ``.object/queries/<id>.json``. No name: "New Query", ``titleIsCustom`` false."""
         name = (name or "").strip()
         data: dict[str, Any] = {"name": name or DEFAULT_QUERY_NAME, "titleIsCustom": bool(name)}
         if definition is not None:
@@ -1847,7 +1849,7 @@ class Space:
         ``base`` is the version on disk the stamp started from (read under the lock) and
         ``version`` the version after it: equal when nothing was written. M9: a
         whiteboard's canvas or ink save stamps its ``.md`` (``lastUpdated`` is
-        component-level in Capacities). A stamp under `_TOUCH_INTERVAL` old is left as it
+        component-level). A stamp under `_TOUCH_INTERVAL` old is left as it
         is (our choice), as is a read-only file; the write takes no version-history
         snapshot (our choice). Raises `KeyError`, `ValueError` and `Conflict` (an
         external write during the stamp).
@@ -2136,7 +2138,7 @@ class Space:
             ("coverImage" in sets and sets["coverImage"] != fm.get("coverImage"))
             or "coverImage" in removals
         ):
-            # A new cover image drops the old one's position (Capacities' `referenceImageId`).
+            # A new cover image drops the old one's position (``referenceImageId``).
             removals.append(_COVER_OFFSET)
         in_place: dict[str, str] = {}
         if hook is not None:
@@ -2948,14 +2950,14 @@ class Space:
         The copy is the source's bytes (line endings and BOM included) except for a
         new ``id``, ``title: <Title> (Copy)``, fresh ``createdAt`` and ``lastUpdated``
         (``now``, default `Space.clock`) and a first ``# <Title>`` heading, which
-        becomes ``# <Title> (Copy)``. The title rule is Capacities'
-        (``${title || 'Untitled'} (Copy)``). Besides the new file, the targets of its
+        becomes ``# <Title> (Copy)``. The title rule is
+        ``${title || 'Untitled'} (Copy)``. Besides the new file, the targets of its
         synced (two-way) relations gain ``[[<Title> (Copy)]]`` in their counterpart
         property, as for any relation edit (Gene, 2026-10-29); ``synced`` lists them.
 
         Raises `KeyError` (no such file), `ValueError` (not an object path) and
-        `InvalidValue` for what Capacities doesn't duplicate (daily notes and media,
-        its ``cannotBeDuplicatedInUI``), templates, whiteboards (their sidecars would
+        `InvalidValue` for what can't be duplicated (daily notes and media),
+        templates, whiteboards (their sidecars would
         need copying too; our choice) and read-only files.
         """
         rel = self._rel(path)
@@ -3558,7 +3560,7 @@ class Space:
             return TrashItem(
                 id=trash_id,
                 kind="type",
-                originalPath=f".capacities/types/{type_def.id}.json",
+                originalPath=f".object/types/{type_def.id}.json",
                 title=type_def.name,
                 type=type_def.id,
                 deletedAt=deleted_at,
@@ -3576,16 +3578,16 @@ class Space:
         refs: list[dict[str, str]],
     ) -> None:
         """`trash_type`'s moves, recording each object's trash id and each ref as it goes."""
-        type_file = self.root / ".capacities" / "types" / f"{type_def.id}.json"
+        type_file = self.root / ".object" / "types" / f"{type_def.id}.json"
         if type_file.is_file():
             os.replace(type_file, folder / "type.json")
         else:
             (folder / "type.json").write_bytes(
                 (json.dumps(type_def.to_json(), indent=2, ensure_ascii=False) + "\n").encode()
             )
-        views_file = self.root / ".capacities" / "views" / f"{type_def.id}.json"
+        views_file = self.root / ".object" / "views" / f"{type_def.id}.json"
         if views_file.is_file():
-            self.own_writes[f".capacities/views/{type_def.id}.json"] = ""
+            self.own_writes[f".object/views/{type_def.id}.json"] = ""
             os.replace(views_file, folder / "views.json")
         for rel in templates:
             self._move_out(rel, folder / "templates" / rel)
@@ -3658,7 +3660,7 @@ class Space:
         folder = self.trash.type_dir(trash_id)
         type_id = str(manifest.get("typeId", ""))
         type_ids = [type_id]
-        type_file = self.root / ".capacities" / "types" / f"{type_id}.json"
+        type_file = self.root / ".object" / "types" / f"{type_id}.json"
         stored = folder / "type.json"
         if stored.is_file():
             if type_file.exists():
@@ -3680,10 +3682,10 @@ class Space:
             self._types_changed(restored.id)
         stored_views = folder / "views.json"
         if stored_views.is_file():
-            views_file = self.root / ".capacities" / "views" / f"{type_id}.json"
+            views_file = self.root / ".object" / "views" / f"{type_id}.json"
             if not views_file.exists():
                 views_file.parent.mkdir(parents=True, exist_ok=True)
-                self.own_writes[f".capacities/views/{type_id}.json"] = version_of(
+                self.own_writes[f".object/views/{type_id}.json"] = version_of(
                     stored_views.read_bytes()
                 )
                 move_no_overwrite(stored_views, views_file)
@@ -3886,7 +3888,7 @@ class Space:
         """The type as its file holds it (None when there is no readable file)."""
         try:
             data = json.loads(
-                (self.root / ".capacities" / "types" / f"{type_id}.json").read_text(
+                (self.root / ".object" / "types" / f"{type_id}.json").read_text(
                     encoding="utf-8"
                 )
             )
@@ -3913,7 +3915,7 @@ class Space:
         Polish item 21: with ``template`` (a gallery key, `typetemplates`), the
         template's properties replace "Content", its name, plural, description,
         icon and colour fill whatever isn't given, and the key is stored as
-        ``templateKey`` (Capacities' `RootStructure.templateKey`).
+        ``templateKey`` (the template it was made from).
         """
         tpl = None
         if template is not None:
@@ -3939,7 +3941,7 @@ class Space:
         with self._lock:
             if self._name_taken(name):
                 raise InvalidValue(f"An object type named {name!r} already exists")
-            types_dir = self.root / ".capacities" / "types"
+            types_dir = self.root / ".object" / "types"
             taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
             if types_dir.is_dir():
                 taken |= {f.stem for f in types_dir.glob("*.json")}
@@ -3985,7 +3987,7 @@ class Space:
         p: PropertyDefinition,
         types: dict[str, TypeDefinition] | None = None,
     ) -> str | None:
-        """Why ``p`` of ``t`` can't sync with its ``propertySyncing`` targets (Capacities' text).
+        """Why ``p`` of ``t`` can't sync with its ``propertySyncing`` targets (the user-facing text).
 
         Syncing needs an entity property that is multi-select without a fixed
         set, on a non-basic type, whose ``allowedTypes`` is exactly the
@@ -4450,7 +4452,7 @@ class Space:
     def change_property_kind(
         self, type_id: str, pid: str, to_type: str, base_revision: str
     ) -> ChangeKindResult:
-        """Change a property's kind as Capacities does: by adding a new property.
+        """Change a property's kind: by adding a new property.
 
         The new definition goes right after the old one, with the same name,
         icon, description and visibility, a new id and a new unique key. Each
@@ -4550,7 +4552,7 @@ class Space:
         type JSONs are written last.
 
         Raises `KeyError`, `TypeReadOnly`, `RevisionConflict` and
-        `InvalidValue` with Capacities' texts when syncing isn't allowed.
+        `InvalidValue` with the user-facing texts when syncing isn't allowed.
         """
         with self._lock:
             src_t, current = self._editable_type(type_id)
@@ -4596,7 +4598,7 @@ class Space:
 
             lookup = {x.id: x for x in self.types}
             lookup[src_t.id] = src_t
-            # Validate the source with a placeholder link (Capacities' texts).
+            # Validate the source with a placeholder link (same texts).
             probe = copy.deepcopy(p)
             probe.options.pop("propertySyncing", None)
             problem = self.sync_problem(src_t, probe, lookup)

@@ -1,12 +1,11 @@
 /**
- * `capacitiesShape`: one of the 12 shapes (`shapePath`), filled with its `fillColor`, outlined
+ * `boardShape`: one of the 12 shapes (`shapePath`), filled with its `fillColor`, outlined
  * in its `borderColor` (else the default ring), rotated and flipped. In-shape text sits in the
  * shape's `textInset` box, aligned vertically by `textVerticalAlign` (unset = center).
  *
  * Gates are rectangles whose text is exactly a gate label ("Persist as `rectangle` plus this exact
  * label"): the label shows centred, and HIGH / LOW carry `data-circuit-bit` for the circuit ring.
- * How the gates are drawn beyond that is not in the trimmed reference (our choice: a labelled
- * rectangle).
+ * Beyond that a gate is drawn as a labelled rectangle (our choice).
  */
 import { memo, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import type { WhiteboardShape, WhiteboardTextBlock, WhiteboardTextVerticalAlign } from '@/api/whiteboardTypes'
@@ -20,7 +19,7 @@ import { commitText } from './BlockNode'
 import { NodeChrome, useNodeEditable } from './NodeChrome'
 import { MarkdownView, TextBlockEditor } from './TextBlockEditor'
 
-/** A shape with no `fillColor` shows the panel colour (our choice; Capacities' default isn't in the reference). */
+/** A shape with no `fillColor` shows the panel colour (our choice). */
 export const DEFAULT_SHAPE_FILL = 'var(--color-bg-base)'
 
 const JUSTIFY: Record<WhiteboardTextVerticalAlign, CSSProperties['justifyContent']> = {

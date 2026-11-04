@@ -1,5 +1,5 @@
 /**
- * Open the extended search page ("Open extended search", `LocalSpaceQuery.openSearch`) in the
+ * Open the extended search page ("Open extended search") in the
  * current tab, carrying what was typed and the "Text matches only" toggle.
  * The `search` target is `nav/tabs.ts`' `{kind: 'search', q?, textOnly?}`.
  */

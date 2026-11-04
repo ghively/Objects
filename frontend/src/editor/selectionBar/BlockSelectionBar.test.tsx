@@ -74,7 +74,7 @@ describe('<BlockSelectionBar>', () => {
     expect(screen.queryByRole('toolbar')).toBeNull()
   })
 
-  test("buttons in Capacities' order: stats, formatting, then turn into, move, delete and close", () => {
+  test("buttons in the bar's order: stats, formatting, then turn into, move, delete and close", () => {
     const editor = mounted(BODY)
     render(<BlockSelectionBar editor={editor} />)
     select(editor, 0)
@@ -166,8 +166,8 @@ describe('<BlockSelectionBar>', () => {
     render(<BlockSelectionBar editor={editor} />)
     select(editor, 1)
     const menu = await openMenu('Color')
-    expect(within(menu).getByText('Text')).toBeInTheDocument() // ColorPicker.section.text
-    expect(within(menu).getByText('Background')).toBeInTheDocument() // ColorPicker.section.background
+    expect(within(menu).getByText('Text')).toBeInTheDocument()
+    expect(within(menu).getByText('Background')).toBeInTheDocument()
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'Blue background' }))
     expect(serializeBody(editor)).toBe('One two\n\n<!-- block: color=bg-blue -->\nThree\n\nFour five six\n')
     fireEvent.click(within(await openMenu('Color')).getByRole('menuitem', { name: 'Remove background color' }))

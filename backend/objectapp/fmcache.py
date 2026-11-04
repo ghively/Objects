@@ -16,7 +16,7 @@ scalars) are stored; and a hit is a fresh copy, so an edit to one object's
 The cache dir is the search index's (`searchindex.cache_dir_for`, mirrored here
 because that module imports `space`, which imports `typedefs`): under
 ``$OBJECT_CACHE_DIR`` keyed by the space root's hash, else
-``<root>/.capacities-cache``. Entries added or refreshed are flushed to disk
+``<root>/.object-cache``. Entries added or refreshed are flushed to disk
 atomically, never from the `get`/`put` that a `read_raw` makes (that could be a
 request thread holding the space's lock: a flush stats every entry, dumps them all
 and fsyncs, ~90 ms at 5,000 objects): `put` schedules one coalesced daemon timer
@@ -41,7 +41,7 @@ from .textfile import atomic_write
 
 __all__ = ["FrontmatterCache", "cache_dir_for_root", "flush_all", "for_root", "forget_all"]
 
-CACHE_FOLDER = ".capacities-cache"
+CACHE_FOLDER = ".object-cache"
 FILE_NAME = "frontmatter.json"
 _VERSION = 1
 _FLUSH_AFTER = 10.0

@@ -1,9 +1,8 @@
 /**
- * The `/` menu's sections and items, in Capacities' order. Strings and icons
- * are Capacities' own (keys beside each; reference check 2026-10-28, 2d).
+ * The `/` menu's sections and items, in catalog order (reference check
+ * 2026-10-28, 2d).
  *
- * Images, PDFs, audio, video and files are not slash items in Capacities, and
- * not here: they are dropped or pasted into the editor (`extensions/fileDrop`).
+ * Images, PDFs, audio, video and files are not slash items: they are dropped or pasted into the editor (`extensions/fileDrop`).
  * "Reuse any content" is ours (not one of CreateMenu's sections): it is the
  * only way to insert an object, collection or query embed.
  *
@@ -38,7 +37,7 @@ export interface SlashItem {
   name: string
   /** Shown as the tooltip of the row's right-hand `ph-text-align-justify` icon (on hover), not as a second line. */
   description?: string
-  /** Capacities' `aliases.alias`: a short word the search also matches (`h1`, `todo`, `mmd`). */
+  /** An alias: a short word the search also matches (`h1`, `todo`, `mmd`). */
   alias?: string
   /** An Iconify id (Phosphor, or a VS Code file icon). */
   icon: string
@@ -56,15 +55,15 @@ export interface SlashSection {
 }
 
 export const SLASH_TEXT = {
-  blocks: 'Create a block', // CreateDropdown.sections.blocks.label
-  structure: 'Create an object', // CreateDropdown.sections.structure.label
-  dates: 'Link to a date', // CreateDropdown.sections.dates.label
-  reuse: 'Reuse any content', // ControlDropdown.reuseContent.heading
-  noResults: 'No results', // AppSettings.search.noResults
-  pasteUrl: 'Paste URL', // EntityPicker.link.placeholder
-  withEmptyTitle: (structureTitle: string) => `Create ${structureTitle}`, // ControlDropdown.structure.withEmptyTitle
+  blocks: 'Create a block',
+  structure: 'Create an object',
+  dates: 'Link to a date',
+  reuse: 'Reuse any content',
+  noResults: 'No results',
+  pasteUrl: 'Paste URL',
+  withEmptyTitle: (structureTitle: string) => `Create ${structureTitle}`,
   withPotentialTitle: (structureTitle: string, potentialTitle: string) =>
-    `Create ${structureTitle} with title "${potentialTitle}"`, // ControlDropdown.structure.withPotentialTitle
+    `Create ${structureTitle} with title "${potentialTitle}"`,
 }
 
 export interface SlashContext {
@@ -72,7 +71,6 @@ export interface SlashContext {
   query: string
   /** The space's types (`useLinkIndex((s) => s.types)`). */
   types: TypeDef[]
-  /** `DeviceSettings.twentyFourHourTime`. */
   twentyFourHourTime: boolean
   /** "Now" (tests pass a fixed date). */
   now?: Date
@@ -105,15 +103,11 @@ const list = (type: ListType) => (e: Editor) => {
 }
 
 /**
- * The "Create a block" items, in Capacities' order (CreateMenu's
- * `[...operations, recordAudio, ...blocks]`): the `yke` operations without the
- * colour and AI ones, then Record audio, then the `Dee` blocks. Names,
- * descriptions, aliases and icons are Capacities' (`ControlDropdown.custom.*`,
- * `blocks.*`, `bke`). "Create bookmark" is ours (Capacities has no slash item
- * for it, and Object has no other way to insert one), last.
+ * The "Create a block" items, in menu order: the operations without the
+ * colour and AI ones, then Record audio, then the blocks. "Create bookmark"
+ * is ours (Object has no other way to insert one), last.
  */
 export const BLOCK_ITEMS: readonly SlashItem[] = [
-  // ControlDropdown.custom.block_Base.*
   block('Base', 'Standard', 'Turn block into a standard text block', 'ph-text-t', hierarchy('Base'), 'normal'),
   block('S', 'Small', 'Turn block into a small text block', 'ph-text-aa', hierarchy('S'), 'small'), // block_S
   block('H1', 'Heading 1', 'Block with a heading level 1', 'ph-text-h', hierarchy('H1'), 'h1'), // block_H1
@@ -135,20 +129,19 @@ export const BLOCK_ITEMS: readonly SlashItem[] = [
   block('group', 'Group', 'A layout element to group multiple blocks into one container', 'ph-rectangle', (e) => {
     e.chain().focus().wrapInGroup().run() // block_group
   }),
-  // CreateDropdown.recordAudio.*
   block('recordAudio', 'Record audio', 'Record audio and embed it at the cursor.', 'ph-microphone', (e) => {
     void recordAudio(e).catch((err) => {
       if (err instanceof NotBuiltYet) showToast(NOT_AVAILABLE)
     })
   }),
   block('math', 'Math', 'A display style math block', 'ph-function', (e) => {
-    e.chain().focus().insertMathBlock().run() // blocks.MathBlock.*
+    e.chain().focus().insertMathBlock().run()
   }),
   block('code', 'Code', 'A code block', 'ph-code', (e) => {
-    e.chain().focus().setCodeBlock().run() // blocks.CodeBlock.*
+    e.chain().focus().setCodeBlock().run()
   }),
   block('hr', 'Horizontal line', 'A horizontal line to separate different sections', 'ph-minus', (e) => {
-    // blocks.HorizontalLineBlock.*: below the block (in place of it when empty).
+    // Horizontal line: below the block (in place of it when empty).
     e.chain()
       .focus()
       .command(({ tr, state }) => {
@@ -158,18 +151,17 @@ export const BLOCK_ITEMS: readonly SlashItem[] = [
       .run()
   }),
   block('columns', 'Two Columns', 'Multiple blocks groups next to each other', 'ph-columns', (e) => {
-    e.chain().focus().insertColumns(2).run() // blocks.GridBlock.*
+    e.chain().focus().insertColumns(2).run()
   }),
   block('table', 'Table', 'A simple block for tabular content', 'ph-table', (e) => {
-    e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() // blocks.SimpleTableBlock.*
+    e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
   }),
   block('bookmark', 'Create bookmark', undefined, 'ph-bookmark-simple', () => 'bookmark'), // pasteInput.bookmark (ours in this menu)
 ]
 
 /**
  * The colour items, listed only while there is search text: the 18
- * backgrounds, then the 18 text colours (Capacities' `[...bgThemes,
- * ...textThemes]`), named `colorThemes.theme-<kind>-<c>` ("Blue background"),
+ * backgrounds, then the 18 text colours, named like "Blue background",
  * drawn with `block_color_bg`'s `ph-stop` / `block_color_text`'s `ph-text-aa`
  * in the colour.
  */
@@ -191,7 +183,7 @@ export const COLOR_ITEMS: readonly SlashItem[] = (['bg', 'text'] as const).flatM
 export const MERMAID_ITEM: SlashItem = block(
   'mermaid',
   'Mermaid Diagram',
-  'A code block', // blocks.CodeBlock.description
+  'A code block',
   'vscode-icons-file-type-mermaid',
   (e) => {
     e.chain().focus().setCodeBlock({ language: 'mermaid' }).run()
@@ -233,8 +225,7 @@ export function dayLabel(day: string): string {
 
 /**
  * The typed-date items (M8): for a query that names a day (`parseDate`), a
- * link to that daily note and a date token. Names are our strings, adapted
- * from `ControlDropdown.custom.entity_dailyNote_today` and `token_date`.
+ * link to that daily note and a date token. Names are our strings.
  */
 export function typedDateItems(query: string, today: string): SlashItem[] {
   const day = parseDate(query, today)
@@ -285,7 +276,6 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
       label: SLASH_TEXT.dates,
       items: [
         ...typedDateItems(ctx.query, today()),
-        // ControlDropdown.custom.entity_dailyNote_*, token_date, token_time
         block('today', 'Today', "Add a link to today's daily note", 'ph-calendar-blank', (e) => insertLink(e, today())),
         block('tomorrow', 'Tomorrow', "Add a link to tomorrow's daily note", 'ph-calendar-plus', (e) =>
           insertLink(e, addDayStr(today(), 1)),

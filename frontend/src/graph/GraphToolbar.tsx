@@ -6,7 +6,6 @@ import { Icon } from '@/components/Icon'
 export const TOOLBAR_TEXT = {
   search: 'Search for a note in the graph',
   fit: 'Fit graph to view',
-  /** `GraphViewModal.exportPng`. */
   exportPng: 'Export view as PNG',
 }
 
@@ -55,7 +54,7 @@ export function GraphToolbar({ onSearch, onFit, onExport, customize, compact }: 
         <Icon name="ph-arrows-in-simple" size={14} />
       </button>
       {onExport && (
-        // The icon is our choice (the trimmed reference doesn't name one).
+        // The icon is our choice.
         <button
           type="button"
           onClick={onExport}

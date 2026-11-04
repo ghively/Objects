@@ -38,8 +38,8 @@ describe('ThreeDaysView', () => {
     expect(screen.getAllByTestId('today-pill')).toHaveLength(1)
     expect(within(columns()[1]).getByTestId('today-pill')).toBeInTheDocument()
     expect(within(columns()[0]).getAllByText('Week 43')).toHaveLength(1)
-    // Each column is the header over its daily note slot and nothing else (the reference and
-    // Capacities show no Tasks / Created / Backlinks sections here: they are the Day view's).
+    // Each column is the header over its daily note slot and nothing else
+    // No Tasks / Created / Backlinks sections here: they are the Day view's.
     await waitFor(() => expect(screen.getAllByTestId('daily-note-slot')).toHaveLength(3))
     expect(screen.queryByTestId('day-sections')).toBeNull()
     expect(screen.queryByTestId('section-tasks')).toBeNull()

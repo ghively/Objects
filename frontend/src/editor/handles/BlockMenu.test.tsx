@@ -57,7 +57,7 @@ const label = (el: Element) =>
 const BODY = 'One\n\n<!-- block: color=bg-red align=center -->\nTwo\n\nThree\n'
 
 describe('<BlockMenu>', () => {
-  test('turn into lists every kind with the reference names', async () => {
+  test('turn into lists every kind with its name', async () => {
     expect(TURN_INTO_ITEMS.map((t) => t.name)).toEqual([
       'Text',
       'Heading 1',
@@ -76,14 +76,14 @@ describe('<BlockMenu>', () => {
     ])
   })
 
-  test("the block menu has Capacities' live set, in its order, with key hints", async () => {
+  test('the block menu has the catalogued set, in its order, with key hints', async () => {
     const editor = headless(BODY)
     selectBlocks(editor, blockPos(editor, 0))
     renderMenu(editor)
     const menu = await screen.findByRole('menu')
     const rows = within(menu).getAllByRole('menuitem')
     const names = rows.map((el) => label(el))
-    // Capacities' live block menu (catalog section 6), then Object's own rows (no other entry point).
+    // The catalogued block menu (catalog section 6), then Object's own rows (no other entry point).
     expect(names).toEqual([
       'Hierarchy (Standard)',
       'List',

@@ -1,17 +1,15 @@
-/* Block options (M7 annotation syntax). Values from Capacities' index36682.css
-   where it has them: a coloured text block (.TextBlock>.block-middle with a
-   .theme-option-bg-*) has padding-block 3px, margin-block 1.5px and
-   --border-radius-base (.5rem, themes.ts borderRadius.base); a quote block is
+/* Block options (M7 annotation syntax). A coloured text block has padding-block 3px, margin-block 1.5px and
+   --border-radius-base (.5rem); a quote block is
    padding-block 6px, padding-left 1.125rem. The colour itself is painted inline
    from the option (menus/colors.ts: --label-text-<c>, --label-bg-<c>). */
 
-/* "Small" (hierarchy S): Capacities' font-size-sm over font-size-base
+/* "Small" (hierarchy S): font-size-sm over font-size-base
    (.84375rem / .9375rem). */
 .object-editor [data-block-small] {
   font-size: 0.9em;
 }
 
-/* A background colour: Capacities' block padding and radius. */
+/* A background colour: the block padding and radius. */
 .object-editor [data-block-color^='bg-'] {
   border-radius: 0.5rem;
   padding: 3px 0.375rem;
@@ -42,7 +40,7 @@
   user-select: none;
 }
 
-/* The standout quote: larger text, no rail (Capacities' quote.layout standout). */
+/* The standout quote: larger text, no rail. */
 .object-editor blockquote[data-block-quote='standout'] {
   border-left: none;
   padding-left: 0;

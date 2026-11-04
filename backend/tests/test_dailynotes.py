@@ -334,7 +334,7 @@ def test_create_in_space_without_daily_note_type(tmp_path: Path):
     body = res.json()
     assert body["path"] == "DailyNotes/2026-10-27.md"
     assert body["typeIds"] == ["dailynote"]
-    assert (root / ".capacities" / "types" / "dailynote.json").is_file()
+    assert (root / ".object" / "types" / "dailynote.json").is_file()
     # A second create of another day writes no type again.
     res = client.post("/api/daily-notes", json={"date": "2026-10-28"})
     assert res.status_code == 201 and res.json()["typeIds"] == []

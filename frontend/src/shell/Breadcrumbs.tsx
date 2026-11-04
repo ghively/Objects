@@ -1,12 +1,12 @@
 /**
  * The breadcrumb row at the top of the main panel content: the active entry's trail (the pages
  * followed by link to get here), each as its icon and title, then the current page, separated by
- * `/`. A crumb goes back to its history entry; the current page is not clickable. Capacities'
- * `RenderBreadcrumbs`: at most 3 crumbs inline counting the current page; every earlier crumb goes
+ * `/`. A crumb goes back to its history entry; the current page is not clickable.
+ * At most 3 crumbs inline counting the current page; every earlier crumb goes
  * into a menu behind a leading dots button, most recent first. Earlier crumbs are at 80 % opacity
  * (100 % on hover). Nothing renders when the trail is empty.
  *
- * The row's host element and position are not pinned in the reference: flagged for Gene's check.
+ * The row's host element and position are not pinned down: flagged for Gene's check.
  */
 import type { ReactNode } from 'react'
 import type { SpaceInfo } from '@/api/types'
@@ -20,7 +20,7 @@ import {
 import { activeTab, tabCrumbs, tabTarget, useTabs } from '@/nav/tabs'
 import { TargetLabel } from '@/shell/TabStrip'
 
-/** Crumbs shown inline, the current page included (Capacities' `length > 3`). */
+/** Crumbs shown inline, the current page included. */
 export const MAX_VISIBLE_CRUMBS = 3
 
 function Separator() {

@@ -7,11 +7,11 @@ import { enqueueUiSave, loadUi, useUiStore } from '@/shell/usePinned'
 import { SaveError, SectionHeader, SwitchRow, errorText } from '../controls'
 
 export const NOTIFICATIONS_TEXT = {
-  heading: 'Notifications', // NotificationsSettings.heading
-  description: 'Control reminder delivery on this computer.', // our string, adapted from NotificationsSettings.description
-  activate: 'Activate notifications', // NotificationsSettings.activation.heading
-  limitsHeading: 'Notifications only work while Object is open', // our string, adapted from deliveryLimits.desktop.heading
-  limitsBody: 'Reminder banners appear on this computer only while Object is running.', // our string, adapted from deliveryLimits.desktop.body
+  heading: 'Notifications',
+  description: 'Control reminder delivery on this computer.', // our string
+  activate: 'Activate notifications',
+  limitsHeading: 'Notifications only work while Object is open', // our string
+  limitsBody: 'Reminder banners appear on this computer only while Object is running.', // our string
 } as const
 
 const T = NOTIFICATIONS_TEXT

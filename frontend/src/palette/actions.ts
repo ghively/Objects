@@ -4,7 +4,7 @@
 import type { Icon, SpaceEntry, TypeDef } from '@/api/types'
 import { nameMatches } from './searchOptions'
 
-/** Capacities' strings, verbatim (`CommandPalette.actions.options.*`, `shortcuts.*.name`). */
+/** The action rows' labels. */
 export const ACTION_TEXT = {
   createNewEntity: (structureName: string) => `Create ${structureName}`,
   openCalendar: 'Open calendar',

@@ -8,8 +8,7 @@
  * inserted as an embedded object block (`![[Title]]`) instead of a link.
  *
  * Linking at the start of an empty block (the block holds only the `[[` or `@`) makes an object
- * block too, as in Capacities, unless the `alwaysCreateInlineLinks` setting is on
- * (`EditorSettings.alwaysCreateInlineLinks`).
+ * block too, unless the `alwaysCreateInlineLinks` setting is on.
  */
 import type { Editor } from '@tiptap/core'
 import { Selection } from '@tiptap/pm/state'
@@ -211,7 +210,7 @@ export function LinkPicker() {
         .insertContentAt(at, [{ type: 'wikilink', attrs: { target: wikilinkTargetFor(o), label: null } }])
         .run()
     } else {
-      // Cancelled: the `[[` stays, as in Capacities, whose link dropdown searches text typed
+      // Cancelled: the `[[` stays, since the link dropdown searches text typed
       // inline after it; the query typed here goes back after the brackets, as if typed there.
       const brackets = mode === 'link' && isOpener(editor.state.doc.textBetween(range.from, range.to, '\0', '\0'))
       if (brackets && query) editor.chain().focus().insertContentAt(range.to, { type: 'text', text: query }).run()

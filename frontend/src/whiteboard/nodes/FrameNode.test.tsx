@@ -10,9 +10,9 @@ describe('FrameNode', () => {
     const { nodeEl, store } = renderBoard(board([f, g]))
 
     const surface = nodeEl('f')!.querySelector('[data-testid="whiteboard-frame-node"]') as HTMLElement
-    // The dashed 3px border is the reference rule on `.react-flow__node-capacitiesFrame .whiteboard-shape-surface`.
+    // The dashed 3px border is the rule on `.react-flow__node-boardFrame .whiteboard-shape-surface`.
     expect(surface).toHaveClass('whiteboard-shape-surface')
-    expect(nodeEl('f')).toHaveClass('react-flow__node-capacitiesFrame')
+    expect(nodeEl('f')).toHaveClass('react-flow__node-boardFrame')
     expect(surface.style.background).toBe('transparent')
     expect((nodeEl('g')!.querySelector('[data-testid="whiteboard-frame-node"]') as HTMLElement).style.backgroundColor).not.toBe('')
 

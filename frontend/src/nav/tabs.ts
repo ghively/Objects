@@ -45,7 +45,7 @@ export type Target =
   | { kind: 'tasks' }
   /** The global graph (M5). */
   | { kind: 'graph' }
-  /** M8: the extended search page ("Search", `LocalSpaceQuery.heading`), with what was typed. */
+  /** M8: the extended search page ("Search"), with what was typed. */
   | { kind: 'search'; q?: string; textOnly?: boolean }
 
 /**
@@ -54,7 +54,7 @@ export type Target =
  */
 export type SidepanelTarget = Target | { kind: 'localGraph' } | { kind: 'backlinks' }
 
-/** One side-panel entry (Capacities' `SidepanelEntry`). `target: null` is the empty "Explore" entry. */
+/** One side-panel entry. `target: null` is the empty "Explore" entry. */
 export interface SidepanelEntry {
   id: string
   target: SidepanelTarget | null
@@ -68,8 +68,8 @@ export interface SidepanelEntry {
 }
 
 /**
- * The side panel's sizes (Capacities' `sidepanelLayout`): area 2 and 3 heights in px, and the width
- * as a share (0.1 to 0.9) of the main column plus the panel (Capacities' `sidepanelWidth`).
+ * The side panel's sizes: area 2 and 3 heights in px, and the width
+ * as a share (0.1 to 0.9) of the main column plus the panel.
  */
 export interface SidepanelLayout {
   width?: number
@@ -77,7 +77,7 @@ export interface SidepanelLayout {
   area3Size?: number
 }
 
-/** One tab (Capacities' `TabEntry`). */
+/** One tab. */
 export interface Tab {
   id: string
   /** Every target visited in this tab, oldest first. */
@@ -89,11 +89,11 @@ export interface Tab {
    * non-persistent tab (the default, shown in italic) navigates in place.
    */
   persistent?: boolean
-  /** Pinned tabs sort before the others and can never be closed (Capacities refuses on every path). */
+  /** Pinned tabs sort before the others and can never be closed (on every path). */
   pinned?: boolean
-  /** When the tab was last made active (Capacities' `lastOpened`): closing the active tab activates the latest. */
+  /** When the tab was last made active: closing the active tab activates the latest. */
   lastOpened?: number
-  /** The breadcrumb trail of each history entry, parallel to `history` (Capacities' `breadcrumbs`). */
+  /** The breadcrumb trail of each history entry, parallel to `history`. */
   crumbs: Target[][]
   /** Side-panel entries of this tab (Task 15). */
   sidepanel?: SidepanelEntry[]
@@ -267,7 +267,7 @@ function freshTab(target: Target | null, trail: Target[] = []): Tab {
     : { id: newId(), history: [], index: -1, crumbs: [], lastOpened: stamp() }
 }
 
-/** The tab to activate once `tabs` lost the active one: the most recently opened (Capacities' `Jk(tabs)[0]`). */
+/** The tab to activate once `tabs` lost the active one: the most recently opened. */
 export function mostRecentTab(tabs: Tab[]): Tab | null {
   let best: Tab | null = null
   for (const t of tabs) if (!best || (t.lastOpened ?? 0) > (best.lastOpened ?? 0)) best = t
@@ -384,7 +384,7 @@ export const useTabs = create<TabsState>()(
       close(id) {
         const s = get()
         const gone = s.tabs.find((t) => t.id === id)
-        // A pinned tab is never closed (Capacities' close returns false for it).
+        // A pinned tab is never closed (close returns false for it).
         if (!gone || gone.pinned) return
         const tabs = s.tabs.filter((t) => t.id !== id)
         let activeId = s.activeId

@@ -65,11 +65,11 @@ def test_create_query_writes_one_file_and_event(space_dir: Path):
     assert body["definition"]["limit"] == {"size": 10}
     assert body["view"]["viewDefinition"]["dataViewLayout"] == "table"
     assert body["revision"] and body["readOnlyReason"] is None
-    assert _files(space_dir) - before == {".capacities/queries/open-tasks.json"}
+    assert _files(space_dir) - before == {".object/queries/open-tasks.json"}
     assert before - _files(space_dir) == set()
     assert [(e.kind, e.path) for e in published] == [("queries", "open-tasks")]
     assert [q["id"] for q in listed] == ["open-tasks"]
-    stored = (space_dir / ".capacities/queries/open-tasks.json").read_text("utf-8")
+    stored = (space_dir / ".object/queries/open-tasks.json").read_text("utf-8")
     assert stored.endswith("\n") and '\n  "id"' in stored
 
 
@@ -111,15 +111,15 @@ def test_query_validation_422(space_dir: Path):
         assert r.json()["detail"]
     assert ok_limit.status_code == 201 and ok_terms.status_code == 201
     assert _files(space_dir) - before == {
-        ".capacities/queries/fine.json",
-        ".capacities/queries/five.json",
+        ".object/queries/fine.json",
+        ".object/queries/five.json",
     }
     assert [e.path for e in published] == ["fine", "five"]
 
 
 def test_save_query_revision_conflict(space_dir: Path):
     _space, c, published = _client(space_dir)
-    path = space_dir / ".capacities" / "queries" / "open-tasks.json"
+    path = space_dir / ".object" / "queries" / "open-tasks.json"
     with c:
         made = _create(c).json()
         edited = {**made, "name": "Open work", "zzz": {"a": 1}}
@@ -137,7 +137,7 @@ def test_save_query_revision_conflict(space_dir: Path):
 
 def test_save_unknown_type_kept_new_unknown_422(space_dir: Path):
     """A stored type id that no longer exists saves unchanged; a new unknown one is refused."""
-    qdir = space_dir / ".capacities" / "queries"
+    qdir = space_dir / ".object" / "queries"
     qdir.mkdir(parents=True)
     stored = {"id": "old", "name": "Old", "definition": {"structures": [{"id": "gone"}], "excludeStructureIds": ["gone2"]}}
     (qdir / "old.json").write_text(json.dumps(stored), encoding="utf-8")
@@ -153,7 +153,7 @@ def test_save_unknown_type_kept_new_unknown_422(space_dir: Path):
 
 
 def test_unreadable_query_listed_readonly_and_untouched(space_dir: Path):
-    qdir = space_dir / ".capacities" / "queries"
+    qdir = space_dir / ".object" / "queries"
     qdir.mkdir(parents=True)
     (qdir / "q.json").write_text('{"id":', encoding="utf-8")
     _space, c, _pub = _client(space_dir)
@@ -169,7 +169,7 @@ def test_unreadable_query_listed_readonly_and_untouched(space_dir: Path):
 
 def test_delete_query_restorable(space_dir: Path):
     space, c, published = _client(space_dir)
-    live = space_dir / ".capacities" / "queries" / "open-tasks.json"
+    live = space_dir / ".object" / "queries" / "open-tasks.json"
     with c:
         made = _create(c, definition={"structures": [{"id": "task"}]}).json()
         original = live.read_bytes()
@@ -178,7 +178,7 @@ def test_delete_query_restorable(space_dir: Path):
         assert r.status_code == 200
         trash_id = r.json()["trashId"]
         assert not live.exists()
-        assert (space_dir / ".capacities/trash/queries" / f"{trash_id}.json").read_bytes() == original
+        assert (space_dir / ".object/trash/queries" / f"{trash_id}.json").read_bytes() == original
         entries = c.get("/api/trash").json()
         assert [(e["kind"], e["id"], e["queryId"], e["name"]) for e in entries] == [
             ("query", trash_id, "open-tasks", "Open tasks")
@@ -203,12 +203,12 @@ def test_delete_query_restorable(space_dir: Path):
     assert [q["revision"] for q in again] == [made["revision"]]
     assert [(e.kind, e.path) for e in published] == [("queries", "open-tasks")]
     assert missing.status_code == 404
-    assert not (space_dir / ".capacities/trash/queries" / f"{trash_id}.json").exists()
+    assert not (space_dir / ".object/trash/queries" / f"{trash_id}.json").exists()
 
 
 def test_query_id_not_reused_while_trashed(space_dir: Path):
     space, c, _pub = _client(space_dir)
-    live = space_dir / ".capacities" / "queries"
+    live = space_dir / ".object" / "queries"
     with c:
         _create(c, "Open tasks")
         trash_id = c.delete("/api/queries/open-tasks").json()["trashId"]
@@ -229,7 +229,7 @@ def test_query_id_not_reused_while_trashed(space_dir: Path):
 
 
 def test_title_is_custom_inferred_on_load(space_dir: Path):
-    qdir = space_dir / ".capacities" / "queries"
+    qdir = space_dir / ".object" / "queries"
     qdir.mkdir(parents=True)
     (qdir / "mine.json").write_text(json.dumps({"id": "mine", "name": "Mine"}), encoding="utf-8")
     (qdir / "blank.json").write_text(json.dumps({"id": "blank", "name": ""}), encoding="utf-8")
@@ -247,7 +247,7 @@ def test_title_is_custom_inferred_on_load(space_dir: Path):
 
 
 def test_view_filter_keys_kept_but_never_read(space_dir: Path):
-    qdir = space_dir / ".capacities" / "queries"
+    qdir = space_dir / ".object" / "queries"
     qdir.mkdir(parents=True)
     stored = {
         "id": "v",
@@ -278,7 +278,7 @@ def test_purge_expired_covers_queries(space_dir: Path):
         _create(c, "Fresh one")
         old_trash = c.delete("/api/queries/old-one").json()["trashId"]
         fresh_trash = c.delete("/api/queries/fresh-one").json()["trashId"]
-    tdir = space_dir / ".capacities" / "trash" / "queries"
+    tdir = space_dir / ".object" / "trash" / "queries"
     aged = tdir / f"{_old_ulid(31)}.json"
     (tdir / f"{old_trash}.json").rename(aged)
 

@@ -1,4 +1,4 @@
-// "Export view as PNG" (`GraphViewModal.exportPng`): the graph view as the renderer draws it,
+// "Export view as PNG": the graph view as the renderer draws it,
 // every sigma layer (edges, nodes, labels, hovers) composed in DOM order onto the theme's
 // `--bg-app` background, at the canvases' own pixel size (sigma sizes them at the device pixel
 // ratio). The file is made and saved in the browser (`graph.png`); nothing goes to the server.

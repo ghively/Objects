@@ -1,5 +1,5 @@
 /**
- * The page's floating inspector (M9, Capacities' `FloatingInspector` on every page, which took
+ * The page's floating inspector (M9, on every page, which took
  * over the old encyclopedia sidebar's table of contents and text stats):
  * - "Outline": the page's headings in order; a click scrolls to the heading. Empty: "No headings
  *   in this page". The headings are read from the rendered body (an embed's own headings, inside
@@ -18,7 +18,7 @@ import { plainText, statRows, textStats, type StatRow } from './textStats'
 
 export type PageInspectorTab = 'outline' | 'stats'
 
-/** Reference strings (`FloatingInspector.*`), plus our toggle's name. */
+/** The inspector's strings, plus our toggle's name. */
 export const PAGE_INSPECTOR_TEXT = {
   outline: 'Outline',
   stats: 'Stats',

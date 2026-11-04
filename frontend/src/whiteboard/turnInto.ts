@@ -1,11 +1,11 @@
 /**
  * Whiteboard helpers other lanes call (M8 Task 22):
- * - `turnBlocksIntoWhiteboard` ("Turn into whiteboard", `Whiteboard.turnInto.action`): a new
+ * - `turnBlocksIntoWhiteboard` ("Turn into whiteboard"): a new
  *   board titled `title` with each editor block as a node, top to bottom in one column: an object
  *   embed (`![[Title]]`, with or without its `<!-- block: … -->` options) becomes an entity node,
  *   anything else a text node holding the block's Markdown. Resolves with the board's path; on a
- *   failure it throws `Could not create whiteboard` (`Whiteboard.turnInto.failed`).
- * - `addObjectToWhiteboard` ("Add to whiteboard", `Whiteboard.addTo.action`): opens the dialog;
+ *   failure it throws `Could not create whiteboard`.
+ * - `addObjectToWhiteboard` ("Add to whiteboard"): opens the dialog;
  *   resolves with the board the object was added to (rejects when the dialog is closed).
  * - `placeObjectOnBoard`: adds an entity node for an object right of a board's content and saves
  *   the board (one retry on a stale revision).
@@ -19,7 +19,6 @@ import { useAddToWhiteboard } from './AddToWhiteboardDialog'
 import { wikilinkFor } from './linkText'
 import { DEFAULT_NODE_WIDTH, emptyBoard, GRID, LINK_BLOCK_MIN_WIDTH, nextContentZ } from './model'
 
-/** `Whiteboard.turnInto.failed` */
 export const TURN_INTO_FAILED = 'Could not create whiteboard'
 
 /** Space between the nodes of a turned-into board (one grid cell; our choice). */

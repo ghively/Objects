@@ -1,10 +1,9 @@
 /**
- * The frame around a media block or an embedded object (Capacities'
- * `ResizableEmbed`): a right-edge drag handle that writes `width` on release,
+ * The frame around a media block or an embedded object: a right-edge drag handle that writes `width` on release,
  * an optional bottom handle that writes `height` (PDF), the alignment buttons
- * "Align left" / "Align center" / "Align right" (`ResizableEmbed.align*`;
- * left removes `align`), and "Add caption" / "Remove caption" with the
- * placeholder "Caption..." (`ResizableEmbed.*`, writing `caption`).
+ * "Align left" / "Align center" / "Align right" (left
+ * removes `align`), and "Add caption" / "Remove caption" with the
+ * placeholder "Caption..." (writing `caption`).
  *
  * Nothing is written while dragging; the live size is local state until the
  * pointer goes up, so one drag is one option change (one undo step).

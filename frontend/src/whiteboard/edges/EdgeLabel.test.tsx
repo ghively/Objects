@@ -29,7 +29,7 @@ describe('EdgeLabel', () => {
     expect(props.onCommit).toHaveBeenCalledWith('new label')
   })
 
-  test('sits at the midpoint with the reference label attributes', () => {
+  test('sits at the midpoint with the label attributes', () => {
     const { box } = renderLabel({ selected: true })
     expect(box!.textContent).toBe('uplink')
     expect(box!.style.transform).toBe('translate(-50%, -50%) translate(120px, 40px)')

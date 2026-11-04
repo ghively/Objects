@@ -1,14 +1,14 @@
 """Exporting one object as a document: PDF (printable HTML), Microsoft Word (.docx) and LaTeX.
 
-Capacities' Export dialog offers PDF, Markdown, Microsoft Word and Latex
-(`entity.settings.{pdf,md,docx,latex}.description`). Markdown is `export.py`'s; the other
+The Export dialog offers PDF, Markdown, Microsoft Word and Latex.
+Markdown is `export.py`'s; the other
 three are built here from one small reading of the object's Markdown body:
 
 - `parse_blocks` reads the body into blocks (headings, paragraphs, lists and to-dos, quotes,
   code, math, tables, horizontal lines, images and object embeds); annotation comments
   (``<!-- block: ... -->``) are dropped. `parse_inline` reads a line into styled runs.
-- `render_html` is the PDF: a self-contained page in one of Capacities' three styles
-  (`entity.settings.typesetPdf.mode.*`: Notes, Essay, Academic, all available) that the
+- `render_html` is the PDF: a self-contained page in one of three styles
+  (Notes, Essay, Academic, all available) that the
   dialog prints with the browser's "Save as PDF" (our choice: no PDF library, no network).
 - `render_docx` writes a minimal WordprocessingML package with `zipfile` (no new dependency).
 - `render_latex` writes an ``article`` ``.tex`` file.

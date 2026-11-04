@@ -18,7 +18,7 @@ from test_types_api import _changed_lines, _snapshot, _type_file, _write
 
 def _project_type(space_dir: Path, **lead_options) -> None:
     """A tmp `Project` type: text `budget`, multi relation `lead` to Person, a `blocks` body."""
-    types = space_dir / ".capacities" / "types"
+    types = space_dir / ".object" / "types"
     types.mkdir(parents=True, exist_ok=True)
     lead = {"isArray": True, "allowedTypes": ["person"], "hasFixedSet": False, "fixedSet": []}
     lead.update(lead_options)
@@ -203,7 +203,7 @@ def test_sync_creates_counterpart(space_dir: Path):
     ) == []
     after = _snapshot(space_dir)
     changed = {k for k in after if after[k] != before.get(k)}
-    assert changed == {".capacities/types/project.json", ".capacities/types/person.json"}
+    assert changed == {".object/types/project.json", ".object/types/person.json"}
 
 
 def test_sync_with_existing_target_property(space_dir: Path):

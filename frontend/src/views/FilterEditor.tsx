@@ -24,7 +24,7 @@ export interface FilterEditorProps {
   collections: Collection[]
 }
 
-/** Capacities' strings (ConvolutionEditor.filter.*); "Select…" is ours (no reference string for an empty picker). */
+/** The filter editor's strings; "Select…" is ours (for an empty picker). */
 export const FILTER_TEXT = {
   selectDate: 'Select date',
   oneSelected: '1 element selected',

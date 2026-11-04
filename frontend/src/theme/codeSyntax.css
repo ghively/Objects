@@ -1,6 +1,6 @@
-/* Code syntax tokens (M8 Task 29): Capacities' `themes.ts` `code` group (`code-keyword` … `code-punctuation`),
-   resolved through `colors.ts`, for the four themes. `editor/nodes/codeBlock.css` maps highlight.js's
-   `hljs-*` classes onto these, as Capacities' CSS maps CodeMirror's `tok-*` classes. Dark is the default.
+/* Code syntax tokens (M8 Task 29): the `code` group (`code-keyword` … `code-punctuation`)
+   for the four themes. `editor/nodes/codeBlock.css` maps highlight.js's
+   `hljs-*` classes onto these. Dark is the default.
    `text-subtle` is our `--text-muted` (theme/themes.css header). */
 :root {
   --code-keyword: oklch(0.8268 0.1083 306.36);

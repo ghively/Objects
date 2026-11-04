@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-/** Capacities' 18 theme colours, in menu order. */
+/** The 18 theme colours, in menu order. */
 export const THEME_COLORS = [
   'gray',
   'rose',

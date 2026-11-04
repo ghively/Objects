@@ -131,7 +131,7 @@ export function CustomizeOverview({
   addable: addableOverride,
   gear = false,
 }: {
-  /** The type page's trigger: a gear at the right of the tab strip (Capacities). */
+  /** The type page's trigger: a gear at the right of the tab strip. */
   gear?: boolean
   type?: TypeDef
   sections: RenderedSection[]
@@ -149,7 +149,7 @@ export function CustomizeOverview({
   const hidden = hiddenSections(sections)
   const addable = addableOverride ?? (type ? addableSections(type, sections, ctx) : [])
   const queryItems = addable.filter((s) => isQueryKey(s.key))
-  // Capacities lists the smart sections ("Not in any collection", "Not tagged", "No backlinks") and
+  // It lists the smart sections ("Not in any collection", "Not tagged", "No backlinks") and
   // the collections not shown under "Hidden Sections", each one click from view; "Add a section"
   // keeps the queries.
   const hiddenAll = [...hidden, ...addable.filter((s) => !isQueryKey(s.key) && !hidden.some((h) => h.key === s.key))]

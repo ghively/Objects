@@ -1,7 +1,6 @@
-/* The columns block (Capacities' GridBlock): a CSS grid with one track per
+/* The columns block: a CSS grid with one track per
    column at its widths (ColumnsView sets --columns-template and
-   --columns-gap). The gap and the grid layout's track size are our values;
-   the reference CSS has no grid-block rule. */
+   --columns-gap). The gap and the grid layout's track size are our values. */
 .object-editor .block-columns {
   position: relative;
   margin-block: 0.5em;

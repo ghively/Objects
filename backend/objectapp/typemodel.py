@@ -1,12 +1,12 @@
-"""Object types, v2: the full Capacities-shaped type model and its lossless migration.
+"""Object types, v2: the full type model and its lossless migration.
 
-A type lives in ``.capacities/types/<id>.json``. M1 wrote a simplified shape
+A type lives in ``.object/types/<id>.json``. M1 wrote a simplified shape
 ("v1": no ``schemaVersion``); `TypeDefinition.from_json` reads both and keeps
 every key it doesn't know (in ``extra``) and every property entry it can't read
 (in ``invalid_property_entries``), so `to_json` gives all of it back.
 
 `load_types` migrates v1 files once (backing each original up to
-``.capacities/backup/types-v1/``), writes the built-in Page and Tag types when
+``.object/backup/types-v1/``), writes the built-in Page and Tag types when
 missing, and never touches a type file that isn't valid JSON (see
 `UnreadableType`).
 """
@@ -70,7 +70,7 @@ THEME_COLORS = (
     "red",
 )
 
-# Default property icons, as Capacities' `propertyIcons`.
+# Default property icons per property kind.
 PROPERTY_ICONS = {
     "text": "ph-text-align-left",
     "textBlock": "ph-text-align-left",
@@ -124,7 +124,7 @@ _OPTIONAL_SYSTEM_DEFS = {
 
 BASIC_TYPE_NAMES = ("Page", "Tag", "Task", "DailyNote", "Whiteboard")
 
-# Capacities' media types: their fields become read-only system definitions.
+# The basic media types: their fields become read-only system definitions.
 BASIC_MEDIA_TYPES: dict[str, dict[str, str]] = {
     "Weblink": {"url": "url", "domain": "text", "iframeUrl": "url", "previewImage": "url"},
     "File": {"mimeType": "text", "fileSize": "number", "source": "text"},
@@ -196,7 +196,7 @@ _STATUS_CATEGORIES = {
     "done": "done",
     "complete": "done",
 }
-# Capacities' colours for the basic Task status options.
+# The colours of the basic Task status options.
 _STATUS_COLORS = {
     "not started": "red",
     "next up": "yellow",
@@ -316,7 +316,7 @@ def _option_id(text: str, taken: set[str]) -> str:
 
 
 def label_options(texts: Iterable[str], status: bool = False) -> list[dict[str, Any]]:
-    """Option JSON for observed label texts, coloured round-robin (status: Capacities' colours)."""
+    """Option JSON for observed label texts, coloured round-robin (status: the status colours)."""
     out: list[dict[str, Any]] = []
     taken: set[str] = set()
     for i, text in enumerate(texts):
@@ -491,7 +491,7 @@ def _system_def(spec: tuple[str, str, str, str], extra_options: dict | None = No
 
 
 def system_property_defs(include_type: bool = False) -> list[PropertyDefinition]:
-    """Fresh system definitions in Capacities' order (``type`` last, when asked for)."""
+    """Fresh system definitions in display order (``type`` last, when asked for)."""
     defs = [_system_def(s) for s in _SYSTEM_DEFS]
     if include_type:
         defs.append(_system_def(_TYPE_DEF))
@@ -722,11 +722,11 @@ class UnreadableType:
 
 
 def _types_dir(root: Path) -> Path:
-    return Path(root) / ".capacities" / "types"
+    return Path(root) / ".object" / "types"
 
 
 def _backup_dir(root: Path) -> Path:
-    return Path(root) / ".capacities" / "backup" / "types-v1"
+    return Path(root) / ".object" / "backup" / "types-v1"
 
 
 def _revision_of(data: bytes) -> str:
@@ -807,7 +807,7 @@ def _sorted(types: list[TypeDefinition]) -> list[TypeDefinition]:
 def load_types(
     root: Path, inferred: list[TypeDefinition] | None = None
 ) -> tuple[list[TypeDefinition], list[UnreadableType]]:
-    """Read (and once, migrate) ``.capacities/types/*.json``.
+    """Read (and once, migrate) ``.object/types/*.json``.
 
     The only writes: when ``types/`` is missing, the inferred types (M1's first
     open); a v1 file's backup and its v2 rewrite; the built-in Page and Tag
@@ -865,7 +865,7 @@ _TASK_PRIORITY = (("low", "Low", "amber"), ("medium", "Medium", "orange"), ("hig
 
 
 def _task_field_defs() -> list[PropertyDefinition]:
-    """Fresh definitions of Capacities' `RootTask` fields (`basicStructures.ts`), plus
+    """Fresh definitions of the basic Task fields, plus
     our hidden ``repeat``, ``remind`` and (M8) ``occurrenceLog`` text fields, in the order
     they are appended."""
 
@@ -916,8 +916,8 @@ def _task_field_defs() -> list[PropertyDefinition]:
     ]  # fmt: skip
 
 
-# Fields Capacities' basic media types define beyond the ones we store (key -> name, kind).
-# Label fields start with Capacities' option set (`_MEDIA_LABEL_SETS`); the user edits it.
+# Fields the basic media types define beyond the ones we store (key -> name, kind).
+# Label fields start with a built-in option set (`_MEDIA_LABEL_SETS`); the user edits it.
 _MEDIA_EXTRA_FIELDS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "PDF": (
         ("numberOfPages", "Number of Pages", "number"),
@@ -935,9 +935,8 @@ _MEDIA_EXTRA_FIELDS: dict[str, tuple[tuple[str, str, str], ...]] = {
 }
 
 
-# Capacities' option sets for those label fields: (option id, en-US text), from
-# ``components.Media{PDF,Image,WebResource,Audio}.propertyDefinitions.media_*.set``, in the
-# order of their ids. Option colours are not in the reference: our choice (round-robin, and for
+# The option sets for those label fields: (option id, en-US text), in the
+# order of their ids. Option colours are our choice (round-robin, and for
 # Image "Colors" the theme colour of the same name where there is one).
 _MEDIA_LABEL_SETS: dict[tuple[str, str], tuple[tuple[str, str], ...]] = {
     ("PDF", "documentType"): (
@@ -1051,7 +1050,7 @@ def topup_task_type(t: TypeDefinition) -> TypeDefinition:
     Each missing key of ``status``, ``priority``, ``date``, ``deadline``,
     ``completed``, ``repeat``, ``remind`` and ``occurrenceLog`` is appended after the existing
     properties (the basic PDF, Image, Weblink and Audio types likewise get the fields
-    Capacities defines for them, in ``_MEDIA_EXTRA_FIELDS``); a key the type already defines keeps its own definition and
+    defined for them, in ``_MEDIA_EXTRA_FIELDS``); a key the type already defines keeps its own definition and
     options. Any other type comes back untouched. Never writes: the fields reach
     ``task.json`` the first time the type is persisted.
     """

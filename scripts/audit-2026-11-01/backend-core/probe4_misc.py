@@ -38,7 +38,7 @@ def check(name, cond, detail=""):
 def t_ui_patch_race():
     root = fresh()
     sp = Space(root)
-    ui_path = root / ".capacities/ui.json"
+    ui_path = root / ".object/ui.json"
     uistate.patch_ui(sp, {"pinned": ["a"]}, None)
     orig = uistate.atomic_write
 

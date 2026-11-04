@@ -1,5 +1,5 @@
 /**
- * Object presentation mode ("Present", `EntityMenu.presentationMode.text`). `path`, `start(path)`
+ * Object presentation mode ("Present"). `path`, `start(path)`
  * and `stop()` are Task 3's names, used by the object's `…` menu. The slide index lives here too;
  * the last slide shown is remembered in `localStorage` (a per-viewer convenience) and starting the
  * same object again opens on it (our choice). Nothing here writes a file.

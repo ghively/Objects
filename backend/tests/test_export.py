@@ -1,6 +1,6 @@
 """M9 Task 3: export an object (``GET /api/object/export?path=&media=0|1``).
 
-Capacities' "Export" with the Markdown format and the "Include media" option ("Adds files
+The "Export" with the Markdown format and the "Include media" option ("Adds files
 and images to the zip."). ``media=0`` downloads the ``.md`` exactly as on disk; ``media=1``
 a zip of ``<stem>.md`` plus the images and attachments it references, at their
 space-relative paths. Exporting writes nothing.
@@ -29,7 +29,7 @@ PAGE_BYTES = (
     b"![[Attachments/report.pdf]]\r\n\r\n"
     b'See [the sheet](Attachments/data.xlsx "Sheet") and ![spaced](Attachments/my%20file.png).\r\n\r\n'
     b"![gone](Attachments/missing.png) ![[Attachments/also missing.pdf]]\r\n\r\n"
-    b"![outside](../secret.png) ![abs](/etc/hosts) ![dot](.capacities/space.json)\r\n\r\n"
+    b"![outside](../secret.png) ![abs](/etc/hosts) ![dot](.object/space.json)\r\n\r\n"
     b"![web](https://example.org/a.png) [[Alpha]]\r\n\r\n"
     b"```\r\n![in code](Attachments/clip.wav)\r\n```\r\n"
 )
@@ -99,7 +99,7 @@ def test_export_skips_missing_and_outside_paths(space_root: Path):
     with c:
         names = zipfile.ZipFile(io.BytesIO(_export(c, PAGE, 1).content)).namelist()
     assert not any("missing" in n for n in names)
-    assert not any("secret" in n or "hosts" in n or ".capacities" in n for n in names)
+    assert not any("secret" in n or "hosts" in n or ".object" in n for n in names)
     assert "Attachments/clip.wav" not in names  # only referenced inside a code block
     assert not any(n.endswith("Alpha.md") for n in names)  # objects aren't media
     assert all(not n.startswith(("/", "..")) for n in names)

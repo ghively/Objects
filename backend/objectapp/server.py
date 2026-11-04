@@ -101,7 +101,7 @@ Routes (all JSON):
 - M7 spaces (the registry is ``<state dir>/spaces.json``; no folder is ever deleted):
   ``GET /api/spaces`` -> ``{spaces: {path, name, icon, current, missing, lastOpened}[]}``
   (registry order, the current space always listed; never writes). ``POST /api/spaces``
-  ``{name, location}`` -> ``201 {path}`` (a new folder holding only ``.capacities/space.json``,
+  ``{name, location}`` -> ``201 {path}`` (a new folder holding only ``.object/space.json``,
   registered); ``409`` the folder exists, ``422`` bad name, ``404`` not a folder.
   ``POST /api/spaces/open`` ``{path}`` -> ``{path}`` (registers an existing folder; ``404``).
   ``DELETE /api/spaces?path=`` -> ``{ok}`` (registry only; ``409`` for the current space).
@@ -439,7 +439,7 @@ _UI_PATCH_KEYS = frozenset(
         "whiteboard", "workspaceOrder", "objectsSectionSortOption", "workspace",
     }
 )  # fmt: skip
-# RootSpace.model.ts `GraphViewCustomization`, verbatim.
+# The graph view customisation keys.
 _GRAPH_LIST_KEYS = ("filterStructureIds", "excludeStructureIds")
 _GRAPH_BOOL_KEYS = (
     "showCompletedTasks",
@@ -1779,7 +1779,7 @@ def create_app(
         return _display_safe(list_images(space.root))
 
     async def _upload_body(request: Request) -> bytes | None:
-        """The uploaded bytes, or None once they exceed Capacities' 100 MiB limit (413)."""
+        """The uploaded bytes, or None once they exceed the 100 MiB limit (413)."""
         limit = media.MAX_ATTACHMENT_BYTES
         declared = request.headers.get("content-length", "")
         if declared.isdigit() and int(declared) > limit:

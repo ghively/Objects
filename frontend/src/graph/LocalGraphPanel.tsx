@@ -1,6 +1,6 @@
 // The open object's local graph in the right panel ("Graph View"): the breadth-first neighbourhood
 // of the object, 1 hop by default and 1–5 one step at a time ("Maximum distance", with separate
-// "Show less" and "Show more" buttons as Capacities' `GraphViewHopChrome`; remembered in
+// "Show less" and "Show more" buttons; remembered in
 // localStorage), the same filters as the global graph except that the centre is never hidden,
 // and the same clicks (peek with the visible nodes; Ctrl/Cmd+click opens a tab).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'

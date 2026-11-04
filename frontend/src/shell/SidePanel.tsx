@@ -1,11 +1,10 @@
 /**
- * The side panel (Capacities' three-area sidepanel), per tab: a column at the right of the main card
+ * The side panel (three areas), per tab: a column at the right of the main card
  * behind a 1 px rule. Each area with an open entry is shown, stacked area 1, area 2, area 3; areas
  * 2 and 3 are `area2Size`/`area3Size` px high (220 by default, 120 at least) and the first shown
  * area takes the rest (120 px at least). The width is a share of the main column plus the panel
  * (`sidepanelWidth`: 45 % by default, dragged between 10 % and 90 %, a double click on the resizer
- * goes back to 45 %). Resizers write the tab's layout on pointer up. Values from the reference
- * (`LocationManager`, `storing` `sidepanelWidth`).
+ * goes back to 45 %). Resizers write the tab's layout on pointer up.
  *
  * M8: an entry dragged by its title and dropped anywhere on the main view (`[data-main-column]`)
  * swaps with it, as "Swap" does ("Drag onto the main content to swap."). The drop is taken in the

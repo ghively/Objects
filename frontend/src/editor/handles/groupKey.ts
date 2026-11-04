@@ -1,7 +1,7 @@
 /**
- * Ctrl+G / ⌘G (`shortcuts.groupBlocks`: "Group selected blocks or ungroup
+ * Ctrl+G / ⌘G ("Group selected blocks or ungroup
  * selected group block"): with blocks selected, group them, or ungroup the
- * group they are in. The key is the one Capacities shows next to the block
+ * group they are in. The key is the one shown next to the block
  * menu's "Group" row (catalog section 6); without a block selection it is left
  * to the browser. The key comes from the registry (`lib/shortcuts.ts`).
  */

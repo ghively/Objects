@@ -61,7 +61,7 @@ describe('TabStrip', () => {
     // Middle click does not close a pinned tab.
     fireEvent(tabs()[0], new MouseEvent('auxclick', { bubbles: true, button: 1 }))
     expect(s().tabs).toHaveLength(2)
-    // Nor does the context menu: it has no "Close tab" for a pinned tab (Capacities refuses on every path).
+    // Nor does the context menu: it has no "Close tab" for a pinned tab (on every path).
     fireEvent.contextMenu(tabs()[0])
     expect(screen.getByRole('menuitem', { name: 'Unpin tab' })).toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'Close tab' })).toBeNull()
@@ -103,7 +103,7 @@ describe('TabStrip', () => {
     expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Pin tab', 'Close tab'])
   })
 
-  test('test tabs are 60 to 200 px wide with a 5 px gap (reference)', () => {
+  test('test tabs are 60 to 200 px wide with a 5 px gap', () => {
     s().open(typeT('a'))
     render(<TabStrip space={null} />)
     expect(tabs()[0].className).toContain('max-w-[200px]')

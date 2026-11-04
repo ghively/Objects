@@ -10,7 +10,7 @@ Calls marked *(builder's call)* or *(Claude's call)* were not decided by Gene; e
 
 Object becomes a **team knowledge space**. A server on CPI's network holds one shared vault; teammates reach it from the web client in a browser or from the desktop app, which keeps working offline and syncs later. Each teammate also points their own Claude session at the server over MCP, and the server makes the vault quick and token-cheap for those agents to find, read and safely edit.
 
-Why: Gene wants a shared, Capacities-style space for the team that agents can use as well as people, without people (or agents) overwriting each other's edits. KiwiFS (`github.com/kiwifs/kiwifs`, evaluated in `docs/kiwifs-evaluation.md`) is the reference for the agent-facing and server-side features; Capacities stays the reference for the app itself. Capacities has no answer for multi-user conflicts (it is single-user), so the conflict model is new here.
+Why: Gene wants a shared Object space for the team that agents can use as well as people, without people (or agents) overwriting each other's edits. KiwiFS (`github.com/kiwifs/kiwifs`, evaluated in `docs/kiwifs-evaluation.md`) is the reference for the agent-facing and server-side features; the behaviour catalog and the design spec stay the reference for the app itself. Object is single-user today, so the conflict model is new here.
 
 ## 2. Goals
 
@@ -48,7 +48,7 @@ Why: Gene wants a shared, Capacities-style space for the team that agents can us
   - Deletes go to the trash and can be restored.
   - CRLF and BOM are preserved.
   - Writes are atomic.
-- **Capacities stays the bar for the app.** Wherever Capacities has an equivalent (sync status, account menus, settings), match its labels and behaviour. New UI that Capacities lacks (needs review, drafts, claims) follows Capacities' visual language.
+- **The behaviour catalog and design spec stay the bar for the app.** Wherever the app already has an equivalent (sync status, account menus, settings), keep its labels and behaviour. New UI (needs review, drafts, claims) follows the app's existing visual language.
 - **The plain `.md` files are the single source of truth.** Every index (search, vectors, links, graph) is derived and rebuildable, and lives in a cache folder.
 - **Deployment is a Docker container** (Linux), with the vault on a mounted volume so the files and history survive container upgrades.
 - **It runs on CPI's own network.** No CPI data leaves it: semantic search uses a local embedding model running on CPU in the container.
@@ -90,7 +90,7 @@ The same React front end, served by the server and working live against it. Its 
 - **Moving an object** from a user space into the team space is an explicit action, recorded in history. *(Claude's call.)*
 
 Gene decided these are each person's own, not the team's:
-- **Personalisation:** pins, sidebar sections and order, All-notes and other view layouts, change-type preferences. Today these live in `.capacities/ui.json` inside the space. In a team vault they become per-user state on the server, synced to that user's desktop, and never merged as a team change.
+- **Personalisation:** pins, sidebar sections and order, All-notes and other view layouts, change-type preferences. Today these live in `.object/ui.json` inside the space. In a team vault they become per-user state on the server, synced to that user's desktop, and never merged as a team change.
 - **Daily notes:** one per person per day.
 - **Reminders:** each reminder is **personal** (fires only for the person who set it) or **team** (fires for everyone). Personal is the default. *(Claude's call: which option is the default.)*
 
@@ -131,7 +131,7 @@ When a write's base version isn't the current one, the server does a three-way m
 | Edit on one side, delete on the other | The object is kept (restored from trash if needed) with the edit, and flagged "needs review". *(Claude's call.)* |
 | Both sides created an object at the same path | Both kept: the second is saved under a new path, and both are flagged. *(Builder's call: exact naming, following Object's existing path rules.)* |
 
-**Other definition files** under `.capacities/` also go through the merge field by field, with clashes flagged the same way. These are the type definitions, saved queries, collections and whiteboards (JSON). Binary media merges as last-write-wins, with the earlier version always kept in history.
+**Other definition files** under `.object/` also go through the merge field by field, with clashes flagged the same way. These are the type definitions, saved queries, collections and whiteboards (JSON). Binary media merges as last-write-wins, with the earlier version always kept in history.
 
 *(Builder's call: the sync protocol and transport, for example a change feed plus batched pushes, or git itself. It must satisfy 6.2 and 6.3 and must not put merge state into the user's files.)*
 
@@ -204,7 +204,7 @@ An agent works in a private draft of one or more objects. A person reviews the d
   - **memory report:** episodes not yet consolidated, expired or contested memories, and objects with unconsolidated episodes pointing at them ("may be out of date");
   - **brief / context:** a new session's starting pack.
 - **Contradictions:** a note that contradicts an object marks that object *contested*, visibly, instead of silently overwriting it.
-- *(Claude's call: the exact property names and their option labels, following Capacities' property style.)*
+- *(Claude's call: the exact property names and their option labels, following the app's property style.)*
 
 **Quizzes and evals**
 - Generate questions from the space.
@@ -225,7 +225,7 @@ Agents can list, read and write Object's whiteboards.
 
 **Importers**
 - Bring outside content in as Object objects with types and properties: Notion, Obsidian, CSV, Markdown folders, databases.
-- *(Claude's guess, for Gene to confirm when that phase is planned: this is also how `C:\Git\wiki` and a Capacities export come in later. That migration stays a separate project.)*
+- *(Claude's guess, for Gene to confirm when that phase is planned: this is also how `C:\Git\wiki` and exports from other apps come in later. That migration stays a separate project.)*
 
 **Health**
 - broken links;
@@ -282,5 +282,5 @@ Each phase is usable on its own, gets its own plan (in the M7/M8 plan format) an
 - **The embedding model and vector store,** as long as they are local, run on CPU and keep the index in the cache folder. *(KiwiFS uses MiniLM through ONNX with sqlite-vec.)*
 - **MCP tool names and shapes.**
 - **Password hashing and token formats,** using standard libraries.
-- **How the needs-review screen looks,** in Capacities' visual language.
+- **How the needs-review screen looks,** in the app's visual language.
 - **The expected scale.** *(Claude's guess: a team of up to about 20 people and a vault of tens of thousands of objects. Design for that, not for hundreds of users.)*

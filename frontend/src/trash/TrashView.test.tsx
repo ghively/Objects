@@ -26,7 +26,7 @@ const NOTE: TrashItem = {
 const BOOK_TYPE: TrashItem = {
   id: 't1',
   kind: 'type',
-  originalPath: '.capacities/types/book.json',
+  originalPath: '.object/types/book.json',
   title: 'Book',
   type: 'Book',
   deletedAt: '2026-10-21T10:00:00.000Z',
@@ -48,7 +48,7 @@ describe('TrashView', () => {
     const COLL: TrashItem = {
       id: 'c1',
       kind: 'collection',
-      originalPath: '.capacities/collections/tooling.json',
+      originalPath: '.object/collections/tooling.json',
       title: 'Tooling',
       type: '',
       deletedAt: '2026-10-22T10:00:00.000Z',
@@ -60,7 +60,7 @@ describe('TrashView', () => {
     const QUERY: TrashItem = {
       id: 'q1',
       kind: 'query',
-      originalPath: '.capacities/queries/open.json',
+      originalPath: '.object/queries/open.json',
       title: 'Open',
       type: '',
       deletedAt: '2026-10-23T10:00:00.000Z',
@@ -74,7 +74,7 @@ describe('TrashView', () => {
     expect(within(list).getAllByRole('listitem').map((li) => li.getAttribute('aria-label'))).toEqual(['Tooling', 'Open'])
     const coll = within(list).getByRole('listitem', { name: 'Tooling' })
     expect(coll).toHaveTextContent('Collection · 2 objects')
-    expect(coll).not.toHaveTextContent('.capacities')
+    expect(coll).not.toHaveTextContent('.object')
     // Icons render once their bundled set has loaded.
     await waitFor(() => expect(coll.querySelector('[data-icon="ph-cards-three"]')).not.toBeNull())
     await waitFor(() =>

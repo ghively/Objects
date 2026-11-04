@@ -5,12 +5,12 @@ Usage: ``uv run python scripts/m5_acceptance.py SPACE [--keep] [--big]``
 Copies SPACE to a temporary folder (SPACE itself is never touched), commits the
 copy to a throw-away git repo, opens it twice and serves it on a free
 ``127.0.0.1`` port **without** ``OBJECT_CACHE_DIR``, so the default
-``.capacities-cache/`` inside the space is exercised. Over HTTP it checks:
+``.object-cache/`` inside the space is exercised. Over HTTP it checks:
 
  1. starting, waiting for ``partial: false`` and calling every M5 read
     (``GET /api/search``, ``GET /api/references`` and ``GET /api/object`` for
     every object, ``GET /api/graph``, ``POST /api/rows``) leaves ``git status``
-    empty and every file outside ``.capacities-cache/`` byte-identical; the cache
+    empty and every file outside ``.object-cache/`` byte-identical; the cache
     gains only ``search.sqlite`` and ``.gitignore`` (files already there are
     unchanged); a second start changes no byte or mtime in the cache;
  2. search: a word only one object has finds it with a snippet; a title with
@@ -27,7 +27,7 @@ copy to a throw-away git repo, opens it twice and serves it on a free
     ``lastUpdated``; a stale ``baseVersion`` is 409;
  5. graph: node count equals ``GET /api/objects``, link pairs equal the
     script's pairs; ``PUT /api/ui`` with ``graph`` changes only
-    ``.capacities/ui.json``; a stale revision is 409, an unknown ``graph`` key 422;
+    ``.object/ui.json``; a stale revision is 409, an unknown ``graph`` key 422;
  6. renaming an object keeps its backlinks and search finds the new title;
  7. with ``--big``: timings on a generated 5,000-object / 50,000-link space
     (``backend/tests/bigspace.py``) against the Performance bar budgets, times
@@ -61,7 +61,7 @@ from m2_acceptance import (
 from objectapp.server import create_app
 from objectapp.space import Space
 
-CACHE = ".capacities-cache"
+CACHE = ".object-cache"
 CACHE_OWNED = {"search.sqlite", ".gitignore", "search.sqlite-journal"}
 SLACK = float(os.environ.get("OBJECT_PERF_SLACK") or 1)
 _LINK = re.compile(r"!?\[\[([^\]\n]+?)\]\]")
@@ -237,7 +237,7 @@ def cache_state(root: Path) -> dict[str, tuple[bytes, int]]:
 
 
 def outside_cache(root: Path) -> dict[str, bytes]:
-    return snapshot(root)  # m2's snapshot skips .git and .capacities-cache
+    return snapshot(root)  # m2's snapshot skips .git and .object-cache
 
 
 def all_reads(run: Run) -> None:
@@ -259,7 +259,7 @@ def check_reads(root: Path, run: Run, served: Served, cache_before: dict) -> Ser
     status = git(root, "status", "--porcelain", "-uall").strip()
     diff = changed_paths(before, outside_cache(root))
     run.report(not status and not diff, f"indexed in {took:.2f}s; every M5 read leaves git status empty "
-               "and every file outside .capacities-cache/ byte-identical", *([status] if status else []), *diff)
+               "and every file outside .object-cache/ byte-identical", *([status] if status else []), *diff)
     after = cache_state(root)
     gained = set(after) - set(cache_before)
     kept = all(after.get(k, (None,))[0] == v[0] for k, v in cache_before.items())
@@ -302,7 +302,7 @@ def unique_body_word(run: Run, model: Model) -> tuple[str, str] | None:
 
 def root_files(root: Path) -> list[str]:
     return [p.relative_to(root).as_posix() for p in root.rglob("*.md")
-            if p.is_file() and not set(p.relative_to(root).parts) & {".git", CACHE, ".capacities"}]
+            if p.is_file() and not set(p.relative_to(root).parts) & {".git", CACHE, ".object"}]
 
 
 def fuzzy_title(model: Model) -> tuple[str, str] | None:
@@ -508,7 +508,7 @@ def check_graph(run: Run, model: Model) -> None:
     stale, _ = run.http("PUT", "/ui", {"patch": {"graph": {}}, "baseRevision": ui["revision"]})
     _, ui2 = run.http("GET", "/ui")
     bad, _ = run.http("PUT", "/ui", {"patch": {"graph": {"bogus": True}}, "baseRevision": ui2["revision"]})
-    run.report(pc == 200 and diff == [".capacities/ui.json"] and stale == 409 and bad == 422,
+    run.report(pc == 200 and diff == [".object/ui.json"] and stale == 409 and bad == 422,
                f"PUT /ui graph wrote {diff}; stale revision {stale}; unknown graph key {bad}")
     commit(run.root, "graph ui")
 
@@ -608,7 +608,7 @@ def main(argv: list[str] | None = None) -> int:
     src = args.space.resolve()
     if not src.is_dir():
         ap.error(f"Not a folder: {src}")
-    os.environ.pop("OBJECT_CACHE_DIR", None)  # exercise the default .capacities-cache/
+    os.environ.pop("OBJECT_CACHE_DIR", None)  # exercise the default .object-cache/
 
     tmp = Path(tempfile.mkdtemp(prefix="m5-acceptance-"))
     root = tmp / src.name

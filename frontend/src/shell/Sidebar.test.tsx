@@ -61,7 +61,7 @@ describe('Sidebar', () => {
     await user.click(screen.getByRole('button', { name: 'Trash' }))
     expect(onOpenTrash).toHaveBeenCalledTimes(1)
 
-    // A custom type: the Capacities menu (TypeContextMenu.test.tsx covers each entry), with delete last.
+    // A custom type: the type menu (TypeContextMenu.test.tsx covers each entry), with delete last.
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Servers' }))
     let menu = await screen.findByRole('menu')
     expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
@@ -206,14 +206,14 @@ describe('Sidebar theme button (M7)', () => {
     vi.mocked(api.patchSettings).mockClear()
     const user = userEvent.setup()
     render(<Sidebar types={TYPES} />)
-    // Dark now: the button offers light mode (SpaceOverview.setLightMode).
+    // Dark now: the button offers light mode.
     const btn = screen.getByRole('button', { name: 'Light mode' })
     expect(btn).toBeEnabled()
     expect(btn).toHaveAttribute('title', 'Light mode')
     await user.click(btn)
     expect(useSettings.getState().settings.themeMode).toBe('light')
     expect(api.patchSettings).toHaveBeenCalledWith({ themeMode: 'light' }, expect.anything())
-    // Light now: it offers dark mode (SpaceOverview.setDarkMode).
+    // Light now: it offers dark mode.
     await user.click(screen.getByRole('button', { name: 'Dark mode' }))
     expect(useSettings.getState().settings.themeMode).toBe('dark')
     expect(screen.getByRole('button', { name: 'Light mode' })).toBeInTheDocument()
@@ -224,7 +224,7 @@ describe('Sidebar theme button (M7)', () => {
     const ui = render(<GlobalOverlays />)
     // Loaded settings are applied to <html>.
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
-    // Mod-Shift-l (Ctrl on Windows/Linux): Toggle dark mode (Capacities' key).
+    // Mod-Shift-l (Ctrl on Windows/Linux): Toggle dark mode.
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'L', code: 'KeyL', ctrlKey: true, shiftKey: true, bubbles: true }))
     })

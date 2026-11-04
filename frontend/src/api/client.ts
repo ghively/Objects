@@ -136,7 +136,7 @@ export type UiPatch = Partial<Pick<UiState, 'pinned' | 'sections' | 'allNotesLay
   whiteboard?: WhiteboardSettings
   /** M9: the sidebar's section order. */
   workspaceOrder?: string[]
-  /** The sidebar's Object Types sort (`RootSpace.objectsSectionSortOption`). */
+  /** The sidebar's Object Types sort. */
   objectsSectionSortOption?: 'alphabetical' | 'manual'
   /** Replaces the whole `workspace` value; `objects.ids` is the manual Object Types order. */
   workspace?: { objects?: { ids?: string[] } }

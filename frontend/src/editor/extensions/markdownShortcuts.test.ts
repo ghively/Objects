@@ -1,5 +1,5 @@
 /**
- * Capacities' Markdown shortcuts (Shortcuts panel > Markdown, `shortcuts.markdown.description`),
+ * The Markdown shortcuts (Shortcuts panel > Markdown),
  * typed one character at a time through the editor's text-input path (the input rules), never
  * through setContent.
  */
@@ -122,7 +122,7 @@ describe('single Markdown shortcuts at the start of a block', () => {
 })
 
 describe('combined shortcuts (Space only after the last one)', () => {
-  test('">#" makes a heading 1 with a toggle (Capacities\' own example)', () => {
+  test('">#" makes a heading 1 with a toggle (the Shortcuts panel\'s example)', () => {
     const ed = fresh()
     type(ed, '># Title')
     expect(pathTo(ed, 'Title')).toEqual(['toggle', 'heading1'])

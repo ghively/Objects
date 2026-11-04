@@ -187,7 +187,7 @@ def extra_state(names: list[str], allowed: set[str]) -> list[str]:
 
 def type_names(root: Path) -> set[str]:
     out = set()
-    for f in (root / ".capacities" / "types").glob("*.json"):
+    for f in (root / ".object" / "types").glob("*.json"):
         try:
             name = json.loads(f.read_text("utf-8")).get("name")
         except (OSError, ValueError):
@@ -210,11 +210,11 @@ def seed(root: Path) -> list[str]:
     """Copy the space-m8 objects the checks need into the copy (only those it lacks)."""
     added = []
     if "task" not in type_names(root):
-        dest = root / ".capacities" / "types" / "task.json"
+        dest = root / ".object" / "types" / "task.json"
         if not dest.exists():
             dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(SPACE_M8 / ".capacities" / "types" / "task.json", dest)
-            added.append(".capacities/types/task.json")
+            shutil.copyfile(SPACE_M8 / ".object" / "types" / "task.json", dest)
+            added.append(".object/types/task.json")
     for rel in SEEDS:
         dest = root / alias(root, rel)
         if not dest.exists():
@@ -644,7 +644,7 @@ def main(argv: list[str] | None = None) -> int:
 
     tmp = Path(tempfile.mkdtemp(prefix="m8-acceptance-")).resolve()
     root = tmp / src.name
-    shutil.copytree(src, root, ignore=shutil.ignore_patterns(".git", ".capacities-cache"))
+    shutil.copytree(src, root, ignore=shutil.ignore_patterns(".git", ".object-cache"))
     saved_env = {k: os.environ.get(k) for k in HOOKS}
     clock = tmp / "clock.txt"
     notify = tmp / "notifications.jsonl"

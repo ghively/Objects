@@ -1,5 +1,5 @@
 /**
- * The text-selection toolbar (`tokensMenu.*`), shown above a non-empty text
+ * The text-selection toolbar, shown above a non-empty text
  * selection, in the live app's order (catalog section 6): Bold, Italic,
  * Strikethrough, Underline, Bullet list, To-do, Link, Code, Formula,
  * "Highlight text" (the colour panel, `ColorMenu`), `+` ("Create object from
@@ -13,12 +13,12 @@
  *   where the click's modifier keys say (`createAndOpen`).
  * - Link existing: pick an object; the selection becomes a link to it, keeping
  *   the selected words as the label when they differ from the title (our choice).
- * - The `highlightText` shortcut is not the panel: as in Capacities it toggles
+ * - The `highlightText` shortcut is not the panel: it toggles
  *   the last-used colour on the selection (`nodes/textStyle`).
  *
  * Mounted by `Editor.tsx` with this name and props (Task 25). Strings are
- * Capacities' unless marked "our string"; the trimmed reference has no CSS for
- * the toolbar, so its look is our choice (`tokens.css`).
+ * catalogued unless marked "our string"; the toolbar's look is our choice
+ * (`tokens.css`).
  */
 import type { Editor } from '@tiptap/core'
 import { NodeSelection, TextSelection } from '@tiptap/pm/state'
@@ -51,24 +51,24 @@ import './tokens.css'
 
 export const TOKENS_MENU_TEXT = {
   toolbar: 'Text selection', // our string (the toolbar's accessible name)
-  bold: 'Bold', // tokensMenu.bold.name
-  italic: 'Italic', // tokensMenu.italic.name
-  underline: 'Underline', // tokensMenu.underline.name
-  strikethrough: 'Strikethrough', // tokensMenu.strikethrough.name
-  code: 'Code', // tokensMenu.code.name
-  formula: 'Formula', // tokensMenu.math.name
-  bullet: 'Bullet list', // ControlDropdown.custom.block_bullet.name
-  todo: 'To-do', // ControlDropdown.custom.block_todo.name
-  link: 'Link', // tokensMenu.link.name
-  highlight: COLOR_MENU_TEXT.title, // tokensMenu.color.name
-  create: 'Create object from text selection.', // tokensMenu.create
-  reuse: 'Link existing object with text selection.', // tokensMenu.reuse
-  searchTypes: 'Search Object Types', // AddPropertyMenu.searchTypes
+  bold: 'Bold',
+  italic: 'Italic',
+  underline: 'Underline',
+  strikethrough: 'Strikethrough',
+  code: 'Code',
+  formula: 'Formula',
+  bullet: 'Bullet list',
+  todo: 'To-do',
+  link: 'Link',
+  highlight: COLOR_MENU_TEXT.title,
+  create: 'Create object from text selection.',
+  reuse: 'Link existing object with text selection.',
+  searchTypes: 'Search Object Types',
   searchObjects: 'Search objects', // our string
   noObjects: 'No matching objects', // our string (as the link picker)
-  addLink: 'Add a link', // tokens.LinkToken.linkPlaceholder
-  updateLink: 'Update link', // tokens.LinkToken.linkPlaceholderUpdate
-  removeLink: 'Remove link', // tokens.LinkToken.remove
+  addLink: 'Add a link',
+  updateLink: 'Update link',
+  removeLink: 'Remove link',
 }
 
 /** The order of the toolbar's buttons (their accessible names). */

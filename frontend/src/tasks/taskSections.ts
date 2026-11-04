@@ -1,9 +1,9 @@
-// The Tasks page sections (Capacities' `DatabaseDashboard.sections.tasks.*`): titles and
-// descriptions verbatim, which tasks each section holds, and the view each one starts from.
+// The Tasks page sections: titles and
+// descriptions, which tasks each section holds, and the view each one starts from.
 //
-// A section's membership (`match`) is fixed, like Capacities' built-in task sections; its
+// A section's membership (`match`) is fixed, as built-in task sections are; its
 // `preset` is only the starting view (layout, sorts, grouping) that the user can change and that
-// is saved per section in `ui.tasks.views`. Icons are ours: the reference names none.
+// is saved per section in `ui.tasks.views`. Icons are ours.
 import type { DateValue, Row, TaskSectionKey, TypeDef, ViewState } from '@/api/types'
 import { zonedDayDate } from '@/lib/zonedShell'
 import { emptyFilterGroup } from '@/views/model'
@@ -22,7 +22,7 @@ export interface TaskSection {
 }
 
 /**
- * Tab order and default tab, from the reference (RootTask's `builtInDashboardSections`): the task
+ * Tab order and default tab: the task
  * sections in this order, then "All" (`allContent`, sorted last for tasks); `inbox` is the
  * default (`defaultSection: 'tasksInbox'`).
  */
@@ -156,7 +156,6 @@ export const TASK_SECTIONS: Record<TaskSectionKey, TaskSection> = {
     match: (row, type) => !isOpen(row, type),
   },
   all: {
-    // `DatabaseDashboard.sections.all`
     title: 'All',
     description: 'All objects of this object type with filter and sort options.',
     icon: 'ph-list-bullets',

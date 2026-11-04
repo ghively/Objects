@@ -25,7 +25,7 @@ def _client(space_dir: Path):
 
 def _define(root: Path, cid: str, name: str, type_ids: list[str], **extra) -> Path:
     c = CollectionDef(id=cid, name=name, typeIds=list(type_ids))
-    path = root / ".capacities" / "collections" / f"{cid}.json"
+    path = root / ".object" / "collections" / f"{cid}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({**c.to_json(), **extra}, indent=2) + "\n", encoding="utf-8")
     return path
@@ -99,7 +99,7 @@ def test_duplicated_collection_file_keeps_its_own_id(space_dir: Path):
 
 
 def test_duplicated_query_file_keeps_its_own_id(space_dir: Path):
-    folder = space_dir / ".capacities" / "queries"
+    folder = space_dir / ".object" / "queries"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "orig.json").write_text(json.dumps({"id": "orig", "name": "Orig"}), encoding="utf-8")
     (folder / "copy.json").write_text(json.dumps({"id": "orig", "name": "Copy"}), encoding="utf-8")
@@ -121,7 +121,7 @@ def test_duplicated_query_file_keeps_its_own_id(space_dir: Path):
 
 
 def test_query_without_id_deletes_and_restores_byte_identical(space_dir: Path):
-    folder = space_dir / ".capacities" / "queries"
+    folder = space_dir / ".object" / "queries"
     folder.mkdir(parents=True, exist_ok=True)
     live = folder / "hand.json"
     live.write_bytes(b'{"name": "Hand made"}\r\n')
@@ -132,25 +132,25 @@ def test_query_without_id_deletes_and_restores_byte_identical(space_dir: Path):
         assert not live.exists()
         entries = c.get("/api/trash").json()
         assert [(e["kind"], e["queryId"], e["originalPath"]) for e in entries] == [
-            ("query", "hand", ".capacities/queries/hand.json")
+            ("query", "hand", ".object/queries/hand.json")
         ]
         r = c.post(f"/api/trash/{trash_id}/restore")
         assert r.status_code == 200, r.text
         assert r.json()["queryIds"] == ["hand"]
         assert c.get("/api/trash").json() == []
     assert live.read_bytes() == original
-    assert not any(p.name.endswith(".meta.json") for p in (space_dir / ".capacities/trash").rglob("*"))
+    assert not any(p.name.endswith(".meta.json") for p in (space_dir / ".object/trash").rglob("*"))
 
 
 def test_purging_a_query_entry_removes_its_record(space_dir: Path):
-    folder = space_dir / ".capacities" / "queries"
+    folder = space_dir / ".object" / "queries"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "hand.json").write_text('{"name": "Hand made"}', encoding="utf-8")
     _space, c, _pub = _client(space_dir)
     with c:
         trash_id = c.delete("/api/queries/hand").json()["trashId"]
         assert c.delete(f"/api/trash/{trash_id}").json() == {"purged": 1}
-    assert list((space_dir / ".capacities/trash/queries").iterdir()) == []
+    assert list((space_dir / ".object/trash/queries").iterdir()) == []
 
 
 # -- sole members --------------------------------------------------------------------
@@ -158,7 +158,7 @@ def test_purging_a_query_entry_removes_its_record(space_dir: Path):
 
 def test_member_also_in_unreadable_collection_is_not_trashed(space_dir: Path):
     _define(space_dir, "tooling", "Tooling", ["server"])
-    broken = space_dir / ".capacities" / "collections" / "broken.json"
+    broken = space_dir / ".object" / "collections" / "broken.json"
     broken.write_text('{"name": "Broken", ', encoding="utf-8")
     _member(space_dir, SERVER, "collections: [Tooling, Broken]")
     space, c, _pub = _client(space_dir)
@@ -185,7 +185,7 @@ def test_member_with_unknown_collection_name_is_not_trashed(space_dir: Path):
 
 
 def test_partial_views_file_is_filled_on_read_without_writing(space_dir: Path):
-    views = space_dir / ".capacities" / "views" / "task.json"
+    views = space_dir / ".object" / "views" / "task.json"
     views.parent.mkdir(parents=True, exist_ok=True)
     views.write_text('{"activeTab": "all", "custom": 1}', encoding="utf-8")
     before = views.read_bytes()
@@ -202,7 +202,7 @@ def test_partial_views_file_is_filled_on_read_without_writing(space_dir: Path):
 
 
 def test_views_sections_without_key_dropped_and_layout_kept(space_dir: Path):
-    views = space_dir / ".capacities" / "views" / "task.json"
+    views = space_dir / ".object" / "views" / "task.json"
     views.parent.mkdir(parents=True, exist_ok=True)
     views.write_text(
         json.dumps(
@@ -232,7 +232,7 @@ def test_put_views_rejects_bad_shapes(space_dir: Path):
         for views in bad:
             r = c.put("/api/views/task", json={"views": views, "baseRevision": ""})
             assert r.status_code == 422, views
-    assert not (space_dir / ".capacities" / "views" / "task.json").exists()
+    assert not (space_dir / ".object" / "views" / "task.json").exists()
 
 
 def test_put_ui_rejects_bad_shapes(space_dir: Path):
@@ -251,7 +251,7 @@ def test_put_ui_rejects_bad_shapes(space_dir: Path):
 
 
 def test_views_of_type_whose_id_is_not_a_file_name(space_dir: Path):
-    types = space_dir / ".capacities" / "types"
+    types = space_dir / ".object" / "types"
     types.mkdir(parents=True, exist_ok=True)
     (types / "My Thing.json").write_text(
         json.dumps({"id": "My Thing", "name": "My Thing", "folder": "Things", "propertyDefinitions": []}),
@@ -284,5 +284,5 @@ def test_change_type_preference_takes_the_given_lock(space_dir: Path):
         assert not done.wait(0.2)  # blocked while another writer holds the lock
     t.join(5)
     assert done.is_set()
-    ui = json.loads((space_dir / ".capacities" / "ui.json").read_text("utf-8"))
+    ui = json.loads((space_dir / ".object" / "ui.json").read_text("utf-8"))
     assert ui["changeTypePreferences"]["page"]["task"] == {"a": "b"}

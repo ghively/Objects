@@ -31,7 +31,7 @@ In one full backend run, `test_search_p95_under_50ms_at_5000` failed under load.
 
 ### `scripts/m5_acceptance.py`
 
-The script works on a temporary git-committed copy of the space. It serves the copy on a free `127.0.0.1` port with `OBJECT_CACHE_DIR` unset, so the default `.capacities-cache/` inside the space is used. It runs the plan's checks:
+The script works on a temporary git-committed copy of the space. It serves the copy on a free `127.0.0.1` port with `OBJECT_CACHE_DIR` unset, so the default `.object-cache/` inside the space is used. It runs the plan's checks:
 
 1. Start, wait for `partial: false`, then call every M5 read: search, references and object for every object, graph, rows. Afterwards `git status` is empty, and every file outside the cache is byte-identical. The cache gains only `search.sqlite` and `.gitignore` (`*`); `ignored.md` in `space-sample` and `space-v1` is unchanged. A second start changes no byte or mtime in the cache.
 2. Search:
@@ -49,17 +49,17 @@ The script works on a temporary git-committed copy of the space. It serves the c
    - Linking a mention changes only the mention line plus `lastUpdated`, and keeps BOM and CRLF. A second call with the stale `baseVersion` returns 409. On `space-links` the linked mention is "Ada Lovelace" in `Archive/Mention from archive.md`. The other fixtures have no unlinked mentions, so this part is skipped there and the script logs that.
 5. Graph:
    - The node count equals `GET /api/objects`, and the link pairs equal the files' pairs. Each pair is `a < b` and appears once.
-   - `PUT /api/ui` with `graph` writes only `.capacities/ui.json`. A stale revision returns 409, and an unknown `graph` key returns 422.
+   - `PUT /api/ui` with `graph` writes only `.object/ui.json`. A stale revision returns 409, and an unknown `graph` key returns 422.
 6. Renaming an object (`POST /api/object/rename`) keeps its backlinks, and search finds the new title.
 7. `--big`: the timings above, with `OBJECT_PERF_SLACK` applied. The first references call is timed on its own, because it builds the link index, and then the warm budget is applied (as `test_references_under_150ms_at_5000` does).
 8. The M1 no-edit pass changes 0 files. Finally, `git status` never shows the cache.
 
-`m1_roundtrip.py` (`snapshot`) and `m2_acceptance.py` (`snapshot`) now skip `.capacities-cache/`, as they skip `.git`. Nothing else in those scripts changed.
+`m1_roundtrip.py` (`snapshot`) and `m2_acceptance.py` (`snapshot`) now skip `.object-cache/`, as they skip `.git`. Nothing else in those scripts changed.
 
 ### Wiring fixes made in this task
 
 1. **Rows now carry backlinks on every type.** Before this fix, `rows.py` sent `values.backlinks` only for types that had the `entity_backlinks` definition. Page, Task and most built-in types don't have it. As a result, in real use every task fell into "Other" in the Tasks page Context section, and "No backlinks" could only be offered on Person/Project-like types (reported by Task 10).
-   - Backlinks are a system property of every object in Capacities (`systemPropertyTypeToIdMap`: `entity_backlinks` → `backlinks`). Each row now carries `values.backlinks` under that id when no definition already uses the key `backlinks`.
+   - Backlinks are a system property of every object, with the id `backlinks`. Each row now carries `values.backlinks` under that id when no definition already uses the key `backlinks`.
    - On the client, the `typeHasBacklinks` gate in `types/dashboardSections.ts` is removed, so "No backlinks" is offered on every type that can have backlinks.
    - Tests updated: `test_rows_carry_backlinks` and `dashboardSections.test.ts`.
    - This widens the contract line `Row.values += { [key of the type's entity_backlinks definition]: EntityRef[] }`. Rows now also carry the key `backlinks` on types without that definition.
@@ -106,31 +106,31 @@ Run `npm run build`, then `uv run objectapp --space <copy of backend/tests/fixtu
 - [ ] Find in page from the `…` menu and with Ctrl+F: match case, whole word, next and previous, replace, replace all, then `git diff`.
 - [ ] The references section on Ada Lovelace: all five tabs, hiding the section by clicking the active tab, linking a mention, then `git diff`.
 - [ ] The backlinks property in the panel, as a table column, as a backlinks filter and as a group; the "No backlinks" Overview section; the Tasks page Context tab with a task linked from a page.
-- [ ] The global graph: filters, tags network, search, fit and click to peek. The local graph: "Maximum distance" 1 to 5 (default 1) with separate "Show less" / "Show more" buttons, as Capacities (`GraphViewHopChrome`, `hops` 1–5).
+- [ ] The global graph: filters, tags network, search, fit and click to peek. The local graph: "Maximum distance" 1 to 5 (default 1) with separate "Show less" / "Show more" buttons (1–5 hops).
 - [ ] On the `--big` copy: the global graph's pan and zoom, and typing in the palette at 5,000 objects.
 
 ### On the CPI copy (outside the repo, `git init` done there)
 
-- [ ] Opening creates only `.capacities-cache/`, and `git status` stays clean. Deleting the folder loses nothing, and it comes back.
+- [ ] Opening creates only `.object-cache/`, and `git status` stays clean. Deleting the folder loses nothing, and it comes back.
 - [ ] Search finds what you expect by title and by text. The snippets read well. `partial` disappears after the first indexing.
-- [ ] Backlinks match what Capacities showed for a few objects you know well. Linking a mention changes only that text (`git diff`).
+- [ ] Backlinks are right for a few objects you know well. Linking a mention changes only that text (`git diff`).
 - [ ] The graph at your space's size pans, zooms and filters without stalls.
 
-### Side by side with Capacities: decisions this plan made without a reference
+### Against the behaviour catalog: decisions this plan made on its own
 
-Note what Capacities does differently, so a fix pass can follow.
+Note what should differ, so a fix pass can follow.
 
-- [ ] Key bindings: Ctrl+P or Ctrl+K opens search, as in Capacities (`reference-check-2026-10-28.md` §1; both also work while the peek is open). Capacities lists no key for the action palette, so it opens from the palette's switch button. Also the Enter / Ctrl+Enter / Shift+Enter variants, Ctrl+Enter in Replace doing "Replace all", and Esc in the find bar.
-- [ ] Search highlight colour, now from the reference (`index36682.css`, `storing36682.js`; see `reference-check-2026-10-28.md` §3a): light themes `#fef08a4b` with yellow 900 text, dark themes `#fddf472c` with yellow 100 text; find in page `#facc1573` for every match and `#f97316b3` for the current one, text colour inherited; palette result titles in the 600-weight `search-highlights-bold` variant. Weight 500 and radius 1px come from the reference CSS.
+- [ ] Key bindings: Ctrl+P or Ctrl+K opens search (`reference-check-2026-10-28.md` §1; both also work while the peek is open). The shortcut table lists no key for the action palette, so it opens from the palette's switch button. Also the Enter / Ctrl+Enter / Shift+Enter variants, Ctrl+Enter in Replace doing "Replace all", and Esc in the find bar.
+- [ ] Search highlight colour, now settled (see `reference-check-2026-10-28.md` §3a): light themes `#fef08a4b` with yellow 900 text, dark themes `#fddf472c` with yellow 100 text; find in page `#facc1573` for every match and `#f97316b3` for the current one, text colour inherited; palette result titles in the 600-weight `search-highlights-bold` variant. Weight 500 and radius 1px.
 - [ ] Graph:
   - node sizes (`3 + 2·sqrt(degree)`, capped at 18) and colours (type colour; tags in their tag colour)
-  - now from the reference (`reference-check-2026-10-28.md` §3b): no synthesized indirect links and no neighbour cap; filtered-out objects (type filter, exclude, "Hide dates") stay as reduced nodes, edges between two reduced nodes are dropped, reduced nodes with one neighbour or none are pruned, and "Hide indirect links" removes them all. How reduced nodes are drawn is still our choice: smallest size, gray, unlabelled until hovered.
-  - now from the reference: `LARGE_NODE_LIMIT = 20` (links + backlinks); a large node stays but draws none of its own edges, and the local graph doesn't walk on from it. A tag with 10 or more backlinks doesn't draw its backlink edges (the API's `linkDirs` tells links from backlinks).
+  - now settled (`reference-check-2026-10-28.md` §3b): no synthesized indirect links and no neighbour cap; filtered-out objects (type filter, exclude, "Hide dates") stay as reduced nodes, edges between two reduced nodes are dropped, reduced nodes with one neighbour or none are pruned, and "Hide indirect links" removes them all. How reduced nodes are drawn is still our choice: smallest size, gray, unlabelled until hovered.
+  - now settled: `LARGE_NODE_LIMIT = 20` (links + backlinks); a large node stays but draws none of its own edges, and the local graph doesn't walk on from it. A tag with 10 or more backlinks doesn't draw its backlink edges (the API's `linkDirs` tells links from backlinks).
   - "Show tags network" offered on a local graph only when the centre is a Tag
 - [ ] The palette's type and tag option matching (prefix, word-prefix, or substring of 3+ characters), the cap of 5 tag options and 10 Recently Opened, and the way picking an option removes the words that named it.
 - [ ] Find bar icons: an underlined "ab" for whole word, `ph-text-aa` for match case. The bar shows Replace even in read-only editors, where it does nothing.
 - [ ] "Related tags" rule: tags that appear together with this object's tags on other objects.
-- [ ] Lexical "Related Content", a stand-in for Capacities' semantic one.
+- [ ] Lexical "Related Content", a stand-in for a semantic one.
 - [ ] Tab counts (All is the sum of the other tabs it offers).
 - [ ] Where the Tasks "Context" tab sits (after Tags, before Completed).
 - [ ] Our strings:

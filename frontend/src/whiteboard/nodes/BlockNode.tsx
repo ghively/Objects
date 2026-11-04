@@ -1,5 +1,5 @@
 /**
- * `capacitiesBlock`: a text block, or an embedded object (delegated to `EntityNode`), a media file
+ * `boardBlock`: a text block, or an embedded object (delegated to `EntityNode`), a media file
  * (`MediaNode`) or a web link (`WeblinkNode`) (M8).
  *
  * A text node with no `width`/`height` hugs its content (the model: "While they are absent the

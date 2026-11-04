@@ -100,7 +100,7 @@ def big_space_stats(_big_space):
 
 @pytest.fixture(autouse=True)
 def _search_cache_stays_in_the_sandbox(tmp_path_factory, monkeypatch):
-    """M5: the search index lives in `.capacities-cache/` by default.
+    """M5: the search index lives in `.object-cache/` by default.
 
     Point `OBJECT_CACHE_DIR` at a per-test temporary folder so no test's space
     tree ever gains a cache (tests that check the default location unset it).

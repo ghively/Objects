@@ -186,7 +186,7 @@ def test_task_completed_not_in_dated(calendar_space_dir: Path):
         "type: 'Meeting'\ntitle: Hidden\ncreatedAt: 2026-10-01T09:00:00.000Z\n"
         "lastUpdated: 2026-10-01T09:00:00.000Z\nsecret: 2026-10-22",
     )
-    t = calendar_space_dir / ".capacities" / "types" / "meeting.json"
+    t = calendar_space_dir / ".object" / "types" / "meeting.json"
     import json
 
     data = json.loads(t.read_text(encoding="utf-8"))
@@ -463,7 +463,7 @@ def test_ui_accepts_calendar_tasks_reminders_keys(calendar_space_dir: Path):
 
 
 def test_ui_accepts_tasks_all_tab(calendar_space_dir: Path):
-    # The Tasks page's "All" tab (Capacities' `allContent`, after Completed).
+    # The Tasks page's "All" tab (after Completed).
     space = _space(calendar_space_dir)
     with TestClient(create_app(space, None, watch=False)) as c:
         rev = c.get("/api/ui").json()["revision"]

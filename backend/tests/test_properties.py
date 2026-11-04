@@ -246,7 +246,7 @@ def test_get_object_returns_links(space_dir: Path):
 
 def _synced_space(space_dir: Path) -> Path:
     """Tmp types A and B whose `rel` properties sync with each other; A/A1 and B/B1."""
-    types = space_dir / ".capacities" / "types"
+    types = space_dir / ".object" / "types"
     types.mkdir(parents=True)
     for tid, name, other in (("a", "A", "b"), ("b", "B", "a")):
         data = {

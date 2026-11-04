@@ -1,6 +1,6 @@
 /**
  * The Gates menu (Engineering mode only): the logic gates, then "I/O" with HIGH and LOW. A gate
- * persists as a rectangle whose text block is exactly its label (`whiteboard.model.ts`).
+ * persists as a rectangle whose text block is exactly its label (`model.ts`).
  */
 import type { WhiteboardCircuitLabel, WhiteboardTool } from '@/api/whiteboardTypes'
 import { CIRCUIT_TEXT } from '../model'

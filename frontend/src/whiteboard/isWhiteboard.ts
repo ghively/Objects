@@ -5,7 +5,7 @@
 import type { TypeDef } from '@/api/types'
 import { summaryOf, typeOf, useLinkIndex } from '@/links/linkIndex'
 
-/** Capacities' `RootWhiteboard` as a type of ours: the basic type named "Whiteboard". */
+/** The whiteboard type: the basic type named "Whiteboard". */
 export const WHITEBOARD_TYPE_NAME = 'Whiteboard'
 
 export function isWhiteboardType(t: Pick<TypeDef, 'name' | 'basic'> | null | undefined): boolean {

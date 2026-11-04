@@ -72,8 +72,8 @@ def test_links_are_distinct_undirected_pairs(links_space_dir: Path):
 
 
 def test_link_dirs_give_each_pairs_direction(links_space_dir: Path):
-    """``linkDirs[k]`` is 1 when a links to b, 2 when b links to a, 3 for both (Capacities
-    draws a node's own links and its backlinks separately; see filterGraph.ts)."""
+    """``linkDirs[k]`` is 1 when a links to b, 2 when b links to a, 3 for both (the
+    graph draws a node's own links and its backlinks separately; see filterGraph.ts)."""
     space = Space(links_space_dir)
     data = graph_data(space)
     nodes = data["nodes"]

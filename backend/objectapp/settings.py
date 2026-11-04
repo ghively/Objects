@@ -72,10 +72,10 @@ DEFAULTS: dict[str, Any] = {
         "footerLeft": "",
         "footerRight": "",
     },
-    # Polish 2026-11-03: Capacities' desktop zoom factor (electron-settings.ts `zoom`); scales the
+    # Polish 2026-11-03: the desktop zoom factor; scales the
     # rem-based UI and editor text from the 15.5px root.
     "zoom": 1.0,
-    # Capacities' `editorSettings` (component.model.ts): the spellcheck language tag (None: the
+    # Editor settings: the spellcheck language tag (None: the
     # device's), the link and type-settings switches, and the highlight block style.
     "spellCheckLang": None,
     "alwaysCreateInlineLinks": False,
@@ -83,7 +83,7 @@ DEFAULTS: dict[str, Any] = {
     "highlightStyle": "default",
 }
 
-# A BCP 47 language tag as Capacities' `normalizeLanguageTag` accepts it ("fr", "de-CH", "en_GB",
+# A BCP 47 language tag as the normaliser accepts it ("fr", "de-CH", "en_GB",
 # "es-419"), at most 35 characters.
 _LANGUAGE_TAG = re.compile(r"[A-Za-z]{2,3}(?:[-_](?:[A-Za-z]{2}|\d{3})(?:[-_][A-Za-z0-9]{1,8})*)?")
 

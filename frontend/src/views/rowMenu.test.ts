@@ -1,4 +1,4 @@
-// M9 Task 17: the common row menu (Capacities' DataView context menu, `EntityMenu.*` labels).
+// M9 Task 17: the common row menu (a data view's context menu).
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { objectSummary, row, typeDef } from '@/test/mockApi'
 

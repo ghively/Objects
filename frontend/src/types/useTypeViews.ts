@@ -1,4 +1,4 @@
-// A type page's saved views (`.capacities/views/<typeId>.json`): optimistic updates with a
+// A type page's saved views (`.object/views/<typeId>.json`): optimistic updates with a
 // debounced save. A save carries the revision it was based on; on a 409 the stored views are
 // fetched, the pending edits are re-applied to them once, and the save is tried again.
 import { useCallback, useEffect, useRef, useState } from 'react'

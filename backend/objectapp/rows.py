@@ -147,7 +147,7 @@ def body_preview(body: str, limit: int = 280) -> str:
 #
 # The table's "Content" column shows "N words" for every row, so this runs over whole
 # bodies: a few whole-string substitutions and one findall, no per-line loop. Code is
-# counted (Capacities counts a code block's text); comments, math, fence lines, link
+# counted (a code block's text counts); comments, math, fence lines, link
 # targets, HTML tags and M8 block ids are not.
 
 _WC_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
@@ -162,7 +162,7 @@ _WC_WORD_RE = re.compile(r"\w+(?:[-‐‑'’]\w+)*")
 
 def word_count(body: str) -> int:
     """The words of a Markdown body, Markdown syntax left out (our approximation of
-    Capacities' word-segment count; the page's Text stats count with `Intl.Segmenter`)."""
+    a word-segment count; the page's Text stats count with `Intl.Segmenter`)."""
     if not body:
         return 0
     s = _WC_COMMENT_RE.sub(" ", body)

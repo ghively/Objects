@@ -453,7 +453,7 @@ def test_delete_log_entry_changes_only_its_line(client: TestClient, m8_space_dir
 
 
 def test_topup_adds_occurrence_log_once(space: Space, m8_space_dir: Path):
-    path = m8_space_dir / ".capacities" / "types" / "task.json"
+    path = m8_space_dir / ".object" / "types" / "task.json"
     stored = path.read_bytes()
     assert b"occurrenceLog" not in stored
     t = space.type_by_id("task")

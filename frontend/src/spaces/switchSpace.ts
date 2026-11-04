@@ -10,7 +10,7 @@ import { flushAll } from '@/lib/flush'
 export const SWITCH_TEXT = {
   switching: 'Switching space…', // our string
   timeout: "The space didn't open. Try again.", // our string
-  dismiss: 'Close', // FindInPage.close
+  dismiss: 'Close',
 } as const
 
 export const SWITCH_POLL_MS = 200

@@ -21,7 +21,7 @@ One flaky front-end test: `editor/preserve.test.ts > 1MB body splits under 300ms
 - `space-sample/Tags/Docs.md`: a tag with `color: bg-blue`.
 - `space-sample/Templates/Tasks/Bug report.md`: a Task template with a `{date:…}` title.
 - `space-sample/Attachments/cover.png`: a generated 4x4 PNG.
-- `space-v1/`: the M1 sample space plus the `.capacities/types/*.json` that M1 wrote. It was produced by running M1's `load_types` from commit `9214781` in a temporary worktree.
+- `space-v1/`: the M1 sample space plus the `.object/types/*.json` that M1 wrote. It was produced by running M1's `load_types` from commit `9214781` in a temporary worktree.
 
 **Deviation: tests were not adjusted by counts.** The new folders broke 24 unit tests. Most of those tests assert that `Tags/` or `Templates/` don't exist yet, or they create their own `Projects/` type. Changing counts would not have fixed them. Instead, `conftest.space_dir` now copies `space-sample` without the four M2 folders, so it is still the M1 sample the tests were written against. A new `full_space_dir` fixture copies everything. `test_fixtures_m2.py` checks the full sample: the Project kinds are inferred, the tag colour is read, the template is discovered and kept out of the object list, `kickoff` in the export's form decodes as a day, and opening writes no `.md` file.
 
@@ -59,7 +59,7 @@ The built app ran on `127.0.0.1:8791`, started with `build_server_config(Space(c
 
 The front-end client (`frontend/src/api/client.ts`) and the server routes matched for every route in the contract: paths, methods, body fields, query parameters and response shapes. No wiring change was needed.
 
-**Bug found and fixed (`backend/objectapp/watcher.py`).** Emptying a Trash that holds a type entry deletes `.capacities/trash/types/<id>/` while watchdog is still reporting the files inside it. On Windows, `Path.resolve()` then raises `OSError` (WinError 1168). That error killed the watcher thread, so external edits were no longer noticed until a restart. The watcher now falls back to the plain absolute path. The regression test is `test_watcher.py::test_relpath_survives_vanished_parent`.
+**Bug found and fixed (`backend/objectapp/watcher.py`).** Emptying a Trash that holds a type entry deletes `.object/trash/types/<id>/` while watchdog is still reporting the files inside it. On Windows, `Path.resolve()` then raises `OSError` (WinError 1168). That error killed the watcher thread, so external edits were no longer noticed until a restart. The watcher now falls back to the plain absolute path. The regression test is `test_watcher.py::test_relpath_survives_vanished_parent`.
 
 ## Hand-run checks (Steps 4–5, for Gene)
 
@@ -87,9 +87,9 @@ Use a copy outside the repo, with `git init` and a base commit done there.
 - [ ] All 13 types migrate (Weblinks and Files as basic types), and each type's settings open.
 - [ ] A property edit gives a one-line `git diff` (plus `lastUpdated`).
 - [ ] A rename relinks and shows the count.
-- [ ] Side by side with Capacities: Object Type Settings look and read the same.
-- [ ] Side by side with Capacities: the property menus (add property, kind change, number format, label options) look and read the same.
-- [ ] Side by side with Capacities: the page layouts look and read the same.
+- [ ] Against the behaviour catalog: Object Type Settings look and read the same.
+- [ ] Against the behaviour catalog: the property menus (add property, kind change, number format, label options) look and read the same.
+- [ ] Against the behaviour catalog: the page layouts look and read the same.
 
 Step-10 lists from the CPI copy, and what was done about them:
 

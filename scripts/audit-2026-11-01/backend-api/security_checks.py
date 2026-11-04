@@ -49,7 +49,7 @@ def main() -> None:
     (root / "Attachments" / "selflink.txt").symlink_to(root / "Attachments" / "inner.txt")
     for p in ["Attachments/link.txt", "Attachments/linkdir/outside-secret.txt", "Attachments/selflink.txt",
               "Attachments/../../outside-secret.txt", "Attachments/..%2F..%2Foutside-secret.txt",
-              "/etc/passwd", "../outside-secret.txt", ".capacities/space.json", ".hidden/secret.md",
+              "/etc/passwd", "../outside-secret.txt", ".object/space.json", ".hidden/secret.md",
               "Attachments/cover.png/../cover.png", "Attachments//cover.png", "Attachments/./cover.png",
               "Attachments\\cover.png", "ATTACHMENTS/COVER.PNG", "Pages/Alpha.md", "Attachments/cover.png"]:
         r = client.get("/api/file", params={"path": p})

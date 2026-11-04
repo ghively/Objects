@@ -123,9 +123,9 @@ def snapshot(root: Path, skip_trash: bool = False) -> dict[str, bytes]:
     out = {}
     for p in root.rglob("*"):
         rel = p.relative_to(root)
-        if not p.is_file() or rel.parts[0] in (".git", ".capacities-cache"):  # the cache is derived data (M5)
+        if not p.is_file() or rel.parts[0] in (".git", ".object-cache"):  # the cache is derived data (M5)
             continue
-        if skip_trash and rel.as_posix().startswith(".capacities/trash/"):
+        if skip_trash and rel.as_posix().startswith(".object/trash/"):
             continue
         out[rel.as_posix()] = p.read_bytes()
     return out
@@ -231,19 +231,19 @@ def check_migration(root: Path, original: dict[str, bytes]) -> tuple[Space, list
     lines = []
     ok = True
     v1 = [k for k, v in original.items()
-          if k.startswith(".capacities/types/") and k.endswith(".json") and b'"schemaVersion"' not in v]
+          if k.startswith(".object/types/") and k.endswith(".json") and b'"schemaVersion"' not in v]
     space = Space(root)
     status = git(root, "status", "--porcelain", "-uall")
     md_changed = [l for l in status.splitlines() if l.endswith(".md") or l.endswith('.md"')]
     if md_changed:
         ok = False
         lines.append(f".md files changed by opening: {md_changed}")
-    types_dir = root / ".capacities" / "types"
+    types_dir = root / ".object" / "types"
     not_v2 = [f.name for f in types_dir.glob("*.json") if json.loads(f.read_text("utf-8")).get("schemaVersion") != 2]
     if not_v2:
         ok = False
         lines.append(f"type files not v2: {not_v2}")
-    backup = root / ".capacities" / "backup" / "types-v1"
+    backup = root / ".object" / "backup" / "types-v1"
     missing = [k for k in v1 if not (backup / PurePosixPath(k).name).is_file()
                or (backup / PurePosixPath(k).name).read_bytes() != original[k]]
     if missing:
@@ -578,7 +578,7 @@ def tag_lines(run: Run) -> dict[str, str]:
     out = {}
     for f in run.root.rglob("*.md"):
         rel = f.relative_to(run.root).as_posix()
-        if rel.startswith((".git/", ".capacities")) or "/." in "/" + rel:
+        if rel.startswith((".git/", ".object")) or "/." in "/" + rel:
             continue
         for line in f.read_bytes().decode("utf-8", "replace").split("\n"):
             if line.startswith("tags:"):

@@ -1,6 +1,6 @@
-"""Definition files in ``.capacities/``: collections, queries and per-type views.
+"""Definition files in ``.object/``: collections, queries and per-type views.
 
-Each lives in ``.capacities/<folder>/<id>.json`` (JSON, ``indent=2``,
+Each lives in ``.object/<folder>/<id>.json`` (JSON, ``indent=2``,
 ``ensure_ascii=False``, LF, trailing newline). Unknown keys are the caller's to
 keep: `JsonStore.write` writes exactly the dict it is given. A file that isn't
 valid JSON is never rewritten (`DefinitionUnreadable` on read, `ReadOnly` on
@@ -75,7 +75,7 @@ def parse_json_object(data: bytes) -> dict[str, Any]:
 
 
 class JsonStore:
-    """The ``.capacities/<folder>/`` definition files of one kind."""
+    """The ``.object/<folder>/`` definition files of one kind."""
 
     def __init__(
         self,
@@ -93,10 +93,10 @@ class JsonStore:
 
     @property
     def dir(self) -> Path:
-        return self.root / ".capacities" / self.folder
+        return self.root / ".object" / self.folder
 
     def rel(self, id: str) -> str:
-        return f".capacities/{self.folder}/{id}.json"
+        return f".object/{self.folder}/{id}.json"
 
     def path(self, id: str) -> Path:
         if not _ID_RE.match(id) or id.endswith("."):
@@ -222,7 +222,7 @@ def _empty_filter_group() -> dict[str, Any]:
 def default_views(t: TypeDefinition) -> dict[str, Any]:
     """The Views of a type page that has none saved yet.
 
-    Capacities' initial built-in sections (``builtInDashboardSections``): Recently Opened,
+    The initial built-in sections: Recently Opened,
     Collections and Queries, with the "All" tab. "Not in any collection" and "Not tagged" are
     not initial; "Add a section" offers them. Saved views are never rewritten to match.
     """

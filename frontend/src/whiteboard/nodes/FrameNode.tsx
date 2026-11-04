@@ -1,5 +1,5 @@
 /**
- * `capacitiesFrame`: a dashed 3 px border (`whiteboard.css`), transparent unless it has a
+ * `boardFrame`: a dashed 3 px border (`whiteboard.css`), transparent unless it has a
  * `fillColor`, always behind content (its `z`, from the projection). When it has a `title` the
  * title bar shows above it; double-click on the title edits it (Enter or blur saves, Escape
  * cancels; an emptied title is removed, like "Remove frame title").

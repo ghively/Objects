@@ -53,8 +53,8 @@ def test_every_md_has_unique_path_and_expected_inventory(links_space_dir: Path):
     rels = {p.relative_to(root).as_posix() for p in root.rglob("*.md")}
     assert rels == INVENTORY
     assert len({r.lower() for r in rels}) == len(rels)
-    assert not (root / ".capacities" / "ui.json").exists()
-    types = {p.stem for p in (root / ".capacities" / "types").glob("*.json")}
+    assert not (root / ".object" / "ui.json").exists()
+    types = {p.stem for p in (root / ".object" / "types").glob("*.json")}
     assert types == {"page", "tag", "task", "dailynote", "person", "project"}
 
     crlf = (root / "Pages" / "CRLF mention.md").read_bytes()
@@ -69,13 +69,13 @@ def test_every_md_has_unique_path_and_expected_inventory(links_space_dir: Path):
         assert not space._raw[rel].readOnly, rel
 
     # The pieces the M5 tests rely on.
-    person = json.loads((root / ".capacities/types/person.json").read_text("utf-8"))
+    person = json.loads((root / ".object/types/person.json").read_text("utf-8"))
     pprops = {p["key"]: p for p in person["propertyDefinitions"]}
     assert pprops["manager"]["type"] == "entity"
     assert pprops["manager"]["options"]["allowedTypes"] == ["person"]
     assert pprops["notes"]["isNotSearchable"] is True
     assert pprops["backlinks"]["type"] == "entity_backlinks"
-    project = json.loads((root / ".capacities/types/project.json").read_text("utf-8"))
+    project = json.loads((root / ".object/types/project.json").read_text("utf-8"))
     jprops = {p["key"]: p for p in project["propertyDefinitions"]}
     assert jprops["members"]["options"]["isArray"] is True
     assert jprops["summary"]["type"] == "text"

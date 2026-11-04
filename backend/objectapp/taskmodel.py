@@ -288,7 +288,7 @@ def parse_repeat(text: object) -> RepeatRule | None:
         return None
     on: RepeatOn | None = None
     if m["on"] is not None:
-        # by due date only: Capacities' completionDate rule has only an interval
+        # by due date only: the completion-date rule has only an interval
         if m["after"]:
             return None
         on = _parse_on(unit, m["on"])

@@ -1,5 +1,5 @@
 /**
- * "Add new object type" (Capacities' `ObjectStudio`, polish item 21): a gallery with "Create your
+ * "Add new object type" (polish item 21): a gallery with "Create your
  * own" first, then the type templates by group. A template shows its description and properties
  * and "Create object type" (the server builds it, `POST /api/types {template}`); one the space
  * already has is "Added". "Create your own" is the form: name and plural (both required), an icon
@@ -19,20 +19,15 @@ import { KIND_META, kindIcon } from '@/properties/kinds'
 import { chipStyle, randomColor } from '@/theme/palette'
 
 export const CREATE_TYPE_TEXT = {
-  // ObjectStudio.heading
   galleryTitle: 'Add new object type',
-  // ObjectStudio.createYourOwn / createYourOwnCard
   createYourOwn: 'Create your own',
   createYourOwnCard: 'Start from a blank type and add the properties you need.',
-  // ObjectStudio.useCases (our choice: the heading of the gallery's first group)
+  // our choice: the heading of the gallery's first group
   useCases: 'Use cases',
-  // ObjectStudio.sections.*
   research: 'Research',
   media: 'Media',
   planningAndReflection: 'Planning and reflection',
-  // ObjectStudio.alreadyAdded
   added: 'Added',
-  // ObjectStudio.templateCustomizeHint
   templateHint: 'Object types can be customized at any time in the object type settings.',
   properties: 'Properties',
   back: 'Back', // our string

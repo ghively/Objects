@@ -17,26 +17,26 @@ import { normalizeLanguageTag } from '@/settings/spellcheck'
 import { useSettingsTypes } from './ObjectTypes'
 
 export const EDITOR_TEXT = {
-  heading: 'Editor', // EditorSettings.heading
-  description: 'Manage your preferences for how the editor of Object should work.', // our string, adapted from EditorSettings.description
-  toggleStyle: 'Toggle style', // EditorSettings.toggleStyle.label
+  heading: 'Editor',
+  description: 'Manage your preferences for how the editor of Object should work.', // our string
+  toggleStyle: 'Toggle style',
   toggleStyleDescription:
     "Set the style of the toggle block. You can choose between 'toggle' (default) and 'bullet'. The latter is especially for those, who are coming from an outliner way of thinking.",
-  toggleStyleToggle: 'Toggle', // EditorSettings.toggleStyle.toggle
-  toggleStyleBullet: 'Bullet', // EditorSettings.toggleStyle.bullet
-  disableNumbered: 'Disable automatic detection of numbered lists', // EditorSettings.disableNumberedListTransformation.label
+  toggleStyleToggle: 'Toggle',
+  toggleStyleBullet: 'Bullet',
+  disableNumbered: 'Disable automatic detection of numbered lists',
   disableNumberedDescription:
     "This will disable the automatic transformation of the shortcut for numbered lists at the start of a text block (e.g., in the case of '1.' followed by a space).",
-  disableSpellcheck: 'Disable spellcheck', // EditorSettings.disableSpellcheck.label
+  disableSpellcheck: 'Disable spellcheck',
   disableSpellcheckDescription: 'Disables system spellcheck in the editor and in text inputs.',
-  fullPage: 'Always open as full page', // EditorSettings.alwaysOpenAsFullPage.label
+  fullPage: 'Always open as full page',
   fullPageDescription:
     'Enabling this option will always open objects as a full page on click. Images and PDFs still open in the preview. Opening other content in the preview modal will still be available by holding Option-Shift (Mac) or Alt-Shift (Windows) while clicking.',
-  inlineIcons: 'Show object type icon for inline object links', // EditorSettings.hideEntityIconsOnInlineLinks.label
+  inlineIcons: 'Show object type icon for inline object links',
   inlineIconsDescription: 'Set whether to display a small colored icon in front of inline links to an object.',
-  outliner: 'Hide outliner lines', // EditorSettings.hideOutlinerLines.label
+  outliner: 'Hide outliner lines',
   outlinerDescription: 'Hides the vertical lines along the blocks nested inside a toggle block.',
-  openOnStart: 'When this space opens', // EditorSettings.openOnStart.label
+  openOnStart: 'When this space opens',
   openOnStartDescription:
     'Used when you start the app and when you switch to this space. It applies only to the current space and stays on this device. You can choose for each space individually.',
   openModes: {
@@ -44,18 +44,18 @@ export const EDITOR_TEXT = {
     today: 'Calendar today',
     calendar: 'Calendar',
     specificObject: 'Specific object',
-  }, // EditorSettings.openOnStart.*
+  },
   specificObjectDescription: 'Choose which object should open when you start the app or switch to this space.',
-  selectObject: 'Select object', // EditorSettings.openOnStart.selectObject
-  startup: 'When Object starts', // our string, adapted from EditorSettings.startup.label
+  selectObject: 'Select object',
+  startup: 'When Object starts', // our string
   startupDescription:
-    'Choose which space opens on this device, then what that space shows when you start the app or switch to it.', // EditorSettings.startup.descriptionWithSpaces
-  startupSpace: 'Space on this device', // EditorSettings.startupSpace.label
-  startupSpaceDescription: 'If the selected space no longer exists, Object falls back to the last opened space.', // our string, adapted from EditorSettings.startupSpace.description
-  startupLast: 'Last opened space', // EditorSettings.startupSpace.lastOpened
-  startupSpecific: 'Specific space', // EditorSettings.startupSpace.specific
-  noObjects: 'No results', // AppSettings.search.noResults
-  // M8: EditorSettings.backlinkSectionsDefault.*
+    'Choose which space opens on this device, then what that space shows when you start the app or switch to it.',
+  startupSpace: 'Space on this device',
+  startupSpaceDescription: 'If the selected space no longer exists, Object falls back to the last opened space.', // our string
+  startupLast: 'Last opened space',
+  startupSpecific: 'Specific space',
+  noObjects: 'No results',
+  // M8
   backlinkSections: 'Default state for backlink sections',
   backlinkSectionsDescription:
     'Choose whether these sections should start open or closed on object pages. You can still change them per object.',
@@ -70,7 +70,7 @@ export const EDITOR_TEXT = {
   hiddenTypes: 'Hide related content for object types',
   hiddenTypesDescription: 'Select object types for which the related content section should be hidden on their pages.',
   clearAll: 'Clear all',
-  // M8: EditorSettings.defaultContextualBacklinkViewMode.*
+  // M8
   nestedBacklinks: 'Default display of nested backlinks',
   nestedBacklinksDescription:
     'Set the default behavior of how to display contextual backlinks when they are nested within other blocks. You can get a more compact view by starting with the block with the actual backlink as root or get a more detailed view by showing the full path that is leading to the block with the backlink.',
@@ -78,23 +78,20 @@ export const EDITOR_TEXT = {
     showBlockContainingBacklink: 'Only block with backlink',
     showFullPathAbove: 'Full path above',
   },
-  // Polish 2026-11-03: EditorSettings.spellCheckLang.*
+  // Polish 2026-11-03
   spellCheckLang: 'Spellcheck language',
-  // our string, adapted from EditorSettings.spellCheckLang.description (Object shows no reference list of tags)
+  // our string
   spellCheckLangDescription:
     'Specify the language for spell checking. Only one language can be spell checked at the same time, and support depends on your browser and operating system. Examples are "fr" or "de-CH": the first part names the language, the optional second part a region.',
   spellCheckLangPlaceholder: 'e.g. "en-GB"...',
   spellCheckLangInvalid: 'Invalid language tag...',
-  experimental: 'Experimental', // general.experimental
-  // EditorSettings.alwaysCreateInlineLinks.*
+  experimental: 'Experimental',
   inlineLinks: 'Always create inline links',
   inlineLinksDescription:
     'With this setting, linking to other objects will always default to creating an inline link, even at the start of an empty block.',
-  // EditorSettings.hideStructureSettings.*
   hideStructure: 'Hide object type settings outside of settings',
   hideStructureDescription:
     'Hide all buttons and options to edit properties and other object type settings in the UI. You can still edit them from the settings.',
-  // EditorSettings.highlightStyle.*
   highlightStyle: 'Highlight Style',
   highlightStyleDescription:
     'Choose how highlight blocks and their notes are displayed — with a coloured rail and a distinct notes section, or minimally as plain text.',
@@ -172,7 +169,7 @@ function HiddenTypes({ value, onChange }: { value: string[]; onChange(next: stri
 
 /**
  * "Spellcheck language": a tag field, saved (normalised) on Enter or blur; an empty field saves
- * `null` (the device's language); a bad tag shows Capacities' "Invalid language tag..." and is not
+ * `null` (the device's language); a bad tag shows "Invalid language tag..." and is not
  * saved.
  */
 function SpellCheckLangInput({ value, onSave }: { value: string | null; onSave(next: string | null): void }) {

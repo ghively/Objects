@@ -1,4 +1,4 @@
-"""M7 Task 3: `.capacities/space.json` (name, icon, description, hideTaskManagement)."""
+"""M7 Task 3: `.object/space.json` (name, icon, description, hideTaskManagement)."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def _client(root: Path) -> TestClient:
 
 def test_space_json_absent_reads_folder_name(blocks_space_dir: Path):
     before = _tree(blocks_space_dir)
-    assert not (blocks_space_dir / ".capacities" / "space.json").exists()
+    assert not (blocks_space_dir / ".object" / "space.json").exists()
     space = Space(blocks_space_dir)
     assert space.name == "space-blocks"
     with TestClient(create_app(space, None, watch=False)) as c:
@@ -61,9 +61,9 @@ def test_patch_space_creates_only_space_json(blocks_space_dir: Path):
         assert info["revision"] and info["types"]
         assert c.get("/api/space").json()["revision"] == info["revision"]
     after = _tree(blocks_space_dir)
-    assert set(after) - set(before) == {".capacities/space.json"}
+    assert set(after) - set(before) == {".object/space.json"}
     assert {k: v for k, v in after.items() if k in before} == before
-    raw = (blocks_space_dir / ".capacities" / "space.json").read_bytes()
+    raw = (blocks_space_dir / ".object" / "space.json").read_bytes()
     assert hashlib.sha256(raw).hexdigest() == info["revision"]
     assert json.loads(raw) == {
         "name": "Lab notes",
@@ -76,8 +76,8 @@ def test_patch_space_creates_only_space_json(blocks_space_dir: Path):
 
 def test_patch_space_keeps_unknown_keys(tmp_path: Path):
     root = tmp_path / "s"
-    (root / ".capacities").mkdir(parents=True)
-    path = root / ".capacities" / "space.json"
+    (root / ".object").mkdir(parents=True)
+    path = root / ".object" / "space.json"
     path.write_text(json.dumps({"name": "Old", "colour": "teal", "extra": {"a": 1}}), encoding="utf-8")
     _data, rev, err = spaceconfig.read(root)
     assert err is None
@@ -106,7 +106,7 @@ def test_stale_revision_409(blocks_space_dir: Path):
 
 
 def test_unreadable_space_json_423_not_replaced(blocks_space_dir: Path):
-    path = blocks_space_dir / ".capacities" / "space.json"
+    path = blocks_space_dir / ".object" / "space.json"
     path.write_bytes(b"{not json\r\n")
     rev = hashlib.sha256(path.read_bytes()).hexdigest()
     with _client(blocks_space_dir) as c:
@@ -157,5 +157,5 @@ def test_name_change_does_not_rename_folder(blocks_space_dir: Path):
     assert blocks_space_dir.is_dir()
     assert not (blocks_space_dir.parent / "Renamed space").exists()
     after = _tree(blocks_space_dir)
-    after.pop(".capacities/space.json")
+    after.pop(".object/space.json")
     assert after == before

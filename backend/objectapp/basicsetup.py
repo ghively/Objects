@@ -1,9 +1,9 @@
 """M8 "Start with basic setup": the Person, Meeting, Project and Book object types.
 
-Capacities' onboarding offers "Start with basic setup" ("Includes people, meetings,
+Onboarding offers "Start with basic setup" ("Includes people, meetings,
 projects, and books."). Its names, plural names, descriptions, property names and
-label options are the en-US strings ``components.{person,meeting,project,book}.*``;
-the trimmed reference does not hold the types' property kinds, icons or colours, so
+label options are fixed en-US strings;
+the design notes do not give the types' property kinds, icons or colours, so
 those are **our choice** (listed for Gene in the M8 plan, Task 8):
 
 - Person: Picture (the cover image), Category (multi label), Organizations
@@ -19,7 +19,7 @@ those are **our choice** (listed for Gene in the M8 plan, Task 8):
 
 "Notes" is each type's ``blocks`` property (the object's body). There is no
 Organization type in the basic setup, so "Organizations" relations allow any type.
-`write_basic_types` writes only ``.capacities/types/<id>.json`` for the four types.
+`write_basic_types` writes only ``.object/types/<id>.json`` for the four types.
 """
 
 from __future__ import annotations
@@ -43,8 +43,8 @@ __all__ = ["BASIC_TYPE_IDS", "basic_types", "write_basic_types"]
 
 BASIC_TYPE_IDS = ("person", "meeting", "project", "book")
 
-# The Project "Status" options and their colours (our choice). It is a plain label: Capacities
-# sets ``isStatus`` (and option ``statusCategory``) only on the basic Task status.
+# The Project "Status" options and their colours (our choice). It is a plain label: only
+# the basic Task status sets ``isStatus`` (and option ``statusCategory``).
 _PROJECT_STATUS = (
     ("Planned", "yellow"),
     ("In Progress", "blue"),
@@ -217,5 +217,5 @@ def write_basic_types(root: Path) -> list[Path]:
     for t in basic_types():
         # base revision "" = the file must not exist yet (RevisionConflict otherwise)
         write_type_json(Path(root), t, "")
-        written.append(Path(root) / ".capacities" / "types" / f"{t.id}.json")
+        written.append(Path(root) / ".object" / "types" / f"{t.id}.json")
     return written

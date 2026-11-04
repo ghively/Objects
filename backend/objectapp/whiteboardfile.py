@@ -1,13 +1,12 @@
 """The whiteboard board file: ``<stem>.whiteboard.json`` beside the board's ``.md``.
 
-The format is Capacities' ``WhiteboardData`` (``whiteboard.model.ts``: ``version``, ``nodes``
+The format is a whiteboard data object (``version``, ``nodes``
 and ``edges`` keyed by id, ``viewport?``, ``locked?``, ``readingOrder?``) plus one key,
-``blocks``: the canvas blocks Capacities keeps on the entity's ``RootWhiteboard_canvas``
-property (text blocks and embedded objects). Unknown keys at any level are kept: validation
-only checks the known fields, and `dump_board` writes exactly the dict it is given.
+``blocks``: the canvas blocks (text blocks and embedded objects). Unknown keys at any
+level are kept: validation only checks the known fields, and `dump_board` writes exactly the dict it is given.
 
-M8 adds two block types (our format; Capacities' media nodes point at media objects, which
-our model keeps as attachments): ``{"type": "media", "path": "Attachments/<file>"}``, a
+M8 adds two block types (our format; media are kept as attachments):
+``{"type": "media", "path": "Attachments/<file>"}``, a
 relative space path that can't leave the space, and ``{"type": "weblink", "url": "https://…",
 "title"?: "…"}``, an ``http``/``https`` URL stored as typed and never fetched. An entity block
 may carry ``view`` (``inline``, ``smallCard``, ``wideCard`` or ``embed``; the View menu).
@@ -63,7 +62,7 @@ DATA_VERSION = 1
 MAX_NODES = 20_000
 MAX_EDGES = 50_000
 
-# Enums from whiteboard.model.ts and colorThemes.ts.
+# The whiteboard enums.
 NODE_KINDS = frozenset({"block", "shape", "point", "frame"})
 SHAPES = frozenset({
     "rectangle", "roundedRectangle", "ellipse", "diamond", "triangle", "triangleDown",
@@ -82,7 +81,7 @@ TEXT_ALIGNS = frozenset({"left", "center", "right"})
 ENTITY_VIEWS = frozenset({"inline", "smallCard", "wideCard", "embed"})
 V_ALIGNS = frozenset({"top", "center", "bottom"})
 
-# Our strings (no Capacities original).
+# Our strings.
 NEWER_VERSION_REASON = "This whiteboard was saved by a newer version of Object."
 _UNREADABLE_PREFIX = "This whiteboard's file can't be read, so it opens read-only: "
 
@@ -184,7 +183,7 @@ def media_path_problem(path: Any) -> str | None:
 
     A relative POSIX path inside the space: not empty, no leading ``/``, no backslash, no
     ``:`` (drive letters, URLs; our choice, it is also not portable), no control characters,
-    no empty, ``.`` or ``..`` segment and no dot-folder (``.capacities/``, ``.git/`` …).
+    no empty, ``.`` or ``..`` segment and no dot-folder (``.object/``, ``.git/`` …).
     """
     if not isinstance(path, str) or not path:
         return "has no file path"

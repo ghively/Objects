@@ -1,6 +1,5 @@
 /**
- * "Export as PNG" (M8; our label, adapted from `entity.settings.export.errors.whiteboardClosed`,
- * "Open the whiteboard to export it as a PNG."): rasterises React Flow's viewport (nodes,
+ * "Export as PNG" (M8; our label): rasterises React Flow's viewport (nodes,
  * connectors and the ink layer) with `html-to-image`, framed on the whole board or the
  * selection, at 2× with the theme's canvas background and no dot grid, and saves it as
  * `<title>.png`. Only same-origin resources are embedded: an image from another origin is left

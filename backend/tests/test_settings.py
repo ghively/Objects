@@ -181,12 +181,12 @@ def test_get_space_and_settings_write_nothing(state: Path, blocks_space_dir: Pat
             assert c.get("/api/settings").status_code == 200
         assert _tree(state) == state_before
     assert _tree(blocks_space_dir) == space_before
-    assert not (blocks_space_dir / ".capacities" / "space.json").exists()
+    assert not (blocks_space_dir / ".object" / "space.json").exists()
     assert not (state / "settings.json").exists()
 
     # With both files present, reading still changes neither.
     settings.patch({"font": "serif"}, "")
-    (blocks_space_dir / ".capacities" / "space.json").write_bytes(b'{"name": "S"}\r\n')
+    (blocks_space_dir / ".object" / "space.json").write_bytes(b'{"name": "S"}\r\n')
     space_before = _tree(blocks_space_dir)
     with TestClient(create_app(Space(blocks_space_dir), None, watch=False)) as c:
         state_before = _tree(state)

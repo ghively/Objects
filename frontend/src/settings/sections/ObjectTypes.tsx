@@ -11,12 +11,12 @@ import { Icon } from '@/components/Icon'
 import { SectionHeader, SettingGroup } from '../controls'
 
 export const OBJECT_TYPES_TEXT = {
-  heading: 'Object Types', // StructureGeneralSettings.heading
-  description: 'Here you can customize your object types.', // StructureGeneralSettings.explanation
-  yourTypes: 'Your object types', // StructureGeneralSettings.contentTypes.heading
-  yourTypesDescription: 'Select an object type to customize it.', // StructureGeneralSettings.contentTypes.explanation
-  basic: 'Basic object types', // StructureSettings.basicContentTypes
-  custom: 'Custom object types', // StructureSettings.customContentTypes
+  heading: 'Object Types',
+  description: 'Here you can customize your object types.',
+  yourTypes: 'Your object types',
+  yourTypesDescription: 'Select an object type to customize it.',
+  basic: 'Basic object types',
+  custom: 'Custom object types',
 } as const
 
 const T = OBJECT_TYPES_TEXT

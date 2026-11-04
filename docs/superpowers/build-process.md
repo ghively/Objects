@@ -7,7 +7,7 @@ Lessons from M1–M8. Read this before planning or running the next build.
 1. **Plan**: one plan per milestone in `docs/superpowers/plans/`, written by a writer agent, then reviewed by three critics (completeness and fidelity, buildability, file safety), then one resolve pass. Planning can overlap the previous milestone's build, because it only writes docs.
 2. **Build**: a workflow script runs the tasks in tracks. Saved copy: `scripts/workflows/object-milestone-build.js`. Args: `plan`, `base`, `backend`, `frontend`, `integrate`, `milestone`, `perTaskReview`.
 3. **Integrate**: the last plan task, acceptance (`scripts/mN_acceptance.py` and a hand-check checklist for Gene).
-4. **Review once**: one whole-milestone review (correctness, file safety, fidelity to Capacities), then one fix pass, then the final gate. No per-task reviews (Gene, 2026-10-26).
+4. **Review once**: one whole-milestone review (correctness, file safety, fidelity to the behaviour catalog and design spec), then one fix pass, then the final gate. No per-task reviews (Gene, 2026-10-26).
 5. **Verify** by hand, then Gene's hands-on check on a copy of the CPI export kept outside the repo.
 
 ## Parallelism: what limits it
@@ -52,4 +52,4 @@ A running workflow can't be edited. Stop it with `TaskStop` and relaunch with th
 
 ## Ground rules
 
-Fidelity to Capacities is the bar; don't over-engineer. Never touch `C:\Git\wiki`. No real CPI data in the repo; fixtures are synthetic. `.reference/` is Capacities' unpacked app and recovered source: read it for behaviour, labels and CSS values, never copy its code. Only a trimmed `reference/` subset (models, English strings, CSS) is committed so a cloud session can continue.
+Fidelity to the behaviour catalog (`docs/behavior-catalog.md`) and the design spec is the bar; don't over-engineer. Never touch `C:\Git\wiki`. No real CPI data in the repo; fixtures are synthetic. Read the catalog and the spec for behaviour, labels and values.

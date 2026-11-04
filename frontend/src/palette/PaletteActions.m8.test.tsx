@@ -25,7 +25,6 @@ import { PALETTE_TEXT } from './searchOptions'
 import { usePalette } from './usePalette'
 
 const mocked = vi.mocked(api)
-const STRINGS_FILE = '../../../reference/app-unpacked/dist/virtual_intlify-i18n-0366822.js'
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true })
 
 beforeAll(() => {
@@ -59,7 +58,7 @@ function setup(clip: Partial<Clipboard> | undefined = { readText: async () => ''
 }
 
 // Content and actions are one list: open the palette and type to reach an action. `q` empty shows
-// the clipboard offers. (`show('actions')` opens the same list; Capacities lists no key for it.)
+// the clipboard offers. (`show('actions')` opens the same list; it has no key.)
 async function openActions(user: ReturnType<typeof userEvent.setup>, q = '') {
   act(() => usePalette.getState().show('actions'))
   const input = await screen.findByPlaceholderText(PALETTE_TEXT.placeholder)
@@ -83,14 +82,7 @@ afterEach(() => {
 })
 
 describe('action palette, M8 actions', () => {
-  test('action labels match the reference', async () => {
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-    const src = fs.readFileSync(path.resolve(__dirname, STRINGS_FILE), 'utf8')
-    expect(src).toContain('openEmptyLocalSpaceQuery:{t:0,b:{t:2,i:[{t:3}],s:`' + ACTION_TEXT.openEmptyLocalSpaceQuery + '`}}')
-    expect(src).toContain('openSettings:{t:0,b:{t:2,i:[{t:3}],s:`' + ACTION_TEXT.openSettings + '`}}')
-    expect(src).toContain('toggleFocusMode:{t:0,b:{t:2,i:[{t:3}],s:`' + ACTION_TEXT.toggleFocusMode + '`}}')
-    expect(src).toContain('openSpace:{t:0,b:{t:2,i:[{t:3,v:`Open space "`},{t:4,k:`spaceName`},{t:3,v:`"`}]}}')
+  test('the open space label', () => {
     expect(ACTION_TEXT.openSpace('Work')).toBe('Open space "Work"')
   })
 

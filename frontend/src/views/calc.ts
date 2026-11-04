@@ -1,4 +1,4 @@
-// Column calculations (the table footer): the kinds each property kind offers, with Capacities'
+// Column calculations (the table footer): the kinds each property kind offers, with their
 // labels, and the calculation itself over a set of rows.
 import type { CalcKind, DateValue, EntityRef, PropertyType, Row } from '@/api/types'
 import { formatDate, formatNumber } from '@/properties/format'
@@ -22,7 +22,7 @@ const VALUE_KINDS = new Set<PropertyType>([
   'entity_type',
 ])
 
-/** The calculations a property kind offers, in the reference's order. Blocks get none. */
+/** The calculations a property kind offers, in menu order. Blocks get none. */
 export function CALC_KINDS(kind: PropertyType): CalcKind[] {
   if (kind === 'blocks') return []
   if (kind === 'number') return [...COMMON, 'sum', 'average', 'median', 'min', 'max', 'range']

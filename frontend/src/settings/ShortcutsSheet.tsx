@@ -1,15 +1,14 @@
-// The Shortcuts sheet ("Shortcuts", `ShortcutsCheatSheet.tooltip`): every registered shortcut,
-// grouped by `shortcuts.categories.*`, with its name and keys. An id with no key (Capacities
-// lists none) is left out, as Capacities' sheet only shows its table's rows. Provisional keys
-// (ours, with no Capacities key to check against) carry a small "unverified" tag.
+// The Shortcuts sheet ("Shortcuts"): every registered shortcut, grouped by category, with its
+// name and keys. An id with no key is left out: the sheet only shows rows with keys. Provisional
+// keys (ours, with no table key to check against) carry a small "unverified" tag.
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { CATEGORY_LABELS, formatKeys, shortcutsByCategory, type ShortcutDef } from '@/lib/shortcuts'
 import { useSettingsModal } from './useSettingsModal'
 
 export const SHORTCUTS_TEXT = {
-  heading: 'Shortcuts', // ShortcutsCheatSheet.tooltip
+  heading: 'Shortcuts',
   unverified: 'unverified', // our string
-  unverifiedHelp: 'Keys marked unverified are provisional until they are checked against Capacities.', // our string
+  unverifiedHelp: 'Keys marked unverified are provisional.', // our string
 } as const
 
 function Keys({ def }: { def: ShortcutDef }) {

@@ -47,7 +47,7 @@ def test_rel_still_checks_unknown_and_unnormalised_paths(space_dir: Path, monkey
     assert space._rel("People//Ada Lovelace.md") == ADA  # another spelling: checked in full
     assert space._rel("Pages/Not yet.md") == "Pages/Not yet.md"
     assert len(calls) == 2
-    for bad in ("../x.md", "/etc/x.md", ".capacities/x.md", "People/Ada.txt"):
+    for bad in ("../x.md", "/etc/x.md", ".object/x.md", "People/Ada.txt"):
         with pytest.raises(ValueError):
             space._rel(bad)
 
@@ -260,7 +260,7 @@ def test_space_name_is_cached_until_space_json_changes(space_dir: Path, monkeypa
     for _ in range(20):
         assert space.name == space_dir.name
     assert reads == []
-    cfg = space_dir / ".capacities" / "space.json"
+    cfg = space_dir / ".object" / "space.json"
     cfg.parent.mkdir(exist_ok=True)
     cfg.write_text('{"name": "Work"}', encoding="utf-8")
     assert space.name == "Work"
@@ -278,7 +278,7 @@ def test_space_name_is_cached_until_space_json_changes(space_dir: Path, monkeypa
 def test_reload_collections_parses_only_changed_files(space_dir: Path, monkeypatch):
     from objectapp import jsonstore
 
-    folder = space_dir / ".capacities" / "collections"
+    folder = space_dir / ".object" / "collections"
     folder.mkdir(parents=True)
     for cid in ("one", "two", "three"):
         (folder / f"{cid}.json").write_text(
@@ -459,10 +459,10 @@ def test_a_big_watcher_batch_is_one_resync_event(space_dir: Path):
     new = [f"Pages/Checked out {i:03d}.md" for i in range(RESYNC_AFTER + 1)]
     for rel in new:
         _write(space_dir / rel, f"---\ntitle: {rel}\n---\n")
-    folder = space_dir / ".capacities" / "collections"
+    folder = space_dir / ".object" / "collections"
     folder.mkdir(parents=True)
     _write(folder / "reading.json", '{"id": "reading", "name": "Reading", "typeIds": []}\n')
-    events = _flushed(space, [*new, ".capacities/collections/reading.json"])
+    events = _flushed(space, [*new, ".object/collections/reading.json"])
     assert [(e.kind, e.path, e.origin) for e in events] == [
         ("types", "*", None),
         ("collections", "reading", None),

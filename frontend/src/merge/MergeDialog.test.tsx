@@ -55,7 +55,7 @@ describe('MergeDialog', () => {
     expect(screen.queryByText('Old')).toBeNull()
     expect(screen.queryByText('Target')).toBeNull()
 
-    // Nothing else of the kind: the reference's empty strings.
+    // Nothing else of the kind: the empty strings.
     mocked.objects.mockResolvedValue([OBJECTS[3]])
     act(() => useMerge.getState().close())
     act(() => useMerge.getState().open('Tags/Old.md'))
@@ -122,7 +122,7 @@ describe('MergeDialog', () => {
     expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Tag successfully merged')
   })
 
-  test('test errors use reference strings', async () => {
+  test('test errors use the expected strings', async () => {
     render(<MergeDialog />)
     act(() => useMerge.getState().open('Pages/Source.md'))
     fireEvent.click(await screen.findByText('Target'))

@@ -1,5 +1,5 @@
 // The global graph page: header "Graph", the toolbar (search in the graph, fit, Customize), the
-// sigma canvas over every visible object, and Capacities' empty states. A click peeks the node
+// sigma canvas over every visible object, and its empty states. A click peeks the node
 // with the visible nodes as the pager list; Ctrl/Cmd+click opens it in a new tab.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@/components/Icon'

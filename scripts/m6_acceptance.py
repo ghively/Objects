@@ -5,13 +5,13 @@ Usage: ``uv run python scripts/m6_acceptance.py SPACE [--keep]``
 Copies SPACE to a temporary folder (SPACE itself is never touched), commits the copy to a
 throw-away git repo, opens it twice and serves it with ``create_app(space, None, watch=True)``
 on a free ``127.0.0.1`` port, with ``OBJECT_STATE_DIR`` and ``OBJECT_CACHE_DIR`` pointed at
-temporary folders outside the copy. Snapshots skip ``.git`` and ``.capacities-cache/``.
+temporary folders outside the copy. Snapshots skip ``.git`` and ``.object-cache/``.
 Boards are created over the API where the space has none. Over HTTP it checks:
 
  1. ``GET /api/whiteboard`` and ``GET /api/whiteboard/ink`` for every whiteboard (and one
     without sidecars) change no file (``git status`` clean);
  2. ``POST /api/whiteboards`` creates exactly ``Whiteboards/<title>.md`` (plus
-    ``.capacities/types/whiteboard.json`` the first time); no sidecar;
+    ``.object/types/whiteboard.json`` the first time); no sidecar;
  3. the first ``PUT /api/whiteboard`` (base ``''``) creates only ``<title>.whiteboard.json``;
     the ``.md`` is byte-identical; a second ``PUT`` with the old revision is 409 and the file
     is unchanged;
@@ -222,13 +222,13 @@ def check_reads(run: Run) -> None:
 
 def check_create(run: Run) -> str:
     print("\n2. POST /api/whiteboards")
-    had_type_file = (run.root / ".capacities/types/whiteboard.json").is_file()
+    had_type_file = (run.root / ".object/types/whiteboard.json").is_file()
     before = snapshot(run.root)
     code, res = run.http("POST", "/whiteboards", {"title": BOARD_TITLE})
     md = res.get("path", "") if isinstance(res, dict) else ""
     time.sleep(0.3)
     diff = diff_since(run, before)
-    expected = {md} | (set() if had_type_file else {".capacities/types/whiteboard.json"})
+    expected = {md} | (set() if had_type_file else {".object/types/whiteboard.json"})
     no_sidecar = not any((run.root / s).exists() for s in sidecars(md)) if md else False
     run.report(
         code == 201 and md == f"Whiteboards/{BOARD_TITLE}.md" and set(diff) == expected and no_sidecar,
@@ -398,7 +398,7 @@ def check_trash(run: Run, md: str) -> None:
     data = {rel: (run.root / rel).read_bytes() for rel in files}
     code, trash_id = _delete(run, md)
     gone = all(not (run.root / f).exists() for f in files)
-    folder = run.root / ".capacities/trash/whiteboards" / trash_id
+    folder = run.root / ".object/trash/whiteboards" / trash_id
     run.report(code == 200 and gone and folder.is_dir(), f"delete: {code}; all three out of the space: {gone}")
     code, res = run.http("POST", f"/trash/{trash_id}/restore")
     back = all((run.root / f).is_file() and (run.root / f).read_bytes() == data[f] for f in files)
@@ -421,7 +421,7 @@ def check_trash(run: Run, md: str) -> None:
 def check_purge(run: Run, md: str) -> None:
     print("\n10. Purging removes the sidecar folder")
     code, trash_id = _delete(run, md)
-    folder = run.root / ".capacities/trash/whiteboards" / trash_id
+    folder = run.root / ".object/trash/whiteboards" / trash_id
     had = folder.is_dir()
     code2, _ = run.http("DELETE", f"/trash/{trash_id}")
     run.report(code == 200 and had and code2 == 200 and not folder.exists(),
@@ -466,7 +466,7 @@ def main(argv: list[str] | None = None) -> int:
 
     tmp = Path(tempfile.mkdtemp(prefix="m6-acceptance-"))
     root = tmp / src.name
-    shutil.copytree(src, root, ignore=shutil.ignore_patterns(".git", ".capacities-cache"))
+    shutil.copytree(src, root, ignore=shutil.ignore_patterns(".git", ".object-cache"))
     os.environ["OBJECT_STATE_DIR"] = str(tmp / "state")
     os.environ["OBJECT_CACHE_DIR"] = str(tmp / "cache")
     git(root, "init", "-q")

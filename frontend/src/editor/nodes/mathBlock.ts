@@ -1,5 +1,5 @@
 /**
- * `mathBlock`: a display formula (Capacities' `MathBlock`), plain Markdown as
+ * `mathBlock`: a display formula, plain Markdown as
  * GitHub and Obsidian read it:
  *
  *   $$

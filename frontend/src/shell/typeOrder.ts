@@ -1,12 +1,10 @@
-// The sidebar's Object Types order: Capacities' `RootSpace.objectsSectionSortOption`
-// ('alphabetical' | 'manual') and, for manual, the `objects` section's `ids` in `RootSpace.workspace`,
+// The sidebar's Object Types order: 'alphabetical' | 'manual' and, for manual, the `objects`
+// section's `ids`,
 // both kept in `ui.json`.
 import type { UiState } from '@/api/types'
 import { saveSidebarUi } from './SidebarSections'
 
-/** `WorkspaceSectionMenu.items.manual`. */
 export const SORT_MANUALLY = 'Sort Manually'
-/** `WorkspaceSectionMenu.items.alphabetical`. */
 export const SORT_ALPHABETICALLY = 'Sort Alphabetically'
 /** Our string: the header `...` button's name. */
 export const TYPES_MENU_LABEL = 'Object Types options'

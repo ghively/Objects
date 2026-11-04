@@ -1,7 +1,6 @@
-# Source material kept local, never committed
+# Installers and archives kept local, never committed
 *.exe
-Capacities*.zip
-docs/ui-reference/03-settings-account.png
+/*.zip
 
 # Local tooling state
 .remember/
@@ -10,11 +9,10 @@ docs/ui-reference/03-settings-account.png
 # Build and runtime
 node_modules/
 dist/
-!reference/app-unpacked/dist/
 .venv/
 __pycache__/
 *.pyc
 .vault-copy/
 
-# Capacities reference material (recovered from the installer); never commit
+# Local reference material; never commit
 .reference/

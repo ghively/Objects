@@ -48,7 +48,7 @@ def test_sidecar_owner_maps_back_and_ignores_others():
         assert sidecar_owner(board) == md
         assert sidecar_owner(ink) == md
     assert sidecar_owner("Whiteboards/Orphan (2).whiteboard.json") == "Whiteboards/Orphan (2).md"
-    for other in ("Whiteboards/Network map.md", "Pages/x.json", "a.svg", ".capacities/types/whiteboard.json", "Whiteboards/.whiteboard.json", ".ink.svg"):
+    for other in ("Whiteboards/Network map.md", "Pages/x.json", "a.svg", ".object/types/whiteboard.json", "Whiteboards/.whiteboard.json", ".ink.svg"):
         assert sidecar_owner(other) is None
 
 

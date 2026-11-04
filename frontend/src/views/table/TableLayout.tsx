@@ -147,7 +147,7 @@ function TitleCell({ row, onRename, onOpen }: { row: Row; onRename(row: Row, tit
         }}
         onKeyDown={(e) => {
           // As every other cell (TextCell): Enter and Escape end the edit, which commits; an
-          // empty title still reverts. Capacities saves fields as you type: no edit to cancel.
+          // empty title still reverts. Fields save as you type: no edit to cancel.
           if (e.key === 'Enter' || e.key === 'Escape') {
             e.preventDefault()
             e.currentTarget.blur()
@@ -173,12 +173,11 @@ const openObject = (path: string) => useTabs.getState().open({ kind: 'object', p
 /** The row-number column at the left, in rem (our choice). */
 export const ROW_NUMBER_WIDTH = 2.5
 
-/** "N words" (`textStats.wordCount`, the plural pair). */
+/** "N words" (singular and plural). */
 export const wordsLabel = (n: number) => `${n.toLocaleString()} ${n === 1 ? TEXT_STATS_TEXT.word[0] : TEXT_STATS_TEXT.word[1]}`
 
 /**
- * A content (`blocks`) column: an "N words" chip and an expand icon that opens the object, as
- * Capacities' table shows its Content column. The type's first content property is the body.
+ * A content (`blocks`) column: an "N words" chip and an expand icon that opens the object. The type's first content property is the body.
  */
 function ContentCell({ words, onExpand }: { words: number; onExpand(e: ReactMouseEvent): void }) {
   return (

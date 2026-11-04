@@ -54,7 +54,7 @@ def test_space_opens_without_writing(wb_dir):
 
 def test_tree_hashes_includes_dot_folders(wb_dir):
     hashes = tree_hashes(wb_dir)
-    assert ".capacities/types/whiteboard.json" in hashes
+    assert ".object/types/whiteboard.json" in hashes
     assert "Whiteboards/Network map.whiteboard.json" in hashes
 
 
@@ -117,9 +117,9 @@ def test_expected_inventory():
     assert not (w / "Orphan (2).md").exists()
     assert (w / "Empty board.md").is_file()
     assert not list(w.glob("Empty board.*.*"))
-    assert not (FIXTURE / ".capacities" / "ui.json").exists()
+    assert not (FIXTURE / ".object" / "ui.json").exists()
 
-    wtype = json.loads((FIXTURE / ".capacities/types/whiteboard.json").read_text("utf-8"))
+    wtype = json.loads((FIXTURE / ".object/types/whiteboard.json").read_text("utf-8"))
     assert wtype["id"] == "whiteboard"
     assert wtype["name"] == "Whiteboard"
     assert wtype["pluralName"] == "Whiteboards"

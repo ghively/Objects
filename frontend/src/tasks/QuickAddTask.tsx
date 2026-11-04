@@ -1,4 +1,4 @@
-// The Tasks page's quick add (`RootTaskFastCreation.*`): type a title, Enter (or "Add task")
+// The Tasks page's quick add: type a title, Enter (or "Add task")
 // creates a Task without opening it, and the field keeps focus for the next one.
 import { useRef, useState } from 'react'
 import { api } from '@/api/client'

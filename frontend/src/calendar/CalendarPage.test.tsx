@@ -38,7 +38,7 @@ describe('CalendarPage', () => {
     // Open by default (no `hideCalendarSidebar`): the mini month sits at the page's right edge.
     const sidebar = screen.getByRole('complementary', { name: 'Calendar sidebar' })
     expect(within(sidebar).getByRole('grid')).toBeInTheDocument()
-    // Capacities' `calendarSidebarWidth` default.
+    // The default sidebar width.
     expect(sidebar.className).toContain('w-[26rem]')
 
     await user.click(screen.getByRole('button', { name: 'Hide calendar sidebar' }))

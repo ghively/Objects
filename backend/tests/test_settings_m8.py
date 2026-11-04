@@ -219,7 +219,7 @@ def test_create_space_setup_parameter(state: Path, tmp_path: Path):
     parent.mkdir()
     made = create_space("Plain", parent, setup="blank")
     assert sorted(p.relative_to(made).as_posix() for p in made.rglob("*")) == [
-        ".capacities", ".capacities/space.json",
+        ".object", ".object/space.json",
     ]
     # M8 Task 8 filled `basic` (see test_basicsetup.py); an unknown setup makes nothing.
     with pytest.raises(ValueError):

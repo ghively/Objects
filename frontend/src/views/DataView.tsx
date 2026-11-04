@@ -37,8 +37,7 @@ import { SelectionBar } from './SelectionBar'
 export type { RowMenuItem } from './rowMenu'
 
 /**
- * Where a full-page view's toolbar goes: a type page puts it in its tab row, right-aligned, as
- * Capacities does. Null (the default): the toolbar sits in the view's own heading row.
+ * Where a full-page view's toolbar goes: a type page puts it in its tab row, right-aligned. Null (the default): the toolbar sits in the view's own heading row.
  */
 export const ToolbarSlot = createContext<HTMLElement | null>(null)
 
@@ -454,7 +453,7 @@ export function DataView(props: DataViewProps) {
       }
       return
     }
-    // Shift-click starts selecting (our choice; Capacities enters it from "Select multiple").
+    // Shift-click starts selecting (our choice; "Select multiple" enters it too).
     if (e.shiftKey && props.rowActions) {
       select([path], path)
       return

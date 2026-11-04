@@ -1,7 +1,6 @@
 /**
  * A media node (M8): a block node whose block is `{type: 'media', path}`, an uploaded file in the
- * space. Rendered as a media primitive filling its frame (Capacities' `data-whiteboard-media-
- * primitive`: no ring, the image `object-fit: cover`, the node radius): an image or video, a PDF
+ * space. Rendered as a media primitive filling its frame (no ring, the image `object-fit: cover`, the node radius): an image or video, a PDF
  * (M7's same-origin `<iframe>` of `api.fileUrl`), an audio player, or a file row with M7's icon by
  * extension. Images and videos keep their aspect while resizing. Double-click opens the file with
  * the OS (`/api/attachments/open`; our choice of the two the plan allows: the peek shows objects,
@@ -18,7 +17,7 @@ import { mediaHost, useWhiteboardHost } from '../host'
 import { keepsAspect, mediaKindOf } from '../model'
 import { NodeChrome } from './NodeChrome'
 
-/** "Open {type} on system" (`EntityMenu.openMediaOnSystem`), with M7's words for the kinds. */
+/** "Open {type} on system", with M7's words for the kinds. */
 const KIND_WORD = { image: 'image', pdf: 'PDF', audio: 'audio', video: 'video', file: 'file' } as const
 
 export function mediaOpenLabel(path: string): string {

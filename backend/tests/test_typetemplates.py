@@ -1,4 +1,4 @@
-"""Polish item 21: the "Add new object type" gallery (Capacities' type templates)."""
+"""Polish item 21: the "Add new object type" gallery (the starter type templates)."""
 
 import json
 from pathlib import Path
@@ -18,10 +18,10 @@ GALLERY = (
 
 
 def _stored(space_dir: Path, type_id: str) -> dict:
-    return json.loads((space_dir / ".capacities" / "types" / f"{type_id}.json").read_text("utf-8"))
+    return json.loads((space_dir / ".object" / "types" / f"{type_id}.json").read_text("utf-8"))
 
 
-def test_the_gallery_has_capacities_templates_in_order():
+def test_the_gallery_has_the_starter_templates_in_order():
     assert TEMPLATE_KEYS == GALLERY
     cat = template_catalog([])
     assert [c["name"] for c in cat][:3] == ["Meeting", "Person", "Project"]

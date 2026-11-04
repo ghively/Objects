@@ -1,4 +1,4 @@
-"""``.capacities/ui.json``: pinned items, custom sidebar sections, the All notes layout.
+"""``.object/ui.json``: pinned items, custom sidebar sections, the All notes layout.
 
 Also holds ``changeTypePreferences`` (see `changetype`) and any key it doesn't
 know. A patch replaces only the top-level keys it names. A missing file reads as
@@ -23,12 +23,12 @@ from .typemodel import RevisionConflict
 
 __all__ = ["UI_REL", "load_ui", "patch_ui", "read_ui", "ui_read_only_reason", "ui_with_defaults", "write_ui_patch"]
 
-UI_REL = ".capacities/ui.json"
+UI_REL = ".object/ui.json"
 _fallback_lock = threading.RLock()
 
 
 def _ui_file(root: Path) -> Path:
-    return Path(root) / ".capacities" / "ui.json"
+    return Path(root) / ".object" / "ui.json"
 
 
 def _read(root: Path) -> tuple[dict[str, Any], str, str | None]:
@@ -48,7 +48,7 @@ def _read(root: Path) -> tuple[dict[str, Any], str, str | None]:
 
 
 def load_ui(root: Path) -> dict[str, Any]:
-    """``.capacities/ui.json`` as a dict (empty when missing or unreadable)."""
+    """``.object/ui.json`` as a dict (empty when missing or unreadable)."""
     return _read(root)[0]
 
 

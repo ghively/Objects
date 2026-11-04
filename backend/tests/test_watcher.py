@@ -92,10 +92,10 @@ def test_new_file_emits_created_and_is_listed(space_dir: Path):
 
 def test_ignored_folders_silent(space_dir: Path):
     async def scenario(space: Space, watcher: SpaceWatcher):
-        (space_dir / ".capacities-cache" / "ignored.md").write_text("changed\n")
-        (space_dir / ".capacities-cache" / "new.md").write_text("new\n")
+        (space_dir / ".object-cache" / "ignored.md").write_text("changed\n")
+        (space_dir / ".object-cache" / "new.md").write_text("new\n")
         (space_dir / ".hidden" / "secret.md").write_text("changed\n")
-        types_dir = space_dir / ".capacities" / "types"
+        types_dir = space_dir / ".object" / "types"
         types_dir.mkdir(parents=True, exist_ok=True)
         (types_dir / "x.json").write_text("{}")
         (space_dir / "Pages" / "notes.txt").write_text("not an object\n")
@@ -271,7 +271,7 @@ def test_relpath_survives_vanished_parent(space_dir: Path, monkeypatch):
         raise OSError(1168, "Element not found")
 
     monkeypatch.setattr(Path, "resolve", boom)
-    gone = space.root / ".capacities" / "trash" / "types" / "X" / "manifest.json"
+    gone = space.root / ".object" / "trash" / "types" / "X" / "manifest.json"
     assert watcher._relpath(str(gone)) is None
     assert watcher._relpath(str(space.root / "Pages" / "Gone.md")) == "Pages/Gone.md"
     watcher._touch_folder(str(space.root / "Pages"))  # must not raise
@@ -306,7 +306,7 @@ def test_touch_folder_drops_templates_under_a_moved_folder(full_space_dir: Path)
 
 
 def test_watcher_reports_external_collection_edit(space_dir: Path):
-    target = space_dir / ".capacities" / "collections" / "x.json"
+    target = space_dir / ".object" / "collections" / "x.json"
 
     async def scenario(space: Space, watcher: SpaceWatcher):
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -330,7 +330,7 @@ def test_watcher_reports_external_collection_edit(space_dir: Path):
 
 
 def test_watcher_definition_kinds_and_ignored_dot_files(space_dir: Path):
-    cap = space_dir / ".capacities"
+    cap = space_dir / ".object"
 
     async def scenario(space: Space, watcher: SpaceWatcher):
         (cap / "queries").mkdir(parents=True)
@@ -374,7 +374,7 @@ def test_watcher_external_collection_edit_refreshes_space(space_dir: Path):
         tool = _member(space, "In Tooling", page.name, "Tooling")
         await _drain(watcher, QUIET)
         assert [r.summary.path for r in space.rows(collection_ids=[c.id])] == [tool]
-        file = space_dir / ".capacities" / "collections" / f"{c.id}.json"
+        file = space_dir / ".object" / "collections" / f"{c.id}.json"
         data = json.loads(file.read_text("utf-8"))
         data["name"] = "Gear"
         file.write_text(json.dumps(data), encoding="utf-8")

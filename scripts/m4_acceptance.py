@@ -35,7 +35,7 @@ the Task 6 test hooks set:
     reminder once to the fake notifier, leaves the space clean, and does not
     fire it again after a restart;
  8. ``PUT /api/ui`` with ``calendar``/``tasks`` keys changes only
-    ``.capacities/ui.json``; a stale revision is 409;
+    ``.object/ui.json``; a stale revision is 409;
  9. the M1 no-edit pass changes no file.
 
 Tasks, daily notes and a probe type are created over the API, so it also works on
@@ -220,14 +220,14 @@ class M4:
     # 2 -------------------------------------------------------------------------
     def daily_note(self) -> str:
         print("\n2. Daily note")
-        type_file_before = {p for p in snapshot(self.root) if p.startswith(".capacities/types/")}
+        type_file_before = {p for p in snapshot(self.root) if p.startswith(".object/types/")}
         before = snapshot(self.root)
         code, res = self.http("POST", "/daily-notes", {"date": day_s(self.note_day)})
         diff = changed_paths(before, snapshot(self.root))
         path = res.get("path") if isinstance(res, dict) else None
         want = f"DailyNotes/{self.note_day}.md"
         extra = [p for p in diff if p != want]
-        types_ok = all(p.startswith(".capacities/types/") and p not in type_file_before for p in extra)
+        types_ok = all(p.startswith(".object/types/") and p not in type_file_before for p in extra)
         type_note = f" (plus {extra})" if extra else ""
         shape = frontmatter_keys(self.run.text(want)) if path == want else []
         values_ok = path == want and fm_value(self.run.text(want), "date") == day_s(self.note_day) \
@@ -424,7 +424,7 @@ class M4:
         stale, _ = self.http("PUT", "/ui", {"patch": {"reminders": {"enabled": True}}, "baseRevision": ui0["revision"]})
         _, ui1 = self.http("GET", "/ui")
         kept = ui1["ui"].get("calendar", {}).get("weekStart") == "monday" and ui1["ui"].get("tasks", {}).get("activeTab") == "today"
-        self.run.report(code == 200 and diff == [".capacities/ui.json"] and stale == 409 and kept,
+        self.run.report(code == 200 and diff == [".object/ui.json"] and stale == 409 and kept,
                         f"PUT /ui wrote {diff}; stale baseRevision is {stale}", *([str(res)] if code != 200 else []))
         commit(self.root, "ui")
 

@@ -4,9 +4,8 @@
  * that matches the app (`dark` for Dark and Dark Dimmed, `default` for the
  * light themes), and re-rendered whenever the text or the theme changes.
  *
- * Empty text shows "Write a Mermaid diagram to see the preview"
- * (`blocks.CodeBlock.mermaidEmpty`); a failure shows "Diagram rendering error"
- * (`blocks.CodeBlock.mermaidError`) with Mermaid's message.
+ * Empty text shows "Write a Mermaid diagram to see the preview"; a failure shows
+ * "Diagram rendering error" with Mermaid's message.
  *
  * M8 Task 29: a rendered diagram offers "Download as SVG" and "Download as PNG"
  * (our labels; `exportDiagram.ts`).

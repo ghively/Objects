@@ -121,7 +121,7 @@ def test_ui_patch_does_not_overwrite_an_external_edit(space_dir: Path, monkeypat
 
     space = Space(space_dir)
     _ui, revision = uistate.patch_ui(space, {"pinned": ["a"]}, None)
-    path = space_dir / ".capacities" / "ui.json"
+    path = space_dir / ".object" / "ui.json"
     external = [b'{"pinned": ["external"], "sections": ["ext"]}\n']
 
     def racing(target, data, check=None):
@@ -145,7 +145,7 @@ def test_collection_with_a_non_latin_name_is_created(space_dir: Path):
         r = c.post("/api/collections", json={"name": "日本語"})
         assert r.status_code == 201, r.text
         assert r.json()["id"] == "日本語"
-        assert (space_dir / ".capacities" / "collections" / "日本語.json").is_file()
+        assert (space_dir / ".object" / "collections" / "日本語.json").is_file()
         assert [x.name for x in Space(space_dir).list_collections()] == ["日本語"]
 
 
@@ -155,11 +155,11 @@ def test_get_views_defaults_without_writing(space_dir: Path):
         body = c.get("/api/views/task").json()
     assert body["revision"] == ""
     keys = [s["key"] for s in body["views"]["dashboard"]["sections"]]
-    # Capacities' initial sections; "Not in any collection" and "Not tagged" come from "Add a section".
+    # The initial sections; "Not in any collection" and "Not tagged" come from "Add a section".
     assert keys == ["recentlyAccessed", "collections", "queries"]
     assert body["views"]["activeTab"] == "all"
     assert body["views"]["all"]["viewDefinition"] == {"dataViewLayout": "list"}
-    assert not (space_dir / ".capacities" / "views").exists()
+    assert not (space_dir / ".object" / "views").exists()
 
 
 def test_default_views_layout_and_tag_section(space_dir: Path):
@@ -196,10 +196,10 @@ def test_views_write_only_views_file(space_dir: Path):
         assert r.status_code == 200, r.text
         after = _snapshot(space_dir)
         _wait(published, 1)
-    assert set(after) - set(before) == {".capacities/views/task.json"}
+    assert set(after) - set(before) == {".object/views/task.json"}
     for name, snap in before.items():
         assert after[name] == snap
-    assert r.json()["revision"] == json_revision(space_dir / ".capacities" / "views" / "task.json")
+    assert r.json()["revision"] == json_revision(space_dir / ".object" / "views" / "task.json")
     assert [(e.kind, e.path, e.origin) for e in published] == [("views", "task", "w1")]
     assert c.get("/api/views/task").json()["views"]["activeTab"] == "overview"
     assert space.type_by_id("task") is not None
@@ -219,7 +219,7 @@ def test_views_put_stale_revision_409(space_dir: Path):
 
 
 def test_ui_patch_keeps_other_keys(space_dir: Path):
-    ui = space_dir / ".capacities" / "ui.json"
+    ui = space_dir / ".object" / "ui.json"
     ui.parent.mkdir(parents=True, exist_ok=True)
     stored = {"changeTypePreferences": {"a": {"b": {"k": "v"}}}, "zzz": 1}
     ui.write_text(json.dumps(stored), encoding="utf-8")
@@ -245,11 +245,11 @@ def test_ui_patch_unknown_key_422(space_dir: Path):
     with c:
         r = c.put("/api/ui", json={"patch": {"notAUiKey": []}, "baseRevision": ""})
     assert r.status_code == 422
-    assert not (space_dir / ".capacities" / "ui.json").exists()
+    assert not (space_dir / ".object" / "ui.json").exists()
 
 
 def test_ui_patch_unreadable_refused(space_dir: Path):
-    ui = space_dir / ".capacities" / "ui.json"
+    ui = space_dir / ".object" / "ui.json"
     ui.parent.mkdir(parents=True, exist_ok=True)
     ui.write_bytes(b"{nope")
     mtime = ui.stat().st_mtime_ns
@@ -274,7 +274,7 @@ def test_ui_put_stale_revision_409(space_dir: Path):
         second = c.put("/api/ui", json={"patch": {"pinned": [two]}, "baseRevision": base})
         assert second.status_code == 409
         assert second.json() == {"currentRevision": first.json()["revision"]}
-    ui = json.loads((space_dir / ".capacities" / "ui.json").read_text(encoding="utf-8"))
+    ui = json.loads((space_dir / ".object" / "ui.json").read_text(encoding="utf-8"))
     assert ui["pinned"] == [one]
 
 
@@ -284,7 +284,7 @@ def test_change_type_preference_still_goes_through_ui_state(space_dir: Path):
     own: dict[str, str] = {}
     assert save_change_type_preference(space_dir, "a", "b", [MappingRow("k", "v", False)], own)
     assert load_ui(space_dir)["changeTypePreferences"] == {"a": {"b": {"k": "v"}}}
-    assert own[".capacities/ui.json"] == json_revision(space_dir / ".capacities" / "ui.json")
+    assert own[".object/ui.json"] == json_revision(space_dir / ".object" / "ui.json")
 
 
 def test_open_twice_writes_nothing(space_dir: Path):
@@ -313,10 +313,10 @@ def test_open_twice_writes_nothing(space_dir: Path):
             assert c2.get("/api/object", params={"path": s.path}).status_code == 200
         assert c2.post("/api/rows", json={}).status_code == 200
     assert _snapshot(space_dir) == first
-    assert not (space_dir / ".capacities" / "views").exists()
-    assert not (space_dir / ".capacities" / "collections").exists()
-    assert not (space_dir / ".capacities" / "queries").exists()
-    assert not (space_dir / ".capacities" / "ui.json").exists()
+    assert not (space_dir / ".object" / "views").exists()
+    assert not (space_dir / ".object" / "collections").exists()
+    assert not (space_dir / ".object" / "queries").exists()
+    assert not (space_dir / ".object" / "ui.json").exists()
 
 
 def test_type_trash_carries_views_file(space_dir: Path):
@@ -324,7 +324,7 @@ def test_type_trash_carries_views_file(space_dir: Path):
     with c:
         views = c.get("/api/views/person").json()["views"]
         assert c.put("/api/views/person", json={"views": views, "baseRevision": ""}).status_code == 200
-        live = space_dir / ".capacities" / "views" / "person.json"
+        live = space_dir / ".object" / "views" / "person.json"
         original = live.read_bytes()
         r = c.delete("/api/types/person?confirm=true")
         assert r.status_code == 200, r.text
@@ -339,7 +339,7 @@ def test_type_restore_keeps_live_views_file(space_dir: Path):
     with c:
         views = c.get("/api/views/person").json()["views"]
         c.put("/api/views/person", json={"views": views, "baseRevision": ""})
-        live = space_dir / ".capacities" / "views" / "person.json"
+        live = space_dir / ".object" / "views" / "person.json"
         trash_id = c.delete("/api/types/person?confirm=true").json()["trashId"]
         live.parent.mkdir(parents=True, exist_ok=True)
         live.write_text('{"made": "later"}', encoding="utf-8")

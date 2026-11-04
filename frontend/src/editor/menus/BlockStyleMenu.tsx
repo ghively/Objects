@@ -1,9 +1,9 @@
 /**
  * The block menu's style rows, rendered inside a dropdown menu's content
- * (Task 12's block menu). `BlockStyleMenu` is Capacities' first block-menu
+ * (Task 12's block menu). `BlockStyleMenu` is the first block-menu
  * section, in its order (reference check 2026-10-28, 2e): "Hierarchy
  * (<current>)" ▸ (Standard, Small, Heading 1–4), "List" ▸, "To-do", "Icon" ▸,
- * "Quote", "Toggle", "Group". `BlockStyleExtras` holds the rows Capacities'
+ * "Quote", "Toggle", "Group". `BlockStyleExtras` holds the rows the catalogued
  * block menu does not have but Object has no other way to reach: "Color" ▸,
  * "Standout" (our string), "Indent" / "Unindent". Each item
  * applies to every target block (the block selection, else the block with the
@@ -14,13 +14,11 @@
  * M8 (Task 26): with the caret in a list item (and no block selection) the
  * colour, the icon and Standard / Small act on that one item, written as its
  * item comment (`- Buy milk <!-- item: color=text-red -->`); headings and the
- * list type still act on the list. "Indent" / "Unindent" rows
- * (`tokensMenu.indent.shortName`, `tokensMenu.unindent.shortName`) nest the
+ * list type still act on the list. "Indent" / "Unindent" rows nest the
  * block under the one before it, or move it back out (a list item sinks or
  * lifts; a block selection indents its list items as Tab does).
  *
- * Strings are Capacities' (`blocksMenu.*`, `styles.color`, `tokensMenu.color.*`,
- * `colorThemes.*`, `ControlDropdown.custom.*`) except where marked "our string".
+ * Strings follow the behaviour catalog except where marked "our string".
  */
 import type { Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
@@ -62,28 +60,28 @@ import {
 } from './colors'
 
 export const T = {
-  hierarchy: 'Hierarchy', // blocksMenu.hierarchy.title
-  list: 'List', // blocksMenu.list.title
+  hierarchy: 'Hierarchy',
+  list: 'List',
   todo: 'To-do', // the block menu's own label
-  quote: 'Quote', // ActionItems.setBlockQuoteInterface.title
+  quote: 'Quote',
   toggle: 'Toggle', // the block menu's own label
-  group: 'Group', // ActionItems.groupBlocks.title
-  quoteBlock: 'Quote block', // ControlDropdown.custom.block_quote.name
-  standout: 'Standout', // our string (Capacities' quote.layout "standout" has no label in the strings file)
-  color: 'Color', // styles.color
-  textColor: 'Text color', // tokensMenu.color.title
-  backgroundColor: 'Background color', // tokensMenu.color.background
-  removeText: 'Remove text color', // colorThemes.theme-remove-text-color
-  removeBg: 'Remove background color', // colorThemes.theme-remove-bg-color
-  icon: 'Icon', // ControlDropdown.custom.block_icon.name
-  indent: 'Indent', // tokensMenu.indent.shortName
-  unindent: 'Unindent', // tokensMenu.unindent.shortName
-  alignment: 'Alignment', // EditorPanel.shortLabels.alignment
+  group: 'Group',
+  quoteBlock: 'Quote block',
+  standout: 'Standout', // our string
+  color: 'Color',
+  textColor: 'Text color',
+  backgroundColor: 'Background color',
+  removeText: 'Remove text color',
+  removeBg: 'Remove background color',
+  icon: 'Icon',
+  indent: 'Indent',
+  unindent: 'Unindent',
+  alignment: 'Alignment',
 }
 
 export type BlockAlign = 'left' | 'center' | 'right'
 
-/** Capacities' alignment items (`shortcuts.textAlign*.name`, icons `ph-text-align-*-bold`); left is the default, never written. */
+/** The alignment items (icons `ph-text-align-*-bold`); left is the default, never written. */
 export const ALIGN_ITEMS: readonly { align: BlockAlign; name: string; icon: string }[] = [
   { align: 'left', name: 'Align text left', icon: 'ph-text-align-left-bold' },
   { align: 'center', name: 'Text align center', icon: 'ph-text-align-center-bold' },
@@ -100,26 +98,26 @@ function itemOption(editor: Editor, key: string): string | true | undefined {
   return currentItemOptions(editor.state.tr).find((o) => o.key === key)?.value
 }
 
-/** Capacities' Hierarchy sub-menu, in its order, with its icons. */
+/** The Hierarchy sub-menu, in its order, with its icons. */
 export const HIERARCHY_ITEMS: readonly { level: Hierarchy; name: string; icon: string }[] = [
-  { level: 'Base', name: 'Standard', icon: 'ph-text-t' }, // blocksMenu.hierarchy.Base
-  { level: 'S', name: 'Small', icon: 'ph-text-aa' }, // blocksMenu.hierarchy.S
+  { level: 'Base', name: 'Standard', icon: 'ph-text-t' },
+  { level: 'S', name: 'Small', icon: 'ph-text-aa' },
   { level: 'H1', name: 'Heading 1', icon: 'ph-text-h-one' },
   { level: 'H2', name: 'Heading 2', icon: 'ph-text-h-two' },
   { level: 'H3', name: 'Heading 3', icon: 'ph-text-h-three' },
   { level: 'H4', name: 'Heading 4', icon: 'ph-text-h-four' },
 ]
 
-/** Capacities' List sub-menu: "No listing" in its own section, then the four list types (`a)` and `i)` are text icons). */
+/** The List sub-menu: "No listing" in its own section, then the four list types (`a)` and `i)` are text icons). */
 export const LIST_ITEMS: readonly { type: ListType | null; name: string; icon: string | null; alt?: string }[] = [
-  { type: null, name: 'No listing', icon: 'ph-placeholder' }, // blocksMenu.list.none
-  { type: 'bullet', name: 'Bulleted', icon: 'ph-list-bullets' }, // blocksMenu.list.bullet
-  { type: 'numerical', name: 'Numbered', icon: 'ph-list-numbers' }, // blocksMenu.list.numerical
-  { type: 'alphabetical', name: 'Alphabetical', icon: null, alt: 'a)' }, // blocksMenu.list.alphabetical
-  { type: 'roman', name: 'Roman', icon: null, alt: 'i)' }, // blocksMenu.list.roman
+  { type: null, name: 'No listing', icon: 'ph-placeholder' },
+  { type: 'bullet', name: 'Bulleted', icon: 'ph-list-bullets' },
+  { type: 'numerical', name: 'Numbered', icon: 'ph-list-numbers' },
+  { type: 'alphabetical', name: 'Alphabetical', icon: null, alt: 'a)' },
+  { type: 'roman', name: 'Roman', icon: null, alt: 'i)' },
 ]
 
-/** "Hierarchy (Standard)": the title with the current block's level, as Capacities labels the row. */
+/** "Hierarchy (Standard)": the title with the current block's level. */
 export function hierarchyLabel(level: Hierarchy | null): string {
   const name = HIERARCHY_ITEMS.find((h) => h.level === (level ?? 'Base'))?.name ?? 'Standard'
   return `${T.hierarchy} (${name})`
@@ -250,7 +248,7 @@ export function setToggle(editor: Editor, on: boolean): boolean {
   return withTargetSelection(editor, (e) => (on ? e.commands.wrapInToggle() : e.commands.unwrapToggle()))
 }
 
-/** "Group": group the target blocks, or ungroup the group they are in (`ActionItems.groupBlocks.shortcut.title`). */
+/** "Group": group the target blocks, or ungroup the group they are in. */
 export function toggleGroupBlocks(editor: Editor): boolean {
   editor.commands.focus()
   return withTargetSelection(editor, (e) => e.commands.toggleGroup())
@@ -342,7 +340,7 @@ export function Check({ on }: { on: boolean }) {
   return <CheckIcon className="ml-auto size-4" style={{ visibility: on ? 'visible' : 'hidden' }} aria-hidden />
 }
 
-/** A row's left icon: a Phosphor icon, or Capacities' text icon (`a)`, `i)`). */
+/** A row's left icon: a Phosphor icon, or a text icon (`a)`, `i)`). */
 export function RowIcon({ icon, alt, color }: { icon: string | null; alt?: string; color?: string }) {
   if (!icon) {
     return (
@@ -424,7 +422,7 @@ export interface BlockStyleMenuProps {
   /** Called after an icon is picked or removed (the picker is not a menu item, so the menu stays open). */
   onDone?: () => void
   /**
-   * Show the "Icon" row (default). Capacities' live block menu has none (catalog section 6): the
+   * Show the "Icon" row (default). The catalogued block menu has none (catalog section 6): the
    * block menu leaves it out, the block-selection bar's icon dropdown sets block icons.
    */
   icon?: boolean
@@ -441,7 +439,7 @@ function Shortcut({ id }: { id: string }) {
   return text ? <DropdownMenuShortcut>{text}</DropdownMenuShortcut> : null
 }
 
-/** Capacities' first block-menu section; render inside a `DropdownMenuContent`. */
+/** The first block-menu section; render inside a `DropdownMenuContent`. */
 export function BlockStyleMenu({ editor, onDone, icon = true }: BlockStyleMenuProps) {
   const style = currentBlockStyle(editor)
   const iconValue: IconValue | null = style.icon
@@ -530,7 +528,7 @@ export function BlockStyleMenu({ editor, onDone, icon = true }: BlockStyleMenuPr
 /**
  * Object's own rows, kept because nothing else reaches them: block colour
  * with its "Remove … color" items (the slash menu only sets a colour),
- * "Alignment" ▸ (M9; Capacities offers alignment only for table cells, and Object's
+ * "Alignment" ▸ (M9; the catalog has alignment only for table cells, and Object's
  * block alignment has no keys, so this is its one entry point; shown only when a
  * target block takes `align`), the quote's standout layout, and indenting non-list blocks.
  */

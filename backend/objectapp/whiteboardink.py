@@ -37,7 +37,7 @@ MAX_POINTS = 20_000
 MAX_D_BYTES = 1_000_000
 PADDING = 15
 
-# Our string (no Capacities original).
+# Our string.
 INK_READ_ONLY_REASON = "This ink file has content Object didn't write, so it opens read-only."
 
 SVG_NS = "http://www.w3.org/2000/svg"

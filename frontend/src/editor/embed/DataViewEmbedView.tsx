@@ -9,7 +9,7 @@
  * details" (the data view's own customize row, and the block's `…` menu) is the
  * block's `details` option, `<!-- block: details -->` (`showDataViewDetails`).
  *
- * M9: the embed keeps its own view (`EntityBlock.localDataViewInfo`). Until the
+ * M9: the embed keeps its own view. Until the
  * first view change it shows the source's view and writes nothing; that change
  * copies the view, with the change, into the block's `localDataViewInfo` option
  * (one line of JSON: layout, filters, sorts and group), which the embed uses from

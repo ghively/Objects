@@ -1,7 +1,7 @@
 // The round task checkbox (`RootTaskCheckbox`): click toggles between "Open" and "Done";
 // Ctrl/Cmd-click or the caret opens "Status" with the options grouped by category. It owns no row
 // state: it calls `taskActions` and hands the outcome to the owner, which patches its list.
-// M8: a recurring task's menu adds "Skip" and "Excuse" (`RootTaskCheckbox.menu.*`); when
+// M8: a recurring task's menu adds "Skip" and "Excuse"; when
 // a recurring task by due date has two or more missed occurrences, the checkbox, Skip and Excuse
 // open the catch-up dialog (`RecurringOverdueDialog`); with one, the action runs at once.
 import { useState, type MouseEvent, type SyntheticEvent } from 'react'
@@ -17,14 +17,14 @@ import { categoryOf, firstOptionOf, statusOption, statusOptionsByCategory } from
 import { DEFAULT_TASK_API, maybeOverdue, occurrenceAction, repeatOf, setStatus, toggleDone, type TaskApi, type TaskOutcome } from './taskActions'
 import type { CatchUp, OccurrenceAction, OverdueInfo } from './taskContract'
 
-/** `RootTaskCheckbox.menuShortcutWindows`, as plain text. */
+/** The checkbox's shortcut hint, as plain text. */
 const SHORTCUT_HINT = 'Click to toggle between "Open" and "Done".\n\nCtrl-click to open menu for all status options.'
 
-/** `RootTaskCheckbox.menu.*`: Skip and Excuse with their tooltips ("Excuse for {date}" is the overdue dialog's button). */
+/** Skip and Excuse with their tooltips ("Excuse for {date}" is the overdue dialog's button). */
 export const RECURRENCE_MENU_TEXT = {
-  skip: 'Skip', // RootTaskCheckbox.menu.skipRecurrence
+  skip: 'Skip',
   skipTooltip: 'Move to the next occurrence without marking done. Resets your streak and counts as skipped in stats.',
-  excuse: 'Excuse', // RootTaskCheckbox.menu.excuseRecurrence
+  excuse: 'Excuse',
   excuseTooltip: "Move to the next occurrence without marking done. Keeps your streak; excused days don't affect completion rate.",
 }
 

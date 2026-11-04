@@ -1,4 +1,4 @@
-// Group-by: Capacities' group options per property kind, the groups a set of rows falls into,
+// Group-by: the group options per property kind, the groups a set of rows falls into,
 // and the update that moves a row into a group (kanban drag). Pure functions over rows.
 import type {
   DataViewDefinition,
@@ -62,7 +62,7 @@ export function GROUP_OPTIONS(kind: PropertyType, def?: Partial<Pick<PropertyDef
 /** Whether a kind can be grouped by at all. */
 export const isGroupable = (kind: PropertyType): boolean => !NOT_GROUPABLE.has(kind)
 
-/** How groups can be ordered; the first option is the default. `manual` is ours (Capacities sets it implicitly). */
+/** How groups can be ordered; the first option is the default. `manual` is ours. */
 export function GROUP_SORT_OPTIONS(kind: PropertyType): { key: GroupSortOption; label: string }[] {
   const head: { key: GroupSortOption; label: string }[] =
     kind === 'label'
@@ -145,11 +145,11 @@ const DATE_LABELS: Record<string, string> = {
   tomorrow: 'Tomorrow',
   theDayAfterTomorrow: 'The day after tomorrow',
   nextWeek: 'Next week',
-  later: 'Later', // our string: nothing in Capacities names dates beyond next week
+  later: 'Later', // our string: dates beyond next week
 }
 // The Tasks "Scheduled" buckets in order; rows without a date fall into "No date" (Other), last.
 const SCHEDULED_ORDER = ['overdue', 'today', 'tomorrow', 'thisWeek', 'nextWeek', 'later']
-const NO_DATE = 'No date' // our string: Capacities names no bucket for undated tasks
+const NO_DATE = 'No date' // our string: the bucket for undated tasks
 const RELATIVE_ORDER = [
   'earlier',
   'lastWeek',

@@ -1,9 +1,8 @@
 /**
- * Connector geometry and stroke, from Capacities' `whiteboard.model.ts` rules: an unset
+ * Connector geometry and stroke: an unset
  * `connection` is cornered (Vue Flow smoothstep, React Flow's `getSmoothStepPath`), `curved` is
  * the bezier and `straight` a line; an unset `line` is solid, dashed is `8 8` and dotted `0 10`,
- * both with round caps; `arrowClosed` renders as `arrow`. The stroke width is the reference CSS
- * `.whiteboard-canvas .vue-flow__edge-path { stroke-width: 3px }`.
+ * both with round caps; `arrowClosed` renders as `arrow`. The stroke width is 3px.
  */
 import type { CSSProperties } from 'react'
 import { Position, getBezierPath, getSmoothStepPath, getStraightPath } from '@xyflow/react'
@@ -20,11 +19,11 @@ import * as A from '../actions'
 import type { MarkerDefsProps } from '../canvasTypes'
 import { dasharray, normalizeConnection, normalizeMarker } from '../model'
 
-/** Reference CSS: `.whiteboard-canvas .vue-flow__edge-path { stroke-width: 3px }`. */
+/** The connector stroke width, in px. */
 export const EDGE_STROKE_WIDTH = 3
-/** Reference CSS: `.whiteboard-canvas .vue-flow__edge { color: var(--whiteboard-edge-color, var(--color-border-front-strong)) }`. */
+/** A connector's colour when `--whiteboard-edge-color` is unset. */
 export const DEFAULT_EDGE_COLOR = 'var(--color-border-front-strong)'
-/** Reference CSS: `.whiteboard-canvas .vue-flow__edge.selected { color: var(--color-border-block-selection) }`. */
+/** A selected connector's colour. */
 export const SELECTED_EDGE_COLOR = 'var(--color-border-block-selection)'
 /** Width of the invisible hit stroke around a connector (our choice). */
 export const EDGE_HIT_WIDTH = 20
@@ -74,7 +73,7 @@ export function markerColorKey(edge: Pick<WhiteboardEdge, 'color'>, selected = f
   return themeOf(edge.color) ?? 'default'
 }
 
-/** The paint behind a colour key (the theme's border value, or the reference CSS variables). */
+/** The paint behind a colour key (the theme's border value, or the canvas CSS variables). */
 export function colorForKey(key: MarkerColorKey, dark = isDarkMode()): string {
   if (key === 'selected') return SELECTED_EDGE_COLOR
   if (key === 'default') return DEFAULT_EDGE_COLOR

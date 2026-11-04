@@ -130,7 +130,7 @@ describe('block references (M8 Task 27)', () => {
     editor.commands.setTextSelection(3)
     render(<BlockMenu editor={editor} open onOpenChange={() => {}} anchor={{ left: 0, top: 0, width: 10, height: 10 }} />)
     const menu = await screen.findByRole('menu')
-    // Capacities: "Copy" ▸ "Copy block reference".
+    // "Copy" ▸ "Copy block reference".
     const copy = within(menu).getByRole('menuitem', { name: /^Copy$/ })
     fireEvent.click(copy)
     const sub = await screen.findByRole('menu', { name: (_, el) => el.id === copy.getAttribute('aria-controls') })

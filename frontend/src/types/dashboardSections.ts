@@ -5,8 +5,8 @@ import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { queryTitle, type TitleCtx } from '@/queries/autoTitle'
 
 /**
- * The built-in sections a type page can show (`pinned` is a collection's). Capacities'
- * `builtInDashboardSections`: Recently Opened, Collections and Queries are the initial set (the
+ * The built-in sections a type page can show (`pinned` is a collection's).
+ * Recently Opened, Collections and Queries are the initial set (the
  * server's `default_views`); "Not in any collection", "Not tagged" (types with tags) and "No
  * backlinks" (types whose objects can have backlinks) are offered in "Add a section", never in the
  * default set. `unreviewed` exists only on the basic DailyNote type (and not while it hides
@@ -38,10 +38,8 @@ export const SECTION_TEXT = {
   queriesEmptyBody: 'Queries you create in this database will appear here.',
   createQuery: 'Create query',
   inNoCollection: 'Not in any collection',
-  /** `DatabaseDashboard.sections.inNoCollection.description` */
   inNoCollectionDescription: 'All objects not yet organized in a collection.',
   notTagged: 'Not tagged',
-  /** `DatabaseDashboard.sections.notTagged.description` */
   notTaggedDescription: 'All objects that do not have a top-level tag.',
   noBacklinks: 'No backlinks',
   noBacklinksDescription: 'All objects that are not linked in any other content.',
@@ -69,14 +67,14 @@ const BUILTIN_META: Record<BuiltinKey, { label: string; icon: string; inFullView
 
 export const isBuiltin = (key: string): key is BuiltinKey => key in BUILTIN_META
 
-/** Sections that can't be removed (Capacities' `canBeRemoved: false`): Collections and Queries. */
+/** Sections that can't be removed: Collections and Queries. */
 const NOT_REMOVABLE: ReadonlySet<string> = new Set(['collections', 'queries'])
 export const canRemoveSection = (key: string): boolean => !NOT_REMOVABLE.has(key)
 export const isQueryKey = (key: string): key is `query:${string}` => key.startsWith('query:')
 export const isCollectionKey = (key: string): key is `collection:${string}` => key.startsWith('collection:')
 export const keyId = (key: string): string => key.slice(key.indexOf(':') + 1)
 
-/** Whether a section is also a header tab, fixed per kind (reference RootEntity). */
+/** Whether a section is also a header tab, fixed per kind. */
 export function sectionInFullView(key: string): boolean {
   if (isQueryKey(key) || isCollectionKey(key)) return true
   return isBuiltin(key) ? BUILTIN_META[key].inFullView : false
@@ -112,9 +110,8 @@ export const typeHasTags = (type: Pick<TypeDef, 'propertyDefinitions'>): boolean
   type.propertyDefinitions.some((d) => d.key === 'tags' || d.type === 'entity_tags')
 
 /**
- * Whether objects of the type can have backlinks: every role but RootDailyNote and MediaVideo
- * (`canHaveBacklinks` in `structureHeuristicsBackbone.ts`, as `roles.py` has it), i.e. not the
- * basic DailyNote and Video types.
+ * Whether objects of the type can have backlinks: every role but the daily note and video roles
+ * (as `roles.py` has it), i.e. not the basic DailyNote and Video types.
  */
 export function canHaveBacklinks(type: Pick<TypeDef, 'basic' | 'name'>): boolean {
   if (!type.basic) return true
@@ -157,7 +154,7 @@ export interface RenderedSection {
   hidden: boolean
   /** The id of the collection or query behind a `collection:` or `query:` key. */
   refId?: string
-  /** A built-in section's description (`DatabaseDashboard.sections.*.description`), when it has one. */
+  /** A built-in section's description, when it has one. */
   description?: string
 }
 

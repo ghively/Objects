@@ -1,18 +1,17 @@
 /**
- * Table formulas (Capacities' `SimpleTableBlock` formulas). A cell is a formula
- * when its text starts with `=` and holds no other `=` (Capacities' rule); the
+ * Table formulas. A cell is a formula
+ * when its text starts with `=` and holds no other `=`; the
  * text stays in the file as written, and the editor shows the value it
  * computes (`FormulaCell.tsx`).
  *
  * The language: numbers, `+ - * / ^` (with `^` binding tightest and right to
  * left), unary `+`/`-`, parentheses, cell references (`A1`: columns lettered,
- * rows counted from 1 at the table's first row, the header row included, as
- * Capacities counts them), `$` absolute references (`$A$1`, `A$1`, `$A1`: the
+ * rows counted from 1 at the table's first row, the header row included), `$` absolute references (`$A$1`, `A$1`, `$A1`: the
  * `$` only matters when a formula is copied, so here it reads as `A1`), ranges
  * (`A1:B3`, only as function arguments) including whole columns (`A:A`, `A:B`:
  * rows 1 to the last row; `A2:B` / `A:B3` fill in the missing row the same
- * way; reference check 2026-10-28, section 4) and Capacities' 20
- * statements (`blocks.simpleTable.formulas.statements.*`). Function names and
+ * way; reference check 2026-10-28, section 4) and 20
+ * statements. Function names and
  * references are case-insensitive and arguments are separated by `,` or `;`
  * (our choices). A constant can be written bare (`PI`) or called (`PI()`).
  *
@@ -21,13 +20,13 @@
  * "Value" error. A range skips empty and non-number cells (as a spreadsheet's
  * SUM does; our choice), so `COUNT` counts the numbers in it.
  *
- * Errors carry Capacities' titles ("Circular", "Expression", "Reference",
- * "Value") and messages (`blocks.simpleTable.formulas.errors.*`).
+ * Errors carry titles ("Circular", "Expression", "Reference",
+ * "Value") and messages.
  */
 
 import { formatNumber } from '@/properties/format'
 
-/** `blocks.simpleTable.formulas.statements.*`, verbatim, in Capacities' order. */
+/** The formula statements, in catalog order. */
 export const FORMULA_STATEMENTS: ReadonlyArray<{ name: string; description: string }> = [
   { name: 'ABS', description: 'Get absolute value' },
   { name: 'AVG', description: 'Calculate average of values' },
@@ -54,13 +53,11 @@ export const FORMULA_STATEMENTS: ReadonlyArray<{ name: string; description: stri
 /** The statements that take no arguments. */
 export const FORMULA_CONSTANTS = new Set(['E', 'PHI', 'PI', 'RAND', 'TAU'])
 
-/** `blocks.simpleTable.formulas.editor.*` */
 export const FORMULA_PLACEHOLDER = 'Formula'
 export const FORMULA_NO_OPTIONS = 'No options found'
 
 export type FormulaErrorKind = 'circular' | 'expression' | 'reference' | 'value'
 
-/** `blocks.simpleTable.formulas.errors.title.*` */
 export const FORMULA_ERROR_TITLES: Record<FormulaErrorKind, string> = {
   circular: 'Circular',
   expression: 'Expression',
@@ -68,7 +65,7 @@ export const FORMULA_ERROR_TITLES: Record<FormulaErrorKind, string> = {
   value: 'Value',
 }
 
-/** `blocks.simpleTable.formulas.errors.message.*`, plus `invalidExpression` (our string). */
+/** The error messages, plus `invalidExpression` (our string). */
 export const FORMULA_ERROR_MESSAGES = {
   circularReference: 'The formula contains a circular reference.',
   expressionIsEmpty: 'The formula expression is empty.',
@@ -106,7 +103,7 @@ function raise(kind: FormulaErrorKind, message: FormulaMessage): never {
 
 /**
  * Whether a cell's text is a formula: it starts with `=` (leading spaces
- * allowed, our choice) and holds no other `=` (Capacities' check: exactly one
+ * allowed, our choice) and holds no other `=` (exactly one
  * `=`). A bare `=` is a formula being typed (its error is "The formula
  * expression is empty.").
  */
@@ -300,7 +297,7 @@ function callStatement(ctx: Context, name: string, args: Value[]): number {
     case 'LN':
       return Math.log(one())
     case 'LOG': {
-      // Capacities describes LOG as the natural logarithm; a second argument is the base (our choice).
+      // LOG is the natural logarithm; a second argument is the base (our choice).
       const [x, base] = oneOrTwo()
       return base == null ? Math.log(x) : Math.log(x) / Math.log(base)
     }
@@ -415,7 +412,7 @@ function parse(ctx: Context, tokens: Token[]): Value {
         return callStatement(ctx, upper, args)
       }
       if (isOp(':')) {
-        // A range; a whole-column end covers rows 1 to the last (Capacities: `A:B` is `A1:B<rows>`).
+        // A range; a whole-column end covers rows 1 to the last (`A:B` is `A1:B<rows>`).
         i++
         const next = peek()
         const start = parseRangeEnd(tok.v)

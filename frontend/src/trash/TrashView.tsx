@@ -1,5 +1,5 @@
 /**
- * The app's own Trash (in `.capacities/trash/`, not the Windows Recycle Bin): deleted objects and
+ * The app's own Trash (in `.object/trash/`, not the Windows Recycle Bin): deleted objects and
  * types (a type shows its object count), "Restore", "Delete permanently", and "Empty Trash", which
  * asks the user to type "Delete". Entries are removed after 30 days.
  */

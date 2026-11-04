@@ -9,13 +9,12 @@ export const meta = {
 const { plan: PLAN, base: BASE, milestone: MS } = args
 const REPO = args.repo || 'the current working directory (the repository root)'
 const RULES = `
-Repository: ${REPO} (git repo). Plan: ${PLAN}. Spec: docs/superpowers/specs/2026-10-23-object-design.md. Visual reference: docs/ui-reference/README.md and its PNGs.
+Repository: ${REPO} (git repo). Plan: ${PLAN}. Spec: docs/superpowers/specs/2026-10-23-object-design.md.
 Rules:
 - Read the plan's header sections (Global Constraints, API contract if present, Review Focus, File Structure) and YOUR task section fully before writing code. Follow interfaces exactly (names, signatures, fields): other agents build against them in parallel.
 - TDD as the plan's steps say: failing tests first, run, implement, run green. Also keep ALL existing tests green (uv run pytest backend/tests -q; cd frontend && npx vitest run).
 - Toolchain: Python via uv, Node via npm in frontend/. Use Bash with absolute paths.
-- Commit only your own task's files with the plan's commit message, ending with a blank line and "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Another agent may be committing concurrently: on index.lock, wait and retry. Never git add -A; add explicit paths. Never commit .reference/, *.exe, Capacities*.zip, node_modules, dist.
-- .reference/ is Capacities' unpacked app and recovered model source: read for behaviour, option names, labels and CSS values only; in a clone it is the trimmed reference/ folder; never copy its code.
+- Commit only your own task's files with the plan's commit message, ending with a blank line and "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Another agent may be committing concurrently: on index.lock, wait and retry. Never git add -A; add explicit paths. Never commit *.exe, *.zip, node_modules, dist.
 - Never read or modify C:\\Git\\wiki. Never put real CPI data in the repo; fixtures are synthetic.
 - If a plan step is impossible as written, make the smallest sensible deviation and report it.`
 
@@ -34,7 +33,7 @@ phase('Review')
 const LENSES = [
   { key: 'correctness', p: 'correctness and integration: frontend and backend agree on every route and field; all tests pass; crash paths, unhandled errors, races in concurrent property writes, renames and type edits; the app works end to end (start it against a fixture copy and drive the API).' },
   { key: 'file-safety', p: 'file safety: prove or disprove with throwaway probes in a temp copy of the fixture space (do not commit them) that opening never writes .md files; property edits change only their lines; rename relink changes only link text in only linking files; change type, type rename, option rename and kind change cascades touch only what they must; deletes go to trash and are restorable; conflicts never overwrite; CRLF/BOM preserved.' },
-  { key: 'fidelity', p: 'faithfulness to Capacities: compare property editors, add-property menu, Object Type Settings, pickers, chips, colours and labels against .reference (locale strings in virtual_intlify-i18n-0366822.js, CSS in index36682.css, models) and docs/ui-reference. Report concrete mismatches with exact labels/values that this milestone should already have.' },
+  { key: 'fidelity', p: 'faithfulness to the design spec and behaviour catalog: compare property editors, add-property menu, Object Type Settings, pickers, chips, colours and labels against the spec and the behaviour catalog (docs/behavior-catalog.md). Report concrete mismatches with exact labels/values that this milestone should already have.' },
 ]
 const reviews = await parallel(LENSES.map(l => () => agent(`${RULES}\n\nReview the WHOLE ${MS} build (all commits on master after ${BASE}) through one lens: ${l.p}\nReport only real issues with a concrete fix. Do not edit or commit anything.`,
   { label: `review:${l.key}`, phase: 'Review', schema: VERDICT })))

@@ -1,7 +1,7 @@
-// "Space Settings": the space's name, icon and description, written to `.capacities/space.json`
+// "Space Settings": the space's name, icon and description, written to `.object/space.json`
 // through `PUT /api/space` (nothing else changes: no folder rename). M8: a "Delete space" row,
 // always disabled here because this is the open space (delete other spaces from the spaces menu).
-// M9's "Recalculate content index" row moved to Offline & Sync (`OfflineSync.tsx`), as in Capacities.
+// M9's "Recalculate content index" row moved to Offline & Sync (`OfflineSync.tsx`).
 import { useEffect, useState } from 'react'
 import type { Icon as IconValue } from '@/api/types'
 import { IconOrEmoji, isIconifyId } from '@/components/Icon'
@@ -13,16 +13,16 @@ import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { SaveError, SectionHeader, SettingGroup, errorText } from '../controls'
 
 export const SPACE_SETTINGS_TEXT = {
-  heading: 'Space Settings', // CurrentSpaceSettings.heading
-  description: 'Modify global properties of your space.', // our string, adapted from CurrentSpaceSettings.description
-  name: 'Name', // SpaceDashboard.general.spaceName.label
-  nameHeader: 'Set or update the name for this space.', // SpaceDashboard.general.spaceName.header
-  namePlaceholder: 'What you want to call this space', // SpaceDashboard.general.spaceName.placeholder
-  icon: 'Icon', // SpaceDashboard.general.spaceIcon.label
-  iconHeader: 'Pick an icon to further identify this space.', // SpaceDashboard.general.spaceIcon.header
-  description_: 'Description', // SpaceDashboard.general.spaceDescription.label
-  descriptionHeader: 'Describe the purpose of this space.', // SpaceDashboard.general.spaceDescription.header
-  descriptionPlaceholder: 'Your description', // SpaceDashboard.general.spaceDescription.placeholder
+  heading: 'Space Settings',
+  description: 'Modify global properties of your space.', // our string
+  name: 'Name',
+  nameHeader: 'Set or update the name for this space.',
+  namePlaceholder: 'What you want to call this space',
+  icon: 'Icon',
+  iconHeader: 'Pick an icon to further identify this space.',
+  description_: 'Description',
+  descriptionHeader: 'Describe the purpose of this space.',
+  descriptionPlaceholder: 'Your description',
 } as const
 
 const T = SPACE_SETTINGS_TEXT

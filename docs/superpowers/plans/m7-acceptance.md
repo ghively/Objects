@@ -38,10 +38,10 @@ Like `m6_acceptance.py`, the script works on a temporary git-committed copy of t
    - An uploaded `.html` comes back as `application/octet-stream` with `Content-Disposition: attachment`.
    - `POST /api/attachments/open` records the PDF with the fake opener. An uploaded `tool.exe` is refused with 415 and nothing is launched. (Task 1 could not commit an `.exe` fixture, so the script uploads its own.)
    - Traversal and dot-folder paths return 404.
-3. `PUT /api/space` with a new name changes only `.capacities/space.json` (created on every fixture space) and leaves the folder name unchanged. A stale revision returns 409 and writes nothing.
+3. `PUT /api/space` with a new name changes only `.object/space.json` (created on every fixture space) and leaves the folder name unchanged. A stale revision returns 409 and writes nothing.
 4. `PUT /api/settings` writes only `settings.json` in the state dir, and the space is unchanged. A stale revision returns 409 and an unknown key returns 422.
 5. Spaces:
-   - `POST /api/spaces` in a temporary location creates a folder holding only `.capacities/space.json`. A second create returns 409 and the folder is byte-identical.
+   - `POST /api/spaces` in a temporary location creates a folder holding only `.object/space.json`. A second create returns 409 and the folder is byte-identical.
    - The new space is listed, and the current space is the only one marked `current`. `DELETE /api/spaces` removes the new space from the list and keeps its folder. Removing the open space returns 409.
    - Switching without the launcher returns 503.
    - A real `SpaceHost` on a free port refuses a non-folder with 404. It then switches with 202, and `GET /api/space` reports the new root.
@@ -99,13 +99,13 @@ These are known issues. Task 19 did not fix them, because they are in files othe
 2. **Fixed in the review fix pass:** `unwrapAt` now keeps the container's trailing blank line on its last child, for every container. **`unwrapToggle` loses the blank line after a container.** `nodes/containers.ts` `unwrapAt` has this problem, reported by Task 10. Groups use Task 10's own `ungroupAt`, but toggles still go through `unwrapAt`.
 3. **Fixed (2026-10-27): `fc0bff2`.** `editorExtensions` takes the registry-owned keys out of the built-in key maps (`withoutRegistryKeys` in `editor/document.ts`: StarterKit's mark and heading keys, the code block's Mod-Alt-c, the task list's Mod-Shift-9, the list items' Tab/Shift-Tab), and Tab/Shift-Tab in a list item go through the registry's `indentBlocks`/`unindentBlocks`; a changed registry key leaves no old key working (`editor/shortcuts.test.ts`). **StarterKit's own key bindings still fire** (Task 12). An example is Mod-Alt-1 for Heading 1. If the shortcut registry changes a key, the old StarterKit key keeps its action. Fixing this needs `document.ts` to configure StarterKit's keymaps off.
 4. **Fixed (2026-10-27): `cddb70e`.** Hierarchy, quote, standout, colour and icon run on every selected block (`forEachTargetBlock`), and List makes the selected blocks one list (`withTargetSelection`), as Turn Into does (`editor/menus/BlockStyleMenu.test.tsx`, multi-block cases). **The block style menu acts only on the block at the cursor** (Task 8's `BlockStyleMenu`). The block menu and the shortcuts act on every selected block.
-5. **The main column gets very narrow when the side panel opens** (seen in the walkthrough). With the property panel open, the editor column shrinks to about 150 px at a 1440 px window, because the side panel and the property panel both keep their widths. Capacities' behaviour here needs checking. Fixed (2026-10-27): 34693ce. The main column keeps 480 px, or 850 px (the 370 px property panel plus 480 px) while a Standard page shows its properties, never leaving the side panel under its 320 px minimum, so the side panel shrinks first. A Standard page narrower than 850 px puts its properties inline under the title (the card look). At 1440x900 with both panels open the content column went from 202 px to 752 px (side panel 500 to 320 px). The reference has no rule for this (its CSS only stacks property rows in its narrowest containers), so the widths and the inline fallback are our choice, for Gene's check. Updated 2026-10-28 from the reference (reference-check sections 2a and 5): the 480 px main-column minimum is gone (Capacities has none; the side panel is a 10–90 % share), and the properties go inline below the container md breakpoint, 768 px, for Standard, Profile and Encyclopedia. Whether Standard has a property sidebar at all in Capacities is still for Gene to check on screen.
+5. **The main column gets very narrow when the side panel opens** (seen in the walkthrough). With the property panel open, the editor column shrinks to about 150 px at a 1440 px window, because the side panel and the property panel both keep their widths. The intended behaviour here needs checking. Fixed (2026-10-27): 34693ce. The main column keeps 480 px, or 850 px (the 370 px property panel plus 480 px) while a Standard page shows its properties, never leaving the side panel under its 320 px minimum, so the side panel shrinks first. A Standard page narrower than 850 px puts its properties inline under the title (the card look). At 1440x900 with both panels open the content column went from 202 px to 752 px (side panel 500 to 320 px). No rule was specified for this, so the widths and the inline fallback are our choice, for Gene's check. Updated 2026-10-28 (reference-check sections 2a and 5): the 480 px main-column minimum is gone (there is none; the side panel is a 10–90 % share), and the properties go inline below the container md breakpoint, 768 px, for Standard, Profile and Encyclopedia. Whether Standard should have a property sidebar at all is still for Gene to check on screen.
 6. **Fixed (2026-10-27): `5e63ef1`.** Not toggle-specific: Tiptap's task-list tokenizer read one line per item, so any to-do with a lazy (or indented) continuation line, and any quote with a lazy line, loaded raw. The to-do list's tokenizer now takes the list and item extents from marked's GFM list tokenizer (`editor/extensions/taskListMarkdown.ts`), and the loose content check ignores quote markers; the lazy line is part of the item's paragraph, and the file round-trips byte for byte (`editor/document.blocks.test.ts`, "lazy continuation lines"). **Lazy continuation in a toggle shows as a raw block** (seen in the walkthrough). In "Every block", the open toggle's `- [ ] Patch the hosts` is followed by the lazy continuation line `Details in [[Embedded target]].`. They show as one raw (monospace) block. This is byte-safe, but the toggle's children look like source.
-7. **Fixed (2026-10-27): `b11a362`.** The math block renders each blank-line-separated part as its own KaTeX display row (`renderDisplayMath` in `editor/math/renderMath.ts`), except across an open `{` group or environment; the source bytes are unchanged. The trimmed reference has nothing on Capacities' handling, so Gene compares this in the hand-check. **A math block with a blank line inside renders as one line.** `E = mc^2`, a blank line, then `a^2+b^2=c^2` shows as `E=mc²a²+b²=c²`. KaTeX ignores the blank line. Compare with Capacities.
+7. **Fixed (2026-10-27): `b11a362`.** The math block renders each blank-line-separated part as its own KaTeX display row (`renderDisplayMath` in `editor/math/renderMath.ts`), except across an open `{` group or environment; the source bytes are unchanged. Nothing specifies this, so Gene compares it in the hand-check. **A math block with a blank line inside renders as one line.** `E = mc^2`, a blank line, then `a^2+b^2=c^2` shows as `E=mc²a²+b²=c²`. KaTeX ignores the blank line. Compare in the hand-check.
 
 ## Rules the build chose, for Gene to confirm
 
-The lane agents chose these where the reference was silent:
+The lane agents chose these where nothing was specified:
 
 - **Tabs:**
   - A pinned tab can never be closed: no close button, no right-click "Close tab", and Ctrl+W and middle click do nothing. Closing the active tab activates the most recently opened tab. Tabs are 60 to 200 px wide with a 5 px gap (reference: `wA`, `Jk(tabs)[0]`, `oW`/`aW`/`sW`, reference-check 2c).
@@ -114,11 +114,11 @@ The lane agents chose these where the reference was silent:
 - **Breadcrumbs:**
   - Following a link back to a page already on the trail cuts the trail at that page.
   - A link opened in a new tab carries the trail with it.
-  - At most 3 crumbs show inline counting the current page; every earlier crumb goes into a menu (256 px wide) behind a leading dots icon button, most recent first; crumbs are separated by `/` and earlier ones are at 80 % opacity (reference: `RenderBreadcrumbs`, reference-check 2b). The button's aria-label "Show hidden breadcrumbs" is our string.
+  - At most 3 crumbs show inline counting the current page; every earlier crumb goes into a menu (256 px wide) behind a leading dots icon button, most recent first; crumbs are separated by `/` and earlier ones are at 80 % opacity (reference-check 2b). The button's aria-label "Show hidden breadcrumbs" is our string.
 - **Side panel:**
   - A plain click on a resolved wikilink inside an entry navigates the entry.
   - Swap works by click only; dragging an entry onto the main view is not built.
-  - The calendar sidebar is 26rem wide (reference: `calendarSidebarWidth` default `26rem`, reference-check 2a). The side panel is 45 % of the main column plus the panel, dragged between 10 % and 90 %, back to 45 % on a double click; areas 2 and 3 are 220 px high by default and every area at least 120 px (reference-check 2a).
+  - The calendar sidebar is 26rem wide (reference-check 2a). The side panel is 45 % of the main column plus the panel, dragged between 10 % and 90 %, back to 45 % on a double click; areas 2 and 3 are 220 px high by default and every area at least 120 px (reference-check 2a).
 - **Blocks:**
   - "Standout" is our label.
   - Small text is 0.9em.
@@ -155,10 +155,10 @@ Run these on his CPI copy outside the repo, with `git init` and a first commit d
 
 ### Shortcut keys
 
-- [x] The keys in Settings → Shortcuts were compared with Capacities' shortcut table (`reference-check-2026-10-28.md` §1) and corrected in `lib/shortcuts.ts`. Ids Capacities gives no key (headings, to-do, toggle, text alignment) have none and are left out of the sheet. "Unverified" now marks only Object's own keys (pen, highlighter, eraser).
+- [x] The keys in Settings → Shortcuts were compared with the shortcut table (`reference-check-2026-10-28.md` §1) and corrected in `lib/shortcuts.ts`. Ids the table gives no key (headings, to-do, toggle, text alignment) have none and are left out of the sheet. "Unverified" now marks only Object's own keys (pen, highlighter, eraser).
 - [ ] Hand-check the changed keys: side panel Ctrl+Shift+→, left sidebar Ctrl+Shift+←, calendar sidebar Ctrl+Alt+S, dark mode Ctrl+Shift+L, shortcuts menu Ctrl+Shift+B, tab menu Ctrl+Shift+↑, back/forward Ctrl+←/→ or Ctrl+[/], math Ctrl+M, code/math block Ctrl+E/Ctrl+M with blocks selected, move blocks Alt+↑/↓.
 
-### Unverified designs, each against Capacities
+### Unverified designs, each against the behaviour catalog
 
 - [ ] the side panel's area layout (and the narrow main column, issue 5)
 - [ ] the breadcrumbs' position and look
@@ -166,8 +166,8 @@ Run these on his CPI copy outside the repo, with `git init` and a first commit d
 - [ ] the code preview's default ("Display")
 - [ ] the column add and remove controls
 - [ ] the PDF's default height
-- [ ] the slash menu's grouping and look (order, icons, search-only colour and Mermaid items, descriptions as hover tooltips and the 22rem width now follow Capacities' CreateMenu: reference check 2026-10-28, 2d; "Create bookmark" and "Reuse any content" are still ours)
-- [ ] the block menu's look (sections, labels, icons and the Hierarchy order Standard, Small, Heading 1–4 now follow Capacities' BlockMenu: reference check 2026-10-28, 2e; no AI row; Color, Standout and Indent/Unindent are kept as ours in a last section because nothing else reaches them)
+- [ ] the slash menu's grouping and look (order, icons, search-only colour and Mermaid items, descriptions as hover tooltips and the 22rem width now follow the create menu: reference check 2026-10-28, 2d; "Create bookmark" and "Reuse any content" are still ours)
+- [ ] the block menu's look (sections, labels, icons and the Hierarchy order Standard, Small, Heading 1–4 now follow the block menu spec: reference check 2026-10-28, 2e; no AI row; Color, Standout and Indent/Unindent are kept as ours in a last section because nothing else reaches them)
 - [ ] the rules listed under "Rules the build chose" above
 
 ### Interactions the headless walkthrough did not drive

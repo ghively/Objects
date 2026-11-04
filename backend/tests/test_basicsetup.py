@@ -30,15 +30,15 @@ def test_basic_setup_writes_four_types(tmp_path: Path, state: Path):
     parent.mkdir()
     made = create_space("Basic", parent, setup="basic")
     assert _files(made) == [
-        ".capacities/space.json",
-        ".capacities/types/book.json",
-        ".capacities/types/meeting.json",
-        ".capacities/types/person.json",
-        ".capacities/types/project.json",
+        ".object/space.json",
+        ".object/types/book.json",
+        ".object/types/meeting.json",
+        ".object/types/person.json",
+        ".object/types/project.json",
     ]
     loaded = {}
     for tid in ("person", "meeting", "project", "book"):
-        data = json.loads((made / ".capacities" / "types" / f"{tid}.json").read_text("utf-8"))
+        data = json.loads((made / ".object" / "types" / f"{tid}.json").read_text("utf-8"))
         t = TypeDefinition.from_json(data)
         assert t.to_json() == data  # round-trips through the type model unchanged
         loaded[tid] = t
@@ -76,7 +76,7 @@ def test_basic_setup_writes_four_types(tmp_path: Path, state: Path):
     assert person.prop("projects").options["allowedTypes"] == ["project"]
     assert person.prop("organizations").options["allowedTypes"] == []
     status = loaded["project"].prop("status").options
-    # Capacities sets isStatus only on the basic Task status; Project's is a plain label.
+    # Only the basic Task status sets isStatus; Project's is a plain label.
     assert "isStatus" not in status
     assert [o["text"] for o in status["set"]] == ["Planned", "In Progress", "On Hold", "Completed"]
     assert all("statusCategory" not in o for o in status["set"])
@@ -87,7 +87,7 @@ def test_basic_setup_writes_four_types(tmp_path: Path, state: Path):
 
 def test_basic_setup_via_route_and_space_opens(tmp_path: Path, state: Path):
     current = tmp_path / "current"
-    (current / ".capacities").mkdir(parents=True)
+    (current / ".object").mkdir(parents=True)
     parent = tmp_path / "parent"
     parent.mkdir()
     with TestClient(create_app(Space(current), watch=False)) as client:
@@ -96,7 +96,7 @@ def test_basic_setup_via_route_and_space_opens(tmp_path: Path, state: Path):
         )
         assert r.status_code == 201, r.text
     made = Path(r.json()["path"])
-    assert len(list((made / ".capacities" / "types").glob("*.json"))) == 4
+    assert len(list((made / ".object" / "types").glob("*.json"))) == 4
     names = {t.name for t in Space(made).types}
     assert {"Person", "Meeting", "Project", "Book"} <= names
 
@@ -106,9 +106,9 @@ def test_blank_setup_unchanged(tmp_path: Path, state: Path):
     parent = tmp_path / "parent"
     parent.mkdir()
     made = create_space("Blank", parent)
-    assert _files(made) == [".capacities/space.json"]
+    assert _files(made) == [".object/space.json"]
     made2 = create_space("Blank two", parent, setup="blank")
-    assert _files(made2) == [".capacities/space.json"]
+    assert _files(made2) == [".object/space.json"]
 
 
 def test_basic_types_have_fresh_property_ids():

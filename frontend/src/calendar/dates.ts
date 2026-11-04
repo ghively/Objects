@@ -97,7 +97,7 @@ export function monthGrid(year: number, month: number, weekStart: WeekStart): Da
 
 /**
  * The ISO week number. With `weekStart: 'sunday'` a Sunday belongs to the next ISO week
- * (Capacities' `startWeekOnSunday` rule: the day is moved forward one day first).
+ * (the `startWeekOnSunday` rule: the day is moved forward one day first).
  */
 export function weekNumber(day: Day, weekStart: WeekStart): number {
   const d = weekStart === 'sunday' ? addDays(day, 1) : day

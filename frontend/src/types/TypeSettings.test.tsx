@@ -53,7 +53,7 @@ describe('TypeSettings', () => {
     expect(nav).toHaveTextContent('Project')
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
     expect(headings).toEqual(['Properties', 'Templates', 'Configuration', 'Delete Object Type'])
-    // The basics come first, in Capacities' order.
+    // The basics come first, in order.
     const labels = ['Type icon', 'Name', 'Plural of name', 'Color', 'Description']
     const nodes = labels.map((l) => screen.getByLabelText(l))
     for (let i = 1; i < nodes.length; i++) {

@@ -23,8 +23,8 @@ import type { InkStroke } from './plugin'
 
 export type { FlowEdge, FlowEdgeData, FlowNode, FlowNodeData, FlowNodeType }
 
-/** React Flow `nodeTypes` keys: Capacities' Vue Flow node type names. */
-export const NODE_TYPE_KEYS = ['capacitiesBlock', 'capacitiesShape', 'capacitiesFrame', 'capacitiesPoint'] as const
+/** React Flow `nodeTypes` keys (runtime only; the file stores each node's `kind`). */
+export const NODE_TYPE_KEYS = ['boardBlock', 'boardShape', 'boardFrame', 'boardPoint'] as const
 export type NodeTypeKey = (typeof NODE_TYPE_KEYS)[number]
 /** React Flow `edgeTypes` key. */
 export const EDGE_TYPE_KEY = 'connector'

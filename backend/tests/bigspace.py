@@ -77,10 +77,10 @@ def make_big_space(root: Path, objects: int = 5000, links: int = 50000, seed: in
     """Write the space into `root` (created if missing) and return what was written."""
     root = Path(root)
     rng = random.Random(seed)
-    types_dir = root / ".capacities" / "types"
+    types_dir = root / ".object" / "types"
     types_dir.mkdir(parents=True, exist_ok=True)
     for name in _TYPE_FILES:
-        shutil.copyfile(FIXTURES / "space-links" / ".capacities" / "types" / f"{name}.json",
+        shutil.copyfile(FIXTURES / "space-links" / ".object" / "types" / f"{name}.json",
                         types_dir / f"{name}.json")
     for folder in _FOLDERS.values():
         (root / folder).mkdir(parents=True, exist_ok=True)

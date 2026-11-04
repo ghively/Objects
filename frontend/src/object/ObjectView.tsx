@@ -112,57 +112,39 @@ export function patchSummary(summary: ObjectSummary, fm: Record<string, unknown>
   return next
 }
 
-/** The `…` menu item (`EntityMenu.openInSidepanel`). */
+/** The `…` menu item. */
 export const OPEN_IN_SIDEPANEL_MENU_ITEM = 'Open in side panel'
 
-/** The `…` menu item (`FindInPage.menuItem`). */
+/** The `…` menu item. */
 export const FIND_IN_PAGE_MENU_ITEM = 'Find in page'
 
-/** M8 menu items and the focus-mode button (reference strings). */
+/** M8 menu items and the focus-mode button. */
 export const OBJECT_M8_TEXT = {
-  /** `EntityMenu.versionHistory.text` */
   versionHistory: 'Version History',
-  /** `EntityMenu.mergeObject.text` */
   mergeObject: 'Merge into object',
-  /** `EntityMenu.mergeTag.text` */
   mergeTag: 'Merge into tag',
-  /** `EntityMenu.presentationMode.text` */
   present: 'Present',
-  /** `Whiteboard.addTo.action` */
   addToWhiteboard: 'Add to whiteboard',
-  /** `ComponentHeader.focusMode.enterLabel` */
   enterFocusMode: 'Enter Focus Mode',
-  /** `ComponentHeader.focusMode.leaveLabel` */
   leaveFocusMode: 'Leave Focus Mode',
 } as const
 
-/** M9 menu items (reference strings). */
+/** M9 menu items. */
 export const OBJECT_M9_TEXT = {
-  /** `components.RootPagePage.enterWideMode` */
   wideLayout: 'Wide layout',
-  /** `components.RootPagePage.leaveWideMode` */
   normalLayout: 'Normal layout',
-  /** `EntityMenu.textStats.text` */
   textStats: 'Text Stats',
-  /** `EntityMenu.openExportMenu.text` */
   export: 'Export',
-  /** `EntityMenu.duplicateObject.text` */
   duplicate: 'Duplicate',
 } as const
 
-/** The menu's Import and Copy > rows (reference strings). */
+/** The menu's Import and Copy > rows. */
 export const OBJECT_MENU_TEXT = {
-  /** `EntityMenu.openImportMenu.text` */
   import: 'Import',
-  /** `ActionItems.copy.title` */
   copy: 'Copy',
-  /** `EntityMenu.copyEntityReference.text` */
   copyReference: 'Copy object reference',
-  /** `EntityMenu.copyEntityReference.copied` */
   referenceCopied: 'Link to object copied',
-  /** `EntityMenu.exportMarkdownToClipboard.text` */
   copyAsMarkdown: 'Copy as Markdown',
-  /** `EntityMenu.exportMarkdownToClipboard.snackbarText` */
   markdownCopied: 'Markdown export written to clipboard',
 } as const
 
@@ -176,7 +158,7 @@ async function copyText(text: string, done: string): Promise<void> {
   }
 }
 
-/** A menu row's keys, as Capacities draws them ("Ctrl Alt P", "Ctrl ⌫"): the registry's first key. */
+/** A menu row's keys, drawn as "Ctrl Alt P", "Ctrl ⌫"): the registry's first key. */
 function MenuKeys({ id }: { id: string }) {
   const keys = keysFor(id)
   if (!keys.length) return null
@@ -743,7 +725,7 @@ export function ObjectView({
     }
     void writes.updateProperties(updates)
   }
-  // Polish item 17: the pane toggle is per object (Capacities' `ComponentData.hideProperties`):
+  // Polish item 17: the pane toggle is per object:
   // hiding saves `hideProperties: true`, showing removes the key. Read-only: this view only.
   const panelOpen = paneToggled ?? detail?.frontmatter.hideProperties !== true
   const togglePanel = () => {
@@ -765,10 +747,10 @@ export function ObjectView({
   // M9: the object's own layout keys override the type's.
   const layout = detail ? frontmatterLayout(detail.frontmatter) : undefined
   const wideOn = objectWideLayout(type, layout)
-  /** Capacities hides "Wide layout" for whiteboards and the index card design. */
+  /** "Wide layout" is hidden for whiteboards and the index card design. */
   const canWide = !!summary && pageDesign(type) !== 'indexCard' && !isWhiteboardType(type)
   const dailyNote = !!summary && isDailyNoteType(type, summary.type)
-  /** Capacities offers no Duplicate for daily notes and templates; whiteboards are ours to refuse. */
+  /** No Duplicate for daily notes and templates; whiteboards are ours to refuse. */
   const canDuplicate = !!summary && !isTemplate && !dailyNote && !isWhiteboardType(type)
 
   // A render function: the layout picks the variant (inline as a card when the page is narrow).
@@ -867,7 +849,7 @@ export function ObjectView({
               {OBJECT_M9_TEXT.export}
               <MenuKeys id="openExportMenu" />
             </DropdownMenuItem>
-            {/* Our choice: Object's import is the type's CSV import (Capacities' page import menu was not seen). */}
+            {/* Our choice: Object's import is the type's CSV import. */}
             <DropdownMenuItem disabled={!type || propsReadOnly} onSelect={() => setImportOpen(true)}>
               <Icon name="ph-download-simple" size={14} />
               {OBJECT_MENU_TEXT.import}
@@ -1216,7 +1198,7 @@ export function ObjectView({
           propsReadOnly
             ? undefined
             : (next) =>
-                // A new image drops the old one's position (Capacities' `referenceImageId` rule).
+                // A new image drops the old one's position.
                 writeProperties(
                   'coverImageOffset' in detail.frontmatter
                     ? { coverImage: next, coverImageOffset: null }

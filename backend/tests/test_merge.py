@@ -53,7 +53,7 @@ def _tree(root: Path) -> dict[str, str]:
     return {
         p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
         for p in sorted(root.rglob("*"))
-        if p.is_file() and ".capacities-cache" not in p.parts
+        if p.is_file() and ".object-cache" not in p.parts
     }
 
 
@@ -239,7 +239,7 @@ def test_merge_announces_and_missing_404(client: TestClient, space: Space):
 
 def _synced_types(root: Path) -> None:
     """Types A and B whose `rel` relations sync with each other (two-way)."""
-    types = root / ".capacities" / "types"
+    types = root / ".object" / "types"
     types.mkdir(parents=True, exist_ok=True)
     for tid, name, other in (("a", "A", "b"), ("b", "B", "a")):
         data = {

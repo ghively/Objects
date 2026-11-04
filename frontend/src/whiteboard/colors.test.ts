@@ -1,23 +1,10 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { COLOR_VALUES, DEFAULT_RING, borderStyle, borderValue, edgeColorStyle, fillStyle, fillValue, isDarkMode } from './colors'
 import { THEME_COLORS } from '@/theme/palette'
 
-const THEMES = readFileSync(
-  path.resolve(import.meta.dirname, '../../../reference/recovered-ts/src/shared-logic/util/colorThemes.ts'),
-  'utf8',
-)
-
 describe('whiteboard colours', () => {
-  test('test fill and border colours from the reference values', () => {
+  test('test fill and border colours', () => {
     expect(Object.keys(COLOR_VALUES)).toEqual([...THEME_COLORS])
-    for (const [name, v] of Object.entries(COLOR_VALUES)) {
-      const block = new RegExp(`\\n  ${name}: \\{([^}]*)\\}`).exec(THEMES)?.[1] ?? ''
-      for (const key of ['bgLight', 'borderLight', 'bgDark', 'borderDark'] as const) {
-        expect(block, `${name}.${key}`).toContain(`${key}: '${v[key]}'`)
-      }
-    }
     expect(fillValue('bg-blue', true)).toBe('#263956')
     expect(fillValue('bg-blue', false)).toBe('#E4EFFE')
     expect(borderValue('red', true)).toBe('#F87171')

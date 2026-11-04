@@ -22,7 +22,7 @@ def _normalised(data: bytes) -> str:
 
 
 def _trash_dir(space_dir: Path) -> Path:
-    return space_dir / ".capacities" / "trash"
+    return space_dir / ".object" / "trash"
 
 
 # -- create ----------------------------------------------------------------------
@@ -98,7 +98,7 @@ def test_create_creates_folder_and_persists_inferred_type(space_dir: Path):
     (space_dir / "Gadgets").mkdir()
     (space_dir / "Gadgets" / "Widget.md").write_bytes(b"---\ntype: 'Gadget'\ntitle: Widget\n---\n")
     space = Space(space_dir)
-    type_file = space_dir / ".capacities" / "types" / "gadget.json"
+    type_file = space_dir / ".object" / "types" / "gadget.json"
     assert not type_file.exists()
     (space_dir / "Gadgets" / "Widget.md").unlink()
     (space_dir / "Gadgets").rmdir()
@@ -235,7 +235,7 @@ def test_restore_unknown_id_404(space_dir: Path):
 
 def _gizmo_space(space_dir: Path) -> dict[str, bytes]:
     """A tmp type Gizmo with two objects and a template; Holder relates to it."""
-    types = space_dir / ".capacities" / "types"
+    types = space_dir / ".object" / "types"
     types.mkdir(parents=True)
     gizmo = {
         "schemaVersion": 2,
@@ -282,7 +282,7 @@ def _gizmo_space(space_dir: Path) -> dict[str, bytes]:
 
 
 def _allowed(space_dir: Path) -> list[str]:
-    holder = json.loads((space_dir / ".capacities" / "types" / "holder.json").read_text())
+    holder = json.loads((space_dir / ".object" / "types" / "holder.json").read_text())
     return holder["propertyDefinitions"][0]["options"]["allowedTypes"]
 
 
@@ -303,7 +303,7 @@ def test_trash_type_moves_type_objects_and_templates(space_dir: Path):
     assert item.objectCount == 2
     for rel in files:
         assert not (space_dir / rel).exists()
-    assert not (space_dir / ".capacities" / "types" / "gizmo.json").exists()
+    assert not (space_dir / ".object" / "types" / "gizmo.json").exists()
     assert space.type_by_id("gizmo") is None
     assert _allowed(space_dir) == ["page"]
     manifest = json.loads(
@@ -321,7 +321,7 @@ def test_trash_type_moves_type_objects_and_templates(space_dir: Path):
 
 def test_restore_type_restores_objects_and_templates(space_dir: Path):
     files = _gizmo_space(space_dir)
-    type_json = (space_dir / ".capacities" / "types" / "gizmo.json").read_bytes()
+    type_json = (space_dir / ".object" / "types" / "gizmo.json").read_bytes()
     space = Space(space_dir)
     item = _trash_gizmo(space)
 
@@ -329,7 +329,7 @@ def test_restore_type_restores_objects_and_templates(space_dir: Path):
 
     for rel, data in files.items():
         assert (space_dir / rel).read_bytes() == data
-    assert (space_dir / ".capacities" / "types" / "gizmo.json").read_bytes() == type_json
+    assert (space_dir / ".object" / "types" / "gizmo.json").read_bytes() == type_json
     assert sorted(result["paths"]) == sorted(files)
     assert "gizmo" in result["typeIds"]
     assert space.type_by_id("gizmo") is not None
@@ -352,7 +352,7 @@ def test_restore_object_of_trashed_type_restores_type_only(space_dir: Path):
     assert (space_dir / "Gizmos" / "G1.md").read_bytes() == files["Gizmos/G1.md"]
     assert not (space_dir / "Gizmos" / "G2.md").exists()
     assert space.type_by_id("gizmo") is not None
-    assert (space_dir / ".capacities" / "types" / "gizmo.json").is_file()
+    assert (space_dir / ".object" / "types" / "gizmo.json").is_file()
     assert _allowed(space_dir) == ["page", "gizmo"]
     remaining = space.list_trash()
     assert [i.originalPath for i in remaining] == ["Gizmos/G2.md"]
@@ -439,12 +439,12 @@ def test_trash_routes(space_dir: Path):
 
 def test_restore_type_refuses_when_a_type_now_has_its_id(space_dir: Path):
     files = _gizmo_space(space_dir)
-    type_json = (space_dir / ".capacities" / "types" / "gizmo.json").read_bytes()
+    type_json = (space_dir / ".object" / "types" / "gizmo.json").read_bytes()
     space = Space(space_dir)
     item = _trash_gizmo(space)
     fresh = space.create_type("Gizmo", "Gizmos")
     assert fresh.id == "gizmo"
-    fresh_json = (space_dir / ".capacities" / "types" / "gizmo.json").read_bytes()
+    fresh_json = (space_dir / ".object" / "types" / "gizmo.json").read_bytes()
     g1 = next(i for i in space.list_trash() if i.originalPath == "Gizmos/G1.md")
 
     for trash_id in (item.id, g1.id):
@@ -452,7 +452,7 @@ def test_restore_type_refuses_when_a_type_now_has_its_id(space_dir: Path):
             space.restore(trash_id)
 
     # Nothing moved: the new type is intact and the old definition is still in the trash.
-    assert (space_dir / ".capacities" / "types" / "gizmo.json").read_bytes() == fresh_json
+    assert (space_dir / ".object" / "types" / "gizmo.json").read_bytes() == fresh_json
     assert (_trash_dir(space_dir) / "types" / item.id / "type.json").read_bytes() == type_json
     assert not (space_dir / "Gizmos" / "G1.md").exists()
     assert len(space.list_trash()) == 3

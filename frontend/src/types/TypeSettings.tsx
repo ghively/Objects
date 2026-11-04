@@ -1,5 +1,5 @@
 /**
- * Object Type Settings, in Capacities' order: breadcrumb; icon, name, plural, colour and
+ * Object Type Settings, in this order: breadcrumb; icon, name, plural, colour and
  * description; Properties; Templates; Configuration › Page, Card view and linking; Delete Object Type.
  *
  * Every edit saves at once through `useTypeEditor` (text fields 400 ms after the last keystroke,

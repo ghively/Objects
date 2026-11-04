@@ -32,7 +32,7 @@ copy. Over HTTP it checks:
     sidecar) and answers ``mdVersion`` with ``mdBaseVersion`` (the version it started from); a
     second save inside 60 s leaves the ``.md`` alone and answers no ``mdVersion``; the Notes
     body save on the first save's ``mdVersion`` succeeds;
- 7. ``PUT /api/ui`` ``workspaceOrder`` round-trips (only ``.capacities/ui.json`` changes);
+ 7. ``PUT /api/ui`` ``workspaceOrder`` round-trips (only ``.object/ui.json`` changes);
     duplicates are 422;
  8. reindex: ``POST /api/search/reindex`` gives 202 and search reports complete afterwards;
  9. the editor round trip (``OBJECT_ROUNDTRIP_SPACE=<copy> npx vitest run
@@ -142,10 +142,10 @@ def seed(root: Path) -> list[str]:
         (root / "DailyNotes").mkdir(exist_ok=True)
         shutil.copyfile(SPACE_M8 / rel, root / rel)
         added.append(rel)
-        types = root / ".capacities" / "types"
+        types = root / ".object" / "types"
         if types.is_dir() and not (types / "dailynote.json").exists():
-            shutil.copyfile(SPACE_M8 / ".capacities" / "types" / "dailynote.json", types / "dailynote.json")
-            added.append(".capacities/types/dailynote.json")
+            shutil.copyfile(SPACE_M8 / ".object" / "types" / "dailynote.json", types / "dailynote.json")
+            added.append(".object/types/dailynote.json")
     return added
 
 
@@ -459,7 +459,7 @@ class M9:
         changed = changed_paths(snap, snapshot(self.root))
         code2, _ = self.http("PUT", "/ui", {"patch": {"workspaceOrder": ["objects", "objects"]},
                                            "baseRevision": got["revision"]})
-        self.run.report(code == 200 and got["ui"].get("workspaceOrder") == order and changed == [".capacities/ui.json"]
+        self.run.report(code == 200 and got["ui"].get("workspaceOrder") == order and changed == [".object/ui.json"]
                         and code2 == 422,
                         f"PUT {code}; read back {got['ui'].get('workspaceOrder')}; files {changed}; duplicates {code2}")
         commit(self.root, "workspace order")
@@ -534,7 +534,7 @@ def main(argv: list[str] | None = None) -> int:
 
     tmp = Path(tempfile.mkdtemp(prefix="m9-acceptance-")).resolve()
     root = tmp / src.name
-    shutil.copytree(src, root, ignore=shutil.ignore_patterns(".git", ".capacities-cache"))
+    shutil.copytree(src, root, ignore=shutil.ignore_patterns(".git", ".object-cache"))
     saved_env = {k: os.environ.get(k) for k in HOOKS}
     clock = tmp / "clock.txt"
     os.environ.update({

@@ -61,7 +61,7 @@ def test_trash_sidecars_moves_both(space: Space, wb_dir: Path) -> None:
     assert not (wb_dir / NETWORK_INK).exists()
     assert (wb_dir / NETWORK).is_file()  # the .md is the caller's
     folder = sidecar_trash_dir(space, TRASH_ID)
-    assert folder == wb_dir / ".capacities" / "trash" / "whiteboards" / TRASH_ID
+    assert folder == wb_dir / ".object" / "trash" / "whiteboards" / TRASH_ID
     assert (folder / "board.json").read_bytes() == board
     assert (folder / "ink.svg").read_bytes() == ink
     assert space.own_deletes[NETWORK_BOARD] == version_of(board)

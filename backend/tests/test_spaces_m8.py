@@ -31,8 +31,8 @@ def fake_trash(tmp_path: Path, monkeypatch) -> Path:
 
 def _space(tmp_path: Path, name: str) -> Path:
     root = tmp_path / name
-    (root / ".capacities").mkdir(parents=True)
-    (root / ".capacities" / "space.json").write_text(json.dumps({"name": name}), encoding="utf-8")
+    (root / ".object").mkdir(parents=True)
+    (root / ".object" / "space.json").write_text(json.dumps({"name": name}), encoding="utf-8")
     (root / "Pages").mkdir()
     (root / "Pages" / "Note.md").write_bytes(b"---\r\ntitle: Note\r\n---\r\nBody\r\n")
     return root
@@ -70,7 +70,7 @@ def test_delete_space_refuses_unregistered_or_plain_folder_404(
     plain = tmp_path / "plain"
     plain.mkdir()
     (plain / "keep.txt").write_text("x", encoding="utf-8")
-    Registry(state).register(plain, touch=False)  # registered, but no .capacities/
+    Registry(state).register(plain, touch=False)  # registered, but no .object/
     with _client(current) as client:
         for path, permanent in ((unregistered, False), (plain, False), (plain, True),
                                 (tmp_path / "nope", False), ("", False)):
@@ -205,14 +205,14 @@ def test_permanent_delete_os_failure_is_503(tmp_path: Path, state: Path, monkeyp
     assert other.is_dir()
 
 
-def test_permanent_recheck_refuses_folder_that_lost_capacities(
+def test_permanent_recheck_refuses_folder_that_lost_its_metadata(
     tmp_path: Path, state: Path, monkeypatch
 ):
     current = _space(tmp_path, "current")
     other = _space(tmp_path, "other")
     Registry(state).register(other, touch=False)
     monkeypatch.setattr(
-        spaces_mod, "_before_permanent_delete", lambda p: shutil.rmtree(p / ".capacities")
+        spaces_mod, "_before_permanent_delete", lambda p: shutil.rmtree(p / ".object")
     )
     with _client(current) as client:
         r = client.post("/api/spaces/delete", json={"path": str(other), "permanent": True})
@@ -251,7 +251,7 @@ def test_delete_route_writes_nothing_in_current_space(tmp_path: Path, state: Pat
         assert client.post("/api/spaces/delete", json={"path": str(other)}).status_code == 200
     after = {
         p.relative_to(current).as_posix(): (p.read_bytes(), os.stat(p).st_mtime_ns)
-        for p in current.rglob("*") if p.is_file() and ".capacities/types" not in p.as_posix()
+        for p in current.rglob("*") if p.is_file() and ".object/types" not in p.as_posix()
     }
     for rel, value in after.items():
         if rel in snapshot:

@@ -15,7 +15,7 @@ from harness import make_client  # noqa: E402
 
 BAD_PATHS = [
     "", " ", "\x00", "a\x00b.md", "..", "../x.md", "/etc/passwd", "C:\\x.md", "Pages",
-    "Pages/", "Pages/Alpha.md/x.md", "Pages/Alpha.md/", ".capacities/space.json",
+    "Pages/", "Pages/Alpha.md/x.md", "Pages/Alpha.md/", ".object/space.json",
     ".hidden/secret.md", "Pages/Alpha.md\x00", "x" * 5000 + ".md", "Pages/../Pages/Alpha.md",
     "Pages/Nope.md", "Attachments/cover.png", "Pages/Alpha.MD", "//Pages/Alpha.md",
     "\\\\server\\share\\x.md", "Pages/Alpha.md?x", "Pages/%41lpha.md", "Pages/Alpha.md#x",

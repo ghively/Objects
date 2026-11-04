@@ -1,5 +1,5 @@
 /**
- * The Version History dialog (M8 Task 5; `VersionHistory.*`). Mounted once in
+ * The Version History dialog (M8 Task 5). Mounted once in
  * `shell/GlobalOverlays.tsx`; the object's `…` menu ("Version History") calls
  * `useVersionHistory.open(path)`.
  *
@@ -37,7 +37,7 @@ import { formattingLocale } from '@/properties/format'
 import { useVersionHistory } from './useVersionHistory'
 import { blockCountLabel, propertyCountLabel, versionCounts, VersionPreview } from './VersionPreview'
 
-/** `VersionHistory.*` (en-US, verbatim) plus M5's conflict string. */
+/** The dialog's strings (en-US), plus M5's conflict string. */
 export const VERSION_HISTORY = {
   title: 'Version History',
   backToList: 'All versions',

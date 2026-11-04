@@ -13,7 +13,7 @@ import { edgeTypes } from './index'
 function Box() {
   return <div style={{ width: 100, height: 100 }} />
 }
-const boxTypes = { capacitiesBlock: Box, capacitiesShape: Box, capacitiesFrame: Box, capacitiesPoint: Box } as unknown as FlowNodeTypes
+const boxTypes = { boardBlock: Box, boardShape: Box, boardFrame: Box, boardPoint: Box } as unknown as FlowNodeTypes
 
 function withHandles(n: FlowNode): FlowNode {
   return {

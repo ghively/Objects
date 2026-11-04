@@ -190,7 +190,7 @@ def test_non_latin_collection_and_query_names_never_500(client: TestClient, m8_s
     assert query.status_code in (201, 422), query.text
     for r, folder in ((collection, "collections"), (query, "queries")):
         if r.status_code == 201:
-            file = m8_space_dir / ".capacities" / folder / f"{r.json()['id']}.json"
+            file = m8_space_dir / ".object" / folder / f"{r.json()['id']}.json"
             assert file.is_file() and file.read_text(encoding="utf-8").strip().startswith("{")
         else:
             assert "name" in r.json()["detail"]
@@ -316,5 +316,5 @@ def test_non_latin_collection_and_query_names_are_created(client: TestClient, m8
     collection = client.post("/api/collections", json={"name": name, "typeIds": ["page"]})
     query = client.post("/api/queries", json={"name": name, "definition": {}, "view": {}})
     assert (collection.status_code, query.status_code) == (201, 201)
-    assert (m8_space_dir / ".capacities" / "collections" / f"{collection.json()['id']}.json").is_file()
-    assert (m8_space_dir / ".capacities" / "queries" / f"{query.json()['id']}.json").is_file()
+    assert (m8_space_dir / ".object" / "collections" / f"{collection.json()['id']}.json").is_file()
+    assert (m8_space_dir / ".object" / "queries" / f"{query.json()['id']}.json").is_file()

@@ -201,7 +201,7 @@ def test_trash_type_failing_partway_leaves_a_restorable_entry(full_space_dir: Pa
     entries = [i for i in space.list_trash() if i.kind == "type"]
     assert [e.title for e in entries] == ["Task"]
     restored = space.restore(entries[0].id)
-    assert (full_space_dir / ".capacities" / "types" / f"{task.id}.json").is_file()
+    assert (full_space_dir / ".object" / "types" / f"{task.id}.json").is_file()
     for rel in templates:
         assert rel in restored["paths"]
         assert (full_space_dir / rel).is_file()
@@ -404,7 +404,7 @@ def test_registry_keeps_a_corrupt_file_before_saving(tmp_path: Path):
     corrupt = b'{"spaces": [{"path": "C:/my/space"}],,}'
     (state / "spaces.json").write_bytes(corrupt)
     root = tmp_path / "s"
-    (root / ".capacities").mkdir(parents=True)
+    (root / ".object").mkdir(parents=True)
     reg = Registry(state)
     reg.register(root)
     reg.register(root)  # a second save keeps the one copy
@@ -449,7 +449,7 @@ def test_spaceconfig_patch_does_not_overwrite_an_external_edit(space_dir: Path, 
     from objectapp.typemodel import RevisionConflict
 
     _data, revision = spaceconfig.patch(space_dir, {"name": "One"}, None)
-    path = space_dir / ".capacities" / "space.json"
+    path = space_dir / ".object" / "space.json"
     external = b'{"name": "Edited elsewhere"}\n'
     _edit_during_write(monkeypatch, spaceconfig, path, external)
     with pytest.raises(RevisionConflict):

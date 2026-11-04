@@ -1,5 +1,5 @@
 /**
- * The side panel's backlinks entry (`RenderSidepanel.backlinks.tooltip`: "Backlinks & Mentions.
+ * The side panel's backlinks entry ("Backlinks & Mentions.
  * Shows the backlinks and mentions of the object in the main window."). `path` is the object the
  * tab's main view shows, so the entry follows the tab as it navigates; with no object there, or one
  * whose type has no references section, it says "Backlinks not available". Backlinks render with

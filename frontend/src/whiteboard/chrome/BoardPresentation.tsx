@@ -1,8 +1,8 @@
 /**
  * The board presentation (M8): "Play" presents the board frame by frame in reading order (else
  * top-to-bottom, left-to-right; `presentationSlides`), fitting each frame in the view, with
- * "Previous page" / "Next page" (`Whiteboard.control.pagePrev/pageNext`) and "Exit presentation"
- * (`FloatingToolbox.presentation.exit`). ArrowRight / ArrowLeft step (also PageDown / PageUp,
+ * "Previous page" / "Next page" and "Exit presentation".
+ * ArrowRight / ArrowLeft step (also PageDown / PageUp,
  * our choice) and Escape exits. A board without frames is one slide of everything (our choice).
  * The control bar sits bottom centre in place of the toolbox (our choice).
  */

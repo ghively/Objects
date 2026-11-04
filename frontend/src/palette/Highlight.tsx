@@ -68,7 +68,7 @@ export function splitTitle(title: string, matches: readonly (readonly [number, n
   return out
 }
 
-/** A result title with the query's matches highlighted, in the 600-weight variant Capacities'
+/** A result title with the query's matches highlighted, in the 600-weight variant the
  * command palette uses for titles (`search-highlights search-highlights-bold`). */
 export function MatchedTitle({ title, matches }: { title: string; matches: readonly (readonly [number, number])[] }) {
   return (

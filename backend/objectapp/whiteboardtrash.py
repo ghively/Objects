@@ -5,7 +5,7 @@ and ``<stem>.ink.svg`` (`whiteboardfile.sidecar_rels`). These functions move the
 with the object; `Space` calls them from its delete, restore, purge and rename paths
 (wired in by the integrate task), so none of them touches the ``.md`` itself.
 
-- **Trash:** ``.capacities/trash/whiteboards/<trash_id>/`` holds ``board.json`` and
+- **Trash:** ``.object/trash/whiteboards/<trash_id>/`` holds ``board.json`` and
   ``ink.svg``, bytes unchanged. `trash.Trash` only lists top-level ``*.json`` and its
   ``types/``, ``collections/`` and ``queries/`` folders, so this folder is never taken for
   an entry.
@@ -83,7 +83,7 @@ def _version(path: Path) -> str:
 
 
 def sidecar_trash_dir(space: Space, trash_id: str) -> Path:
-    """``.capacities/trash/whiteboards/<trash_id>/``; `ValueError` for an unsafe id."""
+    """``.object/trash/whiteboards/<trash_id>/``; `ValueError` for an unsafe id."""
     if not Trash._safe_id(trash_id):
         raise ValueError(f"not a trash id: {trash_id!r}")
     return space.trash.dir / "whiteboards" / trash_id

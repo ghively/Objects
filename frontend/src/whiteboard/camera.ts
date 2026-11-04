@@ -1,5 +1,5 @@
 /**
- * Camera maths: wheel zoom and pan, fit to boxes, and zoom steps through the reference presets
+ * Camera maths: wheel zoom and pan, fit to boxes, and zoom steps through the presets
  * (`WHITEBOARD_ZOOM_LEVELS`) within `WHITEBOARD_ZOOM_MIN`/`MAX`.
  */
 import { ZOOM_MAX, ZOOM_MIN, ZOOM_PRESETS, type Box } from './model'

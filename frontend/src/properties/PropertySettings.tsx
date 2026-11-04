@@ -24,7 +24,7 @@ import {
   updateProperty,
 } from './typeEdits'
 
-// Capacities' PropertySettings texts.
+// The property settings texts.
 const TEXT = {
   heading: 'Property settings',
   explanation: 'Edit name, description, and customize this property.',
@@ -53,7 +53,7 @@ const TEXT = {
   rangePreferenceDescription: 'Choose if you want your date to be initialized as a range.',
   defaultDescription: 'Choose a default start date for the date and time picker.',
   descriptionPlaceholder: 'Give others an idea of what this property means',
-  // Our strings: the reference's `hideCalendarEvents` flag has no property-settings label.
+  // Our strings: the `hideCalendarEvents` flag has no other property-settings label.
   /** Our string (M8): the switch that sets `options.constraints.supportsReminders`. */
   reminders: 'Reminders',
   /** Our string. */

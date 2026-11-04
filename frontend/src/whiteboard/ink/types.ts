@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { MdStamp } from '@/api/whiteboardTypes'
 
-/** The ink tools (Gene's addition; no Capacities original). `select` picks, moves and scales strokes (M8). */
+/** The ink tools (Gene's addition). `select` picks, moves and scales strokes (M8). */
 export type InkTool = 'pen' | 'highlighter' | 'eraser' | 'select'
 
 /** The eraser's modes: whole strokes (M6) or cutting strokes where it passes (M8; our choice of default `stroke`). */

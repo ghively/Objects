@@ -82,7 +82,7 @@ describe('ObjectView … menu (M9)', () => {
     const at = (s: string) => n.findIndex((x) => x === s || x.startsWith(s + 'Ctrl'))
     expect(at('Text Stats')).toBe(at('Version History') + 1)
     expect(at('Export')).toBe(at('Present') + 1)
-    // Capacities' sections: present, export … then version history, text stats (Gene, 2026-10-29).
+    // The sections: present, export … then version history, text stats (Gene, 2026-10-29).
     expect(at('Export')).toBeLessThan(at('Version History'))
     expect(at('Duplicate')).toBe(at('Merge into object') - 1)
   })

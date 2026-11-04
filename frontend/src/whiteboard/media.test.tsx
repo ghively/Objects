@@ -308,7 +308,7 @@ describe('whiteboard media and web-link nodes', () => {
     }
     const flow = toFlow(b)
     const fm = flow.nodes.find((n) => n.id === 'm')!
-    expect(fm.type).toBe('capacitiesBlock')
+    expect(fm.type).toBe('boardBlock')
     expect(fm.data.block).toEqual({ type: 'media', path: 'Attachments/diagram.png', caption: 'kept' })
     expect(fm.data.node).toBe(b.nodes.m)
     expect(fm).toMatchObject({ width: 420, height: 300 })

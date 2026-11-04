@@ -12,7 +12,7 @@ describe('KIND_META', () => {
     }
   })
 
-  it('test labels and icons follow Capacities', () => {
+  it('test labels and icons are the expected ones', () => {
     expect(KIND_META.datetime.name).toBe('Date time')
     expect(KIND_META.datetimeSimple.name).toBe('Date time')
     expect(KIND_META.boolean).toEqual({ name: 'Checkbox', description: 'True or false value', icon: 'ph-check-square' })
@@ -63,7 +63,7 @@ describe('ADD_PROPERTY_ITEMS', () => {
     expect(objectSelect?.description).toBe('Link to objects of a specific type.')
     const cover = ADD_PROPERTY_ITEMS.find((i) => i.action === 'coverImage')
     expect(cover?.description).toBe('A single select image property.')
-    // Kinds Capacities never offers here.
+    // Kinds never offered here.
     for (const t of ['text', 'url', 'simpleTableBlock', 'datetimeSimple'] as const) {
       expect(ADD_PROPERTY_ITEMS.some((i) => i.type === t)).toBe(false)
     }

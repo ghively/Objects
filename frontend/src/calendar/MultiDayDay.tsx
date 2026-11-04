@@ -1,5 +1,5 @@
 // One day of the multi-day views (Week, Three days): the small day header over the day's daily
-// note slot. For an existing note the header's date row ends in a pill (as in Capacities): the
+// note slot. For an existing note the header's date row ends in a pill: the
 // Reviewed flag, an expand button that opens the note as a page, and the note's own `…` menu.
 import { useState } from 'react'
 import { Icon } from '@/components/Icon'
@@ -9,7 +9,6 @@ import { DayHeader, ReviewedButton } from './DayHeader'
 import type { Day, WeekStart } from './dates'
 
 export const MULTI_DAY_TEXT = {
-  /** `components.RootDailyNote.openAsPage` */
   openAsPage: 'Open as Page',
 }
 

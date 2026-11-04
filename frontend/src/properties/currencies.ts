@@ -1,4 +1,4 @@
-// Currencies for the number format's currency menu, in Capacities' menu order
+// Currencies for the number format's currency menu, in menu order
 // (EUR, USD, GBP, CNY, JPY, …), each code once. Names are the English labels; the symbol is
 // prepended to the formatted number (`€1,234.50`).
 

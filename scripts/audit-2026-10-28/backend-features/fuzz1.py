@@ -8,7 +8,7 @@ def show(m, url, **kw):
     if r.status_code >= 500: print("500!!", m, url[:60], repr(kw)[:120])
     return r
 v = c.get("/api/object", params={"path":"Tasks/Write docs.md"}).json()["version"]
-weird = ["", "..", "../x.md", "/etc/passwd", "C:\\x.md", "a\x00b.md", "Tasks", "Tasks/", ".capacities/types/task.json", "Tasks/Write docs.md/..", "%2e%2e/x", "\\\\server\\share\\x.md", "Tasks/./Write docs.md", "Tasks//Write docs.md", "TASKS/write docs.md", "x"*5000+".md"]
+weird = ["", "..", "../x.md", "/etc/passwd", "C:\\x.md", "a\x00b.md", "Tasks", "Tasks/", ".object/types/task.json", "Tasks/Write docs.md/..", "%2e%2e/x", "\\\\server\\share\\x.md", "Tasks/./Write docs.md", "Tasks//Write docs.md", "TASKS/write docs.md", "x"*5000+".md"]
 for p in weird:
     show("GET","/api/object",params={"path":p})
     show("PUT","/api/object/body",json={"path":p,"body":"x","baseVersion":"0"})

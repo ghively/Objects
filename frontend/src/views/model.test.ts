@@ -13,7 +13,7 @@ import {
 } from './model'
 
 describe('view model', () => {
-  test('LAYOUTS labels and icons match reference', () => {
+  test('LAYOUTS labels and icons', () => {
     expect(LAYOUTS.grid.label).toBe('Gallery')
     expect(LAYOUTS.grid.icon).toBe('ph-grid-four')
     expect(LAYOUTS.wall.icon).toBe('ph-wall')

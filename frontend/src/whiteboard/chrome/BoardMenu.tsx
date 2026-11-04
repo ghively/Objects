@@ -1,8 +1,7 @@
 /**
  * The board's "…" menu beside its title: "Open as page" (in the peek; our string, as the page's
- * own button), "Export as PNG" and, with a selection, "Export selection as PNG" (M8; our labels,
- * adapted from `entity.settings.export.errors.whiteboardClosed`), "Clear Whiteboard" (confirmed
- * by `ClearBoardDialog`), "Version History" (M8, `EntityMenu.versionHistory.text`; the board's
+ * own button), "Export as PNG" and, with a selection, "Export selection as PNG" (M8; our labels), "Clear Whiteboard" (confirmed
+ * by `ClearBoardDialog`), "Version History" (M8; the board's
  * snapshots, restorable from the dialog) and "Delete" (the page wires it to `host.requestDelete`, which opens
  * M1's delete dialog). Export works on a locked or read-only board too.
  */
@@ -15,7 +14,7 @@ import { MenuRow, MenuSeparator, PopoverMenu } from './controls'
 
 /** Our string (the same text as the page's expand button). */
 export const OPEN_AS_PAGE = 'Open as page'
-/** Our label (Capacities: "Open the whiteboard to export it as a PNG."). */
+/** Our label. */
 export const EXPORT_AS_PNG = 'Export as PNG'
 /** Our label. */
 export const EXPORT_SELECTION_AS_PNG = 'Export selection as PNG'

@@ -57,11 +57,11 @@ def test_file_with_nul_is_refused_where_the_os_raises(client: TestClient, monkey
 @pytest.mark.parametrize("defs",[1, 0, False, "x", "", {"a": 1}, True, 1.5])
 def test_type_save_refuses_non_list_property_definitions(client: TestClient, m8_space_dir: Path, defs: object):
     task = next(t for t in client.get("/api/space").json()["types"] if t["id"] == "task")
-    before = (m8_space_dir / ".capacities" / "types" / "task.json").read_bytes()
+    before = (m8_space_dir / ".object" / "types" / "task.json").read_bytes()
     res = client.put(
         "/api/types/task",
         json={"type": {"name": "N", "pluralName": "Ns", "propertyDefinitions": defs},
               "baseRevision": task["revision"]},
     )
     assert res.status_code == 422, res.text[:200]
-    assert (m8_space_dir / ".capacities" / "types" / "task.json").read_bytes() == before
+    assert (m8_space_dir / ".object" / "types" / "task.json").read_bytes() == before

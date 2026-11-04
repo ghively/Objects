@@ -36,8 +36,8 @@ def _folder(tmp_path: Path, name: str, space_name: str | None = None) -> Path:
     root = tmp_path / name
     root.mkdir()
     if space_name is not None:
-        (root / ".capacities").mkdir()
-        (root / ".capacities" / "space.json").write_text(
+        (root / ".object").mkdir()
+        (root / ".object" / "space.json").write_text(
             json.dumps({"name": space_name, "icon": "ph-star"}), encoding="utf-8"
         )
     return root
@@ -76,7 +76,7 @@ def test_registry_register_list_remove(tmp_path: Path, state: Path):
     reg.remove(a)
     assert [e.path for e in reg.list()] == [str(b.resolve())]
     assert reg.last_opened() is None
-    assert a.is_dir() and (a / ".capacities" / "space.json").is_file()
+    assert a.is_dir() and (a / ".object" / "space.json").is_file()
 
 
 def test_registry_missing_folder_flagged(tmp_path: Path, state: Path):
@@ -115,11 +115,11 @@ def test_create_space_writes_only_space_json(tmp_path: Path, state: Path):
     path = create_space("  Field notes: 2026 ", loc)
     assert path == loc.resolve() / "Field notes"
     assert _tree(loc) == {
-        "Field notes/.capacities/space.json": hashlib.sha256(
+        "Field notes/.object/space.json": hashlib.sha256(
             (json.dumps({"name": "Field notes: 2026"}, indent=2) + "\n").encode()
         ).hexdigest()
     }
-    assert [p.name for p in path.iterdir()] == [".capacities"]
+    assert [p.name for p in path.iterdir()] == [".object"]
 
     cur = _folder(tmp_path, "current")
     client = _client(cur)
@@ -127,7 +127,7 @@ def test_create_space_writes_only_space_json(tmp_path: Path, state: Path):
     assert resp.status_code == 201
     created = Path(resp.json()["path"])
     assert created == loc.resolve() / "Second"
-    assert _tree(created).keys() == {".capacities/space.json"}
+    assert _tree(created).keys() == {".object/space.json"}
     listed = client.get("/api/spaces").json()["spaces"]
     assert str(created) in [s["path"] for s in listed]
     assert next(s for s in listed if s["path"] == str(created))["name"] == "Second"
@@ -146,7 +146,7 @@ def test_create_space_refuses_existing_folder(tmp_path: Path, state: Path):
     )
     assert resp.status_code == 409
     assert _tree(loc) == before
-    assert not (existing / ".capacities").exists()
+    assert not (existing / ".object").exists()
 
 
 def test_create_space_bad_location_404_bad_name_422(tmp_path: Path, state: Path):

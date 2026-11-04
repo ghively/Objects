@@ -1,13 +1,12 @@
 /**
- * "Highlight text" (`tokensMenu.color.name`): the tokens menu's colour panel,
- * two sections of the 18 theme colours, "Text color" (`tokensMenu.color.title`)
- * and "Background color" (`tokensMenu.color.background`), each led by
- * "No color" (`tokensMenu.color.without`), which removes that kind's mark.
+ * "Highlight text": the tokens menu's colour panel,
+ * two sections of the 18 theme colours, "Text color"
+ * and "Background color", each led by
+ * "No color", which removes that kind's mark.
  *
  * A text colour is the `textColor` mark (`<span data-color="text-<c>">`), a
  * background colour the `highlight` mark (`<mark data-color="bg-<c>">`). The
- * swatch names are Capacities' `colorThemes.theme-text-<c>` /
- * `colorThemes.theme-bg-<c>` ("Blue text", "Blue background"). A chosen colour
+ * swatch names are like "Blue text" and "Blue background". A chosen colour
  * becomes the highlight shortcut's last-used colour (`textHighlightColorLastUsed`).
  */
 import type { Editor } from '@tiptap/core'
@@ -17,10 +16,10 @@ import { bgColorToken, bgTextToken, colorMenuName, textColorToken, type ColorKin
 import { setLastUsedHighlightColor } from '../nodes/textStyle'
 
 export const COLOR_MENU_TEXT = {
-  title: 'Highlight text', // tokensMenu.color.name
-  text: 'Text color', // tokensMenu.color.title
-  background: 'Background color', // tokensMenu.color.background
-  without: 'No color', // tokensMenu.color.without
+  title: 'Highlight text',
+  text: 'Text color',
+  background: 'Background color',
+  without: 'No color',
 }
 
 /** Colour the selected text, or with `null` remove its text colour. A colour becomes the last-used one. */

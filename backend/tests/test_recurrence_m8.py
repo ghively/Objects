@@ -190,8 +190,8 @@ def test_weekly_on_list_respects_week_start():
 
 
 def test_week_start_of_reads_ui_json(tmp_path):
-    assert week_start_of(tmp_path) == "monday"  # no .capacities at all
-    cap = tmp_path / ".capacities"
+    assert week_start_of(tmp_path) == "monday"  # no .object at all
+    cap = tmp_path / ".object"
     cap.mkdir()
     ui = cap / "ui.json"
     ui.write_text('{"calendar": {"weekStart": "sunday"}}', encoding="utf-8")

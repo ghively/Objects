@@ -1,6 +1,6 @@
 // The Calendar page: the chrome over the view chosen in `useCalendar`, and in the Day view the
 // calendar sidebar (the mini month) at its right edge, open unless `ui.calendar.hideCalendarSidebar`.
-// The other views (Month, Week, Three days) have no sidebar, as in Capacities.
+// The other views (Month, Week, Three days) have no sidebar.
 import type { Target } from '@/nav/tabs'
 import { CalendarChrome } from './CalendarChrome'
 import { CalendarSidePanel } from './CalendarSidePanel'

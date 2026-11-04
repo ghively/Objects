@@ -147,13 +147,13 @@ def test_m8_space_opens_without_writing(m8_space_dir: Path):
     Space(m8_space_dir)
     Space(m8_space_dir)
     assert _snapshot(m8_space_dir) == before
-    assert not (m8_space_dir / ".capacities" / "space.json").exists()
-    assert not (m8_space_dir / ".capacities" / "ui.json").exists()
+    assert not (m8_space_dir / ".object" / "space.json").exists()
+    assert not (m8_space_dir / ".object" / "ui.json").exists()
 
 
 def test_expected_inventory(m8_space_dir: Path):
     root = m8_space_dir
-    caps = root / ".capacities"
+    caps = root / ".object"
     assert {p.name for p in caps.iterdir()} == {"types", "collections", "queries"}
     assert {p.stem for p in (caps / "types").glob("*.json")} == {
         "page", "task", "person", "tag", "dailynote", "whiteboard",

@@ -1,5 +1,5 @@
 /**
- * The canvas display settings (`ui.json` key `whiteboard`, Capacities' user-level names), with
+ * The canvas display settings (`ui.json` key `whiteboard`), with
  * the defaults filled in. Reading writes nothing; `set` writes once per toggle, through the one
  * `ui.json` save queue (`enqueueUiSave`, as the sidebar, the calendar and the graph), so it sends
  * the revision the save before it returned and no concurrent sidebar save meets a 409; on a 409

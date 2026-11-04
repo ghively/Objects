@@ -19,7 +19,7 @@ same data type          15
 
 Title, icon, description, tags, aliases and the timestamps always carry over,
 so they are never rows. The user's last mapping for a pair of types is kept in
-``.capacities/ui.json`` under ``changeTypePreferences`` and suggested next time.
+``.object/ui.json`` under ``changeTypePreferences`` and suggested next time.
 The write itself is `Space.change_type`.
 """
 

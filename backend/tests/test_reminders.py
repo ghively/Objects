@@ -336,14 +336,14 @@ def test_firing_writes_only_ledger(calendar_space_dir: Path):
     notifier = FakeNotifier()
     _scheduler(_space(calendar_space_dir, DENTIST_TRIGGER + timedelta(seconds=10)), notifier).tick()
     assert len(notifier.sent) == 1
-    assert _tree(calendar_space_dir) == before  # no object, .capacities/, cache or .gitignore change
+    assert _tree(calendar_space_dir) == before  # no object, .object/, cache or .gitignore change
     ledger = ledger_path_for(calendar_space_dir)
     assert [p for p in _state().rglob("*") if p.is_file()] == [ledger]
     assert calendar_space_dir.resolve() not in ledger.resolve().parents
 
 
 def test_disabled_by_ui_flag(calendar_space_dir: Path):
-    (calendar_space_dir / ".capacities" / "ui.json").write_text(
+    (calendar_space_dir / ".object" / "ui.json").write_text(
         json.dumps({"reminders": {"enabled": False}}), encoding="utf-8"
     )
     notifier = FakeNotifier()
@@ -351,7 +351,7 @@ def test_disabled_by_ui_flag(calendar_space_dir: Path):
     sched.tick()
     assert notifier.sent == []
     assert not ledger_path_for(calendar_space_dir).exists()
-    (calendar_space_dir / ".capacities" / "ui.json").write_text(
+    (calendar_space_dir / ".object" / "ui.json").write_text(
         json.dumps({"reminders": {"enabled": True}}), encoding="utf-8"
     )
     sched.tick(DENTIST_TRIGGER + timedelta(seconds=40))  # the trigger passed while switched off

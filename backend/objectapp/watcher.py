@@ -7,7 +7,7 @@ is put on `SpaceWatcher.events` (an asyncio queue on the given loop); a batch of
 more than `RESYNC_AFTER` object events (a ``git checkout``) is sent as one resync
 (``types`` at ``*``) instead. Nothing is emitted for:
 
-- dot-folders (``.capacities``, ``.capacities-cache``, ``.git``…), dot-files and
+- dot-folders (``.object``, ``.object-cache``, ``.git``…), dot-files and
   non-``.md`` files;
 - writes the app makes itself (`Space._write` and the definition stores record them in
   ``own_writes``)
@@ -15,8 +15,8 @@ more than `RESYNC_AFTER` object events (a ``git checkout``) is sent as one resyn
   itself, tagged with the saving client's id;
 - events that leave the file bytes as the space already knows them.
 
-The JSON definitions ``.capacities/{collections,queries,views}/<id>.json`` and
-``.capacities/ui.json`` are watched too (kinds ``collections``, ``queries``, ``views``,
+The JSON definitions ``.object/{collections,queries,views}/<id>.json`` and
+``.object/ui.json`` are watched too (kinds ``collections``, ``queries``, ``views``,
 ``ui``); every other file under a dot-folder stays ignored.
 
 A whiteboard's sidecars (``<stem>.whiteboard.json``, ``<stem>.ink.svg``, M6) are watched as
@@ -209,12 +209,12 @@ class SpaceWatcher:
         return rel.as_posix()
 
     def _definition_rel(self, path: str) -> str | None:
-        """The space-relative path when `path` is a watched ``.capacities`` JSON definition."""
+        """The space-relative path when `path` is a watched ``.object`` JSON definition."""
         rel = self._space_rel(path)
         if rel is None:
             return None
         parts = rel.parts
-        if rel.suffix != ".json" or parts[0] != ".capacities":
+        if rel.suffix != ".json" or parts[0] != ".object":
             return None
         if len(parts) == 2 and parts[1] == "ui.json":
             return rel.as_posix()
@@ -236,7 +236,7 @@ class SpaceWatcher:
             return path
         if not rel.parts:
             return None
-        if rel.parts[0] == ".capacities":
+        if rel.parts[0] == ".object":
             return rel.as_posix() if rel.suffix == ".json" else None
         if is_ignored(rel) or rel.name.startswith("."):
             return None
@@ -394,7 +394,7 @@ class SpaceWatcher:
         return ChangeEvent(kind="whiteboard", path=owner, version=version)
 
     def _refresh(self, rel: str) -> ChangeEvent | None:
-        if rel.startswith(".capacities/"):
+        if rel.startswith(".object/"):
             return self._refresh_definition(rel)
         owner = sidecar_owner(rel)
         if owner is not None:

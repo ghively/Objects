@@ -1,4 +1,4 @@
-"""The FTS5 search index in `.capacities-cache/` (M5 Task 3)."""
+"""The FTS5 search index in `.object-cache/` (M5 Task 3)."""
 
 from __future__ import annotations
 
@@ -346,7 +346,7 @@ def test_index_writes_only_cache_dir(links_space_dir: Path, monkeypatch):
     monkeypatch.delenv("OBJECT_CACHE_DIR", raising=False)
     before = _snapshot(links_space_dir)
     space = Space(links_space_dir)
-    assert cache_dir_for(space) == links_space_dir / ".capacities-cache"
+    assert cache_dir_for(space) == links_space_dir / ".object-cache"
     _space, idx = _start(links_space_dir, None, space)
     assert idx.in_memory is False
     assert ADA in _paths(idx.search("Ada"))
@@ -355,11 +355,11 @@ def test_index_writes_only_cache_dir(links_space_dir: Path, monkeypatch):
     new = set(after) - set(before)
     # Since the 2026-11-01 audit the scan also writes the parsed-frontmatter cache there.
     assert new == {
-        ".capacities-cache/search.sqlite",
-        ".capacities-cache/.gitignore",
-        ".capacities-cache/frontmatter.json",
+        ".object-cache/search.sqlite",
+        ".object-cache/.gitignore",
+        ".object-cache/frontmatter.json",
     }
-    assert after[".capacities-cache/.gitignore"] == b"*\n"
+    assert after[".object-cache/.gitignore"] == b"*\n"
     assert {k: v for k, v in after.items() if k in before} == before
 
 
@@ -367,7 +367,7 @@ def test_index_keeps_foreign_cache_files(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("OBJECT_CACHE_DIR", raising=False)
     root = tmp_path / "space"
     shutil.copytree(FIXTURES / "space-v1", root)
-    ignored = root / ".capacities-cache" / "ignored.md"
+    ignored = root / ".object-cache" / "ignored.md"
     data = ignored.read_bytes()
     stat = ignored.stat()
     space = Space(root)  # space-v1 migrates its v1 types on the first open
@@ -379,10 +379,10 @@ def test_index_keeps_foreign_cache_files(tmp_path: Path, monkeypatch):
     assert ignored.stat().st_mtime_ns == stat.st_mtime_ns
     after = _snapshot(root)
     # The opening scan already wrote the cache's `.gitignore` (with the frontmatter cache).
-    assert before[".capacities-cache/.gitignore"] == b"*\n"
-    assert set(after) - set(before) == {".capacities-cache/search.sqlite"}
+    assert before[".object-cache/.gitignore"] == b"*\n"
+    assert set(after) - set(before) == {".object-cache/search.sqlite"}
     assert {k: v for k, v in after.items() if k in before} == before
-    assert not any(p.startswith(".capacities-cache") for p in Space(root)._raw)
+    assert not any(p.startswith(".object-cache") for p in Space(root)._raw)
 
 
 @pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
@@ -417,7 +417,7 @@ def test_cache_gitignore_hides_everything(links_space_dir: Path, monkeypatch):
     _space, idx = _start(root, None)
     idx.search("Ada")
     idx.stop()
-    assert (root / ".capacities-cache" / "search.sqlite").exists()
+    assert (root / ".object-cache" / "search.sqlite").exists()
     assert git("status", "--porcelain", "-uall") == ""
 
 
@@ -432,7 +432,7 @@ def test_cache_dir_env_override(links_space_dir: Path, tmp_path: Path, monkeypat
     idx.search("Ada")
     idx.stop()
     assert (override / digest / "search.sqlite").is_file()
-    assert not (links_space_dir / ".capacities-cache").exists()
+    assert not (links_space_dir / ".object-cache").exists()
     assert _snapshot(links_space_dir) == before
 
 

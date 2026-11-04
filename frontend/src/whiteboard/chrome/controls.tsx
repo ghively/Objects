@@ -1,7 +1,7 @@
 /**
  * Small building blocks the whiteboard chrome shares: an icon button, a button that opens a
  * popover menu, a menu row, a group heading and the shape icons. Tooltips are the native
- * `title` (as elsewhere in the app); the accessible name is the Capacities label.
+ * `title` (as elsewhere in the app); the accessible name is the label.
  */
 import { forwardRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import type { WhiteboardShapeMenuTool, WhiteboardTool } from '@/api/whiteboardTypes'
@@ -19,7 +19,7 @@ function keyOf(id: string): string {
   return k ? formatKeys(k) : ''
 }
 
-/** The canvas shortcut keys (Capacities', from `lib/shortcuts.ts`), shown in tooltips next to Capacities' names. */
+/** The canvas shortcut keys (from `lib/shortcuts.ts`), shown in tooltips next to the tool names. */
 export const KEY_HINT = {
   select: keyOf('whiteboardSelect'),
   hand: keyOf('whiteboardHand'),

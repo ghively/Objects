@@ -38,7 +38,7 @@ def test_every_md_has_frontmatter_and_unique_paths(calendar_space_dir: Path):
         assert isinstance(fm.get("type"), str) and fm["type"], p
         assert fm.get("title") not in (None, ""), p
     # ui.json is absent: defaults read as {}.
-    assert not (calendar_space_dir / ".capacities" / "ui.json").exists()
+    assert not (calendar_space_dir / ".object" / "ui.json").exists()
 
 
 def test_space_opens_without_writing(calendar_space_dir: Path):
@@ -49,7 +49,7 @@ def test_space_opens_without_writing(calendar_space_dir: Path):
 
 
 def test_type_files(calendar_space_dir: Path):
-    types_dir = calendar_space_dir / ".capacities" / "types"
+    types_dir = calendar_space_dir / ".object" / "types"
     names = {p.stem for p in types_dir.glob("*.json")}
     assert names == {"task", "dailynote", "page", "meeting", "person", "tag", "event"}
 

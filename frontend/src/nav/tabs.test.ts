@@ -64,7 +64,7 @@ describe('useTabs', () => {
     expect(currentTarget(s())).toEqual(typeT('task'))
   })
 
-  test('closing the active tab activates the most recently opened tab, not a neighbour (reference)', () => {
+  test('closing the active tab activates the most recently opened tab, not a neighbour', () => {
     const s = useTabs.getState
     s().open(typeT('a'))
     s().open(typeT('b'), { newTab: true })
@@ -79,7 +79,7 @@ describe('useTabs', () => {
     expect(s().activeId).toBe(a)
   })
 
-  test('a pinned tab is never closed, by any path (reference)', () => {
+  test('a pinned tab is never closed, by any path', () => {
     const s = useTabs.getState
     s().open(typeT('a'))
     s().open(typeT('b'), { newTab: true })

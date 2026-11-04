@@ -1,5 +1,5 @@
-/* Math block (Task 9). Capacities' `.MathBlock.block-outer` (margin-block 1.5px,
-   padding-block 2px) and `.MathBlock>.block-middle` (radius-base). */
+/* Math block (Task 9): margin-block 1.5px, padding-block 2px, and the
+   formula area at radius-base. */
 .object-editor .math-block {
   position: relative;
   margin-block: 1.5px;

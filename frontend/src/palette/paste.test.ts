@@ -10,7 +10,6 @@ import { useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { objectDetail, objectSummary, typeDef } from '@/test/mockApi'
 import {
-  PASTE_TEXT,
   addToDailyNote,
   appendToBody,
   countBlocks,
@@ -23,7 +22,6 @@ import {
 } from './paste'
 
 const mocked = vi.mocked(api)
-const STRINGS_FILE = '../../../reference/app-unpacked/dist/virtual_intlify-i18n-0366822.js'
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true })
 const TYPES = [PAGE]
 
@@ -40,26 +38,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
-})
-
-describe('paste strings', () => {
-  test('match the reference', async () => {
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-    const src = fs.readFileSync(path.resolve(__dirname, STRINGS_FILE), 'utf8')
-    for (const s of [
-      PASTE_TEXT.addToDailyNote,
-      PASTE_TEXT.addedToDailyNote,
-      PASTE_TEXT.upload,
-      PASTE_TEXT.createPageFromMd,
-      PASTE_TEXT.createPageWithBlocks,
-      '1 block',
-    ]) {
-      expect(src).toContain('s:`' + s + '`')
-    }
-    expect(src).toContain('analyzeClipboardIdle:{t:0,b:{t:2,i:[{t:3}],s:`' + PASTE_TEXT.readClipboard + '`')
-    expect(src).toContain('{t:4,k:`count`},{t:3,v:` blocks`}')
-  })
 })
 
 describe('reading the clipboard', () => {

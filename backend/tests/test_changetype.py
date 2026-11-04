@@ -48,7 +48,7 @@ def _type(type_id: str, name: str, props: list[tuple[str, str, str]]) -> TypeDef
 
 def _add_type(space_dir: Path, type_id: str, name: str, props: list[tuple[str, str, str]]) -> None:
     """Store a custom type's JSON before the space opens."""
-    folder = space_dir / ".capacities" / "types"
+    folder = space_dir / ".object" / "types"
     folder.mkdir(parents=True, exist_ok=True)
     data = _type(type_id, name, props).to_json()
     (folder / f"{type_id}.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -199,7 +199,7 @@ def test_change_type_converts_text_to_label_and_flags_lossy(space_dir: Path):
     widget = space.type_by_id("widget")
     texts = [o["text"] for o in widget.prop("kind").options["set"]]
     assert texts == ["Sprocket"]
-    stored = json.loads((space_dir / ".capacities" / "types" / "widget.json").read_text("utf-8"))
+    stored = json.loads((space_dir / ".object" / "types" / "widget.json").read_text("utf-8"))
     kind = next(p for p in stored["propertyDefinitions"] if p["key"] == "kind")
     assert [o["text"] for o in kind["options"]["set"]] == ["Sprocket"]
 
@@ -254,7 +254,7 @@ def test_links_resolve_after_move(space_dir: Path):
 
 def test_preference_remembered_in_ui_json(space_dir: Path):
     _add_type(space_dir, "contact", "Contact", [("homepage", "Homepage", "url"), ("site", "Site", "url")])
-    ui = space_dir / ".capacities" / "ui.json"
+    ui = space_dir / ".object" / "ui.json"
     ui.write_text(json.dumps({"foo": 1}), encoding="utf-8")
     space = Space(space_dir)
     client = TestClient(create_app(space, watch=False))
@@ -287,8 +287,8 @@ def test_preference_remembered_in_ui_json(space_dir: Path):
 
 
 def test_save_preference_keeps_other_keys(tmp_path: Path):
-    (tmp_path / ".capacities").mkdir()
-    (tmp_path / ".capacities" / "ui.json").write_text('{"a": [1], "changeTypePreferences": {"x": {"y": {}}}}')
+    (tmp_path / ".object").mkdir()
+    (tmp_path / ".object" / "ui.json").write_text('{"a": [1], "changeTypePreferences": {"x": {"y": {}}}}')
     save_change_type_preference(tmp_path, "p", "q", [MappingRow("k", "v", False)])
     data = load_ui(tmp_path)
     assert data["a"] == [1]

@@ -1,9 +1,9 @@
 /**
- * The columns block's node view (Capacities' `GridBlock`, "Two Columns"):
+ * The columns block's node view ("Two Columns"):
  * - a CSS grid with one track per column at its `widths` (even when absent);
  * - a `Divider` between columns that drags and writes `widths` on release;
- * - on hover, "Column layout" (`styles.gridLayout.heading`) with "Columns" and
- *   "Grid" (`styles.gridLayout.columns`, `.grid`; Grid writes `layout=grid`
+ * - on hover, "Column layout" with "Columns" and
+ *   "Grid" (Grid writes `layout=grid`
  *   and wraps the columns into a responsive grid, without dividers), and
  *   "Add column" / "Remove column" (our strings), between 1 and 6 columns,
  *   redistributing widths evenly;
@@ -24,7 +24,7 @@ import type { Option } from '../annotations'
 import { renderOptions } from '../nodes/blockOptions'
 import { Divider, MAX_COLUMNS, evenWidths, parseWidths } from './Divider'
 
-/** The gap between columns, in pixels (our value; the reference CSS has no grid-block gap). */
+/** The gap between columns, in pixels (our value). */
 export const COLUMN_GAP = 24
 
 /** `color: var(--x); background-color: var(--y);` -> a React style object. */

@@ -1,6 +1,6 @@
 /**
- * The `…` menu's "Text Stats" submenu (M9, `EntityMenu.textStats.text`): titled "Text stats"
- * (`xRay.textStats.header`), with the same rows as the page inspector's Stats tab, counted on
+ * The `…` menu's "Text Stats" submenu (M9): titled "Text stats",
+ * with the same rows as the page inspector's Stats tab, counted on
  * the page's current Markdown when the submenu opens.
  */
 import type { ObjectSummary } from '@/api/types'

@@ -31,7 +31,7 @@ beforeEach(() => {
 })
 
 describe('TagPicker', () => {
-  // The plan named this test after a shortened string; Capacities' tagDropdownLabel is
+  // The plan named this test after a shortened string; the full placeholder is
   // "Search for tags or create a new one".
   it('test TagPicker placeholder "Search for tags or create a new one"; create calls onChange', async () => {
     const user = userEvent.setup()

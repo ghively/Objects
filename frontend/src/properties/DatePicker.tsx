@@ -1,4 +1,4 @@
-// The date picker of datetime properties: a natural-language input per point, Capacities'
+// The date picker of datetime properties: a natural-language input per point, the
 // suggestion lists, "Include Time" and "Range" toggles that honour the property's constraints,
 // and "Remove date". The Task `date` (M4) adds the schedule suggestions, a "Repeat" row and a
 // "Reminder" row; there every change carries `{date, repeat, remind}` together. Any other date
@@ -123,7 +123,7 @@ function parseTimePart(t: string): { h: number; min: number } | null {
 }
 
 /**
- * What the user typed into a date field, read the way Capacities' natural-language field reads
+ * What the user typed into a date field, read the way the natural-language field reads
  * it: ISO dates and timestamps; Yesterday, Today, Tomorrow, "next week"; "in N days" and
  * "in N weeks"; "March 14th" (optionally with a year); and any of these followed by
  * "at 1:59 PM". A day without a time is a day value; with a time it is a local time. `null` when
@@ -173,7 +173,7 @@ const START_SUGGESTIONS: { label: string; days: number }[] = [
   { label: 'In 2 weeks', days: 14 },
 ]
 
-/** The Task date's quick suggestions (`DatePicker.suggestions.schedule.*`). */
+/** The Task date's quick suggestions. */
 const SCHEDULE_SUGGESTIONS: { label: string; tooltip: string; pick(today: Date): Date }[] = [
   { label: 'Today', tooltip: 'Schedule task for today', pick: (t) => t },
   { label: 'Tomorrow', tooltip: 'Schedule task for tomorrow', pick: (t) => addDays(t, 1) },
@@ -212,9 +212,8 @@ export interface DatePickerProps {
    * The Task `date` (M4): its current `repeat` and `remind` texts. Given with `onTaskChange`, the
    * picker shows the schedule suggestions and the Repeat row (and the Reminder row when
    * `constraints.supportsReminders`), and every change goes to `onTaskChange` instead of `onChange`.
-   * A non-empty `occurrenceLog` (M8) makes "Remove recurrence" and "Remove date" ask first
-   * (`DatePicker.recurrenceRemoveConfirm.*`, `DatePicker.dateRemoveConfirm.*`); the owner removes
-   * the log with `repeat`.
+   * A non-empty `occurrenceLog` (M8) makes "Remove recurrence" and "Remove date" ask first;
+   * the owner removes the log with `repeat`.
    */
   task?: { repeat: string | null; remind: string | null; occurrenceLog?: string | null }
   onTaskChange?(next: TaskDateChange): void
@@ -370,7 +369,7 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
   const propReminder = !taskMode && !!reminder && !!c.supportsReminders
   const [customOpen, setCustomOpen] = useState(false)
   const [dropped, setDropped] = useState(false)
-  /** M8: "Remove date" on a recurring task with history asks first (`DatePicker.dateRemoveConfirm`). */
+  /** M8: "Remove date" on a recurring task with history asks first. */
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const hasHistory = taskMode && !!task!.occurrenceLog?.trim()
 

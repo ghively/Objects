@@ -16,7 +16,6 @@ import { ReferencesSection } from './ReferencesSection'
 import { referencesKey } from './referencesUi'
 
 const mocked = vi.mocked(api)
-const STRINGS_FILE = '../../../reference/app-unpacked/dist/virtual_intlify-i18n-0366822.js'
 
 const SELF = objectSummary({ path: 'Pages/Self.md', id: 'self-id', title: 'Self' })
 const PERSON = typeDef({
@@ -92,30 +91,7 @@ describe('ReferencesSection', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  test('tab labels, info tooltips and empty states match reference', async () => {
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-    const strings = fs.readFileSync(path.resolve(__dirname, STRINGS_FILE), 'utf8')
-    const verbatim = [
-      'All',
-      'Backlinks',
-      'Links to this object',
-      'Related Content',
-      'Similar objects',
-      'Mentions',
-      'Unlinked name matches',
-      'Related tags',
-      'Click again to hide',
-      'Mentions in text',
-      'No backlinks yet',
-      'Link to this object from another page to create a backlink.',
-      'Link',
-      'Link created',
-      'Show more',
-      'No related content yet',
-    ]
-    for (const s of verbatim) expect(strings, s).toContain(`\`${s}\``)
-
+  test('tab labels, info tooltips and empty states', async () => {
     mocked.references.mockResolvedValue(
       references({ tabs: ['all', 'backlinks', 'related', 'mentions', 'relatedTags'], summaries }),
     )

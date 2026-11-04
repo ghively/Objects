@@ -4,10 +4,10 @@ import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { SpacesMenu } from '@/spaces/SpacesMenu'
 
 export const TOP_BAR_TEXT = {
-  changeSpace: 'Change space', // SpaceOverview.changeSpace.tooltip
-  createNewTab: 'Create new tab', // SpaceHeader.createNewTab
-  hideSidepanel: 'Hide sidepanel', // RenderSidepanel.hideSidepanel
-  showSidepanel: 'Show sidepanel', // RenderSidepanel.showSidepanel
+  changeSpace: 'Change space',
+  createNewTab: 'Create new tab',
+  hideSidepanel: 'Hide sidepanel',
+  showSidepanel: 'Show sidepanel',
 } as const
 
 export interface TopBarProps {

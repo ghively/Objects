@@ -1,7 +1,6 @@
-/* Toggle block. Colours: content.toggleColor, toggleColorEmpty and
-   toggleOutlineColor (--editor-toggle, --editor-toggle-empty,
-   --editor-toggle-outline); the list/todo/toggle row padding is Capacities'
-   .block-outer.toggle>.block-middle (padding-block 4px). */
+/* Toggle block. Colours: --editor-toggle, --editor-toggle-empty and
+   --editor-toggle-outline; the list/todo/toggle row padding is
+   padding-block 4px. */
 .object-editor .block-toggle {
   position: relative;
   padding-left: 1.5em;

@@ -1,5 +1,5 @@
 /**
- * "Import CSV" on a type page (`database.options.options.importCsv.text`): Capacities'
+ * "Import CSV" on a type page: the
  * "Batch import to collection" modal. Every data row of the file becomes one object of the
  * type; each column maps to a property ("Property Mappings", the first column to the title by
  * default, the others to a property of the same name). The objects go into the type, or into a
@@ -25,45 +25,29 @@ import { parseDateInput } from '@/properties/DatePicker'
 import { fromPercent, parseNumberInput } from '@/properties/format'
 
 export const IMPORT_CSV_TEXT = {
-  /** `database.options.options.importCsv.text` */
   menu: 'Import CSV',
-  /** `CSVImportModal.heading` */
   heading: 'Batch import to collection',
-  /** `CSVImportModal.description` */
   description: 'You can upload a CSV that will be transformed into a collection. Every row will create one entity.',
-  /** `PageImportSection.chooseOrDrop` */
   chooseFile: 'Choose file or drop here.',
-  /** `CSVImportModal.headerRow.title` */
   headerRow: 'Has a header row',
-  /** `CSVImportModal.headerRow.description` */
   headerRowDescription: 'First row in CSV holds column names and is not itself a data row.',
-  /** `CSVImportModal.warning.heading` */
   warningHeading: 'Use this with caution',
-  /** `CSVImportModal.warning.text` */
   warningText: 'Every row in your table will be transformed into a new object. You can quickly spam your whole space if you import big tables.',
-  /** `CSVImportModal.errors.readingError` */
   readingError: 'Some issues were found while parsing your file. Make sure to use a valid CSV file to ensure the import you expect.',
-  /** `CSVImportModal.notSupported` */
   notSupported: (rowLimit: number) => `This file is not supported. We only support CSV imports up to ${rowLimit} rows.`,
-  /** `CSVImportModal.newCollection` */
   newCollection: (title: string) => `New collection "${title}"`,
-  /** `PropertyTransformation.info`, before the target. */
+  /** The mapping info, before the target. */
   info: (count: number, plural: string) => `Add ${count} new ${plural} to`,
-  /** `PropertyTransformation.propertyMapping.heading` */
   mappings: 'Property Mappings',
-  /** `PropertyTransformation.propertyMapping.description.text` */
   mappingsDescription: 'Multiple values can be mapped to the same property, but only the first transferred value is kept.',
-  /** `general.import` */
   import: 'Import',
-  /** `general.importing` */
   importing: 'Importing...',
-  /** `general.cancel` */
   cancel: 'Cancel',
   /** Our string: a column without a header. */
   column: (n: number) => `Column ${n}`,
 }
 
-/** The most data rows one import takes (Capacities' `rowLimit` value wasn't found: our choice). */
+/** The most data rows one import takes (our choice). */
 export const CSV_ROW_LIMIT = 1000
 
 /** The title target's key in a mapping. */

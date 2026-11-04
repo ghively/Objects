@@ -196,7 +196,7 @@ describe('m8 round trip', () => {
     b.node.descendants((n) => {
       for (const m of n.marks) if (m.type.name === 'highlight') marks.push(m.attrs as { color: string; bare: boolean })
     })
-    // Capacities' FALLBACK_HIGHLIGHT_COLOR is bg-amber.
+    // FALLBACK_HIGHLIGHT_COLOR is bg-amber.
     expect(marks).toEqual([{ color: 'amber', bare: true }])
     typeAtEndOf(editor, 'A bare highlight', ' Really.')
     expect(serializeBody(editor)).toBe(

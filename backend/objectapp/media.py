@@ -107,7 +107,7 @@ def _ext(name: str) -> str:
 def _walk(root: Path) -> Iterator[tuple[str, os.DirEntry[str]]]:
     """``(space-relative POSIX path, entry)`` of every file under `root` outside dot-folders.
 
-    Dot-folders (``.git``, ``.trash``, ``.capacities-cache``) are pruned before they are
+    Dot-folders (``.git``, ``.trash``, ``.object-cache``) are pruned before they are
     read, not filtered after (`rglob` walked 20,000 ``.git`` files per listing, audit
     2026-11-01 B7); dot-files are skipped; symlinked folders are not followed and a folder
     that can't be read is skipped, as with `rglob`.
@@ -225,7 +225,7 @@ class Attachment(TypedDict):
 
 
 MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024
-"""Capacities' upload limit (``EntityPicker.uploadLimitSize``: 100 MiB)."""
+"""The upload limit: 100 MiB."""
 
 UPLOAD_LIMIT_DETAIL = (
     "You can only upload files up to 100 MiB in size. "

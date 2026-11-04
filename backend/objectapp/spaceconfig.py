@@ -1,4 +1,4 @@
-"""``.capacities/space.json``: the space's name, icon, description and "hide task management".
+"""``.object/space.json``: the space's name, icon, description and "hide task management".
 
 Absent file = the folder name and defaults; reading never creates or changes it.
 A patch writes only the patched keys over what the file already holds (unknown
@@ -27,7 +27,7 @@ __all__ = [
     "space_fields",
 ]
 
-SPACE_REL = ".capacities/space.json"
+SPACE_REL = ".object/space.json"
 MAX_NAME_LENGTH = 120
 PATCH_KEYS = ("name", "icon", "description", "hideTaskManagement")
 
@@ -44,7 +44,7 @@ class SpaceConfigProblem(ValueError):
 
 
 def _path(root: Path) -> Path:
-    return Path(root) / ".capacities" / "space.json"
+    return Path(root) / ".object" / "space.json"
 
 
 def read(root: Path) -> tuple[dict[str, Any], str, str | None]:

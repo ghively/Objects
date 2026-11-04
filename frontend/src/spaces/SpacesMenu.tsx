@@ -38,17 +38,17 @@ import { DELETE_SPACE_TEXT, DeleteSpaceDialog } from './DeleteSpaceDialog'
 import { SWITCH_TEXT, switchSpace, useSpaceSwitch } from './switchSpace'
 
 export const SPACES_MENU_TEXT = {
-  heading: 'Spaces', // SpacesMenu.heading
-  more: 'More', // general.more
-  rename: 'Rename', // general.rename
-  remove: 'Remove', // MultiSpacePicker.remove
+  heading: 'Spaces',
+  more: 'More',
+  rename: 'Rename',
+  remove: 'Remove',
   removeConfirm: 'Object forgets this space. Its folder and files stay where they are.', // our string
-  cancel: 'Cancel', // general.cancel
-  spaceSettings: 'Space settings', // SpacesMenu.spaceSettings
-  addSpace: 'Add space', // components.RootSpace.addSpace
+  cancel: 'Cancel',
+  spaceSettings: 'Space settings',
+  addSpace: 'Add space',
   openFolder: 'Open folder…', // our string
   folderPath: 'Folder path', // our string
-  open: 'Open', // general.open
+  open: 'Open',
 } as const
 
 const T = SPACES_MENU_TEXT

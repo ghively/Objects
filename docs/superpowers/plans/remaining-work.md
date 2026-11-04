@@ -1,13 +1,13 @@
 # Object: remaining work
 
-Status as of 2026-11-03. **All nine milestones are built, reviewed, fixed and gated, and all are on `master`.** The 2026-11-01 full audit is merged (PR #4, `84f3c16`). The 2026-11-02 Capacities study's polish backlog was built on 2026-11-03 in nine parallel lanes, reviewed once, fixed once and gated (see "2026-11-03: the polish backlog" below). Not pushed.
+Status as of 2026-11-03. **All nine milestones are built, reviewed, fixed and gated, and all are on `master`.** The 2026-11-01 full audit is merged (PR #4, `84f3c16`). The 2026-11-02 behaviour study's polish backlog was built on 2026-11-03 in nine parallel lanes, reviewed once, fixed once and gated (see "2026-11-03: the polish backlog" below). Pushed to origin (`55a4059`).
 
 **What remains, in one list** (details: `polish-audit-2026-11-02.md`, "Remaining tasks"):
 0. **M10, the AI assistant** (planned 2026-11-02, not built): `2026-11-02-m10-ai-assistant.md`; three small questions for Gene at its end.
-1. **Polish backlog, still open** (everything else is done, 2026-11-03): the Help & Resources sidebar section and the import migration guides (both link to Capacities' web pages: Gene to rule against the no-network rule); the `@` picker's "Collection" badge (collections are not linkable in Object; Gene to decide whether they should be); empty daily-note placeholders (a real Tags row needs the object header in the inline daily note); the block-selection bar's Tag dropdown (block tags have no Markdown form); "Default list view" type setting and the templates' saved queries (not in the reference); a list item with an icon and no text reloads as a raw block (pre-existing loader limit); Wall card details.
-2. **Decisions for Gene:** (decided 2026-11-02: all Pro features are unlocked, nothing gated; AI is in, through the Claude Code CLI, planned as M10; the integrations come later at lower priority); whether the Capacities how-to guides ship as built-in seeds; scrub the plaintext credentials found in his Work and Personal Capacities spaces before any import.
+1. **Polish backlog, still open** (everything else is done, 2026-11-03): the Help & Resources sidebar section and the import migration guides (both link to external web pages: Gene to rule against the no-network rule); the `@` picker's "Collection" badge (collections are not linkable in Object; Gene to decide whether they should be); empty daily-note placeholders (a real Tags row needs the object header in the inline daily note); the block-selection bar's Tag dropdown (block tags have no Markdown form); "Default list view" type setting and the templates' saved queries (not specified); a list item with an icon and no text reloads as a raw block (pre-existing loader limit); Wall card details.
+2. **Decisions for Gene:** (decided 2026-11-02: all Pro features are unlocked, nothing gated; AI is in, through the Claude Code CLI, planned as M10; the integrations come later at lower priority); whether the how-to guides ship as built-in seeds; scrub the plaintext credentials found in his Work and Personal source spaces before any import.
 3. **Gene's hands-on checking** (M1-M9 acceptance docs, 256 unchecked items), and the fixes it produces. **Settled 2026-10-28:** the Standard design shows properties in the side column; they go inline below 768 px.
-4. **Not yet looked at in Capacities** (needs a scratch view or approval): filter, sort and group editors, Customize card view, Tasks page, Queries, Weblink and PDF viewers, image and file objects, Two Columns/Code/Math/Toggle/Group/Horizontal line blocks, Word and Latex export, Three days view in the other spaces, drag and drop, markdown list shortcuts with real key events.
+4. **Not yet catalogued** (needs a scratch view or approval): filter, sort and group editors, Customize card view, Tasks page, Queries, Weblink and PDF viewers, image and file objects, Two Columns/Code/Math/Toggle/Group/Horizontal line blocks, Word and Latex export, Three days view in the other spaces, drag and drop, markdown list shortcuts with real key events.
 5. ~~One known test failure on Windows~~ fixed 2026-11-03 (`ba43e66`): the gzip test compared newline-translated text; it now compares bytes.
 6. **Wiki import follow-ups** (outside the repo, in Gene's `ObjectSpaces` folder): review the 10 "possible secrets" pages listed in `ai-pass/review.md`; the wiki copy is a snapshot (refresh = recopy and AI-reread only new or changed pages).
 
@@ -17,32 +17,27 @@ Built in nine lanes, one background agent each in its own git worktree, split by
 
 Gate (Windows, at `4052227`; the api-mock fix `28e2ce7` came after, with its tests rerun): back end 1557 passed, 12 skipped, 3 xpassed (the 5,000-object month timing test passes on a quiet machine; it failed once under the nine-lane load); front end 2466 passed, 1 skipped; the one failure, the api-mock contract test, is fixed in `28e2ce7`; `tsc` clean; lint 0 errors; build ok; `m1_roundtrip.py` and `m2`-`m9_acceptance.py` PASS on `space-sample` and `space-v1`.
 
-For Gene's hands-on check: `@` or `[[` in an empty block now inserts an object block (Capacities' default; Settings > Editor > Always create inline links keeps the inline form); the root font is 15.5px so the whole app is about 3% smaller; the properties-pane toggle writes `hideProperties` to the object; the types gallery's property kinds are our choice; PDF export prints from a hidden frame, untried inside the pywebview window; Enter in the tag picker picks the closest tag before Create.
+For Gene's hands-on check: `@` or `[[` in an empty block now inserts an object block (the default; Settings > Editor > Always create inline links keeps the inline form); the root font is 15.5px so the whole app is about 3% smaller; the properties-pane toggle writes `hideProperties` to the object; the types gallery's property kinds are our choice; PDF export prints from a hidden frame, untried inside the pywebview window; Enter in the tag picker picks the closest tag before Create.
 
-## 2026-11-02: the Capacities study
+## 2026-11-02: the behaviour study
 
-Behaviour reference: `docs/capacities-behavior-catalog.md` (sections 1-11). Differences, fixes and backlog: `plans/polish-audit-2026-11-02.md`. **Unlinked mentions must stay** (ground rule in `CLAUDE.md`; built in M5).
+Behaviour reference: `docs/behavior-catalog.md` (sections 1-11). Differences, fixes and backlog: `plans/polish-audit-2026-11-02.md`. **Unlinked mentions must stay** (ground rule in `CLAUDE.md`; built in M5).
 
-Fixed and committed on `master`: daily-note header pill and the calendar section toolbars; Three days view; nested collections in the sidebar and the type context menu (with Pin to Sidebar); how-to guides imported into the wiki space; PDF, Image, Weblink and Audio get Capacities' extra fields; the keyboard-hint footer under the slash menu, New menu, link picker and search palette; slash "In a week" and "A week ago"; Find/Present/Delete key hints in the object menu; a Search field in the space switcher; Graph moved beside Trash; the New menu as a popover under the New button (picking a type creates at once); the `@` and `[[` picker as a popover at the caret with recents and a row per type.
+Fixed and committed on `master`: daily-note header pill and the calendar section toolbars; Three days view; nested collections in the sidebar and the type context menu (with Pin to Sidebar); how-to guides imported into the wiki space; PDF, Image, Weblink and Audio get their extra fields; the keyboard-hint footer under the slash menu, New menu, link picker and search palette; slash "In a week" and "A week ago"; Find/Present/Delete key hints in the object menu; a Search field in the space switcher; Graph moved beside Trash; the New menu as a popover under the New button (picking a type creates at once); the `@` and `[[` picker as a popover at the caret with recents and a row per type.
 
 Gate at the end of 2026-11-02 (Windows): front end `npx vitest run` 2326 passed, 1 skipped; `tsc -b --noEmit` clean; lint 0 errors; `npm run build` ok. Back end 1463 passed, 12 skipped, 3 xpassed, plus the one pre-existing failure in item 5 (run before the last front-end-only commits; no back-end change since).
 
 **Done on 2026-10-28, on Windows:**
 - **Audit bugs:** all ~65 in `audit-2026-10-28.md`, plus every "unconfirmed" item that proved real, fixed one per commit with a failing-first test, in six area branches merged into master (whiteboard, backend API, views and properties, shell, backend storage, editor).
-- **Guessed values:** checked against the full `.reference/` (`reference-check-2026-10-28.md`) and applied in four merged branches: keyboard shortcuts (one registry in `lib/shortcuts.ts`), side panel, breadcrumbs, pinned tabs, the 768 px breakpoint, dashboard default sections, Tasks tab order, slash and block menus, highlight and formula formats, search highlight colours and graph limits.
+- **Guessed values:** checked (`reference-check-2026-10-28.md`) and applied in four merged branches: keyboard shortcuts (one registry in `lib/shortcuts.ts`), side panel, breadcrumbs, pinned tabs, the 768 px breakpoint, dashboard default sections, Tasks tab order, slash and block menus, highlight and formula formats, search highlight colours and graph limits.
 - **Windows-only failures** from the baseline are fixed (non-portable tests, the M5 acceptance cache check, an icon first-render flicker).
 - **Gate:** pytest 1202 passed; vitest 1829 passed; `tsc` clean; build ok; `m1_roundtrip.py` and `m2`–`m8_acceptance.py` PASS on `space-sample` and `space-v1`.
 
-**2026-11-02: the Capacities polish audit.** Gene had Capacities driven live (three spaces, read-only except two scratch pages, trashed). Findings: `docs/capacities-behavior-catalog.md` (everything observed: Settings, shortcuts, menus, editor chrome, views, graph, export; sections 1-10) and `plans/polish-audit-2026-11-02.md` (what differed from Object, what is fixed, and a consolidated backlog A-H). Fixed so far and committed on `master` (not pushed): daily-note header pill, calendar toolbars, three-days view, nested collections in the sidebar, the type context menu, the how-to guides import. **Unlinked mentions must stay** (Gene's requirement; already built in M5). Backlog progress (media-type fields, the keyboard-hint footer, week date links, the `@` trigger) is tabled in the audit doc's "Progress on the backlog"; next: the rest of the backlog from the top, with tests. Open for Gene: which Pro-gated features to unlock.
+**2026-11-02: the polish audit.** A live behaviour study was run (three spaces, read-only except two scratch pages, trashed). Findings: `docs/behavior-catalog.md` (everything observed: Settings, shortcuts, menus, editor chrome, views, graph, export; sections 1-10) and `plans/polish-audit-2026-11-02.md` (what differed from Object, what is fixed, and a consolidated backlog A-H). Fixed so far and committed on `master` (not pushed): daily-note header pill, calendar toolbars, three-days view, nested collections in the sidebar, the type context menu, the how-to guides import. **Unlinked mentions must stay** (Gene's requirement; already built in M5). Backlog progress (media-type fields, the keyboard-hint footer, week date links, the `@` trigger) is tabled in the audit doc's "Progress on the backlog"; next: the rest of the backlog from the top, with tests. Open for Gene: which Pro-gated features to unlock.
 
 Spec: `docs/superpowers/specs/2026-10-23-object-design.md`. How to resume: `HANDOFF.md`, `CONTINUE.md`. Rules: `CLAUDE.md`. Process: `docs/superpowers/build-process.md`.
 
-Capacities reference: `reference/` in the repo, a trimmed subset:
-- models: `recovered-ts/src/shared-logic/models/`
-- English UI strings: `app-unpacked/dist/virtual_intlify-i18n-0366822.js`
-- CSS: `app-unpacked/dist/index36682.css`
-
-On Gene's machine the full unpacked app is in the git-ignored `.reference/`.
+Behaviour reference: `docs/behavior-catalog.md` and the spec.
 
 ## Done
 
@@ -114,18 +109,18 @@ The synthetic fixture spaces are `space-sample`, `space-v1`, `space-calendar`, `
    - Wacom pressure and tilt
    - microphone and clipboard permissions
    - a type page with 1,000+ real objects
-   - the side-by-side look against Capacities in Light, Light Dimmed, Dark and Dark Dimmed
-2. **Guessed values to confirm or correct** (the trimmed reference lacks them):
+   - the look against the behaviour catalog in Light, Light Dimmed, Dark and Dark Dimmed
+2. **Guessed values to confirm or correct** (nothing specifies them):
    - the shortcut keys (`frontend/src/lib/shortcuts.ts`, listed in Settings → Shortcuts)
    - the side-panel area layout, breadcrumbs and pinned tabs
    - the slash and block menu looks
    - the search highlight colour and the graph limits
    - the 480/850 px layout switch points
    - the M8 file formats (block ids and references, inline colours, date tokens, indent and list-item annotations, table formulas, collection and query embeds)
-   - M3's default dashboard section tabs (`inNoCollection`/`notTagged`), which need the RootEntity file from the full `.reference/`
+   - M3's default dashboard section tabs (`inNoCollection`/`notTagged`), still to confirm
 3. **Check the CPI export for a Task type with no Done-category status option.** Inferred status sets, as in the sample spaces, have none, so those tasks can't be completed until one is added in type settings (M4 finding).
 4. **Fix what the hand-checks find.** One finding per commit, each with a regression test, then the full gate.
-5. **Not in M9 (Gene's call):** the sidebar types block's Sort Alphabetically / Manually (needs a key Capacities keeps in each type's default collection); bulk Edit property / Edit tags / Export; export to PDF, Word or LaTeX; duplicating whiteboards; Capacities' "name contains status" group ordering (Gene: no).
+5. **Not in M9 (Gene's call):** the sidebar types block's Sort Alphabetically / Manually (needs a key kept in each type's default collection); bulk Edit property / Edit tags / Export; export to PDF, Word or LaTeX; duplicating whiteboards; the "name contains status" group ordering (Gene: no).
 6. **Deferred by Gene:** TODO handling in the editor. Logseq-style markers were considered and rejected on 2026-10-26.
 7. **Later:**
    - an installer (spec §6: "an installer comes later")
@@ -143,4 +138,4 @@ The synthetic fixture spaces are `space-sample`, `space-v1`, `space-calendar`, `
 
 ## Out of scope (by design)
 
-Accounts, login, billing, sync, sharing/publishing, mobile, integrations (Readwise, Kindle, calendar feeds, messaging), AI features (a Claude Code agent comes later), telemetry, importing Capacities data, migrating `C:\Git\wiki` (a separate later project). Accounts, sync, sharing and agent features return in the parked Object Team spec, not in this version.
+Accounts, login, billing, sync, sharing/publishing, mobile, integrations (Readwise, Kindle, calendar feeds, messaging), AI features (a Claude Code agent comes later), telemetry, importing data from other apps, migrating `C:\Git\wiki` (a separate later project). Accounts, sync, sharing and agent features return in the parked Object Team spec, not in this version.

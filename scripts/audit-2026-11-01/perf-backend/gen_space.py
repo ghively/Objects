@@ -194,7 +194,7 @@ def _size(rng: random.Random) -> int:
 def make_space(root: Path, objects: int = 5000, seed: int = 7) -> dict:
     root = Path(root)
     rng = random.Random(seed)
-    cap = root / ".capacities"
+    cap = root / ".object"
     for sub in ("types", "collections", "queries"):
         (cap / sub).mkdir(parents=True, exist_ok=True)
     for t in TYPES:
@@ -377,7 +377,7 @@ def make_space(root: Path, objects: int = 5000, seed: int = 7) -> dict:
 
     stats = {"objects": len(plan) + 1, "body_links": link_count, "hub_referrers": hub_referrers,
              "bytes": bytes_total, "hub": f"Pages/{hub_title}.md"}
-    (root / ".capacities" / "perf-stats.json").write_text(json.dumps(stats), "utf-8")
+    (root / ".object" / "perf-stats.json").write_text(json.dumps(stats), "utf-8")
     return stats
 
 

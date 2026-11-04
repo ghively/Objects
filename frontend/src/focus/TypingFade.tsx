@@ -1,11 +1,11 @@
 /**
  * Focus while typing: as you type in an editor the surrounding chrome (the top bar with the tabs,
  * the page and peek header buttons) fades out, and comes back as soon as the pointer moves.
- * Capacities does this always (no setting); it is separate from the explicit focus mode
+ * This is always on (no setting); it is separate from the explicit focus mode
  * (`FocusMode.tsx`), which hides chrome until it is left.
  *
  * The chrome opts in with the `data-typing-fade` attribute; while `<html>` has `data-typing`,
- * its children fade out and take no pointer events. The values are Capacities' own
+ * its children fade out and take no pointer events. The values are
  * (`.glass-chrome-fade>*{transition:opacity .22s ease-out}`, `.is-faded-out>*{opacity:0}`, pointer
  * events off, no transition under reduced motion). Mounted once, by `FocusMode`.
  */

@@ -96,9 +96,9 @@ describe('shortcuts', () => {
     expect(matches(key({ key: 'p', metaKey: true, altKey: true }), ['Mod-AltCtrl-p'])).toBe(false)
   })
 
-  // Capacities' shortcut table (shortcuts36682.js; reference-check-2026-10-28 §1), Windows column.
-  test("global and navigation keys are Capacities' own", () => {
-    const CAPACITIES: Record<string, string[]> = {
+  // The expected shortcut table (reference-check-2026-10-28 §1), Windows column.
+  test('global and navigation keys match the expected table', () => {
+    const EXPECTED: Record<string, string[]> = {
       closeTab: ['Mod-w'],
       openNewTab: ['Mod-t'],
       navigateTabs: ['Ctrl-Tab'],
@@ -116,8 +116,8 @@ describe('shortcuts', () => {
       toggleFocusMode: ['Mod-Shift-m'],
       openPresentationMode: ['Mod-AltCtrl-p'],
     }
-    for (const [id, keys] of Object.entries(CAPACITIES)) expect(keysFor(id), id).toEqual(keys)
-    for (const id of Object.keys(CAPACITIES)) expect(allShortcuts().find((d) => d.id === id)?.provisional, id).toBe(false)
+    for (const [id, keys] of Object.entries(EXPECTED)) expect(keysFor(id), id).toEqual(keys)
+    for (const id of Object.keys(EXPECTED)) expect(allShortcuts().find((d) => d.id === id)?.provisional, id).toBe(false)
   })
 
   test('isEditableTarget follows App.tsx rule', () => {
@@ -161,7 +161,7 @@ describe('shortcuts', () => {
           const c = parseKeys(k, mac)
           const sig = `${d.scope}|${c.ctrl}|${c.meta}|${c.alt}|${c.shift}|${c.key.toLowerCase()}`
           const other = seen.get(sig)
-          // Capacities' context-dependent keys (Mod-e: code token or code block, …).
+          // Context-dependent keys (Mod-e: code token or code block, …).
           if (other && sharesKeyByDesign(other, d.id)) continue
           expect(other, `${d.id} (${k}) collides with ${other} in scope ${d.scope}`).toBeUndefined()
           seen.set(sig, d.id)

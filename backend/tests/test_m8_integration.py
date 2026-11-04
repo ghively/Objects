@@ -51,7 +51,7 @@ def _version(client: TestClient, rel: str) -> str:
 
 @pytest.mark.parametrize(("week_start", "nxt"), [("monday", "2026-11-01"), ("sunday", "2026-11-08")])
 def test_completion_hook_uses_week_start(client, m8_space_dir: Path, week_start: str, nxt: str):
-    ui = m8_space_dir / ".capacities" / "ui.json"
+    ui = m8_space_dir / ".object" / "ui.json"
     ui.write_text('{"calendar": {"weekStart": "%s"}}' % week_start, encoding="utf-8")
     rel = _write_task(m8_space_dir, "Fortnightly", "2026-10-26", "every 2 weeks on mon, sun")
     r = client.put(
@@ -64,7 +64,7 @@ def test_completion_hook_uses_week_start(client, m8_space_dir: Path, week_start:
 
 def test_calendar_occurrences_use_week_start(m8_space_dir: Path, tmp_path: Path, monkeypatch):
     monkeypatch.setenv("OBJECT_STATE_DIR", str(tmp_path / "state"))
-    (m8_space_dir / ".capacities" / "ui.json").write_text(
+    (m8_space_dir / ".object" / "ui.json").write_text(
         '{"calendar": {"weekStart": "sunday"}}', encoding="utf-8"
     )
     rel = _write_task(m8_space_dir, "Fortnightly", "2026-10-26", "every 2 weeks on mon, sun")

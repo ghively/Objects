@@ -335,11 +335,11 @@ def t_odd_files():
             check(f"{name}: no crash", False, f"{type(exc).__name__}: {exc}")
 
 
-# 12. write-on-read: open + read everything, nothing outside .capacities changes
+# 12. write-on-read: open + read everything, nothing outside .object changes
 def t_write_on_read():
     root = fresh()
     def snap():
-        return {str(p.relative_to(root)): version_of(p.read_bytes()) for p in root.rglob("*") if p.is_file() and ".capacities" not in p.parts}
+        return {str(p.relative_to(root)): version_of(p.read_bytes()) for p in root.rglob("*") if p.is_file() and ".object" not in p.parts}
     before = snap()
     sp = Space(root)
     sp.list(); [sp.read(s.path) for s in sp.list()]

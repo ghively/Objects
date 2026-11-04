@@ -3,7 +3,7 @@
 import type { DateRelative, DateValue } from '@/api/types'
 import { fromWallClock, wallClock, zonedInstant, zonedParts, zonedStartOfDay } from '@/lib/zonedTime'
 
-/** The relative options in the reference's order, with its labels ("Specific date" is the exact-date pick). */
+/** The relative options in menu order, with their labels ("Specific date" is the exact-date pick). */
 export const DATE_RELATIVE_OPTIONS: { key: DateRelative | 'exactDate'; label: string }[] = [
   { key: 'overdue', label: 'overdue' },
   { key: 'today', label: 'today' },

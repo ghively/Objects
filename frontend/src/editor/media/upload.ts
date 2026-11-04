@@ -14,10 +14,10 @@ import type { Attachment } from '@/api/types'
 import { attachmentKind, type AttachmentKind } from '../annotations'
 import type { MediaAttrs } from '../nodes/media'
 
-/** Capacities' limit (`EntityPicker.uploadLimitSize`); the back end answers 413 above it. */
+/** The upload size limit; the back end answers 413 above it. */
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
-/** `EntityPicker.uploadLimitSize`, verbatim. */
+/** The upload limit message. */
 export const UPLOAD_LIMIT_MESSAGE =
   'You can only upload files up to 100 MiB in size. If your file is bigger than that, it will fail.'
 
@@ -118,8 +118,7 @@ export function mediaAttrsForUpload(path: string, kind: AttachmentKind, name: st
 // ---- upload ---------------------------------------------------------------
 
 /**
- * Upload one file. Over 100 MiB it is refused before sending (the toast
- * `EntityPicker.uploadLimitSize`) and resolves `null`; a failed upload shows
+ * Upload one file. Over 100 MiB it is refused before sending (with a toast) and resolves `null`; a failed upload shows
  * the server's message and resolves `null`.
  */
 export async function uploadFile(file: File): Promise<MediaAttrs | null> {

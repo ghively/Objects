@@ -30,7 +30,7 @@ def _hashes(root: Path) -> dict[str, str]:
     out = {}
     for p in sorted(root.rglob("*")):
         rel = p.relative_to(root).as_posix()
-        if rel.startswith(".capacities-cache"):
+        if rel.startswith(".object-cache"):
             continue
         out[rel] = hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "dir"
     return out
@@ -72,11 +72,11 @@ def test_listing_outside_attachments_only_non_file_kinds(env):
     root, client, _ = env
     (root / "Pages" / "scan.pdf").write_bytes(b"%PDF-1.4\n")
     (root / "Pages" / "notes.txt").write_bytes(b"plain")
-    (root / ".capacities" / "hidden.png").write_bytes(b"x")
+    (root / ".object" / "hidden.png").write_bytes(b"x")
     paths = [a["path"] for a in client.get("/api/attachments").json()]
     assert "Pages/scan.pdf" in paths
     assert "Pages/notes.txt" not in paths
-    assert ".capacities/hidden.png" not in paths
+    assert ".object/hidden.png" not in paths
 
 
 def test_file_route_serves_each_kind_with_headers(env):
@@ -147,7 +147,7 @@ def test_file_route_rejects_traversal_and_dot_folders(env):
     root, client, _ = env
     (root.parent / "x").write_bytes(b"outside")
     for path in (
-        "../x", "/etc/passwd", "C:/x", "C:\\x", ".capacities/types/page.json",
+        "../x", "/etc/passwd", "C:/x", "C:\\x", ".object/types/page.json",
         "Attachments/../../x", "", "Attachments/missing.png",
     ):
         res = client.get("/api/file", params={"path": path})

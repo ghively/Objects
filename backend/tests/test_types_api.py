@@ -46,7 +46,7 @@ def _write(path: Path, text: str) -> Path:
 
 
 def _type_file(space_dir: Path, type_id: str) -> Path:
-    return space_dir / ".capacities" / "types" / f"{type_id}.json"
+    return space_dir / ".object" / "types" / f"{type_id}.json"
 
 
 def _snapshot(space_dir: Path) -> dict[str, bytes]:
@@ -59,7 +59,7 @@ def _snapshot(space_dir: Path) -> dict[str, bytes]:
 
 def _group_type(space_dir: Path) -> None:
     """A tmp `Group` type with a multi label `topics` and a multi relation `members`."""
-    types = space_dir / ".capacities" / "types"
+    types = space_dir / ".object" / "types"
     types.mkdir(parents=True, exist_ok=True)
     data = {
         "schemaVersion": 2,
@@ -494,7 +494,7 @@ def test_rename_property_changes_name_only(space_dir: Path):
     assert result.rewritten == []
     after = _snapshot(space_dir)
     changed = {k for k in after if after[k] != before.get(k)}
-    assert changed == {".capacities/types/server.json"}
+    assert changed == {".object/types/server.json"}
     assert result.type.prop("cores").key == "cores"
 
 
@@ -542,7 +542,7 @@ def test_save_type_stale_revision_409(space_dir: Path):
 
 
 def test_save_inferred_type_first_time(space_dir: Path):
-    types = space_dir / ".capacities" / "types"
+    types = space_dir / ".object" / "types"
     types.mkdir(parents=True)
     space = Space(space_dir)
     assert type_revision(space.root, "server") == ""
@@ -553,7 +553,7 @@ def test_save_inferred_type_first_time(space_dir: Path):
 
 
 def test_save_unreadable_type_423(space_dir: Path):
-    types = space_dir / ".capacities" / "types"
+    types = space_dir / ".object" / "types"
     types.mkdir(parents=True)
     (types / "server.json").write_bytes(b'{"id": "server",')
     space = Space(space_dir)
@@ -710,7 +710,7 @@ def test_external_type_edit_is_served_and_kept_by_the_next_save(space_dir: Path)
     space = Space(space_dir)
     client = TestClient(create_app(space, None, watch=False))
     t = space.create_type("Gadget", "Gadgets")
-    path = space_dir / ".capacities" / "types" / f"{t.id}.json"
+    path = space_dir / ".object" / "types" / f"{t.id}.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     data["description"] = "Edited outside the app"
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -784,7 +784,7 @@ def test_badly_shaped_property_options_are_422_not_500(space_dir: Path):
 
 def test_badly_shaped_options_in_a_type_file_are_normalised_on_load(space_dir: Path):
     _group_type(space_dir)
-    path = space_dir / ".capacities" / "types" / "group.json"
+    path = space_dir / ".object" / "types" / "group.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     for p in data["propertyDefinitions"]:
         if p["key"] == "members":

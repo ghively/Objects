@@ -1,8 +1,8 @@
 // Which nodes and edges a graph shows, from the compact `GET /api/graph` payload and the saved
-// `GraphViewCustomization`. Pure and synchronous, so toggling a filter is instant; every rule of
+// graph filters. Pure and synchronous, so toggling a filter is instant; every rule of
 // the plan's "Graph semantics" lives here (and in `neighbourhood.ts` for the local scope).
 //
-// The rules follow Capacities' graph build (worker-heavy, see reference-check-2026-10-28.md §3b):
+// The graph build rules:
 // - Each object draws its own links and its backlinks. With "Hide objects with many links", an
 //   object with more than `LARGE_NODE_LIMIT` links + backlinks stays in the graph but draws none
 //   of its own edges, and the local graph doesn't walk on from it.
@@ -15,9 +15,9 @@
 import type { GraphCustomization, GraphData } from '@/api/types'
 import { neighbourhood } from './neighbourhood'
 
-/** `hideLargeNodes`: more than this many links + backlinks (Capacities' `{limit:20}`, `w>20`). */
+/** `hideLargeNodes`: more than this many links + backlinks. */
 export const LARGE_NODE_LIMIT = 20
-/** A tag with at least this many backlinks omits its backlink edges (Capacities' `S.length>=10`). */
+/** A tag with at least this many backlinks omits its backlink edges. */
 export const TAG_BACKLINK_LIMIT = 10
 /** The local graph's "Maximum distance": 1 to 5, one step at a time, 1 by default. */
 export const MIN_HOPS = 1
@@ -96,7 +96,7 @@ export function linkDir(data: GraphData, k: number): number {
 }
 
 export interface LinkStats {
-  /** Capacities' `w`: a node's links plus its backlinks (a tag's tagged objects count as backlinks). */
+  /** A node's weight: its links plus its backlinks (a tag's tagged objects count as backlinks). */
   weight: Int32Array
   /** Distinct backlinks: objects linking to the node, and for a tag the objects carrying it. */
   backlinks: Int32Array
@@ -166,7 +166,7 @@ export function excludedEntirely(data: GraphData, custom: GraphCustomization, i:
   return !custom.showCompletedTasks && data.nodes[i].done
 }
 
-/** True when a filter reduces node `i` (type filter, exclude, "Hide dates"; Capacities' `eA`). */
+/** True when a filter reduces node `i` (type filter, exclude, "Hide dates"). */
 export function reducedByFilters(data: GraphData, custom: GraphCustomization, i: number): boolean {
   const node = data.nodes[i]
   const filter = custom.filterStructureIds ?? []
@@ -267,7 +267,7 @@ export function filterGraph(data: GraphData, custom: GraphCustomization, scope: 
   }
 
   // "Hide indirect links" drops every reduced node; otherwise prune reduced nodes with at most
-  // one neighbour until none is left (Capacities' `uA`).
+  // one neighbour until none is left.
   const gone = new Uint8Array(n)
   let anyReduced = false
   for (let i = 0; i < n; i++) if (reduced[i]) anyReduced = true

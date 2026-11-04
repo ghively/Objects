@@ -13,6 +13,6 @@ print(members)
 try:
     s.trash_type(t, members)
 except Exception as e: print("EXC", e)
-print("types dir:", sorted(p.name for p in (d/".capacities/types").iterdir()))
+print("types dir:", sorted(p.name for p in (d/".object/types").iterdir()))
 print("trash items:", [(i.kind, i.title) for i in s.list_trash()])
-print("stranded:", [str(p.relative_to(d)) for p in (d/".capacities/trash/types").rglob("*") if p.is_file()])
+print("stranded:", [str(p.relative_to(d)) for p in (d/".object/trash/types").rglob("*") if p.is_file()])

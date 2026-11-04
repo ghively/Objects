@@ -65,7 +65,7 @@ describe('<BlockHandles>', () => {
     expect(document.querySelector('[data-block-handles]')!.getAttribute('data-pos')).toBe(String(block.pos))
   })
 
-  test('tooltips are the reference strings with bold words', async () => {
+  test('tooltips are the expected strings with bold words', async () => {
     render(<p data-testid="t">{richText('<b>Drag</b> to move block around\n\n<b>Click</b> to show block options')}</p>)
     const p = screen.getByTestId('t')
     expect(Array.from(p.querySelectorAll('b')).map((b) => b.textContent)).toEqual(['Drag', 'Click'])
@@ -123,7 +123,7 @@ describe('<BlockHandles>', () => {
         .filter((n) => !(n instanceof Element && n.getAttribute('data-slot') === 'dropdown-menu-shortcut'))
         .map((n) => n.textContent ?? '')
         .join('')
-    // Capacities' live block menu (catalog section 6), then our kept rows.
+    // The block menu (catalog section 6), then our kept rows.
     expect(within(menu).getAllByRole('menuitem').map(label)).toEqual([
       'Hierarchy (Standard)',
       'List',

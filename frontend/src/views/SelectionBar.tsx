@@ -1,5 +1,5 @@
 // The bar a data view shows while rows are selected ("Select multiple"): the count and the bulk
-// actions of Capacities' `ActionItems.*` (change type, open in side panel, delete), plus the
+// actions (change type, open in side panel, delete), plus the
 // bulk delete's confirmation. Change type runs the one-object dialog once per row (in the view).
 import { useState } from 'react'
 import type { Row, TypeDef } from '@/api/types'
@@ -23,23 +23,18 @@ import {
 import { TypeChip } from '@/shell/Sidebar'
 
 export const SELECTION_TEXT = {
-  /** `blocksMenu.blocksSelected`, after the count. */
+  /** After the count. */
   selected: 'selected',
-  /** `ActionItems.bulkContentTypeChange.title` */
   changeType: 'Change type of selected objects',
-  /** `ActionItems.bulkOpenInSidepanel.title` */
   openInSidepanel: 'Open selected objects in side panel',
-  /** `ActionItems.deleteEntities.title` */
   delete: 'Delete objects',
-  /** `DeleteHandler.fallback.heading` (the variant with `fullDeleteButton`). */
   deleteHeading: 'Delete?',
-  /** `DeleteHandler.fallback.description` */
   deleteDescription: 'Review the items below, then confirm.',
   /** Our string. */
   clear: 'Clear selection',
 }
 
-/** `DeleteHandler.fallback.fullDeleteButton`: "Delete {count} object | Delete {count} objects". */
+/** "Delete {count} object | Delete {count} objects". */
 export function deleteCountLabel(count: number): string {
   return count === 1 ? 'Delete 1 object' : `Delete ${count} objects`
 }

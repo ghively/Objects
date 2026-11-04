@@ -91,20 +91,20 @@
 /* The highlight tokens (--bg-search-highlight, --text-search-highlight, --bg-find-match,
    --bg-find-match-current) are in theme/tokens.css and theme/themes.css. */
 
-/* Search snippets: U+0002/U+0003 rendered as <b> (reference `.search-highlights b`). */
+/* Search snippets: U+0002/U+0003 rendered as <b>. */
 .search-highlights b {
   background-color: var(--bg-search-highlight);
   color: var(--text-search-highlight);
   font-weight: 500;
   border-radius: 1px;
 }
-/* Command-palette result titles (reference `.search-highlights-bold b`, font-weight-semibold). */
+/* Command-palette result titles: matched text semibold. */
 .search-highlights-bold b {
   font-weight: 600;
 }
 
-/* Find in page: editor decorations for every match and the current one (reference
-   `::highlight(find-in-page)` / `find-in-page-active`: text colour inherited). */
+/* Find in page: editor decorations for every match and the current one (text colour
+   inherited). */
 .find-match {
   background-color: var(--bg-find-match);
   color: inherit;
@@ -116,7 +116,7 @@
   border-radius: 1px;
 }
 
-/* Reference CSS. */
+/* The find-in-page bar. */
 .find-in-page-chrome {
   flex-shrink: 1;
   width: 20rem;

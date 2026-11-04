@@ -1,6 +1,6 @@
 // What each property kind is called, how it's described and which icon it shows, and the items of
-// the "Add Property" menu. Names and descriptions are Capacities' `propertyTypes.<type>.*` labels;
-// icons are Capacities' default property icons.
+// the "Add Property" menu. Names and descriptions are the kinds' labels;
+// icons are the default property icons.
 import type { PropertyType, TypeDef } from '@/api/types'
 
 export interface KindMeta {
@@ -80,7 +80,7 @@ export function kindIcon(type: string): string {
 export type AddPropertyAction = 'property' | 'objectSelect' | 'coverImage'
 
 export interface AddPropertyItem {
-  /** Capacities' menu key, which fixes the order. */
+  /** The menu key, which fixes the order. */
   key: string
   action: AddPropertyAction
   type: PropertyType
@@ -89,8 +89,8 @@ export interface AddPropertyItem {
   icon: string
 }
 
-// Capacities' AddPropertyMenu order list. `structure_RootTag_single` and `property_tag` are in it,
-// but Capacities builds no item for them, so neither do we.
+// The Add Property menu order list. `structure_RootTag_single` and `property_tag` are in it,
+// but no item is built for them.
 const MENU_ORDER = [
   'property_textBlock',
   'property_blocks',
@@ -155,7 +155,7 @@ function buildItems(): AddPropertyItem[] {
   return items.filter((i) => rank(i) >= 0).sort((a, b) => rank(a) - rank(b))
 }
 
-/** The Add Property menu's 15 items, in Capacities' order. */
+/** The Add Property menu's 15 items, in order. */
 export const ADD_PROPERTY_ITEMS: readonly AddPropertyItem[] = buildItems()
 
 // Basic types that can't be relation targets.

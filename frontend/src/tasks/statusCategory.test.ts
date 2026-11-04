@@ -6,7 +6,7 @@ import { categoryOf, firstOptionOf, isOpen, STATUS_CATEGORIES, statusOptionsByCa
 const r = (status: unknown) => row({ path: 'Tasks/A.md', values: { status } })
 
 describe('statusCategory', () => {
-  test('categories in order with Capacities labels', () => {
+  test('categories in order with their labels', () => {
     expect(STATUS_CATEGORIES.map((c) => c.label)).toEqual(['Not started', 'In progress', 'Blocked', 'Done'])
   })
 

@@ -1,4 +1,4 @@
-// The sort engine: stable, applied in order, with the reference's per-kind options and fallback.
+// The sort engine: stable, applied in order, with per-kind options and a fallback.
 import type { DateValue, EntityRef, PropertyType, Row, Sort } from '@/api/types'
 import { dateSpan } from './dates'
 import { displayTitle, findDef, rowValue, type FilterCtx } from './filter'

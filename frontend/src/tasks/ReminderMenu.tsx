@@ -1,4 +1,4 @@
-// The "Reminder" row of the Task date picker (`DatePicker.reminder.*`): "No reminder" and the
+// The "Reminder" row of the Task date picker: "No reminder" and the
 // presets for the date's resolution, in an inline list (no portal). Day dates add the "Time" field
 // and its suggestions. Writes the canonical `remind` text (remind.ts).
 import { useState } from 'react'
@@ -18,7 +18,7 @@ export interface ReminderMenuProps {
 
 /** Our string: a reminder that does not fit the date's resolution (kept, or dropped on a switch). */
 export const REMINDER_MISFIT_HINT = "Doesn't fit this date."
-/** Our string, after `NotificationsSettings.deliveryLimits.desktop.body`; shown once per machine. */
+/** Our string; shown once per machine. */
 export const REMINDER_NOTICE = 'Reminders show as system notifications while Object is running.'
 const NOTICE_KEY = 'object.reminderNoticeShown'
 
@@ -26,8 +26,7 @@ const NOTICE_KEY = 'object.reminderNoticeShown'
 export const DEFAULT_REMINDER_TIME = '09:00'
 
 /**
- * `DatePicker.reminder.timeSuggestions.*`. The times are ours: the trimmed reference has the
- * labels, not their values.
+ * The time suggestions. The times are ours.
  */
 const TIME_SUGGESTIONS: { label: string; time: string }[] = [
   { label: 'Morning', time: '09:00' },
@@ -37,7 +36,7 @@ const TIME_SUGGESTIONS: { label: string; time: string }[] = [
   { label: 'Night', time: '21:00' },
 ]
 
-/** Preset offsets (the counts are ours; the labels are `DatePicker.reminder.presets.*`). */
+/** Preset offsets (the counts are ours). */
 const TIME_PRESETS = [0, 5, 15, 30, 60]
 const DAY_PRESETS = [0, 1, 2, 7]
 

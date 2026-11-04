@@ -1,8 +1,7 @@
 /**
- * The board's reading order (Capacities' `WhiteboardData.readingOrder`, `whiteboard.model.ts`):
- * "Explicit node-id reading order. When set, export / search / the outline use this sequence
- * first; remaining nodes keep the geometric top-to-bottom, left-to-right sort. Reordering never
- * moves canvas geometry."
+ * The board's reading order (`WhiteboardData.readingOrder`): an explicit node-id order. When
+ * set, export / search / the outline use this sequence first; remaining nodes keep the geometric
+ * top-to-bottom, left-to-right sort. Reordering never moves canvas geometry.
  *
  * Also the floating inspector's data (outline headings, frames, stats) and the presentation's
  * slides (frames in reading order). Pure functions; our code.

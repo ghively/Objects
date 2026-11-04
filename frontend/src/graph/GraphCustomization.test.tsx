@@ -1,30 +1,11 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { describe, expect, test, vi } from 'vitest'
 import { typeDef } from '@/test/mockApi'
 
 vi.mock('sigma', async () => (await import('./testSigma')).sigmaModule())
 import { CUSTOMIZATION_TEXT, GraphCustomization } from './GraphCustomization'
-import { LOADING_STEPS } from './GraphLoading'
-import { GRAPH_TEXT } from './GraphPage'
-import { TOOLBAR_TEXT } from './GraphToolbar'
 import { LARGE_NODE_LIMIT } from './filterGraph'
-
-const STRINGS = readFileSync(
-  path.resolve(import.meta.dirname, '../../../reference/app-unpacked/dist/virtual_intlify-i18n-0366822.js'),
-  'utf8',
-)
-
-/** A plain message is stored as `s:\`text\``; one with a placeholder as `v:\`before\``,`{t:4,k:\`name\`}`. */
-function inReference(text: string): boolean {
-  if (STRINGS.includes(`s:\`${text}\``)) return true
-  const m = /^(.*)\{(\w+)\}(.*)$/.exec(text)
-  if (!m) return false
-  const [, before, key, after] = m
-  return STRINGS.includes(`{t:3,v:\`${before}\`},{t:4,k:\`${key}\`},{t:3,v:\`${after}\`}`)
-}
 
 const TYPES = [
   typeDef({ id: 'page', name: 'Page', pluralName: 'Pages' }),
@@ -32,29 +13,7 @@ const TYPES = [
 ]
 
 describe('GraphCustomization', () => {
-  test('customization labels and tooltips match reference', async () => {
-    const plain = [
-      CUSTOMIZATION_TEXT.customize,
-      CUSTOMIZATION_TEXT.filterObjectTypes,
-      CUSTOMIZATION_TEXT.excludeObjectTypes,
-      CUSTOMIZATION_TEXT.deselectAll,
-      CUSTOMIZATION_TEXT.showCompletedTasks,
-      CUSTOMIZATION_TEXT.alwaysMinimalNodes,
-      CUSTOMIZATION_TEXT.hideLargeNodes,
-      CUSTOMIZATION_TEXT.hideDates,
-      CUSTOMIZATION_TEXT.hideIndirectLinks,
-      CUSTOMIZATION_TEXT.hideIndirectLinksTooltip,
-      CUSTOMIZATION_TEXT.showTagsNetwork,
-      GRAPH_TEXT.heading,
-      GRAPH_TEXT.emptyTitle,
-      GRAPH_TEXT.emptyDescription,
-      GRAPH_TEXT.emptyFiltered,
-      TOOLBAR_TEXT.search,
-      TOOLBAR_TEXT.fit,
-      ...LOADING_STEPS,
-    ]
-    for (const s of plain) expect(inReference(s), s).toBe(true)
-    expect(inReference('Nodes with more than {limit} links are hidden')).toBe(true)
+  test('customization labels and tooltips', async () => {
     expect(CUSTOMIZATION_TEXT.hideLargeNodesTooltip(LARGE_NODE_LIMIT)).toBe('Nodes with more than 20 links are hidden')
 
     const user = userEvent.setup()

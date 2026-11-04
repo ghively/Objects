@@ -51,7 +51,7 @@ def test_remove_items_falls_back_when_it_cannot_splice():
     assert remove_items("{a: [x, y]}\n", "a", lambda v: v == "x") is None  # flow mapping
     assert remove_items("a: [x, y]\n", "a", lambda v: False) == "a: [x, y]\n"
 
-# Mirrors the shapes found in a Capacities Markdown export (synthetic values).
+# Mirrors the shapes found in an exported Markdown file (synthetic values).
 SRC = (
     "type: 'Task'\n"
     "title: Write the docs\n"

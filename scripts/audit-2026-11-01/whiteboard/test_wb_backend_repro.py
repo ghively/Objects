@@ -164,7 +164,7 @@ def test_trash_restore_board_with_ink_and_media(root):
     item = space.delete_object(NETWORK)
     assert not (root / board_rel(NETWORK)).exists() and not (root / ink_rel(NETWORK)).exists()
     assert (root / "Attachments" / "pic.png").exists()
-    tdir = root / ".capacities" / "trash" / "whiteboards" / item.id
+    tdir = root / ".object" / "trash" / "whiteboards" / item.id
     assert (tdir / "board.json").read_bytes() == b_bytes
     assert (tdir / "ink.svg").read_bytes() == i_bytes
     # an orphan sidecar appears at the old stem meanwhile -> restore must not adopt it

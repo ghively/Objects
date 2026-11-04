@@ -71,7 +71,6 @@ describe('table cell alignment (M9)', () => {
     })
     const menu = await screen.findByRole('menu')
     const items = within(menu).getAllByRole('menuitemradio')
-    // EditorPanel.shortLabels.alignment; shortcuts.textAlignLeft/Center/Right.name
     expect(items.map((i) => i.textContent?.trim())).toEqual(['Align text left', 'Text align center', 'Text align right'])
     expect(items.map((i) => i.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false'])
     fireEvent.click(items[1])

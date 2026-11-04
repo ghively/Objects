@@ -9,9 +9,9 @@
 - **Views and space:** the row context menu and multi-select on type and query pages; **Import CSV** on a type page; type-constrained query tabs with "release constraint"; the sidebar's `workspaceOrder`.
 - **App:** a "Recalculate content index" control; whiteboard edits bump the board's `lastUpdated`.
 
-**Two items are a confirmation, not a feature**, because the reference shows Capacities has no such feature:
-- **Custom label as status:** Capacities does not let a user turn a label into a status. Task 15 confirms this and keeps today's behaviour.
-- **Default collection and `defaultPageViewId`:** Capacities has no user-facing behaviour here that Object lacks. See "Coverage" and "Decisions for Gene".
+**Two items are a confirmation, not a feature**, because the target behaviour has no such feature:
+- **Custom label as status:** a user cannot turn a label into a status. Task 15 confirms this and keeps today's behaviour.
+- **Default collection and `defaultPageViewId`:** there is no user-facing behaviour here that Object lacks. See "Coverage" and "Decisions for Gene".
 
 **Architecture.**
 - **One contract task, then five lanes** with disjoint files: **B** back end, **O** object page, **E** editor and rich property cells, **P** properties and settings, **V** views and sidebar. An **integrate** task follows.
@@ -26,13 +26,13 @@
 
 Considered and not added: `papaparse` (the parser is small), `jszip`/`fflate` (the zip is built server-side with `zipfile`).
 
-**Spec:** `docs/superpowers/specs/2026-10-23-object-design.md` §2 (in scope: everything Capacities does with objects and properties locally; out of scope: AI, sync, accounts, mobile, telemetry, network), §3, §4 (plain Markdown first, never write on read, edits change only their own lines), §5.
+**Spec:** `docs/superpowers/specs/2026-10-23-object-design.md` §2 (in scope: everything the app does with objects and properties locally; out of scope: AI, sync, accounts, mobile, telemetry, network), §3, §4 (plain Markdown first, never write on read, edits change only their own lines), §5.
 
-**Reference paths.** `R/` means `C:\Git\object\.reference\` (Gene's PC; the full unpacked app). `reference/` means the tracked trimmed copy, which holds the same `recovered-ts` models. Bundles are `R/app-unpacked/dist/*.js`, often one long line, so search them with `grep -o '.\{0,200\}KEY.\{0,200\}'`. **English strings** come from `R/app-unpacked/dist/virtual_intlify-i18n-0366822.js`, flattened as the M8 plan describes (`var e={…}` evaluated in a Node `vm` context, giving ~7,700 `key<TAB>text` rows). Every quoted label below is verbatim, with its key, unless it is marked "our string". Never copy Capacities code.
+**Labels and behaviour.** The behaviour catalog (`docs/behavior-catalog.md`) and the design spec. Every quoted label below is verbatim unless it is marked "our string".
 
 ## In-flight branches: start condition
 
-Four reference-fix branches are open while this plan is written, and they edit files M9 needs:
+Four fix branches (from the 2026-10-28 check of guessed values) are open while this plan is written, and they edit files M9 needs:
 
 | Branch (worktree) | Files that M9 also needs |
 |---|---|
@@ -66,20 +66,20 @@ Also carried forward:
   - Front-end tests mock `api` through `test/mockApi.ts`. **No task edits `properties/cells/cells.test.tsx`**; new cell tests go in new files.
   - The 1MB split timing test is load-sensitive: rerun it alone before calling it a failure.
 - **Commits:** each task commits only its own files, by explicit path. On `index.lock`, wait and retry. The message is the subject line, a blank line, then `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (or whichever model made the commit).
-- **Fidelity:** labels, keys, defaults and orders come from the reference. Anything the reference doesn't define is marked **"our choice"** or **"our string"** and listed in Task 22's hand-check.
+- **Fidelity:** labels, keys, defaults and orders come from the behaviour catalog and the design spec. Anything they don't define is marked **"our choice"** or **"our string"** and listed in Task 22's hand-check.
 - **Review once, at the end:** no per-task review. After Task 22: one whole-milestone review (correctness, file safety, fidelity), one fix pass, then the gate.
 
-### Storage (new on-disk keys; all use Capacities' model names)
+### Storage (new on-disk keys)
 
-| What | Where | Form | Capacities model |
+| What | Where | Form | Notes |
 |---|---|---|---|
-| Per-object wide layout | object frontmatter `wideLayoutMode: true\|false` (absent means the type's default) | YAML bool | `ComponentData.wideLayoutMode` (`component.model.ts:218`) |
-| Per-object wide cover | object frontmatter `wideCoverImage: true\|false` (absent means the type's default) | YAML bool | `entity.data.wideCoverImage` (the bundle writes it; index signature) |
-| Cover position | object frontmatter `coverImageOffset: 0–100` (y percent; absent means 50) | YAML number | `coverImageOffset?: CoverImageOffset` (`component.model.ts:184`, `{offset, referenceImageId}`). We keep only `offset`: `referenceImageId` exists so a changed image drops the offset, and Object does that by removing the key in the same write that changes `coverImage` (our choice) |
-| Embed view state | the embed's annotation option `localDataViewInfo="<JSON>"` on the `<!-- block: … -->` line before `![[collection:<id>]]` / `![[query:<id>]]`, written only after the first view change in the embed | M7 annotation grammar, one quoted option | `EntityBlock.localDataViewInfo: LocalDataViewInfo` = `{viewDefinition, filterGroup, sorts, groupBy}` (`dataView.model.ts:226`) |
-| Template date variable | template frontmatter on a `datetime` property: `{creation:day\|week\|month\|year}` (**already built** in `templates.py`; M9 adds only the UI and the write rule) | text | `DatetimeProperty.variable` (`property.model.ts:459`), `DATE_TEMPLATE_VARIABLES` (`date.model.ts:90`) |
-| Searchable | type JSON `propertyDefinitions[].isNotSearchable: true` (absent means searchable; **already honoured** by `searchtext.py:144-147`) | JSON | `PropertyDefinitionInterface.isNotSearchable` (`property.model.ts:162`) |
-| Sidebar section order | `ui.json` `workspaceOrder: ["objects", "pinned", "<sectionId>", …]` | JSON | `RootSpace` `workspaceOrder?: Array<'objects'\|'pinned'\|string>` (`component.model.ts:816`) |
+| Per-object wide layout | object frontmatter `wideLayoutMode: true\|false` (absent means the type's default) | YAML bool | |
+| Per-object wide cover | object frontmatter `wideCoverImage: true\|false` (absent means the type's default) | YAML bool | |
+| Cover position | object frontmatter `coverImageOffset: 0–100` (y percent; absent means 50) | YAML number | Only the offset is stored. A changed image drops the offset: Object removes the key in the same write that changes `coverImage` (our choice) |
+| Embed view state | the embed's annotation option `localDataViewInfo="<JSON>"` on the `<!-- block: … -->` line before `![[collection:<id>]]` / `![[query:<id>]]`, written only after the first view change in the embed | M7 annotation grammar, one quoted option | `{viewDefinition, filterGroup, sorts, groupBy}` |
+| Template date variable | template frontmatter on a `datetime` property: `{creation:day\|week\|month\|year}` (**already built** in `templates.py`; M9 adds only the UI and the write rule) | text | |
+| Searchable | type JSON `propertyDefinitions[].isNotSearchable: true` (absent means searchable; **already honoured** by `searchtext.py:144-147`) | JSON | |
+| Sidebar section order | `ui.json` `workspaceOrder: ["objects", "pinned", "<sectionId>", …]` | JSON | |
 | Inspector pinned | `localStorage` (per viewer, like the whiteboard inspector) | | |
 
 ## API contract (M9)
@@ -198,11 +198,11 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 2: Duplicate, back end (lane B; item 7)
 
-**Capacities evidence:**
-- `EntityMenu.duplicateObject.text` "Duplicate", icon `ph-copy` (`useSyncedSpacePreferences36682.js`).
-- Title rule in `storing36682.js`: `${title||t('general.untitled')} (${t('general.copy.noun')})`, giving **"<Title> (Copy)"** (`general.copy.noun` "Copy").
-- Properties are copied; linked objects stay links (`onlyLinkEntityProperties:!0`); `markEntitiesAsCopy`.
-- Not offered for types in `cannotBeDuplicatedInUI` (`R/recovered-ts/src/shared-logic/util/structureHeuristicsBackbone.ts`: media, RootDailyNote, structures, databases), nor for templates.
+**Target behaviour:**
+- "Duplicate", icon `ph-copy`.
+- Title rule: **"<Title> (Copy)"** ("Untitled (Copy)" for an untitled object).
+- Properties are copied; linked objects stay links.
+- Not offered for media types, daily notes, type definitions and collections, nor for templates.
 
 **Files:** Modify `backend/objectapp/space.py` (`Space.duplicate_object(path, now)`), `backend/objectapp/server.py` (route). Create `backend/tests/test_duplicate.py`.
 
@@ -213,7 +213,7 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
   - fresh `createdAt` and `lastUpdated`
 - A body whose first line is `# <Title>` gets `# <Title> (Copy)`.
 - Same folder, with a unique stem via `unique_path`.
-- Whiteboards are refused with 422. A board's sidecars would need copying too, and Capacities' whiteboard duplicate is not in our scope list (our choice; listed for Gene).
+- Whiteboards are refused with 422. A board's sidecars would need copying too, and whiteboard duplicate is not in our scope list (our choice; listed for Gene).
 
 **Tests:**
 - `test_duplicate_copies_bytes_except_id_title_stamps`
@@ -227,13 +227,13 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 3: Export, back end (lane B; item 7)
 
-**Capacities evidence:**
-- `EntityMenu.openExportMenu.text` "Export".
-- `entity.settings.export.heading` "Export", `.format.text` "Format", `.options.heading` "Options".
-- `entity.settings.md.description` "Markdown".
-- `.options.includeMedia.text` "Include media", with the description "Adds files and images to the zip."
-- `.success` "The export is ready and will be downloaded."
-- Capacities' other formats (PDF, Microsoft Word, LaTeX) and the options "Include title as heading 1", "Export folder containing all subpages", "Links as wikilinks" and "Include embedded content" exist. Object's file already **is** Markdown with wikilinks, so M9 offers Markdown with "Include media" only (our choice, listed).
+**Target behaviour:**
+- Object menu item "Export".
+- Dialog heading "Export", "Format", options heading "Options".
+- Format "Markdown".
+- Option "Include media", with the description "Adds files and images to the zip."
+- Success toast "The export is ready and will be downloaded."
+- Other formats (PDF, Microsoft Word, LaTeX) and the options "Include title as heading 1", "Export folder containing all subpages", "Links as wikilinks" and "Include embedded content" are out of scope here. Object's file already **is** Markdown with wikilinks, so M9 offers Markdown with "Include media" only (our choice, listed).
 
 **Files:** Create `backend/objectapp/export.py` and `backend/tests/test_export.py`. Modify `backend/objectapp/server.py` (the route).
 
@@ -253,11 +253,11 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 4: Back-end rules for template variables, per-object layout keys, `workspaceOrder` (lane B; back-end parts of items 3, 5–6, 12)
 
-**Capacities evidence:**
-- `DatetimeProperty.variable` is "Set only on templates", per the comment at `property.model.ts:456-460`.
-- `component.model.ts:184,218` (`coverImageOffset`, `wideLayoutMode`).
-- `RenderCoverImage` clears the offset when the image changes ("referenceImageId!==t&&(…coverImageOffset=void 0)", `RootEntity36682.js`).
-- `workspaceOrder` (`component.model.ts:816`).
+**Target behaviour:**
+- A date property's template variable is set only on templates.
+- `coverImageOffset` and `wideLayoutMode` are per-object keys.
+- Changing the cover image clears the offset.
+- `workspaceOrder` is a space-level UI key.
 
 **Files:** Modify `backend/objectapp/space.py` (`update_properties` rules), `backend/objectapp/typedefs.py` (add `wideLayoutMode`, `wideCoverImage` and `coverImageOffset` to the reserved keys at line ~43, so v1 inference never makes them properties), `backend/objectapp/server.py` (`_UI_PATCH_KEYS` gains `workspaceOrder`; `_ui_problem` checks it), `backend/objectapp/uistate.py` (only if the shape check lives there). Create `backend/tests/test_m9_props.py`.
 
@@ -274,10 +274,10 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 5: Whiteboard edits bump `lastUpdated` (lane B; item 15)
 
-**Capacities evidence:**
-- `RootWhiteboard` has the system property `lastUpdated` (`R/recovered-ts/src/shared-logic/util/basicStructures.ts:490`, around line 634).
-- `lastUpdated` is component-level (`component.model.ts:283`), and the canvas is component data.
-- **No client code was found that proves the bump.** M6's "Capacities does" is an inference from the model. Gene chose the bump anyway (audit, "Choices worth revisiting").
+**Target behaviour:**
+- A whiteboard has the system property `lastUpdated`.
+- `lastUpdated` belongs to the object, and the canvas is part of the object.
+- **The bump on canvas edits is an inference, not a confirmed behaviour.** Gene chose the bump anyway (audit, "Choices worth revisiting").
 
 **Files:** Modify `backend/objectapp/whiteboardstore.py` (after `_save_sidecar` in `save_board`/`save_ink`, call a stamp-only `Space.touch(md_rel, now)`), `backend/objectapp/space.py` (add `touch`: sets only `lastUpdated` through `frontmatter.set_keys`, with `encode_like` and `atomic_write`, under the lock; a no-op when the stored stamp is under **60 s** old (our choice); no history snapshot for a stamp-only write (our choice)), `backend/objectapp/whiteboardapi.py` (return `mdVersion`; announce `changed` for the `.md`), `frontend/src/api/whiteboardTypes.ts`, `frontend/src/whiteboard/WhiteboardPage.tsx` (the Notes state adopts `mdVersion` so its next body save doesn't hit 409). Also revise the M6 docstring in `whiteboardstore.py` lines 8–13.
 
@@ -297,18 +297,18 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 6: Text stats and the page Floating Inspector (lane O; item 4)
 
-**Capacities evidence:**
-- `DesignThemes.encyclopedia.description`: "Side properties, with a table of contents, linked objects, and text stats."
-- **In the current build, that sidebar is gone.** The `xRay.*` strings ("Table of contents", "Objects inside", "Text stats") have no live call site. The table of contents and the stats now live in `FloatingInspector` on every page:
-  - `FloatingInspector.tabs.outline` "Outline", `.tabs.stats` "Stats", `.emptyOutline` "No headings in this page", `.pin` "Pin" / `.unpin` "Unpin".
-- The stats come from `LocationManager36682.js` `calculateTextStats`, on the page's plain text with math excluded:
+**Target behaviour:**
+- The Encyclopedia design's description: "Side properties, with a table of contents, linked objects, and text stats."
+- **The current design has no such sidebar.** The old sidebar strings ("Table of contents", "Objects inside", "Text stats") are unused. The table of contents and the stats live in a Floating Inspector on every page:
+  - tabs "Outline" and "Stats", empty state "No headings in this page", "Pin" / "Unpin".
+- The stats are computed on the page's plain text with math excluded:
   - words: `Intl.Segmenter` word segments with `isWordLike`, where hyphen-joined words count as one
   - characters: graphemes, whitespace included
   - sentences: sentence segments
   - paragraphs: `split(/\n/).length`, or 0 when empty
-- Order: words, sentences, paragraphs, characters; then "Created" and "Last updated" (`propertyTypes.entity_createdAt.name`, `entity_lastUpdated.name`; Created is hidden for daily notes).
-- Labels: `textStats.wordCount` "word | words", `.sentenceCount`, `.paragraphCount`, `.charCount`.
-- The encyclopedia cover sits above the content column when the layout isn't wide (`RootEntity36682.js`).
+- Order: words, sentences, paragraphs, characters; then "Created" and "Last updated" (Created is hidden for daily notes).
+- Labels: "word | words", and the same pattern for sentences, paragraphs and characters.
+- The encyclopedia cover sits above the content column when the layout isn't wide.
 
 **Files:**
 - Create `frontend/src/object/textStats.ts` (`plainText(markdown)` strips Markdown syntax and `$…$`/`$$` math; `textStats(text, locale)`), `frontend/src/object/textStats.test.ts`, `frontend/src/object/PageInspector.tsx` (tabs Outline and Stats; the Outline lists headings and scrolls to them; pinned state in `localStorage`; the look follows `whiteboard/chrome/FloatingInspector.tsx`, which is read, not edited) and `frontend/src/object/PageInspector.test.tsx`.
@@ -325,15 +325,15 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 7: Per-object wide layout, wide cover, reposition cover (lane O; items 5, 6)
 
-**Capacities evidence:**
+**Target behaviour:**
 - Wide layout:
-  - `RootPagePage.enterWideMode` "Wide layout" / `leaveWideMode` "Normal layout" (icons `ph-arrows-out-simple` / `ph-arrows-in-simple`). Hidden for whiteboards and for the `indexCard` design.
-  - Type text `StructureSpecificSettings.layoutConfig.wideLayoutMode.description` ("…override this default setting for individual entries").
+  - "Wide layout" / "Normal layout" (icons `ph-arrows-out-simple` / `ph-arrows-in-simple`). Hidden for whiteboards and for the `indexCard` design.
+  - The type setting's description says entries can "override this default setting for individual entries".
 - Wide cover:
-  - `CoverImageManager.toggleWideCoverImage` "Toggle wide cover image".
+  - "Toggle wide cover image".
   - Logic: when the object has no value, set it to the opposite of the type's mode; otherwise flip it.
 - Reposition:
-  - `CoverImageManager.toggleCoverImageReposition` "Reposition cover image", `RenderCoverImage.dragImageHint` "Drag image to reposition", `.saveRepositioning` "Save", `.cancelRepositioning` "Cancel".
+  - "Reposition cover image", hint "Drag image to reposition", "Save", "Cancel".
   - The offset is a y percent from 0 to 100, default 50, applied as `object-position: 0% <offset>%` with `object-fit: cover`.
   - Dragging sets offset = start − dy / renderedHeight × 100, clamped. Clicking outside saves.
 
@@ -361,14 +361,14 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 8: Object `…` menu: Duplicate, Text Stats, Export (lane O; item 7)
 
-**Capacities evidence:**
-- Entity menu sections, in order (`RootEntity36682.js`, `km.value.object.*`):
-  - … share, presentationMode, **export**, import, download
-  - versionHistory, **textStats**
-  - copy ▸
-  - **duplicate**, …, deleteEntity
-- `EntityMenu.textStats.text` "Text Stats" (icon `ph-chart-bar`) opens a submenu titled `xRay.textStats.header` "Text stats", showing the same rows as the inspector's Stats.
-- **Import CSV is not an object-menu item.** `EntityMenu.importCsv` has no live call site. The live path is a type or collection import (`database.options.options.importCsv.text`), so it moves to Task 19.
+**Target behaviour:**
+- Object menu sections, in order:
+  - … Share, Presentation mode, **Export**, Import, Download
+  - Version history, **Text Stats**
+  - Copy ▸
+  - **Duplicate**, …, Delete
+- "Text Stats" (icon `ph-chart-bar`) opens a submenu titled "Text stats", showing the same rows as the inspector's Stats.
+- **Import CSV is not an object-menu item.** It is a type or collection import, so it moves to Task 19.
 
 **Files:**
 - Modify `frontend/src/object/ObjectView.tsx`:
@@ -390,9 +390,9 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 9: `blocks` (Content) property uses the block editor (lane E; item 9)
 
-**Capacities evidence:**
-- `propertyTypes.blocks.name` "Content", described as "The main notes area of an object — rich text with formatting and linking."
-- `BlocksPropertyDefinition` (`property.model.ts:276`, `dataType:'blocks'`).
+**Target behaviour:**
+- The property kind is named "Content", described as "The main notes area of an object — rich text with formatting and linking."
+- Its data type is `blocks`.
 - It uses the same block editor as the body.
 
 **Files:**
@@ -416,9 +416,9 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 10: Rich-text (`textBlock`) property with links (lane E; item 8; after Task 9)
 
-**Capacities evidence:**
-- `propertyTypes.textBlock.name` "Text", described as "A single paragraph that allows formatting and linking."
-- The value is one `TextBlock` with tokens (`property.model.ts:190`).
+**Target behaviour:**
+- The property kind is named "Text", described as "A single paragraph that allows formatting and linking."
+- The value is one text block with inline tokens.
 - Links use the body's token editor.
 - No textBlock-specific picker string exists, so the `[[` picker is the body's.
 
@@ -440,10 +440,10 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 11: Embedded views keep their own layout, filters, sorts and group (lane E; item 2)
 
-**Capacities evidence:**
-- `EntityBlock.localDataViewInfo` (`blocks.model.ts:234-246`).
-- `LocalDataViewInfo` = `{viewDefinition, filterGroup, sorts, groupBy}` (`dataView.model.ts:226-231`).
-- `RootEntity36682.js` `Mk`: the block uses its own `localDataViewInfo` when present, else the collection's or query's view. The first change copies that view into the block: "r.value.block.localDataViewInfo=Ak(e.value,…)".
+**Target behaviour:**
+- An embed block can carry its own view state.
+- That state is `{viewDefinition, filterGroup, sorts, groupBy}`.
+- The block uses its own view state when present, else the collection's or query's view. The first change copies that view into the block.
 
 **Files:**
 - Modify `frontend/src/editor/annotations.ts` (a `KNOWN_OPTIONS` entry `localDataViewInfo`, quoted, `appliesTo` `dataView`; the value is one line, with `\"`, `\\` and `\>` escapes).
@@ -465,13 +465,13 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 12: Alignment entry in the block menu (lane E; item 10; last in lane E, after the block-menu branch is in `master`)
 
-**Capacities evidence:**
-- `TextAlignmentInterface.textAlignment: 'left'|'center'|'right'` on TextBlock and GroupBlock (`blocks.model.ts:125`).
-- `LocationManager36682.js` `EditorPanel` renders an "Alignment" dropdown (`EditorPanel.shortLabels.alignment`, icon `ph-text-align-left-bold`) with items "Align text left" / "Text align center" / "Text align right" (`shortcuts.textAlign*.name`, icons `ph-text-align-*-bold`).
-- **That dropdown is gated on a selection containing a simple-table cell** (`on=…find(e=>e.referenceTableCell)`).
-- Capacities' block menu (reference-check §2e) has **no** alignment item, and it binds no keys to these actions (reference-check §1).
+**Target behaviour:**
+- Text and group blocks have a text alignment: `'left'|'center'|'right'`.
+- The editor panel renders an "Alignment" dropdown (icon `ph-text-align-left-bold`) with items "Align text left" / "Text align center" / "Text align right" (icons `ph-text-align-*-bold`).
+- **That dropdown is shown only when the selection contains a simple-table cell.**
+- The block menu (reference-check §2e) has **no** alignment item, and no keys are bound to these actions (reference-check §1).
 
-**Decision for Gene:** the audit asked for a block-menu entry. Capacities only offers alignment for table cells. **Recommended:** an "Alignment" ▸ submenu with Capacities' three labels in `BlockStyleMenu`, shown only for blocks that take the `align` option. This is a superset of Capacities, since Object already aligns any block by key. **Alternative:** no menu entry at all.
+**Decision for Gene:** the audit asked for a block-menu entry. Alignment is otherwise offered only for table cells. **Recommended:** an "Alignment" ▸ submenu with the three labels above in `BlockStyleMenu`, shown only for blocks that take the `align` option. This is a superset, since Object already aligns any block by key. **Alternative:** no menu entry at all.
 
 **Files:** Modify `frontend/src/editor/menus/BlockStyleMenu.tsx` (the submenu calls the exported `setOptionOnBlocks(editor, 'align', null|'center'|'right')` from `editor/extensions/blockSelection.ts`, unchanged; active state from the block's options). Test in `frontend/src/editor/menus/BlockStyleMenu.m9.test.tsx`.
 
@@ -485,9 +485,9 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 13: "Searchable" toggle in property settings (lane P; item 1)
 
-**Capacities evidence:**
-- `isNotSearchable` (`property.model.ts:162`) is set only on built-in definitions (`storing36682.js`: media MIME type, file size, duration, and a structure's `pluralName`).
-- **No user-facing label exists**: no string for "searchable", "Include in search" or "exclude" was found in the i18n file.
+**Target behaviour:**
+- `isNotSearchable` is set only on built-in definitions (media MIME type, file size, duration, and a type's plural name).
+- **No user-facing label exists** for "searchable", "Include in search" or "exclude".
 
 **Decision for Gene:** fidelity alone says no toggle. Gene approved the item, so the label is **our string**: "Include in search", with the description "Off: this property's values don't appear in search results." (our string).
 
@@ -502,11 +502,11 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 14: Template date variables in the date cell (lane P; item 3)
 
-**Capacities evidence:**
-- `DatetimeCell.templateVariable.emptyState` "Select variable"; `.day` "Day of creation", `.week` "Week of creation", `.month` "Month of creation", `.year` "Year of creation".
-- They are offered only on a template, for a `datetime` property that is not a system date (`RootEntity36682.js` DatetimeCell).
+**Target behaviour:**
+- Empty state "Select variable"; options "Day of creation", "Week of creation", "Month of creation", "Year of creation".
+- They are offered only on a template, for a `datetime` property that is not a system date.
 - Picking one clears the date value. "Select variable" removes the variable.
-- They are resolved when the template is applied (`property.model.ts:456-460`; `storing36682.js`). Object's resolver is already built (`backend/objectapp/templates.py` `resolve_date_variable`, used by `space.py` `_template_edit`).
+- They are resolved when the template is applied. Object's resolver is already built (`backend/objectapp/templates.py` `resolve_date_variable`, used by `space.py` `_template_edit`).
 
 **Files:** Modify `frontend/src/properties/cells/DateCell.tsx` (when the open object is a template and `def.type === 'datetime'`, add the variable picker; a `{creation:<v>}` value displays as its label, not as an invalid date). Test in `frontend/src/properties/cells/DateCell.m9.test.tsx`.
 
@@ -520,26 +520,26 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 15: Custom label as status: confirm and keep (lane P; item 13)
 
-**Capacities evidence:**
-- `LabelPropertyDefinition.isStatus` and `LabelItem.statusCategory` exist (`property.model.ts:309-327`).
-- **`isStatus:!0` is set in exactly one place**: the basic Task `status` definition (`storing36682.js`).
-- No string offers "Use as status". The only status strings are `RootTaskCheckbox.*`, `LabelCell.editLabelItem.newStatus` "New status", and the task dashboard sections.
-- One heuristic: `storing36682.js` `Mw()` treats a label as status-like **for group ordering** when it is the Task status, has `isStatus`, or its name contains "status".
-- Verdict: **Capacities has no custom-label status.** Object already matches: `space.py` `_check_label` refuses a new `isStatus` ("Only the basic Task status is a status label"), as the M2 plan line 87 intended.
+**Target behaviour:**
+- A label property can be a status (`isStatus`), and its options carry a status category.
+- **`isStatus` is set in exactly one place**: the basic Task `status` definition.
+- No string offers "Use as status". The only status strings are the task checkbox, "New status" in the label cell, and the task dashboard sections.
+- One heuristic: a label counts as status-like **for group ordering** when it is the Task status, has `isStatus`, or its name contains "status".
+- Verdict: **there is no custom-label status.** Object already matches: `space.py` `_check_label` refuses a new `isStatus` ("Only the basic Task status is a status label"), as the M2 plan line 87 intended.
 
 **Files:** lane B owns the back end, so this task only adds the front-end regression guard `frontend/src/properties/PropertySettings.status.m9.test.tsx` (`test no status toggle on custom labels`, green from the start). Optional, only if Gene picks it: the "name contains status" group ordering in `frontend/src/views/group.ts`, with `views/group.m9.test.ts`.
 
 **Also check:** the M8 plan line 501 says the basic Project type has "Status (label as status)". If `basicsetup.py` seeds `isStatus` on Project, report it to Task 22 as a finding (lane B is done by then; the fix goes in the end fix pass).
 
-**Steps:** write the guard test (green from the start), commit `test(properties): custom labels are not status labels (Capacities)`.
+**Steps:** write the guard test (green from the start), commit `test(properties): custom labels are not status labels`.
 
 ### Task 16: "Recalculate content index" control (lane P; item 14)
 
-**Capacities evidence:**
-- `ContentLoadingStateIndicator.recomputeBacklinkIndex.button` "Recalculate content index" (icon `ph-file-magnifying-glass`).
-- `.description` "If some of your views are inconsistent or search results are not returning content, you can reindex your notes. This is usually not needed, only use it if you are having issues."
-- While it runs: `recomputingBacklinkIndex.heading` "Content is being indexed", `.description` "Your notes are getting analyzed for search, backlinking, and your content views."
-- Capacities places it under Settings › "Offline & Sync" › "Offline". Object has no such section, so it goes in the Space section (our choice).
+**Target behaviour:**
+- Button "Recalculate content index" (icon `ph-file-magnifying-glass`).
+- Description "If some of your views are inconsistent or search results are not returning content, you can reindex your notes. This is usually not needed, only use it if you are having issues."
+- While it runs: heading "Content is being indexed", description "Your notes are getting analyzed for search, backlinking, and your content views."
+- It would sit under an "Offline & Sync" › "Offline" settings section. Object has no such section, so it goes in the Space section (our choice).
 
 **Files:** Modify `frontend/src/settings/sections/SpaceSettings.tsx` (a row with the button calling `api.reindex()`; while search reports `partial`, it shows the indexing heading and description). Test in `frontend/src/settings/sections/SpaceSettings.m9.test.tsx`.
 
@@ -552,13 +552,13 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 17: Row context menu on type and query pages (lane V; item 11, part 1)
 
-**Capacities evidence** (the DataView context menu in `RootEntity36682.js`; labels from `EntityMenu.*`):
-- "Select multiple" (`selectMultiple.text`)
+**Target behaviour** (the data-view row context menu):
+- "Select multiple"
 - "Open in side panel", "Open in new tab"
 - "Change type"
-- "Copy object reference" (`copyEntityReference.text`, toast "Link to object copied")
+- "Copy object reference" (toast "Link to object copied")
 - "Duplicate"
-- "Delete Object" (`deleteEntity.text`)
+- "Delete Object"
 - "Remove from collection" only in a collection.
 
 **Files:**
@@ -577,10 +577,10 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 18: Multi-select and bulk actions (lane V; item 11, part 2)
 
-**Capacities evidence:**
-- Header "<n> selected" (`blocksMenu.blocksSelected`).
-- Bulk actions (`ActionItems.*`): "Change type of selected objects" (`bulkContentTypeChange.title`), "Open selected objects in side panel" (`bulkOpenInSidepanel.title`), "Delete objects" (`deleteEntities.title`).
-- The confirm button reads "Delete {count} object | Delete {count} objects" (`DeleteHandler.content.fullDeleteButton`).
+**Target behaviour:**
+- Header "<n> selected".
+- Bulk actions: "Change type of selected objects", "Open selected objects in side panel", "Delete objects".
+- The confirm button reads "Delete {count} object | Delete {count} objects".
 - Entering selection: "Select multiple" in the row menu. Ctrl/Shift-click also selects (our choice).
 
 **Files:**
@@ -604,16 +604,16 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 19: Import CSV on a type page (lane V; item 7)
 
-**Capacities evidence:**
-- `database.options.options.importCsv.text` "Import CSV" (icon `ph-file-csv`).
-- `CSVImportModal.heading` "Batch import to collection".
-- `.description` "You can upload a CSV that will be transformed into a collection. Every row will create one entity."
-- `.headerRow.title` "Has a header row", `.headerRow.description` "First row in CSV holds column names and is not itself a data row."
-- `.newCollection` 'New collection "{title}"'.
-- `.warning.heading` "Use this with caution", `.warning.text` ("…You can quickly spam your whole space if you import big tables.").
+**Target behaviour:**
+- Type or collection menu item "Import CSV" (icon `ph-file-csv`).
+- Dialog heading "Batch import to collection".
+- Description "You can upload a CSV that will be transformed into a collection. Every row will create one entity."
+- "Has a header row", described as "First row in CSV holds column names and is not itself a data row."
+- 'New collection "{title}"'.
+- Warning heading "Use this with caution", text ("…You can quickly spam your whole space if you import big tables.").
 - `.notSupported` ("…up to {rowLimit} rows"); the `rowLimit` value was not found, so it is **1000** (our choice).
 - `.errors.readingError`.
-- `PropertyTransformation.info` "Add {entriesLength} new {structurePlural} to"; `.propertyMapping.heading` "Property Mappings"; `.propertyMapping.description.text` "Multiple values can be mapped to the same property, but only the first transferred value is kept."
+- "Add {entriesLength} new {structurePlural} to"; heading "Property Mappings"; description "Multiple values can be mapped to the same property, but only the first transferred value is kept."
 
 **Files:**
 - Create `frontend/src/lib/csvParse.ts` (RFC 4180: quotes, doubled quotes, CRLF, a BOM; the inverse of `editor/table/csv.ts` `toCsv`), `frontend/src/lib/csvParse.test.ts`, `frontend/src/types/ImportCsvDialog.tsx` and `frontend/src/types/ImportCsvDialog.test.tsx`.
@@ -633,9 +633,9 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 20: Type-constrained query tabs and "release constraint" (lane V; item 12)
 
-**Capacities evidence:**
-- `components.RootQuery.queryBuilder.releaseConstraintTooltip`: "Turn into a normal query and remove the single type constraint. Opens the query as a page and removes this tab from the type dashboard."
-- The constraint is computed, not stored (`storing36682.js` `singleStructureQueryInfo`: a query in `structures` mode with exactly one type). `RootQueryData` has no constraint field (`component.model.ts:955`).
+**Target behaviour:**
+- Release button tooltip: "Turn into a normal query and remove the single type constraint. Opens the query as a page and removes this tab from the type dashboard."
+- The constraint is computed, not stored: a query in `structures` mode with exactly one type. A query has no constraint field.
 
 **Files:**
 - Modify `frontend/src/queries/QueryBuilder.tsx`: when shown as a tab on a type dashboard for a single-type query, the type picker is locked to that type, with a release button carrying the tooltip.
@@ -653,13 +653,13 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 ### Task 21: Sidebar `workspaceOrder` (lane V; item 12)
 
-**Capacities evidence:**
-- `workspaceOrder` orders the sidebar's top-level sections: `'objects'` (the types block), `'pinned'` and custom section ids. They can be dragged into order (`LocationManager36682.js` `modelValue:e.space.data.workspaceOrder`; `RootEntity36682.js` sorts by `workspaceOrder.indexOf`).
+**Target behaviour:**
+- `workspaceOrder` orders the sidebar's top-level sections: `'objects'` (the types block), `'pinned'` and custom section ids. They can be dragged into order.
 - Unknown ids are ignored. Missing ones keep their default place after the listed ones (our reading).
 
 **Files:** Modify `frontend/src/shell/Sidebar.tsx` and `frontend/src/shell/SidebarSections.tsx` (render order from `ui.workspaceOrder`; drag the section headers to reorder, saved with `api.patchUi({workspaceOrder})`). Test in `frontend/src/shell/Sidebar.m9.test.tsx`.
 
-**Not in M9:** the types block's own "Sort Alphabetically" / "Sort Manually" / "Reorder" (`WorkspaceSectionMenu.items.*`, `objectsSectionSortOption`). Capacities keeps the manual order through each type's default collection, which Object doesn't model, so it needs a new key. That is Gene's call.
+**Not in M9:** the types block's own "Sort Alphabetically" / "Sort Manually" / "Reorder". A manual order there would need a new key. That is Gene's call.
 
 **Tests:**
 - `test sections render in workspaceOrder`
@@ -695,9 +695,9 @@ On a copy of the CPI export outside the repo, with `git init` done there:
 - [ ] Opening the space, exporting and reading stats change nothing (`git status` clean).
 - [ ] Duplicate a page, a task and a tag: the copies are named "<Title> (Copy)" and the source is untouched. The menu offers no Duplicate on a daily note, template or whiteboard.
 - [ ] Export a page as Markdown, then with "Include media": the zip opens, and images and attachments are inside.
-- [ ] Text Stats in the `…` menu and the inspector's Stats tab agree with Capacities on the same note (words, sentences, paragraphs, characters).
+- [ ] Text Stats in the `…` menu and the inspector's Stats tab agree with a hand count on the same note (words, sentences, paragraphs, characters).
 - [ ] The page inspector: the Outline jumps to headings, and Pin/Unpin is remembered.
-- [ ] Wide layout / Normal layout per object overrides the type. Toggling the wide cover and repositioning the cover (drag, Save, Cancel) look like Capacities. A new cover image resets the position.
+- [ ] Wide layout / Normal layout per object overrides the type. Toggling the wide cover and repositioning the cover (drag, Save, Cancel) look as specified. A new cover image resets the position.
 - [ ] Content property: the full block editor works in the property panel. A note edited there reloads identically.
 - [ ] Text property: `[[` opens the picker, links show as chips, and renaming the target updates the link.
 - [ ] Template date variables: "Day/Week/Month/Year of creation" on a template's date property; a new object from it gets the right date or range.
@@ -709,17 +709,17 @@ On a copy of the CPI export outside the repo, with `git init` done there:
 - [ ] Sidebar sections: drag to reorder, restart, and the order is kept.
 - [ ] "Recalculate content index" runs and the indexing state shows.
 - [ ] Draw on a whiteboard: its "Last updated" moves, at most once a minute. The board's Notes still save.
-- [ ] Every "our choice" and "our string" in this plan, against Capacities: the 60 s bump throttle and no history snapshot for it; whiteboard Duplicate refused; Export only Markdown and media; the 1000-row CSV limit; Ctrl/Shift-click selection; the reindex control's place; the "Include in search" label; alignment as a block-menu superset; dropping `referenceImageId`.
+- [ ] Every "our choice" and "our string" in this plan: the 60 s bump throttle and no history snapshot for it; whiteboard Duplicate refused; Export only Markdown and media; the 1000-row CSV limit; Ctrl/Shift-click selection; the reindex control's place; the "Include in search" label; alignment as a block-menu superset; dropping `referenceImageId`.
 - [ ] The side-by-side look of every M9 screen in Light and Dark.
 
 ## Coverage
 
 | Audit row (2026-10-28) | Task |
 |---|---|
-| Property "searchable" flag | 13 (our label: Capacities has none) |
+| Property "searchable" flag | 13 (our label: there is no existing one) |
 | Embedded collection/query views keep their own view | 11 |
 | Template date variables | 4 (write rule), 14 (UI); the resolver is already built |
-| Encyclopedia layout: table of contents, linked objects, text stats | 6 (Capacities' current Floating Inspector: Outline and Stats on every page; encyclopedia cover placement). The old xRay sidebar ("Objects inside") is dead code in Capacities, so it is not built (see Decisions) |
+| Encyclopedia layout: table of contents, linked objects, text stats | 6 (a Floating Inspector: Outline and Stats on every page; encyclopedia cover placement). The old sidebar ("Objects inside") is not built (see Decisions) |
 | Per-object wide layout and wide-cover override | 4, 7 |
 | Reposition cover image (`coverImageOffset`) | 4, 7 |
 | Object `…` menu: Duplicate, Text Stats, Import CSV, Export | 2, 3, 8; Import CSV is on the type page, 19 |
@@ -729,9 +729,9 @@ On a copy of the CPI export outside the repo, with `git init` done there:
 | Row context menu and multi-select on type and query pages | 17, 18 |
 | M2/M3 deferral: type-constrained queries | 20 |
 | M2/M3 deferral: `workspaceOrder` | 4, 21 |
-| M2/M3 deferral: default collection | **no build:** a type page already is the type's default collection (`isDefaultDatabase`, `component.model.ts:903`; Capacities renders the default database as the type page). The key round-trips in `collections.py` today. Gene confirms |
-| M2/M3 deferral: `defaultPageViewId` | **no build:** in Capacities it selects a custom page design from the structure design studio, which Object doesn't have. The key round-trips in the type JSON. Gene confirms |
-| Custom label as status | 15 (confirmed: Capacities has none; regression guard) |
+| M2/M3 deferral: default collection | **no build:** a type page already is the type's default collection (`isDefaultDatabase`). The key round-trips in `collections.py` today. Gene confirms |
+| M2/M3 deferral: `defaultPageViewId` | **no build:** it selects a custom page design from a design studio, which Object doesn't have. The key round-trips in the type JSON. Gene confirms |
+| Custom label as status | 15 (confirmed: not a feature; regression guard) |
 | Search reindex control | 16 |
 | Choice reversed: board edits bump `lastUpdated` | 5 |
 
@@ -755,25 +755,25 @@ Workflow args, if lanes aren't supported: `{"plan":"docs/superpowers/plans/2026-
 
 ## Gene's answers (2026-10-28) — these override the recommendations below
 
-- **Alignment (Task 12): keep block alignment.** Build the "Alignment" ▸ submenu in the block menu for any block that takes `align`, with Capacities' three labels, AND the table-cell "Alignment" dropdown Capacities shows when a table cell is selected (if Object lacks it). Block alignment no longer has keys (the shortcuts fix removed them to match Capacities), so the menu is its only entry point.
-- **Searchable (Task 13): skip.** Do not build the toggle; the flag stays file-only, as in Capacities. Lane P drops Task 13.
+- **Alignment (Task 12): keep block alignment.** Build the "Alignment" ▸ submenu in the block menu for any block that takes `align`, with the three labels, AND the table-cell "Alignment" dropdown shown when a table cell is selected (if Object lacks it). Block alignment no longer has keys (the shortcuts fix removed them), so the menu is its only entry point.
+- **Searchable (Task 13): skip.** Do not build the toggle; the flag stays file-only. Lane P drops Task 13.
 - **Encyclopedia (Task 6): Floating Inspector,** as recommended.
-- **Default collection and `defaultPageViewId`: build anyway.** New Task 23 (lane V, after Task 21): find in `.reference/` every user-facing behaviour behind `isDefaultDatabase` (en.json label "Default collection") and `defaultPageViewId` (component.model.ts:183 per object, :875 per structure) and build exactly that. Do not invent behaviour: if Capacities shows no UI for one of them, keep the key round-tripping and report it in the lane's final message.
+- **Default collection and `defaultPageViewId`: build anyway.** New Task 23 (lane V, after Task 21): find every user-facing behaviour behind `isDefaultDatabase` (label "Default collection") and `defaultPageViewId` (per object and per type) and build exactly that. Do not invent behaviour: if there is no UI for one of them, keep the key round-tripping and report it in the lane's final message.
 - **Custom label as status (Task 15):** keep today's guard; do not add the "name contains status" ordering.
 
 ## Decisions for Gene
 
-1. **Alignment (Task 12):** Capacities offers it only for selected table cells, never in the block menu. Build the block-menu superset (recommended, as the audit asked), or skip it.
-2. **Searchable (Task 13):** Capacities has no UI for it. Build with our label "Include in search" (recommended, since you approved it), or keep it JSON-only.
-3. **Encyclopedia (Task 6):** Capacities' current build shows the TOC and stats in a Floating Inspector on every page; the encyclopedia sidebar ("Objects inside") is dead code. Recommended: follow the current build. Alternative: rebuild the old xRay sections for encyclopedia types only.
+1. **Alignment (Task 12):** alignment is otherwise offered only for selected table cells, never in the block menu. Build the block-menu superset (recommended, as the audit asked), or skip it.
+2. **Searchable (Task 13):** there is no UI for it. Build with our label "Include in search" (recommended, since you approved it), or keep it JSON-only.
+3. **Encyclopedia (Task 6):** show the TOC and stats in a Floating Inspector on every page, with no encyclopedia sidebar ("Objects inside"). Recommended: the Floating Inspector. Alternative: build the old sidebar sections for encyclopedia types only.
 4. **Default collection and `defaultPageViewId`:** recommend closing them as "no build" (see Coverage).
-5. **Custom label as status (Task 15):** Capacities doesn't support it; keep today's guard. Optional: the "name contains status" group ordering.
-6. **Whiteboard `lastUpdated` (Task 5):** there is no direct proof Capacities bumps it on canvas edits; it is inferred from the model. The 60 s throttle is ours.
-7. **Not in M9:** the sidebar types' Sort Alphabetically / Manually (needs a key Capacities doesn't have); bulk Edit property / Edit tags / Export; export to PDF, Word or LaTeX; duplicating whiteboards.
+5. **Custom label as status (Task 15):** not supported; keep today's guard. Optional: the "name contains status" group ordering.
+6. **Whiteboard `lastUpdated` (Task 5):** the bump on canvas edits is inferred, not confirmed. The 60 s throttle is ours.
+7. **Not in M9:** the sidebar types' Sort Alphabetically / Manually (needs a new key); bulk Edit property / Edit tags / Export; export to PDF, Word or LaTeX; duplicating whiteboards.
 
 ## Change history
 
-- **2026-10-28:** written at `fb931dc`, with four reference-fix branches open (see "In-flight branches"). Built-code facts used:
+- **2026-10-28:** written at `fb931dc`, with four fix branches open (see "In-flight branches"). Built-code facts used:
   - `templates.py` already resolves `{creation:…}`
   - `searchtext.py` honours `isNotSearchable`
   - `typemodel.py` keeps unknown type and property keys

@@ -137,7 +137,7 @@ describe('VersionHistoryDialog', () => {
     await waitFor(() => expect(mocked.history).toHaveBeenCalledTimes(2))
     expect(useVersionHistory.getState().path).toBe(PATH)
 
-    // Any other failure says the reference's restore error.
+    // Any other failure says the restore error.
     mocked.restoreVersion.mockRejectedValue(new ApiError(500, 'boom'))
     fireEvent.click((await screen.findAllByRole('option'))[0])
     fireEvent.click(await screen.findByRole('button', { name: S.restore }))
@@ -162,7 +162,7 @@ describe('VersionHistoryDialog', () => {
     )
   })
 
-  test('test empty and error states use reference strings', async () => {
+  test('test empty and error states use the expected strings', async () => {
     mocked.history.mockResolvedValue([])
     openDialog()
     expect(await screen.findByText('No version history available yet')).toBeTruthy()

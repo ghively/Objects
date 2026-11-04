@@ -39,7 +39,7 @@ export const TEMPLATE_TEXT = {
   isDefault: 'Default',
   remove: 'Delete Template',
   create: 'New Template',
-  /** The DailyNote type's no-template choice (`components.RootDailyNote.templates.empty.label`). */
+  /** The DailyNote type's no-template choice. */
   emptyNote: 'Empty Note',
 }
 

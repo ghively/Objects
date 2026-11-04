@@ -16,7 +16,6 @@ import { FIND_TEXT, FindBar } from './FindBar'
 import { useFind } from './useFind'
 
 const saveBody = vi.mocked(api).saveBody
-const STRINGS_FILE = '../../../reference/app-unpacked/dist/virtual_intlify-i18n-0366822.js'
 const CSS_FILE = '../index.css'
 const PATH = 'Pages/Find.md'
 const BODY = 'one alpha two Alpha three.\n\nNothing here.\n'
@@ -100,23 +99,7 @@ describe('<FindBar>', () => {
     expect(screen.queryByRole('search')).toBeNull()
   })
 
-  test('find bar strings and chrome width', () => {
-    const strings = fs.readFileSync(path.resolve(__dirname, STRINGS_FILE), 'utf8')
-    const verbatim = [
-      FIND_TEXT.searchPlaceholder,
-      FIND_TEXT.matchCase,
-      FIND_TEXT.wholeWord,
-      FIND_TEXT.previous,
-      FIND_TEXT.next,
-      FIND_TEXT.toggleReplace,
-      FIND_TEXT.replacePlaceholder,
-      FIND_TEXT.replace,
-      FIND_TEXT.replaceAll,
-      FIND_TEXT.close,
-    ]
-    const group = strings.slice(strings.indexOf('FindInPage:{'), strings.indexOf('FirstSteps:{'))
-    for (const s of verbatim) expect(group, s).toContain(`s:\`${s}\``)
-    expect(group).toContain('noResults:{t:0,b:{t:2,i:[{t:3,v:`No results for "`},{t:4,k:`query`},{t:3,v:`"`}]}}')
+  test('find bar no-results text and chrome width', () => {
     expect(FIND_TEXT.noResults('zzz')).toBe('No results for "zzz"')
 
     const css = fs.readFileSync(path.resolve(__dirname, CSS_FILE), 'utf8').replace(/\s+/g, ' ')

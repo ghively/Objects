@@ -16,7 +16,7 @@ describe('ShortcutsSheet', () => {
 
     const defs = allShortcuts().filter((d) => d.keys.length > 0)
     expect(defs.length).toBeGreaterThan(40)
-    // Ids Capacities lists no key for are left out, as in its sheet.
+    // Ids with no key are left out.
     expect(sheet.querySelector('[data-shortcut="openCommandPalette"]')).toBeNull()
     const categories = [...new Set(defs.map((d) => d.category))]
     expect(within(sheet).getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(
@@ -30,7 +30,7 @@ describe('ShortcutsSheet', () => {
       for (const k of d.keys) expect(row!.textContent).toContain(formatKeys(k))
       expect(!!row!.querySelector('[data-unverified]'), d.id).toBe(d.provisional)
     }
-    // openSettings and toggleDarkMode are Capacities' keys (verified).
+    // openSettings and toggleDarkMode are verified keys.
     expect(sheet.querySelector('[data-shortcut="openSettings"] [data-unverified]')).toBeNull()
     expect(sheet.querySelector('[data-shortcut="toggleDarkMode"] [data-unverified]')).toBeNull()
     expect(sheet.querySelector('[data-shortcut="toggleDarkMode"] [data-keys]')?.textContent).toBe('Ctrl+Shift+L')

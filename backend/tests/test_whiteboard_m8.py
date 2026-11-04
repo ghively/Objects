@@ -146,7 +146,7 @@ def test_media_and_weblink_blocks_validate():
         "Attachments/..",
         "Attachments\\..\\..\\x.png",
         "./Attachments/x.png",
-        ".capacities/trash/x.png",
+        ".object/trash/x.png",
         "Attachments/.hidden/x.png",
         "Attachments/",
         "Attachments//x.png",

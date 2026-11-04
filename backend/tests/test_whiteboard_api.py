@@ -502,13 +502,13 @@ def test_create_whiteboard_writes_md_only(ctx):
 
 def test_create_whiteboard_persists_inferred_type_once(tmp_path):
     root = copy_whiteboard_space(tmp_path)
-    (root / ".capacities" / "types" / "whiteboard.json").unlink()
+    (root / ".object" / "types" / "whiteboard.json").unlink()
     space = Space(root)
     events: list = []
     app = FastAPI()
     app.include_router(whiteboard_router(space, events.append))
     client = TestClient(app)
-    type_file = root / ".capacities" / "types" / "whiteboard.json"
+    type_file = root / ".object" / "types" / "whiteboard.json"
 
     r = client.post("/api/whiteboards", json={"title": "First", "clientId": "c"})
     assert r.status_code == 201, r.text
@@ -533,7 +533,7 @@ def test_create_whiteboard_persists_inferred_type_once(tmp_path):
 def test_create_whiteboard_in_space_without_any_whiteboard(tmp_path):
     root = copy_whiteboard_space(tmp_path)
     shutil.rmtree(root / "Whiteboards")
-    (root / ".capacities" / "types" / "whiteboard.json").unlink()
+    (root / ".object" / "types" / "whiteboard.json").unlink()
     space = Space(root)
     assert whiteboardstore.whiteboard_type(space) is None
     before = tree_hashes(root)
@@ -546,9 +546,9 @@ def test_create_whiteboard_in_space_without_any_whiteboard(tmp_path):
     assert whiteboardstore.is_whiteboard(space, path)
 
 
-def test_whiteboard_type_matches_reference():
+def test_whiteboard_type_json():
     data = whiteboard_type_json()
-    # basicStructures.ts RootWhiteboard: "Whiteboard" / "Whiteboards", ph-presentation,
+    # RootWhiteboard: "Whiteboard" / "Whiteboards", ph-presentation,
     # labelColor 'neutral' (our gray), wideLayoutMode true.
     assert data["id"] == "whiteboard"
     assert data["name"] == "Whiteboard"
@@ -567,7 +567,7 @@ def test_whiteboard_type_matches_reference():
         "createdAt",
     ]
     fixture = json.loads(
-        (FIXTURE / ".capacities" / "types" / "whiteboard.json").read_text(
+        (FIXTURE / ".object" / "types" / "whiteboard.json").read_text(
             encoding="utf-8"
         )
     )

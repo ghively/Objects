@@ -1,5 +1,5 @@
 /**
- * Text stats (M9), as Capacities' `calculateTextStats` counts them on a page's plain text with
+ * Text stats (M9), counted on a page's plain text with
  * math left out:
  * - words: `Intl.Segmenter` word segments that are word-like; hyphen-joined words count once
  * - sentences: sentence segments
@@ -8,7 +8,7 @@
  * The page inspector's "Stats" tab and the `…` menu's "Text Stats" show the same rows: words,
  * sentences, paragraphs, characters, then "Created at" (not for daily notes) and "Last updated".
  * Object's page is Markdown, so `plainText` first strips the Markdown syntax: one line per
- * non-empty block line (our reading of Capacities' one-line-per-block plain text).
+ * non-empty block line (one line per block of plain text).
  */
 import type { ObjectSummary } from '@/api/types'
 import { formatDate } from '@/properties/format'
@@ -20,17 +20,14 @@ export interface TextStats {
   characters: number
 }
 
-/** Reference strings: `textStats.*` (plural pairs), `propertyTypes.entity_*.name`, `xRay.textStats.header`. */
+/** The text stats strings (plural pairs). */
 export const TEXT_STATS_TEXT = {
   word: ['word', 'words'],
   sentence: ['sentence', 'sentences'],
   paragraph: ['paragraph', 'paragraphs'],
   character: ['character', 'characters'],
-  /** `propertyTypes.entity_createdAt.name` */
   createdAt: 'Created at',
-  /** `propertyTypes.entity_lastUpdated.name` */
   lastUpdated: 'Last updated',
-  /** `xRay.textStats.header` */
   header: 'Text stats',
 } as const
 
@@ -134,7 +131,7 @@ function stamp(v: string | null): string {
   return formatDate({ start: v, resolution: /T/.test(v) ? 'time' : 'day' }) || '—'
 }
 
-/** The rows in Capacities' order; "Created at" is hidden for daily notes. */
+/** The rows in order; "Created at" is hidden for daily notes. */
 export function statRows(stats: TextStats, summary: ObjectSummary, opts: { dailyNote: boolean }): StatRow[] {
   const count = (key: keyof TextStats, forms: readonly [string, string]): StatRow => ({
     key,

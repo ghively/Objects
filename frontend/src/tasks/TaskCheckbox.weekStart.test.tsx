@@ -1,5 +1,5 @@
 // With `ui.calendar.weekStart` unset the recurring-task dialog and the calendar must agree on the
-// default (Sunday, Capacities' default): the missed-days grid starts its weeks where the calendar does.
+// default (Sunday): the missed-days grid starts its weeks where the calendar does.
 import { act, render, renderHook, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 

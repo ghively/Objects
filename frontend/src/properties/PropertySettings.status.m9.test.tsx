@@ -1,4 +1,4 @@
-// M9 Task 15: Capacities has no custom-label status. `isStatus` is set only on the basic Task
+// M9 Task 15: there is no custom-label status. `isStatus` is set only on the basic Task
 // `status` definition, and no string offers "Use as status"; Object keeps it that way (the back
 // end refuses a new `isStatus`). This guard keeps the settings and menu from growing a toggle.
 import { render, screen, within } from '@testing-library/react'

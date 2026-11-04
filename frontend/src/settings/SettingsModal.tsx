@@ -1,4 +1,4 @@
-// The Settings modal ("Settings", `AppSettings.heading`): a left nav with "Search settings", the
+// The Settings modal ("Settings"): a left nav with "Search settings", the
 // "General" and "Space" groups and a "Shortcuts" row at the bottom; the content shows the chosen
 // section. Changes save at once: device settings through `useSettings().patch`, `ui.json` keys
 // through `api.patchUi`, space keys through `api.patchSpace` (each reloads and re-applies once on
@@ -20,12 +20,12 @@ import { SHORTCUTS_TEXT } from './ShortcutsSheet'
 import { useSettingsModal, type SettingsSectionId } from './useSettingsModal'
 
 export const SETTINGS_TEXT = {
-  heading: 'Settings', // AppSettings.heading
-  search: 'Search settings', // AppSettings.search.placeholder
-  noResults: 'No results', // AppSettings.search.noResults
-  general: 'General', // general.general
-  space: 'Space', // AppSettings.currentSpace.label
-  shortcuts: SHORTCUTS_TEXT.heading, // ShortcutsCheatSheet.tooltip
+  heading: 'Settings',
+  search: 'Search settings',
+  noResults: 'No results',
+  general: 'General',
+  space: 'Space',
+  shortcuts: SHORTCUTS_TEXT.heading,
 } as const
 
 export interface SettingsSectionDef {

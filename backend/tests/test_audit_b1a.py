@@ -25,7 +25,7 @@ def _ulid_at(when: datetime) -> str:
 
 
 def _trash_dir(space_dir: Path) -> Path:
-    return space_dir / ".capacities" / "trash"
+    return space_dir / ".object" / "trash"
 
 
 # -- a trash object whose .json meta is missing is listed, restorable and purgeable ---------

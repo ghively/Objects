@@ -1,9 +1,9 @@
 /**
  * One saved version's preview in the Version History dialog (M8 Task 5): the body in M1's
- * read-only `Editor` and a "Properties" section (`VersionHistory.propertiesSection`) listing the
+ * read-only `Editor` and a "Properties" section listing the
  * version's frontmatter values as text.
  *
- * Our choices (listed for Gene; the trimmed reference does not show Capacities' preview):
+ * Our choices (listed for Gene):
  * - The properties are the version's own frontmatter keys, minus the keys the app keeps
  *   (`id`, `type`, `template`, `title`, `createdAt`, `lastUpdated`), named by the current type's
  *   property definitions when the key matches one, else by the key itself.
@@ -97,17 +97,16 @@ export function versionCounts(text: string): { blocks: number; properties: numbe
   return { blocks: countBlocks(splitVersionText(text).body), properties: versionProperties(text).length }
 }
 
-/** `VersionHistory.blockCount`: "{count} block | {count} blocks". */
+/** "{count} block | {count} blocks". */
 export function blockCountLabel(n: number): string {
   return `${n} ${n === 1 ? 'block' : 'blocks'}`
 }
 
-/** `VersionHistory.propertyCount`: "{count} property | {count} properties". */
+/** "{count} property | {count} properties". */
 export function propertyCountLabel(n: number): string {
   return `${n} ${n === 1 ? 'property' : 'properties'}`
 }
 
-/** `VersionHistory.propertiesSection` */
 export const PROPERTIES_SECTION = 'Properties'
 
 function typeIdOf(text: string): string | null {

@@ -1,6 +1,6 @@
 /**
- * Focus mode ("Enter Focus Mode" / "Leave Focus Mode", `ComponentHeader.focusMode.*`; palette
- * "Toggle focus mode") and its timer (`ComponentHeader.focusMode.timer.*`).
+ * Focus mode ("Enter Focus Mode" / "Leave Focus Mode"; palette
+ * "Toggle focus mode") and its timer.
  *
  * `on`, `toggle()`, `enter()` and `leave()` are Task 3's names. While `on`, `FocusMode.tsx` hides
  * the shell's chrome with one stylesheet (nothing else changes, so leaving restores each part
@@ -53,7 +53,7 @@ export interface FocusModeState {
 
 export const NO_TIMER: FocusTimer = Object.freeze({ minutes: null, endsAt: null, pausedLeft: null })
 
-/** Preset durations in minutes (our choice; the trimmed reference has no list). */
+/** Preset durations in minutes (our choice). */
 export const FOCUS_PRESETS: readonly number[] = [15, 25, 45, 60]
 export const DEFAULT_FOCUS_MINUTES = 25
 

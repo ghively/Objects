@@ -1,5 +1,5 @@
 // M9 Task 16: "Recalculate content index"; polish 2026-11-03 moved it from Space Settings to
-// Offline & Sync, where Capacities keeps it.
+// Offline & Sync.
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'

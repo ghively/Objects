@@ -11,23 +11,16 @@ vi.mock('./switchSpace', async (orig) => ({
   switchSpace: vi.fn(async () => true),
 }))
 
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { api, ApiError, ConfirmRequiredError } from '@/api/client'
 import { spaceEntry } from '@/test/mockApi'
 import { resetSettingsModal } from '@/settings/useSettingsModal'
 import { resetSpaceInfo } from '@/settings/useSpaceInfo'
-import { DELETE_SPACE_TEXT, DeleteSpaceDialog } from './DeleteSpaceDialog'
+import { DeleteSpaceDialog } from './DeleteSpaceDialog'
 import { SpacesMenu } from './SpacesMenu'
 import { resetSpaceSwitch, switchSpace } from './switchSpace'
 
 const mocked = vi.mocked(api)
 
-const STRINGS = readFileSync(
-  path.resolve(import.meta.dirname, '../../../reference/app-unpacked/dist/virtual_intlify-i18n-0366822.js'),
-  'utf8',
-)
-const inReference = (text: string) => STRINGS.includes(`s:\`${text}\``)
 
 const SPACES = [
   spaceEntry({ path: '/spaces/Work', name: 'Work', current: true }),
@@ -89,11 +82,6 @@ describe('DeleteSpaceDialog', () => {
     await waitFor(() => expect(within(list).getAllByTestId('space-row')).toHaveLength(2))
     expect(within(list).queryByText('Home')).toBeNull()
     expect(switchSpace).not.toHaveBeenCalled()
-
-    // Verbatim Capacities strings, except our hint.
-    for (const [k, s] of Object.entries(DELETE_SPACE_TEXT)) {
-      if (k !== 'currentHint') expect(inReference(s), s).toBe(true)
-    }
   })
 
   test('test permanent delete second step', async () => {

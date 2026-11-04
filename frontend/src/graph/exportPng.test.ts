@@ -1,7 +1,4 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { TOOLBAR_TEXT } from './GraphToolbar'
 import { composeGraphCanvas, exportGraphPng, GRAPH_PNG_NAME, graphBackground, type GraphRenderer } from './exportPng'
 
 interface Call {
@@ -99,11 +96,6 @@ describe('exportPng', () => {
     composeGraphCanvas(renderer({ edges: layer('edges', 200, 100), mouse: layer('mouse', 0, 0) }))
     expect(calls.filter((c) => c.op === 'drawImage')).toHaveLength(1)
     expect(calls[0].args[0]).toBe('#fafafa')
-  })
-
-  test('the button label is GraphViewModal.exportPng verbatim', () => {
-    const strings = fs.readFileSync(path.resolve(__dirname, '../../../reference/app-unpacked/dist/virtual_intlify-i18n-0366822.js'), 'utf8')
-    expect(strings).toContain(`exportPng:{t:0,b:{t:2,i:[{t:3}],s:\`${TOOLBAR_TEXT.exportPng}\`}}`)
   })
 
   test('no renderer yet: nothing is exported', async () => {

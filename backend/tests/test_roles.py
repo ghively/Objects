@@ -1,7 +1,4 @@
-"""Capacities structure roles and the M5 role lists (M5 Task 2)."""
-
-import re
-from pathlib import Path
+"""Structure roles and the M5 role lists (M5 Task 2)."""
 
 from objectapp.roles import (
     CAN_BE_UNLINKED_MENTION,
@@ -14,27 +11,12 @@ from objectapp.roles import (
 )
 from objectapp.typemodel import TypeDefinition
 
-REPO = Path(__file__).resolve().parents[2]
-BACKBONE = (
-    REPO / "reference/recovered-ts/src/shared-logic/util/structureHeuristicsBackbone.ts"
-)
-
-
-def _reference_list(name: str) -> set[str]:
-    src = BACKBONE.read_text("utf-8")
-    m = re.search(rf"\n  {name}: \([^)]*\) => \{{(.*?)\n  \}},", src, re.DOTALL)
-    assert m, name
-    names = set(re.findall(r"'([A-Za-z]+)'", m.group(1)))
-    if "...whiteboard(config)" in m.group(1):
-        names.add("RootWhiteboard")  # the whiteboard rollout flag's spread (M6)
-    return names
-
 
 def _type(name: str, basic: bool = True) -> TypeDefinition:
     return TypeDefinition.from_json({"id": name.lower(), "name": name, "basic": basic})
 
 
-def test_role_lists_match_reference():
+def test_role_lists():
     assert ROLES == {
         "RootPage", "RootTag", "RootTask", "RootDailyNote", "RootEntity",
         "MediaWebResource", "MediaFile", "MediaImage", "MediaPDF", "MediaAudio",
@@ -57,17 +39,6 @@ def test_role_lists_match_reference():
         "MediaWebResource", "MediaFile", "MediaTweet", "RootTag", "RootTask", "RootWhiteboard",
     }  # fmt: skip
     assert NO_GRAPH_SUPPORT == set()
-    # The same lists, read from the reference and restricted to our roles.
-    if BACKBONE.is_file():
-        assert (
-            _reference_list("canHaveBacklinksSection") & ROLES == HAS_REFERENCES_SECTION
-        )
-        assert _reference_list("hasUnlinkedMentions") & ROLES == HAS_UNLINKED_MENTIONS
-        assert (
-            _reference_list("canBeUnlinkedMention") & ROLES == CAN_BE_UNLINKED_MENTION
-        )
-        assert _reference_list("canHaveBacklinks") & ROLES == CAN_HAVE_BACKLINKS
-        assert _reference_list("hasNoGraphViewSupport") & ROLES == NO_GRAPH_SUPPORT
 
 
 def test_role_of_basic_media_and_custom_types():

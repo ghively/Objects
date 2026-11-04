@@ -1,7 +1,5 @@
-/* The group block (Capacities' GroupBlock): a box around its blocks. The
-   radius is Capacities' --border-radius-base (.5rem, themes.ts
-   borderRadius.base); the padding is our value (the reference CSS has no
-   group-block rule). Without a colour the box takes the neutral element fill. */
+/* The group block: a box around its blocks. The
+   radius is --border-radius-base (.5rem); the padding is our value. Without a colour the box takes the neutral element fill. */
 .object-editor .block-group {
   position: relative;
   margin-block: 0.5em;

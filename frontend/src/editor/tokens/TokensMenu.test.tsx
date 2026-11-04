@@ -76,13 +76,13 @@ function bar() {
 }
 
 describe('TokensMenu', () => {
-  test('test tokens menu items and colour names match reference', () => {
+  test('test tokens menu items and colour names', () => {
     setup('Hello brave world\n', 'brave')
     const names = within(bar())
       .getAllByRole('button')
       .map((b) => b.getAttribute('aria-label'))
     expect(names).toEqual(TOKENS_MENU_ITEMS)
-    // The live app's order (catalog section 6); Capacities' tokensMenu.* strings, verbatim.
+    // The catalogued order and strings (catalog section 6).
     expect(TOKENS_MENU_ITEMS).toEqual([
       'Bold',
       'Italic',
@@ -114,7 +114,7 @@ describe('TokensMenu', () => {
       .map((b) => b.getAttribute('aria-label'))
     expect(textNames).toHaveLength(18)
     expect(bgNames).toHaveLength(18)
-    // colorThemes.theme-text-<c> / theme-bg-<c>, in Capacities' order.
+    // "<C> text" / "<C> background", in palette order.
     expect(textNames[0]).toBe('Gray text')
     expect(textNames).toContain('Sky text')
     expect(bgNames[THEME_COLORS.indexOf('yellow')]).toBe('Yellow background')
@@ -215,7 +215,7 @@ describe('TokensMenu', () => {
     expect(screen.getByRole('toolbar')).toBeInTheDocument()
   })
 
-  test('the highlight shortcut toggles the last-used colour, bg-amber at first (Capacities reference)', () => {
+  test('the highlight shortcut toggles the last-used colour, bg-amber at first', () => {
     setLastUsedHighlightColor(null)
     const editor = setup('Hello brave world\n', 'brave')
     const key = keysFor('highlightText')[0]

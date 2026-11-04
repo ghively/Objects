@@ -1,5 +1,5 @@
 /**
- * The whiteboard's node components (Task 10), keyed by Capacities' Vue Flow node type names
+ * The whiteboard's node components (Task 10), keyed by React Flow node type
  * (`canvasTypes.ts` `NODE_TYPE_KEYS`).
  */
 import type { NodeTypes } from '../canvasTypes'
@@ -9,10 +9,10 @@ import { PointNode } from './PointNode'
 import { ShapeNode } from './ShapeNode'
 
 export const nodeTypes: NodeTypes = {
-  capacitiesBlock: BlockNode,
-  capacitiesShape: ShapeNode,
-  capacitiesFrame: FrameNode,
-  capacitiesPoint: PointNode,
+  boardBlock: BlockNode,
+  boardShape: ShapeNode,
+  boardFrame: FrameNode,
+  boardPoint: PointNode,
 }
 
 export { BlockNode, FrameNode, PointNode, ShapeNode }

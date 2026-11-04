@@ -1,6 +1,6 @@
 /**
- * The toolbox (bottom centre; the position is our choice, the trimmed reference has no
- * screenshot). Tools in Capacities' `whiteboardTools` order: Move/Hand (one button re-arming the
+ * The toolbox (bottom centre; the position is our choice). Tools in `TOOLS`
+ * order: Move/Hand (one button re-arming the
  * last pointer tool, with a caret for both), Text, Existing object, New object, Media (M8: re-arms
  * the last of Image, PDF, Audio, File and Web link, else Image; `resolveWhiteboardMediaTool`), Shapes (re-arms
  * the last shape-menu tool, else Rectangle), Gates (Engineering mode; the last gate, else NAND),

@@ -65,7 +65,7 @@ def test_create_template_registers_in_type(space_dir: Path):
     assert fm["template"] == "Bug report"
     assert fm["id"]
     assert space.type_by_id("task").templates["ids"] == [fm["id"]]
-    stored = (space_dir / ".capacities" / "types" / "task.json").read_text(encoding="utf-8")
+    stored = (space_dir / ".object" / "types" / "task.json").read_text(encoding="utf-8")
     assert fm["id"] in stored
     assert [s.path for s in space.list_templates("task")] == [path]
     assert space.get(path).template == "Bug report"

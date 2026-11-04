@@ -155,11 +155,11 @@ export function SidebarSections({ onOpenTarget }: { onOpenTarget?: OpenTarget })
 
 // ---- workspaceOrder (M9) ----
 
-/** `RootSpace.workspaceOrder`'s ids of the two fixed blocks; the others are custom section ids. */
+/** The `workspaceOrder` ids of the two fixed blocks; the others are custom section ids. */
 export const WORKSPACE_OBJECTS = 'objects'
 export const WORKSPACE_PINNED = 'pinned'
 
-/** Our string: the drag handle's name (Capacities drags the heading itself). */
+/** Our string: the drag handle's name. */
 export const REORDER_HANDLE = (name: string) => `Reorder ${name}`
 
 /**
@@ -291,7 +291,7 @@ export function WorkspaceSections({ onOpenTarget, objects }: { onOpenTarget?: Op
           </SortableBlock>
         ))}
       </SortableContext>
-      {/* Under the object types, as in Capacities (their default place is last); our choice: after
+      {/* Under the object types (their default place is last); our choice: after
           every block, whatever the order. */}
       <AddSection />
     </DndContext>

@@ -29,7 +29,7 @@ beforeEach(() => {
 })
 
 describe('Sidebar type context menu', () => {
-  it('lists the Capacities menu for a type, in order', async () => {
+  it('lists the type menu, in order', async () => {
     const user = userEvent.setup()
     render(<Sidebar types={[MEETING]} />)
     await openMenu(user, /Meetings/)

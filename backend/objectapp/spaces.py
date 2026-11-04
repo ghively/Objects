@@ -8,7 +8,7 @@ were first registered, with when each was last opened::
 It holds no user content: an unreadable file reads as empty and is replaced on
 the next write. Reading never writes. Removing a space only drops it from the
 list; its folder is never touched. `create_space` makes a new folder holding only
-``.capacities/space.json`` (plus, for M8's basic setup, four type files) and refuses
+``.object/space.json`` (plus, for M8's basic setup, four type files) and refuses
 a folder that already exists.
 
 M8 `delete_space` deletes a space folder that is not the current one: to the OS
@@ -31,6 +31,7 @@ from typing import Any
 
 from .appstate import state_dir
 from .jsonstore import dump_json
+from .legacy import has_legacy_metadata
 from .space import safe_filename
 from .spaceconfig import MAX_NAME_LENGTH, space_fields
 from .textfile import atomic_write
@@ -250,11 +251,11 @@ class Registry:
 
 
 def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
-    """Create ``<location>/<safe_filename(name)>`` holding only ``.capacities/space.json``.
+    """Create ``<location>/<safe_filename(name)>`` holding only ``.object/space.json``.
 
     `setup` is M8's "How do you want to start?": ``'blank'`` is the behaviour above;
     ``'basic'`` also writes the Person, Meeting, Project and Book types
-    (``.capacities/types/{person,meeting,project,book}.json``, see `basicsetup`).
+    (``.object/types/{person,meeting,project,book}.json``, see `basicsetup`).
 
     Raises `SpaceNameProblem` (422) for an empty or over-long name,
     `NotADirectoryError` (404) when `location` is not an existing folder,
@@ -276,8 +277,8 @@ def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
         raise NotADirectoryError(f"Not a folder: {str(location)[:60]!r}") from exc
     target = parent / safe_filename(name)
     target.mkdir()  # FileExistsError when anything is already there
-    (target / ".capacities").mkdir()
-    atomic_write(target / ".capacities" / "space.json", dump_json({"name": name}))
+    (target / ".object").mkdir()
+    atomic_write(target / ".object" / "space.json", dump_json({"name": name}))
     if setup == "basic":
         from .basicsetup import write_basic_types
 
@@ -289,7 +290,7 @@ def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
 
 
 class SpaceNotFound(LookupError):
-    """Not a registered space folder holding ``.capacities/`` (404)."""
+    """Not a registered space folder holding ``.object/`` (404)."""
 
 
 class SpaceIsCurrent(Exception):
@@ -328,8 +329,10 @@ def _is_space_folder(path: Path) -> bool:
         return (
             path.is_dir()
             and not path.is_symlink()
-            and (path / ".capacities").is_dir()
-            and not (path / ".capacities").is_symlink()
+            and (
+                ((path / ".object").is_dir() and not (path / ".object").is_symlink())
+                or has_legacy_metadata(path)
+            )
         )
     except OSError:  # a path the OS can't even stat (too long) is no space folder
         return False
@@ -391,10 +394,10 @@ def delete_space(
 
     Refuses (`SpaceIsCurrent`, 409) the `current` space, a folder holding it and a
     folder inside it; refuses (`SpaceNotFound`, 404) a folder that is not in the
-    registry or does not hold ``.capacities/``. By default the folder goes to the OS
+    registry or does not hold ``.object/``. By default the folder goes to the OS
     trash (`TrashUnavailable`, 428, when it can't, and nothing changes). With
     `permanent` it is removed for good after re-checking that it is still the same
-    folder (device and inode/file id) and still holds ``.capacities/``. The entry
+    folder (device and inode/file id) and still holds ``.object/``. The entry
     then leaves the registry; nothing in the state dir is deleted.
 
     The 428 carries the folder's identity token (`TrashUnavailable.folder`); a

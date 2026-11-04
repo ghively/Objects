@@ -141,7 +141,7 @@ describe('turn into (M8 Task 27)', () => {
   test('test block menu offers turn into task object for to-dos only', async () => {
     const editor = headless('- [ ] Buy milk\n\nText\n')
     selectBlocks(editor, 0)
-    // Capacities' "Turn into..." sub-menu holds the types; Object adds the to-do and whiteboard rows there.
+    // The "Turn into..." sub-menu holds the types; Object adds the to-do and whiteboard rows there.
     const turnIntoNames = async () => {
       const [menu] = await screen.findAllByRole('menu')
       const trigger = within(menu).getByRole('menuitem', { name: /^Turn into\.\.\./ })

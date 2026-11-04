@@ -58,7 +58,7 @@ def _v1_task() -> dict:
 
 
 def _write_types(root: Path, *types: dict) -> Path:
-    d = root / ".capacities" / "types"
+    d = root / ".object" / "types"
     d.mkdir(parents=True, exist_ok=True)
     for t in types:
         (d / f"{t['id']}.json").write_text(json.dumps(t, indent=2) + "\n", encoding="utf-8")
@@ -129,7 +129,7 @@ def test_migrate_v1_preserves_every_property():
     assert keys[: len(SYSTEM_ORDER)] == SYSTEM_ORDER
     assert keys[len(SYSTEM_ORDER) :] == ["status", "owner", "due"]
     assert out["basic"] is True  # Task
-    # default icons come from Capacities' propertyIcons
+    # default icons per property kind
     assert props["due"]["icon"] == {"type": "iconify", "val": "ph-calendar"}
     assert props["owner"]["icon"] == {"type": "iconify", "val": "ph-file-text"}
     # round trip is stable
@@ -150,7 +150,7 @@ def test_bad_property_entry_preserved(tmp_path):
     (types, unreadable) = load_types(tmp_path, inferred=[])
     assert unreadable == []
     task = _by_id(types)["task"]
-    written = json.loads((tmp_path / ".capacities/types/task.json").read_text("utf-8"))
+    written = json.loads((tmp_path / ".object/types/task.json").read_text("utf-8"))
     assert "oops" in written["propertyDefinitions"]
     assert task.prop("owner") is not None
     # the API shape carries no Python-only attributes
@@ -163,16 +163,16 @@ def test_migrate_backs_up_v1_and_writes_once(space_dir):
     types_dir = _v1_sample_types(space_dir)
     original = (types_dir / "task.json").read_bytes()
     Space(space_dir)
-    backup = space_dir / ".capacities" / "backup" / "types-v1" / "task.json"
+    backup = space_dir / ".object" / "backup" / "types-v1" / "task.json"
     assert backup.read_bytes() == original
     written = (types_dir / "task.json").read_bytes()
     assert json.loads(written)["schemaVersion"] == 2
     assert written.endswith(b"}\n") and b"\r\n" not in written
     assert json.loads(written) == json.loads(json.dumps(json.loads(written), indent=2))
 
-    before = _snapshot(space_dir / ".capacities")
+    before = _snapshot(space_dir / ".object")
     Space(space_dir)
-    assert _snapshot(space_dir / ".capacities") == before
+    assert _snapshot(space_dir / ".object") == before
 
 
 def test_unparseable_type_file_untouched(space_dir):
@@ -182,7 +182,7 @@ def test_unparseable_type_file_untouched(space_dir):
     before = (bad.read_bytes(), bad.stat().st_mtime_ns)
     s = Space(space_dir)
     assert (bad.read_bytes(), bad.stat().st_mtime_ns) == before
-    assert not (space_dir / ".capacities" / "backup" / "types-v1" / "server.json").exists()
+    assert not (space_dir / ".object" / "backup" / "types-v1" / "server.json").exists()
     assert [u.id for u in s.unreadable_types] == ["server"]
     servers = [t for t in s.types if t.id == "server"]
     assert len(servers) == 1  # no inferred type in its place
@@ -199,7 +199,7 @@ def test_unparseable_type_file_untouched(space_dir):
 
 def test_unparseable_non_object_type_file(tmp_path):
     _write_types(tmp_path)
-    (tmp_path / ".capacities/types/list.json").write_text("[1, 2]\n", encoding="utf-8")
+    (tmp_path / ".object/types/list.json").write_text("[1, 2]\n", encoding="utf-8")
     types, unreadable = load_types(tmp_path, inferred=[])
     assert [u.id for u in unreadable] == ["list"]
     assert "list" not in _by_id(types)
@@ -223,7 +223,7 @@ def test_inferred_type_not_written_on_open(space_dir):
     gadget = _by_id(s.types).get("gadget")
     assert gadget is not None and gadget.folder == "Gadgets"
     assert s.get("Gadgets/Widget.md").type == "gadget"
-    assert not (space_dir / ".capacities" / "types" / "gadget.json").exists()
+    assert not (space_dir / ".object" / "types" / "gadget.json").exists()
     assert type_revision(space_dir, "gadget") == ""
 
 
@@ -327,7 +327,7 @@ def test_save_type_conflict_on_stale_revision(tmp_path):
         write_type_json(tmp_path, t, "stale")
     assert exc.value.current_revision == ""
     rev = write_type_json(tmp_path, t, "")
-    path = tmp_path / ".capacities" / "types" / "gadget.json"
+    path = tmp_path / ".object" / "types" / "gadget.json"
     assert rev == hashlib.sha256(path.read_bytes()).hexdigest() == type_revision(tmp_path, "gadget")
     t.description = "Things"
     with pytest.raises(RevisionConflict) as exc:
@@ -351,7 +351,7 @@ def test_tag_and_page_builtin_present(space_dir):
     assert tag.folder == "Tags" and tag.icon == Icon("iconify", "ph-tag") and tag.basic
     assert tag.prop("color") is not None and tag.prop("color").type == "color"
     assert page.basic and page.folder == "Pages"
-    types_dir = space_dir / ".capacities" / "types"
+    types_dir = space_dir / ".object" / "types"
     assert (types_dir / "tag.json").is_file() and (types_dir / "page.json").is_file()
     # the Tags folder is created by the first tag, never on open
     assert not (space_dir / "Tags").exists()
@@ -362,9 +362,9 @@ def test_tag_and_page_builtin_present(space_dir):
 
 def test_type_matches_former_names(space_dir):
     _v1_sample_types(space_dir)
-    data = json.loads((space_dir / ".capacities/types/server.json").read_text("utf-8"))
+    data = json.loads((space_dir / ".object/types/server.json").read_text("utf-8"))
     data.update(schemaVersion=2, name="Machine", formerNames=["Server"])
-    (space_dir / ".capacities/types/server.json").write_text(json.dumps(data), encoding="utf-8")
+    (space_dir / ".object/types/server.json").write_text(json.dumps(data), encoding="utf-8")
     s = Space(space_dir)
     assert s.get("Servers/Alpha.md").type == "server"
     assert "machine" not in _by_id(s.types)
@@ -400,7 +400,7 @@ _TASK_FIELDS = ("status", "priority", "date", "deadline", "completed", "repeat",
 
 
 def test_topup_adds_missing_task_fields_in_memory(calendar_space_dir):
-    path = calendar_space_dir / ".capacities" / "types" / "task.json"
+    path = calendar_space_dir / ".object" / "types" / "task.json"
     data = json.loads(path.read_text("utf-8"))
     data["propertyDefinitions"] = [
         p for p in data["propertyDefinitions"] if p["key"] not in _TASK_FIELDS[1:]
@@ -444,7 +444,7 @@ def test_topup_adds_missing_task_fields_in_memory(calendar_space_dir):
 
 
 def test_topup_keeps_existing_definitions(calendar_space_dir):
-    path = calendar_space_dir / ".capacities" / "types" / "task.json"
+    path = calendar_space_dir / ".object" / "types" / "task.json"
     data = json.loads(path.read_text("utf-8"))
     prio = next(p for p in data["propertyDefinitions"] if p["key"] == "priority")
     prio["options"]["set"] = [{"id": "p1", "text": "P1", "color": "red", "icon": None}]
@@ -465,14 +465,14 @@ def test_topup_not_applied_to_other_types(calendar_space_dir):
     for tid in ("page", "meeting", "person", "dailynote", "event", "tag"):
         t = space.type_by_id(tid)
         stored = json.loads(
-            (calendar_space_dir / ".capacities" / "types" / f"{tid}.json").read_text("utf-8")
+            (calendar_space_dir / ".object" / "types" / f"{tid}.json").read_text("utf-8")
         )
         assert [p.key for p in t.propertyDefinitions] == [
             p["key"] for p in stored["propertyDefinitions"]
         ], tid
 
 
-# -- media types: the fields Capacities defines beyond ours (polish audit item 29) ----
+# -- media types: the extra built-in fields beyond ours (polish audit item 29) ----
 
 
 def _media(name: str, keys=()):
@@ -501,7 +501,7 @@ def _media(name: str, keys=()):
         ("Audio", {"duration": "number", "origin": "text", "category": "label"}),
     ],
 )  # fmt: skip
-def test_topup_adds_capacities_media_fields(name, expected):
+def test_topup_adds_the_extra_media_fields(name, expected):
     t = topup_task_type(_media(name))
     for key, kind in expected.items():
         assert t.prop(key) is not None and t.prop(key).type == kind, key
@@ -528,8 +528,8 @@ def test_topup_media_keeps_an_existing_definition():
         ("Audio", "category", ("ambient", "Ambient"), 10),
     ],
 )  # fmt: skip
-def test_topup_media_labels_get_capacities_option_sets(name, key, first, count):
-    """Item 19: the label fields start with Capacities' own sets (ids and en-US texts)."""
+def test_topup_media_labels_get_the_built_in_option_sets(name, key, first, count):
+    """Item 19: the label fields start with the built-in sets (ids and en-US texts)."""
     p = topup_task_type(_media(name)).prop(key)
     opts = p.options["set"]
     assert len(opts) == count
@@ -550,7 +550,7 @@ def test_media_label_set_is_editable_through_save_type(space_dir):
     from objectapp.space import Space
     from objectapp.typemodel import type_revision as _rev
 
-    types = space_dir / ".capacities" / "types"
+    types = space_dir / ".object" / "types"
     Space(space_dir)  # first open: writes the inferred types
     (types / "pdf.json").write_text(json.dumps(_media("PDF").to_json()), encoding="utf-8")
     sp = Space(space_dir)

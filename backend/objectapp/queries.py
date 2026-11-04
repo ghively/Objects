@@ -1,6 +1,6 @@
 """Saved queries: model and validation rules (M3 Task 5).
 
-A query lives in ``.capacities/queries/<id>.json`` (`JsonStore`). It is a definition
+A query lives in ``.object/queries/<id>.json`` (`JsonStore`). It is a definition
 with a view, not a ``.md`` object. Unknown keys are kept.
 """
 
@@ -24,7 +24,7 @@ __all__ = [
 
 DEFAULT_NAME = "New Query"
 LIMIT_SIZES = (1, 3, 5, 10, 25, 50)
-"""The result limits Capacities offers."""
+"""The result limits offered."""
 MAX_SEARCH_TERMS = 5
 
 _API_ONLY = ("revision", "readOnlyReason")

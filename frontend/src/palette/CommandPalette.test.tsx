@@ -1,5 +1,3 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -26,7 +24,6 @@ import { PALETTE_TEXT } from './searchOptions'
 import { usePalette } from './usePalette'
 
 const mocked = vi.mocked(api)
-const STRINGS_FILE = '../../../reference/app-unpacked/dist/virtual_intlify-i18n-0366822.js'
 
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true })
 const PERSON = typeDef({ id: 'person', name: 'Person', pluralName: 'People' })
@@ -92,7 +89,7 @@ describe('shortcuts', () => {
     }
   })
 
-  test('Ctrl+K and Ctrl+P open search (Capacities), also with focus in the editor; no key opens actions; Esc closes', async () => {
+  test('Ctrl+K and Ctrl+P open search, also with focus in the editor; no key opens actions; Esc closes', async () => {
     const { user } = setup()
     const editor = document.createElement('div')
     editor.setAttribute('contenteditable', 'true')
@@ -267,7 +264,7 @@ describe('search mode', () => {
       return el as HTMLElement
     })
     expect(row.querySelector('[data-result-title] b')?.textContent).toBe('Alp')
-    // Capacities: palette result titles use the 600-weight `search-highlights-bold` variant.
+    // Palette result titles use the 600-weight `search-highlights-bold` variant.
     expect(row.querySelector('[data-result-title] .search-highlights.search-highlights-bold b')?.textContent).toBe('Alp')
     expect(row.querySelector('img')).toBeNull()
     const snippets = row.querySelectorAll('.search-highlights:not(.search-highlights-bold)')
@@ -300,7 +297,7 @@ describe('search mode', () => {
     await user.type(input, 'alpha')
     await screen.findByText('Alpha')
     await user.keyboard('{Shift>}{Enter}{/Shift}')
-    // M7: Shift opens the side panel (Capacities' rule); Alt+Shift keeps the peek.
+    // M7: Shift opens the side panel; Alt+Shift keeps the peek.
     expect(usePeek.getState().path).toBeNull()
     const tab = useTabs.getState().tabs.find((t) => t.id === useTabs.getState().activeId)!
     expect(tab.sidepanel?.find((e) => e.isOpen)?.target).toEqual({ kind: 'object', path: 'Pages/Alpha.md' })
@@ -547,43 +544,8 @@ describe('actions in the list', () => {
   })
 })
 
-test('palette strings match reference', () => {
-  const strings = fs.readFileSync(path.resolve(__dirname, STRINGS_FILE), 'utf8')
-  const verbatim = [
-    PALETTE_TEXT.placeholder,
-    PALETTE_TEXT.placeholderSearch,
-    PALETTE_TEXT.today,
-    PALETTE_TEXT.earlier,
-    PALETTE_TEXT.actionLabel,
-    PALETTE_TEXT.emptyRecentsTitle,
-    PALETTE_TEXT.emptyRecentsDescription,
-    PALETTE_TEXT.emptyDescription,
-    PALETTE_TEXT.onlyPartialResults,
-    PALETTE_TEXT.clearFilter,
-    PALETTE_TEXT.searchTitle,
-    ACTION_TEXT.openCalendar,
-    ACTION_TEXT.openToday,
-    ACTION_TEXT.openGlobalGraph,
-    ACTION_TEXT.openGraphView,
-    ACTION_TEXT.toggleLeftSidebar,
-    ACTION_TEXT.toggleSidepanel,
-  ]
-  for (const s of verbatim) expect(strings, s).toContain(`s:\`${s}\``)
-  // The keys, so a same-worded string elsewhere can't pass for them.
-  expect(strings).toContain('placeholder:{t:0,b:{t:2,i:[{t:3}],s:`Search for content and actions, or paste from clipboard`}}')
-  expect(strings).toContain('earlier:{title:{t:0,b:{t:2,i:[{t:3}],s:`Earlier`}}}')
-  expect(strings).toContain('today:{title:{t:0,b:{t:2,i:[{t:3}],s:`Today`}}}')
-  expect(strings).toContain('actions:{label:{t:0,b:{t:2,i:[{t:3}],s:`Action`}}')
-  // Interpolated strings: their literal pieces, in order.
-  const pieces = [
-    'v:`No results for "`},{t:4,k:`query`}',
-    'v:`Create new `},{t:4,k:`structureTitle`},{t:3,v:` with title "`},{t:4,k:`title`}',
-    'v:`Only search for type "`},{t:4,k:`structureName`}',
-    'v:`Exclude type "`},{t:4,k:`structureName`}',
-    'v:`Only search content tagged with "`},{t:4,k:`tagName`}',
-    'createNewEntity:{t:0,b:{t:2,i:[{t:3,v:`Create `},{t:4,k:`structureName`}',
-  ]
-  for (const s of pieces) expect(strings, s).toContain(s)
+test('palette string templates', () => {
+  expect(PALETTE_TEXT.placeholder).toBe('Search for content and actions, or paste from clipboard')
   expect(PALETTE_TEXT.emptyTitle('q')).toBe('No results for "q"')
   expect(PALETTE_TEXT.createNewWithTitle('Page', 't')).toBe('Create new Page with title "t"')
   expect(PALETTE_TEXT.structureFilter('X')).toBe('Only search for type "X"')

@@ -48,10 +48,10 @@ SYSTEM_KEYS = frozenset(
         "height", "source",
         # DailyNote
         "date", "reviewed",
-        # M9 per-object layout (Capacities' wideLayoutMode, wideCoverImage, coverImageOffset)
+        # M9 per-object layout (wideLayoutMode, wideCoverImage, coverImageOffset)
         # and page view (defaultPageViewId, kept as it is)
         "wideLayoutMode", "wideCoverImage", "coverImageOffset", "defaultPageViewId",
-        # the property-pane toggle (Capacities' hideProperties; polish item 17)
+        # the property-pane toggle (hideProperties; polish item 17)
         "hideProperties",
     }
 )
@@ -126,7 +126,7 @@ _MAX_SLUG = 64
 
 
 def is_ignored(rel: PurePosixPath) -> bool:
-    """Dot-folders (``.capacities``, ``.capacities-cache``, ``.git``…) are not part of the space."""
+    """Dot-folders (``.object``, ``.object-cache``, ``.git``…) are not part of the space."""
     return any(part.startswith(".") for part in rel.parts[:-1])
 
 
