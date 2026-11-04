@@ -205,6 +205,15 @@ const itemVisitor: DecorationVisitor = (node, pos, decos) => {
  * content, the comment and anything after it on the line, as usual). Outside a
  * list such a line is already kept raw by the loader before Markdown parsing.
  */
+const SETEXT_UNDERLINE = /^ {0,3}(?:=+|-+) *$/
+/**
+ * A line that ends a paragraph without a blank line before it (Markdown's paragraph
+ * interruptions): a heading, a thematic break, a fence, a blockquote, a list item (an ordered
+ * one only from 1), or an HTML block (a comment or a block-level tag).
+ */
+const INTERRUPTS_PARAGRAPH =
+  /^ {0,3}(?:#{1,6}(?:[ \t]|$)|(?:[-*_][ \t]*){3,}$|`{3,}|~{3,}|>|[-+*](?:[ \t]|$)|1[.)](?:[ \t]|$)|<!--|<\/?(?:address|article|aside|blockquote|details|div|dl|fieldset|figure|footer|form|h[1-6]|header|hr|main|nav|ol|p|pre|section|table|ul|script|style|textarea)(?:[\s/>]|$))/i
+
 export const ListItemOptionsLine = Extension.create({
   name: 'listItemOptionsLine',
 
@@ -215,9 +224,21 @@ export const ListItemOptionsLine = Extension.create({
     start: () => -1,
     tokenize(src: string, _tokens: unknown[], helpers: { inlineTokens: (src: string) => unknown[] }) {
       if (!parseItemComment(src)) return undefined
-      const nl = src.indexOf('\n')
-      const line = nl < 0 ? src : src.slice(0, nl)
-      return { type: 'paragraph', raw: nl < 0 ? src : src.slice(0, nl + 1), text: line, tokens: helpers.inlineTokens(line) }
+      // The whole paragraph, as Markdown's paragraph rule reads it: up to a blank line or a line
+      // that starts another block.
+      const lines = src.split('\n')
+      let end = 1
+      for (; end < lines.length; end++) {
+        const line = lines[end].replace(/\r$/, '')
+        if (line.trim() === '') break
+        // A setext underline makes the paragraph a heading: leave it to the default rules.
+        if (SETEXT_UNDERLINE.test(line)) return undefined
+        if (INTERRUPTS_PARAGRAPH.test(line)) break
+      }
+      // The line break after it is left to the blank-line rule, as Markdown's own paragraph and
+      // text rules do, so a blank line inside a list item still makes the list loose.
+      const text = lines.slice(0, end).join('\n')
+      return { type: 'paragraph', raw: text, text, tokens: helpers.inlineTokens(text) }
     },
   } as never,
 })
