@@ -275,6 +275,8 @@ export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesCh
               onFocus={() => (focusedRef.current = true)}
               onChange={(e) => onTitleChange(e.target.value, e.target.selectionStart)}
               onKeyDown={(e) => {
+                // Keys that confirm or cancel an IME composition belong to the IME.
+                if (e.nativeEvent.isComposing || e.keyCode === 229) return
                 // Escape with the `#query` tag picker open closes only the picker.
                 if (e.key === 'Escape' && hash !== null) {
                   e.preventDefault()
