@@ -105,7 +105,6 @@ export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesCh
 
   const [draft, setDraft] = useState(summary.title)
   const focusedRef = useRef(false)
-  const skipCommitRef = useRef(false)
   const titleRef = useRef<HTMLInputElement | null>(null)
   /** The `#query` being typed in the title: where the `#` is, and the text after it. */
   const [hash, setHash] = useState<{ start: number; end: number; query: string } | null>(null)
@@ -276,23 +275,21 @@ export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesCh
               onFocus={() => (focusedRef.current = true)}
               onChange={(e) => onTitleChange(e.target.value, e.target.selectionStart)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                // Escape with the `#query` tag picker open closes only the picker.
+                if (e.key === 'Escape' && hash !== null) {
                   e.preventDefault()
-                  e.currentTarget.blur()
-                } else if (e.key === 'Escape') {
+                  closeHash()
+                  return
+                }
+                // As the table's title cells: Enter and Escape both end the edit, which
+                // commits the typed text (an empty title still reverts).
+                if (e.key === 'Enter' || e.key === 'Escape') {
                   e.preventDefault()
-                  skipCommitRef.current = true
-                  setDraft(summary.title)
-                  setHash(null)
                   e.currentTarget.blur()
                 }
               }}
               onBlur={() => {
                 focusedRef.current = false
-                if (skipCommitRef.current) {
-                  skipCommitRef.current = false
-                  return
-                }
                 // Picking a tag for `#query` moves the focus; the title commits after.
                 if (hash !== null || !titleEditable) return
                 commitTitle(draft)

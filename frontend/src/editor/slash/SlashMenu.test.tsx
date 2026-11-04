@@ -127,3 +127,62 @@ describe('<SlashMenu>', () => {
     expect(serializeBody(editor)).toBe('Hello\n\n<!-- block: bookmark -->\n[https://example.com/docs](https://example.com/docs)\n')
   })
 })
+
+describe('typing / opens the menu only at the start of a block or after whitespace', () => {
+  function typeEach(editor: TiptapEditor, text: string) {
+    for (const ch of text) type(editor, ch)
+  }
+  function isOpen(editor: TiptapEditor) {
+    return useSlashMenu.getState().editor === editor
+  }
+
+  test.each(['and/or', '11/04', 'http://x'])('%s inserts the characters and opens no menu', (text) => {
+    const editor = mounted('Hello\n')
+    render(<SlashMenu editor={editor} />)
+    typeEach(editor, ` ${text}`)
+    expect(isOpen(editor)).toBe(false)
+    expect(screen.queryByRole('listbox', { name: '/' })).toBeNull()
+    expect(serializeBody(editor)).toBe(`Hello ${text}\n`)
+  })
+
+  test('a / straight after a word opens no menu', () => {
+    const editor = mounted('Hello\n')
+    render(<SlashMenu editor={editor} />)
+    type(editor, '/')
+    expect(isOpen(editor)).toBe(false)
+  })
+
+  test('a / after bold text with no space between opens no menu', () => {
+    const editor = mounted('**Hello**\n')
+    render(<SlashMenu editor={editor} />)
+    act(() => {
+      editor.view.dispatch(editor.state.tr.setStoredMarks([]).insertText('/'))
+    })
+    expect(isOpen(editor)).toBe(false)
+  })
+
+  test('/ at the start of a block opens the menu', async () => {
+    const editor = mounted('Hello\n')
+    render(<SlashMenu editor={editor} />)
+    act(() => {
+      editor.commands.splitBlock()
+    })
+    type(editor, '/')
+    expect(isOpen(editor)).toBe(true)
+    expect(await screen.findByRole('listbox', { name: '/' })).toBeInTheDocument()
+  })
+
+  test.each([
+    ['a space', ' '],
+    ['a tab', '\t'],
+    ['a non-breaking space', ' '],
+  ])('/ after %s opens the menu, and the query may hold spaces', async (_name, gap) => {
+    const editor = mounted('Hello\n')
+    render(<SlashMenu editor={editor} />)
+    typeEach(editor, `${gap}/`)
+    expect(isOpen(editor)).toBe(true)
+    expect(await screen.findByRole('listbox', { name: '/' })).toBeInTheDocument()
+    typeEach(editor, 'blue back')
+    expect(useSlashMenu.getState().query).toBe('blue back')
+  })
+})

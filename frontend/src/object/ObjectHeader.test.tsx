@@ -62,6 +62,46 @@ describe('ObjectHeader', () => {
     expect(onRename).not.toHaveBeenCalled()
   })
 
+  test('test Escape commits the typed title and leaves the field', async () => {
+    const user = userEvent.setup()
+    const onRename = vi.fn()
+    render(<ObjectHeader summary={page()} type={PAGE} onRename={onRename} onPropertiesChange={vi.fn()} />)
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    await user.click(title)
+    await user.keyboard('{Escape}')
+    expect(title).not.toHaveFocus()
+    expect(onRename).not.toHaveBeenCalled()
+
+    await user.clear(title)
+    await user.type(title, ' Plans {Escape}')
+    expect(title).not.toHaveFocus()
+    expect(title).toHaveValue('Plans')
+    expect(onRename).toHaveBeenCalledExactlyOnceWith('Plans')
+  })
+
+  test('test Escape with an emptied title restores it and writes nothing', async () => {
+    const user = userEvent.setup()
+    const onRename = vi.fn()
+    render(<ObjectHeader summary={page()} type={PAGE} onRename={onRename} onPropertiesChange={vi.fn()} />)
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    await user.clear(title)
+    await user.keyboard('{Escape}')
+    expect(title).toHaveValue('Notes')
+    expect(onRename).not.toHaveBeenCalled()
+  })
+
+  test('test Escape with the #tag picker open closes only the picker', async () => {
+    const onRename = vi.fn()
+    render(<ObjectHeader summary={page()} type={PAGE} onRename={onRename} onPropertiesChange={vi.fn()} />)
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    title.focus()
+    fireEvent.change(title, { target: { value: 'Notes #do', selectionStart: 9 } })
+    await screen.findByRole('listbox', { name: 'Tags' })
+    fireEvent.keyDown(title, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('listbox', { name: 'Tags' })).not.toBeInTheDocument())
+    expect(onRename).not.toHaveBeenCalled()
+  })
+
   test('test Add icon and Add description write icon and description', async () => {
     const user = userEvent.setup()
     const onPropertiesChange = vi.fn()
