@@ -129,3 +129,54 @@ describe('a list item with an icon and no text', () => {
     expect(nodes(editor, 'listItemOptions')).toHaveLength(0)
   })
 })
+
+describe('an item line that opens with an item comment', () => {
+  test('a continuation line stays in the item\'s paragraph', () => {
+    const body = '- <!-- item: small --> Buy\n  more text\n'
+    const editor = headless(body)
+    expect(nodes(editor, 'rawBlock')).toHaveLength(0)
+    expect(nodes(editor, 'listItem')).toHaveLength(1)
+    const item = nodes(editor, 'listItem')[0]
+    expect(item.childCount).toBe(1)
+    expect(item.firstChild!.type.name).toBe('paragraph')
+    expect(item.textContent).toBe(' Buy\nmore text')
+    expect(icons(editor)).toEqual(['small'])
+    expect(serializeBody(editor)).toBe(body)
+  })
+
+  test('a continuation line, then a nested list and a sibling', () => {
+    const body = '- <!-- item: small --> Buy\n  more text\n  - Child\n- Next\n'
+    const editor = headless(body)
+    expect(nodes(editor, 'rawBlock')).toHaveLength(0)
+    expect(nodes(editor, 'listItem').map((n) => n.firstChild!.textContent)).toEqual([' Buy\nmore text', 'Child', 'Next'])
+    expect(serializeBody(editor)).toBe(body)
+  })
+
+  test('the paragraph ends at a blank line', () => {
+    const body = '- <!-- item: small --> Buy\n  more text\n\n  Second paragraph\n'
+    const editor = headless(body)
+    expect(nodes(editor, 'rawBlock')).toHaveLength(0)
+    expect(nodes(editor, 'listItem')[0].childCount).toBe(2)
+    expect(serializeBody(editor)).toBe(body)
+  })
+
+  test('in a blockquote', () => {
+    const body = '> <!-- item: icon=ph-star -->\n'
+    const editor = headless(body)
+    expect(serializeBody(editor)).toBe(body)
+  })
+
+  test('in a blockquote, with text and a continuation line', () => {
+    const body = '> <!-- item: icon=ph-star --> Note\n> more\n'
+    const editor = headless(body)
+    expect(serializeBody(editor)).toBe(body)
+  })
+
+  test('a stray item comment line at the top level stays a raw block, unchanged', () => {
+    for (const body of ['<!-- item: small -->\n', 'Before\n\n<!-- item: small --> text\nmore\n\nAfter\n']) {
+      const editor = headless(body)
+      expect(nodes(editor, 'rawBlock').length).toBeGreaterThan(0)
+      expect(serializeBody(editor)).toBe(body)
+    }
+  })
+})
