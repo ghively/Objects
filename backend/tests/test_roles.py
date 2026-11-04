@@ -18,42 +18,42 @@ def _type(name: str, basic: bool = True) -> TypeDefinition:
 
 def test_role_lists():
     assert ROLES == {
-        "RootPage", "RootTag", "RootTask", "RootDailyNote", "RootEntity",
-        "MediaWebResource", "MediaFile", "MediaImage", "MediaPDF", "MediaAudio",
-        "MediaVideo", "MediaTweet", "RootWhiteboard",
+        "page", "tag", "task", "dailyNote", "entity",
+        "weblink", "file", "image", "pdf", "audio",
+        "video", "tweet", "whiteboard",
     }  # fmt: skip
     assert HAS_REFERENCES_SECTION == {
-        "RootPage", "RootEntity", "MediaImage", "MediaPDF", "MediaAudio",
-        "MediaWebResource", "MediaFile", "MediaTweet", "RootTask", "RootWhiteboard",
+        "page", "entity", "image", "pdf", "audio",
+        "weblink", "file", "tweet", "task", "whiteboard",
     }  # fmt: skip
     assert HAS_UNLINKED_MENTIONS == {
-        "RootPage", "RootEntity", "MediaImage", "MediaPDF", "MediaAudio",
-        "MediaWebResource", "MediaFile", "MediaTweet", "RootTag", "RootTask", "RootWhiteboard",
+        "page", "entity", "image", "pdf", "audio",
+        "weblink", "file", "tweet", "tag", "task", "whiteboard",
     }  # fmt: skip
     assert CAN_BE_UNLINKED_MENTION == {
-        "RootPage", "RootEntity", "MediaImage", "MediaPDF", "MediaAudio",
-        "MediaWebResource", "MediaFile", "MediaTweet", "RootDailyNote", "RootTask", "RootWhiteboard",
+        "page", "entity", "image", "pdf", "audio",
+        "weblink", "file", "tweet", "dailyNote", "task", "whiteboard",
     }  # fmt: skip
     assert CAN_HAVE_BACKLINKS == {
-        "RootPage", "RootEntity", "MediaImage", "MediaPDF", "MediaAudio",
-        "MediaWebResource", "MediaFile", "MediaTweet", "RootTag", "RootTask", "RootWhiteboard",
+        "page", "entity", "image", "pdf", "audio",
+        "weblink", "file", "tweet", "tag", "task", "whiteboard",
     }  # fmt: skip
     assert NO_GRAPH_SUPPORT == set()
 
 
 def test_role_of_basic_media_and_custom_types():
-    assert role_of(_type("Page")) == "RootPage"
-    assert role_of(_type("Tag")) == "RootTag"
-    assert role_of(_type("Task")) == "RootTask"
-    assert role_of(_type("DailyNote")) == "RootDailyNote"
-    assert role_of(_type("Whiteboard")) == "RootWhiteboard"
-    assert role_of(_type("Weblink")) == "MediaWebResource"
-    assert role_of(_type("File")) == "MediaFile"
-    assert role_of(_type("Image")) == "MediaImage"
-    assert role_of(_type("PDF")) == "MediaPDF"
-    assert role_of(_type("Audio")) == "MediaAudio"
-    assert role_of(_type("Video")) == "MediaVideo"
-    assert role_of(_type("Tweet")) == "MediaTweet"
-    assert role_of(_type("Person", basic=False)) == "RootEntity"
-    assert role_of(_type("Image", basic=False)) == "RootEntity"
-    assert role_of(None) == "RootEntity"
+    assert role_of(_type("Page")) == "page"
+    assert role_of(_type("Tag")) == "tag"
+    assert role_of(_type("Task")) == "task"
+    assert role_of(_type("DailyNote")) == "dailyNote"
+    assert role_of(_type("Whiteboard")) == "whiteboard"
+    assert role_of(_type("Weblink")) == "weblink"
+    assert role_of(_type("File")) == "file"
+    assert role_of(_type("Image")) == "image"
+    assert role_of(_type("PDF")) == "pdf"
+    assert role_of(_type("Audio")) == "audio"
+    assert role_of(_type("Video")) == "video"
+    assert role_of(_type("Tweet")) == "tweet"
+    assert role_of(_type("Person", basic=False)) == "entity"
+    assert role_of(_type("Image", basic=False)) == "entity"
+    assert role_of(None) == "entity"

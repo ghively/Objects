@@ -155,6 +155,7 @@ describe('api client v2 writes', () => {
       trashId: 't1',
       paths: ['Servers/Alpha.md', 'Templates/Servers/Base.md'],
       typeIds: ['server', 'project'],
+      queryIds: ['my-servers'],
     })
     vi.stubGlobal('fetch', fetchMock)
     let result: unknown
@@ -167,6 +168,7 @@ describe('api client v2 writes', () => {
       { kind: 'types', path: 'project', version: null, origin: CLIENT_ID },
       { kind: 'deleted', path: 'Servers/Alpha.md', version: null, origin: CLIENT_ID },
       { kind: 'deleted', path: 'Templates/Servers/Base.md', version: null, origin: CLIENT_ID },
+      { kind: 'queries', path: 'my-servers', version: null, origin: CLIENT_ID },
     ])
   })
 

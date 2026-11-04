@@ -548,7 +548,7 @@ def test_create_whiteboard_in_space_without_any_whiteboard(tmp_path):
 
 def test_whiteboard_type_json():
     data = whiteboard_type_json()
-    # RootWhiteboard: "Whiteboard" / "Whiteboards", ph-presentation,
+    # The basic Whiteboard type: "Whiteboard" / "Whiteboards", ph-presentation,
     # labelColor 'neutral' (our gray), wideLayoutMode true.
     assert data["id"] == "whiteboard"
     assert data["name"] == "Whiteboard"

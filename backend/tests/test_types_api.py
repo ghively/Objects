@@ -618,6 +618,96 @@ def test_delete_type_moves_objects_to_trash(space_dir: Path):
     assert space.type_by_id("person").prop("servers").options["allowedTypes"] == ["server"]
 
 
+def _query_file(space_dir: Path, query_id: str) -> Path:
+    return space_dir / ".object" / "queries" / f"{query_id}.json"
+
+
+# Hand-written bytes (CRLF, odd spacing), so a restore that re-serialises would show.
+_SERVER_QUERY = (
+    b'{"name":  "My servers",\r\n "definition": {"structures": [{"id": "server"}],'
+    b' "filterGroup": {"type": "filterGroup", "operator": "and", "elements": []},'
+    b' "sorts": [], "groupBy": null}}\r\n'
+)
+
+
+def test_delete_type_trashes_its_queries_and_restore_brings_them_back(space_dir: Path):
+    live = _write(_query_file(space_dir, "my-servers"), "")
+    live.write_bytes(_SERVER_QUERY)
+    space = Space(space_dir)
+
+    item = space.delete_type("server", confirm=True)
+    assert not live.exists()
+    assert [q.id for q in space.list_queries()] == []
+    manifest = space.trash.manifest(item.id)
+    assert manifest["queries"] == ["my-servers"]
+    # Grouped under the type, as its templates are: no separate entry in the listing.
+    listing = space.list_trash()
+    assert [i.kind for i in listing if i.kind != "object"] == ["type"]
+    assert not any(i.kind == "query" for i in listing)
+    # Its id stays taken while it is in the trash.
+    assert space.create_query("My servers").id == "my-servers-2"
+
+    result = space.restore(item.id)
+    assert live.read_bytes() == _SERVER_QUERY
+    assert result["queryIds"] == ["my-servers"]
+    assert "my-servers" in {q.id for q in space.list_queries()}
+
+
+def test_delete_type_leaves_a_multi_type_query_without_it(space_dir: Path):
+    both = {
+        "name": "People and servers",
+        "definition": {
+            "structures": [{"id": "person"}, {"id": "server"}],
+            "filterGroup": {"type": "filterGroup", "operator": "and", "elements": []},
+            "sorts": [],
+            "groupBy": None,
+        },
+        "view": {"viewDefinition": {"dataViewLayout": "list"}},
+    }
+    live = _write(_query_file(space_dir, "both"), json.dumps(both, indent=2) + "\n")
+    everything = _write(_query_file(space_dir, "everything"), '{"name": "Everything"}\n')
+    before_everything = everything.read_bytes()
+    space = Space(space_dir)
+
+    item = space.delete_type("server", confirm=True)
+    stored = json.loads(live.read_text(encoding="utf-8"))
+    assert stored["definition"]["structures"] == [{"id": "person"}]
+    assert stored["name"] == "People and servers"
+    assert everything.read_bytes() == before_everything  # no structures: not this type's
+    assert space.trash.manifest(item.id)["queries"] == []
+
+    space.restore(item.id)
+    stored = json.loads(live.read_text(encoding="utf-8"))
+    assert stored["definition"]["structures"] == [{"id": "person"}, {"id": "server"}]
+
+
+def test_delete_type_route_announces_its_queries(space_dir: Path):
+    _write(_query_file(space_dir, "my-servers"), "").write_bytes(_SERVER_QUERY)
+    app = create_app(Space(space_dir), None, watch=False)
+    published: list = []
+    app.state.hub.publish = published.append
+    with TestClient(app) as c:
+        r = c.delete("/api/types/server?confirm=true&clientId=w1")
+        assert r.status_code == 200, r.text
+        assert r.json()["queryIds"] == ["my-servers"]
+        _wait_for(published, ("queries", "my-servers", "w1"))
+        assert c.get("/api/queries").json() == []
+        published.clear()
+        r = c.post(f"/api/trash/{r.json()['trashId']}/restore?clientId=w1")
+        assert r.status_code == 200, r.text
+        _wait_for(published, ("queries", "my-servers", "w1"))
+        assert [q["id"] for q in c.get("/api/queries").json()] == ["my-servers"]
+
+
+def _wait_for(published: list, event: tuple) -> None:
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        if event in {(e.kind, e.path, e.origin) for e in published}:
+            return
+        time.sleep(0.01)
+    raise AssertionError(f"{event} was not announced: {published}")
+
+
 def test_delete_basic_type_422(space_dir: Path):
     space = Space(space_dir)
     for type_id in ("page", "tag", "task"):

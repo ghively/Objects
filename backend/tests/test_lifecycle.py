@@ -204,7 +204,7 @@ def test_restore_returns_to_original_path(space_dir: Path):
 
     result = space.restore(item.id)
 
-    assert result == {"paths": ["Tasks/Write docs.md"], "typeIds": []}
+    assert result == {"paths": ["Tasks/Write docs.md"], "typeIds": [], "queryIds": []}
     assert target.read_bytes() == before
     assert space.get("Tasks/Write docs.md").title == "Write docs"
     assert space.list_trash() == []
@@ -427,7 +427,7 @@ def test_trash_routes(space_dir: Path):
 
     resp = client.post(f"/api/trash/{trash_id}/restore", params={"clientId": "c1"})
     assert resp.status_code == 200
-    assert resp.json() == {"paths": ["Tasks/Write docs.md"], "typeIds": [], "rewritten": []}
+    assert resp.json() == {"paths": ["Tasks/Write docs.md"], "typeIds": [], "queryIds": [], "rewritten": []}
 
     client.delete("/api/object", params={"path": "Tasks/Write docs.md"})
     client.delete("/api/object", params={"path": "Pages/Alpha.md"})
