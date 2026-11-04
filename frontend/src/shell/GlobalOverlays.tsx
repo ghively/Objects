@@ -13,7 +13,8 @@
  * M8 Task 3: mounts the Version History and Merge dialogs, focus mode, the presentation and the
  * "Add to whiteboard" dialog (each filled by its owner task).
  */
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { lazyWithReload } from '@/lib/lazyReload'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { DeviceSettingsFollower } from '@/settings/DeviceSettingsFollower'
 import { applyTheme } from '@/theme/applyTheme'
@@ -30,9 +31,9 @@ import { Presentation } from '@/present/Presentation'
 // Not needed to paint the shell: the Settings modal and the Shortcuts sheet load when first
 // opened; the "Add to whiteboard" dialog (and the whiteboard code behind it) loads after the
 // first paint, off the start-up path (audit 2026-11-01 F1).
-const SettingsModal = lazy(() => import('@/settings/SettingsModal').then((m) => ({ default: m.SettingsModal })))
-const ShortcutsSheet = lazy(() => import('@/settings/ShortcutsSheet').then((m) => ({ default: m.ShortcutsSheet })))
-const AddToWhiteboardDialog = lazy(() => import('@/whiteboard/AddToWhiteboardDialog').then((m) => ({ default: m.AddToWhiteboardDialog })))
+const SettingsModal = lazyWithReload(() => import('@/settings/SettingsModal').then((m) => ({ default: m.SettingsModal })))
+const ShortcutsSheet = lazyWithReload(() => import('@/settings/ShortcutsSheet').then((m) => ({ default: m.ShortcutsSheet })))
+const AddToWhiteboardDialog = lazyWithReload(() => import('@/whiteboard/AddToWhiteboardDialog').then((m) => ({ default: m.AddToWhiteboardDialog })))
 
 function ThemeFollower() {
   const settings = useSettings((s) => s.settings)

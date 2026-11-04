@@ -178,6 +178,7 @@ function TabItem({ tab, active, space }: { tab: Tab; active: boolean; space: Spa
             <button
               type="button"
               aria-label="Close tab"
+              title="Close tab"
               onClick={(e) => {
                 e.stopPropagation()
                 close(tab.id)

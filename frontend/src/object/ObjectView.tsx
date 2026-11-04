@@ -4,7 +4,7 @@
  * calendar's daily note) renders only the body editor and its autosave.
  */
 import type { Editor as TiptapEditor, JSONContent } from '@tiptap/core'
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { api, ConflictError, isResync } from '@/api/client'
 import type { ObjectDetail, ObjectSummary, RenameResult, TypeDef, UpdateResult } from '@/api/types'
@@ -49,6 +49,7 @@ import { DeletedBanner } from './DeletedBanner'
 import { ExportDialog } from './ExportDialog'
 import { TextStatsMenu } from './TextStatsMenu'
 import { showToast } from '@/editor/media/upload'
+import { lazyWithReload } from '@/lib/lazyReload'
 import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
 import { ensureNewTags, HeaderTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
@@ -67,7 +68,7 @@ import { TaskStatsSection } from '@/tasks/TaskStatsSection'
 import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 
 // Raw mode (CodeMirror) loads when first switched to, not with the shell (audit 2026-11-01 F1).
-const RawMode = lazy(() => import('@/editor/RawMode').then((m) => ({ default: m.RawMode })))
+const RawMode = lazyWithReload(() => import('@/editor/RawMode').then((m) => ({ default: m.RawMode })))
 
 installWikilinkPresenter()
 installLinkPicker()
