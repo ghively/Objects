@@ -79,6 +79,23 @@ describe('ObjectHeader', () => {
     expect(onRename).toHaveBeenCalledExactlyOnceWith('Plans')
   })
 
+  test.each([
+    ['Enter', { isComposing: true }],
+    ['Escape', { isComposing: true }],
+    ['Enter', { keyCode: 229 }],
+    ['Escape', { keyCode: 229 }],
+  ])('test %s during IME composition (%o) leaves the half-typed title alone', (key, extra) => {
+    const onRename = vi.fn()
+    render(<ObjectHeader summary={page()} type={PAGE} onRename={onRename} onPropertiesChange={vi.fn()} />)
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    title.focus()
+    fireEvent.change(title, { target: { value: 'Notesに' } })
+    const notCancelled = fireEvent.keyDown(title, { key, ...extra })
+    expect(notCancelled).toBe(true)
+    expect(title).toHaveFocus()
+    expect(onRename).not.toHaveBeenCalled()
+  })
+
   test('test Escape with an emptied title restores it and writes nothing', async () => {
     const user = userEvent.setup()
     const onRename = vi.fn()
