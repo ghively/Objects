@@ -10,6 +10,7 @@ import type { TypeDef } from '@/api/types'
 import type { Target } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
 import { WorkspaceSections } from './SidebarSections'
+import { HelpSection } from '@/help/HelpSection'
 import { chipStyle } from './typeColor'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { usePalette } from '@/palette/usePalette'
@@ -517,6 +518,8 @@ export function Sidebar({
           />
           <MainNavButton icon="ph-trash" label="Trash" active={trashActive} onClick={() => onOpenTrash?.()} />
         </nav>
+
+        <HelpSection />
       </ScrollArea>
 
       {collectionFor && (
