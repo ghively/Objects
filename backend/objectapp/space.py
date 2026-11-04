@@ -3725,16 +3725,24 @@ class Space:
             structures = definition.get("structures") if isinstance(definition, dict) else None
             if not isinstance(structures, list):
                 continue  # deleted or reshaped meanwhile
-            present = {s.get("id") for s in structures if isinstance(s, dict)}
+            # What the query held before this restore, as a multiset of exact structures:
+            # a recorded structure already there (a retried restore, or put back by hand)
+            # is not added again, while two different structures of the type both return.
+            present = list(structures)
             new = list(structures)
-            for ref in sorted(refs, key=lambda r: r.get("index") or 0):
+            ordered = sorted(
+                refs, key=lambda r: r["index"] if isinstance(r.get("index"), int) else 0
+            )
+            for ref in ordered:
                 s = ref.get("structure")
-                if not isinstance(s, dict) or s.get("id") in present:
+                if not isinstance(s, dict):
+                    continue
+                if s in present:
+                    present.remove(s)
                     continue
                 index = ref.get("index")
                 at = index if isinstance(index, int) and 0 <= index <= len(new) else len(new)
                 new.insert(at, s)
-                present.add(s.get("id"))
             if new == structures:
                 continue
             updated = copy.deepcopy(data)

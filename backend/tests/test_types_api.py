@@ -681,6 +681,34 @@ def test_delete_type_leaves_a_multi_type_query_without_it(space_dir: Path):
     assert stored["definition"]["structures"] == [{"id": "person"}, {"id": "server"}]
 
 
+def test_restore_brings_back_every_structure_of_a_type_listed_twice(space_dir: Path):
+    structures = [
+        {"id": "server", "label": "a"},
+        {"id": "person"},
+        {"id": "server", "label": "b"},
+    ]
+    query = {
+        "name": "Twice",
+        "definition": {
+            "structures": structures,
+            "filterGroup": {"type": "filterGroup", "operator": "and", "elements": []},
+            "sorts": [],
+            "groupBy": None,
+        },
+    }
+    live = _write(_query_file(space_dir, "twice"), json.dumps(query, indent=2) + "\n")
+    space = Space(space_dir)
+
+    item = space.delete_type("server", confirm=True)
+    stored = json.loads(live.read_text(encoding="utf-8"))
+    assert stored["definition"]["structures"] == [{"id": "person"}]
+
+    result = space.restore(item.id)
+    stored = json.loads(live.read_text(encoding="utf-8"))
+    assert stored["definition"]["structures"] == structures
+    assert result["queryIds"] == ["twice"]
+
+
 def test_delete_type_route_announces_its_queries(space_dir: Path):
     _write(_query_file(space_dir, "my-servers"), "").write_bytes(_SERVER_QUERY)
     app = create_app(Space(space_dir), None, watch=False)
