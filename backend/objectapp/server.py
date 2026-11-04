@@ -1655,6 +1655,9 @@ def create_app(
         except InvalidValue as exc:
             return _error(422, str(exc))
         announce(ChangeEvent("types", t.id, None, origin=req.clientId))
+        if req.template:
+            # The template's saved query: no origin, so the creating window reloads its queries too.
+            announce(ChangeEvent("queries", "*", None))
         return JSONResponse(t.to_api(type_revision(space.root, t.id)), status_code=201)
 
     @api.put("/types/{type_id}")
