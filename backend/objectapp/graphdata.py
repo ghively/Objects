@@ -8,7 +8,7 @@ links to a, 3: both), which the graph rules need to tell a node's own
 links from its backlinks; ``tagged`` holds ``(object, tag)`` pairs the same
 way. Each node
 carries its ``degree`` (distinct linked neighbours) and the flags the client's
-filters need: ``tag`` (role ``RootTag``), ``daily`` (role ``RootDailyNote``) and
+filters need: ``tag`` (role ``tag``), ``daily`` (role ``dailyNote``) and
 ``done`` (a Task whose status is in the ``done`` category). Everything is
 derived from the in-memory scan; nothing is written.
 """
@@ -81,8 +81,8 @@ def graph_data(space: Space) -> dict[str, Any]:
                 "type": s.type,
                 "icon": _icon(s),
                 "degree": 0,
-                "tag": role == "RootTag",
-                "daily": role == "RootDailyNote",
+                "tag": role == "tag",
+                "daily": role == "dailyNote",
                 "done": t is not None and is_task_type(t) and _done(t, fms[s.path]),
             }
         )

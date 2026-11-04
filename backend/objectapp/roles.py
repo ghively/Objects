@@ -1,10 +1,13 @@
 """Structure roles for our types, and the role lists M5 needs.
 
-Each structure role (``RootPage``, ``RootEntity``, ``MediaImage`` …) decides
-whether an object has a references section, unlinked mentions, backlinks or a
-graph view. Our basic types map onto those roles; every other type is a
-``RootEntity`` (custom object types). The lists below hold the roles we have
-(``RootWhiteboard`` since M6).
+Each structure role (``page``, ``entity``, ``image`` …) decides whether an
+object has a references section, unlinked mentions, backlinks or a graph view.
+Our basic types map onto those roles; every other type is an ``entity``
+(custom object types). The lists below hold the roles we have (``whiteboard``
+since M6).
+
+Roles are computed from the type each time (`role_of`); they are never stored
+on disk, in the search index or in an API payload.
 """
 
 from __future__ import annotations
@@ -22,97 +25,97 @@ __all__ = [
 ]
 
 _BASIC_ROLES = {
-    "Page": "RootPage",
-    "Tag": "RootTag",
-    "Task": "RootTask",
-    "DailyNote": "RootDailyNote",
-    "Whiteboard": "RootWhiteboard",
-    "Weblink": "MediaWebResource",
-    "File": "MediaFile",
-    "Image": "MediaImage",
-    "PDF": "MediaPDF",
-    "Audio": "MediaAudio",
-    "Video": "MediaVideo",
-    "Tweet": "MediaTweet",
+    "Page": "page",
+    "Tag": "tag",
+    "Task": "task",
+    "DailyNote": "dailyNote",
+    "Whiteboard": "whiteboard",
+    "Weblink": "weblink",
+    "File": "file",
+    "Image": "image",
+    "PDF": "pdf",
+    "Audio": "audio",
+    "Video": "video",
+    "Tweet": "tweet",
 }
 
-ROLES = frozenset({*_BASIC_ROLES.values(), "RootEntity"})
+ROLES = frozenset({*_BASIC_ROLES.values(), "entity"})
 """Every role one of our types can have."""
 
 HAS_REFERENCES_SECTION = frozenset(
     {
-        "RootPage",
-        "RootEntity",
-        "MediaImage",
-        "MediaPDF",
-        "MediaAudio",
-        "MediaWebResource",
-        "MediaFile",
-        "MediaTweet",
-        "RootTask",
-        "RootWhiteboard",
+        "page",
+        "entity",
+        "image",
+        "pdf",
+        "audio",
+        "weblink",
+        "file",
+        "tweet",
+        "task",
+        "whiteboard",
     }
 )
-"""``canHaveBacklinksSection``."""
+"""Roles whose objects show a references section."""
 
 HAS_UNLINKED_MENTIONS = frozenset(
     {
-        "RootPage",
-        "RootEntity",
-        "MediaImage",
-        "MediaPDF",
-        "MediaAudio",
-        "MediaWebResource",
-        "MediaFile",
-        "MediaTweet",
-        "RootTag",
-        "RootTask",
-        "RootWhiteboard",
+        "page",
+        "entity",
+        "image",
+        "pdf",
+        "audio",
+        "weblink",
+        "file",
+        "tweet",
+        "tag",
+        "task",
+        "whiteboard",
     }
 )
-"""``hasUnlinkedMentions``."""
+"""Roles whose references section offers unlinked mentions."""
 
 CAN_BE_UNLINKED_MENTION = frozenset(
     {
-        "RootPage",
-        "RootEntity",
-        "MediaImage",
-        "MediaPDF",
-        "MediaAudio",
-        "MediaWebResource",
-        "MediaFile",
-        "MediaTweet",
-        "RootDailyNote",
-        "RootTask",
-        "RootWhiteboard",
+        "page",
+        "entity",
+        "image",
+        "pdf",
+        "audio",
+        "weblink",
+        "file",
+        "tweet",
+        "dailyNote",
+        "task",
+        "whiteboard",
     }
 )
-"""``canBeUnlinkedMention``."""
+"""Roles whose objects can be found as an unlinked mention."""
 
 CAN_HAVE_BACKLINKS = frozenset(
     {
-        "RootPage",
-        "RootEntity",
-        "MediaImage",
-        "MediaPDF",
-        "MediaAudio",
-        "MediaWebResource",
-        "MediaFile",
-        "MediaTweet",
-        "RootTag",
-        "RootTask",
-        "RootWhiteboard",
+        "page",
+        "entity",
+        "image",
+        "pdf",
+        "audio",
+        "weblink",
+        "file",
+        "tweet",
+        "tag",
+        "task",
+        "whiteboard",
     }
 )
-"""``canHaveBacklinks``."""
+"""Roles whose objects can have backlinks."""
 
 NO_GRAPH_SUPPORT: frozenset[str] = frozenset()
-"""``hasNoGraphViewSupport`` (RootSpace, User, UserPersonal, UtilDate): none of our roles."""
+"""Roles without a graph view (spaces, users and date utilities): none of our roles."""
 
 
 def role_of(t: TypeDefinition | None) -> str:
-    """The structure role of objects of type ``t`` (``RootEntity`` for custom types)."""
+    """The structure role of objects of type ``t`` (``entity`` for custom types)."""
     if t is None or not t.basic:
-        return "RootEntity"
+        return "entity"
     name = _basic_name(t.name)
-    return _BASIC_ROLES.get(name or "", "RootEntity")
+    return _BASIC_ROLES.get(name or "", "entity")

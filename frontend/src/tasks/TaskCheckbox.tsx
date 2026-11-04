@@ -1,4 +1,4 @@
-// The round task checkbox (`RootTaskCheckbox`): click toggles between "Open" and "Done";
+// The round task checkbox: click toggles between "Open" and "Done";
 // Ctrl/Cmd-click or the caret opens "Status" with the options grouped by category. It owns no row
 // state: it calls `taskActions` and hands the outcome to the owner, which patches its list.
 // M8: a recurring task's menu adds "Skip" and "Excuse"; when

@@ -230,8 +230,8 @@ def test_re_adding_a_deleted_template_type_does_not_duplicate_its_query(tmp_path
     sp = Space(space_dir)
     t = sp.create_type("", "", template="book")
     sp.delete_type(t.id, confirm=True)
-    # Deleting a type leaves its queries where they are (they still name its id).
-    assert [q["name"] for q in _queries(space_dir)] == ["Currently reading"]
+    # Its query goes to the trash with it.
+    assert _queries(space_dir) == []
     again = sp.create_type("", "", template="book")
     assert again.id == t.id
     assert [q["name"] for q in _queries(space_dir)] == ["Currently reading"]

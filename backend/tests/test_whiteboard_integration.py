@@ -324,7 +324,7 @@ def test_whiteboard_is_basic_with_icon():
 
 def test_whiteboard_role(wb_dir: Path):
     space = Space(wb_dir)
-    assert role_of(whiteboard_type(space)) == "RootWhiteboard"
+    assert role_of(whiteboard_type(space)) == "whiteboard"
 
 
 def test_board_links_reach_backlinks_and_search(wb_dir: Path):

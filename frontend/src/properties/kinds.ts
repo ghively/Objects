@@ -89,22 +89,22 @@ export interface AddPropertyItem {
   icon: string
 }
 
-// The Add Property menu order list. `structure_RootTag_single` and `property_tag` are in it,
+// The Add Property menu order list. `structure_tag_single` and `property_tag` are in it,
 // but no item is built for them.
 const MENU_ORDER = [
   'property_textBlock',
   'property_blocks',
   'property_entity_tags',
   'property_label',
-  'structure_RootTag_single',
-  'structure_RootTag_multi',
+  'structure_tag_single',
+  'structure_tag_multi',
   'property_boolean',
   'property_tag',
   'property_datetime',
   'property_number',
   'property_entity_title',
   'property_entity_description',
-  'structure_MediaImage_single',
+  'structure_image_single',
   'property_entity_icon',
   'property_entity_createdAt',
   'property_entity_lastUpdated',
@@ -132,7 +132,7 @@ const ADDABLE_KINDS: readonly PropertyType[] = [
 function buildItems(): AddPropertyItem[] {
   const items: AddPropertyItem[] = [
     {
-      key: 'structure_RootTag_multi',
+      key: 'structure_tag_multi',
       action: 'objectSelect',
       type: 'entity',
       name: 'Object Select',
@@ -140,7 +140,7 @@ function buildItems(): AddPropertyItem[] {
       icon: 'ph-link',
     },
     {
-      key: 'structure_MediaImage_single',
+      key: 'structure_image_single',
       action: 'coverImage',
       type: 'coverImage',
       name: 'Cover Image',

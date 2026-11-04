@@ -118,11 +118,11 @@ def _system_prop(
 
 
 def whiteboard_type_json() -> dict[str, Any]:
-    """The basic Whiteboard type (``RootWhiteboard``) as type JSON.
+    """The basic Whiteboard type (role ``whiteboard``) as type JSON.
 
     Name "Whiteboard", plural "Whiteboards", icon ``ph-presentation``, colour ``gray`` (our
     name for ``neutral``), full width (``wideLayoutMode``: "The canvas owns the
-    page"); its properties are the system ones ``RootWhiteboard`` lists (title, description,
+    page"); its properties are the system ones a whiteboard has (title, description,
     icon, tags, last updated, created at). The Canvas and Notes are the sidecar and the body.
     """
     return {

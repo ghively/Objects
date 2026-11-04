@@ -48,7 +48,7 @@ Routes (all JSON):
   Announces ``queries``. Restoring one re-creates its file under the original id
   (``409`` when that file exists).
 - ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
-  ``{paths, typeIds, rewritten}`` (plus ``collectionIds``, ``queryIds``, ``skipped`` for a
+  ``{paths, typeIds, queryIds, rewritten}`` (plus ``collectionIds``, ``skipped`` for a
   collection or query entry; ``rewritten``: other files written back, announced ``changed``;
   announces ``created`` per path and ``types`` per type); ``422`` when a
   saved type now has the trashed type's id or name;
@@ -67,9 +67,10 @@ Routes (all JSON):
   ``{targetPropertyId, createName?, baseRevision, clientId?}`` -> ``{types, rewritten, skipped}``;
   ``409 {currentRevision}``, ``422 {detail}``, ``423``, ``404``. Announces ``types`` per
   changed type and ``changed`` per backfilled object.
-- ``DELETE /api/types/{id}?confirm=true&clientId=`` -> ``{trashId, paths, typeIds}``; ``422``,
-  ``428 {detail, affected}``, ``404``. Announces ``types`` (this type and each type
-  whose relations stopped allowing it) and ``deleted`` per object and template.
+- ``DELETE /api/types/{id}?confirm=true&clientId=`` -> ``{trashId, paths, typeIds, queryIds}``;
+  ``422``, ``428 {detail, affected}``, ``404``. Announces ``types`` (this type and each type
+  whose relations stopped allowing it), ``deleted`` per object and template, and
+  ``queries`` per saved query trashed with it or edited to drop it.
 - ``GET /api/types/{id}/templates`` -> ``ObjectSummary[]`` (``templates.ids`` order, then
   discovered ones); ``404``. ``POST /api/types/{id}/templates`` ``{name?, clientId?}`` ->
   ``201 {path, version}``; ``422`` (a type without templates), ``423``, ``404``. Announces
@@ -717,8 +718,8 @@ def _ui_problem(patch: dict[str, Any]) -> str | None:
             return "workspaceOrder must be a list of section ids."
         if len(set(order)) != len(order):
             return "workspaceOrder lists a section twice."
-    # The Object Types sort (`RootSpace.objectsSectionSortOption`) and its manual order, kept
-    # as the `objects` section's ids in `RootSpace.workspace`.
+    # The Object Types sort (``ui.json`` ``objectsSectionSortOption``) and its manual order, kept
+    # as the `objects` section's ids in ``ui.json`` ``workspace``.
     if "objectsSectionSortOption" in patch and patch["objectsSectionSortOption"] not in (
         "alphabetical",
         "manual",
@@ -1778,8 +1779,15 @@ def create_app(
                 paths.append(str(meta.get("originalPath", "")))
         for path in paths:
             announce(ChangeEvent("deleted", path, None, origin=clientId))
+        query_ids = [str(q) for q in manifest.get("queries") or []]
+        for ref in manifest.get("queryStructureRefs") or []:
+            qid = str(ref.get("queryId"))
+            if qid not in query_ids:
+                query_ids.append(qid)
+        for qid in query_ids:
+            announce(ChangeEvent("queries", qid, None, origin=clientId))
         # The window that deleted can't list these itself: tell it what changed.
-        return {"trashId": item.id, "paths": paths, "typeIds": type_ids}
+        return {"trashId": item.id, "paths": paths, "typeIds": type_ids, "queryIds": query_ids}
 
     @api.post("/tags/ensure")
     def ensure_tag(req: EnsureTagRequest):
