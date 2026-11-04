@@ -32,8 +32,8 @@ export const NEW_OBJECT_TEXT = {
 const MAX_RESULTS = 30
 
 /**
- * The basic Whiteboard type as step 1 lists it while the space has none yet (`RootWhiteboard`
- * in `basicStructures.ts`: "Whiteboard", "Whiteboards", `ph-presentation`; the server writes
+ * The basic Whiteboard type as step 1 lists it while the space has none yet (the whiteboard
+ * role's basic type: "Whiteboard", "Whiteboards", `ph-presentation`; the server writes
  * the full definition on the first create).
  */
 export const PENDING_WHITEBOARD_TYPE: TypeDef = {

@@ -174,8 +174,8 @@ _NOT_COPIED_KINDS = frozenset(
 # M9 duplicate: the roles that can't be duplicated that
 # our types can have (see `roles.py`), and the refusal (our string).
 _NOT_DUPLICATED_ROLES = frozenset(
-    {"MediaImage", "MediaWebResource", "MediaPDF", "MediaAudio", "MediaFile", "MediaTweet",
-     "RootDailyNote"}
+    {"image", "weblink", "pdf", "audio", "file", "tweet",
+     "dailyNote"}
 )  # fmt: skip
 _CANNOT_DUPLICATE = "This object can't be duplicated."
 # M9 per-object layout keys (`wideLayoutMode`, `wideCoverImage`,

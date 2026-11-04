@@ -1,6 +1,6 @@
 """The sidebar's Object Types sort: ``PUT /api/ui`` takes ``objectsSectionSortOption``
-(``RootSpace.objectsSectionSortOption``: ``alphabetical`` | ``manual``) and ``workspace``
-(``RootSpace.workspace``; its ``objects`` section's ``ids`` hold the manual order).
+(``objectsSectionSortOption``: ``alphabetical`` | ``manual``) and ``workspace``
+(the space's ``workspace``; its ``objects`` section's ``ids`` hold the manual order).
 """
 
 from __future__ import annotations
