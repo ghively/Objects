@@ -1,15 +1,23 @@
 # Object: remaining work
 
-Status as of 2026-11-03. **All nine milestones are built, reviewed, fixed and gated, and all are on `master`.** The 2026-11-01 full audit is merged (PR #4, `84f3c16`). The 2026-11-02 behaviour study's polish backlog was built on 2026-11-03 in nine parallel lanes, reviewed once, fixed once and gated (see "2026-11-03: the polish backlog" below). Pushed to origin (`55a4059`).
+Status as of 2026-11-04. **All nine milestones are built, reviewed, fixed and gated, and all are on `master`.** The 2026-11-01 full audit is merged (PR #4, `84f3c16`). The 2026-11-02 behaviour study's polish backlog was built on 2026-11-03 in nine parallel lanes, reviewed once, fixed once and gated (see "2026-11-03: the polish backlog" below). Pushed to origin (`55a4059`). On 2026-11-04 the repo was clean-roomed (`28d55b1`) and the rest of the polish backlog was built (see "2026-11-04" below).
 
 **What remains, in one list** (details: `polish-audit-2026-11-02.md`, "Remaining tasks"):
 0. **M10, the AI assistant** (planned 2026-11-02, not built): `2026-11-02-m10-ai-assistant.md`; three small questions for Gene at its end.
-1. **Polish backlog, still open** (everything else is done, 2026-11-03): the Help & Resources sidebar section and the import migration guides (both link to external web pages: Gene to rule against the no-network rule); the `@` picker's "Collection" badge (collections are not linkable in Object; Gene to decide whether they should be); empty daily-note placeholders (a real Tags row needs the object header in the inline daily note); the block-selection bar's Tag dropdown (block tags have no Markdown form); "Default list view" type setting and the templates' saved queries (not specified); a list item with an icon and no text reloads as a raw block (pre-existing loader limit); Wall card details.
+1. **Polish backlog: done** (2026-11-04). Built: local Help & Resources (shortcuts, Getting started, Markdown reference; no external links), empty daily-note placeholders (Day view), Default list view type setting, a saved query per starter template, the empty icon list item fix, Wall card details. Closed by Gene: the per-tool import guides, the `@` picker's Collection badge (collections stay unlinkable), block tags. Open question: deleting a type leaves its saved queries in `.object/queries/` pointing at the deleted type id.
 2. **Decisions for Gene:** (decided 2026-11-02: all Pro features are unlocked, nothing gated; AI is in, through the Claude Code CLI, planned as M10; the integrations come later at lower priority); whether the how-to guides ship as built-in seeds; scrub the plaintext credentials found in his Work and Personal source spaces before any import.
 3. **Gene's hands-on checking** (M1-M9 acceptance docs, 256 unchecked items), and the fixes it produces. **Settled 2026-10-28:** the Standard design shows properties in the side column; they go inline below 768 px.
 4. **Not yet catalogued** (needs a scratch view or approval): filter, sort and group editors, Customize card view, Tasks page, Queries, Weblink and PDF viewers, image and file objects, Two Columns/Code/Math/Toggle/Group/Horizontal line blocks, Word and Latex export, Three days view in the other spaces, drag and drop, markdown list shortcuts with real key events.
 5. ~~One known test failure on Windows~~ fixed 2026-11-03 (`ba43e66`): the gzip test compared newline-translated text; it now compares bytes.
 6. **Wiki import follow-ups** (outside the repo, in Gene's `ObjectSpaces` folder): review the 10 "possible secrets" pages listed in `ai-pass/review.md`; the wiki copy is a snapshot (refresh = recopy and AI-reread only new or changed pages).
+
+## 2026-11-04: clean room and the rest of the polish backlog
+
+**Clean room** (`28d55b1`): the repo no longer names or cites the original app. `reference/`, the screenshots and the design notes moved to `a private folder` (outside the repo; history not rewritten, Gene's choice). Space metadata is now `.object/` and `.object-cache/`; `backend/objectapp/legacy.py` renames old folders once on open. The behaviour catalog is `docs/behavior-catalog.md`. Open for Gene: the backend role values (`RootPage`, `RootDailyNote`, ...) still use the original app's internal names.
+
+**Polish** in five worktree lanes, merged `--no-ff`, one review, one fix pass (backend `002306a`, `4b81aea`, `44ecf14`; frontend `3de8d7b`, `38d3d48`, `34f0860`). Our choices to check by hand: Help sits below Graph and Trash; placeholders are Day view only (Week and Three days keep "+ Daily Note", as the catalog says); the type setting is stored as `defaultDataViewLayout`; the 14 template queries (e.g. Books "Currently reading", Projects "Active projects", Films "Top rated films") are in `typetemplates.py` `TEMPLATE_QUERIES`; wall cards show the description under the title and one labelled row per card property with "Empty".
+
+Gate (Windows, at `cf90118`): back end 1592 passed, 12 skipped, 3 xpassed; front end 2528 passed, 1 skipped; `tsc` clean; lint 0 errors; build ok; `m1_roundtrip.py` and `m2`-`m9_acceptance.py` PASS (16 runs).
 
 ## 2026-11-03: the polish backlog
 
