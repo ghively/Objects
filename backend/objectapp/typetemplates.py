@@ -22,7 +22,10 @@ those are **our choice**:
 
 A relation names the template key of its target ("person"); when the type is created it
 points at the space's type made from that template (or named like it), else at any type.
-Saved queries and template objects of the templates are not created.
+Template objects of the templates are not created. Each template's one saved query
+(`TEMPLATE_QUERIES`, written to ``.object/queries/`` when a type is created from the
+gallery, never for a blank type) is **our choice** too; a query uses only properties its
+template creates.
 """
 
 from __future__ import annotations
@@ -31,9 +34,18 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from .typemodel import PropertyDefinition, TypeDefinition
+from .typemodel import Icon, PropertyDefinition, TypeDefinition, system_property_defs
 
-__all__ = ["TEMPLATE_KEYS", "TypeTemplate", "build_template", "template_catalog"]
+__all__ = [
+    "TEMPLATE_KEYS",
+    "TEMPLATE_QUERIES",
+    "TemplateQuery",
+    "TypeTemplate",
+    "build_template",
+    "template_catalog",
+    "template_query",
+    "template_query_fixture",
+]
 
 
 @dataclass(frozen=True)
@@ -238,6 +250,124 @@ def template_for(t: TypeDefinition) -> str | None:
         return key
     low = t.name.lower()
     return next((x.key for x in _TEMPLATES if x.name.lower() == low), None)
+
+
+@dataclass(frozen=True)
+class Option:
+    """A label filter's reference: the option with this text (its id is looked up)."""
+
+    text: str
+
+
+@dataclass(frozen=True)
+class TemplateQuery:
+    """The saved query a gallery template comes with (our choice).
+
+    ``filters`` are ``(property key, operator, reference)``, all AND-ed; a reference is a
+    relative date ``{"relative": ...}``, a number, an `Option`, or None (no value).
+    ``sorts`` are ``(property key, order)``; ``layout`` is the query view's layout.
+    """
+
+    name: str
+    filters: tuple[tuple[str, str, Any], ...] = ()
+    sorts: tuple[tuple[str, str], ...] = ()
+    layout: str = "list"
+
+
+def _rel(when: str) -> dict[str, str]:
+    return {"relative": when}
+
+
+# One query per gallery template, by template key.
+TEMPLATE_QUERIES: dict[str, TemplateQuery] = {
+    "meeting": TemplateQuery("This week's meetings", (("date", "is", _rel("thisWeek")),),
+                             (("date", "ascending"),)),
+    "person": TemplateQuery("Colleagues", (("category", "contains", Option("Colleague")),),
+                            (("title", "ascending"),), "grid"),
+    "project": TemplateQuery("Active projects", (("status", "contains", Option("In Progress")),),
+                             (("lastUpdated", "descending"),)),
+    "atomicNote": TemplateQuery("Recently updated notes", (), (("lastUpdated", "descending"),)),
+    "definition": TemplateQuery("All definitions A-Z", (), (("title", "ascending"),)),
+    "book": TemplateQuery("Currently reading",
+                          (("readingTimeline", "startIsNotEmpty", None),
+                           ("readingTimeline", "endIsEmpty", None)),
+                          (("readingTimeline", "descending"),), "grid"),
+    "film": TemplateQuery("Top rated films", (("rating", "greaterEqual", 4),),
+                          (("rating", "descending"),), "grid"),
+    "tvSeries": TemplateQuery("Watched this year", (("watchedOn", "is", _rel("thisYear")),),
+                              (("watchedOn", "descending"),), "grid"),
+    "podcast": TemplateQuery("Listened this month", (("listenedOn", "is", _rel("thisMonth")),),
+                             (("listenedOn", "descending"),)),
+    "day": TemplateQuery("This week's days", (("day", "is", _rel("thisWeek")),),
+                         (("day", "ascending"),)),
+    "week": TemplateQuery("This month's weeks", (("period", "is", _rel("thisMonth")),),
+                          (("period", "ascending"),)),
+    "month": TemplateQuery("This year's months", (("period", "is", _rel("thisYear")),),
+                           (("period", "ascending"),)),
+    "organization": TemplateQuery("Companies", (("category", "contains", Option("Company")),),
+                                  (("title", "ascending"),)),
+    "area": TemplateQuery("All areas A-Z", (), (("title", "ascending"),)),
+}  # fmt: skip
+
+
+def template_query(key: str, t: TypeDefinition) -> tuple[str, dict[str, Any], dict[str, Any]]:
+    """The (name, definition, view) of template ``key``'s query over the created type ``t``.
+
+    Raises `KeyError` when the query names a property or label option ``t`` lacks.
+    """
+    spec = TEMPLATE_QUERIES[key]
+    elements: list[dict[str, Any]] = []
+    for prop_key, option, ref in spec.filters:
+        p = t.prop(prop_key)
+        if p is None:
+            raise KeyError(prop_key)
+        f: dict[str, Any] = {"type": "filter", "propertyId": prop_key, "option": option}
+        if isinstance(ref, Option):
+            opts = p.options.get("set") or []
+            oid = next((o["id"] for o in opts if isinstance(o, dict) and o.get("text") == ref.text), None)
+            if oid is None:
+                raise KeyError(f"{prop_key}: {ref.text}")
+            f["referenceValue"] = [oid]
+        elif ref is not None:
+            f["referenceValue"] = ref
+        f["structureId"] = t.id
+        elements.append(f)
+    sorts = []
+    for prop_key, order in spec.sorts:
+        if t.prop(prop_key) is None:
+            raise KeyError(prop_key)
+        sorts.append({"propertyId": prop_key, "option": order, "structureId": t.id})
+    definition = {
+        "structures": [{"id": t.id}],
+        "filterGroup": {"type": "filterGroup", "operator": "and", "elements": elements},
+        "sorts": sorts,
+        "groupBy": None,
+    }
+    return spec.name, definition, {"viewDefinition": {"dataViewLayout": spec.layout}}
+
+
+def template_query_fixture() -> dict[str, Any]:
+    """Each template's query and the properties it reads (keys, kinds, options), for the
+    frontend's evaluation test. Property ids are left out so the output is stable."""
+    out: dict[str, Any] = {}
+    for tpl in _TEMPLATES:
+        props = [*system_property_defs(), *build_template(tpl.key, [])]
+        t = TypeDefinition(
+            id=tpl.key, name=tpl.name, pluralName=tpl.pluralName, folder=tpl.pluralName,
+            icon=Icon("iconify", tpl.icon), color=tpl.color, propertyDefinitions=props,
+        )  # fmt: skip
+        name, definition, view = template_query(tpl.key, t)
+        spec = TEMPLATE_QUERIES[tpl.key]
+        used = {"title", *(f[0] for f in spec.filters), *(s[0] for s in spec.sorts)}
+        out[tpl.key] = {
+            "properties": [
+                {"key": p.key, "name": p.name, "type": p.type, "options": p.options}
+                for p in props
+                if p.key in used
+            ],
+            "query": {"name": name, "definition": definition, "view": view},
+        }
+    return out
 
 
 def build_template(key: str, types: list[TypeDefinition]) -> list[PropertyDefinition]:

@@ -1,0 +1,902 @@
+{
+  "meeting": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "date",
+        "name": "Date",
+        "type": "datetime",
+        "options": {
+          "constraints": {
+            "resolutionPreference": "time"
+          }
+        }
+      }
+    ],
+    "query": {
+      "name": "This week's meetings",
+      "definition": {
+        "structures": [
+          {
+            "id": "meeting"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "date",
+              "option": "is",
+              "referenceValue": {
+                "relative": "thisWeek"
+              },
+              "structureId": "meeting"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "date",
+            "option": "ascending",
+            "structureId": "meeting"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "person": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "category",
+        "name": "Category",
+        "type": "label",
+        "options": {
+          "isArray": true,
+          "set": [
+            {
+              "id": "friends",
+              "text": "Friends",
+              "icon": null,
+              "color": "blue"
+            },
+            {
+              "id": "family",
+              "text": "Family",
+              "icon": null,
+              "color": "sky"
+            },
+            {
+              "id": "colleague",
+              "text": "Colleague",
+              "icon": null,
+              "color": "cyan"
+            },
+            {
+              "id": "academic",
+              "text": "Academic",
+              "icon": null,
+              "color": "teal"
+            },
+            {
+              "id": "artist",
+              "text": "Artist",
+              "icon": null,
+              "color": "emerald"
+            },
+            {
+              "id": "author",
+              "text": "Author",
+              "icon": null,
+              "color": "green"
+            },
+            {
+              "id": "entrepreneur",
+              "text": "Entrepreneur",
+              "icon": null,
+              "color": "lime"
+            },
+            {
+              "id": "journalist",
+              "text": "Journalist",
+              "icon": null,
+              "color": "yellow"
+            },
+            {
+              "id": "philosopher",
+              "text": "Philosopher",
+              "icon": null,
+              "color": "amber"
+            },
+            {
+              "id": "politician",
+              "text": "Politician",
+              "icon": null,
+              "color": "orange"
+            },
+            {
+              "id": "scientist",
+              "text": "Scientist",
+              "icon": null,
+              "color": "red"
+            }
+          ]
+        }
+      }
+    ],
+    "query": {
+      "name": "Colleagues",
+      "definition": {
+        "structures": [
+          {
+            "id": "person"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "category",
+              "option": "contains",
+              "referenceValue": [
+                "colleague"
+              ],
+              "structureId": "person"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "structureId": "person"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "grid"
+        }
+      }
+    }
+  },
+  "project": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "lastUpdated",
+        "name": "Last updated",
+        "type": "entity_lastUpdated",
+        "options": {}
+      },
+      {
+        "key": "status",
+        "name": "Status",
+        "type": "label",
+        "options": {
+          "isArray": false,
+          "set": [
+            {
+              "id": "planned",
+              "text": "Planned",
+              "color": "yellow",
+              "icon": null
+            },
+            {
+              "id": "in-progress",
+              "text": "In Progress",
+              "color": "blue",
+              "icon": null
+            },
+            {
+              "id": "on-hold",
+              "text": "On Hold",
+              "color": "pink",
+              "icon": null
+            },
+            {
+              "id": "completed",
+              "text": "Completed",
+              "color": "green",
+              "icon": null
+            }
+          ]
+        }
+      }
+    ],
+    "query": {
+      "name": "Active projects",
+      "definition": {
+        "structures": [
+          {
+            "id": "project"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "status",
+              "option": "contains",
+              "referenceValue": [
+                "in-progress"
+              ],
+              "structureId": "project"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "lastUpdated",
+            "option": "descending",
+            "structureId": "project"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "atomicNote": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "lastUpdated",
+        "name": "Last updated",
+        "type": "entity_lastUpdated",
+        "options": {}
+      }
+    ],
+    "query": {
+      "name": "Recently updated notes",
+      "definition": {
+        "structures": [
+          {
+            "id": "atomicNote"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": []
+        },
+        "sorts": [
+          {
+            "propertyId": "lastUpdated",
+            "option": "descending",
+            "structureId": "atomicNote"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "definition": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      }
+    ],
+    "query": {
+      "name": "All definitions A-Z",
+      "definition": {
+        "structures": [
+          {
+            "id": "definition"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": []
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "structureId": "definition"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "book": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "readingTimeline",
+        "name": "Reading timeline",
+        "type": "datetime",
+        "options": {
+          "constraints": {
+            "resolutionPreference": "day",
+            "endTimePreference": true
+          }
+        }
+      }
+    ],
+    "query": {
+      "name": "Currently reading",
+      "definition": {
+        "structures": [
+          {
+            "id": "book"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "readingTimeline",
+              "option": "startIsNotEmpty",
+              "structureId": "book"
+            },
+            {
+              "type": "filter",
+              "propertyId": "readingTimeline",
+              "option": "endIsEmpty",
+              "structureId": "book"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "readingTimeline",
+            "option": "descending",
+            "structureId": "book"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "grid"
+        }
+      }
+    }
+  },
+  "film": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "rating",
+        "name": "Rating",
+        "type": "number",
+        "options": {
+          "numberFormat": {
+            "type": "progress",
+            "options": {
+              "progress": {
+                "steps": 5,
+                "color": "yellow"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "query": {
+      "name": "Top rated films",
+      "definition": {
+        "structures": [
+          {
+            "id": "film"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "rating",
+              "option": "greaterEqual",
+              "referenceValue": 4,
+              "structureId": "film"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "rating",
+            "option": "descending",
+            "structureId": "film"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "grid"
+        }
+      }
+    }
+  },
+  "tvSeries": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "watchedOn",
+        "name": "Watched on",
+        "type": "datetime",
+        "options": {
+          "constraints": {
+            "resolutionPreference": "day"
+          }
+        }
+      }
+    ],
+    "query": {
+      "name": "Watched this year",
+      "definition": {
+        "structures": [
+          {
+            "id": "tvSeries"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "watchedOn",
+              "option": "is",
+              "referenceValue": {
+                "relative": "thisYear"
+              },
+              "structureId": "tvSeries"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "watchedOn",
+            "option": "descending",
+            "structureId": "tvSeries"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "grid"
+        }
+      }
+    }
+  },
+  "podcast": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "listenedOn",
+        "name": "Listened on",
+        "type": "datetime",
+        "options": {
+          "constraints": {
+            "resolutionPreference": "day"
+          }
+        }
+      }
+    ],
+    "query": {
+      "name": "Listened this month",
+      "definition": {
+        "structures": [
+          {
+            "id": "podcast"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "listenedOn",
+              "option": "is",
+              "referenceValue": {
+                "relative": "thisMonth"
+              },
+              "structureId": "podcast"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "listenedOn",
+            "option": "descending",
+            "structureId": "podcast"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "day": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "day",
+        "name": "Date",
+        "type": "datetime",
+        "options": {
+          "constraints": {
+            "resolutionPreference": "day"
+          }
+        }
+      }
+    ],
+    "query": {
+      "name": "This week's days",
+      "definition": {
+        "structures": [
+          {
+            "id": "day"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "day",
+              "option": "is",
+              "referenceValue": {
+                "relative": "thisWeek"
+              },
+              "structureId": "day"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "day",
+            "option": "ascending",
+            "structureId": "day"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "week": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "period",
+        "name": "Date",
+        "type": "datetime",
+        "options": {
+          "constraints": {
+            "resolutionPreference": "day",
+            "endTimePreference": true
+          }
+        }
+      }
+    ],
+    "query": {
+      "name": "This month's weeks",
+      "definition": {
+        "structures": [
+          {
+            "id": "week"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "period",
+              "option": "is",
+              "referenceValue": {
+                "relative": "thisMonth"
+              },
+              "structureId": "week"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "period",
+            "option": "ascending",
+            "structureId": "week"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "month": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "period",
+        "name": "Date",
+        "type": "datetime",
+        "options": {
+          "constraints": {
+            "resolutionPreference": "day",
+            "endTimePreference": true
+          }
+        }
+      }
+    ],
+    "query": {
+      "name": "This year's months",
+      "definition": {
+        "structures": [
+          {
+            "id": "month"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "period",
+              "option": "is",
+              "referenceValue": {
+                "relative": "thisYear"
+              },
+              "structureId": "month"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "period",
+            "option": "ascending",
+            "structureId": "month"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "organization": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "category",
+        "name": "Category",
+        "type": "label",
+        "options": {
+          "isArray": false,
+          "set": [
+            {
+              "id": "company",
+              "text": "Company",
+              "icon": null,
+              "color": "blue"
+            },
+            {
+              "id": "startup",
+              "text": "Startup",
+              "icon": null,
+              "color": "sky"
+            },
+            {
+              "id": "nonprofit",
+              "text": "Nonprofit",
+              "icon": null,
+              "color": "cyan"
+            },
+            {
+              "id": "ngo",
+              "text": "NGO",
+              "icon": null,
+              "color": "teal"
+            },
+            {
+              "id": "government",
+              "text": "Government",
+              "icon": null,
+              "color": "emerald"
+            },
+            {
+              "id": "university",
+              "text": "University",
+              "icon": null,
+              "color": "green"
+            }
+          ]
+        }
+      }
+    ],
+    "query": {
+      "name": "Companies",
+      "definition": {
+        "structures": [
+          {
+            "id": "organization"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "category",
+              "option": "contains",
+              "referenceValue": [
+                "company"
+              ],
+              "structureId": "organization"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "structureId": "organization"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "area": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      }
+    ],
+    "query": {
+      "name": "All areas A-Z",
+      "definition": {
+        "structures": [
+          {
+            "id": "area"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": []
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "structureId": "area"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  }
+}

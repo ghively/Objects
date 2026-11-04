@@ -1,6 +1,7 @@
 """Polish item 21: the "Add new object type" gallery (the starter type templates)."""
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,12 @@ from fastapi.testclient import TestClient
 from objectapp.propvalues import InvalidValue
 from objectapp.server import create_app
 from objectapp.space import Space
-from objectapp.typetemplates import TEMPLATE_KEYS, template_catalog
+from objectapp.typetemplates import (
+    TEMPLATE_KEYS,
+    TEMPLATE_QUERIES,
+    template_catalog,
+    template_query_fixture,
+)
 
 GALLERY = (
     "meeting", "person", "project", "atomicNote", "definition", "book", "film", "tvSeries",
@@ -106,3 +112,80 @@ def test_api_gallery_and_create(space_dir: Path):
         gallery = c.get("/api/type-gallery").json()
         assert next(g for g in gallery if g["key"] == "film")["added"]
         assert c.post("/api/types", json={"template": "film"}).status_code == 422
+
+
+# -- the templates' saved queries ---------------------------------------------------
+
+# The filter operators per property kind (the frontend's FILTER_OPTIONS, the ones used here).
+_OPS = {
+    "datetime": {"is", "isNotEmpty", "isEmpty", "startIsNotEmpty", "endIsEmpty", "endIsNotEmpty"},
+    "label": {"contains", "notContains", "isEmpty", "isNotEmpty"},
+    "number": {"equal", "notEqual", "greaterEqual", "greater", "smallerEqual", "smaller"},
+}
+_SORTS = {"ascending", "descending", "ascendingExists", "descendingExists"}
+_LAYOUTS = {"list", "grid", "wall", "table", "embed", "kanban"}
+
+FIXTURE = Path(__file__).parents[2] / "frontend" / "src" / "types" / "templateQueries.fixture.json"
+
+
+def _queries(space_dir: Path) -> list[dict]:
+    qdir = space_dir / ".object" / "queries"
+    return [json.loads(p.read_text("utf-8")) for p in sorted(qdir.glob("*.json"))] if qdir.is_dir() else []
+
+
+def test_every_template_has_a_query():
+    assert set(TEMPLATE_QUERIES) == set(GALLERY)
+
+
+@pytest.mark.parametrize("key", GALLERY)
+def test_template_creates_one_valid_query(tmp_path: Path, key: str):
+    space_dir = tmp_path / "s"
+    space_dir.mkdir()
+    sp = Space(space_dir)
+    t = sp.create_type("", "", template=key)
+    [q] = _queries(space_dir)
+    assert q["name"] == TEMPLATE_QUERIES[key].name and q["titleIsCustom"] is True
+    d = q["definition"]
+    assert d["structures"] == [{"id": t.id}]
+    props = {p.key: p for p in t.propertyDefinitions}
+    for f in d["filterGroup"]["elements"]:
+        assert f["type"] == "filter" and f["structureId"] == t.id
+        p = props[f["propertyId"]]  # only properties the template created
+        assert f["option"] in _OPS[p.type], (p.type, f["option"])
+        if p.type == "label":
+            ids = {o["id"] for o in p.options["set"]}
+            assert f["referenceValue"] and set(f["referenceValue"]) <= ids
+    for s in d["sorts"]:
+        assert s["propertyId"] in props and s["option"] in _SORTS
+    assert q["view"]["viewDefinition"]["dataViewLayout"] in _LAYOUTS
+    # it reads back as a valid query
+    [loaded] = sp.list_queries()
+    assert loaded.readOnlyReason is None and loaded.definition == d
+
+
+def test_a_blank_type_creates_no_query(tmp_path: Path):
+    space_dir = tmp_path / "s"
+    space_dir.mkdir()
+    Space(space_dir).create_type("Machine", "Machines")
+    assert _queries(space_dir) == []
+    assert not (space_dir / ".object" / "queries").exists()
+
+
+def test_api_create_from_template_lists_its_query(space_dir: Path):
+    with TestClient(create_app(Space(space_dir), None, watch=False)) as c:
+        before = {q["id"] for q in c.get("/api/queries").json()}
+        assert c.post("/api/types", json={"template": "book"}).status_code == 201
+        new = [q for q in c.get("/api/queries").json() if q["id"] not in before]
+        assert [q["name"] for q in new] == ["Currently reading"]
+        before = {q["id"] for q in c.get("/api/queries").json()}
+        assert c.post("/api/types", json={"name": "Gadget", "pluralName": "Gadgets"}).status_code == 201
+        assert {q["id"] for q in c.get("/api/queries").json()} == before
+
+
+def test_the_frontend_fixture_matches_the_templates():
+    """The frontend evaluates each template's query on rows (`templateQueries.test.ts`) from this
+    fixture. Regenerate with ``OBJECT_WRITE_FIXTURES=1``."""
+    fresh = json.dumps(template_query_fixture(), indent=2, ensure_ascii=False) + "\n"
+    if os.environ.get("OBJECT_WRITE_FIXTURES") == "1":
+        FIXTURE.write_text(fresh, "utf-8", newline="\n")
+    assert json.loads(FIXTURE.read_text("utf-8")) == json.loads(fresh)
