@@ -702,18 +702,20 @@ export const api = {
     return res
   },
 
-  /** Move a type, its objects and its templates to the Trash. Rejects with 428 unless `confirm`. */
+  /** Move a type, its objects, its templates and its only-this-type queries to the Trash. Rejects with 428 unless `confirm`. */
   async deleteType(id: string, opts: { confirm?: boolean } = {}): Promise<{ trashId: string }> {
-    const res = await request<{ trashId: string; paths?: string[]; typeIds?: string[] }>(
+    const res = await request<{ trashId: string; paths?: string[]; typeIds?: string[]; queryIds?: string[] }>(
       `/types/${seg(id)}${qs({ confirm: opts.confirm ? 'true' : undefined, clientId: CLIENT_ID })}`,
       { method: 'DELETE' },
     )
-    // The type's objects and templates went to the Trash, and other types may have dropped it
-    // from their relations: announce each, since the server's events for them are our echoes.
+    // The type's objects, templates and saved queries of only this type went to the Trash, other
+    // types may have dropped it from their relations and other queries from their types: announce
+    // each, since the server's events for them are our echoes.
     const typeIds = res.typeIds?.length ? res.typeIds : [id]
     emitLocal([
       ...typeIds.map((t) => typesEvent(t)),
       ...(res.paths ?? []).map((p): ChangeEvent => ({ kind: 'deleted', path: p, version: null, origin: CLIENT_ID })),
+      ...(res.queryIds ?? []).map((q) => defEvent('queries', q)),
     ])
     return { trashId: res.trashId }
   },

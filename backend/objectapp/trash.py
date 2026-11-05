@@ -5,9 +5,12 @@ Layout:
 - an object: ``<ulid>.md`` (the file's bytes, unchanged) plus ``<ulid>.json``
   ``{id, kind: 'object', originalPath, title, type, deletedAt, typeTrashId?}``;
 - a type: ``types/<ulid>/`` with ``type.json``, ``templates/<original path>``
-  for each of its template files, and ``manifest.json`` ``{id, kind: 'type',
-  typeId, name, deletedAt, objectTrashIds, allowedTypesRefs, templates}``. Its
-  objects are ordinary object entries carrying ``typeTrashId``;
+  for each of its template files, ``queries/<query id>.json`` (unchanged bytes) for
+  each saved query of only this type, and ``manifest.json`` ``{id, kind: 'type',
+  typeId, name, deletedAt, objectTrashIds, allowedTypesRefs, templates, queries,
+  queryRefs}`` (``queryRefs``: ``{queryId, list, index, entry}`` per entry dropped
+  from another query's ``structures`` or ``excludeStructureIds``). Its objects are
+  ordinary object entries carrying ``typeTrashId``;
 - a collection: ``collections/<ulid>/`` with ``collection.json``, ``before/<n>.md``
   (a member's bytes before its ``collections:`` item was removed) and
   ``manifest.json`` ``{id, kind: 'collection', collectionId, name, deletedAt,
@@ -342,6 +345,10 @@ class Trash:
                 query_id = self.query_id(trash_id)
                 if query_id:
                     found.add(query_id)
+            # The saved queries that went to the trash with their type.
+            for manifest in (self.dir / "types").glob("*/manifest.json"):
+                data = _load(manifest) or {}
+                found.update(q for q in data.get("queries") or [] if isinstance(q, str))
         return found
 
     def remove_type(self, trash_id: str) -> None:
