@@ -14,16 +14,23 @@
  *   it is sent at once when it has a prompt or its mode isn't `chat`, once Claude Code answers and
  *   the first-use notice has been acknowledged.
  * - Saving: after each completed turn the chat is saved as an AI Chat object (created on the first
- *   save, then by version; a 409 reloads it and saves again); the entry then names its path, so a
- *   reload shows the same chat. The CLI session id is kept for `--resume`.
+ *   save, with its title; then by version, without one, so a rename elsewhere stays). A 409 reloads
+ *   it: when the saved messages are the start of the panel's, the panel's are saved over them;
+ *   otherwise nothing is saved and a note says the chat changed elsewhere (our choice: the edits
+ *   made elsewhere are never overwritten). The entry then names its path, so a reload shows the
+ *   same chat. The CLI session id is kept for `--resume`.
+ * - A proposal is accepted into the page that was first in the context when its turn was sent.
+ * - A block or selection goes with the object it came from (`blockPath`); the server refuses one
+ *   from a page excluded from AI or a template.
  * - Keys (while focus is inside the panel; catalog section 2): copy message Ctrl+Alt+C, append
  *   message Ctrl+Alt+A, retry Ctrl+Alt+R, close chat Ctrl+Alt+X, rephrase Ctrl+Alt+U, each on the
- *   last answer.
+ *   last answer. In the message box, a Ctrl+Alt (AltGr on Windows) character that isn't a Latin
+ *   letter is typed, not taken as a shortcut ("ą" is AltGr+A on a Polish keyboard).
  * - "Hide AI features" on: the panel shows nothing and closes its entry.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { api, ConflictError } from '@/api/client'
-import type { AiEvent, AiMessage, AiMode, AiProposal, AiStatus, ObjectSummary } from '@/api/types'
+import type { AiEvent, AiMessage, AiMode, AiProposal, AiSkipped, AiStatus, ObjectSummary } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { showToast } from '@/editor/media/upload'
@@ -49,9 +56,12 @@ export interface ChatItem extends AiMessage {
   prompt?: string
   mode?: AiMode
   block?: string | null
-  /** An assistant turn: its proposal, the pages left out, and what became of the proposal. */
+  blockPath?: string | null
+  /** An assistant turn: its proposal, the page it is for, the pages left out, and what became of the proposal. */
   proposal?: AiProposal | null
-  skipped?: string[]
+  /** The first context page when the turn was sent: where an accepted proposal is written. */
+  target?: string | null
+  skipped?: AiSkipped[]
   proposalState?: 'accepted' | 'dismissed'
   stopped?: boolean
 }
@@ -60,6 +70,8 @@ interface Turn {
   prompt: string
   mode: AiMode
   block: string | null
+  /** The object `block` came from (none: an answer of this chat). */
+  blockPath?: string | null
   /** The messages before this turn (default: all of them). */
   base?: ChatItem[]
   /** Start a fresh CLI session (a retry), so the history drives it. */
@@ -71,6 +83,21 @@ const newItemId = () => `m${Date.now().toString(36)}${(++itemSeq).toString(36)}`
 
 const toItem = (m: AiMessage): ChatItem => ({ ...m, id: newItemId() })
 const toMessage = (i: ChatItem): AiMessage => ({ role: i.role, text: i.text, at: i.at })
+
+const sameMessage = (a: AiMessage, b: AiMessage) => a.role === b.role && (a.at ?? '') === (b.at ?? '') && a.text.trim() === b.text.trim()
+
+/** Whether `saved` is the start of `local` (the same messages, maybe fewer). */
+function isPrefix(saved: AiMessage[], local: AiMessage[]): boolean {
+  return saved.length <= local.length && saved.every((m, i) => sameMessage(m, local[i]))
+}
+
+/** A Ctrl+Alt character typed in a text box (AltGr on Windows): text, not a shortcut. */
+function isAltGrText(e: KeyboardEvent): boolean {
+  if (!e.ctrlKey || !e.altKey || e.metaKey) return false
+  const t = e.target
+  if (!(t instanceof HTMLElement) || !t.closest('textarea, input')) return false
+  return [...e.key].length === 1 && !/^[a-z]$/i.test(e.key)
+}
 
 /** The saved chat's title: the first thing asked, on one line (our choice). */
 function chatTitle(items: ChatItem[]): string {
@@ -317,7 +344,8 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
   /** The user (or a seed, or a loaded chat) chose the context: it stops following the main view. */
   const contextChosen = useRef(false)
   const [block, setBlock] = useState<string | null>(null)
-  const callbacks = useRef<Pick<AiSeed, 'onReplace' | 'onInsertBelow'>>({})
+  const [blockPath, setBlockPath] = useState<string | null>(null)
+  const callbacks = useRef<Pick<AiSeed, 'onReplace' | 'onInsertBelow' | 'release'>>({})
   const [canReplace, setCanReplace] = useState(false)
   const [canInsert, setCanInsert] = useState(false)
 
@@ -359,6 +387,11 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
       live = false
       alive.current = false
       controller.current?.abort()
+      // The chat closed: the editor stops tracking its seed's range (not on a remount, as Strict Mode's).
+      const held = callbacks.current
+      setTimeout(() => {
+        if (!alive.current) held.release?.()
+      }, 0)
     }
   }, [])
 
@@ -382,6 +415,8 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
     setSaveError(null)
     setQueued(null)
     setBlock(null)
+    setBlockPath(null)
+    callbacks.current.release?.()
     callbacks.current = {}
     setCanReplace(false)
     setCanInsert(false)
@@ -403,10 +438,12 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
     const fallback = current?.kind === 'object' ? [current.path] : []
     setContext(seed.contextPaths ?? fallback)
     setBlock(seed.block ?? null)
-    callbacks.current = { onReplace: seed.onReplace, onInsertBelow: seed.onInsertBelow }
+    setBlockPath(seed.blockPath ?? null)
+    callbacks.current = { onReplace: seed.onReplace, onInsertBelow: seed.onInsertBelow, release: seed.release }
     setCanReplace(!!seed.onReplace)
     setCanInsert(!!seed.onInsertBelow)
-    if (seed.prompt?.trim() || seed.mode !== 'chat') setQueued({ prompt: seed.prompt ?? '', mode: seed.mode, block: seed.block ?? null })
+    if (seed.prompt?.trim() || seed.mode !== 'chat')
+      setQueued({ prompt: seed.prompt ?? '', mode: seed.mode, block: seed.block ?? null, blockPath: seed.blockPath ?? null })
     else focusInput()
     // `path` and `entryId` are read as they are when a seed arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -441,7 +478,8 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
     const run = async () => {
       const messages = itemsRef.current.filter((i) => !i.stopped).map(toMessage)
       const base = {
-        title: chatTitle(itemsRef.current),
+        // The title only when the chat is made: a saved chat keeps its own (a rename stays).
+        ...(chat.current.path ? {} : { title: chatTitle(itemsRef.current) }),
         contextPaths: contextRef.current,
         sessionId: sessionId.current,
         messages,
@@ -454,6 +492,12 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
         } catch (e) {
           if (!(e instanceof ConflictError) || !chat.current.path) throw e
           const fresh = await api.aiChatLoad(chat.current.path)
+          // Saved over only when nothing but this panel's own turns were added: else stop, and keep
+          // what was changed elsewhere.
+          if (!isPrefix(fresh.messages, messages)) {
+            if (seq === loadSeq.current && alive.current) setSaveError(T.changedElsewhere)
+            return
+          }
           res = await api.saveAiChat({ ...base, path: chat.current.path, baseVersion: fresh.version })
         }
         // A "New chat" (or another chat) since: this save no longer names what is shown.
@@ -481,7 +525,9 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
         prompt: turn.prompt,
         mode: turn.mode,
         block: turn.block,
+        blockPath: turn.block ? (turn.blockPath ?? null) : null,
       }
+      const target = contextRef.current[0] ?? null
       setItems([...base, user])
       setError(null)
       if (turn.fresh) sessionId.current = null
@@ -504,7 +550,15 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
       }
       try {
         await api.aiChat(
-          { mode: turn.mode, prompt: turn.prompt, contextPaths: contextRef.current, block: turn.block, history: base.map(toMessage), sessionId: sessionId.current },
+          {
+            mode: turn.mode,
+            prompt: turn.prompt,
+            contextPaths: contextRef.current,
+            block: turn.block,
+            blockPath: user.blockPath,
+            history: base.map(toMessage),
+            sessionId: sessionId.current,
+          },
           onEvent,
           ctl.signal,
         )
@@ -526,6 +580,7 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
             text: finished.text || acc,
             at: new Date().toISOString(),
             proposal: finished.proposal,
+            target,
             skipped: finished.skipped,
           },
         ])
@@ -567,7 +622,7 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
     const text = input.trim()
     if (!text || !ready || controller.current) return
     setInput('')
-    void send({ prompt: text, mode: 'chat', block })
+    void send({ prompt: text, mode: 'chat', block, blockPath })
   }
 
   const stop = () => controller.current?.abort()
@@ -586,12 +641,13 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
     }
     if (at < 0) return
     const u = list[at]
-    void send({ prompt: u.prompt ?? u.text, mode: u.mode ?? 'chat', block: u.block ?? null, base: list.slice(0, at), fresh: true })
+    void send({ prompt: u.prompt ?? u.text, mode: u.mode ?? 'chat', block: u.block ?? null, blockPath: u.blockPath ?? null, base: list.slice(0, at), fresh: true })
   }
 
   const rephrase = (item: ChatItem) => {
     if (!ready || controller.current) return
-    void send({ prompt: '', mode: 'rephrase', block: item.text })
+    // An answer of this chat, from no page: the server sends it as the history's own text.
+    void send({ prompt: '', mode: 'rephrase', block: item.text, blockPath: null })
   }
 
   const firstPage = context[0] ?? null
@@ -614,8 +670,9 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
 
   const accept = (item: ChatItem) => {
     const p = item.proposal
-    if (!p || !firstPage) return
-    const write = p.kind === 'tags' ? addTags(firstPage, p.tags) : p.kind === 'properties' ? setProperties(firstPage, p.values) : null
+    const target = item.target
+    if (!p || !target) return
+    const write = p.kind === 'tags' ? addTags(target, p.tags) : p.kind === 'properties' ? setProperties(target, p.values) : null
     if (!write) return
     write.then(() => markProposal(item.id, 'accepted')).catch((e: unknown) => setError(errorText(e)))
   }
@@ -624,6 +681,7 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
 
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     const ev = e.nativeEvent
+    if (isAltGrText(ev)) return
     const hit = (id: string) => matches(ev, keysFor(id))
     let act: (() => void) | null = null
     if (hit('aiCloseChat')) act = closeChat
@@ -654,8 +712,8 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
     focusInput()
   }
 
-  const propertyName = (key: string): string => {
-    const typeId = firstPage ? useLinkIndex.getState().objects.find((o) => o.path === firstPage)?.type : undefined
+  const propertyName = (key: string, page: string | null): string => {
+    const typeId = page ? useLinkIndex.getState().objects.find((o) => o.path === page)?.type : undefined
     return typeOf(typeId)?.propertyDefinitions.find((d) => d.key === key)?.name ?? key
   }
 
@@ -689,7 +747,10 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
               <button
                 type="button"
                 aria-label={T.removeBlock}
-                onClick={() => setBlock(null)}
+                onClick={() => {
+                  setBlock(null)
+                  setBlockPath(null)
+                }}
                 className="flex size-4 items-center justify-center rounded text-fg-muted hover:bg-hover hover:text-fg"
               >
                 <Icon name="ph-x" size={10} />
@@ -713,15 +774,17 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
               <li key={item.id} data-role="assistant" className="flex flex-col gap-1">
                 <p className="text-[14px] whitespace-pre-wrap break-words text-fg">{item.text}</p>
                 {item.stopped && <p className="text-[12px] text-fg-muted">{T.stopped}</p>}
-                {item.skipped && item.skipped.length > 0 && <p className="text-[12px] text-fg-muted">{T.skipped(item.skipped.map(titleOf))}</p>}
+                {item.skipped && item.skipped.length > 0 && (
+                  <p className="text-[12px] text-fg-muted">{T.skipped(item.skipped.map((sk) => ({ title: titleOf(sk.path), reason: sk.reason })))}</p>
+                )}
                 {item.proposal && item.proposalState !== 'dismissed' && (
                   <Proposal
                     item={item}
                     proposal={item.proposal}
-                    hasTarget={!!firstPage}
+                    hasTarget={!!item.target}
                     canReplace={canReplace}
                     canInsert={canInsert}
-                    propertyName={propertyName}
+                    propertyName={(key) => propertyName(key, item.target ?? null)}
                     onAccept={() => accept(item)}
                     onDismiss={() => markProposal(item.id, 'dismissed')}
                     onReplace={(t) => callbacks.current.onReplace?.(t)}

@@ -16,7 +16,11 @@ Pieces:
   on PATH) and whether ``claude --version`` answers.
 - `gather_context` / `build_prompt`: the turn's prompt. Context pages are read with
   `Space.read`; excluded pages, templates and unknown paths are left out and listed in
-  ``skipped``; the text is capped at `MAX_CONTEXT_CHARS`.
+  ``skipped`` with the reason (``excluded``, ``template``, ``missing``, ``tooLong``); the
+  text is capped at `MAX_CONTEXT_CHARS`. Relation values that point at a page the
+  assistant may not see are left out of a page's text.
+- `visible_path` / `valid_session`: the checks the route makes on a block's page and on a
+  session id before a turn starts.
 - `parse_proposal`: the mode's proposal from the last fenced block of the answer.
 - `StreamParser`: Claude Code's stream-json lines -> `AiEvent` dicts.
 - `run_turn`: the subprocess, as an async generator of `AiEvent` dicts. The blocking I/O
@@ -63,6 +67,8 @@ __all__ = [
     "parse_proposal",
     "run_turn",
     "status",
+    "valid_session",
+    "visible_path",
 ]
 
 MODES = ("chat", "askBlock", "tagBlock", "tagObject", "autofill", "rephrase")
@@ -239,8 +245,9 @@ class ContextPage:
 @dataclass
 class ContextPack:
     pages: list[ContextPage] = field(default_factory=list)
-    skipped: list[str] = field(default_factory=list)
-    """Pages left out: excluded from AI, templates, unknown, or past the size cap."""
+    skipped: list[dict[str, str]] = field(default_factory=list)
+    """Pages left out, each ``{path, reason}``: ``excluded`` (Exclude from AI), ``template``,
+    ``missing`` (unknown or unreadable) or ``tooLong`` (past the size cap)."""
     truncated: bool = False
     tags: list[str] = field(default_factory=list)
     """Existing tag names (tag modes)."""
@@ -248,16 +255,47 @@ class ContextPack:
     """The empty properties of the first context page (autofill)."""
 
 
-def _visible(space, rel: str):
-    """The summary of `rel` when the assistant may see it, else None."""
+def _hidden_reason(space, rel: str) -> str | None:
+    """Why the assistant may not see `rel` (``missing``, ``template``, ``excluded``), else None."""
     with space._lock:
         summary = space._summaries.get(rel)
         raw = space._raw.get(rel)
-    if summary is None or summary.template is not None:
-        return None
+    if summary is None:
+        return "missing"
+    if summary.template is not None:
+        return "template"
     if is_excluded(raw.fm if raw else None, summary.tags):
+        return "excluded"
+    return None
+
+
+def _visible(space, rel: str):
+    """The summary of `rel` when the assistant may see it, else None."""
+    if _hidden_reason(space, rel) is not None:
         return None
-    return summary
+    with space._lock:
+        return space._summaries.get(rel)
+
+
+def visible_path(space, path: str | None) -> str | None:
+    """`path` as a space path when the assistant may see that object, else None."""
+    if not path:
+        return None
+    try:
+        rel = space._rel(path)
+    except (ValueError, KeyError):
+        return None
+    return rel if _visible(space, rel) is not None else None
+
+
+_UUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+
+def valid_session(session_id: Any) -> str | None:
+    """A Claude Code session id (a UUID) to ``--resume``, else None (start a fresh session)."""
+    if isinstance(session_id, str) and _UUID.match(session_id.strip()):
+        return session_id.strip()
+    return None
 
 
 def _empty(value: Any) -> bool:
@@ -290,16 +328,21 @@ def _fields(space, rel: str, summary) -> list[dict[str, Any]]:
     return out
 
 
-def _value_text(value: Any) -> str:
+def _value_text(value: Any, shown: Any = None) -> str:
+    """A property value as prompt text. `shown(path)`: whether a linked object may be named
+    (a relation or backlink to an object the assistant may not see is left out)."""
     if isinstance(value, dict):
         if "start" in value:
             end = value.get("end")
             return f"{value.get('start')}" + (f" to {end}" if end else "")
         if "target" in value:
+            path = value.get("path")
+            if path and shown is not None and not shown(path):
+                return ""
             return str(value.get("target") or value.get("path") or "")
         return ""
     if isinstance(value, list):
-        return ", ".join(t for t in (_value_text(v) for v in value) if t)
+        return ", ".join(t for t in (_value_text(v, shown) for v in value) if t)
     if isinstance(value, bool):
         return "yes" if value else "no"
     return "" if value is None else str(value)
@@ -319,7 +362,7 @@ def _page_text(space, rel: str, summary) -> str:
         for p in t.propertyDefinitions:
             if p.type in _SKIP_VALUE_KINDS:
                 continue
-            text = _value_text(values.get(p.key))
+            text = _value_text(values.get(p.key), lambda path: _visible(space, path) is not None)
             if text:
                 lines.append(f"{p.name}: {text}")
     head = "\n".join(lines)
@@ -354,23 +397,24 @@ def gather_context(space, paths: list[str], *, tags: bool = False, fields: bool 
         try:
             rel = space._rel(path)
         except (ValueError, KeyError):
-            pack.skipped.append(path)
+            pack.skipped.append({"path": path, "reason": "missing"})
             continue
         if rel in seen:
             continue
         seen.add(rel)
-        summary = _visible(space, rel)
+        reason = _hidden_reason(space, rel)
+        summary = _visible(space, rel) if reason is None else None
         if summary is None:
-            pack.skipped.append(rel)
+            pack.skipped.append({"path": rel, "reason": reason or "missing"})
             continue
         if budget <= 0:
-            pack.skipped.append(rel)
+            pack.skipped.append({"path": rel, "reason": "tooLong"})
             pack.truncated = True
             continue
         try:
             text = _page_text(space, rel, summary)
         except (KeyError, FileNotFoundError, ValueError):
-            pack.skipped.append(rel)
+            pack.skipped.append({"path": rel, "reason": "missing"})
             continue
         cut = len(text) > budget
         if cut:
@@ -675,7 +719,7 @@ class Turn:
     model: str | None
     api_url: str
     token: str
-    skipped: list[str] = field(default_factory=list)
+    skipped: list[dict[str, str]] = field(default_factory=list)
     allowed_keys: set[str] | None = None
 
 

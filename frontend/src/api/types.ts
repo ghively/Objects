@@ -1207,6 +1207,12 @@ export interface AiChatRequest {
   contextPaths: string[]
   /** The block or selected text for askBlock, tagBlock and rephrase. */
   block?: string | null
+  /**
+   * The object the block was taken from. The server sends a block only from an object it may
+   * show the assistant (not excluded from AI, not a template); a block without one is sent only
+   * when it is an assistant message of `history` (rephrasing an answer).
+   */
+  blockPath?: string | null
   /** Earlier messages, used when the CLI session can't be resumed. */
   history: AiMessage[]
   sessionId?: string | null
@@ -1219,13 +1225,19 @@ export type AiProposal =
   | { kind: 'properties'; values: Record<string, unknown> }
   | { kind: 'text'; text: string }
 
+/** A context page the server left out of a turn, and why. */
+export interface AiSkipped {
+  path: string
+  reason: 'excluded' | 'template' | 'missing' | 'tooLong'
+}
+
 export type AiEvent =
   | { type: 'session'; sessionId: string }
   /** A chunk to append to the answer so far. */
   | { type: 'text'; text: string }
   /** The assistant used a tool (an Object MCP read tool, by its short name). */
   | { type: 'tool'; name: string }
-  | { type: 'done'; text: string; sessionId: string | null; proposal: AiProposal | null; skipped: string[] }
+  | { type: 'done'; text: string; sessionId: string | null; proposal: AiProposal | null; skipped: AiSkipped[] }
   | { type: 'error'; message: string }
 
 /** GET /api/ai/chat?path= */
@@ -1242,7 +1254,8 @@ export interface AiChat {
 export interface SaveAiChatRequest {
   path?: string | null
   baseVersion?: string | null
-  title: string
+  /** Sent when the chat is created; empty or absent keeps a saved chat's title (renames stay). */
+  title?: string
   contextPaths: string[]
   sessionId: string | null
   messages: AiMessage[]

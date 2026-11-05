@@ -1,16 +1,19 @@
 import { Editor as TiptapEditor } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { resetAiStore, useAi } from '@/ai/store'
+import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
+import { objectSummary } from '@/test/mockApi'
 import { editorExtensions, loadBody, serializeBody } from './document'
 import { selectBlocks } from './extensions/blockSelection'
 import { setEditorObject } from './nodes/blockRef'
-import { AI_TEXT, blocksSeed, openBlocksAi, openSelectionAi, selectionSeed } from './aiEntries'
+import { AI_TEXT, aiBlockedPath, blocksSeed, openBlocksAi, openSelectionAi, selectionSeed } from './aiEntries'
 
 const editors: TiptapEditor[] = []
 beforeEach(() => {
   resetAiStore()
+  resetLinkIndex()
   useSettings.setState({ settings: { ...settingsDefaults, aiHidden: false } })
 })
 afterEach(() => {
@@ -59,6 +62,7 @@ describe('AI entries: blocks', () => {
     expect(seed.mode).toBe('askBlock')
     expect(seed.block).toBe('# Head\n\n- a\n- b')
     expect(seed.contextPaths).toEqual(['Pages/Note.md'])
+    expect(seed.blockPath).toBe('Pages/Note.md')
     expect(typeof seed.onReplace).toBe('function')
     expect(typeof seed.onInsertBelow).toBe('function')
   })
@@ -84,6 +88,62 @@ describe('AI entries: blocks', () => {
     selectBlocks(editor, blockPos(editor, 1))
     openBlocksAi(editor, 'askBlock')
     expect(useAi.getState().pending).toBeNull()
+  })
+
+  test('nothing opens on a page excluded from AI or a template', () => {
+    useLinkIndex.setState({
+      objects: [
+        objectSummary({ path: 'Pages/Secret.md', tags: ['[[Exclude from AI]]'] }),
+        objectSummary({ path: 'Other/Tpl.md', template: 'Tpl' }),
+        objectSummary({ path: 'Pages/Open.md', tags: ['Ideas'] }),
+      ],
+      loaded: true,
+    })
+    expect(aiBlockedPath('Pages/Secret.md')).toBe(true)
+    expect(aiBlockedPath('Other/Tpl.md')).toBe(true)
+    expect(aiBlockedPath('Templates/Tasks/Bug report.md')).toBe(true)
+    expect(aiBlockedPath('Pages/Open.md')).toBe(false)
+    expect(aiBlockedPath(null)).toBe(false)
+    const editor = headless(BODY)
+    setEditorObject(editor, { path: 'Pages/Secret.md' })
+    selectBlocks(editor, blockPos(editor, 1))
+    openBlocksAi(editor, 'askBlock')
+    selectText(editor, 'Two')
+    openSelectionAi(editor)
+    expect(useAi.getState().pending).toBeNull()
+  })
+
+  test('the range stops following edits once the seed is released or the editor is destroyed', () => {
+    const listener = (editor: TiptapEditor) => {
+      const on = vi.spyOn(editor, 'on')
+      const off = vi.spyOn(editor, 'off')
+      return () => {
+        const added = on.mock.calls.find((c) => c[0] === 'transaction')?.[1]
+        expect(added).toBeTypeOf('function')
+        expect(off).toHaveBeenCalledWith('transaction', added)
+      }
+    }
+    const editor = headless(BODY)
+    const removed = listener(editor)
+    selectBlocks(editor, blockPos(editor, 1))
+    const seed = blocksSeed(editor, 'askBlock')
+    seed.release!()
+    removed()
+
+    const other = headless(BODY)
+    const removedOther = listener(other)
+    other.commands.setTextSelection(2)
+    selectText(other, 'Two')
+    selectionSeed(other)
+    other.destroy()
+    removedOther()
+  })
+
+  test('a seed the chat never took is released when another replaces it', () => {
+    const release = vi.fn()
+    useAi.getState().open({ mode: 'chat', release })
+    useAi.getState().open({ mode: 'chat' })
+    expect(release).toHaveBeenCalledTimes(1)
   })
 
   test('replace puts the accepted Markdown in place of the blocks, as blocks', () => {
@@ -156,7 +216,7 @@ describe('AI entries: text selection', () => {
     setEditorObject(editor, { path: 'Pages/Note.md' })
     selectText(editor, 'brave')
     const seed = selectionSeed(editor)!
-    expect(seed).toMatchObject({ mode: 'chat', block: 'brave', contextPaths: ['Pages/Note.md'] })
+    expect(seed).toMatchObject({ mode: 'chat', block: 'brave', contextPaths: ['Pages/Note.md'], blockPath: 'Pages/Note.md' })
     openSelectionAi(editor)
     expect(useAi.getState().pending?.seed).toMatchObject({ mode: 'chat', block: 'brave' })
   })

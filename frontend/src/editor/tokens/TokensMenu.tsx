@@ -49,7 +49,7 @@ import { cn } from '@/lib/utils'
 import { ensureLinkIndex, typeOf, useLinkIndex } from '@/links/linkIndex'
 import { fuzzyMatch, fuzzyScore } from '@/links/LinkPicker'
 import { TypeChip } from '@/shell/Sidebar'
-import { AI_ICON, AI_TEXT, openSelectionAi } from '../aiEntries'
+import { AI_ICON, AI_TEXT, openSelectionAi, useAiBlocked } from '../aiEntries'
 import { blockSelectionRange, turnInto } from '../extensions/blockSelection'
 import { wikilinkTargetFor } from '../extensions/wikilink'
 import { ColorMenu, COLOR_MENU_TEXT } from './ColorMenu'
@@ -348,7 +348,9 @@ export function TokensMenu({ editor }: TokensMenuProps) {
   panelRef.current = panel
   const types = useLinkIndex((s) => s.types)
   const objects = useLinkIndex((s) => s.objects)
-  const aiHidden = useAiHidden()
+  // Hidden too on a page excluded from AI or a template (M10).
+  const aiBlocked = useAiBlocked(editor)
+  const aiHidden = useAiHidden() || aiBlocked
 
   const refresh = useCallback(() => {
     if (!editor || editor.isDestroyed) return

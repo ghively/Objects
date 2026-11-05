@@ -3,14 +3,20 @@
 - ``GET  /ai/status`` -> `AiStatus` (is the Claude Code CLI there and does it answer)
 - ``POST /ai/chat`` `AiChatRequest` -> ``text/event-stream``, one ``data: <AiEvent JSON>``
   frame per event, ending with ``done`` or ``error``. 403 when "Hide AI features" is on.
+  A ``block`` is sent only when ``blockPath`` names an object the assistant may see (not
+  excluded from AI, not a template), or when it is the text of an assistant message in
+  ``history`` (rephrasing an answer); otherwise the stream is one ``error`` event and the
+  CLI isn't started. ``history`` keeps its newest `MAX_HISTORY` messages within
+  `MAX_TEXT` characters; a ``sessionId`` that isn't a UUID is ignored (a fresh session).
   The turn gets a read-only token held in memory (`TokenStore.ephemeral`, named "AI
   assistant") for Object's MCP read tools; it is revoked when the stream ends. Closing
   the stream stops the CLI.
 - ``GET  /ai/chat?path=`` -> `AiChat` (a saved chat; 404 when the path isn't one)
 - ``POST /ai/chat/save`` `SaveAiChatRequest` -> ``{path, version}``: creates the chat (no
   ``path``; the "AI Chat" type is made on the first save) or replaces its messages,
-  context and session (409 ``{currentVersion}`` on a stale ``baseVersion``). A changed
-  title renames the chat. Writes announce `ChangeEvent`s with the request's ``clientId``.
+  context and session (409 ``{currentVersion}`` on a stale ``baseVersion``). A given
+  title that differs renames the chat; an empty one keeps it. A session id that isn't a
+  UUID is stored as none. Writes announce `ChangeEvent`s with the request's ``clientId``.
 
 A turn reads the space (context pages, tag names) and writes nothing.
 """
@@ -47,6 +53,9 @@ __all__ = ["router"]
 
 MAX_CONTEXT_PATHS = 50
 MAX_TEXT = 200_000
+MAX_HISTORY = 100
+"""Earlier messages a turn carries at most (the newest)."""
+EXCLUDED_BLOCK = "This page is excluded from AI, so its text can't be sent."  # our string
 
 
 class AiMessageModel(BaseModel):
@@ -60,6 +69,7 @@ class ChatRequest(BaseModel):
     prompt: str = ""
     contextPaths: list[str] = []
     block: str | None = None
+    blockPath: str | None = None
     history: list[AiMessageModel] = []
     sessionId: str | None = None
     clientId: str | None = None
@@ -77,6 +87,19 @@ class SaveChatRequest(BaseModel):
 
 def _error(status: int, detail: str, **extra: Any) -> JSONResponse:
     return JSONResponse({"detail": detail, **extra}, status_code=status)
+
+
+def _cap_history(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The newest `MAX_HISTORY` messages whose text fits in `MAX_TEXT` characters together."""
+    kept: list[dict[str, Any]] = []
+    total = 0
+    for m in reversed(history[-MAX_HISTORY:]):
+        total += len(m.get("text") or "")
+        if total > MAX_TEXT:
+            break
+        kept.append(m)
+    kept.reverse()
+    return kept
 
 
 def _settings() -> dict[str, Any]:
@@ -112,12 +135,23 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         def frame(event: dict[str, Any]) -> ServerSentEvent:
             return ServerSentEvent(data=json.dumps(event, ensure_ascii=False), sep="\n")
 
+        def one_error(message: str) -> EventSourceResponse:
+            async def only():
+                yield frame({"type": "error", "message": message})
+
+            return EventSourceResponse(only(), sep="\n")
+
+        history = _cap_history([m.model_dump() for m in req.history])
+        if req.block:
+            # Page text goes out only from a page the assistant may see; an answer of its own
+            # (rephrased) is already in the history.
+            own = any(m["role"] == "assistant" and m["text"] == req.block for m in history)
+            shown = await asyncio.to_thread(ai.visible_path, space, req.blockPath)
+            if shown is None and not (own and not req.blockPath):
+                return one_error(EXCLUDED_BLOCK)
+
         if claude is None:
-
-            async def missing():
-                yield frame({"type": "error", "message": ai.NOT_FOUND})
-
-            return EventSourceResponse(missing(), sep="\n")
+            return one_error(ai.NOT_FOUND)
 
         pack = await asyncio.to_thread(
             ai.gather_context,
@@ -126,9 +160,9 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             tags=req.mode in ("tagBlock", "tagObject"),
             fields=req.mode == "autofill",
         )
-        history = [m.model_dump() for m in req.history]
+        session_id = ai.valid_session(req.sessionId)
         fresh = ai.build_prompt(req.mode, req.prompt, pack, req.block, history)
-        resume = ai.build_prompt(req.mode, req.prompt, pack, req.block) if req.sessionId else None
+        resume = ai.build_prompt(req.mode, req.prompt, pack, req.block) if session_id else None
         allowed = {f["id"] for f in pack.fields} if req.mode == "autofill" else None
         model = settings.get("aiModel") or None
 
@@ -140,7 +174,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
                     mode=req.mode,
                     prompt_resume=resume,
                     prompt_fresh=fresh,
-                    session_id=req.sessionId,
+                    session_id=session_id,
                     model=model,
                     api_url=base,
                     token=secret,
@@ -181,7 +215,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             "version": version,
             "title": summary.title,
             "contextPaths": context,
-            "sessionId": str(session) if session not in (None, "") else None,
+            "sessionId": ai.valid_session(session),
             "messages": parse_body(of.body),
         }
 
@@ -211,7 +245,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         if type_changed:
             announce("types", t.id, None, origin)
         ctx_key, ses_key = chat_keys(t)
-        values: dict[str, Any] = {ctx_key: context_refs(req.contextPaths), ses_key: req.sessionId or None}
+        values: dict[str, Any] = {ctx_key: context_refs(req.contextPaths), ses_key: ai.valid_session(req.sessionId)}
         try:
             if not req.path:
                 title = title or default_title(messages)

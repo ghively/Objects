@@ -22,8 +22,8 @@ Steered by markers in the prompt (the user's message is part of it):
 - ``FAKE:sleep``: sends ``init`` and then sleeps 120 s (timeouts, cancel)
 - ``FAKE:wait``: sends ``init`` and waits (up to 20 s) for the file ``<log>.go``
 
-``--resume expired`` answers like an unknown session (exit 1); any other ``--resume`` id
-is kept as the session id.
+``--resume`` with `EXPIRED_SESSION` (or ``expired``) answers like an unknown session
+(exit 1); any other ``--resume`` id is kept as the session id.
 """
 
 from __future__ import annotations
@@ -36,6 +36,8 @@ import uuid
 from pathlib import Path
 
 HERE = Path(__file__).resolve()
+EXPIRED_SESSION = "deadbeef-0000-4000-8000-000000000000"
+"""A session id (a UUID, as the app only resumes those) the fake doesn't know."""
 
 
 def install(folder: Path) -> Path:
@@ -125,9 +127,9 @@ def main(argv: list[str]) -> int:
             f.write(json.dumps(entry) + "\n")
 
     resume = _arg(argv, "--resume")
-    if resume == "expired":
-        _result("No conversation found with session ID: expired", "expired", error=True)
-        sys.stderr.write("No conversation found with session ID: expired\n")
+    if resume in ("expired", EXPIRED_SESSION):
+        _result(f"No conversation found with session ID: {resume}", resume, error=True)
+        sys.stderr.write(f"No conversation found with session ID: {resume}\n")
         return 1
     session = resume or str(uuid.uuid4())
 

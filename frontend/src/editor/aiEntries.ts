@@ -15,13 +15,22 @@
  * is remembered when the chat opens and mapped through every later transaction. If what it covers
  * no longer matches what was sent (edited, deleted, or the page reloaded), replace inserts below
  * instead and never overwrites newer text. Accepting after the page was closed changes nothing and
- * says so (our string).
+ * says so (our string). The mapping stops (`AiSeed.release`) when the seed is replaced (another
+ * seed, New chat, the chat closing) or the editor is destroyed; not on an accept, since every later
+ * answer in that chat offers Replace and Insert below again.
+ *
+ * A seed carries the editor's object path as `blockPath` (the server sends the text only from a
+ * page it may show the assistant). On a page excluded from AI (its "Exclude from AI" tag, as the
+ * link index knows it) or a template, the entries are hidden (`useAiBlocked`) and do nothing. The
+ * `excludeFromAI: true` property isn't in the index the editor reads, so for that one the server's
+ * refusal is the guard.
  */
 import type { Editor } from '@tiptap/core'
 import { Fragment, Slice, type Node as PMNode } from '@tiptap/pm/model'
 import type { Transaction } from '@tiptap/pm/state'
 import { openAiChat, type AiSeed } from '@/ai/store'
 import type { AiMode } from '@/api/types'
+import { summaryOf, useLinkIndex } from '@/links/linkIndex'
 import { blocksSource, getBlockSelection, pasteBlocks, setBlockSelectionIn, targetRange, type BlockRange } from './extensions/blockSelection'
 import { showToast } from './media/upload'
 import { BLOCK_PARENTS } from './nodes/blockOptions'
@@ -42,27 +51,61 @@ export const AI_TEXT = {
 /** The icon of every AI entry (the catalog's "AI sparkle"). */
 export const AI_ICON = 'ph-sparkle'
 
-/** The edited object as the request's context, when the editor knows it. */
-function contextOf(editor: Editor): Pick<AiSeed, 'contextPaths'> {
+/** The edited object as the request's context and the block's page, when the editor knows it. */
+function contextOf(editor: Editor): Pick<AiSeed, 'contextPaths' | 'blockPath'> {
   const path = editorObjectPath(editor)
-  return path ? { contextPaths: [path] } : {}
+  return path ? { contextPaths: [path], blockPath: path } : { blockPath: null }
+}
+
+const EXCLUDE_TAG = 'exclude from ai'
+
+/** Whether the object at `path` is one the assistant may not see: a template or tagged "Exclude from AI". */
+export function aiBlockedPath(path: string | null): boolean {
+  if (!path) return false
+  if (/^templates\//i.test(path)) return true
+  const summary = summaryOf(path)
+  if (!summary) return false
+  if (summary.template != null) return true
+  return summary.tags.some((t) => {
+    let name = String(t).trim()
+    if (name.startsWith('[[') && name.endsWith(']]')) name = name.slice(2, -2).split('|')[0]
+    return name.trim().toLowerCase() === EXCLUDE_TAG
+  })
+}
+
+/** Whether the editor shows a page the assistant may not see (its AI entries are hidden). */
+export function aiBlocked(editor: Editor): boolean {
+  return aiBlockedPath(editorObjectPath(editor))
+}
+
+/** `aiBlocked`, kept up to date as the link index changes (a tag added or removed). */
+export function useAiBlocked(editor: Editor | null): boolean {
+  useLinkIndex((s) => s.objects)
+  return !!editor && aiBlocked(editor)
 }
 
 /** A range kept in step with the editor's later edits (mapped through each transaction). */
 interface Anchor {
   from: number
   to: number
+  /** Stop mapping (the seed was replaced, or the editor is gone). */
+  release(): void
 }
 
 function track(editor: Editor, from: number, to: number): Anchor {
-  const anchor: Anchor = { from, to }
   const onTransaction = ({ transaction }: { transaction: Transaction }) => {
     if (!transaction.docChanged) return
     // Text typed at either edge stays outside the range.
     anchor.from = transaction.mapping.map(anchor.from, 1)
     anchor.to = Math.max(anchor.from, transaction.mapping.map(anchor.to, -1))
   }
+  const release = () => {
+    editor.off('transaction', onTransaction)
+    editor.off('destroy', release)
+  }
+  const anchor: Anchor = { from, to, release }
   editor.on('transaction', onTransaction)
+  editor.on('destroy', release)
   return anchor
 }
 
@@ -132,6 +175,7 @@ export function blocksSeed(editor: Editor, mode: AiMode, range: BlockRange | nul
     mode,
     ...contextOf(editor),
     block: blocksSource(editor, range).replace(/(?:\r?\n)+$/, ''),
+    release: anchor.release,
     onReplace: (text) =>
       apply(editor, (tr) => {
         const nodes = blocksFromText(editor, text)
@@ -153,6 +197,7 @@ export function blocksSeed(editor: Editor, mode: AiMode, range: BlockRange | nul
 
 /** Open the assistant about the block selection (or the cursor's block). */
 export function openBlocksAi(editor: Editor, mode: AiMode = 'askBlock'): void {
+  if (aiBlocked(editor)) return
   openAiChat(blocksSeed(editor, mode))
 }
 
@@ -177,6 +222,7 @@ export function selectionSeed(editor: Editor): AiSeed | null {
     mode: 'chat',
     ...contextOf(editor),
     block: text,
+    release: anchor.release,
     onReplace: (answer) =>
       apply(editor, (tr) => {
         const paragraphs = plainParagraphs(editor, answer)
@@ -200,6 +246,7 @@ export function selectionSeed(editor: Editor): AiSeed | null {
 
 /** Open the assistant about the selected text. */
 export function openSelectionAi(editor: Editor): void {
+  if (aiBlocked(editor)) return
   const seed = selectionSeed(editor)
   if (seed) openAiChat(seed)
 }
