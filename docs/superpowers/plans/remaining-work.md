@@ -11,6 +11,10 @@ Status as of 2026-11-04. **All nine milestones are built, reviewed, fixed and ga
 5. ~~One known test failure on Windows~~ fixed 2026-11-03 (`ba43e66`): the gzip test compared newline-translated text; it now compares bytes.
 6. **Wiki import follow-ups** (outside the repo, in Gene's `ObjectSpaces` folder): review the 10 "possible secrets" pages listed in `ai-pass/review.md`; the wiki copy is a snapshot (refresh = recopy and AI-reread only new or changed pages).
 
+## 2026-11-05: M13, calendar, timeline and chart layouts
+
+Three new view layouts plus sub-items and dependencies, built on `feat/m13-view-layouts` off `master` in three lanes (calendar; timeline, relation pairs and nested rows; chart), one review, one fix pass (`d6b2d45`) and the gate. Plan `2026-11-05-m13-view-layouts.md`; results, our choices and hand-checks in `m13-acceptance.md`. Built on Linux; not yet run on Windows.
+
 ## 2026-11-05: M12, computed and new property kinds
 
 Formula, Rollup, ID, Email, Phone and Files, built on `feat/m12-property-kinds` off `master` in three lanes (back end, property settings, cells and views), one review, one fix pass (`4a81fe2`, `881faf6`) and the gate. Plan `2026-11-05-m12-property-kinds.md`; results, our choices and hand-checks in `m12-acceptance.md`. Built on Linux; not yet run on Windows.
@@ -77,6 +81,7 @@ Each milestone's plan holds its full scope. Each acceptance doc holds its automa
 | **M10** AI assistant through the Claude Code CLI and M11's MCP read tools | `2026-11-02-m10-ai-assistant.md` | branch `feat/m10-ai-assistant`, gate 2026-11-05 (Linux) | `m10-acceptance.md` (7) |
 | **M11** local API, tokens, MCP server, Settings > Integrations | `2026-11-04-notion-anytype-features-plan.md` | branch `feat/m11-local-api-mcp`, gate 2026-11-05 (Linux) | `m11-acceptance.md` (4) |
 | **M12** computed and new property kinds (Formula, Rollup, ID, Email, Phone, Files) | `2026-11-05-m12-property-kinds.md` | `01289a8..` on `feat/m12-property-kinds`, gate 2026-11-05 (Linux) | `m12-acceptance.md` (7) |
+| **M13** calendar, timeline and chart layouts; sub-items and dependencies | `2026-11-05-m13-view-layouts.md` | `0d9b7db..` on `feat/m13-view-layouts`, gate 2026-11-05 (Linux) | `m13-acceptance.md` (5) |
 
 M8's "Coverage" section maps every deferred item to a task, or to a spec §2 exclusion: AI, network at runtime, accounts and sharing, mobile, telemetry.
 

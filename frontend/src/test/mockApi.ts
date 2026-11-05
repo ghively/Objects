@@ -328,6 +328,12 @@ function defaults(): Api {
       lossy: 0,
     }),
     setPropertySync: async () => ({ types: [], rewritten: [], skipped: [] }),
+    createRelationPair: async (typeId: string) => ({
+      type: typeDef({ id: typeId }),
+      firstId: 'p-first',
+      secondId: 'p-second',
+      created: true,
+    }),
     formulaPreview: async () => ({ value: null, error: null }),
     numberExistingObjects: async (typeId: string) => ({
       type: typeDef({ id: typeId }),

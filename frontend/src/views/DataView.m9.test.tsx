@@ -102,6 +102,35 @@ describe('DataView multi-select (Task 18)', () => {
     expect(selectedTitles().sort()).toEqual(['A', 'C'])
   })
 
+  test('shift click in a table that nests sub-items follows the drawn (nested) order', async () => {
+    const PARENT = propertyDef({ id: 'parent', type: 'entity', name: 'Parent item', options: { isArray: false } })
+    const TASK = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', propertyDefinitions: [TITLE, PARENT] })
+    // Flat order A, B, C, D; C is A's sub-item, so the table draws A, C, B, D.
+    const rows = ROWS.map((r) => (r.summary.title === 'C' ? { ...r, links: { parent: ['Pages/A.md'] } } : r))
+    function Nested() {
+      const [state, setState] = useState<ViewState>({
+        viewDefinition: { dataViewLayout: 'table', subItemsConfig: { parentPropertyId: 'parent', childrenPropertyId: 'children' } },
+        filterGroup: emptyFilterGroup(),
+        sorts: [],
+        groupBy: null,
+      })
+      return <DataView rows={rows} types={[TASK]} scope={{ typeIds: ['page'] }} state={state} onState={setState} layouts={['list', 'table']} rowActions />
+    }
+    const user = userEvent.setup()
+    render(<Nested />)
+    expect([...document.querySelectorAll('[role="row"][data-path]')].map((r) => r.getAttribute('data-path'))).toEqual([
+      'Pages/A.md',
+      'Pages/C.md',
+      'Pages/B.md',
+      'Pages/D.md',
+    ])
+    await startSelecting(user, 'A')
+    await user.keyboard('{Shift>}')
+    await user.click(within(rowEl('C')).getByRole('button', { name: 'Open' }))
+    await user.keyboard('{/Shift}')
+    expect(selectedTitles().sort()).toEqual(['A', 'C'])
+  })
+
   test('test bar shows count', async () => {
     const user = userEvent.setup()
     render(<Harness />)

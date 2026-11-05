@@ -27,7 +27,7 @@ describe('view model', () => {
     for (const list of [STANDARD_LAYOUTS, FULL_VIEW_LAYOUTS, ALL_NOTES_LAYOUTS]) {
       expect(list).not.toContain('gallery')
     }
-    expect(FULL_VIEW_LAYOUTS).toEqual(['list', 'grid', 'wall', 'table', 'embed', 'kanban'])
+    expect(FULL_VIEW_LAYOUTS).toEqual(['list', 'grid', 'wall', 'table', 'embed', 'kanban', 'calendar', 'timeline', 'chart'])
     expect(ALL_NOTES_LAYOUTS).toEqual(['list', 'grid', 'wall', 'embed'])
   })
 

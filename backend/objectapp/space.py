@@ -585,6 +585,39 @@ class ChangeKindResult:
 
 
 @dataclass
+class RelationPairResult:
+    """M13: ``POST /api/types/{typeId}/relation-pair``."""
+
+    type: TypeDefinition
+    firstId: str
+    """"Parent item" or "Blocked by"."""
+    secondId: str
+    """"Sub-items" or "Blocking"."""
+    created: bool
+    """False when the type already had both properties (they were reused)."""
+    revision: str = ""
+    changed: bool = False
+    """Whether the type file was written (a pair was added or linked)."""
+
+    def to_api(self) -> dict[str, Any]:
+        """The route's response: ``{type, firstId, secondId, created}``."""
+        return {
+            "type": self.type.to_api(self.revision),
+            "firstId": self.firstId,
+            "secondId": self.secondId,
+            "created": self.created,
+        }
+
+
+# M13 (our strings): the relation pairs a view turns on. kind -> ((first name, first is a
+# list), (second name, second is a list)); both target the type itself and sync each other.
+RELATION_PAIRS: dict[str, tuple[tuple[str, bool], tuple[str, bool]]] = {
+    "subItems": (("Parent item", False), ("Sub-items", True)),
+    "dependencies": (("Blocked by", True), ("Blocking", True)),
+}
+
+
+@dataclass
 class RenameResult:
     path: str
     """The object's path after the rename (unchanged when the file name stays)."""
@@ -2367,6 +2400,16 @@ class Space:
                 )
                 if cdef is None:
                     continue
+                # M13: a single counterpart (a sub-item's "Parent item") is replaced, so the
+                # parent it named before must drop the target from its own list.
+                displaced: list[str] = []
+                if target in now and cdef.options.get("isArray") is False:
+                    with self._lock:
+                        traw = self._raw.get(target)
+                    if traw is not None:
+                        displaced = sorted(
+                            self._linked_paths(cdef, traw.fm.get(cdef.key), target) - {rel}
+                        )
                 edit = self._backlink_edit(cdef, rel, target, add=target in now)
                 wrote: list[bool] = []
 
@@ -2378,9 +2421,44 @@ class Space:
                 result = self._rewrite_other(target, tracked, stamp=True)
                 if isinstance(result, Skip):
                     skipped.append(result)
-                elif wrote and wrote[-1]:
+                    continue
+                if wrote and wrote[-1]:
                     synced.append(target)
+                for old_parent in displaced:
+                    out = self._drop_link(pdef, old_parent, target)
+                    if isinstance(out, Skip):
+                        skipped.append(out)
+                    elif out and old_parent not in synced:
+                        synced.append(old_parent)
         return synced, skipped
+
+    def _drop_link(self, pdef: PropertyDefinition, owner: str, target: str) -> Skip | bool:
+        """Remove ``owner``'s link to ``target`` from its ``pdef`` value (stamped); whether it wrote."""
+        with self._lock:
+            summary = self._summaries.get(owner)
+        if summary is None:
+            return False
+        if summary.readOnly:
+            return Skip(owner, summary.readOnlyReason or "Object is read-only")
+        tt = self.type_by_id(summary.type)
+        odef = next(
+            (p for p in (tt.propertyDefinitions if tt is not None else []) if p.id == pdef.id),
+            None,
+        )
+        if odef is None or odef.type != "entity":
+            return False
+        edit = self._backlink_edit(odef, target, owner, add=False)
+        wrote: list[bool] = []
+
+        def tracked(of: ObjectFile, fm: dict) -> ObjectFile | None:
+            out = edit(of, fm)
+            wrote.append(out is not None)
+            return out
+
+        result = self._rewrite_other(owner, tracked, stamp=True)
+        if isinstance(result, Skip):
+            return result
+        return bool(wrote and wrote[-1])
 
     def _backlink_edit(self, cdef: PropertyDefinition, rel: str, target: str, add: bool) -> Edit:
         """Add (or remove) the link to ``rel`` in ``target``'s ``cdef`` value, keeping other items."""
@@ -4320,19 +4398,30 @@ class Space:
         Syncing needs an entity property that is multi-select without a fixed
         set, on a non-basic type, whose ``allowedTypes`` is exactly the
         counterpart's (non-basic) type, and a counterpart of the same kind.
+        M13: one side may be single (a relation pair's "Parent item") when its
+        one counterpart is a list that syncs back to it.
         """
         lookup = types if types is not None else {x.id: x for x in self.types}
         if t.basic:
             return SYNC_NOT_ALLOWED
-        if p.type != "entity" or not _is_multi(p) or p.options.get("hasFixedSet"):
+        ids = _sync_ids(p)
+        if p.type != "entity" or p.options.get("hasFixedSet"):
+            return SYNC_MULTI_ONLY
+        if not _is_multi(p) and len(ids) != 1:
             return SYNC_MULTI_ONLY
         allowed = p.options.get("allowedTypes") or []
         target = lookup.get(allowed[0]) if len(allowed) == 1 else None
         if target is None or target.basic:
             return SYNC_NOT_ALLOWED
-        for pid in _sync_ids(p):
+        for pid in ids:
             q = next((x for x in target.propertyDefinitions if x.id == pid), None)
-            if q is None or q.type != "entity" or not _is_multi(q) or q.options.get("hasFixedSet"):
+            if q is None or q.type != "entity" or q.options.get("hasFixedSet"):
+                return SYNC_MULTI_ONLY
+            # M13: one side may be single (a sub-item's "Parent item") when the other is a
+            # list that syncs back to it; two single sides never sync.
+            if not (_is_multi(p) and _is_multi(q)) and not (
+                (_is_multi(p) or _is_multi(q)) and p.id in _sync_ids(q)
+            ):
                 return SYNC_MULTI_ONLY
         return None
 
@@ -4999,6 +5088,95 @@ class Space:
             result_types = list(edited.values())
             new_revisions = {t.id: self._commit_type(t, revisions[t.id]) for t in result_types}
             return SyncResult(result_types, rewritten, skipped, new_revisions)
+
+    def create_relation_pair(
+        self, type_id: str, kind: str, base_revision: str = ""
+    ) -> RelationPairResult:
+        """M13: add (or reuse) a two-way relation pair of ``type_id`` with itself.
+
+        ``kind`` is ``subItems`` ("Parent item", single, and "Sub-items") or
+        ``dependencies`` ("Blocked by" and "Blocking"). A property with one of
+        those names (whitespace and case folded) is reused when it is an entity
+        property targeting exactly this type, of the right cardinality, without
+        a fixed set, and synced with nothing but its partner; the missing ones
+        are added and the two are linked by property syncing. Nothing but the
+        type JSON is written (no object is rewritten, existing values are not
+        backfilled), and nothing at all when the pair is already there.
+
+        Raises `KeyError`, `TypeReadOnly`, `RevisionConflict` and `InvalidValue`
+        (unknown kind, basic type, or a same-named property that doesn't match).
+        """
+        spec = RELATION_PAIRS.get(kind)
+        if spec is None:
+            raise InvalidValue(f"Unknown relation pair {kind!r}")
+        with self._lock:
+            t, current = self._editable_type(type_id)
+            if current != (base_revision or ""):
+                raise RevisionConflict(current)
+            if t.basic:
+                raise InvalidValue(SYNC_NOT_ALLOWED)
+
+            def named(name: str) -> PropertyDefinition | None:
+                want = _fold(" ".join(name.split()))
+                return next(
+                    (q for q in t.propertyDefinitions if _fold(" ".join(str(q.name).split())) == want),
+                    None,
+                )
+
+            found = [named(name) for name, _ in spec]
+            for (name, is_list), q, partner in zip(spec, found, reversed(found)):
+                if q is None:
+                    continue
+                matches = (
+                    q.type == "entity"
+                    and (q.options.get("allowedTypes") or []) == [t.id]
+                    and _is_multi(q) == is_list
+                    and not q.options.get("hasFixedSet")
+                    and all(partner is not None and i == partner.id for i in _sync_ids(q))
+                )
+                if not matches:
+                    raise InvalidValue(
+                        f'A property named "{q.name}" already exists and isn\'t a matching '
+                        f"relation to {t.name}. Rename it to turn this on."
+                    )
+            first, second = found
+            if (
+                first is not None
+                and second is not None
+                and _sync_ids(first) == [second.id]
+                and _sync_ids(second) == [first.id]
+            ):
+                return RelationPairResult(t, first.id, second.id, False, current, False)
+
+            created = False
+            taken = {x.key for x in t.propertyDefinitions}
+            made: list[PropertyDefinition] = []
+            for (name, is_list), q in zip(spec, found):
+                if q is None:
+                    key = unique_key(name, taken)
+                    taken.add(key)
+                    q = PropertyDefinition.from_json(
+                        {
+                            "id": new_ulid(),
+                            "key": key,
+                            "name": name,
+                            "type": "entity",
+                            "options": {
+                                "isArray": is_list,
+                                "allowedTypes": [t.id],
+                                "hasFixedSet": False,
+                                "fixedSet": [],
+                            },
+                        }
+                    )
+                    t.propertyDefinitions.append(q)
+                    created = True
+                made.append(q)
+            first, second = made
+            first.options["propertySyncing"] = {"propertyIds": [second.id]}
+            second.options["propertySyncing"] = {"propertyIds": [first.id]}
+            revision = self._commit_type(t, current)
+            return RelationPairResult(t, first.id, second.id, created, revision, True)
 
     def _backfill_sync(
         self,
