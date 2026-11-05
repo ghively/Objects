@@ -269,6 +269,13 @@ def test_parent_item_and_sub_items_sync_both_ways(space_dir: Path):
     assert fm("Epic")["subItems"] == ["[[D]]"]
     assert fm("Other")["subItems"] == ["[[C]]"]
 
+    # Adding D to Other's sub-items gives D its new parent and takes it out of Epic's list
+    # (a sub-item has one parent).
+    out = space.update_properties("Stories/Other.md", {"subItems": [ref("C"), ref("D")]}, v("Stories/Other.md"))
+    assert fm("D")["parentItem"] == "[[Other]]"
+    assert "subItems" not in fm("Epic") or not fm("Epic")["subItems"]
+    assert sorted(out.synced) == ["Stories/D.md", "Stories/Epic.md"]
+
 
 # -- route ------------------------------------------------------------------------
 
