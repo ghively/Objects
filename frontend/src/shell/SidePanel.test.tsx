@@ -141,7 +141,7 @@ describe('SidePanel', () => {
     await user.click(within(area(1)).getByRole('button', { name: 'New Sidepanel Tab' }))
     expect(within(area(1)).getByText('Explore')).toBeInTheDocument()
     expect(
-      within(area(1)).getByText('Open relevant content or view the graph view to expand the context of your work.'),
+      within(area(1)).getByText('Chat with AI, open relevant content or view the graph view to expand the context of your work.'),
     ).toBeInTheDocument()
     expect(within(area(1)).queryByText('page A.md')).toBeNull()
     expect(tab().sidepanel).toHaveLength(2)

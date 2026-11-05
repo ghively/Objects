@@ -5,6 +5,7 @@ import { create } from 'zustand'
 
 export type SettingsSectionId =
   | 'appearance'
+  | 'aiAssistant'
   | 'editor'
   | 'dateTime'
   | 'language'
