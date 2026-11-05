@@ -155,6 +155,7 @@ from starlette.background import BackgroundTask
 from starlette.middleware.gzip import GZipMiddleware
 
 from . import (
+    api_automations,
     api_blocks,
     api_graph,
     api_history,
@@ -167,6 +168,7 @@ from . import (
 )
 from .apictx import ApiContext
 from .appstate import state_dir
+from .automations import AutomationEngine
 from .collections import CollectionDef
 from .export import ExportOptions, content_disposition, export_object_to_file, export_properties
 from .jsonstore import (
@@ -232,7 +234,8 @@ EVENT_QUEUE_MAX = 1000
 """Events held for one SSE client that isn't reading; past this its backlog is dropped."""
 
 RESYNC_EVENTS = tuple(
-    ChangeEvent(kind, "*", None) for kind in ("types", "views", "ui", "collections", "queries")
+    ChangeEvent(kind, "*", None)
+    for kind in ("types", "views", "ui", "collections", "queries", "automations")
 )
 """What replaces a dropped backlog: the resync the client itself announces after a
 reconnect (``api/client.ts`` ``RESYNC_EVENTS``), on which every consumer reloads."""
@@ -806,11 +809,14 @@ def create_app(
     /api/spaces/switch`` calls it with the new space's folder once the response is
     sent. Without it that route answers 503.
 
-    The reminder scheduler runs for the app's lifespan either way. Test hooks,
+    The reminder scheduler and the M14 automation engine (its trigger worker and its
+    schedule thread) run for the app's lifespan either way. Test hooks,
     ignored unless set: ``OBJECT_CLOCK_FILE`` (a file holding an ISO UTC instant
     that `Space.clock` re-reads on every call), ``OBJECT_FAKE_NOTIFY_FILE`` (a
     file-appending notifier instead of the OS one, and ``POST /api/_test/tick``)
-    and ``OBJECT_STATE_DIR`` (where the reminder ledger lives; read by `reminders`).
+    and ``OBJECT_STATE_DIR`` (where the reminder ledger, the automation schedule state and
+    run logs live). With the fake notifier, ``POST /api/_test/tick`` also runs one automation
+    schedule tick and ``POST /api/_test/automations/idle`` waits for the trigger queue.
     """
     hub = EventHub()
     clock_file = os.environ.get("OBJECT_CLOCK_FILE")
@@ -838,10 +844,12 @@ def create_app(
         hub.closed = False
         scheduler.start()
         search.start()
+        automations.start()
         if not watch:
             try:
                 yield
             finally:
+                await asyncio.to_thread(automations.stop)
                 hub.close()
                 await asyncio.to_thread(search.stop)
                 await asyncio.to_thread(scheduler.stop)
@@ -857,6 +865,7 @@ def create_app(
         try:
             yield
         finally:
+            await asyncio.to_thread(automations.stop)
             hub.close()
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -1048,6 +1057,12 @@ def create_app(
         loop = hub.loop
         if loop is not None and loop.is_running() and not hub.closed:
             loop.call_soon_threadsafe(hub.publish, event)
+
+    # M14: rules run on the engine's worker after the request returns; every write notice of
+    # the space goes to it (it drops an automation's own writes: the loop guard).
+    automations = AutomationEngine(space, announce, notifier)
+    space.after_write = automations.on_write
+    app.state.automations = automations
 
     def announce_relinked(paths: list[str], client_id: str | None) -> None:
         """``changed`` per relinked object; ``whiteboard`` (its .md) per relinked board file."""
@@ -1434,6 +1449,10 @@ def create_app(
             announce(ChangeEvent("collections", collection_id, None, origin=clientId))
         for query_id in result.get("queryIds", []):
             announce(ChangeEvent("queries", query_id, None, origin=clientId))
+        for rule_id in result.get("automationIds", []):
+            announce(ChangeEvent("automations", rule_id, None, origin=clientId))
+        if result.get("automationIds"):
+            automations.rules_changed()
         for path in result["paths"]:
             announce(ChangeEvent("created", path, space.cached_version(path), origin=clientId))
         for path in rewritten:
@@ -1909,14 +1928,23 @@ def create_app(
 
         @api.post("/_test/tick")
         def test_tick():
-            """Run one reminder check at the clock's instant (test hook only)."""
-            fired = scheduler.tick(space.clock())
+            """Run one reminder check and one automation schedule tick at the clock's instant
+            (test hook only)."""
+            now = space.clock()
+            fired = scheduler.tick(now)
+            runs = automations.scheduler.tick(now)
             return {
                 "fired": [
                     {"path": d.path, "title": d.title, "body": d.body, "trigger": d.trigger.isoformat()}
                     for d in fired
-                ]
+                ],
+                "automationRuns": runs,
             }
+
+        @api.post("/_test/automations/idle")
+        def test_automations_idle():
+            """Wait up to 10 s until the automation trigger queue is empty (test hook only)."""
+            return {"idle": automations.wait_idle(10.0)}
 
     ctx = ApiContext(space, announce, search, settings_changed)
     api.include_router(api_search.router(ctx))
@@ -1925,6 +1953,7 @@ def create_app(
     # M8: each router is filled by its own task (see the plan's "Shared files").
     for module in (api_tasks, api_history, api_blocks, api_merge, api_spaces_m8):
         api.include_router(module.router(ctx))
+    api.include_router(api_automations.router(ctx, automations))
     app.include_router(api)
     # M6: the whiteboard routes carry their own /api prefix.
     app.include_router(whiteboard_router(space, announce_whiteboard))

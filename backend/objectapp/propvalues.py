@@ -80,6 +80,7 @@ _READ_ONLY_KINDS = frozenset(
         "entity_createdAt",
         "entity_lastUpdated",
         "entity_backlinks",
+        "button",  # M14: a button runs an automation; it holds no value
     }
 )
 MAX_ALIASES = 8
@@ -320,6 +321,8 @@ def decode_value(pdef: PropertyDefinition, raw: Any, fm: dict[str, Any] | None =
     Entity references come back with ``path: None`` (the space resolves them).
     """
     kind = pdef.type
+    if kind == "button":
+        return None  # M14: a button never has a value, whatever the frontmatter holds
     if kind == "number":
         if isinstance(raw, bool) or raw is None:
             return None
