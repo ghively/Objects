@@ -13,6 +13,9 @@ import { CURRENCIES } from './currencies'
 import { KIND_META, objectSelectTypes } from './kinds'
 import { LabelMenu } from './LabelMenu'
 import { NumberFormatMenu } from './NumberFormatMenu'
+import { FormulaSection } from './settings/FormulaSection'
+import { RollupSection } from './settings/RollupSection'
+import { UniqueIdSection } from './settings/UniqueIdSection'
 import { canChangeVisibility, canDeleteProperty, VISIBILITY_OPTIONS } from './PropertyMenu'
 import {
   allowedKindChanges,
@@ -71,6 +74,8 @@ export interface PropertySettingsProps {
   onOpenProperty?(propertyId: string): void
   /** The type editor to save through; without one the dialog uses its own. */
   editor?: TypeEditor
+  /** M12: the object the settings were opened from (a formula previews against it). */
+  objectPath?: string | null
 }
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
@@ -729,7 +734,15 @@ export function DeletePropertySection({
 // -- dialog ----------------------------------------------------------------------------------
 
 /** "Property settings": name and description, the kind's settings, visibility, change kind, delete. */
-export function PropertySettings({ typeId, propertyId, open, onOpenChange, onOpenProperty, editor }: PropertySettingsProps) {
+export function PropertySettings({
+  typeId,
+  propertyId,
+  open,
+  onOpenChange,
+  onOpenProperty,
+  editor,
+  objectPath,
+}: PropertySettingsProps) {
   const own = useTypeEditor(editor ? null : typeId)
   const ed = editor ?? own
   const type = useLinkIndex((s) => s.types.find((t) => t.id === typeId))
@@ -796,6 +809,9 @@ export function PropertySettings({ typeId, propertyId, open, onOpenChange, onOpe
             )}
             {def.type === 'entity' && !type.basic && <RelationSection type={type} def={def} editor={ed} />}
             {def.type === 'label' && <LabelSection type={type} def={def} save={save} />}
+            {def.type === 'formula' && <FormulaSection type={type} def={def} save={save} objectPath={objectPath} />}
+            {def.type === 'rollup' && <RollupSection type={type} def={def} save={save} />}
+            {def.type === 'uniqueId' && <UniqueIdSection type={type} def={def} save={save} />}
             {canChangeVisibility(def) && (
               <Section title="Visibility" description="Decide whether you want this property to be visible on your object's page.">
                 <div className="flex gap-1.5">

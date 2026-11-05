@@ -547,6 +547,7 @@ export function PropertyPanel({
           onOpenChange={(o) => !o && setSettingsFor(null)}
           onOpenProperty={setSettingsFor}
           editor={typeEditor}
+          objectPath={summary?.path}
         />
       )}
       {type && deleting && (
