@@ -7,8 +7,15 @@
  * M8: the backlinks entry (`{kind: 'backlinks'}`) shows `BacklinksPanel` for the tab's main
  * object and follows it; "Explore" offers it beside the graph. The entry's title can be dragged
  * onto the main view to swap, as "Swap" does (`SidePanel` takes the drop).
+ *
+ * M10: the AI chat entry (`{kind: 'aiChat', path?}`) shows `AiChatPanel` (loaded when first shown);
+ * it can't swap or open as a page. "Explore" offers the "AI Chat" card first, unless "Hide AI
+ * features" is on.
  */
-import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
+import { Suspense, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { lazyWithReload } from '@/lib/lazyReload'
+import { AI_CHAT_TEXT } from '@/ai/aiText'
+import { useAiHidden } from '@/ai/store'
 import type { SpaceInfo } from '@/api/types'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Icon } from '@/components/Icon'
@@ -25,6 +32,7 @@ import {
   BACKLINKS_TARGET,
   entryCanGoBack,
   entryCanGoForward,
+  isAiChatTarget,
   isBacklinksTarget,
   isPageTarget,
   type PanelArea,
@@ -51,8 +59,10 @@ export const SIDEPANEL_TEXT = {
   back: 'Back',
   forward: 'Forward',
   emptyTitle: 'Explore',
-  /** our string (no AI chat) */
-  emptyDescription: 'Open relevant content or view the graph view to expand the context of your work.',
+  /** our string (the AI Chat card, M10, is listed first) */
+  emptyDescription: 'Chat with AI, open relevant content or view the graph view to expand the context of your work.',
+  /** M10: the AI chat entry's title and Explore card (catalog) */
+  aiChat: AI_CHAT_TEXT.title,
   /** `LocalGraphPanel`'s heading (M5) */
   graph: 'Graph View',
   doubleClickToPersist: 'Double click to make tab persistent.',
@@ -60,6 +70,8 @@ export const SIDEPANEL_TEXT = {
   /** The backlinks tooltip, its bold heading as a plain first line */
   backlinksTooltip: 'Backlinks & Mentions\n\nShows the backlinks and mentions of the object in the main window.',
 }
+
+const AiChatPanel = lazyWithReload(() => import('@/ai/AiChatPanel').then((m) => ({ default: m.AiChatPanel })))
 
 /** The backlinks entry's content: the tab's main object, followed as the tab navigates. */
 function BacklinksEntry() {
@@ -98,6 +110,14 @@ function HeaderButton({
 }
 
 export function EntryLabel({ entry, space }: { entry: SidepanelEntry; space: SpaceInfo | null }) {
+  if (isAiChatTarget(entry.target)) {
+    return (
+      <>
+        <Icon name="ph-sparkle" size={15} />
+        <span className="truncate">{SIDEPANEL_TEXT.aiChat}</span>
+      </>
+    )
+  }
   if (isBacklinksTarget(entry.target)) {
     return (
       <>
@@ -126,6 +146,7 @@ export interface SidePanelAreaProps {
 }
 
 export function SidePanelArea({ area, entries, space, renderTarget }: SidePanelAreaProps) {
+  const aiHidden = useAiHidden()
   const entry = entries.find((e) => e.isOpen)
   if (!entry) return null
   const s = useTabs.getState
@@ -242,7 +263,11 @@ export function SidePanelArea({ area, entries, space, renderTarget }: SidePanelA
       </header>
       <div className="min-h-0 flex-1 overflow-auto" data-sidepanel-entry={entry.id} onClickCapture={onClickCapture}>
         <ErrorBoundary what="This side panel tab" resetKey={target ? JSON.stringify(target) : ''}>
-          {isBacklinksTarget(target) ? (
+          {isAiChatTarget(target) ? (
+            <Suspense fallback={null}>
+              <AiChatPanel key={entry.id} entryId={entry.id} path={target.path} />
+            </Suspense>
+          ) : isBacklinksTarget(target) ? (
             <BacklinksEntry />
           ) : target ? (
             renderTarget(target, nav)
@@ -250,10 +275,21 @@ export function SidePanelArea({ area, entries, space, renderTarget }: SidePanelA
             <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
               <p className="text-[18px] font-semibold">{SIDEPANEL_TEXT.emptyTitle}</p>
               <p className="max-w-[320px] text-[14px] text-fg-muted">{SIDEPANEL_TEXT.emptyDescription}</p>
+              {!aiHidden && (
+                <button
+                  type="button"
+                  title={AI_CHAT_TEXT.exploreCardHelp}
+                  onClick={() => s().navigateSidepanelEntry(entry.id, { kind: 'aiChat' })}
+                  className="mt-1 inline-flex h-8 items-center gap-1.5 rounded-md border border-line px-3 text-[14px] hover:bg-hover"
+                >
+                  <Icon name="ph-sparkle" size={15} />
+                  {SIDEPANEL_TEXT.aiChat}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => s().navigateSidepanelEntry(entry.id, { kind: 'localGraph' })}
-                className="mt-1 inline-flex h-8 items-center gap-1.5 rounded-md border border-line px-3 text-[14px] hover:bg-hover"
+                className={cn('inline-flex h-8 items-center gap-1.5 rounded-md border border-line px-3 text-[14px] hover:bg-hover', aiHidden && 'mt-1')}
               >
                 <Icon name="ph-graph" size={15} />
                 {SIDEPANEL_TEXT.graph}

@@ -1,6 +1,7 @@
 // The filter popover's body: nested AND/OR rows, each a property, an operator and a value editor.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
+import { COMPUTED_KINDS } from '@/api/types'
 import type { Collection, EntityRef, Filter, FilterGroup, FilterReference, NumberFormat, PropertyDef, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -8,11 +9,12 @@ import { useLinkIndex } from '@/links/linkIndex'
 import { cn } from '@/lib/utils'
 import { zonedToday } from '@/lib/zonedTime'
 import { DatePicker } from '@/properties/DatePicker'
+import { computedNumberFormat } from '@/properties/computed'
 import { parseNumberInput, usesRadixComma } from '@/properties/format'
 import { LabelPill } from '@/properties/LabelMenu'
 import { RelationPicker } from '@/properties/RelationPicker'
 import { DATE_RELATIVE_OPTIONS } from './dates'
-import { filterIsValid, filterOptionsFor } from './filter'
+import { computedOperand, filterIsValid, filterOptionsFor, withOperator } from './filter'
 import { MenuSelect, propertyOptions } from './MenuSelect'
 import { choiceFor, type PropChoice } from './properties'
 
@@ -260,7 +262,7 @@ function FilterRow({
         <MenuSelect
           label="Operator"
           value={optionOk ? filter.option : ''}
-          onChange={(v) => onChange({ ...filter, option: v })}
+          onChange={(v) => onChange(withOperator(filter, v, choice.kind))}
           options={options.map((o) => ({ value: o.key, label: o.label }))}
           placeholder="Invalid"
         />
@@ -274,6 +276,43 @@ function FilterRow({
         </span>
       )}
       {menu && <span className="ml-auto">{menu}</span>}
+    </div>
+  )
+}
+
+/**
+ * M14: one filter on a fixed property, without the property picker: its operator and value
+ * editor (the rule editor's "changes to"). The value row is the filter editor's own.
+ */
+export function FilterValueRow({
+  filter,
+  choice,
+  types,
+  collections,
+  onChange,
+}: {
+  filter: Filter
+  choice: PropChoice
+  types: TypeDef[]
+  collections: Collection[]
+  onChange(next: Filter): void
+}) {
+  const options = filterOptionsFor(choice.def)
+  const optionOk = options.some((o) => o.key === filter.option)
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-[13px]">
+      {options.length > 0 && (
+        <MenuSelect
+          label="Operator"
+          value={optionOk ? filter.option : ''}
+          onChange={(v) => onChange({ ...filter, option: v })}
+          options={options.map((o) => ({ value: o.key, label: o.label }))}
+          placeholder="Invalid"
+        />
+      )}
+      {optionOk && !NO_VALUE.has(filter.option) && (
+        <ValueEditor filter={filter} choice={choice} collections={collections} types={types} onChange={onChange} />
+      )}
     </div>
   )
 }
@@ -374,7 +413,23 @@ function MultiPick({
   )
 }
 
-const TEXT_KINDS = new Set(['text', 'url', 'color', 'textBlock', 'entity_title', 'entity_description', 'entity_aliases', 'entity_icon'])
+const TEXT_KINDS = new Set([
+  'text',
+  'url',
+  'color',
+  'textBlock',
+  'entity_title',
+  'entity_description',
+  'entity_aliases',
+  'entity_icon',
+  // M12
+  'uniqueId',
+  'email',
+  'phone',
+])
+
+/** M12: the value editor a formula's or rollup's operator takes (by what it compares against). */
+const COMPUTED_EDITOR = { text: 'text', number: 'number', date: 'datetimeSimple', none: 'text' } as const
 const DATE_KINDS = new Set(['datetime', 'datetimeSimple', 'entity_createdAt', 'entity_lastUpdated'])
 
 function ValueEditor({
@@ -391,7 +446,8 @@ function ValueEditor({
   onChange(next: Filter): void
 }) {
   const objects = useLinkIndex((s) => s.objects)
-  const kind = choice.kind
+  const computed = COMPUTED_KINDS.has(choice.kind)
+  const kind: string = computed ? COMPUTED_EDITOR[computedOperand(filter.option)] : choice.kind
   const ref = filter.referenceValue
   const set = (referenceValue: FilterReference | undefined) => {
     const rest = { ...filter }
@@ -412,7 +468,7 @@ function ValueEditor({
   }
   if (kind === 'number') {
     // A percentage stores the fraction (0.25): its filter value is typed and shown in percent (25).
-    const format = (choice.def as PropertyDef).options?.numberFormat ?? null
+    const format = computed ? computedNumberFormat(choice.def) : ((choice.def as PropertyDef).options?.numberFormat ?? null)
     const pct = format?.type === 'percentage'
     return (
       <NumberValue

@@ -7,7 +7,8 @@ import type { Editor as TiptapEditor, JSONContent } from '@tiptap/core'
 import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { api, ConflictError, isResync } from '@/api/client'
-import type { ObjectDetail, ObjectSummary, RenameResult, TypeDef, UpdateResult } from '@/api/types'
+import { openAiChat, useAiHidden } from '@/ai/store'
+import { COMPUTED_KINDS, type ObjectDetail, type ObjectSummary, type PropertyType, type RenameResult, type TypeDef, type UpdateResult } from '@/api/types'
 import { CollectionPicker } from '@/collections/CollectionPicker'
 import { Icon } from '@/components/Icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -147,6 +148,17 @@ export const OBJECT_M9_TEXT = {
   duplicate: 'Duplicate',
 } as const
 
+/**
+ * M10: the AI rows of the `…` menu and the peek's sparkle. "Add tags using AI" is the plan's;
+ * "Fill empty properties using AI" and "AI Chat" (the peek button's name, as the Explore card)
+ * are our strings.
+ */
+export const OBJECT_AI_TEXT = {
+  addTags: 'Add tags using AI',
+  autofill: 'Fill empty properties using AI', // our string
+  peek: 'AI Chat', // our string
+} as const
+
 /** The menu's Import and Copy > rows. */
 export const OBJECT_MENU_TEXT = {
   import: 'Import',
@@ -206,6 +218,15 @@ function appendPlainText(ed: TiptapEditor, text: string) {
   ed.chain().insertContentAt(range, paragraphs).focus('end').run()
   // The focus command defers DOM focus a frame; take it now so the next keystroke lands here.
   ed.view.focus()
+}
+
+/** How long `computed` refreshes wait, so a burst of changes makes one read. */
+const COMPUTED_REFRESH_MS = 150
+const OBJECT_EVENT_KINDS = new Set(['created', 'changed', 'deleted', 'renamed'])
+
+/** Whether the type has a property of a kind matching `test` (the link index's copy). */
+function typeHas(typeId: string | null | undefined, test: (kind: PropertyType) => boolean): boolean {
+  return !!typeOf(typeId)?.propertyDefinitions.some((d) => test(d.type))
 }
 
 export function ObjectView({
@@ -361,6 +382,37 @@ export function ObjectView({
     enqueueRef.current(true)
   }, [])
 
+  // M12: formula and rollup values are computed by the server on each read. After a property
+  // write, a change to this object's type, or (when the type has a rollup) a change to any other
+  // object, read the object again and take only its `computed` values: the body, frontmatter and
+  // version keep their own handling. Requests within one window make one read.
+  const typeIdRef = useRef<string | null>(null)
+  typeIdRef.current = detail?.summary.type ?? null
+  const computedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const computedSeq = useRef(0)
+  const refreshComputed = useCallback(() => {
+    if (computedTimer.current) return
+    computedTimer.current = setTimeout(() => {
+      computedTimer.current = null
+      const n = ++computedSeq.current
+      api
+        .object(path)
+        .then((fresh) => {
+          if (n !== computedSeq.current) return
+          setDetail((d) => (d && d.summary.path === fresh.summary.path ? { ...d, computed: fresh.computed } : d))
+        })
+        .catch(() => undefined)
+    }, COMPUTED_REFRESH_MS)
+  }, [path])
+  useEffect(
+    () => () => {
+      if (computedTimer.current) clearTimeout(computedTimer.current)
+      computedTimer.current = null
+      computedSeq.current++
+    },
+    [path],
+  )
+
   const writes = useObjectWrites({
     path,
     versionRef,
@@ -380,6 +432,7 @@ export function ObjectView({
           version: res.version,
         }
       })
+      if (typeHas(typeIdRef.current, (k) => COMPUTED_KINDS.has(k))) refreshComputed()
     },
     onRenamed: (res: RenameResult, oldPath: string, title: string) => {
       // The title changed even when the path didn't (safe_filename may map both titles to one name).
@@ -451,6 +504,23 @@ export function ObjectView({
       enqueue(false)
     })
   }, [path, enqueue, markDeleted])
+
+  useEffect(() => {
+    return api.onChange((e) => {
+      const typeId = typeIdRef.current
+      if (!typeId || deletedRef.current) return
+      if (e.kind === 'types') {
+        // This type's formulas or rollups may have changed; a rollup also reads other types.
+        const own = e.path === typeId || isResync(e, 'types')
+        if (own ? typeHas(typeId, (k) => COMPUTED_KINDS.has(k)) : typeHas(typeId, (k) => k === 'rollup')) refreshComputed()
+        return
+      }
+      // This object's own changes reload it (or are our writes, refreshed above). Any other
+      // object may be one a rollup reads (a related object, or its title).
+      if (e.path === path || !OBJECT_EVENT_KINDS.has(e.kind)) return
+      if (typeHas(typeId, (k) => k === 'rollup')) refreshComputed()
+    })
+  }, [path, refreshComputed])
 
   const keepMine = () => {
     const h = editorRef.current
@@ -772,6 +842,7 @@ export function ObjectView({
   const isTag = !!summary && isTagType(type, summary.type)
   const isTask = !!summary && !isTemplate && isTaskRoleType(type, summary.type)
   const focusOn = useFocusMode((s) => s.on)
+  const aiHidden = useAiHidden()
   // M9: the object's own layout keys override the type's.
   const layout = detail ? frontmatterLayout(detail.frontmatter) : undefined
   const wideOn = objectWideLayout(type, layout)
@@ -791,6 +862,7 @@ export function ObjectView({
         links={detail.links}
         summary={detail.summary}
         backlinks={detail.backlinks ?? []}
+        computed={detail.computed}
         readOnly={propsReadOnly}
         onChange={(key, value) => writeProperties({ [key]: value })}
         onChangeMany={(u, r) => void writes.updateProperties(u, r)}
@@ -924,6 +996,25 @@ export function ObjectView({
               <Icon name="ph-chalkboard-simple" size={14} />
               {OBJECT_M8_TEXT.addToWhiteboard}
             </DropdownMenuItem>
+            {/* M10: the AI rows; their place (after "Add to whiteboard") is our choice. */}
+            {!aiHidden && (
+              <>
+                <DropdownMenuItem
+                  disabled={propsReadOnly || !summary}
+                  onSelect={() => openAiChat({ mode: 'tagObject', contextPaths: [path] })}
+                >
+                  <Icon name="ph-sparkle" size={14} />
+                  {OBJECT_AI_TEXT.addTags}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={propsReadOnly || !summary}
+                  onSelect={() => openAiChat({ mode: 'autofill', contextPaths: [path] })}
+                >
+                  <Icon name="ph-sparkle" size={14} />
+                  {OBJECT_AI_TEXT.autofill}
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuSub>
               <DropdownMenuSubTrigger disabled={propsReadOnly || !summary || isTemplate}>
@@ -1038,6 +1129,10 @@ export function ObjectView({
             pressed={focusOn}
             onClick={() => useFocusMode.getState().toggle()}
           />
+        )}
+        {/* M10: the peek's sparkle (catalog section 5, "focus/AI sparkle"): the AI chat about this object. */}
+        {mode === 'peek' && !aiHidden && (
+          <ToolButton label={OBJECT_AI_TEXT.peek} icon="ph-sparkle" onClick={() => openAiChat({ mode: 'chat', contextPaths: [path] })} />
         )}
         {objectMenu}
         {onExpand && <ToolButton label="Open as page" icon="ph-arrows-out-simple" onClick={onExpand} />}
@@ -1166,7 +1261,13 @@ export function ObjectView({
       if (b != null) setBodyEmpty(b.trim() === '')
     }
     return (
-      <div className="relative w-full" data-object-view="inline" data-object-path={path} ref={inlineRef}>
+      <div
+        className="relative w-full"
+        data-object-view="inline"
+        data-object-path={path}
+        data-object-template={summary?.template != null ? '' : undefined}
+        ref={inlineRef}
+      >
         {!detail || !summary ? (
           error ? (
             <p className="text-[14px] text-fg-muted">{`Couldn't open this object. ${error}`}</p>

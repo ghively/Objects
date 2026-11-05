@@ -48,7 +48,7 @@ Routes (all JSON):
   Announces ``queries``. Restoring one re-creates its file under the original id
   (``409`` when that file exists).
 - ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
-  ``{paths, typeIds, queryIds, rewritten}`` (plus ``collectionIds``, ``skipped`` for a
+  ``{paths, typeIds, rewritten}`` (plus ``collectionIds``, ``queryIds``, ``skipped`` for a
   collection or query entry; ``rewritten``: other files written back, announced ``changed``;
   announces ``created`` per path and ``types`` per type); ``422`` when a
   saved type now has the trashed type's id or name;
@@ -69,8 +69,8 @@ Routes (all JSON):
   changed type and ``changed`` per backfilled object.
 - ``DELETE /api/types/{id}?confirm=true&clientId=`` -> ``{trashId, paths, typeIds, queryIds}``;
   ``422``, ``428 {detail, affected}``, ``404``. Announces ``types`` (this type and each type
-  whose relations stopped allowing it), ``deleted`` per object and template, and
-  ``queries`` per saved query trashed with it or edited to drop it.
+  whose relations stopped allowing it), ``deleted`` per object and template, and ``queries``
+  per saved query that went to the trash with it or dropped it.
 - ``GET /api/types/{id}/templates`` -> ``ObjectSummary[]`` (``templates.ids`` order, then
   discovered ones); ``404``. ``POST /api/types/{id}/templates`` ``{name?, clientId?}`` ->
   ``201 {path, version}``; ``422`` (a type without templates), ``423``, ``404``. Announces
@@ -128,6 +128,12 @@ Routes (all JSON):
   ``PUT /api/settings`` (null: the device's zone). The M8 routers (`api_tasks`,
   `api_history`, `api_blocks`, `api_merge`, `api_spaces_m8`) are mounted on ``/api``;
   each module's docstring lists its routes and owner task.
+- M15 (`api_import`): ``POST /api/import/preview``, ``POST /api/import/start``,
+  ``GET /api/import/jobs/{id}``, ``POST /api/import/jobs/{id}/cancel``; see that module.
+- M10: `api_ai` adds the AI assistant: ``GET /api/ai/status``, ``POST /api/ai/chat``
+  (Server-Sent Events of `AiEvent`), ``GET /api/ai/chat?path=``, ``POST /api/ai/chat/save``.
+- M11: `api_v1` adds the token-protected local API (``/api/v1/*``) and the token routes
+  (``/api/integrations/tokens``); its docstring lists them.
 
 Errors: a path outside the space or not an object is ``400``; a missing object is ``404``;
 a file the OS refused to write (locked by another program, say) is ``503 {detail}``.
@@ -137,6 +143,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import copy
 import json
 import os
 import subprocess
@@ -156,18 +163,24 @@ from starlette.background import BackgroundTask
 from starlette.middleware.gzip import GZipMiddleware
 
 from . import (
+    api_automations,
+    api_ai,
     api_blocks,
     api_graph,
     api_history,
+    api_import,
     api_merge,
     api_references,
     api_search,
     api_spaces_m8,
     api_tasks,
+    api_v1,
     media,
 )
 from .apictx import ApiContext
+from .computed import Computer, Obj, has_computed
 from .appstate import state_dir
+from .automations import AutomationEngine
 from .collections import CollectionDef
 from .export import ExportOptions, content_disposition, export_object_to_file, export_properties
 from .jsonstore import (
@@ -192,6 +205,8 @@ from .media import (
     serve_headers,
 )
 from .notify import FileNotifier, system_notifier
+from .formula import FormulaError
+from .formula import parse as parse_formula
 from .propvalues import InvalidValue
 from .queries import QueryDef
 from .reminders import ReminderScheduler, file_clock
@@ -214,6 +229,7 @@ from .typedefs import has_undecodable
 from .typemodel import (
     DATA_VIEW_LAYOUTS,
     DEFAULT_LAYOUT_KEY,
+    PropertyDefinition,
     RevisionConflict,
     TypeDefinition,
     TypeReadOnly,
@@ -233,7 +249,8 @@ EVENT_QUEUE_MAX = 1000
 """Events held for one SSE client that isn't reading; past this its backlog is dropped."""
 
 RESYNC_EVENTS = tuple(
-    ChangeEvent(kind, "*", None) for kind in ("types", "views", "ui", "collections", "queries")
+    ChangeEvent(kind, "*", None)
+    for kind in ("types", "views", "ui", "collections", "queries", "automations")
 )
 """What replaces a dropped backlog: the resync the client itself announces after a
 reconnect (``api/client.ts`` ``RESYNC_EVENTS``), on which every consumer reloads."""
@@ -341,6 +358,10 @@ class CreateObjectRequest(BaseModel):
     title: str | None = None
     templateId: str | None = None
     values: dict[str, Any] | None = None
+    body: str | None = None
+    """M14: the new object's body, written in the creating write (replaces the template's)."""
+    appendBody: str | None = None
+    """M14: text added below the body the object gets (its heading or template's)."""
     clientId: str | None = None
 
 
@@ -382,6 +403,18 @@ class ChangeKindRequest(BaseModel):
     toType: str
     baseRevision: str = ""
     clientId: str | None = None
+
+
+class NumberExistingRequest(BaseModel):
+    baseRevision: str = ""
+    clientId: str | None = None
+
+
+class FormulaPreviewRequest(BaseModel):
+    typeId: str
+    expression: str
+    path: str | None = None
+    properties: list[Any] | None = None
 
 
 class SaveViewsRequest(BaseModel):
@@ -504,6 +537,12 @@ class SpacePathRequest(BaseModel):
 
 class EnsureTagRequest(BaseModel):
     name: str = ""
+    clientId: str | None = None
+
+
+class RelationPairRequest(BaseModel):
+    kind: str
+    baseRevision: str = ""
     clientId: str | None = None
 
 
@@ -807,11 +846,14 @@ def create_app(
     /api/spaces/switch`` calls it with the new space's folder once the response is
     sent. Without it that route answers 503.
 
-    The reminder scheduler runs for the app's lifespan either way. Test hooks,
+    The reminder scheduler and the M14 automation engine (its trigger worker and its
+    schedule thread) run for the app's lifespan either way. Test hooks,
     ignored unless set: ``OBJECT_CLOCK_FILE`` (a file holding an ISO UTC instant
     that `Space.clock` re-reads on every call), ``OBJECT_FAKE_NOTIFY_FILE`` (a
     file-appending notifier instead of the OS one, and ``POST /api/_test/tick``)
-    and ``OBJECT_STATE_DIR`` (where the reminder ledger lives; read by `reminders`).
+    and ``OBJECT_STATE_DIR`` (where the reminder ledger, the automation schedule state and
+    run logs live). With the fake notifier, ``POST /api/_test/tick`` also runs one automation
+    schedule tick and ``POST /api/_test/automations/idle`` waits for the trigger queue.
     """
     hub = EventHub()
     clock_file = os.environ.get("OBJECT_CLOCK_FILE")
@@ -839,10 +881,12 @@ def create_app(
         hub.closed = False
         scheduler.start()
         search.start()
+        automations.start()
         if not watch:
             try:
                 yield
             finally:
+                await asyncio.to_thread(automations.stop)
                 hub.close()
                 await asyncio.to_thread(search.stop)
                 await asyncio.to_thread(scheduler.stop)
@@ -858,6 +902,7 @@ def create_app(
         try:
             yield
         finally:
+            await asyncio.to_thread(automations.stop)
             hub.close()
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -1041,14 +1086,28 @@ def create_app(
                 "version": version,
                 "links": space.links_of(path, fm),
                 "backlinks": space.backlinks(summary.path),
+                "computed": computed_of(summary, fm),
             }
         )
+
+    def computed_of(summary: Any, fm: dict) -> dict[str, Any]:
+        """M12: the object's formula and rollup values (``{}`` when it has none)."""
+        t = space.type_by_id(summary.type)
+        if not has_computed(t):
+            return {}
+        return Computer(space).values(Obj(summary.path, fm, summary, t))
 
     def announce(event: ChangeEvent) -> None:
         """Publish `event` to the SSE clients from a worker thread."""
         loop = hub.loop
         if loop is not None and loop.is_running() and not hub.closed:
             loop.call_soon_threadsafe(hub.publish, event)
+
+    # M14: rules run on the engine's worker after the request returns; every write notice of
+    # the space goes to it (it drops an automation's own writes: the loop guard).
+    automations = AutomationEngine(space, announce, notifier)
+    space.after_write = automations.on_write
+    app.state.automations = automations
 
     def announce_relinked(paths: list[str], client_id: str | None) -> None:
         """``changed`` per relinked object; ``whiteboard`` (its .md) per relinked board file."""
@@ -1140,6 +1199,12 @@ def create_app(
     @api.post("/object/duplicate", status_code=201)
     def duplicate_object(req: DuplicateRequest):
         try:
+            source = space.get(req.path) if req.path else None
+        except (KeyError, ValueError):
+            source = None
+        type_id = source.type if source is not None else None
+        rev_before = type_revision(space.root, type_id) if type_id else ""
+        try:
             path, version, synced = space.duplicate_object(req.path)
             summary = space.get(path)
         except InvalidValue as exc:
@@ -1148,6 +1213,10 @@ def create_app(
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
             return _error(404, f"No object at {req.path!r}")
+        if type_id and type_revision(space.root, type_id) != rev_before:
+            # M12: the copy's ID number moved the type's `nextNumber` on (no origin: the
+            # duplicating window has no other way to learn the type's new revision).
+            announce(ChangeEvent("types", type_id, None))
         announce(ChangeEvent("created", path, version, origin=req.clientId))
         for synced_path in synced:
             announce(
@@ -1299,11 +1368,13 @@ def create_app(
     @api.post("/objects", status_code=201)
     def create_object(req: CreateObjectRequest):
         t = space.type_by_id(req.typeId)
-        had_file = bool(type_revision(space.root, req.typeId)) if t is not None else False
+        rev_before = type_revision(space.root, req.typeId) if t is not None else ""
+        had_file = bool(rev_before)
         templates_before = space.template_versions()
         try:
             path, version = space.create_object(
-                req.typeId, req.title or "", req.templateId, req.values
+                req.typeId, req.title or "", req.templateId, req.values,
+                body=req.body, append_body=req.appendBody,
             )
         except InvalidValue as exc:
             announce_template_ids(templates_before, req.clientId)
@@ -1311,7 +1382,9 @@ def create_app(
         except KeyError:
             return _error(404, f"No object type {req.typeId!r}")
         type_ids = []
-        if t is not None and not had_file and type_revision(space.root, req.typeId):
+        rev_after = type_revision(space.root, req.typeId) if t is not None else ""
+        if t is not None and rev_after and (not had_file or rev_after != rev_before):
+            # Written the first time, or M12's ID numbering moved `nextNumber` on.
             announce(ChangeEvent("types", req.typeId, None, origin=req.clientId))
             type_ids.append(req.typeId)
         announce_template_ids(templates_before, req.clientId)
@@ -1324,7 +1397,8 @@ def create_app(
     def create_daily_note(req: CreateDailyNoteRequest):
         before = space.daily_note_type()
         type_id = before.id if before is not None else "dailynote"
-        had_file = bool(type_revision(space.root, type_id))
+        rev_before = type_revision(space.root, type_id)
+        had_file = bool(rev_before)
         templates_before = space.template_versions()
         try:
             path, version = space.create_daily_note(req.date, req.templateId)
@@ -1337,7 +1411,8 @@ def create_app(
             announce_template_ids(templates_before, req.clientId)
             return _error(422, str(exc))
         type_ids = []
-        if not had_file and type_revision(space.root, type_id):
+        rev_after = type_revision(space.root, type_id)
+        if rev_after and (not had_file or rev_after != rev_before):
             announce(ChangeEvent("types", type_id, None, origin=req.clientId))
             type_ids.append(type_id)
         announce_template_ids(templates_before, req.clientId)
@@ -1435,6 +1510,10 @@ def create_app(
             announce(ChangeEvent("collections", collection_id, None, origin=clientId))
         for query_id in result.get("queryIds", []):
             announce(ChangeEvent("queries", query_id, None, origin=clientId))
+        for rule_id in result.get("automationIds", []):
+            announce(ChangeEvent("automations", rule_id, None, origin=clientId))
+        if result.get("automationIds"):
+            automations.rules_changed()
         for path in result["paths"]:
             announce(ChangeEvent("created", path, space.cached_version(path), origin=clientId))
         for path in rewritten:
@@ -1726,6 +1805,56 @@ def create_app(
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
         return _display_safe(result.to_api())
 
+    @api.post("/types/{type_id}/properties/{pid}/number-existing")
+    def number_existing(type_id: str, pid: str, req: NumberExistingRequest):
+        try:
+            result = space.number_existing(type_id, pid, req.baseRevision)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except TypeReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except KeyError:
+            return _error(404, f"No property {pid!r} on object type {type_id!r}")
+        announce(ChangeEvent("types", type_id, None, origin=req.clientId))
+        for path in result.rewritten:
+            announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
+        return _display_safe(result.to_api())
+
+    @api.post("/formula/preview")
+    def formula_preview(req: FormulaPreviewRequest):
+        """M12: parse (and with ``path``, evaluate) an expression. Writes nothing."""
+        t = space.type_by_id(req.typeId)
+        if t is None:
+            return _error(404, f"No object type {req.typeId!r}")
+        try:
+            parse_formula(req.expression) if req.expression.strip() else None
+        except FormulaError as exc:
+            return {"value": None, "error": str(exc)}
+        if not req.path:
+            return {"value": None, "error": None}
+        if req.properties is not None:
+            t = copy.deepcopy(t)
+            defs = []
+            for entry in req.properties:
+                try:
+                    defs.append(PropertyDefinition.from_json(entry))
+                except (ValueError, TypeError, AttributeError):
+                    continue
+            t.propertyDefinitions = defs
+        try:
+            _of, fm, _version = space.read(req.path)
+            summary = space.get(req.path)
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {req.path!r}")
+        value = Computer(space, types={t.id: t}).evaluate(Obj(summary.path, fm, summary, t), req.expression)
+        return _display_safe(
+            {"value": value, "error": value.get("error") if value["type"] == "error" else None}
+        )
+
     @api.post("/types/{type_id}/properties/{pid}/sync")
     def sync_property(type_id: str, pid: str, req: SyncRequest):
         try:
@@ -1748,6 +1877,23 @@ def create_app(
             announce(ChangeEvent("types", t.id, None, origin=req.clientId))
         for path in result.rewritten:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
+        return _display_safe(result.to_api())
+
+    @api.post("/types/{type_id}/relation-pair")
+    def relation_pair(type_id: str, req: RelationPairRequest):
+        """M13: add (or reuse) the sub-items or dependencies pair; rewrites no object."""
+        try:
+            result = space.create_relation_pair(type_id, req.kind, req.baseRevision)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except TypeReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except KeyError:
+            return _error(404, f"No object type {type_id!r}")
+        if result.changed:
+            announce(ChangeEvent("types", type_id, None, origin=req.clientId))
         return _display_safe(result.to_api())
 
     @api.delete("/types/{type_id}")
@@ -1779,13 +1925,13 @@ def create_app(
                 paths.append(str(meta.get("originalPath", "")))
         for path in paths:
             announce(ChangeEvent("deleted", path, None, origin=clientId))
+        # The saved queries that went to the trash with the type, or dropped it.
         query_ids = [str(q) for q in manifest.get("queries") or []]
-        for ref in manifest.get("queryStructureRefs") or []:
-            qid = str(ref.get("queryId"))
-            if qid not in query_ids:
-                query_ids.append(qid)
-        for qid in query_ids:
-            announce(ChangeEvent("queries", qid, None, origin=clientId))
+        for ref in manifest.get("queryRefs") or []:
+            if str(ref.get("queryId")) not in query_ids:
+                query_ids.append(str(ref.get("queryId")))
+        for query_id in query_ids:
+            announce(ChangeEvent("queries", query_id, None, origin=clientId))
         # The window that deleted can't list these itself: tell it what changed.
         return {"trashId": item.id, "paths": paths, "typeIds": type_ids, "queryIds": query_ids}
 
@@ -1917,14 +2063,23 @@ def create_app(
 
         @api.post("/_test/tick")
         def test_tick():
-            """Run one reminder check at the clock's instant (test hook only)."""
-            fired = scheduler.tick(space.clock())
+            """Run one reminder check and one automation schedule tick at the clock's instant
+            (test hook only)."""
+            now = space.clock()
+            fired = scheduler.tick(now)
+            runs = automations.scheduler.tick(now)
             return {
                 "fired": [
                     {"path": d.path, "title": d.title, "body": d.body, "trigger": d.trigger.isoformat()}
                     for d in fired
-                ]
+                ],
+                "automationRuns": runs,
             }
+
+        @api.post("/_test/automations/idle")
+        def test_automations_idle():
+            """Wait up to 10 s until the automation trigger queue is empty (test hook only)."""
+            return {"idle": automations.wait_idle(10.0)}
 
     ctx = ApiContext(space, announce, search, settings_changed)
     api.include_router(api_search.router(ctx))
@@ -1933,6 +2088,13 @@ def create_app(
     # M8: each router is filled by its own task (see the plan's "Shared files").
     for module in (api_tasks, api_history, api_blocks, api_merge, api_spaces_m8):
         api.include_router(module.router(ctx))
+    # M15: the import routes (`api_import`; the importers are in `importers/`).
+    api.include_router(api_import.router(ctx))
+    api.include_router(api_automations.router(ctx, automations))
+    # M11: the local API for agents and scripts (Bearer tokens) and its token routes.
+    api.include_router(api_v1.router(ctx))
+    # M10: the AI assistant (status, a chat turn over SSE, saved AI chats).
+    api.include_router(api_ai.router(ctx))
     app.include_router(api)
     # M6: the whiteboard routes carry their own /api prefix.
     app.include_router(whiteboard_router(space, announce_whiteboard))

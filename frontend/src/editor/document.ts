@@ -12,6 +12,9 @@
  * M8 adds inline colour and highlight marks, date tokens, list-item option
  * comments, the `indent` container, block references and collection / query
  * embeds (each in `nodes/`); every one round-trips under the same byte rules.
+ *
+ * M14 adds the button block (`nodes/buttonBlock.ts`): `<!-- block: button rule="<id>" -->` on a
+ * one-line paragraph, its label.
  */
 import { getExtensionField, type AnyExtension, type Editor, type JSONContent } from '@tiptap/core'
 import { OrderedList, TaskItem } from '@tiptap/extension-list'
@@ -28,7 +31,7 @@ import {
   type Option,
 } from './annotations'
 import { splitBlocks, type SourceBlock } from './blocks'
-import { buildTree, flattenTree, type TreeNode } from './blockTree'
+import { buildTree, flattenTree, isOneLine, type TreeNode } from './blockTree'
 import { preserveBlock, serializeWithPreservation, type EditorBlock } from './preserve'
 import {
   BLOCK_SOURCE_META,
@@ -45,6 +48,7 @@ import { TaskListCommonMark, withTaskItems } from './extensions/taskListMarkdown
 import { Wikilink } from './extensions/wikilink'
 import { BlockOptions, optionApplies } from './nodes/blockOptions'
 import { Bookmark, bookmarkMarkdown } from './nodes/bookmark'
+import { ButtonBlock, buttonBlockMarkdown, buttonLabelOf } from './nodes/buttonBlock'
 import { CodeBlock } from './nodes/codeBlock'
 import { Column, Columns } from './nodes/columns'
 import { Group } from './nodes/group'
@@ -161,6 +165,8 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
     Indent,
     BlockRef,
     DataViewEmbed,
+    // M14
+    ButtonBlock,
     RecordAudio,
     SlashMenu,
     BlockSelection.configure({ markdownPaste: !opts.singleParagraph }),
@@ -186,7 +192,7 @@ const FIELD_LINE = /^[^\s:][^:\n]*(?<!\\)::(?:[ \t]|$)/m
 const RAW_KINDS = new Set(['html', 'def', 'raw', 'text'])
 const CONTAINERS = new Set(['toggle', 'group', 'columns', 'indent'])
 /** Leaf types whose Markdown this module writes itself (`customMarkdown`). */
-const CUSTOM_TYPES = new Set(['mathBlock', 'media', 'objectEmbed', 'bookmark', 'blockRef', 'dataViewEmbed'])
+const CUSTOM_TYPES = new Set(['mathBlock', 'media', 'objectEmbed', 'bookmark', 'blockRef', 'dataViewEmbed', 'buttonBlock'])
 
 const NODE_KIND: Record<string, string> = {
   paragraph: 'paragraph',
@@ -205,6 +211,7 @@ const NODE_KIND: Record<string, string> = {
   bookmark: 'bookmark',
   blockRef: 'blockRef',
   dataViewEmbed: 'dataView',
+  buttonBlock: 'button',
   toggle: 'container',
   group: 'container',
   columns: 'container',
@@ -255,6 +262,9 @@ function sourceToNode(editor: Editor, block: SourceBlock, options?: readonly Opt
       const link = singleLink(block.raw)
       if (link) return { type: 'bookmark', attrs: { href: link.href, title: link.title } }
     }
+    // M14: a button block, its one line the label (kept as written).
+    if (hasFlag(options, 'button') && isOneLine(block.raw))
+      return { type: 'buttonBlock', attrs: { label: buttonLabelOf(block.raw) } }
   }
   const md = editor.markdown
   if (!md || RAW_KINDS.has(block.kind) || FIELD_LINE.test(block.raw)) return rawNode(block.raw)
@@ -463,6 +473,8 @@ function customMarkdown(json: JSONContent): string | null {
       return blockRefMarkdown(String(a.target ?? ''), String(a.id ?? ''), a.label as string | null)
     case 'dataViewEmbed':
       return dataViewEmbedMarkdown(String(a.kind ?? 'collection'), String(a.id ?? ''), a.label as string | null)
+    case 'buttonBlock':
+      return buttonBlockMarkdown(String(a.label ?? ''))
     default:
       return null
   }

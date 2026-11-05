@@ -80,7 +80,8 @@ describe('TypeSettings', () => {
       within(config).getByText('Customize how objects of this type look and behave across pages, cards, and the calendar.'),
     ).toBeInTheDocument()
     expect(within(config).getByRole('option', { name: 'Sans Serif' })).toBeInTheDocument()
-    expect(screen.queryByText(/Calendar/)).not.toBeInTheDocument()
+    // No Calendar settings group (M13's Calendar layout is only an option of the default list view).
+    expect(screen.queryByRole('heading', { name: /Calendar/ })).not.toBeInTheDocument()
     expect(await screen.findByText('Kickoff')).toBeInTheDocument()
   })
 
@@ -183,6 +184,9 @@ describe('TypeSettings default list view', () => {
       'Table',
       'Embed',
       'Kanban',
+      'Calendar',
+      'Timeline',
+      'Chart',
     ])
     expect(select).toHaveValue('list')
     expect(PROJECT).not.toHaveProperty('defaultDataViewLayout')

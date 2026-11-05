@@ -7,9 +7,13 @@ import { useMemo, useState, type ComponentType } from 'react'
 import { Icon } from '@/components/Icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { AI_ASSISTANT_SEARCH, AI_ASSISTANT_TEXT, AiAssistantSection } from './sections/AiAssistant'
 import { APPEARANCE_SEARCH, APPEARANCE_TEXT, AppearanceSection } from './sections/Appearance'
+import { AUTOMATIONS_SEARCH, AUTOMATIONS_TEXT, AutomationsSection } from './sections/Automations'
 import { DATE_TIME_SEARCH, DATE_TIME_TEXT, DateTimeSection } from './sections/DateTime'
+import { INTEGRATIONS_SEARCH, INTEGRATIONS_TEXT, IntegrationsSection } from './sections/Integrations'
 import { EDITOR_SEARCH, EDITOR_TEXT, EditorSection } from './sections/Editor'
+import { IMPORT_CONTENT_SEARCH, IMPORT_CONTENT_TEXT, ImportContentSection } from './sections/ImportContent'
 import { LANGUAGE_SEARCH, LANGUAGE_TEXT, LanguageSection } from './sections/Language'
 import { NOTIFICATIONS_SEARCH, NOTIFICATIONS_TEXT, NotificationsSection } from './sections/Notifications'
 import { OFFLINE_SYNC_SEARCH, OFFLINE_SYNC_TEXT, OfflineSyncSection } from './sections/OfflineSync'
@@ -40,6 +44,8 @@ export interface SettingsSectionDef {
 
 export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
   { id: 'appearance', group: 'general', label: APPEARANCE_TEXT.heading, icon: 'ph-paint-brush', search: APPEARANCE_SEARCH, Component: AppearanceSection },
+  // M10: catalog section 1 lists "AI Assistant" right after Appearance.
+  { id: 'aiAssistant', group: 'general', label: AI_ASSISTANT_TEXT.heading, icon: 'ph-sparkle', search: AI_ASSISTANT_SEARCH, Component: AiAssistantSection },
   { id: 'editor', group: 'general', label: EDITOR_TEXT.heading, icon: 'ph-text-aa', search: EDITOR_SEARCH, Component: EditorSection },
   { id: 'dateTime', group: 'general', label: DATE_TIME_TEXT.heading, icon: 'ph-calendar-blank', search: DATE_TIME_SEARCH, Component: DateTimeSection },
   { id: 'language', group: 'general', label: LANGUAGE_TEXT.heading, icon: 'ph-translate', search: LANGUAGE_SEARCH, Component: LanguageSection },
@@ -50,6 +56,14 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     icon: 'ph-arrows-clockwise',
     search: OFFLINE_SYNC_SEARCH,
     Component: OfflineSyncSection,
+  },
+  {
+    id: 'importContent',
+    group: 'general',
+    label: IMPORT_CONTENT_TEXT.heading,
+    icon: 'ph-download-simple',
+    search: IMPORT_CONTENT_SEARCH,
+    Component: ImportContentSection,
   },
   {
     id: 'notifications',
@@ -68,6 +82,23 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     icon: 'ph-check-circle',
     search: TASK_MANAGEMENT_SEARCH,
     Component: TaskManagementSection,
+  },
+  // M14 (our section): rules live in the space (`.object/automations/`).
+  {
+    id: 'automations',
+    group: 'space',
+    label: AUTOMATIONS_TEXT.heading,
+    icon: 'ph-lightning',
+    search: AUTOMATIONS_SEARCH,
+    Component: AutomationsSection,
+  },
+  {
+    id: 'integrations',
+    group: 'space',
+    label: INTEGRATIONS_TEXT.heading,
+    icon: 'ph-plugs-connected',
+    search: INTEGRATIONS_SEARCH,
+    Component: IntegrationsSection,
   },
 ]
 

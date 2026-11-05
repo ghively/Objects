@@ -147,16 +147,17 @@ describe('running the offers', () => {
   test('create page from markdown takes the first heading', async () => {
     mocked.createObject.mockResolvedValueOnce({ path: 'Pages/Plan.md', version: 'v1' })
     await byId(pasteActions({ kind: 'text', text: '# Plan\n\n- one\n- two\n' }, TYPES))['paste:markdown'].run()
-    expect(mocked.createObject).toHaveBeenCalledWith('page', { title: 'Plan', templateId: 'none' })
-    expect(mocked.saveBody).toHaveBeenCalledWith('Pages/Plan.md', '- one\n- two\n', 'v1')
+    // The text goes in the creating write (M14: a creation rule can't make its save a 409).
+    expect(mocked.createObject).toHaveBeenCalledWith('page', { title: 'Plan', templateId: 'none', body: '- one\n- two\n' })
+    expect(mocked.saveBody).not.toHaveBeenCalled()
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Pages/Plan.md' })
   })
 
   test('create new page with content keeps the whole text', async () => {
     mocked.createObject.mockResolvedValueOnce({ path: 'Pages/Untitled.md', version: 'v1' })
     await byId(pasteActions({ kind: 'text', text: 'alpha\n\nbeta' }, TYPES))['paste:page'].run()
-    expect(mocked.createObject).toHaveBeenCalledWith('page', { templateId: 'none' })
-    expect(mocked.saveBody).toHaveBeenCalledWith('Pages/Untitled.md', 'alpha\n\nbeta\n', 'v1')
+    expect(mocked.createObject).toHaveBeenCalledWith('page', { templateId: 'none', body: 'alpha\n\nbeta\n' })
+    expect(mocked.saveBody).not.toHaveBeenCalled()
   })
 
   test('upload creates attachments', async () => {
@@ -172,12 +173,12 @@ describe('running the offers', () => {
     vi.stubGlobal('fetch', fetchSpy)
     mocked.createObject.mockResolvedValueOnce({ path: 'Pages/example.com_docs.md', version: 'v1' })
     await byId(pasteActions({ kind: 'text', text: 'https://example.com/docs' }, TYPES))['paste:url'].run()
-    expect(mocked.createObject).toHaveBeenCalledWith('page', { title: 'example.com/docs', templateId: 'none' })
-    expect(mocked.saveBody).toHaveBeenCalledWith(
-      'Pages/example.com_docs.md',
-      '<!-- block: bookmark -->\n[example.com/docs](https://example.com/docs)\n',
-      'v1',
-    )
+    expect(mocked.createObject).toHaveBeenCalledWith('page', {
+      title: 'example.com/docs',
+      templateId: 'none',
+      body: '<!-- block: bookmark -->\n[example.com/docs](https://example.com/docs)\n',
+    })
+    expect(mocked.saveBody).not.toHaveBeenCalled()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 

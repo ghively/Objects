@@ -1,13 +1,33 @@
 import type {
+  RelationPairKind,
+  RelationPairResult,
+  SaveAiChatRequest,
+  AiChat,
+  AiChatRequest,
+  AiEvent,
+  AiStatus,
+  ApiTokenList,
+  ApiTokenScope,
+  CreatedApiToken,
   Attachment,
+  AutomationCatchUpChoice,
+  AutomationCatchUpItem,
+  AutomationRule,
+  AutomationRuleInput,
+  AutomationRun,
   BlockInfo,
   CatchUp,
   DuplicatedObject,
+  ImportJob,
+  ImportPreview,
+  ImportPreviewRequest,
   MergeResult,
   OccurrenceAction,
   OverdueInfo,
   RestoreVersionResult,
   SpaceSetup,
+  StartImportRequest,
+  StartImportResponse,
   TaskStats,
   VersionContent,
   VersionInfo,
@@ -16,6 +36,9 @@ import type {
   ChangeEvent,
   ChangeKind,
   ChangeKindResult,
+  FormulaPreviewRequest,
+  FormulaPreviewResult,
+  NumberExistingResult,
   Collection,
   CreatedDailyNote,
   GraphCustomization,
@@ -371,7 +394,7 @@ function typesEvent(id: string, revision: string | null = null): ChangeEvent {
   return { kind: 'types', path: id, version: revision, origin: CLIENT_ID }
 }
 
-function defEvent(kind: 'collections' | 'queries' | 'views' | 'ui', path: string, version: string | null = null): ChangeEvent {
+function defEvent(kind: 'collections' | 'queries' | 'views' | 'ui' | 'automations', path: string, version: string | null = null): ChangeEvent {
   return { kind, path, version, origin: CLIENT_ID }
 }
 
@@ -402,7 +425,18 @@ const RESYNC_EVENTS: readonly ChangeEvent[] = [
   { kind: 'ui', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'collections', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'queries', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'automations', path: RESYNC_PATH, version: null, origin: null },
 ]
+
+/**
+ * Announce to this window that every object and type may have changed: the same `types` resync a
+ * reconnect sends (and the server sends when an import into the open space ends, M15 review
+ * finding 2). The import dialog calls it when its job ends into this space, so this window reloads
+ * its index and types even if it missed the server's event.
+ */
+export function announceResync(): void {
+  emitLocal([{ kind: 'types', path: RESYNC_PATH, version: null, origin: null }])
+}
 
 /** Whether `e` is the synthetic "everything of `kind` may have changed" event sent after a reconnect. */
 export function isResync(e: ChangeEvent, kind: ChangeKind): boolean {
@@ -551,12 +585,27 @@ export const api = {
   },
 
   /** Create an object. `templateId`: an id, `null` for the type's default, `"none"` for no template. */
-  async createObject(typeId: string, opts: { title?: string; templateId?: string | null; values?: Record<string, unknown> } = {},
+  /**
+   * Create an object. `body` replaces the body it would get (its `# title` or its template's);
+   * `appendBody` is added below that body. Both are written in the creating write, so no rule
+   * that fires on the creation can come between the object and its text (M14).
+   */
+  async createObject(
+    typeId: string,
+    opts: {
+      title?: string
+      templateId?: string | null
+      values?: Record<string, unknown>
+      body?: string
+      appendBody?: string
+    } = {},
   ): Promise<CreatedFile> {
     const body: Record<string, unknown> = { typeId }
     if (opts.title !== undefined) body.title = opts.title
     if (opts.templateId !== undefined) body.templateId = opts.templateId
     if (opts.values !== undefined) body.values = opts.values
+    if (opts.body !== undefined) body.body = opts.body
+    if (opts.appendBody !== undefined) body.appendBody = opts.appendBody
     body.clientId = CLIENT_ID
     const res = await request<CreatedFile & { typeIds?: string[] }>('/objects', json('POST', body))
     // An inferred type saved for the first time: the server's `types` event is our own echo.
@@ -615,6 +664,7 @@ export const api = {
       ...(res.typeIds ?? []).map((t) => typesEvent(t)),
       ...(res.collectionIds ?? []).map((c) => defEvent('collections', c)),
       ...(res.queryIds ?? []).map((q) => defEvent('queries', q)),
+      ...(res.automationIds ?? []).map((a) => defEvent('automations', a)),
       // Members whose `collections:` item a collection restore wrote back.
       ...(res.rewritten ?? []).map((p) => changed(p)),
     ])
@@ -683,6 +733,37 @@ export const api = {
     return res
   },
 
+  /**
+   * M13: add the "Parent item"/"Sub-items" or "Blocked by"/"Blocking" relation pair to a type
+   * (two-way, targeting the type itself), or reuse the pair it already has.
+   */
+  async createRelationPair(typeId: string, kind: RelationPairKind, baseRevision: string): Promise<RelationPairResult> {
+    const res = await request<RelationPairResult>(
+      `/types/${seg(typeId)}/relation-pair`,
+      json('POST', { kind, baseRevision, clientId: CLIENT_ID }),
+    )
+    emitLocal([typesEvent(res.type?.id ?? typeId, res.type?.revision ?? null)])
+    return res
+  },
+
+  /** M12: parse a formula and, with `path`, evaluate it against that object. Writes nothing. */
+  async formulaPreview(req: FormulaPreviewRequest): Promise<FormulaPreviewResult> {
+    return request<FormulaPreviewResult>('/formula/preview', json('POST', req))
+  },
+
+  /** M12: give every object of the type without an ID value the next number, oldest first. */
+  async numberExistingObjects(typeId: string, propertyId: string, baseRevision: string): Promise<NumberExistingResult> {
+    const res = await request<NumberExistingResult>(
+      `/types/${seg(typeId)}/properties/${seg(propertyId)}/number-existing`,
+      json('POST', { baseRevision, clientId: CLIENT_ID }),
+    )
+    emitLocal([
+      typesEvent(res.type?.id ?? typeId, res.type?.revision ?? null),
+      ...(res.rewritten ?? []).map((p) => changed(p)),
+    ])
+    return res
+  },
+
   /** Two-way link an entity property with `targetPropertyId` (or a new one named `createName`); `null` unlinks. */
   async setPropertySync(
     typeId: string,
@@ -702,14 +783,15 @@ export const api = {
     return res
   },
 
-  /** Move a type, its objects and its templates to the Trash. Rejects with 428 unless `confirm`. */
+  /** Move a type, its objects, its templates and its only-this-type queries to the Trash. Rejects with 428 unless `confirm`. */
   async deleteType(id: string, opts: { confirm?: boolean } = {}): Promise<{ trashId: string }> {
     const res = await request<{ trashId: string; paths?: string[]; typeIds?: string[]; queryIds?: string[] }>(
       `/types/${seg(id)}${qs({ confirm: opts.confirm ? 'true' : undefined, clientId: CLIENT_ID })}`,
       { method: 'DELETE' },
     )
-    // The type's objects, templates and own queries went to the Trash, other queries and types
-    // may have dropped it: announce each, since the server's events for them are our echoes.
+    // The type's objects, templates and saved queries of only this type went to the Trash, other
+    // types may have dropped it from their relations and other queries from their types: announce
+    // each, since the server's events for them are our echoes.
     const typeIds = res.typeIds?.length ? res.typeIds : [id]
     emitLocal([
       ...typeIds.map((t) => typesEvent(t)),
@@ -908,6 +990,76 @@ export const api = {
     if (opts.limit !== undefined) sp.append('limit', String(opts.limit))
     if (opts.mode) sp.append('mode', opts.mode)
     return request<SearchResponse>(`/search?${sp.toString()}`, opts.signal ? { signal: opts.signal } : undefined)
+  },
+
+  /** M10: whether the Claude Code CLI is there and signed in. */
+  aiStatus(): Promise<AiStatus> {
+    return request<AiStatus>('/ai/status')
+  },
+
+  /**
+   * M10: one AI turn. Calls `onEvent` for each server-sent event until `done` or `error`;
+   * aborting `signal` closes the stream, which stops the CLI. Resolves when the stream ends.
+   */
+  async aiChat(req: AiChatRequest, onEvent: (e: AiEvent) => void, signal?: AbortSignal): Promise<void> {
+    const res = await fetch(`${BASE}/ai/chat`, {
+      ...json('POST', { ...req, clientId: req.clientId ?? CLIENT_ID }),
+      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      signal,
+    })
+    if (!res.ok || !res.body) {
+      await answer(res, '/ai/chat')
+      return
+    }
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+      let cut: number
+      while ((cut = buffer.indexOf('\n\n')) >= 0) {
+        const frame = buffer.slice(0, cut)
+        buffer = buffer.slice(cut + 2)
+        const data = frame
+          .split('\n')
+          .filter((l) => l.startsWith('data:'))
+          .map((l) => l.slice(5).replace(/^ /, ''))
+          .join('\n')
+        if (!data) continue
+        try {
+          onEvent(JSON.parse(data) as AiEvent)
+        } catch {
+          // a malformed frame: skip it
+        }
+      }
+    }
+  },
+
+  /** M10: a saved AI chat and its messages. */
+  aiChatLoad(path: string): Promise<AiChat> {
+    return request<AiChat>(`/ai/chat${qs({ path })}`)
+  },
+
+  /** M10: create or update an AI chat object; rejects with `ConflictError` on a stale version. */
+  saveAiChat(req: SaveAiChatRequest): Promise<{ path: string; version: string }> {
+    return request<{ path: string; version: string }>('/ai/chat/save', json('POST', { ...req, clientId: req.clientId ?? CLIENT_ID }))
+  },
+
+  /** M11: the local API tokens of this space and an MCP config template. */
+  apiTokens(): Promise<ApiTokenList> {
+    return request<ApiTokenList>('/integrations/tokens')
+  },
+
+  /** M11: make a token; the answer holds its secret, shown this once. */
+  createApiToken(name: string, scope: ApiTokenScope): Promise<CreatedApiToken> {
+    return request<CreatedApiToken>('/integrations/tokens', json('POST', { name, scope }))
+  },
+
+  /** M11: revoke a token; programs using it lose access at once. */
+  revokeApiToken(id: string): Promise<{ revoked: string }> {
+    return request<{ revoked: string }>(`/integrations/tokens/${seg(id)}`, { method: 'DELETE' })
   },
 
   /** Drop and rebuild the search index in the background (`partial` until done). */
@@ -1122,6 +1274,112 @@ export const api = {
     if (opts.permanent) body.permanent = true
     if (opts.folder) body.folder = opts.folder
     return request<{ trashed: boolean }>('/spaces/delete', json('POST', body), spaceConflict)
+  },
+
+  // ---- M15 importers (docs/superpowers/plans/2026-11-05-m15-importers.md) ----
+
+  /**
+   * Read a Notion export, Obsidian vault or Anytype export (a `.zip` or a folder, by absolute path)
+   * into a dry-run preview. Writes nothing. 404 no such file or folder, 415 neither a zip nor a
+   * folder, 413 over the limits, 422 a bad mapping.
+   */
+  importPreview(req: ImportPreviewRequest): Promise<ImportPreview> {
+    return request<ImportPreview>('/import/preview', json('POST', req))
+  },
+
+  /**
+   * Start writing a previewed import (202). 409 (`ApiError`) the new space's folder exists, another
+   * import runs or the source changed since the preview; 422 bad name or a target inside the
+   * source; 404 unknown or expired preview, or the location is not a folder. No `clientId`: the
+   * server announces an import's end as one resync from no window (review finding 2), and the
+   * dialog announces it to this window itself (`announceResync`).
+   */
+  startImport(req: StartImportRequest): Promise<StartImportResponse> {
+    return request<StartImportResponse>(
+      '/import/start',
+      json('POST', req),
+      (d) => new ApiError(409, typeof d.detail === 'string' ? d.detail : 'conflict'),
+    )
+  },
+
+  /** An import job's progress and, once over, its result. 404 unknown job. */
+  importJob(jobId: string): Promise<ImportJob> {
+    return request<ImportJob>(`/import/jobs/${encodeURIComponent(jobId)}`)
+  },
+
+  /** Stop an import after the file being written (what was written stays). */
+  cancelImport(jobId: string): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>(`/import/jobs/${encodeURIComponent(jobId)}/cancel`, json('POST', {}))
+  },
+
+  // ---- M14: automations (docs/superpowers/plans/2026-11-05-m14-automations.md) ----
+
+  /** Every rule, by name, each with its newest run (`lastRun`). */
+  automations(): Promise<AutomationRule[]> {
+    return request<AutomationRule[]>('/automations')
+  },
+
+  /** One rule. 404. */
+  automation(id: string): Promise<AutomationRule> {
+    return request<AutomationRule>(`/automations/${seg(id)}`)
+  },
+
+  /** Create a rule (201). 422 names the problem (an unknown property, a bad schedule...). */
+  async createAutomation(rule: AutomationRuleInput): Promise<AutomationRule> {
+    const res = await request<AutomationRule>('/automations', json('POST', { rule, clientId: CLIENT_ID }))
+    emitLocal([defEvent('automations', res.id, res.revision ?? null)])
+    return res
+  },
+
+  /** Save a rule over its file. 409 (`RevisionConflictError`) stale, 422, 423 unreadable, 404. */
+  async saveAutomation(rule: AutomationRule, opts: { baseRevision: string }): Promise<{ rule: AutomationRule }> {
+    const res = await request<{ rule: AutomationRule }>(
+      `/automations/${seg(rule.id)}`,
+      json('PUT', { rule, baseRevision: opts.baseRevision, clientId: CLIENT_ID }),
+    )
+    emitLocal([defEvent('automations', res.rule?.id ?? rule.id, res.rule?.revision ?? null)])
+    return res
+  },
+
+  /** Move a rule to the Trash (restorable; its run log is kept until it is purged). 404, 423. */
+  async deleteAutomation(id: string): Promise<{ trashId: string }> {
+    const res = await request<{ trashId: string }>(`/automations/${seg(id)}${qs({ clientId: CLIENT_ID })}`, {
+      method: 'DELETE',
+    })
+    emitLocal([defEvent('automations', id)])
+    return res
+  },
+
+  /**
+   * Press a button: run button rule `id` on the object at `path` now, and answer the logged run.
+   * Its writes are announced by the server with origin `automation:<id>`. 404, 422 (not a button
+   * rule, turned off, or the object is out of its scope), 423.
+   */
+  runAutomation(id: string, path: string): Promise<AutomationRun> {
+    return request<AutomationRun>(`/automations/${seg(id)}/run`, json('POST', { path, clientId: CLIENT_ID }))
+  },
+
+  /** A rule's run log, newest first (at most 200). 404. */
+  async automationRuns(id: string, limit?: number): Promise<AutomationRun[]> {
+    const res = await request<{ runs: AutomationRun[] }>(
+      `/automations/${seg(id)}/runs${qs({ limit: limit === undefined ? undefined : String(limit) })}`,
+    )
+    return res?.runs ?? []
+  },
+
+  /** The schedule runs missed while Object was closed (or the computer slept), per rule. */
+  async automationCatchUp(): Promise<AutomationCatchUpItem[]> {
+    const res = await request<{ items: AutomationCatchUpItem[] }>('/automations/catch-up')
+    return res?.items ?? []
+  },
+
+  /** Answer one rule's catch-up: run all missed, only the latest, or none. 404 nothing pending. */
+  async confirmAutomationCatchUp(ruleId: string, choice: AutomationCatchUpChoice): Promise<AutomationRun[]> {
+    const res = await request<{ runs: AutomationRun[] }>(
+      '/automations/catch-up',
+      json('POST', { ruleId, choice, clientId: CLIENT_ID }),
+    )
+    return res?.runs ?? []
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */

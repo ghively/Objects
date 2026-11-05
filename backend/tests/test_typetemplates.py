@@ -230,10 +230,18 @@ def test_re_adding_a_deleted_template_type_does_not_duplicate_its_query(tmp_path
     sp = Space(space_dir)
     t = sp.create_type("", "", template="book")
     sp.delete_type(t.id, confirm=True)
-    # Its query goes to the trash with it.
+    # Its query (of only this type) went to the Trash with it.
     assert _queries(space_dir) == []
     again = sp.create_type("", "", template="book")
     assert again.id == t.id
+    assert [q["name"] for q in _queries(space_dir)] == ["Currently reading"]
+    # A query of that name already over the id (here: a file put back by hand) is not made twice.
+    sp.delete_type(again.id, confirm=True)
+    (space_dir / ".object" / "queries" / "by-hand.json").write_text(
+        json.dumps({"name": "Currently reading", "definition": {"structures": [{"id": t.id}]}}),
+        encoding="utf-8",
+    )
+    sp.create_type("", "", template="book")
     assert [q["name"] for q in _queries(space_dir)] == ["Currently reading"]
 
 
