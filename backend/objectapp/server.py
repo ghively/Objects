@@ -67,9 +67,10 @@ Routes (all JSON):
   ``{targetPropertyId, createName?, baseRevision, clientId?}`` -> ``{types, rewritten, skipped}``;
   ``409 {currentRevision}``, ``422 {detail}``, ``423``, ``404``. Announces ``types`` per
   changed type and ``changed`` per backfilled object.
-- ``DELETE /api/types/{id}?confirm=true&clientId=`` -> ``{trashId, paths, typeIds}``; ``422``,
-  ``428 {detail, affected}``, ``404``. Announces ``types`` (this type and each type
-  whose relations stopped allowing it) and ``deleted`` per object and template.
+- ``DELETE /api/types/{id}?confirm=true&clientId=`` -> ``{trashId, paths, typeIds, queryIds}``;
+  ``422``, ``428 {detail, affected}``, ``404``. Announces ``types`` (this type and each type
+  whose relations stopped allowing it), ``deleted`` per object and template, and ``queries``
+  per saved query that went to the trash with it or dropped it.
 - ``GET /api/types/{id}/templates`` -> ``ObjectSummary[]`` (``templates.ids`` order, then
   discovered ones); ``404``. ``POST /api/types/{id}/templates`` ``{name?, clientId?}`` ->
   ``201 {path, version}``; ``422`` (a type without templates), ``423``, ``404``. Announces
@@ -127,6 +128,10 @@ Routes (all JSON):
   ``PUT /api/settings`` (null: the device's zone). The M8 routers (`api_tasks`,
   `api_history`, `api_blocks`, `api_merge`, `api_spaces_m8`) are mounted on ``/api``;
   each module's docstring lists its routes and owner task.
+- M10: `api_ai` adds the AI assistant: ``GET /api/ai/status``, ``POST /api/ai/chat``
+  (Server-Sent Events of `AiEvent`), ``GET /api/ai/chat?path=``, ``POST /api/ai/chat/save``.
+- M11: `api_v1` adds the token-protected local API (``/api/v1/*``) and the token routes
+  (``/api/integrations/tokens``); its docstring lists them.
 
 Errors: a path outside the space or not an object is ``400``; a missing object is ``404``;
 a file the OS refused to write (locked by another program, say) is ``503 {detail}``.
@@ -156,6 +161,7 @@ from starlette.background import BackgroundTask
 from starlette.middleware.gzip import GZipMiddleware
 
 from . import (
+    api_ai,
     api_blocks,
     api_graph,
     api_history,
@@ -164,6 +170,7 @@ from . import (
     api_search,
     api_spaces_m8,
     api_tasks,
+    api_v1,
     media,
 )
 from .apictx import ApiContext
@@ -1868,8 +1875,15 @@ def create_app(
                 paths.append(str(meta.get("originalPath", "")))
         for path in paths:
             announce(ChangeEvent("deleted", path, None, origin=clientId))
+        # The saved queries that went to the trash with the type, or dropped it.
+        query_ids = [str(q) for q in manifest.get("queries") or []]
+        for ref in manifest.get("queryRefs") or []:
+            if str(ref.get("queryId")) not in query_ids:
+                query_ids.append(str(ref.get("queryId")))
+        for query_id in query_ids:
+            announce(ChangeEvent("queries", query_id, None, origin=clientId))
         # The window that deleted can't list these itself: tell it what changed.
-        return {"trashId": item.id, "paths": paths, "typeIds": type_ids}
+        return {"trashId": item.id, "paths": paths, "typeIds": type_ids, "queryIds": query_ids}
 
     @api.post("/tags/ensure")
     def ensure_tag(req: EnsureTagRequest):
@@ -2015,6 +2029,10 @@ def create_app(
     # M8: each router is filled by its own task (see the plan's "Shared files").
     for module in (api_tasks, api_history, api_blocks, api_merge, api_spaces_m8):
         api.include_router(module.router(ctx))
+    # M11: the local API for agents and scripts (Bearer tokens) and its token routes.
+    api.include_router(api_v1.router(ctx))
+    # M10: the AI assistant (status, a chat turn over SSE, saved AI chats).
+    api.include_router(api_ai.router(ctx))
     app.include_router(api)
     # M6: the whiteboard routes carry their own /api prefix.
     app.include_router(whiteboard_router(space, announce_whiteboard))

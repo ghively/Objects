@@ -137,7 +137,7 @@ describe('DeleteTypeDialog', () => {
     expect(screen.getByRole('heading', { name: 'Delete this object type?' })).toBeInTheDocument()
     expect(
       screen.getByText(
-        'Moves the type, all its objects and its templates to the Trash. You can restore them from there for 30 days.',
+        'Moves the type, all its objects, its templates and the saved queries of only this type to the Trash; other queries stop using it. You can restore them from there for 30 days.',
       ),
     ).toBeInTheDocument()
     expect(screen.queryByText(/can't be undone/i)).not.toBeInTheDocument()
