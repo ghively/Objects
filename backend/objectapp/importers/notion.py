@@ -20,6 +20,7 @@ from __future__ import annotations
 import csv
 import io
 import re
+from collections.abc import Iterator
 from pathlib import PurePosixPath
 from urllib.parse import unquote
 
@@ -36,7 +37,7 @@ from .readmodel import (
     read_page_text,
     strip_notion_id,
 )
-from .source import Source, TextBudget, is_csv, is_markdown
+from .source import MAX_OBJECTS, LimitExceeded, Source, TextBudget, is_csv, is_markdown
 
 __all__ = ["CREATED_COLUMNS", "EDITED_COLUMNS", "page_heading", "read_notion", "split_property_lines"]
 
@@ -103,9 +104,14 @@ def suggested_name(path: str) -> str:
     return strip_notion_id(stem) or stem
 
 
-def _parse_csv(text: str) -> list[list[str]]:
+def _rows(text: str) -> Iterator[list[str]]:
+    """The CSV's rows, one at a time (a big CSV is never held as a list of rows)."""
     _big_csv_fields()
-    return [row for row in csv.reader(io.StringIO(text, newline=""))]
+    return csv.reader(io.StringIO(text, newline=""))
+
+
+def _too_many() -> LimitExceeded:
+    return LimitExceeded(f"The source has more than {MAX_OBJECTS:,} objects.")
 
 
 def read_notion(src: Source, *, detected: str | None, suggested: str, budget: TextBudget) -> ReadResult:
@@ -147,11 +153,13 @@ def read_notion(src: Source, *, detected: str | None, suggested: str, budget: Te
         text = read_page_text(src, c, budget, skipped)
         if text is None:
             continue
-        rows = _parse_csv(text)
-        if not rows or not rows[0]:
+        rows = _rows(text)
+        del text
+        first = next(rows, None)
+        if not first:
             skipped.append(SkippedItem(path=c, reason="emptyFile"))
             continue
-        header = [h.strip() for h in rows[0]]
+        header = [h.strip() for h in first]
         title_header = header[0] or "Name"
         headers = header[1:]
         db_key = f"database:{c}"
@@ -164,9 +172,11 @@ def read_notion(src: Source, *, detected: str | None, suggested: str, budget: Te
         for p in in_folder:
             by_title.setdefault(strip_notion_id(PurePosixPath(p).stem).strip().casefold(), []).append(p)
         column_keys = frozenset(h for h in headers if h)
-        for n, row in enumerate(rows[1:], start=1):
+        for n, row in enumerate(rows, start=1):
             if not any(cell.strip() for cell in row):
                 continue
+            if len(objects) >= MAX_OBJECTS:
+                raise _too_many()
             cells = (row + [""] * len(header))[: len(header)]
             title = " ".join(cells[0].split()) or "Untitled"
             fields: dict[str, str] = {}
@@ -189,6 +199,7 @@ def read_notion(src: Source, *, detected: str | None, suggested: str, budget: Te
                     page = None
             if page is not None:
                 conv = markdown.convert(body or "", page, hooks, notion_callouts=True)
+                texts.pop(page, None)  # converted: its text isn't needed again
                 html = html or conv.html
                 objects.append(
                     ReadObject(
@@ -222,8 +233,11 @@ def read_notion(src: Source, *, detected: str | None, suggested: str, budget: Te
                 continue
             body = text_of(p)
             used_pages.add(p)
+            texts.pop(p, None)
             if body is None:
                 continue
+            if len(objects) >= MAX_OBJECTS:
+                raise _too_many()
             props, _rest = split_property_lines(body, column_keys)
             system = {}
             for h, v in props.items():
@@ -251,8 +265,11 @@ def read_notion(src: Source, *, detected: str | None, suggested: str, budget: Te
         if p in used_pages:
             continue
         body = text_of(p)
+        texts.pop(p, None)
         if body is None:
             continue
+        if len(objects) >= MAX_OBJECTS:
+            raise _too_many()
         conv = markdown.convert(body, p, hooks, notion_callouts=True)
         html = html or conv.html
         objects.append(
@@ -264,7 +281,6 @@ def read_notion(src: Source, *, detected: str | None, suggested: str, budget: Te
                 links=conv.links,
             )
         )
-        texts.pop(p, None)
     texts.clear()
     if html:
         warnings.append(HTML_WARNING)

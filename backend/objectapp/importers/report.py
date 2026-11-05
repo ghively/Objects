@@ -51,6 +51,11 @@ def code(text: str) -> str:
     return f"{ticks}{pad}{t}{pad}{ticks}"
 
 
+def _count(n: int, word: str) -> str:
+    """``1 object``, ``2 objects`` (every word here takes an ``s``)."""
+    return f"{n:,} {word}" if n == 1 else f"{n:,} {word}s"
+
+
 def _section(title: str, lines: list[str]) -> list[str]:
     out = [f"## {title}", ""]
     if not lines:
@@ -76,10 +81,12 @@ def build_report(
     not_converted: Iterable[tuple[str, str, str, str]],
     link_for: Callable[[str], str | None],
     stopped: str | None = None,
+    not_written: int = 0,
     warnings: Iterable[str] = (),
 ) -> str:
     """The report's body. ``link_for(source path)`` is the ``[[…]]`` of the object imported
-    from it (None when there is none); ``stopped`` says why the import stopped early."""
+    from it (None when there is none); ``stopped`` says why the import stopped early and
+    ``not_written`` how many planned objects it didn't write (links to them stay unresolved)."""
 
     def obj(src: str) -> str:
         link = link_for(src)
@@ -93,8 +100,8 @@ def build_report(
         lines.append(f"- **The import stopped early:** {stopped}. Everything listed below as imported was written.")
     lines.append("")
     lines.append(
-        f"Imported {counts.get('objects', 0):,} objects, {counts.get('types', 0):,} types, "
-        f"{counts.get('attachments', 0):,} attachments and {counts.get('tags', 0):,} tags."
+        f"Imported {_count(counts.get('objects', 0), 'object')}, {_count(counts.get('types', 0), 'type')}, "
+        f"{_count(counts.get('attachments', 0), 'attachment')} and {_count(counts.get('tags', 0), 'tag')}."
     )
     lines.append("")
     warnings = list(warnings)
@@ -109,7 +116,10 @@ def build_report(
         ],
     )
     lines += _section("Renamed", [f"- {code(t)} was written as [[{path[:-3]}]]" for t, path in renamed])
-    lines += _section("Unresolved links", [f"- {obj(src)}: {code(raw)}" for src, raw in unresolved])
+    unresolved_lines = [f"- {obj(src)}: {code(raw)}" for src, raw in unresolved]
+    if stopped and not_written:
+        unresolved_lines.insert(0, "- Links to objects that weren't imported stay unresolved.")
+    lines += _section("Unresolved links", unresolved_lines)
     lines += _section(
         "Values not converted",
         [f"- {code(t)} › {code(p)}, {obj(src)}: {code(v)}" for t, p, src, v in not_converted],

@@ -5,18 +5,23 @@ checked), ``types`` (new types made with `Space.create_type`; properties and lab
 added with `Space.save_type`; Tag objects made or reused with `Space.ensure_tag`),
 ``attachments`` (each copied to its planned ``Attachments/`` name with `create_new`, the next
 free `` (n)`` name if it was taken meanwhile), ``objects`` (each source file read again and
-converted with the plan's link table, then placed with `Space._place`, which never
+converted with the plan's link table, then placed with `Space.place_new`, which never
 overwrites) and ``report`` (the "Import report" `Page`).
 
 Nothing written is ever removed: a cancel stops after the file being written and a failure
-stops where it happened; the report is still written. New files are LF without a BOM, as
-`Space.create_object` writes them; no template is applied.
+stops where it happened; the report is still written. A file that can't be written (a name
+the file system refuses, permissions) is skipped and listed; the import goes on. New files
+are LF without a BOM, as `Space.create_object` writes them; no template is applied.
+
+Nothing is announced per object or type: an import can write thousands of files, so the
+caller announces one resync when the job ends (`WriteState.wrote_anything`).
 """
 
 from __future__ import annotations
 
 import copy
 import logging
+import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -26,21 +31,20 @@ from ..frontmatter import FlowList, set_keys
 from ..ids import new_ulid
 from ..media import MAX_ATTACHMENT_BYTES
 from ..objfile import ObjectFile, join_object, split_object
-from ..space import _yaml_single_quoted, now_stamp, safe_filename, unique_path
+from ..space import now_stamp, safe_filename, unique_path, yaml_single_quoted
 from ..textfile import create_new
-from ..watcher import ChangeEvent
 from . import markdown
 from .model import ImportResult, SkippedItem
 from .notion import page_heading, split_property_lines
 from .planner import Planned
 from .readmodel import read_page_text
 from .report import REPORT_TITLE, build_report
-from .source import Source, SourceDamaged, TextBudget, open_source
+from .source import LimitExceeded, NotASource, Source, SourceDamaged, SourceMissing, TextBudget, open_source
 
 if TYPE_CHECKING:
     from ..space import Space
 
-__all__ = ["Cancelled", "SourceChanged", "WriteState", "write_import"]
+__all__ = ["Cancelled", "SourceChanged", "WriteState", "open_checked", "write_import"]
 
 _log = logging.getLogger(__name__)
 
@@ -50,7 +54,7 @@ class Cancelled(Exception):
 
 
 class SourceChanged(Exception):
-    """The source's fingerprint no longer matches the preview's (409)."""
+    """The source's fingerprint no longer matches the preview's (409), or it can't be read."""
 
 
 @dataclass
@@ -59,8 +63,6 @@ class WriteState:
 
     progress: Callable[[str, int, int, str | None], None] = lambda *_a: None
     cancelled: Callable[[], bool] = lambda: False
-    announce: Callable[[ChangeEvent], None] | None = None
-    client_id: str | None = None
     done: int = 0
     total: int = 0
     objects: int = 0
@@ -76,6 +78,11 @@ class WriteState:
     stopped: str | None = None
     report_path: str | None = None
 
+    @property
+    def wrote_anything(self) -> bool:
+        """Whether any file was written (an object, a type, an attachment, a tag, the report)."""
+        return bool(self.objects or self.types or self.attachments or self.tags or self.report_path)
+
 
 def _check(state: WriteState) -> None:
     if state.cancelled():
@@ -87,23 +94,28 @@ def _step(state: WriteState, phase: str, current: str | None) -> None:
     state.progress(phase, state.done, state.total, current)
 
 
-def _announce(state: WriteState, kind: str, path: str, version: str | None = None) -> None:
-    if state.announce is not None:
-        try:
-            state.announce(ChangeEvent(kind, path, version, origin=state.client_id))  # type: ignore[arg-type]
-        except Exception:  # noqa: BLE001 - an SSE hiccup never stops an import
-            _log.warning("Could not announce %s %s", kind, path, exc_info=True)
+def open_checked(planned: Planned) -> Source:
+    """The source opened again, still what was previewed; raises `SourceChanged` otherwise
+    (call it before making anything, so a source gone meanwhile leaves nothing behind)."""
+    try:
+        src = open_source(planned.plan.sourcePath)
+    except (SourceMissing, NotASource, LimitExceeded) as exc:
+        raise SourceChanged("The source can't be read any more. Preview it again.") from exc
+    if src.fingerprint != planned.plan.fingerprint:
+        src.close()
+        raise SourceChanged("The source changed since the preview. Preview it again.")
+    return src
 
 
-def write_import(planned: Planned, space: Space, state: WriteState) -> ImportResult:
-    """Write ``planned`` into ``space``. Raises `SourceChanged` before writing anything when
-    the source changed; otherwise always writes the report and answers the result."""
+def write_import(planned: Planned, space: Space, state: WriteState, src: Source | None = None) -> ImportResult:
+    """Write ``planned`` into ``space`` from ``src`` (`open_checked`; opened here when None,
+    raising `SourceChanged` before writing anything) and close it; always writes the report
+    and answers the result."""
     state.total = len(planned.plan.attachments) + len(planned.writes) + 1
     state.progress("preparing", 0, state.total, None)
-    src = open_source(planned.plan.sourcePath)
+    if src is None:
+        src = open_checked(planned)
     try:
-        if src.fingerprint != planned.plan.fingerprint:
-            raise SourceChanged("The source changed since the preview.")
         try:
             _types(planned, space, state)
             _attachments(planned, space, state, src)
@@ -163,7 +175,6 @@ def _types(planned: Planned, space: Space, state: WriteState) -> None:
             state.type_names[pt.key] = t.name
             if tw.new_props:
                 _save_props(space, t.id, tw.new_props, {})
-            _announce(state, "types", t.id)
             continue
         t = space.type_by_id(tw.existingTypeId)
         if t is None:
@@ -172,7 +183,6 @@ def _types(planned: Planned, space: Space, state: WriteState) -> None:
         if (tw.new_props or tw.add_options) and not t.basic:
             _save_props(space, t.id, tw.new_props, _option_pdefs(planned, pt.key))
             state.types += 1
-            _announce(state, "types", t.id)
     for tag in planned.tags:
         _check(state)
         try:
@@ -182,7 +192,6 @@ def _types(planned: Planned, space: Space, state: WriteState) -> None:
             continue
         if created:
             state.tags += 1
-            _announce(state, "created", _path, space.cached_version(_path))
 
 
 def _option_pdefs(planned: Planned, type_key: str) -> dict[str, Any]:
@@ -214,9 +223,20 @@ def _save_props(space: Space, type_id: str, new_props: list[Any], replace: dict[
 # -- attachments -----------------------------------------------------------------------
 
 
+def _names_in(folder: os.PathLike[str] | str) -> set[str]:
+    """The lower-cased names in ``folder`` (empty when it doesn't exist yet)."""
+    try:
+        return {n.lower() for n in os.listdir(folder)}
+    except FileNotFoundError:
+        return set()
+
+
 def _attachments(planned: Planned, space: Space, state: WriteState, src: Source) -> None:
     state.progress("attachments", state.done, state.total, None)
     folder = space.root / "Attachments"
+    if planned.plan.attachments:
+        folder.mkdir(parents=True, exist_ok=True)
+    taken = _names_in(folder)  # listed once; a name taken meanwhile fails `create_new`
     for sp, att in planned.plan.attachments.items():
         _check(state)
         try:
@@ -225,23 +245,31 @@ def _attachments(planned: Planned, space: Space, state: WriteState, src: Source)
             state.skipped.append(SkippedItem(path=sp, reason="damaged", detail=str(exc)[:200]))
             _step(state, "attachments", sp)
             continue
-        folder.mkdir(parents=True, exist_ok=True)
         name = att.targetName.split("/", 1)[1]
         stem, dot, ext = name.rpartition(".")
         if not dot:
             stem, ext = name, ""
         n = 1
-        while True:
+        written = None
+        while n <= 10_000:
             candidate = name if n == 1 else (f"{stem} ({n}).{ext}" if ext else f"{stem} ({n})")
-            taken = {p.name.lower() for p in folder.iterdir()}
-            if candidate.lower() not in taken:
-                try:
-                    create_new(folder / candidate, data)
-                    break
-                except FileExistsError:
-                    pass
             n += 1
-        state.attachment_paths[sp] = f"Attachments/{candidate}"
+            if candidate.lower() in taken:
+                continue
+            taken.add(candidate.lower())
+            try:
+                create_new(folder / candidate, data)
+            except FileExistsError:
+                continue
+            except OSError as exc:
+                state.skipped.append(SkippedItem(path=sp, reason="damaged", detail=f"Couldn't be written: {exc}"[:200]))
+                break
+            written = candidate
+            break
+        if written is None:
+            _step(state, "attachments", sp)
+            continue
+        state.attachment_paths[sp] = f"Attachments/{written}"
         state.attachments += 1
         _step(state, "attachments", sp)
 
@@ -251,7 +279,7 @@ def _attachments(planned: Planned, space: Space, state: WriteState, src: Source)
 
 def _frontmatter(w: Any, type_name: str) -> str:
     fm = set_keys(
-        f"type: {_yaml_single_quoted(type_name)}\n",
+        f"type: {yaml_single_quoted(type_name)}\n",
         {"title": w.obj.title},
         insert_first={"id": new_ulid()},
     )
@@ -312,19 +340,23 @@ def _objects(planned: Planned, space: Space, state: WriteState, src: Source) -> 
         data = join_object(ObjectFile(fm, body, True, None)).encode("utf-8")
         rel = w.obj.targetPath
         folder = rel.rpartition("/")[0]
-        placed = space._place(rel, data)
-        attempt = 0
-        while not placed and attempt < 100:
-            attempt += 1
-            rel = unique_path(space.root, folder, safe_filename(w.obj.title))
-            placed = space._place(rel, data)
+        try:
+            placed = space.place_new(rel, data)
+            attempt = 0
+            while not placed and attempt < 100:
+                attempt += 1
+                rel = unique_path(space.root, folder, safe_filename(w.obj.title))
+                placed = space.place_new(rel, data)
+        except OSError as exc:  # a name the file system refuses, permissions: skip this one
+            state.skipped.append(SkippedItem(path=w.obj.sourcePath, reason="damaged", detail=f"Couldn't be written: {exc}"[:200]))
+            _step(state, "objects", w.obj.sourcePath)
+            continue
         if not placed:
             state.skipped.append(SkippedItem(path=w.obj.sourcePath, reason="damaged", detail="No free file name"))
             _step(state, "objects", w.obj.sourcePath)
             continue
         state.written[w.obj.sourcePath] = rel
         state.objects += 1
-        _announce(state, "created", rel, space.cached_version(rel))
         _step(state, "objects", w.obj.sourcePath)
 
 
@@ -354,10 +386,12 @@ def _report(planned: Planned, space: Space, state: WriteState) -> None:
         return f"[[{rel[:-3]}]]"
 
     when = datetime.now(UTC).astimezone().strftime("%Y-%m-%d %H:%M")
+    # Planned renames, and files that got another name because theirs was taken meanwhile.
     renamed = [
-        (po.title, state.written.get(po.sourcePath, po.targetPath))
+        (po.title, rel)
         for po in planned.plan.objects
-        if po.renamedFrom is not None
+        if (rel := state.written.get(po.sourcePath)) is not None
+        and (po.renamedFrom is not None or rel != po.targetPath)
     ]
     body = build_report(
         title=title,
@@ -371,18 +405,18 @@ def _report(planned: Planned, space: Space, state: WriteState) -> None:
         not_converted=planned.not_converted,
         link_for=link_for,
         stopped=state.stopped,
+        not_written=len(planned.writes) - state.objects if state.stopped else 0,
         warnings=planned.plan.warnings,
     )
     stamp = now_stamp()
     fm = set_keys(
-        f"type: {_yaml_single_quoted(type_name)}\n",
+        f"type: {yaml_single_quoted(type_name)}\n",
         {"title": title, "createdAt": stamp, "lastUpdated": stamp},
         insert_first={"id": new_ulid()},
     )
     data = join_object(ObjectFile(fm, body, True, None)).encode("utf-8")
     for _attempt in range(100):
         rel = unique_path(space.root, folder, safe_filename(title))
-        if space._place(rel, data):
+        if space.place_new(rel, data):
             state.report_path = rel
-            _announce(state, "created", rel, space.cached_version(rel))
             return
