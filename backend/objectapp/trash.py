@@ -5,9 +5,12 @@ Layout:
 - an object: ``<ulid>.md`` (the file's bytes, unchanged) plus ``<ulid>.json``
   ``{id, kind: 'object', originalPath, title, type, deletedAt, typeTrashId?}``;
 - a type: ``types/<ulid>/`` with ``type.json``, ``templates/<original path>``
-  for each of its template files, and ``manifest.json`` ``{id, kind: 'type',
-  typeId, name, deletedAt, objectTrashIds, allowedTypesRefs, templates}``. Its
-  objects are ordinary object entries carrying ``typeTrashId``;
+  for each of its template files, ``queries/<query id>.json`` (unchanged bytes) for
+  each saved query of only this type, and ``manifest.json`` ``{id, kind: 'type',
+  typeId, name, deletedAt, objectTrashIds, allowedTypesRefs, templates, queries,
+  queryRefs}`` (``queryRefs``: ``{queryId, list, index, entry}`` per entry dropped
+  from another query's ``structures`` or ``excludeStructureIds``). Its objects are
+  ordinary object entries carrying ``typeTrashId``;
 - a collection: ``collections/<ulid>/`` with ``collection.json``, ``before/<n>.md``
   (a member's bytes before its ``collections:`` item was removed) and
   ``manifest.json`` ``{id, kind: 'collection', collectionId, name, deletedAt,
@@ -16,7 +19,10 @@ Layout:
 - a query: ``queries/<ulid>.json``, the query file's bytes unchanged, plus
   ``queries/<ulid>.meta.json`` ``{id, deletedAt}`` recording the original id (the
   file's stem, which need not match an ``id`` inside it). Entries without the
-  sidecar fall back to the JSON's ``id`` and the ulid's time.
+  sidecar fall back to the JSON's ``id`` and the ulid's time;
+- an automation rule (M14): ``automations/<ulid>.json``, the rule file's bytes unchanged,
+  plus ``automations/<ulid>.meta.json`` ``{id, deletedAt}`` (as a query). Its run log (in
+  the state dir) stays while the entry is here and goes when the entry is purged.
 
 This module only knows the folder layout and the metadata; `Space` moves the
 files (so it can keep the watcher quiet and its index current).
@@ -53,7 +59,7 @@ def _file_stem(title: str) -> str:
 class TrashItem:
     id: str
     kind: str
-    """``'object'``, ``'type'``, ``'collection'`` or ``'query'``."""
+    """``'object'``, ``'type'``, ``'collection'``, ``'query'`` or ``'automation'``."""
     originalPath: str
     """The object's space path; for a type, its type JSON's space path."""
     title: str
@@ -72,6 +78,8 @@ class TrashItem:
     """For a collection or query entry: its name."""
     queryId: str | None = None
     """For a query entry: the query's id."""
+    automationId: str | None = None
+    """For an automation entry (M14): the rule's id."""
 
     def to_api(self) -> dict[str, Any]:
         return asdict(self)
@@ -120,6 +128,7 @@ class Trash:
         self.types_dir = self.dir / "types"
         self.collections_dir = self.dir / "collections"
         self.queries_dir = self.dir / "queries"
+        self.automations_dir = self.dir / "automations"
 
     # -- paths ---------------------------------------------------------------
 
@@ -140,6 +149,12 @@ class Trash:
 
     def query_meta_file(self, trash_id: str) -> Path:
         return self.queries_dir / f"{trash_id}.meta.json"
+
+    def automation_file(self, trash_id: str) -> Path:
+        return self.automations_dir / f"{trash_id}.json"
+
+    def automation_meta_file(self, trash_id: str) -> Path:
+        return self.automations_dir / f"{trash_id}.meta.json"
 
     @staticmethod
     def _safe_id(trash_id: str) -> bool:
@@ -233,6 +248,45 @@ class Trash:
             return recorded
         return self._stamp_of(trash_id, self.query_file(trash_id))
 
+    # -- automations (M14) ----------------------------------------------------
+
+    def automation_trash_ids(self) -> list[str]:
+        if not self.automations_dir.is_dir():
+            return []
+        return sorted(
+            p.stem for p in self.automations_dir.glob("*.json") if self._safe_id(p.stem)
+        )
+
+    def has_automation(self, trash_id: str) -> bool:
+        return self._safe_id(trash_id) and self.automation_file(trash_id).is_file()
+
+    def automation_data(self, trash_id: str) -> dict[str, Any] | None:
+        """The trashed rule's JSON, or None (missing, or not a JSON object)."""
+        if not self._safe_id(trash_id):
+            return None
+        return _load(self.automation_file(trash_id))
+
+    def _automation_meta(self, trash_id: str) -> dict[str, Any]:
+        if not self._safe_id(trash_id):
+            return {}
+        return _load(self.automation_meta_file(trash_id)) or {}
+
+    def automation_id(self, trash_id: str) -> str:
+        """The deleted rule's id (its file name), from the sidecar."""
+        recorded = self._automation_meta(trash_id).get("id")
+        return recorded if isinstance(recorded, str) else ""
+
+    def automation_deleted_at(self, trash_id: str) -> str:
+        recorded = self._automation_meta(trash_id).get("deletedAt")
+        if isinstance(recorded, str) and recorded:
+            return recorded
+        return self._stamp_of(trash_id, self.automation_file(trash_id))
+
+    def remove_automation(self, trash_id: str) -> None:
+        if self._safe_id(trash_id):
+            self.automation_file(trash_id).unlink(missing_ok=True)
+            self.automation_meta_file(trash_id).unlink(missing_ok=True)
+
     def object_ids(self) -> list[str]:
         """Every trashed object: its ``.md`` is the entry; the ``.json`` may be missing."""
         if not self.dir.is_dir():
@@ -319,6 +373,24 @@ class Trash:
                     name=name,
                 )
             )
+        for aid in self.automation_trash_ids():
+            # A rule file that isn't valid JSON is still listed (and restorable) by its id.
+            data = self.automation_data(aid) or {}
+            rule_id = self.automation_id(aid)
+            name = data.get("name") if isinstance(data.get("name"), str) else ""
+            name = name.strip() or rule_id
+            out.append(
+                TrashItem(
+                    id=aid,
+                    kind="automation",
+                    originalPath=f".object/automations/{rule_id}.json",
+                    title=name,
+                    type="",
+                    deletedAt=self.automation_deleted_at(aid),
+                    automationId=rule_id,
+                    name=name,
+                )
+            )
         out.sort(key=lambda i: (i.deletedAt, i.id), reverse=True)
         return out
 
@@ -342,6 +414,15 @@ class Trash:
                 query_id = self.query_id(trash_id)
                 if query_id:
                     found.add(query_id)
+            # The saved queries that went to the trash with their type.
+            for manifest in (self.dir / "types").glob("*/manifest.json"):
+                data = _load(manifest) or {}
+                found.update(q for q in data.get("queries") or [] if isinstance(q, str))
+        elif folder == "automations":
+            for trash_id in self.automation_trash_ids():
+                rule_id = self.automation_id(trash_id)
+                if rule_id:
+                    found.add(rule_id)
         return found
 
     def remove_type(self, trash_id: str) -> None:

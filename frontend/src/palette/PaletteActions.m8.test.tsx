@@ -151,8 +151,13 @@ describe('action palette, clipboard group', () => {
     await openActions(user)
     await waitFor(() => expect(document.querySelector('[data-action="paste:url"]')?.textContent).toBe('Create Page'))
     await user.click(document.querySelector<HTMLElement>('[data-action="paste:url"]')!)
-    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalled())
-    expect(mocked.createObject).toHaveBeenCalledWith('page', { title: 'example.com/docs', templateId: 'none' })
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalled())
+    expect(mocked.createObject).toHaveBeenCalledWith('page', {
+      title: 'example.com/docs',
+      templateId: 'none',
+      body: '<!-- block: bookmark -->\n[example.com/docs](https://example.com/docs)\n',
+    })
+    expect(mocked.saveBody).not.toHaveBeenCalled()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 

@@ -55,7 +55,7 @@ DEFAULT_LAYOUT_KEY = "defaultDataViewLayout"
 """Polish item 20 (our key): the layout a type page without saved views opens in. Absent
 means the built-in default; it lives in `TypeDefinition.extra`, so an unset type's file
 never gains it."""
-DATA_VIEW_LAYOUTS = ("list", "grid", "wall", "table", "embed", "kanban")
+DATA_VIEW_LAYOUTS = ("list", "grid", "wall", "table", "embed", "kanban", "calendar", "timeline", "chart")
 """The layouts a type page's "All" view offers (the frontend's ``FULL_VIEW_LAYOUTS``)."""
 
 THEME_COLORS = (
@@ -94,6 +94,13 @@ PROPERTY_ICONS = {
     "simpleTableBlock": "ph-table",
     "coverImage": "ph-image",
     "color": "ph-palette",
+    # M12: our kinds (docs/superpowers/plans/2026-11-05-m12-property-kinds.md)
+    "formula": "ph-function",
+    "rollup": "ph-stack",
+    "uniqueId": "ph-hash-straight",
+    "email": "ph-at",
+    "phone": "ph-phone",
+    "files": "ph-paperclip",
     "entity_title": "ph-text-t",
     "entity_icon": "ph-smiley",
     "entity_description": "ph-info",
@@ -104,6 +111,8 @@ PROPERTY_ICONS = {
     "entity_collections": "ph-cards-three",
     "entity_backlinks": "ph-line-segment",
     "entity_type": "ph-notebook",
+    # M14 (our choice): a button runs an automation on its object; it holds no value.
+    "button": "ph-cursor-click",
 }
 
 # (key, kind, en-US name, description) of the system properties, in order.
@@ -410,6 +419,17 @@ def _default_options(kind: str, is_array: bool | None) -> dict[str, Any]:
     if kind == "entity_tags":
         return {"isArray": True, "allowedTypes": ["tag"]}
     if kind == "entity_aliases":
+        return {"isArray": True}
+    if kind == "button":
+        return {"ruleId": None}  # M14: the automation the button runs (our key)
+    # M12: our kinds
+    if kind == "formula":
+        return {"expression": ""}
+    if kind == "rollup":
+        return {"relationId": "", "targetId": "", "calc": "showOriginal"}
+    if kind == "uniqueId":
+        return {"prefix": "", "nextNumber": 1}
+    if kind == "files":
         return {"isArray": True}
     if is_array:
         return {"isArray": True}

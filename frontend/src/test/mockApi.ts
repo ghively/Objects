@@ -11,6 +11,8 @@ import { vi } from 'vitest'
 import type { Api } from '@/api/client'
 import type {
   Attachment,
+  AutomationRule,
+  AutomationRun,
   CalendarDay,
   CalendarRange,
   Collection,
@@ -35,6 +37,19 @@ import type {
   Views,
 } from '@/api/types'
 import { settingsDefaults } from '@/settings/defaults'
+
+/** The MCP config the token routes answer, with `secret` as the token. */
+export function mcpConfig(secret: string) {
+  return {
+    mcpServers: {
+      object: {
+        command: 'uv',
+        args: ['run', '--directory', '/repo', 'objectapp-mcp'],
+        env: { OBJECT_API_URL: 'http://127.0.0.1:8790', OBJECT_API_TOKEN: secret },
+      },
+    },
+  }
+}
 
 /** A v2 type with every contract field; `partial` overrides. */
 export function typeDef(partial: Partial<TypeDef> & Pick<TypeDef, 'id'>): TypeDef {
@@ -251,6 +266,38 @@ export function attachment(partial: Partial<Attachment> = {}): Attachment {
   return { path: 'Attachments/file.pdf', kind: 'pdf', size: 1024, ...partial }
 }
 
+/** An M14 automation rule: a button rule with one "set property" action unless overridden. */
+export function automationRule(partial: Partial<AutomationRule> & Pick<AutomationRule, 'id'>): AutomationRule {
+  return {
+    schemaVersion: 1,
+    name: 'New automation',
+    description: '',
+    enabled: true,
+    trigger: { kind: 'button', scope: null },
+    conditions: { type: 'filterGroup', operator: 'and', elements: [] },
+    actions: [{ kind: 'setProperty', key: 'done', value: true }],
+    templateRepeat: null,
+    createdAt: '2026-11-05T09:00:00.000Z',
+    revision: 'r1',
+    readOnlyReason: null,
+    lastRun: null,
+    ...partial,
+  }
+}
+
+/** An M14 run-log entry (a button run that succeeded) unless overridden. */
+export function automationRun(partial: Partial<AutomationRun> & Pick<AutomationRun, 'ruleId'>): AutomationRun {
+  return {
+    id: '01JRUN0000000000000000000',
+    at: '2026-11-05T09:00:00.000Z',
+    trigger: { kind: 'button', path: null, scheduledFor: null, catchUp: false },
+    status: 'ok',
+    actions: [],
+    error: null,
+    ...partial,
+  }
+}
+
 type Fn =(...args: never[]) => unknown
 
 function defaults(): Api {
@@ -319,6 +366,19 @@ function defaults(): Api {
       lossy: 0,
     }),
     setPropertySync: async () => ({ types: [], rewritten: [], skipped: [] }),
+    createRelationPair: async (typeId: string) => ({
+      type: typeDef({ id: typeId }),
+      firstId: 'p-first',
+      secondId: 'p-second',
+      created: true,
+    }),
+    formulaPreview: async () => ({ value: null, error: null }),
+    numberExistingObjects: async (typeId: string) => ({
+      type: typeDef({ id: typeId }),
+      numbered: 0,
+      rewritten: [],
+      skipped: [],
+    }),
     deleteType: async () => ({ trashId: 'trash-type-1' }),
     templates: async () => [],
     createTemplate: async (typeId: string, name?: string) => ({
@@ -351,6 +411,20 @@ function defaults(): Api {
     }),
     search: async () => ({ results: [], partial: false }),
     reindex: async () => ({ started: true }),
+    aiStatus: async () => ({ available: true, reason: 'ok' as const, claudePath: '/usr/bin/claude', version: '2.0.0', message: null }),
+    aiChat: async (_req: unknown, onEvent: (e: import('@/api/types').AiEvent) => void) => {
+      onEvent({ type: 'text', text: 'Hello' })
+      onEvent({ type: 'done', text: 'Hello', sessionId: 's1', proposal: null, skipped: [] })
+    },
+    aiChatLoad: async (path: string) => ({ path, version: 'v1', title: 'Chat', contextPaths: [], sessionId: null, messages: [] }),
+    saveAiChat: async (req: { path?: string | null }) => ({ path: req.path ?? 'AI Chats/Chat.md', version: 'v1' }),
+    apiTokens: async () => ({ tokens: [], mcp: mcpConfig('<token>') }),
+    createApiToken: async (name: string, scope: 'read' | 'read-write') => ({
+      token: { id: 'tok1', name, scope, createdAt: '2026-11-05T12:00:00.000Z', lastUsedAt: null },
+      secret: 'obj_secret',
+      mcpConfig: mcpConfig('obj_secret'),
+    }),
+    revokeApiToken: async (id: string) => ({ revoked: id }),
     references: async () => references(),
     linkMention: async (input: { baseVersion: string }) => ({ version: `${input.baseVersion}+1` }),
     graph: async () => graphData(),
@@ -455,6 +529,17 @@ function defaults(): Api {
       error: null,
     }),
     cancelImport: async () => ({ ok: true }),
+    // M14
+    automations: async () => [],
+    automation: async (id: string) => automationRule({ id }),
+    createAutomation: async (input: Partial<AutomationRule>) => automationRule({ ...input, id: '01JNEWRULE000000000000000', revision: 'r1' }),
+    saveAutomation: async (rule: AutomationRule) => ({ rule: { ...rule, revision: `${rule.revision}+1` } }),
+    deleteAutomation: async () => ({ trashId: 'trash-automation-1' }),
+    runAutomation: async (id: string, path: string) =>
+      automationRun({ ruleId: id, trigger: { kind: 'button', path, scheduledFor: null, catchUp: false } }),
+    automationRuns: async () => [],
+    automationCatchUp: async () => [],
+    confirmAutomationCatchUp: async () => [],
     onChange: () => () => undefined,
   } as unknown as Api
 }

@@ -1,5 +1,7 @@
 // The sort engine: stable, applied in order, with per-kind options and a fallback.
 import type { DateValue, EntityRef, PropertyType, Row, Sort } from '@/api/types'
+import { asComputed, computedDateResolution, computedIsEmpty, computedText } from '@/properties/computed'
+import { fileName } from '@/properties/files'
 import { dateSpan } from './dates'
 import { displayTitle, findDef, rowValue, type FilterCtx } from './filter'
 
@@ -74,9 +76,48 @@ function sortKey(row: Row, sort: Sort, ctx: FilterCtx): Key {
       return text(row.summary.collections?.[0] ?? '')
     case 'entity_aliases':
       return text(row.summary.aliases?.[0] ?? '')
+    case 'formula':
+    case 'rollup':
+      return computedKey(v)
+    case 'uniqueId':
+      return idKey(v)
+    case 'files':
+      // A list: by its first file's name.
+      return text(Array.isArray(v) && typeof v[0] === 'string' ? fileName(v[0]) : '')
     default:
       return typeof v === 'string' ? text(v) : EMPTY_KEY
   }
+}
+
+/**
+ * M12: a formula or rollup value's key by its result type: numbers numerically, dates by date,
+ * text (and a list's items, joined) case-insensitively, a boolean as checked after unchecked;
+ * empty and errors sort with the empties.
+ */
+function computedKey(v: unknown): Key {
+  const c = asComputed(v)
+  if (!c || computedIsEmpty(c)) return EMPTY_KEY
+  switch (c.type) {
+    case 'number':
+      return { empty: false, value: c.value as number }
+    case 'boolean':
+      return { empty: false, value: c.value === true ? 1 : 0 }
+    case 'date': {
+      const iso = c.value as string
+      const span = dateSpan({ start: iso, resolution: computedDateResolution(iso) })
+      return span ? { empty: false, value: span.start.getTime() } : EMPTY_KEY
+    }
+    default:
+      return text(computedText(c))
+  }
+}
+
+/** M12: an ID by its trailing number (`TASK-9` before `TASK-10`), else as text. */
+function idKey(v: unknown): Key {
+  if (typeof v === 'number' && Number.isFinite(v)) return { empty: false, value: v }
+  if (typeof v !== 'string' || v.trim() === '') return EMPTY_KEY
+  const m = /(\d+)\s*$/.exec(v)
+  return m ? { empty: false, value: Number(m[1]) } : text(v)
 }
 
 type Filled = Extract<Key, { empty: false }>

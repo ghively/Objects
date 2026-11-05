@@ -1,6 +1,15 @@
 // Column calculations (the table footer): the kinds each property kind offers, with their
 // labels, and the calculation itself over a set of rows.
 import type { CalcKind, DateValue, EntityRef, PropertyType, Row } from '@/api/types'
+import {
+  asComputed,
+  computedDateResolution,
+  computedIsEmpty,
+  computedList,
+  computedNumberFormat,
+  computedText,
+} from '@/properties/computed'
+import { filePaths } from '@/properties/files'
 import { formatDate, formatNumber } from '@/properties/format'
 import { wallClock } from '@/lib/zonedTime'
 import { dateSpan } from './dates'
@@ -20,13 +29,23 @@ const VALUE_KINDS = new Set<PropertyType>([
   'entity_collections',
   'entity_aliases',
   'entity_type',
+  // M12
+  'uniqueId',
+  'email',
+  'phone',
+  'files',
 ])
+const NUMBER_CALCS: CalcKind[] = ['sum', 'average', 'median', 'min', 'max', 'range']
+const DATE_CALCS: CalcKind[] = ['earliestDate', 'latestDate', 'dateRange']
 
 /** The calculations a property kind offers, in menu order. Blocks get none. */
 export function CALC_KINDS(kind: PropertyType): CalcKind[] {
   if (kind === 'blocks') return []
-  if (kind === 'number') return [...COMMON, 'sum', 'average', 'median', 'min', 'max', 'range']
-  if (DATE_KINDS.has(kind)) return [...COMMON, 'earliestDate', 'latestDate', 'dateRange']
+  if (kind === 'number') return [...COMMON, ...NUMBER_CALCS]
+  if (DATE_KINDS.has(kind)) return [...COMMON, ...DATE_CALCS]
+  // M12: a formula's or rollup's result type is known per row: the number calculations use its
+  // number values and the date ones its date values.
+  if (kind === 'formula' || kind === 'rollup') return [...COMMON, ...NUMBER_CALCS, ...DATE_CALCS]
   if (kind === 'boolean') return ['countAll', 'checked', 'unchecked', 'percentChecked', 'percentUnchecked']
   if (VALUE_KINDS.has(kind)) return COMMON
   return ['countAll']
@@ -85,6 +104,8 @@ interface Cell {
   value?: number
   endValue?: number
   isDay?: boolean
+  /** `value` is a date's time (the date calculations read these cells, the number ones the rest). */
+  isDate?: boolean
 }
 
 const text = (s: unknown): string[] => (typeof s === 'string' && s.trim() !== '' ? [s] : [])
@@ -108,8 +129,19 @@ function cellOf(row: Row, propertyId: string, kind: PropertyType): Cell {
         value: span.start.getTime(),
         endValue: span.end?.getTime(),
         isDay: span.resolution === 'day',
+        isDate: true,
       }
     }
+    case 'formula':
+    case 'rollup':
+      return computedCell(v)
+    case 'uniqueId':
+      return { keys: typeof v === 'number' ? [String(v)] : text(v) }
+    case 'email':
+    case 'phone':
+      return { keys: text(v) }
+    case 'files':
+      return { keys: filePaths(v) }
     case 'entity_title':
       return { keys: text(displayTitle(row)) }
     case 'label':
@@ -132,6 +164,32 @@ function cellOf(row: Row, propertyId: string, kind: PropertyType): Cell {
       return { keys: text(v) }
     default:
       return { keys: [] }
+  }
+}
+
+/**
+ * M12: a formula or rollup value's cell, by its result type: a number and a date carry a value
+ * for the number and date calculations; text, a boolean and each list item count as values;
+ * empty and errors are empty.
+ */
+function computedCell(v: unknown): Cell {
+  const c = asComputed(v)
+  if (!c || computedIsEmpty(c)) return { keys: [] }
+  switch (c.type) {
+    case 'number': {
+      const n = c.value as number
+      return { keys: [String(n)], value: n }
+    }
+    case 'date': {
+      const iso = c.value as string
+      const span = dateSpan({ start: iso, resolution: computedDateResolution(iso) })
+      if (!span) return { keys: [] }
+      return { keys: [String(span.start.getTime())], value: span.start.getTime(), isDay: span.resolution === 'day', isDate: true }
+    }
+    case 'list':
+      return { keys: computedList(c) ?? [] }
+    default:
+      return { keys: [computedText(c)] }
   }
 }
 
@@ -196,12 +254,16 @@ export function calculate(rows: Row[], propertyId: string, kind: CalcKind, ctx: 
     case 'percentChecked':
       return percent(filled, total)
   }
-  const withValue = cells.filter((c): c is Cell & { value: number } => typeof c.value === 'number')
+  // Number calculations read the number values, date calculations the dates (M12: a formula's
+  // column may hold both).
+  const dateCalc = DATE_CALCS.includes(kind)
+  const withValue = cells.filter((c): c is Cell & { value: number } => typeof c.value === 'number' && !!c.isDate === dateCalc)
   if (!withValue.length) return none
   const sorted = withValue.map((c) => c.value).sort((a, b) => a - b)
   const lo = sorted[0]
   const hi = sorted[sorted.length - 1]
-  const asNumber = (n: number): CalcResult => ({ value: n, display: formatNumber(n, def.options.numberFormat) })
+  const numberFormat = def.type === 'formula' || def.type === 'rollup' ? computedNumberFormat(def) : def.options.numberFormat
+  const asNumber = (n: number): CalcResult => ({ value: n, display: formatNumber(n, numberFormat) })
   const sum = sorted.reduce((a, b) => a + b, 0)
   switch (kind) {
     case 'sum':

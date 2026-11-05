@@ -308,6 +308,7 @@ export function QueryPage({ id }: { id: string }) {
             state={shownState}
             onState={onState}
             layouts={layouts}
+            viewName={title}
             pipeline={pipeline}
             pausedHint={pausedNow ? PAUSED_HINT : undefined}
             emptyState={

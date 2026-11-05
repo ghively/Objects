@@ -1,4 +1,6 @@
-# Object, Milestone 10: the AI assistant. Plan (not built)
+# Object, Milestone 10: the AI assistant. Plan (built 2026-11-05 on `feat/m10-ai-assistant`; results and our choices in `m10-acceptance.md`)
+
+**Revised 2026-11-04** (`2026-11-04-notion-anytype-features-plan.md`, "How this fits with M10"): the runner reads the space only through M11's MCP read tools, never with `Read` in the folder; the paragraphs below that mention `Read`, `Grep` and `Glob` and the space folder as working directory are superseded.
 
 **Decided by Gene, 2026-11-02:** AI is in scope; the other integrations are wanted "eventually" at lower priority (see "Later"). **The AI runs through the Claude Code CLI** installed on his PC, not an API key and not a local model. Pro features are unlocked and nothing is gated (`CLAUDE.md`).
 

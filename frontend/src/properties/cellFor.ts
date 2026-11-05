@@ -1,19 +1,27 @@
 // One cell component per property kind. The property panel renders `cellForDef(def)` with the
-// value from the object's frontmatter and the extras below.
+// value from the object's frontmatter (formula and rollup: from the object read's `computed`) and
+// the extras below.
 import type { ComponentType } from 'react'
 import type { PropertyDef, PropertyType } from '@/api/types'
 import { AliasesCell } from './cells/AliasesCell'
 import { BlocksCell } from './cells/BlocksCell'
+import { ButtonCell } from './cells/ButtonCell'
 import { CheckboxCell } from './cells/CheckboxCell'
 import { ColorCell } from './cells/ColorCell'
 import { CoverImageCell } from './cells/CoverImageCell'
 import { DateCell } from './cells/DateCell'
 import { DescriptionCell } from './cells/DescriptionCell'
+import { EmailCell } from './cells/EmailCell'
+import { FilesCell } from './cells/FilesCell'
+import { FormulaCell } from './cells/FormulaCell'
 import { IconCell } from './cells/IconCell'
+import { IdCell } from './cells/IdCell'
 import { LabelCell } from './cells/LabelCell'
 import { NumberCell } from './cells/NumberCell'
+import { PhoneCell } from './cells/PhoneCell'
 import { ReadOnlyDateCell } from './cells/ReadOnlyDateCell'
 import { RelationCell } from './cells/RelationCell'
+import { RollupCell } from './cells/RollupCell'
 import { SimpleTableCell } from './cells/SimpleTableCell'
 import { BacklinksCell, CollectionsCell, SystemFieldCell } from './cells/SystemFieldCell'
 import { TagsCell } from './cells/TagsCell'
@@ -86,8 +94,17 @@ const CELLS: Readonly<Record<PropertyType, CellComponent | null>> = {
   entity_type: TypeChipCell as CellComponent,
   entity_collections: CollectionsCell,
   entity_backlinks: BacklinksCell,
+  // M14: the Button cell runs its rule on the row's object (it needs `path` from `CellExtras`).
+  button: ButtonCell,
   // The header edits the title.
   entity_title: null,
+  // M12
+  formula: FormulaCell,
+  rollup: RollupCell,
+  uniqueId: IdCell,
+  email: EmailCell,
+  phone: PhoneCell,
+  files: FilesCell,
 }
 
 /** The cell for a property kind; `null` for `entity_title`, which the header edits. */

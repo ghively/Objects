@@ -16,7 +16,10 @@ import { api } from '@/api/client'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { recordAudio } from '../media/recordAudio'
 import { setObjectEmbedPicker } from '../nodes/objectEmbed'
+import { resetAiStore, useAi } from '@/ai/store'
+import { setEditorObject } from '../nodes/blockRef'
 import {
+  AI_ITEMS,
   BLOCK_ITEMS,
   COLOR_ITEMS,
   dailyNoteTitle,
@@ -66,6 +69,8 @@ describe('slash items', () => {
       ['Toggle', 'Add a toggle to this block'],
       ['Icon', 'Add an icon to this block'],
       ['Group', 'A layout element to group multiple blocks into one container'],
+      ['Ask AI about this block', null], // M10: the AI items, after the (search-only) colour items
+      ['Add tags to block using AI', null],
       ['Record audio', 'Record audio and embed it at the cursor.'],
       ['Math', 'A display style math block'],
       ['Code', 'A code block'],
@@ -73,6 +78,7 @@ describe('slash items', () => {
       ['Two Columns', 'Multiple blocks groups next to each other'],
       ['Table', 'A simple block for tabular content'],
       ['Create bookmark', null], // ours: Object's only way to insert a bookmark
+      ['Button', 'A button that runs an automation on this object'], // M14 (ours)
     ])
     // The expected icons.
     expect(Object.fromEntries(sections[0].items.map((i) => [i.id, i.icon]))).toMatchObject({
@@ -143,6 +149,7 @@ describe('each block item runs its command', () => {
     ['columns', (e) => expect(e.state.doc.child(1).type.name).toBe('columns')],
     ['table', (e) => expect(e.state.doc.child(1).type.name).toBe('table')],
     ['bookmark', (_e, view) => expect(view).toBe('bookmark')],
+    ['button', (_e, view) => expect(view).toBe('button')],
   ]
 
   test('every block item has a case', () => {
@@ -282,5 +289,37 @@ describe('search-only items', () => {
     const other = headless('graph TD\n')
     mermaid.run(other)
     expect(serializeBody(other)).toBe('```mermaid\ngraph TD\n```\n')
+  })
+})
+
+describe('m10 AI items', () => {
+  afterEach(() => resetAiStore())
+
+  test('the AI items follow the colour items, before Record audio; hidden with AI features', () => {
+    const ids = (q: string, extra: Partial<SlashContext> = {}) => slashSections(ctx(q, extra))[0].items.map((i) => i.id)
+    expect(AI_ITEMS.map((i) => [i.name, i.icon])).toEqual([
+      ['Ask AI about this block', 'ph-sparkle'],
+      ['Add tags to block using AI', 'ph-sparkle'],
+    ])
+    const plain = ids('')
+    expect(plain.slice(plain.indexOf('group'), plain.indexOf('group') + 4)).toEqual(['group', 'ai:askBlock', 'ai:tagBlock', 'recordAudio'])
+    const searching = ids('a')
+    expect(searching.indexOf('ai:askBlock')).toBe(searching.indexOf(COLOR_ITEMS[COLOR_ITEMS.length - 1].id) + 1)
+    expect(searching.indexOf('recordAudio')).toBe(searching.indexOf('ai:tagBlock') + 1)
+    expect(ids('', { aiHidden: true }).some((id) => id.startsWith('ai:'))).toBe(false)
+    const names = filterSections(slashSections(ctx('ask ai', { types: [] })), 'ask ai').flatMap((s) => s.items.map((i) => i.name))
+    expect(names[0]).toBe('Ask AI about this block')
+  })
+
+  test.each([
+    ['ai:askBlock', 'askBlock'],
+    ['ai:tagBlock', 'tagBlock'],
+  ] as const)('%s opens the AI chat about the block with the cursor', (id, mode) => {
+    const editor = headless('Hello\n\nWorld\n')
+    setEditorObject(editor, { path: 'Pages/Hello.md' })
+    AI_ITEMS.find((i) => i.id === id)!.run(editor)
+    expect(useAi.getState().pending?.seed).toMatchObject({ mode, block: 'Hello', contextPaths: ['Pages/Hello.md'] })
+    useAi.getState().pending!.seed.onInsertBelow!('Answer')
+    expect(serializeBody(editor)).toBe('Hello\n\nAnswer\n\nWorld\n')
   })
 })

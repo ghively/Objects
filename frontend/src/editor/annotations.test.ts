@@ -170,7 +170,9 @@ describe('annotation lines', () => {
   test('the option table follows the plan', () => {
     expect(KNOWN_OPTIONS.map((o) => o.key)).toEqual([
       'small', 'color', 'align', 'icon', 'quote', 'list', 'wrap', 'lock', 'preview', 'header-column',
-      'no-header-row', 'width', 'height', 'caption', 'view', 'bookmark', 'open', 'widths', 'layout',
+      'no-header-row', 'width', 'height', 'caption', 'view', 'bookmark',
+      'button', 'rule', // M14: the button block
+      'open', 'widths', 'layout',
       'details', // M8: "Show details" on a collection or query embed
       'localDataViewInfo', // M9: the embed's own view
     ])
