@@ -504,19 +504,23 @@ def test_15_previews_of_several_sources_can_start(client, tmp_path, monkeypatch)
         (folder / f"Note {i}.md").write_text("hello\n")
         sources.append(folder)
     previews = [_preview(client, s).json() for s in sources]
+    # The new spaces get their own folder: on a case-insensitive file system (Windows,
+    # macOS) a space "S1" next to the source "s1" is the same name, and is refused (409).
+    spaces = tmp_path / "spaces"
+    spaces.mkdir()
     # The oldest of four reads is gone (three kept); the others start.
-    assert _start(client, previews[0], {"kind": "newSpace", "name": "S0", "location": str(tmp_path)}).status_code == 404
-    r = _start(client, previews[1], {"kind": "newSpace", "name": "S1", "location": str(tmp_path)})
+    assert _start(client, previews[0], {"kind": "newSpace", "name": "S0", "location": str(spaces)}).status_code == 404
+    r = _start(client, previews[1], {"kind": "newSpace", "name": "S1", "location": str(spaces)})
     assert r.status_code == 202
     wait_job(client, r.json()["jobId"])
     # Its read was dropped when the import started.
-    assert _start(client, previews[1], {"kind": "newSpace", "name": "S1b", "location": str(tmp_path)}).status_code == 404
+    assert _start(client, previews[1], {"kind": "newSpace", "name": "S1b", "location": str(spaces)}).status_code == 404
     # A re-preview of the same source reuses its read; an expired read answers 404.
     again = _preview(client, sources[2]).json()
     assert again["counts"] == previews[2]["counts"]
     real = time.monotonic
     monkeypatch.setattr(api_import.time, "monotonic", lambda: real() + api_import.READ_TTL + 1)
-    assert _start(client, previews[3], {"kind": "newSpace", "name": "S3", "location": str(tmp_path)}).status_code == 404
+    assert _start(client, previews[3], {"kind": "newSpace", "name": "S3", "location": str(spaces)}).status_code == 404
 
 
 # -- 16. Obsidian's system keys ignore case ---------------------------------------------
