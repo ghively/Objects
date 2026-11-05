@@ -12,6 +12,7 @@ vi.mock('./switchSpace', async (orig) => ({
 }))
 
 import { api, ApiError } from '@/api/client'
+import { resetImportDialog, useImportDialog } from '@/import/useImportDialog'
 import { resetSpaceInfo } from '@/settings/useSpaceInfo'
 import { CREATE_SPACE_TEXT, CreateSpaceDialog, parentFolder, useCreateSpaceDialog } from './CreateSpaceDialog'
 import { switchSpace } from './switchSpace'
@@ -22,6 +23,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   resetSpaceInfo()
   useCreateSpaceDialog.setState({ isOpen: false })
+  resetImportDialog()
   mocked.space.mockResolvedValue({
     name: 'Work',
     root: '/home/gene/Spaces/Work',
@@ -118,6 +120,17 @@ describe('CreateSpaceDialog', () => {
     act(() => useCreateSpaceDialog.getState().close())
     act(() => useCreateSpaceDialog.getState().open())
     expect(await screen.findByRole('radio', { name: 'Start with a blank space' })).toBeChecked()
+  })
+
+  test('test import from closes the dialog and opens the import dialog with the name and location (M15)', async () => {
+    const user = await openDialog()
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Location' })).toHaveValue('/home/gene/Spaces'))
+    await user.type(screen.getByPlaceholderText('Name'), 'Vault')
+    expect(screen.getByText(CREATE_SPACE_TEXT.importDescription)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: CREATE_SPACE_TEXT.importFrom }))
+    expect(useCreateSpaceDialog.getState().isOpen).toBe(false)
+    expect(useImportDialog.getState()).toMatchObject({ isOpen: true, preset: { name: 'Vault', location: '/home/gene/Spaces' } })
+    expect(mocked.createSpace).not.toHaveBeenCalled()
   })
 
   test('test parent folder of posix and windows roots', () => {
