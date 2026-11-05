@@ -128,6 +128,8 @@ Routes (all JSON):
   ``PUT /api/settings`` (null: the device's zone). The M8 routers (`api_tasks`,
   `api_history`, `api_blocks`, `api_merge`, `api_spaces_m8`) are mounted on ``/api``;
   each module's docstring lists its routes and owner task.
+- M11: `api_v1` adds the token-protected local API (``/api/v1/*``) and the token routes
+  (``/api/integrations/tokens``); its docstring lists them.
 
 Errors: a path outside the space or not an object is ``400``; a missing object is ``404``;
 a file the OS refused to write (locked by another program, say) is ``503 {detail}``.
@@ -164,6 +166,7 @@ from . import (
     api_search,
     api_spaces_m8,
     api_tasks,
+    api_v1,
     media,
 )
 from .apictx import ApiContext
@@ -1933,6 +1936,8 @@ def create_app(
     # M8: each router is filled by its own task (see the plan's "Shared files").
     for module in (api_tasks, api_history, api_blocks, api_merge, api_spaces_m8):
         api.include_router(module.router(ctx))
+    # M11: the local API for agents and scripts (Bearer tokens) and its token routes.
+    api.include_router(api_v1.router(ctx))
     app.include_router(api)
     # M6: the whiteboard routes carry their own /api prefix.
     app.include_router(whiteboard_router(space, announce_whiteboard))
