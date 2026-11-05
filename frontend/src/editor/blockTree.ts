@@ -3,6 +3,7 @@
  * block below them, and container lines (toggle, group, columns) pair up
  * around their children (plan rules 4, 5 and 7). M8 adds the `indent`
  * container (`<!-- indent -->` … `<!-- /indent -->`), which pairs like the others.
+ * M14 offers `button` for a one-line paragraph (the button block's label).
  *
  * Invariant: `joinBlocks(flattenTree(buildTree(splitBlocks(body)))) === body`
  * for every input. Anything that does not pair or apply stays a plain leaf,
@@ -39,6 +40,12 @@ export type ContainerNode = {
 }
 export type TreeNode = LeafNode | ContainerNode
 
+/** A block whose text (without its final line break) is one line. */
+export function isOneLine(raw: string): boolean {
+  const body = raw.replace(/(?:\r\n|\n|\r)$/, '')
+  return body.trim() !== '' && !/[\r\n]/.test(body)
+}
+
 /** What a source block can be, for the option table's "Applies to" column. */
 export function blockTargets(block: SourceBlock): OptionTarget[] {
   switch (block.kind) {
@@ -49,7 +56,10 @@ export function blockTargets(block: SourceBlock): OptionTarget[] {
       if (embed?.kind === 'objectEmbed') return ['objectEmbed']
       if (embed?.kind === 'blockRef') return ['blockRef']
       if (embed?.kind === 'dataView') return ['dataView']
-      return singleLink(block.raw) ? ['paragraph', 'bookmark'] : ['paragraph']
+      const targets: OptionTarget[] = singleLink(block.raw) ? ['paragraph', 'bookmark'] : ['paragraph']
+      // M14: a one-line paragraph can be a button (its label).
+      if (isOneLine(block.raw)) targets.push('button')
+      return targets
     }
     case 'heading':
       return ['heading']

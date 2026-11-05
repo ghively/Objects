@@ -40,6 +40,8 @@ export interface CustomRepeatDialogProps {
   day: string
   onSave(rule: RepeatRule): void
   onCancel(): void
+  /** M14 (an automation's schedule): repeats by date only, so "Based on" isn't offered. */
+  dueDateOnly?: boolean
 }
 
 /** The "On" label of an anchored month or year rule. */
@@ -75,11 +77,11 @@ export function onChoices(unit: 'month' | 'year', d: Date): RepeatOn[] {
 const FIELD =
   'h-8 rounded-md border border-line bg-raised px-2 text-[14px] text-fg outline-none focus:border-fg-muted'
 
-export function CustomRepeatDialog({ initial, day, onSave, onCancel }: CustomRepeatDialogProps) {
+export function CustomRepeatDialog({ initial, day, onSave, onCancel, dueDateOnly = false }: CustomRepeatDialogProps) {
   const fromWeekday = initial?.unit === 'weekday'
   const [every, setEvery] = useState(String(initial && !fromWeekday ? initial.every : 1))
   const [unit, setUnit] = useState<Unit>(initial && !fromWeekday ? (initial.unit as Unit) : 'day')
-  const [mode, setMode] = useState<RepeatRule['mode']>(initial && !fromWeekday ? initial.mode : 'dueDate')
+  const [mode, setMode] = useState<RepeatRule['mode']>(initial && !fromWeekday && !dueDateOnly ? initial.mode : 'dueDate')
   const [ends, setEnds] = useState<'never' | 'on'>(initial?.until ? 'on' : 'never')
   const [until, setUntil] = useState(initial?.until ?? day)
   const taskDay = localDayOf(day) ?? new Date()
@@ -186,22 +188,24 @@ export function CustomRepeatDialog({ initial, day, onSave, onCancel }: CustomRep
         </div>
       )}
 
-      <fieldset className="px-1">
-        <legend className="pb-1 text-[13px] font-medium text-fg-muted">Based on</legend>
-        <label className="flex items-center gap-2 py-0.5 text-[14px]" title={SCHEDULED_TOOLTIP}>
-          <input type="radio" name="custom-repeat-mode" checked={mode === 'dueDate'} onChange={() => setMode('dueDate')} />
-          Scheduled date
-        </label>
-        <label className="flex items-center gap-2 py-0.5 text-[14px]" title={COMPLETED_TOOLTIP}>
-          <input
-            type="radio"
-            name="custom-repeat-mode"
-            checked={mode === 'completionDate'}
-            onChange={() => setMode('completionDate')}
-          />
-          Completed date
-        </label>
-      </fieldset>
+      {!dueDateOnly && (
+        <fieldset className="px-1">
+          <legend className="pb-1 text-[13px] font-medium text-fg-muted">Based on</legend>
+          <label className="flex items-center gap-2 py-0.5 text-[14px]" title={SCHEDULED_TOOLTIP}>
+            <input type="radio" name="custom-repeat-mode" checked={mode === 'dueDate'} onChange={() => setMode('dueDate')} />
+            Scheduled date
+          </label>
+          <label className="flex items-center gap-2 py-0.5 text-[14px]" title={COMPLETED_TOOLTIP}>
+            <input
+              type="radio"
+              name="custom-repeat-mode"
+              checked={mode === 'completionDate'}
+              onChange={() => setMode('completionDate')}
+            />
+            Completed date
+          </label>
+        </fieldset>
+      )}
 
       <fieldset className="px-1">
         <legend className="pb-1 text-[13px] font-medium text-fg-muted">Ends</legend>
