@@ -37,6 +37,7 @@ __all__ = [
     "MAX_DEPTH",
     "MAX_EXPRESSION",
     "MAX_LIST",
+    "MAX_TEXT",
     "Env",
     "FDate",
     "FormulaError",
@@ -53,6 +54,10 @@ __all__ = [
 MAX_EXPRESSION = 2000
 MAX_DEPTH = 50
 MAX_LIST = 1000
+MAX_TEXT = 100_000
+"""The longest text a formula may build (`replace`, ``+``, `concat`, `join`, `format`)."""
+MAX_NUMBER_BITS = 1023
+"""An integer of more bits is refused ("Number too large"): it would not fit a float or JSON."""
 
 
 class FormulaError(Exception):
@@ -576,6 +581,12 @@ def _is_empty(v: Any) -> bool:
     return v is None or v == "" or (isinstance(v, list) and not v)
 
 
+def _check_text(t: str) -> str:
+    if len(t) > MAX_TEXT:
+        raise FormulaError("Text too long")
+    return t
+
+
 def _check_list(items: list) -> list:
     if len(items) > MAX_LIST:
         raise FormulaError(f"A list holds at most {MAX_LIST} items")
@@ -618,6 +629,8 @@ def _bool_cond(name: str, v: Any) -> bool:
 def _finite(n: float) -> int | float:
     if isinstance(n, float) and not math.isfinite(n):
         raise FormulaError("The result is not a finite number")
+    if isinstance(n, int) and n.bit_length() > MAX_NUMBER_BITS:
+        raise FormulaError("Number too large")
     return n
 
 
@@ -659,7 +672,10 @@ def _compare(op: str, a: Any, b: Any, tz: tzinfo) -> Any:
 def _arith(op: str, a: Any, b: Any) -> Any:
     if op == "+":
         if isinstance(a, str) or isinstance(b, str):
-            return value_text(a) + value_text(b)
+            ta, tb = value_text(a), value_text(b)
+            if len(ta) + len(tb) > MAX_TEXT:
+                raise FormulaError("Text too long")
+            return ta + tb
         if a is None or b is None:
             if (a is None or _is_num(a)) and (b is None or _is_num(b)):
                 return None
@@ -914,6 +930,8 @@ class _Evaluator:
         for x in present:
             if not isinstance(x, str):
                 _want("concat", x, "text", "lists")
+        if sum(len(x) for x in present) > MAX_TEXT:
+            raise FormulaError("Text too long")
         return "".join(present) if present else None
 
     def f_join(self, xs: Any, sep: Any) -> Any:
@@ -922,7 +940,10 @@ class _Evaluator:
             return None
         if not isinstance(xs, list):
             _want("join", xs, "a list")
-        return sep.join(t for t in (value_text(x) for x in xs) if t)
+        parts = [t for t in (value_text(x) for x in xs) if t]
+        if sum(len(t) for t in parts) + len(sep) * max(len(parts) - 1, 0) > MAX_TEXT:
+            raise FormulaError("Text too long")
+        return sep.join(parts)
 
     def f_lower(self, x: Any) -> Any:
         t = _text_arg("lower", x)
@@ -942,7 +963,12 @@ class _Evaluator:
         r = _text_arg("replace", repl) or ""
         if t is None:
             return None
-        return t.replace(f, r) if f else t
+        if not f:
+            return t
+        # Predict the size before building: nested replaces would otherwise grow without bound.
+        if len(t) + t.count(f) * (len(r) - len(f)) > MAX_TEXT:
+            raise FormulaError("Text too long")
+        return t.replace(f, r)
 
     # -- numbers ----------------------------------------------------------------------
     def f_round(self, x: Any, digits: Any = 0) -> Any:
@@ -1003,7 +1029,7 @@ class _Evaluator:
         return _to_number(x)
 
     def f_format(self, x: Any) -> str:
-        return value_text(x)
+        return _check_text(value_text(x))
 
     # -- dates ------------------------------------------------------------------------
     def f_now(self) -> FDate:
@@ -1040,7 +1066,7 @@ class _Evaluator:
     def f_formatDate(self, d: Any, pattern: Any) -> Any:
         dv = _date_arg("formatDate", d)
         p = _text_arg("formatDate", pattern) or ""
-        return None if dv is None else _format_date(dv, p, self.tz)
+        return None if dv is None else _check_text(_format_date(dv, p, self.tz))
 
     def f_year(self, d: Any) -> Any:
         dv = _date_arg("year", d)
@@ -1086,6 +1112,14 @@ def error_value(message: str) -> dict[str, Any]:
 
 def to_computed(v: Any) -> dict[str, Any]:
     """The API ``ComputedValue`` of an internal value."""
+    try:
+        return _to_computed(v)
+    except (OverflowError, ValueError, ArithmeticError):
+        # An integer too long to write as text (Python refuses over 4,300 digits).
+        return error_value("Number too large")
+
+
+def _to_computed(v: Any) -> dict[str, Any]:
     if v is None or v == "":
         return {"type": "empty", "value": None}
     if isinstance(v, bool):
@@ -1093,6 +1127,8 @@ def to_computed(v: Any) -> dict[str, Any]:
     if _is_num(v):
         if isinstance(v, float) and not math.isfinite(v):
             return error_value("The result is not a finite number")
+        if isinstance(v, int) and v.bit_length() > MAX_NUMBER_BITS:
+            return error_value("Number too large")
         return {"type": "number", "value": v}
     if isinstance(v, str):
         return {"type": "text", "value": v}
