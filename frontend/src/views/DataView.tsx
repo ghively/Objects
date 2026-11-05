@@ -17,15 +17,19 @@ import { applyFilters } from './filter'
 import { findGroupConfig, groupRows, type Group, type GroupCtx } from './group'
 import { cardProperties } from './cards/cardConfig'
 import { CardCustomizePage } from './cards/CardCustomize'
+import { CalendarLayout, CalendarSettings } from './layouts/CalendarLayout'
+import { ChartLayout, ChartSettings } from './layouts/ChartLayout'
 import { EmbedLayout } from './layouts/EmbedLayout'
 import { GalleryLayout } from './layouts/GalleryLayout'
 import { GridLayout } from './layouts/GridLayout'
 import { KanbanLayout } from './layouts/KanbanLayout'
 import { ListLayout } from './layouts/ListLayout'
+import { TimelineLayout, TimelineSettings } from './layouts/TimelineLayout'
+import { RelationPairsPage } from './RelationPairsPage'
 import { WallLayout } from './layouts/WallLayout'
 import { TableLayout } from './table/TableLayout'
 import { TableCustomizePage } from './table/TableCustomize'
-import { LOAD_PAGE } from './model'
+import { LAYOUTS, LOAD_PAGE, WHOLE_SET_LAYOUTS } from './model'
 import { propertyChoices } from './properties'
 import { applySorts } from './sort'
 import { Toolbar } from './Toolbar'
@@ -88,6 +92,11 @@ export interface LayoutProps {
    */
   loadPreviews(rows: Row[]): void
   showsPreviews: boolean
+  /**
+   * M13: create an object of `typeId` with `values` (the calendar's click on a day). Present only
+   * when the view allows creating; the values the view's filters imply are added by the view.
+   */
+  onCreate?(values: Record<string, unknown>, typeId: string): void
 }
 
 /** What an owner adds to one row: `leading` before its title, `trailing` after it. */
@@ -525,6 +534,11 @@ export function DataView(props: DataViewProps) {
     !props.previewsLoaded &&
     viewTypes.some((t) => cardProperties(t, state.viewDefinition).some((p) => p.propertyId === 'computed_preview'))
   const layoutProps: LayoutProps = {
+    onCreate:
+      props.allowCreate && props.onCreate
+        ? (values, typeId) =>
+            props.onCreate?.({ ...matchingValues(state.filterGroup, types, typeId, collections), ...values }, typeId)
+        : undefined,
     groups: paged,
     grouped,
     state,
@@ -561,6 +575,12 @@ export function DataView(props: DataViewProps) {
         return <EmbedLayout {...layoutProps} />
       case 'kanban':
         return <KanbanLayout {...layoutProps} />
+      case 'calendar':
+        return <CalendarLayout {...layoutProps} />
+      case 'timeline':
+        return <TimelineLayout {...layoutProps} />
+      case 'chart':
+        return <ChartLayout {...layoutProps} />
       default:
         return null
     }
@@ -577,6 +597,25 @@ export function DataView(props: DataViewProps) {
       : []),
     ...(cardLayout
       ? [{ key: 'card', label: 'Card view', icon: 'ph-cards', body: <CardCustomizePage types={viewTypes} state={state} onState={onState} /> }]
+      : []),
+    ...(layout === 'calendar'
+      ? [{ key: 'calendar', label: 'Calendar', icon: LAYOUTS.calendar.icon, body: <CalendarSettings types={viewTypes} state={state} onState={onState} /> }]
+      : []),
+    ...(layout === 'timeline'
+      ? [{ key: 'timeline', label: 'Timeline', icon: LAYOUTS.timeline.icon, body: <TimelineSettings types={viewTypes} state={state} onState={onState} /> }]
+      : []),
+    ...(layout === 'chart'
+      ? [{ key: 'chart', label: 'Chart', icon: LAYOUTS.chart.icon, body: <ChartSettings types={viewTypes} state={state} onState={onState} /> }]
+      : []),
+    ...((layout === 'table' || layout === 'timeline') && viewTypes.length === 1
+      ? [
+          {
+            key: 'relationPairs',
+            label: 'Sub-items and dependencies',
+            icon: 'ph-tree-structure',
+            body: <RelationPairsPage type={viewTypes[0]} state={state} onState={onState} />,
+          },
+        ]
       : []),
     ...(props.customizePages ?? []),
   ]
@@ -727,7 +766,7 @@ export function DataView(props: DataViewProps) {
               ))}
             </div>
           )}
-          {total > visible && layout !== 'kanban' && (
+          {total > visible && layout !== 'kanban' && !WHOLE_SET_LAYOUTS.has(layout) && (
             <button
               type="button"
               onClick={() => setVisible((v) => v + LOAD_PAGE)}
