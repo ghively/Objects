@@ -11,6 +11,10 @@ Status as of 2026-11-04. **All nine milestones are built, reviewed, fixed and ga
 5. ~~One known test failure on Windows~~ fixed 2026-11-03 (`ba43e66`): the gzip test compared newline-translated text; it now compares bytes.
 6. **Wiki import follow-ups** (outside the repo, in Gene's `ObjectSpaces` folder): review the 10 "possible secrets" pages listed in `ai-pass/review.md`; the wiki copy is a snapshot (refresh = recopy and AI-reread only new or changed pages).
 
+## 2026-11-05: M15, importers
+
+Import a Notion "Markdown & CSV" export, an Obsidian vault or an Anytype Markdown export (zip or folder, read in place by path) into a new space or, when picked, this space: a preview that writes nothing, editable type and property mappings, a polled job with Stop, new files only, and an "Import report" page. Built on `feat/m15-importers` off `master` in two lanes (back end; dialog), one review, one fix pass in two parts (`b16bc66`, `90af287`) and the gate. Plan `2026-11-05-m15-importers.md`; results, our choices and hand-checks in `m15-acceptance.md`. Built on Linux; not yet run on Windows. The Anytype reader is unverified until a real export is checked.
+
 ## 2026-11-04: clean room and the rest of the polish backlog
 
 **Clean room** (`28d55b1`): the repo no longer names or cites the original app. `reference/`, the screenshots and the reverse-engineering notes moved to `C:\Git\object-private\` (outside the repo; history not rewritten, Gene's choice). Space metadata is now `.object/` and `.object-cache/`; `backend/objectapp/legacy.py` renames old folders once on open. The behaviour catalog is `docs/behavior-catalog.md`. Open for Gene: the backend role values (`RootPage`, `RootDailyNote`, ...) still use the original app's internal names.
@@ -62,6 +66,7 @@ Each milestone's plan holds its full scope. Each acceptance doc holds its automa
 | **M7** remaining blocks, light mode, settings, spaces, tabs, side panel | `2026-10-26-m7-blocks-lightmode-polish.md` | `f98e401..338a42f`, gate 2026-10-27; known-issue fixes `fc0bff2..96af06e` | `m7-acceptance.md` (57, incl. the side-by-side pass) |
 | **M8** every feature M4–M7 deferred, local only (31 tasks) | `2026-10-27-m8-deferred-features.md` | `61b6fed..0e7c748`, gate 2026-10-28; review-minor fixes `1721a4b..9383a9b` | `m8-acceptance.md` (40) |
 | **M9** the audit's completeness gaps (Tasks 1–23; 13 skipped by Gene) | `2026-10-28-m9-completeness-gaps.md` | `19a8167..c138f1d`, review fixes `3d46450..d17bd90`, gate 2026-10-28 | `m9-acceptance.md` (19) |
+| **M15** importers: Notion, Obsidian and Anytype exports | `2026-11-05-m15-importers.md` | `80973d0..` on `feat/m15-importers`, gate 2026-11-05 (Linux) | `m15-acceptance.md` (7) |
 
 M8's "Coverage" section maps every deferred item to a task, or to a spec §2 exclusion: AI, network at runtime, accounts and sharing, mobile, telemetry.
 
