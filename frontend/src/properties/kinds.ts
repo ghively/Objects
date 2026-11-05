@@ -63,6 +63,8 @@ export const KIND_META: Readonly<Record<PropertyType, KindMeta>> = {
     icon: 'ph-clock-clockwise',
   },
   entity_backlinks: { name: 'Context', description: 'Objects linking to this one', icon: 'ph-line-segment' },
+  // M14 (our strings): a button that runs an automation on its object.
+  button: { name: 'Button', description: 'Run an automation on this object with one click', icon: 'ph-cursor-click' },
 }
 
 /** The icon of a kind, with a fallback for kinds the API may add later. */
@@ -109,6 +111,8 @@ const MENU_ORDER = [
   'property_entity_createdAt',
   'property_entity_lastUpdated',
   'property_entity_aliases',
+  // M14: after the catalogued items (our choice).
+  'property_button',
 ] as const
 
 // The property kinds that become menu items; `text`, `url`, `simpleTableBlock` and
@@ -127,6 +131,7 @@ const ADDABLE_KINDS: readonly PropertyType[] = [
   'entity_createdAt',
   'entity_lastUpdated',
   'entity_aliases',
+  'button',
 ]
 
 function buildItems(): AddPropertyItem[] {
@@ -155,7 +160,7 @@ function buildItems(): AddPropertyItem[] {
   return items.filter((i) => rank(i) >= 0).sort((a, b) => rank(a) - rank(b))
 }
 
-/** The Add Property menu's 15 items, in order. */
+/** The Add Property menu's 16 items, in order (M14 added "Button" last). */
 export const ADD_PROPERTY_ITEMS: readonly AddPropertyItem[] = buildItems()
 
 // Basic types that can't be relation targets.

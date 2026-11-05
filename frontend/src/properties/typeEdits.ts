@@ -117,6 +117,8 @@ function defaultOptions(kind: PropertyType): PropertyOptions {
       return { isArray: true, allowedTypes: [], hasFixedSet: false, fixedSet: [] }
     case 'label':
       return { isArray: false, set: [] }
+    case 'button':
+      return { ruleId: null }
     default:
       return {}
   }

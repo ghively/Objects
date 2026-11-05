@@ -8,6 +8,7 @@ import { Icon } from '@/components/Icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { APPEARANCE_SEARCH, APPEARANCE_TEXT, AppearanceSection } from './sections/Appearance'
+import { AUTOMATIONS_SEARCH, AUTOMATIONS_TEXT, AutomationsSection } from './sections/Automations'
 import { DATE_TIME_SEARCH, DATE_TIME_TEXT, DateTimeSection } from './sections/DateTime'
 import { EDITOR_SEARCH, EDITOR_TEXT, EditorSection } from './sections/Editor'
 import { LANGUAGE_SEARCH, LANGUAGE_TEXT, LanguageSection } from './sections/Language'
@@ -68,6 +69,15 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     icon: 'ph-check-circle',
     search: TASK_MANAGEMENT_SEARCH,
     Component: TaskManagementSection,
+  },
+  // M14 (our section): rules live in the space (`.object/automations/`).
+  {
+    id: 'automations',
+    group: 'space',
+    label: AUTOMATIONS_TEXT.heading,
+    icon: 'ph-lightning',
+    search: AUTOMATIONS_SEARCH,
+    Component: AutomationsSection,
   },
 ]
 

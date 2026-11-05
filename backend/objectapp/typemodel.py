@@ -104,6 +104,8 @@ PROPERTY_ICONS = {
     "entity_collections": "ph-cards-three",
     "entity_backlinks": "ph-line-segment",
     "entity_type": "ph-notebook",
+    # M14 (our choice): a button runs an automation on its object; it holds no value.
+    "button": "ph-cursor-click",
 }
 
 # (key, kind, en-US name, description) of the system properties, in order.
@@ -411,6 +413,8 @@ def _default_options(kind: str, is_array: bool | None) -> dict[str, Any]:
         return {"isArray": True, "allowedTypes": ["tag"]}
     if kind == "entity_aliases":
         return {"isArray": True}
+    if kind == "button":
+        return {"ruleId": None}  # M14: the automation the button runs (our key)
     if is_array:
         return {"isArray": True}
     return {}

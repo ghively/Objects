@@ -4,6 +4,7 @@ import type { ComponentType } from 'react'
 import type { PropertyDef, PropertyType } from '@/api/types'
 import { AliasesCell } from './cells/AliasesCell'
 import { BlocksCell } from './cells/BlocksCell'
+import { ButtonCell } from './cells/ButtonCell'
 import { CheckboxCell } from './cells/CheckboxCell'
 import { ColorCell } from './cells/ColorCell'
 import { CoverImageCell } from './cells/CoverImageCell'
@@ -86,6 +87,8 @@ const CELLS: Readonly<Record<PropertyType, CellComponent | null>> = {
   entity_type: TypeChipCell as CellComponent,
   entity_collections: CollectionsCell,
   entity_backlinks: BacklinksCell,
+  // M14: a placeholder until Lane U's cell (it needs `path` from `CellExtras`).
+  button: ButtonCell,
   // The header edits the title.
   entity_title: null,
 }
