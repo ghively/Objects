@@ -1338,10 +1338,10 @@ export interface AutomationRule {
 }
 
 /** What `POST /api/automations` takes (the server sets the rest). */
-export type AutomationRuleInput = Omit<
+export type AutomationRuleInput = Pick<
   AutomationRule,
-  'schemaVersion' | 'id' | 'createdAt' | 'revision' | 'readOnlyReason' | 'lastRun'
->
+  'name' | 'description' | 'enabled' | 'trigger' | 'conditions' | 'actions' | 'templateRepeat'
+> & { [extra: string]: unknown }
 
 /** GET /api/automations/catch-up entry: a schedule's runs missed while Object was closed. */
 export interface AutomationCatchUpItem {

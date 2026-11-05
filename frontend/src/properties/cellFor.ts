@@ -87,7 +87,7 @@ const CELLS: Readonly<Record<PropertyType, CellComponent | null>> = {
   entity_type: TypeChipCell as CellComponent,
   entity_collections: CollectionsCell,
   entity_backlinks: BacklinksCell,
-  // M14: a placeholder until Lane U's cell (it needs `path` from `CellExtras`).
+  // M14: the Button cell runs its rule on the row's object (it needs `path` from `CellExtras`).
   button: ButtonCell,
   // The header edits the title.
   entity_title: null,
