@@ -9,8 +9,9 @@ with nothing effective left passes.
 Everything works on the API's JSON shapes: a row is ``{summary, values, links}`` as
 ``GET /api/rows`` serves it, a type is ``{id, propertyDefinitions: [{id, key, type,
 options}]}``, a collection ``{id, name, formerNames}``. Relative dates ("today", "this
-week"...) resolve against ``ctx.now`` in ``ctx.tz``; weeks start on ``ctx.week_start``
-(``filter.ts`` always uses Monday, so the two agree on a Monday-start space). Tag
+week"...) resolve against ``ctx.now`` in ``ctx.tz``; a week runs Monday to Sunday whatever the
+space's week start, as ``views/dates.ts`` resolves it (our choice: a rule's "this week" is the
+one the views show). Tag
 references are Tag object ids (``ctx.tag_titles``), entity references object ids
 (``ctx.paths_by_id``).
 
@@ -117,7 +118,6 @@ class FilterCtx:
     """Tag object id -> title (tag values are titles)."""
     now: datetime = field(default_factory=lambda: datetime.now(UTC))
     tz: tzinfo = UTC
-    week_start: str = "monday"
     paths_by_id: Mapping[str, str] = field(default_factory=dict)
     """Object id -> path, for entity filters' object ids."""
     view_type_ids: list[str] | None = None
@@ -367,8 +367,10 @@ def _add_months(d: date, n: int) -> date:
     return date(y, m, min(d.day, calendar.monthrange(y, m)[1]))
 
 
-def _relative_range(rel: str, now: datetime, tz: tzinfo, week_start: str) -> tuple[str, str] | None:
-    """``resolveRelative`` as an inclusive range of ``YYYY-MM-DD`` days (``''``: no start)."""
+def _relative_range(rel: str, now: datetime, tz: tzinfo) -> tuple[str, str] | None:
+    """``resolveRelative`` as an inclusive range of ``YYYY-MM-DD`` days (``''``: no start).
+
+    Weeks run Monday to Sunday, as ``views/dates.ts`` has them (not the space's week start)."""
     today = now.astimezone(tz).date()
 
     def day(d: date) -> tuple[str, str]:
@@ -384,8 +386,7 @@ def _relative_range(rel: str, now: datetime, tz: tzinfo, week_start: str) -> tup
         case "tomorrow":
             return day(today + timedelta(days=1))
         case "thisWeek":
-            first = 6 if week_start == "sunday" else 0
-            start = today - timedelta(days=(today.weekday() - first) % 7)
+            start = today - timedelta(days=today.weekday())
             return start.isoformat(), (start + timedelta(days=6)).isoformat()
         case "thisMonth":
             last = calendar.monthrange(today.year, today.month)[1]
@@ -409,7 +410,7 @@ def _reference_range(f: Mapping[str, Any], ctx: FilterCtx) -> tuple[str, str] | 
         return None
     rel = ref.get("relative")
     if rel:
-        return _relative_range(str(rel), ctx.now, ctx.tz, ctx.week_start)
+        return _relative_range(str(rel), ctx.now, ctx.tz)
     exact = ref.get("exactDate")
     if exact:
         m = _DAY_RE.match(str(exact))

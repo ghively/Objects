@@ -25,7 +25,6 @@ def ctx() -> FilterCtx:
         tag_titles=DATA["tagIdsToTitles"],
         now=datetime.fromisoformat(DATA["now"]),
         tz=ZoneInfo(DATA["timeZone"]),
-        week_start="monday",
         paths_by_id=DATA["pathsById"],
     )
 
@@ -40,11 +39,9 @@ def test_the_port_matches_the_shared_cases(case):
     assert got == case["matches"]
 
 
-def test_a_sunday_week_start_moves_this_week():
-    # The server honours the space's week start (the view engine's weeks always start on
-    # Monday): with Sunday weeks, "this week" is Nov 1-7, so Oct 30 falls out.
-    c = ctx()
-    c.week_start = "sunday"
-    f = {"type": "filter", "propertyId": "due", "option": "is", "referenceValue": {"relative": "thisWeek"}}
-    got = [r["summary"]["path"] for r in DATA["rows"] if match_filter(r, f, c)]
-    assert got == ["Tasks/Beta.md"]
+def test_this_week_ignores_the_spaces_week_start():
+    # Review M14 #6 (our choice): the port has no week-start setting; "this week" runs Monday
+    # to Sunday as the views' engine has it, so a Sunday-start space's rules match its views
+    # (the fixture's ``spaceWeekStart`` case; `test_m14_engine` checks it on a real space).
+    assert "week_start" not in FilterCtx.__dataclass_fields__
+    assert any(c.get("spaceWeekStart") == "sunday" for c in DATA["cases"])

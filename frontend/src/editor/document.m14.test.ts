@@ -226,6 +226,21 @@ describe('insertButtonBlock', () => {
 })
 
 describe('labels', () => {
+  // Review M14 #7: a label that would read back as a thematic break or a link reference
+  // definition is escaped, so the button survives a reload.
+  test.each(['___', '_ _ _', '[x]: y', '[^1]: note', '* * *', '- - -', '[Open](https://example.com)'])(
+    'a button labelled %j reads back as that button',
+    (label) => {
+      const editor = headless('Text\n')
+      cursorAtEndOf(editor, 'Text')
+      editor.commands.insertButtonBlock('R1', label)
+      const out = serializeBody(editor)
+      const again = headless(out)
+      expect(buttons(again).map(({ node }) => buttonLabelText(node.attrs.label))).toEqual([label])
+      expect(serializeBody(again)).toBe(out)
+    },
+  )
+
   test.each([
     ['Start review', 'Start review'],
     ['  two\nlines  ', 'two lines'],
@@ -237,6 +252,13 @@ describe('labels', () => {
     ['![[embed]]', '\\![[embed]]'],
     ['$$x$$', '\\$$x$$'],
     ['Key:: value', 'Key\\:: value'],
+    ['___', '\\___'],
+    ['_ _ _', '\\_ _ _'],
+    ['_start_ here', '\\_start_ here'],
+    ['[x]: y', '\\[x]: y'],
+    ['[^1]: note', '\\[^1]: note'],
+    ['[Open](https://example.com)', '[Open](https://example.com)'],
+    ['[[Page]] review', '[[Page]] review'],
     ['', null],
     ['   ', null],
   ])('%j is written %j', (typed, source) => {

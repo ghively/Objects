@@ -6,6 +6,7 @@ import type {
   AutomationAction,
   AutomationActionKind,
   AutomationRule,
+  AutomationRuleInput,
   AutomationRun,
   AutomationScope,
   AutomationTrigger,
@@ -23,15 +24,8 @@ import { localDayOf, parseRepeat, stepAfter, weekdayName, weekdayOf, type Repeat
 import { filterOptionsFor } from '@/views/filter'
 import { propertyChoices, type PropChoice } from '@/views/properties'
 
-/**
- * A rule's editable fields (what `POST /api/automations` takes), plus any unknown keys it had.
- * Named here because `AutomationRuleInput` (an `Omit` over a type with an index signature) keeps
- * only the index signature.
- */
-export type RuleFields = Pick<
-  AutomationRule,
-  'name' | 'description' | 'enabled' | 'trigger' | 'conditions' | 'actions' | 'templateRepeat'
-> & { [extra: string]: unknown }
+/** A rule's editable fields (what `POST /api/automations` takes), plus any unknown keys it had. */
+export type RuleFields = AutomationRuleInput
 
 export const RULE_TEXT = {
   triggers: {

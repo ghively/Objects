@@ -117,6 +117,8 @@ CATCH_UP_PATH = "catch-up"
 """``automationRuns`` with this path: the catch-up list changed."""
 LOG_FLUSH_EVERY = 2.0
 """Seconds the worker may hold logged runs before writing them (a burst is one write)."""
+STOP_WAIT = 5.0
+"""Seconds quitting waits for the run in progress (our choice; queued runs are dropped)."""
 
 # Our strings.
 CANT_READ = "This automation can't be read."
@@ -325,18 +327,20 @@ def check_rule(
     payload: Mapping[str, Any],
     rule_id: str | None = None,
     others: Iterable[LoadedRule] = (),
+    against_space: bool = True,
 ) -> AutomationRule:
     """The rule in ``payload``, validated against the model and the space.
 
     ``repeat`` comes back canonical. Raises `InvalidValue` with one message (the 422).
+    Without ``against_space`` the scope, keys, values, types and templates the rule names
+    aren't checked (a save that only turns a rule on or off, or keeps it off: a rule whose
+    template or type was deleted can still be turned off and edited).
     """
     try:
         rule = AutomationRule.model_validate(dict(payload))
     except ValidationError as exc:
         raise InvalidValue(_model_problem(exc)) from exc
     trigger = rule.trigger
-    scope = None if isinstance(trigger, ScheduleTrigger) else trigger.scope
-    types = _scope_types(space, scope)
     if isinstance(trigger, ScheduleTrigger):
         parsed = parse_repeat(trigger.repeat)
         if parsed is None:
@@ -344,6 +348,28 @@ def check_rule(
         if parsed.mode == "completionDate":
             raise InvalidValue("A schedule can't repeat after completion.")
         trigger.repeat = format_repeat(parsed)
+    if against_space:
+        _check_against_space(space, rule)
+    if rule.templateRepeat is not None:
+        for other in others:
+            if other.id == rule_id:
+                continue
+            tr = other.rule.templateRepeat if other.rule is not None else None
+            if tr is None and other.data is not None:
+                raw = other.data.get("templateRepeat")
+                tid = raw.get("templateId") if isinstance(raw, dict) else None
+            else:
+                tid = tr.templateId if tr is not None else None
+            if tid == rule.templateRepeat.templateId:
+                raise InvalidValue("This template already repeats.")
+    return rule
+
+
+def _check_against_space(space: Space, rule: AutomationRule) -> None:
+    """What `check_rule` checks in the space: the scope, keys, values, types and templates."""
+    trigger = rule.trigger
+    scope = None if isinstance(trigger, ScheduleTrigger) else trigger.scope
+    types = _scope_types(space, scope)
     if isinstance(trigger, PropertyChangedTrigger):
         assert types is not None
         pdef = _key_def(space, types, trigger.propertyKey)
@@ -393,19 +419,6 @@ def check_rule(
                         raise InvalidValue(
                             f"{where}: {rel_def.name} doesn't take {', '.join(refused)} objects."
                         )
-    if rule.templateRepeat is not None:
-        for other in others:
-            if other.id == rule_id:
-                continue
-            tr = other.rule.templateRepeat if other.rule is not None else None
-            if tr is None and other.data is not None:
-                raw = other.data.get("templateRepeat")
-                tid = raw.get("templateId") if isinstance(raw, dict) else None
-            else:
-                tid = tr.templateId if tr is not None else None
-            if tid == rule.templateRepeat.templateId:
-                raise InvalidValue("This template already repeats.")
-    return rule
 
 
 def rule_api(lr: LoadedRule, last_run: dict[str, Any] | None) -> dict[str, Any]:
@@ -593,7 +606,9 @@ class AutomationScheduler:
         rules = self.engine.rules.all() if rules is None else rules
         changed = catch_up = False
         with self._lock:
-            live: set[str] = set()
+            # A rule file that can't be read just now keeps its entry (and what it owes); only
+            # a deleted, turned-off or no-longer-scheduled rule drops it.
+            live: set[str] = {lr.id for lr in rules if lr.rule is None}
             for lr in self._schedule_rules(rules):
                 fingerprint = lr.rule.trigger.model_dump(mode="json")  # type: ignore[union-attr]
                 live.add(lr.id)
@@ -672,13 +687,18 @@ class AutomationScheduler:
         self._thread.start()
 
     def stop(self) -> None:
-        """Stop the thread and record ``lastRunning`` (when there is state to keep)."""
+        """Stop the thread and record ``lastRunning`` (when there is state to keep).
+
+        ``lastRunning`` is the instant occurrences were handled through (the last tick), never
+        the clock at quitting: what came due between the last tick and the quit (or across a
+        sleep the app quit right after) is then owed on the next start, never lost.
+        """
         thread, self._thread = self._thread, None
         self._stop.set()
         if thread is not None:
-            thread.join()
+            thread.join(STOP_WAIT)
             with self._lock:
-                self._save(self.space.clock())
+                self._save(self._last_tick or self.space.clock())
 
     @property
     def running(self) -> bool:
@@ -874,6 +894,7 @@ class AutomationEngine:
         """Notices queued or being handled (for `wait_idle`)."""
         self._worker: threading.Thread | None = None
         self._running = False
+        self.stop_wait = STOP_WAIT
         self._log_lock = threading.Lock()
         self._unflushed: dict[str, list[dict[str, Any]]] = {}
         self._last_flush = time.monotonic()
@@ -885,22 +906,52 @@ class AutomationEngine:
             if self._running:
                 return
             self._running = True
+        self.prune_logs()
         self._worker = threading.Thread(target=self._work, name="object-automation-runs", daemon=True)
         self._worker.start()
         self.scheduler.start()
 
     def stop(self) -> None:
+        """Quit: drop the triggered runs that haven't started (our choice: one log line), let
+        the one in progress finish (waiting at most `stop_wait` seconds), write the logs."""
         self.scheduler.stop()
         with self._cond:
             if not self._running:
                 return
             self._running = False
+            dropped = sum(1 for item in self._queue if item is not _STOP)
+            self._queue.clear()
+            self._busy -= dropped
             self._queue.append(_STOP)
             self._cond.notify_all()
+        if dropped:
+            log.info("Automations: %d queued run(s) not started before quitting were dropped", dropped)
         worker, self._worker = self._worker, None
         if worker is not None:
-            worker.join()
+            worker.join(self.stop_wait)
+            if worker.is_alive():
+                log.warning("Automations: a run was still going when the app quit")
         self.flush_logs()
+
+    def prune_logs(self) -> None:
+        """Remove the run logs of rules that are gone (deleted outside the app, not in the
+        trash). Only ``<id>.json`` files in this space's log folder (in the state dir)."""
+        try:
+            folder = run_log_path(self.space.root, "x").parent
+            if not folder.is_dir():
+                return
+            known = {lr.id for lr in self.rules.all()}
+            trash = self.space.trash
+            known |= {trash.automation_id(t) for t in trash.automation_trash_ids()}
+            for p in folder.glob("*.json"):
+                if p.stem not in known and p.is_file():
+                    try:
+                        run_log_path(self.space.root, p.stem)
+                    except ValueError:
+                        continue  # not a name a log is written under
+                    p.unlink(missing_ok=True)
+        except OSError:
+            log.exception("Automations: could not prune the run logs")
 
     @property
     def running(self) -> bool:
@@ -1012,6 +1063,10 @@ class AutomationEngine:
             if notice.kind != "changed" or not self._in_scope(trigger.scope, after):
                 return False
             key = trigger.propertyKey
+            if notice.requested and key in notice.requested:
+                # Completing a repeating Task asked for Done and wrote the reset status (M8):
+                # the change the user made is the one asked for.
+                after = {**after, key: notice.requested[key]}
             if self._decoded(notice.before, key) == self._decoded(after, key):
                 return False
             if trigger.to is None:
@@ -1125,7 +1180,6 @@ class AutomationEngine:
             tag_titles=_LazyMap(tags),
             now=instant,
             tz=space.tz,
-            week_start=week_start_of(space.root),
             paths_by_id=_LazyMap(ids),
             view_type_ids=[self._type_id_of(fm)] if fm is not None else None,
         )
@@ -1178,7 +1232,8 @@ class AutomationEngine:
         with writeorigin.acting_as(origin_for(lr.id)):
             obj = [(i, a) for i, a in enumerate(rule.actions) if a.kind in OBJECT_ACTION_KINDS]
             if obj and path is not None:
-                results.update(self._object_actions(lr, path, obj, instant))
+                done, path = self._object_actions(lr, path, obj, instant)
+                results.update(done)
             for i, a in enumerate(rule.actions):
                 if i in results:
                     continue
@@ -1254,15 +1309,25 @@ class AutomationEngine:
 
     def _object_actions(
         self, lr: LoadedRule, path: str, actions: list[tuple[int, Any]], instant: datetime
-    ) -> dict[int, dict[str, Any]]:
+    ) -> tuple[dict[int, dict[str, Any]], str]:
+        """Apply the object actions as one write; return their results and the object's path
+        (a rename since the trigger may have moved it: the retry follows it by its id)."""
         space = self.space
         out: dict[int, dict[str, Any]] = {}
+        known: Mapping[str, Any] = {}
         for attempt in range(2):
             out = {}
+            if attempt:
+                # Before the retry: where the object is now (a rename moves the file).
+                path = self._current_path(path, known) or path
             try:
                 _of, fm, version = space.read(path)
             except (KeyError, FileNotFoundError):
-                return {i: self._result(i, a.kind, "failed", None, GONE) for i, a in actions}
+                moved = self._current_path(path, known) if attempt == 0 and known else None
+                if moved is not None and moved != path:
+                    continue
+                return {i: self._result(i, a.kind, "failed", None, GONE) for i, a in actions}, path
+            known = fm
             t = space._type_of(path)
             updates: dict[str, Any] = {}
             prepared: list[tuple[int, str]] = []
@@ -1283,19 +1348,21 @@ class AutomationEngine:
             if not updates:
                 for i, k in prepared:
                     out[i] = self._result(i, k, "ok", path)
-                return out
+                return out, path
             try:
                 result = space.update_properties(path, updates, version)
             except Conflict:
                 if attempt == 0:
                     continue
-                return {**out, **{i: self._result(i, k, "failed", path, CHANGED) for i, k in prepared}}
+                return {**out, **{i: self._result(i, k, "failed", path, CHANGED) for i, k in prepared}}, path
             except ReadOnly as exc:
-                return {**out, **{i: self._result(i, k, "failed", path, exc.reason) for i, k in prepared}}
+                return {**out, **{i: self._result(i, k, "failed", path, exc.reason) for i, k in prepared}}, path
             except (KeyError, FileNotFoundError):
-                return {**out, **{i: self._result(i, k, "failed", None, GONE) for i, k in prepared}}
+                if attempt == 0:
+                    continue  # moved meanwhile: the retry finds it by its id
+                return {**out, **{i: self._result(i, k, "failed", None, GONE) for i, k in prepared}}, path
             except InvalidValue as exc:
-                return {**out, **{i: self._result(i, k, "failed", path, str(exc)) for i, k in prepared}}
+                return {**out, **{i: self._result(i, k, "failed", path, str(exc)) for i, k in prepared}}, path
             origin = origin_for(lr.id)
             if result.version != version:
                 self.announce(ChangeEvent("changed", path, result.version, origin=origin))
@@ -1303,8 +1370,8 @@ class AutomationEngine:
                 self.announce(ChangeEvent("changed", synced, space.cached_version(synced), origin=origin))
             for i, k in prepared:
                 out[i] = self._result(i, k, "ok", path)
-            return out
-        return out
+            return out, path
+        return out, path
 
     def _prepare(
         self,
@@ -1562,7 +1629,18 @@ class AutomationEngine:
             data = {**kept, **{k: v for k, v in payload.items() if k not in API_ONLY_KEYS}}
             data["schemaVersion"] = 1
             data["createdAt"] = stored.get("createdAt")
-            rule = check_rule(space, data, rule_id, self.rules.all())
+            # Turning a rule off, or only on or off, isn't checked against the space: a rule
+            # whose template, type or collection is gone can still be turned off and edited.
+            against = True
+            try:
+                asked = AutomationRule.model_validate(dict(data))
+            except ValidationError:
+                pass  # check_rule names the problem
+            else:
+                only_switch = {**asked.to_json(), "enabled": None} == {
+                    **current.rule.to_json(), "enabled": None}  # fmt: skip
+                against = asked.enabled and not only_switch
+            rule = check_rule(space, data, rule_id, self.rules.all(), against_space=against)
             store.write(rule_id, rule.to_json(), base_revision)
         self.rules_changed()
         lr = self.rules.get(rule_id)

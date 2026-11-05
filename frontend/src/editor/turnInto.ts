@@ -216,21 +216,13 @@ const taskTypeId = () => basicType('task')?.id ?? 'Task'
 /** Create the object for `t` (title, and its children as the body); returns the embed target. */
 async function createFor(editor: Editor, t: Turnable, typeId: string, values?: Record<string, unknown>): Promise<string> {
   const body = markdownOf(editor, t.children)
-  const created = await api.createObject(typeId, values && Object.keys(values).length ? { title: t.title, values } : { title: t.title })
-  let version = created.version
-  if (body.trim()) {
-    let existing = ''
-    try {
-      const detail = await api.object(created.path)
-      existing = detail.body
-      version = detail.version
-    } catch {
-      existing = ''
-    }
-    const joined = existing.trim() ? `${existing.replace(/\s+$/, '')}\n\n${body}` : body
-    const text = joined.endsWith('\n') ? joined : `${joined}\n`
-    await api.saveBody(created.path, text, version)
-  }
+  // The children go below the new object's own body (its heading or template) in the creating
+  // write, so a creation rule's write can't come between the object and its text.
+  const created = await api.createObject(typeId, {
+    title: t.title,
+    ...(values && Object.keys(values).length ? { values } : {}),
+    ...(body.trim() ? { appendBody: body } : {}),
+  })
   void invalidateLinkIndex()
   return linkTarget(created.path, t.title)
 }

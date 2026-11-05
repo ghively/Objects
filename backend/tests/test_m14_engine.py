@@ -8,7 +8,17 @@ import time
 from pathlib import Path
 
 import pytest
-from m14support import DAILY, NEW_TAG, OLD_TAG, REPORT, m14_space, served, status_rule
+from m14support import (
+    DAILY,
+    NEW_TAG,
+    OLD_TAG,
+    PAY_RENT,
+    REPORT,
+    STRETCH,
+    m14_space,
+    served,
+    status_rule,
+)
 from objectapp.automations import CHANGED, MAX_RUNS, NO_TAG, NO_TEMPLATE, run_log_path
 from objectapp.frontmatter import parse_fm
 from objectapp.objfile import split_object
@@ -307,6 +317,28 @@ def test_a_conflict_retries_once_then_fails(root, monkeypatch, tmp_path):
         assert run["status"] == "failed" and run["actions"][0]["detail"] == CHANGED
 
 
+def test_a_retry_follows_a_rename_by_the_objects_id(root, monkeypatch, tmp_path):
+    # Review M14 #3 (backstop): a rename between the run's read and its write moves the file;
+    # the retry finds the object by its id instead of failing with "no longer exists".
+    with served(root, monkeypatch, tmp_path) as s:
+        rule = s.create(button_rule([{"kind": "setProperty", "key": "priority", "value": "High"}]))
+        real = s.space.update_properties
+        calls = {"n": 0}
+
+        def renamed_meanwhile(path, updates, base_version, remove=()):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                v = s.space.read(path)[2]
+                s.space.rename_object(path, "Report moved", v)
+            return real(path, updates, base_version, remove)
+
+        monkeypatch.setattr(s.space, "update_properties", renamed_meanwhile)
+        run = s.client.post(f"/api/automations/{rule['id']}/run", json={"path": REPORT}).json()
+        assert calls["n"] == 2
+        assert run["status"] == "ok" and run["actions"][0]["path"] == "Tasks/Report moved.md"
+        assert fm(s, "Tasks/Report moved.md")["priority"] == "High"
+
+
 # -- buttons ------------------------------------------------------------------------------------
 
 
@@ -415,3 +447,101 @@ def test_a_stale_object_path_follows_a_rename(root, monkeypatch, tmp_path):
         run = s.runs(rule["id"])[0]
         assert run["status"] == "ok" and fm(s, "Tasks/Report.md")["priority"] == "High"
 
+
+
+@pytest.mark.parametrize("path", [PAY_RENT, STRETCH])
+def test_completing_a_repeating_task_fires_changes_to_done(root, monkeypatch, tmp_path, path):
+    # Review M14 #4: completing a repeating Task resets its status and moves its date in the
+    # same write; "Status changes to Done" and "Status changes" still fire, once.
+    with served(root, monkeypatch, tmp_path) as s:
+        to_done = s.create(status_rule())
+        any_change = s.create(status_rule(
+            name="Any status change",
+            trigger={"kind": "propertyChanged", "scope": {"kind": "type", "id": "task"},
+                     "propertyKey": "status", "to": None},
+            actions=[{"kind": "notify", "title": "", "body": "{title}"}],
+        ))  # fmt: skip
+        res = s.props(path, {"status": "Done"})
+        assert res["task"]["advanced"] is True
+        s.idle()
+        assert fm(s, path)["status"] == "Not Started"
+        assert [r["status"] for r in s.runs(to_done["id"])] == ["ok"]
+        assert [r["status"] for r in s.runs(any_change["id"])] == ["ok"]
+        assert fm(s, path)["doneOn"] == "2026-11-02"
+        # A later edit of another key fires neither.
+        s.props(path, {"priority": "High"})
+        s.idle()
+        assert len(s.runs(to_done["id"])) == 1 and len(s.runs(any_change["id"])) == 1
+
+
+def test_a_new_object_gets_its_text_in_the_creating_write(root, monkeypatch, tmp_path):
+    # Review M14 #2: "Move to new page" and "Create page from paste" create the page with its
+    # text in one write, so a creation rule's write can't make a later body save a 409.
+    with served(root, monkeypatch, tmp_path) as s:
+        rule = s.create(created_rule([{"kind": "addTag", "tagId": NEW_TAG}], scope={"kind": "type", "id": "page"}))
+        for i in range(5):
+            res = s.client.post("/api/objects", json={
+                "typeId": "page", "templateId": "none", "body": f"moved text {i}\r\n"})  # fmt: skip
+            assert res.status_code == 201, res.text
+            path = res.json()["path"]
+            s.idle()
+            assert split_object(s.text(path)).body == f"moved text {i}\n"
+            assert fm(s, path)["tags"] == ["New tag"]
+        assert len(s.runs(rule["id"])) == 5
+        # appendBody goes below the body the object would get (its heading here).
+        res = s.client.post("/api/objects", json={
+            "typeId": "page", "title": "Parent", "templateId": "none", "appendBody": "- child"})  # fmt: skip
+        assert split_object(s.text(res.json()["path"])).body == "# Parent\n\n- child\n"
+        res = s.client.post("/api/objects", json={"typeId": "page", "templateId": "none", "appendBody": "x"})
+        assert split_object(s.text(res.json()["path"])).body == "x\n"
+
+
+def test_quitting_drops_queued_runs_and_waits_only_so_long(root, monkeypatch, tmp_path):
+    # Review M14 #8a: on quit the run in progress finishes, the queued ones are dropped, and the
+    # wait for the worker is bounded.
+    import threading
+
+    with served(root, monkeypatch, tmp_path) as s:
+        s.create(status_rule())
+        started, gate = threading.Event(), threading.Event()
+        handled: list[str] = []
+        real = s.engine._handle
+
+        def slow(notice):
+            handled.append(notice.after.get("priority"))
+            started.set()
+            gate.wait(10)
+            real(notice)
+
+        monkeypatch.setattr(s.engine, "_handle", slow)
+        for p in ("Low", "Medium", "High"):
+            s.props(REPORT, {"priority": p})
+        assert started.wait(5)
+        s.engine.stop_wait = 0.3
+        t0 = time.monotonic()
+        s.engine.stop()
+        assert time.monotonic() - t0 < 3  # bounded, though the run in progress still waits
+        gate.set()
+        time.sleep(0.3)
+        assert handled == ["Low"]  # the two queued runs never started
+        assert s.engine._busy == 0
+
+
+def test_this_week_in_a_sunday_start_space_is_the_views_week(root, monkeypatch, tmp_path):
+    # Review M14 #6 (our choice): a rule's "this week" runs Monday to Sunday, as views show it,
+    # whatever the space's week start.
+    from datetime import UTC, datetime
+
+    (root / ".object" / "ui.json").write_text(json.dumps({"calendar": {"weekStart": "sunday"}}), encoding="utf-8")
+    sunday = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
+    with served(root, monkeypatch, tmp_path, now=sunday) as s:
+        s.props(REPORT, {"date": {"start": "2026-11-04", "resolution": "day"}})  # Wednesday
+        rule = s.create(button_rule(
+            [{"kind": "setProperty", "key": "priority", "value": "High"}],
+            conditions={"type": "filterGroup", "operator": "and", "elements": [
+                {"type": "filter", "propertyId": "date", "option": "is",
+                 "referenceValue": {"relative": "thisWeek"}}]},
+        ))  # fmt: skip
+        run = s.client.post(f"/api/automations/{rule['id']}/run", json={"path": REPORT}).json()
+        assert run["status"] == "ok", run
+        assert fm(s, REPORT)["priority"] == "High"
