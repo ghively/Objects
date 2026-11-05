@@ -94,8 +94,9 @@ export const TYPE_SETTINGS_TEXT = {
   reviewingExplanation: 'Daily notes can be marked as reviewed. Hide this if you do not use reviewing.',
   hideReviewing: 'Hide reviewing',
   deleteHeading: 'Delete Object Type',
+  // The saved-queries part is our string (see DeleteTypeDialog).
   deleteExplanation:
-    'Moves the type, all its objects and its templates to the Trash. You can restore them from there for 30 days.',
+    'Moves the type, all its objects, its templates and the saved queries of only this type to the Trash; other queries stop using it. You can restore them from there for 30 days.',
   deleteAction: 'Delete Object Type',
 }
 
