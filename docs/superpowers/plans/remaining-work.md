@@ -11,6 +11,10 @@ Status as of 2026-11-04. **All nine milestones are built, reviewed, fixed and ga
 5. ~~One known test failure on Windows~~ fixed 2026-11-03 (`ba43e66`): the gzip test compared newline-translated text; it now compares bytes.
 6. **Wiki import follow-ups** (outside the repo, in Gene's `ObjectSpaces` folder): review the 10 "possible secrets" pages listed in `ai-pass/review.md`; the wiki copy is a snapshot (refresh = recopy and AI-reread only new or changed pages).
 
+## 2026-11-05: M15, importers
+
+Import a Notion "Markdown & CSV" export, an Obsidian vault or an Anytype Markdown export (zip or folder, read in place by path) into a new space or, when picked, this space: a preview that writes nothing, editable type and property mappings, a polled job with Stop, new files only, and an "Import report" page. Built on `feat/m15-importers` off `master` in two lanes (back end; dialog), one review, one fix pass in two parts (`b16bc66`, `90af287`) and the gate. Plan `2026-11-05-m15-importers.md`; results, our choices and hand-checks in `m15-acceptance.md`. Built on Linux; not yet run on Windows. The Anytype reader is unverified until a real export is checked.
+
 ## 2026-11-05: M14, local automations
 
 Rules that run on this machine: triggers on create, property change, schedule and button; conditions from the view filters; actions that set properties, tag, file into collections, create from templates, append to the daily note and notify; a template "Repeat"; a Button block and a Button property; Settings > Automations with each rule's run log; and a catch-up dialog for missed schedule runs. Built on `feat/m14-automations` off `master` in two lanes (back end; editor and screens), one review, one fix pass (`a4544c5`, `cc2c407`) and the gate. Plan `2026-11-05-m14-automations.md`; results, our choices and hand-checks in `m14-acceptance.md`. Built on Linux; not yet run on Windows.
@@ -87,6 +91,7 @@ Each milestone's plan holds its full scope. Each acceptance doc holds its automa
 | **M12** computed and new property kinds (Formula, Rollup, ID, Email, Phone, Files) | `2026-11-05-m12-property-kinds.md` | `01289a8..` on `feat/m12-property-kinds`, gate 2026-11-05 (Linux) | `m12-acceptance.md` (7) |
 | **M13** calendar, timeline and chart layouts; sub-items and dependencies | `2026-11-05-m13-view-layouts.md` | `0d9b7db..` on `feat/m13-view-layouts`, gate 2026-11-05 (Linux) | `m13-acceptance.md` (5) |
 | **M14** local automations: rules, schedules and catch-up, template repeat, buttons | `2026-11-05-m14-automations.md` | `dbb09d9..` on `feat/m14-automations`, gate 2026-11-05 (Linux) | `m14-acceptance.md` (7) |
+| **M15** importers: Notion, Obsidian and Anytype exports | `2026-11-05-m15-importers.md` | `80973d0..` on `feat/m15-importers`, gate 2026-11-05 (Linux) | `m15-acceptance.md` (7) |
 
 M8's "Coverage" section maps every deferred item to a task, or to a spec §2 exclusion: AI, network at runtime, accounts and sharing, mobile, telemetry.
 

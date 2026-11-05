@@ -128,6 +128,8 @@ Routes (all JSON):
   ``PUT /api/settings`` (null: the device's zone). The M8 routers (`api_tasks`,
   `api_history`, `api_blocks`, `api_merge`, `api_spaces_m8`) are mounted on ``/api``;
   each module's docstring lists its routes and owner task.
+- M15 (`api_import`): ``POST /api/import/preview``, ``POST /api/import/start``,
+  ``GET /api/import/jobs/{id}``, ``POST /api/import/jobs/{id}/cancel``; see that module.
 - M10: `api_ai` adds the AI assistant: ``GET /api/ai/status``, ``POST /api/ai/chat``
   (Server-Sent Events of `AiEvent`), ``GET /api/ai/chat?path=``, ``POST /api/ai/chat/save``.
 - M11: `api_v1` adds the token-protected local API (``/api/v1/*``) and the token routes
@@ -166,6 +168,7 @@ from . import (
     api_blocks,
     api_graph,
     api_history,
+    api_import,
     api_merge,
     api_references,
     api_search,
@@ -2085,6 +2088,8 @@ def create_app(
     # M8: each router is filled by its own task (see the plan's "Shared files").
     for module in (api_tasks, api_history, api_blocks, api_merge, api_spaces_m8):
         api.include_router(module.router(ctx))
+    # M15: the import routes (`api_import`; the importers are in `importers/`).
+    api.include_router(api_import.router(ctx))
     api.include_router(api_automations.router(ctx, automations))
     # M11: the local API for agents and scripts (Bearer tokens) and its token routes.
     api.include_router(api_v1.router(ctx))

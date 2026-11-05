@@ -1359,6 +1359,191 @@ export interface MergeResult {
 
 export type SpaceSetup = 'blank' | 'basic'
 
+// ---- M15 importers (docs/superpowers/plans/2026-11-05-m15-importers.md) ----
+// Mirrors backend/objectapp/importers/model.py; field names match exactly.
+
+/** Which reader reads an import source. */
+export type ImportSourceKind = 'notion' | 'obsidian' | 'anytype'
+
+/** The property kinds an import can make (a subset of `PropertyType`). */
+export type ImportKind = Extract<PropertyType, 'text' | 'number' | 'boolean' | 'url' | 'datetime' | 'label' | 'entity'>
+
+export const IMPORT_KINDS: readonly ImportKind[] = ['text', 'number', 'boolean', 'url', 'datetime', 'label', 'entity']
+
+/** A source field that fills one of the app's own fields instead of a new property. */
+export type ImportSystemKey = 'title' | 'tags' | 'aliases' | 'description' | 'createdAt' | 'lastUpdated'
+
+export type ImportSkipReason =
+  | 'unsafePath'
+  | 'symlink'
+  | 'encrypted'
+  | 'tooLarge'
+  | 'damaged'
+  | 'nestedArchive'
+  | 'unsupported'
+  | 'appSettings'
+  | 'notUtf8'
+  | 'missingAttachment'
+  | 'unresolvedLink'
+  | 'databaseLink'
+  | 'valueNotConverted'
+  | 'userSkipped'
+  | 'emptyFile'
+
+export type ImportPhase = 'preparing' | 'types' | 'attachments' | 'objects' | 'report' | 'done' | 'failed' | 'cancelled'
+
+/** A zip file or a folder on this device, by absolute path. */
+export interface ImportSource {
+  path: string
+  kind?: ImportSourceKind | 'auto'
+}
+
+export interface ImportTypeOverride {
+  name?: string | null
+  pluralName?: string | null
+  skip?: boolean | null
+  /** Only with a `currentSpace` target: put these objects into that existing type. */
+  existingTypeId?: string | null
+}
+
+export interface ImportPropertyOverride {
+  kind?: ImportKind | null
+  isArray?: boolean | null
+  name?: string | null
+  skip?: boolean | null
+}
+
+/** The mapping step. A preview answers the effective mapping (defaults filled in). */
+export interface ImportMapping {
+  /** Obsidian and Anytype: what makes an object's type. Notion ignores it (databases are types). */
+  typeSource: 'folder' | 'key' | 'none'
+  typeKey: string | null
+  /** Planned type key -> override. */
+  types: Record<string, ImportTypeOverride>
+  /** Planned type key -> planned property key -> override. */
+  properties: Record<string, Record<string, ImportPropertyOverride>>
+}
+
+/** POST /api/import/preview */
+export interface ImportPreviewRequest {
+  source: ImportSource
+  mapping?: ImportMapping | null
+  target?: 'newSpace' | 'currentSpace'
+}
+
+export type ImportTarget = { kind: 'newSpace'; name: string; location: string } | { kind: 'currentSpace' }
+
+/** POST /api/import/start */
+export interface StartImportRequest {
+  previewId: string
+  mapping: ImportMapping
+  target: ImportTarget
+  clientId?: string | null
+}
+
+export interface ImportPlannedProperty {
+  key: string
+  sourceName: string
+  name: string
+  kind: ImportKind
+  guessedKind: ImportKind
+  isArray: boolean
+  systemKey: ImportSystemKey | null
+  valueCount: number
+  /** Values that don't fit `kind` (dropped and listed in the report). */
+  unconvertible: number
+  /** Up to 3 distinct values, as the source writes them. */
+  samples: string[]
+  /** For `label`: the distinct texts, first 50. */
+  options: string[]
+  skip: boolean
+}
+
+export interface ImportPlannedType {
+  /** Stable within a preview: `database:<csv path>`, `folder:<name>`, `key:<value>`, `page`. */
+  key: string
+  name: string
+  pluralName: string
+  origin: 'database' | 'folder' | 'key' | 'page'
+  originLabel: string
+  objectCount: number
+  existingTypeId: string | null
+  skip: boolean
+  properties: ImportPlannedProperty[]
+}
+
+export interface ImportSkippedItem {
+  /** Source-relative POSIX path. */
+  path: string
+  reason: ImportSkipReason
+  detail: string
+}
+
+export interface ImportCounts {
+  objects: number
+  types: number
+  properties: number
+  attachments: number
+  attachmentBytes: number
+  links: number
+  resolvedLinks: number
+  unresolvedLinks: number
+  renamed: number
+  skipped: number
+}
+
+export interface ImportPreview {
+  previewId: string
+  sourcePath: string
+  kind: ImportSourceKind
+  detected: ImportSourceKind | null
+  container: 'zip' | 'folder'
+  /** A name for the new space. */
+  suggestedName: string
+  counts: ImportCounts
+  types: ImportPlannedType[]
+  mapping: ImportMapping
+  /** Obsidian/Anytype: [key, file count] for "type from key". */
+  frontmatterKeys: [string, number][]
+  /** Obsidian/Anytype: [top-level folder, Markdown file count]. */
+  folders: [string, number][]
+  /** The first 20 planned objects. */
+  samples: { title: string; typeKey: string; path: string; sourcePath: string }[]
+  /** The first 500; `counts.skipped` has the total. */
+  skipped: ImportSkippedItem[]
+  warnings: string[]
+}
+
+export interface StartImportResponse {
+  jobId: string
+  targetPath: string
+}
+
+export interface ImportResult {
+  targetPath: string
+  spaceName: string
+  objects: number
+  types: number
+  attachments: number
+  tags: number
+  skipped: number
+  /** The "Import report" object's space path. */
+  reportPath: string | null
+  cancelled: boolean
+}
+
+/** GET /api/import/jobs/{id} */
+export interface ImportJob {
+  id: string
+  phase: ImportPhase
+  done: number
+  total: number
+  targetPath: string
+  currentPath: string | null
+  result: ImportResult | null
+  error: string | null
+}
+
 // ---------------------------------------------------------------------------------------------
 // M14: local automations (docs/superpowers/plans/2026-11-05-m14-automations.md, "Contract (T1)").
 // One rule per `.object/automations/<id>.json`; the back end's `automations_model.py` is the twin.

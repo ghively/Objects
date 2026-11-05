@@ -18,11 +18,16 @@ import type {
   BlockInfo,
   CatchUp,
   DuplicatedObject,
+  ImportJob,
+  ImportPreview,
+  ImportPreviewRequest,
   MergeResult,
   OccurrenceAction,
   OverdueInfo,
   RestoreVersionResult,
   SpaceSetup,
+  StartImportRequest,
+  StartImportResponse,
   TaskStats,
   VersionContent,
   VersionInfo,
@@ -422,6 +427,16 @@ const RESYNC_EVENTS: readonly ChangeEvent[] = [
   { kind: 'queries', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'automations', path: RESYNC_PATH, version: null, origin: null },
 ]
+
+/**
+ * Announce to this window that every object and type may have changed: the same `types` resync a
+ * reconnect sends (and the server sends when an import into the open space ends, M15 review
+ * finding 2). The import dialog calls it when its job ends into this space, so this window reloads
+ * its index and types even if it missed the server's event.
+ */
+export function announceResync(): void {
+  emitLocal([{ kind: 'types', path: RESYNC_PATH, version: null, origin: null }])
+}
 
 /** Whether `e` is the synthetic "everything of `kind` may have changed" event sent after a reconnect. */
 export function isResync(e: ChangeEvent, kind: ChangeKind): boolean {
@@ -1259,6 +1274,42 @@ export const api = {
     if (opts.permanent) body.permanent = true
     if (opts.folder) body.folder = opts.folder
     return request<{ trashed: boolean }>('/spaces/delete', json('POST', body), spaceConflict)
+  },
+
+  // ---- M15 importers (docs/superpowers/plans/2026-11-05-m15-importers.md) ----
+
+  /**
+   * Read a Notion export, Obsidian vault or Anytype export (a `.zip` or a folder, by absolute path)
+   * into a dry-run preview. Writes nothing. 404 no such file or folder, 415 neither a zip nor a
+   * folder, 413 over the limits, 422 a bad mapping.
+   */
+  importPreview(req: ImportPreviewRequest): Promise<ImportPreview> {
+    return request<ImportPreview>('/import/preview', json('POST', req))
+  },
+
+  /**
+   * Start writing a previewed import (202). 409 (`ApiError`) the new space's folder exists, another
+   * import runs or the source changed since the preview; 422 bad name or a target inside the
+   * source; 404 unknown or expired preview, or the location is not a folder. No `clientId`: the
+   * server announces an import's end as one resync from no window (review finding 2), and the
+   * dialog announces it to this window itself (`announceResync`).
+   */
+  startImport(req: StartImportRequest): Promise<StartImportResponse> {
+    return request<StartImportResponse>(
+      '/import/start',
+      json('POST', req),
+      (d) => new ApiError(409, typeof d.detail === 'string' ? d.detail : 'conflict'),
+    )
+  },
+
+  /** An import job's progress and, once over, its result. 404 unknown job. */
+  importJob(jobId: string): Promise<ImportJob> {
+    return request<ImportJob>(`/import/jobs/${encodeURIComponent(jobId)}`)
+  },
+
+  /** Stop an import after the file being written (what was written stays). */
+  cancelImport(jobId: string): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>(`/import/jobs/${encodeURIComponent(jobId)}/cancel`, json('POST', {}))
   },
 
   // ---- M14: automations (docs/superpowers/plans/2026-11-05-m14-automations.md) ----
