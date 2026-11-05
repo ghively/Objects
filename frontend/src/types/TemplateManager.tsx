@@ -2,6 +2,9 @@
  * A type's templates, in `templates.ids` order (discovered templates not in `ids` follow):
  * "Edit Template", "Mark as Default", "Delete Template", drag to reorder, "+ New Template".
  * Order and default are saved on the type through `useTypeEditor`.
+ *
+ * M14: each row's "Repeat" opens the template's Repeat dialog (an automation that makes an object
+ * from the template on a schedule); a repeating template shows "Repeats".
  */
 import {
   closestCenter,
@@ -28,6 +31,8 @@ import { useLinkIndex } from '@/links/linkIndex'
 import { ObjectIcon } from '@/object/ObjectHeader'
 import { useTypeEditor, type TypeEditor } from '@/object/useTypeEditor'
 import { isBasicDailyNote } from './dashboardSections'
+import { repeatOf, TEMPLATE_REPEAT_TEXT, TemplateRepeatDialog } from '@/automations/TemplateRepeatDialog'
+import { useAutomations } from '@/automations/useAutomations'
 
 export const TEMPLATE_TEXT = {
   explanation:
@@ -87,6 +92,8 @@ export function TemplateManager({ typeId, onOpenTemplate, editor: given, disable
   const type = useLinkIndex((s) => s.types.find((t) => t.id === typeId))
   const [templates, setTemplates] = useState<ObjectSummary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [repeating, setRepeating] = useState<ObjectSummary | null>(null)
+  const { rules } = useAutomations()
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -203,6 +210,8 @@ export function TemplateManager({ typeId, onOpenTemplate, editor: given, disable
                 onEdit={() => onOpenTemplate?.(t.path)}
                 onMarkDefault={() => markDefault(t)}
                 onDelete={() => void remove(t)}
+                repeats={!!repeatOf(rules, t.id)}
+                onRepeat={() => setRepeating(t)}
               />
             ))}
           </ul>
@@ -218,6 +227,9 @@ export function TemplateManager({ typeId, onOpenTemplate, editor: given, disable
         {TEMPLATE_TEXT.create}
       </button>
       {!given && own.dialog}
+      {repeating && (
+        <TemplateRepeatDialog open typeId={typeId} template={repeating} onOpenChange={(o) => !o && setRepeating(null)} />
+      )}
     </div>
   )
 }
@@ -229,6 +241,8 @@ function TemplateRow({
   onEdit,
   onMarkDefault,
   onDelete,
+  repeats = false,
+  onRepeat,
 }: {
   template: ObjectSummary
   isDefault: boolean
@@ -236,6 +250,9 @@ function TemplateRow({
   onEdit(): void
   onMarkDefault(): void
   onDelete(): void
+  /** M14: the template has a Repeat automation. */
+  repeats?: boolean
+  onRepeat?(): void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: templateKey(template),
@@ -259,11 +276,18 @@ function TemplateRow({
       </span>
       {template.icon ? <ObjectIcon icon={template.icon} size={16} /> : <Icon name="ph-file-dashed" size={16} />}
       <span className="min-w-0 flex-1 truncate text-[15px]">{name}</span>
+      {repeats && (
+        <span className="flex items-center gap-1 rounded border border-line px-1.5 text-[12px] text-fg-muted">
+          <Icon name="ph-repeat" size={11} />
+          {TEMPLATE_REPEAT_TEXT.repeating}
+        </span>
+      )}
       {isDefault && (
         <span className="rounded border border-line px-1.5 text-[12px] text-fg-muted">{TEMPLATE_TEXT.isDefault}</span>
       )}
       <span className="flex shrink-0 items-center gap-0.5">
         <RowAction icon="ph-pencil-simple" label={TEMPLATE_TEXT.edit} onClick={onEdit} />
+        {onRepeat && <RowAction icon="ph-repeat" label={TEMPLATE_REPEAT_TEXT.menu} onClick={onRepeat} disabled={disabled} />}
         {!isDefault && (
           <RowAction icon="ph-star" label={TEMPLATE_TEXT.markDefault} onClick={onMarkDefault} disabled={disabled} />
         )}

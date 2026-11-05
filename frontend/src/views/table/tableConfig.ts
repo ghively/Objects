@@ -13,6 +13,13 @@ export const DEFAULT_COL_WIDTH: Partial<Record<PropertyType, number>> = {
   url: 16,
   label: 12,
   entity_collections: 10,
+  // M12 (our widths)
+  formula: 12,
+  rollup: 12,
+  uniqueId: 8,
+  email: 16,
+  phone: 11,
+  files: 16,
 }
 export const FALLBACK_COL_WIDTH = 12
 export const MIN_COL_WIDTH = 2

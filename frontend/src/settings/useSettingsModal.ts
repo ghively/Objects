@@ -5,14 +5,19 @@ import { create } from 'zustand'
 
 export type SettingsSectionId =
   | 'appearance'
+  | 'aiAssistant'
   | 'editor'
   | 'dateTime'
   | 'language'
   | 'offlineSync'
+  | 'importContent'
   | 'notifications'
   | 'space'
   | 'objectTypes'
   | 'taskManagement'
+  /** M14 */
+  | 'automations'
+  | 'integrations'
 
 export const DEFAULT_SECTION: SettingsSectionId = 'appearance'
 

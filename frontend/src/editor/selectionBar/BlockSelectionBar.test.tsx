@@ -8,6 +8,8 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api, DailyNoteExistsError } from '@/api/client'
+import { resetAiStore, useAi } from '@/ai/store'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { addDays, todayYmd } from '@/calendar/dates'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { blockSelectionRange, selectBlocks } from '../extensions/blockSelection'
@@ -97,6 +99,7 @@ describe('<BlockSelectionBar>', () => {
       'Turn blocks into',
       'Move',
       'Delete selected blocks',
+      'AI', // M10
       'Clear selection',
     ])
   })
@@ -263,6 +266,19 @@ describe('<BlockSelectionBar>', () => {
     expect(order).toEqual(['flush', `save DailyNotes/${todayYmd()}.md`])
   })
 
+  test('move to a new page creates the page with the blocks in one write', async () => {
+    // M14: the text rides in the creating write, so a creation rule's write can't come between
+    // the page and its text (a separate save would meet a 409 and leave the page empty).
+    const editor = mounted(BODY)
+    vi.mocked(api.createObject).mockResolvedValueOnce({ path: 'Pages/Untitled.md', version: 'v1' })
+    render(<BlockSelectionBar editor={editor} />)
+    select(editor, 0, 1)
+    fireEvent.click(within(await openMenu('Move')).getByRole('menuitem', { name: 'New page' }))
+    await waitFor(() => expect(serializeBody(editor)).toBe('Four five six\n'))
+    expect(api.createObject).toHaveBeenCalledWith(expect.any(String), { templateId: 'none', body: 'One two\n\nThree\n' })
+    expect(api.saveBody).not.toHaveBeenCalled()
+  })
+
   test('a failed move keeps the blocks', async () => {
     const editor = mounted(BODY)
     render(<BlockSelectionBar editor={editor} />)
@@ -272,5 +288,31 @@ describe('<BlockSelectionBar>', () => {
     await waitFor(() => expect(api.saveBody).toHaveBeenCalled())
     await act(async () => {})
     expect(serializeBody(editor)).toBe(BODY)
+  })
+
+  test('m10: AI opens the chat about the selected blocks; accepting replaces them', () => {
+    resetAiStore()
+    const editor = mounted(BODY)
+    setEditorObject(editor, { path: 'Pages/Note.md' })
+    render(<BlockSelectionBar editor={editor} />)
+    select(editor, 0, 1)
+    fireEvent.click(within(bar()).getByRole('button', { name: 'AI' }))
+    const seed = useAi.getState().pending!.seed
+    expect(seed).toMatchObject({ mode: 'askBlock', block: 'One two\n\nThree', contextPaths: ['Pages/Note.md'] })
+    act(() => seed.onReplace!('# Merged'))
+    expect(serializeBody(editor)).toBe('# Merged\n\nFour five six\n')
+    resetAiStore()
+  })
+
+  test('m10: no AI button while AI features are hidden', () => {
+    useSettings.setState({ settings: { ...settingsDefaults, aiHidden: true } })
+    try {
+      const editor = mounted(BODY)
+      render(<BlockSelectionBar editor={editor} />)
+      select(editor, 0)
+      expect(within(bar()).queryByRole('button', { name: 'AI' })).toBeNull()
+    } finally {
+      useSettings.setState({ settings: settingsDefaults })
+    }
   })
 })

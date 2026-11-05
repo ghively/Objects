@@ -150,7 +150,7 @@ describe('api client v2 writes', () => {
     ])
   })
 
-  test('deleteType announces each trashed object and each touched type locally', async () => {
+  test('deleteType announces each trashed object, each touched type and each touched query locally', async () => {
     const fetchMock = respond(200, {
       trashId: 't1',
       paths: ['Servers/Alpha.md', 'Templates/Servers/Base.md'],
@@ -179,6 +179,18 @@ describe('api client v2 writes', () => {
     vi.stubGlobal('fetch', respond(201, { path: 'Gadgets/A.md', version: 'v1', typeIds: ['gadget'] }))
     const made = await collect(() => api.createObject('gadget'))
     expect(made).toContainEqual({ kind: 'types', path: 'gadget', version: null, origin: CLIENT_ID })
+  })
+
+  test('creating an object can carry its body (M14: the text is in the creating write)', async () => {
+    const fetchSpy = respond(201, { path: 'Pages/A.md', version: 'v1' })
+    vi.stubGlobal('fetch', fetchSpy)
+    await api.createObject('page', { templateId: 'none', body: 'text\n' })
+    await api.createObject('page', { title: 'A', appendBody: '- child\n' })
+    const sent = (fetchSpy.mock.calls as unknown as [string, RequestInit][]).map(([, init]) => JSON.parse(String(init.body)))
+    expect(sent[0]).toMatchObject({ typeId: 'page', templateId: 'none', body: 'text\n' })
+    expect(sent[0]).not.toHaveProperty('appendBody')
+    expect(sent[1]).toMatchObject({ typeId: 'page', title: 'A', appendBody: '- child\n' })
+    expect(sent[1]).not.toHaveProperty('body')
   })
 
   test('test 409 on saveType maps to RevisionConflictError with currentRevision', async () => {

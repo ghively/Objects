@@ -18,9 +18,13 @@ import { IconPicker } from '@/components/IconPicker'
 import { cn } from '@/lib/utils'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useSettings } from '@/settings/useSettings'
+import { useAiHidden } from '@/ai/store'
+import { useAiBlocked } from '../aiEntries'
 import { closeSlashMenu, registerSlashKeyHandler, useSlashMenu } from '../extensions/slashMenu'
 import { filterSections, hasRealMatch, slashSections, SLASH_TEXT, type SlashItem, type SlashView } from './slashItems'
 import { KeyHints } from '@/components/KeyHints'
+import { RulePicker } from '@/automations/RulePicker'
+import { useAutomations } from '@/automations/useAutomations'
 import '../handles/handles.css'
 
 function position(rect: DOMRect | null): CSSProperties {
@@ -60,8 +64,30 @@ function BookmarkView({ editor, onDone }: { editor: Editor; onDone: () => void }
   )
 }
 
+/** M14: "Button" picks the automation the new button block runs (or leaves it for later). */
+function ButtonView({ editor, onDone }: { editor: Editor; onDone: () => void }) {
+  const { rules } = useAutomations()
+  const insert = (ruleId: string | null) => {
+    editor.chain().focus().insertButtonBlock(ruleId).run()
+    onDone()
+  }
+  return (
+    <div className="flex max-h-72 flex-col overflow-y-auto p-1">
+      <RulePicker rules={rules} value={null} onChange={insert} />
+      <button
+        type="button"
+        onClick={() => insert(null)}
+        className="flex items-center gap-2 rounded px-2 py-1 text-left text-[14px] text-fg-muted hover:bg-hover hover:text-fg"
+      >
+        {SLASH_TEXT.buttonLater}
+      </button>
+    </div>
+  )
+}
+
 function SubView({ editor, view, onDone }: { editor: Editor; view: SlashView; onDone: () => void }) {
   if (view === 'bookmark') return <BookmarkView editor={editor} onDone={onDone} />
+  if (view === 'button') return <ButtonView editor={editor} onDone={onDone} />
   return (
     <IconPicker
       value={null}
@@ -77,11 +103,17 @@ export function SlashMenu({ editor }: { editor: Editor }) {
   const state = useSlashMenu()
   const types = useLinkIndex((s) => s.types)
   const twentyFourHourTime = useSettings((s) => s.settings.twentyFourHourTime)
+  // Hidden too on a page excluded from AI or a template (M10).
+  const aiBlocked = useAiBlocked(editor)
+  const aiHidden = useAiHidden() || aiBlocked
   const open = state.editor === editor && state.range !== null
   const sub = state.sub && state.sub.editor === editor ? state.sub : null
   const query = open ? state.query : ''
 
-  const all = useMemo(() => slashSections({ query, types, twentyFourHourTime }), [query, types, twentyFourHourTime])
+  const all = useMemo(
+    () => slashSections({ query, types, twentyFourHourTime, aiHidden }),
+    [query, types, twentyFourHourTime, aiHidden],
+  )
   const sections = useMemo(() => filterSections(all, query), [all, query])
   const flat = useMemo(() => sections.flatMap((s) => s.items), [sections])
   // The active row; it goes back to the first one whenever the query changes.

@@ -19,6 +19,13 @@ export type PropertyType =
   | 'blocks'
   | 'coverImage'
   | 'color'
+  // M12 (our kinds)
+  | 'formula'
+  | 'rollup'
+  | 'uniqueId'
+  | 'email'
+  | 'phone'
+  | 'files'
   | 'entity_title'
   | 'entity_icon'
   | 'entity_description'
@@ -29,6 +36,8 @@ export type PropertyType =
   | 'entity_createdAt'
   | 'entity_lastUpdated'
   | 'entity_backlinks'
+  /** M14: runs an automation on its object; holds no value (`options.ruleId`). */
+  | 'button'
 
 /** @deprecated M1 name; use `PropertyType`. */
 export type PropertyKind = PropertyType
@@ -47,6 +56,12 @@ export const PROPERTY_TYPES: readonly PropertyType[] = [
   'blocks',
   'coverImage',
   'color',
+  'formula',
+  'rollup',
+  'uniqueId',
+  'email',
+  'phone',
+  'files',
   'entity_title',
   'entity_icon',
   'entity_description',
@@ -57,6 +72,7 @@ export const PROPERTY_TYPES: readonly PropertyType[] = [
   'entity_createdAt',
   'entity_lastUpdated',
   'entity_backlinks',
+  'button',
 ]
 
 /**
@@ -77,6 +93,12 @@ export const KIND_TRANSFORMS: Readonly<Record<PropertyType, readonly PropertyTyp
   blocks: [],
   coverImage: [],
   color: [],
+  formula: [],
+  rollup: [],
+  uniqueId: [],
+  email: [],
+  phone: [],
+  files: [],
   entity_title: [],
   entity_icon: [],
   entity_description: [],
@@ -87,6 +109,7 @@ export const KIND_TRANSFORMS: Readonly<Record<PropertyType, readonly PropertyTyp
   entity_createdAt: [],
   entity_lastUpdated: [],
   entity_backlinks: [],
+  button: [],
 }
 
 /** An icon: an emoji, or any Iconify id (`ph-…`, `vscode-icons-…`) with an optional theme colour. */
@@ -155,7 +178,105 @@ export interface PropertyOptions {
   propertySyncing?: { propertyIds: string[] }
   set?: LabelOption[]
   isStatus?: boolean
+  /** M14 `button`: the id of the automation the button runs (`null`: none chosen yet). */
+  ruleId?: string | null
+  /** M12 formula: the expression (at most 2000 characters). */
+  expression?: string
+  /** M12 rollup: the `entity` property of this type whose related objects are rolled up. */
+  relationId?: string
+  /** M12 rollup: the property (id) of the related objects, or `title`. */
+  targetId?: string
+  /** M12 rollup: the calculation. */
+  calc?: RollupCalc
+  /** M12 ID: the text before the number (`TASK-`). */
+  prefix?: string
+  /** M12 ID: the number the next created object gets. The server never lets it go back. */
+  nextNumber?: number
   [extra: string]: unknown
+}
+
+/** M12: a rollup's calculation (the `views/calc.ts` names, plus show original/unique). */
+export type RollupCalc =
+  | 'showOriginal'
+  | 'showUnique'
+  | 'countAll'
+  | 'countValues'
+  | 'countUnique'
+  | 'countEmpty'
+  | 'countNotEmpty'
+  | 'percentEmpty'
+  | 'percentNotEmpty'
+  | 'sum'
+  | 'average'
+  | 'median'
+  | 'min'
+  | 'max'
+  | 'range'
+  | 'earliestDate'
+  | 'latestDate'
+  | 'dateRange'
+
+export const ROLLUP_CALCS: readonly RollupCalc[] = [
+  'showOriginal',
+  'showUnique',
+  'countAll',
+  'countValues',
+  'countUnique',
+  'countEmpty',
+  'countNotEmpty',
+  'percentEmpty',
+  'percentNotEmpty',
+  'sum',
+  'average',
+  'median',
+  'min',
+  'max',
+  'range',
+  'earliestDate',
+  'latestDate',
+  'dateRange',
+]
+
+/** M12: the result type of a formula or rollup value. */
+export type ComputedType = 'text' | 'number' | 'boolean' | 'date' | 'list' | 'empty' | 'error'
+
+/**
+ * M12: a formula or rollup value, computed by the server per request and never stored.
+ * `value` is a string (text), a finite number, a boolean, an ISO date (`YYYY-MM-DD`) or instant
+ * (date), a string list (list) or `null` (empty, error).
+ */
+export interface ComputedValue {
+  type: ComputedType
+  value: string | number | boolean | string[] | null
+  /** Only for `error`: what went wrong (shown on hover). */
+  error?: string
+}
+
+/** M12: the property kinds whose values the server computes (never in frontmatter). */
+export const COMPUTED_KINDS: ReadonlySet<PropertyType> = new Set<PropertyType>(['formula', 'rollup'])
+
+/** M12: POST /api/formula/preview */
+export interface FormulaPreviewRequest {
+  typeId: string
+  expression: string
+  /** The object to evaluate against; without it the expression is only parsed. */
+  path?: string | null
+  /** The type's definitions as the editor has them (unsaved), replacing the stored ones. */
+  properties?: PropertyDef[]
+}
+
+export interface FormulaPreviewResult {
+  value: ComputedValue | null
+  /** A parse or evaluation error. */
+  error: string | null
+}
+
+/** M12: POST /api/types/{typeId}/properties/{pid}/number-existing */
+export interface NumberExistingResult {
+  type: TypeDef
+  numbered: number
+  rewritten: string[]
+  skipped: string[]
 }
 
 export interface PropertyDef {
@@ -343,6 +464,13 @@ export interface DeviceSettings {
   hideStructureSettings: boolean
   /** How highlight blocks show (none exist in Object yet; stored only). */
   highlightStyle: 'default' | 'minimal'
+  // ---- M10 (AI assistant) ----
+  /** "Hide AI features": removes every AI entry from the app. */
+  aiHidden: boolean
+  /** Where the Claude Code CLI is; `null` = found on PATH. */
+  claudePath: string | null
+  /** The model passed to `claude --model`; `null` = Claude Code's default. */
+  aiModel: string | null
 }
 
 /** M8 `DeviceSettings.language`. */
@@ -387,6 +515,8 @@ export interface ObjectDetail {
   links: Record<string, (string | null)[]>
   /** M5: the distinct objects linking to this one, by title then path. */
   backlinks: EntityRef[]
+  /** M12: the object's formula and rollup values by property key (computed, never stored). */
+  computed?: Record<string, ComputedValue>
 }
 
 /** PUT /api/object/body → 200 */
@@ -448,7 +578,7 @@ export interface CreatedFile {
 
 export interface TrashItem {
   id: string
-  kind: 'object' | 'type' | 'collection' | 'query'
+  kind: 'object' | 'type' | 'collection' | 'query' | 'automation'
   originalPath: string
   title: string
   type: string
@@ -460,6 +590,8 @@ export interface TrashItem {
   /** Collection and query entries. */
   collectionId?: string
   queryId?: string
+  /** M14 automation entries. */
+  automationId?: string
   name?: string
 }
 
@@ -468,6 +600,8 @@ export interface RestoreResult {
   typeIds: string[]
   collectionIds?: string[]
   queryIds?: string[]
+  /** M14: restored automation rules. */
+  automationIds?: string[]
   skipped?: SkippedFile[]
   /** Other files the restore wrote back (a collection's members); announced as `changed`. */
   rewritten?: string[]
@@ -502,6 +636,10 @@ export type ChangeKind =
   | 'ui'
   /** M6: a whiteboard's canvas or ink file changed; `path` is the board's `.md`. */
   | 'whiteboard'
+  /** M14: an automation rule file changed; `path` is the rule id (`*`: resync). */
+  | 'automations'
+  /** M14: a run was logged (`path` the rule id), or (`path` `catch-up`) the catch-up list changed. */
+  | 'automationRuns'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {
@@ -533,7 +671,79 @@ export interface Row {
   words?: number
 }
 
-export type Layout = 'list' | 'grid' | 'wall' | 'table' | 'embed' | 'kanban' | 'gallery'
+export type Layout =
+  | 'list'
+  | 'grid'
+  | 'wall'
+  | 'table'
+  | 'embed'
+  | 'kanban'
+  | 'gallery'
+  // M13 (our layouts)
+  | 'calendar'
+  | 'timeline'
+  | 'chart'
+
+/** M13: the calendar layout's settings. Property ids are property keys, as in filters. */
+export interface CalendarViewConfig {
+  /** The date property the objects are placed by (`null`: the first date property). */
+  dateProperty: string | null
+  mode: 'month' | 'week'
+}
+
+export type TimelineZoom = 'day' | 'week' | 'month' | 'quarter' | 'year'
+
+/** M13: the timeline layout's settings. */
+export interface TimelineViewConfig {
+  /** A date property; a range value gives both ends. */
+  startProperty: string | null
+  /** A second date property for the end (`null`: the start's own range end, else one day). */
+  endProperty: string | null
+  zoom: TimelineZoom
+  /** The table on the left. */
+  showTable: boolean
+  /** Its columns (property keys), after the title. */
+  tableColumns: string[]
+  /** Draw the dependency arrows (needs `dependenciesConfig`). */
+  showDependencies: boolean
+}
+
+export type ChartKind = 'bar' | 'horizontalBar' | 'line' | 'donut' | 'number'
+export type ChartSort = 'xAscending' | 'xDescending' | 'yAscending' | 'yDescending'
+
+/** M13: the chart layout's settings. */
+export interface ChartViewConfig {
+  kind: ChartKind
+  /** The X axis: group by this property (the group-by code). Ignored by `number`. */
+  xProperty: string | null
+  /** For a date X axis: the bucket. */
+  xDateBucket: 'day' | 'week' | 'month' | 'year'
+  /** The Y axis: `countAll`, or a calculation of `yProperty` (the column calculations). */
+  yCalc: CalcKind
+  yProperty: string | null
+  /** Split each bar or line by a second property. */
+  splitBy: string | null
+  /** Line charts: add each point to the ones before it. */
+  cumulative: boolean
+  sort: ChartSort
+  hideEmptyGroups: boolean
+  showLegend: boolean
+  showValues: boolean
+}
+
+/** M13: a two-way relation pair turned on from a view's "..." menu. */
+export type RelationPairKind = 'subItems' | 'dependencies'
+
+/** M13: POST /api/types/{typeId}/relation-pair */
+export interface RelationPairResult {
+  type: TypeDef
+  /** "Parent item" (single) or "Blocked by". */
+  firstId: string
+  /** "Sub-items" or "Blocking". */
+  secondId: string
+  /** False when the type already had the pair (it was reused). */
+  created: boolean
+}
 
 export type DateRelative =
   | 'overdue'
@@ -633,6 +843,16 @@ export interface DataViewDefinition {
   }
   calculations?: { propertyId: string; structureId: string; kind: CalcKind }[]
   smallCardViewConfigs?: Record<string, SmallCardViewConfig>
+  /** M13 */
+  calendarConfig?: CalendarViewConfig
+  /** M13 */
+  timelineConfig?: TimelineViewConfig
+  /** M13 */
+  chartConfig?: ChartViewConfig
+  /** M13: nest rows under their parent (table and timeline). Property keys. */
+  subItemsConfig?: { parentPropertyId: string; childrenPropertyId: string }
+  /** M13: the dependency pair (timeline arrows). Property keys. */
+  dependenciesConfig?: { blockedByPropertyId: string; blockingPropertyId: string }
 }
 
 export interface ViewState {
@@ -1138,3 +1358,509 @@ export interface MergeResult {
 }
 
 export type SpaceSetup = 'blank' | 'basic'
+
+// ---- M15 importers (docs/superpowers/plans/2026-11-05-m15-importers.md) ----
+// Mirrors backend/objectapp/importers/model.py; field names match exactly.
+
+/** Which reader reads an import source. */
+export type ImportSourceKind = 'notion' | 'obsidian' | 'anytype'
+
+/** The property kinds an import can make (a subset of `PropertyType`). */
+export type ImportKind = Extract<PropertyType, 'text' | 'number' | 'boolean' | 'url' | 'datetime' | 'label' | 'entity'>
+
+export const IMPORT_KINDS: readonly ImportKind[] = ['text', 'number', 'boolean', 'url', 'datetime', 'label', 'entity']
+
+/** A source field that fills one of the app's own fields instead of a new property. */
+export type ImportSystemKey = 'title' | 'tags' | 'aliases' | 'description' | 'createdAt' | 'lastUpdated'
+
+export type ImportSkipReason =
+  | 'unsafePath'
+  | 'symlink'
+  | 'encrypted'
+  | 'tooLarge'
+  | 'damaged'
+  | 'nestedArchive'
+  | 'unsupported'
+  | 'appSettings'
+  | 'notUtf8'
+  | 'missingAttachment'
+  | 'unresolvedLink'
+  | 'databaseLink'
+  | 'valueNotConverted'
+  | 'userSkipped'
+  | 'emptyFile'
+
+export type ImportPhase = 'preparing' | 'types' | 'attachments' | 'objects' | 'report' | 'done' | 'failed' | 'cancelled'
+
+/** A zip file or a folder on this device, by absolute path. */
+export interface ImportSource {
+  path: string
+  kind?: ImportSourceKind | 'auto'
+}
+
+export interface ImportTypeOverride {
+  name?: string | null
+  pluralName?: string | null
+  skip?: boolean | null
+  /** Only with a `currentSpace` target: put these objects into that existing type. */
+  existingTypeId?: string | null
+}
+
+export interface ImportPropertyOverride {
+  kind?: ImportKind | null
+  isArray?: boolean | null
+  name?: string | null
+  skip?: boolean | null
+}
+
+/** The mapping step. A preview answers the effective mapping (defaults filled in). */
+export interface ImportMapping {
+  /** Obsidian and Anytype: what makes an object's type. Notion ignores it (databases are types). */
+  typeSource: 'folder' | 'key' | 'none'
+  typeKey: string | null
+  /** Planned type key -> override. */
+  types: Record<string, ImportTypeOverride>
+  /** Planned type key -> planned property key -> override. */
+  properties: Record<string, Record<string, ImportPropertyOverride>>
+}
+
+/** POST /api/import/preview */
+export interface ImportPreviewRequest {
+  source: ImportSource
+  mapping?: ImportMapping | null
+  target?: 'newSpace' | 'currentSpace'
+}
+
+export type ImportTarget = { kind: 'newSpace'; name: string; location: string } | { kind: 'currentSpace' }
+
+/** POST /api/import/start */
+export interface StartImportRequest {
+  previewId: string
+  mapping: ImportMapping
+  target: ImportTarget
+  clientId?: string | null
+}
+
+export interface ImportPlannedProperty {
+  key: string
+  sourceName: string
+  name: string
+  kind: ImportKind
+  guessedKind: ImportKind
+  isArray: boolean
+  systemKey: ImportSystemKey | null
+  valueCount: number
+  /** Values that don't fit `kind` (dropped and listed in the report). */
+  unconvertible: number
+  /** Up to 3 distinct values, as the source writes them. */
+  samples: string[]
+  /** For `label`: the distinct texts, first 50. */
+  options: string[]
+  skip: boolean
+}
+
+export interface ImportPlannedType {
+  /** Stable within a preview: `database:<csv path>`, `folder:<name>`, `key:<value>`, `page`. */
+  key: string
+  name: string
+  pluralName: string
+  origin: 'database' | 'folder' | 'key' | 'page'
+  originLabel: string
+  objectCount: number
+  existingTypeId: string | null
+  skip: boolean
+  properties: ImportPlannedProperty[]
+}
+
+export interface ImportSkippedItem {
+  /** Source-relative POSIX path. */
+  path: string
+  reason: ImportSkipReason
+  detail: string
+}
+
+export interface ImportCounts {
+  objects: number
+  types: number
+  properties: number
+  attachments: number
+  attachmentBytes: number
+  links: number
+  resolvedLinks: number
+  unresolvedLinks: number
+  renamed: number
+  skipped: number
+}
+
+export interface ImportPreview {
+  previewId: string
+  sourcePath: string
+  kind: ImportSourceKind
+  detected: ImportSourceKind | null
+  container: 'zip' | 'folder'
+  /** A name for the new space. */
+  suggestedName: string
+  counts: ImportCounts
+  types: ImportPlannedType[]
+  mapping: ImportMapping
+  /** Obsidian/Anytype: [key, file count] for "type from key". */
+  frontmatterKeys: [string, number][]
+  /** Obsidian/Anytype: [top-level folder, Markdown file count]. */
+  folders: [string, number][]
+  /** The first 20 planned objects. */
+  samples: { title: string; typeKey: string; path: string; sourcePath: string }[]
+  /** The first 500; `counts.skipped` has the total. */
+  skipped: ImportSkippedItem[]
+  warnings: string[]
+}
+
+export interface StartImportResponse {
+  jobId: string
+  targetPath: string
+}
+
+export interface ImportResult {
+  targetPath: string
+  spaceName: string
+  objects: number
+  types: number
+  attachments: number
+  tags: number
+  skipped: number
+  /** The "Import report" object's space path. */
+  reportPath: string | null
+  cancelled: boolean
+}
+
+/** GET /api/import/jobs/{id} */
+export interface ImportJob {
+  id: string
+  phase: ImportPhase
+  done: number
+  total: number
+  targetPath: string
+  currentPath: string | null
+  result: ImportResult | null
+  error: string | null
+}
+
+// ---------------------------------------------------------------------------------------------
+// M14: local automations (docs/superpowers/plans/2026-11-05-m14-automations.md, "Contract (T1)").
+// One rule per `.object/automations/<id>.json`; the back end's `automations_model.py` is the twin.
+
+/** The objects a trigger watches: one type's, or one collection's. */
+export interface AutomationScope {
+  kind: 'type' | 'collection'
+  id: string
+}
+
+/** An object is created in the scope (for a collection scope: also added to it by a write). */
+export interface ObjectCreatedTrigger {
+  kind: 'objectCreated'
+  scope: AutomationScope
+}
+
+/**
+ * `propertyKey` changes on an object in the scope: to any value (`to` null), or into matching
+ * `to` (a filter on the same key; it didn't match before the write and does after).
+ */
+export interface PropertyChangedTrigger {
+  kind: 'propertyChanged'
+  scope: AutomationScope
+  propertyKey: string
+  to: Filter | null
+}
+
+/**
+ * Runs at `time` (`HH:mm`, the space's time zone) on `start` (`YYYY-MM-DD`) and on every later
+ * day the M8 repeat text reaches from it (`tasks/repeat.ts` `parseRepeat`; by due date only, so
+ * never "after completion"). The server stores `repeat` in canonical form (`formatRepeat`).
+ */
+export interface ScheduleTrigger {
+  kind: 'schedule'
+  repeat: string
+  time: string
+  start: string
+}
+
+/** Run by hand on one object: a button block or a Button property. `scope` null: any object. */
+export interface ButtonTrigger {
+  kind: 'button'
+  scope: AutomationScope | null
+}
+
+export type AutomationTrigger = ObjectCreatedTrigger | PropertyChangedTrigger | ScheduleTrigger | ButtonTrigger
+export type AutomationTriggerKind = AutomationTrigger['kind']
+
+/**
+ * Set `key` to `value` (the `PUT /api/object/properties` value form), or with `now` to the run's
+ * instant (date properties only; `value` is then null).
+ */
+export interface SetPropertyAction {
+  kind: 'setProperty'
+  key: string
+  value: unknown
+  now?: boolean
+}
+export interface ClearPropertyAction {
+  kind: 'clearProperty'
+  key: string
+}
+/** A Tag object, by its frontmatter `id`. */
+export interface AddTagAction {
+  kind: 'addTag'
+  tagId: string
+}
+export interface RemoveTagAction {
+  kind: 'removeTag'
+  tagId: string
+}
+export interface AddToCollectionAction {
+  kind: 'addToCollection'
+  collectionId: string
+}
+export interface RemoveFromCollectionAction {
+  kind: 'removeFromCollection'
+  collectionId: string
+}
+/**
+ * Create an object of `typeId`: `templateId` null applies the type's default template, `'none'`
+ * none. `title` takes placeholders (empty: the template's title). `relateVia`: a relation
+ * property key of the new object's type, set to the triggering object (null: not related).
+ */
+export interface CreateFromTemplateAction {
+  kind: 'createFromTemplate'
+  typeId: string
+  templateId: string | null
+  title: string
+  relateVia: string | null
+}
+/** Append `text` (placeholders expanded, may be several lines) to the run day's daily note. */
+export interface AppendToDailyNoteAction {
+  kind: 'appendToDailyNote'
+  text: string
+}
+/** A local notification; placeholders expanded. An empty title shows the rule's name. */
+export interface NotifyAction {
+  kind: 'notify'
+  title: string
+  body: string
+}
+
+export type AutomationAction =
+  | SetPropertyAction
+  | ClearPropertyAction
+  | AddTagAction
+  | RemoveTagAction
+  | AddToCollectionAction
+  | RemoveFromCollectionAction
+  | CreateFromTemplateAction
+  | AppendToDailyNoteAction
+  | NotifyAction
+export type AutomationActionKind = AutomationAction['kind']
+
+/** The actions that edit the triggering object (not offered on a schedule). */
+export const OBJECT_ACTION_KINDS: readonly AutomationActionKind[] = [
+  'setProperty',
+  'clearProperty',
+  'addTag',
+  'removeTag',
+  'addToCollection',
+  'removeFromCollection',
+]
+
+export type AutomationRunStatus = 'ok' | 'failed' | 'skipped'
+
+/** One run in a rule's log (`<state dir>`, the newest 200 per rule). */
+export interface AutomationRun {
+  /** A ULID. */
+  id: string
+  ruleId: string
+  /** ISO UTC instant the run started. */
+  at: string
+  trigger: {
+    kind: AutomationTriggerKind
+    /** The triggering object (null for a schedule). */
+    path: string | null
+    /** A schedule run: the occurrence's ISO UTC instant. */
+    scheduledFor: string | null
+    /** Run from the catch-up dialog. */
+    catchUp: boolean
+  }
+  /** `skipped`: the object didn't meet the conditions (logged for button presses only). */
+  status: AutomationRunStatus
+  actions: {
+    /** The action's index in the rule. */
+    index: number
+    kind: AutomationActionKind
+    status: AutomationRunStatus
+    /** The object the action wrote or created. */
+    path: string | null
+    /** Why it failed or was skipped. */
+    detail: string | null
+  }[]
+  error: string | null
+}
+
+export interface AutomationRule {
+  schemaVersion: 1
+  /** API only: the file name (a ULID). */
+  id: string
+  /** At most 100 characters. */
+  name: string
+  description: string
+  enabled: boolean
+  trigger: AutomationTrigger
+  /** The view filter group; empty passes. Always empty on a schedule. */
+  conditions: FilterGroup
+  /** 1 to 20, run in order (the object edits as one write, first). */
+  actions: AutomationAction[]
+  /** Set on the rule a template's "Repeat" made (one per template). */
+  templateRepeat: { typeId: string; templateId: string } | null
+  /** ISO UTC; set by the server on create. */
+  createdAt: string | null
+  /** API only: sha256 of the file. */
+  revision: string
+  /** API only: set when the file can't be read or has an unknown kind; such a rule never runs. */
+  readOnlyReason: string | null
+  /** API only: the newest logged run. */
+  lastRun: AutomationRun | null
+  [extra: string]: unknown
+}
+
+/** What `POST /api/automations` takes (the server sets the rest). */
+export type AutomationRuleInput = Pick<
+  AutomationRule,
+  'name' | 'description' | 'enabled' | 'trigger' | 'conditions' | 'actions' | 'templateRepeat'
+> & { [extra: string]: unknown }
+
+/** GET /api/automations/catch-up entry: a schedule's runs missed while Object was closed. */
+export interface AutomationCatchUpItem {
+  ruleId: string
+  /** The rule's name; for a template's repeat, the template's name. */
+  name: string
+  /** ISO UTC occurrence instants, oldest first, at most 50 (the newest ones). */
+  missed: string[]
+  count: number
+  /** More than 50 were missed. */
+  capped: boolean
+  /** The rule creates objects (the dialog says "Create" rather than "Run"). */
+  createsObjects: boolean
+}
+
+export type AutomationCatchUpChoice = 'all' | 'latest' | 'skip'
+/** M11: a local API token (Settings > Integrations). The secret is shown only when made. */
+export type ApiTokenScope = 'read' | 'read-write'
+
+export interface ApiToken {
+  id: string
+  name: string
+  scope: ApiTokenScope
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+/** The ``mcpServers`` entry an MCP client (Claude Code, Claude Desktop) needs. */
+export interface McpConfig {
+  mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }>
+}
+
+/** GET /api/integrations/tokens */
+export interface ApiTokenList {
+  tokens: ApiToken[]
+  mcp: McpConfig
+}
+
+/** POST /api/integrations/tokens */
+export interface CreatedApiToken {
+  token: ApiToken
+  secret: string
+  mcpConfig: McpConfig
+}
+
+
+// ---- M10: the AI assistant (contract) ----
+
+/** What an AI request is for. The server picks the instructions and the proposal it parses. */
+export type AiMode = 'chat' | 'askBlock' | 'tagBlock' | 'tagObject' | 'autofill' | 'rephrase'
+
+/** GET /api/ai/status */
+export interface AiStatus {
+  available: boolean
+  /** `notFound`: no `claude` at the path or on PATH; `notSignedIn`: it answered but isn't signed in. */
+  reason: 'ok' | 'notFound' | 'notSignedIn' | 'error'
+  claudePath: string | null
+  version: string | null
+  message: string | null
+}
+
+export interface AiMessage {
+  role: 'user' | 'assistant'
+  text: string
+  /** ISO instant */
+  at: string
+}
+
+/** POST /api/ai/chat (answers a server-sent event stream of `AiEvent`) */
+export interface AiChatRequest {
+  mode: AiMode
+  /** The user's message (for the other modes, an optional extra instruction). */
+  prompt: string
+  /** The pages the request is about; excluded pages are left out by the server. */
+  contextPaths: string[]
+  /** The block or selected text for askBlock, tagBlock and rephrase. */
+  block?: string | null
+  /**
+   * The object the block was taken from. The server sends a block only from an object it may
+   * show the assistant (not excluded from AI, not a template); a block without one is sent only
+   * when it is an assistant message of `history` (rephrasing an answer).
+   */
+  blockPath?: string | null
+  /** Earlier messages, used when the CLI session can't be resumed. */
+  history: AiMessage[]
+  sessionId?: string | null
+  clientId?: string
+}
+
+/** A change the assistant suggests; nothing is applied until the user accepts it. */
+export type AiProposal =
+  | { kind: 'tags'; tags: string[] }
+  | { kind: 'properties'; values: Record<string, unknown> }
+  | { kind: 'text'; text: string }
+
+/** A context page the server left out of a turn, and why. */
+export interface AiSkipped {
+  path: string
+  reason: 'excluded' | 'template' | 'missing' | 'tooLong'
+}
+
+export type AiEvent =
+  | { type: 'session'; sessionId: string }
+  /** A chunk to append to the answer so far. */
+  | { type: 'text'; text: string }
+  /** The assistant used a tool (an Object MCP read tool, by its short name). */
+  | { type: 'tool'; name: string }
+  | { type: 'done'; text: string; sessionId: string | null; proposal: AiProposal | null; skipped: AiSkipped[] }
+  | { type: 'error'; message: string }
+
+/** GET /api/ai/chat?path= */
+export interface AiChat {
+  path: string
+  version: string
+  title: string
+  contextPaths: string[]
+  sessionId: string | null
+  messages: AiMessage[]
+}
+
+/** POST /api/ai/chat/save: creates the chat (no `path`) or replaces its messages (409 on a stale `baseVersion`). */
+export interface SaveAiChatRequest {
+  path?: string | null
+  baseVersion?: string | null
+  /** Sent when the chat is created; empty or absent keeps a saved chat's title (renames stay). */
+  title?: string
+  contextPaths: string[]
+  sessionId: string | null
+  messages: AiMessage[]
+  clientId?: string
+}

@@ -77,6 +77,17 @@ describe('PropertySettings', () => {
     expect(vi.mocked(api.saveType).mock.calls[0][1]).toEqual({ baseRevision: 'r1', confirm: true })
   })
 
+  test('a formula or rollup is deleted without typing "delete"', async () => {
+    const user = userEvent.setup()
+    const formula = propertyDef({ id: 'p-f', key: 'f', name: 'F', type: 'formula', options: { expression: '1' } })
+    useLinkIndex.setState({ types: [{ ...PROJECT, propertyDefinitions: [...PROJECT.propertyDefinitions, formula] }, PERSON] })
+    open('p-f')
+    expect(screen.queryByRole('textbox', { name: 'Type "delete" to confirm' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Delete property' }))
+    await waitFor(() => expect(api.saveType).toHaveBeenCalledTimes(1))
+    expect(savedDef('p-f')).toBeUndefined()
+  })
+
   test('test relation Apply changes sends confirm after the 428 dialog', async () => {
     const user = userEvent.setup()
     vi.mocked(api.saveType)
@@ -102,6 +113,43 @@ describe('PropertySettings', () => {
     open('p-lead')
     expect(screen.getByText('Two-way linking')).toBeInTheDocument()
     expect(screen.getByText(/Synced properties are only available for multi-select properties/)).toBeInTheDocument()
+  })
+
+  describe('two-way linking of a single-sided pair (sub-items)', () => {
+    const PARENT = propertyDef({
+      id: 'p-parent',
+      key: 'parent',
+      name: 'Parent item',
+      type: 'entity',
+      options: { isArray: false, allowedTypes: ['task'], hasFixedSet: false, fixedSet: [], propertySyncing: { propertyIds: ['p-children'] } },
+    })
+    const CHILDREN = propertyDef({
+      id: 'p-children',
+      key: 'children',
+      name: 'Sub-items',
+      type: 'entity',
+      options: { isArray: true, allowedTypes: ['task'], hasFixedSet: false, fixedSet: [], propertySyncing: { propertyIds: ['p-parent'] } },
+    })
+    const TASK = typeDef({ id: 'task', name: 'Task', pluralName: 'Tasks', revision: 't1', propertyDefinitions: [TITLE, PARENT, CHILDREN] })
+    const openTask = (propertyId: string) => {
+      useLinkIndex.setState({ types: [TASK], objects: [], loaded: true })
+      render(<PropertySettings typeId="task" propertyId={propertyId} open onOpenChange={vi.fn()} onOpenProperty={vi.fn()} />)
+    }
+
+    test('"Parent item" shows its synced partner, not the multi-select notice', () => {
+      openTask('p-parent')
+      expect(screen.queryByText(/Synced properties are only available for multi-select properties/)).toBeNull()
+      expect(screen.getByRole('button', { name: 'Sub-items', pressed: true })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'No Property', pressed: false })).toBeInTheDocument()
+    })
+
+    test('"Sub-items" shows its single partner as the synced property', async () => {
+      const user = userEvent.setup()
+      openTask('p-children')
+      expect(screen.getByRole('button', { name: 'Parent item', pressed: true })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'No Property' }))
+      expect(api.setPropertySync).toHaveBeenCalledWith('task', 'p-children', null, 't1', undefined)
+    })
   })
 
   test('two-way linking offers to create a property in the linked type', async () => {

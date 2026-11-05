@@ -86,9 +86,13 @@ describe('turn into (M8 Task 27)', () => {
       ok = await turnIntoObject(editor, 'Page')
     })
     expect(ok).toBe(true)
-    expect(mocked.createObject).toHaveBeenCalledWith('Page', { title: 'Parent item' })
-    // The children became the body (dedented), saved against the loaded version.
-    expect(mocked.saveBody).toHaveBeenCalledWith('Pages/Parent item.md', '- child one\n- child two\n', 'v-loaded')
+    // The children (dedented) go below the new object's own body in the creating write (M14:
+    // no separate save a creation rule's write could turn into a 409).
+    expect(mocked.createObject).toHaveBeenCalledWith('Page', {
+      title: 'Parent item',
+      appendBody: '- child one\n- child two',
+    })
+    expect(mocked.saveBody).not.toHaveBeenCalled()
     expect(serializeBody(editor)).toBe(
       'Before\n\n<!-- block: view=inline -->\n![[Parent item]]\n\n- Sibling\n\nAfter\n',
     )

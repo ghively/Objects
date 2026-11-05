@@ -8,6 +8,7 @@ import type { DateValue, NumberFormat, PropertyDef, SettingsLanguage } from '@/a
 import type { DeviceSettings } from '@/api/types'
 import { currentTimeZone, zonedParts } from '@/lib/zonedTime'
 import { useSettings } from '@/settings/useSettings'
+import { computedIsEmpty } from './computed'
 import { currencySymbol } from './currencies'
 
 /** Digits are laid out in en-US (`1,234.5`) and the separators swapped for a comma radix. */
@@ -210,7 +211,8 @@ function blank(v: unknown): boolean {
 
 /**
  * Whether a property counts as empty (for "Hide when empty"), with these quirks: number 0
- * and boolean false are empty, and created at, last updated and backlinks are always empty.
+ * and boolean false are empty, and created at, last updated and backlinks are always empty. A
+ * formula or rollup is empty when its computed value is (M12).
  */
 export function propertyIsEmpty(def: Pick<PropertyDef, 'type'>, value: unknown): boolean {
   switch (def.type) {
@@ -221,6 +223,10 @@ export function propertyIsEmpty(def: Pick<PropertyDef, 'type'>, value: unknown):
     case 'entity_lastUpdated':
     case 'entity_backlinks':
       return true
+    case 'formula':
+    case 'rollup':
+      // M12: a computed value; an error still shows (so "Hide when empty" never hides it).
+      return computedIsEmpty(value, { errorIsEmpty: false })
     case 'datetime':
     case 'datetimeSimple':
       if (value !== null && typeof value === 'object' && !Array.isArray(value)) {

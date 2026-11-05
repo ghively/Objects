@@ -3,8 +3,8 @@
  * selection, in the live app's order (catalog section 6): Bold, Italic,
  * Strikethrough, Underline, Bullet list, To-do, Link, Code, Formula,
  * "Highlight text" (the colour panel, `ColorMenu`), `+` ("Create object from
- * text selection.") and `@` ("Link existing object with text selection.").
- * The AI sparkle is left out until M10. The two list buttons turn the block
+ * text selection."), `@` ("Link existing object with text selection.") and the
+ * AI sparkle ("AI", M10; gone while "Hide AI features" is on). The two list buttons turn the block
  * into that list and back to text (the catalog read the second icon as
  * numbered or to-do; To-do is our choice).
  *
@@ -13,6 +13,9 @@
  *   where the click's modifier keys say (`createAndOpen`).
  * - Link existing: pick an object; the selection becomes a link to it, keeping
  *   the selected words as the label when they differ from the title (our choice).
+ * - AI: opens the AI chat about the selected text (`aiEntries.openSelectionAi`);
+ *   accepting an answer replaces the selection (if it is still the same text)
+ *   or adds a paragraph below its block. The divider before it is our choice.
  * - The `highlightText` shortcut is not the panel: it toggles
  *   the last-used colour on the selection (`nodes/textStyle`).
  *
@@ -38,12 +41,15 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useAiHidden } from '@/ai/store'
 import type { ObjectSummary, TypeDef } from '@/api/types'
+import { Icon } from '@/components/Icon'
 import { createAndOpen, type OpenMods } from '@/create/createAndOpen'
 import { cn } from '@/lib/utils'
 import { ensureLinkIndex, typeOf, useLinkIndex } from '@/links/linkIndex'
 import { fuzzyMatch, fuzzyScore } from '@/links/LinkPicker'
 import { TypeChip } from '@/shell/Sidebar'
+import { AI_ICON, AI_TEXT, openSelectionAi, useAiBlocked } from '../aiEntries'
 import { blockSelectionRange, turnInto } from '../extensions/blockSelection'
 import { wikilinkTargetFor } from '../extensions/wikilink'
 import { ColorMenu, COLOR_MENU_TEXT } from './ColorMenu'
@@ -63,6 +69,7 @@ export const TOKENS_MENU_TEXT = {
   highlight: COLOR_MENU_TEXT.title,
   create: 'Create object from text selection.',
   reuse: 'Link existing object with text selection.',
+  ai: AI_TEXT.ai,
   searchTypes: 'Search Object Types',
   searchObjects: 'Search objects', // our string
   noObjects: 'No matching objects', // our string (as the link picker)
@@ -85,6 +92,7 @@ export const TOKENS_MENU_ITEMS: readonly string[] = [
   TOKENS_MENU_TEXT.highlight,
   TOKENS_MENU_TEXT.create,
   TOKENS_MENU_TEXT.reuse,
+  TOKENS_MENU_TEXT.ai, // M10, while AI features are not hidden
 ]
 
 export type TokensMenuProps = { editor: Editor | null; path: string }
@@ -340,6 +348,9 @@ export function TokensMenu({ editor }: TokensMenuProps) {
   panelRef.current = panel
   const types = useLinkIndex((s) => s.types)
   const objects = useLinkIndex((s) => s.objects)
+  // Hidden too on a page excluded from AI or a template (M10).
+  const aiBlocked = useAiBlocked(editor)
+  const aiHidden = useAiHidden() || aiBlocked
 
   const refresh = useCallback(() => {
     if (!editor || editor.isDestroyed) return
@@ -485,6 +496,20 @@ export function TokensMenu({ editor }: TokensMenuProps) {
         <ToolButton label={TOKENS_MENU_TEXT.reuse} active={panel === 'reuse'} onClick={() => toggle('reuse')}>
           <AtSignIcon aria-hidden />
         </ToolButton>
+        {!aiHidden && (
+          <>
+            <span className="tokens-divider" aria-hidden />
+            <ToolButton
+              label={TOKENS_MENU_TEXT.ai}
+              onClick={() => {
+                setPanel(null)
+                openSelectionAi(editor)
+              }}
+            >
+              <Icon name={AI_ICON} size={16} />
+            </ToolButton>
+          </>
+        )}
       </div>
       {panel === 'color' && (
         <div className="tokens-panel">

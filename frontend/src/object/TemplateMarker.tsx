@@ -1,6 +1,8 @@
 /**
  * The banner on a template object: "Template", its "Template Name" (the `template:` key),
  * "Templates prefill new objects.", a "Make default" star and "Manage" (Object Type Settings).
+ * M14: "Repeat" opens the template's Repeat dialog (an automation that makes an object from it on
+ * a schedule).
  */
 import { useEffect, useState } from 'react'
 import type { ObjectSummary, TypeDef } from '@/api/types'
@@ -8,6 +10,8 @@ import { Icon } from '@/components/Icon'
 import { cn } from '@/lib/utils'
 import { templateKey } from '@/types/TemplateManager'
 import { makeDefaultTemplate } from './UseTemplateMenu'
+import { repeatOf, TEMPLATE_REPEAT_TEXT, TemplateRepeatDialog } from '@/automations/TemplateRepeatDialog'
+import { useAutomations } from '@/automations/useAutomations'
 import type { TypeEditor } from './useTypeEditor'
 
 export const TEMPLATE_MARKER_TEXT = {
@@ -37,6 +41,9 @@ export function TemplateMarker({ summary, type, editor, readOnly, onRename, onMa
   useEffect(() => setName(saved), [saved])
   const key = templateKey(summary)
   const isDefault = !!type && type.templates?.defaultTemplateId === key
+  const { rules } = useAutomations()
+  const repeats = !!repeatOf(rules, summary.id)
+  const [repeatOpen, setRepeatOpen] = useState(false)
 
   const commit = () => {
     const next = name.trim()
@@ -86,9 +93,27 @@ export function TemplateMarker({ summary, type, editor, readOnly, onRename, onMa
         <Icon name={isDefault ? 'ph-star-fill' : 'ph-star'} size={14} />
         {isDefault && TEMPLATE_MARKER_TEXT.isDefault}
       </button>
+      {type && (
+        <button
+          type="button"
+          aria-pressed={repeats}
+          disabled={readOnly}
+          onClick={() => setRepeatOpen(true)}
+          className={cn(
+            'flex h-7 items-center gap-1 rounded-md px-2 hover:bg-hover disabled:hover:bg-transparent',
+            repeats ? 'text-fg' : 'text-fg-muted',
+          )}
+        >
+          <Icon name="ph-repeat" size={14} />
+          {repeats ? TEMPLATE_REPEAT_TEXT.repeating : TEMPLATE_REPEAT_TEXT.menu}
+        </button>
+      )}
       <button type="button" onClick={onManage} className="h-7 rounded-md px-2 text-fg-muted hover:bg-hover hover:text-fg">
         {TEMPLATE_MARKER_TEXT.manage}
       </button>
+      {type && repeatOpen && (
+        <TemplateRepeatDialog open typeId={type.id} template={summary} onOpenChange={setRepeatOpen} />
+      )}
     </div>
   )
 }

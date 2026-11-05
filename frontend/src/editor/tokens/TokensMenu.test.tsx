@@ -9,6 +9,9 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
+import { resetAiStore, useAi } from '@/ai/store'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
+import { setEditorObject } from '../nodes/blockRef'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { THEME_COLORS } from '@/theme/palette'
@@ -96,6 +99,7 @@ describe('TokensMenu', () => {
       'Highlight text',
       'Create object from text selection.',
       'Link existing object with text selection.',
+      'AI', // M10
     ])
 
     fireEvent.click(within(bar()).getByRole('button', { name: 'Highlight text' }))
@@ -241,5 +245,33 @@ describe('TokensMenu', () => {
     press()
     expect(serializeBody(editor)).toBe('Hello <span data-color="text-red">brave</span> world\n')
     setLastUsedHighlightColor(null)
+  })
+
+  test('m10: the AI sparkle opens the chat about the selection; accepting replaces it', () => {
+    resetAiStore()
+    const editor = setup('Hello brave world\n', 'brave')
+    setEditorObject(editor, { path: 'Pages/Note.md' })
+    fireEvent.click(within(bar()).getByRole('button', { name: 'AI' }))
+    const seed = useAi.getState().pending!.seed
+    expect(seed).toMatchObject({ mode: 'chat', block: 'brave', contextPaths: ['Pages/Note.md'] })
+    // The panel takes the focus; the editor moves on before the answer is accepted.
+    act(() => {
+      editor.commands.setTextSelection(1)
+    })
+    act(() => seed.onReplace!('bold'))
+    expect(serializeBody(editor)).toBe('Hello bold world\n')
+    act(() => seed.onInsertBelow!('More'))
+    expect(serializeBody(editor)).toBe('Hello bold world\n\nMore\n')
+    resetAiStore()
+  })
+
+  test('m10: no AI sparkle while AI features are hidden', () => {
+    useSettings.setState({ settings: { ...settingsDefaults, aiHidden: true } })
+    try {
+      setup('Hello brave world\n', 'brave')
+      expect(within(bar()).queryByRole('button', { name: 'AI' })).toBeNull()
+    } finally {
+      useSettings.setState({ settings: settingsDefaults })
+    }
   })
 })
