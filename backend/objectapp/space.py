@@ -2221,6 +2221,16 @@ class Space:
                 )
                 if cdef is None:
                     continue
+                # M13: a single counterpart (a sub-item's "Parent item") is replaced, so the
+                # parent it named before must drop the target from its own list.
+                displaced: list[str] = []
+                if target in now and cdef.options.get("isArray") is False:
+                    with self._lock:
+                        traw = self._raw.get(target)
+                    if traw is not None:
+                        displaced = sorted(
+                            self._linked_paths(cdef, traw.fm.get(cdef.key), target) - {rel}
+                        )
                 edit = self._backlink_edit(cdef, rel, target, add=target in now)
                 wrote: list[bool] = []
 
@@ -2232,9 +2242,44 @@ class Space:
                 result = self._rewrite_other(target, tracked, stamp=True)
                 if isinstance(result, Skip):
                     skipped.append(result)
-                elif wrote and wrote[-1]:
+                    continue
+                if wrote and wrote[-1]:
                     synced.append(target)
+                for old_parent in displaced:
+                    out = self._drop_link(pdef, old_parent, target)
+                    if isinstance(out, Skip):
+                        skipped.append(out)
+                    elif out and old_parent not in synced:
+                        synced.append(old_parent)
         return synced, skipped
+
+    def _drop_link(self, pdef: PropertyDefinition, owner: str, target: str) -> Skip | bool:
+        """Remove ``owner``'s link to ``target`` from its ``pdef`` value (stamped); whether it wrote."""
+        with self._lock:
+            summary = self._summaries.get(owner)
+        if summary is None:
+            return False
+        if summary.readOnly:
+            return Skip(owner, summary.readOnlyReason or "Object is read-only")
+        tt = self.type_by_id(summary.type)
+        odef = next(
+            (p for p in (tt.propertyDefinitions if tt is not None else []) if p.id == pdef.id),
+            None,
+        )
+        if odef is None or odef.type != "entity":
+            return False
+        edit = self._backlink_edit(odef, target, owner, add=False)
+        wrote: list[bool] = []
+
+        def tracked(of: ObjectFile, fm: dict) -> ObjectFile | None:
+            out = edit(of, fm)
+            wrote.append(out is not None)
+            return out
+
+        result = self._rewrite_other(owner, tracked, stamp=True)
+        if isinstance(result, Skip):
+            return result
+        return bool(wrote and wrote[-1])
 
     def _backlink_edit(self, cdef: PropertyDefinition, rel: str, target: str, add: bool) -> Edit:
         """Add (or remove) the link to ``rel`` in ``target``'s ``cdef`` value, keeping other items."""
