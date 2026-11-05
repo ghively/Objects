@@ -1,7 +1,9 @@
 // Rows for a scope, kept fresh from change events. Events are batched in one 150 ms window:
 // a create, delete, rename, type or collection event reloads everything (value shapes and
 // collection-name resolution may have changed); otherwise the changed paths are fetched in ONE
-// call and merged in. Other kinds (queries, views, ui) are ignored.
+// call and merged in. Other kinds (queries, views, ui) are ignored. M12: when the scope holds a
+// type with a rollup, a change to an object that isn't a row of such a type (a related Member of
+// a Project, say) reloads everything too, since any rollup may read it.
 //
 // Rows load without previews (`preview: false`; audit 2026-11-01 P2): the pipeline runs over
 // every row, but only a card layout's visible page shows a preview, and `DataView` fetches those
@@ -9,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import type { ChangeEvent, Row, RowsScope } from '@/api/types'
+import { typeOf } from '@/links/linkIndex'
 
 const WINDOW_MS = 150
 const RELOAD_KINDS = new Set(['created', 'deleted', 'renamed', 'types', 'collections'])
@@ -20,6 +23,20 @@ export interface UseRows {
   patchRow(path: string, row: Row): void
 }
 
+function hasRollup(typeId: string | null | undefined): boolean {
+  return !!typeOf(typeId)?.propertyDefinitions.some((d) => d.type === 'rollup')
+}
+
+/** Whether a change to `changed` may alter a rollup shown in `rows` (beyond those rows' own refetch). */
+export function rollupsMayChange(scope: RowsScope, rows: Row[], changed: string[]): boolean {
+  const rolled = new Set<string>()
+  for (const t of scope.typeIds ?? []) if (hasRollup(t)) rolled.add(t)
+  for (const r of rows) if (hasRollup(r.summary.type)) rolled.add(r.summary.type)
+  if (rolled.size === 0) return false
+  const rollupRows = new Set(rows.filter((r) => rolled.has(r.summary.type)).map((r) => r.summary.path))
+  return changed.some((p) => !rollupRows.has(p))
+}
+
 export function useRows(scope: RowsScope): UseRows {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,6 +44,8 @@ export function useRows(scope: RowsScope): UseRows {
   const scopeRef = useRef(scope)
   scopeRef.current = scope
   const seq = useRef(0)
+  const rowsRef = useRef(rows)
+  rowsRef.current = rows
 
   const reload = useCallback(async () => {
     const n = ++seq.current
@@ -58,6 +77,7 @@ export function useRows(scope: RowsScope): UseRows {
       paths.clear()
       if (everything) return reload()
       if (changed.length === 0) return
+      if (rollupsMayChange(scopeRef.current, rowsRef.current, changed)) return reload()
       const inScope = scopeRef.current.paths
       const wanted = inScope ? changed.filter((p) => inScope.includes(p)) : changed
       if (wanted.length === 0) return

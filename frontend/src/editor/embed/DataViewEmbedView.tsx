@@ -114,6 +114,8 @@ interface EmbedBodyProps {
   savedView: string | null
   onSaveView(json: string): void
   heading: ReactNode
+  /** The embedded collection's or query's name (the chart's export file name). */
+  viewName: string
   types: TypeDef[]
   collections: Collection[]
 }
@@ -150,7 +152,7 @@ function useEmbedState(
   return { state, onState }
 }
 
-function CollectionEmbed({ collection: c, details, onDetails, savedView, onSaveView, heading, types, collections }: EmbedBodyProps & { collection: Collection }) {
+function CollectionEmbed({ collection: c, details, onDetails, savedView, onSaveView, heading, viewName, types, collections }: EmbedBodyProps & { collection: Collection }) {
   const scope = useMemo(() => ({ collectionIds: [c.id] }), [c.id])
   const { rows, loading, patchRow } = useRows(scope)
   const { state, onState } = useEmbedState(c.views.all, savedView, details, onDetails, onSaveView)
@@ -165,6 +167,7 @@ function CollectionEmbed({ collection: c, details, onDetails, savedView, onSaveV
       state={fit.state}
       onState={onState}
       layouts={fit.layouts}
+      viewName={viewName}
       heading={heading}
       embedded
       patchRow={patchRow}
@@ -172,7 +175,7 @@ function CollectionEmbed({ collection: c, details, onDetails, savedView, onSaveV
   )
 }
 
-function QueryEmbed({ query: q, details, onDetails, savedView, onSaveView, heading, types, collections }: EmbedBodyProps & { query: Query }) {
+function QueryEmbed({ query: q, details, onDetails, savedView, onSaveView, heading, viewName, types, collections }: EmbedBodyProps & { query: Query }) {
   const def = q.definition
   const allTypeIds = useMemo(() => types.map((t) => t.id), [types])
   const ready = isQueryReady(def)
@@ -211,6 +214,7 @@ function QueryEmbed({ query: q, details, onDetails, savedView, onSaveView, headi
       state={fit.state}
       onState={onState}
       layouts={fit.layouts}
+      viewName={viewName}
       heading={heading}
       embedded
       pipeline={pipeline}
@@ -312,7 +316,7 @@ export function DataViewEmbedView({ node, editor, getPos, selected }: NodeViewPr
   )
 
   let body: ReactNode
-  const shared = { details, onDetails, savedView, onSaveView, heading, types, collections: defs.collections }
+  const shared = { details, onDetails, savedView, onSaveView, heading, viewName: title, types, collections: defs.collections }
   if (collection) body = <CollectionEmbed key={collection.id} collection={collection} {...shared} />
   else if (query) body = <QueryEmbed key={query.id} query={query} {...shared} />
   else if (!defs.loaded) body = <p className="py-2 text-[14px] text-fg-muted" aria-busy="true">{DATA_VIEW_EMBED_TEXT.loading}</p>

@@ -12,10 +12,12 @@ import {
   cleanLayout,
   closeEntry,
   entriesOf,
+  isPageTarget,
   isSidepanelShown,
   moveEntry,
   navigateEntry,
   openInArea,
+  replaceEntryTarget,
   retargetEntries,
   stepEntry,
   togglePersistentEntry,
@@ -49,10 +51,12 @@ export type Target =
   | { kind: 'search'; q?: string; textOnly?: boolean }
 
 /**
- * What a side-panel entry shows (Task 15): a page target, M5's local graph of the tab's object, or
- * (M8) the tab's object's backlinks.
+ * What a side-panel entry shows (Task 15): a page target, M5's local graph of the tab's object,
+ * (M8) the tab's object's backlinks, or (M10) the AI chat, with the path of its saved AI Chat
+ * object once the chat has been saved (none for a new chat). The AI chat is not a page target: it
+ * can't swap with the main view or open as a page.
  */
-export type SidepanelTarget = Target | { kind: 'localGraph' } | { kind: 'backlinks' }
+export type SidepanelTarget = Target | { kind: 'localGraph' } | { kind: 'backlinks' } | { kind: 'aiChat'; path?: string }
 
 /** One side-panel entry. `target: null` is the empty "Explore" entry. */
 export interface SidepanelEntry {
@@ -157,6 +161,11 @@ export interface TabsState {
   toggleSidepanel(): void
   /** A link followed inside entry `id` (the entry keeps its own history). */
   navigateSidepanelEntry(id: string, target: SidepanelTarget | null): void
+  /**
+   * M10: entry `id` shows `target` in place of its current target, without a new history entry
+   * (the AI chat names its saved chat once it is saved, and forgets it on "New chat").
+   */
+  replaceSidepanelEntryTarget(id: string, target: SidepanelTarget): void
   sidepanelBack(id: string): void
   sidepanelForward(id: string): void
   toggleSidepanelEntryPersistent(id: string): void
@@ -179,6 +188,8 @@ export function sameTarget(a: SidepanelTarget | null | undefined, b: SidepanelTa
     case 'localGraph':
     case 'backlinks':
       return true
+    case 'aiChat':
+      return (a.path ?? null) === ((b as typeof a).path ?? null)
     case 'type':
     case 'typeSettings':
       return a.typeId === (b as typeof a).typeId
@@ -495,7 +506,7 @@ export const useTabs = create<TabsState>()(
         withPanel(set, get, false, (t) => {
           const entry = entriesOf(t).find((e) => e.id === id)
           const side = entry?.target
-          if (!entry || !side || side.kind === 'localGraph' || side.kind === 'backlinks') return t
+          if (!entry || !isPageTarget(side)) return t
           const main = tabTarget(t)
           if (side.kind === 'object') useRecent.getState().add(side.path)
           const swapped = sameTarget(main, side) ? t : pushEntry(t, side, [])
@@ -522,6 +533,10 @@ export const useTabs = create<TabsState>()(
       navigateSidepanelEntry(id, target) {
         if (target?.kind === 'object') useRecent.getState().add(target.path)
         withPanel(set, get, false, (t) => ({ ...t, sidepanel: navigateEntry(entriesOf(t), id, target) }))
+      },
+
+      replaceSidepanelEntryTarget(id, target) {
+        withPanel(set, get, false, (t) => ({ ...t, sidepanel: replaceEntryTarget(entriesOf(t), id, target) }))
       },
 
       sidepanelBack(id) {

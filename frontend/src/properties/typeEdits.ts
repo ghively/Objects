@@ -119,6 +119,15 @@ function defaultOptions(kind: PropertyType): PropertyOptions {
       return { isArray: false, set: [] }
     case 'button':
       return { ruleId: null }
+    // M12 (our defaults, as the back end's `_default_options`)
+    case 'formula':
+      return { expression: '' }
+    case 'rollup':
+      return { relationId: '', targetId: '', calc: 'showOriginal' }
+    case 'uniqueId':
+      return { prefix: '', nextNumber: 1 }
+    case 'files':
+      return { isArray: true }
     default:
       return {}
   }
