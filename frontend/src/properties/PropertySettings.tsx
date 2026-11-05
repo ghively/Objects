@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { DateConstraints, PropertyDef, PropertyOptions, PropertyType, TypeDef } from '@/api/types'
+import { COMPUTED_KINDS } from '@/api/types'
 import { ColorPicker } from '@/components/ColorPicker'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -13,6 +14,9 @@ import { CURRENCIES } from './currencies'
 import { KIND_META, objectSelectTypes } from './kinds'
 import { LabelMenu } from './LabelMenu'
 import { NumberFormatMenu } from './NumberFormatMenu'
+import { FormulaSection } from './settings/FormulaSection'
+import { RollupSection } from './settings/RollupSection'
+import { UniqueIdSection } from './settings/UniqueIdSection'
 import { canChangeVisibility, canDeleteProperty, VISIBILITY_OPTIONS } from './PropertyMenu'
 import {
   allowedKindChanges,
@@ -71,6 +75,8 @@ export interface PropertySettingsProps {
   onOpenProperty?(propertyId: string): void
   /** The type editor to save through; without one the dialog uses its own. */
   editor?: TypeEditor
+  /** M12: the object the settings were opened from (a formula previews against it). */
+  objectPath?: string | null
 }
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
@@ -700,6 +706,8 @@ export function DeletePropertySection({
 }) {
   const word = def.type === 'blocks' ? 'delete-all-content' : 'delete'
   const [typed, setTyped] = useState('')
+  // A formula or rollup holds no values in the files: deleted without typing a confirmation.
+  const computed = COMPUTED_KINDS.has(def.type)
   return (
     <Section title="Delete property" description={TEXT.deleteDescription}>
       {def.type === 'blocks' && (
@@ -707,16 +715,18 @@ export function DeletePropertySection({
           {onlyContent ? TEXT.onlyBlocksPropertyWarning : TEXT.blocksPropertyWarning}
         </p>
       )}
-      <input
-        aria-label={`Type "${word}" to confirm`}
-        placeholder={word}
-        value={typed}
-        onChange={(e) => setTyped(e.target.value)}
-        className="w-full rounded border border-line bg-transparent px-2 py-1 text-[13px] outline-none"
-      />
+      {!computed && (
+        <input
+          aria-label={`Type "${word}" to confirm`}
+          placeholder={word}
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          className="w-full rounded border border-line bg-transparent px-2 py-1 text-[13px] outline-none"
+        />
+      )}
       <button
         type="button"
-        disabled={typed.trim() !== word}
+        disabled={!computed && typed.trim() !== word}
         onClick={onDelete}
         className="mt-2 rounded bg-red-900/60 px-3 py-1 text-[13px] font-medium text-red-100 disabled:opacity-40"
       >
@@ -729,7 +739,15 @@ export function DeletePropertySection({
 // -- dialog ----------------------------------------------------------------------------------
 
 /** "Property settings": name and description, the kind's settings, visibility, change kind, delete. */
-export function PropertySettings({ typeId, propertyId, open, onOpenChange, onOpenProperty, editor }: PropertySettingsProps) {
+export function PropertySettings({
+  typeId,
+  propertyId,
+  open,
+  onOpenChange,
+  onOpenProperty,
+  editor,
+  objectPath,
+}: PropertySettingsProps) {
   const own = useTypeEditor(editor ? null : typeId)
   const ed = editor ?? own
   const type = useLinkIndex((s) => s.types.find((t) => t.id === typeId))
@@ -796,6 +814,9 @@ export function PropertySettings({ typeId, propertyId, open, onOpenChange, onOpe
             )}
             {def.type === 'entity' && !type.basic && <RelationSection type={type} def={def} editor={ed} />}
             {def.type === 'label' && <LabelSection type={type} def={def} save={save} />}
+            {def.type === 'formula' && <FormulaSection type={type} def={def} save={save} objectPath={objectPath} />}
+            {def.type === 'rollup' && <RollupSection type={type} def={def} save={save} />}
+            {def.type === 'uniqueId' && <UniqueIdSection type={type} def={def} save={save} />}
             {canChangeVisibility(def) && (
               <Section title="Visibility" description="Decide whether you want this property to be visible on your object's page.">
                 <div className="flex gap-1.5">

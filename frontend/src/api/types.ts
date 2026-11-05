@@ -19,6 +19,13 @@ export type PropertyType =
   | 'blocks'
   | 'coverImage'
   | 'color'
+  // M12 (our kinds)
+  | 'formula'
+  | 'rollup'
+  | 'uniqueId'
+  | 'email'
+  | 'phone'
+  | 'files'
   | 'entity_title'
   | 'entity_icon'
   | 'entity_description'
@@ -47,6 +54,12 @@ export const PROPERTY_TYPES: readonly PropertyType[] = [
   'blocks',
   'coverImage',
   'color',
+  'formula',
+  'rollup',
+  'uniqueId',
+  'email',
+  'phone',
+  'files',
   'entity_title',
   'entity_icon',
   'entity_description',
@@ -77,6 +90,12 @@ export const KIND_TRANSFORMS: Readonly<Record<PropertyType, readonly PropertyTyp
   blocks: [],
   coverImage: [],
   color: [],
+  formula: [],
+  rollup: [],
+  uniqueId: [],
+  email: [],
+  phone: [],
+  files: [],
   entity_title: [],
   entity_icon: [],
   entity_description: [],
@@ -155,7 +174,103 @@ export interface PropertyOptions {
   propertySyncing?: { propertyIds: string[] }
   set?: LabelOption[]
   isStatus?: boolean
+  /** M12 formula: the expression (at most 2000 characters). */
+  expression?: string
+  /** M12 rollup: the `entity` property of this type whose related objects are rolled up. */
+  relationId?: string
+  /** M12 rollup: the property (id) of the related objects, or `title`. */
+  targetId?: string
+  /** M12 rollup: the calculation. */
+  calc?: RollupCalc
+  /** M12 ID: the text before the number (`TASK-`). */
+  prefix?: string
+  /** M12 ID: the number the next created object gets. The server never lets it go back. */
+  nextNumber?: number
   [extra: string]: unknown
+}
+
+/** M12: a rollup's calculation (the `views/calc.ts` names, plus show original/unique). */
+export type RollupCalc =
+  | 'showOriginal'
+  | 'showUnique'
+  | 'countAll'
+  | 'countValues'
+  | 'countUnique'
+  | 'countEmpty'
+  | 'countNotEmpty'
+  | 'percentEmpty'
+  | 'percentNotEmpty'
+  | 'sum'
+  | 'average'
+  | 'median'
+  | 'min'
+  | 'max'
+  | 'range'
+  | 'earliestDate'
+  | 'latestDate'
+  | 'dateRange'
+
+export const ROLLUP_CALCS: readonly RollupCalc[] = [
+  'showOriginal',
+  'showUnique',
+  'countAll',
+  'countValues',
+  'countUnique',
+  'countEmpty',
+  'countNotEmpty',
+  'percentEmpty',
+  'percentNotEmpty',
+  'sum',
+  'average',
+  'median',
+  'min',
+  'max',
+  'range',
+  'earliestDate',
+  'latestDate',
+  'dateRange',
+]
+
+/** M12: the result type of a formula or rollup value. */
+export type ComputedType = 'text' | 'number' | 'boolean' | 'date' | 'list' | 'empty' | 'error'
+
+/**
+ * M12: a formula or rollup value, computed by the server per request and never stored.
+ * `value` is a string (text), a finite number, a boolean, an ISO date (`YYYY-MM-DD`) or instant
+ * (date), a string list (list) or `null` (empty, error).
+ */
+export interface ComputedValue {
+  type: ComputedType
+  value: string | number | boolean | string[] | null
+  /** Only for `error`: what went wrong (shown on hover). */
+  error?: string
+}
+
+/** M12: the property kinds whose values the server computes (never in frontmatter). */
+export const COMPUTED_KINDS: ReadonlySet<PropertyType> = new Set<PropertyType>(['formula', 'rollup'])
+
+/** M12: POST /api/formula/preview */
+export interface FormulaPreviewRequest {
+  typeId: string
+  expression: string
+  /** The object to evaluate against; without it the expression is only parsed. */
+  path?: string | null
+  /** The type's definitions as the editor has them (unsaved), replacing the stored ones. */
+  properties?: PropertyDef[]
+}
+
+export interface FormulaPreviewResult {
+  value: ComputedValue | null
+  /** A parse or evaluation error. */
+  error: string | null
+}
+
+/** M12: POST /api/types/{typeId}/properties/{pid}/number-existing */
+export interface NumberExistingResult {
+  type: TypeDef
+  numbered: number
+  rewritten: string[]
+  skipped: string[]
 }
 
 export interface PropertyDef {
@@ -394,6 +509,8 @@ export interface ObjectDetail {
   links: Record<string, (string | null)[]>
   /** M5: the distinct objects linking to this one, by title then path. */
   backlinks: EntityRef[]
+  /** M12: the object's formula and rollup values by property key (computed, never stored). */
+  computed?: Record<string, ComputedValue>
 }
 
 /** PUT /api/object/body → 200 */
