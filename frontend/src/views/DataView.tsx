@@ -620,7 +620,8 @@ export function DataView(props: DataViewProps) {
     ...(props.customizePages ?? []),
   ]
 
-  const empty = !props.loading && total === 0
+  // M13: the calendar and timeline still draw their grid with no rows (a day click creates the first object).
+  const empty = !props.loading && total === 0 && layout !== 'calendar' && layout !== 'timeline'
   const createType = viewTypes[0]
   const createName = viewTypes.length === 1 ? viewTypes[0].name : 'object'
 
