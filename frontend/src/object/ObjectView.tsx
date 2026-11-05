@@ -790,6 +790,7 @@ export function ObjectView({
         links={detail.links}
         summary={detail.summary}
         backlinks={detail.backlinks ?? []}
+        computed={detail.computed}
         readOnly={propsReadOnly}
         onChange={(key, value) => writeProperties({ [key]: value })}
         onChangeMany={(u, r) => void writes.updateProperties(u, r)}
