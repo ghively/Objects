@@ -263,6 +263,19 @@ describe('<BlockSelectionBar>', () => {
     expect(order).toEqual(['flush', `save DailyNotes/${todayYmd()}.md`])
   })
 
+  test('move to a new page creates the page with the blocks in one write', async () => {
+    // M14: the text rides in the creating write, so a creation rule's write can't come between
+    // the page and its text (a separate save would meet a 409 and leave the page empty).
+    const editor = mounted(BODY)
+    vi.mocked(api.createObject).mockResolvedValueOnce({ path: 'Pages/Untitled.md', version: 'v1' })
+    render(<BlockSelectionBar editor={editor} />)
+    select(editor, 0, 1)
+    fireEvent.click(within(await openMenu('Move')).getByRole('menuitem', { name: 'New page' }))
+    await waitFor(() => expect(serializeBody(editor)).toBe('Four five six\n'))
+    expect(api.createObject).toHaveBeenCalledWith(expect.any(String), { templateId: 'none', body: 'One two\n\nThree\n' })
+    expect(api.saveBody).not.toHaveBeenCalled()
+  })
+
   test('a failed move keeps the blocks', async () => {
     const editor = mounted(BODY)
     render(<BlockSelectionBar editor={editor} />)

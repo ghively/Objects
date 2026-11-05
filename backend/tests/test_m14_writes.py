@@ -141,3 +141,53 @@ def test_put_properties_refuses_a_button_key(space: Space):
     )
     with pytest.raises(InvalidValue):
         space.update_properties(REPORT, {"go": None}, version(space, REPORT))
+
+
+def test_a_rename_or_type_change_is_announced_once_the_file_has_moved(space: Space):
+    # Review M14 #3: the notice of the stamped write inside a rename (or a type change) is
+    # handed on only when the whole locked operation is over, so whoever gets it finds the
+    # object at its new path (and the space's lock is free).
+    seen: list[tuple[WriteNotice, bool, bool]] = []
+
+    def hook(n: WriteNotice) -> None:
+        seen.append((n, (space.root / n.path).is_file(), space._lock._is_owned()))
+
+    space.after_write = hook
+    space.rename_object(REPORT, "Submit the report", version(space, REPORT))
+    assert [(n.kind, n.path, on_disk, held) for n, on_disk, held in seen] == [
+        ("changed", REPORT, False, False)]  # fmt: skip
+    assert (space.root / "Tasks/Submit the report.md").is_file()
+    seen.clear()
+    moved = "Tasks/Submit the report.md"
+    result = space.change_type(moved, "page", {}, version(space, moved))
+    assert result.path.startswith("Pages/")
+    assert [(n.kind, on_disk, held) for n, on_disk, held in seen] == [("changed", False, False)]
+    assert seen[0][0].after["type"] == "Page"
+
+
+def test_notices_wait_for_the_outermost_lock(space: Space):
+    seen = record(space)
+    with space._lock:
+        with space._lock:
+            space.update_properties(REPORT, {"priority": "Low"}, version(space, REPORT))
+        assert seen == []
+    assert [n.after["priority"] for n in seen] == ["Low"]
+    # A write outside any lock is announced at once, as before.
+    space.update_properties(REPORT, {"priority": "High"}, version(space, REPORT))
+    assert [n.after["priority"] for n in seen] == ["Low", "High"]
+
+
+@pytest.mark.parametrize("path", ["Tasks/Pay rent.md", "Tasks/Stretch.md"])
+def test_completing_a_repeating_task_carries_the_requested_status(space: Space, path: str):
+    # Review M14 #4: completing a repeating Task resets its status in the same write; the
+    # notice carries the status the caller asked for, so "changes to Done" can still match.
+    seen = record(space)
+    result = space.update_properties(path, {"status": "Done"}, version(space, path))
+    assert result.task is not None and result.task.advanced
+    assert len(seen) == 1
+    n = seen[0]
+    assert n.after["status"] == "Not Started"
+    assert n.requested == {"status": "Done"}
+    seen.clear()
+    space.update_properties(path, {"priority": "High"}, version(space, path))
+    assert seen[0].requested is None

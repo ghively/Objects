@@ -415,6 +415,49 @@ class ObjectSummary:
     """The raw names of the ``collections:`` key (``[]`` when absent)."""
 
 
+class _SpaceLock:
+    """The space's re-entrant lock, holding back `after_write` notices until it is free.
+
+    A notice made while the writing thread holds the lock (a write inside a rename, a type
+    change, or any other operation that holds the lock across several steps) is kept for that
+    thread and handed on when its outermost hold ends, so whoever gets it (the M14 engine's
+    worker) never sees a half-done operation: a renamed file not moved yet, a lock still held.
+    """
+
+    __slots__ = ("_deliver", "_lock", "_pending")
+
+    def __init__(self, deliver: Callable[[list[WriteNotice]], None]) -> None:
+        self._lock = threading.RLock()
+        self._pending: dict[int, list[WriteNotice]] = {}
+        self._deliver = deliver
+
+    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
+        return self._lock.acquire(blocking, timeout)
+
+    def release(self) -> None:
+        self._lock.release()
+        if self._pending and not self._lock._is_owned():  # type: ignore[attr-defined]
+            held = self._pending.pop(threading.get_ident(), None)
+            if held:
+                self._deliver(held)
+
+    def __enter__(self) -> bool:
+        return self._lock.acquire()
+
+    def __exit__(self, *_exc: object) -> None:
+        self.release()
+
+    def _is_owned(self) -> bool:
+        return self._lock._is_owned()  # type: ignore[attr-defined]
+
+    def hold(self, notice: WriteNotice) -> bool:
+        """Keep ``notice`` until this thread's outermost hold ends; False when it holds none."""
+        if not self._lock._is_owned():  # type: ignore[attr-defined]
+            return False
+        self._pending.setdefault(threading.get_ident(), []).append(notice)
+        return True
+
+
 @dataclass(frozen=True)
 class WriteNotice:
     """What `Space.after_write` is told about one write (M14 automations).
@@ -422,6 +465,10 @@ class WriteNotice:
     ``kind`` is ``'created'`` (``before`` None) or ``'changed'``; ``before`` and ``after``
     are the parsed frontmatter values around the write; ``origin`` is
     `writeorigin.current()` at the write (None for the app's and the API's own writes).
+    ``requested`` holds the values (frontmatter form) the caller's write asked for that a
+    hook replaced before writing: completing a repeating Task asks for ``status: Done`` and
+    writes the reset status and the next date (M8), so ``requested`` is ``{"status": "Done"}``
+    (None when nothing was replaced).
     """
 
     kind: str
@@ -429,6 +476,7 @@ class WriteNotice:
     before: dict | None
     after: dict
     origin: str | None = None
+    requested: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -834,7 +882,7 @@ class Space:
         self._space_json = os.fspath(self.root / SPACE_REL)
         self._name_cache: tuple[tuple | None, str] | None = None
         """(`space.json`'s stat key, the name read with it) for `name`."""
-        self._lock = threading.RLock()
+        self._lock = _SpaceLock(self._deliver_notices)
         self._raw: dict[str, RawObject] = {}
         self._summaries: dict[str, ObjectSummary] = {}
         self._checked_rels: set[str] = set()
@@ -863,8 +911,9 @@ class Space:
         right before the app replaces an existing file (never on create, never on read).
         Errors it raises are logged and never stop the write (see `_call_before_write`)."""
         self.after_write: Callable[[WriteNotice], None] | None = None
-        """M14 automations: called with a `WriteNotice` after the replace (outside `_write`'s
-        own lock section) for stamped writes whose frontmatter changed, and by the create
+        """M14 automations: called with a `WriteNotice` after the replace, once the writing
+        thread holds the space's lock no more (a rename's write is announced after its move;
+        see `_SpaceLock`), for stamped writes whose frontmatter changed, and by the create
         paths (`create_object`, `duplicate_object`, `create_daily_note`, `ensure_tag`). Never
         for unstamped rewrites, body-only saves, version or trash restores, or templates.
         Errors it raises are logged and never stop the write (see `_call_after_write`)."""
@@ -1256,13 +1305,21 @@ class Space:
 
     def _call_after_write(self, notice: WriteNotice | None) -> None:
         """Run the `after_write` hook (M14 automations) for one write; never raises."""
-        hook = self.after_write
-        if hook is None or notice is None:
+        if self.after_write is None or notice is None:
             return
-        try:
-            hook(notice)
-        except Exception:  # noqa: BLE001 - an automation must never stop a save
-            _log.exception("The post-write hook failed for %s", notice.path)
+        if self._lock.hold(notice):
+            return  # handed on when this thread's outermost hold of the lock ends
+        self._deliver_notices([notice])
+
+    def _deliver_notices(self, notices: list[WriteNotice]) -> None:
+        hook = self.after_write
+        if hook is None:
+            return
+        for notice in notices:
+            try:
+                hook(notice)
+            except Exception:  # noqa: BLE001 - an automation must never stop a save
+                _log.exception("The post-write hook failed for %s", notice.path)
 
     def _created_notice(self, rel: str) -> WriteNotice | None:
         """The ``created`` notice of a file one of the create paths just placed (None for a
@@ -1849,6 +1906,7 @@ class Space:
         stamp: bool = True,
         now: datetime | None = None,
         history: bool = True,
+        requested: dict[str, Any] | None = None,
     ) -> str:
         """Apply `edit` to an object file safely; return its (new) version.
 
@@ -1860,6 +1918,7 @@ class Space:
         untouched line's bytes are kept; the replace re-checks the version.
         ``now`` is the write's instant for the stamp (default: `Space.clock`).
         Without ``history`` the write takes no version-history snapshot (`before_write`).
+        ``requested`` (filled by `edit` as it runs) is passed on as `WriteNotice.requested`.
 
         The lock is held for the read and the edit, released while the history
         snapshot and the temp file are written and synced (the slow part; reads go
@@ -1941,7 +2000,8 @@ class Space:
             if notify and self.after_write is not None:
                 after = fresh.fm if fresh is not None else self._raw.get(rel, raw).fm
                 notice = WriteNotice(
-                    "changed", rel, dict(raw.fm), dict(after), writeorigin.current()
+                    "changed", rel, dict(raw.fm), dict(after), writeorigin.current(),
+                    dict(requested) if requested else None,
                 )
         self._call_after_write(notice)
         return new_version
@@ -2190,20 +2250,27 @@ class Space:
         t = self._type_of(rel)
         before: dict = {}
         task: list[TaskResult | None] = [None]
+        requested: dict[str, Any] = {}
         now = self.clock()  # one instant for `completed`, `lastUpdated` and "today"
 
         def hook(fm: dict, sets: dict[str, Any], removals: list[str]) -> None:
+            asked = dict(sets)
             task[0] = on_status_change(
                 t, fm, sets, removals, now, self.tz, explicit={*updates, *remove},
                 week_start=week_start_of(self.root),
             )
+            if task[0] is not None and task[0].advanced:
+                # M14: the notice says which asked-for values the recurrence replaced (the
+                # status set to Done, reset to Not Started), so "changes to Done" still fires.
+                requested.update({k: v for k, v in asked.items() if sets.get(k) != v})
 
         def apply(src: str, fm: dict) -> str:
             before.update(fm)
             task[0] = None
+            requested.clear()
             return self._apply_values(t, rel, src, fm, updates, remove, hook=hook)
 
-        version = self._write(rel, base_version, self._fm_edit(apply), now=now)
+        version = self._write(rel, base_version, self._fm_edit(apply), now=now, requested=requested)
         _of, fm, _v = self.read(rel)
         synced, skipped = self._sync_relations(rel, t, before, fm)
         return UpdateResult(
@@ -2998,6 +3065,8 @@ class Space:
         template_id: str | None = None,
         values: dict[str, Any] | None = None,
         reference: datetime | None = None,
+        body: str | None = None,
+        append_body: str | None = None,
     ) -> tuple[str, str]:
         """Create an object of the type in its folder; return (path, version).
 
@@ -3018,6 +3087,11 @@ class Space:
         ``reference`` (M14: an automation's run instant) is the instant a template's
         ``{date:FMT}`` and ``{creation:...}`` values are taken at (default: the clock);
         ``createdAt`` and ``lastUpdated`` are always the clock's.
+
+        ``body`` replaces the body the object would get (``# <title>`` or the template's);
+        ``append_body`` is added below that body after one blank line (alone when it is
+        empty). Both are written in the creating write, so the text is there before anything
+        hears of the object (M14: a creation rule's write can't race a separate body save).
 
         Raises `KeyError` for an unknown type and `TemplateError` when the
         template can't be found or applied (nothing is written then).
@@ -3050,10 +3124,15 @@ class Space:
             {**({"title": title} if title else {}), "createdAt": stamp, "lastUpdated": stamp},
             insert_first={"id": new_ulid()},
         )
-        body = f"# {title}\n" if title else ""
-        of = ObjectFile(fm_src, body, True, None)
+        of = ObjectFile(fm_src, f"# {title}\n" if title else "", True, None)
         if tmpl is not None:
             of = self._template_edit(t, tmpl, created)(of, parse_fm(fm_src)) or of
+        if body is not None:
+            of = replace(of, body=body.replace("\r\n", "\n"))
+        if append_body:
+            extra = append_body.replace("\r\n", "\n")
+            joined = f"{of.body.rstrip()}\n\n{extra}" if of.body.strip() else extra
+            of = replace(of, body=joined if joined.endswith("\n") else f"{joined}\n")
         stem = safe_filename(title) if title else "Untitled"
         if values:
             for key in values:

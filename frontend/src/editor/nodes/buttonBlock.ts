@@ -51,13 +51,16 @@ export function buttonLabelText(label: string): string {
 /**
  * The source text for a label typed in the app: one line (line breaks become spaces), trimmed,
  * with a backslash before a first character that would start another block on reload (a heading,
- * a list item, a quote, a fence, a comment, an embed, a math block, a table row...), so the
- * paragraph stays one paragraph. `null` for an empty label (a button keeps its label).
+ * a list item, a quote, a fence, a comment, an embed, a math block, a table row, a `___` rule...)
+ * or make the line a link reference definition (`[x]: y`), so the paragraph stays one paragraph.
+ * `null` for an empty label (a button keeps its label).
  */
 export function buttonLabelSource(text: string): string | null {
   const one = text.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim()
   if (one === '') return null
-  if (/^(?:[#>*+\-=`~<|$!\\]|\d{1,9}[.)](?:\s|$))/.test(one)) return `\\${one}`
+  if (/^(?:[#>*+\-=`~<|$!\\_]|\d{1,9}[.)](?:\s|$))/.test(one)) return `\\${one}`
+  // `[label]: destination` (and `[^1]: note`) is a definition, not a paragraph.
+  if (/^\[(?:[^\]\\]|\\.)+\]:/.test(one)) return `\\${one}`
   // A `Key:: value` field line is kept raw on load.
   if (/^[^\s:][^:]*::(?:\s|$)/.test(one)) return one.replace('::', '\\::')
   return one

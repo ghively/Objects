@@ -343,6 +343,10 @@ class CreateObjectRequest(BaseModel):
     title: str | None = None
     templateId: str | None = None
     values: dict[str, Any] | None = None
+    body: str | None = None
+    """M14: the new object's body, written in the creating write (replaces the template's)."""
+    appendBody: str | None = None
+    """M14: text added below the body the object gets (its heading or template's)."""
     clientId: str | None = None
 
 
@@ -1317,7 +1321,8 @@ def create_app(
         templates_before = space.template_versions()
         try:
             path, version = space.create_object(
-                req.typeId, req.title or "", req.templateId, req.values
+                req.typeId, req.title or "", req.templateId, req.values,
+                body=req.body, append_body=req.appendBody,
             )
         except InvalidValue as exc:
             announce_template_ids(templates_before, req.clientId)
