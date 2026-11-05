@@ -1,5 +1,5 @@
 // M10: the AI chat side-panel entry.
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -220,7 +220,10 @@ describe('AiChatPanel', () => {
   test('test a properties proposal: a table; Accept writes only those keys', async () => {
     mocked.object.mockResolvedValue(objectDetail({ summary: objectSummary({ path: 'Pages/A.md' }), version: 'v2' }))
     mocked.aiChat.mockImplementation(
-      answer(done('', { proposal: { kind: 'properties', values: { owner: 'Gene', due: '2026-11-09' } }, skipped: ['Pages/B.md'] })),
+      answer(done('', { proposal: { kind: 'properties', values: { owner: 'Gene', due: '2026-11-09' } }, skipped: [
+          { path: 'Pages/B.md', reason: 'excluded' },
+          { path: 'Pages/Gone.md', reason: 'tooLong' },
+        ] })),
     )
     const { user } = setup()
     act(() => openAiChat({ mode: 'autofill' }))
@@ -228,7 +231,7 @@ describe('AiChatPanel', () => {
     const rows = within(box).getAllByRole('row').slice(1)
     expect(rows.map((r) => r.textContent)).toEqual(['ownerGene', 'due2026-11-09'])
     // The excluded page is named.
-    expect(screen.getByText('Left out (Exclude from AI): Beta')).toBeInTheDocument()
+    expect(screen.getByText('Left out: Beta (excluded from AI), Gone (too long)')).toBeInTheDocument()
     await user.click(within(box).getByRole('button', { name: T.accept }))
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Pages/A.md', { owner: 'Gene', due: '2026-11-09' }, 'v2'))
   })
@@ -352,6 +355,101 @@ describe('AiChatPanel', () => {
     expect(mocked.aiChatLoad).toHaveBeenCalledWith('AI Chats/C.md')
     expect(mocked.saveAiChat.mock.calls[2][0]).toMatchObject({ path: 'AI Chats/C.md', baseVersion: 'v9' })
     expect(mocked.saveAiChat.mock.calls[2][0].messages).toHaveLength(4)
+  })
+
+  test('test a block goes with its page; a rephrased answer goes without one', async () => {
+    mocked.aiChat.mockImplementation(answer(done('Answer one')))
+    const { user } = setup()
+    act(() => openAiChat({ mode: 'askBlock', block: 'Block text', blockPath: 'Pages/A.md' }))
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(1))
+    expect(mocked.aiChat.mock.calls[0][0]).toMatchObject({ mode: 'askBlock', block: 'Block text', blockPath: 'Pages/A.md' })
+    await screen.findByText('Answer one')
+    // A typed follow-up still carries the block chip and its page.
+    await user.type(input(), 'More{Enter}')
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(2))
+    expect(mocked.aiChat.mock.calls[1][0]).toMatchObject({ block: 'Block text', blockPath: 'Pages/A.md' })
+    await waitFor(() => expect(screen.getAllByRole('button', { name: T.rephrase })[0]).toBeEnabled())
+    await user.click(screen.getAllByRole('button', { name: T.rephrase })[0])
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(3))
+    expect(mocked.aiChat.mock.calls[2][0]).toMatchObject({ mode: 'rephrase', block: 'Answer one', blockPath: null })
+    expect(mocked.aiChat.mock.calls[2][0].history).toContainEqual(expect.objectContaining({ role: 'assistant', text: 'Answer one' }))
+  })
+
+  test('test a later save sends no title, so a rename made elsewhere stays', async () => {
+    const { user } = setup()
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'One{Enter}')
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+    expect(mocked.saveAiChat.mock.calls[0][0]).toMatchObject({ title: 'One' })
+    await user.type(input(), 'Two{Enter}')
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(2))
+    expect(mocked.saveAiChat.mock.calls[1][0].path).toBe('AI Chats/Chat.md')
+    expect(mocked.saveAiChat.mock.calls[1][0].title).toBeUndefined()
+  })
+
+  test('test a stale save over messages changed elsewhere stops and says so', async () => {
+    mocked.saveAiChat.mockResolvedValueOnce({ path: 'AI Chats/C.md', version: 'v1' }).mockRejectedValueOnce(new ConflictError('v9'))
+    mocked.aiChatLoad.mockResolvedValue({
+      path: 'AI Chats/C.md',
+      version: 'v9',
+      title: 'Renamed',
+      contextPaths: [],
+      sessionId: null,
+      messages: [{ role: 'user', text: 'Edited elsewhere', at: '2026-11-05T09:00:00Z' }],
+    })
+    const { user } = setup()
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'One{Enter}')
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+    await user.type(input(), 'Two{Enter}')
+    expect(await screen.findByText(T.changedElsewhere)).toBeInTheDocument()
+    expect(mocked.aiChatLoad).toHaveBeenCalledWith('AI Chats/C.md')
+    expect(mocked.saveAiChat).toHaveBeenCalledTimes(2)
+  })
+
+  test('test Accept writes to the page the proposal was made for, not the context at the click', async () => {
+    mocked.object.mockResolvedValue(objectDetail({ summary: objectSummary({ path: 'Pages/A.md', tags: [] }), version: 'v4' }))
+    mocked.aiChat.mockImplementation(answer(done('Try these.', { proposal: { kind: 'tags', tags: ['ops'] } })))
+    const { user } = setup()
+    act(() => openAiChat({ mode: 'tagObject', contextPaths: ['Pages/A.md'] }))
+    const box = await screen.findByRole('region', { name: T.proposedTags })
+    // The context changes after the proposal came back.
+    await user.click(screen.getByRole('button', { name: T.removeContext('Alpha') }))
+    await user.click(screen.getByRole('button', { name: T.addContext }))
+    await user.click(await screen.findByRole('option', { name: 'Beta' }))
+    await user.click(within(box).getByRole('button', { name: T.accept }))
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Pages/A.md', { tags: ['ops'] }, 'v4'))
+    expect(mocked.object).not.toHaveBeenCalledWith('Pages/B.md', expect.anything())
+  })
+
+  test('test an AltGr character typed in the message box is text, not a shortcut', async () => {
+    mocked.object.mockResolvedValue(objectDetail({ summary: objectSummary({ path: 'Pages/A.md' }), body: '', version: 'v1' }))
+    const { user } = setup()
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'Q{Enter}')
+    await screen.findByRole('button', { name: T.retry })
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+    // Polish AltGr+A ("ą"): Windows reports Ctrl+Alt with the A key.
+    const typed = fireEvent.keyDown(input(), { key: 'ą', code: 'KeyA', ctrlKey: true, altKey: true })
+    expect(typed).toBe(true) // not prevented: the character is typed
+    await new Promise((r) => setTimeout(r, 20))
+    expect(mocked.saveBody).not.toHaveBeenCalled()
+    // From elsewhere in the panel the same keys are the shortcut.
+    fireEvent.keyDown(screen.getByRole('button', { name: T.newChat }), { key: 'ą', code: 'KeyA', ctrlKey: true, altKey: true })
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith('Pages/A.md', 'Hello\n', 'v1'))
+  })
+
+  test('test a seed’s range tracking is released when another seed or New chat replaces it', async () => {
+    const first = vi.fn()
+    const second = vi.fn()
+    const { user } = setup()
+    act(() => openAiChat({ mode: 'chat', block: 'x', blockPath: 'Pages/A.md', release: first }))
+    await waitFor(() => expect(within(screen.getByRole('list', { name: T.context })).getByText(T.block)).toBeInTheDocument())
+    expect(first).not.toHaveBeenCalled()
+    act(() => openAiChat({ mode: 'chat', block: 'y', blockPath: 'Pages/A.md', release: second }))
+    await waitFor(() => expect(first).toHaveBeenCalledTimes(1))
+    await user.click(screen.getByRole('button', { name: T.newChat }))
+    expect(second).toHaveBeenCalledTimes(1)
   })
 
   test('test chat keys act on the last answer while the panel has focus', async () => {

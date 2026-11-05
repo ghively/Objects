@@ -14,10 +14,14 @@ export interface AiSeed {
   contextPaths?: string[]
   /** The block or selected text the request is about. */
   block?: string | null
+  /** The object `block` was taken from (the server sends the block only from a visible one). */
+  blockPath?: string | null
   /** Set by an editor entry: puts accepted text in place of the block or selection. */
   onReplace?: (text: string) => void
   /** Set by an editor entry: inserts accepted text below the block. */
   onInsertBelow?: (text: string) => void
+  /** Set by an editor entry: called once the seed is replaced (another seed, New chat, the chat closing). */
+  release?: () => void
 }
 
 interface AiState {
@@ -34,6 +38,8 @@ export const useAi = create<AiState>((set, get) => ({
   pending: null,
   open(seed) {
     counter += 1
+    // A seed the chat never took is replaced: let it go.
+    get().pending?.seed.release?.()
     set({ pending: { seed, n: counter } })
   },
   take() {
@@ -66,5 +72,6 @@ export function useAiHidden(): boolean {
 }
 
 export function resetAiStore(): void {
+  useAi.getState().pending?.seed.release?.()
   useAi.setState({ pending: null })
 }

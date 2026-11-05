@@ -50,6 +50,9 @@ READ_TOOLS = {
     "schema", "search", "query", "run_saved_query", "peek", "read", "backlinks",
     "daily_note", "changes_since",
 }
+# Claude Code session ids are UUIDs (the app drops any other id).
+SESSION_1 = "0f8fad5b-d9cb-469f-a165-70867728950e"
+SESSION_2 = "7c9e6679-7425-40de-944b-e07fc1f90ae7"
 MESSAGES = [
     {"role": "user", "text": "What do my notes say?", "at": "2026-11-05T12:00:00.000Z"},
     {"role": "assistant", "text": "A code block:\n\n```md\n## You\nstill code\n```\n\nThat's all.",
@@ -189,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
 
         print("\n4. Saved chats")
         code, made = run.http("POST", "/ai/chat/save", {
-            "title": "", "contextPaths": [page] if page else [], "sessionId": "sess-1",
+            "title": "", "contextPaths": [page] if page else [], "sessionId": SESSION_1,
             "messages": MESSAGES, "clientId": "acceptance"})
         run.report(code == 200, f"save: {made}")
         status_lines = sorted(git(root, "status", "--porcelain", "--untracked-files=all").splitlines())
@@ -199,17 +202,17 @@ def main(argv: list[str] | None = None) -> int:
                    f"exactly the AI Chat type file and one chat file: {added}")
         if code == 200:
             code, loaded = run.http("GET", "/ai/chat", path=made["path"])
-            run.report(code == 200 and loaded["messages"] == MESSAGES and loaded["sessionId"] == "sess-1"
+            run.report(code == 200 and loaded["messages"] == MESSAGES and loaded["sessionId"] == SESSION_1
                        and loaded["title"] == "What do my notes say?"
                        and loaded["contextPaths"] == ([page] if page else []),
                        "load gives the messages, title, session and context back")
             more = [*MESSAGES, {"role": "user", "text": "And then?", "at": "2026-11-05T12:01:00.000Z"}]
             code, saved = run.http("POST", "/ai/chat/save", {
                 "path": made["path"], "baseVersion": made["version"], "title": "", "contextPaths": [],
-                "sessionId": "sess-2", "messages": more, "clientId": "acceptance"})
+                "sessionId": SESSION_2, "messages": more, "clientId": "acceptance"})
             run.report(code == 200 and saved["path"] == made["path"], f"second save: {code}")
             _, again = run.http("GET", "/ai/chat", path=made["path"])
-            run.report(again["messages"] == more and again["sessionId"] == "sess-2", "the messages were replaced")
+            run.report(again["messages"] == more and again["sessionId"] == SESSION_2, "the messages were replaced")
             before = (root / made["path"]).read_bytes()
             code, stale = run.http("POST", "/ai/chat/save", {
                 "path": made["path"], "baseVersion": made["version"], "title": "", "contextPaths": [],

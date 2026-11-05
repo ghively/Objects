@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from fake_claude import install
+from fake_claude import EXPIRED_SESSION, install
 from fastapi.testclient import TestClient
 from objectapp import ai, aichat
 from objectapp import settings as device_settings
@@ -26,6 +26,9 @@ from objectapp.space import Space
 from objectapp.tokens import TokenStore
 
 NOW = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
+SESSION_A = "0f8fad5b-d9cb-469f-a165-70867728950e"
+SESSION_B = "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+SESSION_C = "16fd2706-8baf-433b-82eb-8c7fada847da"
 BACKEND = Path(__file__).resolve().parents[1] / "objectapp"
 
 
@@ -193,14 +196,14 @@ def test_tool_use_and_text_are_not_repeated(api) -> None:
 def test_cli_flags_config_and_cwd(api, fake, space_dir: Path) -> None:
     _space, client, _ = api
     _set(aiModel="sonnet")
-    _chat(client, "Hi", sessionId="abc-123")
+    _chat(client, "Hi", sessionId=SESSION_A)
     (run,) = _runs(fake["log"])
     argv = run["argv"]
     assert argv[0] == "-p" or "-p" in argv
     i = argv.index("--output-format")
     assert argv[i + 1] == "stream-json" and "--verbose" in argv
     assert argv[argv.index("--model") + 1] == "sonnet"
-    assert argv[argv.index("--resume") + 1] == "abc-123"
+    assert argv[argv.index("--resume") + 1] == SESSION_A
     assert "--strict-mcp-config" in argv
     allowed = set(argv[argv.index("--allowedTools") + 1].split(","))
     assert allowed == {f"mcp__object__{t}" for t in ai.READ_TOOLS}
@@ -235,12 +238,12 @@ def test_expired_session_retries_fresh_with_history(api, fake) -> None:
         {"role": "user", "text": "Earlier question about llamas", "at": "2026-11-05T10:00:00Z"},
         {"role": "assistant", "text": "Earlier answer", "at": "2026-11-05T10:00:01Z"},
     ]
-    events = _chat(client, "Next", sessionId="expired", history=history)
+    events = _chat(client, "Next", sessionId=EXPIRED_SESSION, history=history)
     first, second = _runs(fake["log"])
     assert "--resume" in first["argv"] and "Earlier question" not in first["prompt"]
     assert "--resume" not in second["argv"] and "Earlier question about llamas" in second["prompt"]
     done = _done(events)
-    assert done["sessionId"] and done["sessionId"] != "expired"
+    assert done["sessionId"] and done["sessionId"] != EXPIRED_SESSION
     assert not [e for e in events if e["type"] == "error"]
 
 
@@ -248,7 +251,7 @@ def test_history_is_sent_only_without_a_session(api, fake) -> None:
     _space, client, _ = api
     history = [{"role": "user", "text": "Older words", "at": "2026-11-05T10:00:00Z"}]
     _chat(client, "Now", history=history)
-    _chat(client, "Now", history=history, sessionId="live-1")
+    _chat(client, "Now", history=history, sessionId=SESSION_B)
     fresh, resumed = _runs(fake["log"])
     assert "Older words" in fresh["prompt"] and "Older words" not in resumed["prompt"]
 
@@ -299,13 +302,13 @@ def test_bad_mode_is_422(api) -> None:
 def test_tag_proposal(api) -> None:
     _space, client, _ = api
     for mode in ("tagBlock", "tagObject"):
-        events = _chat(client, "FAKE:tags", mode=mode, block="Some block", contextPaths=["People/Ada Lovelace.md"])
+        events = _chat(client, "FAKE:tags", mode=mode, block="Some block", blockPath="Pages/Notes.md", contextPaths=["People/Ada Lovelace.md"])
         assert _done(events)["proposal"] == {"kind": "tags", "tags": ["Math", "history", "Ideas"]}
 
 
 def test_tag_prompt_lists_existing_tags(api, fake) -> None:
     _space, client, _ = api
-    _chat(client, "", mode="tagBlock", block="A block about docs")
+    _chat(client, "", mode="tagBlock", block="A block about docs", blockPath="Pages/Notes.md")
     (run,) = _runs(fake["log"])
     assert "Docs" in run["prompt"] and "A block about docs" in run["prompt"]
     assert "```json" in run["prompt"]
@@ -321,13 +324,13 @@ def test_autofill_proposal_keeps_only_empty_properties(api, fake) -> None:
 
 def test_text_proposal(api) -> None:
     _space, client, _ = api
-    events = _chat(client, "FAKE:text", mode="rephrase", block="a unclear sentence")
+    events = _chat(client, "FAKE:text", mode="rephrase", block="a unclear sentence", blockPath="Pages/Notes.md")
     assert _done(events)["proposal"] == {"kind": "text", "text": "A clearer sentence.\nSecond line."}
 
 
 def test_malformed_proposal_is_null(api) -> None:
     _space, client, _ = api
-    events = _chat(client, "FAKE:badjson", mode="tagBlock", block="b")
+    events = _chat(client, "FAKE:badjson", mode="tagBlock", block="b", blockPath="Pages/Notes.md")
     assert _done(events)["proposal"] is None
     events = _chat(client, "FAKE:tags", mode="chat")
     assert _done(events)["proposal"] is None  # chat proposes nothing
@@ -368,7 +371,11 @@ def test_excluded_and_template_pages_never_reach_the_prompt(full_space_dir: Path
     paths = ["Pages/Alpha.md", "Templates/Tasks/Bug report.md", "People/Ada Lovelace.md", "Pages/Nope.md"]
     events = _chat(client, "Summarise", contextPaths=paths)
     done = _done(events)
-    assert done["skipped"] == ["Pages/Alpha.md", "Templates/Tasks/Bug report.md", "Pages/Nope.md"]
+    assert done["skipped"] == [
+        {"path": "Pages/Alpha.md", "reason": "excluded"},
+        {"path": "Templates/Tasks/Bug report.md", "reason": "template"},
+        {"path": "Pages/Nope.md", "reason": "missing"},
+    ]
     (run,) = _runs(fake["log"])
     assert "first published algorithm" in run["prompt"]
     assert "collides with the server" not in run["prompt"]
@@ -381,7 +388,7 @@ def test_tag_excluded_page_is_skipped(space_dir: Path, fake) -> None:
                    encoding="utf-8")
     _space, app, _ = _app(space_dir)
     events = _chat(TestClient(app), "x", contextPaths=["People/Ada Lovelace.md"])
-    assert _done(events)["skipped"] == ["People/Ada Lovelace.md"]
+    assert _done(events)["skipped"] == [{"path": "People/Ada Lovelace.md", "reason": "excluded"}]
     assert "first published algorithm" not in _runs(fake["log"])[0]["prompt"]
 
 
@@ -391,9 +398,81 @@ def test_context_is_capped(space_dir: Path, monkeypatch) -> None:
     pack = ai.gather_context(space, ["People/Ada Lovelace.md", "Pages/Notes.md"])
     assert pack.truncated
     assert sum(len(p.text) for p in pack.pages) <= 40
-    assert pack.skipped == ["Pages/Notes.md"]  # left out entirely by the cap
+    assert pack.skipped == [{"path": "Pages/Notes.md", "reason": "tooLong"}]  # left out entirely by the cap
     prompt = ai.build_prompt("chat", "q", pack)
     assert "cut" in prompt.lower()
+
+
+def _exclude_ada(space_dir: Path) -> None:
+    ada = space_dir / "People" / "Ada Lovelace.md"
+    ada.write_text(ada.read_text(encoding="utf-8").replace("tags: [Math]", "tags: [Math, Exclude from AI]"),
+                   encoding="utf-8")
+
+
+def test_block_of_an_excluded_page_is_refused(space_dir: Path, fake) -> None:
+    _exclude_ada(space_dir)
+    _space, app, _ = _app(space_dir)
+    client = TestClient(app)
+    secret = "Wrote the first published algorithm."
+    for extra in ({"blockPath": "People/Ada Lovelace.md"}, {}, {"blockPath": "Pages/Nope.md"}):
+        events = _chat(client, "", mode="askBlock", block=secret, **extra)
+        assert events == [{"type": "error", "message": "This page is excluded from AI, so its text can't be sent."}]
+    assert _runs(fake["log"]) == []  # the CLI never started
+
+
+def test_block_of_a_template_is_refused(full_space_dir: Path, fake) -> None:
+    _space, app, _ = _app(full_space_dir)
+    events = _chat(TestClient(app), "", mode="rephrase", block="Steps to reproduce",
+                   blockPath="Templates/Tasks/Bug report.md")
+    assert [e["type"] for e in events] == ["error"]
+    assert _runs(fake["log"]) == []
+
+
+def test_block_of_a_visible_page_or_an_answer_is_sent(api, fake) -> None:
+    _space, client, _ = api
+    _done(_chat(client, "", mode="askBlock", block="Block words", blockPath="Pages/Notes.md"))
+    history = [{"role": "assistant", "text": "An earlier answer", "at": "2026-11-05T10:00:00Z"}]
+    _done(_chat(client, "", mode="rephrase", block="An earlier answer", history=history))
+    first, second = _runs(fake["log"])
+    assert "Block words" in first["prompt"] and "An earlier answer" in second["prompt"]
+
+
+def test_relations_to_excluded_pages_are_left_out(full_space_dir: Path, fake) -> None:
+    _exclude_ada(full_space_dir)
+    _space, app, _ = _app(full_space_dir)
+    _done(_chat(TestClient(app), "x", contextPaths=["Projects/Object app.md"]))
+    prompt = _runs(fake["log"])[0]["prompt"]
+    assert "Lead: Ada Lovelace" not in prompt
+    assert "Members: Alpha" in prompt and "Members: Ada" not in prompt
+
+
+def test_history_is_capped_keeping_the_newest(api, fake, monkeypatch) -> None:
+    from objectapp import api_ai
+
+    _space, client, _ = api
+    history = [{"role": "user", "text": f"message-{i:03d}", "at": ""} for i in range(150)]
+    _chat(client, "Now", history=history)
+    prompt = _runs(fake["log"])[0]["prompt"]
+    assert "message-149" in prompt and "message-050" in prompt and "message-049" not in prompt
+    monkeypatch.setattr(api_ai, "MAX_TEXT", 25)
+    big = [{"role": "user", "text": "old-" + "x" * 20, "at": ""}, {"role": "user", "text": "newest-words", "at": ""}]
+    _chat(client, "Now", history=big)
+    prompt = _runs(fake["log"])[1]["prompt"]
+    assert "newest-words" in prompt and "old-" not in prompt
+
+
+def test_a_session_id_that_is_not_a_uuid_is_ignored(api, fake, space_dir: Path) -> None:
+    _space, client, _ = api
+    _chat(client, "Hi", sessionId="--help")
+    _chat(client, "Hi", sessionId=f"{SESSION_A} --x")
+    for run in _runs(fake["log"]):
+        assert "--resume" not in run["argv"]
+    _code, made = _save(client, title="Bad session", sessionId=SESSION_A)
+    p = space_dir / made["path"]
+    p.write_text(p.read_text(encoding="utf-8").replace(f"session: {SESSION_A}", "session: '-x'"), encoding="utf-8")
+    assert client.get("/api/ai/chat", params={"path": made["path"]}).json()["sessionId"] is None
+    _code, made2 = _save(client, title="Bad session two", sessionId="not-a-uuid")
+    assert client.get("/api/ai/chat", params={"path": made2["path"]}).json()["sessionId"] is None
 
 
 def test_a_turn_writes_no_file(api, space_dir: Path, fake) -> None:
@@ -542,7 +621,7 @@ def test_save_creates_the_type_and_the_chat(api, space_dir: Path) -> None:
     assert not (space_dir / ".object" / "types" / "ai-chat.json").exists()
     with client:
         code, made = _save(
-            client, contextPaths=["People/Ada Lovelace.md", "Pages/Nope.md"], sessionId="sess-1"
+            client, contextPaths=["People/Ada Lovelace.md", "Pages/Nope.md"], sessionId=SESSION_A
         )
         assert code == 200, made
         _wait(published, 3)
@@ -556,7 +635,7 @@ def test_save_creates_the_type_and_the_chat(api, space_dir: Path) -> None:
     assert props["context"].name == "Context"
     assert props["session"].type == "text" and props["session"].name == "Session"
     text = (space_dir / path).read_text(encoding="utf-8")
-    assert "type: 'AI Chat'" in text and "session: sess-1" in text
+    assert "type: 'AI Chat'" in text and f"session: {SESSION_A}" in text
     assert "Ada Lovelace" in text.split("---")[1]
     assert "## You" in text and "## Claude" in text
     assert {e.origin for e in published} == {"win-1"}
@@ -569,10 +648,10 @@ def test_save_creates_the_type_and_the_chat(api, space_dir: Path) -> None:
 
 def test_load_round_trips_messages(api) -> None:
     _space, client, _ = api
-    _code, made = _save(client, title="Round trip", sessionId="s-9")
+    _code, made = _save(client, title="Round trip", sessionId=SESSION_C)
     loaded = client.get("/api/ai/chat", params={"path": made["path"]}).json()
     assert loaded["messages"] == MESSAGES
-    assert loaded["sessionId"] == "s-9" and loaded["title"] == "Round trip"
+    assert loaded["sessionId"] == SESSION_C and loaded["title"] == "Round trip"
     assert loaded["path"] == made["path"] and loaded["contextPaths"] == []
 
 
@@ -581,11 +660,11 @@ def test_second_save_replaces_messages_and_stale_is_409(api, space_dir: Path) ->
     _code, made = _save(client, title="Chat A")
     more = [*MESSAGES, {"role": "assistant", "text": "Another answer", "at": "2026-11-05T12:02:00.000Z"}]
     code, saved = _save(client, title="Chat A", path=made["path"], baseVersion=made["version"],
-                        messages=more, sessionId="s-2", contextPaths=["People/Ada Lovelace.md"])
+                        messages=more, sessionId=SESSION_B, contextPaths=["People/Ada Lovelace.md"])
     assert code == 200, saved
     assert saved["path"] == made["path"] and saved["version"] != made["version"]
     loaded = client.get("/api/ai/chat", params={"path": made["path"]}).json()
-    assert loaded["messages"] == more and loaded["sessionId"] == "s-2"
+    assert loaded["messages"] == more and loaded["sessionId"] == SESSION_B
     assert loaded["contextPaths"] == ["People/Ada Lovelace.md"]
     before = (space_dir / made["path"]).read_bytes()
     code, stale = _save(client, title="Chat A", path=made["path"], baseVersion=made["version"], messages=MESSAGES)

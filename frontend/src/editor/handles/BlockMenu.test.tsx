@@ -2,7 +2,10 @@ import { Editor as TiptapEditor } from '@tiptap/core'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, test } from 'vitest'
 import { resetAiStore, useAi } from '@/ai/store'
+import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
+import { objectSummary } from '@/test/mockApi'
+import { setEditorObject } from '../nodes/blockRef'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { selectBlocks } from '../extensions/blockSelection'
 import { BlockMenu, TURN_INTO_ITEMS } from './BlockMenu'
@@ -210,6 +213,23 @@ describe('<BlockMenu>', () => {
     many.onInsertBelow!('After')
     expect(serializeBody(editor)).toBe('- Uno\n- Dos\n\n<!-- block: color=bg-red align=center -->\nTwo\n\nThree\n\nAfter\n')
     resetAiStore()
+  })
+
+  test('m10: no AI assistant... on a page excluded from AI or a template', async () => {
+    useLinkIndex.setState({ objects: [objectSummary({ path: 'Pages/Secret.md', tags: ['Exclude from AI'] })], loaded: true })
+    try {
+      for (const path of ['Pages/Secret.md', 'Templates/Tasks/Bug report.md']) {
+        const editor = headless(BODY)
+        setEditorObject(editor, { path })
+        selectBlocks(editor, blockPos(editor, 0))
+        renderMenu(editor)
+        const menu = await screen.findByRole('menu')
+        expect(within(menu).queryByRole('menuitem', { name: /AI assistant/ })).toBeNull()
+        cleanup()
+      }
+    } finally {
+      resetLinkIndex()
+    }
   })
 
   test('m10: no AI assistant... while AI features are hidden', async () => {
