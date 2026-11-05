@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { cn } from '@/lib/utils'
 import { APPEARANCE_SEARCH, APPEARANCE_TEXT, AppearanceSection } from './sections/Appearance'
 import { DATE_TIME_SEARCH, DATE_TIME_TEXT, DateTimeSection } from './sections/DateTime'
+import { INTEGRATIONS_SEARCH, INTEGRATIONS_TEXT, IntegrationsSection } from './sections/Integrations'
 import { EDITOR_SEARCH, EDITOR_TEXT, EditorSection } from './sections/Editor'
 import { LANGUAGE_SEARCH, LANGUAGE_TEXT, LanguageSection } from './sections/Language'
 import { NOTIFICATIONS_SEARCH, NOTIFICATIONS_TEXT, NotificationsSection } from './sections/Notifications'
@@ -68,6 +69,14 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     icon: 'ph-check-circle',
     search: TASK_MANAGEMENT_SEARCH,
     Component: TaskManagementSection,
+  },
+  {
+    id: 'integrations',
+    group: 'space',
+    label: INTEGRATIONS_TEXT.heading,
+    icon: 'ph-plugs-connected',
+    search: INTEGRATIONS_SEARCH,
+    Component: IntegrationsSection,
   },
 ]
 

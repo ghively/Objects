@@ -11,6 +11,10 @@ Status as of 2026-11-04. **All nine milestones are built, reviewed, fixed and ga
 5. ~~One known test failure on Windows~~ fixed 2026-11-03 (`ba43e66`): the gzip test compared newline-translated text; it now compares bytes.
 6. **Wiki import follow-ups** (outside the repo, in Gene's `ObjectSpaces` folder): review the 10 "possible secrets" pages listed in `ai-pass/review.md`; the wiki copy is a snapshot (refresh = recopy and AI-reread only new or changed pages).
 
+## 2026-11-05: M11, the local API and MCP server (branch `feat/m11-local-api-mcp`, PR pending Gene's merge)
+
+Next plan: `2026-11-04-notion-anytype-features-plan.md` (Notion and Anytype comparison; order M11, M10, M12, M13, M14, M15, one branch and PR each, Gene merges). M11 is built and gated on Linux: tokens in the state dir, `/api/v1`, `objectapp-mcp`, Settings > Integrations, "Exclude from AI". Results and our choices: `m11-acceptance.md`.
+
 ## 2026-11-04: clean room and the rest of the polish backlog
 
 **Clean room** (`28d55b1`): the repo no longer names or cites the original app. `reference/`, the screenshots and the reverse-engineering notes moved to `C:\Git\object-private\` (outside the repo; history not rewritten, Gene's choice). Space metadata is now `.object/` and `.object-cache/`; `backend/objectapp/legacy.py` renames old folders once on open. The behaviour catalog is `docs/behavior-catalog.md`. Open for Gene: the backend role values (`RootPage`, `RootDailyNote`, ...) still use the original app's internal names.
@@ -62,6 +66,7 @@ Each milestone's plan holds its full scope. Each acceptance doc holds its automa
 | **M7** remaining blocks, light mode, settings, spaces, tabs, side panel | `2026-10-26-m7-blocks-lightmode-polish.md` | `f98e401..338a42f`, gate 2026-10-27; known-issue fixes `fc0bff2..96af06e` | `m7-acceptance.md` (57, incl. the side-by-side pass) |
 | **M8** every feature M4–M7 deferred, local only (31 tasks) | `2026-10-27-m8-deferred-features.md` | `61b6fed..0e7c748`, gate 2026-10-28; review-minor fixes `1721a4b..9383a9b` | `m8-acceptance.md` (40) |
 | **M9** the audit's completeness gaps (Tasks 1–23; 13 skipped by Gene) | `2026-10-28-m9-completeness-gaps.md` | `19a8167..c138f1d`, review fixes `3d46450..d17bd90`, gate 2026-10-28 | `m9-acceptance.md` (19) |
+| **M11** local API, tokens, MCP server, Settings > Integrations | `2026-11-04-notion-anytype-features-plan.md` | branch `feat/m11-local-api-mcp`, gate 2026-11-05 (Linux) | `m11-acceptance.md` (4) |
 
 M8's "Coverage" section maps every deferred item to a task, or to a spec §2 exclusion: AI, network at runtime, accounts and sharing, mobile, telemetry.
 

@@ -1,4 +1,7 @@
 import type {
+  ApiTokenList,
+  ApiTokenScope,
+  CreatedApiToken,
   Attachment,
   BlockInfo,
   CatchUp,
@@ -909,6 +912,21 @@ export const api = {
     if (opts.limit !== undefined) sp.append('limit', String(opts.limit))
     if (opts.mode) sp.append('mode', opts.mode)
     return request<SearchResponse>(`/search?${sp.toString()}`, opts.signal ? { signal: opts.signal } : undefined)
+  },
+
+  /** M11: the local API tokens of this space and an MCP config template. */
+  apiTokens(): Promise<ApiTokenList> {
+    return request<ApiTokenList>('/integrations/tokens')
+  },
+
+  /** M11: make a token; the answer holds its secret, shown this once. */
+  createApiToken(name: string, scope: ApiTokenScope): Promise<CreatedApiToken> {
+    return request<CreatedApiToken>('/integrations/tokens', json('POST', { name, scope }))
+  },
+
+  /** M11: revoke a token; programs using it lose access at once. */
+  revokeApiToken(id: string): Promise<{ revoked: string }> {
+    return request<{ revoked: string }>(`/integrations/tokens/${seg(id)}`, { method: 'DELETE' })
   },
 
   /** Drop and rebuild the search index in the background (`partial` until done). */

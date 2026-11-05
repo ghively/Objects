@@ -1138,3 +1138,32 @@ export interface MergeResult {
 }
 
 export type SpaceSetup = 'blank' | 'basic'
+
+/** M11: a local API token (Settings > Integrations). The secret is shown only when made. */
+export type ApiTokenScope = 'read' | 'read-write'
+
+export interface ApiToken {
+  id: string
+  name: string
+  scope: ApiTokenScope
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+/** The ``mcpServers`` entry an MCP client (Claude Code, Claude Desktop) needs. */
+export interface McpConfig {
+  mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }>
+}
+
+/** GET /api/integrations/tokens */
+export interface ApiTokenList {
+  tokens: ApiToken[]
+  mcp: McpConfig
+}
+
+/** POST /api/integrations/tokens */
+export interface CreatedApiToken {
+  token: ApiToken
+  secret: string
+  mcpConfig: McpConfig
+}
