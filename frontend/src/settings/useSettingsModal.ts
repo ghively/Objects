@@ -14,6 +14,8 @@ export type SettingsSectionId =
   | 'space'
   | 'objectTypes'
   | 'taskManagement'
+  /** M14 */
+  | 'automations'
   | 'integrations'
 
 export const DEFAULT_SECTION: SettingsSectionId = 'appearance'

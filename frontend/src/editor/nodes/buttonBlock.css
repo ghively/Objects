@@ -1,0 +1,46 @@
+/* The button block (M14): a bordered button with its label, and a `…` menu beside it. */
+.object-editor .button-block { margin-block: 0.2em; }
+.object-editor .button-block.is-selected .button-block-button { outline: 2px solid var(--accent, var(--border-subtle)); }
+.object-editor .button-block-frame { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.object-editor .button-block-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 2px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.375rem;
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 0.95em;
+  cursor: pointer;
+}
+.object-editor .button-block-button:hover:not(:disabled) { background: var(--bg-hover); }
+.object-editor .button-block-button:disabled { color: var(--text-muted); cursor: default; }
+.object-editor .button-block-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.object-editor .button-block-input {
+  min-width: 12rem;
+  height: 28px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+}
+.object-editor .button-block-note { font-size: 0.85em; color: var(--text-muted); }
+.object-editor .button-block-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 0.375rem;
+  color: var(--text-muted);
+  opacity: 0;
+}
+.object-editor .button-block:hover .button-block-menu,
+.object-editor .button-block-menu[data-state='open'],
+.object-editor .button-block-menu:focus-visible { opacity: 1; }
+.object-editor .button-block-menu:hover { background: var(--bg-hover); color: var(--text); }

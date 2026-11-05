@@ -24,7 +24,7 @@ describe('KIND_META', () => {
 })
 
 describe('ADD_PROPERTY_ITEMS', () => {
-  it('test ADD_PROPERTY_ITEMS order has 15 catalogued entries then the six M12 kinds and Object Select lists Page, Tag and custom types but not Task', () => {
+  it('test ADD_PROPERTY_ITEMS order has 15 catalogued entries then the six M12 kinds and the M14 Button and Object Select lists Page, Tag and custom types but not Task', () => {
     expect(ADD_PROPERTY_ITEMS.map((i) => i.name)).toEqual([
       'Text',
       'Content',
@@ -47,6 +47,7 @@ describe('ADD_PROPERTY_ITEMS', () => {
       'Email',
       'Phone',
       'Files',
+      'Button',
     ])
     expect(ADD_PROPERTY_ITEMS.map((i) => i.type)).toEqual([
       'textBlock',
@@ -70,6 +71,7 @@ describe('ADD_PROPERTY_ITEMS', () => {
       'email',
       'phone',
       'files',
+      'button',
     ])
     const objectSelect = ADD_PROPERTY_ITEMS.find((i) => i.action === 'objectSelect')
     expect(objectSelect?.description).toBe('Link to objects of a specific type.')

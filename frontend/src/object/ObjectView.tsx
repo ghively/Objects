@@ -1260,7 +1260,13 @@ export function ObjectView({
       if (b != null) setBodyEmpty(b.trim() === '')
     }
     return (
-      <div className="relative w-full" data-object-view="inline" data-object-path={path} ref={inlineRef}>
+      <div
+        className="relative w-full"
+        data-object-view="inline"
+        data-object-path={path}
+        data-object-template={summary?.template != null ? '' : undefined}
+        ref={inlineRef}
+      >
         {!detail || !summary ? (
           error ? (
             <p className="text-[14px] text-fg-muted">{`Couldn't open this object. ${error}`}</p>

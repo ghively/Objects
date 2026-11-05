@@ -2,6 +2,7 @@
  * The app's own Trash (in `.object/trash/`, not the Windows Recycle Bin): deleted objects and
  * types (a type shows its object count), "Restore", "Delete permanently", and "Empty Trash", which
  * asks the user to type "Delete". Entries are removed after 30 days.
+ * M14: deleted automations are listed too ("Automation"), restored under their id.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/api/client'
@@ -38,6 +39,8 @@ export const TRASH_TEXT = {
   objectType: 'Object type',
   collection: 'Collection',
   query: 'Query',
+  /** M14 (our string). */
+  automation: 'Automation',
   objects: (n: number) => `${n} object${n === 1 ? '' : 's'}`,
 }
 
@@ -45,6 +48,7 @@ const ENTRY_ICON: Partial<Record<TrashItem['kind'], string>> = {
   type: 'ph-shapes',
   collection: COLLECTION_ICON,
   query: QUERY_ICON,
+  automation: 'ph-lightning',
 }
 
 /** How many entries go with this one: a type or collection takes its objects with it. */
@@ -128,12 +132,12 @@ export function TrashView() {
             {visible.map((item) => (
               <li
                 key={item.id}
-                aria-label={item.title}
+                aria-label={item.title || item.name}
                 className="flex min-h-12 items-center gap-2.5 border-b border-line/60 px-2 py-1.5 last:border-b-0"
               >
                 <Icon name={ENTRY_ICON[item.kind] ?? 'ph-file-text'} size={18} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-medium">{item.title}</p>
+                  <p className="truncate text-[15px] font-medium">{item.title || item.name}</p>
                   <p className="truncate text-[13px] text-fg-muted">
                     {item.kind === 'type'
                       ? `${TRASH_TEXT.objectType} · ${TRASH_TEXT.objects(item.objectCount ?? 0)}`
@@ -141,7 +145,9 @@ export function TrashView() {
                         ? `${TRASH_TEXT.collection} · ${TRASH_TEXT.objects(item.objectCount ?? 0)}`
                         : item.kind === 'query'
                           ? TRASH_TEXT.query
-                          : `${item.type} · ${item.originalPath}`}
+                          : item.kind === 'automation'
+                            ? TRASH_TEXT.automation
+                            : `${item.type} · ${item.originalPath}`}
                     {' · '}
                     {formatDeletedAt(item.deletedAt)}
                   </p>

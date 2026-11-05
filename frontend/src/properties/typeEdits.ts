@@ -117,6 +117,8 @@ function defaultOptions(kind: PropertyType): PropertyOptions {
       return { isArray: true, allowedTypes: [], hasFixedSet: false, fixedSet: [] }
     case 'label':
       return { isArray: false, set: [] }
+    case 'button':
+      return { ruleId: null }
     // M12 (our defaults, as the back end's `_default_options`)
     case 'formula':
       return { expression: '' }

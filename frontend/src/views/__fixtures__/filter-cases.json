@@ -1,0 +1,1198 @@
+{
+  "about": "Shared cases for the view filter engine (filter.ts) and its server port (automation_filter.py); both test suites run every case. Weeks start on Monday, also where a case names a Sunday-start space (spaceWeekStart): rules mean what views show.",
+  "timeZone": "America/Chicago",
+  "now": "2026-11-02T03:30:00.000Z",
+  "types": [
+    {
+      "id": "task",
+      "name": "Task",
+      "propertyDefinitions": [
+        {
+          "id": "status",
+          "key": "status",
+          "name": "status",
+          "type": "label",
+          "options": {
+            "set": [
+              {
+                "id": "todo",
+                "text": "To Do"
+              },
+              {
+                "id": "done",
+                "text": "Done"
+              }
+            ]
+          }
+        },
+        {
+          "id": "priority",
+          "key": "priority",
+          "name": "priority",
+          "type": "label",
+          "options": {
+            "set": [
+              {
+                "id": "high",
+                "text": "High"
+              },
+              {
+                "id": "low",
+                "text": "Low"
+              }
+            ],
+            "isArray": true
+          }
+        },
+        {
+          "id": "estimate",
+          "key": "estimate",
+          "name": "estimate",
+          "type": "number",
+          "options": {}
+        },
+        {
+          "id": "flagged",
+          "key": "flagged",
+          "name": "flagged",
+          "type": "boolean",
+          "options": {}
+        },
+        {
+          "id": "note",
+          "key": "note",
+          "name": "note",
+          "type": "text",
+          "options": {}
+        },
+        {
+          "id": "body",
+          "key": "body",
+          "name": "body",
+          "type": "textBlock",
+          "options": {}
+        },
+        {
+          "id": "due",
+          "key": "due",
+          "name": "due",
+          "type": "datetime",
+          "options": {
+            "constraints": {
+              "resolutionPreference": "day",
+              "supportsReminders": true
+            }
+          }
+        },
+        {
+          "id": "span",
+          "key": "span",
+          "name": "span",
+          "type": "datetime",
+          "options": {}
+        },
+        {
+          "id": "owner",
+          "key": "owner",
+          "name": "owner",
+          "type": "entity",
+          "options": {
+            "isArray": true
+          }
+        },
+        {
+          "id": "repeat",
+          "key": "repeat",
+          "name": "repeat",
+          "type": "text",
+          "options": {}
+        },
+        {
+          "id": "remind",
+          "key": "remind",
+          "name": "remind",
+          "type": "text",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "id": "page",
+      "name": "Page",
+      "propertyDefinitions": [
+        {
+          "id": "estimate",
+          "key": "estimate",
+          "name": "estimate",
+          "type": "text",
+          "options": {}
+        }
+      ]
+    }
+  ],
+  "collections": [
+    {
+      "id": "reading",
+      "name": "Reading",
+      "formerNames": [
+        "Books"
+      ]
+    },
+    {
+      "id": "work",
+      "name": "Work",
+      "formerNames": []
+    }
+  ],
+  "tagIdsToTitles": {
+    "T1": "Urgent",
+    "T2": "Home"
+  },
+  "pathsById": {
+    "P1": "People/Ann.md",
+    "P2": "People/Bo.md"
+  },
+  "rows": [
+    {
+      "summary": {
+        "path": "Tasks/Alpha.md",
+        "id": null,
+        "type": "task",
+        "title": "Alpha plan",
+        "icon": "ph-star",
+        "iconColor": null,
+        "description": "Quarterly",
+        "aliases": [
+          "First"
+        ],
+        "createdAt": "2026-11-02T04:30:00.000Z",
+        "lastUpdated": null,
+        "tags": [
+          "Urgent"
+        ],
+        "template": null,
+        "color": null,
+        "coverImage": null,
+        "readOnly": false,
+        "collections": [
+          "Books"
+        ]
+      },
+      "version": "v1",
+      "preview": "",
+      "values": {
+        "status": [
+          "Done"
+        ],
+        "priority": [
+          "High"
+        ],
+        "estimate": 3,
+        "flagged": true,
+        "note": "Call the bank",
+        "body": "Para one\n\nPara two",
+        "due": {
+          "start": "2026-10-30",
+          "resolution": "day"
+        },
+        "span": {
+          "start": "2026-10-28",
+          "end": "2026-11-03",
+          "resolution": "day"
+        },
+        "owner": [
+          {
+            "target": "Ann",
+            "path": "People/Ann.md"
+          }
+        ],
+        "repeat": "every week",
+        "remind": "1 day before at 09:00"
+      },
+      "links": {
+        "owner": [
+          "People/Ann.md"
+        ]
+      }
+    },
+    {
+      "summary": {
+        "path": "Tasks/Beta.md",
+        "id": null,
+        "type": "task",
+        "title": "  ",
+        "icon": null,
+        "iconColor": null,
+        "description": null,
+        "aliases": [],
+        "createdAt": "2026-10-25T12:00:00.000Z",
+        "lastUpdated": null,
+        "tags": [],
+        "template": null,
+        "color": null,
+        "coverImage": null,
+        "readOnly": false,
+        "collections": [
+          "Work"
+        ]
+      },
+      "version": "v1",
+      "preview": "",
+      "values": {
+        "status": [
+          "To Do"
+        ],
+        "priority": [],
+        "estimate": null,
+        "flagged": false,
+        "note": "",
+        "body": "",
+        "due": {
+          "start": "2026-11-02T05:59:00.000Z",
+          "resolution": "time"
+        },
+        "span": null,
+        "owner": [],
+        "repeat": "",
+        "remind": ""
+      },
+      "links": {
+        "owner": []
+      }
+    },
+    {
+      "summary": {
+        "path": "Pages/Gamma.md",
+        "id": null,
+        "type": "page",
+        "title": "Gamma",
+        "icon": null,
+        "iconColor": null,
+        "description": null,
+        "aliases": [],
+        "createdAt": null,
+        "lastUpdated": null,
+        "tags": [
+          "Home",
+          "Urgent"
+        ],
+        "template": null,
+        "color": null,
+        "coverImage": null,
+        "readOnly": false,
+        "collections": []
+      },
+      "version": "v1",
+      "preview": "",
+      "values": {
+        "estimate": "about three"
+      },
+      "links": {}
+    }
+  ],
+  "cases": [
+    {
+      "name": "title includes",
+      "filter": {
+        "type": "filter",
+        "propertyId": "title",
+        "option": "contains",
+        "referenceValue": "alpha"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "a blank title reads as Untitled",
+      "filter": {
+        "type": "filter",
+        "propertyId": "title",
+        "option": "is",
+        "referenceValue": "untitled"
+      },
+      "matches": [
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "title is empty: never (Untitled)",
+      "filter": {
+        "type": "filter",
+        "propertyId": "title",
+        "option": "isEmpty"
+      },
+      "matches": []
+    },
+    {
+      "name": "an empty text reference passes",
+      "filter": {
+        "type": "filter",
+        "propertyId": "title",
+        "option": "contains",
+        "referenceValue": ""
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "label includes",
+      "filter": {
+        "type": "filter",
+        "propertyId": "status",
+        "option": "contains",
+        "referenceValue": [
+          "done"
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "label does not include",
+      "filter": {
+        "type": "filter",
+        "propertyId": "status",
+        "option": "notContains",
+        "referenceValue": [
+          "done"
+        ]
+      },
+      "matches": [
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "label is empty",
+      "filter": {
+        "type": "filter",
+        "propertyId": "status",
+        "option": "isEmpty"
+      },
+      "matches": [
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "an unknown label id is dropped: passes",
+      "filter": {
+        "type": "filter",
+        "propertyId": "status",
+        "option": "contains",
+        "referenceValue": [
+          "gone"
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "multi label is not empty",
+      "filter": {
+        "type": "filter",
+        "propertyId": "priority",
+        "option": "isNotEmpty"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "number greater: a text estimate with a number reference passes",
+      "filter": {
+        "type": "filter",
+        "propertyId": "estimate",
+        "option": "greater",
+        "referenceValue": 2
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "number not equal: no value counts",
+      "filter": {
+        "type": "filter",
+        "propertyId": "estimate",
+        "option": "notEqual",
+        "referenceValue": 3
+      },
+      "matches": [
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "structureId lets other types through",
+      "filter": {
+        "type": "filter",
+        "propertyId": "estimate",
+        "option": "equal",
+        "referenceValue": 3,
+        "structureId": "task"
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "a string number reference is inactive",
+      "filter": {
+        "type": "filter",
+        "propertyId": "estimate",
+        "option": "equal",
+        "referenceValue": "3"
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "boolean selected",
+      "filter": {
+        "type": "filter",
+        "propertyId": "flagged",
+        "option": "isChecked"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "boolean not selected",
+      "filter": {
+        "type": "filter",
+        "propertyId": "flagged",
+        "option": "isNotChecked"
+      },
+      "matches": [
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "text starts with, any case",
+      "filter": {
+        "type": "filter",
+        "propertyId": "note",
+        "option": "startsWith",
+        "referenceValue": "call"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "text ends with, any case",
+      "filter": {
+        "type": "filter",
+        "propertyId": "note",
+        "option": "endsWith",
+        "referenceValue": "BANK"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "text is not",
+      "filter": {
+        "type": "filter",
+        "propertyId": "note",
+        "option": "isNot",
+        "referenceValue": "x"
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "text is empty",
+      "filter": {
+        "type": "filter",
+        "propertyId": "note",
+        "option": "isEmpty"
+      },
+      "matches": [
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "a text block reads its first paragraph only",
+      "filter": {
+        "type": "filter",
+        "propertyId": "body",
+        "option": "contains",
+        "referenceValue": "two"
+      },
+      "matches": []
+    },
+    {
+      "name": "text block first paragraph",
+      "filter": {
+        "type": "filter",
+        "propertyId": "body",
+        "option": "contains",
+        "referenceValue": "one"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "tags include by id",
+      "filter": {
+        "type": "filter",
+        "propertyId": "tags",
+        "option": "contains",
+        "referenceValue": [
+          "T1"
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "tags do not include",
+      "filter": {
+        "type": "filter",
+        "propertyId": "tags",
+        "option": "notContains",
+        "referenceValue": [
+          "T2"
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "tags empty",
+      "filter": {
+        "type": "filter",
+        "propertyId": "tags",
+        "option": "isEmpty"
+      },
+      "matches": [
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "collections by a former name",
+      "filter": {
+        "type": "filter",
+        "propertyId": "collections",
+        "option": "contains",
+        "referenceValue": [
+          "reading"
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "collections offer includes only: does not include is ignored",
+      "filter": {
+        "type": "filter",
+        "propertyId": "collections",
+        "option": "notContains",
+        "referenceValue": [
+          "work"
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "collections include",
+      "filter": {
+        "type": "filter",
+        "propertyId": "collections",
+        "option": "contains",
+        "referenceValue": [
+          "work",
+          "reading"
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "type includes",
+      "filter": {
+        "type": "filter",
+        "propertyId": "type",
+        "option": "contains",
+        "referenceValue": [
+          "page"
+        ]
+      },
+      "matches": [
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "aliases include",
+      "filter": {
+        "type": "filter",
+        "propertyId": "aliases",
+        "option": "contains",
+        "referenceValue": "fir"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "aliases not empty",
+      "filter": {
+        "type": "filter",
+        "propertyId": "aliases",
+        "option": "isNotEmpty"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "icon is",
+      "filter": {
+        "type": "filter",
+        "propertyId": "icon",
+        "option": "is",
+        "referenceValue": "ph-star"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "icon is empty",
+      "filter": {
+        "type": "filter",
+        "propertyId": "icon",
+        "option": "isEmpty"
+      },
+      "matches": [
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "description includes",
+      "filter": {
+        "type": "filter",
+        "propertyId": "description",
+        "option": "contains",
+        "referenceValue": "quarter"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "relation includes by object id",
+      "filter": {
+        "type": "filter",
+        "propertyId": "owner",
+        "option": "contains",
+        "referenceValue": [
+          "P1"
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "relation does not include",
+      "filter": {
+        "type": "filter",
+        "propertyId": "owner",
+        "option": "notContains",
+        "referenceValue": [
+          "P1"
+        ]
+      },
+      "matches": [
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "relation is empty",
+      "filter": {
+        "type": "filter",
+        "propertyId": "owner",
+        "option": "isEmpty"
+      },
+      "matches": [
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "an unknown object id is dropped: passes",
+      "filter": {
+        "type": "filter",
+        "propertyId": "owner",
+        "option": "contains",
+        "referenceValue": [
+          "P9"
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "date is today (an instant late in the local day)",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "is",
+        "referenceValue": {
+          "relative": "today"
+        }
+      },
+      "matches": [
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "date is yesterday",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "is",
+        "referenceValue": {
+          "relative": "yesterday"
+        }
+      },
+      "matches": []
+    },
+    {
+      "name": "date before today",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "isBefore",
+        "referenceValue": {
+          "relative": "today"
+        }
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "date is overdue",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "is",
+        "referenceValue": {
+          "relative": "overdue"
+        }
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "this week, Monday to Sunday",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "is",
+        "referenceValue": {
+          "relative": "thisWeek"
+        }
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "this week in a Sunday-start space still runs Monday to Sunday",
+      "spaceWeekStart": "sunday",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "is",
+        "referenceValue": {
+          "relative": "thisWeek"
+        }
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "this month",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "is",
+        "referenceValue": {
+          "relative": "thisMonth"
+        }
+      },
+      "matches": [
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "on or after an exact date",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "isOnOrAfter",
+        "referenceValue": {
+          "exactDate": "2026-10-30"
+        }
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "after an exact date",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "isAfter",
+        "referenceValue": {
+          "exactDate": "2026-10-31"
+        }
+      },
+      "matches": [
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "an exact date rolls over as a calendar does",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "isOnOrAfter",
+        "referenceValue": {
+          "exactDate": "2026-10-32"
+        }
+      },
+      "matches": [
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "date is empty",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "isEmpty"
+      },
+      "matches": [
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "range ends after today",
+      "filter": {
+        "type": "filter",
+        "propertyId": "span",
+        "option": "endIsAfter",
+        "referenceValue": {
+          "relative": "today"
+        }
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "a range overlapping today is today",
+      "filter": {
+        "type": "filter",
+        "propertyId": "span",
+        "option": "is",
+        "referenceValue": {
+          "relative": "today"
+        }
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "range starts before this week",
+      "filter": {
+        "type": "filter",
+        "propertyId": "span",
+        "option": "startIsBefore",
+        "referenceValue": {
+          "relative": "thisWeek"
+        }
+      },
+      "matches": []
+    },
+    {
+      "name": "end is empty needs a value",
+      "filter": {
+        "type": "filter",
+        "propertyId": "span",
+        "option": "endIsEmpty"
+      },
+      "matches": []
+    },
+    {
+      "name": "created today in the setting's zone",
+      "filter": {
+        "type": "filter",
+        "propertyId": "createdAt",
+        "option": "is",
+        "referenceValue": {
+          "relative": "today"
+        }
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "created tomorrow: not by UTC",
+      "filter": {
+        "type": "filter",
+        "propertyId": "createdAt",
+        "option": "is",
+        "referenceValue": {
+          "relative": "tomorrow"
+        }
+      },
+      "matches": []
+    },
+    {
+      "name": "created one week ago",
+      "filter": {
+        "type": "filter",
+        "propertyId": "createdAt",
+        "option": "is",
+        "referenceValue": {
+          "relative": "oneWeekAgo"
+        }
+      },
+      "matches": [
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "Task date is recurring",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "isRecurring"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "Task date is not recurring",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "isNotRecurring"
+      },
+      "matches": [
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "Task date has a reminder",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "hasReminder"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "an unknown property is ignored",
+      "filter": {
+        "type": "filter",
+        "propertyId": "nope",
+        "option": "contains",
+        "referenceValue": "x"
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "an operator the kind lacks is ignored",
+      "filter": {
+        "type": "filter",
+        "propertyId": "status",
+        "option": "greater",
+        "referenceValue": 1
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "an unknown structure is ignored",
+      "filter": {
+        "type": "filter",
+        "propertyId": "estimate",
+        "option": "equal",
+        "referenceValue": 3,
+        "structureId": "ghost"
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "or group",
+      "group": {
+        "type": "filterGroup",
+        "operator": "or",
+        "elements": [
+          {
+            "type": "filter",
+            "propertyId": "status",
+            "option": "contains",
+            "referenceValue": [
+              "done"
+            ]
+          },
+          {
+            "type": "filter",
+            "propertyId": "tags",
+            "option": "contains",
+            "referenceValue": [
+              "T2"
+            ]
+          }
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "nested groups",
+      "group": {
+        "type": "filterGroup",
+        "operator": "and",
+        "elements": [
+          {
+            "type": "filter",
+            "propertyId": "type",
+            "option": "contains",
+            "referenceValue": [
+              "task"
+            ]
+          },
+          {
+            "type": "filterGroup",
+            "operator": "or",
+            "elements": [
+              {
+                "type": "filter",
+                "propertyId": "flagged",
+                "option": "isChecked"
+              },
+              {
+                "type": "filter",
+                "propertyId": "note",
+                "option": "isEmpty"
+              }
+            ]
+          }
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "an empty group passes",
+      "group": {
+        "type": "filterGroup",
+        "operator": "and",
+        "elements": []
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "a group of invalid filters passes",
+      "group": {
+        "type": "filterGroup",
+        "operator": "or",
+        "elements": [
+          {
+            "type": "filter",
+            "propertyId": "nope",
+            "option": "isEmpty"
+          },
+          {
+            "type": "filter",
+            "propertyId": "status",
+            "option": "greater",
+            "referenceValue": 2
+          }
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    }
+  ]
+}

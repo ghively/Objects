@@ -10,6 +10,11 @@ import type {
   ApiTokenScope,
   CreatedApiToken,
   Attachment,
+  AutomationCatchUpChoice,
+  AutomationCatchUpItem,
+  AutomationRule,
+  AutomationRuleInput,
+  AutomationRun,
   BlockInfo,
   CatchUp,
   DuplicatedObject,
@@ -384,7 +389,7 @@ function typesEvent(id: string, revision: string | null = null): ChangeEvent {
   return { kind: 'types', path: id, version: revision, origin: CLIENT_ID }
 }
 
-function defEvent(kind: 'collections' | 'queries' | 'views' | 'ui', path: string, version: string | null = null): ChangeEvent {
+function defEvent(kind: 'collections' | 'queries' | 'views' | 'ui' | 'automations', path: string, version: string | null = null): ChangeEvent {
   return { kind, path, version, origin: CLIENT_ID }
 }
 
@@ -415,6 +420,7 @@ const RESYNC_EVENTS: readonly ChangeEvent[] = [
   { kind: 'ui', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'collections', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'queries', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'automations', path: RESYNC_PATH, version: null, origin: null },
 ]
 
 /** Whether `e` is the synthetic "everything of `kind` may have changed" event sent after a reconnect. */
@@ -564,12 +570,27 @@ export const api = {
   },
 
   /** Create an object. `templateId`: an id, `null` for the type's default, `"none"` for no template. */
-  async createObject(typeId: string, opts: { title?: string; templateId?: string | null; values?: Record<string, unknown> } = {},
+  /**
+   * Create an object. `body` replaces the body it would get (its `# title` or its template's);
+   * `appendBody` is added below that body. Both are written in the creating write, so no rule
+   * that fires on the creation can come between the object and its text (M14).
+   */
+  async createObject(
+    typeId: string,
+    opts: {
+      title?: string
+      templateId?: string | null
+      values?: Record<string, unknown>
+      body?: string
+      appendBody?: string
+    } = {},
   ): Promise<CreatedFile> {
     const body: Record<string, unknown> = { typeId }
     if (opts.title !== undefined) body.title = opts.title
     if (opts.templateId !== undefined) body.templateId = opts.templateId
     if (opts.values !== undefined) body.values = opts.values
+    if (opts.body !== undefined) body.body = opts.body
+    if (opts.appendBody !== undefined) body.appendBody = opts.appendBody
     body.clientId = CLIENT_ID
     const res = await request<CreatedFile & { typeIds?: string[] }>('/objects', json('POST', body))
     // An inferred type saved for the first time: the server's `types` event is our own echo.
@@ -628,6 +649,7 @@ export const api = {
       ...(res.typeIds ?? []).map((t) => typesEvent(t)),
       ...(res.collectionIds ?? []).map((c) => defEvent('collections', c)),
       ...(res.queryIds ?? []).map((q) => defEvent('queries', q)),
+      ...(res.automationIds ?? []).map((a) => defEvent('automations', a)),
       // Members whose `collections:` item a collection restore wrote back.
       ...(res.rewritten ?? []).map((p) => changed(p)),
     ])
@@ -1237,6 +1259,76 @@ export const api = {
     if (opts.permanent) body.permanent = true
     if (opts.folder) body.folder = opts.folder
     return request<{ trashed: boolean }>('/spaces/delete', json('POST', body), spaceConflict)
+  },
+
+  // ---- M14: automations (docs/superpowers/plans/2026-11-05-m14-automations.md) ----
+
+  /** Every rule, by name, each with its newest run (`lastRun`). */
+  automations(): Promise<AutomationRule[]> {
+    return request<AutomationRule[]>('/automations')
+  },
+
+  /** One rule. 404. */
+  automation(id: string): Promise<AutomationRule> {
+    return request<AutomationRule>(`/automations/${seg(id)}`)
+  },
+
+  /** Create a rule (201). 422 names the problem (an unknown property, a bad schedule...). */
+  async createAutomation(rule: AutomationRuleInput): Promise<AutomationRule> {
+    const res = await request<AutomationRule>('/automations', json('POST', { rule, clientId: CLIENT_ID }))
+    emitLocal([defEvent('automations', res.id, res.revision ?? null)])
+    return res
+  },
+
+  /** Save a rule over its file. 409 (`RevisionConflictError`) stale, 422, 423 unreadable, 404. */
+  async saveAutomation(rule: AutomationRule, opts: { baseRevision: string }): Promise<{ rule: AutomationRule }> {
+    const res = await request<{ rule: AutomationRule }>(
+      `/automations/${seg(rule.id)}`,
+      json('PUT', { rule, baseRevision: opts.baseRevision, clientId: CLIENT_ID }),
+    )
+    emitLocal([defEvent('automations', res.rule?.id ?? rule.id, res.rule?.revision ?? null)])
+    return res
+  },
+
+  /** Move a rule to the Trash (restorable; its run log is kept until it is purged). 404, 423. */
+  async deleteAutomation(id: string): Promise<{ trashId: string }> {
+    const res = await request<{ trashId: string }>(`/automations/${seg(id)}${qs({ clientId: CLIENT_ID })}`, {
+      method: 'DELETE',
+    })
+    emitLocal([defEvent('automations', id)])
+    return res
+  },
+
+  /**
+   * Press a button: run button rule `id` on the object at `path` now, and answer the logged run.
+   * Its writes are announced by the server with origin `automation:<id>`. 404, 422 (not a button
+   * rule, turned off, or the object is out of its scope), 423.
+   */
+  runAutomation(id: string, path: string): Promise<AutomationRun> {
+    return request<AutomationRun>(`/automations/${seg(id)}/run`, json('POST', { path, clientId: CLIENT_ID }))
+  },
+
+  /** A rule's run log, newest first (at most 200). 404. */
+  async automationRuns(id: string, limit?: number): Promise<AutomationRun[]> {
+    const res = await request<{ runs: AutomationRun[] }>(
+      `/automations/${seg(id)}/runs${qs({ limit: limit === undefined ? undefined : String(limit) })}`,
+    )
+    return res?.runs ?? []
+  },
+
+  /** The schedule runs missed while Object was closed (or the computer slept), per rule. */
+  async automationCatchUp(): Promise<AutomationCatchUpItem[]> {
+    const res = await request<{ items: AutomationCatchUpItem[] }>('/automations/catch-up')
+    return res?.items ?? []
+  },
+
+  /** Answer one rule's catch-up: run all missed, only the latest, or none. 404 nothing pending. */
+  async confirmAutomationCatchUp(ruleId: string, choice: AutomationCatchUpChoice): Promise<AutomationRun[]> {
+    const res = await request<{ runs: AutomationRun[] }>(
+      '/automations/catch-up',
+      json('POST', { ruleId, choice, clientId: CLIENT_ID }),
+    )
+    return res?.runs ?? []
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */

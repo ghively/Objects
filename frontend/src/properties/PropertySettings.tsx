@@ -27,6 +27,7 @@ import {
   setSeparators,
   updateProperty,
 } from './typeEdits'
+import { ButtonSettingsSection } from './settings/ButtonSettings'
 
 // The property settings texts.
 const TEXT = {
@@ -822,6 +823,7 @@ export function PropertySettings({
             )}
             {def.type === 'entity' && !type.basic && <RelationSection type={type} def={def} editor={ed} />}
             {def.type === 'label' && <LabelSection type={type} def={def} save={save} />}
+            {def.type === 'button' && <ButtonSettingsSection type={type} def={def} save={save} />}
             {def.type === 'formula' && <FormulaSection type={type} def={def} save={save} objectPath={objectPath} />}
             {def.type === 'rollup' && <RollupSection type={type} def={def} save={save} />}
             {def.type === 'uniqueId' && <UniqueIdSection type={type} def={def} save={save} />}
