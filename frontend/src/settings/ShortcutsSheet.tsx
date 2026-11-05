@@ -1,6 +1,8 @@
 // The Shortcuts sheet ("Shortcuts"): every registered shortcut, grouped by category, with its
 // name and keys. An id with no key is left out: the sheet only shows rows with keys. Provisional
-// keys (ours, with no table key to check against) carry a small "unverified" tag.
+// keys (ours, with no table key to check against) carry a small "unverified" tag. M10: the AI
+// Assistant group is left out while "Hide AI features" is on.
+import { useAiHidden } from '@/ai/store'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { CATEGORY_LABELS, formatKeys, shortcutsByCategory, type ShortcutDef } from '@/lib/shortcuts'
 import { useSettingsModal } from './useSettingsModal'
@@ -35,8 +37,11 @@ function Keys({ def }: { def: ShortcutDef }) {
 export function ShortcutsSheet() {
   const open = useSettingsModal((s) => s.shortcutsOpen)
   const close = useSettingsModal((s) => s.closeShortcuts)
+  const aiHidden = useAiHidden()
   const groups = open
-    ? [...shortcutsByCategory()].map(([c, defs]) => [c, defs.filter((d) => d.keys.length > 0)] as const).filter(([, defs]) => defs.length > 0)
+    ? [...shortcutsByCategory()]
+        .filter(([c]) => !(aiHidden && c === 'ai'))
+        .map(([c, defs]) => [c, defs.filter((d) => d.keys.length > 0)] as const).filter(([, defs]) => defs.length > 0)
     : []
   return (
     <Dialog open={open} onOpenChange={(o) => !o && close()}>

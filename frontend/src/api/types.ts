@@ -19,6 +19,13 @@ export type PropertyType =
   | 'blocks'
   | 'coverImage'
   | 'color'
+  // M12 (our kinds)
+  | 'formula'
+  | 'rollup'
+  | 'uniqueId'
+  | 'email'
+  | 'phone'
+  | 'files'
   | 'entity_title'
   | 'entity_icon'
   | 'entity_description'
@@ -47,6 +54,12 @@ export const PROPERTY_TYPES: readonly PropertyType[] = [
   'blocks',
   'coverImage',
   'color',
+  'formula',
+  'rollup',
+  'uniqueId',
+  'email',
+  'phone',
+  'files',
   'entity_title',
   'entity_icon',
   'entity_description',
@@ -77,6 +90,12 @@ export const KIND_TRANSFORMS: Readonly<Record<PropertyType, readonly PropertyTyp
   blocks: [],
   coverImage: [],
   color: [],
+  formula: [],
+  rollup: [],
+  uniqueId: [],
+  email: [],
+  phone: [],
+  files: [],
   entity_title: [],
   entity_icon: [],
   entity_description: [],
@@ -155,7 +174,103 @@ export interface PropertyOptions {
   propertySyncing?: { propertyIds: string[] }
   set?: LabelOption[]
   isStatus?: boolean
+  /** M12 formula: the expression (at most 2000 characters). */
+  expression?: string
+  /** M12 rollup: the `entity` property of this type whose related objects are rolled up. */
+  relationId?: string
+  /** M12 rollup: the property (id) of the related objects, or `title`. */
+  targetId?: string
+  /** M12 rollup: the calculation. */
+  calc?: RollupCalc
+  /** M12 ID: the text before the number (`TASK-`). */
+  prefix?: string
+  /** M12 ID: the number the next created object gets. The server never lets it go back. */
+  nextNumber?: number
   [extra: string]: unknown
+}
+
+/** M12: a rollup's calculation (the `views/calc.ts` names, plus show original/unique). */
+export type RollupCalc =
+  | 'showOriginal'
+  | 'showUnique'
+  | 'countAll'
+  | 'countValues'
+  | 'countUnique'
+  | 'countEmpty'
+  | 'countNotEmpty'
+  | 'percentEmpty'
+  | 'percentNotEmpty'
+  | 'sum'
+  | 'average'
+  | 'median'
+  | 'min'
+  | 'max'
+  | 'range'
+  | 'earliestDate'
+  | 'latestDate'
+  | 'dateRange'
+
+export const ROLLUP_CALCS: readonly RollupCalc[] = [
+  'showOriginal',
+  'showUnique',
+  'countAll',
+  'countValues',
+  'countUnique',
+  'countEmpty',
+  'countNotEmpty',
+  'percentEmpty',
+  'percentNotEmpty',
+  'sum',
+  'average',
+  'median',
+  'min',
+  'max',
+  'range',
+  'earliestDate',
+  'latestDate',
+  'dateRange',
+]
+
+/** M12: the result type of a formula or rollup value. */
+export type ComputedType = 'text' | 'number' | 'boolean' | 'date' | 'list' | 'empty' | 'error'
+
+/**
+ * M12: a formula or rollup value, computed by the server per request and never stored.
+ * `value` is a string (text), a finite number, a boolean, an ISO date (`YYYY-MM-DD`) or instant
+ * (date), a string list (list) or `null` (empty, error).
+ */
+export interface ComputedValue {
+  type: ComputedType
+  value: string | number | boolean | string[] | null
+  /** Only for `error`: what went wrong (shown on hover). */
+  error?: string
+}
+
+/** M12: the property kinds whose values the server computes (never in frontmatter). */
+export const COMPUTED_KINDS: ReadonlySet<PropertyType> = new Set<PropertyType>(['formula', 'rollup'])
+
+/** M12: POST /api/formula/preview */
+export interface FormulaPreviewRequest {
+  typeId: string
+  expression: string
+  /** The object to evaluate against; without it the expression is only parsed. */
+  path?: string | null
+  /** The type's definitions as the editor has them (unsaved), replacing the stored ones. */
+  properties?: PropertyDef[]
+}
+
+export interface FormulaPreviewResult {
+  value: ComputedValue | null
+  /** A parse or evaluation error. */
+  error: string | null
+}
+
+/** M12: POST /api/types/{typeId}/properties/{pid}/number-existing */
+export interface NumberExistingResult {
+  type: TypeDef
+  numbered: number
+  rewritten: string[]
+  skipped: string[]
 }
 
 export interface PropertyDef {
@@ -343,6 +458,13 @@ export interface DeviceSettings {
   hideStructureSettings: boolean
   /** How highlight blocks show (none exist in Object yet; stored only). */
   highlightStyle: 'default' | 'minimal'
+  // ---- M10 (AI assistant) ----
+  /** "Hide AI features": removes every AI entry from the app. */
+  aiHidden: boolean
+  /** Where the Claude Code CLI is; `null` = found on PATH. */
+  claudePath: string | null
+  /** The model passed to `claude --model`; `null` = Claude Code's default. */
+  aiModel: string | null
 }
 
 /** M8 `DeviceSettings.language`. */
@@ -387,6 +509,8 @@ export interface ObjectDetail {
   links: Record<string, (string | null)[]>
   /** M5: the distinct objects linking to this one, by title then path. */
   backlinks: EntityRef[]
+  /** M12: the object's formula and rollup values by property key (computed, never stored). */
+  computed?: Record<string, ComputedValue>
 }
 
 /** PUT /api/object/body → 200 */
@@ -1220,3 +1344,119 @@ export interface MergeResult {
 }
 
 export type SpaceSetup = 'blank' | 'basic'
+
+/** M11: a local API token (Settings > Integrations). The secret is shown only when made. */
+export type ApiTokenScope = 'read' | 'read-write'
+
+export interface ApiToken {
+  id: string
+  name: string
+  scope: ApiTokenScope
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+/** The ``mcpServers`` entry an MCP client (Claude Code, Claude Desktop) needs. */
+export interface McpConfig {
+  mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }>
+}
+
+/** GET /api/integrations/tokens */
+export interface ApiTokenList {
+  tokens: ApiToken[]
+  mcp: McpConfig
+}
+
+/** POST /api/integrations/tokens */
+export interface CreatedApiToken {
+  token: ApiToken
+  secret: string
+  mcpConfig: McpConfig
+}
+
+
+// ---- M10: the AI assistant (contract) ----
+
+/** What an AI request is for. The server picks the instructions and the proposal it parses. */
+export type AiMode = 'chat' | 'askBlock' | 'tagBlock' | 'tagObject' | 'autofill' | 'rephrase'
+
+/** GET /api/ai/status */
+export interface AiStatus {
+  available: boolean
+  /** `notFound`: no `claude` at the path or on PATH; `notSignedIn`: it answered but isn't signed in. */
+  reason: 'ok' | 'notFound' | 'notSignedIn' | 'error'
+  claudePath: string | null
+  version: string | null
+  message: string | null
+}
+
+export interface AiMessage {
+  role: 'user' | 'assistant'
+  text: string
+  /** ISO instant */
+  at: string
+}
+
+/** POST /api/ai/chat (answers a server-sent event stream of `AiEvent`) */
+export interface AiChatRequest {
+  mode: AiMode
+  /** The user's message (for the other modes, an optional extra instruction). */
+  prompt: string
+  /** The pages the request is about; excluded pages are left out by the server. */
+  contextPaths: string[]
+  /** The block or selected text for askBlock, tagBlock and rephrase. */
+  block?: string | null
+  /**
+   * The object the block was taken from. The server sends a block only from an object it may
+   * show the assistant (not excluded from AI, not a template); a block without one is sent only
+   * when it is an assistant message of `history` (rephrasing an answer).
+   */
+  blockPath?: string | null
+  /** Earlier messages, used when the CLI session can't be resumed. */
+  history: AiMessage[]
+  sessionId?: string | null
+  clientId?: string
+}
+
+/** A change the assistant suggests; nothing is applied until the user accepts it. */
+export type AiProposal =
+  | { kind: 'tags'; tags: string[] }
+  | { kind: 'properties'; values: Record<string, unknown> }
+  | { kind: 'text'; text: string }
+
+/** A context page the server left out of a turn, and why. */
+export interface AiSkipped {
+  path: string
+  reason: 'excluded' | 'template' | 'missing' | 'tooLong'
+}
+
+export type AiEvent =
+  | { type: 'session'; sessionId: string }
+  /** A chunk to append to the answer so far. */
+  | { type: 'text'; text: string }
+  /** The assistant used a tool (an Object MCP read tool, by its short name). */
+  | { type: 'tool'; name: string }
+  | { type: 'done'; text: string; sessionId: string | null; proposal: AiProposal | null; skipped: AiSkipped[] }
+  | { type: 'error'; message: string }
+
+/** GET /api/ai/chat?path= */
+export interface AiChat {
+  path: string
+  version: string
+  title: string
+  contextPaths: string[]
+  sessionId: string | null
+  messages: AiMessage[]
+}
+
+/** POST /api/ai/chat/save: creates the chat (no `path`) or replaces its messages (409 on a stale `baseVersion`). */
+export interface SaveAiChatRequest {
+  path?: string | null
+  baseVersion?: string | null
+  /** Sent when the chat is created; empty or absent keeps a saved chat's title (renames stay). */
+  title?: string
+  contextPaths: string[]
+  sessionId: string | null
+  messages: AiMessage[]
+  clientId?: string
+}

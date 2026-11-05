@@ -7,6 +7,7 @@ import type { PropertyDef, Row, TypeDef } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { cn } from '@/lib/utils'
 import { cellForDef } from '@/properties/cellFor'
+import { asComputed, computedIsEmpty } from '@/properties/computed'
 import { chipStyle, tagStyle } from '@/theme/palette'
 import { kindIcon } from '@/properties/kinds'
 import { displayTitle } from '../filter'
@@ -22,7 +23,13 @@ export function cardImage(row: Row): string | null {
 }
 
 export const isEmptyValue = (v: unknown): boolean =>
-  v === null || v === undefined || v === '' || v === false || (Array.isArray(v) && v.length === 0)
+  v === null ||
+  v === undefined ||
+  v === '' ||
+  v === false ||
+  (Array.isArray(v) && v.length === 0) ||
+  // M12: a formula or rollup value with nothing in it (an error still shows).
+  (asComputed(v) !== null && computedIsEmpty(v, { errorIsEmpty: false }))
 
 export const CARD_BASE =
   'preview-card-base preview-card-core relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised text-left shadow-(--card-shadow) active:brightness-[1.02]'

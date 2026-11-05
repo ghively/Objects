@@ -1,5 +1,7 @@
 import { Fragment, memo, useMemo, useRef, useState, type ReactNode } from 'react'
+import { COMPUTED_KINDS } from '@/api/types'
 import type {
+  ComputedValue,
   DateValue,
   EntityRef,
   Icon as IconValue,
@@ -161,7 +163,10 @@ export function cellValue(
   summary?: ObjectSummary,
   /** M5: the objects linking to this one (`GET /api/object`'s `backlinks`). */
   backlinks?: EntityRef[],
+  /** M12: the object's formula and rollup values (`GET /api/object`'s `computed`), never in frontmatter. */
+  computed?: Record<string, ComputedValue>,
 ): unknown {
+  if (COMPUTED_KINDS.has(def.type)) return computed?.[def.key] ?? null
   const raw = frontmatter[def.key]
   switch (def.type) {
     case 'entity_type':
@@ -198,6 +203,11 @@ export function cellValue(
       })
       return refs
     }
+    case 'files':
+      // `[[Attachments/a.pdf]]` items → the space-relative paths the API sends.
+      return asList(raw)
+        .map(linkTarget)
+        .filter((t): t is string => !!t)
     default:
       if (typeof raw === 'number' || typeof raw === 'boolean') return String(raw)
       return scalarText(raw)
@@ -214,6 +224,8 @@ export interface PropertyPanelProps {
   summary?: ObjectSummary
   /** M5: the objects linking to this one, shown by the backlinks property. */
   backlinks?: EntityRef[]
+  /** M12: formula and rollup values by property key (`ObjectDetail.computed`). */
+  computed?: Record<string, ComputedValue>
   readOnly?: boolean
   /** A cell committed `value` for the frontmatter `key`. */
   onChange?(key: string, value: unknown): void
@@ -296,7 +308,8 @@ interface RowHandlers {
   onChangeType?(): void
   setMenuFor(id: string | null): void
   setSettingsFor(id: string | null): void
-  setDeleteFor(id: string | null): void
+  /** "Delete property": a formula or rollup goes straight away, others ask to type `delete`. */
+  deleteProperty(def: PropertyDef): void
 }
 
 interface PropertyRowProps {
@@ -342,7 +355,7 @@ const PropertyRow = memo(
               }}
               onDelete={() => {
                 h.setMenuFor(null)
-                h.setDeleteFor(def.id)
+                h.deleteProperty(def)
               }}
             />
           ),
@@ -391,6 +404,7 @@ export function PropertyPanel({
   links,
   summary,
   backlinks,
+  computed,
   readOnly,
   onChange,
   onChangeMany,
@@ -417,15 +431,15 @@ export function PropertyPanel({
   const hidden: PropertyDef[] = []
   for (const d of rows) {
     if (d.visibility === 'hidden') hidden.push(d)
-    else if (d.visibility === 'hideWhenEmpty' && propertyIsEmpty(d, cellValue(d, frontmatter, links, summary, backlinks))) continue
+    else if (d.visibility === 'hideWhenEmpty' && propertyIsEmpty(d, cellValue(d, frontmatter, links, summary, backlinks, computed))) continue
     else visible.push(d)
   }
   const external = externalKeys(type, frontmatter)
 
   // The handlers rows get are stable (they read the newest props through `latest`), so a value
   // change re-renders only its own row, whatever handlers the parent passes per render.
-  const latest = useRef({ type, onChange, onChangeMany, onSetReminder, onTypeChange, onOpenTag, onOpenObject, onChangeType })
-  latest.current = { type, onChange, onChangeMany, onSetReminder, onTypeChange, onOpenTag, onOpenObject, onChangeType }
+  const latest = useRef({ type, onChange, onChangeMany, onSetReminder, onTypeChange, onOpenTag, onOpenObject, onChangeType, typeEditor })
+  latest.current = { type, onChange, onChangeMany, onSetReminder, onTypeChange, onOpenTag, onOpenObject, onChangeType, typeEditor }
   const has = { onChangeMany: !!onChangeMany, onSetReminder: !!onSetReminder, onOpenTag: !!onOpenTag, onOpenObject: !!onOpenObject, onChangeType: !!onChangeType }
   const handlers = useMemo<RowHandlers>(
     () => ({
@@ -444,7 +458,15 @@ export function PropertyPanel({
       onChangeType: has.onChangeType ? () => latest.current.onChangeType?.() : undefined,
       setMenuFor,
       setSettingsFor,
-      setDeleteFor,
+      deleteProperty: (def) => {
+        const { type: t, typeEditor: ed, onTypeChange: save } = latest.current
+        // A formula or rollup holds no values in the files (the server deletes it without a
+        // confirmation): no typed confirmation either.
+        if (!t || !COMPUTED_KINDS.has(def.type)) return setDeleteFor(def.id)
+        const next = removeProperty(t, def.id)
+        if (ed) void ed.save(next, { confirm: true })
+        else void save?.(next)
+      },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only whether each handler is given matters
     [has.onChangeMany, has.onSetReminder, has.onOpenTag, has.onOpenObject, has.onChangeType],
@@ -456,7 +478,7 @@ export function PropertyPanel({
   const renderRow = (def: PropertyDef) => (
     <PropertyRow
       def={def}
-      value={cellValue(def, frontmatter, links, summary, backlinks)}
+      value={cellValue(def, frontmatter, links, summary, backlinks, computed)}
       readOnly={ro}
       frontmatter={frontmatter}
       type={editDefs ? type : undefined}
@@ -547,6 +569,7 @@ export function PropertyPanel({
           onOpenChange={(o) => !o && setSettingsFor(null)}
           onOpenProperty={setSettingsFor}
           editor={typeEditor}
+          objectPath={summary?.path}
         />
       )}
       {type && deleting && (

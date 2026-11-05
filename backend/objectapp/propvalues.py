@@ -24,6 +24,10 @@ tags, aliases       flow list                                   ``[str]``
 icon                ``icon: ph-...`` + ``iconColor: <c>``       ``{type, val, color?}``
 coverImage          space-relative image path                   ``str | None``
 color (Tag)         ``bg-<c>``                                  ``str | None``
+email, phone        string (checked on write)                   ``str | None``
+uniqueId            ``TASK-12`` or ``12`` (read-only)           ``str | None``
+files               flow list of ``'[[Attachments/a.pdf]]'``     ``[str]`` (space paths)
+formula, rollup     never stored (computed, read-only)          ``None`` here
 ==================  ==========================================  ============================
 """
 
@@ -70,7 +74,7 @@ _STRING_KINDS = frozenset({"text", "textBlock", "url", "coverImage", "entity_des
 _BLOCK_KINDS = frozenset({"blocks", "simpleTableBlock"})
 _DATE_KINDS = frozenset({"datetime", "datetimeSimple"})
 _STRING_LIST_KINDS = frozenset({"entity_tags", "entity_aliases"})
-_LIST_KINDS = frozenset({"label", "entity"}) | _STRING_LIST_KINDS
+_LIST_KINDS = frozenset({"label", "entity", "files"}) | _STRING_LIST_KINDS
 # System kinds whose values are not edited through the property codec (title and
 # type have their own routes; the rest are maintained by the app).
 _READ_ONLY_KINDS = frozenset(
@@ -80,9 +84,17 @@ _READ_ONLY_KINDS = frozenset(
         "entity_createdAt",
         "entity_lastUpdated",
         "entity_backlinks",
+        # M12: computed by the server, or written only at create / "Number existing objects".
+        "formula",
+        "rollup",
+        "uniqueId",
     }
 )
+COMPUTED_KINDS = frozenset({"formula", "rollup"})
 MAX_ALIASES = 8
+ATTACHMENTS = "Attachments/"
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+$")
+_PHONE_RE = re.compile(r"^[0-9 +\-().]+$")
 MAX_OPTION_TEXT = 100
 
 _DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -99,7 +111,7 @@ class InvalidValue(ValueError):
 
 
 def _is_array(pdef: PropertyDefinition) -> bool:
-    if pdef.type in _STRING_LIST_KINDS:
+    if pdef.type in _STRING_LIST_KINDS or pdef.type == "files":
         return True
     default = pdef.type == "entity"
     value = pdef.options.get("isArray", default)
@@ -320,6 +332,15 @@ def decode_value(pdef: PropertyDefinition, raw: Any, fm: dict[str, Any] | None =
     Entity references come back with ``path: None`` (the space resolves them).
     """
     kind = pdef.type
+    if kind in COMPUTED_KINDS:
+        return None  # never in frontmatter: the server computes it (`computed.Computer`)
+    if kind == "files":
+        out: list[str] = []
+        for item in _as_list(raw):
+            target = _link_target(item)
+            if target and target not in out:
+                out.append(target)
+        return out
     if kind == "number":
         if isinstance(raw, bool) or raw is None:
             return None
@@ -464,6 +485,53 @@ def _encode_color(value: Any) -> str:
     return f"bg-{name}"
 
 
+def _encode_email(value: Any) -> str | None:
+    if not isinstance(value, str):
+        raise InvalidValue("Expected an email address")
+    text = value.strip()
+    if not text:
+        return None
+    if not _EMAIL_RE.match(text):
+        raise InvalidValue(f"{text!r} is not an email address")
+    return text
+
+
+def _encode_phone(value: Any) -> str | None:
+    if not isinstance(value, str):
+        raise InvalidValue("Expected a phone number")
+    text = value.strip()
+    if not text:
+        return None
+    if not _PHONE_RE.match(text) or sum(c.isdigit() for c in text) < 3:
+        raise InvalidValue(f"{text!r} is not a phone number")
+    return text
+
+
+def _encode_files(value: Any) -> FlowList | None:
+    """Space paths under ``Attachments/`` as a flow list of wikilinks (always a list)."""
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise InvalidValue("Expected a list of file paths")
+    links: list[str] = []
+    for v in value:
+        path = v.strip().replace("\\", "/")
+        if not path:
+            continue
+        parts = path.split("/")
+        if (
+            not path.startswith(ATTACHMENTS)
+            or len(parts) < 2
+            or any(p in ("", ".", "..") for p in parts)
+            or any(ch in path for ch in "[]|\n\r")
+        ):
+            raise InvalidValue(f"{v!r} is not a file in {ATTACHMENTS[:-1]}")
+        link = f"[[{path}]]"
+        if link not in links:
+            links.append(link)
+    return FlowList(links) if links else None
+
+
 def encode_value(
     pdef: PropertyDefinition,
     value: Any,
@@ -513,6 +581,12 @@ def encode_value(
         return icon.val
     if kind == "color":
         return _encode_color(value)
+    if kind == "email":
+        return _encode_email(value)
+    if kind == "phone":
+        return _encode_phone(value)
+    if kind == "files":
+        return _encode_files(value)
     raise InvalidValue(f"Properties of kind {kind!r} can't be edited")
 
 
