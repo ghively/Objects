@@ -16,7 +16,9 @@ Safety (contract "Safety and limits"):
   (``symlink``); zip entries whose mode marks a link skipped.
 - Encrypted entries are skipped (``encrypted``).
 - Zip files at the top level of the source (Notion's multi-part export) are read as part of it,
-  one level only; deeper ones are skipped (``nestedArchive``).
+  one level only; deeper ones are skipped (``nestedArchive``). One inside the source zip is
+  read into memory up to `NESTED_IN_MEMORY` (256 MiB, our choice), else through a
+  `SeekableInflate`; nothing is ever extracted to disk.
 - A zip whose every entry sits under one folder is read as that folder (our choice).
 - Dot-folders are not entered: ``.obsidian/`` is noted for detection and listed once
   (``appSettings``), any other once (``unsupported``); dot-files are listed (``unsupported``).
@@ -30,10 +32,13 @@ zips included); for a folder, every file's relative path, size and mtime.
 
 from __future__ import annotations
 
+import bisect
 import hashlib
+import io
 import os
 import re
 import stat
+import struct
 import zipfile
 import zlib
 from dataclasses import dataclass, field
@@ -61,6 +66,10 @@ MAX_ENTRIES = 100_000
 MAX_OBJECTS = 50_000
 MAX_TEXT_FILE = 20 * 1024 * 1024
 MAX_PREVIEW_TEXT = 512 * 1024 * 1024
+NESTED_IN_MEMORY = 256 * 1024 * 1024
+"""A zip inside the source zip up to this size is read into memory (our choice)."""
+CHECKPOINT_EVERY = 4 * 1024 * 1024
+MAX_CHECKPOINTS = 1024
 
 _DRIVE_RE = re.compile(r"^[A-Za-z]:")
 _BAD_CHARS_RE = re.compile("[\x00�\ud800-\udfff]")
@@ -374,11 +383,140 @@ def _list_zip(src: Source, st: os.stat_result) -> None:
             if "/" in rel:
                 lister.skip(rel, "nestedArchive")
                 continue
-            _nested_zip(src, lister, rel, lambda info=info: zf.open(info))
+            _nested_zip(src, lister, rel, lambda info=info: _open_inner(src, zf, info))
             continue
         src_entry = Entry(rel, info.file_size, _local_epoch(info.date_time), 0, info)
         lister.add(src_entry)
     src.fingerprint = lister.hash.hexdigest()
+
+
+def _open_inner(src: Source, zf: zipfile.ZipFile, info: zipfile.ZipInfo):
+    """A zip stored inside the source zip, opened for random access without writing anything:
+    read into memory when it has at most `NESTED_IN_MEMORY` bytes; else, when the outer zip
+    deflated it, a `SeekableInflate` over the outer file (a backward seek inflates again from
+    the nearest checkpoint, not from the start); else the entry's own stream (a stored entry
+    seeks directly)."""
+    if info.file_size <= NESTED_IN_MEMORY:
+        with zf.open(info) as fh:
+            data = fh.read(info.file_size + 1)
+        if len(data) != info.file_size:
+            raise zipfile.BadZipFile("not the size its header says")
+        return io.BytesIO(data)
+    if info.compress_type == zipfile.ZIP_DEFLATED and not info.flag_bits & 0x1:
+        fh = open(src.path, "rb")  # noqa: SIM115 - closed by the stream, closed by Source.close
+        try:
+            fh.seek(info.header_offset)
+            header = fh.read(zipfile.sizeFileHeader)
+            if len(header) != zipfile.sizeFileHeader or header[:4] != zipfile.stringFileHeader:
+                raise zipfile.BadZipFile("bad local file header")
+            fields = struct.unpack(zipfile.structFileHeader, header)
+            start = info.header_offset + zipfile.sizeFileHeader + fields[10] + fields[11]
+            return SeekableInflate(fh, start, info.compress_size, info.file_size)
+        except BaseException:
+            fh.close()
+            raise
+    return zf.open(info)
+
+
+class SeekableInflate:
+    """A deflated zip entry as a seekable, read-only file (for a zip inside the source zip).
+
+    The inflater's state is saved every `CHECKPOINT_EVERY` bytes of output (fewer for a large
+    entry: at most `MAX_CHECKPOINTS`), so reading anywhere costs at most one interval of
+    inflating, not inflating everything before it again. Never writes anything; the output is
+    cut at the entry's declared size."""
+
+    _CHUNK = 64 * 1024
+    _OUT_MAX = 256 * 1024
+
+    def __init__(self, fh, start: int, compress_size: int, size: int) -> None:
+        self._fh = fh
+        self._start = start
+        self._csize = compress_size
+        self.size = size
+        self._every = max(CHECKPOINT_EVERY, size // MAX_CHECKPOINTS)
+        self._pos = 0
+        self.inflated = 0
+        """Bytes inflated so far (tests check that backward reads stay cheap)."""
+        d = zlib.decompressobj(-15)
+        self._checkpoints: list[tuple[int, int, object, bytes]] = [(0, 0, d.copy(), b"")]
+        self._outs = [0]
+        self._restore(0)
+
+    def _restore(self, i: int) -> None:
+        out, used, d, tail = self._checkpoints[i]
+        self._d = d.copy()  # type: ignore[attr-defined]
+        self._in = used
+        self._tail = tail
+        self._cur = out
+        self._buf = bytearray()
+        self._buf_start = out
+
+    def _more(self) -> bytes:
+        """The next piece of output (b"" at the end of the stream)."""
+        while True:
+            if self._tail:
+                data = self._tail
+            else:
+                left = self._csize - self._in
+                if left <= 0 or self._d.eof:
+                    return b""
+                self._fh.seek(self._start + self._in)
+                data = self._fh.read(min(self._CHUNK, left))
+                if not data:
+                    raise EOFError("the zip ends early")
+                self._in += len(data)
+            out = self._d.decompress(data, self._OUT_MAX)
+            self._tail = self._d.unconsumed_tail
+            if out:
+                self.inflated += len(out)
+                return out
+            if self._d.eof:
+                return b""
+
+    def read(self, n: int = -1) -> bytes:
+        end = self.size if n is None or n < 0 else min(self.size, self._pos + n)
+        if end <= self._pos:
+            return b""
+        i = bisect.bisect_right(self._outs, self._pos) - 1
+        if self._pos < self._buf_start or self._outs[i] > self._cur:
+            self._restore(i)  # back to (or ahead to) the nearest checkpoint before the read
+        while self._cur < end:
+            if self._buf_start < self._pos:  # never keep what lies before the read
+                drop = min(len(self._buf), self._pos - self._buf_start)
+                del self._buf[:drop]
+                self._buf_start += drop
+            piece = self._more()
+            if not piece:
+                break
+            self._buf += piece
+            self._cur += len(piece)
+            if self._cur >= self._outs[-1] + self._every:
+                self._checkpoints.append((self._cur, self._in, self._d.copy(), self._tail))
+                self._outs.append(self._cur)
+        lo = self._pos - self._buf_start
+        out = bytes(self._buf[lo : lo + (end - self._pos)])
+        self._pos += len(out)
+        return out
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        base = 0 if whence == 0 else (self._pos if whence == 1 else self.size)
+        self._pos = max(0, base + offset)
+        return self._pos
+
+    def tell(self) -> int:
+        return self._pos
+
+    def seekable(self) -> bool:
+        return True
+
+    def readable(self) -> bool:
+        return True
+
+    def close(self) -> None:
+        self._buf = bytearray()
+        self._checkpoints = self._checkpoints[:1]
+        self._fh.close()
 
 
 def _nested_zip(src: Source, lister: _Lister, rel: str, opener) -> None:

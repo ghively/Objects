@@ -153,6 +153,7 @@ __all__ = [
     "safe_filename",
     "unique_path",
     "version_of",
+    "yaml_single_quoted",
 ]
 
 _log = logging.getLogger(__name__)
@@ -744,6 +745,11 @@ def _title_of(raw: RawObject) -> str:
 
 def _yaml_single_quoted(text: str) -> str:
     return "'" + text.replace("'", "''") + "'"
+
+
+def yaml_single_quoted(text: str) -> str:
+    """``text`` as a single-quoted YAML scalar, as the app writes ``type: '<Name>'``."""
+    return _yaml_single_quoted(text)
 
 
 _link_candidates = link_candidates
@@ -3004,6 +3010,13 @@ class Space:
         _of, fm, _v = self.read(new_rel)
         synced, _skipped = self._sync_relations(new_rel, t, {}, fm)
         return new_rel, version, synced
+
+    def place_new(self, rel: str, data: bytes) -> bool:
+        """Write a new object file at ``rel`` unless something is there by then; True if
+        written. Never overwrites; holds the space lock as `create_object` does and rescans
+        the file (M15's importer writes through this)."""
+        with self._lock:
+            return self._place(rel, data)
 
     def _place(self, rel: str, data: bytes) -> bool:
         """Write a new file at ``rel`` unless something is there by then; True if written."""
