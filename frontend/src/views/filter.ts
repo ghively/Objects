@@ -118,6 +118,13 @@ export const FILTER_OPTIONS: Record<PropertyType, FilterOption[]> = {
   blocks: BLOCKS,
   simpleTableBlock: BLOCKS,
   coverImage: BLOCKS,
+  // M12: Lane C replaces these with operators per computed result type.
+  formula: TEXT,
+  rollup: TEXT,
+  uniqueId: TEXT,
+  email: TEXT,
+  phone: TEXT,
+  files: BLOCKS,
 }
 
 /** The operators a property offers: the start/end ones only when its dates may have an end. */

@@ -88,6 +88,13 @@ const CELLS: Readonly<Record<PropertyType, CellComponent | null>> = {
   entity_backlinks: BacklinksCell,
   // The header edits the title.
   entity_title: null,
+  // M12: Lane C's cells.
+  formula: null,
+  rollup: null,
+  uniqueId: null,
+  email: null,
+  phone: null,
+  files: null,
 }
 
 /** The cell for a property kind; `null` for `entity_title`, which the header edits. */
