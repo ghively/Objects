@@ -24,7 +24,7 @@ describe('KIND_META', () => {
 })
 
 describe('ADD_PROPERTY_ITEMS', () => {
-  it('test ADD_PROPERTY_ITEMS order has 15 entries and Object Select lists Page, Tag and custom types but not Task', () => {
+  it('test ADD_PROPERTY_ITEMS order has 16 entries and Object Select lists Page, Tag and custom types but not Task', () => {
     expect(ADD_PROPERTY_ITEMS.map((i) => i.name)).toEqual([
       'Text',
       'Content',
@@ -41,6 +41,7 @@ describe('ADD_PROPERTY_ITEMS', () => {
       'Created at',
       'Last updated',
       'Aliases',
+      'Button',
     ])
     expect(ADD_PROPERTY_ITEMS.map((i) => i.type)).toEqual([
       'textBlock',
@@ -58,6 +59,7 @@ describe('ADD_PROPERTY_ITEMS', () => {
       'entity_createdAt',
       'entity_lastUpdated',
       'entity_aliases',
+      'button',
     ])
     const objectSelect = ADD_PROPERTY_ITEMS.find((i) => i.action === 'objectSelect')
     expect(objectSelect?.description).toBe('Link to objects of a specific type.')

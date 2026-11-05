@@ -118,6 +118,8 @@ export const FILTER_OPTIONS: Record<PropertyType, FilterOption[]> = {
   blocks: BLOCKS,
   simpleTableBlock: BLOCKS,
   coverImage: BLOCKS,
+  // M14: a button holds no value, so it can't be filtered.
+  button: [],
 }
 
 /** The operators a property offers: the start/end ones only when its dates may have an end. */

@@ -11,6 +11,8 @@ import { vi } from 'vitest'
 import type { Api } from '@/api/client'
 import type {
   Attachment,
+  AutomationRule,
+  AutomationRun,
   CalendarDay,
   CalendarRange,
   Collection,
@@ -247,6 +249,38 @@ export function attachment(partial: Partial<Attachment> = {}): Attachment {
   return { path: 'Attachments/file.pdf', kind: 'pdf', size: 1024, ...partial }
 }
 
+/** An M14 automation rule: a button rule with one "set property" action unless overridden. */
+export function automationRule(partial: Partial<AutomationRule> & Pick<AutomationRule, 'id'>): AutomationRule {
+  return {
+    schemaVersion: 1,
+    name: 'New automation',
+    description: '',
+    enabled: true,
+    trigger: { kind: 'button', scope: null },
+    conditions: { type: 'filterGroup', operator: 'and', elements: [] },
+    actions: [{ kind: 'setProperty', key: 'done', value: true }],
+    templateRepeat: null,
+    createdAt: '2026-11-05T09:00:00.000Z',
+    revision: 'r1',
+    readOnlyReason: null,
+    lastRun: null,
+    ...partial,
+  }
+}
+
+/** An M14 run-log entry (a button run that succeeded) unless overridden. */
+export function automationRun(partial: Partial<AutomationRun> & Pick<AutomationRun, 'ruleId'>): AutomationRun {
+  return {
+    id: '01JRUN0000000000000000000',
+    at: '2026-11-05T09:00:00.000Z',
+    trigger: { kind: 'button', path: null, scheduledFor: null, catchUp: false },
+    status: 'ok',
+    actions: [],
+    error: null,
+    ...partial,
+  }
+}
+
 type Fn =(...args: never[]) => unknown
 
 function defaults(): Api {
@@ -409,6 +443,17 @@ function defaults(): Api {
       trashId: 'trash-merge-1',
     }),
     deleteSpace: async () => ({ trashed: true }),
+    // M14
+    automations: async () => [],
+    automation: async (id: string) => automationRule({ id }),
+    createAutomation: async (input: Partial<AutomationRule>) => automationRule({ ...input, id: '01JNEWRULE000000000000000', revision: 'r1' }),
+    saveAutomation: async (rule: AutomationRule) => ({ rule: { ...rule, revision: `${rule.revision}+1` } }),
+    deleteAutomation: async () => ({ trashId: 'trash-automation-1' }),
+    runAutomation: async (id: string, path: string) =>
+      automationRun({ ruleId: id, trigger: { kind: 'button', path, scheduledFor: null, catchUp: false } }),
+    automationRuns: async () => [],
+    automationCatchUp: async () => [],
+    confirmAutomationCatchUp: async () => [],
     onChange: () => () => undefined,
   } as unknown as Api
 }

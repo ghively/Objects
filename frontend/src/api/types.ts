@@ -29,6 +29,8 @@ export type PropertyType =
   | 'entity_createdAt'
   | 'entity_lastUpdated'
   | 'entity_backlinks'
+  /** M14: runs an automation on its object; holds no value (`options.ruleId`). */
+  | 'button'
 
 /** @deprecated M1 name; use `PropertyType`. */
 export type PropertyKind = PropertyType
@@ -57,6 +59,7 @@ export const PROPERTY_TYPES: readonly PropertyType[] = [
   'entity_createdAt',
   'entity_lastUpdated',
   'entity_backlinks',
+  'button',
 ]
 
 /**
@@ -87,6 +90,7 @@ export const KIND_TRANSFORMS: Readonly<Record<PropertyType, readonly PropertyTyp
   entity_createdAt: [],
   entity_lastUpdated: [],
   entity_backlinks: [],
+  button: [],
 }
 
 /** An icon: an emoji, or any Iconify id (`ph-…`, `vscode-icons-…`) with an optional theme colour. */
@@ -155,6 +159,8 @@ export interface PropertyOptions {
   propertySyncing?: { propertyIds: string[] }
   set?: LabelOption[]
   isStatus?: boolean
+  /** M14 `button`: the id of the automation the button runs (`null`: none chosen yet). */
+  ruleId?: string | null
   [extra: string]: unknown
 }
 
@@ -448,7 +454,7 @@ export interface CreatedFile {
 
 export interface TrashItem {
   id: string
-  kind: 'object' | 'type' | 'collection' | 'query'
+  kind: 'object' | 'type' | 'collection' | 'query' | 'automation'
   originalPath: string
   title: string
   type: string
@@ -460,6 +466,8 @@ export interface TrashItem {
   /** Collection and query entries. */
   collectionId?: string
   queryId?: string
+  /** M14 automation entries. */
+  automationId?: string
   name?: string
 }
 
@@ -468,6 +476,8 @@ export interface RestoreResult {
   typeIds: string[]
   collectionIds?: string[]
   queryIds?: string[]
+  /** M14: restored automation rules. */
+  automationIds?: string[]
   skipped?: SkippedFile[]
   /** Other files the restore wrote back (a collection's members); announced as `changed`. */
   rewritten?: string[]
@@ -502,6 +512,10 @@ export type ChangeKind =
   | 'ui'
   /** M6: a whiteboard's canvas or ink file changed; `path` is the board's `.md`. */
   | 'whiteboard'
+  /** M14: an automation rule file changed; `path` is the rule id (`*`: resync). */
+  | 'automations'
+  /** M14: a run was logged (`path` the rule id), or (`path` `catch-up`) the catch-up list changed. */
+  | 'automationRuns'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {
@@ -1138,3 +1152,209 @@ export interface MergeResult {
 }
 
 export type SpaceSetup = 'blank' | 'basic'
+
+// ---------------------------------------------------------------------------------------------
+// M14: local automations (docs/superpowers/plans/2026-11-05-m14-automations.md, "Contract (T1)").
+// One rule per `.object/automations/<id>.json`; the back end's `automations_model.py` is the twin.
+
+/** The objects a trigger watches: one type's, or one collection's. */
+export interface AutomationScope {
+  kind: 'type' | 'collection'
+  id: string
+}
+
+/** An object is created in the scope (for a collection scope: also added to it by a write). */
+export interface ObjectCreatedTrigger {
+  kind: 'objectCreated'
+  scope: AutomationScope
+}
+
+/**
+ * `propertyKey` changes on an object in the scope: to any value (`to` null), or into matching
+ * `to` (a filter on the same key; it didn't match before the write and does after).
+ */
+export interface PropertyChangedTrigger {
+  kind: 'propertyChanged'
+  scope: AutomationScope
+  propertyKey: string
+  to: Filter | null
+}
+
+/**
+ * Runs at `time` (`HH:mm`, the space's time zone) on `start` (`YYYY-MM-DD`) and on every later
+ * day the M8 repeat text reaches from it (`tasks/repeat.ts` `parseRepeat`; by due date only, so
+ * never "after completion"). The server stores `repeat` in canonical form (`formatRepeat`).
+ */
+export interface ScheduleTrigger {
+  kind: 'schedule'
+  repeat: string
+  time: string
+  start: string
+}
+
+/** Run by hand on one object: a button block or a Button property. `scope` null: any object. */
+export interface ButtonTrigger {
+  kind: 'button'
+  scope: AutomationScope | null
+}
+
+export type AutomationTrigger = ObjectCreatedTrigger | PropertyChangedTrigger | ScheduleTrigger | ButtonTrigger
+export type AutomationTriggerKind = AutomationTrigger['kind']
+
+/**
+ * Set `key` to `value` (the `PUT /api/object/properties` value form), or with `now` to the run's
+ * instant (date properties only; `value` is then null).
+ */
+export interface SetPropertyAction {
+  kind: 'setProperty'
+  key: string
+  value: unknown
+  now?: boolean
+}
+export interface ClearPropertyAction {
+  kind: 'clearProperty'
+  key: string
+}
+/** A Tag object, by its frontmatter `id`. */
+export interface AddTagAction {
+  kind: 'addTag'
+  tagId: string
+}
+export interface RemoveTagAction {
+  kind: 'removeTag'
+  tagId: string
+}
+export interface AddToCollectionAction {
+  kind: 'addToCollection'
+  collectionId: string
+}
+export interface RemoveFromCollectionAction {
+  kind: 'removeFromCollection'
+  collectionId: string
+}
+/**
+ * Create an object of `typeId`: `templateId` null applies the type's default template, `'none'`
+ * none. `title` takes placeholders (empty: the template's title). `relateVia`: a relation
+ * property key of the new object's type, set to the triggering object (null: not related).
+ */
+export interface CreateFromTemplateAction {
+  kind: 'createFromTemplate'
+  typeId: string
+  templateId: string | null
+  title: string
+  relateVia: string | null
+}
+/** Append `text` (placeholders expanded, may be several lines) to the run day's daily note. */
+export interface AppendToDailyNoteAction {
+  kind: 'appendToDailyNote'
+  text: string
+}
+/** A local notification; placeholders expanded. An empty title shows the rule's name. */
+export interface NotifyAction {
+  kind: 'notify'
+  title: string
+  body: string
+}
+
+export type AutomationAction =
+  | SetPropertyAction
+  | ClearPropertyAction
+  | AddTagAction
+  | RemoveTagAction
+  | AddToCollectionAction
+  | RemoveFromCollectionAction
+  | CreateFromTemplateAction
+  | AppendToDailyNoteAction
+  | NotifyAction
+export type AutomationActionKind = AutomationAction['kind']
+
+/** The actions that edit the triggering object (not offered on a schedule). */
+export const OBJECT_ACTION_KINDS: readonly AutomationActionKind[] = [
+  'setProperty',
+  'clearProperty',
+  'addTag',
+  'removeTag',
+  'addToCollection',
+  'removeFromCollection',
+]
+
+export type AutomationRunStatus = 'ok' | 'failed' | 'skipped'
+
+/** One run in a rule's log (`<state dir>`, the newest 200 per rule). */
+export interface AutomationRun {
+  /** A ULID. */
+  id: string
+  ruleId: string
+  /** ISO UTC instant the run started. */
+  at: string
+  trigger: {
+    kind: AutomationTriggerKind
+    /** The triggering object (null for a schedule). */
+    path: string | null
+    /** A schedule run: the occurrence's ISO UTC instant. */
+    scheduledFor: string | null
+    /** Run from the catch-up dialog. */
+    catchUp: boolean
+  }
+  /** `skipped`: the object didn't meet the conditions (logged for button presses only). */
+  status: AutomationRunStatus
+  actions: {
+    /** The action's index in the rule. */
+    index: number
+    kind: AutomationActionKind
+    status: AutomationRunStatus
+    /** The object the action wrote or created. */
+    path: string | null
+    /** Why it failed or was skipped. */
+    detail: string | null
+  }[]
+  error: string | null
+}
+
+export interface AutomationRule {
+  schemaVersion: 1
+  /** API only: the file name (a ULID). */
+  id: string
+  /** At most 100 characters. */
+  name: string
+  description: string
+  enabled: boolean
+  trigger: AutomationTrigger
+  /** The view filter group; empty passes. Always empty on a schedule. */
+  conditions: FilterGroup
+  /** 1 to 20, run in order (the object edits as one write, first). */
+  actions: AutomationAction[]
+  /** Set on the rule a template's "Repeat" made (one per template). */
+  templateRepeat: { typeId: string; templateId: string } | null
+  /** ISO UTC; set by the server on create. */
+  createdAt: string | null
+  /** API only: sha256 of the file. */
+  revision: string
+  /** API only: set when the file can't be read or has an unknown kind; such a rule never runs. */
+  readOnlyReason: string | null
+  /** API only: the newest logged run. */
+  lastRun: AutomationRun | null
+  [extra: string]: unknown
+}
+
+/** What `POST /api/automations` takes (the server sets the rest). */
+export type AutomationRuleInput = Omit<
+  AutomationRule,
+  'schemaVersion' | 'id' | 'createdAt' | 'revision' | 'readOnlyReason' | 'lastRun'
+>
+
+/** GET /api/automations/catch-up entry: a schedule's runs missed while Object was closed. */
+export interface AutomationCatchUpItem {
+  ruleId: string
+  /** The rule's name; for a template's repeat, the template's name. */
+  name: string
+  /** ISO UTC occurrence instants, oldest first, at most 50 (the newest ones). */
+  missed: string[]
+  count: number
+  /** More than 50 were missed. */
+  capped: boolean
+  /** The rule creates objects (the dialog says "Create" rather than "Run"). */
+  createsObjects: boolean
+}
+
+export type AutomationCatchUpChoice = 'all' | 'latest' | 'skip'
