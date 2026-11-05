@@ -1,5 +1,7 @@
 import { Fragment, memo, useMemo, useRef, useState, type ReactNode } from 'react'
+import { COMPUTED_KINDS } from '@/api/types'
 import type {
+  ComputedValue,
   DateValue,
   EntityRef,
   Icon as IconValue,
@@ -161,7 +163,10 @@ export function cellValue(
   summary?: ObjectSummary,
   /** M5: the objects linking to this one (`GET /api/object`'s `backlinks`). */
   backlinks?: EntityRef[],
+  /** M12: the object's formula and rollup values (`GET /api/object`'s `computed`), never in frontmatter. */
+  computed?: Record<string, ComputedValue>,
 ): unknown {
+  if (COMPUTED_KINDS.has(def.type)) return computed?.[def.key] ?? null
   const raw = frontmatter[def.key]
   switch (def.type) {
     case 'entity_type':
@@ -198,6 +203,11 @@ export function cellValue(
       })
       return refs
     }
+    case 'files':
+      // `[[Attachments/a.pdf]]` items → the space-relative paths the API sends.
+      return asList(raw)
+        .map(linkTarget)
+        .filter((t): t is string => !!t)
     default:
       if (typeof raw === 'number' || typeof raw === 'boolean') return String(raw)
       return scalarText(raw)
@@ -214,6 +224,8 @@ export interface PropertyPanelProps {
   summary?: ObjectSummary
   /** M5: the objects linking to this one, shown by the backlinks property. */
   backlinks?: EntityRef[]
+  /** M12: formula and rollup values by property key (`ObjectDetail.computed`). */
+  computed?: Record<string, ComputedValue>
   readOnly?: boolean
   /** A cell committed `value` for the frontmatter `key`. */
   onChange?(key: string, value: unknown): void
@@ -391,6 +403,7 @@ export function PropertyPanel({
   links,
   summary,
   backlinks,
+  computed,
   readOnly,
   onChange,
   onChangeMany,
@@ -417,7 +430,7 @@ export function PropertyPanel({
   const hidden: PropertyDef[] = []
   for (const d of rows) {
     if (d.visibility === 'hidden') hidden.push(d)
-    else if (d.visibility === 'hideWhenEmpty' && propertyIsEmpty(d, cellValue(d, frontmatter, links, summary, backlinks))) continue
+    else if (d.visibility === 'hideWhenEmpty' && propertyIsEmpty(d, cellValue(d, frontmatter, links, summary, backlinks, computed))) continue
     else visible.push(d)
   }
   const external = externalKeys(type, frontmatter)
@@ -456,7 +469,7 @@ export function PropertyPanel({
   const renderRow = (def: PropertyDef) => (
     <PropertyRow
       def={def}
-      value={cellValue(def, frontmatter, links, summary, backlinks)}
+      value={cellValue(def, frontmatter, links, summary, backlinks, computed)}
       readOnly={ro}
       frontmatter={frontmatter}
       type={editDefs ? type : undefined}
