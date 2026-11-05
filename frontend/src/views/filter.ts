@@ -151,6 +151,8 @@ export const FILTER_OPTIONS: Record<PropertyType, FilterOption[]> = {
   blocks: BLOCKS,
   simpleTableBlock: BLOCKS,
   coverImage: BLOCKS,
+  // M14: a button holds no value, so it can't be filtered.
+  button: [],
   // M12
   formula: COMPUTED,
   rollup: COMPUTED,

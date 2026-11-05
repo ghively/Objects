@@ -46,6 +46,7 @@ describe('SettingsModal', () => {
       'Space Settings',
       'Object Types',
       'Task management',
+      'Automations',
       'Integrations',
     ])
     expect(within(nav).getByRole('button', { name: 'Shortcuts' })).toBeInTheDocument()

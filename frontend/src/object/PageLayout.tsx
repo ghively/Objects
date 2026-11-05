@@ -376,6 +376,8 @@ export function PageLayout({
               coverEl && !wideCover ? 'pt-4' : 'pt-10',
             )}
             data-object-path={summary.path}
+            // M14: button blocks are disabled in a template.
+            data-object-template={summary.template != null ? '' : undefined}
           >
             {coverOnTop && <div className="mb-8">{coverEl}</div>}
             {coverEl && wideCover && <div className="h-6" />}

@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { cn } from '@/lib/utils'
 import { AI_ASSISTANT_SEARCH, AI_ASSISTANT_TEXT, AiAssistantSection } from './sections/AiAssistant'
 import { APPEARANCE_SEARCH, APPEARANCE_TEXT, AppearanceSection } from './sections/Appearance'
+import { AUTOMATIONS_SEARCH, AUTOMATIONS_TEXT, AutomationsSection } from './sections/Automations'
 import { DATE_TIME_SEARCH, DATE_TIME_TEXT, DateTimeSection } from './sections/DateTime'
 import { INTEGRATIONS_SEARCH, INTEGRATIONS_TEXT, IntegrationsSection } from './sections/Integrations'
 import { EDITOR_SEARCH, EDITOR_TEXT, EditorSection } from './sections/Editor'
@@ -72,6 +73,15 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     icon: 'ph-check-circle',
     search: TASK_MANAGEMENT_SEARCH,
     Component: TaskManagementSection,
+  },
+  // M14 (our section): rules live in the space (`.object/automations/`).
+  {
+    id: 'automations',
+    group: 'space',
+    label: AUTOMATIONS_TEXT.heading,
+    icon: 'ph-lightning',
+    search: AUTOMATIONS_SEARCH,
+    Component: AutomationsSection,
   },
   {
     id: 'integrations',

@@ -46,6 +46,8 @@ export type OptionTarget =
   | 'indent'
   | 'blockRef'
   | 'dataView'
+  /** M14: a one-line paragraph that is a button running an automation (its label). */
+  | 'button'
 
 export type KnownOption = {
   key: string
@@ -87,6 +89,10 @@ export const KNOWN_OPTIONS: readonly KnownOption[] = (
     { key: 'caption', value: /^[^\r\n]*$/, appliesTo: ['image', 'pdf', 'video', 'audio', 'file'], quoted: true },
     { key: 'view', value: /^(?:inline|smallCard|wideCard|embed)$/, appliesTo: ['objectEmbed'] },
     { key: 'bookmark', value: 'flag', appliesTo: ['bookmark'] },
+    // M14 (our option names): a button block and the id of the automation it runs (a ULID;
+    // empty: none chosen yet), always written quoted.
+    { key: 'button', value: 'flag', appliesTo: ['button'] },
+    { key: 'rule', value: /^[\w.-]{0,100}$/, appliesTo: ['button'], quoted: true },
     { key: 'open', value: 'flag', appliesTo: ['toggle'] },
     { key: 'widths', value: /^\d+(?:,\d+)*$/, appliesTo: ['columns'] },
     { key: 'layout', value: /^grid$/, appliesTo: ['columns'] },

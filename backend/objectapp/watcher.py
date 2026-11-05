@@ -15,9 +15,10 @@ more than `RESYNC_AFTER` object events (a ``git checkout``) is sent as one resyn
   itself, tagged with the saving client's id;
 - events that leave the file bytes as the space already knows them.
 
-The JSON definitions ``.object/{collections,queries,views}/<id>.json`` and
+The JSON definitions ``.object/{collections,queries,views,automations}/<id>.json`` and
 ``.object/ui.json`` are watched too (kinds ``collections``, ``queries``, ``views``,
-``ui``); every other file under a dot-folder stays ignored.
+``automations``, ``ui``); every other file under a dot-folder stays ignored. The watcher only
+rescans: an edit it sees never reaches `Space.after_write`, so it never runs an automation.
 
 A whiteboard's sidecars (``<stem>.whiteboard.json``, ``<stem>.ink.svg``, M6) are watched as
 well: a change made outside the app announces ``whiteboard`` with the board's ``.md`` path
@@ -66,7 +67,7 @@ RESYNC_AFTER = 100
 RESYNC_PATH = "*"
 """``types`` with this path: "everything may have changed" (the client's ``RESYNC_PATH``)."""
 _OBJECT_KINDS = frozenset({"created", "changed", "deleted", "renamed", "whiteboard"})
-_DEFINITION_FOLDERS = ("collections", "queries", "views")
+_DEFINITION_FOLDERS = ("collections", "queries", "views", "automations")
 
 
 @dataclass(frozen=True)
@@ -82,10 +83,13 @@ class ChangeEvent:
         "views",
         "ui",
         "whiteboard",
+        "automations",
+        "automationRuns",
     ]
     path: str
     """Space-relative POSIX path of the object file (for ``types``: the type id; for
-    ``collections``, ``queries`` and ``views``: the definition id; for ``ui``: ``ui.json``;
+    ``collections``, ``queries``, ``views`` and ``automations``: the definition id; for ``ui``:
+    ``ui.json``; for ``automationRuns``: the rule id, or ``catch-up``;
     for ``whiteboard``: the board's ``.md``, whose canvas or ink file changed)."""
     version: str | None
     """The new file version (sha256 of its bytes); ``None`` when deleted."""
