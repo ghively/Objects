@@ -557,12 +557,27 @@ export const api = {
   },
 
   /** Create an object. `templateId`: an id, `null` for the type's default, `"none"` for no template. */
-  async createObject(typeId: string, opts: { title?: string; templateId?: string | null; values?: Record<string, unknown> } = {},
+  /**
+   * Create an object. `body` replaces the body it would get (its `# title` or its template's);
+   * `appendBody` is added below that body. Both are written in the creating write, so no rule
+   * that fires on the creation can come between the object and its text (M14).
+   */
+  async createObject(
+    typeId: string,
+    opts: {
+      title?: string
+      templateId?: string | null
+      values?: Record<string, unknown>
+      body?: string
+      appendBody?: string
+    } = {},
   ): Promise<CreatedFile> {
     const body: Record<string, unknown> = { typeId }
     if (opts.title !== undefined) body.title = opts.title
     if (opts.templateId !== undefined) body.templateId = opts.templateId
     if (opts.values !== undefined) body.values = opts.values
+    if (opts.body !== undefined) body.body = opts.body
+    if (opts.appendBody !== undefined) body.appendBody = opts.appendBody
     body.clientId = CLIENT_ID
     const res = await request<CreatedFile & { typeIds?: string[] }>('/objects', json('POST', body))
     // An inferred type saved for the first time: the server's `types` event is our own echo.
