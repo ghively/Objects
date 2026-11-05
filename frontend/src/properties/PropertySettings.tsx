@@ -23,6 +23,7 @@ import {
   setSeparators,
   updateProperty,
 } from './typeEdits'
+import { ButtonSettingsSection } from './settings/ButtonSettings'
 
 // The property settings texts.
 const TEXT = {
@@ -796,6 +797,7 @@ export function PropertySettings({ typeId, propertyId, open, onOpenChange, onOpe
             )}
             {def.type === 'entity' && !type.basic && <RelationSection type={type} def={def} editor={ed} />}
             {def.type === 'label' && <LabelSection type={type} def={def} save={save} />}
+            {def.type === 'button' && <ButtonSettingsSection type={type} def={def} save={save} />}
             {canChangeVisibility(def) && (
               <Section title="Visibility" description="Decide whether you want this property to be visible on your object's page.">
                 <div className="flex gap-1.5">
