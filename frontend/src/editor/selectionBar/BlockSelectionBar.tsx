@@ -4,10 +4,11 @@
  * text stats; middle, Bold, Italic, Strikethrough, Underline, the Hierarchy and List dropdowns,
  * Toggle, Quote, To-do, the Icon and Color dropdowns; right, "Turn blocks into" (the object picker
  * the block menu's "Turn into..." shows), "Move" (to today's or tomorrow's daily note, or a new page),
- * delete (red) and close.
+ * delete (red), "AI" (M10: the AI chat about the selected blocks, as the block menu's "AI
+ * assistant..."; gone while "Hide AI features" is on) and close.
  *
- * Left out: an "AI" button (M10) and a "Tag" dropdown, which tags blocks: Object's
- * Markdown has no block tags, and inventing them is out (CLAUDE.md: no invented schema).
+ * Left out: the "Tag" dropdown, which tags blocks: Object's Markdown has no block tags, and
+ * inventing them is out (CLAUDE.md: no invented schema).
  *
  * Every button acts on the selected blocks (the block menu's functions) and the block selection
  * stays, so several can be applied in turn. Strings follow the behaviour catalog unless
@@ -17,6 +18,7 @@ import type { Editor } from '@tiptap/core'
 import { BoldIcon, ItalicIcon, StrikethroughIcon, UnderlineIcon, XIcon } from 'lucide-react'
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useAiHidden } from '@/ai/store'
 import type { Icon as IconValue } from '@/api/types'
 import { Icon, isIconifyId } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
@@ -39,6 +41,7 @@ import {
   selectBlocks,
   withTargetSelection,
 } from '../extensions/blockSelection'
+import { AI_ICON, AI_TEXT, openBlocksAi } from '../aiEntries'
 import { HANDLE_TEXT } from '../handles/BlockHandles'
 import { TurnIntoObjectItems } from '../handles/BlockMenu'
 import {
@@ -87,6 +90,7 @@ export const BLOCK_BAR_TEXT = {
   newPage: 'New page',
   newPageHint: 'Create a new page with the selected elements',
   delete: 'Delete selected blocks',
+  ai: AI_TEXT.ai,
   clear: 'Clear selection',
 }
 
@@ -106,6 +110,7 @@ export const BLOCK_BAR_ITEMS: readonly string[] = [
   BLOCK_BAR_TEXT.turnInto,
   BLOCK_BAR_TEXT.move,
   BLOCK_BAR_TEXT.delete,
+  BLOCK_BAR_TEXT.ai, // M10, while AI features are not hidden
   BLOCK_BAR_TEXT.clear,
 ]
 
@@ -242,6 +247,7 @@ function StatsRows({ stats }: { stats: TextStats }) {
 export function BlockSelectionBar({ editor }: { editor: Editor }) {
   const [, setTick] = useState(0)
   const [iconOpen, setIconOpen] = useState(false)
+  const aiHidden = useAiHidden()
 
   // Redraw on every transaction: the selection, the counts and the pressed states follow it.
   useEffect(() => {
@@ -354,6 +360,11 @@ export function BlockSelectionBar({ editor }: { editor: Editor }) {
       <BarButton label={BLOCK_BAR_TEXT.delete} className="block-bar-delete" onClick={() => deleteBlocks(editor)}>
         <Icon name="ph-trash" size={18} />
       </BarButton>
+      {!aiHidden && (
+        <BarButton label={BLOCK_BAR_TEXT.ai} onClick={() => openBlocksAi(editor, 'askBlock')}>
+          <Icon name={AI_ICON} size={18} />
+        </BarButton>
+      )}
       <BarButton label={BLOCK_BAR_TEXT.clear} onClick={() => clearBlockSelection(editor)}>
         <XIcon aria-hidden />
       </BarButton>
