@@ -41,7 +41,7 @@ import {
   selectBlocks,
   withTargetSelection,
 } from '../extensions/blockSelection'
-import { AI_ICON, AI_TEXT, openBlocksAi } from '../aiEntries'
+import { AI_ICON, AI_TEXT, openBlocksAi, useAiBlocked } from '../aiEntries'
 import { HANDLE_TEXT } from '../handles/BlockHandles'
 import { TurnIntoObjectItems } from '../handles/BlockMenu'
 import {
@@ -247,7 +247,9 @@ function StatsRows({ stats }: { stats: TextStats }) {
 export function BlockSelectionBar({ editor }: { editor: Editor }) {
   const [, setTick] = useState(0)
   const [iconOpen, setIconOpen] = useState(false)
-  const aiHidden = useAiHidden()
+  // Hidden too on a page excluded from AI or a template (M10).
+  const aiBlocked = useAiBlocked(editor)
+  const aiHidden = useAiHidden() || aiBlocked
 
   // Redraw on every transaction: the selection, the counts and the pressed states follow it.
   useEffect(() => {
