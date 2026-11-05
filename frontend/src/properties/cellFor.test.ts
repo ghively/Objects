@@ -18,13 +18,16 @@ import { AliasesCell } from './cells/AliasesCell'
 import { TextCell } from './cells/TextCell'
 import { TypeChipCell } from './cells/TypeChipCell'
 import { UrlCell } from './cells/UrlCell'
+import { EmailCell } from './cells/EmailCell'
+import { FilesCell } from './cells/FilesCell'
+import { FormulaCell } from './cells/FormulaCell'
+import { IdCell } from './cells/IdCell'
+import { PhoneCell } from './cells/PhoneCell'
+import { RollupCell } from './cells/RollupCell'
 
 describe('cellFor', () => {
   it('test cellFor covers every PropertyType', () => {
-    // M12 contract: Lane C fills the cells of the new kinds and drops this skip.
-    const PENDING_M12 = new Set<PropertyType>(['formula', 'rollup', 'uniqueId', 'email', 'phone', 'files'])
     for (const t of PROPERTY_TYPES) {
-      if (PENDING_M12.has(t)) continue
       if (t === 'entity_title') expect(cellFor(t)).toBeNull()
       else expect(cellFor(t), t).toBeTypeOf('function')
     }
@@ -48,6 +51,12 @@ describe('cellFor', () => {
       entity_type: TypeChipCell,
       entity_collections: CollectionsCell,
       entity_backlinks: BacklinksCell,
+      formula: FormulaCell,
+      rollup: RollupCell,
+      uniqueId: IdCell,
+      email: EmailCell,
+      phone: PhoneCell,
+      files: FilesCell,
     }
     for (const [t, cell] of Object.entries(expected)) expect(cellFor(t as PropertyType), t).toBe(cell)
   })
