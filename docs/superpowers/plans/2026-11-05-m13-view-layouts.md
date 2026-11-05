@@ -1,6 +1,6 @@
 # Milestone 13: calendar, timeline and chart layouts
 
-Expanded 2026-11-05 from `2026-11-04-notion-anytype-features-plan.md`, M13, against `master` at `c72567f`. Built on branch `feat/m13-view-layouts`. Everything here is new ("Beyond the catalog"); every label and default is "our string" or "our choice".
+Expanded 2026-11-05 from `2026-11-04-notion-anytype-features-plan.md`, M13, against `master` at `c72567f`. Built on branch `feat/m13-view-layouts` (built, reviewed and fixed 2026-11-05; results in `m13-acceptance.md`). Everything here is new ("Beyond the catalog"); every label and default is "our string" or "our choice".
 
 ## Contract (T1)
 
