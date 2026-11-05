@@ -1,6 +1,6 @@
 # Milestone 12: computed and new property kinds (Formula, Rollup, ID, Email, Phone, Files)
 
-Expanded 2026-11-05 from `2026-11-04-notion-anytype-features-plan.md`, M12, against `master` at `c72567f`. Built on branch `feat/m12-property-kinds`. Everything here is new schema ("Beyond the catalog"); every label and default is "our string" or "our choice".
+Expanded 2026-11-05 from `2026-11-04-notion-anytype-features-plan.md`, M12, against `master` at `c72567f`. Built on branch `feat/m12-property-kinds` (built, reviewed and fixed 2026-11-05; results in `m12-acceptance.md`). Everything here is new schema ("Beyond the catalog"); every label and default is "our string" or "our choice".
 
 ## Contract (T1)
 
