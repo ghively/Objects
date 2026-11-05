@@ -50,7 +50,7 @@ import {
   targetRange,
   type TurnIntoKind,
 } from '../extensions/blockSelection'
-import { AI_ICON, AI_TEXT, openBlocksAi } from '../aiEntries'
+import { AI_ICON, AI_TEXT, openBlocksAi, useAiBlocked } from '../aiEntries'
 import { showToast } from '../media/upload'
 import { BlockStyleExtras, BlockStyleMenu } from '../menus/BlockStyleMenu'
 import { copyBlockReference } from '../nodes/blockRef'
@@ -169,7 +169,9 @@ export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps
   const todo = open && hasTodoAt(editor)
   const selected = open ? (blockSelectionRange(editor.state)?.blocks.length ?? 0) : 0
   const targetCount = open ? (targetRange(editor.state)?.blocks.length ?? 0) : 0
-  const aiHidden = useAiHidden()
+  // Hidden too on a page excluded from AI or a template (M10).
+  const aiBlocked = useAiBlocked(editor)
+  const aiHidden = useAiHidden() || aiBlocked
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange} modal={false}>
       <DropdownMenuTrigger asChild>

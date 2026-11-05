@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useSettings } from '@/settings/useSettings'
 import { useAiHidden } from '@/ai/store'
+import { useAiBlocked } from '../aiEntries'
 import { closeSlashMenu, registerSlashKeyHandler, useSlashMenu } from '../extensions/slashMenu'
 import { filterSections, hasRealMatch, slashSections, SLASH_TEXT, type SlashItem, type SlashView } from './slashItems'
 import { KeyHints } from '@/components/KeyHints'
@@ -78,7 +79,9 @@ export function SlashMenu({ editor }: { editor: Editor }) {
   const state = useSlashMenu()
   const types = useLinkIndex((s) => s.types)
   const twentyFourHourTime = useSettings((s) => s.settings.twentyFourHourTime)
-  const aiHidden = useAiHidden()
+  // Hidden too on a page excluded from AI or a template (M10).
+  const aiBlocked = useAiBlocked(editor)
+  const aiHidden = useAiHidden() || aiBlocked
   const open = state.editor === editor && state.range !== null
   const sub = state.sub && state.sub.editor === editor ? state.sub : null
   const query = open ? state.query : ''

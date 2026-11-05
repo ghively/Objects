@@ -2,7 +2,15 @@
  * M10: the AI chat's strings. The catalog names only the entry points ("AI Chat", "Relevant
  * Content", "Find More", the shortcut names); everything else here is ours ("our string").
  */
-import type { AiMode } from '@/api/types'
+import type { AiMode, AiSkipped } from '@/api/types'
+
+/** Why a context page was left out of a turn (our strings). */
+export const SKIP_REASONS: Record<AiSkipped['reason'], string> = {
+  excluded: 'excluded from AI',
+  template: 'template',
+  missing: 'not found',
+  tooLong: 'too long',
+}
 
 export const AI_CHAT_TEXT = {
   /** The side-panel entry's title and the Explore card (catalog). */
@@ -48,7 +56,11 @@ export const AI_CHAT_TEXT = {
   dismiss: 'Dismiss', // our string
   accepted: 'Added', // our string
   noTarget: 'Add a page to the context first.', // our string
-  skipped: (titles: string[]) => `Left out (Exclude from AI): ${titles.join(', ')}`,
+  /** Our string: the pages left out of a turn, each with its reason. */
+  skipped: (pages: { title: string; reason: AiSkipped['reason'] }[]) =>
+    `Left out: ${pages.map((p) => `${p.title} (${SKIP_REASONS[p.reason] ?? p.reason})`).join(', ')}`,
+  /** Our string: a save that found the chat changed in another window or on disk. */
+  changedElsewhere: 'This chat was changed elsewhere. Start a new chat to continue.',
   // status
   notFound: 'Claude Code not found',
   notFoundHelp: 'Install Claude Code and sign in, or set its path in Settings > AI Assistant.',
