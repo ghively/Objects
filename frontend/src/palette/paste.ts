@@ -186,8 +186,12 @@ export async function appendToDailyNote(path: string, text: string): Promise<str
 
 /** Create a page (titled `title`, or the default title), write `body` into it and open it. */
 export async function createPage(typeId: string, body: string, title?: string): Promise<string> {
-  const created = await api.createObject(typeId, title !== undefined ? { title, templateId: 'none' } : { templateId: 'none' })
-  if (body.trim()) await api.saveBody(created.path, asBodyText(body, false), created.version)
+  // The text goes in the creating write: a creation rule's write can't come between them.
+  const created = await api.createObject(typeId, {
+    ...(title !== undefined ? { title } : {}),
+    templateId: 'none',
+    ...(body.trim() ? { body: asBodyText(body, false) } : {}),
+  })
   openObject(created.path, {}, typeId)
   void invalidateLinkIndex()
   return created.path

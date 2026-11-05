@@ -14,7 +14,15 @@ import type {
   StatusCategory,
   TypeDef,
 } from '@/api/types'
-import { formatNumber } from '@/properties/format'
+import {
+  asComputed,
+  computedDateResolution,
+  computedIsEmpty,
+  computedList,
+  computedNumberFormat,
+  computedText,
+} from '@/properties/computed'
+import { formatDate, formatNumber } from '@/properties/format'
 import { STATUS_CATEGORIES, optionCategory } from '@/tasks/statusCategory'
 import { wallClock } from '@/lib/zonedTime'
 import { wallStart } from './dates'
@@ -28,7 +36,8 @@ export interface GroupOption {
 const o = (key: string, label: string): GroupOption => ({ key, label })
 
 const DATE_KINDS = new Set<PropertyType>(['datetime', 'datetimeSimple', 'entity_lastUpdated', 'entity_createdAt'])
-const NOT_GROUPABLE = new Set<PropertyType>(['blocks', 'simpleTableBlock'])
+// M12: files are not grouped by (our choice).
+const NOT_GROUPABLE = new Set<PropertyType>(['blocks', 'simpleTableBlock', 'files'])
 
 /** Group-by option of a status label: one group per status category ("By category" is our string). */
 export const STATUS_CATEGORY_OPTION = 'statusCategory'
@@ -377,8 +386,45 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
       }
       return textBucket(s.split(/\n\s*\n/)[0] ?? '')
     }
+    case 'formula':
+    case 'rollup':
+      return computedBuckets(v, def)
+    case 'uniqueId':
+      return textBucket(typeof v === 'number' ? String(v) : typeof v === 'string' ? v : '')
     default:
       return textBucket(typeof v === 'string' ? v : '')
+  }
+}
+
+/**
+ * M12: a formula or rollup value's groups, by its value as text: a number as its format writes it
+ * (ordered numerically), a date as the date (ordered by date), a boolean as Checked/Unchecked,
+ * one group per list item, text as text; empty and errors go to Other.
+ */
+function computedBuckets(v: unknown, def: Pick<PropertyDef, 'type' | 'options'>): Bucket[] {
+  const c = asComputed(v)
+  if (!c || computedIsEmpty(c)) return []
+  switch (c.type) {
+    case 'number': {
+      const n = c.value as number
+      return [{ id: TEXT_ID + String(n), label: formatNumber(n, computedNumberFormat(def)) || String(n), sort: n }]
+    }
+    case 'boolean':
+      return [c.value === true ? { id: TEXT_ID + 'true', label: 'Checked', sort: 0 } : { id: TEXT_ID + 'false', label: 'Unchecked', sort: 1 }]
+    case 'date': {
+      const iso = c.value as string
+      const label = formatDate({ start: iso, resolution: computedDateResolution(iso) }) || iso
+      return [{ id: TEXT_ID + iso, label, sort: iso }]
+    }
+    case 'list': {
+      const out: Bucket[] = []
+      for (const item of computedList(c) ?? []) {
+        for (const b of textBucket(item)) if (!out.some((x) => x.id === b.id)) out.push(b)
+      }
+      return out
+    }
+    default:
+      return textBucket(computedText(c))
   }
 }
 
@@ -524,8 +570,9 @@ function swapText(current: unknown, fromLabel: string | null, add: string, same:
 
 /**
  * The update that moves a row into `group`, or null where a drag can't (created, updated, type,
- * backlinks, number ranges and date periods). With `move`, a multi-value property keeps its other
- * values: the source column's value is removed and the target's added.
+ * backlinks, number ranges, date periods; M12 formulas, rollups, IDs and files). With `move`, a
+ * multi-value property keeps its other values: the source column's value is removed and the
+ * target's added.
  */
 export function valueForGroup(
   groupBy: GroupBy | GroupByEntry,
@@ -547,6 +594,11 @@ export function valueForGroup(
     case 'datetimeSimple':
     case 'blocks':
     case 'simpleTableBlock':
+    // M12: computed and server-written values can't be set by a drop; nor can a file be.
+    case 'formula':
+    case 'rollup':
+    case 'uniqueId':
+    case 'files':
       return null
     case 'number':
       return entry.option === 'range' ? null : { key, value: group.isOther ? null : Number(group.id) }

@@ -25,10 +25,8 @@ socket or writes inside the space.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
-import os
 import threading
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -36,7 +34,7 @@ from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from pathlib import Path
 from typing import Any
 
-from .appstate import state_dir
+from .appstate import space_key, state_dir
 from .localtime import from_local, to_local
 from .notify import Notifier
 from .propvalues import decode_value, label_lookup
@@ -324,9 +322,7 @@ def _state_dir() -> Path:
 
 def ledger_path_for(space_root: Path) -> Path:
     """``<state dir>/reminders-<hash of the space path>.json`` (outside the space)."""
-    key = os.path.normcase(str(Path(space_root).resolve()))
-    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
-    return _state_dir() / f"reminders-{digest}.json"
+    return _state_dir() / f"reminders-{space_key(space_root)}.json"
 
 
 class Ledger:

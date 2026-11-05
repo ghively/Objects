@@ -7,6 +7,7 @@ import type { PropertyDef, Row, TypeDef } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { cn } from '@/lib/utils'
 import { cellForDef } from '@/properties/cellFor'
+import { asComputed, computedIsEmpty } from '@/properties/computed'
 import { chipStyle, tagStyle } from '@/theme/palette'
 import { kindIcon } from '@/properties/kinds'
 import { displayTitle } from '../filter'
@@ -22,7 +23,13 @@ export function cardImage(row: Row): string | null {
 }
 
 export const isEmptyValue = (v: unknown): boolean =>
-  v === null || v === undefined || v === '' || v === false || (Array.isArray(v) && v.length === 0)
+  v === null ||
+  v === undefined ||
+  v === '' ||
+  v === false ||
+  (Array.isArray(v) && v.length === 0) ||
+  // M12: a formula or rollup value with nothing in it (an error still shows).
+  (asComputed(v) !== null && computedIsEmpty(v, { errorIsEmpty: false }))
 
 export const CARD_BASE =
   'preview-card-base preview-card-core relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised text-left shadow-(--card-shadow) active:brightness-[1.02]'
@@ -101,12 +108,21 @@ export function CardProperties({
             const def: PropertyDef | undefined = type?.propertyDefinitions.find((d) => d.key === p.propertyId)
             if (!def) return null
             const value = p.propertyId in row.values ? row.values[p.propertyId] : undefined
-            if (isEmptyValue(value)) return null
+            // M14: a Button property holds no value and is always shown (and pressable).
+            const button = def.type === 'button'
+            if (!button && isEmptyValue(value)) return null
             const Cell = cellForDef(def)
             if (!Cell) return null
             return (
               <div key={p.propertyId} data-prop={p.propertyId} className="pointer-events-none min-w-0">
-                <Cell def={def} value={value} readOnly density="table" onChange={() => {}} />
+                <Cell
+                  def={def}
+                  value={value}
+                  readOnly={button ? !!row.summary.readOnly : true}
+                  density="table"
+                  onChange={() => {}}
+                  path={row.summary.path}
+                />
               </div>
             )
           }
@@ -214,11 +230,23 @@ export function WallCardProperties({
             const Cell = cellForDef(def)
             if (!Cell) return null
             const value = p.propertyId in row.values ? row.values[p.propertyId] : undefined
-            // A checkbox always shows its box; every other kind reads "Empty" when unset.
-            const empty = def.type !== 'boolean' && isEmptyValue(value)
+            // A checkbox always shows its box (M14: a button its button); every other kind reads "Empty" when unset.
+            const button = def.type === 'button'
+            const empty = def.type !== 'boolean' && !button && isEmptyValue(value)
             return (
               <PropRow key={p.propertyId} id={p.propertyId} name={def.name} icon={def.icon ?? kindIcon(def.type)}>
-                {empty ? EMPTY : <Cell def={def} value={value} readOnly density="table" onChange={() => {}} />}
+                {empty ? (
+                  EMPTY
+                ) : (
+                  <Cell
+                    def={def}
+                    value={value}
+                    readOnly={button ? !!row.summary.readOnly : true}
+                    density="table"
+                    onChange={() => {}}
+                    path={row.summary.path}
+                  />
+                )}
               </PropRow>
             )
           }

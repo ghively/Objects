@@ -3,8 +3,8 @@
 Status as of 2026-11-04. **All nine milestones are built, reviewed, fixed and gated, and all are on `master`.** The 2026-11-01 full audit is merged (PR #4, `84f3c16`). The 2026-11-02 behaviour study's polish backlog was built on 2026-11-03 in nine parallel lanes, reviewed once, fixed once and gated (see "2026-11-03: the polish backlog" below). Pushed to origin (`55a4059`). On 2026-11-04 the repo was clean-roomed (`28d55b1`) and the rest of the polish backlog was built (see "2026-11-04" below).
 
 **What remains, in one list** (details: `polish-audit-2026-11-02.md`, "Remaining tasks"):
-0. **M10, the AI assistant** (planned 2026-11-02, not built): `2026-11-02-m10-ai-assistant.md`; three small questions for Gene at its end.
-1. **Polish backlog: done** (2026-11-04). Built: local Help & Resources (shortcuts, Getting started, Markdown reference; no external links), empty daily-note placeholders (Day view), Default list view type setting, a saved query per starter template, the empty icon list item fix, Wall card details. Closed by Gene: the per-tool import guides, the `@` picker's Collection badge (collections stay unlinkable), block tags. Open question: deleting a type leaves its saved queries in `.object/queries/` pointing at the deleted type id.
+0. **M10, the AI assistant**: built 2026-11-05 on `feat/m10-ai-assistant`; `m10-acceptance.md`. Its three open questions were answered as the plan's brackets proposed.
+1. **Polish backlog: done** (2026-11-04). Built: local Help & Resources (shortcuts, Getting started, Markdown reference; no external links), empty daily-note placeholders (Day view), Default list view type setting, a saved query per starter template, the empty icon list item fix, Wall card details. Closed by Gene: the per-tool import guides, the `@` picker's Collection badge (collections stay unlinkable), block tags. Deleting a type (our choice, 2026-11-05): its saved queries of only that type go to the Trash with it, other queries drop its id (kept in the trash entry), and a restore brings both back as they were.
 2. **Decisions for Gene:** (decided 2026-11-02: all Pro features are unlocked, nothing gated; AI is in, through the Claude Code CLI, planned as M10; the integrations come later at lower priority); whether the how-to guides ship as built-in seeds; scrub the plaintext credentials found in his Work and Personal source spaces before any import.
 3. **Gene's hands-on checking** (M1-M9 acceptance docs, 256 unchecked items), and the fixes it produces. **Settled 2026-10-28:** the Standard design shows properties in the side column; they go inline below 768 px.
 4. **Not yet catalogued** (needs a scratch view or approval): filter, sort and group editors, Customize card view, Tasks page, Queries, Weblink and PDF viewers, image and file objects, Two Columns/Code/Math/Toggle/Group/Horizontal line blocks, Word and Latex export, Three days view in the other spaces, drag and drop, markdown list shortcuts with real key events.
@@ -14,6 +14,26 @@ Status as of 2026-11-04. **All nine milestones are built, reviewed, fixed and ga
 ## 2026-11-05: M15, importers
 
 Import a Notion "Markdown & CSV" export, an Obsidian vault or an Anytype Markdown export (zip or folder, read in place by path) into a new space or, when picked, this space: a preview that writes nothing, editable type and property mappings, a polled job with Stop, new files only, and an "Import report" page. Built on `feat/m15-importers` off `master` in two lanes (back end; dialog), one review, one fix pass in two parts (`b16bc66`, `90af287`) and the gate. Plan `2026-11-05-m15-importers.md`; results, our choices and hand-checks in `m15-acceptance.md`. Built on Linux; not yet run on Windows. The Anytype reader is unverified until a real export is checked.
+
+## 2026-11-05: M14, local automations
+
+Rules that run on this machine: triggers on create, property change, schedule and button; conditions from the view filters; actions that set properties, tag, file into collections, create from templates, append to the daily note and notify; a template "Repeat"; a Button block and a Button property; Settings > Automations with each rule's run log; and a catch-up dialog for missed schedule runs. Built on `feat/m14-automations` off `master` in two lanes (back end; editor and screens), one review, one fix pass (`a4544c5`, `cc2c407`) and the gate. Plan `2026-11-05-m14-automations.md`; results, our choices and hand-checks in `m14-acceptance.md`. Built on Linux; not yet run on Windows.
+
+## 2026-11-05: M13, calendar, timeline and chart layouts
+
+Three new view layouts plus sub-items and dependencies, built on `feat/m13-view-layouts` off `master` in three lanes (calendar; timeline, relation pairs and nested rows; chart), one review, one fix pass (`d6b2d45`) and the gate. Plan `2026-11-05-m13-view-layouts.md`; results, our choices and hand-checks in `m13-acceptance.md`. Built on Linux; not yet run on Windows.
+
+## 2026-11-05: M12, computed and new property kinds
+
+Formula, Rollup, ID, Email, Phone and Files, built on `feat/m12-property-kinds` off `master` in three lanes (back end, property settings, cells and views), one review, one fix pass (`4a81fe2`, `881faf6`) and the gate. Plan `2026-11-05-m12-property-kinds.md`; results, our choices and hand-checks in `m12-acceptance.md`. Built on Linux; not yet run on Windows.
+
+## 2026-11-05: M10, the AI assistant (branch `feat/m10-ai-assistant`, on top of M11)
+
+Built in three lanes (back end; chat panel and settings; editor and object entries), reviewed once, fixed once, gated on Linux. The assistant runs `claude -p` with only Object's MCP read tools, in an empty folder, with a read-only token that lives only in memory; "Exclude from AI" pages and templates are never sent; nothing the assistant proposes is written without a click. Results and our choices: `m10-acceptance.md`.
+
+## 2026-11-05: M11, the local API and MCP server (branch `feat/m11-local-api-mcp`, merged 2026-11-05, PR #5)
+
+Next plan: `2026-11-04-notion-anytype-features-plan.md` (Notion and Anytype comparison; order M11, M10, M12, M13, M14, M15, one branch and PR each, Gene merges). M11 is built and gated on Linux: tokens in the state dir, `/api/v1`, `objectapp-mcp`, Settings > Integrations, "Exclude from AI". Results and our choices: `m11-acceptance.md`.
 
 ## 2026-11-04: clean room and the rest of the polish backlog
 
@@ -66,6 +86,11 @@ Each milestone's plan holds its full scope. Each acceptance doc holds its automa
 | **M7** remaining blocks, light mode, settings, spaces, tabs, side panel | `2026-10-26-m7-blocks-lightmode-polish.md` | `f98e401..338a42f`, gate 2026-10-27; known-issue fixes `fc0bff2..96af06e` | `m7-acceptance.md` (57, incl. the side-by-side pass) |
 | **M8** every feature M4–M7 deferred, local only (31 tasks) | `2026-10-27-m8-deferred-features.md` | `61b6fed..0e7c748`, gate 2026-10-28; review-minor fixes `1721a4b..9383a9b` | `m8-acceptance.md` (40) |
 | **M9** the audit's completeness gaps (Tasks 1–23; 13 skipped by Gene) | `2026-10-28-m9-completeness-gaps.md` | `19a8167..c138f1d`, review fixes `3d46450..d17bd90`, gate 2026-10-28 | `m9-acceptance.md` (19) |
+| **M10** AI assistant through the Claude Code CLI and M11's MCP read tools | `2026-11-02-m10-ai-assistant.md` | branch `feat/m10-ai-assistant`, gate 2026-11-05 (Linux) | `m10-acceptance.md` (7) |
+| **M11** local API, tokens, MCP server, Settings > Integrations | `2026-11-04-notion-anytype-features-plan.md` | branch `feat/m11-local-api-mcp`, gate 2026-11-05 (Linux) | `m11-acceptance.md` (4) |
+| **M12** computed and new property kinds (Formula, Rollup, ID, Email, Phone, Files) | `2026-11-05-m12-property-kinds.md` | `01289a8..` on `feat/m12-property-kinds`, gate 2026-11-05 (Linux) | `m12-acceptance.md` (7) |
+| **M13** calendar, timeline and chart layouts; sub-items and dependencies | `2026-11-05-m13-view-layouts.md` | `0d9b7db..` on `feat/m13-view-layouts`, gate 2026-11-05 (Linux) | `m13-acceptance.md` (5) |
+| **M14** local automations: rules, schedules and catch-up, template repeat, buttons | `2026-11-05-m14-automations.md` | `dbb09d9..` on `feat/m14-automations`, gate 2026-11-05 (Linux) | `m14-acceptance.md` (7) |
 | **M15** importers: Notion, Obsidian and Anytype exports | `2026-11-05-m15-importers.md` | `80973d0..` on `feat/m15-importers`, gate 2026-11-05 (Linux) | `m15-acceptance.md` (7) |
 
 M8's "Coverage" section maps every deferred item to a task, or to a spec §2 exclusion: AI, network at runtime, accounts and sharing, mobile, telemetry.

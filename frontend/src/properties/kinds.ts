@@ -37,6 +37,17 @@ export const KIND_META: Readonly<Record<PropertyType, KindMeta>> = {
   },
   coverImage: { name: 'Cover Image', description: 'A single select image property.', icon: 'ph-image' },
   color: { name: 'Color', description: '', icon: 'ph-palette' },
+  // M12: our kinds, names and descriptions (our strings)
+  formula: { name: 'Formula', description: 'A value calculated from other properties.', icon: 'ph-function' },
+  rollup: {
+    name: 'Rollup',
+    description: 'Shows or calculates a property of related objects.',
+    icon: 'ph-stack',
+  },
+  uniqueId: { name: 'ID', description: 'A number given to each new object, with an optional prefix.', icon: 'ph-hash-straight' },
+  email: { name: 'Email', description: 'An email address.', icon: 'ph-at' },
+  phone: { name: 'Phone', description: 'A phone number.', icon: 'ph-phone' },
+  files: { name: 'Files', description: 'Attached files.', icon: 'ph-paperclip' },
   entity_title: {
     name: 'Title',
     description: 'The title serves as the main identifier for any entry',
@@ -63,6 +74,8 @@ export const KIND_META: Readonly<Record<PropertyType, KindMeta>> = {
     icon: 'ph-clock-clockwise',
   },
   entity_backlinks: { name: 'Context', description: 'Objects linking to this one', icon: 'ph-line-segment' },
+  // M14 (our strings): a button that runs an automation on its object.
+  button: { name: 'Button', description: 'Run an automation on this object with one click', icon: 'ph-cursor-click' },
 }
 
 /** The icon of a kind, with a fallback for kinds the API may add later. */
@@ -109,6 +122,15 @@ const MENU_ORDER = [
   'property_entity_createdAt',
   'property_entity_lastUpdated',
   'property_entity_aliases',
+  // M12: our kinds, after the catalogued items
+  'property_formula',
+  'property_rollup',
+  'property_uniqueId',
+  'property_email',
+  'property_phone',
+  'property_files',
+  // M14: after the catalogued items (our choice).
+  'property_button',
 ] as const
 
 // The property kinds that become menu items; `text`, `url`, `simpleTableBlock` and
@@ -127,6 +149,13 @@ const ADDABLE_KINDS: readonly PropertyType[] = [
   'entity_createdAt',
   'entity_lastUpdated',
   'entity_aliases',
+  'formula',
+  'rollup',
+  'uniqueId',
+  'email',
+  'phone',
+  'files',
+  'button',
 ]
 
 function buildItems(): AddPropertyItem[] {
@@ -155,7 +184,7 @@ function buildItems(): AddPropertyItem[] {
   return items.filter((i) => rank(i) >= 0).sort((a, b) => rank(a) - rank(b))
 }
 
-/** The Add Property menu's 15 items, in order. */
+/** The Add Property menu's items, in order: the 15 catalogued ones, then M12's six, then M14's Button. */
 export const ADD_PROPERTY_ITEMS: readonly AddPropertyItem[] = buildItems()
 
 // Basic types that can't be relation targets.

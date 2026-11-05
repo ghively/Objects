@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { DateConstraints, PropertyDef, PropertyOptions, PropertyType, TypeDef } from '@/api/types'
+import { COMPUTED_KINDS } from '@/api/types'
 import { ColorPicker } from '@/components/ColorPicker'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -13,6 +14,9 @@ import { CURRENCIES } from './currencies'
 import { KIND_META, objectSelectTypes } from './kinds'
 import { LabelMenu } from './LabelMenu'
 import { NumberFormatMenu } from './NumberFormatMenu'
+import { FormulaSection } from './settings/FormulaSection'
+import { RollupSection } from './settings/RollupSection'
+import { UniqueIdSection } from './settings/UniqueIdSection'
 import { canChangeVisibility, canDeleteProperty, VISIBILITY_OPTIONS } from './PropertyMenu'
 import {
   allowedKindChanges,
@@ -23,6 +27,7 @@ import {
   setSeparators,
   updateProperty,
 } from './typeEdits'
+import { ButtonSettingsSection } from './settings/ButtonSettings'
 
 // The property settings texts.
 const TEXT = {
@@ -71,6 +76,8 @@ export interface PropertySettingsProps {
   onOpenProperty?(propertyId: string): void
   /** The type editor to save through; without one the dialog uses its own. */
   editor?: TypeEditor
+  /** M12: the object the settings were opened from (a formula previews against it). */
+  objectPath?: string | null
 }
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
@@ -468,13 +475,19 @@ function RelationSection({
 
   const linked = types.find((t) => t.id === saved.allowedTypes[0])
   const syncedId = def.options.propertySyncing?.propertyIds?.[0] ?? null
+  // The synced partner is always listed: a relation pair (M13 "Parent item" and "Sub-items") links
+  // a single-select property with a list, which the rules below would otherwise hide.
   const eligible = (linked?.propertyDefinitions ?? []).filter(
     (p) =>
-      p.type === 'entity' &&
-      p.options.isArray !== false &&
-      !p.options.hasFixedSet &&
-      (p.options.allowedTypes ?? []).includes(type.id),
+      p.id === syncedId ||
+      (p.type === 'entity' &&
+        p.options.isArray !== false &&
+        !p.options.hasFixedSet &&
+        (p.options.allowedTypes ?? []).includes(type.id)),
   )
+  // A single-select (or fixed-set) property that is already synced (the pair's "Parent item")
+  // shows its partner and "No Property" only: it can't be linked anew.
+  const singleSided = !saved.isArray || saved.hasFixedSet
 
   return (
     <>
@@ -573,21 +586,23 @@ function RelationSection({
       <Section title="Two-way linking" description={TEXT.syncExplanation}>
         {!linked || linked.basic || type.basic ? (
           <p className="text-[13px] text-fg-muted">{TEXT.notAllowed}</p>
-        ) : !saved.isArray || saved.hasFixedSet ? (
+        ) : singleSided && syncedId === null ? (
           <p className="text-[13px] text-fg-muted">{TEXT.multiSelectOnly}</p>
         ) : (
           <div className="flex flex-col items-start gap-1">
             <Choice selected={syncedId === null} onClick={() => syncedId !== null && void editor.setSync(def.id, null)}>
               No Property
             </Choice>
-            {eligible.map((p) => (
+            {(singleSided ? eligible.filter((p) => p.id === syncedId) : eligible).map((p) => (
               <Choice key={p.id} selected={syncedId === p.id} onClick={() => syncedId !== p.id && void editor.setSync(def.id, p.id)}>
                 {p.name}
               </Choice>
             ))}
-            <Choice selected={false} onClick={() => void editor.setSync(def.id, null, type.name)}>
-              {`Create property "${type.name}" for "${linked.pluralName}"`}
-            </Choice>
+            {!singleSided && (
+              <Choice selected={false} onClick={() => void editor.setSync(def.id, null, type.name)}>
+                {`Create property "${type.name}" for "${linked.pluralName}"`}
+              </Choice>
+            )}
           </div>
         )}
       </Section>
@@ -700,6 +715,8 @@ export function DeletePropertySection({
 }) {
   const word = def.type === 'blocks' ? 'delete-all-content' : 'delete'
   const [typed, setTyped] = useState('')
+  // A formula or rollup holds no values in the files: deleted without typing a confirmation.
+  const computed = COMPUTED_KINDS.has(def.type)
   return (
     <Section title="Delete property" description={TEXT.deleteDescription}>
       {def.type === 'blocks' && (
@@ -707,16 +724,18 @@ export function DeletePropertySection({
           {onlyContent ? TEXT.onlyBlocksPropertyWarning : TEXT.blocksPropertyWarning}
         </p>
       )}
-      <input
-        aria-label={`Type "${word}" to confirm`}
-        placeholder={word}
-        value={typed}
-        onChange={(e) => setTyped(e.target.value)}
-        className="w-full rounded border border-line bg-transparent px-2 py-1 text-[13px] outline-none"
-      />
+      {!computed && (
+        <input
+          aria-label={`Type "${word}" to confirm`}
+          placeholder={word}
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          className="w-full rounded border border-line bg-transparent px-2 py-1 text-[13px] outline-none"
+        />
+      )}
       <button
         type="button"
-        disabled={typed.trim() !== word}
+        disabled={!computed && typed.trim() !== word}
         onClick={onDelete}
         className="mt-2 rounded bg-red-900/60 px-3 py-1 text-[13px] font-medium text-red-100 disabled:opacity-40"
       >
@@ -729,7 +748,15 @@ export function DeletePropertySection({
 // -- dialog ----------------------------------------------------------------------------------
 
 /** "Property settings": name and description, the kind's settings, visibility, change kind, delete. */
-export function PropertySettings({ typeId, propertyId, open, onOpenChange, onOpenProperty, editor }: PropertySettingsProps) {
+export function PropertySettings({
+  typeId,
+  propertyId,
+  open,
+  onOpenChange,
+  onOpenProperty,
+  editor,
+  objectPath,
+}: PropertySettingsProps) {
   const own = useTypeEditor(editor ? null : typeId)
   const ed = editor ?? own
   const type = useLinkIndex((s) => s.types.find((t) => t.id === typeId))
@@ -796,6 +823,10 @@ export function PropertySettings({ typeId, propertyId, open, onOpenChange, onOpe
             )}
             {def.type === 'entity' && !type.basic && <RelationSection type={type} def={def} editor={ed} />}
             {def.type === 'label' && <LabelSection type={type} def={def} save={save} />}
+            {def.type === 'button' && <ButtonSettingsSection type={type} def={def} save={save} />}
+            {def.type === 'formula' && <FormulaSection type={type} def={def} save={save} objectPath={objectPath} />}
+            {def.type === 'rollup' && <RollupSection type={type} def={def} save={save} />}
+            {def.type === 'uniqueId' && <UniqueIdSection type={type} def={def} save={save} />}
             {canChangeVisibility(def) && (
               <Section title="Visibility" description="Decide whether you want this property to be visible on your object's page.">
                 <div className="flex gap-1.5">

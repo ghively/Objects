@@ -80,8 +80,8 @@ export async function moveBlocks(editor: Editor, target: MoveTarget): Promise<bo
     if (target === 'newPage') {
       const type = pageType(useLinkIndex.getState().types)
       const typeId = type?.id ?? 'Page'
-      const created = await api.createObject(typeId, { templateId: 'none' })
-      await api.saveBody(created.path, text.endsWith('\n') ? text : `${text}\n`, created.version)
+      // The text goes in the creating write: a creation rule's write can't come between them.
+      const created = await api.createObject(typeId, { templateId: 'none', body: text.endsWith('\n') ? text : `${text}\n` })
       void invalidateLinkIndex()
       removeBlocks(editor, nodes)
       openObject(created.path, {}, typeId)

@@ -13,11 +13,13 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from .computed import COMPUTED_KINDS, Computer, Obj, has_computed
 from .propvalues import InvalidValue, decode_value
 from .typedefs import RawObject
 
 if TYPE_CHECKING:
     from .space import ObjectSummary, Space
+    from .typemodel import PropertyDefinition
 
 __all__ = [
     "MAX_TERMS",
@@ -301,6 +303,7 @@ def build_rows(
     items.sort(key=lambda it: it[1].path)
 
     rows: list[Row] = []
+    computer = None
     for raw, summary in items:
         if type_ids is not None and summary.type not in type_ids:
             continue
@@ -312,23 +315,38 @@ def build_rows(
             continue
         if terms and not _matches(raw, summary, terms, mode):
             continue
-        rows.append(_row(space, raw, summary, preview))
+        t = space.type_by_id(summary.type)
+        if computer is None and has_computed(t):
+            # M12: one per request, so "now" is one instant and each value is computed once.
+            computer = Computer(space)
+        rows.append(_row(space, raw, summary, preview, computer))
     return rows
 
 
-def _row(space: Space, raw: RawObject, summary: ObjectSummary, preview: bool = True) -> Row:
+def _row(
+    space: Space,
+    raw: RawObject,
+    summary: ObjectSummary,
+    preview: bool = True,
+    computer: Computer | None = None,
+) -> Row:
     from .space import version_of
 
     t = space.type_by_id(summary.type)
     version = version_of(raw.data)
     values: dict[str, Any] = {}
     links: dict[str, list[str | None]] = {}
+    computed: list[PropertyDefinition] = []
     for p in t.propertyDefinitions if t is not None else []:
         if p.type == "entity_collections":
             values[p.key] = list(summary.collections)
             continue
         if p.type == "entity_backlinks":
             values[p.key] = space.backlinks(summary.path)
+            continue
+        if p.type in COMPUTED_KINDS:
+            computed.append(p)  # after the loop, once every relation is resolved
+            values[p.key] = None
             continue
         value = decode_value(p, raw.fm.get(p.key), raw.fm)
         if p.type == "entity":
@@ -339,6 +357,13 @@ def _row(space: Space, raw: RawObject, summary: ObjectSummary, preview: bool = T
         elif p.type == "entity_title" and value is None:
             value = summary.title
         values[p.key] = value
+    if computed:
+        # M12: formula and rollup values (`ComputedValue`s), computed here and never stored.
+        if computer is None:
+            computer = Computer(space)
+        obj = Obj(summary.path, raw.fm, summary, t, links)
+        for p in computed:
+            values[p.key] = computer.computed_value(obj, p)
     if "backlinks" not in values:
         # Backlinks are a system property of every object (`systemPropertyTypeToIdMap`:
         # entity_backlinks -> 'backlinks'), so rows carry them under that id even when the

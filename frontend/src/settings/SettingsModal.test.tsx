@@ -35,6 +35,7 @@ describe('SettingsModal', () => {
     expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(['General', 'Space'])
     expect(within(groups[0]).getAllByRole('button').map((b) => b.textContent)).toEqual([
       'Appearance',
+      'AI Assistant',
       'Editor',
       'Date & Time',
       'Language',
@@ -46,6 +47,8 @@ describe('SettingsModal', () => {
       'Space Settings',
       'Object Types',
       'Task management',
+      'Automations',
+      'Integrations',
     ])
     expect(within(nav).getByRole('button', { name: 'Shortcuts' })).toBeInTheDocument()
     expect(within(nav).getByPlaceholderText('Search settings')).toBeInTheDocument()

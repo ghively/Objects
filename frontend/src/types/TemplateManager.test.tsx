@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { objectSummary, propertyDef, typeDef } from '@/test/mockApi'
+import { automationRule, objectSummary, propertyDef, typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig<typeof import('@/api/client')>()),
@@ -9,6 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
+import { resetAutomations } from '@/automations/useAutomations'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { TemplateManager, templatesAllowed } from './TemplateManager'
 
@@ -68,5 +69,25 @@ describe('TemplateManager', () => {
     render(<TemplateManager typeId="tag" />)
     expect(screen.getByText('Templates are not available for this object type.')).toBeInTheDocument()
     expect(screen.queryByRole('listitem', { name: 'Empty Note' })).not.toBeInTheDocument()
+  })
+
+  test('M14: a repeating template shows "Repeats"; Repeat opens its dialog', async () => {
+    resetAutomations()
+    mocked.automations.mockResolvedValueOnce([
+      automationRule({
+        id: 'rep',
+        name: 'Repeat “Plan”',
+        trigger: { kind: 'schedule', repeat: 'every day', time: '07:00', start: '2026-11-05' },
+        templateRepeat: { typeId: 'dailynote', templateId: 't-plan' },
+      }),
+    ])
+    const user = userEvent.setup()
+    render(<TemplateManager typeId="dailynote" />)
+    const plan = await screen.findByRole('listitem', { name: 'Plan' })
+    await waitFor(() => expect(within(plan).getByText('Repeats')).toBeInTheDocument())
+    expect(within(screen.getByRole('listitem', { name: 'Empty Note' })).queryByRole('button', { name: 'Repeat' })).toBeNull()
+    await user.click(within(plan).getByRole('button', { name: 'Repeat' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Repeat template' })
+    expect(within(dialog).getByRole('button', { name: 'Remove repeat' })).toBeInTheDocument()
   })
 })

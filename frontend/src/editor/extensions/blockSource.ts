@@ -43,6 +43,8 @@ export const TOP_LEVEL_TYPES = [
   // M8
   'blockRef',
   'dataViewEmbed',
+  // M14
+  'buttonBlock',
   ...CONTAINER_TYPES,
 ]
 

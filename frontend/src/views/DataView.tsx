@@ -17,15 +17,19 @@ import { applyFilters } from './filter'
 import { findGroupConfig, groupRows, type Group, type GroupCtx } from './group'
 import { cardProperties } from './cards/cardConfig'
 import { CardCustomizePage } from './cards/CardCustomize'
+import { CalendarLayout, CalendarSettings } from './layouts/CalendarLayout'
+import { ChartLayout, ChartSettings } from './layouts/ChartLayout'
 import { EmbedLayout } from './layouts/EmbedLayout'
 import { GalleryLayout } from './layouts/GalleryLayout'
 import { GridLayout } from './layouts/GridLayout'
 import { KanbanLayout } from './layouts/KanbanLayout'
 import { ListLayout } from './layouts/ListLayout'
+import { TimelineLayout, TimelineSettings } from './layouts/TimelineLayout'
+import { RelationPairsPage } from './RelationPairsPage'
 import { WallLayout } from './layouts/WallLayout'
 import { TableLayout } from './table/TableLayout'
 import { TableCustomizePage } from './table/TableCustomize'
-import { LOAD_PAGE } from './model'
+import { LAYOUTS, LOAD_PAGE, WHOLE_SET_LAYOUTS } from './model'
 import { propertyChoices } from './properties'
 import { applySorts } from './sort'
 import { Toolbar } from './Toolbar'
@@ -33,6 +37,7 @@ import { ViewSummary } from './ViewSummary'
 import { matchingValues } from './matching'
 import { commonRowMenu, type RowMenuCtx, type RowMenuItem } from './rowMenu'
 import { SelectionBar } from './SelectionBar'
+import { buildRowTree, flattenTree } from './subItems'
 
 export type { RowMenuItem } from './rowMenu'
 
@@ -88,6 +93,15 @@ export interface LayoutProps {
    */
   loadPreviews(rows: Row[]): void
   showsPreviews: boolean
+  /**
+   * M13: create an object of `typeId` with `values` (the calendar's click on a day). Present only
+   * when the view allows creating; the values the view's filters imply are added by the view.
+   */
+  onCreate?(values: Record<string, unknown>, typeId: string): void
+  /** The layouts the view offers (the chart's "Show as table" needs the table among them). */
+  layouts?: readonly Layout[]
+  /** The view's name, when its owner has one (the chart's export file name). */
+  viewName?: string
 }
 
 /** What an owner adds to one row: `leading` before its title, `trailing` after it. */
@@ -105,6 +119,8 @@ export interface DataViewProps {
   state: ViewState
   onState(next: ViewState): void
   layouts: readonly Layout[]
+  /** The view's name, when the owner has one (a type page's or embed's view, a collection's or query's title). */
+  viewName?: string
   allowCreate?: boolean
   /** `typeId` is the view's type (the first one when it spans several). */
   onCreate?(values: Record<string, unknown>, typeId: string): void
@@ -431,6 +447,13 @@ export function DataView(props: DataViewProps) {
     onState({ ...state, viewDefinition: { ...state.viewDefinition, groupByConfig: { ...state.viewDefinition.groupByConfig, groups: next } } })
   }
 
+  /** The table's nested order (paths), when it nests sub-items; else null. */
+  const nestedOrder = (): string[] | null => {
+    const parentKey = state.viewDefinition.subItemsConfig?.parentPropertyId
+    if (state.viewDefinition.dataViewLayout !== 'table' || grouped || !parentKey || viewTypes.length !== 1) return null
+    if (!viewTypes[0].propertyDefinitions.some((d) => d.key === parentKey)) return null
+    return flattenTree(buildRowTree(flat, parentKey)).map((t) => t.row.summary.path)
+  }
   const select = (paths: string[] | null, last: string | null) => {
     anchor.current = last
     setSelected(paths && paths.length > 0 ? paths : null)
@@ -439,10 +462,11 @@ export function DataView(props: DataViewProps) {
     const path = row.summary.path
     if (selected) {
       // Shift: the range from the last clicked row, added; else toggle this row.
-      // The on-screen order: grouped views show each open group's rows in turn.
+      // The on-screen order: grouped views show each open group's rows in turn; a table that
+      // nests sub-items draws each parent's sub-items under it (as `TableLayout` does).
       const order = grouped
         ? [...new Set(result.groups.flatMap((g) => (closed(g) ? [] : g.rows)).map((r) => r.summary.path))]
-        : flat.map((r) => r.summary.path)
+        : (nestedOrder() ?? flat.map((r) => r.summary.path))
       const from = anchor.current ? order.indexOf(anchor.current) : -1
       const to = order.indexOf(path)
       if (e.shiftKey && from >= 0 && to >= 0) {
@@ -525,6 +549,13 @@ export function DataView(props: DataViewProps) {
     !props.previewsLoaded &&
     viewTypes.some((t) => cardProperties(t, state.viewDefinition).some((p) => p.propertyId === 'computed_preview'))
   const layoutProps: LayoutProps = {
+    onCreate:
+      props.allowCreate && props.onCreate
+        ? (values, typeId) =>
+            props.onCreate?.({ ...matchingValues(state.filterGroup, types, typeId, collections), ...values }, typeId)
+        : undefined,
+    layouts,
+    viewName: props.viewName,
     groups: paged,
     grouped,
     state,
@@ -561,6 +592,12 @@ export function DataView(props: DataViewProps) {
         return <EmbedLayout {...layoutProps} />
       case 'kanban':
         return <KanbanLayout {...layoutProps} />
+      case 'calendar':
+        return <CalendarLayout {...layoutProps} />
+      case 'timeline':
+        return <TimelineLayout {...layoutProps} />
+      case 'chart':
+        return <ChartLayout {...layoutProps} />
       default:
         return null
     }
@@ -578,10 +615,30 @@ export function DataView(props: DataViewProps) {
     ...(cardLayout
       ? [{ key: 'card', label: 'Card view', icon: 'ph-cards', body: <CardCustomizePage types={viewTypes} state={state} onState={onState} /> }]
       : []),
+    ...(layout === 'calendar'
+      ? [{ key: 'calendar', label: 'Calendar', icon: LAYOUTS.calendar.icon, body: <CalendarSettings types={viewTypes} state={state} onState={onState} /> }]
+      : []),
+    ...(layout === 'timeline'
+      ? [{ key: 'timeline', label: 'Timeline', icon: LAYOUTS.timeline.icon, body: <TimelineSettings types={viewTypes} state={state} onState={onState} /> }]
+      : []),
+    ...(layout === 'chart'
+      ? [{ key: 'chart', label: 'Chart', icon: LAYOUTS.chart.icon, body: <ChartSettings types={viewTypes} state={state} onState={onState} /> }]
+      : []),
+    ...((layout === 'table' || layout === 'timeline') && viewTypes.length === 1
+      ? [
+          {
+            key: 'relationPairs',
+            label: 'Sub-items and dependencies',
+            icon: 'ph-tree-structure',
+            body: <RelationPairsPage type={viewTypes[0]} state={state} onState={onState} />,
+          },
+        ]
+      : []),
     ...(props.customizePages ?? []),
   ]
 
-  const empty = !props.loading && total === 0
+  // M13: the calendar and timeline still draw their grid with no rows (a day click creates the first object).
+  const empty = !props.loading && total === 0 && layout !== 'calendar' && layout !== 'timeline'
   const createType = viewTypes[0]
   const createName = viewTypes.length === 1 ? viewTypes[0].name : 'object'
 
@@ -727,7 +784,7 @@ export function DataView(props: DataViewProps) {
               ))}
             </div>
           )}
-          {total > visible && layout !== 'kanban' && (
+          {total > visible && layout !== 'kanban' && !WHOLE_SET_LAYOUTS.has(layout) && (
             <button
               type="button"
               onClick={() => setVisible((v) => v + LOAD_PAGE)}

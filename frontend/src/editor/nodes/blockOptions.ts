@@ -49,6 +49,8 @@ export const BLOCK_OPTION_TYPES = [
   'blockRef',
   'dataViewEmbed',
   'indent',
+  // M14
+  'buttonBlock',
 ]
 
 /** Parents whose children are blocks that serialize on their own (with an annotation). */
@@ -93,6 +95,8 @@ export function nodeTargets(node: PMNode): OptionTarget[] {
       return ['blockRef']
     case 'dataViewEmbed':
       return ['dataView']
+    case 'buttonBlock':
+      return ['button']
     default:
       return []
   }

@@ -41,4 +41,8 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
   alwaysCreateInlineLinks: false,
   hideStructureSettings: false,
   highlightStyle: 'default',
+  // M10
+  aiHidden: false,
+  claudePath: null,
+  aiModel: null,
 }) as DeviceSettings

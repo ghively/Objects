@@ -131,6 +131,7 @@ describe('<BlockHandles>', () => {
       'Quote',
       'Toggle',
       'Group',
+      'AI assistant...', // M10
       'Turn into...',
       'Copy',
       'Duplicate',
