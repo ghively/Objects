@@ -1,8 +1,11 @@
-import { describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test } from 'vitest'
 import type { Row } from '@/api/types'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
 import {
   addBlocker,
+  AXIS_YEARS,
+  axisWindow,
   barSpan,
   buildAxis,
   canWriteDate,
@@ -126,6 +129,29 @@ describe('the axis', () => {
   })
 })
 
+describe('the axis window', () => {
+  test('a typo date far away does not stretch the axis; it is outside the window', () => {
+    const today = day('2026-11-05')
+    const near = [{ start: day('2026-11-02'), end: day('2026-11-20') }, { start: day('2026-12-01'), end: day('2026-12-03') }]
+    const typos = [{ start: day('0202-11-03'), end: day('0202-11-03') }, { start: day('2026-11-03'), end: dayNum('9999-11-03') }]
+    const axis = buildAxis('day', [...near, ...typos], today)
+    expect(axis.width).toBeLessThan(2 * (AXIS_YEARS + 1) * 366 * DAY_PX.day)
+    expect(axis.start).toBeGreaterThan(day('2015-01-01'))
+    expect(axis.end).toBeLessThan(day('2038-01-01'))
+    const w = axisWindow([...near, ...typos], today)
+    expect(near.every((s) => s.start >= w.lo && s.end <= w.hi)).toBe(true)
+    expect(typos.some((s) => s.start >= w.lo && s.end <= w.hi)).toBe(false)
+  })
+
+  test('items years from today keep their own window (around their middle)', () => {
+    const old = [{ start: day('1990-03-01'), end: day('1990-03-05') }, { start: day('1991-06-01'), end: day('1991-06-02') }]
+    const axis = buildAxis('month', old, day('2026-11-05'))
+    expect(axis.start).toBeLessThanOrEqual(old[0].start)
+    expect(axis.end).toBeGreaterThan(old[1].end)
+    expect(axis.end).toBeLessThan(day('2003-01-01'))
+  })
+})
+
 describe('drags', () => {
   const s = { start: day('2026-11-03'), end: day('2026-11-06') }
   test('move, start edge, end edge; an edge never passes the other', () => {
@@ -158,6 +184,55 @@ describe('drags', () => {
     const noEnd = mk({ due: { start: '2026-11-03', resolution: 'day' } })
     const one = { start: s.start, end: s.start }
     expect(dragUpdates(noEnd, 'due', 'finish', one, dragSpan(one, 'end', 1))).toEqual({ finish: { start: '2026-11-04', resolution: 'day' } })
+  })
+
+  test('the start property alone: a time range within one day keeps its end time', () => {
+    const r = mk({ due: { start: '2026-11-05T09:00:00.000Z', end: '2026-11-05T17:00:00.000Z', resolution: 'time' } })
+    const one = { start: day('2026-11-05'), end: day('2026-11-05') }
+    const out = dragUpdates(r, 'due', null, one, dragSpan(one, 'move', 2))
+    expect(out.due.end).toBeDefined()
+    expect(new Date(out.due.end as string).getTime() - new Date(out.due.start).getTime()).toBe(8 * 3_600_000)
+    expect(out.due.start.slice(0, 10)).toBe('2026-11-07')
+  })
+
+  test('the start property alone: a multi-day time range shrunk to one day keeps its end time', () => {
+    const r = mk({ due: { start: '2026-11-05T09:00:00.000Z', end: '2026-11-07T17:00:00.000Z', resolution: 'time' } })
+    const span = { start: day('2026-11-05'), end: day('2026-11-07') }
+    const out = dragUpdates(r, 'due', null, span, dragSpan(span, 'end', -2))
+    expect(out.due.start).toBe('2026-11-05T09:00:00.000Z')
+    expect(out.due.end).toBeDefined()
+    expect(new Date(out.due.end as string).getTime() - new Date(out.due.start).getTime()).toBe(8 * 3_600_000)
+    // A day range whose end falls on its start day still drops the end.
+    const dr = mk({ due: { start: '2026-11-05', end: '2026-11-07', resolution: 'day' } })
+    expect(dragUpdates(dr, 'due', null, span, dragSpan(span, 'end', -2))).toEqual({ due: { start: '2026-11-05', resolution: 'day' } })
+  })
+
+  test('with an end property, a move or start-edge drag never creates an end value', () => {
+    const r = mk({ due: { start: '2026-11-03', resolution: 'day' } })
+    const one = { start: day('2026-11-03'), end: day('2026-11-03') }
+    expect(dragUpdates(r, 'due', 'finish', one, dragSpan(one, 'move', 2))).toEqual({ due: { start: '2026-11-05', resolution: 'day' } })
+    expect(dragUpdates(r, 'due', 'finish', one, dragSpan(one, 'start', -2))).toEqual({ due: { start: '2026-11-01', resolution: 'day' } })
+    // An end-edge drag still creates it.
+    expect(dragUpdates(r, 'due', 'finish', one, dragSpan(one, 'end', 1))).toEqual({ finish: { start: '2026-11-04', resolution: 'day' } })
+  })
+
+  describe('in the time-zone setting', () => {
+    const tz = process.env.TZ
+    afterEach(() => {
+      process.env.TZ = tz
+      useSettings.setState({ settings: { ...settingsDefaults } })
+    })
+    test("a time moves by days in the app's zone, not the browser's (a browser DST gap moves nothing)", () => {
+      // The browser in New York (clocks spring forward 2026-03-08 02:00), the app set to UTC.
+      process.env.TZ = 'America/New_York'
+      useSettings.setState({ settings: { ...settingsDefaults, timeZone: 'UTC' } })
+      expect(shiftPoint('2026-03-07T02:30:00.000Z', 'time', 1)).toBe('2026-03-08T02:30:00.000Z')
+      // And across the app zone's own DST change, the wall-clock time stays.
+      useSettings.setState({ settings: { ...settingsDefaults, timeZone: 'Europe/Berlin' } })
+      process.env.TZ = 'UTC'
+      // 09:00 in Berlin on 2026-03-28 (UTC+1) -> 09:00 on 2026-03-30 (UTC+2).
+      expect(shiftPoint('2026-03-28T08:00:00.000Z', 'time', 2)).toBe('2026-03-30T07:00:00.000Z')
+    })
   })
 
   test('a time keeps its time of day', () => {
