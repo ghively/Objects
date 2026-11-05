@@ -37,6 +37,7 @@ import { ViewSummary } from './ViewSummary'
 import { matchingValues } from './matching'
 import { commonRowMenu, type RowMenuCtx, type RowMenuItem } from './rowMenu'
 import { SelectionBar } from './SelectionBar'
+import { buildRowTree, flattenTree } from './subItems'
 
 export type { RowMenuItem } from './rowMenu'
 
@@ -97,6 +98,10 @@ export interface LayoutProps {
    * when the view allows creating; the values the view's filters imply are added by the view.
    */
   onCreate?(values: Record<string, unknown>, typeId: string): void
+  /** The layouts the view offers (the chart's "Show as table" needs the table among them). */
+  layouts?: readonly Layout[]
+  /** The view's name, when its owner has one (the chart's export file name). */
+  viewName?: string
 }
 
 /** What an owner adds to one row: `leading` before its title, `trailing` after it. */
@@ -114,6 +119,8 @@ export interface DataViewProps {
   state: ViewState
   onState(next: ViewState): void
   layouts: readonly Layout[]
+  /** The view's name, when the owner has one (a type page's or embed's view, a collection's or query's title). */
+  viewName?: string
   allowCreate?: boolean
   /** `typeId` is the view's type (the first one when it spans several). */
   onCreate?(values: Record<string, unknown>, typeId: string): void
@@ -440,6 +447,13 @@ export function DataView(props: DataViewProps) {
     onState({ ...state, viewDefinition: { ...state.viewDefinition, groupByConfig: { ...state.viewDefinition.groupByConfig, groups: next } } })
   }
 
+  /** The table's nested order (paths), when it nests sub-items; else null. */
+  const nestedOrder = (): string[] | null => {
+    const parentKey = state.viewDefinition.subItemsConfig?.parentPropertyId
+    if (state.viewDefinition.dataViewLayout !== 'table' || grouped || !parentKey || viewTypes.length !== 1) return null
+    if (!viewTypes[0].propertyDefinitions.some((d) => d.key === parentKey)) return null
+    return flattenTree(buildRowTree(flat, parentKey)).map((t) => t.row.summary.path)
+  }
   const select = (paths: string[] | null, last: string | null) => {
     anchor.current = last
     setSelected(paths && paths.length > 0 ? paths : null)
@@ -448,10 +462,11 @@ export function DataView(props: DataViewProps) {
     const path = row.summary.path
     if (selected) {
       // Shift: the range from the last clicked row, added; else toggle this row.
-      // The on-screen order: grouped views show each open group's rows in turn.
+      // The on-screen order: grouped views show each open group's rows in turn; a table that
+      // nests sub-items draws each parent's sub-items under it (as `TableLayout` does).
       const order = grouped
         ? [...new Set(result.groups.flatMap((g) => (closed(g) ? [] : g.rows)).map((r) => r.summary.path))]
-        : flat.map((r) => r.summary.path)
+        : (nestedOrder() ?? flat.map((r) => r.summary.path))
       const from = anchor.current ? order.indexOf(anchor.current) : -1
       const to = order.indexOf(path)
       if (e.shiftKey && from >= 0 && to >= 0) {
@@ -539,6 +554,8 @@ export function DataView(props: DataViewProps) {
         ? (values, typeId) =>
             props.onCreate?.({ ...matchingValues(state.filterGroup, types, typeId, collections), ...values }, typeId)
         : undefined,
+    layouts,
+    viewName: props.viewName,
     groups: paged,
     grouped,
     state,

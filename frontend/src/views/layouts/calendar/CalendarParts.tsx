@@ -22,6 +22,16 @@ export interface ChipProps {
   onOpen(row: Row, e: MouseEvent): void
 }
 
+/**
+ * dnd-kit's attributes without the screen-reader hints for a keyboard pick-up ("press space to pick
+ * up"): the layout registers only a pointer sensor, so Space and Enter open the chip as a button.
+ */
+function pointerOnly(attrs: ReturnType<typeof useDraggable>['attributes']) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- dropped on purpose
+  const { 'aria-describedby': _describedBy, 'aria-roledescription': _roleDescription, ...rest } = attrs
+  return rest
+}
+
 /** One object on one day: its icon and title. The drag id names the day, as a range shows on several. */
 export const Chip = memo(function Chip({ row, day, type, draggable, selected, time, onOpen }: ChipProps) {
   const d = useDraggable({ id: `${day}\n${row.summary.path}`, data: { path: row.summary.path, day }, disabled: !draggable })
@@ -30,7 +40,7 @@ export const Chip = memo(function Chip({ row, day, type, draggable, selected, ti
     <button
       ref={d.setNodeRef}
       type="button"
-      {...(draggable ? d.attributes : {})}
+      {...(draggable ? pointerOnly(d.attributes) : {})}
       {...(draggable ? d.listeners : {})}
       data-testid="calendar-chip"
       data-chip

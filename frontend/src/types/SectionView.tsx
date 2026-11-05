@@ -67,6 +67,8 @@ interface RowsSectionProps {
   rowFilter?: RowFilter
   pipeline?: Pipeline
   layouts: readonly Layout[]
+  /** The section's name (the chart's export file name). */
+  viewName?: string
   heading?: ReactNode
   search: string
   /** Values a new object gets in this section (a collection tab: its name). */
@@ -102,6 +104,7 @@ function RowsSection(p: RowsSectionProps) {
         if (s.viewDefinition !== state.viewDefinition) p.onViewDefinition(s.viewDefinition)
       }}
       layouts={p.layouts}
+      viewName={p.viewName}
       allowCreate
       onCreate={(values, typeId) =>
         void createAndOpen(typeId, { values: { ...p.createValues, ...values } }).catch((e: unknown) =>
@@ -301,6 +304,7 @@ export function SectionView({ type, section, search, heading, onCreateCollection
           base={stateWith(section.key === 'noBacklinks' ? { dataViewLayout: 'list' } : defaultViewState(type).viewDefinition)}
           rowFilter={section.key === 'inNoCollection' ? 'noCollection' : section.key === 'notTagged' ? 'notTagged' : 'noBacklinks'}
           layouts={FULL_VIEW_LAYOUTS}
+          viewName={section.label}
           heading={head}
           search={search}
           onViewDefinition={onViewDefinition}
@@ -323,6 +327,7 @@ export function SectionView({ type, section, search, heading, onCreateCollection
               groupBy: q.definition.groupBy,
             })}
             layouts={FULL_VIEW_LAYOUTS}
+            viewName={section.label}
             heading={head}
             search={search}
             onViewDefinition={onViewDefinition}
@@ -339,6 +344,7 @@ export function SectionView({ type, section, search, heading, onCreateCollection
             scope={{ collectionIds: [c.id], typeIds: [type.id] }}
             base={{ ...c.views.all, viewDefinition: baseDef ?? c.views.all.viewDefinition }}
             layouts={FULL_VIEW_LAYOUTS}
+            viewName={section.label}
             heading={head}
             search={search}
             createValues={{ collections: [c.name] }}
