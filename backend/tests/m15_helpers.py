@@ -28,11 +28,9 @@ def zip_folder(folder: Path, dest: Path, top: str | None = None) -> Path:
 
 
 def snapshot(root: Path) -> dict[str, bytes]:
-    return {
-        p.relative_to(root).as_posix(): p.read_bytes()
-        for p in sorted(root.rglob("*"))
-        if p.is_file() and ".object-cache" not in p.parts
-    }
+    """Every file under ``root`` and its bytes, ``.object-cache`` included (a preview writes
+    nothing anywhere, not even the cache)."""
+    return {p.relative_to(root).as_posix(): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
 
 
 def wait_job(client, job_id: str, timeout: float = 30.0) -> dict:

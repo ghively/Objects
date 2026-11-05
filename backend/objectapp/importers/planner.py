@@ -60,7 +60,7 @@ from .readmodel import ReadObject, ReadResult
 if TYPE_CHECKING:
     from ..space import Space
 
-__all__ = ["MappingProblem", "Planned", "Target", "plan", "to_preview"]
+__all__ = ["MappingProblem", "Planned", "Target", "importable_type", "plan", "to_preview"]
 
 PAGE_KEY = "page"
 TAG_FOLDER = "Tags"
@@ -90,6 +90,20 @@ _TO_IMPORT_KIND = {
 _SYSTEM_KINDS = {"tags": "label", "aliases": "label", "description": "text", "createdAt": "datetime", "lastUpdated": "datetime"}
 
 
+_IMPORTABLE_BASIC = frozenset({"page", "task"})
+
+
+def importable_type(t: TypeDefinition) -> bool:
+    """Whether imported pages can go into the existing type ``t`` (matched by name or chosen
+    as ``existingTypeId``): every custom type and the basic Page and Task types, unless
+    read-only. Every other basic type (Tag, DailyNote, Whiteboard, the media types Weblink,
+    File, Image, PDF, Audio, Video, Tweet, any other) is left out: its objects aren't pages.
+    The import dialog's "Add to" list uses the same rule."""
+    if t.readOnlyReason:
+        return False
+    return not t.basic or t.name.casefold() in _IMPORTABLE_BASIC
+
+
 class MappingProblem(ValueError):
     """A mapping that names an unknown type, property or existing type (422)."""
 
@@ -112,8 +126,7 @@ class Target:
     def summaries(self) -> list[ObjectSummary]:
         if self.space is None:
             return []
-        with self.space._lock:
-            return [s for s in self.space._summaries.values() if s.template is None]
+        return self.space.list()
 
     def names_in(self, folder: str) -> set[str]:
         """Lower-cased names already in ``folder`` of the target (empty for a new space)."""
@@ -200,14 +213,39 @@ def _stamp(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
 
 
+# Words left as they are (our choice): already singular, or the same in both numbers.
+_SINGULAR_KEEP = frozenset({"series", "species", "news", "status", "bus", "analysis", "basis", "gas", "lens", "atlas"})
+# -ies words whose singular keeps the "ie" (Movies -> Movie, not Movy).
+_IE_WORDS = frozenset({"movies", "cookies", "pies", "ties", "lies", "zombies", "selfies", "calories", "rookies", "hippies", "goalies", "smoothies", "brownies", "pixies", "aunties", "genies"})
+# -ches words whose singular keeps the "e" (Caches -> Cache).
+_CHES_WORDS = frozenset({"caches", "niches", "aches", "headaches", "avalanches", "moustaches", "mustaches", "cliches", "quiches"})
+
+
 def _singular(name: str) -> str:
-    """A folder name made singular by a plain English rule (our choice)."""
-    low = name.lower()
-    if low.endswith("ies") and len(name) > 3:
-        return name[:-3] + ("Y" if name[-3:].isupper() else "y")
-    if low.endswith("s") and not low.endswith("ss") and len(name) > 1:
-        return name[:-1]
-    return name
+    """A folder name made singular by a plain English rule (our choice), applied to its last
+    word: ``-ies`` -> ``-y`` (``Stories``; ``Movies`` -> ``Movie``), ``-sses``, ``-xes``,
+    ``-ches``, ``-shes`` drop ``es`` (``Classes``, ``Boxes``, ``Watches``,
+    ``Wishes``), a final ``s`` is dropped unless the word ends ``ss``, ``us`` or ``is``; a few
+    words (``Series``, ``Status``, ``News``…) stay as they are. Never answers an empty name."""
+    head, _, word = name.rpartition(" ")
+    low = word.lower()
+    upper = word.isupper()
+
+    def done(stem: str, add: str = "") -> str:
+        out = stem + (add.upper() if upper else add)
+        return f"{head} {out}" if head else out
+
+    if len(low) <= 1 or not low.endswith("s") or low in _SINGULAR_KEEP:
+        return name
+    if low in _IE_WORDS or low in _CHES_WORDS:
+        return done(word[:-1])
+    if low.endswith("ies") and len(low) > 3:
+        return done(word[:-3], "y")
+    if low.endswith(("sses", "xes", "ches", "shes")) and len(low) > 4:
+        return done(word[:-2])
+    if low.endswith(("ss", "us", "is")) or low == "ies":
+        return name
+    return done(word[:-1])
 
 
 def _scalar_type_value(value: Any) -> str | None:
@@ -294,6 +332,7 @@ def plan(
             raise MappingProblem(f"The mapping names an unknown type {key!r}.")
 
     taken_type_names = {t.name.casefold() for t in existing_types}
+    taken_folders = {t.folder.strip("/").casefold() for t in existing_types} | {ATTACHMENTS.casefold()}
     page_type = next((t for t in existing_types if t.id == "page"), None) or next(
         (t for t in existing_types if t.name.casefold() == "page"), None
     )
@@ -309,10 +348,14 @@ def plan(
         existing_id = o.existingTypeId or None
         if existing_id is not None:
             ex = by_id.get(existing_id)
-            if ex is None or ex.readOnlyReason:
+            if ex is None:
                 raise MappingProblem(f"No type {existing_id!r} can take these objects.")
+            if ex.readOnlyReason:
+                raise MappingProblem(f"The {ex.name} type can't be changed, so pages can't be imported into it.")
+            if not importable_type(ex):
+                raise MappingProblem(f"Imported pages can't become {ex.name} objects; choose another type.")
         elif target.kind == "currentSpace" and not force_new:
-            match = next((t for t in existing_types if t.name.casefold() == name.casefold() and not t.readOnlyReason), None)
+            match = next((t for t in existing_types if t.name.casefold() == name.casefold() and importable_type(t)), None)
             if key == PAGE_KEY and page_type is not None:
                 match = page_type
             existing_id = match.id if match is not None else None
@@ -327,6 +370,12 @@ def plan(
             base, n = name, 2
             while name.casefold() in taken_type_names:
                 name, n = f"{base} ({n})", n + 1
+            # A new type's folder (its plural's file name) is its own, ignoring case: two
+            # folders that differ only in case are one folder on Windows (our choice: `` (2)``).
+            base, n = plural, 2
+            while safe_filename(plural).casefold() in taken_folders:
+                plural, n = f"{base} ({n})", n + 1
+            taken_folders.add(safe_filename(plural).casefold())
             tw = TypeWrite(key, None, name, plural, safe_filename(plural), False)
         if existing_id is None and (force_new or not (key == PAGE_KEY and page_type is not None)):
             taken_type_names.add(name.casefold())
@@ -512,9 +561,9 @@ def plan(
     taken_names: dict[str, set[str]] = {}
 
     def free(folder: str, stem: str) -> tuple[str, bool]:
-        names = taken_names.get(folder)
+        names = taken_names.get(folder.casefold())  # one folder on Windows whatever its case
         if names is None:
-            names = taken_names[folder] = set(target.names_in(folder))
+            names = taken_names[folder.casefold()] = set(target.names_in(folder))
         n = 1
         while True:
             name = f"{stem}.md" if n == 1 else f"{stem} ({n}).md"

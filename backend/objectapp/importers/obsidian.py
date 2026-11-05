@@ -1,7 +1,7 @@
 """The Obsidian vault reader (also a plain Markdown folder's, and Anytype's: see `anytype`).
 
 Each ``.md`` file is an object. Its frontmatter fills the system fields (``title``,
-``tags``/``tag``, ``aliases``/``alias``, ``description``); the display-only keys
+``tags``/``tag``, ``aliases``/``alias``, ``description``, in any case: ``Tags:`` too); the display-only keys
 (``cssclasses``, ``cssclass``, ``publish``, ``permalink``) are dropped and listed once each
 (``appSettings``); nested maps and lists of maps are kept as they are under their key; every
 other key is a property of the object's type. Inline ``#tags`` outside code also become tags
@@ -113,7 +113,7 @@ def read_markdown_folder(
             if low in DISPLAY_KEYS:
                 display.setdefault(key, []).append(rel)
                 continue
-            target = _SYSTEM_SOURCES.get(key)
+            target = _SYSTEM_SOURCES.get(low)  # Obsidian reads these names ignoring case
             if target == "title":
                 if isinstance(value, (str, int, float)) and str(value).strip():
                     system["title"] = " ".join(str(value).split())

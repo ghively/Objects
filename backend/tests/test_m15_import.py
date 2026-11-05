@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from m15_helpers import copy_fixture, snapshot, wait_job, zip_folder
 from objectapp.appstate import state_dir
+from objectapp.fmcache import cache_dir_for_root
 from objectapp.importers.detect import detect, read_source
 from objectapp.importers.model import ImportMapping
 from objectapp.importers.planner import MappingProblem, Target, plan
@@ -106,8 +107,11 @@ def test_planner_defaults_and_mapping(tmp_path):
 def test_preview_writes_nothing(client, tmp_path, name, as_zip):
     folder = copy_fixture(name, tmp_path / "src" / name)
     source = zip_folder(folder, tmp_path / "src" / f"{name}.zip") if as_zip else folder
+    assert client.app.state.search.ready.wait(30)  # the space's own start-up indexing is done
     before_src = snapshot(tmp_path / "src")
     before_space = snapshot(client.space_root)
+    cache = cache_dir_for_root(client.space_root)  # the space's cache (here outside the space)
+    before_cache = snapshot(cache) if cache.is_dir() else {}
     state = state_dir()
     before_state = snapshot(state) if state.is_dir() else {}
     r = _preview(client, source)
@@ -119,6 +123,7 @@ def test_preview_writes_nothing(client, tmp_path, name, as_zip):
     assert r2.status_code == 200 and r2.json()["counts"] == preview["counts"]
     assert snapshot(tmp_path / "src") == before_src
     assert snapshot(client.space_root) == before_space
+    assert (snapshot(cache) if cache.is_dir() else {}) == before_cache
     assert (snapshot(state) if state.is_dir() else {}) == before_state
 
 
@@ -280,8 +285,9 @@ def test_import_into_this_space_never_overwrites(client, tmp_path):
     job = _import(client, preview, {"kind": "currentSpace"})
     after = snapshot(root)
     changed = [k for k in before if after.get(k) != before[k]]
-    # Only stored type files may change (new types, added properties); no object is rewritten.
-    assert all(k.startswith(".object/") for k in changed), changed
+    # Only stored type files (new types, added properties) and the rebuildable cache may
+    # change; no object is rewritten.
+    assert all(k.startswith((".object/", ".object-cache/")) for k in changed), changed
     assert job["result"]["objects"] == 2
     assert client.get("/api/space").status_code == 200
 
@@ -346,7 +352,12 @@ def test_one_import_at_a_time_and_cancel(client, tmp_path, monkeypatch):
     assert r.status_code == 202
     job_id = r.json()["jobId"]
     assert started.wait(10)
+    # The started preview's read was let go: its id answers 404; a fresh preview answers 409.
     r2 = client.post("/api/import/start", json={"previewId": preview["previewId"], "mapping": preview["mapping"],
+                                                "target": {"kind": "newSpace", "name": "Two", "location": str(tmp_path)}})
+    assert r2.status_code == 404
+    again = _preview(client, folder).json()
+    r2 = client.post("/api/import/start", json={"previewId": again["previewId"], "mapping": again["mapping"],
                                                 "target": {"kind": "newSpace", "name": "Two", "location": str(tmp_path)}})
     assert r2.status_code == 409
     assert client.post(f"/api/import/jobs/{job_id}/cancel").json() == {"ok": True}

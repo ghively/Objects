@@ -3,9 +3,10 @@
 - ``POST /api/import/preview`` `PreviewRequest` -> `ImportPreview`: reads the zip or folder at
   ``source.path`` into an `ImportPlan` and answers the dry run; writes nothing anywhere.
   ``404`` no such file or folder, ``415`` neither a ``.zip`` nor a folder, ``413`` over the
-  limits, ``422`` a bad mapping. The latest read is kept for 30 minutes (our choice): sent
-  again with the same path and kind while the source's fingerprint is unchanged, the preview
-  re-plans without reading the source again.
+  limits, ``422`` a bad mapping. The last `MAX_READS` reads are kept, each for `READ_TTL`
+  (our choice): sent again with the same path and kind while the source's fingerprint is
+  unchanged, the preview re-plans without reading the source again. A read is dropped when an
+  import starts from one of its previews (the job keeps what it needs until it ends).
 - ``POST /api/import/start`` `StartImportRequest` -> ``202`` `StartImportResponse`: checks the
   target (``409`` the new space's folder exists, another import runs or the source changed since
   the preview; ``422`` bad name, a target inside the source or the source inside the target;
@@ -15,16 +16,20 @@
 
 A new space is made with `create_space(name, location, 'blank')` and written through a second,
 unserved `Space` (no watcher, no search index); it is registered (``touch=False``) once the job
-ends. Importing into the open space writes through ``ctx.space``, announces each new type and
-object and reindexes search when done.
+ends. Importing into the open space writes through ``ctx.space``; when the job ends having
+written anything (done, stopped or failed), it reindexes search and announces one resync, the
+watcher's (``types`` at `RESYNC_PATH`, no origin), so every window, the importing one too,
+reloads once instead of handling an event per object.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -39,14 +44,19 @@ from .importers.model import ImportResult, PreviewRequest, StartImportRequest
 from .importers.planner import MappingProblem, Target, plan, to_preview
 from .importers.readmodel import ReadResult
 from .importers.source import LimitExceeded, NotASource, SourceMissing, open_source
-from .importers.writer import WriteState, write_import
+from .importers.writer import WriteState, open_checked, write_import
 from .space import Space, safe_filename
 from .spaceconfig import MAX_NAME_LENGTH
 from .spaces import Registry, create_space, normalize
+from .watcher import RESYNC_PATH, ChangeEvent
 
-__all__ = ["READ_TTL", "router"]
+__all__ = ["MAX_READS", "READ_TTL", "router"]
+
+_log = logging.getLogger(__name__)
 
 READ_TTL = 30 * 60.0
+MAX_READS = 3
+"""Source reads kept for re-planning and starting (least recently used dropped first)."""
 
 
 def _error(status: int, detail: str) -> JSONResponse:
@@ -71,16 +81,36 @@ def router(ctx: ApiContext) -> APIRouter:
     """The import routes, mounted on the app's ``/api`` router (so no prefix here)."""
     r = APIRouter()
     lock = threading.Lock()
-    cache: dict[str, _Cached] = {}  # "latest" -> the one read kept
+    reads: OrderedDict[tuple[str, str, str], _Cached] = OrderedDict()  # least recently used first
     jobs = Jobs()
     r.jobs = jobs  # type: ignore[attr-defined]  (tests reach the job list)
 
-    def latest() -> _Cached | None:
-        c = cache.get("latest")
-        if c is not None and time.monotonic() - c.at > READ_TTL:
-            cache.pop("latest", None)
-            return None
-        return c
+    def expire() -> None:
+        """Drop expired reads (call with ``lock`` held)."""
+        now = time.monotonic()
+        for key in [k for k, c in reads.items() if now - c.at > READ_TTL]:
+            reads.pop(key, None)
+
+    def keep(c: _Cached, preview_id: str) -> None:
+        """Remember ``c`` as the most recently used read (call with ``lock`` held)."""
+        current = reads.get(c.key)
+        if current is not None and current is not c:
+            current.previews |= c.previews
+            c = current
+        c.previews.add(preview_id)
+        c.at = time.monotonic()
+        reads[c.key] = c
+        reads.move_to_end(c.key)
+        while len(reads) > MAX_READS:
+            reads.popitem(last=False)
+
+    def announce_resync() -> None:
+        """One resync for a whole import, with no origin: every window (the importing one
+        too) reloads once, as after the watcher's resync."""
+        try:
+            ctx.announce(ChangeEvent("types", RESYNC_PATH, None))
+        except Exception:  # noqa: BLE001 - an SSE hiccup never fails an import
+            _log.warning("Could not announce the import's resync", exc_info=True)
 
     @r.post("/import/preview")
     def post_preview(req: PreviewRequest):
@@ -95,8 +125,9 @@ def router(ctx: ApiContext) -> APIRouter:
         try:
             key = (str(src.path), req.source.kind, src.fingerprint)
             with lock:
-                c = latest()
-            if c is None or c.key != key:
+                expire()
+                c = reads.get(key)
+            if c is None:
                 try:
                     read = read_source(src, req.source.kind)
                 except LimitExceeded as exc:
@@ -111,16 +142,15 @@ def router(ctx: ApiContext) -> APIRouter:
             return _error(422, str(exc))
         preview_id = secrets.token_hex(8)
         with lock:
-            cache["latest"] = c
-            c.at = time.monotonic()
-            c.previews.add(preview_id)
+            keep(c, preview_id)
         return to_preview(planned, preview_id).model_dump()
 
     @r.post("/import/start", status_code=202)
     def post_start(req: StartImportRequest):
         with lock:
-            c = latest()
-            if c is None or req.previewId not in c.previews:
+            expire()
+            c = next((c for c in reads.values() if req.previewId in c.previews), None)
+            if c is None:
                 return _error(404, "This preview has expired. Preview the source again.")
             read = c.read
         if jobs.running():
@@ -166,15 +196,23 @@ def router(ctx: ApiContext) -> APIRouter:
             handle = jobs.reserve(str(target_path))
         except Busy as exc:
             return _error(409, str(exc))
+        with lock:  # this read's job holds what it needs; the cache lets it go
+            if reads.get(c.key) is c:
+                reads.pop(c.key, None)
 
         if req.target.kind == "newSpace":
             space_name, where = req.target.name.strip(), str(location)
 
             def work(h: JobHandle) -> ImportResult:
-                folder = create_space(space_name, where, "blank")
+                src = open_checked(planned)  # before the space is made: a source gone leaves nothing
+                try:
+                    folder = create_space(space_name, where, "blank")
+                except BaseException:
+                    src.close()
+                    raise
                 try:
                     state = WriteState(progress=h.progress, cancelled=h.cancelled)
-                    result = write_import(planned, Space(folder), state)
+                    result = write_import(planned, Space(folder), state, src)
                 finally:
                     try:
                         Registry(state_dir()).register(folder, touch=False)
@@ -187,16 +225,16 @@ def router(ctx: ApiContext) -> APIRouter:
         else:
 
             def work(h: JobHandle) -> ImportResult:
-                state = WriteState(
-                    progress=h.progress, cancelled=h.cancelled, announce=ctx.announce, client_id=req.clientId
-                )
+                state = WriteState(progress=h.progress, cancelled=h.cancelled)
                 try:
                     result = write_import(planned, ctx.space, state)
                 finally:
-                    try:
-                        ctx.search.reindex()
-                    except Exception:  # noqa: BLE001 - search catches up on its own
-                        pass
+                    if state.wrote_anything:
+                        try:
+                            ctx.search.reindex()
+                        except Exception:  # noqa: BLE001 - search catches up on its own
+                            pass
+                        announce_resync()
                 if state.stopped and not result.cancelled:
                     h.job.error = f"The import stopped: {state.stopped}."
                 return result

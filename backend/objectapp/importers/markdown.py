@@ -7,15 +7,17 @@ spans, as `relink.segments` finds them) is never touched.
 
 Rules (contract "Per-source rules"; the choices marked there are ours):
 
-- ``[text](Relative%20Path.md)`` (decoded, relative to the page) -> ``[[Title]]``, or
-  ``[[Title|text]]`` when the text differs; a link to a ``.csv`` (a Notion database) and a link
+- ``[text](Relative%20Path.md)`` (decoded, relative to the page; one level of parentheses
+  in the destination, as the exports leave them unescaped) -> ``[[Title]]``, or
+  ``[[Title|text]]`` when the text differs (a ``#heading`` kept: ``[[Title#Heading|text]]``); a link to a ``.csv`` (a Notion database) and a link
   to a page not in the source become their text. Web links stay.
 - ``![alt](file.png)`` -> ``![alt](Attachments/file.png)`` (the path escaped as
   ``encodeMarkdownPath`` does); a link to another local file -> ``![[Attachments/file.pdf]]``
   when it is alone on its line, else ``[text](Attachments/file.pdf)``. A missing file leaves
   the link's text.
 - ``[[Note]]``, ``[[Note|alias]]``, ``[[Note#Heading]]`` -> the target's link text with the
-  ``#…`` and ``|alias`` parts kept; unresolved ones stay as written.
+  ``#…`` and ``|alias`` parts kept (``[[Note\\|alias]]``, as written in a table, keeps its
+  ``\\|``); unresolved ones stay as written.
 - ``![[Note]]`` -> ``![[Title]]``; ``![[image.png|300]]`` -> ``![](Attachments/image.png)``
   with ``<!-- block: width=300 -->`` before it when alone on its line; ``![[file.pdf]]`` ->
   ``![[Attachments/file.pdf]]``.
@@ -42,13 +44,15 @@ STANDOUT = "<!-- block: quote=standout -->"
 
 _LINK_RE = re.compile(
     r"(?P<wiki>(?P<wbang>!?)\[\[(?P<winner>[^\[\]\n]+)\]\])"
-    r"|(?P<md>(?P<mbang>!?)\[(?P<mtext>[^\[\]\n]*)\]\(\s*(?:<(?P<mangle>[^>\n]*)>|(?P<mdest>[^)\s]+))"
+    r"|(?P<md>(?P<mbang>!?)\[(?P<mtext>[^\[\]\n]*)\]\(\s*(?:<(?P<mangle>[^>\n]*)>|(?P<mdest>(?:[^()\s]|\([^()\s]*\))+))"
     r"(?:\s+\"[^\"\n]*\")?\s*\))"
 )
 _SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 _FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 _CALLOUT_RE = re.compile(r"^(?P<ws>[ \t]*)>[ \t]?\[!(?P<type>[^\]\s]+)\][+-]?[ \t]*(?P<title>.*)$")
 _HTML_RE = re.compile(r"<(?:details|summary|table|div|span)\b", re.IGNORECASE)
+_HEADING_BREAKING_RE = re.compile(r"[\[\]|#]")
+"""A heading with one of these can't be part of a ``[[Title#Heading]]`` link (it's dropped)."""
 _WIDTH_RE = re.compile(r"^(\d+)(?:x(\d+))?$")
 _TAG_RE = re.compile(r"(?:(?<=[\s(,])|^)#([^\s#!\"$%&'()*+,.:;<=>?@\[\]^`{|}~\\]+)", re.MULTILINE)
 
@@ -162,12 +166,17 @@ def _callouts(text: str, notion: bool) -> tuple[str, bool]:
     return "\n".join(out), html
 
 
-def _split_wiki(inner: str) -> tuple[str, str | None, str | None]:
-    """(target, ``#heading`` part or None, alias or None) of a wikilink's inner text."""
+def _split_wiki(inner: str) -> tuple[str, str | None, str | None, str]:
+    """(target, ``#heading`` part or None, alias or None, the alias separator) of a wikilink's
+    inner text. In a table Obsidian writes the separator as ``\\|`` (so the pipe doesn't end
+    the cell); it is read as the separator and written back the same way."""
     target, _, alias = inner.partition("|")
     has_alias = "|" in inner
+    sep = "|"
+    if has_alias and target.endswith("\\"):
+        target, sep = target[:-1], "\\|"
     target, hash_, heading = target.partition("#")
-    return target.strip(), (f"#{heading}" if hash_ else None), (alias if has_alias else None)
+    return target.strip(), (f"#{heading}" if hash_ else None), (alias if has_alias else None), sep
 
 
 def _decode_dest(dest: str) -> str:
@@ -208,14 +217,14 @@ def convert(body: str, page: str, hooks: Hooks, *, notion_callouts: bool = False
 def _wiki(m: re.Match[str], text: str, page: str, hooks: Hooks, links: list[PlanLink]) -> str | None:
     raw = m.group(0)
     embed = bool(m.group("wbang"))
-    target, heading, alias = _split_wiki(m.group("winner"))
+    target, heading, alias, sep = _split_wiki(m.group("winner"))
     if not target:
         return None
     kind, found = hooks.resolve_wiki(target, page)
     if kind == "object" and found is not None:
         links.append(PlanLink(page, raw, found, "object", alias, heading, embed))
         link_text, _title = hooks.object_link(found, page)
-        suffix = (heading or "") + (f"|{alias}" if alias is not None else "")
+        suffix = (heading or "") + (f"{sep}{alias}" if alias is not None else "")
         return f"{'!' if embed else ''}[[{link_text}{suffix}]]"
     if kind == "attachment" and found is not None:
         links.append(PlanLink(page, raw, found, "attachment", alias, heading, embed))
@@ -249,18 +258,21 @@ def _markdown(m: re.Match[str], text: str, page: str, hooks: Hooks, links: list[
     bang = bool(m.group("mbang"))
     if not dest or _SCHEME_RE.match(dest) or dest.startswith("#") or dest.startswith("//"):
         return None
-    path = _decode_dest(dest.split("#", 1)[0])
+    path_part, hash_, anchor = dest.partition("#")
+    path = _decode_dest(path_part)
     if not path:
         return None
     kind, found = hooks.resolve_href(path, page)
     shown = label.strip()
     if kind == "object" and found is not None:
-        links.append(PlanLink(page, raw, found, "object", shown or None, None, bang))
+        anchor = " ".join(_decode_dest(anchor).split()) if hash_ else ""
+        heading = f"#{anchor}" if anchor and not _HEADING_BREAKING_RE.search(anchor) else None
+        links.append(PlanLink(page, raw, found, "object", shown or None, heading, bang))
         link_text, title = hooks.object_link(found, page)
         if not shown or shown == title:
-            return f"[[{link_text}]]"
+            return f"[[{link_text}{heading or ''}]]"
         safe = shown.replace("|", "-").replace("[", "(").replace("]", ")")
-        return f"[[{link_text}|{safe}]]"
+        return f"[[{link_text}{heading or ''}|{safe}]]"
     if kind == "database":
         links.append(PlanLink(page, raw, found, "database", shown or None, None, bang))
         return shown
