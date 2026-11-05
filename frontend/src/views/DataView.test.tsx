@@ -407,6 +407,62 @@ describe('useRows', () => {
   })
 })
 
+describe('useRows with rollups (M12)', () => {
+  let emit: (e: ChangeEvent) => void
+  const PROJECT = typeDef({
+    id: 'project',
+    name: 'Project',
+    propertyDefinitions: [
+      propertyDef({ id: 'p-members', key: 'members', name: 'Members', type: 'entity', options: { isArray: true, allowedTypes: ['member'] } }),
+      propertyDef({ id: 'p-hours', key: 'hours', name: 'Hours', type: 'rollup', options: { relationId: 'p-members', targetId: 'm-hours', calc: 'sum' } }),
+    ],
+  })
+  const P1 = mk('Projects/Apollo.md', {}, {}, 'project')
+  const P2 = mk('Projects/Gemini.md', {}, {}, 'project')
+  const ev = (kind: ChangeEvent['kind'], path: string): ChangeEvent => ({ kind, path, version: null })
+
+  beforeEach(() => {
+    resetLinkIndex()
+    useLinkIndex.setState({ types: [PROJECT, PAGE], objects: [], loaded: true })
+    mocked.onChange.mockImplementation((cb) => {
+      emit = cb
+      return () => undefined
+    })
+    mocked.rows.mockReset()
+    mocked.rows.mockResolvedValue([P1, P2])
+  })
+
+  test('a change to an object outside the rows reloads every row (a related object a rollup reads)', async () => {
+    const { result } = renderHook(() => useRows({ typeIds: ['project'] }))
+    await waitFor(() => expect(result.current.rows).toHaveLength(2))
+    mocked.rows.mockClear()
+    act(() => emit(ev('changed', 'Members/Ann.md')))
+    await waitFor(() => expect(mocked.rows).toHaveBeenCalledTimes(1))
+    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['project'], preview: false })
+  })
+
+  test("a change to one of the rollup type's own rows still refetches only that row", async () => {
+    const { result } = renderHook(() => useRows({ typeIds: ['project'] }))
+    await waitFor(() => expect(result.current.rows).toHaveLength(2))
+    mocked.rows.mockClear()
+    mocked.rows.mockResolvedValue([P1])
+    act(() => emit(ev('changed', 'Projects/Apollo.md')))
+    await waitFor(() => expect(mocked.rows).toHaveBeenCalledTimes(1))
+    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['project'], paths: ['Projects/Apollo.md'], preview: false })
+  })
+
+  test('without a rollup in scope an outside change fetches only that path', async () => {
+    mocked.rows.mockResolvedValue([mk('Pages/A.md')])
+    const { result } = renderHook(() => useRows({ typeIds: ['page'] }))
+    await waitFor(() => expect(result.current.rows).toHaveLength(1))
+    mocked.rows.mockClear()
+    mocked.rows.mockResolvedValue([])
+    act(() => emit(ev('changed', 'Members/Ann.md')))
+    await waitFor(() => expect(mocked.rows).toHaveBeenCalledTimes(1))
+    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['page'], paths: ['Members/Ann.md'], preview: false })
+  })
+})
+
 describe('useViewState', () => {
   test('test useViewState 409 refetches and reapplies once', async () => {
     const initial = base()

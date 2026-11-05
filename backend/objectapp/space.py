@@ -28,6 +28,7 @@ import random
 import re
 import shutil
 import threading
+import time
 from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
@@ -72,6 +73,7 @@ from .localtime import SystemTz, from_local, to_local
 from .queries import DEFAULT_NAME as DEFAULT_QUERY_NAME
 from .queries import LIMIT_SIZES, MAX_SEARCH_TERMS, QueryDef, query_type_ids
 from .objfile import ObjectFile, join_object, split_object
+from .computed import COMPUTED_KINDS, check_type, rename_in_formulas
 from .rows import member_of
 from .propvalues import (
     KIND_TRANSFORMS,
@@ -169,8 +171,10 @@ _WHITEBOARD_TYPE_ID = "whiteboard"  # whiteboardstore.WHITEBOARD_TYPE_ID (it imp
 _NOT_COPIED = frozenset({"template", "id", "type", "title", "createdAt", "lastUpdated", "iconColor"})
 _NOT_COPIED_KINDS = frozenset(
     {"entity_title", "entity_type", "entity_createdAt", "entity_lastUpdated",
-     "entity_collections", "entity_backlinks"}
+     "entity_collections", "entity_backlinks", "formula", "rollup", "uniqueId"}
 )  # fmt: skip
+# M12: kinds never written through the property routes (computed, or numbered by the app).
+_READ_ONLY_VALUE_KINDS = frozenset({"formula", "rollup", "uniqueId"})
 # M9 duplicate: the roles that can't be duplicated that
 # our types can have (see `roles.py`), and the refusal (our string).
 _NOT_DUPLICATED_ROLES = frozenset(
@@ -515,6 +519,42 @@ class SaveTypeResult:
             "rewritten": list(self.rewritten),
             "skipped": [{"path": s.path, "reason": s.reason} for s in self.skipped],
         }
+
+
+@dataclass
+class NumberExistingResult:
+    type: TypeDefinition
+    numbered: int
+    """How many objects got a number."""
+    rewritten: list[str]
+    """The objects numbered (unstamped rewrites)."""
+    skipped: list[Skip]
+    revision: str = ""
+
+    def to_api(self) -> dict[str, Any]:
+        """The route's response: ``{type, numbered, rewritten, skipped}`` (skipped: paths)."""
+        return {
+            "type": self.type.to_api(self.revision),
+            "numbered": self.numbered,
+            "rewritten": list(self.rewritten),
+            "skipped": [s.path for s in self.skipped],
+        }
+
+
+def _has_unique_ids(t: TypeDefinition | None) -> bool:
+    return t is not None and any(p.type == "uniqueId" for p in t.propertyDefinitions)
+
+
+def _positive_int(value: Any, default: int = 1) -> int:
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 1:
+        return value
+    return default
+
+
+def _id_value(p: PropertyDefinition, n: int) -> Any:
+    """What an ID property writes for number ``n``: ``TASK-12`` (text) or ``12`` (no prefix)."""
+    prefix = p.options.get("prefix")
+    return f"{prefix}{n}" if isinstance(prefix, str) and prefix else n
 
 
 def _skips_api(skipped: Iterable[Skip]) -> list[dict[str, str]]:
@@ -2185,6 +2225,10 @@ class Space:
             if key in _LOCKED_KEYS:
                 raise InvalidValue(f"{key!r} can't be changed as a property")
         t = self._type_of(rel)
+        for key in (*updates, *remove):
+            pdef = t.prop(key) if t is not None else None
+            if pdef is not None and pdef.type in _READ_ONLY_VALUE_KINDS:
+                raise InvalidValue(f"{pdef.name} can't be edited")
         before: dict = {}
         task: list[TaskResult | None] = [None]
         now = self.clock()  # one instant for `completed`, `lastUpdated` and "today"
@@ -3060,6 +3104,9 @@ class Space:
                     merge_collections=True,
                 ),
             )
+        ids = self._take_unique_ids(t)
+        if ids:
+            of = replace(of, frontmatter_src=set_keys(of.frontmatter_src or "", ids))
         data = join_object(of).encode("utf-8")
         version = version_of(data)
         with self._lock:
@@ -3110,12 +3157,15 @@ class Space:
                 or self._is_whiteboard(rel)
             ):
                 raise InvalidValue(_CANNOT_DUPLICATE)
+        # M12: a copy gets a new ID number (taken outside the lock: it may wait for a type save).
+        ids = self._take_unique_ids(t) if t is not None else {}
+        with self._lock:
             title = _title_of(raw)
             new_title = f"{title or 'Untitled'} (Copy)"
             stamp = now_stamp(instant)
             fm_src = set_keys(
                 raw.of.frontmatter_src or "",
-                {"title": new_title, "createdAt": stamp, "lastUpdated": stamp},
+                {"title": new_title, "createdAt": stamp, "lastUpdated": stamp, **ids},
                 insert_first={"id": new_ulid()},
             )
             body = raw.of.body
@@ -3139,6 +3189,92 @@ class Space:
         _of, fm, _v = self.read(new_rel)
         synced, _skipped = self._sync_relations(new_rel, t, {}, fm)
         return new_rel, version, synced
+
+    # -- M12: IDs -----------------------------------------------------------------
+
+    _ID_WAIT_SECONDS = 10.0
+
+    def _take_unique_ids(self, t: TypeDefinition) -> dict[str, Any]:
+        """The next number of each ID property of ``t`` (``{key: value}``), bumping ``nextNumber``.
+
+        The type JSON is written under the space lock, so two creates never share a number;
+        a create that comes while `save_type` is rewriting the type's objects waits for it
+        (outside the lock) so the save can't write an older ``nextNumber`` back. A number,
+        once taken, is never given again (even when the create then fails).
+        """
+        if not _has_unique_ids(t):
+            return {}
+        deadline = time.monotonic() + self._ID_WAIT_SECONDS
+        while True:
+            with self._lock:
+                if t.id not in self._types_saving:
+                    try:
+                        stored, current = self._editable_type(t.id)
+                    except (KeyError, TypeReadOnly):
+                        return {}  # an unreadable type file can't be bumped: no number
+                    values: dict[str, Any] = {}
+                    for p in stored.propertyDefinitions:
+                        if p.type != "uniqueId":
+                            continue
+                        n = _positive_int(p.options.get("nextNumber"))
+                        values[p.key] = _id_value(p, n)
+                        p.options["nextNumber"] = n + 1
+                    if values:
+                        self._commit_type(stored, current)
+                    return values
+            if time.monotonic() > deadline:
+                raise RevisionConflict(type_revision(self.root, t.id))
+            time.sleep(0.02)
+
+    def number_existing(self, type_id: str, pid: str, base_revision: str) -> NumberExistingResult:
+        """Give every object of the type without a value of ID property ``pid`` the next number.
+
+        Oldest ``createdAt`` first (then path); templates are left out. ``nextNumber`` is
+        bumped (written first, so a number is never given twice) and the objects are
+        rewritten unstamped. Raises `KeyError` (unknown type or property), `TypeReadOnly`,
+        `RevisionConflict` and `InvalidValue` (not an ID property).
+        """
+        with self._lock:
+            t, current = self._editable_type(type_id)
+            if current != (base_revision or ""):
+                raise RevisionConflict(current)
+            self._check_type_free(t.id, current)
+            p = next((x for x in t.propertyDefinitions if x.id == pid), None)
+            if p is None:
+                raise KeyError(pid)
+            if p.type != "uniqueId":
+                raise InvalidValue(f"{p.name} is not an ID property")
+            key = p.key
+            members = self._type_members(t.id, templates=False)
+
+            def missing(fm: dict) -> bool:
+                return fm.get(key) is None or str(fm.get(key)).strip() == ""
+
+            todo = [
+                self._raw[rel] for rel in members if rel in self._raw and missing(self._raw[rel].fm)
+            ]
+
+            def order(raw: RawObject) -> tuple:
+                created = _instant_or_none(raw.fm.get("createdAt"), self.tz)
+                return (created is None, created.timestamp() if created else 0.0, raw.path)
+
+            todo.sort(key=order)
+            n = _positive_int(p.options.get("nextNumber"))
+            numbers: dict[str, Any] = {}
+            for raw in todo:
+                numbers[raw.path] = _id_value(p, n)
+                n += 1
+            p.options["nextNumber"] = n
+            revision = self._commit_type(t, current) if numbers else current
+
+            def run(src: str, rel: str, fm: dict) -> str:
+                if not missing(fm) or rel not in numbers:
+                    return src
+                return set_keys(src, {key: numbers[rel]})
+
+            rewritten, skipped = self._apply_type_ops(list(numbers), run)
+            stored = self.type_by_id(t.id) or t
+            return NumberExistingResult(stored, len(rewritten), rewritten, skipped, revision)
 
     def _place(self, rel: str, data: bytes) -> bool:
         """Write a new file at ``rel`` unless something is there by then; True if written."""
@@ -3237,6 +3373,10 @@ class Space:
         if parsed is None or parsed != day.strip():
             raise InvalidValue(f"Not a day (YYYY-MM-DD): {day!r}")
         day = parsed
+        ids: dict[str, Any] = {}
+        pre = self.daily_note_type()
+        if pre is not None and _has_unique_ids(pre) and day not in self.daily_notes()[0]:
+            ids = self._take_unique_ids(pre)  # M12: before the lock (it may wait for a type save)
         with self._lock:
             t = self._ensure_daily_note_type()
             existing = self.daily_notes()[0].get(day)
@@ -3268,6 +3408,8 @@ class Space:
                 src = of.frontmatter_src or ""
                 if parse_fm(src).get("date") != day:
                     of = replace(of, frontmatter_src=set_keys(src, {"date": day}))
+            if ids:
+                of = replace(of, frontmatter_src=set_keys(of.frontmatter_src or "", ids))
             data = join_object(of).encode("utf-8")
             folder = t.folder.strip("/") or "DailyNotes"
             rel = f"{folder}/{day}.md"
@@ -4364,6 +4506,8 @@ class Space:
                 continue  # an optional system property: display only, nothing to strip
             if old.basic:
                 raise InvalidValue(BASIC_LOCKED)
+            if p.type in COMPUTED_KINDS:
+                continue  # M12: a formula or rollup has no values in any file
             deletes_property = True
             ops.append(self._delete_key_op(p.key))
 
@@ -4392,6 +4536,10 @@ class Space:
                     op = self._entity_op(before, p)
                     if op is not None:
                         ops.append(op)
+        # M12: renamed properties are renamed in the type's formulas, then the formulas,
+        # rollups and IDs are checked (no file is rewritten for any of them).
+        rename_in_formulas(old, new)
+        check_type(old, new, lookup)
         return ops, deletes_property
 
     def _check_new_property(

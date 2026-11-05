@@ -24,6 +24,9 @@ import type {
   ChangeEvent,
   ChangeKind,
   ChangeKindResult,
+  FormulaPreviewRequest,
+  FormulaPreviewResult,
+  NumberExistingResult,
   Collection,
   CreatedDailyNote,
   GraphCustomization,
@@ -683,6 +686,24 @@ export const api = {
     const res = await request<ChangeKindResult>(
       `/types/${seg(typeId)}/properties/${seg(propertyId)}/change-kind`,
       json('POST', { toType, baseRevision, clientId: CLIENT_ID }),
+    )
+    emitLocal([
+      typesEvent(res.type?.id ?? typeId, res.type?.revision ?? null),
+      ...(res.rewritten ?? []).map((p) => changed(p)),
+    ])
+    return res
+  },
+
+  /** M12: parse a formula and, with `path`, evaluate it against that object. Writes nothing. */
+  async formulaPreview(req: FormulaPreviewRequest): Promise<FormulaPreviewResult> {
+    return request<FormulaPreviewResult>('/formula/preview', json('POST', req))
+  },
+
+  /** M12: give every object of the type without an ID value the next number, oldest first. */
+  async numberExistingObjects(typeId: string, propertyId: string, baseRevision: string): Promise<NumberExistingResult> {
+    const res = await request<NumberExistingResult>(
+      `/types/${seg(typeId)}/properties/${seg(propertyId)}/number-existing`,
+      json('POST', { baseRevision, clientId: CLIENT_ID }),
     )
     emitLocal([
       typesEvent(res.type?.id ?? typeId, res.type?.revision ?? null),

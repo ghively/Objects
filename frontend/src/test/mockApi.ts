@@ -328,6 +328,13 @@ function defaults(): Api {
       lossy: 0,
     }),
     setPropertySync: async () => ({ types: [], rewritten: [], skipped: [] }),
+    formulaPreview: async () => ({ value: null, error: null }),
+    numberExistingObjects: async (typeId: string) => ({
+      type: typeDef({ id: typeId }),
+      numbered: 0,
+      rewritten: [],
+      skipped: [],
+    }),
     deleteType: async () => ({ trashId: 'trash-type-1' }),
     templates: async () => [],
     createTemplate: async (typeId: string, name?: string) => ({

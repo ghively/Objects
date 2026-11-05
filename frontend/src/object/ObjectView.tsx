@@ -8,7 +8,7 @@ import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { createPortal } from 'react-dom'
 import { api, ConflictError, isResync } from '@/api/client'
 import { openAiChat, useAiHidden } from '@/ai/store'
-import type { ObjectDetail, ObjectSummary, RenameResult, TypeDef, UpdateResult } from '@/api/types'
+import { COMPUTED_KINDS, type ObjectDetail, type ObjectSummary, type PropertyType, type RenameResult, type TypeDef, type UpdateResult } from '@/api/types'
 import { CollectionPicker } from '@/collections/CollectionPicker'
 import { Icon } from '@/components/Icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -219,6 +219,15 @@ function appendPlainText(ed: TiptapEditor, text: string) {
   ed.view.focus()
 }
 
+/** How long `computed` refreshes wait, so a burst of changes makes one read. */
+const COMPUTED_REFRESH_MS = 150
+const OBJECT_EVENT_KINDS = new Set(['created', 'changed', 'deleted', 'renamed'])
+
+/** Whether the type has a property of a kind matching `test` (the link index's copy). */
+function typeHas(typeId: string | null | undefined, test: (kind: PropertyType) => boolean): boolean {
+  return !!typeOf(typeId)?.propertyDefinitions.some((d) => test(d.type))
+}
+
 export function ObjectView({
   path,
   mode,
@@ -372,6 +381,37 @@ export function ObjectView({
     enqueueRef.current(true)
   }, [])
 
+  // M12: formula and rollup values are computed by the server on each read. After a property
+  // write, a change to this object's type, or (when the type has a rollup) a change to any other
+  // object, read the object again and take only its `computed` values: the body, frontmatter and
+  // version keep their own handling. Requests within one window make one read.
+  const typeIdRef = useRef<string | null>(null)
+  typeIdRef.current = detail?.summary.type ?? null
+  const computedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const computedSeq = useRef(0)
+  const refreshComputed = useCallback(() => {
+    if (computedTimer.current) return
+    computedTimer.current = setTimeout(() => {
+      computedTimer.current = null
+      const n = ++computedSeq.current
+      api
+        .object(path)
+        .then((fresh) => {
+          if (n !== computedSeq.current) return
+          setDetail((d) => (d && d.summary.path === fresh.summary.path ? { ...d, computed: fresh.computed } : d))
+        })
+        .catch(() => undefined)
+    }, COMPUTED_REFRESH_MS)
+  }, [path])
+  useEffect(
+    () => () => {
+      if (computedTimer.current) clearTimeout(computedTimer.current)
+      computedTimer.current = null
+      computedSeq.current++
+    },
+    [path],
+  )
+
   const writes = useObjectWrites({
     path,
     versionRef,
@@ -391,6 +431,7 @@ export function ObjectView({
           version: res.version,
         }
       })
+      if (typeHas(typeIdRef.current, (k) => COMPUTED_KINDS.has(k))) refreshComputed()
     },
     onRenamed: (res: RenameResult, oldPath: string, title: string) => {
       // The title changed even when the path didn't (safe_filename may map both titles to one name).
@@ -462,6 +503,23 @@ export function ObjectView({
       enqueue(false)
     })
   }, [path, enqueue, markDeleted])
+
+  useEffect(() => {
+    return api.onChange((e) => {
+      const typeId = typeIdRef.current
+      if (!typeId || deletedRef.current) return
+      if (e.kind === 'types') {
+        // This type's formulas or rollups may have changed; a rollup also reads other types.
+        const own = e.path === typeId || isResync(e, 'types')
+        if (own ? typeHas(typeId, (k) => COMPUTED_KINDS.has(k)) : typeHas(typeId, (k) => k === 'rollup')) refreshComputed()
+        return
+      }
+      // This object's own changes reload it (or are our writes, refreshed above). Any other
+      // object may be one a rollup reads (a related object, or its title).
+      if (e.path === path || !OBJECT_EVENT_KINDS.has(e.kind)) return
+      if (typeHas(typeId, (k) => k === 'rollup')) refreshComputed()
+    })
+  }, [path, refreshComputed])
 
   const keepMine = () => {
     const h = editorRef.current
@@ -803,6 +861,7 @@ export function ObjectView({
         links={detail.links}
         summary={detail.summary}
         backlinks={detail.backlinks ?? []}
+        computed={detail.computed}
         readOnly={propsReadOnly}
         onChange={(key, value) => writeProperties({ [key]: value })}
         onChangeMany={(u, r) => void writes.updateProperties(u, r)}
