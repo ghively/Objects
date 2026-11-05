@@ -1,4 +1,9 @@
 import type {
+  SaveAiChatRequest,
+  AiChat,
+  AiChatRequest,
+  AiEvent,
+  AiStatus,
   ApiTokenList,
   ApiTokenScope,
   CreatedApiToken,
@@ -910,6 +915,61 @@ export const api = {
     if (opts.limit !== undefined) sp.append('limit', String(opts.limit))
     if (opts.mode) sp.append('mode', opts.mode)
     return request<SearchResponse>(`/search?${sp.toString()}`, opts.signal ? { signal: opts.signal } : undefined)
+  },
+
+  /** M10: whether the Claude Code CLI is there and signed in. */
+  aiStatus(): Promise<AiStatus> {
+    return request<AiStatus>('/ai/status')
+  },
+
+  /**
+   * M10: one AI turn. Calls `onEvent` for each server-sent event until `done` or `error`;
+   * aborting `signal` closes the stream, which stops the CLI. Resolves when the stream ends.
+   */
+  async aiChat(req: AiChatRequest, onEvent: (e: AiEvent) => void, signal?: AbortSignal): Promise<void> {
+    const res = await fetch(`${BASE}/ai/chat`, {
+      ...json('POST', { ...req, clientId: req.clientId ?? CLIENT_ID }),
+      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      signal,
+    })
+    if (!res.ok || !res.body) {
+      await answer(res, '/ai/chat')
+      return
+    }
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+      let cut: number
+      while ((cut = buffer.indexOf('\n\n')) >= 0) {
+        const frame = buffer.slice(0, cut)
+        buffer = buffer.slice(cut + 2)
+        const data = frame
+          .split('\n')
+          .filter((l) => l.startsWith('data:'))
+          .map((l) => l.slice(5).replace(/^ /, ''))
+          .join('\n')
+        if (!data) continue
+        try {
+          onEvent(JSON.parse(data) as AiEvent)
+        } catch {
+          // a malformed frame: skip it
+        }
+      }
+    }
+  },
+
+  /** M10: a saved AI chat and its messages. */
+  aiChatLoad(path: string): Promise<AiChat> {
+    return request<AiChat>(`/ai/chat${qs({ path })}`)
+  },
+
+  /** M10: create or update an AI chat object; rejects with `ConflictError` on a stale version. */
+  saveAiChat(req: SaveAiChatRequest): Promise<{ path: string; version: string }> {
+    return request<{ path: string; version: string }>('/ai/chat/save', json('POST', { ...req, clientId: req.clientId ?? CLIENT_ID }))
   },
 
   /** M11: the local API tokens of this space and an MCP config template. */

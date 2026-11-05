@@ -81,7 +81,14 @@ DEFAULTS: dict[str, Any] = {
     "alwaysCreateInlineLinks": False,
     "hideStructureSettings": False,
     "highlightStyle": "default",
+    # M10: the AI assistant ("Hide AI features", where the Claude Code CLI is, its model).
+    "aiHidden": False,
+    "claudePath": None,
+    "aiModel": None,
 }
+
+# A model name or alias for ``claude --model`` ("sonnet", "claude-sonnet-4-5", "opus[1m]").
+_MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,79}")
 
 # A BCP 47 language tag as the normaliser accepts it ("fr", "de-CH", "en_GB",
 # "es-419"), at most 35 characters.
@@ -150,6 +157,10 @@ def _valid(key: str, value: Any) -> bool:
             and math.isfinite(value)
             and ZOOM_MIN <= value <= ZOOM_MAX
         )
+    if key == "claudePath":
+        return value is None or (isinstance(value, str) and 0 < len(value) <= 1024 and "\x00" not in value)
+    if key == "aiModel":
+        return value is None or (isinstance(value, str) and _MODEL_NAME.fullmatch(value) is not None)
     if key == "startupSpacePath":
         return value is None or isinstance(value, str)
     if key == "spellCheckLang":
