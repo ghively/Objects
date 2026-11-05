@@ -20,10 +20,17 @@ export const LAYOUTS: Record<Layout, LayoutInfo> = {
   kanban: { label: 'Kanban', icon: 'ph-kanban', requiresGroupByEntity: false, hasSeparateBlocksGroup: false },
   // Our string: no picker offers this layout; it is set only by code (dashboard sections).
   gallery: { label: 'Gallery strip', icon: 'ph-slideshow', requiresGroupByEntity: true, hasSeparateBlocksGroup: true },
+  // M13: our layouts (our strings)
+  calendar: { label: 'Calendar', icon: 'ph-calendar-dots', requiresGroupByEntity: false, hasSeparateBlocksGroup: false },
+  timeline: { label: 'Timeline', icon: 'ph-chart-bar-horizontal', requiresGroupByEntity: false, hasSeparateBlocksGroup: false },
+  chart: { label: 'Chart', icon: 'ph-chart-pie-slice', requiresGroupByEntity: false, hasSeparateBlocksGroup: false },
 }
 
+/** M13: the layouts that draw every row themselves (no paging, no "Load more", no group headers). */
+export const WHOLE_SET_LAYOUTS: ReadonlySet<Layout> = new Set<Layout>(['calendar', 'timeline', 'chart'])
+
 export const STANDARD_LAYOUTS: readonly Layout[] = ['list', 'grid', 'wall', 'table', 'embed']
-export const FULL_VIEW_LAYOUTS: readonly Layout[] = [...STANDARD_LAYOUTS, 'kanban']
+export const FULL_VIEW_LAYOUTS: readonly Layout[] = [...STANDARD_LAYOUTS, 'kanban', 'calendar', 'timeline', 'chart']
 export const ALL_NOTES_LAYOUTS: readonly Layout[] = ['list', 'grid', 'wall', 'embed']
 
 export function emptyFilterGroup(): FilterGroup {
