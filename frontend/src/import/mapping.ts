@@ -1,12 +1,16 @@
 // The import dialog's mapping state: the user's overrides on top of a preview, and what is sent.
-// The dialog keeps its own `ImportMapping` (started from the first preview's effective mapping) as
-// the source of truth while the user edits; every request sends a cleaned copy.
+// The dialog keeps its own `ImportMapping` while the user edits: it starts from how the first
+// preview made types (`seedMapping`) and holds only what the user changed; every other value is the
+// latest preview's (`effectiveType`, `effectiveProperty`), so a new target shows the server's own
+// matches. Every request sends a cleaned copy.
 import type {
+  ImportKind,
   ImportMapping,
   ImportPlannedProperty,
   ImportPlannedType,
   ImportPropertyOverride,
   ImportTypeOverride,
+  TypeDef,
 } from '@/api/types'
 
 export type ImportTargetKind = 'newSpace' | 'currentSpace'
@@ -16,6 +20,16 @@ export const NEW_TYPE = ''
 
 export function emptyMapping(): ImportMapping {
   return { typeSource: 'folder', typeKey: null, types: {}, properties: {} }
+}
+
+/**
+ * The dialog's mapping after the first preview: how that preview made types, and no overrides.
+ * The preview's effective mapping fills in every name, kind and "Multiple values"; sending those back
+ * would pin the new-space guesses (a "Page (2)" next to the new space's own Page) after the target
+ * changes, and an old "Multiple values" after the kind changes (review finding 4).
+ */
+export function seedMapping(served: ImportMapping): ImportMapping {
+  return { typeSource: served.typeSource, typeKey: served.typeKey, types: {}, properties: {} }
 }
 
 /** A copy of `m` with `typeKey`'s override merged with `patch`. */
@@ -35,6 +49,39 @@ export function withPropertyOverride(
     ...m,
     properties: { ...m.properties, [typeKey]: { ...props, [propKey]: { ...props[propKey], ...patch } } },
   }
+}
+
+/**
+ * A new kind for a property. A "Multiple values" the user set stays while the new kind takes it,
+ * and goes with a kind that doesn't (the server's default applies when the user never set it).
+ */
+export function withPropertyKind(m: ImportMapping, typeKey: string, propKey: string, kind: ImportKind): ImportMapping {
+  const patch: ImportPropertyOverride = { kind }
+  if (!kindTakesArray(kind)) patch.isArray = undefined
+  return withPropertyOverride(m, typeKey, propKey, patch)
+}
+
+/**
+ * Whether imported Markdown notes can go into an existing type ("Add to"): custom types and the
+ * basic Page and Task types. Tag, DailyNote, Whiteboard and the media types (Image, File, Audio,
+ * Video, Weblink…) hold other things, and a type whose file can't be read takes nothing (review
+ * finding 5; the server refuses them too).
+ */
+export function canReceiveImport(t: Pick<TypeDef, 'basic' | 'name' | 'readOnlyReason'>): boolean {
+  if (t.readOnlyReason) return false
+  if (!t.basic) return true
+  const name = t.name.replace(/\s+/g, '').toLowerCase()
+  return name === 'page' || name === 'task'
+}
+
+/**
+ * The path as typed or pasted, without surrounding spaces and the quotes Windows Explorer's
+ * "Copy as path" puts around it (review O4).
+ */
+export function cleanSourcePath(raw: string): string {
+  let p = raw.trim()
+  while (p.length >= 2 && (p[0] === '"' || p[0] === "'") && p[p.length - 1] === p[0]) p = p.slice(1, -1).trim()
+  return p
 }
 
 /**

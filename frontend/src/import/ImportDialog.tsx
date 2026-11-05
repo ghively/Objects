@@ -10,9 +10,14 @@
  * Steps: source (path, "Exported from", "Preview") -> review (the summary, "Review mappings",
  * "Import into", "Import"; every mapping or target change re-previews after 300 ms) -> running
  * (progress, "Stop import"; the dialog can't be closed) -> finished.
+ *
+ * Review fixes: the mapping holds only what the user changed, the rest is the latest preview's
+ * (finding 4); a start refused with 404 (the preview expired or was dropped) reads the export again
+ * and waits for the user (finding 15); a job that ends into this space reloads this window's
+ * objects and types (`announceResync`, finding 2).
  */
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { api, ApiError } from '@/api/client'
+import { announceResync, api, ApiError } from '@/api/client'
 import type { ImportJob, ImportMapping, ImportPhase, ImportPreview, ImportSourceKind, ImportTarget } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -21,7 +26,7 @@ import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { parentFolder } from '@/spaces/CreateSpaceDialog'
 import { switchSpace } from '@/spaces/switchSpace'
 import { MappingEditor } from './MappingEditor'
-import { cleanMapping, emptyMapping, type ImportTargetKind } from './mapping'
+import { cleanMapping, cleanSourcePath, emptyMapping, seedMapping, type ImportTargetKind } from './mapping'
 import { PreviewSummary } from './PreviewSummary'
 import { TargetPicker } from './TargetPicker'
 import { IMPORT_TEXT } from './text'
@@ -85,6 +90,8 @@ export function ImportDialog() {
   const [updating, setUpdating] = useState(false)
   const [stale, setStale] = useState(false)
   const [starting, setStarting] = useState(false)
+  /** Shown after a start found the preview expired and the export was read again (finding 15). */
+  const [notice, setNotice] = useState<string | null>(null)
   // Running and finished.
   const [jobId, setJobId] = useState<string | null>(null)
   const [targetPath, setTargetPath] = useState<string | null>(null)
@@ -95,6 +102,8 @@ export function ImportDialog() {
 
   const seq = useRef(0)
   const lastStep = useRef<Step>('source')
+  /** The last start answered 404 and the export is being, or was, read again: a second 404 is not an expiry. */
+  const reread = useRef(false)
 
   useEffect(() => {
     if (!isOpen) return
@@ -118,6 +127,8 @@ export function ImportDialog() {
     setUpdating(false)
     setStale(false)
     setStarting(false)
+    setNotice(null)
+    reread.current = false
     setJobId(null)
     setTargetPath(null)
     setStartedInto('newSpace')
@@ -151,8 +162,9 @@ export function ImportDialog() {
 
   const read = async (e?: FormEvent) => {
     e?.preventDefault()
-    const p = path.trim()
+    const p = cleanSourcePath(path)
     if (!p || busy) return
+    if (p !== path) setPath(p)
     const my = ++seq.current
     setBusy(true)
     setError(null)
@@ -161,12 +173,14 @@ export function ImportDialog() {
       if (my !== seq.current) return
       setSource({ path: p, kind })
       setPreview(res)
-      setMapping(res.mapping)
+      setMapping(seedMapping(res.mapping))
       setDefaultTypeKey(res.mapping.typeKey)
       setTarget('newSpace')
       setRev(0)
       setUpdating(false)
       setStale(false)
+      setNotice(null)
+      reread.current = false
       if (!nameTouched) setName(res.suggestedName)
       setStep('review')
     } catch (err) {
@@ -178,16 +192,20 @@ export function ImportDialog() {
 
   // ---- Review: every change re-previews, debounced ----
 
-  const changeMapping = (next: ImportMapping) => {
-    setMapping(next)
+  const repreview = () => {
     setUpdating(true)
     setRev((r) => r + 1)
+  }
+  const changeMapping = (next: ImportMapping) => {
+    setMapping(next)
+    setNotice(null)
+    repreview()
   }
   const changeTarget = (next: ImportTargetKind) => {
     if (next === target) return
     setTarget(next)
-    setUpdating(true)
-    setRev((r) => r + 1)
+    setNotice(null)
+    repreview()
   }
 
   useEffect(() => {
@@ -223,15 +241,28 @@ export function ImportDialog() {
       target === 'newSpace' ? { kind: 'newSpace', name: name.trim(), location: location.trim() } : { kind: 'currentSpace' }
     setStarting(true)
     setError(null)
+    setNotice(null)
     try {
       const res = await api.startImport({ previewId: preview.previewId, mapping: cleanMapping(mapping, target), target: into })
+      reread.current = false
       setJobId(res.jobId)
       setTargetPath(res.targetPath)
       setStartedInto(target)
       setJob(null)
       setStep('running')
     } catch (err) {
-      setError(message(err))
+      if (err instanceof ApiError && err.status === 404 && !reread.current) {
+        // The server dropped the preview (expired, or a newer read replaced it): read the export
+        // again with the same request and let the user check it before importing (finding 15).
+        // A 404 right after reading again is something else (a new space's location that isn't a
+        // folder): its message is shown.
+        reread.current = true
+        setNotice(T.previewExpired)
+        repreview()
+      } else {
+        reread.current = false
+        setError(message(err))
+      }
     } finally {
       setStarting(false)
     }
@@ -242,6 +273,12 @@ export function ImportDialog() {
   useEffect(() => {
     if (!jobId) return
     let alive = true
+    // A job that wrote into the open space (done, stopped, failed, or forgotten by a restarted
+    // server) reloads this window's objects and types once: the server's end-of-import resync may
+    // not reach this window (finding 2).
+    const finishedHere = () => {
+      if (startedInto === 'currentSpace') announceResync()
+    }
     let timer: ReturnType<typeof setTimeout> | undefined
     const tick = async () => {
       try {
@@ -249,6 +286,7 @@ export function ImportDialog() {
         if (!alive) return
         setJob(j)
         if (OVER.has(j.phase)) {
+          finishedHere()
           setStep('finished')
           return
         }
@@ -256,6 +294,7 @@ export function ImportDialog() {
         if (!alive) return
         // A server restart forgets jobs: nothing more to wait for.
         if (err instanceof ApiError && err.status === 404) {
+          finishedHere()
           setLost(true)
           setStep('finished')
           return
@@ -269,7 +308,8 @@ export function ImportDialog() {
       alive = false
       clearTimeout(timer)
     }
-  }, [jobId])
+    // `startedInto` is set with `jobId` and doesn't change while the job runs.
+  }, [jobId, startedInto])
 
   const stop = () => {
     if (!jobId || stopping) return
@@ -381,6 +421,11 @@ export function ImportDialog() {
               onLocation={setLocation}
               spaceName={space?.name ?? null}
             />
+            {notice && (
+              <p role="alert" className="text-[13px]">
+                {notice}
+              </p>
+            )}
             {error && (
               <p role="alert" className="text-[13px] text-danger">
                 {error}
@@ -394,6 +439,7 @@ export function ImportDialog() {
                 onClick={() => {
                   seq.current++
                   setError(null)
+                  setNotice(null)
                   setUpdating(false)
                   setStep('source')
                 }}
@@ -486,6 +532,7 @@ function Progress({
   const total = job?.total ?? 0
   const max = Math.max(total, 1)
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0
+  const announced = useAnnouncedProgress(job)
   return (
     <section aria-labelledby={FOCUS_ID.running} className="flex flex-col gap-3">
       <h3 id={FOCUS_ID.running} tabIndex={-1} className="text-[14px] font-semibold outline-none">
@@ -502,8 +549,9 @@ function Progress({
       >
         <div className="h-full rounded-full bg-fg transition-[width]" style={{ width: `${pct}%` }} />
       </div>
-      <p role="status" className="text-[14px]">
-        {T.importingCount(done, total)}
+      <p className="text-[14px]">{T.importingCount(done, total)}</p>
+      <p role="status" className="sr-only">
+        {announced}
       </p>
       <p className="truncate text-[13px] text-fg-muted" title={job?.currentPath ?? undefined}>
         {job ? T.phases[job.phase] : T.phases.preparing}
@@ -521,4 +569,19 @@ function Progress({
       </DialogFooter>
     </section>
   )
+}
+
+/**
+ * The progress a screen reader hears: it changes when the phase changes and every tenth of the
+ * way, not on every poll (review O3; the visible count still follows every poll).
+ */
+function useAnnouncedProgress(job: ImportJob | null): string {
+  const phase = job?.phase ?? 'preparing'
+  const done = job?.done ?? 0
+  const total = job?.total ?? 0
+  const tenth = total > 0 ? Math.floor((Math.min(done, total) * 10) / total) : 0
+  const [announced, setAnnounced] = useState({ key: '', text: '' })
+  const key = `${phase}|${tenth}`
+  if (announced.key !== key) setAnnounced({ key, text: T.progressStatus(T.phases[phase], done, total) })
+  return announced.key === key ? announced.text : T.progressStatus(T.phases[phase], done, total)
 }
