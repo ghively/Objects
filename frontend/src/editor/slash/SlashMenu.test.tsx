@@ -9,7 +9,9 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
+import { resetAiStore, useAi } from '@/ai/store'
 import { useLinkIndex } from '@/links/linkIndex'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { openSlashMenu, useSlashMenu } from '../extensions/slashMenu'
 import { SlashMenu } from './SlashMenu'
@@ -125,5 +127,25 @@ describe('<SlashMenu>', () => {
     fireEvent.change(input, { target: { value: 'https://example.com/docs' } })
     fireEvent.submit(input.closest('form')!)
     expect(serializeBody(editor)).toBe('Hello\n\n<!-- block: bookmark -->\n[https://example.com/docs](https://example.com/docs)\n')
+  })
+
+  test('m10: the AI items open the chat about the block, and are gone while AI features are hidden', async () => {
+    resetAiStore()
+    const editor = mounted('Hello\n')
+    let menu = await openMenu(editor)
+    fireEvent.click(within(menu).getByRole('option', { name: 'Ask AI about this block' }))
+    expect(useAi.getState().pending?.seed).toMatchObject({ mode: 'askBlock', block: 'Hello' })
+    expect(serializeBody(editor)).toBe('Hello\n')
+    cleanup()
+
+    useSettings.setState({ settings: { ...settingsDefaults, aiHidden: true } })
+    try {
+      const other = mounted('World\n')
+      menu = await openMenu(other)
+      expect(within(menu).queryByRole('option', { name: /using AI|Ask AI/ })).toBeNull()
+    } finally {
+      useSettings.setState({ settings: settingsDefaults })
+      resetAiStore()
+    }
   })
 })

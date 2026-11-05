@@ -27,6 +27,7 @@ import { setBlockColor, setQuote } from '../menus/BlockStyleMenu'
 import { BLOCK_COLORS, bgColorToken, colorMenuName, textColorToken } from '../menus/colors'
 import type { Hierarchy, ListType } from '../nodes/blockOptions'
 import { insertBlockNode } from '../nodes/containers'
+import { AI_ICON, AI_TEXT, openBlocksAi } from '../aiEntries'
 
 export type SlashView = 'icon' | 'bookmark'
 
@@ -77,6 +78,8 @@ export interface SlashContext {
   /** M8: the collections and queries "Reuse any content" offers (default: the definitions store). */
   collections?: Pick<Collection, 'id' | 'name'>[]
   queries?: Pick<Query, 'id' | 'name'>[]
+  /** M10: "Hide AI features" is on (the AI items are left out). */
+  aiHidden?: boolean
 }
 
 const block = (
@@ -104,8 +107,10 @@ const list = (type: ListType) => (e: Editor) => {
 
 /**
  * The "Create a block" items, in menu order: the operations without the
- * colour and AI ones, then Record audio, then the blocks. "Create bookmark"
- * is ours (Object has no other way to insert one), last.
+ * colour and AI ones (Standard to Group), then Record audio, then the blocks.
+ * "Create bookmark" is ours (Object has no other way to insert one), last.
+ * `slashSections` puts the colour items (while searching) and then the AI
+ * items (`AI_ITEMS`) after the operations, before Record audio.
  */
 export const BLOCK_ITEMS: readonly SlashItem[] = [
   block('Base', 'Standard', 'Turn block into a standard text block', 'ph-text-t', hierarchy('Base'), 'normal'),
@@ -178,6 +183,19 @@ export const COLOR_ITEMS: readonly SlashItem[] = (['bg', 'text'] as const).flatM
     }),
   ),
 )
+
+/** Where the operations end in `BLOCK_ITEMS` (after Group): the colour and AI items go here. */
+const OPERATIONS_END = BLOCK_ITEMS.findIndex((item) => item.id === 'recordAudio')
+
+/**
+ * M10: the AI items (catalog audit item 41, "Use the AI Assistant"), after the colour items:
+ * each opens the AI chat about the block holding the cursor (`aiEntries`). Hidden while
+ * "Hide AI features" is on.
+ */
+export const AI_ITEMS: readonly SlashItem[] = [
+  block('ai:askBlock', AI_TEXT.askBlock, undefined, AI_ICON, (e) => openBlocksAi(e, 'askBlock'), 'ai'),
+  block('ai:tagBlock', AI_TEXT.tagBlock, undefined, AI_ICON, (e) => openBlocksAi(e, 'tagBlock'), 'ai'),
+]
 
 /** "Mermaid Diagram" (alias `mmd`), listed only while there is search text: a code block in Mermaid. */
 export const MERMAID_ITEM: SlashItem = block(
@@ -259,8 +277,19 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
   const collections = ctx.collections ?? defs.collections ?? []
   const queries = ctx.queries ?? defs.queries ?? []
   return [
-    // The colour items and "Mermaid Diagram" only while searching (CreateMenu).
-    { id: 'blocks', label: SLASH_TEXT.blocks, items: title ? [...BLOCK_ITEMS, ...COLOR_ITEMS, MERMAID_ITEM] : [...BLOCK_ITEMS] },
+    // The colour items and "Mermaid Diagram" only while searching (CreateMenu); the AI items
+    // after the colour ones, unless AI features are hidden.
+    {
+      id: 'blocks',
+      label: SLASH_TEXT.blocks,
+      items: [
+        ...BLOCK_ITEMS.slice(0, OPERATIONS_END),
+        ...(title ? COLOR_ITEMS : []),
+        ...(ctx.aiHidden ? [] : AI_ITEMS),
+        ...BLOCK_ITEMS.slice(OPERATIONS_END),
+        ...(title ? [MERMAID_ITEM] : []),
+      ],
+    },
     {
       id: 'structure',
       label: SLASH_TEXT.structure,

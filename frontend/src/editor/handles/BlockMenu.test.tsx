@@ -1,6 +1,8 @@
 import { Editor as TiptapEditor } from '@tiptap/core'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, test } from 'vitest'
+import { resetAiStore, useAi } from '@/ai/store'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { selectBlocks } from '../extensions/blockSelection'
 import { BlockMenu, TURN_INTO_ITEMS } from './BlockMenu'
@@ -91,6 +93,7 @@ describe('<BlockMenu>', () => {
       'Quote',
       'Toggle',
       'Group',
+      'AI assistant...', // M10
       'Turn into...',
       'Copy',
       'Duplicate',
@@ -187,5 +190,38 @@ describe('<BlockMenu>', () => {
     // Without a block selection the key is left alone.
     editor.commands.setTextSelection(2)
     expect(press()).toBeFalsy()
+  })
+
+  test('m10: AI assistant... opens the chat about the selected blocks; accepting replaces them', async () => {
+    resetAiStore()
+    const editor = headless(BODY)
+    await pick(editor, 0, 'AI assistant...')
+    const seed = useAi.getState().pending!.seed
+    expect(seed).toMatchObject({ mode: 'askBlock', block: 'One' })
+    seed.onReplace!('- Uno\n- Dos')
+    expect(serializeBody(editor)).toBe('- Uno\n- Dos\n\n<!-- block: color=bg-red align=center -->\nTwo\n\nThree\n')
+
+    // Several blocks: their Markdown, and insert below goes after the last.
+    selectBlocks(editor, blockPos(editor, 1), blockPos(editor, 2))
+    renderMenu(editor)
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: /^AI assistant/ }))
+    const many = useAi.getState().pending!.seed
+    expect(many.block).toBe('<!-- block: color=bg-red align=center -->\nTwo\n\nThree')
+    many.onInsertBelow!('After')
+    expect(serializeBody(editor)).toBe('- Uno\n- Dos\n\n<!-- block: color=bg-red align=center -->\nTwo\n\nThree\n\nAfter\n')
+    resetAiStore()
+  })
+
+  test('m10: no AI assistant... while AI features are hidden', async () => {
+    useSettings.setState({ settings: { ...settingsDefaults, aiHidden: true } })
+    try {
+      const editor = headless(BODY)
+      selectBlocks(editor, blockPos(editor, 0))
+      renderMenu(editor)
+      const menu = await screen.findByRole('menu')
+      expect(within(menu).queryByRole('menuitem', { name: /AI assistant/ })).toBeNull()
+    } finally {
+      useSettings.setState({ settings: settingsDefaults })
+    }
   })
 })
