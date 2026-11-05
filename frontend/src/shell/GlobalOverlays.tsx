@@ -12,6 +12,8 @@
  *
  * M8 Task 3: mounts the Version History and Merge dialogs, focus mode, the presentation and the
  * "Add to whiteboard" dialog (each filled by its owner task).
+ *
+ * M15: mounts the import dialog (loaded when first opened, as the Settings modal).
  */
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
@@ -20,6 +22,7 @@ import { applyTheme } from '@/theme/applyTheme'
 import { useThemeShortcuts } from '@/theme/shortcuts'
 import { useGlobalShortcut } from '@/lib/shortcuts'
 import { useSettingsModal } from '@/settings/useSettingsModal'
+import { useImportDialog } from '@/import/useImportDialog'
 import { CreateSpaceDialog } from '@/spaces/CreateSpaceDialog'
 import { SpaceSwitchOverlay } from '@/spaces/SpacesMenu'
 import { VersionHistoryDialog } from '@/history/VersionHistoryDialog'
@@ -32,6 +35,7 @@ import { Presentation } from '@/present/Presentation'
 // first paint, off the start-up path (audit 2026-11-01 F1).
 const SettingsModal = lazy(() => import('@/settings/SettingsModal').then((m) => ({ default: m.SettingsModal })))
 const ShortcutsSheet = lazy(() => import('@/settings/ShortcutsSheet').then((m) => ({ default: m.ShortcutsSheet })))
+const ImportDialog = lazy(() => import('@/import/ImportDialog').then((m) => ({ default: m.ImportDialog })))
 const AddToWhiteboardDialog = lazy(() => import('@/whiteboard/AddToWhiteboardDialog').then((m) => ({ default: m.AddToWhiteboardDialog })))
 
 function ThemeFollower() {
@@ -66,6 +70,21 @@ function SettingsOverlays() {
   )
 }
 
+/** The import dialog, mounted (and its code loaded) once it has been opened. */
+function ImportOverlay() {
+  const opened = useImportDialog((s) => s.isOpen)
+  const [everOpened, setEverOpened] = useState(opened)
+  useEffect(() => {
+    if (opened) setEverOpened(true)
+  }, [opened])
+  if (!everOpened) return null
+  return (
+    <Suspense fallback={null}>
+      <ImportDialog />
+    </Suspense>
+  )
+}
+
 export function GlobalOverlays() {
   return (
     <>
@@ -73,6 +92,7 @@ export function GlobalOverlays() {
       <DeviceSettingsFollower />
       <SettingsOverlays />
       <CreateSpaceDialog />
+      <ImportOverlay />
       <SpaceSwitchOverlay />
       <VersionHistoryDialog />
       <MergeDialog />
