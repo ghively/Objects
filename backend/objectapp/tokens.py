@@ -10,6 +10,10 @@ Secrets are 32 random bytes, so a plain hash is enough (no password stretching).
 
 The activity log (``api-activity.jsonl`` in the same folder) records each write made
 through a token: when, which token, what and where. ``GET /api/v1/changes`` reads it.
+
+M10: `TokenStore.ephemeral` makes a short-lived ``read`` token for one AI assistant turn.
+It lives only in this process's memory (never in a file), `verify` accepts it like a
+stored one, and `TokenStore.drop_ephemeral` revokes it when the turn ends.
 """
 
 from __future__ import annotations
@@ -44,6 +48,12 @@ ACTIVITY_KEEP = 2000
 
 def _now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+# M10: in-memory tokens (hash -> record), shared by every `TokenStore` of the process so the
+# ``/api/v1`` router's store accepts the token the AI router made. Never written to disk.
+_EPHEMERAL: dict[str, TokenRecord] = {}
+_EPHEMERAL_LOCK = threading.Lock()
 
 
 def _hash(secret: str) -> str:
@@ -154,12 +164,45 @@ class TokenStore:
             self._save(keep)
             return True
 
+    # -- M10: per-turn tokens held in memory ---------------------------------------
+
+    def ephemeral(self, name: str, scope: str = "read") -> tuple[TokenRecord, str]:
+        """A token for this space that only this process knows; return (record, secret).
+
+        Nothing is written: the record sits in a process-wide dict until
+        `drop_ephemeral`. It isn't listed by `list` (it isn't the user's token).
+        """
+        if scope not in SCOPES:
+            raise ValueError("scope must be read or read-write.")
+        secret = PREFIX + secrets.token_urlsafe(32)
+        record = TokenRecord(
+            id="ephemeral-" + secrets.token_hex(6),
+            name=name,
+            scope=scope,
+            space=self.space,
+            hash=_hash(secret),
+            createdAt=_now(),
+        )
+        with _EPHEMERAL_LOCK:
+            _EPHEMERAL[record.hash] = record
+        return record, secret
+
+    @staticmethod
+    def drop_ephemeral(secret: str) -> bool:
+        """Revoke an in-memory token; True when it existed."""
+        with _EPHEMERAL_LOCK:
+            return _EPHEMERAL.pop(_hash(secret), None) is not None
+
     def verify(self, secret: str | None) -> TokenRecord | None:
         """The record `secret` belongs to in this space, else None. Stamps ``lastUsedAt``
         at most once a minute, so reads don't rewrite the file on every call."""
         if not secret or not secret.startswith(PREFIX):
             return None
         digest = _hash(secret)
+        with _EPHEMERAL_LOCK:
+            temporary = _EPHEMERAL.get(digest)
+        if temporary is not None:
+            return temporary if temporary.space == self.space else None
         with self._lock:
             tokens = self._load()
             for t in tokens:
