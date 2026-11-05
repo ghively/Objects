@@ -18,6 +18,8 @@ export interface RepeatMenuProps {
   onCustom(): void
   /** The task has a non-empty occurrence log: removing the recurrence asks first. */
   hasHistory?: boolean
+  /** M14 (an automation's schedule): a repeat is required, so "No repeat" and "Remove recurrence" aren't offered. */
+  required?: boolean
 }
 
 /** Our string: a `repeat` text that does not parse is kept and shown with this hint. */
@@ -32,7 +34,7 @@ function presetText(text: (typeof PRESET_TEXTS)[number], day: Date | null): stri
   return formatRepeat({ every: 1, unit, mode: 'dueDate', on: presetOn(unit, day) })
 }
 
-export function RepeatMenu({ value, date, onChange, onCustom, hasHistory = false }: RepeatMenuProps) {
+export function RepeatMenu({ value, date, onChange, onCustom, hasHistory = false, required = false }: RepeatMenuProps) {
   const [open, setOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const rule = parseRepeat(value)
@@ -40,7 +42,7 @@ export function RepeatMenu({ value, date, onChange, onCustom, hasHistory = false
   const current = invalid ? (value as string) : describeRepeat(rule, date)
   const day = localDayOf(date)
   const items: { label: string; text: string | null }[] = [
-    { label: 'No repeat', text: null },
+    ...(required ? [] : [{ label: 'No repeat', text: null }]),
     ...PRESET_TEXTS.map((text) => ({ label: describeRepeat(parseRepeat(text), date), text: presetText(text, day) })),
   ]
   const presetLabel = invalid ? null : rule ? current : 'No repeat'
@@ -128,7 +130,7 @@ export function RepeatMenu({ value, date, onChange, onCustom, hasHistory = false
             Custom
             {presetLabel === 'Custom' && <Icon name="ph-check" size={13} />}
           </button>
-          {hasValue && (
+          {hasValue && !required && (
             <button
               type="button"
               role="menuitem"

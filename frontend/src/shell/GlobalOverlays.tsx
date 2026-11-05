@@ -12,6 +12,8 @@
  *
  * M8 Task 3: mounts the Version History and Merge dialogs, focus mode, the presentation and the
  * "Add to whiteboard" dialog (each filled by its owner task).
+ *
+ * M14: mounts the automations' "Missed automations" catch-up dialog.
  */
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
@@ -26,6 +28,7 @@ import { VersionHistoryDialog } from '@/history/VersionHistoryDialog'
 import { MergeDialog } from '@/merge/MergeDialog'
 import { FocusMode } from '@/focus/FocusMode'
 import { Presentation } from '@/present/Presentation'
+import { CatchUpDialog } from '@/automations/CatchUpDialog'
 
 // Not needed to paint the shell: the Settings modal and the Shortcuts sheet load when first
 // opened; the "Add to whiteboard" dialog (and the whiteboard code behind it) loads after the
@@ -78,6 +81,7 @@ export function GlobalOverlays() {
       <MergeDialog />
       <FocusMode />
       <Presentation />
+      <CatchUpDialog />
       <Suspense fallback={null}>
         <AddToWhiteboardDialog />
       </Suspense>

@@ -278,6 +278,43 @@ function FilterRow({
   )
 }
 
+/**
+ * M14: one filter on a fixed property, without the property picker: its operator and value
+ * editor (the rule editor's "changes to"). The value row is the filter editor's own.
+ */
+export function FilterValueRow({
+  filter,
+  choice,
+  types,
+  collections,
+  onChange,
+}: {
+  filter: Filter
+  choice: PropChoice
+  types: TypeDef[]
+  collections: Collection[]
+  onChange(next: Filter): void
+}) {
+  const options = filterOptionsFor(choice.def)
+  const optionOk = options.some((o) => o.key === filter.option)
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-[13px]">
+      {options.length > 0 && (
+        <MenuSelect
+          label="Operator"
+          value={optionOk ? filter.option : ''}
+          onChange={(v) => onChange({ ...filter, option: v })}
+          options={options.map((o) => ({ value: o.key, label: o.label }))}
+          placeholder="Invalid"
+        />
+      )}
+      {optionOk && !NO_VALUE.has(filter.option) && (
+        <ValueEditor filter={filter} choice={choice} collections={collections} types={types} onChange={onChange} />
+      )}
+    </div>
+  )
+}
+
 /** `n` times 10^`by`, without the binary rounding of a multiplication (0.143 → 14.3). */
 function shift(n: number, by: number): number {
   const [mantissa, exp] = String(n).split('e')
