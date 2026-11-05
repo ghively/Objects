@@ -533,7 +533,79 @@ export interface Row {
   words?: number
 }
 
-export type Layout = 'list' | 'grid' | 'wall' | 'table' | 'embed' | 'kanban' | 'gallery'
+export type Layout =
+  | 'list'
+  | 'grid'
+  | 'wall'
+  | 'table'
+  | 'embed'
+  | 'kanban'
+  | 'gallery'
+  // M13 (our layouts)
+  | 'calendar'
+  | 'timeline'
+  | 'chart'
+
+/** M13: the calendar layout's settings. Property ids are property keys, as in filters. */
+export interface CalendarViewConfig {
+  /** The date property the objects are placed by (`null`: the first date property). */
+  dateProperty: string | null
+  mode: 'month' | 'week'
+}
+
+export type TimelineZoom = 'day' | 'week' | 'month' | 'quarter' | 'year'
+
+/** M13: the timeline layout's settings. */
+export interface TimelineViewConfig {
+  /** A date property; a range value gives both ends. */
+  startProperty: string | null
+  /** A second date property for the end (`null`: the start's own range end, else one day). */
+  endProperty: string | null
+  zoom: TimelineZoom
+  /** The table on the left. */
+  showTable: boolean
+  /** Its columns (property keys), after the title. */
+  tableColumns: string[]
+  /** Draw the dependency arrows (needs `dependenciesConfig`). */
+  showDependencies: boolean
+}
+
+export type ChartKind = 'bar' | 'horizontalBar' | 'line' | 'donut' | 'number'
+export type ChartSort = 'xAscending' | 'xDescending' | 'yAscending' | 'yDescending'
+
+/** M13: the chart layout's settings. */
+export interface ChartViewConfig {
+  kind: ChartKind
+  /** The X axis: group by this property (the group-by code). Ignored by `number`. */
+  xProperty: string | null
+  /** For a date X axis: the bucket. */
+  xDateBucket: 'day' | 'week' | 'month' | 'year'
+  /** The Y axis: `countAll`, or a calculation of `yProperty` (the column calculations). */
+  yCalc: CalcKind
+  yProperty: string | null
+  /** Split each bar or line by a second property. */
+  splitBy: string | null
+  /** Line charts: add each point to the ones before it. */
+  cumulative: boolean
+  sort: ChartSort
+  hideEmptyGroups: boolean
+  showLegend: boolean
+  showValues: boolean
+}
+
+/** M13: a two-way relation pair turned on from a view's "..." menu. */
+export type RelationPairKind = 'subItems' | 'dependencies'
+
+/** M13: POST /api/types/{typeId}/relation-pair */
+export interface RelationPairResult {
+  type: TypeDef
+  /** "Parent item" (single) or "Blocked by". */
+  firstId: string
+  /** "Sub-items" or "Blocking". */
+  secondId: string
+  /** False when the type already had the pair (it was reused). */
+  created: boolean
+}
 
 export type DateRelative =
   | 'overdue'
@@ -633,6 +705,16 @@ export interface DataViewDefinition {
   }
   calculations?: { propertyId: string; structureId: string; kind: CalcKind }[]
   smallCardViewConfigs?: Record<string, SmallCardViewConfig>
+  /** M13 */
+  calendarConfig?: CalendarViewConfig
+  /** M13 */
+  timelineConfig?: TimelineViewConfig
+  /** M13 */
+  chartConfig?: ChartViewConfig
+  /** M13: nest rows under their parent (table and timeline). Property keys. */
+  subItemsConfig?: { parentPropertyId: string; childrenPropertyId: string }
+  /** M13: the dependency pair (timeline arrows). Property keys. */
+  dependenciesConfig?: { blockedByPropertyId: string; blockingPropertyId: string }
 }
 
 export interface ViewState {

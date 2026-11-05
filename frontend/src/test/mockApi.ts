@@ -315,6 +315,12 @@ function defaults(): Api {
       lossy: 0,
     }),
     setPropertySync: async () => ({ types: [], rewritten: [], skipped: [] }),
+    createRelationPair: async (typeId: string) => ({
+      type: typeDef({ id: typeId }),
+      firstId: 'p-first',
+      secondId: 'p-second',
+      created: true,
+    }),
     deleteType: async () => ({ trashId: 'trash-type-1' }),
     templates: async () => [],
     createTemplate: async (typeId: string, name?: string) => ({

@@ -1,4 +1,6 @@
 import type {
+  RelationPairKind,
+  RelationPairResult,
   Attachment,
   BlockInfo,
   CatchUp,
@@ -680,6 +682,19 @@ export const api = {
       typesEvent(res.type?.id ?? typeId, res.type?.revision ?? null),
       ...(res.rewritten ?? []).map((p) => changed(p)),
     ])
+    return res
+  },
+
+  /**
+   * M13: add the "Parent item"/"Sub-items" or "Blocked by"/"Blocking" relation pair to a type
+   * (two-way, targeting the type itself), or reuse the pair it already has.
+   */
+  async createRelationPair(typeId: string, kind: RelationPairKind, baseRevision: string): Promise<RelationPairResult> {
+    const res = await request<RelationPairResult>(
+      `/types/${seg(typeId)}/relation-pair`,
+      json('POST', { kind, baseRevision, clientId: CLIENT_ID }),
+    )
+    emitLocal([typesEvent(res.type?.id ?? typeId, res.type?.revision ?? null)])
     return res
   },
 
