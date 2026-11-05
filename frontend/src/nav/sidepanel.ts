@@ -42,15 +42,23 @@ export function followsMain(t: SidepanelTarget | null | undefined): boolean {
   return t?.kind === 'localGraph' || isBacklinksTarget(t)
 }
 
-/** Whether the target can swap with the main view or open as a page (not a target that follows it). */
+/** M10: the AI chat entry (`{kind: 'aiChat', path?}`). */
+export function isAiChatTarget(t: SidepanelTarget | null | undefined): t is { kind: 'aiChat'; path?: string } {
+  return t?.kind === 'aiChat'
+}
+
+/**
+ * Whether the target can swap with the main view or open as a page (not a target that follows it,
+ * and not the AI chat).
+ */
 export function isPageTarget(t: SidepanelTarget | null | undefined): t is Target {
-  return !!t && !followsMain(t)
+  return !!t && !followsMain(t) && !isAiChatTarget(t)
 }
 
 export function sameSidepanelTarget(a: SidepanelTarget | null | undefined, b: SidepanelTarget | null | undefined): boolean {
   if (!a || !b) return false
   if (followsMain(a) || followsMain(b)) return a.kind === b.kind
-  return sameTarget(a as Target, b as Target)
+  return sameTarget(a, b)
 }
 
 /** The entries of `tab` (none when it has no side panel yet). */
@@ -108,14 +116,24 @@ function pushTarget(e: SidepanelEntry, target: SidepanelTarget | null): Sidepane
 }
 
 /**
- * Open `target` in `area`: an entry already showing M5's local graph (or M8's backlinks) is revealed; otherwise the
- * area's open non-persistent entry shows the target, else a new open entry is added.
+ * Open `target` in `area`: an entry already showing M5's local graph (or M8's backlinks, or M10's
+ * AI chat) is revealed; otherwise the area's open non-persistent entry shows the target, else a new
+ * open entry is added.
  */
 export function openInArea(entries: SidepanelEntry[], target: SidepanelTarget, area: PanelArea, newId: () => string): SidepanelEntry[] {
   if (followsMain(target)) {
     // One local graph and one backlinks entry per tab: an existing one is revealed.
     const shown = entries.find((e) => e.target?.kind === target.kind)
     if (shown) return openOnly(entries, shown.id)
+  }
+  if (isAiChatTarget(target)) {
+    // Our choice: one AI chat per tab. The open one (else any) is revealed; a saved chat asked for
+    // by path is shown in it.
+    const shown = entries.find((e) => e.isOpen && isAiChatTarget(e.target)) ?? entries.find((e) => isAiChatTarget(e.target))
+    if (shown) {
+      const revealed = openOnly(entries, shown.id)
+      return target.path ? revealed.map((e) => (e.id === shown.id ? pushTarget(e, target) : e)) : revealed
+    }
   }
   const open = openEntryIn(entries, area)
   if (open && sameSidepanelTarget(open.target, target)) return entries
@@ -163,6 +181,17 @@ export function moveEntry(entries: SidepanelEntry[], id: string, area: PanelArea
 /** A link followed inside entry `id`: the entry shows `target` and remembers where it was. */
 export function navigateEntry(entries: SidepanelEntry[], id: string, target: SidepanelTarget | null): SidepanelEntry[] {
   return entries.map((e) => (e.id === id ? pushTarget(e, target) : e))
+}
+
+/** Entry `id` shows `target` in place of its current target (its history keeps its length). */
+export function replaceEntryTarget(entries: SidepanelEntry[], id: string, target: SidepanelTarget): SidepanelEntry[] {
+  return entries.map((e) => {
+    if (e.id !== id) return e
+    const h = entryHistory(e)
+    if (h.index < 0) return { ...e, target, history: [target], index: 0 }
+    const history = h.history.map((x, i) => (i === h.index ? target : x))
+    return { ...e, target, history, index: h.index }
+  })
 }
 
 /** Step entry `id` back (`-1`) or forward (`+1`) in its own history. */
