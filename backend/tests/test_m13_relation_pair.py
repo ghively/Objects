@@ -6,13 +6,11 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-
 from objectapp.frontmatter import parse_fm
 from objectapp.propvalues import InvalidValue
 from objectapp.server import create_app
 from objectapp.space import SYNC_MULTI_ONLY, SYNC_NOT_ALLOWED, Space
 from objectapp.typemodel import RevisionConflict, type_revision
-
 from test_types_api import _changed_lines, _type_file, _write
 
 STAMP = "lastUpdated: 2026-10-01T08:00:00.000Z\n"
