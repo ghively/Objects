@@ -68,6 +68,9 @@ function Harness({ rows, init = timeline(), patchRow }: { rows: Row[]; init?: Vi
   )
 }
 
+const rect = (left: number, top: number, width: number, height: number) =>
+  ({ left, top, right: left + width, bottom: top + height, width, height, x: left, y: top, toJSON: () => ({}) }) as DOMRect
+
 const bar = (title: string) => screen.getAllByTestId('timeline-bar').find((b) => b.getAttribute('data-path') === `Stories/${title}.md`) as HTMLElement
 const px = (el: HTMLElement) => parseFloat(el.style.left)
 
@@ -177,7 +180,10 @@ describe('TimelineLayout', () => {
     const chip = screen.getByTestId('timeline-tray-item')
     const axis = screen.getByTestId('timeline-axis')
     const left = 1000
-    axis.getBoundingClientRect = () => ({ left, top: 50, right: left + 5000, bottom: 400, width: 5000, height: 350, x: left, y: 50, toJSON: () => ({}) })
+    axis.getBoundingClientRect = () => rect(left, 50, 5000, 350)
+    // The scroller shows the axis from x = 800 on, with the table's 200 px on its left.
+    screen.getByTestId('timeline-scroll').getBoundingClientRect = () => rect(600, 0, 2000, 400)
+    screen.getByTestId('timeline-sidebar').getBoundingClientRect = () => rect(600, 0, 200, 48)
     const aLeft = px(bar('A'))
     // Two days after A's start.
     const x = left + aLeft + 2 * DAY_PX.week + 1
@@ -197,6 +203,76 @@ describe('TimelineLayout', () => {
     fireEvent.mouseUp(document, { clientX: 300, clientY: 900 })
     await act(async () => {})
     expect(mocked.updateProperties).not.toHaveBeenCalled()
+  })
+
+  test('a tray item dropped over the table or below the scroller writes nothing, though the axis lies under it', async () => {
+    render(<Harness rows={[story('A', { due: d('2026-11-03') }), story('Later')]} />)
+    await userEvent.click(screen.getByRole('button', { name: 'No date (1)' }))
+    const chip = screen.getByTestId('timeline-tray-item')
+    // The axis is wider and taller than the scroller (it scrolls); it starts under the table.
+    screen.getByTestId('timeline-axis').getBoundingClientRect = () => rect(300, 50, 5000, 3000)
+    screen.getByTestId('timeline-scroll').getBoundingClientRect = () => rect(100, 0, 1000, 400)
+    screen.getByTestId('timeline-sidebar').getBoundingClientRect = () => rect(100, 0, 300, 48)
+    const dropAt = (x: number, y: number) => {
+      fireEvent.mouseDown(chip, { clientX: 10, clientY: 500, button: 0 })
+      fireEvent.mouseMove(document, { clientX: x, clientY: y })
+      fireEvent.mouseUp(document, { clientX: x, clientY: y })
+    }
+    dropAt(350, 200) // over the sticky table
+    dropAt(700, 600) // over the tray, below the scroller
+    dropAt(700, 20) // over the sticky header
+    await act(async () => {})
+    expect(mocked.updateProperties).not.toHaveBeenCalled()
+    dropAt(700, 200)
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(1))
+  })
+
+  test('bars are buttons: Enter or Space opens the object; the link handle is out of the tab order', async () => {
+    const init = timeline({ dependenciesConfig: { blockedByPropertyId: 'blockedBy', blockingPropertyId: 'blocking' } })
+    render(<Harness rows={[story('A', { due: d('2026-11-03') }), story('B', { due: d('2026-11-04') })]} init={init} />)
+    const a = bar('A')
+    expect(a.getAttribute('role')).toBe('button')
+    expect(a.tabIndex).toBe(0)
+    a.focus()
+    fireEvent.keyDown(a, { key: 'Enter' })
+    expect(usePeek.getState().path).toBe('Stories/A.md')
+    usePeek.getState().close()
+    fireEvent.keyDown(bar('B'), { key: ' ' })
+    expect(usePeek.getState().path).toBe('Stories/B.md')
+    const handle = within(a).getByTestId('timeline-link-handle')
+    expect(handle.getAttribute('aria-hidden')).toBe('true')
+    expect(handle.tabIndex).toBe(-1)
+    expect(within(a).queryByRole('button')).toBeNull()
+  })
+
+  test('a typo date far from the rest goes to an "Out of range" tray instead of stretching the axis', async () => {
+    const rows = [story('A', { due: d('2026-11-03') }), story('Typo', { due: d('0202-11-03') }), story('Later')]
+    render(<Harness rows={rows} />)
+    expect(screen.queryAllByTestId('timeline-bar').map((b) => b.dataset.path)).toEqual(['Stories/A.md'])
+    expect(parseFloat(screen.getByTestId('timeline-axis').style.width)).toBeLessThan(30 * 366 * DAY_PX.week)
+    expect(screen.getByRole('button', { name: 'No date (1)' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Out of range (1)' }))
+    const item = screen.getAllByTestId('timeline-tray-item').find((i) => i.dataset.path === 'Stories/Typo.md') as HTMLElement
+    expect(item.textContent).toContain('Typo')
+    expect(item.textContent).toContain('0202-11-03')
+  })
+
+  test('the scrolled window is measured on mount (no fixed height until the first scroll)', () => {
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get() {
+        return (this as HTMLElement).dataset.testid === 'timeline-scroll' ? 3200 : 0
+      },
+    })
+    try {
+      const rows = Array.from({ length: 500 }, (_, i) => story(`S${i}`, { due: d('2026-11-03') }))
+      render(<Harness rows={rows} />)
+      // 3,200 px of rows is 100 rows (plus the overscan), more than an 800 px guess would draw.
+      expect(screen.getAllByTestId('timeline-bar').length).toBeGreaterThanOrEqual(100)
+    } finally {
+      // The own property shadows Element's getter; removing it restores jsdom's.
+      delete (HTMLElement.prototype as { clientHeight?: number }).clientHeight
+    }
   })
 
   test('the table shows the chosen columns and their calculations', () => {

@@ -1,6 +1,13 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+
+// The calculations run per chart cell: counted to check empty cells cost none.
+vi.mock('../../calc', async (orig) => {
+  const real = await orig<typeof import('../../calc')>()
+  return { ...real, calculate: vi.fn(real.calculate) }
+})
 import type { ChartViewConfig, Row, TypeDef, ViewState } from '@/api/types'
 import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
+import { calculate } from '../../calc'
 import { applyFilters, filterIsValid, typeMap } from '../../filter'
 import type { GroupCtx } from '../../group'
 import { emptyFilterGroup } from '../../model'
@@ -188,6 +195,20 @@ describe('aggregation', () => {
     expect(numberValue(ROWS, cfg({ kind: 'number', yCalc: 'sum', yProperty: 'points' }), [task], ctx()).display).toBe('19')
   })
 
+  test('a split over many values calculates only the cells with rows, each row placed once', () => {
+    // 2,000 rows, 40 X groups by 200 split values: 8,000 cells, at most 2,000 with rows.
+    const many = Array.from({ length: 2000 }, (_, i) => R(i, { status: [['Todo', 'Doing', 'Done'][i % 3]], note: `n${i % 200}`, points: i % 7, due: day(`20${String(10 + (i % 40)).padStart(2, '0')}-01-10`) }))
+    vi.mocked(calculate).mockClear()
+    const d = build({ xProperty: 'due', xDateBucket: 'year', splitBy: 'note', yCalc: 'sum', yProperty: 'points' }, many)
+    expect(d.categories).toHaveLength(40)
+    expect(d.series).toHaveLength(200)
+    expect(vi.mocked(calculate).mock.calls.length).toBeLessThanOrEqual(2000)
+    // Every row sits in exactly one cell, and the empty cells are 0.
+    expect(d.categories.reduce((n, c) => n + c.seriesRows.reduce((m, rs) => m + rs.length, 0), 0)).toBe(2000)
+    const sum = (rs: Row[]) => rs.reduce((n, r) => n + (r.values.points as number), 0)
+    for (const c of d.categories) c.seriesRows.forEach((rs, si) => expect(c.values[si]).toBe(sum(rs)))
+  })
+
   test('2,000 rows aggregate quickly', () => {
     const many = Array.from({ length: 2000 }, (_, i) =>
       R(i, { status: [['Todo', 'Doing', 'Done'][i % 3]], size: [i % 2 ? 'S' : 'L'], points: i % 7, due: day(`2026-${String((i % 12) + 1).padStart(2, '0')}-10`) }),
@@ -250,6 +271,26 @@ describe('Show as table: a group as a filter', () => {
       { type: 'filter', propertyId: 'size', option: 'contains', referenceValue: ['o1'] },
     ])
     expect(paths(applyFilters(ROWS, next.filterGroup, ctx()))).toEqual(paths(d.categories[0].seriesRows[0]))
+  })
+
+  test('checked against the rows: a group the filter would not keep exactly is not a filter', () => {
+    // Texts group trimmed and case-sensitive, but "is" matches any case: "Alpha" would keep "alpha" too.
+    const texts = [R(1, { note: 'Alpha' }), R(2, { note: 'alpha' }), R(3, { note: 'Beta' })]
+    const s = state({ xProperty: 'note' })
+    const dt = build({ xProperty: 'note' }, texts)
+    const alpha = dt.categories.find((x) => x.label === 'Alpha')!
+    expect(tableStateFor(s, dt, alpha, null, ctx())).not.toBeNull()
+    expect(tableStateFor(s, dt, alpha, null, ctx(), texts)).toBeNull()
+    const beta = dt.categories.find((x) => x.label === 'Beta')!
+    expect(tableStateFor(s, dt, beta, null, ctx(), texts)).not.toBeNull()
+    // A label outside the option set falls in "Other", which "is empty" doesn't keep.
+    const ghosts = [R(1, { status: ['Ghost'] }), R(2, { status: [] }), R(3, { status: ['Todo'] })]
+    const dl = build({}, ghosts)
+    const other = dl.categories.find((x) => x.group.isOther)!
+    expect(paths(other.group.rows)).toEqual(['Tasks/T1.md', 'Tasks/T2.md'])
+    expect(tableStateFor(state({}), dl, other, null, ctx(), ghosts)).toBeNull()
+    const todo = dl.categories.find((x) => x.label === 'Todo')!
+    expect(tableStateFor(state({}), dl, todo, null, ctx(), ghosts)).not.toBeNull()
   })
 
   test('an OR filter group is wrapped, an empty one replaced', () => {

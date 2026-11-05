@@ -25,6 +25,7 @@ import { buildRowTree, flattenTree, visibleTreeRows, type TreeRow } from '../sub
 import { CalcFooter } from '../table/CalcFooter'
 import {
   addBlocker,
+  axisWindow,
   barSpan,
   buildAxis,
   canWriteDate,
@@ -34,6 +35,7 @@ import {
   dayText,
   dragSpan,
   dragUpdates,
+  inWindow,
   linkedPaths,
   relationRefs,
   resolveEnd,
@@ -60,6 +62,8 @@ const CLICK_SLOP = 3
 export const TIMELINE_TEXT = {
   today: 'Today',
   noDate: (n: number) => `No date (${n})`,
+  outOfRange: (n: number) => `Out of range (${n})`,
+  outOfRangeHint: 'Too far from the other dates to draw. Drag it onto the timeline to give it a new start date.',
   zoom: { day: 'Day', week: 'Week', month: 'Month', quarter: 'Quarter', year: 'Year' } as Record<TimelineZoom, string>,
   zoomGroup: 'Zoom',
   conflict: 'Changed elsewhere. Reloaded.',
@@ -172,10 +176,28 @@ export function TimelineLayout(props: LayoutProps) {
     },
     [pending, spans],
   )
-  const dated = useMemo(() => flat.filter((r) => spanOf(r)), [flat, spanOf])
-  const undated = useMemo(() => flat.filter((r) => !spanOf(r)), [flat, spanOf])
   const today = dayNum(todayYmd())
-  const axis = useMemo(() => buildAxis(config.zoom, dated.map((r) => spanOf(r) as BarSpan), today), [config.zoom, dated, spanOf, today])
+  // The days the axis may cover (around the bars' middle), so a typo date (year 0202 or 20260)
+  // can't make it millions of px wide; a bar outside it waits in the "Out of range" tray.
+  const range = useMemo(() => {
+    const all: BarSpan[] = []
+    for (const r of flat) {
+      const sp = spanOf(r)
+      if (sp) all.push(sp)
+    }
+    return axisWindow(all, today)
+  }, [flat, spanOf, today])
+  const { dated, undated, outliers } = useMemo(() => {
+    const out = { dated: [] as Row[], undated: [] as Row[], outliers: [] as Row[] }
+    for (const r of flat) {
+      const sp = spanOf(r)
+      if (!sp) out.undated.push(r)
+      else if (inWindow(sp, range)) out.dated.push(r)
+      else out.outliers.push(r)
+    }
+    return out
+  }, [flat, spanOf, range])
+  const axis = useMemo(() => buildAxis(config.zoom, dated.map((r) => spanOf(r) as BarSpan), today, range), [config.zoom, dated, spanOf, today, range])
 
   // Nesting (sub-items) and the rows on screen.
   const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set())
@@ -221,11 +243,22 @@ export function TimelineLayout(props: LayoutProps) {
   const scroller = useRef<HTMLDivElement>(null)
   const sidebar = useRef<HTMLDivElement>(null)
   const overlay = useRef<HTMLDivElement>(null)
+  const header = useRef<HTMLDivElement>(null)
   const [win, setWin] = useState({ top: 0, height: 800 })
-  const onScroll = () => {
+  const measure = useCallback(() => {
     const el = scroller.current
-    if (el) setWin({ top: el.scrollTop, height: el.clientHeight || 800 })
-  }
+    if (el) setWin((w) => (w.top === el.scrollTop && w.height === (el.clientHeight || 800) ? w : { top: el.scrollTop, height: el.clientHeight || 800 }))
+  }, [])
+  const onScroll = measure
+  // The window's height is measured when the layout opens and whenever the scroller is resized.
+  useEffect(() => {
+    measure()
+    const el = scroller.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [measure])
   const first = Math.max(0, Math.floor((win.top - HEADER_H) / TIMELINE_ROW_H) - OVERSCAN)
   const last = Math.min(shown.length, Math.ceil((win.top + win.height) / TIMELINE_ROW_H) + OVERSCAN)
 
@@ -373,6 +406,22 @@ export function TimelineLayout(props: LayoutProps) {
     return { x: clientX - r.left, y: clientY - r.top, inside: r.width > 0 && clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom }
   }
 
+  /**
+   * Whether a point is over the part of the axis on screen: inside the scroller's visible box,
+   * right of the sticky table and below the sticky header (the overlay's own box runs on under
+   * them and past the scroller's edges).
+   */
+  const onVisibleAxis = (clientX: number, clientY: number): boolean => {
+    const box = scroller.current?.getBoundingClientRect()
+    if (!box || box.width <= 0 || box.height <= 0) return false
+    if (clientX < box.left || clientX > box.right || clientY < box.top || clientY > box.bottom) return false
+    const side = sidebar.current?.getBoundingClientRect()
+    if (side && side.width > 0 && clientX < side.right) return false
+    const head = header.current?.getBoundingClientRect()
+    if (head && head.height > 0 && clientY < head.bottom) return false
+    return true
+  }
+
   const startLink = (e: ReactMouseEvent, row: Row) => {
     if (e.button !== 0) return
     e.preventDefault()
@@ -420,7 +469,7 @@ export function TimelineLayout(props: LayoutProps) {
       if (!cur.moved) return
       markDragged()
       const p = overlayPoint(ev.clientX, ev.clientY)
-      if (p?.inside) void latest.current.writeStart(row, dayAt(latest.current.axis, p.x))
+      if (p?.inside && onVisibleAxis(ev.clientX, ev.clientY)) void latest.current.writeStart(row, dayAt(latest.current.axis, p.x))
     }
     document.addEventListener('mousemove', move)
     document.addEventListener('mouseup', up)
@@ -543,11 +592,19 @@ export function TimelineLayout(props: LayoutProps) {
               data-path={row.summary.path}
               data-start={dayText(geo.span.start)}
               data-end={dayText(geo.span.end)}
+              role="button"
+              tabIndex={0}
+              aria-label={row.summary.title || 'Untitled'}
               title={row.summary.title}
               onMouseDown={movable ? (e) => startBarDrag(e, row, 'move') : undefined}
               onMouseEnter={() => hoverBar(row.summary.path)}
               onMouseLeave={() => hoverBar(null)}
               onClick={(e) => open(row, e)}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+                e.preventDefault()
+                onOpen(row, e as unknown as ReactMouseEvent)
+              }}
               style={{ left: geo.left, width: geo.width, top: 5, height: TIMELINE_ROW_H - 10 }}
               className={cn(
                 'group/bar absolute flex items-center rounded-md border border-[var(--line-blue)] bg-[var(--type-blue-bg)] text-[12px] text-[var(--type-blue-fg)]',
@@ -574,14 +631,17 @@ export function TimelineLayout(props: LayoutProps) {
                 />
               )}
               {linkable && (
-                <button
-                  type="button"
+                // Pointer only (our choice): out of the tab order and hidden from screen readers,
+                // since a keyboard picker of rows would be out of proportion; "Blocked by" stays
+                // editable as a property.
+                <span
                   data-testid="timeline-link-handle"
-                  aria-label={TIMELINE_TEXT.addDependency(row.summary.title)}
+                  aria-hidden
+                  tabIndex={-1}
                   title={TIMELINE_TEXT.addDependency(row.summary.title)}
                   onMouseDown={(e) => startLink(e, row)}
                   onClick={(e) => e.stopPropagation()}
-                  className="absolute -right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border border-[var(--line-blue)] bg-app opacity-0 group-hover/bar:opacity-100 focus-visible:opacity-100"
+                  className="absolute -right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair rounded-full border border-[var(--line-blue)] bg-app opacity-0 group-hover/bar:opacity-100"
                 />
               )}
             </div>
@@ -620,9 +680,9 @@ export function TimelineLayout(props: LayoutProps) {
       )}
       <div ref={scroller} data-testid="timeline-scroll" onScroll={onScroll} className="relative max-h-[70vh] overflow-auto rounded-md border border-line">
         <div className="relative" style={{ width: `calc(${sidebarRem}rem + ${axis.width}px)` }}>
-          <div className="sticky top-0 z-[3] flex border-b border-line bg-app" style={{ height: HEADER_H }}>
+          <div ref={header} className="sticky top-0 z-[3] flex border-b border-line bg-app" style={{ height: HEADER_H }}>
             {showTable && (
-              <div ref={sidebar} style={{ width: `${sidebarRem}rem` }} className="sticky left-0 z-[4] flex h-full shrink-0 items-end bg-app">
+              <div ref={sidebar} data-testid="timeline-sidebar" style={{ width: `${sidebarRem}rem` }} className="sticky left-0 z-[4] flex h-full shrink-0 items-end bg-app">
                 {columns.map((c) => (
                   <div key={c.id} role="columnheader" style={{ width: `${c.colWidth}rem` }} className="flex h-1/2 shrink-0 items-center truncate border-r border-line px-2 text-[13px] text-fg-muted">
                     {defsByKey[c.id]?.name}
@@ -680,7 +740,25 @@ export function TimelineLayout(props: LayoutProps) {
           )}
         </div>
       </div>
-      {undated.length > 0 && <NoDateTray rows={undated} canDrag={(r) => canWriteDate(r, startKey, types)} onDown={startTrayDrag} onOpen={open} />}
+      {(undated.length > 0 || outliers.length > 0) && (
+        <div className="flex flex-col gap-1">
+          {undated.length > 0 && <Tray label={TIMELINE_TEXT.noDate(undated.length)} rows={undated} canDrag={(r) => canWriteDate(r, startKey, types)} onDown={startTrayDrag} onOpen={open} />}
+          {outliers.length > 0 && (
+            <Tray
+              label={TIMELINE_TEXT.outOfRange(outliers.length)}
+              rows={outliers}
+              detail={(r) => {
+                const sp = spanOf(r)
+                return sp ? dayText(sp.start) : ''
+              }}
+              hint={TIMELINE_TEXT.outOfRangeHint}
+              canDrag={(r) => canWriteDate(r, startKey, types)}
+              onDown={startTrayDrag}
+              onOpen={open}
+            />
+          )}
+        </div>
+      )}
       {trayDrag?.moved && trayRow && (
         <div
           data-testid="timeline-tray-ghost"
@@ -723,13 +801,20 @@ function TimeHeader({ axis, today }: { axis: Axis; today: number }) {
   )
 }
 
-function NoDateTray({
+/** A tray of rows that have no bar: "No date", and "Out of range" (a date too far from the rest). */
+function Tray({
+  label,
   rows,
+  detail,
+  hint,
   canDrag,
   onDown,
   onOpen,
 }: {
+  label: string
   rows: Row[]
+  detail?(row: Row): string
+  hint?: string
   canDrag(row: Row): boolean
   onDown(e: ReactMouseEvent, row: Row): void
   onOpen(row: Row, e: ReactMouseEvent): void
@@ -745,23 +830,26 @@ function NoDateTray({
         className="flex h-7 items-center gap-1 self-start rounded-md px-2 text-[13px] text-fg-muted hover:bg-hover hover:text-fg"
       >
         <Icon name={open ? 'ph-caret-down' : 'ph-caret-right'} size={12} />
-        {TIMELINE_TEXT.noDate(rows.length)}
+        {label}
       </button>
       {open && (
         <div className="flex max-h-48 flex-wrap gap-1 overflow-y-auto px-2">
           {rows.map((r) => {
             const draggable = canDrag(r)
+            const extra = detail?.(r)
             return (
               <button
                 key={r.summary.path}
                 type="button"
                 data-testid="timeline-tray-item"
                 data-path={r.summary.path}
+                title={hint}
                 onMouseDown={draggable ? (e) => onDown(e, r) : undefined}
                 onClick={(e) => onOpen(r, e)}
                 className={cn('h-7 max-w-[16rem] truncate rounded-md border border-line px-2 text-[13px] text-fg hover:bg-hover', draggable && 'cursor-grab')}
               >
                 {r.summary.title || 'Untitled'}
+                {extra && <span className="ml-1.5 text-fg-muted">{extra}</span>}
               </button>
             )
           })}

@@ -10,7 +10,7 @@ vi.mock('html-to-image', () => ({
   toSvg: (el: HTMLElement, opts?: Record<string, unknown>) => toSvg(el, opts),
 }))
 
-import type { LayoutProps } from '../../DataView'
+import { DataView, type LayoutProps } from '../../DataView'
 import type { GroupCtx } from '../../group'
 import { emptyFilterGroup } from '../../model'
 import { ChartLayout, ChartSettings } from '../ChartLayout'
@@ -104,6 +104,22 @@ describe('chart layout', () => {
     expect(screen.getByText('Sum (Points)')).toBeTruthy()
   })
 
+  test('line: the empty buckets between dates are no tab stops; with many, they draw no point', () => {
+    const due = (d: string) => ({ start: d, resolution: 'day' })
+    const line = (rows: Row[]) => props(stateFor({ kind: 'line', xProperty: 'due', xDateBucket: 'day', hideEmptyGroups: false }), { flat: rows })
+    const { rerender } = render(<ChartLayout {...line([R(1, { due: due('2026-01-01') }), R(2, { due: due('2026-01-05') })])} />)
+    const points = () => [...document.querySelectorAll('[data-chart-kind="line"] circle')] as SVGElement[]
+    expect(points()).toHaveLength(5)
+    expect(points().filter((c) => c.getAttribute('tabindex') === '0')).toHaveLength(2)
+    // Still clickable: an empty bucket lists no rows.
+    fireEvent.click(points()[1])
+    expect(screen.getByTestId('chart-drill')).toBeTruthy()
+    // Ninety days apart: only the two points with rows are drawn.
+    rerender(<ChartLayout {...line([R(1, { due: due('2026-01-01') }), R(2, { due: due('2026-03-31') })])} />)
+    expect(points()).toHaveLength(2)
+    expect(points().every((c) => c.getAttribute('tabindex') === '0')).toBe(true)
+  })
+
   test('no legend when turned off; nothing to chart without rows', () => {
     const { rerender } = render(<ChartLayout {...props(stateFor({ splitBy: 'size', showLegend: false }))} />)
     expect(screen.queryByTestId('chart-legend')).toBeNull()
@@ -155,6 +171,26 @@ describe('chart layout', () => {
     ])
   })
 
+  test('Show as table checks the filter against the rows on the click: a group it would not keep exactly says so', () => {
+    // A label outside the option set is in "Other", which "is empty" would not keep.
+    const rows = [R(1, { status: ['Ghost'] }), R(2, { status: [] }), R(3, { status: ['Todo'] })]
+    const p = props(stateFor({ hideEmptyGroups: true }), { flat: rows })
+    render(<ChartLayout {...p} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Other: 2' }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(SHOW_AS_TABLE) }))
+    expect(p.onState).not.toHaveBeenCalled()
+    expect(screen.getByTestId('chart-not-filter').textContent).toBe(NOT_A_FILTER)
+    expect(screen.queryByRole('button', { name: new RegExp(SHOW_AS_TABLE) })).toBeNull()
+  })
+
+  test('no "Show as table" when the view does not offer the table', () => {
+    render(<ChartLayout {...props(stateFor(), { layouts: ['list', 'chart'] })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Todo: 2' }))
+    expect(screen.getByTestId('chart-drill')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: new RegExp(SHOW_AS_TABLE) })).toBeNull()
+    expect(screen.queryByTestId('chart-not-filter')).toBeNull()
+  })
+
   test('a group that is no filter says so instead', () => {
     const rows = [R(1, { owner: [{ target: 'Nobody', path: null }] })]
     render(<ChartLayout {...props(stateFor({ xProperty: 'owner' }), { flat: rows })} />)
@@ -187,6 +223,27 @@ describe('export', () => {
     })
     expect(toSvg).toHaveBeenCalledTimes(1)
     expect(clicked[1].download).toBe('Chart.svg')
+  })
+
+  test("the export file takes the view's name", async () => {
+    render(<ChartLayout {...props(stateFor(), { viewName: 'Sprint points' })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Export chart' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Export PNG' }))
+    })
+    expect(clicked[0].download).toBe('Sprint points.png')
+  })
+
+  test("the data view hands the chart its layouts and its owner's view name", async () => {
+    render(<DataView rows={ROWS} types={[task]} scope={{ typeIds: ['task'] }} state={stateFor()} onState={vi.fn()} layouts={['list', 'chart']} viewName="Board" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Todo: 2' }))
+    expect(screen.getByTestId('chart-drill')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: new RegExp(SHOW_AS_TABLE) })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Export chart' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Export SVG' }))
+    })
+    expect(clicked[0].download).toBe('Board.svg')
   })
 
   test('a failed export says so', async () => {

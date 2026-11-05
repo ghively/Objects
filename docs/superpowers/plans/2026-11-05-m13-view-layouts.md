@@ -17,7 +17,7 @@ Each layout keeps its settings in its own optional key of `DataViewDefinition`; 
 ### Calendar (`CalendarViewConfig`)
 
 - `dateProperty: string | null` (a property key of a `date` property of the view's types, or `createdAt`/`lastUpdated`; `null`: the first date property of the first view type, else `createdAt`), `mode: 'month' | 'week'` (default `month`).
-- A month grid (weeks start on the space's week start, as the Calendar page) or a week strip, with previous / today / next. Each object sits on the day of its date (a range sits on every day it covers); a day shows at most 4 chips then "+N more" (our choice), which opens the day's list.
+- A month grid (weeks start on the space's week start, as the Calendar page) or a week strip, with previous / today / next. Each object sits on the day of its date (a range sits on every day it covers); a day shows at most 4 chips in the month grid and 12 in the taller week strip, then "+N more" (our choice), which opens the day's list.
 - Drag a chip to another day: writes that day into the property (a range keeps its length; a time keeps its time). `createdAt` and `lastUpdated` can't be dragged.
 - Click an empty spot of a day: `onCreate({[key]: day}, typeId)` with the first view type, when `onCreate` is present.
 - Objects without the date are counted in a "No date (N)" button (our string) that lists them.
@@ -26,9 +26,9 @@ Each layout keeps its settings in its own optional key of `DataViewDefinition`; 
 ### Timeline (`TimelineViewConfig`)
 
 - `startProperty` (a date property key; `null`: the first date property), `endProperty` (`null`: the start's own range end, else the same day), `zoom` (default `week`; `day` is one wide column per day, `year` one narrow column per month), `showTable` (default `true`), `tableColumns` (property keys after the title, default `[]`), `showDependencies` (default `true`, used only when `dependenciesConfig` is set).
-- A table on the left (title plus chosen columns, with the column calculations of `views/calc.ts` in its footer), bars on the right on a scrolled time axis, a "Today" button. Drag a bar's body to move both dates; drag its left or right edge to change one. A drag writes once, on drop. Items without a start are in a "No date (N)" tray (our string) below; dragging one onto the axis sets its dates.
+- A table on the left (title plus chosen columns, with the column calculations of `views/calc.ts` in its footer), bars on the right on a scrolled time axis, a "Today" button. Drag a bar's body to move both dates; drag its left or right edge to change one. A drag writes once, on drop. Items without a start are in a "No date (N)" tray (our string) below; dragging one onto the axis sets its dates. The axis spans at most 10 years each side of the middle of the items' starts and today (our choice); an item outside it (a typo date such as year 0202) is listed in an "Out of range (N)" tray (our string) with its date, and dragging it onto the axis gives it a new start.
 - With `subItemsConfig`, rows nest under their parent with a toggle (as in the table, below).
-- With `dependenciesConfig` and `showDependencies`, arrows go from each "Blocked by" item's bar end to the blocked item's bar start. A handle on a bar's right end can be dragged onto another bar: the target becomes blocked by the source (the source is added to the target's `blockedByPropertyId`; syncing fills the other side). Moving an item never moves its dependents (our choice for v1).
+- With `dependenciesConfig` and `showDependencies`, arrows go from each "Blocked by" item's bar end to the blocked item's bar start. A handle on a bar's right end (pointer only, out of the tab order; our choice) can be dragged onto another bar: the target becomes blocked by the source (the source is added to the target's `blockedByPropertyId`; syncing fills the other side). Moving an item never moves its dependents (our choice for v1).
 
 ### Sub-items and dependencies
 
