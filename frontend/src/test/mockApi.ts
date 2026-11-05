@@ -360,6 +360,13 @@ function defaults(): Api {
     }),
     search: async () => ({ results: [], partial: false }),
     reindex: async () => ({ started: true }),
+    aiStatus: async () => ({ available: true, reason: 'ok' as const, claudePath: '/usr/bin/claude', version: '2.0.0', message: null }),
+    aiChat: async (_req: unknown, onEvent: (e: import('@/api/types').AiEvent) => void) => {
+      onEvent({ type: 'text', text: 'Hello' })
+      onEvent({ type: 'done', text: 'Hello', sessionId: 's1', proposal: null, skipped: [] })
+    },
+    aiChatLoad: async (path: string) => ({ path, version: 'v1', title: 'Chat', contextPaths: [], sessionId: null, messages: [] }),
+    saveAiChat: async (req: { path?: string | null }) => ({ path: req.path ?? 'AI Chats/Chat.md', version: 'v1' }),
     apiTokens: async () => ({ tokens: [], mcp: mcpConfig('<token>') }),
     createApiToken: async (name: string, scope: 'read' | 'read-write') => ({
       token: { id: 'tok1', name, scope, createdAt: '2026-11-05T12:00:00.000Z', lastUsedAt: null },

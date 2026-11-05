@@ -128,6 +128,8 @@ Routes (all JSON):
   ``PUT /api/settings`` (null: the device's zone). The M8 routers (`api_tasks`,
   `api_history`, `api_blocks`, `api_merge`, `api_spaces_m8`) are mounted on ``/api``;
   each module's docstring lists its routes and owner task.
+- M10: `api_ai` adds the AI assistant: ``GET /api/ai/status``, ``POST /api/ai/chat``
+  (Server-Sent Events of `AiEvent`), ``GET /api/ai/chat?path=``, ``POST /api/ai/chat/save``.
 - M11: `api_v1` adds the token-protected local API (``/api/v1/*``) and the token routes
   (``/api/integrations/tokens``); its docstring lists them.
 
@@ -158,6 +160,7 @@ from starlette.background import BackgroundTask
 from starlette.middleware.gzip import GZipMiddleware
 
 from . import (
+    api_ai,
     api_blocks,
     api_graph,
     api_history,
@@ -1938,6 +1941,8 @@ def create_app(
         api.include_router(module.router(ctx))
     # M11: the local API for agents and scripts (Bearer tokens) and its token routes.
     api.include_router(api_v1.router(ctx))
+    # M10: the AI assistant (status, a chat turn over SSE, saved AI chats).
+    api.include_router(api_ai.router(ctx))
     app.include_router(api)
     # M6: the whiteboard routes carry their own /api prefix.
     app.include_router(whiteboard_router(space, announce_whiteboard))
