@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { DateConstraints, PropertyDef, PropertyOptions, PropertyType, TypeDef } from '@/api/types'
+import { COMPUTED_KINDS } from '@/api/types'
 import { ColorPicker } from '@/components/ColorPicker'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -705,6 +706,8 @@ export function DeletePropertySection({
 }) {
   const word = def.type === 'blocks' ? 'delete-all-content' : 'delete'
   const [typed, setTyped] = useState('')
+  // A formula or rollup holds no values in the files: deleted without typing a confirmation.
+  const computed = COMPUTED_KINDS.has(def.type)
   return (
     <Section title="Delete property" description={TEXT.deleteDescription}>
       {def.type === 'blocks' && (
@@ -712,16 +715,18 @@ export function DeletePropertySection({
           {onlyContent ? TEXT.onlyBlocksPropertyWarning : TEXT.blocksPropertyWarning}
         </p>
       )}
-      <input
-        aria-label={`Type "${word}" to confirm`}
-        placeholder={word}
-        value={typed}
-        onChange={(e) => setTyped(e.target.value)}
-        className="w-full rounded border border-line bg-transparent px-2 py-1 text-[13px] outline-none"
-      />
+      {!computed && (
+        <input
+          aria-label={`Type "${word}" to confirm`}
+          placeholder={word}
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          className="w-full rounded border border-line bg-transparent px-2 py-1 text-[13px] outline-none"
+        />
+      )}
       <button
         type="button"
-        disabled={typed.trim() !== word}
+        disabled={!computed && typed.trim() !== word}
         onClick={onDelete}
         className="mt-2 rounded bg-red-900/60 px-3 py-1 text-[13px] font-medium text-red-100 disabled:opacity-40"
       >
