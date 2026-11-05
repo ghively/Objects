@@ -164,3 +164,68 @@ def test_the_watcher_names_rule_files_automations(root, monkeypatch, tmp_path):
         ev = watcher._refresh_definition(rel)
         assert ev is not None and (ev.kind, ev.path) == ("automations", made["id"])
         assert s.client.get(f"/api/automations/{made['id']}").json()["name"] == "Edited"
+
+
+def test_a_rule_whose_template_is_gone_can_be_turned_off_and_edited(root, monkeypatch, tmp_path):
+    # Review M14 #5: saves that only switch a rule, or keep it off, aren't checked against the
+    # space; turning it back on with an edit still is.
+    from objectapp.frontmatter import parse_fm
+    from objectapp.objfile import split_object
+
+    with served(root, monkeypatch, tmp_path) as s:
+        tpath = s.client.post("/api/types/page/templates", json={"name": "Weekly plan"}).json()["path"]
+        tid = parse_fm(split_object((root / tpath).read_text(encoding="utf-8")).frontmatter_src or "")["id"]
+        made = s.create({
+            "name": "Repeat", "trigger": {"kind": "schedule", "repeat": "every week", "time": "09:00",
+                                          "start": "2026-11-02"},
+            "actions": [{"kind": "createFromTemplate", "typeId": "page", "templateId": tid,
+                         "title": "", "relateVia": None}],
+            "templateRepeat": {"typeId": "page", "templateId": tid},
+        })  # fmt: skip
+        v = s.client.get("/api/object", params={"path": tpath}).json()["version"]
+        assert s.client.request("DELETE", "/api/object", params={"path": tpath, "baseVersion": v}).status_code == 200
+
+        def put(rule):
+            return s.client.put(f"/api/automations/{made['id']}", json={"rule": rule, "baseRevision": rule["revision"]})
+
+        rule = s.client.get(f"/api/automations/{made['id']}").json()
+        res = put({**rule, "enabled": False})  # off
+        assert res.status_code == 200, res.text
+        rule = res.json()["rule"]
+        assert rule["enabled"] is False
+        res = put({**rule, "name": "Repeat (old)"})  # an edit while off
+        assert res.status_code == 200, res.text
+        rule = res.json()["rule"]
+        res = put({**rule, "name": "Repeat again", "enabled": True})  # on, with an edit: checked
+        assert res.status_code == 422 and "template" in res.json()["detail"]
+        res = put({**rule, "enabled": True})  # only switched back on
+        assert res.status_code == 200, res.text
+        assert res.json()["rule"]["enabled"] is True and res.json()["rule"]["name"] == "Repeat (old)"
+        # The model's shape is still checked on every save.
+        res = put({**res.json()["rule"], "enabled": False, "name": ""})
+        assert res.status_code == 422
+
+
+def test_run_logs_of_rules_deleted_outside_the_trash_are_pruned_on_start(root, monkeypatch, tmp_path):
+    # Review M14 #8c: a run log whose rule file is gone (deleted outside the app, not in the
+    # trash) is removed on the next start; logs of trashed and unreadable rules stay.
+    with served(root, monkeypatch, tmp_path) as s:
+        kept = s.create(status_rule())
+        gone = s.create(status_rule(name="Gone"))
+        trashed = s.create(status_rule(name="Trashed"))
+        broken = s.create(status_rule(name="Broken"))
+        s.props(REPORT, {"status": "Done"})
+        s.idle()
+        for r in (kept, gone, trashed, broken):
+            assert run_log_path(root, r["id"]).exists()
+        s.client.delete(f"/api/automations/{trashed['id']}")
+    rule_file(root, gone["id"]).unlink()
+    rule_file(root, broken["id"]).write_text("{broken", encoding="utf-8")
+    stray = run_log_path(root, kept["id"]).parent / "notes.txt"
+    stray.write_text("not a log", encoding="utf-8")
+    with served(root, monkeypatch, tmp_path):
+        pass
+    assert not run_log_path(root, gone["id"]).exists()
+    for r in (kept, trashed, broken):
+        assert run_log_path(root, r["id"]).exists()
+    assert stray.exists()  # only run logs are pruned
