@@ -62,6 +62,7 @@ from .frontmatter import (
     set_keys,
     take_parsed,
 )
+from . import writeorigin
 from .ids import new_ulid
 from .collections import CollectionDef, SaveCollectionResult
 from . import fmcache
@@ -149,6 +150,7 @@ __all__ = [
     "SyncResult",
     "TrashItem",
     "UpdateResult",
+    "WriteNotice",
     "now_stamp",
     "safe_filename",
     "unique_path",
@@ -411,6 +413,22 @@ class ObjectSummary:
     """A Tag's colour (``bg-<c>``), else None."""
     collections: list[str] = field(default_factory=list)
     """The raw names of the ``collections:`` key (``[]`` when absent)."""
+
+
+@dataclass(frozen=True)
+class WriteNotice:
+    """What `Space.after_write` is told about one write (M14 automations).
+
+    ``kind`` is ``'created'`` (``before`` None) or ``'changed'``; ``before`` and ``after``
+    are the parsed frontmatter values around the write; ``origin`` is
+    `writeorigin.current()` at the write (None for the app's and the API's own writes).
+    """
+
+    kind: str
+    path: str
+    before: dict | None
+    after: dict
+    origin: str | None = None
 
 
 @dataclass(frozen=True)
@@ -844,6 +862,12 @@ class Space:
         """M8 version history: called as ``before_write(rel, current_bytes, object_id)``
         right before the app replaces an existing file (never on create, never on read).
         Errors it raises are logged and never stop the write (see `_call_before_write`)."""
+        self.after_write: Callable[[WriteNotice], None] | None = None
+        """M14 automations: called with a `WriteNotice` after the replace (outside `_write`'s
+        own lock section) for stamped writes whose frontmatter changed, and by the create
+        paths (`create_object`, `duplicate_object`, `create_daily_note`, `ensure_tag`). Never
+        for unstamped rewrites, body-only saves, version or trash restores, or templates.
+        Errors it raises are logged and never stop the write (see `_call_after_write`)."""
         for rel in iter_object_paths(self.root):
             try:
                 self._raw[rel] = read_raw(self.root, rel)
@@ -1230,6 +1254,27 @@ class Space:
         except Exception:  # noqa: BLE001 - history must never stop a save
             _log.exception("The pre-write hook failed for %s", rel)
 
+    def _call_after_write(self, notice: WriteNotice | None) -> None:
+        """Run the `after_write` hook (M14 automations) for one write; never raises."""
+        hook = self.after_write
+        if hook is None or notice is None:
+            return
+        try:
+            hook(notice)
+        except Exception:  # noqa: BLE001 - an automation must never stop a save
+            _log.exception("The post-write hook failed for %s", notice.path)
+
+    def _created_notice(self, rel: str) -> WriteNotice | None:
+        """The ``created`` notice of a file one of the create paths just placed (None for a
+        template, or when the hook is unset)."""
+        if self.after_write is None:
+            return None
+        with self._lock:
+            raw = self._raw.get(rel)
+        if raw is None or raw.readOnly or _str_or_none(raw.fm.get("template")):
+            return None
+        return WriteNotice("created", rel, None, dict(raw.fm), writeorigin.current())
+
     def _write_exact(self, rel: str, base_version: str, data: bytes) -> bool:
         """Put ``data`` back at ``rel`` if it is still at ``base_version``; False when it changed."""
         full = self.root / rel
@@ -1595,6 +1640,89 @@ class Space:
             "skipped": [],
         }
 
+    # -- automations (M14): delete to the trash, restore -------------------------
+
+    def delete_automation(self, rule_id: str) -> str:
+        """Move a rule's file to ``trash/automations/<ulid>.json`` unchanged; return the trash id.
+
+        No confirmation: it is restorable and touches no object. Its run log stays until the
+        entry is purged. Raises `KeyError` (no such rule, or an unusable id) and `ReadOnly`
+        (the file isn't valid JSON).
+        """
+        with self._lock:
+            store = self.store("automations")
+            try:
+                data, _rev = store.read(rule_id)
+            except DefinitionUnreadable as exc:
+                raise ReadOnly(exc.error) from exc
+            except ValueError as exc:
+                raise KeyError(rule_id) from exc
+            if data is None:
+                raise KeyError(rule_id)
+            trash_id = new_ulid()
+            dest = self.trash.automation_file(trash_id)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            rel = store.rel(rule_id)
+            previous = self.own_writes.get(rel)
+            self.own_writes[rel] = ""
+            try:
+                move_no_overwrite(store.path(rule_id), dest)
+            except BaseException:
+                if previous is None:
+                    self.own_writes.pop(rel, None)
+                else:
+                    self.own_writes[rel] = previous
+                raise
+            self.trash.write_json(
+                self.trash.automation_meta_file(trash_id),
+                {"id": rule_id, "deletedAt": now_stamp()},
+            )
+            return trash_id
+
+    def _restore_automation_entry(self, trash_id: str) -> dict[str, Any]:
+        """Bring a deleted rule back under its id (`RestoreConflict` if that file exists)."""
+        rule_id = self.trash.automation_id(trash_id)
+        store = self.store("automations")
+        try:
+            live = store.path(rule_id)
+        except ValueError as exc:
+            raise InvalidValue("The deleted automation's id is not valid.") from exc
+        if live.exists():
+            raise RestoreConflict("Its id is used by another automation.")
+        src = self.trash.automation_file(trash_id)
+        live.parent.mkdir(parents=True, exist_ok=True)
+        rel = store.rel(rule_id)
+        self.own_writes[rel] = version_of(src.read_bytes())
+        try:
+            move_no_overwrite(src, live)
+        except FileExistsError as exc:
+            self.own_writes.pop(rel, None)
+            raise RestoreConflict("Its id is used by another automation.") from exc
+        except BaseException:
+            self.own_writes.pop(rel, None)
+            raise
+        self.trash.automation_meta_file(trash_id).unlink(missing_ok=True)
+        return {
+            "paths": [],
+            "typeIds": [],
+            "collectionIds": [],
+            "queryIds": [],
+            "automationIds": [rule_id],
+            "skipped": [],
+        }
+
+    def _purge_automation_entry(self, trash_id: str) -> None:
+        """Delete a trashed rule for good, with its run log in the state dir."""
+        from .automations import run_log_path  # automations imports this module
+
+        rule_id = self.trash.automation_id(trash_id)
+        self.trash.remove_automation(trash_id)
+        if rule_id:
+            try:
+                run_log_path(self.root, rule_id).unlink(missing_ok=True)
+            except (OSError, ValueError):
+                _log.exception("Could not remove the run log of automation %s", rule_id)
+
     def rows(
         self,
         type_ids: list[str] | None = None,
@@ -1753,6 +1881,9 @@ class Space:
             if of is None or join_object(of) == join_object(raw.of):
                 return current
             stamped: dict[str, str] | None = None
+            # M14: a stamped write that changes the frontmatter is announced to `after_write`
+            # (a body-only save changes it only by its own stamp; unstamped rewrites never).
+            notify = stamp and of.frontmatter_src != raw.of.frontmatter_src
             if stamp:
                 insert_first = None if _str_or_none(raw.fm.get("id")) else {"id": new_ulid()}
                 stamps = {"lastUpdated": now_stamp(now or self.clock())}
@@ -1806,7 +1937,14 @@ class Space:
                     # new frontmatter parsed instead of parsing it again.
                     fmcache.for_root(self.root).put(rel, fresh.of.frontmatter_src, fresh.fm)
                 self._rescan_with(rel, fresh)
-            return new_version
+            notice: WriteNotice | None = None
+            if notify and self.after_write is not None:
+                after = fresh.fm if fresh is not None else self._raw.get(rel, raw).fm
+                notice = WriteNotice(
+                    "changed", rel, dict(raw.fm), dict(after), writeorigin.current()
+                )
+        self._call_after_write(notice)
+        return new_version
 
     @staticmethod
     def _raw_after_write(
@@ -2636,8 +2774,11 @@ class Space:
             for _attempt in range(100):
                 rel = unique_path(self.root, folder, stem)
                 if self._place(rel, data):
-                    return rel, True
-        raise OSError(f"Could not find a free file name for {stem!r}")
+                    break
+            else:
+                raise OSError(f"Could not find a free file name for {stem!r}")
+        self._call_after_write(self._created_notice(rel))
+        return rel, True
 
     # -- change type ----------------------------------------------------------
 
@@ -2856,6 +2997,7 @@ class Space:
         title: str = "",
         template_id: str | None = None,
         values: dict[str, Any] | None = None,
+        reference: datetime | None = None,
     ) -> tuple[str, str]:
         """Create an object of the type in its folder; return (path, version).
 
@@ -2872,6 +3014,10 @@ class Space:
         creating write; after a template they win, except ``collections``, which
         are merged with the template's. An invalid value raises `InvalidValue`
         before anything is written.
+
+        ``reference`` (M14: an automation's run instant) is the instant a template's
+        ``{date:FMT}`` and ``{creation:...}`` values are taken at (default: the clock);
+        ``createdAt`` and ``lastUpdated`` are always the clock's.
 
         Raises `KeyError` for an unknown type and `TemplateError` when the
         template can't be found or applied (nothing is written then).
@@ -2892,7 +3038,7 @@ class Space:
                 raise TemplateError(f"{t.name} objects have no templates")
             tmpl = self._find_template(t, template_id)
         instant = self.clock()
-        created = to_local(instant, self.tz)
+        created = to_local(reference or instant, self.tz)
         title = " ".join(str(title or "").split("\n")).strip()
         if not title and tmpl is not None:
             pattern = _str_or_none(tmpl.fm.get("title"))
@@ -2939,8 +3085,11 @@ class Space:
             for _attempt in range(100):
                 rel = free(self.root, folder, stem)
                 if self._place(rel, data):
-                    return rel, version
-        raise OSError(f"Could not find a free file name for {stem!r}")
+                    break
+            else:
+                raise OSError(f"Could not find a free file name for {stem!r}")
+        self._call_after_write(self._created_notice(rel))
+        return rel, version
 
     def duplicate_object(
         self, path: str, now: datetime | None = None
@@ -3001,6 +3150,7 @@ class Space:
                     break
             else:
                 raise OSError(f"Could not find a free file name for {stem!r}")
+        self._call_after_write(self._created_notice(new_rel))
         _of, fm, _v = self.read(new_rel)
         synced, _skipped = self._sync_relations(new_rel, t, {}, fm)
         return new_rel, version, synced
@@ -3137,8 +3287,15 @@ class Space:
             folder = t.folder.strip("/") or "DailyNotes"
             rel = f"{folder}/{day}.md"
             self._persist_type(t)
-            if self._place(rel, data):
-                return rel, version_of(data)
+            placed = self._place(rel, data)
+            if not placed:
+                self._daily_note_taken(rel, day)
+        self._call_after_write(self._created_notice(rel))
+        return rel, version_of(data)
+
+    def _daily_note_taken(self, rel: str, day: str) -> None:
+        """Raise `DailyNoteExists` for a daily note whose file name was taken meanwhile."""
+        with self._lock:
             # The name is taken: a racing client, a file the watcher hasn't
             # reported yet, or a file that is not this day's note.
             self.rescan_file(rel)
@@ -3791,6 +3948,8 @@ class Space:
             if manifest is None:
                 collection = self.trash.collection_manifest(trash_id)
                 if collection is None:
+                    if self.trash.has_automation(trash_id):
+                        return self._restore_automation_entry(trash_id)
                     query = self.trash.query_data(trash_id)
                     if query is None:
                         raise KeyError(trash_id)
@@ -3817,6 +3976,9 @@ class Space:
                 if collection is None:
                     if self.trash.has_query(trash_id):
                         self.trash.remove_query(trash_id)
+                        return 1
+                    if self.trash.has_automation(trash_id):
+                        self._purge_automation_entry(trash_id)
                         return 1
                     raise KeyError(trash_id)
                 count = 1
