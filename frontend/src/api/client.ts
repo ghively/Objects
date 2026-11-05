@@ -1,4 +1,12 @@
 import type {
+  SaveAiChatRequest,
+  AiChat,
+  AiChatRequest,
+  AiEvent,
+  AiStatus,
+  ApiTokenList,
+  ApiTokenScope,
+  CreatedApiToken,
   Attachment,
   BlockInfo,
   CatchUp,
@@ -723,18 +731,20 @@ export const api = {
     return res
   },
 
-  /** Move a type, its objects and its templates to the Trash. Rejects with 428 unless `confirm`. */
+  /** Move a type, its objects, its templates and its only-this-type queries to the Trash. Rejects with 428 unless `confirm`. */
   async deleteType(id: string, opts: { confirm?: boolean } = {}): Promise<{ trashId: string }> {
-    const res = await request<{ trashId: string; paths?: string[]; typeIds?: string[] }>(
+    const res = await request<{ trashId: string; paths?: string[]; typeIds?: string[]; queryIds?: string[] }>(
       `/types/${seg(id)}${qs({ confirm: opts.confirm ? 'true' : undefined, clientId: CLIENT_ID })}`,
       { method: 'DELETE' },
     )
-    // The type's objects and templates went to the Trash, and other types may have dropped it
-    // from their relations: announce each, since the server's events for them are our echoes.
+    // The type's objects, templates and saved queries of only this type went to the Trash, other
+    // types may have dropped it from their relations and other queries from their types: announce
+    // each, since the server's events for them are our echoes.
     const typeIds = res.typeIds?.length ? res.typeIds : [id]
     emitLocal([
       ...typeIds.map((t) => typesEvent(t)),
       ...(res.paths ?? []).map((p): ChangeEvent => ({ kind: 'deleted', path: p, version: null, origin: CLIENT_ID })),
+      ...(res.queryIds ?? []).map((q) => defEvent('queries', q)),
     ])
     return { trashId: res.trashId }
   },
@@ -928,6 +938,76 @@ export const api = {
     if (opts.limit !== undefined) sp.append('limit', String(opts.limit))
     if (opts.mode) sp.append('mode', opts.mode)
     return request<SearchResponse>(`/search?${sp.toString()}`, opts.signal ? { signal: opts.signal } : undefined)
+  },
+
+  /** M10: whether the Claude Code CLI is there and signed in. */
+  aiStatus(): Promise<AiStatus> {
+    return request<AiStatus>('/ai/status')
+  },
+
+  /**
+   * M10: one AI turn. Calls `onEvent` for each server-sent event until `done` or `error`;
+   * aborting `signal` closes the stream, which stops the CLI. Resolves when the stream ends.
+   */
+  async aiChat(req: AiChatRequest, onEvent: (e: AiEvent) => void, signal?: AbortSignal): Promise<void> {
+    const res = await fetch(`${BASE}/ai/chat`, {
+      ...json('POST', { ...req, clientId: req.clientId ?? CLIENT_ID }),
+      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      signal,
+    })
+    if (!res.ok || !res.body) {
+      await answer(res, '/ai/chat')
+      return
+    }
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+      let cut: number
+      while ((cut = buffer.indexOf('\n\n')) >= 0) {
+        const frame = buffer.slice(0, cut)
+        buffer = buffer.slice(cut + 2)
+        const data = frame
+          .split('\n')
+          .filter((l) => l.startsWith('data:'))
+          .map((l) => l.slice(5).replace(/^ /, ''))
+          .join('\n')
+        if (!data) continue
+        try {
+          onEvent(JSON.parse(data) as AiEvent)
+        } catch {
+          // a malformed frame: skip it
+        }
+      }
+    }
+  },
+
+  /** M10: a saved AI chat and its messages. */
+  aiChatLoad(path: string): Promise<AiChat> {
+    return request<AiChat>(`/ai/chat${qs({ path })}`)
+  },
+
+  /** M10: create or update an AI chat object; rejects with `ConflictError` on a stale version. */
+  saveAiChat(req: SaveAiChatRequest): Promise<{ path: string; version: string }> {
+    return request<{ path: string; version: string }>('/ai/chat/save', json('POST', { ...req, clientId: req.clientId ?? CLIENT_ID }))
+  },
+
+  /** M11: the local API tokens of this space and an MCP config template. */
+  apiTokens(): Promise<ApiTokenList> {
+    return request<ApiTokenList>('/integrations/tokens')
+  },
+
+  /** M11: make a token; the answer holds its secret, shown this once. */
+  createApiToken(name: string, scope: ApiTokenScope): Promise<CreatedApiToken> {
+    return request<CreatedApiToken>('/integrations/tokens', json('POST', { name, scope }))
+  },
+
+  /** M11: revoke a token; programs using it lose access at once. */
+  revokeApiToken(id: string): Promise<{ revoked: string }> {
+    return request<{ revoked: string }>(`/integrations/tokens/${seg(id)}`, { method: 'DELETE' })
   },
 
   /** Drop and rebuild the search index in the background (`partial` until done). */

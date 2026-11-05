@@ -1,6 +1,7 @@
 /**
- * "Delete this object type?": moves the type, its objects and its templates to the app's Trash
- * (restorable for 30 days), so "This can't be undone." is not shown.
+ * "Delete this object type?": moves the type, its objects, its templates and the saved queries of
+ * only this type to the app's Trash (restorable for 30 days; other queries drop the type until
+ * it is restored), so "This can't be undone." is not shown.
  */
 import { useState } from 'react'
 import { api } from '@/api/client'
@@ -19,8 +20,9 @@ import { invalidateLinkIndex } from '@/links/linkIndex'
 
 export const DELETE_TYPE_TEXT = {
   title: 'Delete this object type?',
+  // The saved-queries part is our string (what a type delete does to queries is our choice).
   description:
-    'Moves the type, all its objects and its templates to the Trash. You can restore them from there for 30 days.',
+    'Moves the type, all its objects, its templates and the saved queries of only this type to the Trash; other queries stop using it. You can restore them from there for 30 days.',
   action: 'Delete object type',
 }
 

@@ -458,6 +458,13 @@ export interface DeviceSettings {
   hideStructureSettings: boolean
   /** How highlight blocks show (none exist in Object yet; stored only). */
   highlightStyle: 'default' | 'minimal'
+  // ---- M10 (AI assistant) ----
+  /** "Hide AI features": removes every AI entry from the app. */
+  aiHidden: boolean
+  /** Where the Claude Code CLI is; `null` = found on PATH. */
+  claudePath: string | null
+  /** The model passed to `claude --model`; `null` = Claude Code's default. */
+  aiModel: string | null
 }
 
 /** M8 `DeviceSettings.language`. */
@@ -1255,3 +1262,119 @@ export interface MergeResult {
 }
 
 export type SpaceSetup = 'blank' | 'basic'
+
+/** M11: a local API token (Settings > Integrations). The secret is shown only when made. */
+export type ApiTokenScope = 'read' | 'read-write'
+
+export interface ApiToken {
+  id: string
+  name: string
+  scope: ApiTokenScope
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+/** The ``mcpServers`` entry an MCP client (Claude Code, Claude Desktop) needs. */
+export interface McpConfig {
+  mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }>
+}
+
+/** GET /api/integrations/tokens */
+export interface ApiTokenList {
+  tokens: ApiToken[]
+  mcp: McpConfig
+}
+
+/** POST /api/integrations/tokens */
+export interface CreatedApiToken {
+  token: ApiToken
+  secret: string
+  mcpConfig: McpConfig
+}
+
+
+// ---- M10: the AI assistant (contract) ----
+
+/** What an AI request is for. The server picks the instructions and the proposal it parses. */
+export type AiMode = 'chat' | 'askBlock' | 'tagBlock' | 'tagObject' | 'autofill' | 'rephrase'
+
+/** GET /api/ai/status */
+export interface AiStatus {
+  available: boolean
+  /** `notFound`: no `claude` at the path or on PATH; `notSignedIn`: it answered but isn't signed in. */
+  reason: 'ok' | 'notFound' | 'notSignedIn' | 'error'
+  claudePath: string | null
+  version: string | null
+  message: string | null
+}
+
+export interface AiMessage {
+  role: 'user' | 'assistant'
+  text: string
+  /** ISO instant */
+  at: string
+}
+
+/** POST /api/ai/chat (answers a server-sent event stream of `AiEvent`) */
+export interface AiChatRequest {
+  mode: AiMode
+  /** The user's message (for the other modes, an optional extra instruction). */
+  prompt: string
+  /** The pages the request is about; excluded pages are left out by the server. */
+  contextPaths: string[]
+  /** The block or selected text for askBlock, tagBlock and rephrase. */
+  block?: string | null
+  /**
+   * The object the block was taken from. The server sends a block only from an object it may
+   * show the assistant (not excluded from AI, not a template); a block without one is sent only
+   * when it is an assistant message of `history` (rephrasing an answer).
+   */
+  blockPath?: string | null
+  /** Earlier messages, used when the CLI session can't be resumed. */
+  history: AiMessage[]
+  sessionId?: string | null
+  clientId?: string
+}
+
+/** A change the assistant suggests; nothing is applied until the user accepts it. */
+export type AiProposal =
+  | { kind: 'tags'; tags: string[] }
+  | { kind: 'properties'; values: Record<string, unknown> }
+  | { kind: 'text'; text: string }
+
+/** A context page the server left out of a turn, and why. */
+export interface AiSkipped {
+  path: string
+  reason: 'excluded' | 'template' | 'missing' | 'tooLong'
+}
+
+export type AiEvent =
+  | { type: 'session'; sessionId: string }
+  /** A chunk to append to the answer so far. */
+  | { type: 'text'; text: string }
+  /** The assistant used a tool (an Object MCP read tool, by its short name). */
+  | { type: 'tool'; name: string }
+  | { type: 'done'; text: string; sessionId: string | null; proposal: AiProposal | null; skipped: AiSkipped[] }
+  | { type: 'error'; message: string }
+
+/** GET /api/ai/chat?path= */
+export interface AiChat {
+  path: string
+  version: string
+  title: string
+  contextPaths: string[]
+  sessionId: string | null
+  messages: AiMessage[]
+}
+
+/** POST /api/ai/chat/save: creates the chat (no `path`) or replaces its messages (409 on a stale `baseVersion`). */
+export interface SaveAiChatRequest {
+  path?: string | null
+  baseVersion?: string | null
+  /** Sent when the chat is created; empty or absent keeps a saved chat's title (renames stay). */
+  title?: string
+  contextPaths: string[]
+  sessionId: string | null
+  messages: AiMessage[]
+  clientId?: string
+}

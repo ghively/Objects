@@ -7,6 +7,7 @@ import type { Editor as TiptapEditor, JSONContent } from '@tiptap/core'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { api, ConflictError, isResync } from '@/api/client'
+import { openAiChat, useAiHidden } from '@/ai/store'
 import { COMPUTED_KINDS, type ObjectDetail, type ObjectSummary, type PropertyType, type RenameResult, type TypeDef, type UpdateResult } from '@/api/types'
 import { CollectionPicker } from '@/collections/CollectionPicker'
 import { Icon } from '@/components/Icon'
@@ -144,6 +145,17 @@ export const OBJECT_M9_TEXT = {
   textStats: 'Text Stats',
   export: 'Export',
   duplicate: 'Duplicate',
+} as const
+
+/**
+ * M10: the AI rows of the `…` menu and the peek's sparkle. "Add tags using AI" is the plan's;
+ * "Fill empty properties using AI" and "AI Chat" (the peek button's name, as the Explore card)
+ * are our strings.
+ */
+export const OBJECT_AI_TEXT = {
+  addTags: 'Add tags using AI',
+  autofill: 'Fill empty properties using AI', // our string
+  peek: 'AI Chat', // our string
 } as const
 
 /** The menu's Import and Copy > rows. */
@@ -829,6 +841,7 @@ export function ObjectView({
   const isTag = !!summary && isTagType(type, summary.type)
   const isTask = !!summary && !isTemplate && isTaskRoleType(type, summary.type)
   const focusOn = useFocusMode((s) => s.on)
+  const aiHidden = useAiHidden()
   // M9: the object's own layout keys override the type's.
   const layout = detail ? frontmatterLayout(detail.frontmatter) : undefined
   const wideOn = objectWideLayout(type, layout)
@@ -982,6 +995,25 @@ export function ObjectView({
               <Icon name="ph-chalkboard-simple" size={14} />
               {OBJECT_M8_TEXT.addToWhiteboard}
             </DropdownMenuItem>
+            {/* M10: the AI rows; their place (after "Add to whiteboard") is our choice. */}
+            {!aiHidden && (
+              <>
+                <DropdownMenuItem
+                  disabled={propsReadOnly || !summary}
+                  onSelect={() => openAiChat({ mode: 'tagObject', contextPaths: [path] })}
+                >
+                  <Icon name="ph-sparkle" size={14} />
+                  {OBJECT_AI_TEXT.addTags}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={propsReadOnly || !summary}
+                  onSelect={() => openAiChat({ mode: 'autofill', contextPaths: [path] })}
+                >
+                  <Icon name="ph-sparkle" size={14} />
+                  {OBJECT_AI_TEXT.autofill}
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuSub>
               <DropdownMenuSubTrigger disabled={propsReadOnly || !summary || isTemplate}>
@@ -1096,6 +1128,10 @@ export function ObjectView({
             pressed={focusOn}
             onClick={() => useFocusMode.getState().toggle()}
           />
+        )}
+        {/* M10: the peek's sparkle (catalog section 5, "focus/AI sparkle"): the AI chat about this object. */}
+        {mode === 'peek' && !aiHidden && (
+          <ToolButton label={OBJECT_AI_TEXT.peek} icon="ph-sparkle" onClick={() => openAiChat({ mode: 'chat', contextPaths: [path] })} />
         )}
         {objectMenu}
         {onExpand && <ToolButton label="Open as page" icon="ph-arrows-out-simple" onClick={onExpand} />}
