@@ -94,6 +94,8 @@ export const IMPORT_TEXT = {
   importing: 'Importing…',
   progress: 'Import progress',
   importingCount: (done: number, total: number) => `Importing… ${done} / ${total}`,
+  /** What a screen reader hears: on a new phase and every tenth of the way (the line above changes on every poll). */
+  progressStatus: (phase: string, done: number, total: number) => `${phase}: ${done} of ${total}`,
   phases: {
     preparing: 'Preparing',
     types: 'Making types',
@@ -126,4 +128,5 @@ export const IMPORT_TEXT = {
   notZip: "That isn't a .zip file or a folder.",
   tooLarge: 'This export is larger than Object can import at once.',
   jobLost: 'The import is no longer running (Object was restarted).',
+  previewExpired: 'The preview had expired, so Object read the export again. Check the review, then choose Import again.',
 } as const
