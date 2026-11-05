@@ -84,3 +84,15 @@ Object read: `GET /api/object` (`ObjectDetail`) gains `computed: Record<string, 
 ## Review focus
 
 Formula and rollup values never reach a file; a formula-only type edit never bumps any object's `lastUpdated` or asks to confirm; two concurrent creates never share an ID; a 5,000-object type page with three formulas and two rollups stays within the M5 row-load budget.
+
+## Lane B notes
+
+Choices the contract didn't settle (back end, our choices):
+
+- **Parse vs. evaluation errors:** an unknown function, a wrong argument count and `prop(...)` without a quoted name are parse errors, so saving the type refuses them (422) as well as showing them as errors.
+- **Equality:** `==`/`!=` between two different kinds (say a number and text) is an error, like the ordering comparisons; an empty value equals only an empty value (`""`, `[]`, nothing). `if`, `and`, `or` and `not` read an empty condition as false.
+- **Empty inputs:** `length(empty)` is 0, `contains(empty, x)` is false, `toNumber` of text that isn't a number is empty, `toNumber(date)` is milliseconds since 1970.
+- **Lists:** a formula list over 1,000 items is an error; a rollup's `showOriginal`/`showUnique` list is cut at 1,000.
+- **Rollups:** a related object is counted once even when linked twice; templates are never related objects; `dateRange` is whole days between two day values, else days with a fraction; the percentages are unrounded fractions.
+- **IDs:** "Number existing objects" leaves templates out and orders objects without a readable `createdAt` last (then by path); its `skipped` lists paths. A create that comes while the type is being saved waits for the save (up to 10 s). A number taken by a create that then fails is not given again. Changing an object's type to a type with an ID gives it no number (not a create). `POST /objects` and `POST /daily-notes` list the type in `typeIds` (and announce `types`) when the ID moved `nextNumber`; a duplicate announces `types` without an origin. Deleting an ID property still asks to confirm (its values are in the files). Templates and merges never copy an ID, formula or rollup.
+- **Preview:** an evaluation error answers `value` as the error `ComputedValue` and `error` as its message.

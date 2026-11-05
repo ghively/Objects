@@ -49,8 +49,9 @@ _NOT_MERGED = frozenset(
     {"id", "type", "title", "template", "createdAt", "lastUpdated", "iconColor"}
 )
 _NOT_MERGED_KINDS = frozenset(
-    {"entity_title", "entity_type", "entity_createdAt", "entity_lastUpdated", "entity_backlinks"}
-)
+    {"entity_title", "entity_type", "entity_createdAt", "entity_lastUpdated", "entity_backlinks",
+     "formula", "rollup", "uniqueId"}  # M12: computed, or the target's own number
+)  # fmt: skip
 
 
 class TooLarge(Exception):
