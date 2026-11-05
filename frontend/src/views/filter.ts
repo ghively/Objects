@@ -13,6 +13,16 @@ import type {
   Row,
   TypeDef,
 } from '@/api/types'
+import { COMPUTED_KINDS } from '@/api/types'
+import {
+  asComputed,
+  computedDate,
+  computedDateResolution,
+  computedIsEmpty,
+  computedList,
+  computedNumber,
+  computedText,
+} from '@/properties/computed'
 import { parseRemind } from '@/tasks/remind'
 import { parseRepeat } from '@/tasks/repeat'
 import { dayRange, dayReader, daySpan, endOfDay, parseDay, resolveRelative, startOfDay, type DayRange } from './dates'
@@ -92,6 +102,29 @@ const TASK_DATE_KEYS = new Set(TASK_DATE_OPTIONS.map((x) => x.key))
 const RANGE_ONLY = new Set(DATE.map((x) => x.key).filter((k) => /^(start|end)/.test(k)))
 const SIMPLE_DATE = DATE.filter((x) => !RANGE_ONLY.has(x.key))
 const BLOCKS: FilterOption[] = [o('isNotEmpty', 'is not empty'), o('isEmpty', 'is empty')]
+/** M12: the date comparisons a formula or rollup offers (by day, as a date property's). */
+const DATE_COMPARE = DATE.filter((x) => ['isBefore', 'isAfter', 'isOnOrBefore', 'isOnOrAfter'].includes(x.key))
+/**
+ * M12: a formula's or rollup's operators. Its result type is known only per row, so it offers the
+ * text operators (empty and not empty first), the number and date comparisons and the checkbox
+ * ones; each is evaluated against the row's value by its `type` (`matchComputed`).
+ */
+const COMPUTED: FilterOption[] = [...TEXT, ...NUMBER, ...DATE_COMPARE, ...BOOLEAN]
+const NUMBER_KEYS = new Set(NUMBER.map((x) => x.key))
+const DATE_COMPARE_KEYS = new Set(DATE_COMPARE.map((x) => x.key))
+const NO_OPERAND = new Set(['isEmpty', 'isNotEmpty', 'isChecked', 'isNotChecked'])
+
+/**
+ * M12: what a formula or rollup filter's operator compares against: a number, a date reference
+ * (`{relative}` / `{exactDate}`), a text, or nothing. The filter editor shows the value editor of
+ * that kind and drops a reference of another kind when the operator changes.
+ */
+export function computedOperand(option: string): 'text' | 'number' | 'date' | 'none' {
+  if (NO_OPERAND.has(option)) return 'none'
+  if (NUMBER_KEYS.has(option)) return 'number'
+  if (DATE_COMPARE_KEYS.has(option)) return 'date'
+  return 'text'
+}
 
 /** Every operator per kind, in menu order with its labels. */
 export const FILTER_OPTIONS: Record<PropertyType, FilterOption[]> = {
@@ -120,6 +153,24 @@ export const FILTER_OPTIONS: Record<PropertyType, FilterOption[]> = {
   coverImage: BLOCKS,
   // M14: a button holds no value, so it can't be filtered.
   button: [],
+  // M12
+  formula: COMPUTED,
+  rollup: COMPUTED,
+  uniqueId: TEXT,
+  email: TEXT,
+  phone: TEXT,
+  files: EMPTY,
+}
+
+/**
+ * The filter with operator `option` (the filter editor's operator menu). M12: a formula's or
+ * rollup's operators compare against different kinds of value (text, a number, a date), so a
+ * reference of another kind is dropped.
+ */
+export function withOperator(filter: Filter, option: string, kind: PropertyType): Filter {
+  const next = { ...filter, option }
+  if (COMPUTED_KINDS.has(kind) && computedOperand(filter.option) !== computedOperand(option)) delete next.referenceValue
+  return next
 }
 
 /** The operators a property offers: the start/end ones only when its dates may have an end. */
@@ -442,8 +493,49 @@ function compileFilter(f: Filter, ctx: FilterCtx, pass: Pass): Test | null {
       if (range === undefined) range = referenceRange(f, ctx.now)
       return matchDate(own ? dateOf(row, f.propertyId) : null, f, range, pass.dayOf)
     }
+    if (COMPUTED_KINDS.has(def.type)) {
+      if (range === undefined) range = computedOperand(f.option) === 'date' ? referenceRange(f, ctx.now) : null
+      return matchComputed(own ? rowValue(row, f.propertyId) : undefined, f, range, pass.dayOf)
+    }
     return matchKind(row, f, def, !!own, ctx)
   }
+}
+
+/**
+ * M12: a formula or rollup value against a filter, by the value's result type: empty and not
+ * empty (an error counts as empty); the checkbox operators on a boolean; number comparisons on a
+ * number and date comparisons on a date (another type never matches them, but passes "≠"); the
+ * text operators on the value as text (a list's items joined, `is`/`is not` per item).
+ */
+function matchComputed(value: unknown, f: Filter, range: DayRange | null, dayOf: (iso: string) => string | null): boolean {
+  switch (f.option) {
+    case 'isEmpty':
+      return computedIsEmpty(value)
+    case 'isNotEmpty':
+      return !computedIsEmpty(value)
+    case 'isChecked':
+    case 'isNotChecked': {
+      const c = asComputed(value)
+      const on = c?.type === 'boolean' && c.value === true
+      return f.option === 'isChecked' ? on : !on
+    }
+  }
+  switch (computedOperand(f.option)) {
+    case 'number':
+      return matchNumber(computedNumber(value), f)
+    case 'date': {
+      const iso = computedDate(value)
+      return matchDate(iso ? { start: iso, resolution: computedDateResolution(iso) } : null, f, range, dayOf)
+    }
+  }
+  const items = computedList(value)
+  if (items && (f.option === 'is' || f.option === 'isNot')) {
+    const ref = typeof f.referenceValue === 'string' ? f.referenceValue.toLowerCase() : ''
+    if (ref === '') return true
+    const hit = items.some((x) => x.toLowerCase() === ref)
+    return f.option === 'is' ? hit : !hit
+  }
+  return matchText('text', computedText(value), f)
 }
 
 /** Whether a row passes one filter. An invalid filter passes; so does a row of another type than `structureId`. */
@@ -463,7 +555,12 @@ function matchKind(row: Row, f: Filter, def: DefLike, has: boolean, ctx: FilterC
     case 'color':
     case 'textBlock':
     case 'entity_description':
+    case 'email':
+    case 'phone':
       return matchText(kind, value, f)
+    case 'uniqueId':
+      // An ID without a prefix may come as a number.
+      return matchText(kind, typeof value === 'number' ? String(value) : value, f)
     case 'number':
       return matchNumber(value, f)
     case 'boolean':

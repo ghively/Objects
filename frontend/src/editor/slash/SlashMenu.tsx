@@ -18,6 +18,8 @@ import { IconPicker } from '@/components/IconPicker'
 import { cn } from '@/lib/utils'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useSettings } from '@/settings/useSettings'
+import { useAiHidden } from '@/ai/store'
+import { useAiBlocked } from '../aiEntries'
 import { closeSlashMenu, registerSlashKeyHandler, useSlashMenu } from '../extensions/slashMenu'
 import { filterSections, hasRealMatch, slashSections, SLASH_TEXT, type SlashItem, type SlashView } from './slashItems'
 import { KeyHints } from '@/components/KeyHints'
@@ -101,11 +103,17 @@ export function SlashMenu({ editor }: { editor: Editor }) {
   const state = useSlashMenu()
   const types = useLinkIndex((s) => s.types)
   const twentyFourHourTime = useSettings((s) => s.settings.twentyFourHourTime)
+  // Hidden too on a page excluded from AI or a template (M10).
+  const aiBlocked = useAiBlocked(editor)
+  const aiHidden = useAiHidden() || aiBlocked
   const open = state.editor === editor && state.range !== null
   const sub = state.sub && state.sub.editor === editor ? state.sub : null
   const query = open ? state.query : ''
 
-  const all = useMemo(() => slashSections({ query, types, twentyFourHourTime }), [query, types, twentyFourHourTime])
+  const all = useMemo(
+    () => slashSections({ query, types, twentyFourHourTime, aiHidden }),
+    [query, types, twentyFourHourTime, aiHidden],
+  )
   const sections = useMemo(() => filterSections(all, query), [all, query])
   const flat = useMemo(() => sections.flatMap((s) => s.items), [sections])
   // The active row; it goes back to the first one whenever the query changes.

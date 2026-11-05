@@ -16,7 +16,8 @@
  */
 import { useEffect, useRef } from 'react'
 
-export type ShortcutScope = 'global' | 'editor' | 'calendar' | 'table' | 'whiteboard'
+/** `aiChat`: bound while focus is inside the AI chat panel (M10). */
+export type ShortcutScope = 'global' | 'editor' | 'calendar' | 'table' | 'whiteboard' | 'aiChat'
 
 export interface ShortcutDef {
   id: string
@@ -32,6 +33,7 @@ export interface ShortcutDef {
 
 /** The category labels. */
 export const CATEGORY_LABELS: Record<string, string> = {
+  ai: 'AI Assistant',
   block: 'Block editing',
   calendar: 'Calendar',
   collection: 'Collection',
@@ -499,8 +501,30 @@ export const OBJECT_MENU_SHORTCUTS: ShortcutDef[] = [
   def('toggleFavorite', 'page', 'Add/remove current page to/from favorites', ['Mod-Shift-*'], 'global', V, false),
 ]
 
+/**
+ * M10's AI Assistant group (catalog section 2: open; copy message Ctrl+Alt+C; replace context;
+ * append message Ctrl+Alt+A; append to daily note; retry Ctrl+Alt+R; close chat Ctrl+Alt+X;
+ * rephrase Ctrl+Alt+U). Ctrl means Cmd on macOS, so the catalog's Ctrl+Alt is `Mod-Alt`.
+ * `openAiChat` has no catalogued key: Ctrl+Alt+J is ours (provisional; next to Explore's Ctrl+J),
+ * bound by `ai/AiHost.tsx` anywhere in the window. The others act on the chat's last assistant
+ * message and are bound by `ai/AiChatPanel.tsx` while focus is inside the chat panel (scope
+ * `aiChat`). "Replace context" and "Append to daily note" have no catalogued key: display-only,
+ * keyless (the panel's buttons do them).
+ */
+export const AI_SHORTCUTS: ShortcutDef[] = [
+  def('openAiChat', 'ai', 'Open AI chat', ['Mod-Alt-j'], 'global', OURS, true),
+  def('aiCopyMessage', 'ai', 'Copy message', ['Mod-Alt-c'], 'aiChat', V, true),
+  def('aiReplaceContext', 'ai', 'Replace context', [], 'aiChat', V, false),
+  def('aiAppendMessage', 'ai', 'Append message', ['Mod-Alt-a'], 'aiChat', V, true),
+  def('aiAppendToDailyNote', 'ai', 'Append message to daily note', [], 'aiChat', V, false),
+  def('aiRetry', 'ai', 'Retry', ['Mod-Alt-r'], 'aiChat', V, true),
+  def('aiCloseChat', 'ai', 'Close chat', ['Mod-Alt-x'], 'aiChat', V, true),
+  def('aiRephrase', 'ai', 'Rephrase', ['Mod-Alt-u'], 'aiChat', V, true),
+]
+
 registerShortcuts(EXISTING_SHORTCUTS)
 registerShortcuts(M7_SHORTCUTS)
 registerShortcuts(M8_SHORTCUTS)
 registerShortcuts(POLISH_SHORTCUTS)
 registerShortcuts(OBJECT_MENU_SHORTCUTS)
+registerShortcuts(AI_SHORTCUTS)

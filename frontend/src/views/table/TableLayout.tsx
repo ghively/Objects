@@ -18,6 +18,7 @@ import { PropertySettings } from '@/properties/PropertySettings'
 import { cn } from '@/lib/utils'
 import type { LayoutProps } from '../DataView'
 import { createRowWrites } from '../rowWrites'
+import { buildRowTree, flattenTree, visibleTreeRows, type TreeRow } from '../subItems'
 import { CalcFooter } from './CalcFooter'
 import { ColumnMenu } from './ColumnMenu'
 import {
@@ -119,7 +120,17 @@ function HeaderCell({
 /** Our string: each row's title input is named by its row ("Title of Alpha"). */
 export const titleLabel = (title: string) => `Title of ${title || 'Untitled'}`
 
-function TitleCell({ row, onRename, onOpen }: { row: Row; onRename(row: Row, title: string): void; onOpen(e: ReactMouseEvent): void }) {
+function TitleCell({
+  row,
+  onRename,
+  onOpen,
+  leading,
+}: {
+  row: Row
+  onRename(row: Row, title: string): void
+  onOpen(e: ReactMouseEvent): void
+  leading?: ReactNode
+}) {
   const [text, setText] = useState(row.summary.title)
   const focused = useRef(false)
   useEffect(() => {
@@ -135,6 +146,7 @@ function TitleCell({ row, onRename, onOpen }: { row: Row; onRename(row: Row, tit
   }
   return (
     <div className="group/title flex w-full min-w-0 items-center gap-1">
+      {leading}
       <input
         aria-label={titleLabel(row.summary.title)}
         value={text}
@@ -169,6 +181,30 @@ function TitleCell({ row, onRename, onOpen }: { row: Row; onRename(row: Row, tit
 }
 
 const openObject = (path: string) => useTabs.getState().open({ kind: 'object', path })
+
+/** M13: one nesting level's indent, in rem (our choice). */
+export const NEST_INDENT = 1.25
+
+/** M13: the indent and, on a parent, the open/close toggle before a nested table row's title. */
+function NestToggle({ row, depth, open, onToggle }: { row: Row; depth: number; open: boolean | null; onToggle(path: string): void }) {
+  return (
+    <span className="flex shrink-0 items-center" style={{ paddingLeft: `${depth * NEST_INDENT}rem` }}>
+      {open === null ? (
+        <span aria-hidden className="h-5 w-5" />
+      ) : (
+        <button
+          type="button"
+          aria-label={`${open ? 'Hide' : 'Show'} sub-items of ${row.summary.title || 'Untitled'}`}
+          aria-expanded={open}
+          onClick={() => onToggle(row.summary.path)}
+          className="flex h-5 w-5 items-center justify-center rounded text-fg-muted hover:bg-hover hover:text-fg"
+        >
+          <Icon name={open ? 'ph-caret-down' : 'ph-caret-right'} size={12} />
+        </button>
+      )}
+    </span>
+  )
+}
 
 /** The row-number column at the left, in rem (our choice). */
 export const ROW_NUMBER_WIDTH = 2.5
@@ -223,10 +259,15 @@ interface TableRowProps {
   commit(row: Row, def: PropertyDef, next: unknown): Promise<boolean>
   onDefChange(next: PropertyDef): Promise<unknown>
   openSettings(id: string): void
+  /** M13 nesting: the row's depth (absent when the table doesn't nest). */
+  depth?: number
+  /** M13 nesting: whether its sub-items show (null: it has none). */
+  open?: boolean | null
+  onToggle?(path: string): void
 }
 
 /** One row of cells; re-renders only when its row, the columns, their widths or its selection change. */
-const TableRow = memo(function TableRow({ row, index, mainContent, pinned, columns, defs, config, widths, sticky, selected, canEditType, onOpen, rename, commit, onDefChange, openSettings }: TableRowProps) {
+const TableRow = memo(function TableRow({ row, index, mainContent, pinned, columns, defs, config, widths, sticky, selected, canEditType, onOpen, rename, commit, onDefChange, openSettings, depth, open, onToggle }: TableRowProps) {
   const cellStyle = (c: TableColumn): CSSProperties => ({
     width: `${widths[c.id] ?? c.colWidth}rem`,
     ...(sticky[c.id] !== undefined ? { position: 'sticky', left: `${sticky[c.id]}rem`, zIndex: 1 } : {}),
@@ -236,6 +277,7 @@ const TableRow = memo(function TableRow({ row, index, mainContent, pinned, colum
       role="row"
       data-path={row.summary.path}
       data-selected={selected || undefined}
+      data-depth={depth}
       style={{ minHeight: TABLE_ROW_HEIGHT }}
       className={cn('flex border-b border-line hover:bg-hover/40', selected && 'bg-[var(--block-selection-bg)]')}
     >
@@ -264,7 +306,12 @@ const TableRow = memo(function TableRow({ row, index, mainContent, pinned, colum
             )}
           >
             {def?.type === 'entity_title' ? (
-              <TitleCell row={row} onRename={rename} onOpen={(e) => onOpen(row, e)} />
+              <TitleCell
+                row={row}
+                onRename={rename}
+                onOpen={(e) => onOpen(row, e)}
+                leading={depth !== undefined && onToggle ? <NestToggle row={row} depth={depth} open={open ?? null} onToggle={onToggle} /> : undefined}
+              />
             ) : def?.type === 'blocks' ? (
               <ContentCell words={contentWords(def, row, mainContent)} onExpand={(e) => onOpen(row, e)} />
             ) : def && Cell ? (
@@ -298,6 +345,16 @@ export function TableLayout(props: TableLayoutProps) {
   const [settingsFor, setSettingsFor] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [live, setLive] = useState<{ id: string; rem: number } | null>(null)
+  // M13: parents whose sub-items are hidden (open by default, our choice; not saved).
+  const [closedParents, setClosedParents] = useState<ReadonlySet<string>>(() => new Set())
+  const toggleParent = useCallback((path: string) => {
+    setClosedParents((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }, [])
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const writes = useMemo(() => createRowWrites(), [])
   // The owner's `patchRow` may be a new function per render: the row callbacks read the latest one.
@@ -321,6 +378,17 @@ export function TableLayout(props: TableLayoutProps) {
   const config = useMemo(() => (type ? normalizeTableConfig(type, stored) : null), [type, stored])
   const defs = useMemo(() => Object.fromEntries((type ? tableDefs(type) : []).map((d) => [d.key, d])), [type])
   const columns = useMemo(() => (config ? visibleColumns(config) : []), [config])
+
+  // M13: with sub-items, rows nest under their parent (not in grouped views: groups stay flat).
+  const parentKey = state.viewDefinition.subItemsConfig?.parentPropertyId
+  const nestKey = !grouped && parentKey && type?.propertyDefinitions.some((d) => d.key === parentKey) ? parentKey : null
+  const tree = useMemo(() => (nestKey ? flattenTree(buildRowTree(flat, nestKey)) : null), [flat, nestKey])
+  // The view pages rows (its "Load more"): the first `shown` rows of the tree, in tree order.
+  const shown = groups.reduce((n, g) => n + g.rows.length, 0)
+  const nested: TreeRow[] | null = useMemo(
+    () => (tree ? visibleTreeRows(tree.slice(0, shown), closedParents) : null),
+    [tree, shown, closedParents],
+  )
 
   const widths = useMemo(() => {
     const w: Record<string, number> = {}
@@ -451,7 +519,7 @@ export function TableLayout(props: TableLayoutProps) {
   const pinned = config.pinnedColumnIndex !== undefined
   const gutterStyle: CSSProperties = { width: `${ROW_NUMBER_WIDTH}rem`, ...(pinned ? { position: 'sticky', left: 0, zIndex: 2 } : {}) }
 
-  const renderRow = (row: Row, i: number) => (
+  const renderRow = (row: Row, i: number, nest?: TreeRow) => (
     <TableRow
       key={row.summary.path}
       row={row}
@@ -470,6 +538,9 @@ export function TableLayout(props: TableLayoutProps) {
       commit={commit}
       onDefChange={onDefChange}
       openSettings={setSettingsFor}
+      depth={nest?.depth}
+      open={nest ? (nest.hasChildren ? !closedParents.has(row.summary.path) : null) : undefined}
+      onToggle={nest ? toggleParent : undefined}
     />
   )
 
@@ -516,14 +587,18 @@ export function TableLayout(props: TableLayoutProps) {
               </div>
             </SortableContext>
           </DndContext>
-          {groups.map((g) => (
-            <div key={g.id} role="rowgroup">
-              {grouped && (
-                <div className="sticky left-0 max-w-[48rem]">{header(g, props.groupCount(g))}</div>
-              )}
-              {!(grouped && closed(g)) && g.rows.map(renderRow)}
+          {nested ? (
+            <div role="rowgroup" data-testid="table-nested">
+              {nested.map((n, i) => renderRow(n.row, i, n))}
             </div>
-          ))}
+          ) : (
+            groups.map((g) => (
+              <div key={g.id} role="rowgroup">
+                {grouped && <div className="sticky left-0 max-w-[48rem]">{header(g, props.groupCount(g))}</div>}
+                {!(grouped && closed(g)) && g.rows.map((r, i) => renderRow(r, i))}
+              </div>
+            ))
+          )}
           <CalcFooter
             columns={columns}
             defs={defs}

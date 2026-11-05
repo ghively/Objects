@@ -8,6 +8,8 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api, DailyNoteExistsError } from '@/api/client'
+import { resetAiStore, useAi } from '@/ai/store'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { addDays, todayYmd } from '@/calendar/dates'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { blockSelectionRange, selectBlocks } from '../extensions/blockSelection'
@@ -97,6 +99,7 @@ describe('<BlockSelectionBar>', () => {
       'Turn blocks into',
       'Move',
       'Delete selected blocks',
+      'AI', // M10
       'Clear selection',
     ])
   })
@@ -285,5 +288,31 @@ describe('<BlockSelectionBar>', () => {
     await waitFor(() => expect(api.saveBody).toHaveBeenCalled())
     await act(async () => {})
     expect(serializeBody(editor)).toBe(BODY)
+  })
+
+  test('m10: AI opens the chat about the selected blocks; accepting replaces them', () => {
+    resetAiStore()
+    const editor = mounted(BODY)
+    setEditorObject(editor, { path: 'Pages/Note.md' })
+    render(<BlockSelectionBar editor={editor} />)
+    select(editor, 0, 1)
+    fireEvent.click(within(bar()).getByRole('button', { name: 'AI' }))
+    const seed = useAi.getState().pending!.seed
+    expect(seed).toMatchObject({ mode: 'askBlock', block: 'One two\n\nThree', contextPaths: ['Pages/Note.md'] })
+    act(() => seed.onReplace!('# Merged'))
+    expect(serializeBody(editor)).toBe('# Merged\n\nFour five six\n')
+    resetAiStore()
+  })
+
+  test('m10: no AI button while AI features are hidden', () => {
+    useSettings.setState({ settings: { ...settingsDefaults, aiHidden: true } })
+    try {
+      const editor = mounted(BODY)
+      render(<BlockSelectionBar editor={editor} />)
+      select(editor, 0)
+      expect(within(bar()).queryByRole('button', { name: 'AI' })).toBeNull()
+    } finally {
+      useSettings.setState({ settings: settingsDefaults })
+    }
   })
 })

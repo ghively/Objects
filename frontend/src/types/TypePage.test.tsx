@@ -103,7 +103,7 @@ describe('TypePage', () => {
     await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['task'], preview: false }))
     await user.click(screen.getByRole('button', { name: 'Layout' }))
     const items = (await screen.findAllByRole('menuitemcheckbox')).map((i) => i.textContent)
-    expect(items).toEqual(['List', 'Gallery', 'Wall', 'Table', 'Embed', 'Kanban'])
+    expect(items).toEqual(['List', 'Gallery', 'Wall', 'Table', 'Embed', 'Kanban', 'Calendar', 'Timeline', 'Chart'])
     expect(items).not.toContain('Gallery strip')
   })
 
