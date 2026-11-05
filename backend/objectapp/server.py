@@ -67,9 +67,10 @@ Routes (all JSON):
   ``{targetPropertyId, createName?, baseRevision, clientId?}`` -> ``{types, rewritten, skipped}``;
   ``409 {currentRevision}``, ``422 {detail}``, ``423``, ``404``. Announces ``types`` per
   changed type and ``changed`` per backfilled object.
-- ``DELETE /api/types/{id}?confirm=true&clientId=`` -> ``{trashId, paths, typeIds}``; ``422``,
-  ``428 {detail, affected}``, ``404``. Announces ``types`` (this type and each type
-  whose relations stopped allowing it) and ``deleted`` per object and template.
+- ``DELETE /api/types/{id}?confirm=true&clientId=`` -> ``{trashId, paths, typeIds, queryIds}``;
+  ``422``, ``428 {detail, affected}``, ``404``. Announces ``types`` (this type and each type
+  whose relations stopped allowing it), ``deleted`` per object and template, and ``queries``
+  per saved query that went to the trash with it or dropped it.
 - ``GET /api/types/{id}/templates`` -> ``ObjectSummary[]`` (``templates.ids`` order, then
   discovered ones); ``404``. ``POST /api/types/{id}/templates`` ``{name?, clientId?}`` ->
   ``201 {path, version}``; ``422`` (a type without templates), ``423``, ``404``. Announces
@@ -1781,8 +1782,15 @@ def create_app(
                 paths.append(str(meta.get("originalPath", "")))
         for path in paths:
             announce(ChangeEvent("deleted", path, None, origin=clientId))
+        # The saved queries that went to the trash with the type, or dropped it.
+        query_ids = [str(q) for q in manifest.get("queries") or []]
+        for ref in manifest.get("queryRefs") or []:
+            if str(ref.get("queryId")) not in query_ids:
+                query_ids.append(str(ref.get("queryId")))
+        for query_id in query_ids:
+            announce(ChangeEvent("queries", query_id, None, origin=clientId))
         # The window that deleted can't list these itself: tell it what changed.
-        return {"trashId": item.id, "paths": paths, "typeIds": type_ids}
+        return {"trashId": item.id, "paths": paths, "typeIds": type_ids, "queryIds": query_ids}
 
     @api.post("/tags/ensure")
     def ensure_tag(req: EnsureTagRequest):

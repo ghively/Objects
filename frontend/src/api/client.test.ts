@@ -150,11 +150,12 @@ describe('api client v2 writes', () => {
     ])
   })
 
-  test('deleteType announces each trashed object and each touched type locally', async () => {
+  test('deleteType announces each trashed object, each touched type and each touched query locally', async () => {
     const fetchMock = respond(200, {
       trashId: 't1',
       paths: ['Servers/Alpha.md', 'Templates/Servers/Base.md'],
       typeIds: ['server', 'project'],
+      queryIds: ['my-servers'],
     })
     vi.stubGlobal('fetch', fetchMock)
     let result: unknown
@@ -167,6 +168,7 @@ describe('api client v2 writes', () => {
       { kind: 'types', path: 'project', version: null, origin: CLIENT_ID },
       { kind: 'deleted', path: 'Servers/Alpha.md', version: null, origin: CLIENT_ID },
       { kind: 'deleted', path: 'Templates/Servers/Base.md', version: null, origin: CLIENT_ID },
+      { kind: 'queries', path: 'my-servers', version: null, origin: CLIENT_ID },
     ])
   })
 
