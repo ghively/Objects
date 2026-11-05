@@ -7,6 +7,7 @@ import { useMemo, useState, type ComponentType } from 'react'
 import { Icon } from '@/components/Icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { AI_ASSISTANT_SEARCH, AI_ASSISTANT_TEXT, AiAssistantSection } from './sections/AiAssistant'
 import { APPEARANCE_SEARCH, APPEARANCE_TEXT, AppearanceSection } from './sections/Appearance'
 import { DATE_TIME_SEARCH, DATE_TIME_TEXT, DateTimeSection } from './sections/DateTime'
 import { INTEGRATIONS_SEARCH, INTEGRATIONS_TEXT, IntegrationsSection } from './sections/Integrations'
@@ -41,6 +42,8 @@ export interface SettingsSectionDef {
 
 export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
   { id: 'appearance', group: 'general', label: APPEARANCE_TEXT.heading, icon: 'ph-paint-brush', search: APPEARANCE_SEARCH, Component: AppearanceSection },
+  // M10: catalog section 1 lists "AI Assistant" right after Appearance.
+  { id: 'aiAssistant', group: 'general', label: AI_ASSISTANT_TEXT.heading, icon: 'ph-sparkle', search: AI_ASSISTANT_SEARCH, Component: AiAssistantSection },
   { id: 'editor', group: 'general', label: EDITOR_TEXT.heading, icon: 'ph-text-aa', search: EDITOR_SEARCH, Component: EditorSection },
   { id: 'dateTime', group: 'general', label: DATE_TIME_TEXT.heading, icon: 'ph-calendar-blank', search: DATE_TIME_SEARCH, Component: DateTimeSection },
   { id: 'language', group: 'general', label: LANGUAGE_TEXT.heading, icon: 'ph-translate', search: LANGUAGE_SEARCH, Component: LanguageSection },

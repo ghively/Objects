@@ -38,6 +38,10 @@ CONTRACT_DEFAULTS = {
     **M8_DEFAULTS,
     # Polish 2026-11-03; `test_settings_polish.py` checks them.
     **POLISH_DEFAULTS,
+    # M10
+    "aiHidden": False,
+    "claudePath": None,
+    "aiModel": None,
 }
 
 
@@ -194,3 +198,17 @@ def test_get_space_and_settings_write_nothing(state: Path, blocks_space_dir: Pat
         assert c.get("/api/settings").json()["settings"]["font"] == "serif"
         assert _tree(state) == state_before
     assert _tree(blocks_space_dir) == space_before
+
+
+@pytest.mark.parametrize(
+    ("key", "good", "bad"),
+    [
+        ("aiHidden", True, "yes"),
+        ("claudePath", "C:/Tools/claude.exe", ""),
+        ("aiModel", "claude-sonnet-4-5", "rm -rf /"),
+        ("aiModel", "opus[1m]", "--dangerously-skip-permissions"),
+    ],
+)
+def test_m10_ai_settings_validate(state: Path, key: str, good, bad):
+    assert settings._valid(key, good)
+    assert not settings._valid(key, bad)

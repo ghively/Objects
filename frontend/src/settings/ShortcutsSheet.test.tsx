@@ -4,8 +4,12 @@ import { CATEGORY_LABELS, allShortcuts, formatKeys } from '@/lib/shortcuts'
 import '@/theme/shortcuts'
 import { ShortcutsSheet } from './ShortcutsSheet'
 import { resetSettingsModal, useSettingsModal } from './useSettingsModal'
+import { settingsDefaults, useSettings } from './useSettings'
 
-beforeEach(() => resetSettingsModal())
+beforeEach(() => {
+  resetSettingsModal()
+  useSettings.setState({ settings: settingsDefaults, revision: 'r0', loaded: true })
+})
 
 describe('ShortcutsSheet', () => {
   test('test shortcuts sheet lists every registered shortcut with a key, by category, with unverified tags', async () => {
@@ -34,5 +38,15 @@ describe('ShortcutsSheet', () => {
     expect(sheet.querySelector('[data-shortcut="openSettings"] [data-unverified]')).toBeNull()
     expect(sheet.querySelector('[data-shortcut="toggleDarkMode"] [data-unverified]')).toBeNull()
     expect(sheet.querySelector('[data-shortcut="toggleDarkMode"] [data-keys]')?.textContent).toBe('Ctrl+Shift+L')
+  })
+
+  test('test the AI Assistant group is left out while AI features are hidden', async () => {
+    render(<ShortcutsSheet />)
+    act(() => useSettingsModal.getState().openShortcuts())
+    const sheet = await screen.findByRole('dialog', { name: 'Shortcuts' })
+    expect(within(sheet).getByRole('region', { name: 'AI Assistant' })).toBeInTheDocument()
+    expect(sheet.querySelector('[data-shortcut="aiCopyMessage"] [data-keys]')?.textContent).toBe('Ctrl+Alt+C')
+    act(() => useSettings.setState({ settings: { ...settingsDefaults, aiHidden: true } }))
+    expect(within(sheet).queryByRole('region', { name: 'AI Assistant' })).toBeNull()
   })
 })
