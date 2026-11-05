@@ -308,7 +308,8 @@ interface RowHandlers {
   onChangeType?(): void
   setMenuFor(id: string | null): void
   setSettingsFor(id: string | null): void
-  setDeleteFor(id: string | null): void
+  /** "Delete property": a formula or rollup goes straight away, others ask to type `delete`. */
+  deleteProperty(def: PropertyDef): void
 }
 
 interface PropertyRowProps {
@@ -354,7 +355,7 @@ const PropertyRow = memo(
               }}
               onDelete={() => {
                 h.setMenuFor(null)
-                h.setDeleteFor(def.id)
+                h.deleteProperty(def)
               }}
             />
           ),
@@ -437,8 +438,8 @@ export function PropertyPanel({
 
   // The handlers rows get are stable (they read the newest props through `latest`), so a value
   // change re-renders only its own row, whatever handlers the parent passes per render.
-  const latest = useRef({ type, onChange, onChangeMany, onSetReminder, onTypeChange, onOpenTag, onOpenObject, onChangeType })
-  latest.current = { type, onChange, onChangeMany, onSetReminder, onTypeChange, onOpenTag, onOpenObject, onChangeType }
+  const latest = useRef({ type, onChange, onChangeMany, onSetReminder, onTypeChange, onOpenTag, onOpenObject, onChangeType, typeEditor })
+  latest.current = { type, onChange, onChangeMany, onSetReminder, onTypeChange, onOpenTag, onOpenObject, onChangeType, typeEditor }
   const has = { onChangeMany: !!onChangeMany, onSetReminder: !!onSetReminder, onOpenTag: !!onOpenTag, onOpenObject: !!onOpenObject, onChangeType: !!onChangeType }
   const handlers = useMemo<RowHandlers>(
     () => ({
@@ -457,7 +458,15 @@ export function PropertyPanel({
       onChangeType: has.onChangeType ? () => latest.current.onChangeType?.() : undefined,
       setMenuFor,
       setSettingsFor,
-      setDeleteFor,
+      deleteProperty: (def) => {
+        const { type: t, typeEditor: ed, onTypeChange: save } = latest.current
+        // A formula or rollup holds no values in the files (the server deletes it without a
+        // confirmation): no typed confirmation either.
+        if (!t || !COMPUTED_KINDS.has(def.type)) return setDeleteFor(def.id)
+        const next = removeProperty(t, def.id)
+        if (ed) void ed.save(next, { confirm: true })
+        else void save?.(next)
+      },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only whether each handler is given matters
     [has.onChangeMany, has.onSetReminder, has.onOpenTag, has.onOpenObject, has.onChangeType],

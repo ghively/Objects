@@ -1,6 +1,7 @@
 // M12: the property panel reads formula and rollup values from the object read's `computed` map
 // (never from frontmatter) and decodes a files value's wikilinks to paths.
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { objectSummary, propertyDef, typeDef } from '@/test/mockApi'
 
@@ -58,5 +59,33 @@ describe('PropertyPanel: M12 values', () => {
       />,
     )
     expect(screen.getByText('Formula error')).toHaveAttribute('title', 'Unknown function "foo"')
+  })
+
+  test('Delete on a formula deletes it straight away; another kind still asks to type "delete"', async () => {
+    const user = userEvent.setup()
+    const note = propertyDef({ id: 'note', key: 'note', name: 'Note', type: 'text' })
+    const T = typeDef({ id: 'task', name: 'Task', propertyDefinitions: [total, note] })
+    const onTypeChange = vi.fn()
+    render(
+      <PropertyPanel
+        type={T}
+        frontmatter={{ note: 'hi' }}
+        summary={summary}
+        computed={{ total: { type: 'number', value: 8 } }}
+        onChange={() => undefined}
+        onTypeChange={onTypeChange}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Total property menu' }))
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(onTypeChange).toHaveBeenCalledTimes(1)
+    expect(onTypeChange.mock.calls[0][0].propertyDefinitions.map((d: { id: string }) => d.id)).toEqual(['note'])
+
+    await user.click(screen.getByRole('button', { name: 'Note property menu' }))
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Type "delete" to confirm' })).toBeInTheDocument()
+    expect(onTypeChange).toHaveBeenCalledTimes(1)
   })
 })
