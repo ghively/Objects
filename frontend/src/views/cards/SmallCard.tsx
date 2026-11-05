@@ -101,12 +101,21 @@ export function CardProperties({
             const def: PropertyDef | undefined = type?.propertyDefinitions.find((d) => d.key === p.propertyId)
             if (!def) return null
             const value = p.propertyId in row.values ? row.values[p.propertyId] : undefined
-            if (isEmptyValue(value)) return null
+            // M14: a Button property holds no value and is always shown (and pressable).
+            const button = def.type === 'button'
+            if (!button && isEmptyValue(value)) return null
             const Cell = cellForDef(def)
             if (!Cell) return null
             return (
               <div key={p.propertyId} data-prop={p.propertyId} className="pointer-events-none min-w-0">
-                <Cell def={def} value={value} readOnly density="table" onChange={() => {}} />
+                <Cell
+                  def={def}
+                  value={value}
+                  readOnly={button ? !!row.summary.readOnly : true}
+                  density="table"
+                  onChange={() => {}}
+                  path={row.summary.path}
+                />
               </div>
             )
           }
@@ -214,11 +223,23 @@ export function WallCardProperties({
             const Cell = cellForDef(def)
             if (!Cell) return null
             const value = p.propertyId in row.values ? row.values[p.propertyId] : undefined
-            // A checkbox always shows its box; every other kind reads "Empty" when unset.
-            const empty = def.type !== 'boolean' && isEmptyValue(value)
+            // A checkbox always shows its box (M14: a button its button); every other kind reads "Empty" when unset.
+            const button = def.type === 'button'
+            const empty = def.type !== 'boolean' && !button && isEmptyValue(value)
             return (
               <PropRow key={p.propertyId} id={p.propertyId} name={def.name} icon={def.icon ?? kindIcon(def.type)}>
-                {empty ? EMPTY : <Cell def={def} value={value} readOnly density="table" onChange={() => {}} />}
+                {empty ? (
+                  EMPTY
+                ) : (
+                  <Cell
+                    def={def}
+                    value={value}
+                    readOnly={button ? !!row.summary.readOnly : true}
+                    density="table"
+                    onChange={() => {}}
+                    path={row.summary.path}
+                  />
+                )}
               </PropRow>
             )
           }

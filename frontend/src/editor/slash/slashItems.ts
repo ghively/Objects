@@ -28,7 +28,7 @@ import { BLOCK_COLORS, bgColorToken, colorMenuName, textColorToken } from '../me
 import type { Hierarchy, ListType } from '../nodes/blockOptions'
 import { insertBlockNode } from '../nodes/containers'
 
-export type SlashView = 'icon' | 'bookmark'
+export type SlashView = 'icon' | 'bookmark' | 'button'
 
 export type SectionId = 'blocks' | 'structure' | 'dates' | 'reuse'
 
@@ -61,6 +61,8 @@ export const SLASH_TEXT = {
   reuse: 'Reuse any content',
   noResults: 'No results',
   pasteUrl: 'Paste URL',
+  /** M14 (our string): insert a button block without an automation yet. */
+  buttonLater: 'Choose the automation later',
   withEmptyTitle: (structureTitle: string) => `Create ${structureTitle}`,
   withPotentialTitle: (structureTitle: string, potentialTitle: string) =>
     `Create ${structureTitle} with title "${potentialTitle}"`,
@@ -105,7 +107,7 @@ const list = (type: ListType) => (e: Editor) => {
 /**
  * The "Create a block" items, in menu order: the operations without the
  * colour and AI ones, then Record audio, then the blocks. "Create bookmark"
- * is ours (Object has no other way to insert one), last.
+ * is ours (Object has no other way to insert one); M14's "Button" (ours) follows it.
  */
 export const BLOCK_ITEMS: readonly SlashItem[] = [
   block('Base', 'Standard', 'Turn block into a standard text block', 'ph-text-t', hierarchy('Base'), 'normal'),
@@ -157,6 +159,8 @@ export const BLOCK_ITEMS: readonly SlashItem[] = [
     e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
   }),
   block('bookmark', 'Create bookmark', undefined, 'ph-bookmark-simple', () => 'bookmark'), // pasteInput.bookmark (ours in this menu)
+  // M14 (our item): a button that runs an automation; the sub-view picks the automation.
+  block('button', 'Button', 'A button that runs an automation on this object', 'ph-cursor-click', () => 'button'),
 ]
 
 /**

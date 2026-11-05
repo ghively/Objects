@@ -175,4 +175,26 @@ describe('TrashView times', () => {
       useSettings.setState({ settings })
     }
   })
+
+  test('an automation entry shows its name, "Automation" and restores by id', async () => {
+    const RULE: TrashItem = {
+      id: 'a1',
+      kind: 'automation',
+      originalPath: '.object/automations/01JRULE.json',
+      title: '',
+      type: '',
+      deletedAt: '2026-10-24T10:00:00.000Z',
+      automationId: '01JRULE',
+      name: 'Stamp done',
+    }
+    entries = [RULE]
+    const user = userEvent.setup()
+    render(<TrashView />)
+    const row = await screen.findByRole('listitem', { name: 'Stamp done' })
+    expect(row).toHaveTextContent('Automation · ')
+    expect(row).not.toHaveTextContent('.object')
+    await waitFor(() => expect(row.querySelector('[data-icon="ph-lightning"]')).not.toBeNull())
+    await user.click(within(row).getByRole('button', { name: 'Restore' }))
+    await waitFor(() => expect(mocked.restore).toHaveBeenCalledWith('a1'))
+  })
 })

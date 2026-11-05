@@ -73,6 +73,7 @@ describe('slash items', () => {
       ['Two Columns', 'Multiple blocks groups next to each other'],
       ['Table', 'A simple block for tabular content'],
       ['Create bookmark', null], // ours: Object's only way to insert a bookmark
+      ['Button', 'A button that runs an automation on this object'], // M14 (ours)
     ])
     // The expected icons.
     expect(Object.fromEntries(sections[0].items.map((i) => [i.id, i.icon]))).toMatchObject({
@@ -143,6 +144,7 @@ describe('each block item runs its command', () => {
     ['columns', (e) => expect(e.state.doc.child(1).type.name).toBe('columns')],
     ['table', (e) => expect(e.state.doc.child(1).type.name).toBe('table')],
     ['bookmark', (_e, view) => expect(view).toBe('bookmark')],
+    ['button', (_e, view) => expect(view).toBe('button')],
   ]
 
   test('every block item has a case', () => {

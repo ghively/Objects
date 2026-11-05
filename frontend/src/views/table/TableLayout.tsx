@@ -278,6 +278,7 @@ const TableRow = memo(function TableRow({ row, index, mainContent, pinned, colum
                   onChange={(next: unknown) => commit(row, def, next)}
                   onDefChange={onDefChange}
                   typeId={row.summary.type}
+                  path={row.summary.path}
                   onOpenObject={openObject}
                   onOpenSettings={canEditType ? () => openSettings(def.id) : undefined}
                 />
