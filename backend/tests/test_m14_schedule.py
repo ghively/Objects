@@ -248,3 +248,55 @@ def test_template_repeat_names_the_template_and_is_one_per_template(root, monkey
         at(s, NOW + timedelta(minutes=80))  # a sleep
         items = s.client.get("/api/automations/catch-up").json()["items"]
         assert [(i["ruleId"], i["name"]) for i in items] == [(made["id"], "Weekly plan")]
+
+
+def daily(**over):
+    return weekly(trigger={"kind": "schedule", "repeat": "every day", "time": "09:00", "start": "2026-11-02"}, **over)
+
+
+def test_quitting_between_two_ticks_owes_what_came_due_since_the_last(root, monkeypatch, tmp_path):
+    # Review M14 #1: `lastRunning` is the instant occurrences were handled through (the last
+    # tick), not the clock at quitting, so 09:00 between the last tick and the quit is owed.
+    with served(root, monkeypatch, tmp_path, now=NOW + timedelta(minutes=59, seconds=40)) as s:
+        made = s.create(daily())
+        assert at(s, NOW + timedelta(minutes=59, seconds=50)) == []
+        s.clock.now = NOW + timedelta(hours=1, seconds=10)  # quit before the next tick
+    state = json.loads(state_path(root).read_text(encoding="utf-8"))
+    assert state["lastRunning"] == "2026-11-02T08:59:50.000Z"
+    with served(root, monkeypatch, tmp_path, now=NOW + timedelta(hours=1, minutes=30)) as s:
+        items = s.client.get("/api/automations/catch-up").json()["items"]
+        assert [(i["ruleId"], i["missed"]) for i in items] == [(made["id"], ["2026-11-02T09:00:00.000Z"])]
+        assert at(s, NOW + timedelta(hours=1, minutes=31)) == []  # never run silently
+        assert pages(root) == []
+
+
+def test_quitting_right_after_a_sleep_owes_the_whole_gap(root, monkeypatch, tmp_path):
+    # The computer slept across 09:00 and the app quit on waking, before any tick.
+    with served(root, monkeypatch, tmp_path, now=NOW + timedelta(minutes=40)) as s:
+        made = s.create(daily())
+        assert at(s, NOW + timedelta(minutes=50)) == []
+        s.clock.now = NOW + timedelta(days=2, minutes=20)
+    with served(root, monkeypatch, tmp_path, now=NOW + timedelta(days=2, minutes=25)) as s:
+        items = s.client.get("/api/automations/catch-up").json()["items"]
+        assert [(i["ruleId"], i["missed"]) for i in items] == [(made["id"], [
+            "2026-11-02T09:00:00.000Z", "2026-11-03T09:00:00.000Z"])]  # fmt: skip
+        assert pages(root) == []
+
+
+def test_an_unreadable_rule_keeps_what_it_owes(root, monkeypatch, tmp_path):
+    # Review M14 #8b: a rule file that can't be read for a while keeps its pending items; they
+    # are listed again once it reads (only a deleted or turned-off rule drops them).
+    made, later = restart_after_three_weeks(root, monkeypatch, tmp_path)
+    rule_file = root / ".object" / "automations" / f"{made['id']}.json"
+    good = rule_file.read_bytes()
+    with served(root, monkeypatch, tmp_path, now=later) as s:
+        assert s.client.get("/api/automations/catch-up").json()["items"][0]["count"] == 3
+        rule_file.write_text("{broken", encoding="utf-8")
+        assert at(s, later + timedelta(minutes=1)) == []
+        assert s.client.get("/api/automations/catch-up").json() == {"items": []}
+    state = json.loads(state_path(root).read_text(encoding="utf-8"))
+    assert len(state["rules"][made["id"]]["pending"]) == 3
+    rule_file.write_bytes(good)
+    with served(root, monkeypatch, tmp_path, now=later + timedelta(minutes=5)) as s:
+        items = s.client.get("/api/automations/catch-up").json()["items"]
+        assert [i["count"] for i in items] == [3]
