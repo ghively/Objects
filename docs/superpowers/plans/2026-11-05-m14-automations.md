@@ -1,6 +1,6 @@
 # Milestone 14: local automations
 
-Expanded 2026-11-05 from the 2026-11-04 features plan (its "M14: Local automations" section; that plan is not on `master`), against `master` at `c72567f`. Built on branch `feat/m14-automations`. Everything here is new schema ("Beyond the catalog"); every label and default is "our string" or "our choice".
+Expanded 2026-11-05 from the 2026-11-04 features plan (its "M14: Local automations" section; that plan is not on `master`), against `master` at `c72567f`. Built on branch `feat/m14-automations` (built, reviewed and fixed 2026-11-05; results in `m14-acceptance.md`). Everything here is new schema ("Beyond the catalog"); every label and default is "our string" or "our choice".
 
 **Goal.** Routine edits happen by themselves or with one click, all on this machine: no network and no account. Rules live in the space (they travel with it and can be versioned); their run log and schedule state live in the per-user state dir.
 
