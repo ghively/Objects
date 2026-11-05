@@ -35,6 +35,7 @@ describe('SettingsModal', () => {
     expect(groups.map((g) => g.getAttribute('aria-label'))).toEqual(['General', 'Space'])
     expect(within(groups[0]).getAllByRole('button').map((b) => b.textContent)).toEqual([
       'Appearance',
+      'AI Assistant',
       'Editor',
       'Date & Time',
       'Language',

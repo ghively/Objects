@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
+import { AiHost } from '@/ai/AiHost'
 import type { ChangeKind, ObjectSummary, SpaceInfo, TypeDef } from '@/api/types'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -306,6 +307,8 @@ export default function App() {
     }
     // M8: the backlinks entry follows the tab's current object.
     if (t.kind === 'backlinks') return <BacklinksPanel path={target?.kind === 'object' ? target.path : null} />
+    // M10: `SidePanelArea` shows the AI chat itself (it needs the entry).
+    if (t.kind === 'aiChat') return null
     return pageFor(t, { types, space, open: (x, o) => (o?.newTab ? open(x, o) : nav.open(x, o)) })
   }
 
@@ -360,6 +363,7 @@ export default function App() {
           </MainPanel>
         </div>
         <ObjectPeek />
+        <AiHost />
         <CommandPalette
           onOpenTarget={(t, o) => open(t, o)}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
