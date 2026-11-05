@@ -7,7 +7,7 @@ import type { LayoutProps } from '../../DataView'
 import { ListLayout } from '../ListLayout'
 import { useWidth } from '../shared'
 import { BarChart } from './BarChart'
-import { buildChartData, chartConfigOf, numberValue, tableStateFor } from './chartData'
+import { buildChartData, chartConfigOf, numberValue, pickedRows, tableStateFor } from './chartData'
 import { DonutChart } from './DonutChart'
 import {
   CHART_EXPORT_FAILED,
@@ -39,7 +39,7 @@ interface Picked {
   seriesId: string | null
 }
 
-export function ChartView(props: LayoutProps & { exportDeps?: ChartExportDeps; name?: string | null }) {
+export function ChartView(props: LayoutProps & { exportDeps?: ChartExportDeps }) {
   const { flat, state, viewTypes, ctx } = props
   const config = useMemo(() => chartConfigOf(state.viewDefinition), [state.viewDefinition])
   const isNumber = config.kind === 'number'
@@ -54,9 +54,9 @@ export function ChartView(props: LayoutProps & { exportDeps?: ChartExportDeps; n
 
   useEffect(() => {
     const key = state.viewDefinition
-    registerChartFrame(key, frameRef.current, props.name ?? null)
+    registerChartFrame(key, frameRef.current, props.viewName ?? null)
     return () => registerChartFrame(key, null, null)
-  }, [state.viewDefinition, frameRef, props.name])
+  }, [state.viewDefinition, frameRef, props.viewName])
 
   // The pick by ids, so it survives a reload of the rows; gone when its group is.
   const hit = useMemo<ChartHit | null>(() => {
@@ -77,7 +77,7 @@ export function ChartView(props: LayoutProps & { exportDeps?: ChartExportDeps; n
 
   const doExport = async (format: ChartExportFormat) => {
     if (!frameRef.current) return
-    setFailed(!(await exportChart(frameRef.current, format, props.name, props.exportDeps)))
+    setFailed(!(await exportChart(frameRef.current, format, props.viewName, props.exportDeps)))
   }
 
   const legend: LegendItem[] = !data || !config.showLegend
@@ -155,7 +155,9 @@ export function ChartView(props: LayoutProps & { exportDeps?: ChartExportDeps; n
           {CHART_EXPORT_FAILED}
         </p>
       )}
-      {data && hit && <Drill props={props} data={data} hit={hit} all={all} onAll={() => setAll(true)} onClose={() => setPicked(null)} />}
+      {data && hit && picked && (
+        <Drill key={`${picked.categoryId}\n${picked.seriesId ?? ''}`} props={props} data={data} hit={hit} all={all} onAll={() => setAll(true)} onClose={() => setPicked(null)} />
+      )}
     </div>
   )
 }
@@ -176,9 +178,19 @@ function Drill({
   onClose(): void
 }) {
   const c = data.categories[hit.category]
-  const rows = hit.series === null ? (data.split ? c.group.rows : c.seriesRows[0]) : c.seriesRows[hit.series]
+  const seriesIndex = data.split ? hit.series : null
+  const rows = pickedRows(data, c, seriesIndex)
   const title = hit.series !== null && data.split ? `${c.label} · ${data.series[hit.series].label}` : c.label
-  const table = tableStateFor(props.state, data, c, data.split ? hit.series : null, props.ctx)
+  // Only when the view offers the table (a view without `layouts` offers it, as before).
+  const offersTable = !props.layouts || props.layouts.includes('table')
+  // The check against every row runs on the click; one that fails says so in place of the button.
+  const [mismatch, setMismatch] = useState(false)
+  const table = offersTable && !mismatch ? tableStateFor(props.state, data, c, seriesIndex, props.ctx) : null
+  const showTable = () => {
+    const checked = tableStateFor(props.state, data, c, seriesIndex, props.ctx, props.flat)
+    if (checked) props.onState(checked)
+    else setMismatch(true)
+  }
   const shown = all ? rows : rows.slice(0, DRILL_PAGE)
   return (
     <section data-testid="chart-drill" aria-label={title} className="flex flex-col border-t border-line pt-2">
@@ -187,15 +199,15 @@ function Drill({
         <span className="text-[13px] text-fg-muted">{rows.length}</span>
         <span className="flex-1" />
         {table ? (
-          <button type="button" onClick={() => props.onState(table)} className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[13px] hover:bg-hover">
+          <button type="button" onClick={showTable} className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[13px] hover:bg-hover">
             <Icon name="ph-table" size={14} />
             {SHOW_AS_TABLE}
           </button>
-        ) : (
+        ) : offersTable ? (
           <span className="text-[12px] text-fg-muted" data-testid="chart-not-filter">
             {NOT_A_FILTER}
           </span>
-        )}
+        ) : null}
         <button type="button" aria-label="Close" onClick={onClose} className="rounded-md p-1 text-fg-muted hover:bg-hover hover:text-fg">
           <Icon name="ph-x" size={14} />
         </button>

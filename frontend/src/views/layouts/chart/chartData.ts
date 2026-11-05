@@ -19,7 +19,7 @@ import type {
 import { formatNumber } from '@/properties/format'
 import { lineColor, type ThemeColor } from '@/theme/palette'
 import { CALC_KINDS, CALC_LABELS, calculate } from '../../calc'
-import { filterOptionsFor, findDef } from '../../filter'
+import { applyFilters, filterOptionsFor, findDef } from '../../filter'
 import { groupRows, isGroupable, type Group, type GroupCtx } from '../../group'
 import { propertyChoices, type PropChoice } from '../../properties'
 
@@ -182,9 +182,9 @@ export function yLabelOf(calc: CalcKind, y: PropChoice | null): string {
   return `${CALC_LABELS.full[calc] ?? calc} (${y.name})`
 }
 
-/** One Y value over `rows`: the calculation's number (an empty result is 0). */
+/** One Y value over `rows`: the calculation's number (an empty result is 0, as is no rows). */
 function valueOf(rows: Row[], calc: CalcKind, y: PropChoice | null, ctx: GroupCtx): number {
-  if (calc === 'countAll' || !y) return rows.length
+  if (calc === 'countAll' || !y || rows.length === 0) return rows.length
   const r = calculate(rows, y.key, calc, ctx, y.structureId)
   return typeof r.value === 'number' && Number.isFinite(r.value) ? r.value : 0
 }
@@ -295,17 +295,30 @@ export function buildChartData(rows: Row[], config: ChartViewConfig, viewTypes: 
   if (!config.hideEmptyGroups && DATE_KINDS.has(x.kind)) groups = fillDateGaps(groups, config.xDateBucket)
 
   let series: ChartSeries[]
-  let members: Set<Row>[] | null = null
+  // Each row's series (a row with several values is in several), indexed once: a category's rows
+  // are then dealt into its series in one pass, not filtered once per series.
+  let seriesOf: Map<Row, number[]> | null = null
   if (splitBy) {
     const split = groupRows(rows, { groups: [entryFor(splitBy, config.xDateBucket)] }, { groups: [] }, ctx).groups.filter((g) => g.rows.length > 0)
     series = split.map((g, i) => ({ id: g.id, label: g.label, color: colorOfGroup(g, splitBy, i), group: g }))
-    members = split.map((g) => new Set(g.rows))
+    seriesOf = new Map()
+    split.forEach((g, si) => {
+      for (const r of g.rows) {
+        const list = seriesOf!.get(r)
+        if (list) list.push(si)
+        else seriesOf!.set(r, [si])
+      }
+    })
   } else {
     series = [{ id: 'all', label: yLabelOf(calc, y), color: paletteColor(0) }]
   }
 
   let categories: ChartCategory[] = groups.map((g, i) => {
-    const seriesRows = members ? members.map((m) => g.rows.filter((r) => m.has(r))) : [g.rows]
+    let seriesRows: Row[][] = [g.rows]
+    if (seriesOf) {
+      seriesRows = series.map(() => [])
+      for (const r of g.rows) for (const si of seriesOf.get(r) ?? []) seriesRows[si].push(r)
+    }
     const values = seriesRows.map((rs) => valueOf(rs, calc, y, ctx))
     return {
       id: g.id,
@@ -435,8 +448,25 @@ export function addFilters(group: FilterGroup, added: Filter[]): FilterGroup {
   return { type: 'filterGroup', operator: 'and', elements: group.elements.length ? [group, ...added] : added }
 }
 
-/** The view turned into a table showing one category (and series): one state, or null when it can't be a filter. */
-export function tableStateFor(state: ViewState, data: ChartData, category: ChartCategory, seriesIndex: number | null, ctx: GroupCtx): ViewState | null {
+/** The rows a pick of `category` (and series) lists. */
+export function pickedRows(data: ChartData, category: ChartCategory, seriesIndex: number | null): Row[] {
+  return seriesIndex !== null && data.split ? (category.seriesRows[seriesIndex] ?? []) : data.split ? category.group.rows : category.seriesRows[0]
+}
+
+/**
+ * The view turned into a table showing one category (and series): one state, or null when it
+ * can't be a filter. With `flat` (the view's rows), also null when the added filters wouldn't keep
+ * exactly the picked rows (texts group trimmed and by case but "is" matches any case; a label
+ * outside the option set is in "Other" but not empty): run on the click, as it filters every row.
+ */
+export function tableStateFor(
+  state: ViewState,
+  data: ChartData,
+  category: ChartCategory,
+  seriesIndex: number | null,
+  ctx: GroupCtx,
+  flat?: Row[],
+): ViewState | null {
   const bucket = chartConfigOf(state.viewDefinition).xDateBucket
   const fx = filtersForGroup(data.x, category.group, bucket, ctx)
   if (!fx) return null
@@ -447,6 +477,11 @@ export function tableStateFor(state: ViewState, data: ChartData, category: Chart
     if (!fsplit) return null
     // Don't repeat the type filter both sides add.
     fs = [...fx, ...fsplit.filter((f) => !fx.some((g) => JSON.stringify(g) === JSON.stringify(f)))]
+  }
+  if (flat) {
+    const kept = applyFilters(flat, { type: 'filterGroup', operator: 'and', elements: fs }, ctx)
+    const want = new Set(pickedRows(data, category, seriesIndex))
+    if (kept.length !== want.size || kept.some((r) => !want.has(r))) return null
   }
   return {
     ...state,

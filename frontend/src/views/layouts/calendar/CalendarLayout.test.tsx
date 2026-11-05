@@ -241,6 +241,15 @@ describe('CalendarLayout writes', () => {
     expect(screen.getByTestId('calendar-chip').getAttribute('data-draggable')).toBe('false')
   })
 
+  test('a draggable chip does not announce a keyboard pick-up it has no sensor for', () => {
+    render(<Harness rows={[mk('A', { due: day('2026-11-10') })]} />)
+    const chip = screen.getByTestId('calendar-chip')
+    expect(chip.getAttribute('data-draggable')).toBe('true')
+    expect(chip.hasAttribute('aria-describedby')).toBe(false)
+    expect(chip.hasAttribute('aria-roledescription')).toBe(false)
+    expect(chip.tagName).toBe('BUTTON')
+  })
+
   test('a read-only row is not draggable', () => {
     render(<Harness rows={[mk('A', { due: day('2026-11-10') }, { readOnly: true })]} />)
     expect(screen.getByTestId('calendar-chip').getAttribute('data-draggable')).toBe('false')

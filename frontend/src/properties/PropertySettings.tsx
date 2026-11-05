@@ -468,13 +468,19 @@ function RelationSection({
 
   const linked = types.find((t) => t.id === saved.allowedTypes[0])
   const syncedId = def.options.propertySyncing?.propertyIds?.[0] ?? null
+  // The synced partner is always listed: a relation pair (M13 "Parent item" and "Sub-items") links
+  // a single-select property with a list, which the rules below would otherwise hide.
   const eligible = (linked?.propertyDefinitions ?? []).filter(
     (p) =>
-      p.type === 'entity' &&
-      p.options.isArray !== false &&
-      !p.options.hasFixedSet &&
-      (p.options.allowedTypes ?? []).includes(type.id),
+      p.id === syncedId ||
+      (p.type === 'entity' &&
+        p.options.isArray !== false &&
+        !p.options.hasFixedSet &&
+        (p.options.allowedTypes ?? []).includes(type.id)),
   )
+  // A single-select (or fixed-set) property that is already synced (the pair's "Parent item")
+  // shows its partner and "No Property" only: it can't be linked anew.
+  const singleSided = !saved.isArray || saved.hasFixedSet
 
   return (
     <>
@@ -573,21 +579,23 @@ function RelationSection({
       <Section title="Two-way linking" description={TEXT.syncExplanation}>
         {!linked || linked.basic || type.basic ? (
           <p className="text-[13px] text-fg-muted">{TEXT.notAllowed}</p>
-        ) : !saved.isArray || saved.hasFixedSet ? (
+        ) : singleSided && syncedId === null ? (
           <p className="text-[13px] text-fg-muted">{TEXT.multiSelectOnly}</p>
         ) : (
           <div className="flex flex-col items-start gap-1">
             <Choice selected={syncedId === null} onClick={() => syncedId !== null && void editor.setSync(def.id, null)}>
               No Property
             </Choice>
-            {eligible.map((p) => (
+            {(singleSided ? eligible.filter((p) => p.id === syncedId) : eligible).map((p) => (
               <Choice key={p.id} selected={syncedId === p.id} onClick={() => syncedId !== p.id && void editor.setSync(def.id, p.id)}>
                 {p.name}
               </Choice>
             ))}
-            <Choice selected={false} onClick={() => void editor.setSync(def.id, null, type.name)}>
-              {`Create property "${type.name}" for "${linked.pluralName}"`}
-            </Choice>
+            {!singleSided && (
+              <Choice selected={false} onClick={() => void editor.setSync(def.id, null, type.name)}>
+                {`Create property "${type.name}" for "${linked.pluralName}"`}
+              </Choice>
+            )}
           </div>
         )}
       </Section>

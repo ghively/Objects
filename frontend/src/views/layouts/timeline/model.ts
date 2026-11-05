@@ -3,7 +3,8 @@
 // texts or day numbers (days since 1970-01-01, UTC arithmetic, so DST never moves a day).
 import type { DataViewDefinition, DateValue, EntityRef, PropertyType, Row, TimelineViewConfig, TimelineZoom, TypeDef } from '@/api/types'
 import { addDays, isDay } from '@/calendar/dates'
-import { fromWallClock, wallClock } from '@/lib/zonedTime'
+import { zonedWallToInstant } from '@/lib/zonedShell'
+import { zonedParts } from '@/lib/zonedTime'
 import { dayOfInstant } from '../../dates'
 import { findDef, rowValue } from '../../filter'
 import { propertyChoices, type PropChoice } from '../../properties'
@@ -213,14 +214,43 @@ export interface Axis {
   bottom: HeaderCell[]
 }
 
-/** The axis around the bars (and today), padded and snapped to the header's top unit. */
-export function buildAxis(zoom: TimelineZoom, spans: Iterable<BarSpan>, today: number): Axis {
-  let lo = today
-  let hi = today
-  for (const s of spans) {
+/** Years the axis reaches each side of its middle (our choice): a typo date such as year 0202 or 20260 can't stretch it. */
+export const AXIS_YEARS = 10
+const WINDOW_DAYS = Math.round(AXIS_YEARS * 365.25)
+
+/**
+ * The days the axis may cover: `AXIS_YEARS` years each side of the bars' middle start (the median
+ * of their starts and today, so a few typo dates don't move it). A bar outside it is an outlier
+ * (the layout lists it in the tray instead).
+ */
+export function axisWindow(spans: Iterable<BarSpan>, today: number): { lo: number; hi: number } {
+  // Today counts as one more start: it settles a tie (one item near today, one far off).
+  const starts: number[] = [today]
+  for (const s of spans) starts.push(s.start)
+  starts.sort((a, b) => a - b)
+  const mid = starts[Math.floor(starts.length / 2)]
+  return { lo: mid - WINDOW_DAYS, hi: mid + WINDOW_DAYS }
+}
+
+/** Whether a bar sits inside the window. */
+export const inWindow = (span: BarSpan, w: { lo: number; hi: number }): boolean => span.start >= w.lo && span.end <= w.hi
+
+/**
+ * The axis around the bars (and today, when it is in the window), padded and snapped to the
+ * header's top unit. Bars outside the window (`window`, else `axisWindow` of the bars) are left out.
+ */
+export function buildAxis(zoom: TimelineZoom, spans: Iterable<BarSpan>, today: number, window?: { lo: number; hi: number }): Axis {
+  const list = [...spans]
+  const w = window ?? axisWindow(list, today)
+  let lo = Number.POSITIVE_INFINITY
+  let hi = Number.NEGATIVE_INFINITY
+  if (today >= w.lo && today <= w.hi) lo = hi = today
+  for (const s of list) {
+    if (!inWindow(s, w)) continue
     if (s.start < lo) lo = s.start
     if (s.end > hi) hi = s.end
   }
+  if (lo > hi) lo = hi = Math.min(Math.max(today, w.lo), w.hi)
   const px = DAY_PX[zoom]
   const [topUnit, bottomUnit] = HEADER_UNITS[zoom]
   const start = unitStart(topUnit, lo - PAD_DAYS[zoom])
@@ -260,22 +290,37 @@ export function dragSpan(span: BarSpan, mode: DragMode, delta: number): BarSpan 
   }
 }
 
-/** A date value's point moved by `days` days: a day stays a day, a time keeps its time of day. */
+/** A date value's point moved by `days` days: a day stays a day, a time keeps its time of day (in the time-zone setting). */
 export function shiftPoint(point: string, resolution: DateValue['resolution'], days: number): string {
   if (days === 0) return point
   if (resolution !== 'time') return addDays(point.slice(0, 10), days)
+  // The same wall-clock time `days` calendar days on, in the time-zone setting (as the calendar's
+  // `shiftDateValue`): day arithmetic on the zone's date, so the browser's own DST never moves it.
   const d = new Date(point)
   if (Number.isNaN(d.getTime())) return point
-  const w = wallClock(d)
-  w.setDate(w.getDate() + days)
-  return fromWallClock(w).toISOString()
+  const p = zonedParts(d)
+  return zonedWallToInstant(addDays(p.date, days), p.hour, p.minute, p.second, d.getUTCMilliseconds()).toISOString()
 }
 
 const sameValue = (a: DateValue | null, b: DateValue) => !!a && a.start === b.start && (a.end ?? null) === (b.end ?? null) && a.resolution === b.resolution
 
+/** A shifted end point that never falls before its start (a time range shrunk past its start's time). */
+function endNotBefore(start: string, end: string, res: 'day' | 'time'): string {
+  if (res === 'day') return end.slice(0, 10) < start.slice(0, 10) ? start : end
+  const a = new Date(start).getTime()
+  const b = new Date(end).getTime()
+  return !Number.isNaN(a) && !Number.isNaN(b) && b < a ? start : end
+}
+
 /**
- * The property values a drag from `from` to `to` writes (only the keys that change). Without an
- * end property, the start property's own range carries the end: a one-day result drops it.
+ * The property values a drag from `from` to `to` writes (only the keys that change).
+ *
+ * Without an end property, the start property's own range carries the end: an existing end is
+ * always moved (so a time range keeps its end time, even within one day); only a day range whose
+ * end falls on its start day drops it; a one-day value made longer gains one.
+ *
+ * With an end property, each edge writes its own property. The end property is written only when
+ * it has a value, except on an end-edge drag (the start stays), which creates it.
  */
 export function dragUpdates(row: Row, startKey: string, endKey: string | null, from: BarSpan, to: BarSpan): Record<string, DateValue> {
   const out: Record<string, DateValue> = {}
@@ -286,9 +331,14 @@ export function dragUpdates(row: Row, startKey: string, endKey: string | null, f
   const res = sv.resolution === 'time' ? 'time' : 'day'
   if (!endKey) {
     const start = shiftPoint(sv.start, res, dStart)
-    // The end: the value's own end moved, or (a one-day bar made longer) a new one.
     let end: string | null = null
-    if (to.end !== to.start) end = sv.end ? shiftPoint(sv.end, res, dEnd) : res === 'time' ? shiftPoint(sv.start, res, to.end - from.start) : dayText(to.end)
+    if (sv.end) {
+      end = endNotBefore(start, shiftPoint(sv.end, res, dEnd), res)
+      if (res === 'day' && end.slice(0, 10) === start.slice(0, 10)) end = null
+    } else if (to.end !== to.start) {
+      // A one-day bar made longer: a new end (a time keeps the start's time of day).
+      end = res === 'time' ? shiftPoint(sv.start, res, to.end - from.start) : dayText(to.end)
+    }
     const next: DateValue = { start, ...(end ? { end } : {}), resolution: sv.resolution }
     if (!sameValue(sv, next)) out[startKey] = next
     return out
@@ -310,8 +360,8 @@ export function dragUpdates(row: Row, startKey: string, endKey: string | null, f
         ...(ev.end ? { end: shiftPoint(ev.end, eres, dEnd) } : {}),
         resolution: ev.resolution,
       }
-    } else {
-      // No end value yet (the bar ended on its start day): the new end day.
+    } else if (dStart === 0) {
+      // An end-edge drag on a bar without an end value (it ended on its start day): the new end day.
       out[endKey] = { start: dayText(to.end), resolution: 'day' }
     }
   }

@@ -454,6 +454,7 @@ export function CollectionPage({ id }: { id: string }) {
           state={multiType && views.all.viewDefinition.dataViewLayout === 'table' ? { ...views.all, viewDefinition: { ...views.all.viewDefinition, dataViewLayout: 'list' } } : views.all}
           onState={(s) => update((v) => ({ ...v, all: s }))}
           layouts={layouts}
+          viewName={c.name}
           allowCreate
           onCreate={(values, typeId) => create(typeId, {}, values)}
           rowMenu={rowMenu}

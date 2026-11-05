@@ -305,6 +305,7 @@ function AllTab({
       state={views.all}
       onState={(s) => update((v) => ({ ...v, all: s }))}
       layouts={FULL_VIEW_LAYOUTS}
+      viewName={type.pluralName}
       allowCreate
       onCreate={(values, typeId) =>
         void createAndOpen(typeId, { values }).catch((e: unknown) => console.warn('Could not create an object:', e))
