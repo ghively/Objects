@@ -5,6 +5,8 @@
  * as "A folder with that name already exists here."). M8: "How do you want to start?" picks
  * "Start with basic setup" (the server also writes the Person, Meeting, Project and Book types)
  * or "Start with a blank space" (nothing else is created; the default, our choice).
+ * M15: "Import from…" below the choices closes this dialog and opens the import dialog with the
+ * name and location typed here (the import makes the new space itself).
  */
 import { useEffect, useState, type FormEvent } from 'react'
 import { create } from 'zustand'
@@ -13,6 +15,7 @@ import type { SpaceSetup } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useImportDialog } from '@/import/useImportDialog'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { switchSpace } from './switchSpace'
 
@@ -34,6 +37,8 @@ export const CREATE_SPACE_TEXT = {
   basicDescription: 'Includes people, meetings, projects, and books.',
   blankLabel: 'Start with a blank space',
   blankDescription: 'Add object types when you need them.',
+  importFrom: 'Import from…', // our string
+  importDescription: 'Make the new space from a Notion, Obsidian or Anytype export.', // our string
 } as const
 
 const T = CREATE_SPACE_TEXT
@@ -192,6 +197,24 @@ export function CreateSpaceDialog() {
                 </label>
               ))}
             </fieldset>
+            <button
+              type="button"
+              onClick={() => {
+                close()
+                useImportDialog.getState().open({ name: trimmed || undefined, location: location.trim() || undefined })
+              }}
+              aria-label={T.importFrom}
+              aria-describedby="space-import-description"
+              className="flex items-start gap-2.5 rounded-lg border border-dashed border-line p-2.5 text-left hover:bg-hover"
+            >
+              <Icon name="ph-download-simple" size={18} className="mt-0.5 shrink-0 text-fg-muted" />
+              <span className="min-w-0">
+                <span className="block text-[14px] font-semibold">{T.importFrom}</span>
+                <span id="space-import-description" className="block text-[13px] text-fg-muted">
+                  {T.importDescription}
+                </span>
+              </span>
+            </button>
             <aside aria-label={T.explainHeading} className="flex gap-2 rounded-lg bg-hover/60 p-3 text-[13px]">
               <Icon name="ph-lightbulb" size={16} />
               <div>

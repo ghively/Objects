@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { APPEARANCE_SEARCH, APPEARANCE_TEXT, AppearanceSection } from './sections/Appearance'
 import { DATE_TIME_SEARCH, DATE_TIME_TEXT, DateTimeSection } from './sections/DateTime'
 import { EDITOR_SEARCH, EDITOR_TEXT, EditorSection } from './sections/Editor'
+import { IMPORT_CONTENT_SEARCH, IMPORT_CONTENT_TEXT, ImportContentSection } from './sections/ImportContent'
 import { LANGUAGE_SEARCH, LANGUAGE_TEXT, LanguageSection } from './sections/Language'
 import { NOTIFICATIONS_SEARCH, NOTIFICATIONS_TEXT, NotificationsSection } from './sections/Notifications'
 import { OFFLINE_SYNC_SEARCH, OFFLINE_SYNC_TEXT, OfflineSyncSection } from './sections/OfflineSync'
@@ -50,6 +51,14 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     icon: 'ph-arrows-clockwise',
     search: OFFLINE_SYNC_SEARCH,
     Component: OfflineSyncSection,
+  },
+  {
+    id: 'importContent',
+    group: 'general',
+    label: IMPORT_CONTENT_TEXT.heading,
+    icon: 'ph-download-simple',
+    search: IMPORT_CONTENT_SEARCH,
+    Component: ImportContentSection,
   },
   {
     id: 'notifications',

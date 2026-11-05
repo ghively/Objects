@@ -9,6 +9,7 @@ export type SettingsSectionId =
   | 'dateTime'
   | 'language'
   | 'offlineSync'
+  | 'importContent'
   | 'notifications'
   | 'space'
   | 'objectTypes'
