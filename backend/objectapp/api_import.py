@@ -3,7 +3,9 @@
 - ``POST /api/import/preview`` `PreviewRequest` -> `ImportPreview`: reads the zip or folder at
   ``source.path`` into an `ImportPlan` and answers the dry run; writes nothing anywhere.
   ``404`` no such file or folder, ``415`` neither a ``.zip`` nor a folder, ``413`` over the
-  limits, ``422`` a bad mapping.
+  limits, ``422`` a bad mapping. The latest read is kept for 30 minutes (our choice): sent
+  again with the same path and kind while the source's fingerprint is unchanged, the preview
+  re-plans without reading the source again.
 - ``POST /api/import/start`` `StartImportRequest` -> ``202`` `StartImportResponse`: checks the
   target (``409`` the new space's folder exists, another import runs or the source changed since
   the preview; ``422`` bad name, a target inside the source or the source inside the target;
@@ -11,44 +13,208 @@
 - ``GET /api/import/jobs/{id}`` -> `ImportJob` (``404``).
 - ``POST /api/import/jobs/{id}/cancel`` -> ``{ok}``: stops after the file being written (``404``).
 
-T1 scaffolding: every route answers ``501`` until Lane B builds it.
+A new space is made with `create_space(name, location, 'blank')` and written through a second,
+unserved `Space` (no watcher, no search index); it is registered (``touch=False``) once the job
+ends. Importing into the open space writes through ``ctx.space``, announces each new type and
+object and reindexes search when done.
 """
 
 from __future__ import annotations
+
+import os
+import secrets
+import threading
+import time
+from dataclasses import dataclass
+from pathlib import Path
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from .apictx import ApiContext
-from .importers.model import PreviewRequest, StartImportRequest
+from .appstate import state_dir
+from .importers.detect import read_source
+from .importers.jobs import Busy, JobHandle, Jobs
+from .importers.model import ImportResult, PreviewRequest, StartImportRequest
+from .importers.planner import MappingProblem, Target, plan, to_preview
+from .importers.readmodel import ReadResult
+from .importers.source import LimitExceeded, NotASource, SourceMissing, open_source
+from .importers.writer import WriteState, write_import
+from .space import Space, safe_filename
+from .spaceconfig import MAX_NAME_LENGTH
+from .spaces import Registry, create_space, normalize
 
-__all__ = ["NOT_BUILT", "router"]
+__all__ = ["READ_TTL", "router"]
 
-NOT_BUILT = "Import is not built yet."
+READ_TTL = 30 * 60.0
 
 
-def _not_built() -> JSONResponse:
-    return JSONResponse({"detail": NOT_BUILT}, status_code=501)
+def _error(status: int, detail: str) -> JSONResponse:
+    return JSONResponse({"detail": detail}, status_code=status)
+
+
+@dataclass
+class _Cached:
+    key: tuple[str, str, str]
+    """(source path, requested kind, fingerprint)."""
+    read: ReadResult
+    at: float
+    previews: set[str]
+
+
+def _within(child: Path, parent: Path) -> bool:
+    c, p = os.path.normcase(str(child)), os.path.normcase(str(parent))
+    return c == p or c.startswith(p.rstrip(os.sep) + os.sep)
 
 
 def router(ctx: ApiContext) -> APIRouter:
     """The import routes, mounted on the app's ``/api`` router (so no prefix here)."""
     r = APIRouter()
+    lock = threading.Lock()
+    cache: dict[str, _Cached] = {}  # "latest" -> the one read kept
+    jobs = Jobs()
+    r.jobs = jobs  # type: ignore[attr-defined]  (tests reach the job list)
+
+    def latest() -> _Cached | None:
+        c = cache.get("latest")
+        if c is not None and time.monotonic() - c.at > READ_TTL:
+            cache.pop("latest", None)
+            return None
+        return c
 
     @r.post("/import/preview")
     def post_preview(req: PreviewRequest):
-        return _not_built()
+        try:
+            src = open_source(req.source.path)
+        except SourceMissing:
+            return _error(404, "There is no file or folder at this path.")
+        except NotASource as exc:
+            return _error(415, str(exc))
+        except LimitExceeded as exc:
+            return _error(413, str(exc))
+        try:
+            key = (str(src.path), req.source.kind, src.fingerprint)
+            with lock:
+                c = latest()
+            if c is None or c.key != key:
+                try:
+                    read = read_source(src, req.source.kind)
+                except LimitExceeded as exc:
+                    return _error(413, str(exc))
+                c = _Cached(key, read, time.monotonic(), set())
+        finally:
+            src.close()
+        target = Target("currentSpace", ctx.space) if req.target == "currentSpace" else Target("newSpace")
+        try:
+            planned = plan(c.read, req.mapping, target)
+        except MappingProblem as exc:
+            return _error(422, str(exc))
+        preview_id = secrets.token_hex(8)
+        with lock:
+            cache["latest"] = c
+            c.at = time.monotonic()
+            c.previews.add(preview_id)
+        return to_preview(planned, preview_id).model_dump()
 
     @r.post("/import/start", status_code=202)
     def post_start(req: StartImportRequest):
-        return _not_built()
+        with lock:
+            c = latest()
+            if c is None or req.previewId not in c.previews:
+                return _error(404, "This preview has expired. Preview the source again.")
+            read = c.read
+        if jobs.running():
+            return _error(409, "Another import is running.")
+        source = Path(read.sourcePath)
+        source_folder = source if read.container == "folder" else source.parent
+        if req.target.kind == "newSpace":
+            name = req.target.name.strip()
+            if not name:
+                return _error(422, "A space needs a name.")
+            if len(name) > MAX_NAME_LENGTH:
+                return _error(422, f"A space name can have at most {MAX_NAME_LENGTH} characters.")
+            try:
+                location = normalize(req.target.location)
+            except (ValueError, OSError):
+                return _error(404, "Not a folder.")
+            if not location.is_dir():
+                return _error(404, f"Not a folder: {location}")
+            target_path = location / safe_filename(name)
+            if target_path.exists():
+                return _error(409, "A file or folder with this name already exists there.")
+            if read.container == "folder" and _within(target_path, source):
+                return _error(422, "The new space can't be inside the folder being imported.")
+            target = Target("newSpace")
+        else:
+            target_path = ctx.space.root
+            if _within(source, target_path) or (read.container == "folder" and _within(target_path, source_folder)):
+                return _error(422, "A source inside this space can't be imported into it.")
+            target = Target("currentSpace", ctx.space)
+        # The source must still be what was previewed.
+        try:
+            with open_source(read.sourcePath) as src:
+                fingerprint = src.fingerprint
+        except (SourceMissing, NotASource, LimitExceeded):
+            fingerprint = ""
+        if fingerprint != read.fingerprint:
+            return _error(409, "The source changed since the preview. Preview it again.")
+        try:
+            planned = plan(read, req.mapping, target)
+        except MappingProblem as exc:
+            return _error(422, str(exc))
+        try:
+            handle = jobs.reserve(str(target_path))
+        except Busy as exc:
+            return _error(409, str(exc))
+
+        if req.target.kind == "newSpace":
+            space_name, where = req.target.name.strip(), str(location)
+
+            def work(h: JobHandle) -> ImportResult:
+                folder = create_space(space_name, where, "blank")
+                try:
+                    state = WriteState(progress=h.progress, cancelled=h.cancelled)
+                    result = write_import(planned, Space(folder), state)
+                finally:
+                    try:
+                        Registry(state_dir()).register(folder, touch=False)
+                    except OSError:
+                        pass
+                if state.stopped and not result.cancelled:
+                    h.job.error = f"The import stopped: {state.stopped}."
+                return result
+
+        else:
+
+            def work(h: JobHandle) -> ImportResult:
+                state = WriteState(
+                    progress=h.progress, cancelled=h.cancelled, announce=ctx.announce, client_id=req.clientId
+                )
+                try:
+                    result = write_import(planned, ctx.space, state)
+                finally:
+                    try:
+                        ctx.search.reindex()
+                    except Exception:  # noqa: BLE001 - search catches up on its own
+                        pass
+                if state.stopped and not result.cancelled:
+                    h.job.error = f"The import stopped: {state.stopped}."
+                return result
+
+        jobs.run(handle, work)
+        return {"jobId": handle.job.id, "targetPath": str(target_path)}
 
     @r.get("/import/jobs/{job_id}")
     def get_job(job_id: str):
-        return _not_built()
+        job = jobs.get(job_id)
+        if job is None:
+            return _error(404, "No such import.")
+        return job.model_dump()
 
     @r.post("/import/jobs/{job_id}/cancel")
     def post_cancel(job_id: str):
-        return _not_built()
+        if not jobs.cancel(job_id):
+            return _error(404, "No such import.")
+        return {"ok": True}
 
     return r
