@@ -409,6 +409,16 @@ const RESYNC_EVENTS: readonly ChangeEvent[] = [
   { kind: 'queries', path: RESYNC_PATH, version: null, origin: null },
 ]
 
+/**
+ * Announce to this window that every object and type may have changed: the same `types` resync a
+ * reconnect sends (and the server sends when an import into the open space ends, M15 review
+ * finding 2). The import dialog calls it when its job ends into this space, so this window reloads
+ * its index and types even if it missed the server's event.
+ */
+export function announceResync(): void {
+  emitLocal([{ kind: 'types', path: RESYNC_PATH, version: null, origin: null }])
+}
+
 /** Whether `e` is the synthetic "everything of `kind` may have changed" event sent after a reconnect. */
 export function isResync(e: ChangeEvent, kind: ChangeKind): boolean {
   return e.kind === kind && e.path === RESYNC_PATH
@@ -1142,12 +1152,14 @@ export const api = {
   /**
    * Start writing a previewed import (202). 409 (`ApiError`) the new space's folder exists, another
    * import runs or the source changed since the preview; 422 bad name or a target inside the
-   * source; 404 unknown or expired preview, or the location is not a folder.
+   * source; 404 unknown or expired preview, or the location is not a folder. No `clientId`: the
+   * server announces an import's end as one resync from no window (review finding 2), and the
+   * dialog announces it to this window itself (`announceResync`).
    */
   startImport(req: StartImportRequest): Promise<StartImportResponse> {
     return request<StartImportResponse>(
       '/import/start',
-      json('POST', { ...req, clientId: CLIENT_ID }),
+      json('POST', req),
       (d) => new ApiError(409, typeof d.detail === 'string' ? d.detail : 'conflict'),
     )
   },
