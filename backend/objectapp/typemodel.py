@@ -94,6 +94,13 @@ PROPERTY_ICONS = {
     "simpleTableBlock": "ph-table",
     "coverImage": "ph-image",
     "color": "ph-palette",
+    # M12: our kinds (docs/superpowers/plans/2026-11-05-m12-property-kinds.md)
+    "formula": "ph-function",
+    "rollup": "ph-stack",
+    "uniqueId": "ph-hash-straight",
+    "email": "ph-at",
+    "phone": "ph-phone",
+    "files": "ph-paperclip",
     "entity_title": "ph-text-t",
     "entity_icon": "ph-smiley",
     "entity_description": "ph-info",
@@ -410,6 +417,15 @@ def _default_options(kind: str, is_array: bool | None) -> dict[str, Any]:
     if kind == "entity_tags":
         return {"isArray": True, "allowedTypes": ["tag"]}
     if kind == "entity_aliases":
+        return {"isArray": True}
+    # M12: our kinds
+    if kind == "formula":
+        return {"expression": ""}
+    if kind == "rollup":
+        return {"relationId": "", "targetId": "", "calc": "showOriginal"}
+    if kind == "uniqueId":
+        return {"prefix": "", "nextNumber": 1}
+    if kind == "files":
         return {"isArray": True}
     if is_array:
         return {"isArray": True}

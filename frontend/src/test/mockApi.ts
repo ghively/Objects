@@ -32,6 +32,19 @@ import type {
 } from '@/api/types'
 import { settingsDefaults } from '@/settings/defaults'
 
+/** The MCP config the token routes answer, with `secret` as the token. */
+export function mcpConfig(secret: string) {
+  return {
+    mcpServers: {
+      object: {
+        command: 'uv',
+        args: ['run', '--directory', '/repo', 'objectapp-mcp'],
+        env: { OBJECT_API_URL: 'http://127.0.0.1:8790', OBJECT_API_TOKEN: secret },
+      },
+    },
+  }
+}
+
 /** A v2 type with every contract field; `partial` overrides. */
 export function typeDef(partial: Partial<TypeDef> & Pick<TypeDef, 'id'>): TypeDef {
   const name = partial.name ?? partial.id.charAt(0).toUpperCase() + partial.id.slice(1)
@@ -321,6 +334,13 @@ function defaults(): Api {
       secondId: 'p-second',
       created: true,
     }),
+    formulaPreview: async () => ({ value: null, error: null }),
+    numberExistingObjects: async (typeId: string) => ({
+      type: typeDef({ id: typeId }),
+      numbered: 0,
+      rewritten: [],
+      skipped: [],
+    }),
     deleteType: async () => ({ trashId: 'trash-type-1' }),
     templates: async () => [],
     createTemplate: async (typeId: string, name?: string) => ({
@@ -353,6 +373,20 @@ function defaults(): Api {
     }),
     search: async () => ({ results: [], partial: false }),
     reindex: async () => ({ started: true }),
+    aiStatus: async () => ({ available: true, reason: 'ok' as const, claudePath: '/usr/bin/claude', version: '2.0.0', message: null }),
+    aiChat: async (_req: unknown, onEvent: (e: import('@/api/types').AiEvent) => void) => {
+      onEvent({ type: 'text', text: 'Hello' })
+      onEvent({ type: 'done', text: 'Hello', sessionId: 's1', proposal: null, skipped: [] })
+    },
+    aiChatLoad: async (path: string) => ({ path, version: 'v1', title: 'Chat', contextPaths: [], sessionId: null, messages: [] }),
+    saveAiChat: async (req: { path?: string | null }) => ({ path: req.path ?? 'AI Chats/Chat.md', version: 'v1' }),
+    apiTokens: async () => ({ tokens: [], mcp: mcpConfig('<token>') }),
+    createApiToken: async (name: string, scope: 'read' | 'read-write') => ({
+      token: { id: 'tok1', name, scope, createdAt: '2026-11-05T12:00:00.000Z', lastUsedAt: null },
+      secret: 'obj_secret',
+      mcpConfig: mcpConfig('obj_secret'),
+    }),
+    revokeApiToken: async (id: string) => ({ revoked: id }),
     references: async () => references(),
     linkMention: async (input: { baseVersion: string }) => ({ version: `${input.baseVersion}+1` }),
     graph: async () => graphData(),

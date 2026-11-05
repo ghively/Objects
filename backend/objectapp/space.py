@@ -28,6 +28,7 @@ import random
 import re
 import shutil
 import threading
+import time
 from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
@@ -72,6 +73,7 @@ from .localtime import SystemTz, from_local, to_local
 from .queries import DEFAULT_NAME as DEFAULT_QUERY_NAME
 from .queries import LIMIT_SIZES, MAX_SEARCH_TERMS, QueryDef, query_type_ids
 from .objfile import ObjectFile, join_object, split_object
+from .computed import COMPUTED_KINDS, check_type, rename_in_formulas
 from .rows import member_of
 from .propvalues import (
     KIND_TRANSFORMS,
@@ -169,8 +171,10 @@ _WHITEBOARD_TYPE_ID = "whiteboard"  # whiteboardstore.WHITEBOARD_TYPE_ID (it imp
 _NOT_COPIED = frozenset({"template", "id", "type", "title", "createdAt", "lastUpdated", "iconColor"})
 _NOT_COPIED_KINDS = frozenset(
     {"entity_title", "entity_type", "entity_createdAt", "entity_lastUpdated",
-     "entity_collections", "entity_backlinks"}
+     "entity_collections", "entity_backlinks", "formula", "rollup", "uniqueId"}
 )  # fmt: skip
+# M12: kinds never written through the property routes (computed, or numbered by the app).
+_READ_ONLY_VALUE_KINDS = frozenset({"formula", "rollup", "uniqueId"})
 # M9 duplicate: the roles that can't be duplicated that
 # our types can have (see `roles.py`), and the refusal (our string).
 _NOT_DUPLICATED_ROLES = frozenset(
@@ -515,6 +519,42 @@ class SaveTypeResult:
             "rewritten": list(self.rewritten),
             "skipped": [{"path": s.path, "reason": s.reason} for s in self.skipped],
         }
+
+
+@dataclass
+class NumberExistingResult:
+    type: TypeDefinition
+    numbered: int
+    """How many objects got a number."""
+    rewritten: list[str]
+    """The objects numbered (unstamped rewrites)."""
+    skipped: list[Skip]
+    revision: str = ""
+
+    def to_api(self) -> dict[str, Any]:
+        """The route's response: ``{type, numbered, rewritten, skipped}`` (skipped: paths)."""
+        return {
+            "type": self.type.to_api(self.revision),
+            "numbered": self.numbered,
+            "rewritten": list(self.rewritten),
+            "skipped": [s.path for s in self.skipped],
+        }
+
+
+def _has_unique_ids(t: TypeDefinition | None) -> bool:
+    return t is not None and any(p.type == "uniqueId" for p in t.propertyDefinitions)
+
+
+def _positive_int(value: Any, default: int = 1) -> int:
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 1:
+        return value
+    return default
+
+
+def _id_value(p: PropertyDefinition, n: int) -> Any:
+    """What an ID property writes for number ``n``: ``TASK-12`` (text) or ``12`` (no prefix)."""
+    prefix = p.options.get("prefix")
+    return f"{prefix}{n}" if isinstance(prefix, str) and prefix else n
 
 
 def _skips_api(skipped: Iterable[Skip]) -> list[dict[str, str]]:
@@ -1628,6 +1668,141 @@ class Space:
             "skipped": [],
         }
 
+    # A type delete's saved queries (our choice): a query whose only type is the deleted one
+    # goes to the type's trash entry; one that names other types too, or excludes it, drops
+    # the id (the dropped entries are kept in the entry's manifest). A restore undoes both,
+    # so no live query points at a missing type and no types list empties (= every type).
+
+    _QUERY_TYPE_LISTS = ("structures", "excludeStructureIds")
+
+    @staticmethod
+    def _query_type_list(data: dict, key: str) -> list | None:
+        d = data.get("definition")
+        found = d.get(key) if isinstance(d, dict) else None
+        return found if isinstance(found, list) else None
+
+    @staticmethod
+    def _query_entry_id(entry: Any) -> Any:
+        """A ``structures`` entry's type id, or an ``excludeStructureIds`` item itself."""
+        return entry.get("id") if isinstance(entry, dict) else entry
+
+    def _queries_of_type(self, type_id: str) -> tuple[list[str], list[tuple[str, dict, str]]]:
+        """(ids of the readable queries of only `type_id`, (id, data, revision) of the others
+        naming it in ``structures`` or ``excludeStructureIds``)."""
+        only: list[str] = []
+        others: list[tuple[str, dict, str]] = []
+        for qid, data, rev, err in self.store("queries").list():
+            if data is None or err is not None:
+                continue  # an unreadable file is never rewritten or moved
+            structures = self._query_type_list(data, "structures") or []
+            excluded = self._query_type_list(data, "excludeStructureIds") or []
+            ids = [self._query_entry_id(s) for s in structures]
+            if ids and all(i == type_id for i in ids):
+                only.append(qid)
+            elif type_id in ids or type_id in excluded:
+                others.append((qid, data, rev))
+        return only, others
+
+    def _trash_type_queries(
+        self, type_id: str, folder: Path, moved: list[str], refs: list[dict[str, Any]]
+    ) -> None:
+        """`trash_type`'s query part: moves into ``folder/queries/``, drops the id elsewhere."""
+        store = self.store("queries")
+        only, others = self._queries_of_type(type_id)
+        for qid in only:
+            dest = folder / "queries" / f"{qid}.json"
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            rel = store.rel(qid)
+            previous = self.own_writes.get(rel)
+            self.own_writes[rel] = ""
+            try:
+                move_no_overwrite(store.path(qid), dest)
+            except OSError:
+                if previous is None:
+                    self.own_writes.pop(rel, None)
+                else:
+                    self.own_writes[rel] = previous
+                _log.exception("Could not move query %s to the trash with its type", qid)
+                continue
+            moved.append(qid)
+        for qid, data, rev in others:
+            changed = copy.deepcopy(data)
+            dropped: list[dict[str, Any]] = []
+            for key in self._QUERY_TYPE_LISTS:
+                items = self._query_type_list(changed, key)
+                if items is None:
+                    continue
+                kept = []
+                for index, entry in enumerate(items):
+                    if self._query_entry_id(entry) == type_id:
+                        dropped.append(
+                            {"queryId": qid, "list": key, "index": index, "entry": entry}
+                        )
+                    else:
+                        kept.append(entry)
+                changed["definition"][key] = kept
+            try:
+                store.write(qid, changed, rev)
+            except (RevisionConflict, ReadOnly, OSError):
+                _log.warning("Could not drop the deleted type %s from query %s", type_id, qid)
+                continue
+            refs.extend(dropped)
+
+    def _restore_type_queries(self, folder: Path, type_id: str, manifest: dict) -> list[str]:
+        """Put back a type trash entry's queries and dropped ids; return the query ids touched."""
+        store = self.store("queries")
+        out: list[str] = []
+        for qid in manifest.get("queries") or []:
+            src = folder / "queries" / f"{qid}.json" if isinstance(qid, str) else None
+            if src is None or not src.is_file():
+                continue
+            data = src.read_bytes()
+            try:
+                target = qid if not store.path(qid).exists() else ""
+            except ValueError:
+                target = ""
+            if not target:  # the id was taken meanwhile: never overwrite, use a new one
+                try:
+                    name = json.loads(data.decode("utf-8")).get("name")
+                except (ValueError, UnicodeDecodeError, AttributeError):
+                    name = None
+                usable = isinstance(name, str) and name.strip()
+                target = store.new_id(name if usable else DEFAULT_QUERY_NAME)
+            rel = store.rel(target)
+            self.own_writes[rel] = version_of(data)
+            try:
+                move_no_overwrite(src, store.path(target))
+            except BaseException:
+                self.own_writes.pop(rel, None)
+                raise
+            out.append(target)
+        for ref in manifest.get("queryRefs") or []:
+            qid, key = ref.get("queryId"), ref.get("list")
+            if not isinstance(qid, str) or key not in self._QUERY_TYPE_LISTS or "entry" not in ref:
+                continue
+            try:
+                data, rev = store.read(qid)
+            except (DefinitionUnreadable, ValueError):
+                continue
+            if data is None or not isinstance(data.get("definition"), dict):
+                continue  # deleted since: nothing to put the id back into
+            items = self._query_type_list(data, key)
+            if items is None:
+                items = data["definition"][key] = []
+            if any(self._query_entry_id(e) == type_id for e in items):
+                continue  # already there again (added back by hand)
+            index = ref.get("index")
+            index = index if isinstance(index, int) and 0 <= index <= len(items) else len(items)
+            items.insert(index, ref["entry"])
+            try:
+                store.write(qid, data, rev)
+            except (RevisionConflict, ReadOnly, OSError):
+                _log.warning("Could not put the restored type %s back into query %s", type_id, qid)
+                continue
+            if qid not in out:
+                out.append(qid)
+        return out
+
     def rows(
         self,
         type_ids: list[str] | None = None,
@@ -2083,6 +2258,10 @@ class Space:
             if key in _LOCKED_KEYS:
                 raise InvalidValue(f"{key!r} can't be changed as a property")
         t = self._type_of(rel)
+        for key in (*updates, *remove):
+            pdef = t.prop(key) if t is not None else None
+            if pdef is not None and pdef.type in _READ_ONLY_VALUE_KINDS:
+                raise InvalidValue(f"{pdef.name} can't be edited")
         before: dict = {}
         task: list[TaskResult | None] = [None]
         now = self.clock()  # one instant for `completed`, `lastUpdated` and "today"
@@ -3003,6 +3182,9 @@ class Space:
                     merge_collections=True,
                 ),
             )
+        ids = self._take_unique_ids(t)
+        if ids:
+            of = replace(of, frontmatter_src=set_keys(of.frontmatter_src or "", ids))
         data = join_object(of).encode("utf-8")
         version = version_of(data)
         with self._lock:
@@ -3053,12 +3235,15 @@ class Space:
                 or self._is_whiteboard(rel)
             ):
                 raise InvalidValue(_CANNOT_DUPLICATE)
+        # M12: a copy gets a new ID number (taken outside the lock: it may wait for a type save).
+        ids = self._take_unique_ids(t) if t is not None else {}
+        with self._lock:
             title = _title_of(raw)
             new_title = f"{title or 'Untitled'} (Copy)"
             stamp = now_stamp(instant)
             fm_src = set_keys(
                 raw.of.frontmatter_src or "",
-                {"title": new_title, "createdAt": stamp, "lastUpdated": stamp},
+                {"title": new_title, "createdAt": stamp, "lastUpdated": stamp, **ids},
                 insert_first={"id": new_ulid()},
             )
             body = raw.of.body
@@ -3082,6 +3267,92 @@ class Space:
         _of, fm, _v = self.read(new_rel)
         synced, _skipped = self._sync_relations(new_rel, t, {}, fm)
         return new_rel, version, synced
+
+    # -- M12: IDs -----------------------------------------------------------------
+
+    _ID_WAIT_SECONDS = 10.0
+
+    def _take_unique_ids(self, t: TypeDefinition) -> dict[str, Any]:
+        """The next number of each ID property of ``t`` (``{key: value}``), bumping ``nextNumber``.
+
+        The type JSON is written under the space lock, so two creates never share a number;
+        a create that comes while `save_type` is rewriting the type's objects waits for it
+        (outside the lock) so the save can't write an older ``nextNumber`` back. A number,
+        once taken, is never given again (even when the create then fails).
+        """
+        if not _has_unique_ids(t):
+            return {}
+        deadline = time.monotonic() + self._ID_WAIT_SECONDS
+        while True:
+            with self._lock:
+                if t.id not in self._types_saving:
+                    try:
+                        stored, current = self._editable_type(t.id)
+                    except (KeyError, TypeReadOnly):
+                        return {}  # an unreadable type file can't be bumped: no number
+                    values: dict[str, Any] = {}
+                    for p in stored.propertyDefinitions:
+                        if p.type != "uniqueId":
+                            continue
+                        n = _positive_int(p.options.get("nextNumber"))
+                        values[p.key] = _id_value(p, n)
+                        p.options["nextNumber"] = n + 1
+                    if values:
+                        self._commit_type(stored, current)
+                    return values
+            if time.monotonic() > deadline:
+                raise RevisionConflict(type_revision(self.root, t.id))
+            time.sleep(0.02)
+
+    def number_existing(self, type_id: str, pid: str, base_revision: str) -> NumberExistingResult:
+        """Give every object of the type without a value of ID property ``pid`` the next number.
+
+        Oldest ``createdAt`` first (then path); templates are left out. ``nextNumber`` is
+        bumped (written first, so a number is never given twice) and the objects are
+        rewritten unstamped. Raises `KeyError` (unknown type or property), `TypeReadOnly`,
+        `RevisionConflict` and `InvalidValue` (not an ID property).
+        """
+        with self._lock:
+            t, current = self._editable_type(type_id)
+            if current != (base_revision or ""):
+                raise RevisionConflict(current)
+            self._check_type_free(t.id, current)
+            p = next((x for x in t.propertyDefinitions if x.id == pid), None)
+            if p is None:
+                raise KeyError(pid)
+            if p.type != "uniqueId":
+                raise InvalidValue(f"{p.name} is not an ID property")
+            key = p.key
+            members = self._type_members(t.id, templates=False)
+
+            def missing(fm: dict) -> bool:
+                return fm.get(key) is None or str(fm.get(key)).strip() == ""
+
+            todo = [
+                self._raw[rel] for rel in members if rel in self._raw and missing(self._raw[rel].fm)
+            ]
+
+            def order(raw: RawObject) -> tuple:
+                created = _instant_or_none(raw.fm.get("createdAt"), self.tz)
+                return (created is None, created.timestamp() if created else 0.0, raw.path)
+
+            todo.sort(key=order)
+            n = _positive_int(p.options.get("nextNumber"))
+            numbers: dict[str, Any] = {}
+            for raw in todo:
+                numbers[raw.path] = _id_value(p, n)
+                n += 1
+            p.options["nextNumber"] = n
+            revision = self._commit_type(t, current) if numbers else current
+
+            def run(src: str, rel: str, fm: dict) -> str:
+                if not missing(fm) or rel not in numbers:
+                    return src
+                return set_keys(src, {key: numbers[rel]})
+
+            rewritten, skipped = self._apply_type_ops(list(numbers), run)
+            stored = self.type_by_id(t.id) or t
+            return NumberExistingResult(stored, len(rewritten), rewritten, skipped, revision)
 
     def _place(self, rel: str, data: bytes) -> bool:
         """Write a new file at ``rel`` unless something is there by then; True if written."""
@@ -3180,6 +3451,10 @@ class Space:
         if parsed is None or parsed != day.strip():
             raise InvalidValue(f"Not a day (YYYY-MM-DD): {day!r}")
         day = parsed
+        ids: dict[str, Any] = {}
+        pre = self.daily_note_type()
+        if pre is not None and _has_unique_ids(pre) and day not in self.daily_notes()[0]:
+            ids = self._take_unique_ids(pre)  # M12: before the lock (it may wait for a type save)
         with self._lock:
             t = self._ensure_daily_note_type()
             existing = self.daily_notes()[0].get(day)
@@ -3211,6 +3486,8 @@ class Space:
                 src = of.frontmatter_src or ""
                 if parse_fm(src).get("date") != day:
                     of = replace(of, frontmatter_src=set_keys(src, {"date": day}))
+            if ids:
+                of = replace(of, frontmatter_src=set_keys(of.frontmatter_src or "", ids))
             data = join_object(of).encode("utf-8")
             folder = t.folder.strip("/") or "DailyNotes"
             rel = f"{folder}/{day}.md"
@@ -3596,7 +3873,8 @@ class Space:
         The type JSON and templates go to ``trash/types/<ulid>/``; each object
         becomes an object entry with ``typeTrashId``. Other types' relation
         properties that allowed this type stop allowing it; ``allowedTypesRefs``
-        records them so a restore puts them back.
+        records them so a restore puts them back. Saved queries of only this type
+        move to ``queries/`` in the entry; others naming it drop it (``queryRefs``).
         """
         with self._lock:
             self._check_type_free(type_def.id)
@@ -3607,6 +3885,8 @@ class Space:
             templates = [p for p in self._templates_of(type_def.id) if p not in objects]
             object_ids: list[str] = []
             refs: list[dict[str, str]] = []
+            queries: list[str] = []
+            query_refs: list[dict[str, Any]] = []
             deleted_at = now_stamp()
             manifest = {
                 "id": trash_id,
@@ -3617,12 +3897,15 @@ class Space:
                 "objectTrashIds": object_ids,
                 "allowedTypesRefs": refs,
                 "templates": templates,
+                "queries": queries,
+                "queryRefs": query_refs,
             }
             # The manifest goes first, so a failure partway (a locked file) never
             # strands the type and its templates in the trash with no way back.
             self.trash.write_json(folder / "manifest.json", manifest)
             try:
                 self._trash_type_files(type_def, folder, trash_id, objects, templates, object_ids, refs)
+                self._trash_type_queries(type_def.id, folder, queries, query_refs)
             except BaseException:
                 try:
                     if not (folder / "type.json").exists():
@@ -3733,8 +4016,13 @@ class Space:
                     "Rename or delete it first, then restore."
                 )
 
-    def _restore_type_entry(self, trash_id: str, manifest: dict) -> tuple[list[str], list[str]]:
-        """Restore a trashed type's definition, templates and relation refs; (paths, typeIds)."""
+    def _restore_type_entry(
+        self, trash_id: str, manifest: dict
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Restore a trashed type's definition, templates, relation refs and queries.
+
+        Returns (paths, typeIds, queryIds).
+        """
         folder = self.trash.type_dir(trash_id)
         type_id = str(manifest.get("typeId", ""))
         type_ids = [type_id]
@@ -3785,6 +4073,7 @@ class Space:
                 other.propertyDefinitions = changed.propertyDefinitions
                 if other.id not in type_ids:
                     type_ids.append(other.id)
+        query_ids = self._restore_type_queries(folder, type_id, manifest)
         self.trash.remove_type(trash_id)
         # Objects whose type was unknown while it was in the trash resolve again: only the
         # ones whose summary no longer matches what their type name resolves to are
@@ -3798,7 +4087,7 @@ class Space:
                 or summary.type != self._type_id(raw.typeName)
             ):
                 self.rescan_file(rel)
-        return paths, type_ids
+        return paths, type_ids, query_ids
 
     def _restore_object_entry(self, trash_id: str, meta: dict) -> str:
         from .whiteboardtrash import sidecar_trash_dir
@@ -3848,23 +4137,23 @@ class Space:
         An object returns to its original path (`` (2)`` on a collision); if its
         type is in the trash, the type definition and templates come back with
         it (not the type's other objects). A type entry restores the type, its
-        templates, its remaining objects and its ``allowedTypesRefs``.
-        Raises `KeyError` for an unknown id and `InvalidValue` when a saved type
-        now has the trashed type's id or name (nothing is restored then).
+        templates, its remaining objects, its ``allowedTypesRefs`` and its saved
+        queries (``queryIds``). Raises `KeyError` for an unknown id and
+        `InvalidValue` when a saved type now has the trashed type's id or name
+        (nothing is restored then).
         """
         with self._lock:
             meta = self.trash.object_meta(trash_id)
             if meta is not None:
-                paths: list[str] = []
-                type_ids: list[str] = []
                 type_trash = meta.get("typeTrashId")
                 manifest = self.trash.manifest(type_trash) if type_trash else None
                 if manifest is not None:
                     self._check_type_restorable(type_trash, manifest)
                 obj_path = self._restore_object_entry(trash_id, meta)
-                if manifest is not None:
-                    paths, type_ids = self._restore_type_entry(type_trash, manifest)
-                return {"paths": [obj_path, *paths], "typeIds": type_ids}
+                if manifest is None:
+                    return {"paths": [obj_path], "typeIds": []}
+                paths, type_ids, query_ids = self._restore_type_entry(type_trash, manifest)
+                return {"paths": [obj_path, *paths], "typeIds": type_ids, "queryIds": query_ids}
             manifest = self.trash.manifest(trash_id)
             if manifest is None:
                 collection = self.trash.collection_manifest(trash_id)
@@ -3880,8 +4169,8 @@ class Space:
                 ometa = self.trash.object_meta(oid)
                 if ometa is not None:
                     objects.append(self._restore_object_entry(oid, ometa))
-            paths, type_ids = self._restore_type_entry(trash_id, manifest)
-            return {"paths": [*objects, *paths], "typeIds": type_ids}
+            paths, type_ids, query_ids = self._restore_type_entry(trash_id, manifest)
+            return {"paths": [*objects, *paths], "typeIds": type_ids, "queryIds": query_ids}
 
     def purge(self, trash_id: str) -> int:
         """Delete a trash entry for good (a type with its objects); return how many entries went."""
@@ -4090,8 +4379,8 @@ class Space:
                 exc,
             )
             return None
-        # A type deleted and re-added under the same id finds its query still there
-        # (deleting a type leaves its queries alone): don't make a second one.
+        # A query of that name already over the id (made by hand, or a type's query that
+        # stayed live because its file could not be moved to the trash): don't make a second one.
         if any(
             q.name == qname and t.id in query_type_ids(q.definition) for q in self.list_queries()
         ):
@@ -4306,6 +4595,8 @@ class Space:
                 continue  # an optional system property: display only, nothing to strip
             if old.basic:
                 raise InvalidValue(BASIC_LOCKED)
+            if p.type in COMPUTED_KINDS:
+                continue  # M12: a formula or rollup has no values in any file
             deletes_property = True
             ops.append(self._delete_key_op(p.key))
 
@@ -4334,6 +4625,10 @@ class Space:
                     op = self._entity_op(before, p)
                     if op is not None:
                         ops.append(op)
+        # M12: renamed properties are renamed in the type's formulas, then the formulas,
+        # rollups and IDs are checked (no file is rewritten for any of them).
+        rename_in_formulas(old, new)
+        check_type(old, new, lookup)
         return ops, deletes_property
 
     def _check_new_property(
@@ -4530,7 +4825,8 @@ class Space:
 
         Raises `KeyError` for an unknown type, `InvalidValue` for a basic type
         and `ConfirmRequired` (``affected`` = its objects) without ``confirm``.
-        Other types' relations stop allowing it (restored with it).
+        Other types' relations stop allowing it, and its saved queries follow it
+        (`_trash_type_queries`); both are restored with it.
         """
         with self._lock:
             t = self.type_by_id(type_id)
@@ -4541,11 +4837,25 @@ class Space:
             objects = self._type_members(type_id, templates=False)
             if not confirm:
                 n = len(objects)
-                raise ConfirmRequired(
-                    n,
+                only, others = self._queries_of_type(type_id)
+                detail = (
                     f"Delete the object type {t.name}? Its {n} object{'s' if n != 1 else ''} "
-                    "and templates move to the Trash.",
+                    "and templates move to the Trash."
                 )
+                # Our strings: what happens to the saved queries that name the type.
+                if only:
+                    k = len(only)
+                    detail += (
+                        f" {k} saved {'query' if k == 1 else 'queries'} of only this type "
+                        f"{'goes' if k == 1 else 'go'} with it."
+                    )
+                if others:
+                    m = len(others)
+                    detail += (
+                        f" {m} other {'query' if m == 1 else 'queries'} "
+                        f"{'stops' if m == 1 else 'stop'} using it until it is restored."
+                    )
+                raise ConfirmRequired(n, detail)
             return self.trash_type(t, objects)
 
     # -- kind change and two-way linking ------------------------------------------

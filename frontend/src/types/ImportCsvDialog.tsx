@@ -23,6 +23,7 @@ import { columnDecimalComma, parseCsvCells, type CsvCell } from '@/lib/csvParse'
 import { CHANGE_TYPE_TEXT } from '@/object/ChangeTypeDialog'
 import { parseDateInput } from '@/properties/DatePicker'
 import { fromPercent, parseNumberInput } from '@/properties/format'
+import { isValidEmail, isValidPhone } from '@/properties/contact'
 
 export const IMPORT_CSV_TEXT = {
   menu: 'Import CSV',
@@ -68,6 +69,9 @@ const IMPORTABLE = new Set<PropertyDef['type']>([
   'entity_description',
   'entity_tags',
   'entity_aliases',
+  // M12: plain text values, checked as their cells check typed text.
+  'email',
+  'phone',
 ])
 
 export interface CsvTarget {
@@ -143,6 +147,11 @@ export function csvValue(def: PropertyDef, cell: string | CsvCell, radixComma?: 
     case 'entity_tags':
     case 'entity_aliases':
       return [...new Set(splitList(c))]
+    // M12: a value the server would refuse (422) is skipped, as a number that isn't one is.
+    case 'email':
+      return isValidEmail(t) ? t : undefined
+    case 'phone':
+      return isValidPhone(t) ? t : undefined
     default:
       return t
   }

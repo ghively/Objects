@@ -24,12 +24,26 @@ uv run objectapp --space /path/to/space --browser # or in your browser
 
 The server listens on `127.0.0.1:8790` only.
 
+## Connect an AI assistant (MCP)
+
+Object has a local API for programs on the same computer, and an MCP server on top of it, so an assistant such as Claude Code or Claude Desktop can search, query and read your notes, and (with a read-write token) make careful edits.
+
+1. Start Object, then open Settings > Integrations and create a token. Pick "Read only" unless the assistant should change notes. The token is shown once.
+2. Copy the MCP config shown there into your client (Claude Code: `.mcp.json`; Claude Desktop: `claude_desktop_config.json`). It runs:
+
+```sh
+OBJECT_API_TOKEN=obj_... uv run --directory /path/to/objects objectapp-mcp
+```
+
+Object must be running: the MCP server talks to it over `http://127.0.0.1:8790/api/v1` and never opens the space itself, so every edit keeps the app's rules (version checks, only the changed lines, the trash, version history). Tokens are stored as hashes in the app's state folder, never in the space. Objects with the tag "Exclude from AI" or the property `excludeFromAI: true` are invisible to every token. Writes made through a token are listed by `GET /api/v1/changes`. The routes are documented in `backend/objectapp/api_v1.py`.
+
 ## Develop
 
 ```sh
 uv run pytest backend/tests -q
 cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build
 uv run python scripts/m8_acceptance.py backend/tests/fixtures/space-sample
+uv run python scripts/m11_acceptance.py backend/tests/fixtures/space-sample
 ```
 
 Rules for contributors (human or agent) are in `CLAUDE.md`. Status is in `docs/superpowers/plans/remaining-work.md`. To pick the work up, read `HANDOFF.md`.

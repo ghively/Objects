@@ -5,8 +5,8 @@
  *
  * 1. "Hierarchy (<current>)" ▸, "List" ▸, "To-do", "Quote", "Toggle",
  *    "Group" (Ctrl+G) (`BlockStyleMenu` without its "Icon" row);
- * 2. ("AI assistant...": M10, not here yet)
- *    "Turn into..." ▸ (the object picker: the types, a to-do's "Turn into
+ * 2. "AI assistant..." (M10: opens the AI chat about the blocks, `aiEntries`; gone while
+ *    "Hide AI features" is on), "Turn into..." ▸ (the object picker: the types, a to-do's "Turn into
  *    task object", "Turn into whiteboard"), "Copy" ▸ ("Copy blocks", "Copy as
  *    Markdown", "Copy block reference" for one block), "Duplicate" (Ctrl+D),
  *    "Remove" (Backspace, red trash).
@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import type { TypeDef } from '@/api/types'
 import { useLinkIndex } from '@/links/linkIndex'
+import { useAiHidden } from '@/ai/store'
 import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
 import { formatKeys, keysFor } from '@/lib/shortcuts'
 import { TypeChip } from '@/shell/Sidebar'
@@ -49,6 +50,7 @@ import {
   targetRange,
   type TurnIntoKind,
 } from '../extensions/blockSelection'
+import { AI_ICON, AI_TEXT, openBlocksAi, useAiBlocked } from '../aiEntries'
 import { showToast } from '../media/upload'
 import { BlockStyleExtras, BlockStyleMenu } from '../menus/BlockStyleMenu'
 import { copyBlockReference } from '../nodes/blockRef'
@@ -167,6 +169,9 @@ export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps
   const todo = open && hasTodoAt(editor)
   const selected = open ? (blockSelectionRange(editor.state)?.blocks.length ?? 0) : 0
   const targetCount = open ? (targetRange(editor.state)?.blocks.length ?? 0) : 0
+  // Hidden too on a page excluded from AI or a template (M10).
+  const aiBlocked = useAiBlocked(editor)
+  const aiHidden = useAiHidden() || aiBlocked
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange} modal={false}>
       <DropdownMenuTrigger asChild>
@@ -186,6 +191,11 @@ export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps
       <DropdownMenuContent align="start" side="bottom" className="min-w-[220px]" onCloseAutoFocus={(e) => e.preventDefault()}>
         {selected > 1 && <DropdownMenuLabel className="text-muted-foreground">{BLOCK_MENU_TEXT.selected(selected)}</DropdownMenuLabel>}
         <BlockStyleMenu editor={editor} onDone={close} icon={false} />
+        {!aiHidden && (
+          <Row icon={AI_ICON} onSelect={() => openBlocksAi(editor, 'askBlock')}>
+            {AI_TEXT.assistant}
+          </Row>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>

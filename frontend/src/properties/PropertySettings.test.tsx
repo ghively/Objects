@@ -77,6 +77,17 @@ describe('PropertySettings', () => {
     expect(vi.mocked(api.saveType).mock.calls[0][1]).toEqual({ baseRevision: 'r1', confirm: true })
   })
 
+  test('a formula or rollup is deleted without typing "delete"', async () => {
+    const user = userEvent.setup()
+    const formula = propertyDef({ id: 'p-f', key: 'f', name: 'F', type: 'formula', options: { expression: '1' } })
+    useLinkIndex.setState({ types: [{ ...PROJECT, propertyDefinitions: [...PROJECT.propertyDefinitions, formula] }, PERSON] })
+    open('p-f')
+    expect(screen.queryByRole('textbox', { name: 'Type "delete" to confirm' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Delete property' }))
+    await waitFor(() => expect(api.saveType).toHaveBeenCalledTimes(1))
+    expect(savedDef('p-f')).toBeUndefined()
+  })
+
   test('test relation Apply changes sends confirm after the 428 dialog', async () => {
     const user = userEvent.setup()
     vi.mocked(api.saveType)
