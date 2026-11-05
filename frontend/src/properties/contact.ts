@@ -6,9 +6,9 @@ export function isValidEmail(s: string): boolean {
   return /^[^\s@]+@[^\s@]+$/.test(s)
 }
 
-/** Digits, spaces and `+ - ( ) .` only, with at least 3 digits. */
+/** Digits, spaces (not tabs) and `+ - ( ) .` only, with at least 3 digits: the server's `_PHONE_RE`. */
 export function isValidPhone(s: string): boolean {
-  return /^[\d\s+\-().]+$/.test(s) && (s.match(/\d/g)?.length ?? 0) >= 3
+  return /^[0-9 +\-().]+$/.test(s) && (s.match(/\d/g)?.length ?? 0) >= 3
 }
 
 /** A phone number as a `tel:` target: the `+` and the digits only. */

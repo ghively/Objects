@@ -376,3 +376,33 @@ def test_rename_references():
     assert swapped == 'prop("B") - prop("A")'
     assert rename_references('prop("A")', lambda n: 'Say "hi"') == 'prop("Say \\"hi\\"")'
     assert rename_references('"unterminated', lambda n: "x") == '"unterminated'
+
+
+# -- size limits (review 2026-11-05) -------------------------------------------------------------
+
+
+def _nested_replace(levels: int) -> str:
+    expr = '"aaaaaaaaaa"'
+    for _ in range(levels):
+        expr = f'replace({expr}, "a", "aaaaaaaaaa")'
+    return expr
+
+
+def test_text_growth_is_bounded():
+    assert len(val(_nested_replace(3))) == 10_000
+    # Each level multiplies the text by ten: refused before it is built.
+    assert err(_nested_replace(5)) == "Text too long"
+    big = "x" * 60_000
+    assert err('prop("A") + prop("A")', A=big) == "Text too long"
+    assert err('concat(prop("A"), prop("A"))', A=big) == "Text too long"
+    assert err('join(prop("L"), "")', L=[big, big]) == "Text too long"
+    assert err('format(prop("L"))', L=[big, big]) == "Text too long"
+    assert len(val('prop("A") + "!"', A=big)) == 60_001  # under the limit is fine
+    assert val('replace("abc", "b", "")') == "ac"  # shrinking needs no room
+
+
+def test_huge_numbers_are_errors():
+    assert err('prop("N") * prop("N")', N=10**200) == "Number too large"
+    assert ev('prop("N")', N=10**320) == {"type": "error", "value": None, "error": "Number too large"}
+    assert ev('prop("N")', N=10**5000)["error"] == "Number too large"
+    assert val('prop("N") + 1', N=10**300) == 10**300 + 1

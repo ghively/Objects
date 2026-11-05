@@ -102,7 +102,8 @@ describe('FormulaSection', () => {
     const onOpenChange = vi.fn()
     const view = render(<PropertySettings typeId="order" propertyId="p-total" open onOpenChange={onOpenChange} />)
     await user.type(editor(), '0')
-    await user.type(screen.getByRole('textbox', { name: 'Type "delete" to confirm' }), 'delete')
+    // A formula is deleted without typing a confirmation (it holds no values in the files).
+    expect(screen.queryByRole('textbox', { name: 'Type "delete" to confirm' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Delete property' }))
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
     view.unmount()

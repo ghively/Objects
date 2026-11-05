@@ -296,6 +296,10 @@ class Computer:
         except FormulaError as exc:
             self._memo[key] = _Failed(str(exc))
             raise
+        except (OverflowError, ValueError, ArithmeticError) as exc:
+            # Rollup arithmetic runs outside `evaluate`'s guard: a huge number is an error value.
+            self._memo[key] = _Failed("Number too large")
+            raise FormulaError("Number too large") from exc
         finally:
             self._active.discard(key)
         self._memo[key] = value
@@ -421,6 +425,27 @@ def _rollup_targets(
     return out
 
 
+def _is_relation(t: TypeDefinition, pid: str) -> bool:
+    rel = next((q for q in t.propertyDefinitions if q.id == pid), None)
+    return rel is not None and rel.type == "entity"
+
+
+def _kept_broken(old: TypeDefinition, p: PropertyDefinition, rel_id: str) -> bool:
+    """True when rollup ``p`` is stored as it is, already without a valid relation.
+
+    A type file written that way (by hand, or by an older version) must not lock the type: the
+    rollup evaluates to empty, and the type's other edits still save. A rollup that loses its
+    relation in this very save is still refused.
+    """
+    before = next((q for q in old.propertyDefinitions if q.id == p.id), None)
+    return (
+        before is not None
+        and before.type == "rollup"
+        and before.options == p.options
+        and not _is_relation(old, rel_id)
+    )
+
+
 def check_type(
     old: TypeDefinition, new: TypeDefinition, types: dict[str, TypeDefinition]
 ) -> None:
@@ -453,10 +478,8 @@ def check_type(
                 raise InvalidValue(f"{p.name}: the relation and the property are ids")
             if calc not in ROLLUP_CALCS:
                 raise InvalidValue(f"{p.name}: unknown calculation {calc!r}")
-            if rel_id:
-                rel = next((q for q in new.propertyDefinitions if q.id == rel_id), None)
-                if rel is None or rel.type != "entity":
-                    raise InvalidValue(f"{p.name}: the rollup's relation must be a relation property of this type")
+            if rel_id and not _is_relation(new, rel_id) and not _kept_broken(old, p, rel_id):
+                raise InvalidValue(f"{p.name}: the rollup's relation must be a relation property of this type")
             for _c, q in _rollup_targets(new, p, types):
                 if q.type == "rollup":
                     raise InvalidValue(f"{p.name}: a rollup can't use another rollup")
