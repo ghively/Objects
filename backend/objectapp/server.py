@@ -506,6 +506,12 @@ class EnsureTagRequest(BaseModel):
     clientId: str | None = None
 
 
+class RelationPairRequest(BaseModel):
+    kind: str
+    baseRevision: str = ""
+    clientId: str | None = None
+
+
 class SyncRequest(BaseModel):
     targetPropertyId: str | None = None
     createName: str | None = None
@@ -1747,6 +1753,23 @@ def create_app(
             announce(ChangeEvent("types", t.id, None, origin=req.clientId))
         for path in result.rewritten:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
+        return _display_safe(result.to_api())
+
+    @api.post("/types/{type_id}/relation-pair")
+    def relation_pair(type_id: str, req: RelationPairRequest):
+        """M13: add (or reuse) the sub-items or dependencies pair; rewrites no object."""
+        try:
+            result = space.create_relation_pair(type_id, req.kind, req.baseRevision)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except TypeReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except KeyError:
+            return _error(404, f"No object type {type_id!r}")
+        if result.changed:
+            announce(ChangeEvent("types", type_id, None, origin=req.clientId))
         return _display_safe(result.to_api())
 
     @api.delete("/types/{type_id}")
