@@ -588,3 +588,67 @@ def test_template_never_copies_the_id(m12_dir: Path):
     made, _ = space.create_object("project", "From template", template_id=tid)
     fm = _fm(m12_dir, made)
     assert fm["code"] == "PRJ-1" and fm["budget"] == 5
+
+
+# -- review fixes (2026-11-05) ---------------------------------------------------------------------
+
+
+def test_huge_numbers_in_rollups_are_errors(m12_dir: Path):
+    _write(m12_dir / "Members" / "Ann.md",
+           "---\ntype: 'Member'\ntitle: Ann\nhours: " + "1" + "0" * 320 + "\n---\n")
+    space = _space(m12_dir)
+    too_large = {"type": "error", "value": None, "error": "Number too large"}
+    v = _row(space, "Projects/Apollo.md")
+    assert v["teamHours"] == too_large  # sum: float() overflows
+    assert v["ref"] == too_large  # a formula over it says the same
+    assert v["teamCount"] == {"type": "number", "value": 3}  # the others still compute
+    t = _edit(space, "project")
+    for calc in ("average", "median", "max"):
+        _p(t, "teamHours").options["calc"] = calc
+        _save(space, t)
+        t = _edit(space, "project")
+        assert _row(space, "Projects/Apollo.md")["teamHours"] == too_large, calc
+    with TestClient(create_app(space, None, watch=False)) as c:
+        r = c.get("/api/object", params={"path": "Projects/Apollo.md"})
+        assert r.status_code == 200
+        assert r.json()["computed"]["teamHours"] == too_large
+        r = c.post("/api/rows", json={"typeIds": ["project"]})
+        assert r.status_code == 200
+
+
+def test_kind_change_keeps_the_rollup_relation(m12_dir: Path):
+    # Changing a relation's kind adds a new property and keeps the old relation, so the
+    # rollups over it still work and the type still saves.
+    space = _space(m12_dir)
+    space.change_property_kind("project", "p-members", "text", _rev(space, "project"))
+    t = _edit(space, "project")
+    assert _p(t, "members").type == "entity"
+    _p(t, "budget").name = "Money"
+    _save(space, t)
+    assert _row(space, "Projects/Apollo.md")["teamHours"] == {"type": "number", "value": 12.5}
+
+
+def test_a_stored_broken_rollup_never_locks_the_type(m12_dir: Path):
+    f = m12_dir / ".object/types/project.json"
+    data = json.loads(f.read_text("utf-8"))
+    for p in data["propertyDefinitions"]:
+        if p["id"] == "p-hours":
+            p["options"]["relationId"] = "p-budget"  # not a relation
+        if p["id"] == "p-count":
+            p["options"]["relationId"] = "gone"  # missing
+    f.write_text(json.dumps(data, indent=2) + "\n", "utf-8")
+    space = _space(m12_dir)
+    assert _row(space, "Projects/Apollo.md")["teamHours"] == E
+    assert _row(space, "Projects/Apollo.md")["teamCount"] == E
+    # Other edits still save while the broken rollups are left as they are.
+    t = _edit(space, "project")
+    _p(t, "budget").name = "Money"
+    _save(space, t)
+    # Changing a broken rollup checks it again.
+    t = _edit(space, "project")
+    _p(t, "teamHours").options["calc"] = "average"
+    _invalid(space, t, "Team hours", "relation")
+    # Removing the relation a working rollup uses is still refused.
+    t = _edit(space, "project")
+    t.propertyDefinitions = [p for p in t.propertyDefinitions if p.key != "members"]
+    _invalid(space, t, "relation")

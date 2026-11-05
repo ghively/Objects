@@ -142,7 +142,8 @@ def rollup_value(c: Computer, obj: Obj, p: PropertyDefinition) -> Any:
         raise FormulaError(f"Unknown calculation {calc!r}")
     rel = c.prop_by_id(obj.t, rel_id)
     if rel is None or rel.type != "entity":
-        raise FormulaError("The rollup's relation is not a relation property of this type")
+        # Only a type file stored that way gets here (saving refuses it): empty, like no relation.
+        return None
     related = c.related(obj, rel)
     if calc == "countAll":
         return len(related)
