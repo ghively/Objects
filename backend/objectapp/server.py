@@ -136,6 +136,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import copy
 import json
 import os
 import subprocess
@@ -166,6 +167,7 @@ from . import (
     media,
 )
 from .apictx import ApiContext
+from .computed import Computer, Obj, has_computed
 from .appstate import state_dir
 from .collections import CollectionDef
 from .export import ExportOptions, content_disposition, export_object_to_file, export_properties
@@ -191,6 +193,8 @@ from .media import (
     serve_headers,
 )
 from .notify import FileNotifier, system_notifier
+from .formula import FormulaError
+from .formula import parse as parse_formula
 from .propvalues import InvalidValue
 from .queries import QueryDef
 from .reminders import ReminderScheduler, file_clock
@@ -213,6 +217,7 @@ from .typedefs import has_undecodable
 from .typemodel import (
     DATA_VIEW_LAYOUTS,
     DEFAULT_LAYOUT_KEY,
+    PropertyDefinition,
     RevisionConflict,
     TypeDefinition,
     TypeReadOnly,
@@ -381,6 +386,18 @@ class ChangeKindRequest(BaseModel):
     toType: str
     baseRevision: str = ""
     clientId: str | None = None
+
+
+class NumberExistingRequest(BaseModel):
+    baseRevision: str = ""
+    clientId: str | None = None
+
+
+class FormulaPreviewRequest(BaseModel):
+    typeId: str
+    expression: str
+    path: str | None = None
+    properties: list[Any] | None = None
 
 
 class SaveViewsRequest(BaseModel):
@@ -1040,8 +1057,16 @@ def create_app(
                 "version": version,
                 "links": space.links_of(path, fm),
                 "backlinks": space.backlinks(summary.path),
+                "computed": computed_of(summary, fm),
             }
         )
+
+    def computed_of(summary: Any, fm: dict) -> dict[str, Any]:
+        """M12: the object's formula and rollup values (``{}`` when it has none)."""
+        t = space.type_by_id(summary.type)
+        if not has_computed(t):
+            return {}
+        return Computer(space).values(Obj(summary.path, fm, summary, t))
 
     def announce(event: ChangeEvent) -> None:
         """Publish `event` to the SSE clients from a worker thread."""
@@ -1139,6 +1164,12 @@ def create_app(
     @api.post("/object/duplicate", status_code=201)
     def duplicate_object(req: DuplicateRequest):
         try:
+            source = space.get(req.path) if req.path else None
+        except (KeyError, ValueError):
+            source = None
+        type_id = source.type if source is not None else None
+        rev_before = type_revision(space.root, type_id) if type_id else ""
+        try:
             path, version, synced = space.duplicate_object(req.path)
             summary = space.get(path)
         except InvalidValue as exc:
@@ -1147,6 +1178,10 @@ def create_app(
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
             return _error(404, f"No object at {req.path!r}")
+        if type_id and type_revision(space.root, type_id) != rev_before:
+            # M12: the copy's ID number moved the type's `nextNumber` on (no origin: the
+            # duplicating window has no other way to learn the type's new revision).
+            announce(ChangeEvent("types", type_id, None))
         announce(ChangeEvent("created", path, version, origin=req.clientId))
         for synced_path in synced:
             announce(
@@ -1298,7 +1333,8 @@ def create_app(
     @api.post("/objects", status_code=201)
     def create_object(req: CreateObjectRequest):
         t = space.type_by_id(req.typeId)
-        had_file = bool(type_revision(space.root, req.typeId)) if t is not None else False
+        rev_before = type_revision(space.root, req.typeId) if t is not None else ""
+        had_file = bool(rev_before)
         templates_before = space.template_versions()
         try:
             path, version = space.create_object(
@@ -1310,7 +1346,9 @@ def create_app(
         except KeyError:
             return _error(404, f"No object type {req.typeId!r}")
         type_ids = []
-        if t is not None and not had_file and type_revision(space.root, req.typeId):
+        rev_after = type_revision(space.root, req.typeId) if t is not None else ""
+        if t is not None and rev_after and (not had_file or rev_after != rev_before):
+            # Written the first time, or M12's ID numbering moved `nextNumber` on.
             announce(ChangeEvent("types", req.typeId, None, origin=req.clientId))
             type_ids.append(req.typeId)
         announce_template_ids(templates_before, req.clientId)
@@ -1323,7 +1361,8 @@ def create_app(
     def create_daily_note(req: CreateDailyNoteRequest):
         before = space.daily_note_type()
         type_id = before.id if before is not None else "dailynote"
-        had_file = bool(type_revision(space.root, type_id))
+        rev_before = type_revision(space.root, type_id)
+        had_file = bool(rev_before)
         templates_before = space.template_versions()
         try:
             path, version = space.create_daily_note(req.date, req.templateId)
@@ -1336,7 +1375,8 @@ def create_app(
             announce_template_ids(templates_before, req.clientId)
             return _error(422, str(exc))
         type_ids = []
-        if not had_file and type_revision(space.root, type_id):
+        rev_after = type_revision(space.root, type_id)
+        if rev_after and (not had_file or rev_after != rev_before):
             announce(ChangeEvent("types", type_id, None, origin=req.clientId))
             type_ids.append(type_id)
         announce_template_ids(templates_before, req.clientId)
@@ -1724,6 +1764,56 @@ def create_app(
         for path in result.rewritten:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
         return _display_safe(result.to_api())
+
+    @api.post("/types/{type_id}/properties/{pid}/number-existing")
+    def number_existing(type_id: str, pid: str, req: NumberExistingRequest):
+        try:
+            result = space.number_existing(type_id, pid, req.baseRevision)
+        except RevisionConflict as exc:
+            return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
+        except TypeReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except KeyError:
+            return _error(404, f"No property {pid!r} on object type {type_id!r}")
+        announce(ChangeEvent("types", type_id, None, origin=req.clientId))
+        for path in result.rewritten:
+            announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
+        return _display_safe(result.to_api())
+
+    @api.post("/formula/preview")
+    def formula_preview(req: FormulaPreviewRequest):
+        """M12: parse (and with ``path``, evaluate) an expression. Writes nothing."""
+        t = space.type_by_id(req.typeId)
+        if t is None:
+            return _error(404, f"No object type {req.typeId!r}")
+        try:
+            parse_formula(req.expression) if req.expression.strip() else None
+        except FormulaError as exc:
+            return {"value": None, "error": str(exc)}
+        if not req.path:
+            return {"value": None, "error": None}
+        if req.properties is not None:
+            t = copy.deepcopy(t)
+            defs = []
+            for entry in req.properties:
+                try:
+                    defs.append(PropertyDefinition.from_json(entry))
+                except (ValueError, TypeError, AttributeError):
+                    continue
+            t.propertyDefinitions = defs
+        try:
+            _of, fm, _version = space.read(req.path)
+            summary = space.get(req.path)
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f"No object at {req.path!r}")
+        value = Computer(space, types={t.id: t}).evaluate(Obj(summary.path, fm, summary, t), req.expression)
+        return _display_safe(
+            {"value": value, "error": value.get("error") if value["type"] == "error" else None}
+        )
 
     @api.post("/types/{type_id}/properties/{pid}/sync")
     def sync_property(type_id: str, pid: str, req: SyncRequest):
