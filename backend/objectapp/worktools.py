@@ -207,7 +207,7 @@ def read_only_write_guard(record: TokenRecord, request: Request) -> str | None:
 
 def step_guard(record: TokenRecord, path: str, step_id: str, action: str) -> str | None:
     """`api_v1_work.STEP_GUARD`: only the run for an approved step may report an Approve step."""
-    if action not in ("complete", "fail"):
+    if action not in ("complete", "fail") or record is None:
         return None
     if record.purpose not in WORK_PURPOSES:
         return None
