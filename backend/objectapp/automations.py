@@ -1363,6 +1363,18 @@ class AutomationEngine:
                 log.exception("Automations: could not record the skills schedule %s used", lr.id)
         return run
 
+    def log_failed_agent_job(self, job: Any, detail: str) -> dict[str, Any] | None:
+        """Log an agent schedule occurrence whose run raised (M21 backstop): status ``failed``, one
+        ``runAgent`` result with ``detail``. A deleted rule logs nothing: None."""
+        lr = self.rules.get(job.rule_id)
+        if lr is None:
+            return None
+        run = self._new_run(lr, "schedule", None, job.instant, job.catch_up)
+        run["status"] = "failed"
+        run["actions"] = [self._result(0, "runAgent", "failed", None, detail)]
+        self._log(run, flush=True)
+        return run
+
     def log_skipped_catch_up(self, lr: LoadedRule, newest: datetime) -> dict[str, Any]:
         run = self._new_run(lr, "schedule", None, newest, True)
         rule = lr.rule
