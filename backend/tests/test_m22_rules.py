@@ -347,8 +347,11 @@ def test_edit_rules():
             apply_op(approved, op, "agent", now=NOW, new_id=_ids())
         with pytest.raises(IllegalMove, match=agents):
             apply_op(steps_of(("approve", "done")), op, "agent", now=NOW, new_id=_ids())
-    # An agent may still change an open Approve step and remove its own steps.
-    assert apply_op(steps_of(("approve", "open")), {"op": "remove", "stepId": "s00001", "stepRev": "x"},
+    # An agent may still reword an open Approve step and remove its own steps ...
+    reworded = apply_op(steps_of(("approve", "open")), {"op": "edit", "stepId": "s00001", "stepRev": "x",
+                                                        "text": "Other"}, "agent", now=NOW, new_id=_ids())
+    assert (reworded[0].kind, reworded[0].text) == ("approve", "Other")
+    assert apply_op(steps_of(("agent", "open")), {"op": "remove", "stepId": "s00001", "stepRev": "x"},
                     "agent", now=NOW, new_id=_ids()) == []
     with pytest.raises(IllegalMove, match="^A step is one line.$"):
         apply_op([], {"op": "add", "kind": "do", "text": "one\ntwo"}, "user", now=NOW, new_id=_ids())
@@ -370,6 +373,48 @@ def test_edit_rules():
     with pytest.raises(KeyError):
         apply_op(steps_of(("do", "open")), {"op": "remove", "stepId": "zzzzzz", "stepRev": "x"}, "user",
                  now=NOW, new_id=_ids())
+
+
+def test_agent_ops_keep_the_approval_gate():
+    """An agent can't take a pending Approve step out of the way: not by removing or moving it,
+    not by changing its kind (or making one), and not by putting an Agent step ahead of it."""
+    gate = steps_of(("question", "done"), ("approve", "open"), ("agent", "open"))
+    reshape = "^Agents can't move or remove an Approve step, or change a step to or from Approve.$"
+    passing = "^Agents can't put an Agent step ahead of an Approve step.$"
+    refused = [
+        ({"op": "edit", "stepId": "s00002", "stepRev": "x", "kind": "agent"}, reshape),
+        ({"op": "edit", "stepId": "s00002", "stepRev": "x", "kind": "do"}, reshape),
+        ({"op": "edit", "stepId": "s00003", "stepRev": "x", "kind": "approve"}, reshape),
+        ({"op": "remove", "stepId": "s00002", "stepRev": "x"}, reshape),
+        ({"op": "move", "stepId": "s00002", "stepRev": "x", "before": None}, reshape),
+        ({"op": "move", "stepId": "s00002", "stepRev": "x", "before": "s00001"}, reshape),
+        ({"op": "move", "stepId": "s00003", "stepRev": "x", "before": "s00002"}, passing),
+        ({"op": "move", "stepId": "s00003", "stepRev": "x", "before": "s00001"}, passing),
+        ({"op": "add", "kind": "agent", "text": "Restart it now", "before": "s00002"}, passing),
+    ]
+    for op, message in refused:
+        with pytest.raises(IllegalMove, match=message):
+            apply_op(gate, op, "agent", now=NOW, new_id=_ids())
+        # Gene may do every one of them.
+        apply_op(gate, op, "user", now=NOW, new_id=_ids())
+    declined = steps_of(("approve", "declined"), ("agent", "open"))
+    with pytest.raises(IllegalMove, match=reshape):
+        apply_op(declined, {"op": "remove", "stepId": "s00001", "stepRev": "x"}, "agent", now=NOW,
+                 new_id=_ids())
+    # What stays open to an agent: same-kind edits, Agent steps after the gate, other steps
+    # ahead of it, and Agent steps ahead of a finished Approve step.
+    ok = [
+        {"op": "edit", "stepId": "s00002", "stepRev": "x", "kind": "approve", "text": "Restart it"},
+        {"op": "add", "kind": "agent", "text": "Check the log"},
+        {"op": "add", "kind": "question", "text": "Which printer?", "before": "s00002"},
+        {"op": "move", "stepId": "s00001", "stepRev": "x", "before": None},
+    ]
+    for op in ok:
+        apply_op(gate, op, "agent", now=NOW, new_id=_ids())
+    moved = apply_op(declined, {"op": "move", "stepId": "s00002", "stepRev": "x", "before": "s00001"},
+                     "agent", now=NOW, new_id=_ids())
+    assert [s.id for s in moved] == ["s00002", "s00001"]
+    assert [s.state for s in gate] == ["done", "open", "open"]  # input untouched
 
 
 # -- ticket helpers ---------------------------------------------------------------------------
