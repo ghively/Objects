@@ -53,7 +53,7 @@ from .agentmodel import (
 )
 from .appstate import state_dir
 from .ids import new_ulid
-from .jsonstore import dump_json
+from .jsonstore import dump_json, parse_json_object
 from .space import safe_filename
 from .textfile import atomic_write, create_new, decode, encode_like
 from .toolcatalog import AGENT_SERVER, OBJECT_SERVER, default_off
@@ -76,6 +76,8 @@ NOT_AN_AGENT = "This folder isn't an Object agent."
 DEFAULT_UNDELETABLE = "The default agent can't be deleted."
 NOT_LISTED = "That agent isn't listed any more."  # our string (also the chat route's)
 CHANGED = "This agent was changed elsewhere."  # our string
+SETTINGS_UNREADABLE = "This agent's .claude/settings.json can't be read. Fix it, then save again."  # our string
+FOLDER_IN_USE = "This agent's folder is in use. Wait for its turn to finish, then try again."  # our string
 
 _ULID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 _AGENT_ID = re.compile(AGENT_ID)
@@ -247,16 +249,20 @@ class AgentRegistry:
         atomic_write(self.path, dump_json({"agents": entries}))
 
     def _keep_unreadable(self) -> None:
-        """Copy an ``agents.json`` `_load` couldn't parse aside before it is replaced."""
+        """Copy an ``agents.json`` aside before it is replaced when `_load` couldn't parse it or
+        dropped any of its entries (``agents`` not a list, a bad id, a missing path...)."""
         try:
             raw = self.path.read_bytes()
         except FileNotFoundError:
             return
         try:
-            if isinstance(json.loads(raw.decode("utf-8")), dict):
-                return
+            data = json.loads(raw.decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
-            pass
+            data = None
+        if isinstance(data, dict):
+            listed = data.get("agents", [])
+            if isinstance(listed, list) and len(listed) == len(self._load()):
+                return
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
         aside = self.state / f"agents.unreadable-{stamp}.json"
         n = 2
@@ -516,10 +522,15 @@ class AgentRegistry:
             if inp.learning is not None:
                 data["learning"] = inp.learning
             data["updatedAt"] = _now()
-            agentfiles.write_agent_file(rec.folder, data)
             new_off = data.get("toolsOff") or []
             if new_off != old_off:
-                agentfiles.sync_permissions(rec.folder, old_off, new_off)
+                _check_settings(rec.folder)  # before agent.json, so the two never disagree
+            agentfiles.write_agent_file(rec.folder, data)
+            if new_off != old_off:
+                try:
+                    agentfiles.sync_permissions(rec.folder, old_off, new_off)
+                except ValueError:
+                    raise AgentReadOnly(SETTINGS_UNREADABLE) from None
             return self.get(agent_id)
 
     def read_instructions(self, agent_id: str) -> tuple[str, str | None]:
@@ -589,6 +600,9 @@ class AgentRegistry:
             create_new(meta_path, dump_json(meta))
             try:
                 _move_folder(rec.folder, self.trash_dir / trash_id)
+            except OSError:
+                meta_path.unlink(missing_ok=True)
+                raise AgentConflict(FOLDER_IN_USE) from None
             except BaseException:
                 meta_path.unlink(missing_ok=True)
                 raise
@@ -648,10 +662,28 @@ class AgentRegistry:
             while target.exists():
                 target = original.parent / f"{original.name} ({n})"
                 n += 1
-            _move_folder(self.trash_dir / trash_id, target)
+            try:
+                _move_folder(self.trash_dir / trash_id, target)
+            except OSError:
+                raise AgentConflict(FOLDER_IN_USE) from None
             (self.trash_dir / f"{trash_id}.json").unlink(missing_ok=True)
             self._register(agent_id, target)
             return self._record(agent_id, target, default=False)
+
+
+def _check_settings(folder: Path) -> None:
+    """Raise `AgentReadOnly` when the folder's ``.claude/settings.json`` exists but can't be read
+    (`agentfiles.sync_permissions` would refuse it)."""
+    try:
+        raw = (Path(folder) / agentfiles.SETTINGS_FILE).read_bytes()
+    except FileNotFoundError:
+        return
+    except OSError:
+        raise AgentReadOnly(SETTINGS_UNREADABLE) from None
+    try:
+        parse_json_object(raw)
+    except (ValueError, UnicodeDecodeError):
+        raise AgentReadOnly(SETTINGS_UNREADABLE) from None
 
 
 def _move_folder(src: Path, dest: Path) -> None:

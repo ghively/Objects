@@ -267,6 +267,46 @@ def test_delete_and_restore_routes(api, tmp_path: Path) -> None:
     assert client.delete("/api/agents/01JC7ZK3T9Q4M2X8B5N6R1V0WE").status_code == 404
 
 
+def test_put_with_unreadable_folder_settings_is_refused(api) -> None:
+    client = api["client"]
+    made = _create(client)
+    folder = Path(made["folder"])
+    settings = folder / ".claude" / "settings.json"
+    settings.write_text("{nope", encoding="utf-8")
+    agent_before = (folder / ".object-agent" / "agent.json").read_bytes()
+    body = {"agent": {"name": "Researcher", "toolsOff": []}, "baseRevision": made["revision"]}
+    res = client.put(f"/api/agents/{made['id']}", json=body)
+    assert res.status_code == 423
+    assert res.json()["detail"] == "This agent's .claude/settings.json can't be read. Fix it, then save again."
+    assert (folder / ".object-agent" / "agent.json").read_bytes() == agent_before  # nothing half-saved
+    assert settings.read_text(encoding="utf-8") == "{nope"
+
+
+def test_delete_and_restore_while_the_folder_is_in_use(api, monkeypatch) -> None:
+    from objectapp import agents
+
+    client = api["client"]
+    made = _create(client)
+
+    def busy(src, dest):
+        raise PermissionError(32, "The process cannot access the file", str(src))
+
+    real = agents._move_folder
+    monkeypatch.setattr(agents, "_move_folder", busy)
+    res = client.delete(f"/api/agents/{made['id']}")
+    in_use = "This agent's folder is in use. Wait for its turn to finish, then try again."
+    assert res.status_code == 409 and res.json()["detail"] == in_use
+    assert Path(made["folder"]).is_dir()
+    assert client.get(f"/api/agents/{made['id']}").status_code == 200  # still listed
+    assert not list((state_dir() / "agents" / ".trash").glob("*.json"))
+    monkeypatch.setattr(agents, "_move_folder", real)
+    trash_id = client.delete(f"/api/agents/{made['id']}").json()["trashId"]
+    monkeypatch.setattr(agents, "_move_folder", busy)
+    res = client.post(f"/api/agent-trash/{trash_id}/restore", json={})
+    assert res.status_code == 409 and res.json()["detail"] == in_use
+    assert [i["trashId"] for i in client.get("/api/agent-trash").json()["items"]] == [trash_id]
+
+
 def test_unregister_route(api) -> None:
     client = api["client"]
     made = _create(client)
