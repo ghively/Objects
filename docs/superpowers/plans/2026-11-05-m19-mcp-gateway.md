@@ -397,7 +397,7 @@ export interface McpServerInput {
   transport?: McpTransport | null; url?: string | null; headers?: { name: string; value?: string | null; secret: boolean }[]
   bearer?: string | null; bearerAction?: 'keep' | 'set' | 'remove'
 }
-export interface McpServersAnswer { servers: McpServer[]; readOnlyReason: string | null }
+export interface McpServersAnswer { servers: McpServer[]; readOnlyReason: string | null; unreadable: boolean }  // unreadable: added by the M19 review fix, for Gene to approve
 export interface SecretVarUse { agentId: string; agentName: string; server: string }
 export interface SecretVar { name: string; set: boolean; settable: boolean; usedBy: SecretVarUse[] }
 export interface McpGroupStatus {

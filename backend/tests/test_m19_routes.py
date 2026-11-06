@@ -209,6 +209,22 @@ def test_crud_routes(api):
     assert c.delete("/api/mcp-servers/x").status_code == 423
 
 
+def test_unreadable_servers_file(api):
+    c = api["client"]
+    path = state_dir() / "mcp-servers.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"{nope")
+    listed = c.get("/api/mcp-servers").json()
+    assert listed == {"servers": [], "readOnlyReason": None, "unreadable": True}
+    assert path.read_bytes() == b"{nope"
+    # Writes stay allowed: the next one copies the file aside first.
+    _create(c, _stdio("fresh", secret=None))
+    aside = [p for p in path.parent.iterdir() if p.name.startswith("mcp-servers.unreadable-")]
+    assert len(aside) == 1 and aside[0].read_bytes() == b"{nope"
+    listed = c.get("/api/mcp-servers").json()
+    assert listed["unreadable"] is False and [s["name"] for s in listed["servers"]] == ["fresh"]
+
+
 def test_events(api):
     c, published = api["client"], api["published"]
     made = _create(c, _stdio(), client_id="win-7")
@@ -384,6 +400,21 @@ def test_no_answer_holds_a_secret(api, http_fake, caplog):
     bad["env"][1]["value"] = BAD_SECRET
     assert c.post("/api/mcp-servers", json={"server": bad}).status_code == 422
     assert c.put("/api/mcp-secrets/GH_TOKEN", json={"value": BAD_SECRET}).status_code == 422
+    # Malformed bodies: our own 422, never pydantic's (whose errors echo each `input`).
+    no_kind = {"name": "leak", "url": url, "bearer": BEARER_SECRET, "bearerAction": "set"}
+    no_key = _stdio("leak2")
+    no_key["env"] = [{"value": ENV_SECRET, "secret": True}]
+    for res in (
+        c.post("/api/mcp-servers", json={"server": no_kind}),
+        c.post("/api/mcp-servers", json={"server": no_key}),
+        c.post("/api/mcp-servers", json=[ENV_SECRET]),
+        c.put(f"/api/mcp-servers/{web['id']}", json={"server": no_kind, "baseRevision": web["revision"]}),
+        c.put(f"/api/mcp-servers/{web['id']}", json={"server": no_key, "baseRevision": ENV_SECRET}),
+    ):
+        assert res.status_code == 422 and res.json() == {"detail": "That server can't be saved."}
+    for body in ({"value": {"v": VAR_SECRET}}, {"value": [VAR_SECRET]}, VAR_SECRET, [VAR_SECRET]):
+        res = c.put("/api/mcp-secrets/GH_TOKEN", json=body)
+        assert res.status_code == 422 and res.json() == {"detail": "That value can't be used."}
     assert c.put("/api/mcp-secrets/GH_TOKEN", json={"value": VAR_SECRET + "x" * 16385}).status_code == 422
     assert c.put("/api/mcp-secrets/PATH", json={"value": VAR_SECRET}).status_code == 422
     assert c.put("/api/mcp-secrets/FAKE_FOLDER_KEY", json={"value": FOLDER_SECRET}).status_code == 200
@@ -427,5 +458,5 @@ def test_routes_answer_while_ai_is_hidden(api):
     c = api["client"]
     res = c.get("/api/mcp-servers")
     assert res.status_code == 200
-    assert res.json() == {"servers": [], "readOnlyReason": None}
+    assert res.json() == {"servers": [], "readOnlyReason": None, "unreadable": False}
     assert c.get("/api/mcp-secrets").status_code == 200

@@ -1,7 +1,8 @@
 """The MCP gateway's routes (M19): ``/mcp-servers...``, ``/mcp-secrets...`` and
 ``/agents/{id}/tools/refresh``.
 
-- ``GET    /mcp-servers`` -> ``McpServersAnswer`` (file order). Never writes.
+- ``GET    /mcp-servers`` -> ``McpServersAnswer`` (file order; ``unreadable`` is true when the
+  file is there but can't be read, and writes stay allowed). Never writes.
 - ``POST   /mcp-servers`` ``{server, clientId?}`` -> 201 ``McpServer``. 409 (name taken, no
   ``currentRevision``), 422, 423.
 - ``PUT    /mcp-servers/{id}`` ``{server, baseRevision, clientId?}`` -> ``McpServer``. 404,
@@ -19,17 +20,17 @@ origin=clientId)``; a secret set or delete also announces ``ChangeEvent("agents"
 None, origin=clientId)`` (a missing var changes ``Agent.mcpServers``).
 
 Mounted on the app's ``/api`` router before `api_agents`. Every route stays available while
-"Hide AI features" is on; only the UI hides the section. A 422 message never holds a submitted
-value, and no answer, event or log line ever holds a secret value. Imports no network client.
+"Hide AI features" is on; only the UI hides the section. Bodies are validated in the routes, not
+by FastAPI, so a 422 message never holds a submitted value, and no answer, event or log line ever holds a secret value. Imports no network client.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from . import agentfiles, mcpprobe
 from .agents import AgentError, AgentRecord, AgentRegistry
@@ -49,6 +50,7 @@ ENTER_VALUE = "Enter a value."
 SECRET_TOO_LONG = "That secret is too long."
 BAD_SECRET = "That value can't be used."
 NO_SUCH_VAR = "That secret variable isn't set."
+BAD_SERVER = "That server can't be saved."
 SECRETS_PATH = "secrets"
 
 
@@ -66,6 +68,16 @@ class SaveServerRequest(BaseModel):
 class SecretRequest(BaseModel):
     value: str | None = None
     clientId: str | None = None
+
+
+def _parse(model: type[BaseModel], body: Any) -> Any:
+    """`model` from a request body, or None when it doesn't fit. The body is validated here, not
+    by FastAPI, so a 422 is ours and never echoes a submitted value (pydantic's errors carry
+    each one's ``input``)."""
+    try:
+        return model.model_validate(body)
+    except ValidationError:
+        return None
 
 
 def _error(status: int, detail: str) -> JSONResponse:
@@ -148,10 +160,14 @@ def router(ctx: ApiContext) -> APIRouter:
         return {
             "servers": [server_out(st, rec) for rec in st.list()],
             "readOnlyReason": st.read_only_reason(),
+            "unreadable": st.unreadable(),
         }
 
     @r.post("/mcp-servers", status_code=201)
-    def create_server(req: CreateServerRequest):
+    def create_server(body: Any = Body(None)):
+        req = _parse(CreateServerRequest, body)
+        if req is None:
+            return _error(422, BAD_SERVER)
         st = store()
         try:
             rec = st.create(req.server)
@@ -161,7 +177,10 @@ def router(ctx: ApiContext) -> APIRouter:
         return JSONResponse(server_out(st, rec), status_code=201)
 
     @r.put("/mcp-servers/{server_id}")
-    def save_server(server_id: str, req: SaveServerRequest):
+    def save_server(server_id: str, body: Any = Body(None)):
+        req = _parse(SaveServerRequest, body)
+        if req is None:
+            return _error(422, BAD_SERVER)
         st = store()
         try:
             rec = st.save(server_id, req.server, req.baseRevision or "")
@@ -201,11 +220,14 @@ def router(ctx: ApiContext) -> APIRouter:
         return {"vars": _secret_vars(AgentRegistry(), SecretStore())}
 
     @r.put("/mcp-secrets/{name}")
-    def set_secret(name: str, req: SecretRequest):
+    def set_secret(name: str, body: Any = Body(None)):
         try:
             check_var_name(name)
         except ValueError as exc:
             return _error(422, str(exc))
+        req = _parse(SecretRequest, body)
+        if req is None:
+            return _error(422, BAD_SECRET)
         value = req.value
         if not isinstance(value, str) or value == "":
             return _error(422, ENTER_VALUE)
