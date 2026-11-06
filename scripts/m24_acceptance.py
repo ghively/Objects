@@ -267,6 +267,15 @@ class M24:
         before = len(self.runs())
         code, st = self.put_settings(autoRun=True)
         self.run.report(code == 200 and st["autoRun"] is True, "Agent runs by itself switched on")
+        self.run.report(self.idle() and not self.entries_of(kind="run"),
+                        "switching it on scans nothing (no write on settings)")
+        # an Agent step runs by itself when it BECOMES current after Gene's action: answer a question before it
+        agent_step = next(s for s in self.item(PRINTER)["steps"] if s["kind"] == "agent")
+        code, _r = self.http("POST", "/work/steps", {"path": PRINTER, "clientId": CLIENT, "ops": [
+            {"op": "add", "kind": "question", "text": "Which host?", "before": agent_step["id"]}]})
+        ask = next(s for s in self.item(PRINTER)["steps"] if s["text"] == "Which host?")
+        code, _r = self.step(PRINTER, ask["id"], "answer", text="PRN-TEST-01")
+        self.run.report(code == 200, f"answered the question before the Agent step: {code}")
         self.run.report(self.idle(), "the queue went idle")
         runs = self.entries_of(kind="run")
         self.run.report(len(runs) == 1 and runs[0].get("auto") is True and runs[0].get("purpose") == "work-read",
@@ -275,8 +284,8 @@ class M24:
         self.run.report(e.get("state") == "failed" and "Can't read the log" in str(e.get("reason")),
                         f"it failed with the ask: {e.get('state')} {e.get('reason')!r}")
         mine = self.runs()[before:]
-        self.run.report(len(mine) == 1 and "Bash" not in (mine[0].get("allowed") or []),
-                        "the read-only run had no Bash allowed")
+        self.run.report(bool(mine) and all("Bash" not in (r.get("allowed") or []) for r in mine),
+                        f"the read-only runs had no Bash allowed ({len(mine)} runs)")
         steps = self.item(PRINTER)["steps"]
         texts = [s["text"] for s in steps]
         agent_step = next(s for s in steps if s["kind"] == "agent")
@@ -373,7 +382,9 @@ class M24:
         started = time.monotonic()
         self.put_settings(acts=True)
         self.run.report(self.idle(), "idle")
-        [e] = self.entries_of(capturePath=waiting["path"]) or [{}]
+        # a restart forgets which captures were queued, so the failed one is queued once more by the scan
+        all_e = self.entries_of(capturePath=waiting["path"])
+        e = all_e[-1] if all_e else {}
         self.run.report(e.get("state") == "failed" and e.get("reason") == TIMED_OUT
                         and 2 < time.monotonic() - started < 25,
                         f"the entry failed: {e.get('state')} {e.get('reason')!r}")
