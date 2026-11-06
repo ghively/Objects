@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from objectapp.space import Space
+from objectapp.workfields import TICKET_FIELDS, WORK_FIELDS
 from objectapp.typemodel import (
     BUILTIN_TYPES,
     THEME_COLORS,
@@ -397,6 +398,12 @@ def test_api_space_returns_v2_types(space_dir):
 # -- M4 Task 3: the Task fields, topped up in memory --------------------------------
 
 _TASK_FIELDS = ("status", "priority", "date", "deadline", "completed", "repeat", "remind")
+# M22 tops up the ticket and work fields after these; the M4 order checks skip them.
+_WORK_KEYS = {f.key for f in (*TICKET_FIELDS, *WORK_FIELDS)}
+
+
+def _non_work_keys(t):
+    return [p.key for p in t.propertyDefinitions if p.key not in _WORK_KEYS]
 
 
 def test_topup_adds_missing_task_fields_in_memory(calendar_space_dir):
@@ -410,7 +417,7 @@ def test_topup_adds_missing_task_fields_in_memory(calendar_space_dir):
 
     space = Space(calendar_space_dir)
     t = space.type_by_id("task")
-    keys = [p.key for p in t.propertyDefinitions]
+    keys = _non_work_keys(t)
     # appended after the existing ones (M8's hidden `occurrenceLog` last)
     assert keys[-7:] == [*_TASK_FIELDS[1:], "occurrenceLog"]
     assert t.prop("priority").options["set"][2] == {
@@ -434,7 +441,7 @@ def test_topup_adds_missing_task_fields_in_memory(calendar_space_dir):
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     t2, _rev = space.refresh_type("task")
     assert t2.description == "edited by hand"
-    assert [p.key for p in t2.propertyDefinitions][-7:] == [*_TASK_FIELDS[1:], "occurrenceLog"]
+    assert _non_work_keys(t2)[-7:] == [*_TASK_FIELDS[1:], "occurrenceLog"]
 
     # Saving the type persists the fields (the first write of the type).
     t3, rev = space.refresh_type("task")
@@ -455,7 +462,7 @@ def test_topup_keeps_existing_definitions(calendar_space_dir):
 
     t = Space(calendar_space_dir).type_by_id("task")
     assert [o["text"] for o in t.prop("priority").options["set"]] == ["P1"]
-    keys = [p.key for p in t.propertyDefinitions]
+    keys = _non_work_keys(t)
     assert keys.count("priority") == 1
     assert keys[-3:] == ["deadline", "remind", "occurrenceLog"]  # M8 adds the log last
 
