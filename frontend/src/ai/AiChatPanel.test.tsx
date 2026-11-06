@@ -8,8 +8,8 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
-import { api, ApiError, ConflictError } from '@/api/client'
-import type { AiChatRequest, AiEvent, ChangeEvent } from '@/api/types'
+import { api, ApiError, ConfirmRequiredError, ConflictError } from '@/api/client'
+import type { AiChatRequest, AiEvent, ChangeEvent, RemoteAttachment } from '@/api/types'
 import { resetAgents, useAgents } from '@/agents/useAgents'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { isAiChatTarget } from '@/nav/sidepanel'
@@ -17,7 +17,8 @@ import { activeTab, currentTarget, useTabs } from '@/nav/tabs'
 import { usePalette } from '@/palette/usePalette'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { resetSpaceInfo } from '@/settings/useSpaceInfo'
-import { agent, agentTranscript, objectDetail, objectSummary, references, reviewStatus } from '@/test/mockApi'
+import { agent, agentTranscript, objectDetail, objectSummary, references, remoteAgent, reviewStatus } from '@/test/mockApi'
+import { REMOTE_TEXT } from '@/agents/agentText'
 import { useLearningFocus } from '@/agents/learningFocus'
 import { CHAT_MENU_TEXT } from './ChatMenu'
 import { LEARNING_LINE_TEXT } from './LearningLine'
@@ -26,7 +27,7 @@ import { AiChatHeader } from './AiChatHeader'
 import { AiChatPanel } from './AiChatPanel'
 import { assertInert } from './markdown'
 import { noticeKey, revealAiChat, useAiFocus } from './reveal'
-import { AI_CHAT_TEXT as T } from './aiText'
+import { AI_CHAT_TEXT as T, REMOTE_CHAT_TEXT as R } from './aiText'
 import { openAiChat, resetAiStore, useAi } from './store'
 
 const mocked = vi.mocked(api)
@@ -82,7 +83,7 @@ const CHAT_ID = '01JCHAT0000000000000000000'
 beforeEach(() => {
   vi.clearAllMocks()
   // Back to the mock's own answers (a test's mockResolvedValue would outlive it).
-  for (const fn of [mocked.aiStatus, mocked.aiChat, mocked.aiChatLoad, mocked.saveAiChat, mocked.object, mocked.saveBody, mocked.references, mocked.updateProperties, mocked.agentChat, mocked.agents, mocked.chatReviews, mocked.learnFromChat, mocked.onChange])
+  for (const fn of [mocked.aiStatus, mocked.aiChat, mocked.aiChatLoad, mocked.saveAiChat, mocked.object, mocked.saveBody, mocked.references, mocked.updateProperties, mocked.agentChat, mocked.agents, mocked.chatReviews, mocked.learnFromChat, mocked.onChange, mocked.ackRemoteContext, mocked.revealAgentFile])
     fn.mockReset()
   localStorage.clear()
   localStorage.setItem(noticeKey(null), '1')
@@ -1101,5 +1102,271 @@ describe('AiChatPanel', () => {
     // The saved AI Chat holds the messages only.
     const saved = mocked.saveAiChat.mock.calls[0][0].messages
     expect(saved.map((m) => m.text)).toEqual(['Hi', 'Hello'])
+  })
+
+  // ---- M20: remote agents ----
+
+  const REMOTE = '01JREMOTE00000000000000000'
+  const NOTICE_AT = '2026-11-05T09:00:00.000Z'
+
+  /** The agents with a remote one ("Fake Planner"); `noticeAt` its `contextNoticeAt`. */
+  function remoteList(noticeAt: string | null = null) {
+    const base = remoteAgent({ id: REMOTE })
+    return [agent({ id: 'assistant' }), remoteAgent({ id: REMOTE, remote: { ...base.remote!, contextNoticeAt: noticeAt } })]
+  }
+
+  function withRemote(noticeAt: string | null = null) {
+    useAgents.setState({ agents: remoteList(noticeAt), loaded: true })
+  }
+
+  const planFile = (partial: Partial<RemoteAttachment> = {}): RemoteAttachment => ({
+    name: 'plan.md',
+    mediaType: 'text/markdown',
+    size: 12 * 1024,
+    kind: 'file',
+    file: `${CHAT_ID}/plan.md`,
+    url: null,
+    ...partial,
+  })
+
+  const notice = () => screen.findByRole('dialog', { name: R.noticeTitle })
+
+  test("test a remote agent's header has no model picker", async () => {
+    withRemote()
+    setup({ agentId: REMOTE })
+    expect(picker()).toHaveTextContent('Fake Planner')
+    expect(within(picker()).getByLabelText(REMOTE_TEXT.markLabel)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: T.modelForChat })).toBeNull()
+    // No "Learn from this chat" menu either: a remote agent has no memory or skills in Object.
+    expect(screen.queryByRole('button', { name: CHAT_MENU_TEXT.more })).toBeNull()
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+  })
+
+  test('test the first send with context to a remote agent shows the notice, then sends after Send', async () => {
+    withRemote()
+    const { user } = setup({ agentId: REMOTE })
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'Plan it{Enter}')
+    const dialog = await notice()
+    expect(dialog).toHaveTextContent(
+      'Fake Planner is a remote agent. The context pages you send go to 127.0.0.1, outside this computer. Pages excluded from AI are never sent.',
+    )
+    expect(mocked.aiChat).not.toHaveBeenCalled()
+    await user.click(within(dialog).getByRole('button', { name: R.noticeSend }))
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(1))
+    expect(mocked.ackRemoteContext).toHaveBeenCalledWith(REMOTE)
+    expect(mocked.ackRemoteContext.mock.invocationCallOrder[0]).toBeLessThan(mocked.aiChat.mock.invocationCallOrder[0])
+    expect(mocked.aiChat.mock.calls[0][0]).toMatchObject({ mode: 'chat', prompt: 'Plan it', contextPaths: ['Pages/A.md'], agentId: REMOTE })
+    expect(input()).toHaveValue('')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  test('test Cancel on the notice sends nothing and keeps the draft', async () => {
+    withRemote()
+    const { user } = setup({ agentId: REMOTE })
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'Plan it{Enter}')
+    const dialog = await notice()
+    await user.click(within(dialog).getByRole('button', { name: R.noticeCancel }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(mocked.aiChat).not.toHaveBeenCalled()
+    expect(mocked.ackRemoteContext).not.toHaveBeenCalled()
+    expect(input()).toHaveValue('Plan it')
+    expect(screen.getByRole('list', { name: T.title }).querySelector('[data-role="user"]')).toBeNull()
+  })
+
+  test('test the notice is not shown again for that agent', async () => {
+    const listeners = new Set<(e: ChangeEvent) => void>()
+    mocked.onChange.mockImplementation((cb) => {
+      listeners.add(cb)
+      return () => {
+        listeners.delete(cb)
+      }
+    })
+    // The agents list as the app keeps it: loaded once, then reloaded on `agents` events.
+    mocked.agents.mockResolvedValue(remoteList(null))
+    await act(() => useAgents.getState().load())
+    expect(useAgents.getState().byId(REMOTE)?.remote?.contextNoticeAt).toBeNull()
+    const { user } = setup({ agentId: REMOTE })
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'One{Enter}')
+    await user.click(within(await notice()).getByRole('button', { name: R.noticeSend }))
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+    // The ack's `agents` event reloads the list: the agent's contextNoticeAt is now set.
+    mocked.agents.mockResolvedValue(remoteList(NOTICE_AT))
+    await act(async () => {
+      for (const cb of [...listeners]) cb({ kind: 'agents', path: REMOTE, version: 'r2', origin: null })
+    })
+    await waitFor(() => expect(useAgents.getState().byId(REMOTE)?.remote?.contextNoticeAt).toBe(NOTICE_AT))
+    await user.type(input(), 'Two{Enter}')
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(2))
+    expect(mocked.aiChat.mock.calls[1][0]).toMatchObject({ prompt: 'Two', contextPaths: ['Pages/A.md'] })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocked.ackRemoteContext).toHaveBeenCalledTimes(1)
+  })
+
+  test('test a send without context to a remote agent shows no notice', async () => {
+    withRemote()
+    const { user } = setup({ agentId: REMOTE })
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.click(screen.getByRole('button', { name: T.removeContext('Alpha') }))
+    await user.type(input(), 'Hello there{Enter}')
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(1))
+    expect(mocked.aiChat.mock.calls[0][0]).toMatchObject({ prompt: 'Hello there', contextPaths: [], agentId: REMOTE })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocked.ackRemoteContext).not.toHaveBeenCalled()
+  })
+
+  test('test a 428 answer opens the notice', async () => {
+    // The list says the notice was seen, the server says not (another window, a restored agent).
+    withRemote(NOTICE_AT)
+    mocked.aiChat.mockRejectedValueOnce(new ConfirmRequiredError('Confirm that context leaves this computer first.', 0))
+    const { user } = setup({ agentId: REMOTE })
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'Plan it{Enter}')
+    const dialog = await notice()
+    expect(mocked.aiChat).toHaveBeenCalledTimes(1)
+    // The refused turn is taken back: the draft is in the box again, and no error shows (the
+    // panel is behind the modal notice, so it is queried with `hidden`).
+    expect(screen.getByRole('textbox', { name: T.inputLabel, hidden: true })).toHaveValue('Plan it')
+    expect(screen.queryByRole('alert', { hidden: true })).toBeNull()
+    expect(screen.getByRole('list', { name: T.title, hidden: true }).querySelector('[data-role="user"]')).toBeNull()
+    await user.click(within(dialog).getByRole('button', { name: R.noticeSend }))
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(2))
+    expect(mocked.ackRemoteContext).toHaveBeenCalledWith(REMOTE)
+    expect(mocked.aiChat.mock.calls[1][0]).toMatchObject({ prompt: 'Plan it', contextPaths: ['Pages/A.md'], agentId: REMOTE, history: [] })
+    expect(await screen.findByText('Hello')).toBeInTheDocument()
+  })
+
+  test('test attachment events show chips and Show in folder reveals the file', async () => {
+    withRemote(NOTICE_AT)
+    mocked.aiChat.mockImplementation(
+      answer(
+        { type: 'chat', chatId: CHAT_ID, agentId: REMOTE },
+        { type: 'text', text: 'Here is the plan.' },
+        { type: 'attachment', agentId: REMOTE, chatId: CHAT_ID, attachment: planFile() },
+        done('Here is the plan.', { sessionId: null }),
+      ),
+    )
+    const { user } = setup({ agentId: REMOTE })
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'A2A:file{Enter}')
+    const list = screen.getByRole('list', { name: T.title })
+    const reply = (await within(list).findByText('Here is the plan.')).closest('[data-role="assistant"]') as HTMLElement
+    expect(within(reply).getByText('plan.md')).toBeInTheDocument()
+    expect(within(reply).getByText('12 KB')).toBeInTheDocument()
+    await user.click(within(reply).getByRole('button', { name: R.showInFolder }))
+    await waitFor(() => expect(mocked.revealAgentFile).toHaveBeenCalledWith(REMOTE, `${CHAT_ID}/plan.md`))
+    // The save holds the messages only: attachments stay in the transcript.
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+    const saved = mocked.saveAiChat.mock.calls[0][0]
+    expect(saved).toMatchObject({ agentId: REMOTE, chatId: CHAT_ID })
+    expect(saved.messages[1]).toEqual({ role: 'assistant', text: 'Here is the plan.', at: expect.any(String) })
+  })
+
+  test('test an attachment shows under the streaming reply', async () => {
+    withRemote(NOTICE_AT)
+    mocked.aiChat.mockImplementation(async (_req, onEvent, sig) => {
+      onEvent({ type: 'chat', chatId: CHAT_ID, agentId: REMOTE })
+      onEvent({ type: 'text', text: 'Working on it' })
+      onEvent({ type: 'attachment', agentId: REMOTE, chatId: CHAT_ID, attachment: planFile() })
+      await new Promise<void>((_resolve, reject) => sig?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))))
+    })
+    const { user } = setup({ agentId: REMOTE })
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'A2A:file{Enter}')
+    const streaming = (await screen.findByText('Working on it')).closest('[data-streaming]') as HTMLElement
+    expect(within(streaming).getByText('plan.md')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: T.stop }))
+    // The stopped reply keeps its chip.
+    const kept = (await screen.findByText(T.stopped)).closest('[data-role="assistant"]') as HTMLElement
+    expect(within(kept).getByText('plan.md')).toBeInTheDocument()
+  })
+
+  test("test a url attachment that isn't http is not shown as a link", async () => {
+    withRemote(NOTICE_AT)
+    mocked.aiChat.mockImplementation(
+      answer(
+        { type: 'chat', chatId: CHAT_ID, agentId: REMOTE },
+        { type: 'text', text: 'Links.' },
+        { type: 'attachment', agentId: REMOTE, chatId: CHAT_ID, attachment: planFile({ kind: 'url', file: null, url: 'https://example.org/x.pdf', name: 'x.pdf', size: null }) },
+        { type: 'attachment', agentId: REMOTE, chatId: CHAT_ID, attachment: planFile({ kind: 'url', file: null, url: 'javascript:alert(1)', name: 'evil.pdf', size: null }) },
+        done('Links.', { sessionId: null }),
+      ),
+    )
+    const { user } = setup({ agentId: REMOTE })
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'A2A:url{Enter}')
+    const list = screen.getByRole('list', { name: T.title })
+    await within(list).findByText('Links.')
+    const good = within(list).getByRole('link', { name: 'x.pdf' })
+    expect(good).toHaveAttribute('href', 'https://example.org/x.pdf')
+    expect(good).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(within(list).getByText('evil.pdf').closest('a')).toBeNull()
+    expect(list.querySelector('a[href^="javascript"]')).toBeNull()
+  })
+
+  test('test New chat with a remote agent starts a fresh context', async () => {
+    withRemote(NOTICE_AT)
+    mocked.aiChat.mockImplementation(answer({ type: 'chat', chatId: CHAT_ID, agentId: REMOTE }, { type: 'text', text: 'Hi' }, done('Hi', { sessionId: null })))
+    const { user } = setup({ agentId: REMOTE })
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'One{Enter}')
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+    await user.type(input(), 'Two{Enter}')
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(2))
+    // The same chat: the server continues its A2A context from the transcript.
+    expect(mocked.aiChat.mock.calls[1][0]).toMatchObject({ agentId: REMOTE, chatId: CHAT_ID })
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(2))
+    await user.click(screen.getByRole('button', { name: T.newChat }))
+    expect(picker()).toHaveTextContent('Fake Planner')
+    await user.type(input(), 'Three{Enter}')
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(3))
+    expect(mocked.aiChat.mock.calls[2][0]).toMatchObject({ agentId: REMOTE, chatId: null, history: [] })
+  })
+
+  test('test a loaded remote transcript shows its attachments', async () => {
+    withRemote(NOTICE_AT)
+    mocked.agentChat.mockResolvedValue(
+      agentTranscript({
+        id: CHAT_ID,
+        agentId: REMOTE,
+        sessionId: null,
+        items: [
+          { type: 'user', text: 'A2A:file', at: '2026-11-05T09:00:00.000Z', contextPaths: [] },
+          {
+            type: 'assistant',
+            text: 'Here is the plan.',
+            at: '2026-11-05T09:00:02.000Z',
+            model: null,
+            sessionId: null,
+            a2a: { contextId: 'ctx-1', taskId: null, state: 'TASK_STATE_COMPLETED' },
+            attachments: [planFile()],
+          },
+        ],
+      }),
+    )
+    const { user } = setup({ agentId: REMOTE, chatId: CHAT_ID })
+    const list = screen.getByRole('list', { name: T.title })
+    const reply = (await within(list).findByText('Here is the plan.')).closest('[data-role="assistant"]') as HTMLElement
+    expect(within(reply).getByText('plan.md')).toBeInTheDocument()
+    await user.click(within(reply).getByRole('button', { name: R.showInFolder }))
+    await waitFor(() => expect(mocked.revealAgentFile).toHaveBeenCalledWith(REMOTE, `${CHAT_ID}/plan.md`))
+    expect(mocked.agentChat).toHaveBeenCalledWith(REMOTE, CHAT_ID)
+  })
+
+  test('test an editor entry while a remote agent is shown goes to the default agent', async () => {
+    withRemote()
+    mocked.aiChat.mockImplementation(answer(done('Try these.', { proposal: { kind: 'tags', tags: ['runbook'] } })))
+    setup({ agentId: REMOTE })
+    expect(picker()).toHaveTextContent('Fake Planner')
+    act(() => openAiChat({ mode: 'tagBlock', block: 'Some text', blockPath: 'Pages/A.md' }))
+    await screen.findByRole('region', { name: T.proposedTags })
+    expect(mocked.aiChat.mock.calls[0][0]).toMatchObject({ mode: 'tagBlock', agentId: 'assistant', block: 'Some text' })
+    expect(picker()).toHaveTextContent('Assistant')
+    // The default agent: no remote notice, and the model picker is back.
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocked.ackRemoteContext).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: T.modelForChat })).toBeInTheDocument()
   })
 })

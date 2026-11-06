@@ -115,6 +115,13 @@ describe('toolStepLine', () => {
     expect(line('agent_info')).toBe('Looked up this agent')
   })
 
+  test("test the A2A tools' lines", () => {
+    // M20: the three agent tools that reach other agents.
+    expect(line('remote_agents_list')).toBe('Listed remote agents')
+    expect(line('remote_agent_call', { agent: 'Fake Planner', message: 'Hi' })).toBe('Asked Fake Planner')
+    expect(line('delegate', { agent: 'Researcher', goal: 'List rack pages' })).toBe('Handed a task to Researcher')
+  })
+
   test('test long values are cut at 60 characters', () => {
     const q = 'x'.repeat(61)
     expect(line('search', { query: q })).toBe(`Searched notes for '${'x'.repeat(60)}…'`)
