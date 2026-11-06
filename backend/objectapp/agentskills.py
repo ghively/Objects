@@ -211,12 +211,17 @@ def _utf8(data: bytes) -> str | None:
     return textfile.decode(data).text
 
 
-def _stored(data: bytes | None) -> tuple[str | None, str]:
-    """A file's bytes as the ledger keeps them: (text or base64, encoding)."""
+def _stored(data: bytes | None, *, exact: bool = False) -> tuple[str | None, str]:
+    """A file's bytes as the ledger keeps them: (text or base64, encoding).
+
+    With `exact` (a removed file, which undo rebuilds with nothing to copy the form from), text
+    that can't give back the same bytes as plain ``\\n`` UTF-8 (a BOM, CRLF endings) is kept as
+    base64 too, so the undo restores the file byte for byte.
+    """
     if data is None:
         return None, "text"
     text = _utf8(data)
-    if text is None:
+    if text is None or (exact and text.encode("utf-8") != data):
         return base64.b64encode(data).decode("ascii"), "base64"
     return text, "text"
 
@@ -726,7 +731,7 @@ def _change_file(folder: Path, name: str, skill_dir: Path, action: str, source: 
     if action == "remove_file":
         if original is None:
             raise SkillNotFound(f"There's no file {rel} in '{name}'.")
-        before, encoding = _stored(original)
+        before, encoding = _stored(original, exact=True)
         textfile.retry_os(lambda: os.unlink(path))
         return _log(folder, action, name, source, file=rel, before=before, after=None, encoding=encoding)
     if action == "write_file":

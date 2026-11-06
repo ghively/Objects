@@ -415,6 +415,32 @@ def test_undo_each_action(folder: Path) -> None:
     assert first["action"] == "create" and first["skill"] == "rack-labels"
 
 
+@pytest.mark.parametrize("data", [
+    b"\xef\xbb\xbfref one\r\nref two\r\n",
+    b"ref one\r\nref two\r\n",
+    b"\xef\xbb\xbfref\n",
+])
+def test_undo_remove_file_keeps_bom_and_crlf(folder: Path, data: bytes) -> None:
+    _create(folder, key="r")
+    path = folder / SKILLS_DIR / "rack-labels" / "references" / "a.md"
+    path.parent.mkdir()
+    path.write_bytes(data)
+    out = manage(folder, "remove_file", name="rack-labels", source=SOURCE, memo_key="r", file="references/a.md")
+    assert not path.exists()
+    undo(folder, out["entryId"], source=UNDO)
+    assert path.read_bytes() == data
+
+
+def test_remove_file_plain_text_stays_text(folder: Path) -> None:
+    _create(folder, key="r")
+    path = folder / SKILLS_DIR / "rack-labels" / "references" / "a.md"
+    path.parent.mkdir()
+    path.write_bytes(b"ref\n")
+    out = manage(folder, "remove_file", name="rack-labels", source=SOURCE, memo_key="r", file="references/a.md")
+    entry = ledger.get(folder, out["entryId"])
+    assert entry["encoding"] == "text" and entry["before"] == "ref\n"
+
+
 def test_undo_refuses_when_changed_since(folder: Path) -> None:
     _create(folder)
     view(folder, "rack-labels", memo_key="r")
