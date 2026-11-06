@@ -8,7 +8,63 @@ Each run used a temp agent folder under a temp state dir, an empty `--mcp-config
 {"deny": [...]}}`, and the environment minus `CLAUDE_CONFIG_DIR` and minus the variables a parent
 Claude Code session sets (see "Environment" below).
 
-## Result: stop-and-ask
+## Gene's decision (2026-11-06)
+
+Gene's answer to the stop-and-ask below: "Yes, add and continue". **`claudeMdExcludes` is adopted.**
+Every agent run's `--settings` file (`run-settings.json`) now holds
+
+```jsonc
+{
+  "autoMemoryEnabled": false,                       // agentrun.RUN_SETTINGS_BASE
+  "claudeMdExcludes": [ ... ],                      // agentrun.claude_md_excludes(own, Path.home())
+  "permissions": {"deny": [ ... ]}                  // the fence
+}
+```
+
+The excludes' form (`claude_md_excludes(own, home)`, plan Contract, Turn runner): absolute paths
+from the resolved (long-form, never 8.3) folders, with `/` separators and duplicates removed, in
+this order:
+
+1. `<home>/.claude/CLAUDE.md` and `<home>/.claude/rules/**` (Gene's user instructions);
+2. for every ancestor folder `a` of the agent folder, from its parent up to the drive root:
+   `a/CLAUDE.md`, `a/.claude/CLAUDE.md`, `a/CLAUDE.local.md`.
+
+The agent folder's own `CLAUDE.md` is never in the list, so it is the only instruction file that
+loads. A contributor's `parts.settings` can extend the list, never replace it. For example, on the
+re-run the list began `C:/Users/genehively/.claude/CLAUDE.md`,
+`C:/Users/genehively/.claude/rules/**`, `<tmp>/state/agents/CLAUDE.md`,
+`<tmp>/state/agents/.claude/CLAUDE.md`, `<tmp>/state/agents/CLAUDE.local.md`, `<tmp>/state/CLAUDE.md`
+and ended `C:/CLAUDE.md`, `C:/.claude/CLAUDE.md`, `C:/CLAUDE.local.md`.
+
+`test_m17_live_cli.py::test_claude_md_excludes_list` and `::test_claude_md_excludes_home_inside_ancestors`
+(not live, they always run) pin the list; T4's `test_run_settings_keep_user_instructions_out` pins
+that `build_run` writes it. The live test's run environment also drops `agentrun.RUN_ENV_DROP` (plus
+`BAGGAGE`).
+
+### The re-run (2026-11-06, CLI 2.1.317, haiku, `--no-session-persistence`)
+
+`OBJECT_LIVE_CLAUDE=1 uv run pytest backend/tests/test_m17_live_cli.py -q -s`: **6 passed** (the four
+live tests and the two list tests), with the run settings above. The make-agent setup now plants
+four ancestor instruction files carrying the ancestor marker: `<state>/CLAUDE.md`,
+`<state>/.claude/CLAUDE.md`, `<state>/agents/CLAUDE.md` and `<state>/agents/CLAUDE.local.md`.
+
+- `test_user_setup_never_reaches_a_run`: **pass.** Asked without tools to list the instruction files in
+  its context, the model answered its soul marker and only
+  `<tmp>\state\agents\Spike\CLAUDE.md`. Neither Gene's user `CLAUDE.md` nor any planted ancestor file
+  was listed, and the ancestor marker was not in the answer. The debug log shows one
+  `InstructionsLoaded` dispatch (four before the excludes). The other checks still hold: no plugin
+  outside `@builtin`, no user skill (`init.skills` holds only the CLI's bundled skills), `mcp_servers`
+  empty, user deny rules replaced with 0 rules, 0 hooks registered, no auto-memory folder in the log.
+- `test_folder_hook_runs`: pass.
+- `test_fence_is_enforced`: pass. Read was refused ("File is in a directory that is denied by your
+  permission settings."), Grep and Glob were refused ("Permission to read <folder> has been denied."),
+  and the secret text appeared in no event. The unfenced Read worked.
+- `test_builtin_names`: pass. `init.tools` was the same list as below; the To-do list row was absent
+  from this run, as the spike allows.
+
+The stop-and-ask is answered: the build goes on with T2-T11.
+
+## Result of the first run: stop-and-ask (answered above)
 
 **Gene's user `CLAUDE.md` reaches an agent run.** With `--setting-sources project,local`, the CLI
 still gives the model `C:\Users\genehively\.claude\CLAUDE.md` (Gene's user instructions: his name,
@@ -49,8 +105,8 @@ agent's own folder; and the live test should then pass unchanged.
 
 | Check | Result |
 |---|---|
-| User `CLAUDE.md` (`~/.claude/CLAUDE.md`) | **Reaches the run** (above). |
-| An ancestor folder's `CLAUDE.md` | **Reaches the run** (above). |
+| User `CLAUDE.md` (`~/.claude/CLAUDE.md`) | **Reaches the run** with `--setting-sources` alone (above). Kept out by `claudeMdExcludes` (Gene's decision, re-run passed). |
+| An ancestor folder's `CLAUDE.md` | **Reaches the run** with `--setting-sources` alone (above). Kept out by `claudeMdExcludes`, as are an ancestor's `.claude/CLAUDE.md` and `CLAUDE.local.md` (re-run passed). |
 | User skills (`~/.claude/skills/`) | Kept out when the agent folder's path is a long path: debug log "Loading skills from: ... user=C:\Users\genehively\.claude\skills, project=[]" and "Loaded 0 unique skills (... user: 0, project: 0 ...)"; `init.skills` holds only the CLI's bundled skills. **But** with the folder under the 8.3 form of `%TEMP%` (`C:\Users\GENEHI~1\...`), the CLI walked up to `C:\Users\GENEHI~1\.claude\skills`, did not see it as the user folder, and loaded all 7 of Gene's skills as *project* skills. The real state dir (`%LOCALAPPDATA%`) is a long path, so `agentrun` must run in the resolved (long) folder path; the live test resolves its temp folder. |
 | Plugins | None of Gene's 30 installed plugins load ("Found 6 plugins (5 enabled, 1 disabled)"; "Total plugin skills loaded: 0"). `init.plugins` is not empty: it lists five `cc-plugin-*@builtin` plugins the CLI binary carries, which are not Gene's setup. The live test checks that no plugin outside `@builtin` loads (the plan's "plugins is empty" can't hold on this CLI). |
 | User hooks | None run: "Registered 0 hooks from 5 plugins"; no command hook from `~/.claude/settings.json` in the log. |
@@ -101,7 +157,7 @@ The live test removes them, as Object started on its own would have none. If Obj
 from inside a Claude Code terminal, `build_run`'s environment (today `os.environ` minus
 `CLAUDE_CONFIG_DIR`) would pass them on; that is for Gene or T4 to decide, not changed here.
 
-## Live test status
+## Live test status (first run; for the re-run see "Gene's decision" above)
 
 `OBJECT_LIVE_CLAUDE=1 uv run pytest backend/tests/test_m17_live_cli.py -q -s`:
 
