@@ -1,6 +1,6 @@
 # Object import and migration: design
 
-Date: 2026-11-06. Owner: Gene Hively. Status: **draft for Gene's review**. Plans: none yet (milestones after M24; see "Phases").
+Date: 2026-11-06. Owner: Gene Hively. Status: **approved by Gene, 2026-11-06** (the whole document, our calls included). Plans: none yet (milestones after M24; see "Phases").
 
 Builds on M1-M15 (types, properties, media blocks, File/Image/PDF types, the importer, version history, Trash, "Exclude from AI"), on the agents milestones M16-M21 (`specs/2026-11-05-agents-design.md`: skills, the MCP gateway, schedules) and on the MCP server (M11).
 
