@@ -76,6 +76,13 @@ Reported by the build lanes, plus T13's:
   - Check 2 reads the Tickets view's rows through the agents' `POST /api/v1/queries/work-tickets/run` with the "Work" token (the app's rows are filtered in the front end, so no app route runs a saved query's filter). The token is made before check 1; it writes only the state dir.
   - Check 3 accepts the two new section headings with the two lines: Parked thing has no `## Activity` or `## Work notes` yet.
   - Only this milestone's tests, `tsc` and the acceptance script were run, as the build instructions say; the full suites, `npm run lint`, `npm run build`, `m14_acceptance.py` and `m11_acceptance.py` run in the track's gate.
+- **Review fix pass (tightens Our call 11, for Gene to confirm):**
+  - Agents now can't remove or move an Approve step in any state, or change a step's kind to or from Approve ("Agents can't move or remove an Approve step, or change a step to or from Approve."). They also can't add an Agent step in front of an Approve step that still waits (open or approved), or move one there ("Agents can't put an Agent step ahead of an Approve step."). They can still reword an open Approve step, and add or move Question, Do and Approve steps anywhere. Gene's own edits are unchanged.
+  - These op rules are server only. The TS port has no `applyOp`, and `step-cases.json` rows are action rows, so no parity rows were added. `test_m22_rules.py::test_agent_ops_keep_the_approval_gate` and `test_m22_writes.py::test_gate_cannot_be_bypassed_with_step_ops` cover them.
+  - On a work item, the agents' `POST /v1/history/restore` and `POST /v1/object/duplicate` answer 422 "Steps change with the step actions." when the restored version or the copy would hold an approved or done Approve step that the file doesn't have now. Approve steps are compared on id, text, state, `approvedAt`, `notBefore` and `doneAt`. The app's own routes are unchanged. `POST /v1/trash/{id}/restore` is not gated, because it brings back the file as it was when it was deleted.
+  - A step or floor item whose known key holds a mapping or a list is now a problem ("Step n's answer isn't text."), so writes to that list are refused and its bytes are kept.
+  - The work service takes the Jira site from `space_fields`, so a site that isn't an http(s) address makes no ticket link.
+  - A later line of a multi-line note that would open a code fence (```` ``` ````, `~~~`) or a heading (`#` to `######`) is written with a backslash in front. `work_note_lines` removes the backslash again on read.
 
 ## Hand checks for Gene
 
