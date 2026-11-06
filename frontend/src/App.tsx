@@ -53,6 +53,8 @@ import { CreateTypeDialog } from '@/types/CreateTypeDialog'
 import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
 import { TypePage } from '@/types/TypePage'
 import { WorkPage } from '@/work/page/WorkPage'
+import { WorkOverlays } from '@/work/session/WorkOverlays'
+import { WorkToasts } from '@/work/state/WorkToasts.tsx'
 
 // Pages whose code the shell does not need at start (the graph's sigma and graphology, the
 // calendar, type settings) load when first shown (audit 2026-11-01 F1).
@@ -113,7 +115,8 @@ interface PageCtx {
 function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
   switch (target.kind) {
     case 'object':
-      return <ObjectPage path={target.path} />
+      // M23: `work: true` (the item panel) shows the work header above the object's page.
+      return <ObjectPage path={target.path} workHeader={target.work} />
     case 'type': {
       const type = types.find((t) => t.id === target.typeId)
       if (type) return <TypePage key={type.id} type={type} />
@@ -358,6 +361,7 @@ export default function App() {
                 calendarActive={target?.kind === 'calendar'}
                 tasksActive={target?.kind === 'tasks'}
                 graphActive={target?.kind === 'graph'}
+                workActive={target?.kind === 'work'}
                 activeCollectionId={target?.kind === 'collection' ? target.id : null}
               />
             </ErrorBoundary>
@@ -382,6 +386,9 @@ export default function App() {
           onShowRightPanel={() => openInSidepanel({ kind: 'localGraph' })}
         />
         <LinkPicker />
+        {/* M23: the work toasts (problems and Undo) and the focus session / Make it smaller, once. */}
+        <WorkToasts />
+        <WorkOverlays />
         <NewObjectMenu open={newMenuOpen} onOpenChange={setNewMenuOpen} />
         <CreateTypeDialog
           open={createTypeOpen}

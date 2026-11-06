@@ -448,7 +448,9 @@ export const useTabs = create<TabsState>()(
 
       retarget(oldPath, newPath) {
         if (oldPath !== newPath) {
-          const moved = (t: Target): Target => (t.kind === 'object' && t.path === oldPath ? { kind: 'object', path: newPath } : t)
+          // M23: the item panel's `work` flag moves with the object.
+          const moved = (t: Target): Target =>
+            t.kind === 'object' && t.path === oldPath ? { kind: 'object', path: newPath, ...(t.work ? { work: true as const } : {}) } : t
           const s = get()
           const hit = (h: Target) => h.kind === 'object' && h.path === oldPath
           const panelHit = (t: Tab) => !!t.sidepanel && retargetEntries(t.sidepanel, oldPath, newPath) !== t.sidepanel
