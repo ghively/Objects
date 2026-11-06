@@ -41,7 +41,7 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     (
         "password",
         re.compile(
-            r"(?i)\b(?:password|passwd|pwd|passphrase|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)"
+            r"(?i)(?<![A-Za-z0-9])(?:password|passwd|pwd|passphrase|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)"
             r"[\"']?\s*(?:[:=]|:=|=>)\s*[\"']?(?!\s*[\"']?\s*$)(?![<{$%\[(*]|your[_-]|example|changeme|xxx|null\b|none\b|true\b|false\b|redacted|\.\.\.)"
             r"[^\s\"',;]{4,}"
         ),
