@@ -619,12 +619,17 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
       const finished = done as Extract<AiEvent, { type: 'done' }> | null
       if (finished) {
         if (finished.sessionId) sessionId.current = finished.sessionId
+        // With tool steps, `done.text` is only the last message: the item's text is every
+        // streamed text (what the parts show), so Copy and the save hold what was displayed.
+        // `finished.text` still gives the proposal (parsed by the backend from it).
+        if (hasSteps(parts) && !acc && finished.text) parts = [...parts, { kind: 'text', text: finished.text }]
+        const shown = hasSteps(parts) ? acc || finished.text : finished.text || acc
         setItems((prev) => [
           ...prev,
           {
             id: newItemId(),
             role: 'assistant',
-            text: finished.text || acc,
+            text: shown,
             at: new Date().toISOString(),
             proposal: finished.proposal,
             target,
@@ -644,11 +649,13 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
         stopped: true,
         ...(hasSteps(parts) ? { parts: stopSteps(parts) } : {}),
       })
+      // A stopped or failed turn keeps what it showed: its text, or its steps when no text came yet.
+      const keep = !!acc || hasSteps(parts)
       if (ctl.signal.aborted) {
-        if (acc) setItems((prev) => [...prev, partial()])
+        if (keep) setItems((prev) => [...prev, partial()])
         return
       }
-      if (acc) setItems((prev) => [...prev, partial()])
+      if (keep) setItems((prev) => [...prev, partial()])
       setError(failed ?? T.emptyAnswer)
     },
     [save, setItems],

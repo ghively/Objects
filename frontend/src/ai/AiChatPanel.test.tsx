@@ -627,6 +627,45 @@ describe('AiChatPanel', () => {
     expect(screen.getByText(T.stopped)).toBeInTheDocument()
   })
 
+  test('test Stop with no text before the tool call keeps the step, marked stopped', async () => {
+    mocked.aiChat.mockImplementation(async (_req, onEvent, sig) => {
+      onEvent({ type: 'tool', id: 't1', name: 'search', input: { query: 'rack' } })
+      await new Promise<void>((_resolve, reject) => sig?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))))
+    })
+    const { user } = setup()
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'Find it{Enter}')
+    await screen.findByRole('button', { name: "Searched notes for 'rack'" })
+    await user.click(screen.getByRole('button', { name: T.stop }))
+    expect(await screen.findByRole('button', { name: "Searched notes for 'rack' (stopped)" })).toBeInTheDocument()
+    expect(screen.getByText(T.stopped)).toBeInTheDocument()
+  })
+
+  test('test an answer with tool steps between its texts: Copy and the save hold what is shown', async () => {
+    mocked.aiChat.mockImplementation(
+      answer(
+        { type: 'text', text: 'Let me look.' },
+        { type: 'tool', id: 't1', name: 'search', input: { query: 'rack' } },
+        { type: 'tool', id: 't1', name: 'search', input: null, result: '[]', isError: false },
+        { type: 'text', text: '\n\nFound it.' },
+        // The CLI's result is only the last assistant message.
+        done('Found it.'),
+      ),
+    )
+    const { user } = setup()
+    const write = vi.spyOn(navigator.clipboard, 'writeText')
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'Find rack{Enter}')
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+    const reply = screen.getByRole('list', { name: T.title }).querySelector('[data-role="assistant"]') as HTMLElement
+    expect(within(reply).getByText('Let me look.')).toBeInTheDocument()
+    expect(within(reply).getByText('Found it.')).toBeInTheDocument()
+    const shown = 'Let me look.\n\nFound it.'
+    expect(mocked.saveAiChat.mock.calls[0][0].messages[1]).toMatchObject({ role: 'assistant', text: shown })
+    await user.click(within(reply).getByRole('button', { name: T.copy }))
+    expect(write).toHaveBeenCalledWith(shown)
+  })
+
   test("test the header's model picker sets this chat's model", async () => {
     const { user } = setup()
     await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
