@@ -1,10 +1,11 @@
 /**
  * M17: the agent page (spec section 2), a main-view target `{kind: 'agent', id, tab}`. The
  * agent's icon and name, then its tabs (`AGENT_TABS`, sorted by order: Profile, Instructions,
- * Tools, Chats; M18 adds Memory, Skills and Learning). The agent comes from the shared list
- * (`useAgents`), which the tabs update after a save; opening the page writes nothing.
+ * Tools, Memory, Skills, Learning, Chats). The agent comes from the shared list (`useAgents`),
+ * which the tabs update after a save; opening the page writes nothing. A changed `tab` prop (the
+ * agent opened again at another tab, e.g. "Memory & skills") switches to it.
  */
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { IconOrEmoji } from '@/components/Icon'
 import { cn } from '@/lib/utils'
 import { AGENT_TABS } from './agentTabs'
@@ -31,6 +32,11 @@ export function AgentPage({ id, tab }: AgentPageProps) {
   useEffect(() => {
     if (!useAgents.getState().loaded) void useAgents.getState().load()
   }, [])
+
+  // M18: opening this agent again with another tab (the page stays mounted) shows that tab.
+  useEffect(() => {
+    if (tab && AGENT_TABS.some((t) => t.id === tab)) setActive(tab)
+  }, [tab])
 
   if (!agent) {
     return (
@@ -71,7 +77,9 @@ export function AgentPage({ id, tab }: AgentPageProps) {
         ))}
       </div>
       <div role="tabpanel" id={`agent-panel-${current.id}`} aria-labelledby={`agent-tab-${current.id}`}>
-        <Body key={`${agent.id}:${current.id}`} agent={agent} />
+        <Suspense fallback={<p className="text-[14px] text-fg-muted">{AGENT_PAGE_TEXT.loading}</p>}>
+          <Body key={`${agent.id}:${current.id}`} agent={agent} />
+        </Suspense>
       </div>
     </div>
   )

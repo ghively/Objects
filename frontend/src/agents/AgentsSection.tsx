@@ -2,7 +2,7 @@
  * M17: the Agents section at the top of the sidebar (spec section 2), directly above the main
  * navigation. Each row is an agent's icon and name, the default agent first; a click opens that
  * agent's chat in the side panel. A row's `…` menu holds Open chat, Settings (the agent page),
- * Duplicate (New agent, started from it) and Delete (no confirm: restorable from "Deleted
+ * Memory & skills (M18: the agent page's Memory tab), Duplicate (New agent, started from it) and Delete (no confirm: restorable from "Deleted
  * agents…"; an agent outside the state dir is only unregistered, and the section says so). The
  * heading's `+` menu holds New agent, Add agent folder… and Deleted agents…; "+ New agent" is
  * also the last row. Nothing renders while AI features are hidden.
@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { AddAgentFolderDialog } from './AddAgentFolderDialog'
 import { AgentTrashDialog } from './AgentTrashDialog'
 import { AGENT_TEXT as T } from './agentText'
+import { LEARNING_TEXT } from './learningText'
 import { NewAgentDialog } from './NewAgentDialog'
 import { useAgents } from './useAgents'
 
@@ -45,12 +46,14 @@ function AgentRow({
   agent,
   onOpen,
   onSettings,
+  onMemory,
   onDuplicate,
   onDelete,
 }: {
   agent: Agent
   onOpen(): void
   onSettings(): void
+  onMemory(): void
   onDuplicate(): void
   onDelete(): void
 }) {
@@ -89,6 +92,10 @@ function AgentRow({
           <DropdownMenuItem onSelect={onSettings}>
             <Icon name="ph-gear" size={14} />
             {T.settings}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={onMemory}>
+            <Icon name="ph-lightbulb" size={14} />
+            {LEARNING_TEXT.memoryAndSkills}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={onDuplicate}>
             <Icon name="ph-copy" size={14} />
@@ -175,6 +182,7 @@ export function AgentsSection({ onOpenTarget }: AgentsSectionProps) {
             agent={a}
             onOpen={() => openAgentChat(a)}
             onSettings={() => open({ kind: 'agent', id: a.id }, {})}
+            onMemory={() => open({ kind: 'agent', id: a.id, tab: 'memory' }, {})}
             onDuplicate={() => newAgent(a)}
             onDelete={() => void remove(a)}
           />

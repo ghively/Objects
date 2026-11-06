@@ -8,8 +8,9 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
-import { agent } from '@/test/mockApi'
+import { agent, ledgerSummary } from '@/test/mockApi'
 import { AgentPage, AGENT_PAGE_TEXT } from './AgentPage'
+import { LEARNING_TEXT } from './learningText'
 import { PROFILE_TEXT } from './ProfileTab'
 import { resetAgents, useAgents } from './useAgents'
 
@@ -23,12 +24,12 @@ describe('AgentPage', () => {
   })
   afterEach(() => resetAgents())
 
-  test('test the page shows the agent and its four tabs, Profile first', async () => {
+  test('test the agent page lists Profile, Instructions, Tools, Memory, Skills, Learning, Chats in that order', async () => {
     mocked.agents.mockResolvedValue([agent({ id: 'assistant' }), agent({ id: RESEARCHER })])
     render(<AgentPage id={RESEARCHER} />)
     expect(await screen.findByRole('heading', { name: 'Researcher' })).toBeInTheDocument()
     const tabs = within(screen.getByRole('tablist', { name: AGENT_PAGE_TEXT.tabs })).getAllByRole('tab')
-    expect(tabs.map((t) => t.textContent)).toEqual(['Profile', 'Instructions', 'Tools', 'Chats'])
+    expect(tabs.map((t) => t.textContent)).toEqual(['Profile', 'Instructions', 'Tools', 'Memory', 'Skills', 'Learning', 'Chats'])
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('textbox', { name: PROFILE_TEXT.name })).toHaveValue('Researcher')
   })
@@ -38,6 +39,48 @@ describe('AgentPage', () => {
     render(<AgentPage id={RESEARCHER} tab="chats" />)
     expect(screen.getByRole('tab', { name: 'Chats' })).toHaveAttribute('aria-selected', 'true')
     expect(await screen.findByRole('searchbox', { name: 'Filter chats' })).toBeInTheDocument()
+  })
+
+  test('test an open agent page switches to a newly opened tab', async () => {
+    useAgents.setState({ agents: [agent({ id: RESEARCHER })], loaded: true })
+    const { rerender } = render(<AgentPage id={RESEARCHER} tab="profile" />)
+    expect(screen.getByRole('tab', { name: 'Profile' })).toHaveAttribute('aria-selected', 'true')
+    rerender(<AgentPage id={RESEARCHER} tab="memory" />)
+    expect(screen.getByRole('tab', { name: 'Memory' })).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByText(LEARNING_TEXT.memoryIntro)).toBeInTheDocument()
+    rerender(<AgentPage id={RESEARCHER} tab="skills" />)
+    expect(screen.getByRole('tab', { name: 'Skills' })).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByRole('tabpanel')).toBeInTheDocument()
+    await waitFor(() => expect(document.querySelector('[data-agent-tab="skills"]')).not.toBeNull())
+  })
+
+  test('test a read-only agent disables memory and learning fields', async () => {
+    const reason = 'This agent was made by a newer version of Object.'
+    mocked.agentMemory.mockResolvedValue({
+      memory: { target: 'memory', text: 'Racks are labelled by row.', entries: ['Racks are labelled by row.'], chars: 26, cap: 2200, revision: 'm1' },
+      user: { target: 'user', text: '', entries: [], chars: 0, cap: 1375, revision: null },
+    })
+    mocked.agentLedger.mockImplementation(async (_id, q) => ({
+      entries: q?.target === 'memory' ? [ledgerSummary({ id: '01JLEDGER00000000000000001' })] : [],
+      more: false,
+    }))
+    useAgents.setState({ agents: [agent({ id: RESEARCHER, readOnlyReason: reason })], loaded: true })
+    const user = userEvent.setup()
+    render(<AgentPage id={RESEARCHER} tab="memory" />)
+    const memory = await screen.findByRole('textbox', { name: LEARNING_TEXT.memory })
+    await waitFor(() => expect(memory).toHaveAttribute('contenteditable', 'false'))
+    expect(screen.getByRole('textbox', { name: LEARNING_TEXT.user })).toHaveAttribute('contenteditable', 'false')
+    expect(await screen.findByRole('button', { name: `${LEARNING_TEXT.undo}: Saved a memory` })).toBeDisabled()
+
+    await user.click(screen.getByRole('tab', { name: 'Learning' }))
+    const numbers = await screen.findAllByRole('spinbutton')
+    expect(numbers).toHaveLength(6)
+    for (const n of numbers) expect(n).toBeDisabled()
+    for (const s of screen.getAllByRole('switch')) expect(s).toBeDisabled()
+    expect(screen.getByRole('button', { name: LEARNING_TEXT.reviewModel })).toBeDisabled()
+    expect(screen.getByRole('button', { name: LEARNING_TEXT.reset })).toBeDisabled()
+    expect(mocked.saveAgentMemory).not.toHaveBeenCalled()
+    expect(mocked.saveAgentLearning).not.toHaveBeenCalled()
   })
 
   test('test an unlisted agent says so', async () => {
