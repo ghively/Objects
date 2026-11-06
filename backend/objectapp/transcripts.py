@@ -13,6 +13,10 @@ M18 adds two line types. A ``memory`` line (the chat's frozen memory snapshot) i
 ``review`` lines (a background review's start and end, sharing an ``id``) read as one
 ``learning`` item per review, at the start line's place, with the end line's state, summary and
 message. Unknown line types are skipped. `raw_lines` gives every parsable line, header included.
+
+M20 adds a delegated chat's header keys ``from`` (the delegating agent's id) and ``fromChat`` (its
+chat), and a remote agent's assistant lines carry ``a2a`` (``{contextId, taskId, state}``) and
+``attachments`` (`RemoteAttachment` list); `read` keeps both on the items.
 """
 
 from __future__ import annotations
@@ -62,8 +66,10 @@ def path_for(folder: Path, chat_id: str) -> Path:
 
 
 def start(folder: Path, chat_id: str, *, agent_id: str, title: str, space_name: str | None,
-          space_key: str | None, created_at: str, delegated: bool = False) -> None:
-    """Write the header line, only when the transcript is new."""
+          space_key: str | None, created_at: str, delegated: bool = False,
+          delegated_from: str | None = None, from_chat: str | None = None) -> None:
+    """Write the header line, only when the transcript is new. A delegated chat's header also
+    names the delegating agent (``from``) and its chat (``fromChat``) when given."""
     path = path_for(folder, chat_id)
     header = {
         "type": "chat",
@@ -75,6 +81,10 @@ def start(folder: Path, chat_id: str, *, agent_id: str, title: str, space_name: 
         "space": {"name": space_name, "key": space_key} if (space_name or space_key) else None,
         "delegated": delegated,
     }
+    if delegated_from is not None:
+        header["from"] = delegated_from
+    if from_chat is not None:
+        header["fromChat"] = from_chat
     with _lock_for(path):
         path.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -130,6 +140,10 @@ def _item(line: dict[str, Any]) -> dict[str, Any]:
                                 "model": line.get("model"), "sessionId": line.get("sessionId")}
         if line.get("stopped"):
             item["stopped"] = True
+        if isinstance(line.get("a2a"), dict):
+            item["a2a"] = line["a2a"]
+        if isinstance(line.get("attachments"), list):
+            item["attachments"] = [a for a in line["attachments"] if isinstance(a, dict)]
         return item
     if kind == "tool":
         inp = line.get("input")
@@ -200,6 +214,7 @@ def _summarize(chat_id: str, lines: list[dict[str, Any]]) -> dict[str, Any]:
         "messageCount": sum(1 for i in items if i["type"] in _MESSAGE_TYPES),
         "spaceName": space.get("name") if isinstance(space, dict) else None,
         "delegated": bool(header.get("delegated")),
+        "from": header.get("from") if isinstance(header.get("from"), str) else None,
         "agentId": header.get("agentId"),
         "sessionId": session_id,
         "objectPath": object_path,
@@ -219,7 +234,7 @@ def read(folder: Path, chat_id: str) -> dict[str, Any]:
     return _summarize(chat_id, _parse(path))
 
 
-_SUMMARY_KEYS = ("id", "title", "createdAt", "updatedAt", "messageCount", "spaceName", "delegated")
+_SUMMARY_KEYS = ("id", "title", "createdAt", "updatedAt", "messageCount", "spaceName", "delegated", "from")
 
 
 def _all(folder: Path) -> list[dict[str, Any]]:
@@ -253,3 +268,43 @@ def find_by_session(folder: Path, session_id: str) -> str | None:
         if any(i["type"] == "assistant" and i["sessionId"] == session_id for i in t["items"]):
             return t["id"]
     return None
+
+
+def _last_assistant_a2a(lines: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for line in reversed(lines):
+        if line.get("type") == "assistant":
+            a2a = line.get("a2a")
+            return a2a if isinstance(a2a, dict) else None
+    return None
+
+
+def last_a2a(folder: Path, chat_id: str) -> dict[str, Any] | None:
+    """The last assistant line's ``a2a`` (M20), or None (no such chat, no assistant line, or a
+    last assistant line without one). Never writes."""
+    try:
+        return _last_assistant_a2a(_parse(path_for(folder, chat_id)))
+    except (OSError, ValueError):
+        return None
+
+
+def find_by_context(folder: Path, context_id: str) -> str | None:
+    """The newest chat whose last assistant line's ``a2a.contextId`` is `context_id` (M20)."""
+    if not context_id:
+        return None
+    sessions = Path(folder) / SESSIONS_DIR
+    try:
+        entries = list(sessions.iterdir())
+    except OSError:
+        return None
+    found: list[tuple[str, str]] = []
+    for entry in entries:
+        if entry.suffix != ".jsonl" or not _CHAT_ID_RE.match(entry.stem):
+            continue
+        try:
+            lines = _parse(entry)
+        except OSError:
+            continue
+        a2a = _last_assistant_a2a(lines)
+        if a2a is not None and a2a.get("contextId") == context_id:
+            found.append((_summarize(entry.stem, lines)["updatedAt"], entry.stem))
+    return max(found)[1] if found else None
