@@ -8,7 +8,8 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
-import type { ToolGroup } from '@/api/types'
+import type { McpGroupStatus, ToolGroup } from '@/api/types'
+import { MCP_TEXT } from '@/mcp/mcpText'
 import { agent } from '@/test/mockApi'
 import { AGENT_TEXT } from './agentText'
 import { ToolsTab } from './ToolsTab'
@@ -39,6 +40,7 @@ describe('ToolsTab', () => {
     resetAgents()
     useAgents.setState({ agents: [agent({ id: RESEARCHER, toolsOff: ['Bash'], revision: 'r1' })], loaded: true })
     mocked.agentTools.mockResolvedValue(GROUPS)
+    mocked.refreshAgentTools.mockResolvedValue(GROUPS)
     mocked.saveAgent.mockImplementation(async (id, input, base) => agent({ id, toolsOff: input.toolsOff ?? [], revision: `${base}+1` }))
   })
   afterEach(() => resetAgents())
@@ -70,5 +72,62 @@ describe('ToolsTab', () => {
     expect(mocked.saveAgent.mock.calls[1][1].toolsOff).toEqual(['Read'])
     expect(mocked.saveAgent.mock.calls[1][2]).toBe('r1+1')
     await waitFor(() => expect(screen.getByRole('switch', { name: 'Shell (Bash, PowerShell)' })).toBeChecked())
+  })
+})
+
+function server(partial: Partial<McpGroupStatus> = {}): McpGroupStatus {
+  return { source: 'gateway', serverId: '01JSRV', name: 'fake', status: 'ok', error: null, fetchedAt: '2026-11-06T09:00:00.000Z', missingVars: [], ...partial }
+}
+
+const ECHO = { id: 'mcp__fake__echo', label: 'echo', on: true, warning: null }
+const ADD = { id: 'mcp__fake__add', label: 'add', on: true, warning: null }
+
+describe('ToolsTab: outside MCP servers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetAgents()
+    useAgents.setState({ agents: [agent({ id: RESEARCHER, toolsOff: [], revision: 'r1' })], loaded: true })
+    mocked.saveAgent.mockImplementation(async (id, input, base) => agent({ id, toolsOff: input.toolsOff ?? [], revision: `${base}+1` }))
+  })
+  afterEach(() => resetAgents())
+
+  test('test the Tools tab refreshes server tools on open and shows Listing tools… meanwhile', async () => {
+    mocked.agentTools.mockResolvedValue([...GROUPS, { id: 'mcp:fake', label: 'fake', tools: [], server: server({ status: 'unknown', fetchedAt: null }) }])
+    let answer: (g: ToolGroup[]) => void = () => undefined
+    mocked.refreshAgentTools.mockImplementation(() => new Promise<ToolGroup[]>((r) => (answer = r)))
+    render(<Live />)
+    expect(await screen.findByText(MCP_TEXT.listing)).toBeInTheDocument()
+    expect(mocked.agentTools).toHaveBeenCalledWith(RESEARCHER)
+    expect(mocked.refreshAgentTools).toHaveBeenCalledTimes(1)
+    expect(mocked.refreshAgentTools).toHaveBeenCalledWith(RESEARCHER)
+    answer([...GROUPS, { id: 'mcp:fake', label: 'fake', tools: [ADD, ECHO], server: server() }])
+    const group = await screen.findByRole('region', { name: 'fake' })
+    await waitFor(() => expect(within(group).getByRole('switch', { name: 'echo' })).toBeChecked())
+    expect(screen.queryByText(MCP_TEXT.listing)).toBeNull()
+    expect(mocked.refreshAgentTools).toHaveBeenCalledTimes(1)
+  })
+
+  test('test a new tool from the refresh shows switched on', async () => {
+    useAgents.setState({ agents: [agent({ id: RESEARCHER, toolsOff: ['mcp__fake__echo'], revision: 'r1' })], loaded: true })
+    mocked.agentTools.mockResolvedValue([{ id: 'mcp:fake', label: 'fake', tools: [{ ...ECHO, on: false }], server: server() }])
+    mocked.refreshAgentTools.mockResolvedValue([{ id: 'mcp:fake', label: 'fake', tools: [ADD, { ...ECHO, on: false }], server: server() }])
+    render(<Live />)
+    const added = await screen.findByRole('switch', { name: 'add' })
+    expect(added).toBeChecked()
+    expect(screen.getByRole('switch', { name: 'echo' })).not.toBeChecked()
+    expect(mocked.saveAgent).not.toHaveBeenCalled()
+  })
+
+  test('test switching one server tool off saves its mcp__server__tool id in toolsOff', async () => {
+    mocked.agentTools.mockResolvedValue([{ id: 'mcp:fake', label: 'fake', tools: [ADD, ECHO], server: server() }])
+    mocked.refreshAgentTools.mockResolvedValue([{ id: 'mcp:fake', label: 'fake', tools: [ADD, ECHO], server: server() }])
+    const user = userEvent.setup()
+    render(<Live />)
+    await waitFor(() => expect(mocked.refreshAgentTools).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.queryByText(MCP_TEXT.listing)).toBeNull())
+    await user.click(await screen.findByRole('switch', { name: 'add' }))
+    await waitFor(() => expect(mocked.saveAgent).toHaveBeenCalledTimes(1))
+    expect(mocked.saveAgent.mock.calls[0][1].toolsOff).toEqual(['mcp__fake__add'])
+    expect(mocked.saveAgent.mock.calls[0][2]).toBe('r1')
   })
 })

@@ -6,6 +6,9 @@
  * "Open folder" button; folder MCP servers missing secrets say so (the values come in M19);
  * "Remove from list" unregisters an agent that isn't the default one. A read-only agent shows
  * its reason and every field is disabled.
+ *
+ * M19: each variable in "Needs secrets: …" has a "Set…" button that opens the Set dialog; after
+ * saving, the agent reloads (the route also announces `agents`).
  */
 import { useEffect, useRef, useState } from 'react'
 import { api, ConflictError } from '@/api/client'
@@ -15,6 +18,8 @@ import { IconPicker } from '@/components/IconPicker'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ModelPicker } from '@/ai/ModelPicker'
+import { MCP_TEXT } from '@/mcp/mcpText'
+import { SetSecretDialog } from '@/mcp/SetSecretDialog'
 import { useSettings } from '@/settings/useSettings'
 import { iconValue } from './NewAgentDialog'
 import { useAgents } from './useAgents'
@@ -80,6 +85,7 @@ export function ProfileTab({ agent }: { agent: Agent }) {
   const [name, setName] = useState(agent.name)
   const [description, setDescription] = useState(agent.description)
   const [iconOpen, setIconOpen] = useState(false)
+  const [settingVar, setSettingVar] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const disabled = agent.readOnlyReason !== null
@@ -236,11 +242,31 @@ export function ProfileTab({ agent }: { agent: Agent }) {
               <li key={s.name} data-mcp-server={s.name}>
                 <span className="font-medium">{s.name}</span>{' '}
                 <span className="text-fg-muted">{PROFILE_TEXT.needsSecrets(s.missingVars)}</span>
+                {s.missingVars.map((v) => (
+                  <Button
+                    key={v}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="ml-2 h-7"
+                    aria-label={`${MCP_TEXT.setVar} ${v}`}
+                    data-set-var={v}
+                    onClick={() => setSettingVar(v)}
+                  >
+                    {MCP_TEXT.setVar}
+                  </Button>
+                ))}
               </li>
             ))}
           </ul>
         </div>
       )}
+
+      <SetSecretDialog
+        name={settingVar}
+        onOpenChange={(o) => !o && setSettingVar(null)}
+        onSaved={() => void reloadAgent(agent.id)}
+      />
 
       {!agent.default && (
         <div>

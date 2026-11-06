@@ -3,6 +3,10 @@
  * (the catalogue with this agent's states, plus a group per folder MCP server). A change saves
  * `toolsOff` through `PUT /agents/{id}` with the revision; turning the shell on asks first
  * (`ToolSwitches`). On a 409 the tab reloads the agent and asks for the change again.
+ *
+ * M19: after the GET, the tab lists the outside servers' tools once (`POST /agents/{id}/tools/
+ * refresh`) and puts the answer in place of the groups; meanwhile the server groups say
+ * "Listing tools…". A tool a server added since is on (it isn't in `toolsOff`).
  */
 import { useEffect, useRef, useState } from 'react'
 import { api, ConflictError } from '@/api/client'
@@ -18,6 +22,7 @@ export const TOOLS_TEXT = {
 
 export function ToolsTab({ agent }: { agent: Agent }) {
   const [groups, setGroups] = useState<ToolGroup[] | null>(null)
+  const [listing, setListing] = useState(false)
   const [off, setOff] = useState<string[]>(agent.toolsOff)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -27,10 +32,17 @@ export function ToolsTab({ agent }: { agent: Agent }) {
 
   useEffect(() => {
     let live = true
-    void api.agentTools(id).then(
-      (g) => live && setGroups(g ?? []),
-      (e: unknown) => live && setError(e instanceof Error ? e.message : String(e)),
-    )
+    const fail = (e: unknown) => live && setError(e instanceof Error ? e.message : String(e))
+    void api.agentTools(id).then((g) => {
+      if (!live) return
+      setGroups(g ?? [])
+      setListing(true)
+      void api
+        .refreshAgentTools(id)
+        // The route always answers the catalogue groups too; an empty answer keeps the GET's.
+        .then((fresh) => live && fresh && fresh.length > 0 && setGroups(fresh), fail)
+        .finally(() => live && setListing(false))
+    }, fail)
     return () => {
       live = false
     }
@@ -75,7 +87,13 @@ export function ToolsTab({ agent }: { agent: Agent }) {
         </p>
       )}
       {groups ? (
-        <ToolSwitches groups={groups} off={off} onChange={(next) => void change(next)} disabled={agent.readOnlyReason !== null} />
+        <ToolSwitches
+          groups={groups}
+          off={off}
+          onChange={(next) => void change(next)}
+          disabled={agent.readOnlyReason !== null}
+          serversLoading={listing}
+        />
       ) : (
         !error && <p className="text-[14px] text-fg-muted">{TOOLS_TEXT.loading}</p>
       )}
