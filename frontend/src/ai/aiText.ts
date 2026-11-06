@@ -17,6 +17,9 @@ export const AI_CHAT_TEXT = {
   title: 'AI Chat',
   exploreCardHelp: 'Ask about your pages with Claude Code.', // our string
   newChat: 'New chat', // our string
+  modelForChat: 'Model for this chat', // our string (M16)
+  defaultModel: 'Default', // our string (M16)
+  defaultModelOf: (label: string) => `Default (${label})`, // our string (M16)
   context: 'Context', // our string
   addContext: 'Add a page to the context', // our string
   pickPage: 'Find a page', // our string
@@ -29,7 +32,6 @@ export const AI_CHAT_TEXT = {
   send: 'Send', // our string
   stop: 'Stop', // our string
   thinking: 'Thinking…', // our string
-  usedTools: 'Used:', // our string
   stopped: 'Stopped.', // our string
   emptyAnswer: 'No answer came back.', // our string
   empty: 'Ask a question about the pages in the context, or about anything in your space.', // our string
