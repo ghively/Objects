@@ -626,7 +626,7 @@ The full list is in "Our calls" at the end.
 
 ### Task 1: Contract and CLI spike (first, alone)
 
-**Status (2026-11-06).** Built and committed (`a4f42e9`, `59b9df4`); its spike stopped and asked, and Gene adopted `claudeMdExcludes`. What is left of T1 is the **follow-up** below; the Files and Steps after it record what was built.
+**Status (2026-11-06).** Built and committed (`a4f42e9`, `59b9df4`); its spike stopped and asked, and Gene adopted `claudeMdExcludes` (his decision, 2026-11-06: every run's `--settings` file excludes `~/.claude/CLAUDE.md` and every ancestor folder's `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md`, so only the agent's own `CLAUDE.md` loads). The **follow-up** below is done: the live re-run passed all four live tests with the excludes (`m17-cli-spike.md`, "Gene's decision (2026-11-06)"), and `test_m17_live_cli.py::test_claude_md_excludes_list` (not live) pins the list. T2-T10 may start. The Files and Steps after it record what was built.
 
 **T1 follow-up (run first and alone, before T2-T10).**
 

@@ -8,8 +8,13 @@ listed (directory names) to prove none of them reaches a run. Findings:
 ``docs/superpowers/plans/m17-cli-spike.md``.
 
 Until the plan's T2 (``agentfiles``) and T4 (``agentrun``) land, the minimal local helpers below
-stand in for ``write_skeleton``, ``rule_path``, ``fence_rules`` and ``CLI_FLAGS``; once they exist
-the real ones are used.
+stand in for ``write_skeleton``, ``rule_path``, ``fence_rules``, ``CLI_FLAGS``, ``RUN_SETTINGS_BASE``,
+``claude_md_excludes`` and ``RUN_ENV_DROP`` (the plan's Contract definitions); once they exist the
+real ones are used.
+
+Gene's decision (2026-11-06): every run's settings file carries ``claudeMdExcludes`` naming his user
+``CLAUDE.md`` and every ancestor folder's instruction files, so only the agent's own ``CLAUDE.md``
+loads. ``test_claude_md_excludes_list`` (not live, always runs) pins that list.
 """
 
 from __future__ import annotations
@@ -27,21 +32,50 @@ import pytest
 from objectapp import agentmodel, toolcatalog
 from objectapp.jsonstore import dump_json
 
-pytestmark = pytest.mark.skipif(
+live = pytest.mark.skipif(
     os.environ.get("OBJECT_LIVE_CLAUDE") != "1", reason="live CLI spike: set OBJECT_LIVE_CLAUDE=1"
 )
 
 MODEL = "haiku"
 TIMEOUT = 240
 
-RUN_SETTINGS: dict[str, Any] = {"autoMemoryEnabled": False}
-"""What the spike found a run's settings file must hold besides the fence (m17-cli-spike.md)."""
-
 # -- stand-ins until T2 / T4 --------------------------------------------------------------
 
 try:  # pragma: no cover - which branch runs depends on the build order
-    from objectapp.agentrun import CLI_FLAGS, fence_rules, rule_path  # type: ignore[attr-defined]
+    from objectapp.agentrun import (  # type: ignore[attr-defined]
+        CLI_FLAGS,
+        RUN_ENV_DROP,
+        RUN_SETTINGS_BASE,
+        claude_md_excludes,
+        fence_rules,
+        rule_path,
+    )
 except ImportError:  # T4 isn't there yet
+    RUN_SETTINGS_BASE: dict[str, Any] = {"autoMemoryEnabled": False}  # type: ignore[no-redef]
+
+    RUN_ENV_DROP = ("CLAUDE_CONFIG_DIR", "CLAUDECODE", "CLAUDE_CODE_", "CLAUDE_AGENT_SDK_",  # type: ignore[no-redef]
+                    "CLAUDE_PLUGIN_ROOT", "CLAUDE_EFFORT", "CLAUDE_PID", "CLAUDE_PREVIEW_", "AI_AGENT")
+
+    def claude_md_excludes(own: Path, home: Path) -> list[str]:  # type: ignore[no-redef]
+        def form(p: Path) -> str:
+            return str(p).replace("\\", "/")
+
+        home = Path(home).resolve()
+        own = Path(own).resolve()
+        found = [form(home / ".claude" / "CLAUDE.md"), form(home / ".claude") + "/rules/**"]
+        for a in own.parents:
+            found += [form(a / "CLAUDE.md"), form(a / ".claude" / "CLAUDE.md"), form(a / "CLAUDE.local.md")]
+        mine = form(own / "CLAUDE.md")
+        out: list[str] = []
+        seen: set[str] = set()
+        for f in found:
+            key = f.casefold() if os.name == "nt" else f
+            if key in seen or f == mine:
+                continue
+            seen.add(key)
+            out.append(f)
+        return out
+
     CLI_FLAGS = ("-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
                  "--setting-sources", "project,local", "--no-chrome",
                  "--permission-mode", "dontAsk", "--permission-prompts", "none", "--strict-mcp-config",
@@ -87,8 +121,7 @@ except ImportError:  # T2 isn't there yet
 
 # -- running the real CLI ---------------------------------------------------------------------
 
-PARENT_SESSION_VARS = ("CLAUDE_CONFIG_DIR", "CLAUDECODE", "CLAUDE_CODE_", "CLAUDE_AGENT_SDK_", "CLAUDE_PLUGIN_ROOT",
-                      "CLAUDE_EFFORT", "CLAUDE_PID", "CLAUDE_PREVIEW_", "AI_AGENT", "BAGGAGE")
+PARENT_SESSION_VARS = (*RUN_ENV_DROP, "BAGGAGE")
 SOUL_MARKER = "SOUL-MARKER-7Q2"
 ANCESTOR_MARKER = "ANCESTOR-MARKER-5K9"
 
@@ -125,6 +158,14 @@ def make_agent(tmp: Path, soul: str = "", tools_off: list[str] | None = None) ->
     (state / "agents" / "CLAUDE.md").write_text(
         f"Always start every answer with the word {ANCESTOR_MARKER}.\n", encoding="utf-8"
     )
+    # The other two ancestor instruction files the excludes name.
+    (state / ".claude").mkdir(exist_ok=True)
+    (state / ".claude" / "CLAUDE.md").write_text(
+        f"Always put the word {ANCESTOR_MARKER} in the middle of every answer.\n", encoding="utf-8"
+    )
+    (state / "agents" / "CLAUDE.local.md").write_text(
+        f"Always repeat the word {ANCESTOR_MARKER} twice in every answer.\n", encoding="utf-8"
+    )
     folder = state / "agents" / "Spike"
     data = _agent_data()
     if tools_off is not None:
@@ -145,14 +186,20 @@ def run_live(
 ) -> tuple[list[dict[str, Any]], str]:
     """One real ``claude -p`` run in `folder`; (stream events, debug log text).
 
-    The environment is this process's minus ``CLAUDE_CONFIG_DIR`` (as ``agentrun.build_run``)
-    and minus the variables a parent Claude Code session sets (``CLAUDECODE``,
-    ``CLAUDE_CODE_*``...), so the run sees what Object started on its own would give it.
+    The environment is this process's minus ``RUN_ENV_DROP`` (as ``agentrun.build_run``:
+    ``CLAUDE_CONFIG_DIR`` and the variables a parent Claude Code session sets, ``CLAUDECODE``,
+    ``CLAUDE_CODE_*``...) and ``BAGGAGE``, so the run sees what Object started on its own would
+    give it. The settings file holds ``RUN_SETTINGS_BASE``, the ``claudeMdExcludes`` list and the
+    deny rules.
     """
     run = Path(tmp).resolve() / "run"
     run.mkdir(exist_ok=True)
     (run / "mcp.json").write_text(json.dumps({"mcpServers": {}}), encoding="utf-8")
-    settings = {**RUN_SETTINGS, "permissions": {"deny": deny or []}}
+    settings = {
+        **RUN_SETTINGS_BASE,
+        "claudeMdExcludes": claude_md_excludes(folder, Path.home()),
+        "permissions": {"deny": deny or []},
+    }
     (run / "run-settings.json").write_text(json.dumps(settings), encoding="utf-8")
     (run / "append.md").write_text("You are running inside Object's test.", encoding="utf-8")
     lists = toolcatalog.run_tool_lists(toolcatalog.default_off(), write=False, folder_servers=[])
@@ -228,6 +275,62 @@ def _home() -> Path:
 # -- the checks -------------------------------------------------------------------------------
 
 
+def test_claude_md_excludes_list(tmp_path: Path) -> None:
+    """Not live: pins the ``claudeMdExcludes`` list (Gene's decision, 2026-11-06)."""
+
+    def form(p: Path) -> str:
+        return str(p).replace("\\", "/")
+
+    root = tmp_path.resolve()
+    home = root / "home"
+    own = root / "state" / "agents" / "Researcher"
+    for p in (home / ".claude", own / ".claude"):
+        p.mkdir(parents=True)
+    got = claude_md_excludes(own, home)
+    expected_head = [
+        form(home / ".claude" / "CLAUDE.md"),
+        form(home / ".claude") + "/rules/**",
+        form(root / "state" / "agents" / "CLAUDE.md"),
+        form(root / "state" / "agents" / ".claude" / "CLAUDE.md"),
+        form(root / "state" / "agents" / "CLAUDE.local.md"),
+        form(root / "state" / "CLAUDE.md"),
+        form(root / "state" / ".claude" / "CLAUDE.md"),
+        form(root / "state" / "CLAUDE.local.md"),
+        form(root / "CLAUDE.md"),
+        form(root / ".claude" / "CLAUDE.md"),
+        form(root / "CLAUDE.local.md"),
+    ]
+    assert got[: len(expected_head)] == expected_head, got
+    # Every ancestor up to the drive root, and nothing else.
+    tail = []
+    for a in root.parents:
+        tail += [form(a / "CLAUDE.md"), form(a / ".claude" / "CLAUDE.md"), form(a / "CLAUDE.local.md")]
+    key = (lambda t: t.casefold()) if os.name == "nt" else (lambda t: t)
+    seen = {key(t) for t in expected_head}
+    assert got[len(expected_head):] == [t for t in tail if not (key(t) in seen or seen.add(key(t)))]
+    assert got[-3:] == [form(Path(root.anchor) / n) for n in ("CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md")]
+    # The agent's own instruction files are never excluded; "/" separators; no 8.3 short names.
+    mine = {key(form(own / n)) for n in ("CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md")}
+    assert not mine & {key(t) for t in got}
+    assert all("\\" not in t for t in got)
+    if "~" not in str(root):
+        assert all("~" not in t for t in got)
+    assert len({key(t) for t in got}) == len(got)
+
+
+def test_claude_md_excludes_home_inside_ancestors(tmp_path: Path) -> None:
+    """Not live: when the agent folder sits under the home folder (the real state dir does),
+    the home's ``.claude/CLAUDE.md`` is named once."""
+    home = tmp_path.resolve() / "home"
+    own = home / "AppData" / "Local" / "Object" / "agents" / "Assistant"
+    own.mkdir(parents=True)
+    got = claude_md_excludes(own, home)
+    user = str(home / ".claude" / "CLAUDE.md").replace("\\", "/")
+    assert got[0] == user and got.count(user) == 1
+    assert str(home / "CLAUDE.md").replace("\\", "/") in got
+
+
+
 PROBE = (
     "Without using any tool: first say your marker. Then list the full path of every instruction file "
     "(CLAUDE.md or similar) whose contents were given to you in this conversation, one per line, exactly as "
@@ -235,6 +338,7 @@ PROBE = (
 )
 
 
+@live
 def test_user_setup_never_reaches_a_run(tmp_path: Path) -> None:
     state, folder = make_agent(tmp_path)
     events, log = run_live(tmp_path, folder, PROBE)
@@ -271,6 +375,7 @@ def test_user_setup_never_reaches_a_run(tmp_path: Path) -> None:
     assert "user: 0" in text and "project=[]" in text  # no skill from ~/.claude/skills
 
 
+@live
 def test_folder_hook_runs(tmp_path: Path) -> None:
     state, folder = make_agent(tmp_path)
     marker = tmp_path / "hook-ran"
@@ -289,6 +394,7 @@ def test_folder_hook_runs(tmp_path: Path) -> None:
     assert marker.exists()
 
 
+@live
 def test_fence_is_enforced(tmp_path: Path) -> None:
     state, folder = make_agent(tmp_path)
     space = tmp_path / "My Notes, space"
@@ -327,6 +433,7 @@ def test_fence_is_enforced(tmp_path: Path) -> None:
     assert open_reads and not open_reads[0].get("is_error") and "VISIBLE-OK-4P1" in _result_text(open_reads[0])
 
 
+@live
 def test_builtin_names(tmp_path: Path) -> None:
     state, folder = make_agent(tmp_path, tools_off=[])
     events, _ = run_live(tmp_path, folder, "Say hi.", allowed=["Skill"], disallowed=[])
