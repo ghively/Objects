@@ -22,7 +22,8 @@
   clientId?}`` -> ``{revision}`` (404, 409 ``{currentRevision}``, 423)
 - ``GET  /agent-tools`` -> ``{groups}``: the catalogue with the defaults (the New agent form)
 - ``GET  /agents/{id}/tools`` -> ``{groups}``: this agent's switches, one group per folder MCP
-  server, then `toolcatalog.GROUP_PROVIDERS`' groups
+  server, then `toolcatalog.GROUP_PROVIDERS`' groups (a provider group replaces the catalogue
+  group with the same ``id``; `agent_tool_groups`)
 - ``GET  /agents/{id}/chats`` -> ``{chats}`` newest first; ``GET /agents/{id}/chats/{chatId}``
   -> ``AgentTranscript`` (404, also for a chat id that isn't a ULID)
 - ``POST /agents/{id}/reveal`` -> ``{ok}``: shows the folder in the OS file manager
@@ -52,7 +53,7 @@ from .settings import read as read_settings
 from .space import ReadOnly
 from .watcher import ChangeEvent
 
-__all__ = ["router"]
+__all__ = ["agent_tool_groups", "router"]
 
 
 class DuplicateOf(BaseModel):
@@ -110,6 +111,24 @@ def _error(status: int, detail: str) -> JSONResponse:
 
 def _location(text: str | None) -> Path | None:
     return Path(text) if isinstance(text, str) and text.strip() else None
+
+
+def agent_tool_groups(rec: AgentRecord) -> list[dict[str, Any]]:
+    """``GET /agents/{id}/tools``' groups (M19's refresh answers the same): the catalogue with one
+    group per folder MCP server, then `toolcatalog.GROUP_PROVIDERS`' groups, each in place of a
+    catalogue group with the same ``id`` (else appended), with the agent's switches."""
+    servers = list(agentfiles.folder_mcp_servers(rec.folder)) if rec.exists and not rec.missing else []
+    groups = toolcatalog.catalogue(servers)
+    for provider in toolcatalog.GROUP_PROVIDERS:
+        for group in provider(rec):
+            at = next((i for i, g in enumerate(groups) if g.id == group.id), None)
+            if at is None:
+                groups.append(group)
+            else:
+                groups[at] = group
+    off = rec.data.get("toolsOff")
+    off = [t for t in off if isinstance(t, str)] if isinstance(off, list) else []
+    return toolcatalog.groups_out(groups, off)
 
 
 def router(ctx: ApiContext) -> APIRouter:
@@ -272,13 +291,7 @@ def router(ctx: ApiContext) -> APIRouter:
             rec = registry().get(agent_id)
         except AgentError as exc:
             return _fail(exc)
-        servers = list(agentfiles.folder_mcp_servers(rec.folder)) if rec.exists and not rec.missing else []
-        groups = toolcatalog.catalogue(servers)
-        for provider in toolcatalog.GROUP_PROVIDERS:
-            groups += provider(rec)
-        off = rec.data.get("toolsOff")
-        off = [t for t in off if isinstance(t, str)] if isinstance(off, list) else []
-        return {"groups": toolcatalog.groups_out(groups, off)}
+        return {"groups": agent_tool_groups(rec)}
 
     # -- chats ------------------------------------------------------------------------------
 
