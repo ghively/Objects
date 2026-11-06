@@ -49,6 +49,23 @@ describe('ChatsTab', () => {
   })
   afterEach(() => useTabs.setState({ openInSidepanel: realOpenInSidepanel }))
 
+  test('test scheduled chats are marked', async () => {
+    mocked.agentChats.mockResolvedValue([
+      chat(CHAT_B, 'Weekly review 2026-11-09', {
+        schedule: { ruleId: '01JSCHED000000000000000000', name: 'Weekly review', scheduledFor: '2026-11-09T09:00:00.000Z', catchUp: false },
+      }),
+      chat(CHAT_A, 'What do my notes say?'),
+    ])
+    render(<ChatsTab agent={agent({ id: RESEARCHER })} />)
+    const list = await screen.findByRole('list', { name: CHATS_TEXT.list })
+    const [scheduled, plain] = within(list).getAllByRole('listitem')
+    expect(within(scheduled).getByText(CHATS_TEXT.scheduled)).toBeInTheDocument()
+    expect(CHATS_TEXT.scheduled).toBe('Scheduled')
+    expect(within(scheduled).getByRole('button')).toHaveAttribute('title', 'Scheduled: Weekly review')
+    expect(within(plain).queryByText('Scheduled')).toBeNull()
+    expect(within(plain).getByRole('button')).not.toHaveAttribute('title')
+  })
+
   test('test Chats filters by title and opens a chat in the side panel', async () => {
     const openInSidepanel = vi.fn()
     useTabs.setState({ openInSidepanel })

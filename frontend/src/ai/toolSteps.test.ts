@@ -122,6 +122,17 @@ describe('toolStepLine', () => {
     expect(line('delegate', { agent: 'Researcher', goal: 'List rack pages' })).toBe('Handed a task to Researcher')
   })
 
+  test('test schedule_manage lines', () => {
+    // M21's table.
+    expect(line('schedule_manage', { action: 'list' })).toBe('Listed schedules')
+    expect(line('schedule_manage', { action: 'create', name: 'Weekly review', prompt: 'x', repeat: 'every day' })).toBe(
+      "Created the schedule 'Weekly review'",
+    )
+    expect(line('schedule_manage', { action: 'update', schedule_id: 'r1', enabled: false })).toBe('Changed a schedule')
+    expect(line('schedule_manage', { action: 'delete', schedule_id: 'r1' })).toBe('Moved a schedule to the Trash')
+    expect(line('mcp__object-agent__schedule_manage', { action: 'list' })).toBe('Listed schedules')
+  })
+
   test('test long values are cut at 60 characters', () => {
     const q = 'x'.repeat(61)
     expect(line('search', { query: q })).toBe(`Searched notes for '${'x'.repeat(60)}…'`)

@@ -166,7 +166,7 @@ const str = (input: Record<string, unknown> | null, key: string): string | null 
 }
 const quoted = (head: string, v: string | null): string => (v ? `${head} '${v}'` : head)
 
-/** M18: the learning tools' lines (our strings, the M18 plan's table): they depend on the action. */
+/** M18: the learning tools' lines (our strings, the M18 plan's table), and M21's `schedule_manage`: they depend on the action. */
 const LEARNING_LINES: Record<string, (input: Record<string, unknown> | null) => string> = {
   memory: (input) => {
     const action = input?.action
@@ -187,6 +187,14 @@ const LEARNING_LINES: Record<string, (input: Record<string, unknown> | null) => 
   },
   // The CLI's own Skill tool
   Skill: (input) => quoted('Used the skill', str(input, 'skill')),
+  // M21: the agent's schedules tool (our strings, the M21 plan's table), beside M20's `delegate`
+  schedule_manage: (input) => {
+    const action = input?.action
+    if (action === 'create') return quoted('Created the schedule', str(input, 'name'))
+    if (action === 'update') return 'Changed a schedule'
+    if (action === 'delete') return 'Moved a schedule to the Trash'
+    return 'Listed schedules'
+  },
 }
 
 function baseLine(step: ToolStepState): string {

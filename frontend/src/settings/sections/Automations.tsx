@@ -7,15 +7,22 @@
 // last run, and a menu with "Edit", "Run log" and "Delete" (to the trash, no confirm). A rule that
 // can't be read shows why and no switch. A template's repeat says which template it repeats, and
 // "Edit" opens its Repeat dialog. The list follows `automations` and `automationRuns` events.
+//
+// M21: an agent schedule's summary names the agent it runs (`Runs “{name}” · …`, or "Runs an agent
+// that isn't listed · …"), and "Edit" opens the agent page's schedule dialog instead of the rule
+// editor. For an agent that isn't listed, the dialog opens with "Save" disabled and the agent
+// check's message shown.
 import { useEffect, useMemo, useState } from 'react'
 import { api, ConflictError } from '@/api/client'
-import type { AutomationRule, AutomationRun, ObjectSummary } from '@/api/types'
+import type { Agent, AutomationRule, AutomationRun, ObjectSummary } from '@/api/types'
+import { ScheduleDialog } from '@/agents/ScheduleDialog'
+import { useAgents } from '@/agents/useAgents'
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
 import { RuleEditorDialog } from '@/automations/RuleEditor'
 import { TemplateRepeatDialog, templateDisplayName } from '@/automations/TemplateRepeatDialog'
-import { lastRunText, RULE_TEXT, triggerSummary } from '@/automations/ruleModel'
+import { isAgentSchedule, lastRunText, RULE_TEXT, triggerSummary } from '@/automations/ruleModel'
 import { reloadAutomations, useAutomations } from '@/automations/useAutomations'
 import { openObject } from '@/create/createAndOpen'
 import { byPathOf, stemOf, useLinkIndex } from '@/links/linkIndex'
@@ -40,6 +47,7 @@ export const AUTOMATIONS_TEXT = {
   noRuns: 'No runs yet', // our string
   catchUp: 'missed run', // our string
   status: { ok: 'Done', failed: 'Failed', skipped: 'Skipped' }, // our strings
+  agentNotListed: "That agent isn't listed any more.", // M21: the agent check's message (agents.NOT_LISTED)
 } as const
 
 const T = AUTOMATIONS_TEXT
@@ -81,6 +89,38 @@ function useTemplateNames(rules: readonly AutomationRule[]): Map<string, ObjectS
   return found
 }
 
+/** M21: the agent id an agent schedule runs, else null. */
+function scheduleAgentId(rule: AutomationRule): string | null {
+  const a = rule.actions[0]
+  return isAgentSchedule(rule) && a?.kind === 'runAgent' ? a.agentId : null
+}
+
+/** M21: a stand-in for an agent that isn't listed, so the schedule dialog opens with "Save" disabled. */
+function unlistedAgent(id: string): Agent {
+  return {
+    id,
+    kind: 'local',
+    name: '',
+    icon: null,
+    color: null,
+    description: '',
+    model: null,
+    toolsOff: [],
+    learning: null,
+    createdAt: null,
+    updatedAt: null,
+    default: false,
+    folder: '',
+    inStateDir: false,
+    exists: false,
+    missing: true,
+    readOnlyReason: T.agentNotListed,
+    revision: null,
+    mcpServers: [],
+    remote: null,
+  }
+}
+
 /** Flip a rule's switch: `PUT` the whole rule; on 409 reload it and try once more. */
 export async function setRuleEnabled(rule: AutomationRule, enabled: boolean): Promise<void> {
   try {
@@ -96,9 +136,17 @@ export function AutomationsSection() {
   const { rules, loaded } = useAutomations()
   const [editing, setEditing] = useState<AutomationRule | 'new' | null>(null)
   const [repeating, setRepeating] = useState<{ rule: AutomationRule; template: ObjectSummary } | null>(null)
+  const [scheduling, setScheduling] = useState<{ rule: AutomationRule; agent: Agent } | null>(null)
   const [logFor, setLogFor] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const templates = useTemplateNames(rules)
+  const agents = useAgents((s) => s.agents)
+  const agentsLoaded = useAgents((s) => s.loaded)
+  const hasSchedules = rules.some(isAgentSchedule)
+
+  useEffect(() => {
+    if (hasSchedules && !useAgents.getState().loaded) void useAgents.getState().load()
+  }, [hasSchedules])
 
   const logRule = logFor ? rules.find((r) => r.id === logFor) : undefined
   if (logFor) return <RunLog ruleId={logFor} name={logRule?.name ?? ''} onBack={() => setLogFor(null)} />
@@ -126,16 +174,25 @@ export function AutomationsSection() {
           <ul aria-label={T.heading} className="flex flex-col divide-y divide-line rounded-lg border border-line">
             {rules.map((r) => {
               const template = r.templateRepeat ? templates.get(r.templateRepeat.templateId) : undefined
+              const agentId = scheduleAgentId(r)
+              const runs = agentId ? agents.find((a) => a.id === agentId) : undefined
               return (
                 <RuleRow
                   key={r.id}
                   rule={r}
                   templateName={template ? templateDisplayName(template) : undefined}
+                  agentLine={agentId ? (runs ? RULE_TEXT.runsAgent(runs.name) : agentsLoaded ? RULE_TEXT.runsMissingAgent : null) : null}
                   onToggle={(on) => {
                     setError(null)
                     run(setRuleEnabled(r, on))
                   }}
-                  onEdit={() => (r.templateRepeat && template ? setRepeating({ rule: r, template }) : setEditing(r))}
+                  onEdit={() =>
+                    agentId
+                      ? setScheduling({ rule: r, agent: runs ?? unlistedAgent(agentId) })
+                      : r.templateRepeat && template
+                        ? setRepeating({ rule: r, template })
+                        : setEditing(r)
+                  }
                   onLog={() => setLogFor(r.id)}
                   onDelete={() => {
                     setError(null)
@@ -155,6 +212,9 @@ export function AutomationsSection() {
           onSaved={() => void reloadAutomations()}
         />
       )}
+      {scheduling && (
+        <ScheduleDialog open agent={scheduling.agent} rule={scheduling.rule} onOpenChange={(o) => !o && setScheduling(null)} />
+      )}
       {repeating && (
         <TemplateRepeatDialog
           open
@@ -170,6 +230,7 @@ export function AutomationsSection() {
 function RuleRow({
   rule,
   templateName,
+  agentLine,
   onToggle,
   onEdit,
   onLog,
@@ -177,6 +238,8 @@ function RuleRow({
 }: {
   rule: AutomationRule
   templateName?: string
+  /** M21: an agent schedule's "Runs “{name}”" (null: not an agent schedule, or the agents aren't loaded yet). */
+  agentLine?: string | null
   onToggle(on: boolean): void
   onEdit(): void
   onLog(): void
@@ -192,6 +255,7 @@ function RuleRow({
     ? rule.readOnlyReason
     : [
         rule.templateRepeat ? RULE_TEXT.repeatsTemplate(templateName ?? rule.name) : null,
+        agentLine ?? null,
         triggerSummary(rule.trigger, { types, collections, twentyFourHour }),
       ]
         .filter(Boolean)
