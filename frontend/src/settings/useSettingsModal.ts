@@ -17,6 +17,8 @@ export type SettingsSectionId =
   | 'taskManagement'
   /** M14 */
   | 'automations'
+  /** M22 */
+  | 'work'
   | 'integrations'
 
 export const DEFAULT_SECTION: SettingsSectionId = 'appearance'

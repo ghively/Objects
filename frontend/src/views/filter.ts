@@ -160,6 +160,10 @@ export const FILTER_OPTIONS: Record<PropertyType, FilterOption[]> = {
   email: TEXT,
   phone: TEXT,
   files: EMPTY,
+  // M22: a list matches as Aliases do; steps and floor items are only empty or not.
+  textList: [o('contains', 'includes'), o('notContains', 'does not include'), ...EMPTY],
+  steps: EMPTY,
+  floorItems: EMPTY,
 }
 
 /**
@@ -595,6 +599,16 @@ function matchKind(row: Row, f: Filter, def: DefLike, has: boolean, ctx: FilterC
       return matchSet([row.summary.type], refIds(f), f)
     case 'entity_aliases': {
       const have = row.summary.aliases ?? []
+      if (f.option === 'isEmpty') return have.length === 0
+      if (f.option === 'isNotEmpty') return have.length > 0
+      const ref = typeof f.referenceValue === 'string' ? f.referenceValue.toLowerCase() : ''
+      if (ref === '') return true
+      const hit = have.some((a) => a.toLowerCase().includes(ref))
+      return f.option === 'notContains' ? !hit : hit
+    }
+    case 'textList': {
+      // M22: as Aliases, on the row's value: a case-insensitive substring of any item.
+      const have = Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string') : []
       if (f.option === 'isEmpty') return have.length === 0
       if (f.option === 'isNotEmpty') return have.length > 0
       const ref = typeof f.referenceValue === 'string' ? f.referenceValue.toLowerCase() : ''

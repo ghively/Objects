@@ -20,6 +20,7 @@ import { OFFLINE_SYNC_SEARCH, OFFLINE_SYNC_TEXT, OfflineSyncSection } from './se
 import { OBJECT_TYPES_SEARCH, OBJECT_TYPES_TEXT, ObjectTypesSection } from './sections/ObjectTypes'
 import { SPACE_SETTINGS_SEARCH, SPACE_SETTINGS_TEXT, SpaceSettingsSection } from './sections/SpaceSettings'
 import { TASK_MANAGEMENT_SEARCH, TASK_MANAGEMENT_TEXT, TaskManagementSection } from './sections/TaskManagement'
+import { WORK_SEARCH, WORK_TEXT, WorkSection } from './sections/Work'
 import { SHORTCUTS_TEXT } from './ShortcutsSheet'
 import { useSettingsModal, type SettingsSectionId } from './useSettingsModal'
 
@@ -92,6 +93,8 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     search: AUTOMATIONS_SEARCH,
     Component: AutomationsSection,
   },
+  // M22 (our section): Your name in Activity and the Jira site.
+  { id: 'work', group: 'space', label: WORK_TEXT.heading, icon: 'ph-briefcase', search: WORK_SEARCH, Component: WorkSection },
   {
     id: 'integrations',
     group: 'space',

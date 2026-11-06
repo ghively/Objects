@@ -95,6 +95,14 @@ import type {
   McpServersAnswer,
   McpTestResult,
   SecretVar,
+  AddWorkFieldsResult,
+  StepOp,
+  WorkFloorRequest,
+  WorkItem,
+  WorkItemSummary,
+  WorkStep,
+  WorkStepRequest,
+  WorkWriteResult,
 } from './types'
 import type { WhiteboardSettings } from './whiteboardTypes'
 
@@ -130,6 +138,28 @@ export class RevisionConflictError extends ConflictError {
   get currentRevision(): string {
     return this.currentVersion
   }
+}
+
+/**
+ * M22: 409 from a step or floor-item action (`workStep`, `workSteps`, `workFloor`): the step (or
+ * floor item) changed since its `rev` was read. Nothing was written. `message` is the server's
+ * detail ("This step changed. Look again."); `step` is the step as it is now, when the server sends it.
+ */
+export class StepChangedError extends ConflictError {
+  readonly step: WorkStep | null
+  constructor(message: string, currentVersion: string, step: WorkStep | null = null) {
+    super(currentVersion)
+    this.name = 'StepChangedError'
+    this.message = message
+    this.step = step
+  }
+}
+
+/** The `StepChangedError` a work action's 409 detail becomes. */
+function stepChanged(d: Record<string, unknown>): Error {
+  const message = typeof d.detail === 'string' ? d.detail : 'This step changed. Look again.'
+  const step = d.step && typeof d.step === 'object' ? (d.step as WorkStep) : null
+  return new StepChangedError(message, String(d.currentVersion ?? ''), step)
 }
 
 /** 428: the write needs `confirm: true`; `affected` files would change. Nothing was written. */
@@ -418,6 +448,11 @@ function typesEvent(id: string, revision: string | null = null): ChangeEvent {
 
 function defEvent(kind: 'collections' | 'queries' | 'views' | 'ui' | 'automations', path: string, version: string | null = null): ChangeEvent {
   return { kind, path, version, origin: CLIENT_ID }
+}
+
+/** M22: a work write's `changed` events: the item, then each relation-synced object. */
+function workEvents(path: string, res: WorkWriteResult): ChangeEvent[] {
+  return [changed(path, res.version ?? null), ...(res.synced ?? []).map((p) => changed(p))]
 }
 
 /** `renamed` when the write moved the file, else `changed`. */
@@ -1679,6 +1714,82 @@ export const api = {
   async refreshAgentTools(agentId: string): Promise<ToolGroup[]> {
     const res = await request<{ groups: ToolGroup[] }>(`/agents/${seg(agentId)}/tools/refresh`, json('POST', {}))
     return res?.groups ?? []
+  },
+
+  // ---- M22: the work model (every write goes through the server's one work service) ----
+
+  /** The work items: `active` (default) = active items plus the recently done; `all` = every one. */
+  async workItems(scope?: 'active' | 'all'): Promise<WorkItemSummary[]> {
+    const res = await request<{ items: WorkItemSummary[] }>(`/work/items${qs({ scope })}`)
+    return res?.items ?? []
+  },
+
+  /** One work item. 404; 422 when the object has no work fields. */
+  workItem(path: string): Promise<WorkItem> {
+    return request<WorkItem>(`/work/item${qs({ path })}`)
+  },
+
+  /**
+   * Act on one step (answer, done, approve, decline, run, reopen). A stale `stepRev` rejects with
+   * `StepChangedError` (409); a move the rules refuse is an `ApiError` 422 with the reason.
+   */
+  async workStep(req: WorkStepRequest): Promise<WorkWriteResult> {
+    const res = await request<WorkWriteResult>('/work/step', json('POST', { ...req, clientId: CLIENT_ID }), stepChanged)
+    emitLocal(workEvents(req.path, res))
+    return res
+  },
+
+  /** Add, edit, move or remove steps: every op in one write, in order. 409 `StepChangedError`. */
+  async workSteps(path: string, ops: StepOp[]): Promise<WorkWriteResult> {
+    const res = await request<WorkWriteResult>('/work/steps', json('POST', { path, ops, clientId: CLIENT_ID }), stepChanged)
+    emitLocal(workEvents(path, res))
+    return res
+  },
+
+  /** Set (and `remove`) work and ticket fields with one Activity line. 409 `ConflictError`. */
+  async workFields(
+    path: string,
+    set: Record<string, unknown>,
+    remove: string[],
+    baseVersion: string,
+  ): Promise<WorkWriteResult> {
+    const res = await request<WorkWriteResult>(
+      '/work/fields',
+      json('POST', { path, baseVersion, set, remove, clientId: CLIENT_ID }),
+    )
+    emitLocal(workEvents(path, res))
+    return res
+  },
+
+  /** Add a note, or a request for the agent, to Activity and Work notes. */
+  async workNote(path: string, kind: 'note' | 'request', text: string): Promise<WorkWriteResult> {
+    const res = await request<WorkWriteResult>('/work/note', json('POST', { path, kind, text, clientId: CLIENT_ID }))
+    emitLocal(workEvents(path, res))
+    return res
+  },
+
+  /** Close the item: Object's own done status (Task Done, Project Completed). 409 `ConflictError`. */
+  async workClose(path: string, baseVersion: string): Promise<WorkWriteResult> {
+    const res = await request<WorkWriteResult>('/work/close', json('POST', { path, baseVersion, clientId: CLIENT_ID }))
+    emitLocal(workEvents(path, res))
+    return res
+  },
+
+  /** Add, edit, collect, un-tick or remove a floor item. A stale `itemRev` rejects with `StepChangedError`. */
+  async workFloor(req: WorkFloorRequest): Promise<WorkWriteResult> {
+    const res = await request<WorkWriteResult>('/work/floor', json('POST', { ...req, clientId: CLIENT_ID }), stepChanged)
+    emitLocal(workEvents(req.path, res))
+    return res
+  },
+
+  /** "Add work fields" to a type. 409 `RevisionConflictError`; 422 for a basic type. */
+  async addWorkFields(typeId: string, baseRevision: string): Promise<AddWorkFieldsResult> {
+    const res = await request<AddWorkFieldsResult>(
+      `/types/${seg(typeId)}/work-fields`,
+      json('POST', { baseRevision, clientId: CLIENT_ID }),
+    )
+    emitLocal([typesEvent(res.type?.id ?? typeId, res.type?.revision ?? null), defEvent('queries', 'work-tickets')])
+    return res
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */

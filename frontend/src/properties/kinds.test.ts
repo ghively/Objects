@@ -24,7 +24,7 @@ describe('KIND_META', () => {
 })
 
 describe('ADD_PROPERTY_ITEMS', () => {
-  it('test ADD_PROPERTY_ITEMS order has 15 catalogued entries then the six M12 kinds and the M14 Button and Object Select lists Page, Tag and custom types but not Task', () => {
+  it('test ADD_PROPERTY_ITEMS order has 15 catalogued entries then the six M12 kinds, the M14 Button and the M22 List, and Object Select lists Page, Tag and custom types but not Task', () => {
     expect(ADD_PROPERTY_ITEMS.map((i) => i.name)).toEqual([
       'Text',
       'Content',
@@ -48,6 +48,7 @@ describe('ADD_PROPERTY_ITEMS', () => {
       'Phone',
       'Files',
       'Button',
+      'List',
     ])
     expect(ADD_PROPERTY_ITEMS.map((i) => i.type)).toEqual([
       'textBlock',
@@ -72,13 +73,14 @@ describe('ADD_PROPERTY_ITEMS', () => {
       'phone',
       'files',
       'button',
+      'textList',
     ])
     const objectSelect = ADD_PROPERTY_ITEMS.find((i) => i.action === 'objectSelect')
     expect(objectSelect?.description).toBe('Link to objects of a specific type.')
     const cover = ADD_PROPERTY_ITEMS.find((i) => i.action === 'coverImage')
     expect(cover?.description).toBe('A single select image property.')
     // Kinds never offered here.
-    for (const t of ['text', 'url', 'simpleTableBlock', 'datetimeSimple'] as const) {
+    for (const t of ['text', 'url', 'simpleTableBlock', 'datetimeSimple', 'steps', 'floorItems'] as const) {
       expect(ADD_PROPERTY_ITEMS.some((i) => i.type === t)).toBe(false)
     }
 

@@ -49,6 +49,9 @@ import type {
   TypeDef,
   ViewState,
   Views,
+  WorkItem,
+  WorkStep,
+  WorkWriteResult,
 } from '@/api/types'
 import { settingsDefaults } from '@/settings/defaults'
 
@@ -480,6 +483,93 @@ export function secretVar(partial: Partial<SecretVar> & Pick<SecretVar, 'name'>)
   return { set: false, settable: true, usedBy: [], ...partial }
 }
 
+/** M22: a work step: an open Do step, first and current, unless `partial` says otherwise. */
+export function workStep(partial: Partial<WorkStep> = {}): WorkStep {
+  return {
+    id: 'q4m2xa',
+    rev: '0123456789ab',
+    kind: 'do',
+    state: 'open',
+    text: 'Check the printer cable',
+    notBefore: null,
+    answer: null,
+    result: null,
+    addedAt: null,
+    approvedAt: null,
+    doneAt: null,
+    declinedAt: null,
+    n: 1,
+    current: true,
+    actions: [],
+    ...partial,
+  }
+}
+
+/** M22: a work item with every contract field; the title follows `path` unless given. */
+export function workItem(partial: Partial<WorkItem> = {}): WorkItem {
+  const path = partial.path ?? 'Tasks/Printer jams on line 3.md'
+  const steps = partial.steps ?? []
+  const current = steps.find((s) => s.current) ?? null
+  return {
+    path,
+    objectId: null,
+    title: path.replace(/^.*\//, '').replace(/\.md$/, ''),
+    typeId: 'task',
+    version: 'v1',
+    ticket: null,
+    rank: null,
+    area: null,
+    cause: null,
+    priority: null,
+    priorityNote: null,
+    blockedOn: null,
+    confidence: null,
+    status: 'In Progress',
+    stage: 'doing',
+    done: false,
+    doneAt: null,
+    recentlyDone: false,
+    turn: steps.length === 0 ? 'none' : 'you',
+    deskSays: null,
+    current,
+    stepCount: steps.length,
+    stepsFinished: steps.filter((s) => s.state === 'done' || s.state === 'declined').length,
+    projectPath: null,
+    lastActivity: null,
+    lastTouched: '2026-11-05T10:00:00.000Z',
+    problems: [],
+    fields: {},
+    steps,
+    verified: [],
+    assumed: [],
+    toRaiseConfidence: [],
+    floorItems: [],
+    findings: null,
+    hypothesis: null,
+    confidenceReason: null,
+    activity: [],
+    workNotes: [],
+    resolution: null,
+    ...partial,
+  }
+}
+
+/** M22: what a work write answers: the item at `version`, one Activity line, no Work notes line. */
+export function workWriteResult(partial: Partial<WorkWriteResult> = {}): WorkWriteResult {
+  const version = partial.version ?? 'v2'
+  const item = partial.item ?? workItem({ version })
+  return {
+    version,
+    frontmatter: {},
+    body: '',
+    item,
+    synced: [],
+    activity: '2026-11-05 10:00 Gene marked done step 1 "Check the printer cable"',
+    workNote: null,
+    ...partial,
+  }
+}
+
 type Fn =(...args: never[]) => unknown
 
 function defaults(): Api {
@@ -819,6 +909,20 @@ function defaults(): Api {
     setMcpSecret: async (name: string) => ({ name, set: true as const }),
     deleteMcpSecret: async () => ({ ok: true as const }),
     refreshAgentTools: async () => [],
+    // M22
+    workItems: async () => [],
+    workItem: async (path: string) => workItem({ path }),
+    workStep: async (req: { path: string }) => workWriteResult({ item: workItem({ path: req.path }) }),
+    workSteps: async (path: string) => workWriteResult({ item: workItem({ path }) }),
+    workFields: async (path: string) => workWriteResult({ item: workItem({ path }) }),
+    workNote: async (path: string) => workWriteResult({ item: workItem({ path }) }),
+    workClose: async (path: string) => workWriteResult({ item: workItem({ path }) }),
+    workFloor: async (req: { path: string }) => workWriteResult({ item: workItem({ path: req.path }) }),
+    addWorkFields: async (typeId: string, baseRevision: string) => ({
+      type: typeDef({ id: typeId, revision: `${baseRevision}+1` }),
+      added: [],
+      skipped: [],
+    }),
     onChange: () => () => undefined,
   } as unknown as Api
 }

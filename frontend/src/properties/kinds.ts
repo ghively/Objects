@@ -76,6 +76,14 @@ export const KIND_META: Readonly<Record<PropertyType, KindMeta>> = {
   entity_backlinks: { name: 'Context', description: 'Objects linking to this one', icon: 'ph-line-segment' },
   // M14 (our strings): a button that runs an automation on its object.
   button: { name: 'Button', description: 'Run an automation on this object with one click', icon: 'ph-cursor-click' },
+  // M22 (our strings): Steps and Floor items come only from "Add work fields"; List is addable.
+  steps: {
+    name: 'Steps',
+    description: 'An ordered list of questions, things to do, approvals and agent work.',
+    icon: 'ph-list-checks',
+  },
+  textList: { name: 'List', description: 'A list of short texts.', icon: 'ph-list-bullets' },
+  floorItems: { name: 'Floor items', description: 'Things to look at or collect on the floor.', icon: 'ph-clipboard-text' },
 }
 
 /** The icon of a kind, with a fallback for kinds the API may add later. */
@@ -131,6 +139,8 @@ const MENU_ORDER = [
   'property_files',
   // M14: after the catalogued items (our choice).
   'property_button',
+  // M22: List, after Button (our choice). Steps and Floor items are not in the menu.
+  'property_textList',
 ] as const
 
 // The property kinds that become menu items; `text`, `url`, `simpleTableBlock` and
@@ -156,6 +166,7 @@ const ADDABLE_KINDS: readonly PropertyType[] = [
   'phone',
   'files',
   'button',
+  'textList',
 ]
 
 function buildItems(): AddPropertyItem[] {
@@ -184,7 +195,7 @@ function buildItems(): AddPropertyItem[] {
   return items.filter((i) => rank(i) >= 0).sort((a, b) => rank(a) - rank(b))
 }
 
-/** The Add Property menu's items, in order: the 15 catalogued ones, then M12's six, then M14's Button. */
+/** The Add Property menu's items, in order: the 15 catalogued ones, then M12's six, then M14's Button, then M22's List. */
 export const ADD_PROPERTY_ITEMS: readonly AddPropertyItem[] = buildItems()
 
 // Basic types that can't be relation targets.
