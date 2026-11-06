@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from mcp.server.mcpserver.exceptions import ToolError
-from objectapp import agent_mcp
+from objectapp import agent_mcp, toolcatalog
 from objectapp.agentmodel import DEFAULT_AGENT_ID
 from objectapp.agents import AgentRegistry
 from objectapp.mcp_server import ApiError, ObjectClient
@@ -127,7 +127,8 @@ def test_tool_modules_extend(http: TestClient, monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setitem(sys.modules, mod.__name__, mod)
     monkeypatch.setattr(agent_mcp, "TOOL_MODULES", (*agent_mcp.TOOL_MODULES, mod.__name__))
     server = agent_mcp.build_server(ObjectClient("http://testserver", "x", http))
-    assert _names(server) == {"agent_info", "ping"}
+    # Later milestones' tools (M18's learning tools) come from the default modules too.
+    assert _names(server) == {"ping", *toolcatalog.AGENT_TOOLS}
     assert server.name == "object-agent"
 
 
