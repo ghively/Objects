@@ -29,7 +29,7 @@ describe('AgentPage', () => {
     render(<AgentPage id={RESEARCHER} />)
     expect(await screen.findByRole('heading', { name: 'Researcher' })).toBeInTheDocument()
     const tabs = within(screen.getByRole('tablist', { name: AGENT_PAGE_TEXT.tabs })).getAllByRole('tab')
-    expect(tabs.map((t) => t.textContent)).toEqual(['Profile', 'Instructions', 'Tools', 'Memory', 'Skills', 'Learning', 'Chats'])
+    expect(tabs.map((t) => t.textContent)).toEqual(['Profile', 'Instructions', 'Tools', 'Memory', 'Skills', 'Learning', 'Chats', 'Schedules'])
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('textbox', { name: PROFILE_TEXT.name })).toHaveValue('Researcher')
   })
