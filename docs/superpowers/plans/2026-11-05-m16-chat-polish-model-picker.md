@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Written 2026-11-05 against `master` at `0f4fde1`. Build on branch `feat/m16-chat-polish`.
+Written 2026-11-05 against `master` at `0f4fde1`; reconciled with the built code (M10-M15) at `d5da80a`. Build on branch `feat/m16-m24` (shared with M17-M24; no branch of its own).
 
 **Goal.** The AI chat shows every message as rendered Markdown (safely), shows each tool call as a collapsed step between messages, and lets Gene pick the model: in the chat header for this chat, and in Settings > AI Assistant as the default agent's model. The model list is one back-end constant.
 
@@ -35,7 +35,7 @@ CLI checked: `claude --version` = **2.1.317 (Claude Code)**. Flags this plan use
 The five inputs or failure modes most likely to slip past the task tests, most likely first. Each one's test is listed in its owning task.
 
 1. **A hostile reply.** A reply (or a pasted user message) holding `<script>`, `<img src=x onerror=…>`, `<a href="javascript:…">`, a Markdown link to `javascript:` or `data:`, an HTML block inside a list, `<style>`, an `<iframe>`, KaTeX `\href{javascript:…}` or `\htmlClass`, a fence whose language is `"><script>`. Nothing may run or fetch. Test: `markdown.test.ts` "test a hostile reply renders inert" (T4), with the generic `assertInert(html)` check; `AiChatPanel.test.tsx` "test a reply's HTML is shown as text" (T7).
-2. **Copy and save keep the source.** After rendering, Copy, the save and Rephrase must all use `item.text` (the Markdown source), also for a stopped (partial) answer and for an answer that had tool steps between its texts. Test: `AiChatPanel.test.tsx` "test Copy copies the Markdown source and the save stores it" (T7); `test_m16_models.py::test_saved_chat_keeps_markdown_source` (T2).
+2. **Copy and save keep the source.** After rendering, Copy, the save and Rephrase must all use `item.text` (the Markdown source), also for a stopped (partial) answer (M10 keeps it as an item with `stopped: true` and does not save on Stop; the next turn's save carries its `text`) and for an answer that had tool steps between its texts. Test: `AiChatPanel.test.tsx` "test Copy copies the Markdown source and the save stores it" (T7); `test_m16_models.py::test_saved_chat_keeps_markdown_source` (T2).
 3. **A model switch mid-chat.** The next turn must carry both `--resume <session>` and the new `--model`; a CLI that refuses to resume on another model must fall back to a fresh run with the history, once, not loop or lose the turn; switching back to "Default" must drop `--model` (unless Settings names one). Tests: `test_m16_models.py::test_model_change_mid_chat_resumes_with_new_model`, `::test_resume_refused_after_model_change_replays_history`, `::test_default_pick_uses_the_setting_then_nothing` (T2).
 4. **Untrusted model names.** A custom id is passed to a subprocess: `-p`, `--dangerously-skip-permissions`, `a b`, `$(x)`, an 81-character id, an empty string. Each must answer 422 (empty: treated as no pick) and never start the CLI; the Settings field must refuse the same names. Tests: `test_m16_models.py::test_bad_model_is_422_and_cli_not_run`, `::test_settings_and_chat_share_the_model_rule` (T2); `ModelPicker.test.tsx` "test Custom… refuses a name the server would refuse" (T5).
 5. **Awkward tool traffic.** A tool result that is huge (100,000 characters), a list of blocks with an image, an error result, a result for an id never announced, the same result twice, a tool call repeated in the final `assistant` message, a run stopped while a tool is pending, a 200,000-character streamed reply with many fences (render must stay responsive: re-render at most every `STREAM_RENDER_MS`). Tests: `test_m16_tool_events.py` (T3: caps, joins, dedup, unknown id); `toolSteps.test.ts` (T6: merge by id, unknown id ignored); `ChatMarkdown.test.tsx` "test streaming re-renders at most every STREAM_RENDER_MS" and "test past MAX_RENDER_CHARS the text shows plain" (T4); `AiChatPanel.test.tsx` "test Stop leaves a pending step marked stopped" (T7).
@@ -121,7 +121,7 @@ export type AiEvent =
   | { type: 'error'; message: string }
 ```
 
-`frontend/src/api/client.ts` (T1): `api.aiModels(): Promise<AiModels>` (`GET /ai/models`). `frontend/src/test/mockApi.ts` (T1): `aiModels` answering the eight choices above and the pattern, and `aiChat`'s mock tool event updated to the new shape (`{type:'tool', id:'t1', name:'search', input:{query:'rack'}}`).
+`frontend/src/api/client.ts` (T1): `api.aiModels(): Promise<AiModels>` (`GET /ai/models`), next to M10's `aiStatus`. `frontend/src/test/mockApi.ts` (T1): `aiModels` answering the eight choices above and the pattern. (Reconciled: M10's mock `aiChat` sends only `text` and `done`, no tool event, so it stays as is. The one old-shape tool event is in `frontend/src/ai/AiChatPanel.test.tsx`, M10's "test streaming shows the tools used, and Stop aborts": `onEvent({ type: 'tool', name: 'search' })`. `tsc -b` type-checks test files (`tsconfig.app.json` includes all of `src`), so T1 changes that one line to `onEvent({ type: 'tool', id: 't1', name: 'search', input: { query: 'rack' } })`; T7 owns the file after that.)
 
 ### Routes (T2, `backend/objectapp/api_ai.py`)
 
@@ -237,7 +237,7 @@ A failed step appends ` (failed)`; a pending one shows a spinner and the same li
 
 ### Labels (our strings)
 
-Picker: "Default", "Latest" (alias group heading), "Versions" (id group heading), "Custom…", placeholder "Model id, e.g. claude-opus-5-5" (the example id is read from `models` at runtime: the first `kind: 'id'` entry, so no id is written in the front end), "Save", "That isn't a model name.". Header: the picker's trigger shows the chat's pick label, or `Default` when none (its row says `Default ({label of the setting})` when Settings names a model); aria-label "Model for this chat". Settings > AI Assistant > Model: help becomes "The default agent's model. Default uses Claude Code's own default." and the search keywords gain "model".
+Picker: "Default", "Latest" (alias group heading), "Versions" (id group heading), "Custom…", placeholder "Model id, e.g. claude-opus-5-5" (the example id is read from `models` at runtime: the first `kind: 'id'` entry, so no id is written in the front end), "Save", "That isn't a model name.". Header: the picker's trigger shows the chat's pick label, or `Default` when none (its row says `Default ({label of the setting})` when Settings names a model); aria-label "Model for this chat". Settings > AI Assistant > Model: help becomes "The default agent's model. Default uses Claude Code's own default."; the search keywords already find "model" (they hold the `Model` label).
 
 ### Our choices (summary)
 
@@ -261,7 +261,7 @@ Run each task's own tests only; the full suites run in T8.
 
 **Files:**
 - Create: `backend/objectapp/aimodels.py`, `backend/tests/test_m16_contract.py`
-- Modify: `backend/objectapp/settings.py` (use `aimodels.MODEL_PATTERN`), `frontend/src/api/types.ts`, `frontend/src/api/client.ts`, `frontend/src/test/mockApi.ts`
+- Modify: `backend/objectapp/settings.py` (use `aimodels.MODEL_PATTERN`), `frontend/src/api/types.ts`, `frontend/src/api/client.ts`, `frontend/src/test/mockApi.ts`, `frontend/src/ai/AiChatPanel.test.tsx` (only the one old-shape `tool` event line, see the Contract)
 
 **Interfaces:** Produces everything in "Contract (T1)" above except the route and stream changes (T2, T3).
 
@@ -272,19 +272,19 @@ Run each task's own tests only; the full suites run in T8.
   - `test_settings_use_the_shared_rule`: `settings` validates `aiModel` `"claude-opus-5-5[1m]"` true, `"-x"` false; `settings.py` source no longer contains `_MODEL_NAME`.
   - `test_one_model_list`: walks `backend/objectapp` and `frontend/src` (skipping `frontend/src/test/` and `*.test.*` files); the strings `claude-fable-5-1`, `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5` appear only in `aimodels.py`.
 - [ ] **Step 2:** `uv run pytest backend/tests/test_m16_contract.py -q`, see them fail (no module).
-- [ ] **Step 3:** write `aimodels.py` with the exact signatures; switch `settings.py`; add the TS types, `api.aiModels`, the mock. `npx tsc -b --noEmit` passes (the old `tool` mock shape is updated in the same commit; `AiChatPanel.tsx` still compiles because it only reads `e.name`).
+- [ ] **Step 3:** write `aimodels.py` with the exact signatures; switch `settings.py`; add the TS types, `api.aiModels`, the mock. `npx tsc -b --noEmit` passes (the old `tool` event in `AiChatPanel.test.tsx` is updated in the same commit; `AiChatPanel.tsx` still compiles because it only reads `e.name`).
 - [ ] **Step 4:** run the test file and `uv run pytest backend/tests/test_m10_ai.py -q`; both pass.
 - [ ] **Step 5:** commit `feat(m16): contract: one model list, model pick and tool step types` with the trailer.
 
 ### Task 2: Model route and per-chat override (Lane B)
 
 **Files:**
-- Modify: `backend/objectapp/api_ai.py`, `backend/tests/fake_claude.py`, `backend/tests/test_m10_ai.py` (only: add `"aimodels"` to the no-network module list)
+- Modify: `backend/objectapp/api_ai.py`, `backend/tests/fake_claude.py`, `backend/tests/test_m10_ai.py` (only: add `"aimodels.py"` to `test_ai_modules_use_no_network_client`'s parametrize list, today `["ai.py", "aichat.py", "api_ai.py"]`)
 - Create: `backend/tests/test_m16_models.py`
 
 **Interfaces:** Consumes `aimodels.clean_model`, `resolve_model`, `models_payload`, `BAD_MODEL`. Produces `GET /api/ai/models`, `ChatRequest.model`.
 
-`fake_claude.py` gains two markers (documented in its docstring): `FAKE:modelswitch` (with `--resume` and `--model` both given: answers like an unknown session, exit 1, so the app retries fresh) and `FAKE:toolerror` (like `FAKE:tool`, but the `tool_result` has `"is_error": true` and content `[{"type":"text","text":"Search failed: index busy"}]`). The log line also records `"model": _arg(argv, "--model")`. `FAKE:tool` is unchanged (M10's tests rely on it).
+`fake_claude.py` gains two markers (documented in its docstring): `FAKE:modelswitch` (with `--resume` and `--model` both given: answers like an unknown session, as its `expired` branch does, exit 1 with nothing shown, which `run_turn` treats as retryable, so the app retries fresh) and `FAKE:toolerror` (like `FAKE:tool`, but the `tool_result` has `"is_error": true` and content `[{"type":"text","text":"Search failed: index busy"}]`). The log entry (the dict written to `FAKE_CLAUDE_LOG`) also records `"model": _arg(argv, "--model")`. `FAKE:tool` is unchanged (M10's tests rely on it).
 
 - [ ] **Step 1: failing tests** in `test_m16_models.py` (fixtures copied from `test_m10_ai.py`: `fake`, `api`, `OBJECT_STATE_DIR` in `tmp_path`):
   - `test_models_route_lists_the_constant`: 200; `body["models"] == [asdict(m) for m in MODELS]`; `body["pattern"] == MODEL_PATTERN`; also 200 with `aiHidden` on.
@@ -297,14 +297,14 @@ Run each task's own tests only; the full suites run in T8.
   - `test_settings_and_chat_share_the_model_rule`: `PUT /api/settings` `aiModel="a b"` refused as M10 refuses a bad value; `"claude-opus-5-5[1m]"` saved.
   - `test_saved_chat_keeps_markdown_source`: save messages whose assistant text is `"# Title\n\n**bold** and `x`\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n- [ ] task\n\n$x^2$"`; load gives it back exactly; the file body holds it unchanged.
 - [ ] **Step 2:** run, see them fail.
-- [ ] **Step 3:** implement in `api_ai.py`: `ChatRequest.model: str | None = None`; in `ai_chat`, before `find_claude`: `try: pick = aimodels.clean_model(req.model) except ValueError: return _error(422, aimodels.BAD_MODEL)`; `model = aimodels.resolve_model(pick, settings.get("aiModel") or None)`; `@r.get("/ai/models") def ai_models(): return aimodels.models_payload()`. Update the module docstring's route list. Fake markers as above.
+- [ ] **Step 3:** implement in `api_ai.py`: `ChatRequest.model: str | None = None`; in `ai_chat`, after the `aiHidden` / context / length checks and before `ai.find_claude` (today `claude = await asyncio.to_thread(ai.find_claude, settings.get("claudePath"))`): `try: pick = aimodels.clean_model(req.model) except ValueError: return _error(422, aimodels.BAD_MODEL)`; the later `model = settings.get("aiModel") or None` becomes `model = aimodels.resolve_model(pick, settings.get("aiModel") or None)`; `@r.get("/ai/models") def ai_models(): return aimodels.models_payload()`. Update the module docstring's route list. Fake markers as above.
 - [ ] **Step 4:** `uv run pytest backend/tests/test_m16_models.py backend/tests/test_m10_ai.py -q` pass.
 - [ ] **Step 5:** commit `feat(m16): model list route and a model pick per chat`.
 
 ### Task 3: Tool step events (Lane B, after T2)
 
 **Files:**
-- Modify: `backend/objectapp/ai.py` (`StreamParser`, `short_input`, `short_result`, caps, `__all__`, docstring)
+- Modify: `backend/objectapp/ai.py` (`StreamParser`, `short_input`, `short_result`, caps, `__all__`, docstring), `backend/tests/test_m10_ai.py` (only the one assertion in `test_tool_use_and_text_are_not_repeated`, Step 4)
 - Create: `backend/tests/test_m16_tool_events.py`
 
 **Interfaces:** Consumes the fake's `FAKE:tool` / `FAKE:toolerror`. Produces the `tool` event pair of the Contract.
@@ -320,8 +320,8 @@ Run each task's own tests only; the full suites run in T8.
   - `test_tool_results_never_reach_text`: route turn with `FAKE:tool`: `done.text == "Hello from the fake claude."`-style final text with no `[]` added; event order is `session`, `text`, `tool` (call), `tool` (result), `text`…, `done`.
   - `test_tool_error_over_http`: `FAKE:toolerror` -> the result event has `isError: True` and `result == "Search failed: index busy"`.
 - [ ] **Step 2:** run, see them fail.
-- [ ] **Step 3:** implement: `feed` handles `kind == "user"` -> `_user(msg)`; `_assistant` emits the call event with `id`, `input`; keep a `dict[str, str]` id -> short name and a set of answered ids.
-- [ ] **Step 4:** `uv run pytest backend/tests/test_m16_tool_events.py backend/tests/test_m10_ai.py -q` pass (M10's `test_tool_use_and_text_are_not_repeated` still passes: it counts `tool` events by name; update its expectation only if it asserts exactly one `tool` event, to "one call event").
+- [ ] **Step 3:** implement: `feed` handles `kind == "user"` -> `_user(obj.get("message") or {})`; `_assistant` emits the call event with `id`, `input` (today it keeps `self._tools: set[str]` and emits `{"type": "tool", "name": ...}`): replace that set with a `dict[str, str]` id -> short name and add a set of answered ids. `run_turn` makes a new `StreamParser` per attempt, so a fresh retry starts with no known ids.
+- [ ] **Step 4:** `uv run pytest backend/tests/test_m16_tool_events.py backend/tests/test_m10_ai.py -q` pass. (Reconciled: M10's `test_tool_use_and_text_are_not_repeated` asserts the exact dict `{"type": "tool", "name": "search"} in events`, which the new shape breaks; T3 changes that one assertion to `{"type": "tool", "id": "toolu_1", "name": "search", "input": {"query": "alpha"}} in events` (the fake's `FAKE:tool` searches for `alpha`) and leaves its text assertions alone.)
 - [ ] **Step 5:** commit `feat(m16): tool events carry the call's input and result`.
 
 ### Task 4: Markdown renderer (Lane M)
@@ -346,7 +346,7 @@ Rendering rules (`markdown.ts`): a private `new Marked({ async: false, gfm: true
   - "test images show as alt text": `![a diagram](https://example.org/a.png)` -> no `img`, text `a diagram`.
   - "test past MAX_RENDER_CHARS the text shows plain": a 200,001-character source with `**` -> no `<strong>`, the `**` visible.
   - "test fenceLanguages": `"```python\n```\n```ts\n```"` -> `["python","ts"]`.
-- [ ] `ChatMarkdown.test.tsx`: "test renders and presents object links" (a `[[Alpha]]` chip gets `data-resolved-path` from the mock `resolve`, and a click opens it in a tab); "test streaming re-renders at most every STREAM_RENDER_MS" (fake timers: 20 source updates within 100 ms -> `renderChatMarkdown` spy called ≤ 2 times, and the last source is shown after the timer); "test a fence's grammar loading re-renders" (a `yaml` fence shows highlight spans after `loadGrammar('yaml')` resolves).
+- [ ] `ChatMarkdown.test.tsx`: "test renders and presents object links" (a `[[Alpha]]` chip gets `data-resolved-path` from the mock `resolve`, which the test sets to answer a path since `mockApi`'s default `resolve` answers `null`; a click opens it as `presentWikilink` does: peek on click, a new tab with Ctrl/Cmd+click); "test streaming re-renders at most every STREAM_RENDER_MS" (fake timers: 20 source updates within 100 ms -> `renderChatMarkdown` spy called ≤ 2 times, and the last source is shown after the timer); "test a fence's grammar loading re-renders" (a `yaml` fence shows highlight spans after `loadGrammar('yaml')` resolves).
 - [ ] **Step 2:** `npx vitest run src/ai/markdown.test.ts src/ai/ChatMarkdown.test.tsx`, see them fail.
 - [ ] **Step 3:** implement with the exact signatures.
 - [ ] **Step 4:** the two files pass; `npx vitest run src/noNetwork.m8.test.ts` passes; `npx tsc -b --noEmit`.
@@ -362,7 +362,7 @@ Rendering rules (`markdown.ts`): a private `new Marked({ async: false, gfm: true
 
 `ModelPicker`: a `Popover` (`@/components/ui/popover`) whose trigger shows `modelLabel(value, models, defaultLabel)` and a caret. The list (`role="listbox"`, rows `role="option"` with `aria-selected`): the Default row (`defaultLabel`), "Latest" (aliases), "Versions" (ids), a current custom value not in the list (its id, selected), then "Custom…". Custom… swaps the list for an input (`aria-label="Model id"`) and "Save"; Enter saves; `isModelName` false -> "That isn't a model name." under it and nothing is saved; Escape goes back. Keyboard: arrows move, Enter picks (our choice, like the app's other menus). While `models` is null: Default and Custom… only (Custom… disabled until the pattern is there).
 
-Settings: the Model `TextSetting` is replaced by `<ModelPicker value={settings.aiModel} onChange={(v) => patch({ aiModel: v })} defaultLabel="Default" ariaLabel="Model" />`; `AI_ASSISTANT_TEXT.modelHelp` becomes "The default agent's model. Default uses Claude Code's own default."; `modelPlaceholder` is removed; `AI_ASSISTANT_SEARCH` gains `'model'`. The Claude Code path field is unchanged.
+Settings: the Model `TextSetting` is replaced by `<ModelPicker value={settings.aiModel} onChange={(v) => patch({ aiModel: v })} defaultLabel="Default" ariaLabel="Model" />`; `AI_ASSISTANT_TEXT.modelHelp` becomes "The default agent's model. Default uses Claude Code's own default."; `modelPlaceholder` is removed; `AI_ASSISTANT_SEARCH` is unchanged (reconciled: it already holds `T.model` = `'Model'`, and `SettingsModal` matches keywords case-insensitively, so "model" already finds the section). The Claude Code path field is unchanged.
 
 - [ ] **Step 1: failing tests**:
   - `models.test.ts`: "test useAiModels fetches once" (two hooks, one `api.aiModels` call); "test modelLabel" (`null` -> the default label; `"claude-opus-5-5"` -> `"Opus 5.5"`; `"my-model"` -> `"my-model"`); "test isModelName follows the served pattern" (`"claude-opus-5-5[1m]"` true; `"-p"`, `"a b"`, 81 characters false; with `models` null false).
@@ -423,7 +423,7 @@ Changes:
 
 **Files:**
 - Create: `scripts/m16_acceptance.py`, `docs/superpowers/plans/m16-acceptance.md`
-- Modify: `docs/superpowers/plans/remaining-work.md` (add the M16 status line only; Gene has uncommitted edits in this file: edit on top of them, never revert or reformat other lines)
+- Modify: `docs/superpowers/plans/remaining-work.md` (add the M16 status line only; never revert or reformat other lines, and keep any uncommitted edits Gene or another milestone's agent has made there)
 
 **Interfaces:** Consumes everything above; `m2_acceptance.Run/commit/git/remove_tree`, `m8_acceptance.Served`, `fake_claude.install` (as `m10_acceptance.py` does).
 
@@ -451,7 +451,7 @@ Ends with `RESULT: PASS` (exit 0) or `RESULT: FAIL` (exit 1).
 - [ ] Settings > AI Assistant > Model is a picker; a value set in M10 as text still shows; the chat's Default row names it.
 - [ ] New chat resets the chat's model to Default.
 
-- [ ] **Step 1:** write the script and run it on a copy of a fixture space (`uv run python scripts/m16_acceptance.py backend/tests/fixtures/<space>`); see `RESULT: PASS`.
+- [ ] **Step 1:** write the script and run it on a copy of a fixture space (`uv run python scripts/m16_acceptance.py backend/tests/fixtures/space-sample`, then `space-m8`, as M10 did); see `RESULT: PASS`.
 - [ ] **Step 2:** one whole-milestone review (correctness, file safety, fidelity to sections 10 and 11; the Review Focus list first), then one fix pass.
 - [ ] **Step 3:** the gate: `uv run pytest backend/tests -q`, `npx vitest run`, `npx tsc -b --noEmit`, `npm run build`, `scripts/m10_acceptance.py` and `scripts/m16_acceptance.py` on fixture copies; rerun on a quiet machine any timing failure before calling it real.
 - [ ] **Step 4:** write `m16-acceptance.md` with the results; add the status line to `remaining-work.md`.
@@ -464,12 +464,13 @@ Ends with `RESULT: PASS` (exit 0) or `RESULT: FAIL` (exit 1).
 | `backend/objectapp/aimodels.py` | T1 | T2 imports it |
 | `backend/objectapp/settings.py` | T1 | none |
 | `frontend/src/api/types.ts`, `api/client.ts`, `test/mockApi.ts` | T1 | lanes that need a change say so in their report, they don't edit |
+| `frontend/src/ai/AiChatPanel.test.tsx` | T7 | T1 changes its one old-shape `tool` event line first (T1 runs alone, before T7) |
 | `backend/objectapp/api_ai.py` | T2 | none |
 | `backend/tests/fake_claude.py` | T2 | T3, T8 use its markers |
-| `backend/tests/test_m10_ai.py` | T2 (the no-network list) | T3 may change one expectation in `test_tool_use_and_text_are_not_repeated` (same lane, after T2) |
+| `backend/tests/test_m10_ai.py` | T2 (the no-network list) | T3 changes the one tool assertion in `test_tool_use_and_text_are_not_repeated` (same lane, after T2) |
 | `backend/objectapp/ai.py` | T3 | none |
 | `frontend/src/settings/sections/AiAssistant.tsx` (+ test) | T5 | none |
-| `frontend/src/ai/AiChatPanel.tsx`, `aiText.ts`, `AiChatPanel.test.tsx` | T7 | none |
+| `frontend/src/ai/AiChatPanel.tsx`, `aiText.ts` | T7 | none |
 | `docs/superpowers/plans/remaining-work.md` | T8 | none |
 
 New files belong to the task that creates them. Read-only imports (`TextBlockCell.safeHref`, `highlight.ts`, `renderMath.ts`, `annotations.findInlineMath`, `wikilinkPresenter`, `linkIndex`) are not edited by anyone in M16.
