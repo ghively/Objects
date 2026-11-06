@@ -9,12 +9,16 @@ lines the way Claude Code does: a ``system``/``init`` line with the session id, 
 ``stream_event`` text deltas, the full ``assistant`` message, and a ``result``.
 
 ``FAKE_CLAUDE_LOG``: a file it appends one JSON line to per run (argv, cwd, pid, the
-prompt, the MCP config it was given, the ``OBJECT_API_*`` variables), so tests can check
-the flags, the working folder and the token.
+prompt, the MCP config it was given, the ``OBJECT_API_*`` variables, the ``--model``
+value), so tests can check the flags, the working folder, the token and the model.
 
 Steered by markers in the prompt (the user's message is part of it):
 
 - ``FAKE:tool``: uses ``mcp__object__search`` before answering
+- ``FAKE:toolerror``: like ``FAKE:tool``, but the ``tool_result`` has ``is_error`` and the
+  content ``[{"type": "text", "text": "Search failed: index busy"}]`` (M16)
+- ``FAKE:modelswitch``: with both ``--resume`` and ``--model`` given, answers like an
+  unknown session (exit 1, nothing shown), so the app retries fresh with the history (M16)
 - ``FAKE:tags`` / ``FAKE:props`` / ``FAKE:text`` / ``FAKE:badjson``: ends with a fenced block
 - ``FAKE:fail``: writes to stderr and exits 1 without a result
 - ``FAKE:error``: a ``result`` with ``is_error`` (exit 1)
@@ -122,12 +126,14 @@ def main(argv: list[str]) -> int:
             "mcpConfig": config,
             "token": os.environ.get("OBJECT_API_TOKEN"),
             "url": os.environ.get("OBJECT_API_URL"),
+            "model": _arg(argv, "--model"),
         }
         with open(log, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
 
     resume = _arg(argv, "--resume")
-    if resume in ("expired", EXPIRED_SESSION):
+    refused = "FAKE:modelswitch" in prompt and resume is not None and _arg(argv, "--model") is not None
+    if resume in ("expired", EXPIRED_SESSION) or refused:
         _result(f"No conversation found with session ID: {resume}", resume, error=True)
         sys.stderr.write(f"No conversation found with session ID: {resume}\n")
         return 1
@@ -157,12 +163,16 @@ def main(argv: list[str]) -> int:
         _result("Something went wrong in the fake", session, error=True)
         return 1
 
-    if "FAKE:tool" in prompt:
+    if "FAKE:tool" in prompt:  # also FAKE:toolerror
+        failed = "FAKE:toolerror" in prompt
         _stream_text("msg_1", ["Let me look."], session)
         _out(_message("msg_1", [{"type": "tool_use", "id": "toolu_1", "name": "mcp__object__search",
                                  "input": {"query": "alpha"}}], session))
-        _out({"type": "user", "message": {"role": "user", "content": [
-            {"type": "tool_result", "tool_use_id": "toolu_1", "content": "[]"}]}, "session_id": session})
+        block: dict = {"type": "tool_result", "tool_use_id": "toolu_1", "content": "[]"}
+        if failed:
+            block = {"type": "tool_result", "tool_use_id": "toolu_1", "is_error": True,
+                     "content": [{"type": "text", "text": "Search failed: index busy"}]}
+        _out({"type": "user", "message": {"role": "user", "content": [block]}, "session_id": session})
 
     final = "Hello from the fake claude."
     if "FAKE:tags" in prompt:
