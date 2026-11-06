@@ -326,6 +326,9 @@ describe('AiChatPanel', () => {
       title: 'Old',
       contextPaths: ['Pages/B.md'],
       sessionId: 'sess-old',
+      agent: null,
+      agentId: 'assistant',
+      chatId: null,
       messages: [
         { role: 'user', text: 'Earlier question', at: '2026-11-05T10:00:00Z' },
         { role: 'assistant', text: 'Earlier answer', at: '2026-11-05T10:00:01Z' },
@@ -351,7 +354,17 @@ describe('AiChatPanel', () => {
       .mockResolvedValueOnce({ path: 'AI Chats/C.md', version: 'v1' })
       .mockRejectedValueOnce(new ConflictError('v9'))
       .mockResolvedValueOnce({ path: 'AI Chats/C.md', version: 'v10' })
-    mocked.aiChatLoad.mockResolvedValue({ path: 'AI Chats/C.md', version: 'v9', title: 'x', contextPaths: [], sessionId: null, messages: [] })
+    mocked.aiChatLoad.mockResolvedValue({
+      path: 'AI Chats/C.md',
+      version: 'v9',
+      title: 'x',
+      contextPaths: [],
+      sessionId: null,
+      messages: [],
+      agent: null,
+      agentId: 'assistant',
+      chatId: null,
+    })
     const { user } = setup()
     await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
     await user.type(input(), 'One{Enter}')
@@ -400,6 +413,9 @@ describe('AiChatPanel', () => {
       version: 'v9',
       title: 'Renamed',
       contextPaths: [],
+      agent: null,
+      agentId: 'assistant',
+      chatId: null,
       sessionId: null,
       messages: [{ role: 'user', text: 'Edited elsewhere', at: '2026-11-05T09:00:00Z' }],
     })

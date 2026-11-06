@@ -14,6 +14,10 @@ through a token: when, which token, what and where. ``GET /api/v1/changes`` read
 M10: `TokenStore.ephemeral` makes a short-lived ``read`` token for one AI assistant turn.
 It lives only in this process's memory (never in a file), `verify` accepts it like a
 stored one, and `TokenStore.drop_ephemeral` revokes it when the turn ends.
+
+M17: an agent turn's ephemeral token also names the agent and the chat (`TokenRecord.agent`,
+`TokenRecord.chat`), so ``/api/v1/agent/*`` acts only on that agent. Stored tokens never
+have them (and the file never holds the keys).
 """
 
 from __future__ import annotations
@@ -75,6 +79,10 @@ class TokenRecord:
     hash: str
     createdAt: str
     lastUsedAt: str | None = None
+    agent: str | None = None
+    """M17: the agent id of an agent turn's ephemeral token; None for every stored token."""
+    chat: str | None = None
+    """M17: the chat id of an agent turn's ephemeral token; None for every stored token."""
 
     def to_api(self) -> dict[str, Any]:
         """What the UI sees: everything but the hash and the space key."""
@@ -85,6 +93,15 @@ class TokenRecord:
             "createdAt": self.createdAt,
             "lastUsedAt": self.lastUsedAt,
         }
+
+
+def _stored(t: TokenRecord) -> dict[str, Any]:
+    """A record as the file holds it: M11's keys only (the M17 agent fields are memory-only)."""
+    out = asdict(t)
+    for key in ("agent", "chat"):
+        if out.get(key) is None:
+            out.pop(key, None)
+    return out
 
 
 class TokenStore:
@@ -118,7 +135,7 @@ class TokenStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".json.tmp")
         tmp.write_text(
-            json.dumps({"tokens": [asdict(t) for t in tokens]}, indent=2), encoding="utf-8"
+            json.dumps({"tokens": [_stored(t) for t in tokens]}, indent=2), encoding="utf-8"
         )
         os.replace(tmp, self.path)
 
@@ -166,11 +183,14 @@ class TokenStore:
 
     # -- M10: per-turn tokens held in memory ---------------------------------------
 
-    def ephemeral(self, name: str, scope: str = "read") -> tuple[TokenRecord, str]:
+    def ephemeral(
+        self, name: str, scope: str = "read", agent: str | None = None, chat: str | None = None
+    ) -> tuple[TokenRecord, str]:
         """A token for this space that only this process knows; return (record, secret).
 
         Nothing is written: the record sits in a process-wide dict until
         `drop_ephemeral`. It isn't listed by `list` (it isn't the user's token).
+        M17: `agent` and `chat` stamp an agent turn's token with its agent and chat ids.
         """
         if scope not in SCOPES:
             raise ValueError("scope must be read or read-write.")
@@ -182,6 +202,8 @@ class TokenStore:
             space=self.space,
             hash=_hash(secret),
             createdAt=_now(),
+            agent=agent,
+            chat=chat,
         )
         with _EPHEMERAL_LOCK:
             _EPHEMERAL[record.hash] = record

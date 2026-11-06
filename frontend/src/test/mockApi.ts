@@ -10,12 +10,16 @@
 import { vi } from 'vitest'
 import type { Api } from '@/api/client'
 import type {
+  Agent,
+  AgentInput,
+  AgentTranscript,
   Attachment,
   AutomationRule,
   AutomationRun,
   CalendarDay,
   CalendarRange,
   Collection,
+  CreateAgentRequest,
   DeviceSettings,
   GraphData,
   ImportJob,
@@ -298,6 +302,52 @@ export function automationRun(partial: Partial<AutomationRun> & Pick<AutomationR
   }
 }
 
+/** M17: an agent with every contract field (a local agent, not the default one); `partial` overrides. */
+export function agent(partial: Partial<Agent> & Pick<Agent, 'id'>): Agent {
+  const isDefault = partial.id === 'assistant'
+  return {
+    kind: 'local',
+    name: isDefault ? 'Assistant' : 'Researcher',
+    icon: isDefault ? 'ph-sparkle' : 'ph-robot',
+    color: null,
+    description: '',
+    model: null,
+    toolsOff: ['Bash'],
+    learning: null,
+    createdAt: '2026-11-05T09:00:00.000Z',
+    updatedAt: '2026-11-05T09:00:00.000Z',
+    default: isDefault,
+    folder: `/state/agents/${isDefault ? 'Assistant' : 'Researcher'}`,
+    inStateDir: true,
+    exists: true,
+    missing: false,
+    readOnlyReason: null,
+    revision: 'r1',
+    mcpServers: [],
+    ...partial,
+  }
+}
+
+/** M17: a chat transcript of `agentId` (one user line, one assistant line); `partial` overrides. */
+export function agentTranscript(partial: Partial<AgentTranscript> & Pick<AgentTranscript, 'id'>): AgentTranscript {
+  return {
+    title: 'What do my notes say?',
+    createdAt: '2026-11-05T09:00:00.000Z',
+    updatedAt: '2026-11-05T09:01:00.000Z',
+    messageCount: 2,
+    spaceName: 'space',
+    delegated: false,
+    agentId: 'assistant',
+    sessionId: 's1',
+    objectPath: null,
+    items: [
+      { type: 'user', text: 'What do my notes say?', at: '2026-11-05T09:00:00.000Z', contextPaths: [] },
+      { type: 'assistant', text: 'Hello', at: '2026-11-05T09:01:00.000Z', model: null, sessionId: 's1' },
+    ],
+    ...partial,
+  }
+}
+
 type Fn =(...args: never[]) => unknown
 
 function defaults(): Api {
@@ -429,7 +479,17 @@ function defaults(): Api {
       onEvent({ type: 'text', text: 'Hello' })
       onEvent({ type: 'done', text: 'Hello', sessionId: 's1', proposal: null, skipped: [] })
     },
-    aiChatLoad: async (path: string) => ({ path, version: 'v1', title: 'Chat', contextPaths: [], sessionId: null, messages: [] }),
+    aiChatLoad: async (path: string) => ({
+      path,
+      version: 'v1',
+      title: 'Chat',
+      contextPaths: [],
+      sessionId: null,
+      messages: [],
+      agent: null,
+      agentId: 'assistant',
+      chatId: null,
+    }),
     saveAiChat: async (req: { path?: string | null }) => ({ path: req.path ?? 'AI Chats/Chat.md', version: 'v1' }),
     apiTokens: async () => ({ tokens: [], mcp: mcpConfig('<token>') }),
     createApiToken: async (name: string, scope: 'read' | 'read-write') => ({
@@ -553,6 +613,27 @@ function defaults(): Api {
     automationRuns: async () => [],
     automationCatchUp: async () => [],
     confirmAutomationCatchUp: async () => [],
+    // M17
+    agents: async () => [agent({ id: 'assistant', exists: false })],
+    agent: async (id: string) => agent({ id }),
+    createAgent: async (req: CreateAgentRequest) =>
+      agent({ id: '01JNEWAGENT000000000000000', name: req.agent.name, revision: 'r1' }),
+    addAgentFolder: async (path: string) => agent({ id: '01JADDEDAGENT0000000000000', folder: path, inStateDir: false }),
+    saveAgent: async (id: string, input: AgentInput, baseRevision: string | null) =>
+      agent({ id, name: input.name, revision: `${baseRevision ?? 'r0'}+1` }),
+    deleteAgent: async () => ({ trashId: 'agent-trash-1' }),
+    unregisterAgent: async () => ({ ok: true as const }),
+    agentTrash: async () => [],
+    restoreAgent: async () => agent({ id: '01JRESTOREDAGENT0000000000' }),
+    agentInstructions: async () => ({ text: '', revision: null }),
+    saveAgentInstructions: async (_id: string, _text: string, baseRevision: string | null) => ({
+      revision: `${baseRevision ?? 'r0'}+1`,
+    }),
+    agentToolDefaults: async () => [],
+    agentTools: async () => [],
+    agentChats: async () => [],
+    agentChat: async (id: string, chatId: string) => agentTranscript({ id: chatId, agentId: id }),
+    revealAgentFolder: async () => ({ ok: true }),
     onChange: () => () => undefined,
   } as unknown as Api
 }

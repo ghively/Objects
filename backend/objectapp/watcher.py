@@ -85,12 +85,15 @@ class ChangeEvent:
         "whiteboard",
         "automations",
         "automationRuns",
+        "agents",
+        "agentChats",
     ]
     path: str
     """Space-relative POSIX path of the object file (for ``types``: the type id; for
     ``collections``, ``queries``, ``views`` and ``automations``: the definition id; for ``ui``:
     ``ui.json``; for ``automationRuns``: the rule id, or ``catch-up``;
-    for ``whiteboard``: the board's ``.md``, whose canvas or ink file changed)."""
+    for ``whiteboard``: the board's ``.md``, whose canvas or ink file changed; M17: for
+    ``agents`` the agent id, or ``trash``; for ``agentChats`` the agent id)."""
     version: str | None
     """The new file version (sha256 of its bytes); ``None`` when deleted."""
     origin: str | None = None

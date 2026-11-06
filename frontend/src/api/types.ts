@@ -640,6 +640,10 @@ export type ChangeKind =
   | 'automations'
   /** M14: a run was logged (`path` the rule id), or (`path` `catch-up`) the catch-up list changed. */
   | 'automationRuns'
+  /** M17: an agent was created, saved, deleted, unregistered or restored (`path` its id, or `trash`). */
+  | 'agents'
+  /** M17: an agent's chat transcript was written (`path` the agent id, `version` the chat id). */
+  | 'agentChats'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {
@@ -1834,6 +1838,10 @@ export interface AiChatRequest {
   clientId?: string
   /** M16: this chat's model pick; null/absent = the default agent's model (Settings), else the CLI's. */
   model?: string | null
+  /** M17: the agent the turn runs as; null/absent = the default agent ("assistant"). */
+  agentId?: string | null
+  /** M17: the chat's transcript id; null/absent (or not a ULID) starts a new chat. */
+  chatId?: string | null
 }
 
 /** A change the assistant suggests; nothing is applied until the user accepts it. */
@@ -1849,6 +1857,8 @@ export interface AiSkipped {
 }
 
 export type AiEvent =
+  /** M17: the first event of every turn: the chat's transcript id and the agent it runs as. */
+  | { type: 'chat'; chatId: string; agentId: string }
   | { type: 'session'; sessionId: string }
   /** A chunk to append to the answer so far. */
   | { type: 'text'; text: string }
@@ -1869,6 +1879,12 @@ export interface AiChat {
   contextPaths: string[]
   sessionId: string | null
   messages: AiMessage[]
+  /** M17: the chat's Agent property (the agent's name), null when it has none (an M10 chat). */
+  agent: string | null
+  /** M17: the first listed agent with that name (case-insensitive), else the default agent. */
+  agentId: string
+  /** M17: the transcript that carries its session id, else null. */
+  chatId: string | null
 }
 
 /** POST /api/ai/chat/save: creates the chat (no `path`) or replaces its messages (409 on a stale `baseVersion`). */
@@ -1881,4 +1897,119 @@ export interface SaveAiChatRequest {
   sessionId: string | null
   messages: AiMessage[]
   clientId?: string
+  /** M17: the agent the chat ran as (written as its Agent property); null/absent = the default agent. */
+  agentId?: string | null
+  /** M17: the transcript the saved object is recorded in. */
+  chatId?: string | null
+}
+
+// ---- M17: agents (docs/superpowers/plans/2026-11-05-m17-agents-and-tools.md, "Contract (T1)") ----
+
+/** GET /api/agents, /api/agents/{id}: one agent (a folder). */
+export interface Agent {
+  id: string
+  /** M20 adds 'remote'. */
+  kind: 'local'
+  name: string
+  icon: string | null
+  color: string | null
+  description: string
+  /** The agent's default model; the default agent's is Settings' aiModel. */
+  model: string | null
+  /** The switched-off tool ids (toolcatalog). */
+  toolsOff: string[]
+  /** Reserved for M18. */
+  learning: Record<string, unknown> | null
+  createdAt: string | null
+  updatedAt: string | null
+  default: boolean
+  folder: string
+  inStateDir: boolean
+  /** false: the default agent before its first use (no folder yet). */
+  exists: boolean
+  /** A registered folder that is gone. */
+  missing: boolean
+  readOnlyReason: string | null
+  revision: string | null
+  /** The folder's .mcp.json servers. */
+  mcpServers: { name: string; missingVars: string[]; usable: boolean }[]
+}
+
+/** What create and save accept. */
+export interface AgentInput {
+  name: string
+  icon?: string | null
+  color?: string | null
+  description?: string
+  model?: string | null
+  toolsOff?: string[]
+  learning?: Record<string, unknown> | null
+}
+
+/** POST /api/agents */
+export interface CreateAgentRequest {
+  agent: AgentInput
+  instructions: string
+  location?: string | null
+  duplicateOf?: { id: string; memory: boolean; skills: boolean } | null
+  clientId?: string
+}
+
+/** GET /api/agent-trash: one deleted agent's folder. */
+export interface AgentTrashItem {
+  trashId: string
+  agentId: string
+  name: string
+  icon: string | null
+  originalPath: string
+  deletedAt: string
+}
+
+/** One row of the Tools tab. */
+export interface ToolRow {
+  id: string
+  label: string
+  on: boolean
+  warning: string | null
+}
+
+/** One group of the Tools tab. */
+export interface ToolGroup {
+  id: string
+  label: string
+  tools: ToolRow[]
+}
+
+/** GET /api/agents/{id}/chats: one chat transcript. */
+export interface AgentChatSummary {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  messageCount: number
+  spaceName: string | null
+  delegated: boolean
+}
+
+/** One line of a chat transcript. */
+export type TranscriptItem =
+  | { type: 'user'; text: string; at: string; contextPaths: string[] }
+  | { type: 'assistant'; text: string; at: string; model: string | null; sessionId: string | null; stopped?: boolean }
+  | {
+      type: 'tool'
+      id: string
+      name: string
+      input: Record<string, unknown> | null
+      result: string | null
+      isError: boolean
+      at: string
+    }
+  | { type: 'error'; message: string; at: string }
+
+/** GET /api/agents/{id}/chats/{chatId} */
+export interface AgentTranscript extends AgentChatSummary {
+  agentId: string
+  sessionId: string | null
+  objectPath: string | null
+  items: TranscriptItem[]
 }

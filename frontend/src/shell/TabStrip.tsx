@@ -68,6 +68,8 @@ export function useTargetTitle(space: SpaceInfo | null): (target: Target | null)
         }
         case 'object':
           return byPath.get(target.path)?.title ?? stemOf(target.path)
+        case 'agent':
+          return 'Agent' // M17 T1 placeholder; T9 shows the agent's name
       }
     },
     [byPath, types, collections, queries, titleCtx],

@@ -1,4 +1,11 @@
 import type {
+  Agent,
+  AgentChatSummary,
+  AgentInput,
+  AgentTranscript,
+  AgentTrashItem,
+  CreateAgentRequest,
+  ToolGroup,
   RelationPairKind,
   RelationPairResult,
   SaveAiChatRequest,
@@ -427,6 +434,8 @@ const RESYNC_EVENTS: readonly ChangeEvent[] = [
   { kind: 'collections', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'queries', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'automations', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'agents', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'agentChats', path: RESYNC_PATH, version: null, origin: null },
 ]
 
 /**
@@ -1386,6 +1395,96 @@ export const api = {
       json('POST', { ruleId, choice, clientId: CLIENT_ID }),
     )
     return res?.runs ?? []
+  },
+
+  // ---- M17: agents ("Contract (T1)", routes filled by the plan's T7) ----
+
+  /** Every agent: the default agent first, then the registry's order. Never writes. */
+  async agents(): Promise<Agent[]> {
+    const res = await request<{ agents: Agent[] }>('/agents')
+    return res?.agents ?? []
+  },
+
+  /** One agent. 404 when it isn't listed. */
+  agent(id: string): Promise<Agent> {
+    return request<Agent>(`/agents/${seg(id)}`)
+  },
+
+  /** Make an agent (blank or a duplicate). 404, 409 (a folder exists at the location), 422. */
+  createAgent(req: CreateAgentRequest): Promise<Agent> {
+    return request<Agent>('/agents', json('POST', { ...req, clientId: req.clientId ?? CLIENT_ID }), spaceConflict)
+  },
+
+  /** Register an existing agent folder; never writes into it. 404, 409 (its id is listed), 422. */
+  addAgentFolder(path: string): Promise<Agent> {
+    return request<Agent>('/agents/add-folder', json('POST', { path, clientId: CLIENT_ID }), spaceConflict)
+  },
+
+  /** Save an agent's fields. Rejects with `RevisionConflictError` (409) or `ReadOnlyError` (423). */
+  saveAgent(id: string, input: AgentInput, baseRevision: string | null): Promise<Agent> {
+    return request<Agent>(`/agents/${seg(id)}`, json('PUT', { agent: input, baseRevision, clientId: CLIENT_ID }))
+  },
+
+  /** Delete an agent: its folder goes to the agent trash; `trashId` null = only unregistered. */
+  deleteAgent(id: string): Promise<{ trashId: string | null }> {
+    return request<{ trashId: string | null }>(`/agents/${seg(id)}${qs({ clientId: CLIENT_ID })}`, { method: 'DELETE' })
+  },
+
+  /** Remove an agent from the list; its folder is left as it is. */
+  unregisterAgent(id: string): Promise<{ ok: true }> {
+    return request<{ ok: true }>(`/agents/${seg(id)}/unregister`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** The deleted agents, newest first. */
+  async agentTrash(): Promise<AgentTrashItem[]> {
+    const res = await request<{ items: AgentTrashItem[] }>('/agent-trash')
+    return res?.items ?? []
+  },
+
+  /** Put a deleted agent's folder back. 404; 409 when its id is listed again. */
+  restoreAgent(trashId: string): Promise<Agent> {
+    return request<Agent>(`/agent-trash/${seg(trashId)}/restore`, json('POST', { clientId: CLIENT_ID }), spaceConflict)
+  },
+
+  /** The agent's CLAUDE.md (`""` and `null` when there is none). */
+  agentInstructions(id: string): Promise<{ text: string; revision: string | null }> {
+    return request<{ text: string; revision: string | null }>(`/agents/${seg(id)}/instructions`)
+  },
+
+  /** Save the agent's CLAUDE.md. Rejects with `RevisionConflictError` (409) or `ReadOnlyError` (423). */
+  saveAgentInstructions(id: string, text: string, baseRevision: string | null): Promise<{ revision: string }> {
+    return request<{ revision: string }>(
+      `/agents/${seg(id)}/instructions`,
+      json('PUT', { text, baseRevision, clientId: CLIENT_ID }),
+    )
+  },
+
+  /** The tool catalogue with its default states (the New agent form). */
+  async agentToolDefaults(): Promise<ToolGroup[]> {
+    const res = await request<{ groups: ToolGroup[] }>('/agent-tools')
+    return res?.groups ?? []
+  },
+
+  /** One agent's tool switches, with a group per folder MCP server. */
+  async agentTools(id: string): Promise<ToolGroup[]> {
+    const res = await request<{ groups: ToolGroup[] }>(`/agents/${seg(id)}/tools`)
+    return res?.groups ?? []
+  },
+
+  /** One agent's chats, newest first. */
+  async agentChats(id: string): Promise<AgentChatSummary[]> {
+    const res = await request<{ chats: AgentChatSummary[] }>(`/agents/${seg(id)}/chats`)
+    return res?.chats ?? []
+  },
+
+  /** One chat's transcript. */
+  agentChat(id: string, chatId: string): Promise<AgentTranscript> {
+    return request<AgentTranscript>(`/agents/${seg(id)}/chats/${seg(chatId)}`)
+  },
+
+  /** Show the agent's folder in the OS file manager. */
+  revealAgentFolder(id: string): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>(`/agents/${seg(id)}/reveal`, json('POST', {}))
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */
