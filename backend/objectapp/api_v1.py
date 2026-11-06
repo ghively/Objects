@@ -24,10 +24,17 @@ Routes (all JSON):
 - ``GET  /v1/daily-note?date=`` -> ``{path}`` or 404
 - ``GET  /v1/changes?since=`` -> ``{objects, activity}``
 - ``POST /v1/objects`` ``{type, title?, values?, body?, templateId?}`` -> 201 ``{path, version}``
-- ``POST /v1/object/properties`` ``{path, version, set?, add?, remove?}`` -> ``{version, values}``
+- ``POST /v1/object/properties`` ``{path, version, set?, add?, subtract?, remove?}`` -> ``{version, values}``
+  (``subtract: {key: [values]}`` takes items out of a list property, matched by name, M17)
 - ``POST /v1/object/section`` ``{path, version, heading?, mode, text}`` -> ``{version}``
 - ``POST /v1/object/rename`` ``{path, version, title}`` -> ``{path, version}``
 - ``POST /v1/object/trash`` ``{path, version}`` -> ``{trashId}``
+
+M17 adds the routes behind the expanded ``objectapp-mcp`` in `api_v1_tools` (types,
+collections, queries, whiteboards, version history, unlinked mentions, the trash, daily notes,
+automations and imports) and the agent routes in `api_agent_v1`. Auth, visibility,
+announcements and the activity log are shared through `v1guard.V1Guard`; a write also passes
+every `v1guard.WRITE_GUARDS` check.
 
 The app's own window manages tokens with routes that need no token (the app's
 local-only guard already refuses other hosts and cross-origin writes):
@@ -61,20 +68,14 @@ from .apiquery import (
 )
 from .propvalues import InvalidValue
 from .space import Conflict, ReadOnly
-from .tokens import ActivityLog, TokenRecord, TokenStore
-from .watcher import ChangeEvent
+from .tokens import ActivityLog, TokenStore
+from .v1guard import V1Guard, guarded
 
 __all__ = ["REPO_ROOT", "mcp_config", "router"]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MAX_ROWS = 500
 MAX_BODY = 2_000_000
-
-
-class _Denied(Exception):
-    def __init__(self, status: int, detail: str) -> None:
-        self.status = status
-        self.detail = detail
 
 
 def _error(status: int, detail: str, **extra: Any) -> JSONResponse:
@@ -127,6 +128,8 @@ class PropertiesRequest(BaseModel):
     version: str
     set: dict[str, Any] = {}
     add: dict[str, list[Any]] = {}
+    subtract: dict[str, list[Any]] = {}
+    """M17: items to take out of a list property (tags, collections, relations), by name."""
     remove: list[str] = []
 
 
@@ -149,6 +152,17 @@ class TrashRequest(BaseModel):
     version: str
 
 
+def _item_name(item: Any) -> str:
+    """A list item's name for `PropertiesRequest.subtract`: a link's target (``[[...]]``
+    unwrapped) or the text, case-folded."""
+    if isinstance(item, dict):
+        item = item.get("target") or item.get("path") or ""
+    text = str(item).strip()
+    if text.startswith("[[") and text.endswith("]]"):
+        text = text[2:-2].split("|", 1)[0]
+    return text.strip().casefold()
+
+
 def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
     """The local API and the token routes, mounted on the app's ``/api`` router."""
     space = ctx.space
@@ -156,55 +170,10 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
     activity = ActivityLog(space.root, state_folder)
     r = APIRouter()
 
-    # -- auth ---------------------------------------------------------------------
-
-    def auth(request: Request, write: bool = False) -> TokenRecord:
-        header = request.headers.get("authorization", "")
-        scheme, _sep, secret = header.partition(" ")
-        if scheme.lower() != "bearer" or not secret.strip():
-            raise _Denied(401, "A token is needed: Authorization: Bearer <token>.")
-        token = tokens.verify(secret.strip())
-        if token is None:
-            raise _Denied(401, "That token isn't valid for this space.")
-        if write and token.scope != "read-write":
-            raise _Denied(403, "This token can only read.")
-        return token
-
-    def guarded(fn):
-        """Turn `_Denied` from `auth` into its JSON answer."""
-        import functools
-
-        @functools.wraps(fn)
-        def wrapper(*args, **kwargs):
-            try:
-                return fn(*args, **kwargs)
-            except _Denied as exc:
-                return _error(exc.status, exc.detail)
-
-        return wrapper
-
-    # -- visibility ---------------------------------------------------------------
-
-    def visible_rel(path: str) -> str:
-        """The object's space path when the API may show it; KeyError (404) otherwise."""
-        rel = space._rel(path)
-        with space._lock:
-            summary = space._summaries.get(rel)
-            raw = space._raw.get(rel)
-        if summary is None or summary.template is not None:
-            raise KeyError(rel)
-        if is_excluded(raw.fm if raw else None, summary.tags):
-            raise KeyError(rel)
-        return rel
-
-    def hidden_paths() -> set[str]:
-        with space._lock:
-            return {
-                rel
-                for rel, s in space._summaries.items()
-                if s.template is not None
-                or is_excluded(space._raw[rel].fm if rel in space._raw else None, s.tags)
-            }
+    guard = V1Guard(ctx, tokens, activity)
+    auth = guard.auth
+    visible_rel = guard.visible_rel
+    hidden_paths = guard.hidden_paths
 
     def type_name(type_id: str) -> str:
         t = space.type_by_id(type_id)
@@ -227,8 +196,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             t = space.type_by_id(space._type_id(name_or_id))
         return t
 
-    def announce(kind: str, path: str, version: str | None, token: TokenRecord, **extra) -> None:
-        ctx.announce(ChangeEvent(kind, path, version, origin=f"api:{token.name}", **extra))
+    announce = guard.announce
 
     # -- token routes (the app's window) --------------------------------------------
 
@@ -555,12 +523,12 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
                 version = space.save_body(path, joined or req.body, current)
                 announce("changed", path, version, token)
             except (Conflict, ReadOnly, ValueError) as exc:
-                activity.add(token, "create", path)
+                guard.log(token, "create", path)
                 return JSONResponse(
                     {"path": path, "version": version, "warning": f"Body not written: {exc}"},
                     status_code=201,
                 )
-        activity.add(token, "create", path)
+        guard.log(token, "create", path)
         return JSONResponse({"path": path, "version": version}, status_code=201)
 
     @r.post("/v1/object/properties")
@@ -570,9 +538,9 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         try:
             rel = visible_rel(req.path)
             updates = dict(req.set)
+            rows = space.rows(None, None, [rel], None, False) if req.add or req.subtract else []
+            current = rows[0].values if rows else {}
             if req.add:
-                rows = space.rows(None, None, [rel], None, False)
-                current = rows[0].values if rows else {}
                 for key, items in req.add.items():
                     have = current.get(key)
                     have = list(have) if isinstance(have, list) else ([] if have in (None, "") else [have])
@@ -583,6 +551,11 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
                             have.append(item)
                             seen.add(k)
                     updates[key] = have
+            for key, items in req.subtract.items():
+                have = updates.get(key, current.get(key))
+                have = list(have) if isinstance(have, list) else ([] if have in (None, "") else [have])
+                drop = {_item_name(i) for i in items}
+                updates[key] = [h for h in have if _item_name(h) not in drop]
             result = space.update_properties(rel, updates, req.version, remove=req.remove)
         except Conflict as exc:
             return conflict(exc)
@@ -596,7 +569,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             return _error(404, f"No object at {req.path!r}")
         if result.version != req.version:
             announce("changed", rel, result.version, token)
-            activity.add(token, "properties", rel, keys=sorted({*updates, *req.remove}))
+            guard.log(token, "properties", rel, keys=sorted({*updates, *req.remove}))
         for path in result.synced:
             announce("changed", path, space.cached_version(path), token)
         rows = space.rows(None, None, [rel], None, False)
@@ -644,7 +617,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             return _error(404, f"No object at {req.path!r}")
         if version != req.version:
             announce("changed", rel, version, token)
-            activity.add(token, f"section-{req.mode}", rel, heading=req.heading)
+            guard.log(token, f"section-{req.mode}", rel, heading=req.heading)
         return {"version": version}
 
     @r.post("/v1/object/rename")
@@ -670,7 +643,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             announce("changed", rel, result.version, token)
         for path in result.relinked:
             announce("changed", path, space.cached_version(path), token)
-        activity.add(token, "rename", result.path, oldPath=rel)
+        guard.log(token, "rename", result.path, oldPath=rel)
         return {"path": result.path, "version": result.version}
 
     @r.post("/v1/object/trash")
@@ -687,7 +660,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         except (KeyError, FileNotFoundError):
             return _error(404, f"No object at {req.path!r}")
         announce("deleted", item.originalPath, None, token)
-        activity.add(token, "trash", item.originalPath)
+        guard.log(token, "trash", item.originalPath)
         return {"trashId": item.id}
 
     return r

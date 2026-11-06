@@ -41,6 +41,7 @@ from typing import Any
 from m2_acceptance import Run, commit, git, remove_tree
 from m8_acceptance import Served, diff_keys
 from objectapp.space import Space
+from objectapp.toolcatalog import OBJECT_READ
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
@@ -147,8 +148,8 @@ def main(argv: list[str] | None = None) -> int:
 
         async def reads(s: ClientSession) -> None:
             names = {t.name for t in (await s.list_tools()).tools}
-            run.report(names == READ_TOOLS, f"read token lists only the read tools ({len(names)})",
-                       *sorted(names ^ READ_TOOLS))
+            run.report(names == set(OBJECT_READ), f"read token lists only the read tools ({len(names)})",
+                       *sorted(names ^ set(OBJECT_READ)))
             ok, schema = await call(s, "schema")
             run.report(ok and schema["types"], f"schema: {len(schema['types']) if ok else schema} types")
             ok, found = await call(s, "search", query="a", limit=5)

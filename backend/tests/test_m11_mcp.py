@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from mcp.server.mcpserver.exceptions import ToolError
+from objectapp import toolcatalog
 from objectapp.mcp_server import ApiError, ObjectClient, _check_url, build_server
 from objectapp.server import create_app
 from objectapp.space import Space
@@ -58,8 +59,8 @@ def _names(server) -> set[str]:
 
 def test_tool_sets(http: TestClient) -> None:
     client = _client(http, "read")
-    assert _names(build_server(client, write=False)) == READ_TOOLS
-    assert _names(build_server(client, write=True)) == READ_TOOLS | WRITE_TOOLS
+    assert _names(build_server(client, write=False)) == set(toolcatalog.OBJECT_READ)
+    assert _names(build_server(client, write=True)) == set(toolcatalog.OBJECT_READ + toolcatalog.OBJECT_WRITE)
     tools = {t.name: t for t in asyncio.run(build_server(client).list_tools())}
     assert tools["read"].annotations.read_only_hint is True
     assert tools["move_to_trash"].annotations.destructive_hint is True
