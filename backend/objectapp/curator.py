@@ -363,6 +363,9 @@ class Curator:
         except Exception as exc:  # noqa: BLE001 - the registry can't be read: try next tick
             log.warning("curator: the agents can't be listed: %s", exc)
             return []
+        # Read once: one agent's consolidation run calls the API, which touches the clock, and
+        # that must not make the later agents in this tick look active.
+        idle = self.idle.idle_for()
         ran: list[str] = []
         for agent in agents:
             if not agent.exists or agent.missing or agent.read_only_reason:
@@ -372,7 +375,7 @@ class Curator:
                 continue  # usage.json can't be read: nothing to go on, and nowhere to record the run
             now = self.clock()
             learning = effective_learning(agent.data)
-            if not due(learning, usage, now, self.idle.idle_for(), self._busy()):
+            if not due(learning, usage, now, idle, self._busy()):
                 continue
             if not self._claim(agent.id):
                 continue
