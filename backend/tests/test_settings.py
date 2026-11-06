@@ -42,6 +42,8 @@ CONTRACT_DEFAULTS = {
     "aiHidden": False,
     "claudePath": None,
     "aiModel": None,
+    # M22 (`test_m22_api.py` checks it)
+    "activityName": "Gene",
 }
 
 
