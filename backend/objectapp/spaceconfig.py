@@ -23,17 +23,21 @@ __all__ = [
     "JIRA_SITE_PROBLEM",
     "MAX_JIRA_SITE_LENGTH",
     "MAX_NAME_LENGTH",
+    "INTERNAL_KEYS",
     "PATCH_KEYS",
     "SPACE_REL",
     "SpaceConfigProblem",
     "patch",
     "read",
+    "set_internal",
     "space_fields",
 ]
 
 SPACE_REL = ".object/space.json"
 MAX_NAME_LENGTH = 120
 PATCH_KEYS = ("name", "icon", "description", "hideTaskManagement", "jiraSite")
+INTERNAL_KEYS = ("deskSyncRuleId",)
+"""M24: keys Object keeps in ``space.json`` for itself; never in `PATCH_KEYS`, never in `space_fields`."""
 MAX_JIRA_SITE_LENGTH = 300
 JIRA_SITE_PROBLEM = "The Jira site is a web address (https://…)."
 _WEB_ADDRESS = re.compile(r"https?://\S+", re.IGNORECASE)
@@ -155,3 +159,29 @@ def patch(root: Path, patch: dict[str, Any], base_revision: str | None) -> tuple
 
         atomic_write(path, payload, check=unchanged)
         return data, hashlib.sha256(payload).hexdigest()
+
+
+def set_internal(root: Path, key: str, value: str) -> str:
+    """Set one internal key (`INTERNAL_KEYS`) in ``space.json``, keeping every other key; return the
+    new revision. Atomic. Raises `ValueError` for another key and `ReadOnly` (423) for an
+    unreadable file, which is left as it is."""
+    from .space import ReadOnly  # space imports this module
+
+    if key not in INTERNAL_KEYS:
+        raise ValueError(f"{key} isn't an internal key.")
+    path = _path(root)
+    with _lock:
+        data, current, error = read(root)
+        if error is not None:
+            raise ReadOnly(error)
+        data = {**data, key: value}
+        payload = dump_json(data)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        def unchanged() -> None:
+            now = read(root)[1]
+            if now != current:
+                raise RevisionConflict(now)
+
+        atomic_write(path, payload, check=unchanged)
+        return hashlib.sha256(payload).hexdigest()

@@ -110,7 +110,11 @@ import type {
   AgentStatus,
   AlertScanReport,
   CaptureRequest,
+  CaptureItem,
   CaptureSummary,
+  DeskSyncStatus,
+  ReadToolServer,
+  WorkAgentSettings,
   FocusDay,
   GeneralFloor,
   WorkAlerts,
@@ -1960,6 +1964,84 @@ export const api = {
   async workCaptures(status?: 'new' | 'filed' | 'needsYou'): Promise<CaptureSummary[]> {
     const res = await request<{ captures: CaptureSummary[] }>(`/work/captures${qs({ status })}`)
     return res?.captures ?? []
+  },
+
+  // ---- M24: the work agent, captures and Desk sync ----
+
+  /** The work agent's settings (Settings > Work). */
+  workAgentSettings(): Promise<WorkAgentSettings> {
+    return request<WorkAgentSettings>('/work/agent-settings')
+  },
+
+  /** Save some of the work agent's settings. 409 `ConflictError` on a stale `baseRevision`; 422 with the server's text. */
+  async saveWorkAgentSettings(
+    patch: { agentId?: string | null; acts?: boolean; autoRun?: boolean; readTools?: string[] },
+    baseRevision: string,
+  ): Promise<WorkAgentSettings> {
+    const res = await request<WorkAgentSettings>(
+      '/work/agent-settings',
+      json('PUT', { ...patch, baseRevision, clientId: CLIENT_ID }),
+      (d) => new ConflictError(String(d.currentRevision ?? '')),
+    )
+    emitLocal([{ kind: 'workQueue', path: RESYNC_PATH, version: null, origin: CLIENT_ID }])
+    return res
+  },
+
+  /** The name "Create the Work agent" will use and the change-reviewer file found, if any. */
+  workAgentCreateInfo(): Promise<{ name: string; changeReviewer: string | null }> {
+    return request<{ name: string; changeReviewer: string | null }>('/work/agent/create-info')
+  },
+
+  /** "Create the Work agent". 409 when a usable one is already set. */
+  async createWorkAgent(copyChangeReviewer: boolean): Promise<{ agent: Agent; settings: WorkAgentSettings }> {
+    const res = await request<{ agent: Agent; settings: WorkAgentSettings }>(
+      '/work/agent/create',
+      json('POST', { copyChangeReviewer, clientId: CLIENT_ID }),
+    )
+    emitLocal([{ kind: 'workQueue', path: RESYNC_PATH, version: null, origin: CLIENT_ID }])
+    return res
+  },
+
+  /** The work agent's folder servers and enabled gateway servers, with their tools. */
+  async workReadTools(): Promise<ReadToolServer[]> {
+    const res = await request<{ servers: ReadToolServer[] }>('/work/read-tools')
+    return res?.servers ?? []
+  },
+
+  /** Brain dumps with their filing state, newest first. */
+  async captureItems(status?: 'new' | 'filed' | 'needsYou'): Promise<CaptureItem[]> {
+    const res = await request<{ captures: CaptureItem[] }>(`/work/captures${qs({ status })}`)
+    return res?.captures ?? []
+  },
+
+  /** Reply to a brain dump that needs you: back to New with "Reply: <text>" added. */
+  async replyCapture(path: string, version: string, text: string): Promise<CaptureItem> {
+    const res = await request<{ capture: CaptureItem }>(
+      '/work/captures/reply',
+      json('POST', { path, version, text, clientId: CLIENT_ID }),
+      (d) => new ConflictError(String(d.currentVersion ?? '')),
+    )
+    return res.capture
+  },
+
+  /** Mark a brain dump filed yourself. */
+  async markCaptureFiled(path: string, version: string): Promise<CaptureItem> {
+    const res = await request<{ capture: CaptureItem }>(
+      '/work/captures/mark-filed',
+      json('POST', { path, version, clientId: CLIENT_ID }),
+      (d) => new ConflictError(String(d.currentVersion ?? '')),
+    )
+    return res.capture
+  },
+
+  /** Desk sync's schedule and last run. */
+  deskSync(): Promise<DeskSyncStatus> {
+    return request<DeskSyncStatus>('/work/desk-sync')
+  },
+
+  /** Set up Desk sync (off until turned on). 409 when it already is; 422 without a work agent. */
+  setUpDeskSync(): Promise<DeskSyncStatus> {
+    return request<DeskSyncStatus>('/work/desk-sync/setup', json('POST', { clientId: CLIENT_ID }))
   },
 
   /** Whether the Object window can open the keep-on-top window. */

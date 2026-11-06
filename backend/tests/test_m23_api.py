@@ -288,7 +288,14 @@ def test_floor_general_routes(env: Env) -> None:
 # -- The M24 seams ------------------------------------------------------------------------
 
 
-def test_seams_until_m24(env: Env) -> None:
+def test_seams_until_m24(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # M24 fills the seams in `create_app`; this keeps checking M23's own 501 path with its defaults.
+    monkeypatch.setattr(
+        "objectapp.server.build_seams",
+        lambda space, service: WorkSeams(workseams.NoAgent(), workseams.NoCaptures()),
+    )
+    windowhost.set_opener(None)
+    env = _make(tmp_path, monkeypatch)
     board = env.c.get("/api/work/board").json()["items"]
     agent = env.c.get("/api/work/agent")
     assert agent.status_code == 200

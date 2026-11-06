@@ -115,5 +115,8 @@ class NoCaptures:
 
 
 def build_seams(space: Space, service: WorkService) -> WorkSeams:
-    """The app's seams. M23: no agent, no capture sink; M24 replaces this body only."""
-    return WorkSeams(NoAgent(), NoCaptures())
+    """The app's seams: M24's agent loop and capture sink (M23 shipped `NoAgent` and `NoCaptures`)."""
+    from .captures import CaptureSeam
+    from .workloop import AgentSeam
+
+    return WorkSeams(AgentSeam(), CaptureSeam(service))

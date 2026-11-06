@@ -180,6 +180,8 @@ from . import (
     api_automations,
     api_ai,
     api_blocks,
+    api_captures,
+    api_desksync,
     api_graph,
     api_history,
     api_import,
@@ -196,13 +198,18 @@ from . import (
     api_v1,
     api_v1_tools,
     delegation,
+    api_v1_captures,
+    api_v1_desksync,
     api_v1_work,
     api_work,
+    api_work_agent,
     api_work_section,
     learnhooks,
     mcpgateway,
     media,
+    desksync,
     schedulerun,
+    worktools,
 )
 from .alertwatch import AlertWatch
 from .apictx import ApiContext
@@ -271,6 +278,7 @@ from .watcher import ChangeEvent, SpaceWatcher
 from .whiteboardapi import whiteboard_router
 from .whiteboardfile import sidecar_owner
 from .whiteboardstore import whiteboard_ui_problem
+from .workloop import WorkLoop
 from .workseams import build_seams
 from .workservice import WorkService
 from .workview import api_extra as query_api_extra
@@ -941,6 +949,7 @@ def create_app(
         scheduler.start()
         search.start()
         automations.start()
+        work_loop.start()
         alert_watch.start()
         curator.start()
         if not watch:
@@ -948,6 +957,7 @@ def create_app(
                 yield
             finally:
                 await curator.stop()
+                await asyncio.to_thread(work_loop.stop)
                 await asyncio.to_thread(automations.stop)
                 await asyncio.to_thread(alert_watch.stop)
                 hub.close()
@@ -966,6 +976,7 @@ def create_app(
             yield
         finally:
             await curator.stop()
+            await asyncio.to_thread(work_loop.stop)
             await asyncio.to_thread(automations.stop)
             await asyncio.to_thread(alert_watch.stop)
             hub.close()
@@ -2245,6 +2256,16 @@ def create_app(
     app.state.work = work
     api.include_router(api_work.router(ctx, work))
     api.include_router(api_v1_work.router(ctx, work))
+    # M24: one work loop per app beside the work service, made before M23's seams are built
+    # (`build_seams` finds it with `workloop.loop_for`); the queue, captures and Desk sync routes.
+    work_loop = WorkLoop(space, work, announce=announce, base_url=lambda: base_url or idle.base_url)
+    worktools.install(work_loop, work)
+    schedulerun.PURPOSE_FOR = desksync.purpose_for
+    api.include_router(api_work_agent.router(ctx, work_loop, work))
+    api.include_router(api_captures.router(ctx, work_loop, work))
+    api.include_router(api_desksync.router(ctx, work_loop, work, automations))
+    api.include_router(api_v1_captures.router(ctx, work_loop, work))
+    api.include_router(api_v1_desksync.router(ctx, work_loop, work))
     # M23: the Work section's routes, over the same service, the M24 seams and the alert watch.
     api.include_router(api_work_section.router(ctx, work, build_seams(space, work), alert_watch))
     # M18: the learning routes go before api_agents, whose GET /agents/{id}/chats/{chatId} would

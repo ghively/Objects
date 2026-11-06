@@ -47,6 +47,11 @@ CONTRACT_DEFAULTS = {
     # M23 (`test_m23_contract.py` checks their messages)
     "workAlertFolder": None,
     "workAlertIntervals": {},
+    # M24 (`test_m24_contract.py` checks them)
+    "workAgentId": None,
+    "workAgentActs": False,
+    "workAutoRun": True,
+    "workReadTools": [],
 }
 
 

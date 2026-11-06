@@ -57,6 +57,9 @@ import type {
   WorkStep,
   WorkWriteResult,
   AgentStatus,
+  CaptureItem,
+  DeskSyncStatus,
+  WorkAgentSettings,
   FocusDay,
   FocusLine,
   WorkAlerts,
@@ -705,6 +708,45 @@ export function agentStatus(over: Partial<AgentStatus> = {}): AgentStatus {
   }
 }
 
+/** M24: no work agent yet. */
+export function workAgentSettings(over: Partial<WorkAgentSettings> = {}): WorkAgentSettings {
+  return {
+    agentId: null,
+    agent: null,
+    problem: 'Create the Work agent first.',
+    acts: false,
+    autoRun: true,
+    readTools: [],
+    settingsRevision: '',
+    ...over,
+  }
+}
+
+/** M24: a New brain dump. */
+export function captureItem(over: Partial<CaptureItem> = {}): CaptureItem {
+  return {
+    path: 'Captures/Tray 2 jams again.md',
+    text: 'Tray 2 jams again',
+    status: 'new',
+    question: null,
+    capturedAt: '2026-11-05T10:00:00.000Z',
+    linkedPath: null,
+    objectId: 'cap1',
+    version: 'v1',
+    title: 'Tray 2 jams again',
+    fromView: 'now',
+    linkedTitle: null,
+    filedTo: null,
+    route: 'file',
+    ...over,
+  }
+}
+
+/** M24: Desk sync not set up. */
+export function deskSyncStatus(over: Partial<DeskSyncStatus> = {}): DeskSyncStatus {
+  return { ruleId: null, enabled: false, repeat: null, time: null, lastRun: null, markedReadTools: 0, ...over }
+}
+
 /** M23: no alerts, no folder, no Alert type. */
 export function workAlerts(over: Partial<WorkAlerts> = {}): WorkAlerts {
   return {
@@ -1116,6 +1158,18 @@ function defaults(): Api {
       throw await unavailable('Saving a brain dump comes with M24.')
     },
     workCaptures: async () => [],
+    workAgentSettings: async () => workAgentSettings(),
+    saveWorkAgentSettings: async () => workAgentSettings(),
+    workAgentCreateInfo: async () => ({ name: 'Work', changeReviewer: null }),
+    createWorkAgent: async () => {
+      throw new Error('createWorkAgent is not mocked')
+    },
+    workReadTools: async () => [],
+    captureItems: async () => [],
+    replyCapture: async () => captureItem(),
+    markCaptureFiled: async () => captureItem({ status: 'filed' }),
+    deskSync: async () => deskSyncStatus(),
+    setUpDeskSync: async () => deskSyncStatus(),
     keepOnTopInfo: async () => ({ window: false }),
     openKeepOnTop: async () => {
       throw await unavailable('Keep on top needs the Object window.')
