@@ -22,6 +22,7 @@ import { queryTitle } from '@/queries/autoTitle'
 import { useTitleCtx } from '@/queries/QueryPage'
 import { TypeChip } from '@/shell/Sidebar'
 import { TabMenu } from '@/shell/TabMenu'
+import { useAgents } from '@/agents/useAgents'
 import { useDefinitions } from '@/types/useDefinitions'
 
 /** The space's types: the link index's (reloaded as files bring new types), else the initial fetch's. */
@@ -36,6 +37,7 @@ export function useTargetTitle(space: SpaceInfo | null): (target: Target | null)
   const types = useSpaceTypes(space)
   const { collections, queries } = useDefinitions()
   const titleCtx = useTitleCtx(types)
+  const agents = useAgents((s) => s.agents)
   return useCallback(
     (target: Target | null): string => {
       if (!target) return 'New tab'
@@ -69,10 +71,10 @@ export function useTargetTitle(space: SpaceInfo | null): (target: Target | null)
         case 'object':
           return byPath.get(target.path)?.title ?? stemOf(target.path)
         case 'agent':
-          return 'Agent' // M17 T1 placeholder; T9 shows the agent's name
+          return agents.find((a) => a.id === target.id)?.name ?? 'Agent'
       }
     },
-    [byPath, types, collections, queries, titleCtx],
+    [byPath, types, collections, queries, titleCtx, agents],
   )
 }
 
