@@ -74,6 +74,14 @@ describe('AlertsView', () => {
     expect(row.querySelector('[data-tone="critical"]')).not.toBeNull()
   })
 
+  test('test an unsafe link renders no anchor', () => {
+    show(workAlerts({ alerts: [alert({ link: 'javascript:alert(1)' }), alert({ path: 'Alerts/b.md', title: 'B', link: 'https://example.test/b' })] }))
+    const unsafe = screen.getByText('Tray 2 jammed').closest('[data-alert]') as HTMLElement
+    expect(within(unsafe).queryByRole('link')).toBeNull()
+    const ok = screen.getByText('B').closest('[data-alert]') as HTMLElement
+    expect(within(ok).getByRole('link')).toHaveAttribute('href', 'https://example.test/b')
+  })
+
   test('test cleared alerts are folded', () => {
     show()
     const cleared = document.querySelector('details[data-alerts-cleared]') as HTMLDetailsElement

@@ -34,7 +34,7 @@ const BTN =
   'inline-flex h-7 items-center gap-1 rounded border border-line px-2 text-[12px] text-fg hover:bg-hover disabled:opacity-50'
 
 /** An http(s) link, else null (a ticket's url opens in the browser only when clicked). */
-function safeUrl(url: string | null | undefined): string | null {
+export function safeUrl(url: string | null | undefined): string | null {
   if (!url) return null
   try {
     const u = new URL(url)
