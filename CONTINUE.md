@@ -14,6 +14,8 @@ Take the current state from `docs/superpowers/plans/remaining-work.md` and `git 
 
 **2026-11-06:** M19 (the MCP gateway (in): outside MCP servers, secrets, secret variables, server tool groups) is built and integrated on `feat/m16-m24` (`m19_acceptance.py` PASS); the track's full gate and review are next, and his 11 hand-checks in `plans/m19-acceptance.md` are pending.
 
+**2026-11-06:** M20 (A2A (outbound) and delegation: remote agents, the context notice, attachments, `remote_agents_list`, `remote_agent_call` and `delegate`) is built and integrated on `feat/m16-m24` (`m20_acceptance.py` PASS); the track's full gate and review are next, and his 12 hand-checks in `plans/m20-acceptance.md` are pending.
+
 As of 2026-11-02:
 - **Built:** M1–M9 are built, reviewed, fixed and gated, all on `master`. M8 covers every feature M4–M7 had deferred, local only; M9 the audit's completeness gaps. The 2026-11-01 full audit's fixes (bugs and optimization) are merged (PR #4).
 - **Out of scope by the spec:** AI, network integrations, accounts, mobile, telemetry.
