@@ -1,0 +1,21 @@
+// M24 Task 10: the Captures view's strings (ours, calm).
+export const CAPTURE_TEXT = {
+  label: 'Captures',
+  empty: 'Nothing waiting to be filed.',
+  filterAll: 'All',
+  filterNew: 'New',
+  filterNeedsYou: 'Needs you',
+  filterFiled: 'Filed',
+  statusNew: 'New',
+  statusFiled: 'Filed',
+  statusNeedsYou: 'Needs you',
+  capturedAt: 'Captured',
+  fromView: 'From',
+  filedTo: 'Filed to',
+  linkedItem: 'Linked item',
+  question: 'Question',
+  replyLabel: 'Reply to the agent',
+  send: 'Send',
+  markFiled: 'Mark filed',
+  changed: 'This capture changed. Look again.',
+} as const

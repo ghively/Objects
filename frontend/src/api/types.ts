@@ -2636,7 +2636,7 @@ export interface AddWorkFieldsResult {
 
 // ---- M23: the Work section (plan `2026-11-05-m23-work-section.md`, Contract) ----
 
-export type WorkViewId = 'now' | 'flow' | 'projects' | 'today' | 'floor' | 'queues' | 'agent' | 'stuck' | 'wins'
+export type WorkViewId = 'now' | 'flow' | 'projects' | 'today' | 'floor' | 'queues' | 'agent' | 'stuck' | 'wins' | 'captures'
   | 'alerts' | 'everything' | 'tickets' | (string & {}) // M24 adds 'captures'
 export type Energy = 'low' | 'medium' | 'high'
 export interface PersonRef { path: string; title: string }
