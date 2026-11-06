@@ -2229,6 +2229,9 @@ export interface McpServerInput {
 export interface McpServersAnswer {
   servers: McpServer[]
   readOnlyReason: string | null
+  /** The file is there but can't be read: no servers are listed, and writes stay allowed (the
+   * next one copies the file aside first). */
+  unreadable: boolean
 }
 
 export interface SecretVarUse {

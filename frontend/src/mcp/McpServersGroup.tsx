@@ -49,6 +49,7 @@ function lastTestLine(r: McpTestResultData | null): string | null {
 export function McpServersGroup() {
   const [servers, setServers] = useState<McpServer[] | null>(null)
   const [readOnly, setReadOnly] = useState<string | null>(null)
+  const [unreadable, setUnreadable] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<string | null>(null)
   const [testing, setTesting] = useState<Record<string, boolean>>({})
@@ -60,6 +61,7 @@ export function McpServersGroup() {
       const r = await api.mcpServers()
       setServers(r.servers)
       setReadOnly(r.readOnlyReason)
+      setUnreadable(r.unreadable)
       return r.servers
     } catch (e) {
       setError(errorText(e))
@@ -124,7 +126,9 @@ export function McpServersGroup() {
     <>
       <SettingGroup title={T.heading} help={T.help}>
         {readOnly && <p className="text-[13px] text-fg-muted">{readOnly}</p>}
-        {servers && servers.length === 0 && !readOnly && <p className="text-[13px] text-fg-muted">{T.empty}</p>}
+        {servers && servers.length === 0 && !readOnly && (
+          <p className="text-[13px] text-fg-muted">{unreadable ? T.unreadable : T.empty}</p>
+        )}
         {servers && servers.length > 0 && (
           <ul aria-label={T.heading} className="flex flex-col divide-y divide-line rounded-lg border border-line">
             {servers.map((s) => {

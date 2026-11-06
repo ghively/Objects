@@ -808,7 +808,7 @@ function defaults(): Api {
       reviewStatus({ id: '01JREVIEW00000000000000000', agentId: id, chatId, trigger: 'manual', state: 'running', endedAt: null, summary: null }),
     chatReviews: async () => [],
     // M19
-    mcpServers: async () => ({ servers: [], readOnlyReason: null }),
+    mcpServers: async () => ({ servers: [], readOnlyReason: null, unreadable: false }),
     createMcpServer: async (input: McpServerInput) =>
       mcpServer({ id: '01JNEWMCPSERVER00000000000', name: input.name, enabled: input.enabled, kind: input.kind, env: [], args: [] }),
     saveMcpServer: async (id: string, input: McpServerInput, baseRevision: string) =>

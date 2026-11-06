@@ -18,7 +18,7 @@ const mocked = vi.mocked(api)
 beforeEach(() => {
   vi.clearAllMocks()
   mocked.mcpServers.mockReset()
-  mocked.mcpServers.mockResolvedValue({ servers: [], readOnlyReason: null })
+  mocked.mcpServers.mockResolvedValue({ servers: [], readOnlyReason: null, unreadable: false })
   mocked.saveMcpServer.mockReset()
   mocked.testMcpServer.mockReset()
   mocked.deleteMcpServer.mockReset()
@@ -40,7 +40,7 @@ describe('McpServersGroup', () => {
         mcpServer({ id: 's1', name: 'github', lastTest: mcpTestResult() }),
         mcpServer({ id: 's2', name: 'remote', kind: 'url', command: null, args: [], env: [], transport: 'sse', url: 'https://host/path' }),
       ],
-      readOnlyReason: null,
+      readOnlyReason: null, unreadable: false,
     })
     render(<McpServersGroup />)
     const list = await screen.findByRole('list', { name: T.heading })
@@ -53,8 +53,8 @@ describe('McpServersGroup', () => {
     const user = userEvent.setup()
     const first = mcpServer({ id: 's1', name: 'github', revision: 'r1' })
     mocked.mcpServers
-      .mockResolvedValueOnce({ servers: [first], readOnlyReason: null })
-      .mockResolvedValue({ servers: [{ ...first, revision: 'r2' }], readOnlyReason: null })
+      .mockResolvedValueOnce({ servers: [first], readOnlyReason: null, unreadable: false })
+      .mockResolvedValue({ servers: [{ ...first, revision: 'r2' }], readOnlyReason: null, unreadable: false })
     mocked.saveMcpServer
       .mockRejectedValueOnce(new RevisionConflictError('r2'))
       .mockResolvedValue({ ...first, enabled: false, revision: 'r3' })
@@ -76,7 +76,7 @@ describe('McpServersGroup', () => {
 
   test('test Test lists the tools and shows a failure\'s message', async () => {
     const user = userEvent.setup()
-    mocked.mcpServers.mockResolvedValue({ servers: [mcpServer({ id: 's1', name: 'github' })], readOnlyReason: null })
+    mocked.mcpServers.mockResolvedValue({ servers: [mcpServer({ id: 's1', name: 'github' })], readOnlyReason: null, unreadable: false })
     let finish: (r: ReturnType<typeof mcpTestResult>) => void = () => undefined
     mocked.testMcpServer.mockReturnValueOnce(new Promise((r) => (finish = r)))
     render(<McpServersGroup />)
@@ -96,7 +96,7 @@ describe('McpServersGroup', () => {
 
   test('test Delete asks to confirm', async () => {
     const user = userEvent.setup()
-    mocked.mcpServers.mockResolvedValue({ servers: [mcpServer({ id: 's1', name: 'github' })], readOnlyReason: null })
+    mocked.mcpServers.mockResolvedValue({ servers: [mcpServer({ id: 's1', name: 'github' })], readOnlyReason: null, unreadable: false })
     render(<McpServersGroup />)
     await user.click(await screen.findByRole('button', { name: `${T.delete} github` }))
     expect(mocked.deleteMcpServer).not.toHaveBeenCalled()
@@ -119,9 +119,17 @@ describe('McpServersGroup', () => {
   })
 
   test('test a read-only list says why and offers no Add', async () => {
-    mocked.mcpServers.mockResolvedValue({ servers: [], readOnlyReason: T.newerVersion })
+    mocked.mcpServers.mockResolvedValue({ servers: [], readOnlyReason: T.newerVersion, unreadable: false })
     render(<McpServersGroup />)
     expect(await screen.findByText(T.newerVersion)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: T.add })).toBeNull()
+  })
+
+  test('test an unreadable file says so and still offers Add', async () => {
+    mocked.mcpServers.mockResolvedValue({ servers: [], readOnlyReason: null, unreadable: true })
+    render(<McpServersGroup />)
+    expect(await screen.findByText(T.unreadable)).toBeInTheDocument()
+    expect(screen.queryByText(T.empty)).toBeNull()
+    expect(screen.getByRole('button', { name: T.add })).toBeInTheDocument()
   })
 })

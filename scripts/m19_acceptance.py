@@ -238,7 +238,7 @@ def main(argv: list[str] | None = None) -> int:
         snap = watched()
         code, listed = run.http("GET", "/mcp-servers")
         code2, secrets = run.http("GET", "/mcp-secrets")
-        run.report(code == 200 and listed == {"servers": [], "readOnlyReason": None}
+        run.report(code == 200 and listed == {"servers": [], "readOnlyReason": None, "unreadable": False}
                    and code2 == 200 and secrets == {"vars": []}, f"both lists empty: {listed}, {secrets}")
         run.report(not (state / "mcp-servers.json").exists() and not (state / "secrets.json").exists(),
                    "no mcp-servers.json and no secrets.json in the state dir")
