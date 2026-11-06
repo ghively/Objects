@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -9,7 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import { agent, ledgerSummary } from '@/test/mockApi'
-import { AgentPage, AGENT_PAGE_TEXT } from './AgentPage'
+import { AgentPage, AGENT_PAGE_TEXT, openAgentTab, requestAgentTab } from './AgentPage'
 import { LEARNING_TEXT } from './learningText'
 import { PROFILE_TEXT } from './ProfileTab'
 import { resetAgents, useAgents } from './useAgents'
@@ -52,6 +52,23 @@ describe('AgentPage', () => {
     expect(screen.getByRole('tab', { name: 'Skills' })).toHaveAttribute('aria-selected', 'true')
     expect(await screen.findByRole('tabpanel')).toBeInTheDocument()
     await waitFor(() => expect(document.querySelector('[data-agent-tab="skills"]')).not.toBeNull())
+  })
+
+  test('test opening the same agent tab again switches back from a hand-picked tab', async () => {
+    useAgents.setState({ agents: [agent({ id: RESEARCHER })], loaded: true })
+    const user = userEvent.setup()
+    render(<AgentPage id={RESEARCHER} tab="memory" />)
+    expect(screen.getByRole('tab', { name: 'Memory' })).toHaveAttribute('aria-selected', 'true')
+    await user.click(screen.getByRole('tab', { name: 'Profile' }))
+    expect(screen.getByRole('tab', { name: 'Profile' })).toHaveAttribute('aria-selected', 'true')
+    // the same target again: the tab prop doesn't change
+    act(() => openAgentTab(RESEARCHER, 'memory'))
+    expect(screen.getByRole('tab', { name: 'Memory' })).toHaveAttribute('aria-selected', 'true')
+    // another agent's ask leaves this page alone
+    await user.click(screen.getByRole('tab', { name: 'Profile' }))
+    act(() => requestAgentTab('assistant', 'skills'))
+    expect(screen.getByRole('tab', { name: 'Profile' })).toHaveAttribute('aria-selected', 'true')
+    await waitFor(() => expect(document.querySelector('[data-agent-tab]')).not.toBeNull())
   })
 
   test('test a read-only agent disables memory and learning fields', async () => {

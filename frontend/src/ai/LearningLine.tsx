@@ -4,9 +4,9 @@
 // the Skills tab) with its entries highlighted; "Nothing new to learn" is plain text; failed:
 // "Learning stopped: {message}". Never a chat message: Copy and the saved AI Chat leave it out.
 import type { ReviewStatus } from '@/api/types'
+import { openAgentTab } from '@/agents/AgentPage'
 import { useLearningFocus } from '@/agents/learningFocus'
 import { Icon } from '@/components/Icon'
-import { useTabs } from '@/nav/tabs'
 
 // "Learning…" is the spec's; the others are our strings (reviews.summary_text's "Nothing new to learn").
 export const LEARNING_LINE_TEXT = {
@@ -29,7 +29,7 @@ export function memoryOnly(review: ReviewStatus): boolean {
 /** Highlight the review's entries and open the agent page on the tab that shows them. */
 export function openReviewChange(review: ReviewStatus, agentId: string): void {
   useLearningFocus.getState().set(agentId, review.entryIds)
-  useTabs.getState().open({ kind: 'agent', id: agentId, tab: memoryOnly(review) ? 'memory' : 'skills' })
+  openAgentTab(agentId, memoryOnly(review) ? 'memory' : 'skills')
 }
 
 export function LearningLine({ review, agentId }: { review: ReviewStatus; agentId: string }) {
