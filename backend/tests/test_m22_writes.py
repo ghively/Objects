@@ -245,6 +245,98 @@ def test_gate_cannot_be_bypassed(space, svc, path, n, action, actor, extra, mess
     assert _bytes(space, path) == before
 
 
+RESHAPE = "Agents can't move or remove an Approve step, or change a step to or from Approve."
+GATE_OP_CASES = [
+    ("agent turns the open Approve step into an Agent step",
+     {"op": "edit", "stepId": "r8k1pd", "kind": "agent"}, RESHAPE),
+    ("agent turns the open Approve step into a Do step",
+     {"op": "edit", "stepId": "r8k1pd", "kind": "do"}, RESHAPE),
+    ("agent removes the open Approve step", {"op": "remove", "stepId": "r8k1pd"}, RESHAPE),
+    ("agent moves the open Approve step last",
+     {"op": "move", "stepId": "r8k1pd", "before": None}, RESHAPE),
+    ("agent moves its step ahead of the Approve step",
+     {"op": "move", "stepId": "t2n7vc", "before": "r8k1pd"},
+     "Agents can't put an Agent step ahead of an Approve step."),
+    ("agent adds a step ahead of the Approve step",
+     {"op": "add", "kind": "agent", "text": "Restart it", "before": "r8k1pd"},
+     "Agents can't put an Agent step ahead of an Approve step."),
+]
+
+
+@pytest.mark.parametrize("op, message", [c[1:] for c in GATE_OP_CASES],
+                         ids=[c[0] for c in GATE_OP_CASES])
+def test_gate_cannot_be_bypassed_with_step_ops(space, svc, op, message):
+    before = _bytes(space, PRINTER)
+    item = svc.item(PRINTER)
+    if "stepId" in op:
+        op = {**op, "stepRev": next(s["rev"] for s in item["steps"] if s["id"] == op["stepId"])}
+    with pytest.raises(IllegalMove) as exc:
+        svc.edit_steps(PRINTER, [op], AGENT)
+    assert str(exc.value) == message
+    assert _bytes(space, PRINTER) == before
+    # ... and so the agent still can't finish the step Gene hasn't approved.
+    s2 = _step(svc.item(PRINTER), 2)
+    with pytest.raises(IllegalMove):
+        svc.step(PRINTER, s2["id"], s2["rev"], "complete", AGENT, text="Restarted")
+    assert _bytes(space, PRINTER) == before
+
+
+def _v1(space: Space) -> tuple[TestClient, dict[str, str]]:
+    client = TestClient(create_app(space, None, watch=False))
+    tok = client.post("/api/integrations/tokens", json={"name": "Work", "scope": "read-write"})
+    return client, {"Authorization": f"Bearer {tok.json()['secret']}"}
+
+
+def _app_step(client: TestClient, n: int, action: str) -> None:
+    s = _step(client.get("/api/work/item", params={"path": PRINTER}).json(), n)
+    res = client.post("/api/work/step", json={"path": PRINTER, "stepId": s["id"], "stepRev": s["rev"],
+                                              "action": action})
+    assert res.status_code == 200, res.text
+
+
+def test_gate_cannot_be_bypassed_by_version_restore(space: Space):
+    from objectapp.history import HistoryStore
+
+    client, hdr = _v1(space)
+    _app_step(client, 2, "approve")  # keeps the open version
+    space.clock = lambda: datetime(2026, 11, 5, 10, 30, tzinfo=UTC)
+    _app_step(client, 2, "reopen")  # Gene withdraws: keeps the approved version
+    store = HistoryStore(space.root)
+    versions = {v["id"]: store.content(PRINTER, v["id"])["text"] for v in store.versions(PRINTER)}
+    approved = next(i for i, t in versions.items() if "state: approved" in t)
+    still_open = next(i for i, t in versions.items() if "state: approved" not in t)
+    before = _bytes(space, PRINTER)
+    v = space.read(PRINTER)[2]
+    res = client.post("/api/v1/history/restore",
+                      json={"path": PRINTER, "versionId": approved, "version": v}, headers=hdr)
+    assert res.status_code == 422 and res.json()["detail"] == "Steps change with the step actions."
+    assert _bytes(space, PRINTER) == before
+    # A version that brings back no approval restores as before.
+    res = client.post("/api/v1/history/restore",
+                      json={"path": PRINTER, "versionId": still_open, "version": v}, headers=hdr)
+    assert res.status_code == 200, res.text
+    # Gene's own restore is unchanged.
+    v = space.read(PRINTER)[2]
+    res = client.post("/api/history/restore", json={"path": PRINTER, "id": approved, "baseVersion": v})
+    assert res.status_code == 200, res.text
+    assert "state: approved" in space.read(PRINTER)[0].frontmatter_src
+
+
+def test_gate_cannot_be_bypassed_by_duplicate(space: Space):
+    client, hdr = _v1(space)
+    # No approval to copy: the agent may duplicate.
+    res = client.post("/api/v1/object/duplicate", json={"path": PRINTER}, headers=hdr)
+    assert res.status_code == 201, res.text
+    _app_step(client, 2, "approve")
+    before = sorted(p.name for p in (space.root / "Tasks").iterdir())
+    res = client.post("/api/v1/object/duplicate", json={"path": PRINTER}, headers=hdr)
+    assert res.status_code == 422 and res.json()["detail"] == "Steps change with the step actions."
+    assert sorted(p.name for p in (space.root / "Tasks").iterdir()) == before
+    # Gene's own duplicate is unchanged.
+    res = client.post("/api/object/duplicate", json={"path": PRINTER})
+    assert res.status_code == 201, res.text
+
+
 def test_gate_approved_text_edit(space: Space, svc: WorkService):
     step = _step(svc.item(PRINTER), 2)
     svc.step(PRINTER, step["id"], step["rev"], "approve", GENE)
