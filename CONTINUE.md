@@ -12,6 +12,8 @@ Take the current state from `docs/superpowers/plans/remaining-work.md` and `git 
 
 **2026-11-06:** M18 (learning: memory, skills, the ledger and Undo, background reviews, the curator, chat search) is built and gated on `feat/m16-m24` (re-gated at `5fb14d2` after the review fixes, all green, pushed); Gene on 2026-11-05 asked for M16-M24 to be built straight through, so his 15 hand-checks in `plans/m18-acceptance.md` are pending. Next: M19.
 
+**2026-11-06:** M19 (the MCP gateway (in): outside MCP servers, secrets, secret variables, server tool groups) is built and integrated on `feat/m16-m24` (`m19_acceptance.py` PASS); the track's full gate and review are next, and his 11 hand-checks in `plans/m19-acceptance.md` are pending.
+
 As of 2026-11-02:
 - **Built:** M1–M9 are built, reviewed, fixed and gated, all on `master`. M8 covers every feature M4–M7 had deferred, local only; M9 the audit's completeness gaps. The 2026-11-01 full audit's fixes (bugs and optimization) are merged (PR #4).
 - **Out of scope by the spec:** AI, network integrations, accounts, mobile, telemetry.
