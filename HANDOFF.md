@@ -4,9 +4,11 @@ Updated 2026-11-06 (after M24; M1-M24 are built). You are continuing "Object", a
 
 ## Where things stand
 
-- **`master` (`6ac46a5`, 2026-11-06) holds M1-M23.** Both build tracks were merged into it: `feat/m16-m24` (M16-M21) and `feat/m22-m23` (M22-M23). `master` is the default branch; there is no `main`. Both feature branches are merged and can be deleted; the old `ccr-*` branches are earlier sessions already folded in.
-- **Merge verification (Linux):** 2972 back-end tests passed (15 skipped, 3 xpassed); 3755 front-end tests passed (1 skipped); `tsc` clean; `npm run build` ok. Merge conflicts were only in `server.py`, `CONTINUE.md` and `remaining-work.md` (both sides kept). `test_topup_adds_occurrence_log_once` was relaxed: M22 adds Task fields after `occurrenceLog`. **Not run on the merged tree:** `npm run lint`, `m1_roundtrip.py` and every `mN_acceptance.py`.
-- **Not done:** the track's full gate was stopped mid-run before the merge; M19-M21 and M22 were quick-checked only; **M23's integrate task, review and fix pass never ran** (it has no `m23-acceptance.md` or `scripts/m23_acceptance.py`; its last commit, the Now view, was written with no test run); M24 is not built. Gene's hand-checks for M1-M23 are all unticked.
+- **M1-M24 are all built and on `master`** (2026-11-06). `master` is the default branch (no `main`). The feature branches are merged and can be deleted.
+- **Gate (Linux, 2026-11-06):** back-end 3058+ tests passed (3 tests that pinned pre-M24 defaults were updated), front-end 3775 passed, `tsc` clean, lint clean, `npm run build` ok. Every acceptance script PASS: `m1_roundtrip.py`, `m2`-`m21` on `space-sample` and `space-v1`, `m22`-`m24` on `space-work`.
+- **Reviews done:** M23 (8 fixes) and M24 (5 fixes) were reviewed once and fixed. M19-M22 had their per-milestone reviews on their build tracks.
+- **Open items from the M24 review, for Gene's call (not changed):** Retry re-runs a timed-out or crashed Approve step with the full tool set and no new approval; the learning and A2A agent routes are not covered by the read-only write guard (only the CLI tool lists block them); a full-tool work run can reach the app's local routes (self-approval, marking tools read-only); `file_capture` is not atomic (a conflict can duplicate a note); the auto-run chain has no depth cap; the answer/question prompts mention fields that the read-only tools can't change; a restart can queue a failed capture once more. Details in the M24 review notes in `m24-acceptance.md`.
+- **Not done:** Gene's hand-checks for M1-M24 (none ticked); his decisions at the top of `remaining-work.md`; M25-M27 (import and migration) are designed but not planned.
 
 Milestones and plans (`docs/superpowers/plans/`): M16 chat polish and model picker, M17 agents and tools, M18 learning, M19 MCP gateway, M20 A2A and delegation, M21 schedules (designs: `specs/2026-11-05-agents-design.md`); M22 work model, M23 Work section, M24 brain dump and agent loop (design: `specs/2026-11-05-work-dashboard-design.md`). Each built milestone has `mNN-acceptance.md` (Gene's hand-checks, unticked, plus deviations) and `scripts/mNN_acceptance.py`.
 
@@ -14,13 +16,9 @@ Milestones and plans (`docs/superpowers/plans/`): M16 chat polish and model pick
 
 ## What to do next, in order
 
-1. **Set up** (fresh clone): install `uv` and Node 22+; `uv sync`; `cd frontend && npm ci` (not `npm install`). Work on `master`; the `object-work` worktree is no longer needed.
-2. **Finish M23**: run its integrate task (the last task in `2026-11-05-m23-work-section.md`: wire the lanes together, write `scripts/m23_acceptance.py` and `m23-acceptance.md`). Open item from Task 10: `NowSide.tsx` keeps three of our strings (`No more meetings today`, `Steps done today`, `Focus`) as local constants instead of in `WORK_TEXT`.
-3. **One review of M19-M23** (correctness, file safety, fidelity), one fix pass, then the **full gate**: `uv run pytest backend/tests -q` (about 12 minutes); `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run lint && npm run build`; `m1_roundtrip.py` plus every `mN_acceptance.py`, on copies of `space-sample` and `space-v1` (`m22`+ also on `space-work`).
-4. *(done 2026-11-06: the two tracks are merged.)*
-5. **Build M24** (`2026-11-05-m24-brain-dump-and-agent-loop.md`). It needs both tracks.
-6. **Final full gate** (step 3's list), update `remaining-work.md` / `CONTINUE.md` / this file, and push to `master`.
-7. **Then:** plan M25-M27 from the approved import design (`docs/superpowers/specs/2026-11-06-import-migration-design.md`: provenance and re-runs; Office/PDF readers and the sensitive scan; schema proposal, AI filing pass and the "Migrate a source" skill). Write the plans against the code as built after M24.
+1. **Set up** (fresh clone): install `uv` and Node 22+; `uv sync`; `cd frontend && npm ci` (not `npm install`).
+2. **Gene's hands-on checks**, M1-M24 (`docs/superpowers/plans/mN-acceptance.md`), on a copy of his space, and the fixes they produce.
+3. **The open review items** above, then **plan M25-M27** from `docs/superpowers/specs/2026-11-06-import-migration-design.md` against the code as built.
 
 How Gene wants it built (2026-11-06): **parallel tracks by file ownership, a quick check per milestone, and one full gate per track plus one at the end, not a full gate after every milestone.** A workflow must record task results sorted by task number, so a resumed run hits its cache. The previous script ordered them by finish time, which broke resumes and rebuilt finished milestones. The two-track script is at `~/.claude/projects/C--Git-object/412d563a-525c-462f-98d8-9a68624a5e84/workflows/scripts/object-build-two-tracks-wf_9e539a30-330.js`; it can only be resumed from the same session, so copy its structure instead.
 
