@@ -16,7 +16,10 @@ import contextlib
 from collections.abc import Iterator
 from contextvars import ContextVar
 
-__all__ = ["acting_as", "current"]
+__all__ = ["ALERTS", "acting_as", "current"]
+
+ALERTS = "alerts"
+"""M23: the origin of the Work section's monitoring folder watch (its Alert writes)."""
 
 _ORIGIN: ContextVar[str | None] = ContextVar("object_write_origin", default=None)
 

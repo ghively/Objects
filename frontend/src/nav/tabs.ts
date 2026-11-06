@@ -3,6 +3,7 @@
  * localStorage), and the peek modal with its pager list (not persisted).
  */
 import { create } from 'zustand'
+import type { WorkViewId } from '@/api/types'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { useRecent } from './recent'
 import {
@@ -28,7 +29,8 @@ import { followStorage, switchStoreSpace } from './spaceStorage'
 
 export type Target =
   | { kind: 'type'; typeId: string }
-  | { kind: 'object'; path: string }
+  /** M23: `work: true` in the side panel is the item panel (the object page with the work header). */
+  | { kind: 'object'; path: string; work?: true }
   /** Object Type Settings for one type. */
   | { kind: 'typeSettings'; typeId: string }
   /** The app's own Trash (not the Windows Recycle Bin). */
@@ -51,6 +53,8 @@ export type Target =
   | { kind: 'search'; q?: string; textOnly?: boolean }
   /** M17: an agent's page (Settings for one agent), on one of its tabs (`profile` when absent). */
   | { kind: 'agent'; id: string; tab?: string }
+  /** M23: the Work section's page, on one of its views (the remembered view when absent). */
+  | { kind: 'work'; view?: WorkViewId }
 
 /**
  * What a side-panel entry shows (Task 15): a page target, M5's local graph of the tab's object,
@@ -210,8 +214,12 @@ export function sameTarget(a: SidepanelTarget | null | undefined, b: SidepanelTa
     case 'type':
     case 'typeSettings':
       return a.typeId === (b as typeof a).typeId
-    case 'object':
-      return a.path === (b as typeof a).path
+    case 'object': {
+      const o = b as typeof a
+      return a.path === o.path && !!a.work === !!o.work
+    }
+    case 'work':
+      return (a.view ?? null) === ((b as typeof a).view ?? null)
     case 'collection':
     case 'query':
       return a.id === (b as typeof a).id

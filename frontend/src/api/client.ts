@@ -103,6 +103,16 @@ import type {
   WorkStep,
   WorkStepRequest,
   WorkWriteResult,
+  AgentStatus,
+  AlertScanReport,
+  CaptureRequest,
+  CaptureSummary,
+  FocusDay,
+  GeneralFloor,
+  WorkAlerts,
+  WorkBoard,
+  WorkToday,
+  WorkWins,
 } from './types'
 import type { WhiteboardSettings } from './whiteboardTypes'
 
@@ -152,6 +162,28 @@ export class StepChangedError extends ConflictError {
     this.name = 'StepChangedError'
     this.message = message
     this.step = step
+  }
+}
+
+/**
+ * M23: 501 from a seam M24 fills (the brain-dump save, the agent switch and retry) or from Keep on
+ * top outside the Object window. `message` is the server's detail ("Saving a brain dump comes with
+ * M24."). Nothing was written.
+ */
+export class UnavailableError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'UnavailableError'
+  }
+}
+
+/** A call whose 501 becomes `UnavailableError` (other routes keep their `ApiError` 501). */
+async function seamCall<T>(call: Promise<T>): Promise<T> {
+  try {
+    return await call
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 501) throw new UnavailableError(e.message)
+    throw e
   }
 }
 
@@ -486,6 +518,8 @@ const RESYNC_EVENTS: readonly ChangeEvent[] = [
   { kind: 'agents', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'agentChats', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'agentLearning', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'work', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'workQueue', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'mcpServers', path: RESYNC_PATH, version: null, origin: null },
 ]
 
@@ -1790,6 +1824,113 @@ export const api = {
     )
     emitLocal([typesEvent(res.type?.id ?? typeId, res.type?.revision ?? null), defEvent('queries', 'work-tickets')])
     return res
+  },
+
+  // ---- M23: the Work section (reads write nothing; item writes stay M22's calls above) ----
+
+  /** The board every Work view is computed from: `active` (default) or `all`. */
+  workBoard(scope?: 'active' | 'all'): Promise<WorkBoard> {
+    return request<WorkBoard>(`/work/board${qs({ scope })}`)
+  },
+
+  /** A day's focus lines (default today); reading never creates the daily note. */
+  workFocus(day?: string): Promise<FocusDay> {
+    return request<FocusDay>(`/work/focus${qs({ day })}`)
+  },
+
+  /**
+   * Replace the day's focus lines (only the Focus section's list lines change; the daily note is
+   * created when missing). A stale `baseVersion` rejects with `ConflictError` (409).
+   */
+  async saveWorkFocus(day: string, lines: string[], baseVersion: string | null): Promise<FocusDay> {
+    const res = await request<FocusDay>('/work/focus', json('PUT', { day, lines, baseVersion, clientId: CLIENT_ID }))
+    if (res?.notePath) {
+      emitLocal([baseVersion === null ? created(res.notePath, res.version) : changed(res.notePath, res.version)])
+    }
+    return res
+  },
+
+  /** Today's (or `day`'s) meetings and the current local time. */
+  workToday(day?: string): Promise<WorkToday> {
+    return request<WorkToday>(`/work/today${qs({ day })}`)
+  },
+
+  /** Steps done, items closed and objects changed over the last `days` (1-31, default 14). */
+  workWins(days?: number): Promise<WorkWins> {
+    return request<WorkWins>(`/work/wins${qs({ days: days === undefined ? undefined : String(days) })}`)
+  },
+
+  /** The Alert objects and the monitoring folder's sources. */
+  workAlerts(): Promise<WorkAlerts> {
+    return request<WorkAlerts>('/work/alerts')
+  },
+
+  /** Scan the monitoring folder now (Check now). The watch announces its own writes. */
+  scanAlerts(): Promise<{ report: AlertScanReport; alerts: WorkAlerts }> {
+    return request<{ report: AlertScanReport; alerts: WorkAlerts }>('/work/alerts/scan', json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** "Add the Alert type" (idempotent: `created` is false when it exists). */
+  async ensureAlertType(): Promise<{ type: TypeDef; created: boolean }> {
+    const res = await request<{ type: TypeDef; created: boolean }>('/work/alert-type', json('POST', { clientId: CLIENT_ID }))
+    if (res?.created) emitLocal([typesEvent(res.type.id, res.type.revision ?? null)])
+    return res
+  },
+
+  /** The general floor list (floor items no work item owns). */
+  generalFloor(): Promise<GeneralFloor> {
+    return request<GeneralFloor>('/work/floor/general')
+  },
+
+  /** Add, edit, collect, un-tick or remove a general floor item. A stale `itemRev` rejects with `StepChangedError`. */
+  async generalFloorOp(req: Omit<WorkFloorRequest, 'path'>): Promise<GeneralFloor> {
+    const res = await request<GeneralFloor>('/work/floor/general', json('POST', { ...req, clientId: CLIENT_ID }), stepChanged)
+    emitLocal([{ kind: 'work', path: 'floor', version: res?.revision ?? null, origin: CLIENT_ID }])
+    return res
+  },
+
+  /** The work agent's status and queue (M23: `available: false`, `carrying` from the board). */
+  workAgent(): Promise<AgentStatus> {
+    return request<AgentStatus>('/work/agent')
+  },
+
+  /** "Agent acts on my approvals". 501 `UnavailableError` until M24. */
+  async setAgentActs(on: boolean): Promise<AgentStatus> {
+    const res = await seamCall(request<AgentStatus>('/work/agent/acts', json('PUT', { on, clientId: CLIENT_ID })))
+    emitLocal([{ kind: 'workQueue', path: RESYNC_PATH, version: null, origin: CLIENT_ID }])
+    return res
+  },
+
+  /** Retry one agent queue entry. 404; 501 `UnavailableError` until M24. */
+  async retryAgentEntry(id: string): Promise<AgentStatus> {
+    const res = await seamCall(request<AgentStatus>('/work/agent/retry', json('POST', { id, clientId: CLIENT_ID })))
+    emitLocal([{ kind: 'workQueue', path: id, version: null, origin: CLIENT_ID }])
+    return res
+  },
+
+  /** Save a brain dump. 501 `UnavailableError` ("Saving a brain dump comes with M24.") until M24. */
+  async workCapture(req: CaptureRequest): Promise<CaptureSummary> {
+    const res = await seamCall(
+      request<{ capture: CaptureSummary }>('/work/captures', json('POST', { ...req, clientId: CLIENT_ID })),
+    )
+    if (res?.capture?.path) emitLocal([created(res.capture.path)])
+    return res.capture
+  },
+
+  /** Saved brain dumps, newest first (M23: none). */
+  async workCaptures(status?: 'new' | 'filed' | 'needsYou'): Promise<CaptureSummary[]> {
+    const res = await request<{ captures: CaptureSummary[] }>(`/work/captures${qs({ status })}`)
+    return res?.captures ?? []
+  },
+
+  /** Whether the Object window can open the keep-on-top window. */
+  keepOnTopInfo(): Promise<{ window: boolean }> {
+    return request<{ window: boolean }>('/work/keep-on-top')
+  },
+
+  /** Open the keep-on-top window (`/?mini=work`). 501 `UnavailableError` outside the Object window. */
+  async openKeepOnTop(): Promise<void> {
+    await seamCall(request<null>('/work/keep-on-top', json('POST', { clientId: CLIENT_ID })))
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */

@@ -159,14 +159,14 @@ def test_event_hub_bounds_a_slow_subscriber():
         got = [await stream.__anext__() for _ in range(q.qsize())]
         # The resync the client sends itself after a reconnect (`api/client.ts` RESYNC_EVENTS).
         # (M14 added "automations", M17 "agents" and "agentChats", M18 "agentLearning", M19
-        # "mcpServers".)
+        # "mcpServers", M23 "work" and "workQueue".)
         kinds = ("types", "views", "ui", "collections", "queries", "automations", "agents", "agentChats",
-                 "agentLearning", "mcpServers")
+                 "agentLearning", "work", "workQueue", "mcpServers")
         resync = [ChangeEvent(k, "*", None) for k in kinds]
-        assert got[:10] == resync and all(e.origin is None for e in got[:10])
-        # 1,000 fill the queue; p1000 drops them for the resync (10), p1001..p1990 fill it
-        # again, p1991 drops those, and p1992..p2499 follow the second resync.
-        assert [e.path for e in got[10:]] == [f"p{i}" for i in range(1992, 2500)]
+        assert got[:12] == resync and all(e.origin is None for e in got[:12])
+        # 1,000 fill the queue; p1000 drops them for the resync (12), p1001..p1988 fill it
+        # again, p1989 drops those, and p1990..p2499 follow the second resync.
+        assert [e.path for e in got[12:]] == [f"p{i}" for i in range(1990, 2500)]
         # A full queue still ends when the hub closes.
         for i in range(1000):
             hub.publish(ChangeEvent("changed", f"q{i}", "v"))

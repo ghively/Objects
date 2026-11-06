@@ -47,4 +47,7 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
   aiModel: null,
   // M22
   activityName: 'Gene',
+  // M23
+  workAlertFolder: null,
+  workAlertIntervals: {},
 }) as DeviceSettings
