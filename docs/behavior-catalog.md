@@ -292,6 +292,25 @@ Each starter template pre-fills the new type's properties.
 - **Delete** of a page from the list or the peek `...` menu uses the same confirmation as before and the object
   goes to Trash.
 
+## 10b. Brain dump and the Work agent (Object's own, M24)
+
+- **Brain-dump bar** (Work page, key B): Enter saves a **Capture** object at once (type "Capture", Status New
+  | Filed | Needs you; properties Text, Captured at, From view, Linked item, Filed to, Question). `Question about
+  <item>: ...` and `Break down <item> step <n>: ...` link that item (title, Ticket ID, `[[link]]`, path) and
+  queue a question or a break-down; anything else is filed as typed. The capture is never deleted by filing.
+- **Captures** view (Work switcher, icon lightbulb, no key; count = New + Needs you): filters All, New, Needs you,
+  Filed; a row shows Captured, From, Filed to, Linked item and, for Needs you, the question with **Reply to the
+  agent** + **Send**; **Mark filed**; empty text "Nothing waiting to be filed.".
+- **Agent acts on my approvals** (switch; Agent queue and Settings > Work): off = approvals, answers, notes and
+  requests only wait in the Agent queue; on = Object runs due entries one at a time. **Agent runs by itself**
+  (Settings > Work): an Agent step that becomes current runs once, read-only.
+- **Settings > Work**: **Create the Work agent** (shell warning; offers to copy your `change-reviewer`),
+  **Read tools** (mark a server's read-only tools; no more than 500), **Set up Desk sync** (an off schedule at
+  07:00 every weekday that updates ticket fields only; never writes to Jira or ServiceNow).
+- **Queue entry states**: pending, running, done, failed (reason + **Retry**), withdrawn. A failed run says why
+  ("The run didn't finish within 30 minutes.", "The agent finished without marking the step done.", "Object closed
+  during this run.") or asks Gene one question (a Question step is inserted before the step).
+
 ## 11. Unlinked mentions (kept in Object)
 
 An "Unlinked Mentions" section sits under Backlinks on an object's page; it lists text elsewhere that matches
