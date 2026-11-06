@@ -44,11 +44,12 @@ import subprocess
 import sys
 import tempfile
 import threading
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .agentrun import RunCommand, RunRefused
 from .apiquery import EXCLUDE_TAG, is_excluded
 
 __all__ = [
@@ -490,9 +491,15 @@ def build_prompt(
     pack: ContextPack,
     block: str | None = None,
     history: list[dict[str, Any]] | None = None,
+    *,
+    intro: bool = True,
 ) -> str:
-    """The text sent on stdin. `history` (earlier messages) only when no session resumes."""
-    parts = [_INTRO, _INSTRUCTIONS.get(mode, _INSTRUCTIONS["chat"])]
+    """The text sent on stdin. `history` (earlier messages) only when no session resumes.
+
+    ``intro=False`` (agent runs, M17) leaves out `_INTRO`: the run's appended guidance carries it.
+    """
+    parts = [_INTRO] if intro else []
+    parts.append(_INSTRUCTIONS.get(mode, _INSTRUCTIONS["chat"]))
     if pack.pages:
         ctx = ["# Context"]
         for page in pack.pages:
@@ -606,9 +613,15 @@ TOOL_RESULT_CAP = 4_000
 ELLIPSIS = "…"
 
 
+_SHORT_PREFIXES = (f"mcp__{MCP_SERVER}__", "mcp__object-agent__")
+"""Object's tools and the agent tools (M17) are named by their short name in ``tool`` events."""
+
+
 def _short_tool(name: str) -> str:
-    prefix = f"mcp__{MCP_SERVER}__"
-    return name.removeprefix(prefix)
+    for prefix in _SHORT_PREFIXES:
+        if name.startswith(prefix):
+            return name.removeprefix(prefix)
+    return name
 
 
 def _cap(text: str, cap: int) -> str:
@@ -802,6 +815,11 @@ class Turn:
     token: str
     skipped: list[dict[str, str]] = field(default_factory=list)
     allowed_keys: set[str] | None = None
+    run: Callable[[str | None], RunCommand] | None = None
+    """M17: the resume id in, a fresh agent-run command out (`agentrun.build_run`). While it is
+    None the M10 path runs (an empty temp folder, `cli_args`, `mcp_config`); T7 removes that."""
+    timeout: float = field(default_factory=lambda: TURN_TIMEOUT)
+    """Seconds this turn may run (`run_turn`'s deadline); the module constant when made."""
 
 
 def _kill_tree(proc: subprocess.Popen) -> None:
@@ -830,19 +848,29 @@ class _Attempt:
         self.resume = resume
         self.proc: subprocess.Popen | None = None
         self.stderr: list[str] = []
-        self.workdir = Path(tempfile.mkdtemp(prefix="object-ai-"))
-        self.cwd = self.workdir / "cwd"
-        self.cwd.mkdir()
-        self.config = Path(tempfile.mkdtemp(prefix="object-ai-config-")) / "mcp.json"
+        self.command: RunCommand | None = None
+        self.workdir: Path | None = None
+        self.config: Path | None = None
+        if turn.run is None:  # M10's path (T7 removes it)
+            self.workdir = Path(tempfile.mkdtemp(prefix="object-ai-"))
+            self.cwd = self.workdir / "cwd"
+            self.cwd.mkdir()
+            self.config = Path(tempfile.mkdtemp(prefix="object-ai-config-")) / "mcp.json"
 
     def start(self, loop: asyncio.AbstractEventLoop, queue: asyncio.Queue) -> None:
-        self.config.write_text(json.dumps(mcp_config(self.turn.api_url)), encoding="utf-8")
-        env = {**os.environ, "OBJECT_API_TOKEN": self.turn.token, "OBJECT_API_URL": self.turn.api_url}
-        args = cli_args(self.turn.claude, model=self.turn.model, resume=self.resume,
-                        mcp_config_path=str(self.config))
+        if self.turn.run is not None:
+            self.command = self.turn.run(self.resume)
+            args, cwd, env = self.command.args, self.command.cwd, self.command.env
+        else:
+            assert self.config is not None
+            self.config.write_text(json.dumps(mcp_config(self.turn.api_url)), encoding="utf-8")
+            env = {**os.environ, "OBJECT_API_TOKEN": self.turn.token, "OBJECT_API_URL": self.turn.api_url}
+            args = cli_args(self.turn.claude, model=self.turn.model, resume=self.resume,
+                            mcp_config_path=str(self.config))
+            cwd = self.cwd
         self.proc = subprocess.Popen(
             args,
-            cwd=self.cwd,
+            cwd=cwd,
             env=env,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -883,8 +911,12 @@ class _Attempt:
     def stop(self) -> None:
         if self.proc is not None:
             _kill_tree(self.proc)
-        shutil.rmtree(self.workdir, ignore_errors=True)
-        shutil.rmtree(self.config.parent, ignore_errors=True)
+        if self.command is not None:
+            shutil.rmtree(self.command.tmp, ignore_errors=True)
+        if self.workdir is not None:
+            shutil.rmtree(self.workdir, ignore_errors=True)
+        if self.config is not None:
+            shutil.rmtree(self.config.parent, ignore_errors=True)
 
     def stderr_text(self) -> str:
         return "".join(self.stderr).strip()[-800:]
@@ -901,6 +933,8 @@ async def _attempt_events(attempt: _Attempt, parser: StreamParser, deadline: flo
     queue: asyncio.Queue = asyncio.Queue()
     try:
         attempt.start(loop, queue)
+    except RunRefused as exc:
+        raise _Failed(exc.message, retryable=False) from exc
     except OSError as exc:
         raise _Failed(f"Claude Code couldn't be started: {exc.strerror or exc}", retryable=False) from exc
     while True:
@@ -944,12 +978,12 @@ def _wait(proc: subprocess.Popen, timeout: float) -> int | None:
 async def run_turn(turn: Turn) -> AsyncIterator[dict[str, Any]]:
     """The turn's `AiEvent` dicts, ending with one ``done`` or ``error``.
 
-    Closing the generator early (the client went away) or running past `TURN_TIMEOUT`
-    kills the CLI's process tree. A ``--resume`` that fails before any answer is tried
+    Closing the generator early (the client went away) or running past the turn's `timeout`
+    (`TURN_TIMEOUT` unless the caller set one) kills the CLI's process tree. A ``--resume`` that fails before any answer is tried
     once more as a fresh session with the earlier messages.
     """
     loop = asyncio.get_running_loop()
-    deadline = loop.time() + TURN_TIMEOUT
+    deadline = loop.time() + turn.timeout
     plans: list[tuple[str, str | None]] = []
     if turn.session_id and turn.prompt_resume is not None:
         plans.append((turn.prompt_resume, turn.session_id))
@@ -967,7 +1001,7 @@ async def run_turn(turn: Turn) -> AsyncIterator[dict[str, Any]]:
             return
         except TimeoutError:
             yield {"type": "error",
-                   "message": f"Claude Code took too long (over {TURN_TIMEOUT:g} seconds) and was stopped."}
+                   "message": f"Claude Code took too long (over {turn.timeout:g} seconds) and was stopped."}
             return
         finally:
             await asyncio.shield(asyncio.to_thread(attempt.stop))
