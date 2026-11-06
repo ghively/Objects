@@ -281,3 +281,23 @@ def test_fenced_code_in_focus_is_not_focus(space: Space) -> None:
     only = "## Focus\n\n```\n- x\n```\n"
     assert workfocus.parse_focus(only) == []
     assert workfocus.replace_focus(only, ["A"]) == "## Focus\n\n- A\n\n```\n- x\n```\n"
+
+
+def test_save_uses_one_read_for_check_and_edit(root: Path, space: Space) -> None:
+    _of, _fm, version = space.read(NOTE)
+    real = space.read
+    calls = {"n": 0}
+
+    def read(path, *a, **k):
+        out = real(path, *a, **k)
+        calls["n"] += 1
+        if calls["n"] == 1:  # an outside edit right after the first read
+            p = root / NOTE
+            p.write_bytes(p.read_bytes() + b"\r\nOutside edit\r\n")
+        return out
+
+    space.read = read  # type: ignore[method-assign]
+    with pytest.raises(Conflict):
+        workfocus.save_focus(space, "2026-11-05", ["Mine"], version)
+    assert b"Outside edit" in (root / NOTE).read_bytes()
+    assert b"- Mine" not in (root / NOTE).read_bytes()
