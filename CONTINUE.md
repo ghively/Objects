@@ -10,7 +10,7 @@ Take the current state from `docs/superpowers/plans/remaining-work.md` and `git 
 
 **2026-11-06:** M17 (agents, agent folders, the fenced turn runner, the expanded Object tools) is built and gated on `feat/m16-m24` (re-gated at `3c1857f` after the review fixes, all green, pushed); Gene on 2026-11-05 asked for M16-M24 to be built straight through, so his 13 hand-checks in `plans/m17-acceptance.md` are pending. Next: M18.
 
-**2026-11-06:** M18 (learning: memory, skills, the ledger and Undo, background reviews, the curator, chat search) is built and gated on `feat/m16-m24`; Gene's 15 hand-checks in `plans/m18-acceptance.md` are pending; the milestone review and fix pass come next, then M19.
+**2026-11-06:** M18 (learning: memory, skills, the ledger and Undo, background reviews, the curator, chat search) is built and gated on `feat/m16-m24` (re-gated at `5fb14d2` after the review fixes, all green, pushed); Gene on 2026-11-05 asked for M16-M24 to be built straight through, so his 15 hand-checks in `plans/m18-acceptance.md` are pending. Next: M19.
 
 As of 2026-11-02:
 - **Built:** M1–M9 are built, reviewed, fixed and gated, all on `master`. M8 covers every feature M4–M7 had deferred, local only; M9 the audit's completeness gaps. The 2026-11-01 full audit's fixes (bugs and optimization) are merged (PR #4).
