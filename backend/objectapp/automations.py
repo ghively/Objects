@@ -385,6 +385,20 @@ def _check_against_space(space: Space, rule: AutomationRule) -> None:
                 raise InvalidValue(f"“{trigger.to.option}” isn't a condition for {pdef.name}.")
     for n, a in enumerate(rule.actions, start=1):
         where = f"Action {n}"
+        if a.kind == "runAgent":
+            # M21: an agent schedule runs one of Object's own listed agents (late imports: the
+            # registry is machine state, and agentschedules imports this module).
+            from .agents import AgentNotFound, AgentRegistry
+            from .agentschedules import REMOTE_REFUSED
+            from .remotemodel import REMOTE_KIND
+
+            try:
+                record = AgentRegistry().get(a.agentId)  # type: ignore[union-attr]
+            except AgentNotFound as exc:
+                raise InvalidValue(str(exc)) from exc
+            if record.kind == REMOTE_KIND:
+                raise InvalidValue(REMOTE_REFUSED)
+            continue
         if a.kind in ("setProperty", "clearProperty") and types is not None:
             key = a.key  # type: ignore[union-attr]
             pdef = _key_def(space, types, key)
@@ -1684,3 +1698,8 @@ def _now_value(pdef: PropertyDefinition, instant: datetime, tz: Any) -> dict[str
         return {"start": to_local(instant, tz).date().isoformat(), "resolution": "day"}
     return {"start": _stamp(instant), "resolution": "time"}
 
+
+
+# M21: importing agentschedules sets M18's agentskills.SCHEDULE_SKILLS whenever the app runs. A late
+# import, since agentschedules imports this module's rules and schedule helpers.
+from . import agentschedules as _agentschedules  # noqa: E402, F401
