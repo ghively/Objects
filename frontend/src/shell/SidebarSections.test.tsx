@@ -83,7 +83,8 @@ describe('SidebarSections', () => {
     stored.sections.push({ id: 'S2', name: 'Later', icon: null, items: [] })
     render(<Sidebar types={[SERVER]} />)
     await screen.findByText('Open servers')
-    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    // M17's Agents section sits above the main navigation, outside the workspace blocks.
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent).filter((h) => h !== 'Agents')
     expect(headings.slice(0, 3)).toEqual(['In Progress', 'Later', 'Pinned'])
     const later = screen.getByRole('region', { name: 'Later' })
     expect(within(later).getByText('No pinned content')).toBeInTheDocument()
