@@ -71,6 +71,15 @@ async function mount(body: string, path = 'Pages/Host.md'): Promise<TiptapEditor
 }
 
 describe('ObjectEmbedView', () => {
+  test('test turn into inline link replaces the card with a link line', async () => {
+    const editor = await mount('Intro\n\n<!-- block: view=wideCard -->\n![[Ada Lovelace|Ada]]\n\nOutro\n')
+    const embed = await screen.findByTestId('object-embed')
+    fireEvent.click(within(embed).getByRole('button', { name: 'Block menu' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Turn into inline link' }))
+    expect(serializeBody(editor)).toBe('Intro\n\n[[Ada Lovelace|Ada]]\n\nOutro\n')
+    expect(screen.queryByTestId('object-embed')).toBeNull()
+  })
+
   test('test object embed renders each view and change block view writes view', async () => {
     const body = 'Intro\n\n<!-- block: view=wideCard -->\n![[Ada Lovelace]]\n\nOutro\n'
     const editor = await mount(body)
