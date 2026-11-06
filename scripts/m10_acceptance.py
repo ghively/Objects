@@ -148,7 +148,8 @@ def main(argv: list[str] | None = None) -> int:
         run.report(code == 200 and kinds[:1] == ["session"] and "text" in kinds and kinds[-1:] == ["done"],
                    f"chat streams session, text, done: {kinds}")
         run.report("\r" not in raw and raw.startswith("data: "), "frames are 'data: <json>' + blank line")
-        run.report({"type": "tool", "name": "search"} in events, "the MCP tool use is reported by short name")
+        run.report(any(e["type"] == "tool" and e.get("name") == "search" for e in events),
+                   "the MCP tool use is reported by short name")
         done = events[-1] if events else {}
         run.report(done.get("text") == "Hello from the fake claude." and done.get("sessionId") == events[0].get("sessionId"),
                    f"done carries the answer and the session: {done.get('text')!r}")
