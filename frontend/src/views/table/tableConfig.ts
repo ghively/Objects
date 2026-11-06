@@ -20,6 +20,10 @@ export const DEFAULT_COL_WIDTH: Partial<Record<PropertyType, number>> = {
   email: 16,
   phone: 11,
   files: 16,
+  // M22 (our widths)
+  steps: 18,
+  textList: 16,
+  floorItems: 12,
 }
 export const FALLBACK_COL_WIDTH = 12
 export const MIN_COL_WIDTH = 2

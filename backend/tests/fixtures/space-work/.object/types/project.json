@@ -1,0 +1,310 @@
+{
+  "schemaVersion": 2,
+  "id": "project",
+  "name": "Project",
+  "pluralName": "Projects",
+  "folder": "Projects",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-kanban"
+  },
+  "color": "violet",
+  "description": "Track work with status, collaborators, and meetings.",
+  "basic": false,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The title serves as the main identifier for any entry",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "Collections this content is included in",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "Additional information to further describe an item",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "Date and time of creation",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "Date and time of last edit",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "General tags of this content",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "A quick visual identifier",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Additional names for this content",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    },
+    {
+      "id": "01M6RSXD9ER0ZAVMW7GJ1ZRTKD",
+      "key": "status",
+      "name": "Status",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "planned",
+            "text": "Planned",
+            "color": "yellow",
+            "icon": null
+          },
+          {
+            "id": "in-progress",
+            "text": "In Progress",
+            "color": "blue",
+            "icon": null
+          },
+          {
+            "id": "on-hold",
+            "text": "On Hold",
+            "color": "pink",
+            "icon": null
+          },
+          {
+            "id": "completed",
+            "text": "Completed",
+            "color": "green",
+            "icon": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M6RSXD9EHQ158QB0D3FDF390",
+      "key": "projectType",
+      "name": "Type",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "work",
+            "text": "Work",
+            "icon": null,
+            "color": "blue"
+          },
+          {
+            "id": "personal",
+            "text": "Personal",
+            "icon": null,
+            "color": "sky"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M6RSXD9E76GF6X59M3XGBSKK",
+      "key": "timeframe",
+      "name": "Timeframe",
+      "type": "datetime",
+      "description": "Start when it begins, end when it's done",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "day",
+          "endTimePreference": true
+        }
+      }
+    },
+    {
+      "id": "01M6RSXD9EECT0S3B0Y96QBDEX",
+      "key": "collaborators",
+      "name": "Collaborators",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "person"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": []
+      }
+    },
+    {
+      "id": "01M6RSXD9EPMR5SXWWPHF621NC",
+      "key": "organizations",
+      "name": "Organizations",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [],
+        "hasFixedSet": false,
+        "fixedSet": []
+      }
+    },
+    {
+      "id": "01M6RSXD9EB75XK6VYPH2C7JVZ",
+      "key": "meetings",
+      "name": "Meetings",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "meeting"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": []
+      }
+    },
+    {
+      "id": "coverImage",
+      "key": "coverImage",
+      "name": "Cover image",
+      "type": "coverImage",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-image"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "01M6RSXD9EGYKRS9N2EYHYN6AV",
+      "key": "notes",
+      "name": "Notes",
+      "type": "blocks",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-dashes"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [],
+    "defaultTemplateId": null
+  }
+}

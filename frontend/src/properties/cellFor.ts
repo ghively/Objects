@@ -2,7 +2,7 @@
 // value from the object's frontmatter (formula and rollup: from the object read's `computed`) and
 // the extras below.
 import type { ComponentType } from 'react'
-import type { PropertyDef, PropertyType } from '@/api/types'
+import type { PropertyDef, PropertyType, WorkWriteResult } from '@/api/types'
 import { AliasesCell } from './cells/AliasesCell'
 import { BlocksCell } from './cells/BlocksCell'
 import { ButtonCell } from './cells/ButtonCell'
@@ -13,6 +13,7 @@ import { DateCell } from './cells/DateCell'
 import { DescriptionCell } from './cells/DescriptionCell'
 import { EmailCell } from './cells/EmailCell'
 import { FilesCell } from './cells/FilesCell'
+import { FloorItemsCell } from './cells/FloorItemsCell'
 import { FormulaCell } from './cells/FormulaCell'
 import { IconCell } from './cells/IconCell'
 import { IdCell } from './cells/IdCell'
@@ -23,10 +24,12 @@ import { ReadOnlyDateCell } from './cells/ReadOnlyDateCell'
 import { RelationCell } from './cells/RelationCell'
 import { RollupCell } from './cells/RollupCell'
 import { SimpleTableCell } from './cells/SimpleTableCell'
+import { StepsCell } from './cells/StepsCell'
 import { BacklinksCell, CollectionsCell, SystemFieldCell } from './cells/SystemFieldCell'
 import { TagsCell } from './cells/TagsCell'
 import { TextBlockCell } from './cells/TextBlockCell'
 import { TextCell } from './cells/TextCell'
+import { TextListCell } from './cells/TextListCell'
 import { TypeChipCell } from './cells/TypeChipCell'
 import type { CellProps } from './cells/types'
 import { UrlCell } from './cells/UrlCell'
@@ -66,6 +69,13 @@ export interface CellExtras {
   onSetReminder?(key: string, remind: string | null): void
   /** BlocksCell and TextBlockCell: the owning object's path (the editor's token menu and block references). */
   path?: string
+  /**
+   * M22: run a work write (a step action, a step edit, a floor-item op) for this object. The
+   * property panel passes it from `useObjectWrites` (`writes.work(run)`): it flushes the body, calls
+   * `run(path, baseVersion)`, adopts the result's version and loads its front matter and body. It
+   * resolves `null` when the write failed (the error is shown). Table cells don't get it.
+   */
+  onWorkWrite?(run: (path: string, baseVersion: string) => Promise<WorkWriteResult>): Promise<WorkWriteResult | null>
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each cell takes its own value type
@@ -105,6 +115,10 @@ const CELLS: Readonly<Record<PropertyType, CellComponent | null>> = {
   email: EmailCell,
   phone: PhoneCell,
   files: FilesCell,
+  // M22
+  steps: StepsCell,
+  textList: TextListCell,
+  floorItems: FloorItemsCell,
 }
 
 /** The cell for a property kind; `null` for `entity_title`, which the header edits. */

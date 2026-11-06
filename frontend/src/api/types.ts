@@ -38,6 +38,10 @@ export type PropertyType =
   | 'entity_backlinks'
   /** M14: runs an automation on its object; holds no value (`options.ruleId`). */
   | 'button'
+  // M22 (our kinds): a work item's steps, a list of short texts and its floor items.
+  | 'steps'
+  | 'textList'
+  | 'floorItems'
 
 /** @deprecated M1 name; use `PropertyType`. */
 export type PropertyKind = PropertyType
@@ -73,6 +77,9 @@ export const PROPERTY_TYPES: readonly PropertyType[] = [
   'entity_lastUpdated',
   'entity_backlinks',
   'button',
+  'steps',
+  'textList',
+  'floorItems',
 ]
 
 /**
@@ -110,6 +117,10 @@ export const KIND_TRANSFORMS: Readonly<Record<PropertyType, readonly PropertyTyp
   entity_lastUpdated: [],
   entity_backlinks: [],
   button: [],
+  // M22: none is a source or target of "Change property type".
+  steps: [],
+  textList: [],
+  floorItems: [],
 }
 
 /** An icon: an emoji, or any Iconify id (`ph-…`, `vscode-icons-…`) with an optional theme colour. */
@@ -392,6 +403,8 @@ export interface SpaceInfo {
   hideTaskManagement?: boolean
   /** M7: the revision of `space.json` (`''` when the file is absent). */
   revision?: string
+  /** M22: the Jira site the browse links use (`https://…`), or null. Optional, as M7's keys are. */
+  jiraSite?: string | null
 }
 
 /** M7 `PUT /api/space` patch: only these keys are written to `space.json`. */
@@ -400,6 +413,8 @@ export interface SpacePatch {
   icon?: string | null
   description?: string | null
   hideTaskManagement?: boolean
+  /** M22: `null` or an `http(s)://` address of at most 300 characters. */
+  jiraSite?: string | null
 }
 
 /** M7: the kind of an attachment file (Task 2's `media.py` kinds). */
@@ -471,6 +486,9 @@ export interface DeviceSettings {
   claudePath: string | null
   /** The model passed to `claude --model`; `null` = Claude Code's default. */
   aiModel: string | null
+  // ---- M22 (the work model) ----
+  /** "Your name in Activity": who the Activity and Work notes lines name (1-60 characters). */
+  activityName: string
 }
 
 /** M8 `DeviceSettings.language`. */
@@ -948,6 +966,8 @@ export interface Query {
   view: { viewDefinition: DataViewDefinition; showDataViewDetails?: boolean }
   readOnlyReason?: string | null
   revision: string
+  /** M22: the built-in Tickets view (`work-tickets`); absent for every other query. */
+  builtIn?: 'tickets'
   [extra: string]: unknown
 }
 
@@ -2254,4 +2274,226 @@ export interface McpGroupStatus {
   error: string | null
   fetchedAt: string | null
   missingVars: string[]
+}
+
+// ---------------------------------------------------------------------------------------------
+// M22: the work model (docs/superpowers/plans/2026-11-05-m22-work-model.md, "Contract (T1)").
+// Pydantic mirrors in `backend/objectapp/workmodel.py`.
+
+export type StepKind = 'question' | 'do' | 'approve' | 'agent'
+export type StepState = 'open' | 'approved' | 'done' | 'declined'
+export type StepAction = 'answer' | 'done' | 'approve' | 'decline' | 'run' | 'reopen' | 'complete' | 'fail'
+/** Who acts on a step: Gene, an agent, or Object itself (M24's auto-run, which may only `run`). */
+export type WorkRole = 'user' | 'agent' | 'app'
+export type Turn = 'you' | 'approve' | 'agent' | 'parked' | 'close' | 'none'
+export type Stage = 'notStarted' | 'ready' | 'doing' | 'parked' | 'done'
+
+export const STEP_KIND_LABELS: Readonly<Record<StepKind, string>> = {
+  question: 'Question',
+  do: 'Do',
+  approve: 'Approve',
+  agent: 'Agent',
+}
+export const STEP_STATE_LABELS: Readonly<Record<StepState, string>> = {
+  open: 'Open',
+  approved: 'Approved',
+  done: 'Done',
+  declined: 'Declined',
+}
+export const STAGE_LABELS: Readonly<Record<Stage, string>> = {
+  notStarted: 'Not started',
+  ready: 'Ready',
+  doing: 'Doing',
+  parked: 'Waiting / parked',
+  done: 'Done',
+}
+export const TURN_LABELS: Readonly<Record<Turn, string>> = {
+  you: 'you',
+  approve: 'approve',
+  agent: 'agent',
+  parked: 'parked',
+  close: 'close',
+  none: 'none',
+}
+
+/** The value of a `steps` property in rows and object reads (decode_value). */
+export interface StepValue {
+  /** "q4m2xa", or "@3" when the file gives none. */
+  id: string
+  /** 12 hex characters. */
+  rev: string
+  kind: StepKind
+  state: StepState
+  text: string
+  notBefore: string | null
+  answer: string | null
+  result: string | null
+  addedAt: string | null
+  approvedAt: string | null
+  doneAt: string | null
+  declinedAt: string | null
+}
+
+export interface WorkStep extends StepValue {
+  /** 1-based position. */
+  n: number
+  current: boolean
+  /** What the user may do on it now (`allowedActions(steps, i, 'user')`). */
+  actions: StepAction[]
+}
+
+export interface FloorItemValue {
+  id: string
+  rev: string
+  place: string | null
+  what: string | null
+  collected: string | null
+  found: string | null
+}
+
+export interface ActivityLine {
+  /** "YYYY-MM-DD HH:MM", space time. */
+  at: string
+  /** "<who> <what>". */
+  text: string
+  raw: string
+}
+
+export interface WorkNoteLine {
+  date: string
+  who: string
+  text: string
+  raw: string
+}
+
+export interface ResolutionNote {
+  /** "Work notes: <id> <title>\nReported: …" (ported text). */
+  workNotes: string
+  /** "Close notes: <id> <title>\nCause: …" */
+  closeNotes: string
+  /** The count of "[fill in: …]". */
+  gaps: number
+}
+
+export interface TicketInfo {
+  id: string
+  system: 'ServiceNow' | 'Jira' | null
+  url: string | null
+  deskStatus: string | null
+  deskPriority: 'Critical' | 'High' | 'Medium' | 'Low' | null
+  requester: string | null
+  group: string | null
+  location: string | null
+  /** Days. */
+  opened: string | null
+  updated: string | null
+  resolved: string | null
+}
+
+export interface WorkItemSummary {
+  path: string
+  objectId: string | null
+  title: string
+  typeId: string
+  version: string
+  /** null unless Ticket ID is set. */
+  ticket: TicketInfo | null
+  rank: number | null
+  area: string | null
+  cause: string | null
+  /** The item's own Priority label (Task), else null. */
+  priority: string | null
+  priorityNote: string | null
+  blockedOn: string | null
+  confidence: string | null
+  status: string | null
+  stage: Stage
+  done: boolean
+  /** `completed`, ISO. */
+  doneAt: string | null
+  /** Done and within `DONE_VISIBLE_DAYS`. */
+  recentlyDone: boolean
+  turn: Turn
+  /** An active item whose Desk status is Resolved or Closed. */
+  deskSays: 'Resolved' | 'Closed' | null
+  current: WorkStep | null
+  stepCount: number
+  /** Done or declined. */
+  stepsFinished: number
+  /** Task: its Project relation resolved. */
+  projectPath: string | null
+  lastActivity: ActivityLine | null
+  /** ISO: the later of lastUpdated and the last Activity line. */
+  lastTouched: string
+  /** Unreadable steps, duplicate ids, a field of the wrong kind… */
+  problems: string[]
+}
+
+export interface WorkItem extends WorkItemSummary {
+  /** The decoded value of every work and ticket field the type has. */
+  fields: Record<string, unknown>
+  steps: WorkStep[]
+  verified: string[]
+  assumed: string[]
+  toRaiseConfidence: string[]
+  floorItems: FloorItemValue[]
+  findings: string | null
+  hypothesis: string | null
+  confidenceReason: string | null
+  /** Newest first. */
+  activity: ActivityLine[]
+  /** Oldest first, as on disk. */
+  workNotes: WorkNoteLine[]
+  /** Tickets only. */
+  resolution: ResolutionNote | null
+}
+
+export interface WorkWriteResult {
+  version: string
+  frontmatter: Record<string, unknown>
+  body: string
+  item: WorkItem
+  synced: string[]
+  /** The Activity line appended (without "- "). */
+  activity: string
+  /** The Work notes line appended, if any. */
+  workNote: string | null
+}
+
+/** One op of `POST /api/work/steps`; `before` is a step id (null/absent = at the end). */
+export type StepOp =
+  | { op: 'add'; kind: StepKind; text: string; before?: string | null }
+  | { op: 'edit'; stepId: string; stepRev: string; text?: string; kind?: StepKind }
+  | { op: 'move'; stepId: string; stepRev: string; before: string | null }
+  | { op: 'remove'; stepId: string; stepRev: string }
+
+export type FloorOp = 'add' | 'edit' | 'collect' | 'uncollect' | 'remove'
+
+/** `api.workStep` input (`POST /api/work/step`, the client adds `clientId`). */
+export interface WorkStepRequest {
+  path: string
+  stepId: string
+  stepRev: string
+  action: StepAction
+  text?: string | null
+  notBefore?: string | null
+  ask?: string | null
+}
+
+/** `api.workFloor` input (`POST /api/work/floor`, the client adds `clientId`). */
+export interface WorkFloorRequest {
+  path: string
+  op: FloorOp
+  itemId?: string | null
+  itemRev?: string | null
+  place?: string | null
+  what?: string | null
+  found?: string | null
+}
+
+/** `POST /api/types/{typeId}/work-fields` → 200. */
+export interface AddWorkFieldsResult {
+  type: TypeDef
+  added: string[]
+  skipped: { key: string; name: string; reason: string }[]
 }

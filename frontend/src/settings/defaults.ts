@@ -45,4 +45,6 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
   aiHidden: false,
   claudePath: null,
   aiModel: null,
+  // M22
+  activityName: 'Gene',
 }) as DeviceSettings
