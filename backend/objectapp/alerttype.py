@@ -14,6 +14,7 @@ Nothing here announces: the caller (the watch, or the route) announces
 from __future__ import annotations
 
 import copy
+import threading
 from typing import TYPE_CHECKING
 
 from .propvalues import InvalidValue
@@ -38,6 +39,8 @@ ALERT_NAME = "Alert"
 ALERT_PLURAL = "Alerts"
 ALERT_ICON = "ph-warning"
 ALERT_COLOR = "red"
+
+_LOCK = threading.RLock()
 
 _FALLBACK_NAME = "Monitoring alert"
 _FALLBACK_PLURAL = "Monitoring alerts"
@@ -98,19 +101,26 @@ def alert_type(space: Space) -> TypeDefinition | None:
     return None
 
 
-def ensure_alert_type(space: Space) -> tuple[TypeDefinition, bool]:
-    """The alert type, making it when the space has none: ``(type, created)``. Idempotent."""
-    existing = alert_type(space)
-    if existing is not None:
-        return existing, False
-    try:
-        made = space.create_type(ALERT_NAME, ALERT_PLURAL, ALERT_ICON, ALERT_COLOR)
-    except InvalidValue:
-        # "Alert" is taken by a type that isn't an alert type.
-        made = space.create_type(
-            _FALLBACK_NAME, _FALLBACK_PLURAL, ALERT_ICON, ALERT_COLOR
-        )
-    t, rev = space.refresh_type(made.id)
+def _bare(space: Space, name: str, plural: str) -> TypeDefinition | None:
+    """A type this module made but never finished (a failed second step): our name, plural,
+    icon and colour and none of the alert fields."""
+    for t in space.types:
+        if (
+            t.name == name
+            and t.pluralName == plural
+            and not t.readOnlyReason
+            and t.prop("alertKey") is None
+            and t.prop("severity") is None
+            and t.icon is not None
+            and t.icon.val == ALERT_ICON
+            and t.color == ALERT_COLOR
+        ):
+            return t
+    return None
+
+
+def _add_fields(space: Space, type_id: str) -> TypeDefinition:
+    t, rev = space.refresh_type(type_id)
     assert t is not None
     new = copy.deepcopy(t)
     taken = {p.key for p in new.propertyDefinitions}
@@ -119,5 +129,29 @@ def ensure_alert_type(space: Space) -> tuple[TypeDefinition, bool]:
         *(_define(spec) for spec in ALERT_FIELDS if spec.key not in taken),
     ]
     result = space.save_type(new, rev)
-    saved = space.type_by_id(made.id) or result.type
-    return saved, True
+    return space.type_by_id(type_id) or result.type
+
+
+def ensure_alert_type(space: Space) -> tuple[TypeDefinition, bool]:
+    """The alert type, making it when the space has none: ``(type, created)``. Idempotent.
+
+    Serialised, so two callers never make two types. When the second step (adding the
+    fields) failed earlier and left a bare type, the next call finishes that one.
+    """
+    with _LOCK:
+        existing = alert_type(space)
+        if existing is not None:
+            return existing, False
+        bare = _bare(space, ALERT_NAME, ALERT_PLURAL) or _bare(
+            space, _FALLBACK_NAME, _FALLBACK_PLURAL
+        )
+        if bare is not None:
+            return _add_fields(space, bare.id), True
+        try:
+            made = space.create_type(ALERT_NAME, ALERT_PLURAL, ALERT_ICON, ALERT_COLOR)
+        except InvalidValue:
+            # "Alert" is taken by a type that isn't an alert type.
+            made = space.create_type(
+                _FALLBACK_NAME, _FALLBACK_PLURAL, ALERT_ICON, ALERT_COLOR
+            )
+        return _add_fields(space, made.id), True

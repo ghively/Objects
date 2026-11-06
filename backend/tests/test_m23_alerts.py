@@ -506,3 +506,39 @@ def test_failed_apply_is_retried(space: Space, root: Path, mon: Path) -> None:
     second = watch.scan_once()
     assert second.created > 0
     assert any(k.startswith("printer-watch|") for k in _by_key(space))
+
+
+def test_ensure_alert_type_repairs_a_bare_type(space: Space) -> None:
+    real = space.save_type
+    calls = {"n": 0}
+
+    def flaky(*a, **k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError("disk says no")
+        return real(*a, **k)
+
+    space.save_type = flaky  # type: ignore[method-assign]
+    with pytest.raises(OSError):
+        alerttype.ensure_alert_type(space)
+    t, created = alerttype.ensure_alert_type(space)
+    assert created is True and t.name == "Alert"
+    assert alerttype.is_alert_type(t)
+    assert [x.name for x in space.types if "lert" in x.name] == ["Alert"]
+
+
+def test_ensure_alert_type_is_serialised(space: Space) -> None:
+    import threading
+
+    results: list = []
+    threads = [
+        threading.Thread(target=lambda: results.append(alerttype.ensure_alert_type(space)))
+        for _ in range(4)
+    ]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert len(results) == 4
+    assert sum(1 for _t, created in results if created) == 1
+    assert [x.name for x in space.types if "lert" in x.name] == ["Alert"]
