@@ -74,9 +74,27 @@ describe('AgentsSection', () => {
     render(<AgentsSection onOpenTarget={onOpenTarget} />)
     await user.click(await screen.findByRole('button', { name: AGENT_TEXT.rowMenu('Researcher') }))
     const menu = await screen.findByRole('menu')
-    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Open chat', 'Settings', 'Duplicate', 'Delete'])
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
+      'Open chat',
+      'Settings',
+      'Memory & skills',
+      'Duplicate',
+      'Delete',
+    ])
     await user.click(within(menu).getByRole('menuitem', { name: 'Settings' }))
     expect(onOpenTarget).toHaveBeenCalledWith({ kind: 'agent', id: RESEARCHER }, {})
+  })
+
+  test('test the row menu has Memory & skills after Settings and it opens the memory tab', async () => {
+    const onOpenTarget = vi.fn()
+    const user = userEvent.setup()
+    render(<AgentsSection onOpenTarget={onOpenTarget} />)
+    await user.click(await screen.findByRole('button', { name: AGENT_TEXT.rowMenu('Researcher') }))
+    const menu = await screen.findByRole('menu')
+    const labels = within(menu).getAllByRole('menuitem').map((i) => i.textContent)
+    expect(labels.indexOf('Memory & skills')).toBe(labels.indexOf('Settings') + 1)
+    await user.click(within(menu).getByRole('menuitem', { name: 'Memory & skills' }))
+    expect(onOpenTarget).toHaveBeenCalledWith({ kind: 'agent', id: RESEARCHER, tab: 'memory' }, {})
   })
 
   test('test the default agent cannot be deleted from its menu', async () => {
