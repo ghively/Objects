@@ -88,6 +88,7 @@ class ChangeEvent:
         "agents",
         "agentChats",
         "agentLearning",
+        "mcpServers",
     ]
     path: str
     """Space-relative POSIX path of the object file (for ``types``: the type id; for
@@ -96,7 +97,7 @@ class ChangeEvent:
     for ``whiteboard``: the board's ``.md``, whose canvas or ink file changed; M17: for
     ``agents`` the agent id, or ``trash``; for ``agentChats`` the agent id; M18: for
     ``agentLearning`` the agent id, with the ledger entry, review or curator run id as
-    ``version``)."""
+    ``version``; M19: for ``mcpServers`` the server id, or ``secrets``)."""
     version: str | None
     """The new file version (sha256 of its bytes); ``None`` when deleted."""
     origin: str | None = None

@@ -173,6 +173,7 @@ from . import (
     api_import,
     api_learning,
     api_learning_v1,
+    api_mcp,
     api_merge,
     api_references,
     api_search,
@@ -181,6 +182,7 @@ from . import (
     api_v1,
     api_v1_tools,
     learnhooks,
+    mcpgateway,
     media,
 )
 from .apictx import ApiContext
@@ -260,7 +262,7 @@ RESYNC_EVENTS = tuple(
     ChangeEvent(kind, "*", None)
     for kind in (
         "types", "views", "ui", "collections", "queries", "automations", "agents", "agentChats",
-        "agentLearning",
+        "agentLearning", "mcpServers",
     )
 )
 """What replaces a dropped backlog: the resync the client itself announces after a
@@ -894,6 +896,8 @@ def create_app(
     # M18: the learning contributors (idempotent) and the curator's idle clock, on the space's
     # clock so OBJECT_CLOCK_FILE moves it in tests.
     learnhooks.install()
+    # M19: the MCP gateway's run contributors, Tools tab groups and secret lookup (idempotent).
+    mcpgateway.install()
     idle = IdleClock(lambda: space.clock())
 
     @contextlib.asynccontextmanager
@@ -2154,6 +2158,8 @@ def create_app(
     # M18: the learning routes go before api_agents, whose GET /agents/{id}/chats/{chatId} would
     # otherwise take /agents/{id}/chats/search for a chat id.
     api.include_router(api_learning.router(ctx, reviews=reviews, curator=curator))
+    # M19: the MCP server, secret and tool-refresh routes (filled by the plan's T6).
+    api.include_router(api_mcp.router(ctx))
     api.include_router(api_agents.router(ctx))
     # M10: the AI assistant (status, a chat turn over SSE, saved AI chats).
     api.include_router(api_ai.router(ctx, reviews=reviews, curator=curator))

@@ -104,6 +104,8 @@ class ToolGroup:
     id: str
     label: str
     tools: tuple[ToolEntry, ...]
+    server: dict[str, Any] | None = None
+    """M19: an outside MCP server group's status (the API's ``McpGroupStatus``); None otherwise."""
 
 
 BUILTINS: tuple[ToolEntry, ...] = (
@@ -182,6 +184,7 @@ def groups_out(groups: list[ToolGroup], off: Iterable[str]) -> list[dict[str, An
                 {"id": t.id, "label": t.label, "on": t.id not in off_set, "warning": t.warning}
                 for t in g.tools
             ],
+            "server": g.server,
         }
         for g in groups
     ]

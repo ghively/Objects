@@ -90,6 +90,11 @@ import type {
   UpdateResult,
   UploadedAttachment,
   Views,
+  McpServer,
+  McpServerInput,
+  McpServersAnswer,
+  McpTestResult,
+  SecretVar,
 } from './types'
 import type { WhiteboardSettings } from './whiteboardTypes'
 
@@ -446,6 +451,7 @@ const RESYNC_EVENTS: readonly ChangeEvent[] = [
   { kind: 'agents', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'agentChats', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'agentLearning', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'mcpServers', path: RESYNC_PATH, version: null, origin: null },
 ]
 
 /**
@@ -1625,6 +1631,54 @@ export const api = {
   async chatReviews(id: string, chatId: string): Promise<ReviewStatus[]> {
     const res = await request<{ reviews: ReviewStatus[] }>(`/agents/${seg(id)}/chats/${seg(chatId)}/reviews`)
     return res?.reviews ?? []
+  },
+
+  // ---- M19: the MCP gateway ("Contract (T1)", routes filled by the plan's T6) ----
+  /** The outside MCP servers (file order) and why the list is read-only, if it is. Never a secret value. */
+  mcpServers(): Promise<McpServersAnswer> {
+    return request<McpServersAnswer>('/mcp-servers')
+  },
+
+  /** Add an MCP server. 409 `ApiError` with the server's message (name taken), 422, 423. */
+  createMcpServer(input: McpServerInput): Promise<McpServer> {
+    return request<McpServer>('/mcp-servers', json('POST', { server: input, clientId: CLIENT_ID }), spaceConflict)
+  },
+
+  /** Save an MCP server. Rejects with `RevisionConflictError` (409) or `ReadOnlyError` (423); 404, 422. */
+  saveMcpServer(id: string, input: McpServerInput, baseRevision: string): Promise<McpServer> {
+    return request<McpServer>(`/mcp-servers/${seg(id)}`, json('PUT', { server: input, baseRevision, clientId: CLIENT_ID }))
+  },
+
+  /** Delete an MCP server and its secrets. 404, 423. */
+  deleteMcpServer(id: string): Promise<{ ok: true }> {
+    return request<{ ok: true }>(`/mcp-servers/${seg(id)}${qs({ clientId: CLIENT_ID })}`, { method: 'DELETE' })
+  },
+
+  /** "Test": list the server's tools (also for a disabled server). 404; 422 when a secret is missing. */
+  testMcpServer(id: string): Promise<McpTestResult> {
+    return request<McpTestResult>(`/mcp-servers/${seg(id)}/test`, json('POST', {}))
+  },
+
+  /** The secret variables: every one set, plus every `${NAME}` an agent folder's `.mcp.json` uses. */
+  async mcpSecrets(): Promise<SecretVar[]> {
+    const res = await request<{ vars: SecretVar[] }>('/mcp-secrets')
+    return res?.vars ?? []
+  },
+
+  /** Set a secret variable; its value is never shown again. 422 (name rule, empty, too long). */
+  setMcpSecret(name: string, value: string): Promise<{ name: string; set: true }> {
+    return request<{ name: string; set: true }>(`/mcp-secrets/${seg(name)}`, json('PUT', { value, clientId: CLIENT_ID }))
+  },
+
+  /** Delete a secret variable. 404. */
+  deleteMcpSecret(name: string): Promise<{ ok: true }> {
+    return request<{ ok: true }>(`/mcp-secrets/${seg(name)}${qs({ clientId: CLIENT_ID })}`, { method: 'DELETE' })
+  },
+
+  /** List the agent's outside servers' tools again; answers the same groups as `agentTools`. 404. */
+  async refreshAgentTools(agentId: string): Promise<ToolGroup[]> {
+    const res = await request<{ groups: ToolGroup[] }>(`/agents/${seg(agentId)}/tools/refresh`, json('POST', {}))
+    return res?.groups ?? []
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */

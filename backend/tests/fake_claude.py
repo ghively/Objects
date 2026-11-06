@@ -73,6 +73,13 @@ reused). More markers and variables:
   instead of answering.
 - ``FAKE:skilltool:<name>``: a call of the CLI's own ``Skill`` tool with input
   ``{"skill": "<name>"}`` and its result (no MCP).
+
+M19 (MCP gateway). ``FAKE:mcp`` also reaches ``{"type": "http"}`` and ``{"type": "sse"}`` entries:
+their ``url`` and ``headers`` are filled with the same ``${VAR}`` rule, then the ``mcp`` client
+library's ``streamable_http_client`` (headers through ``create_mcp_http_client``) or
+``sse_client`` connects. The ``${VAR}`` rule also takes ``${VAR:-default}`` (the default when the
+variable is unset or empty). The log line also holds ``mcpServers``: the server names in the
+``--mcp-config`` (sorted).
 """
 
 from __future__ import annotations
@@ -253,9 +260,11 @@ def _builtin_calls(prompt: str, argv: list[str], run_settings: dict | None, sess
 
 
 def _fill(value, env: dict[str, str]):
-    """``${VAR}`` filled from `env` in a string, or in each string of a list or dict."""
+    """``${VAR}`` and ``${VAR:-default}`` filled from `env` in a string, or in each string of a list
+    or dict (written from the CLI's documented form, not from Object's code)."""
     if isinstance(value, str):
-        return re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", lambda m: env.get(m.group(1), ""), value)
+        return re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}",
+                      lambda m: env.get(m.group(1)) or (m.group(2) if m.group(2) is not None else ""), value)
     if isinstance(value, list):
         return [_fill(v, env) for v in value]
     if isinstance(value, dict):
@@ -331,11 +340,32 @@ def _mcp_calls(prompt: str, argv: list[str], config: dict | None, run_settings: 
                 spec = servers.get(server)
                 if _mcp_denied(name, server, argv, rules):
                     block |= {"is_error": True, "content": f"Permission to use {name} has been denied."}
-                elif not isinstance(spec, dict) or not spec.get("command"):
+                elif not isinstance(spec, dict) or not (
+                    spec.get("command") or (spec.get("type") in ("http", "sse") and spec.get("url"))
+                ):
                     block |= {"is_error": True, "content": f"No such tool available: {name}"}
                 else:
                     try:
                         client = sessions.get(server)
+                        if client is None and spec.get("type") in ("http", "sse"):
+                            env = dict(os.environ)
+                            url = str(_fill(spec["url"], env))
+                            headers = {str(k): str(v) for k, v in _fill(spec.get("headers") or {}, env).items()}
+                            if spec["type"] == "http":
+                                from mcp.client.streamable_http import streamable_http_client
+                                from mcp.shared._httpx_utils import create_mcp_http_client
+
+                                http = await stack.enter_async_context(create_mcp_http_client(headers=headers))
+                                streams = await stack.enter_async_context(
+                                    streamable_http_client(url, http_client=http))
+                            else:
+                                from mcp.client.sse import sse_client
+
+                                streams = await stack.enter_async_context(sse_client(url, headers=headers))
+                            read, write = streams[0], streams[1]
+                            client = await stack.enter_async_context(ClientSession(read, write))
+                            await client.initialize()
+                            sessions[server] = client
                         if client is None:
                             env = dict(os.environ)
                             extra = _fill(spec.get("env") or {}, env)
@@ -468,6 +498,8 @@ def main(argv: list[str]) -> int:
             "forkSession": "--fork-session" in argv,
             "noSessionPersistence": "--no-session-persistence" in argv,
             "resume": _arg(argv, "--resume"),
+            "mcpServers": sorted(config["mcpServers"]) if isinstance(config, dict)
+            and isinstance(config.get("mcpServers"), dict) else [],
         }
         with open(log, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
