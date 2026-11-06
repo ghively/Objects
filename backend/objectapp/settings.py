@@ -1,7 +1,8 @@
 """Device settings: ``<state dir>/settings.json`` (outside every space).
 
 The keys are the M7 contract's ``DeviceSettings`` plus M8's (language, decimal
-separator, time zone, backlink defaults, presentation); `read` merges the file over
+separator, time zone, backlink defaults, presentation) and M22's ``activityName`` (your
+name in a work item's Activity, 1-60 characters, one line); `read` merges the file over
 `DEFAULTS` (a missing file reads as the defaults, revision ``''``, and is not
 created). `patch` checks each key's shape, replaces the patched top-level keys,
 keeps unknown keys already in the file, and writes atomically against the
@@ -86,6 +87,8 @@ DEFAULTS: dict[str, Any] = {
     "aiHidden": False,
     "claudePath": None,
     "aiModel": None,
+    # M22: who "you" are in a work item's Activity and Work notes lines.
+    "activityName": "Gene",
 }
 
 # A model name or alias for ``claude --model``: the one rule, in `aimodels` (M16).
@@ -162,6 +165,14 @@ def _valid(key: str, value: Any) -> bool:
         return value is None or (isinstance(value, str) and 0 < len(value) <= 1024 and "\x00" not in value)
     if key == "aiModel":
         return value is None or (isinstance(value, str) and _AI_MODEL.fullmatch(value) is not None)
+    if key == "activityName":
+        return (
+            isinstance(value, str)
+            and 1 <= len(value) <= 60
+            and value.strip() != ""
+            and "\n" not in value
+            and "\r" not in value
+        )
     if key == "startupSpacePath":
         return value is None or isinstance(value, str)
     if key == "spellCheckLang":

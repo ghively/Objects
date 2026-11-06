@@ -46,7 +46,11 @@ Routes (all JSON):
   ``{query}`` (``404``, ``409 {currentRevision}``, ``422``, ``423``);
   ``DELETE /api/queries/{id}?clientId=`` -> ``{trashId}`` (restorable; ``404``, ``423``).
   Announces ``queries``. Restoring one re-creates its file under the original id
-  (``409`` when that file exists).
+  (``409`` when that file exists). M22: the built-in Tickets view (``work-tickets``) lists
+  with ``builtIn: "tickets"``; deleting it answers ``422`` ("The Tickets view is built in.").
+- M22: the work routes (``api_work``: ``/api/work/*``, ``POST /api/types/{id}/work-fields``)
+  and the agents' (``api_v1_work``: ``/api/v1/work/*``) share one `WorkService`.
+  ``GET /api/space`` also serves ``jiraSite``.
 - ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
   ``{paths, typeIds, rewritten}`` (plus ``collectionIds``, ``queryIds``, ``skipped`` for a
   collection or query entry; ``rewritten``: other files written back, announced ``changed``;
@@ -181,6 +185,8 @@ from . import (
     api_tasks,
     api_v1,
     api_v1_tools,
+    api_v1_work,
+    api_work,
     learnhooks,
     mcpgateway,
     media,
@@ -233,6 +239,7 @@ from .space import (
     Space,
 )
 from .spaceconfig import SpaceConfigProblem, space_fields
+from .spaceconfig import read as read_space_config
 from .spaceconfig import patch as patch_space_config
 from .spaces import Registry, SpaceNameProblem, create_space, normalize
 from .typedefs import has_undecodable
@@ -251,6 +258,8 @@ from .watcher import ChangeEvent, SpaceWatcher
 from .whiteboardapi import whiteboard_router
 from .whiteboardfile import sidecar_owner
 from .whiteboardstore import whiteboard_ui_problem
+from .workservice import WorkService
+from .workview import api_extra as query_api_extra
 
 __all__ = ["EventHub", "create_app"]
 
@@ -978,6 +987,7 @@ def create_app(
             "icon": fields["icon"],
             "description": fields["description"],
             "hideTaskManagement": fields["hideTaskManagement"],
+            "jiraSite": fields["jiraSite"],
             "revision": fields["revision"],
         }
 
@@ -1720,7 +1730,10 @@ def create_app(
 
     @api.get("/queries")
     def get_queries():
-        return _display_safe([q.to_api(space.query_revision(q.id)) for q in space.list_queries()])
+        return _display_safe([
+            {**q.to_api(space.query_revision(q.id)), **query_api_extra(q)}
+            for q in space.list_queries()
+        ])
 
     @api.post("/queries", status_code=201)
     def create_query(req: CreateQueryRequest):
@@ -1750,7 +1763,7 @@ def create_app(
         except (KeyError, ValueError):
             return _error(404, f"No query {query_id!r}")
         announce(ChangeEvent("queries", query_id, revision, origin=req.clientId))
-        return _display_safe({"query": q.to_api(revision)})
+        return _display_safe({"query": {**q.to_api(revision), **query_api_extra(q)}})
 
     @api.delete("/queries/{query_id}")
     def delete_query(query_id: str, clientId: str | None = Query(default=None)):
@@ -1760,6 +1773,8 @@ def create_app(
             trash_id = space.delete_query(query_id)
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:  # M22: the built-in Tickets view (before ValueError's 404)
+            return _error(422, str(exc))
         except (KeyError, ValueError):
             return _error(404, f"No query {query_id!r}")
         announce(ChangeEvent("queries", query_id, None, origin=clientId))
@@ -2155,6 +2170,22 @@ def create_app(
     api.include_router(api_agent_v1.router(ctx))
     # M18: the agent tools' learning routes, beside M17's agent v1 routes.
     api.include_router(api_learning_v1.router(ctx))
+    # M22: one work service per app; the app's work routes and the agents' (filled by T9).
+    def jira_site() -> str | None:
+        site = read_space_config(space.root)[0].get("jiraSite")
+        return site if isinstance(site, str) and site else None
+
+    def activity_name() -> str:
+        try:
+            name = read_settings()[0].get("activityName")
+        except (ReadOnly, OSError, ValueError):
+            name = None
+        return name if isinstance(name, str) and name.strip() else "Gene"
+
+    work = WorkService(space, jira_site=jira_site, user_name=activity_name)
+    app.state.work = work
+    api.include_router(api_work.router(ctx, work))
+    api.include_router(api_v1_work.router(ctx, work))
     # M18: the learning routes go before api_agents, whose GET /agents/{id}/chats/{chatId} would
     # otherwise take /agents/{id}/chats/search for a chat id.
     api.include_router(api_learning.router(ctx, reviews=reviews, curator=curator))
