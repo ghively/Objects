@@ -38,7 +38,7 @@ import threading
 import zlib
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
@@ -249,6 +249,34 @@ class HistoryStore:
             object_id = _str(_fm_of(_read(self.root / md_rel)).get("id"))
         id_key = self._id_key(object_id)
         return [id_key, self._path_key(md_rel)] if id_key else [self._path_key(md_rel)]
+
+    def key_for(self, md_rel: str, object_id: str | None) -> str:
+        """The key the object's new versions go under (its id key, else its path key).
+
+        ``object_id`` None reads the file's frontmatter ``id``. Reads only (M23 Wins)."""
+        return self._keys_for(PurePosixPath(md_rel).as_posix(), object_id)[0]
+
+    def changed_keys_by_day(
+        self, lo: datetime, hi: datetime, tz: tzinfo
+    ) -> dict[str, set[str]]:
+        """The keys with a version made in ``[lo, hi)``, by the local day (``YYYY-MM-DD`` in
+        ``tz``) it was made on. An index that can't be read is skipped. Reads only: no folder
+        is created (M23 Wins)."""
+        out: dict[str, set[str]] = {}
+        try:
+            folders = [p for p in self.dir.iterdir() if p.is_dir()]
+        except OSError:
+            return out
+        for folder in folders:
+            for entry in self._load_index(folder.name):
+                at = _parse_iso(entry.get("at", ""))
+                if at is None:
+                    continue
+                if at.tzinfo is None:
+                    at = at.replace(tzinfo=UTC)
+                if lo <= at < hi:
+                    out.setdefault(at.astimezone(tz).date().isoformat(), set()).add(folder.name)
+        return out
 
     def _load_index(self, key: str) -> list[dict[str, Any]]:
         return self._parse_index(_read(self.dir / key / _INDEX))
