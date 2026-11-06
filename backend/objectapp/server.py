@@ -185,6 +185,7 @@ from . import (
     api_graph,
     api_history,
     api_import,
+    api_importscan,
     api_learning,
     api_learning_v1,
     api_mcp,
@@ -2225,6 +2226,7 @@ def create_app(
     # M15: the import routes (`api_import`; the importers are in `importers/`).
     imports = api_import.router(ctx)
     api.include_router(imports)
+    api.include_router(api_importscan.router(ctx))  # M26: the sensitive-content scan
     api.include_router(api_automations.router(ctx, automations))
     # M11: the local API for agents and scripts (Bearer tokens) and its token routes.
     api.include_router(api_v1.router(ctx))
