@@ -28,11 +28,13 @@ import { agentStatus, workAlerts } from '@/test/mockApi'
 import boardJson from '../__fixtures__/board.json'
 import { resetWorkData } from '../state/useWorkData'
 import { loadWorkUi, useWorkUi } from '../state/useWorkUi'
-import { resetWorkViews } from '../views/registry'
+import { resetWorkViews, workViews } from '../views/registry'
 import { WorkPage } from './WorkPage'
 import { clearWorkSearch } from './WorkTopBar'
 
 const mocked = vi.mocked(api)
+// Read before any beforeEach resets the registry: the views the page's glob registered at import (M24).
+const registeredAtImport = workViews().map((v) => ({ id: v.id, label: v.label, key: v.key }))
 const board = boardJson as unknown as WorkBoard
 const NOW = new Date('2026-11-05T10:00:00.000Z')
 
@@ -175,5 +177,9 @@ describe('WorkPage', () => {
     expect(mocked.workCaptures).toHaveBeenCalledWith('needsYou')
     expect(mocked.workWins).toHaveBeenCalled()
     expect(mocked.generalFloor).toHaveBeenCalled()
+  })
+
+  test('test WorkPage lists Captures (M24 registers it through the glob)', () => {
+    expect(registeredAtImport).toContainEqual({ id: 'captures', label: 'Captures', key: null })
   })
 })

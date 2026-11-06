@@ -1,6 +1,6 @@
 # Handoff: pick up Object
 
-Updated 2026-11-06 (after the merge to `master`). You are continuing "Object", a local, Markdown-backed notes app with its own object model. A space keeps its metadata in `.object/` and its cache in `.object-cache/`. Read this file, then `CLAUDE.md` (rules), then `CONTINUE.md` (process). The long history and every gate's numbers live in `docs/superpowers/plans/remaining-work.md`.
+Updated 2026-11-06 (after M24; M1-M24 are built). You are continuing "Object", a local, Markdown-backed notes app with its own object model. A space keeps its metadata in `.object/` and its cache in `.object-cache/`. Read this file, then `CLAUDE.md` (rules), then `CONTINUE.md` (process). The long history and every gate's numbers live in `docs/superpowers/plans/remaining-work.md`.
 
 ## Where things stand
 
@@ -9,6 +9,8 @@ Updated 2026-11-06 (after the merge to `master`). You are continuing "Object", a
 - **Not done:** the track's full gate was stopped mid-run before the merge; M19-M21 and M22 were quick-checked only; **M23's integrate task, review and fix pass never ran** (it has no `m23-acceptance.md` or `scripts/m23_acceptance.py`; its last commit, the Now view, was written with no test run); M24 is not built. Gene's hand-checks for M1-M23 are all unticked.
 
 Milestones and plans (`docs/superpowers/plans/`): M16 chat polish and model picker, M17 agents and tools, M18 learning, M19 MCP gateway, M20 A2A and delegation, M21 schedules (designs: `specs/2026-11-05-agents-design.md`); M22 work model, M23 Work section, M24 brain dump and agent loop (design: `specs/2026-11-05-work-dashboard-design.md`). Each built milestone has `mNN-acceptance.md` (Gene's hand-checks, unticked, plus deviations) and `scripts/mNN_acceptance.py`.
+
+**Update (M24):** M23's integrate task has since been done (`scripts/m23_acceptance.py`, `m23-acceptance.md`, the `fix(m23)` commits) and M24 is built and integrated on `ccr-381ccf85-cjstne` (`scripts/m24_acceptance.py` PASS; `m24-acceptance.md` lists its deviations and 12 hand-checks). **M1-M24 are all built.** What is left: one review of M19-M24, one fix pass, the final full gate (a Linux run was in progress on 2026-11-06; numbers go in `remaining-work.md`), merging the branch to `master`, and Gene's hand-checks. Steps 2, 3 and 5 below are therefore done or reduced to that review and gate.
 
 ## What to do next, in order
 
