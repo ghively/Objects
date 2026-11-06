@@ -12,9 +12,12 @@ export interface SortOptionInfo {
 
 const DATE_KINDS = new Set<PropertyType>(['datetime', 'datetimeSimple', 'entity_createdAt', 'entity_lastUpdated'])
 
-/** The sort options a kind offers; `entity_type` is not sortable. */
+/** M22: steps and floor items are not sortable (a List sorts by its first item). */
+const UNSORTABLE = new Set<PropertyType>(['entity_type', 'steps', 'floorItems'])
+
+/** The sort options a kind offers; `entity_type`, `steps` and `floorItems` are not sortable. */
 export function SORT_OPTIONS(kind: PropertyType): SortOptionInfo[] {
-  if (kind === 'entity_type') return []
+  if (UNSORTABLE.has(kind)) return []
   if (DATE_KINDS.has(kind)) {
     return [
       { key: 'ascending', label: 'Oldest first' },
@@ -84,6 +87,9 @@ function sortKey(row: Row, sort: Sort, ctx: FilterCtx): Key {
     case 'files':
       // A list: by its first file's name.
       return text(Array.isArray(v) && typeof v[0] === 'string' ? fileName(v[0]) : '')
+    case 'textList':
+      // M22: a List by its first item.
+      return text(Array.isArray(v) && typeof v[0] === 'string' ? v[0] : '')
     default:
       return typeof v === 'string' ? text(v) : EMPTY_KEY
   }
@@ -149,7 +155,7 @@ function createdMs(row: Row): number | null {
 export function applySorts(rows: Row[], sorts: Sort[], ctx: FilterCtx): Row[] {
   const active = sorts.filter((s) => {
     const kind = findDef(ctx.types, s.propertyId, s.structureId, ctx.viewTypeIds)?.type
-    return !!kind && kind !== 'entity_type'
+    return !!kind && !UNSORTABLE.has(kind)
   })
   const keyed = rows.map((row, i) => ({ row, i, keys: active.map((s) => sortKey(row, s, ctx)) }))
   keyed.sort((p, q) => {
