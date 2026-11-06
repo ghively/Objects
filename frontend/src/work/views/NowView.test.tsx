@@ -137,6 +137,15 @@ describe('NowView', () => {
     expect(useWorkUi.getState().focusLine).toBeNull()
   })
 
+  test('test a selected line missing from the focus data shows no work', () => {
+    useWorkUi.getState().setFocusLine(4)
+    show({ focus: linkedFocus([{ text: '[[Scanner rollout]]', paths: ['Projects/Scanner rollout.md'] }]) })
+    expect(card()).toBeNull()
+    expect(screen.queryByText('Printer jams on line 3')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Show everything again' }))
+    expect(useWorkUi.getState().focusLine).toBeNull()
+  })
+
   test('test the focus empty states for a line linking nothing or nothing of yours', () => {
     useWorkUi.getState().setFocusLine(1)
     const { unmount } = show({ focus: linkedFocus([{ text: 'Think about labels', paths: [] }]) })

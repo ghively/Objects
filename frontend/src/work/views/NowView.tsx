@@ -30,7 +30,7 @@ function Empty({ data }: { data: WorkDataState }): JSX.Element {
   return (
     <div data-now-empty="" className="flex flex-col items-start gap-3 rounded-lg border border-line p-6">
       <p className="text-[15px] text-fg">{text}</p>
-      {line && filter ? (
+      {n !== null ? (
         <button
           type="button"
           className="h-7 rounded border border-line px-2 text-[12px] text-fg hover:bg-hover"
