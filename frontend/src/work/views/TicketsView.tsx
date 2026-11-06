@@ -1,7 +1,13 @@
-// M23 T1 stub: the Tickets view (T11 fills it). Renders its name.
+// M23 Task 11: the Tickets view: M22's Tickets query page (`work-tickets`) embedded, so its list,
+// board (by Desk status) and table layouts work here.
 import type { JSX } from 'react'
+import { QueryPage } from '@/queries/QueryPage'
+import type { WorkDataState } from '../state/useWorkData'
 
-/** The Tickets view (stub). `WorkViewProps` (T9's registry) is `{ data, now }`. */
-export function TicketsView(_p: { data: unknown; now: Date }): JSX.Element {
-  return <div data-work-stub="TicketsView">TicketsView</div>
+export function TicketsView(_p: { data: WorkDataState; now: Date }): JSX.Element {
+  return (
+    <div data-work-view="tickets" className="min-h-0">
+      <QueryPage id="work-tickets" />
+    </div>
+  )
 }
