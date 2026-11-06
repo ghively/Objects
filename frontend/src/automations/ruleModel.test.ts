@@ -1,15 +1,20 @@
 import { describe, expect, test } from 'vitest'
 import type { AutomationRule } from '@/api/types'
-import { automationRule, automationRun, collection, propertyDef, typeDef } from '@/test/mockApi'
+import { agentSchedule, automationRule, automationRun, collection, propertyDef, typeDef } from '@/test/mockApi'
 import {
+  RULE_TEXT,
+  actionKindsFor,
+  agentScheduleInput,
   cleanRule,
   defaultStart,
+  isAgentSchedule,
   lastRunText,
   newRuleInput,
   parseTime,
   repeatText,
   ruleInputOf,
   ruleProblem,
+  schedulesOf,
   showTime,
   triggerOfKind,
   triggerSummary,
@@ -191,5 +196,50 @@ describe('before saving', () => {
       propertyDefinitions: [STATUS, propertyDef({ id: 'b', key: 'b', type: 'button' }), propertyDef({ id: 'c', key: 'createdAt', type: 'entity_createdAt' })],
     })
     expect(writableDefs([t, TASK]).map((d) => d.key)).toEqual(['status'])
+  })
+})
+
+describe('M21 agent schedules', () => {
+  const RESEARCHER = '01JC7ZK3T9Q4M2X8B5N6R1V0WE'
+
+  test('test isAgentSchedule and schedulesOf', () => {
+    const weekly = agentSchedule({ id: 'b', name: 'weekly review', actions: [{ kind: 'runAgent', agentId: RESEARCHER, prompt: 'Hi', model: null }] })
+    const daily = agentSchedule({ id: 'a', name: 'Daily digest', actions: [{ kind: 'runAgent', agentId: RESEARCHER, prompt: 'Sum up', model: null }] })
+    const twin = agentSchedule({ id: 'c', name: 'Daily digest', actions: [{ kind: 'runAgent', agentId: RESEARCHER, prompt: 'Again', model: null }] })
+    const other = agentSchedule({ id: 'd', name: 'Other' })
+    const plain = automationRule({ id: 'e', trigger: { kind: 'schedule', repeat: 'every day', time: '09:00', start: '2026-11-05' }, actions: [{ kind: 'notify', title: '', body: '' }] })
+    expect(isAgentSchedule(weekly)).toBe(true)
+    expect(isAgentSchedule(other)).toBe(true)
+    expect(isAgentSchedule(plain)).toBe(false)
+    expect(other.actions[0]).toMatchObject({ kind: 'runAgent', agentId: 'assistant' })
+    expect(other.trigger.kind).toBe('schedule')
+    expect(schedulesOf([weekly, plain, twin, other, daily], RESEARCHER).map((r) => r.id)).toEqual(['a', 'c', 'b'])
+    expect(schedulesOf([weekly, plain, other], 'assistant').map((r) => r.id)).toEqual(['d'])
+  })
+
+  test('test agentScheduleInput builds one runAgent action with empty conditions', () => {
+    const trigger = { kind: 'schedule' as const, repeat: 'every week on monday', time: '09:00', start: '2026-11-09' }
+    const input = agentScheduleInput(RESEARCHER, 'Weekly review', 'Review {date:YYYY-MM-DD}', trigger, null)
+    expect(input).toEqual({
+      name: 'Weekly review',
+      description: '',
+      enabled: true,
+      trigger,
+      conditions: { type: 'filterGroup', operator: 'and', elements: [] },
+      actions: [{ kind: 'runAgent', agentId: RESEARCHER, prompt: 'Review {date:YYYY-MM-DD}', model: null }],
+      templateRepeat: null,
+    })
+    expect(agentScheduleInput(RESEARCHER, 'x', 'y', trigger, 'haiku', false)).toMatchObject({
+      enabled: false,
+      actions: [{ kind: 'runAgent', model: 'haiku' }],
+    })
+  })
+
+  test('test runAgent is never offered as an action', () => {
+    expect(actionKindsFor('schedule')).not.toContain('runAgent')
+    expect(actionKindsFor('button')).not.toContain('runAgent')
+    expect(RULE_TEXT.actions.runAgent).toBe('Run an agent')
+    expect(RULE_TEXT.runsAgent('Researcher')).toBe('Runs “Researcher”')
+    expect(RULE_TEXT.runsMissingAgent).toBe("Runs an agent that isn't listed")
   })
 })

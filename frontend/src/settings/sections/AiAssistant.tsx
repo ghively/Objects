@@ -1,10 +1,11 @@
 // M10 "AI Assistant": the catalogued "Hide AI features" switch, plus where the Claude Code CLI is
-// (empty = found on PATH), the model passed to it (empty = Claude Code's default) and whether it
-// answers (`GET /api/ai/status`) with a Recheck button. Every value is a device setting
-// (`useSettings().patch`); the two text fields save on blur (and on Enter).
+// (empty = found on PATH), the default agent's model (M16: a picker; Default = Claude Code's own
+// default) and whether it answers (`GET /api/ai/status`) with a Recheck button. Every value is a
+// device setting (`useSettings().patch`); the path field saves on blur (and on Enter).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import type { AiStatus, DeviceSettings } from '@/api/types'
+import { ModelPicker } from '@/ai/ModelPicker'
 import { Icon } from '@/components/Icon'
 import { useSettings } from '@/settings/useSettings'
 import { SaveError, SecondaryButton, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
@@ -18,8 +19,7 @@ export const AI_ASSISTANT_TEXT = {
   pathHelp: 'Leave empty to use the claude command found on your PATH.', // our string
   pathPlaceholder: 'claude (from PATH)', // our string
   model: 'Model', // our string
-  modelHelp: "Leave empty to use Claude Code's default model.", // our string
-  modelPlaceholder: 'Default', // our string
+  modelHelp: "The default agent's model. Default uses Claude Code's own default.", // our string
   status: 'Status', // our string
   checking: 'Checking…', // our string
   ready: (version: string | null, path: string | null) =>
@@ -135,7 +135,7 @@ export function AiAssistantSection() {
         <TextSetting label={T.path} placeholder={T.pathPlaceholder} value={settings.claudePath} onSave={(v) => patch({ claudePath: v }, true)} />
       </SettingGroup>
       <SettingGroup title={T.model} help={T.modelHelp}>
-        <TextSetting label={T.model} placeholder={T.modelPlaceholder} value={settings.aiModel} onSave={(v) => patch({ aiModel: v })} />
+        <ModelPicker value={settings.aiModel} onChange={(v) => patch({ aiModel: v })} defaultLabel="Default" ariaLabel="Model" />
       </SettingGroup>
       <SettingGroup title={T.status}>
         <div className="flex items-start gap-3">

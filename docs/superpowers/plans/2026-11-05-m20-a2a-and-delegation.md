@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Written 2026-11-05 against `master` at `0f4fde1`, to be built after M17 (`2026-11-05-m17-agents-and-tools.md`), M18 (`2026-11-05-m18-learning.md`) and M19 (MCP gateway) are merged. Before the build, one reconcile pass checks every M17/M18/M19 name this plan consumes against the code actually built. Every label and number not quoted from the spec is "our string" / "our number".
+Written 2026-11-05 against `master` at `0f4fde1`, to be built after M17 (`2026-11-05-m17-agents-and-tools.md`), M18 (`2026-11-05-m18-learning.md`) and M19 (MCP gateway) are merged. Reconciled on 2026-11-06 against `feat/m16-m24` at `ce56d85` (M16-M19 built): every M17/M18/M19 name this plan consumes was checked against the code, and the drifts were fixed in place (M19 installs its contributors through an `install()` that `create_app` calls, so M20 does too; `TokenStore.ephemeral` is an instance method answering `(record, secret)`; `ai.Turn` takes every field; `GET /agents/{id}/tools` lives in `api_agents.py`, now T5's). Every label and number not quoted from the spec is "our string" / "our number".
 
 **Goal.** Gene adds remote agents by their Agent Card URL (or base URL), with an optional bearer token or header. They are listed in the Agents section with a small "remote" mark, and he chats with them in the same chat panel. Object uses A2A's streaming method when the card offers streaming, else the plain send method. It shows text, file artifacts as attachments and data artifacts as code blocks, keeps the A2A context id across turns, and shows an input-required question as the agent's reply. Local agents get three tools: `remote_agents_list`, `remote_agent_call` (with a timeout) and `delegate`. `delegate` hands a task to a local or remote agent and gets back a summary of at most 24,000 characters. Delegation is flat (one level), at most 3 run at once per turn, the delegated agent never writes the caller's memory, and the delegated chat is kept in the other agent's chats, marked as delegated.
 
@@ -16,7 +16,7 @@ Written 2026-11-05 against `master` at `0f4fde1`, to be built after M17 (`2026-1
 - `delegation.py` runs a delegated turn:
   - a local target runs headless through `headless.run_chat` (new in M20, below; M21's schedules call it too), which uses M17's `agentrun.build_run` and `ai.run_turn`;
   - a remote target goes through `remotechat.call_remote`;
-  - it enforces the limits and registers two `agentrun` contributors, "delegation" and "fence-remote".
+  - it enforces the limits, and its `install()` (idempotent, called once by `server.create_app` after `mcpgateway.install()`, as M18's `learnhooks.install` and M19's `mcpgateway.install` are) registers two `agentrun` contributors, "delegation" and "fence-remote".
 - `api_remote_agents.py` holds the app's remote-agent routes. `api_agent_a2a_v1.py` holds the `/api/v1/agent/*` routes behind the three tools. `agent_tools_a2a.py` registers the tools in M17's `object-agent` MCP server.
 - Front end:
   - `agents/AddRemoteAgentDialog.tsx`, the remote Profile and Card tabs, and a `RemoteMark` badge;
@@ -287,8 +287,9 @@ STATE_TERMINAL: frozenset[str]; STATE_INTERRUPTED: frozenset[str]
 @dataclass
 class AgentRecord:                         # M17 fields unchanged, plus:
     kind: Literal["local", "remote"] = "local"
-    # to_api(settings) adds "kind" and, for a remote record, "remote": RemoteInfo (below);
-    # a remote record answers model None, toolsOff [], learning None, mcpServers []
+    # to_api(settings) answers the record's "kind" (M17 hard-codes "local") and "remote": RemoteInfo (below)
+    # for a remote record, None for a local one; a remote record answers model None, toolsOff [], learning None,
+    # mcpServers []
 
 class AgentRegistry:                       # M17 methods unchanged, plus:
     def create_remote(self, card: a2a.Card, card_raw: dict[str, Any], card_url: str, auth: AuthInput,
@@ -324,7 +325,8 @@ M19's `secretstore.SecretStore` (M19 plan, Contract) is consumed only through th
 ### TypeScript (T1, `frontend/src/api/types.ts`)
 
 ```ts
-// M17's Agent: kind: 'local' | 'remote'; remote: RemoteInfo | null (null for local agents)
+// M17's Agent (today kind: 'local' only, no remote field): T1 widens it to kind: 'local' | 'remote' and adds
+// remote: RemoteInfo | null (null for local agents); mockApi's agent() gets remote: null
 export interface RemoteSkill { id: string; name: string; description: string; tags: string[]; examples: string[] }
 export interface RemoteCard {
   name: string; description: string; version: string | null; provider: string | null
@@ -381,7 +383,7 @@ export interface RemoteAttachment {
 
 ### The chat route and remote agents (T4, one hook in M17's `api_ai.py`)
 
-After M17's agent lookup in `POST /api/ai/chat`, a record with `kind == "remote"` returns `remotechat.respond(...)`. This happens before the CLI is looked for, so a remote chat works without Claude Code installed (our call).
+After M17's agent lookup in `POST /api/ai/chat` (and its missing-folder and read-only checks), a record with `kind == "remote"` returns `remotechat.respond(...)`. This happens before the route's `claude is None` check (`ai.NOT_FOUND`), so a remote chat works without Claude Code installed (our call). The route's earlier checks (the Hide AI features 403, the context and text caps, `aimodels.clean_model`, the excluded-`block` check) stay in front of it unchanged.
 
 - `mode != "chat"`: one `error` event, "Remote agents can only chat." No call is made.
 - `contextPaths` non-empty and `contextNoticeAt` null: **428** `{"detail": "Confirm that context leaves this computer first.", "agentId", "host"}`. No call is made.
@@ -496,7 +498,7 @@ async def delegate(ctx: ApiContext, registry: AgentRegistry, caller: AgentRecord
     # always: the token dropped, the chat id removed from DELEGATED_CHATS, LIMITER.leave
 ```
 
-**Contributors registered at import** (orders from M17's registry of contributor orders):
+**Contributors registered by `delegation.install()`** (idempotent; `server.create_app` calls it once after `mcpgateway.install()`, as M18 and M19 do; orders from M17's registry of contributor orders):
 
 - `"delegation"` at **64** (after M17's `"tools"` 60 and M19's `"gateway-tools"` 62, before M18's `"review-tools"` 68).
   - When `scope.purpose == "delegate"`: `mcp__object-agent__delegate` and `mcp__object-agent__remote_agent_call` are removed from `allowed` and added to `disallowed`.
@@ -530,21 +532,26 @@ async def run_chat(target: AgentRecord, *, settings: dict[str, Any], space_root:
                    timeout: float, header: dict[str, Any] | None = None,
                    stop: Callable[[], Awaitable[bool]] | None = None,
                    announce: Callable[[ChangeEvent], None] | None = None) -> HeadlessResult
-    # 1. the default agent's folder via AgentRegistry.ensure_default (its first write); a nesting problem raises
-    #    agentrun.RunRefused before anything is written (callers map it to their own message)
+    # 1. claude = ai.find_claude(settings.get("claudePath")); None raises agentrun.RunRefused(ai.NOT_FOUND).
+    #    The default agent's folder via AgentRegistry.ensure_default (its first write); a nesting problem raises
+    #    agentrun.RunRefused before anything is written (a build_run check, as api_ai's check() does; callers map
+    #    it to their own message)
     # 2. chat_id = transcripts.new_chat_id(); transcripts.start(..., title=title, **(header or {})); the user line
-    # 3. token = TokenStore.ephemeral(target.name, "read-write", agent=target.id, chat=chat_id, purpose=purpose)
-    # 4. RunScope(target, space_root, space_name, api_url, secret, write=True, chat_id=chat_id, purpose=purpose,
-    #             state=appstate.state_dir())
-    # 5. ai.Turn(mode="chat", prompt_fresh=ai.build_prompt("chat", prompt, ai.ContextPack(), None, []), session_id=None,
+    # 3. record, secret = TokenStore(space_root).ephemeral(target.name, "read-write", agent=target.id, chat=chat_id,
+    #                                                    purpose=purpose)
+    # 4. scope = agentrun.RunScope(agent=target, space_root=space_root, space_name=space_name, api_url=api_url,
+    #             token=secret, write=True, chat_id=chat_id, purpose=purpose, state=appstate.state_dir())
+    # 5. ai.Turn(claude=claude, mode="chat", prompt_resume=None,
+    #            prompt_fresh=ai.build_prompt("chat", prompt, ai.ContextPack(), None, [], intro=False),
+    #            session_id=None, model=model, api_url=api_url, token=secret,
     #            timeout=timeout,   # M17's Turn.timeout: run_turn's own deadline is this run's, not M10's 300 s
-    #            run=lambda resume: agentrun.build_run(scope, claude=<ai.find_claude(settings)>, model=model, resume=resume))
+    #            run=lambda resume: agentrun.build_run(scope, claude=claude, model=model, resume=resume))
     # 6. ai.run_turn (its deadline is `timeout`; reaching it ends the result "stopped"); every event also goes to
     #    M18's reviews.watch(event, folder=, memo_key=<token id>);
     #    stop() polled every 0.5 s: True closes the run (kills its process tree)
     # 7. the tool lines and the assistant line (stopped: true when cut short) or the error line appended in one write,
     #    as M17's chat route does; ChangeEvent("agentChats", target.id, chat_id) announced
-    # 8. finally: the token dropped and agentskills.MEMO.forget(<token id>)
+    # 8. finally: TokenStore.drop_ephemeral(secret) and agentskills.MEMO.forget(record.id)
 ```
 
 `header` goes to `transcripts.start` as keyword arguments: M20's `delegated`, `delegated_from` and `from_chat`; M21 adds `schedule`. No review is started: the purposes callers pass (`"delegate"`, `"schedule"`) are never in `REVIEW_PURPOSES`, and `run_chat` never calls `ReviewRunner.after_turn`.
@@ -604,12 +611,13 @@ Every commit message below ends with the trailer `Co-Authored-By: Claude Opus 5.
   - stubs:
     - `backend/objectapp/a2a.py` (the dataclasses, `A2AError`, the state sets and `parse_card`'s signature raising `NotImplementedError`);
     - `backend/objectapp/api_remote_agents.py` and `backend/objectapp/api_agent_a2a_v1.py` (`def router(ctx) -> APIRouter`, no routes);
-    - `backend/objectapp/agent_tools_a2a.py` (`register(server, client)` that registers nothing).
+    - `backend/objectapp/agent_tools_a2a.py` (`register(server, client)` that registers nothing);
+    - `backend/objectapp/delegation.py` (an `install()` that registers nothing yet; T6 fills the module).
   - `backend/tests/fake_a2a.py`, `backend/tests/test_m20_contract.py`, `backend/tests/test_m20_live_cli.py`
   - `docs/superpowers/plans/m20-spike.md`
 - Modify:
   - `pyproject.toml` and `uv.lock`: `httpx>=0.28.1` moves to `[project] dependencies` (`uv add httpx`; the dev entry is removed).
-  - `backend/objectapp/server.py`: mount the two stub routers.
+  - `backend/objectapp/server.py`: mount the two stub routers (`api_agent_a2a_v1` after `api_learning_v1`, `api_remote_agents` before `api_agents`) and call `delegation.install()` right after `mcpgateway.install()`.
   - `backend/objectapp/toolcatalog.py`: the three `AGENT_TOOLS` names and labels.
   - `backend/objectapp/agent_mcp.py`: `TOOL_MODULES` gains `"objectapp.agent_tools_a2a"`.
   - `backend/tests/fake_claude.py`: `FAKE:long:<n>`, `FAKE:echo-env`.
@@ -638,13 +646,13 @@ Every commit message below ends with the trailer `Co-Authored-By: Claude Opus 5.
     - `toolcatalog.AGENT_TOOLS` holds the three names in order, right after M18's `session_search` (M21 appends `schedule_manage` after them, so the test doesn't assume they are last);
     - the "object-agent" group lists them with the three labels, all `default_on`;
     - `"objectapp.agent_tools_a2a" in agent_mcp.TOOL_MODULES`.
-  - `test_stub_routers_mounted`: `create_app` imports both new routers.
+  - `test_stub_routers_mounted`: `create_app` imports both new routers and calls `delegation.install()`.
   - `test_fake_a2a_card_and_echo`:
     - `FakeA2A(token="t").start()` serves the card at `CARD_PATH`: `supportedInterfaces[0]` is `{"url": ".../a2a", "protocolBinding": "JSONRPC", "protocolVersion": "1.0"}`, and `capabilities.streaming` is true;
     - a `SendMessage` without the token is 401; with it, the result is `{"task": {... "status": {"state": "TASK_STATE_COMPLETED"}}}` with "Echo: hi";
     - no part in any answer has a `kind` key.
   - `test_fake_claude_long`: `FAKE:long:30000` gives a `done.text` of 30,000 characters.
-  - `test_ai_modules_use_no_network_client_m20`: a static check that none of `remotemodel`, `remotesecrets`, `remotechat`, `delegation`, `headless`, `api_remote_agents` or `api_agent_a2a_v1` imports `httpx`, `requests`, `urllib.request`, `socket` or `http.client`. `a2a` is the only one allowed.
+  - `test_ai_modules_use_no_network_client_m20`: a static check that none of `remotemodel`, `remotesecrets`, `remotechat`, `delegation`, `headless`, `api_remote_agents` or `api_agent_a2a_v1` imports `httpx`, `requests`, `urllib.request`, `socket` or `http.client` (a module a later task creates is skipped while its file is absent). `a2a` is the only one allowed.
   - Front end: `npx tsc -b --noEmit`; `client.m20.test.ts` "test the remote agent methods call their routes".
 - [ ] **Step 2:** run them; they fail.
 - [ ] **Step 3:** implement the Contract signatures and both fakes.
@@ -847,6 +855,7 @@ Every commit message below ends with the trailer `Co-Authored-By: Claude Opus 5.
 - Fill: `backend/objectapp/api_remote_agents.py`
 - Create: `backend/tests/test_m20_remote_routes.py`
 - Modify (M18's files, for remote ids only): `backend/objectapp/api_learning.py` (its routes answer 422 for a remote agent) and `backend/objectapp/curator.py` (`tick` skips remote records)
+- Modify (M17's file, for remote ids only): `backend/objectapp/api_agents.py` (`GET /agents/{id}/tools` answers `{groups: []}` for a remote agent; nothing else changes)
 
 **Interfaces.**
 
@@ -900,26 +909,26 @@ Every commit message below ends with the trailer `Co-Authored-By: Claude Opus 5.
 
 **Files:**
 
-- Create: `backend/objectapp/headless.py`, `backend/objectapp/delegation.py`, `backend/tests/test_m20_delegation.py`, `backend/tests/test_m20_agent_tools.py`
-- Fill: `backend/objectapp/api_agent_a2a_v1.py`, `backend/objectapp/agent_tools_a2a.py`
+- Create: `backend/objectapp/headless.py`, `backend/tests/test_m20_delegation.py`, `backend/tests/test_m20_agent_tools.py`
+- Fill: `backend/objectapp/delegation.py` (T1's stub), `backend/objectapp/api_agent_a2a_v1.py`, `backend/objectapp/agent_tools_a2a.py`
 
 **Interfaces.**
 
 - Consumes:
-  - M17's `agentrun` (`RunScope`, `build_run`, `add_contributor`, `rule_path`, `RunRefused`), `ai.Turn`/`ai.run_turn`, `TokenStore.ephemeral`/`drop_ephemeral`, `v1guard.agent_auth`, `transcripts`, `agents.effective_model`, `settings.read`;
+  - M17's `agentrun` (`RunScope`, `build_run`, `add_contributor`, `contributors`, `rule_path`, `RunRefused`), `ai.Turn`/`ai.run_turn`/`ai.build_prompt`/`ai.find_claude`, `TokenStore(root).ephemeral` (answers `(record, secret)`) / `TokenStore.drop_ephemeral(secret)`, `v1guard.V1Guard`/`agent_auth`/`guarded`, `transcripts`, `agents.effective_model`, `settings.read`;
   - M18's `reviews.watch`, `agentskills.MEMO` and the token's `purpose` field;
   - `mcp_server.ObjectClient`/`ApiError`;
   - T3's `find_by_name`, `remote_folders` and `transcripts.start` kwargs;
   - `remotechat.call_remote` (T4's signature from the Contract; until T4 lands, the tests patch it with a double that records its arguments).
 - Produces:
   - `delegate`, `DelegationResult`, `LIMITER`, `DELEGATED_CHATS`, `is_delegated_chat`, `DELEGATE_PROMPT`;
-  - the contributors `"delegation"` (64) and `"fence-remote"` (75);
+  - `delegation.install()` registering the contributors `"delegation"` (64) and `"fence-remote"` (75);
   - `headless.run_chat` and `HeadlessResult` (M21 consumes them);
   - the three `/api/v1/agent/*` routes and the three MCP tools.
 
 **Steps.**
 
-- [ ] **Step 1: failing tests.** The setup is the synthetic space, the fake `claude` (`claudePath`), a local agent "Researcher" (`AgentRegistry.create`), and the caller's turn token minted as M17's chat route does: `TokenStore.ephemeral("Assistant", "read-write", agent="assistant", chat=<caller chat ULID>)`. Requests go to `/api/v1/agent/*` with that token, as the MCP tool would send them.
+- [ ] **Step 1: failing tests.** The setup is the synthetic space, the fake `claude` (`claudePath`), a local agent "Researcher" (`AgentRegistry.create`), and the caller's turn token minted as M17's chat route does: `record, secret = TokenStore(space.root).ephemeral("Assistant", "read-write", agent="assistant", chat=<caller chat ULID>)`. Requests go to `/api/v1/agent/*` with that token, as the MCP tool would send them.
   - `test_m20_delegation.py`:
     - `test_delegate_to_a_local_agent`:
       - `POST /api/v1/agent/delegate {agent: "researcher", goal: "Find rack notes", context: "Gene asked"}` answers `{agent: {id, name: "Researcher", kind: "local"}, chatId, state: "completed", summary, cut: false}`;
@@ -961,7 +970,7 @@ Every commit message below ends with the trailer `Co-Authored-By: Claude Opus 5.
       - the run's token `agent` is Researcher's id;
       - the test calls M18's `memory` tool through `agent_mcp.build_server(ObjectClient(<url>, <delegated token>, http=TestClient))` with M18's signature `memory(action="add", target="memory", content="delegated note")`. Researcher's `MEMORY.md` changes and the caller's hashes are unchanged.
     - `test_remote_folders_are_fenced`: any agent's run has `Read(<rp remote folder>/**)` and `Edit(<rp remote folder>/**)` in `deny_rules`, each once. With the fake's `FAKE:read:<remote folder>/.object-agent/sessions/<chat>.jsonl`, the result is the denial.
-    - `test_contributor_orders`: in `agentrun.contributors()`, "delegation" is at 64 (after "tools" and "gateway-tools", before "review-tools") and "fence-remote" at 75 (after "fence"); no two contributors share an order.
+    - `test_contributor_orders`: after `delegation.install()` (twice: idempotent), in `agentrun.contributors()`, "delegation" is at 64 (after "tools" and "gateway-tools", before "review-tools") and "fence-remote" at 75 (after "fence"); no two contributors share an order.
   - `test_m20_agent_tools.py` (MCP server built with `agent_mcp.build_server` over a `TestClient`):
     - `test_tools_listed`: the server lists `agent_info` (M17), M18's tools when present, and `remote_agents_list`, `remote_agent_call` and `delegate`, with these descriptions:
       - `remote_agents_list`: "List the remote (A2A) agents you can call, with what their cards say they do."
@@ -1002,7 +1011,7 @@ Every commit message below ends with the trailer `Co-Authored-By: Claude Opus 5.
 **Interfaces.**
 
 - Consumes:
-  - `useAgents`; the T1 client methods (`previewRemoteAgent`, `addRemoteAgent`, `saveRemoteAgent`, `refreshRemoteAgent`) and M17's (`deleteAgent`, `unregisterAgent`, `agentChats`);
+  - `useAgents`; the T1 client methods (`previewRemoteAgent`, `addRemoteAgent`, `saveRemoteAgent`, `refreshRemoteAgent`) and M17's (`deleteAgent`, `unregisterAgent`, `agentChats`, `revealAgentFolder`);
   - `IconPicker`; `ChatMarkdown` is **not** used for card text (plain text only).
 - Produces:
   - `AddRemoteAgentDialog(props: { open: boolean; onOpenChange(o: boolean): void })`
@@ -1038,7 +1047,7 @@ Every commit message below ends with the trailer `Co-Authored-By: Claude Opus 5.
     - "None", "Bearer token: set" or "Header {name}: set". When the token is missing: "Token: needed".
     - "Replace token…" opens the auth fields in place, with "Save" and "Cancel". The saved value is never shown again.
   - "Context sent": "Not yet", or "First sent {date}" (from `contextNoticeAt`).
-  - "Folder", with "Open folder" (M17's reveal) and "Remove from list".
+  - "Folder", with "Open folder" (M17's `revealAgentFolder`) and "Remove from list".
 - **Card tab.** What the Agent Card says (spec section 1), all as plain text:
   - description;
   - provider and version;
@@ -1091,7 +1100,7 @@ Every commit message below ends with the trailer `Co-Authored-By: Claude Opus 5.
 
 **Behaviour and strings** (ours unless quoted from the spec):
 
-- **Header.** With a remote agent, the model picker is hidden (`modelHidden`), since a remote agent has no model of Object's. The agent picker shows the remote mark. There is no "Learning…" line, and M18's `…` menu has no "Learn from this chat".
+- **Header.** With a remote agent, the model picker is hidden (`modelHidden`), since a remote agent has no model of Object's. The agent picker shows the remote mark. There is no "Learning…" line (`LearningLine`), and the panel passes no `menu` (M18's `ChatMenu`, whose one item is "Learn from this chat") to `AiChatHeader`, so `ChatMenu.tsx` doesn't change.
 - **Context notice** (spec: "the first time Gene sends context to a remote agent, a notice says so (once per remote agent)").
   - When the agent is remote, the turn has context chips and `contextNoticeAt` is null, Send first opens `RemoteContextNotice`:
     - title "This leaves your computer";
@@ -1140,7 +1149,7 @@ Every commit message below ends with the trailer `Co-Authored-By: Claude Opus 5.
 
 - Create: `scripts/m20_acceptance.py`, `docs/superpowers/plans/m20-acceptance.md`
 - Modify:
-  - `backend/tests/test_m10_ai.py`: `test_ai_modules_use_no_network_client` gains `remotemodel`, `remotesecrets`, `remotechat`, `delegation`, `api_remote_agents` and `api_agent_a2a_v1`. It doesn't gain `a2a`.
+  - `backend/tests/test_m10_ai.py`: `test_ai_modules_use_no_network_client`'s parametrised file list gains `remotemodel.py`, `remotesecrets.py`, `remotechat.py`, `delegation.py`, `headless.py`, `api_remote_agents.py` and `api_agent_a2a_v1.py` (on an `# M20:` line, as M19's). It doesn't gain `a2a.py`.
   - `docs/superpowers/plans/remaining-work.md`: the M20 status line.
   - `CONTINUE.md`: one line.
   - `backend/tests/fake_a2a.py` and `fake_claude.py`: only a marker the script needs.
@@ -1149,9 +1158,9 @@ Every commit message below ends with the trailer `Co-Authored-By: Claude Opus 5.
 
 - Setup:
   - It copies `SPACE` to a temp folder and commits the copy to a throw-away git repo, as M10's script does. The original is never touched.
-  - It sets `OBJECT_STATE_DIR` and `OBJECT_CACHE_DIR` to temp folders and `FAKE_CLAUDE_LOG`. It serves the copy with M8's `Served` on a free `127.0.0.1` port. `claudePath` points at the fake `claude`.
+  - It sets `OBJECT_STATE_DIR` and `OBJECT_CACHE_DIR` to temp folders and `FAKE_CLAUDE_LOG`. It serves the copy with M8's `Served` (`from m8_acceptance import Served`, as `m19_acceptance.py` does) on a free `127.0.0.1` port. `claudePath` points at the fake `claude`.
   - It starts two `FakeA2A` agents on `127.0.0.1`: "Fake Planner" (streaming, bearer `acc-TOKEN-7f3a`) and "Fake Notes" (no streaming, no auth).
-  - It tags one page of the copy "Exclude from AI" through `PUT /api/object/properties` (committed). That page's body holds a marker line, and a visible page holds another.
+  - It marks one page of the copy `excludeFromAI: true` through `PUT /api/object/properties` (committed), as `m17_acceptance.py` does. That page's body holds a marker line, and a visible page holds another.
 - Checks:
   1. `POST /api/remote-agents/preview` with Fake Planner's base URL and the bearer answers its card. The state dir is unchanged.
   2. Adding both:
@@ -1229,13 +1238,14 @@ Then comes the one milestone review (correctness, file safety, fidelity, the fiv
 | `backend/objectapp/remotechat.py` | T4 | T6 consumes (patched in its tests) |
 | `backend/objectapp/api_remote_agents.py` | T1 (stub), then T5 | none |
 | `backend/objectapp/api_learning.py`, `curator.py` (M18; remote ids refused / skipped) | T5 | none |
-| `backend/objectapp/api_agent_a2a_v1.py`, `agent_tools_a2a.py`, `delegation.py` | T1 (stubs), then T6 | none |
+| `backend/objectapp/api_agents.py` (M17; a remote agent's `GET /agents/{id}/tools` answers no groups) | T5 | none |
+| `backend/objectapp/api_agent_a2a_v1.py`, `agent_tools_a2a.py`, `delegation.py` (with its `install()`) | T1 (stubs), then T6 | none |
 | `backend/objectapp/headless.py` | T6 | none (M21 consumes `run_chat`) |
 | `frontend/src/agents/AgentsSection.tsx`, `agentTabs.ts`, `AgentPage.tsx`, `ChatsTab.tsx`, `agentText.ts`; `frontend/src/ai/AgentPicker.tsx` (M17) | T7 | none |
 | `frontend/src/ai/AiChatPanel.tsx`, `AiChatHeader.tsx`, `toolSteps.ts`, `aiText.ts` (M16/M17) | T8 | none |
 | `backend/tests/test_m10_ai.py`, `remaining-work.md`, `CONTINUE.md` | T9 | none |
 
-`agentrun.py` (M17) is **not** edited: M20 plugs in through `add_contributor` from `delegation.py`.
+`agentrun.py` (M17) is **not** edited: M20 plugs in through `add_contributor` from `delegation.install()`, which T1 wires into `server.py`.
 
 **Lanes** (counted from the Files lists). T1 runs first and alone. Then four lanes run:
 
@@ -1285,9 +1295,9 @@ T9 runs last and alone. No two lanes edit the same file.
 
 ## Guesses (spec points I could not settle without guessing)
 
-1. **M19's secrets store.** Checked against M19's Contract: `secretstore.SecretStore(state)` with `get`/`has`/`set`/`delete`, `redact(text, values)`, `KEY_PATTERN`, and the `a2a:` prefix reserved for M20. M20 uses exactly those, behind `remotesecrets`. If the built names differ, only `remotesecrets.py` changes.
+1. **M19's secrets store.** Checked against the built `secretstore.py` (2026-11-06): `SecretStore(state)` with `get`/`has`/`set`/`delete`, `redact(text, values)`, `KEY_PATTERN` (`^[a-z0-9]+:[^\x00-\x1f]{1,200}$`), values up to `mcpmodel.MAX_SECRET_CHARS` (16,384), and the `a2a:` prefix reserved for M20 in its docstring. M20 uses exactly those, behind `remotesecrets`. No longer a guess.
 2. **"Up to 3 delegations at once per turn".** Read as concurrency (in flight at once), refused past 3, not queued and not a per-turn total. **Guess.**
 3. **Whether `remote_agent_call` is "delegating further"** for a delegated run. **Guess:** yes, it is refused (call 19). The spec names only `delegate`.
 4. **`MCP_TOOL_TIMEOUT`.** It is a documented Claude Code environment variable, but not shown in `claude --help` of 2.1.317. **Guess:** it is honoured. The T1 spike proves it or stops for Gene.
-5. **M18's `memory` tool** signature `memory(action, target, content=None, old_text=None)`, checked against M18's Contract, is used only in `test_caller_memory_untouched`. M18 is merged before M20, so the test doesn't skip.
+5. **M18's `memory` tool** signature `memory(action, target, content=None, old_text=None)`, checked against the built `agent_tools_learning.py`, is used only in `test_caller_memory_untouched`. M18 is merged before M20, so the test doesn't skip.
 6. **The notice's form.** The spec says "a notice says so". **Guess:** a dialog with Send/Cancel before the first context send (call 8), rather than a passive banner after it.

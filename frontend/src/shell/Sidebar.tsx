@@ -11,6 +11,7 @@ import type { Target } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
 import { WorkspaceSections } from './SidebarSections'
 import { HelpSection } from '@/help/HelpSection'
+import { AgentsSection } from '@/agents/AgentsSection'
 import { chipStyle } from './typeColor'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { usePalette } from '@/palette/usePalette'
@@ -481,6 +482,9 @@ export function Sidebar({
           <Icon name="ph-magnifying-glass" size={18} />
         </button>
       </div>
+
+      {/* M17: the agents, at the top, directly above the main navigation (nothing while AI is hidden). */}
+      <AgentsSection onOpenTarget={onOpenTarget} />
 
       <nav aria-label="Main" className="flex flex-col gap-0.5">
         <MainNavButton

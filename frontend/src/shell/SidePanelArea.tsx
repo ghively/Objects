@@ -10,7 +10,7 @@
  *
  * M10: the AI chat entry (`{kind: 'aiChat', path?}`) shows `AiChatPanel` (loaded when first shown);
  * it can't swap or open as a page. "Explore" offers the "AI Chat" card first, unless "Hide AI
- * features" is on.
+ * features" is on. M17: the entry's `agentId` and `chatId` (an agent's chat, a transcript) go to the panel.
  */
 import { Suspense, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { lazyWithReload } from '@/lib/lazyReload'
@@ -265,7 +265,7 @@ export function SidePanelArea({ area, entries, space, renderTarget }: SidePanelA
         <ErrorBoundary what="This side panel tab" resetKey={target ? JSON.stringify(target) : ''}>
           {isAiChatTarget(target) ? (
             <Suspense fallback={null}>
-              <AiChatPanel key={entry.id} entryId={entry.id} path={target.path} />
+              <AiChatPanel key={entry.id} entryId={entry.id} path={target.path} agentId={target.agentId} chatId={target.chatId} />
             </Suspense>
           ) : isBacklinksTarget(target) ? (
             <BacklinksEntry />

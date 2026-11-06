@@ -24,6 +24,7 @@ import { cardProperties } from '@/views/cards/cardConfig'
 import { ObjectCard, type CardView } from '@/views/cards/ObjectCard'
 import type { Option } from '../annotations'
 import { EmbedMenu, ResizableEmbed } from '../media/ResizableEmbed'
+import { cardToLink, LINK_CARD_TEXT } from '../linkCard'
 
 /** The four views and their names, in menu order. */
 export const EMBED_VIEWS: { view: CardView; name: string }[] = [
@@ -120,6 +121,9 @@ export function ObjectEmbedView({ node, editor, getPos, selected }: NodeViewProp
             onSelect: () => setOption('view', v.view),
           })),
         },
+        ...(editable
+          ? [{ label: LINK_CARD_TEXT.toLink, onSelect: () => { const at = pos(); if (at != null) cardToLink(editor, at) } }]
+          : []),
         { label: 'Remove Block', onSelect: remove },
       ]}
     />

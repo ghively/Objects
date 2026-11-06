@@ -54,6 +54,7 @@ import { AI_ICON, AI_TEXT, openBlocksAi, useAiBlocked } from '../aiEntries'
 import { showToast } from '../media/upload'
 import { BlockStyleExtras, BlockStyleMenu } from '../menus/BlockStyleMenu'
 import { copyBlockReference } from '../nodes/blockRef'
+import { LINK_CARD_TEXT, linkToCard, soleLinkBlock } from '../linkCard'
 import { hasTodoAt, turnIntoObject, turnIntoWhiteboard, turnTodoIntoTask } from '../turnInto'
 
 export const BLOCK_MENU_TEXT = {
@@ -169,6 +170,7 @@ export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps
   const todo = open && hasTodoAt(editor)
   const selected = open ? (blockSelectionRange(editor.state)?.blocks.length ?? 0) : 0
   const targetCount = open ? (targetRange(editor.state)?.blocks.length ?? 0) : 0
+  const linkLine = open && editor.isEditable && !!soleLinkBlock(editor)
   // Hidden too on a page excluded from AI or a template (M10).
   const aiBlocked = useAiBlocked(editor)
   const aiHidden = useAiHidden() || aiBlocked
@@ -207,6 +209,11 @@ export function BlockMenu({ editor, open, onOpenChange, anchor }: BlockMenuProps
             <TurnIntoObjectItems editor={editor} todo={todo} />
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+        {linkLine && (
+          <Row icon="ph-arrow-u-down-right" onSelect={() => linkToCard(editor)}>
+            {LINK_CARD_TEXT.toCard}
+          </Row>
+        )}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             <Icon name="ph-copy" size={16} />

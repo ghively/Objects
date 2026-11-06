@@ -10,13 +10,28 @@
 import { vi } from 'vitest'
 import type { Api } from '@/api/client'
 import type {
+  AddRemoteAgentRequest,
+  Agent,
+  AgentInput,
+  AgentTranscript,
   Attachment,
   AutomationRule,
   AutomationRun,
   CalendarDay,
   CalendarRange,
   Collection,
+  CreateAgentRequest,
   DeviceSettings,
+  LearningSettings,
+  LearningState,
+  LedgerSummary,
+  McpServer,
+  McpServerInput,
+  McpTestResult,
+  MemoryFile,
+  SecretVar,
+  ReviewStatus,
+  SkillSummary,
   GraphData,
   ImportJob,
   ImportPreview,
@@ -26,6 +41,9 @@ import type {
   ObjectSummary,
   PropertyDef,
   Query,
+  RemoteAuthInput,
+  RemotePreview,
+  SaveRemoteAgentRequest,
   References,
   Row,
   SearchResult,
@@ -285,6 +303,20 @@ export function automationRule(partial: Partial<AutomationRule> & Pick<Automatio
   }
 }
 
+/**
+ * M21: an agent schedule (a weekly schedule rule whose one action runs the default agent), built on
+ * `automationRule`; `partial` overrides.
+ */
+export function agentSchedule(partial: Partial<AutomationRule> = {}): AutomationRule {
+  return automationRule({
+    id: '01JSCHED000000000000000000',
+    name: 'Weekly review',
+    trigger: { kind: 'schedule', repeat: 'every week on monday', time: '09:00', start: '2026-11-09' },
+    actions: [{ kind: 'runAgent', agentId: 'assistant', prompt: 'Review last week’s notes.', model: null }],
+    ...partial,
+  })
+}
+
 /** An M14 run-log entry (a button run that succeeded) unless overridden. */
 export function automationRun(partial: Partial<AutomationRun> & Pick<AutomationRun, 'ruleId'>): AutomationRun {
   return {
@@ -296,6 +328,233 @@ export function automationRun(partial: Partial<AutomationRun> & Pick<AutomationR
     error: null,
     ...partial,
   }
+}
+
+/** M17: an agent with every contract field (a local agent, not the default one); `partial` overrides. */
+export function agent(partial: Partial<Agent> & Pick<Agent, 'id'>): Agent {
+  const isDefault = partial.id === 'assistant'
+  return {
+    kind: 'local',
+    name: isDefault ? 'Assistant' : 'Researcher',
+    icon: isDefault ? 'ph-sparkle' : 'ph-robot',
+    color: null,
+    description: '',
+    model: null,
+    toolsOff: ['Bash'],
+    learning: null,
+    createdAt: '2026-11-05T09:00:00.000Z',
+    updatedAt: '2026-11-05T09:00:00.000Z',
+    default: isDefault,
+    folder: `/state/agents/${isDefault ? 'Assistant' : 'Researcher'}`,
+    inStateDir: true,
+    exists: true,
+    missing: false,
+    readOnlyReason: null,
+    revision: 'r1',
+    mcpServers: [],
+    remote: null,
+    ...partial,
+  }
+}
+
+/** M20: a remote agent ("Fake Planner", bearer auth set, streaming); `partial` overrides. */
+export function remoteAgent(partial: Partial<Agent> & Pick<Agent, 'id'>): Agent {
+  return agent({
+    kind: 'remote',
+    name: 'Fake Planner',
+    icon: 'ph-globe',
+    model: null,
+    toolsOff: [],
+    learning: null,
+    folder: '/state/agents/Fake Planner',
+    mcpServers: [],
+    remote: {
+      cardUrl: 'http://127.0.0.1:8799/.well-known/agent-card.json',
+      endpointUrl: 'http://127.0.0.1:8799/a2a',
+      endpointHost: '127.0.0.1',
+      protocolVersion: '1.0',
+      streaming: true,
+      auth: { kind: 'bearer', headerName: null, set: true },
+      card: remotePreview().card,
+      cardFetchedAt: '2026-11-05T09:00:00.000Z',
+      contextNoticeAt: null,
+    },
+    ...partial,
+  })
+}
+
+/** M20: a remote agent's card preview (no warnings); `partial` overrides. */
+export function remotePreview(partial: Partial<RemotePreview> = {}): RemotePreview {
+  return {
+    cardUrl: 'http://127.0.0.1:8799/.well-known/agent-card.json',
+    card: {
+      name: 'Fake Planner',
+      description: "A synthetic agent for Object's tests.",
+      version: '1.0.0',
+      provider: 'Fake Org',
+      documentationUrl: 'https://example.org/docs',
+      skills: [
+        {
+          id: 'plan-trip',
+          name: 'Plan a trip',
+          description: 'Plans a short trip.',
+          tags: ['travel'],
+          examples: ['Plan two days in Lisbon.'],
+        },
+      ],
+      streaming: true,
+      inputModes: ['text/plain', 'text/markdown'],
+      outputModes: ['text/plain', 'application/json'],
+    },
+    endpointUrl: 'http://127.0.0.1:8799/a2a',
+    endpointHost: '127.0.0.1',
+    warnings: [],
+    ...partial,
+  }
+}
+
+/** M17: a chat transcript of `agentId` (one user line, one assistant line); `partial` overrides. */
+export function agentTranscript(partial: Partial<AgentTranscript> & Pick<AgentTranscript, 'id'>): AgentTranscript {
+  return {
+    title: 'What do my notes say?',
+    createdAt: '2026-11-05T09:00:00.000Z',
+    updatedAt: '2026-11-05T09:01:00.000Z',
+    messageCount: 2,
+    spaceName: 'space',
+    delegated: false,
+    from: null,
+    schedule: null,
+    agentId: 'assistant',
+    sessionId: 's1',
+    objectPath: null,
+    items: [
+      { type: 'user', text: 'What do my notes say?', at: '2026-11-05T09:00:00.000Z', contextPaths: [] },
+      { type: 'assistant', text: 'Hello', at: '2026-11-05T09:01:00.000Z', model: null, sessionId: 's1' },
+    ],
+    ...partial,
+  }
+}
+
+/** M18: a skill (an agent-made, active one); `partial` overrides. */
+export function skillSummary(partial: Partial<SkillSummary> & Pick<SkillSummary, 'name'>): SkillSummary {
+  return {
+    description: 'How to label server racks',
+    createdBy: 'agent',
+    state: 'active',
+    pinned: false,
+    uses: 0,
+    lastUsed: null,
+    createdAt: '2026-11-05T09:00:00.000Z',
+    absorbedInto: null,
+    ...partial,
+  }
+}
+
+/** M18: a ledger entry without its before and after (a memory saved in a chat); `partial` overrides. */
+export function ledgerSummary(partial: Partial<LedgerSummary> & Pick<LedgerSummary, 'id'>): LedgerSummary {
+  return {
+    at: '2026-11-05T09:00:00.000Z',
+    target: 'memory',
+    action: 'add',
+    skill: null,
+    file: null,
+    absorbedInto: null,
+    source: { kind: 'chat', agentId: 'assistant', chatId: '01JCHAT0000000000000000000', run: null },
+    undoes: null,
+    line: 'Saved a memory',
+    ...partial,
+  }
+}
+
+/** M18: a finished automatic review of both kinds; `partial` overrides. */
+export function reviewStatus(partial: Partial<ReviewStatus> & Pick<ReviewStatus, 'id'>): ReviewStatus {
+  return {
+    agentId: 'assistant',
+    chatId: '01JCHAT0000000000000000000',
+    kinds: ['memory', 'skills'],
+    trigger: 'auto',
+    state: 'done',
+    startedAt: '2026-11-05T09:00:00.000Z',
+    endedAt: '2026-11-05T09:00:30.000Z',
+    summary: 'Saved 1 memory, updated 1 skill',
+    message: null,
+    entryIds: [],
+    ...partial,
+  }
+}
+
+const LEARNING_DEFAULTS: LearningSettings = {
+  memoryChars: 2200,
+  userChars: 1375,
+  memoryReviewEvery: 10,
+  skillReviewEvery: 10,
+  reviewModel: null,
+  curator: true,
+  curatorIdleHours: 2,
+  curatorEveryDays: 7,
+  consolidate: false,
+}
+
+/** M18: an agent's learning state with the default settings; `partial` overrides. */
+export function learningState(partial: Partial<LearningState> = {}): LearningState {
+  return {
+    settings: { ...LEARNING_DEFAULTS },
+    defaults: { ...LEARNING_DEFAULTS },
+    curator: { lastRunAt: null, nextDueAt: null, running: false, report: null },
+    revision: 'r1',
+    ...partial,
+  }
+}
+
+function memoryFile(target: MemoryFile['target'], text = '', revision: string | null = null): MemoryFile {
+  const entries = text ? text.split(/\n§\n/).filter((e) => e.trim() !== '') : []
+  return { target, text, entries, chars: text.length, cap: target === 'memory' ? 2200 : 1375, revision }
+}
+
+/** M19: a stdio MCP server with one plain and one stored secret env row (no value ever); `partial` overrides. */
+export function mcpServer(partial: Partial<McpServer> & Pick<McpServer, 'id'>): McpServer {
+  return {
+    name: 'fake',
+    enabled: true,
+    kind: 'command',
+    command: 'npx',
+    args: ['-y', 'some-mcp-server'],
+    env: [
+      { key: 'LOG_LEVEL', value: 'info', secret: false, set: false },
+      { key: 'API_KEY', value: null, secret: true, set: true },
+    ],
+    transport: null,
+    url: null,
+    headers: [],
+    bearer: false,
+    createdAt: '2026-11-05T09:00:00.000Z',
+    updatedAt: '2026-11-05T09:00:00.000Z',
+    revision: 'r1',
+    missingSecrets: [],
+    lastTest: null,
+    ...partial,
+  }
+}
+
+/** M19: a passing Test listing `echo`, `add` and `whoami`; `partial` overrides. */
+export function mcpTestResult(partial: Partial<McpTestResult> = {}): McpTestResult {
+  return {
+    ok: true,
+    tools: [
+      { name: 'add', description: 'Add two numbers.' },
+      { name: 'echo', description: 'Echo the text back.' },
+      { name: 'whoami', description: 'The value of the variable named by --require-env.' },
+    ],
+    error: null,
+    elapsedMs: 120,
+    at: '2026-11-05T09:00:00.000Z',
+    ...partial,
+  }
+}
+
+/** M19: a secret variable (never its value); `partial` overrides. */
+export function secretVar(partial: Partial<SecretVar> & Pick<SecretVar, 'name'>): SecretVar {
+  return { set: false, settable: true, usedBy: [], ...partial }
 }
 
 type Fn =(...args: never[]) => unknown
@@ -412,11 +671,34 @@ function defaults(): Api {
     search: async () => ({ results: [], partial: false }),
     reindex: async () => ({ started: true }),
     aiStatus: async () => ({ available: true, reason: 'ok' as const, claudePath: '/usr/bin/claude', version: '2.0.0', message: null }),
+    aiModels: async () => ({
+      models: [
+        { id: 'fable', label: 'Fable (latest)', kind: 'alias' as const },
+        { id: 'opus', label: 'Opus (latest)', kind: 'alias' as const },
+        { id: 'sonnet', label: 'Sonnet (latest)', kind: 'alias' as const },
+        { id: 'haiku', label: 'Haiku (latest)', kind: 'alias' as const },
+        { id: 'claude-fable-5-1', label: 'Fable 5.1', kind: 'id' as const },
+        { id: 'claude-opus-5-5', label: 'Opus 5.5', kind: 'id' as const },
+        { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5', kind: 'id' as const },
+        { id: 'claude-haiku-5-5', label: 'Haiku 5.5', kind: 'id' as const },
+      ],
+      pattern: '[A-Za-z0-9][A-Za-z0-9._:\\[\\]-]{0,79}',
+    }),
     aiChat: async (_req: unknown, onEvent: (e: import('@/api/types').AiEvent) => void) => {
       onEvent({ type: 'text', text: 'Hello' })
       onEvent({ type: 'done', text: 'Hello', sessionId: 's1', proposal: null, skipped: [] })
     },
-    aiChatLoad: async (path: string) => ({ path, version: 'v1', title: 'Chat', contextPaths: [], sessionId: null, messages: [] }),
+    aiChatLoad: async (path: string) => ({
+      path,
+      version: 'v1',
+      title: 'Chat',
+      contextPaths: [],
+      sessionId: null,
+      messages: [],
+      agent: null,
+      agentId: 'assistant',
+      chatId: null,
+    }),
     saveAiChat: async (req: { path?: string | null }) => ({ path: req.path ?? 'AI Chats/Chat.md', version: 'v1' }),
     apiTokens: async () => ({ tokens: [], mcp: mcpConfig('<token>') }),
     createApiToken: async (name: string, scope: 'read' | 'read-write') => ({
@@ -540,6 +822,89 @@ function defaults(): Api {
     automationRuns: async () => [],
     automationCatchUp: async () => [],
     confirmAutomationCatchUp: async () => [],
+    // M17
+    agents: async () => [agent({ id: 'assistant', exists: false })],
+    agent: async (id: string) => agent({ id }),
+    createAgent: async (req: CreateAgentRequest) =>
+      agent({ id: '01JNEWAGENT000000000000000', name: req.agent.name, revision: 'r1' }),
+    addAgentFolder: async (path: string) => agent({ id: '01JADDEDAGENT0000000000000', folder: path, inStateDir: false }),
+    saveAgent: async (id: string, input: AgentInput, baseRevision: string | null) =>
+      agent({ id, name: input.name, revision: `${baseRevision ?? 'r0'}+1` }),
+    deleteAgent: async () => ({ trashId: 'agent-trash-1' }),
+    unregisterAgent: async () => ({ ok: true as const }),
+    agentTrash: async () => [],
+    restoreAgent: async () => agent({ id: '01JRESTOREDAGENT0000000000' }),
+    agentInstructions: async () => ({ text: '', revision: null }),
+    saveAgentInstructions: async (_id: string, _text: string, baseRevision: string | null) => ({
+      revision: `${baseRevision ?? 'r0'}+1`,
+    }),
+    agentToolDefaults: async () => [],
+    agentTools: async () => [],
+    agentChats: async () => [],
+    agentChat: async (id: string, chatId: string) => agentTranscript({ id: chatId, agentId: id }),
+    revealAgentFolder: async () => ({ ok: true }),
+    // M20
+    previewRemoteAgent: async (_url: string, _auth: RemoteAuthInput) => remotePreview(),
+    addRemoteAgent: async (req: AddRemoteAgentRequest) =>
+      remoteAgent({ id: '01JNEWREMOTE00000000000000', name: req.name ?? 'Fake Planner', revision: 'r1' }),
+    saveRemoteAgent: async (id: string, req: SaveRemoteAgentRequest) =>
+      remoteAgent({ id, name: req.name, revision: `${req.baseRevision}+1` }),
+    refreshRemoteAgent: async (id: string) => remoteAgent({ id }),
+    ackRemoteContext: async () => ({ contextNoticeAt: '2026-11-05T09:00:00.000Z' }),
+    revealAgentFile: async () => ({ ok: true as const }),
+    // M18
+    agentMemory: async () => ({ memory: memoryFile('memory'), user: memoryFile('user') }),
+    saveAgentMemory: async (_id: string, target: MemoryFile['target'], text: string, baseRevision: string | null) =>
+      memoryFile(target, text, `${baseRevision ?? 'r0'}+1`),
+    agentSkills: async () => [],
+    createAgentSkill: async (_id: string, req: { name: string; description: string; body: string }) => ({
+      ...skillSummary({ name: req.name, description: req.description, createdBy: 'user' }),
+      text: req.body,
+      revision: 'r1',
+      files: [{ path: 'SKILL.md', size: req.body.length }],
+    }),
+    agentSkill: async (_id: string, name: string) => ({
+      ...skillSummary({ name }),
+      text: '',
+      revision: 'r1',
+      files: [{ path: 'SKILL.md', size: 0 }],
+    }),
+    agentSkillFile: async (_id: string, _name: string, path: string) => ({ path, text: '', revision: 'r1', binary: false }),
+    saveAgentSkillFile: async (_id: string, _name: string, _path: string, _text: string, baseRevision: string | null) => ({
+      revision: `${baseRevision ?? 'r0'}+1`,
+    }),
+    archiveAgentSkill: async (_id: string, name: string) => skillSummary({ name, state: 'archived' }),
+    restoreAgentSkill: async (_id: string, name: string) => skillSummary({ name }),
+    pinAgentSkill: async (_id: string, name: string, pinned: boolean) => skillSummary({ name, pinned }),
+    agentLedger: async () => ({ entries: [], more: false }),
+    agentLedgerEntry: async (_id: string, entryId: string) => ({
+      ...ledgerSummary({ id: entryId }),
+      before: null,
+      after: 'A memory',
+      encoding: 'text' as const,
+    }),
+    undoLedgerEntry: async (_id: string, entryId: string) =>
+      ledgerSummary({ id: '01JUNDO0000000000000000000', action: 'undo', undoes: entryId, line: 'Undid: Saved a memory' }),
+    agentLearning: async () => learningState(),
+    saveAgentLearning: async (_id: string, learning: Partial<LearningSettings>, baseRevision: string | null) =>
+      learningState({ settings: { ...LEARNING_DEFAULTS, ...learning }, revision: `${baseRevision ?? 'r0'}+1` }),
+    tidyAgentSkills: async () => ({ runId: '01JTIDY0000000000000000000' }),
+    searchAgentChats: async () => [],
+    learnFromChat: async (id: string, chatId: string) =>
+      reviewStatus({ id: '01JREVIEW00000000000000000', agentId: id, chatId, trigger: 'manual', state: 'running', endedAt: null, summary: null }),
+    chatReviews: async () => [],
+    // M19
+    mcpServers: async () => ({ servers: [], readOnlyReason: null, unreadable: false }),
+    createMcpServer: async (input: McpServerInput) =>
+      mcpServer({ id: '01JNEWMCPSERVER00000000000', name: input.name, enabled: input.enabled, kind: input.kind, env: [], args: [] }),
+    saveMcpServer: async (id: string, input: McpServerInput, baseRevision: string) =>
+      mcpServer({ id, name: input.name, enabled: input.enabled, kind: input.kind, revision: `${baseRevision}+1` }),
+    deleteMcpServer: async () => ({ ok: true as const }),
+    testMcpServer: async () => mcpTestResult(),
+    mcpSecrets: async () => [],
+    setMcpSecret: async (name: string) => ({ name, set: true as const }),
+    deleteMcpSecret: async () => ({ ok: true as const }),
+    refreshAgentTools: async () => [],
     onChange: () => () => undefined,
   } as unknown as Api
 }

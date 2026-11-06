@@ -1,0 +1,139 @@
+/* The AI chat's rendered Markdown (M16, `ChatMarkdown`). Our choices within the existing look:
+   14 px body text as M10's messages, headings 18/16/15 px, bordered tables, code in the code
+   block's `--code-*` tokens with highlight.js's `hljs-*` classes mapped as `codeBlock.css` does. */
+.chat-md {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.chat-md > :first-child { margin-top: 0; }
+.chat-md > :last-child { margin-bottom: 0; }
+.chat-md p,
+.chat-md ul,
+.chat-md ol,
+.chat-md blockquote,
+.chat-md table,
+.chat-md pre,
+.chat-md .chat-math { margin: 0 0 0.6em; }
+.chat-md h1,
+.chat-md h2,
+.chat-md h3,
+.chat-md h4,
+.chat-md h5,
+.chat-md h6 { margin: 0.9em 0 0.4em; font-weight: 600; line-height: 1.3; }
+.chat-md h1 { font-size: 18px; }
+.chat-md h2 { font-size: 16px; }
+.chat-md h3,
+.chat-md h4,
+.chat-md h5,
+.chat-md h6 { font-size: 15px; }
+.chat-md strong { font-weight: 600; }
+.chat-md del { color: var(--text-muted); }
+.chat-md ul,
+.chat-md ol { padding-left: 1.4em; }
+.chat-md ul { list-style: disc; }
+.chat-md ol { list-style: decimal; }
+.chat-md ul ul { list-style: circle; }
+.chat-md li { margin: 0.15em 0; }
+.chat-md li > p { margin: 0 0 0.3em; }
+.chat-md li::marker { color: var(--editor-bullet); }
+.chat-md li:has(> input[type='checkbox']) { list-style: none; margin-left: -1.2em; }
+.chat-md input[type='checkbox'] { margin: 0 0.4em 0 0; vertical-align: -0.1em; accent-color: var(--text-muted); }
+.chat-md blockquote {
+  padding-left: 0.8em;
+  border-left: 3px solid var(--editor-quote-line);
+  color: var(--text-muted);
+}
+.chat-md hr { border: none; border-top: 1px solid var(--editor-hr); margin: 0.8em 0; }
+.chat-md a { text-decoration: underline; text-underline-offset: 2px; }
+.chat-md table { border-collapse: collapse; display: block; max-width: 100%; overflow-x: auto; }
+.chat-md th,
+.chat-md td { border: 1px solid var(--border-subtle); padding: 0.25em 0.6em; vertical-align: top; text-align: left; }
+.chat-md th { background: var(--bg-raised); font-weight: 600; }
+.chat-md .chat-raw,
+.chat-md .chat-plain { white-space: pre-wrap; }
+.chat-md .chat-math { overflow-x: auto; }
+.chat-md .chat-math .katex-display { margin: 0.3em 0; }
+
+.chat-md .wikilink {
+  border-radius: 4px;
+  padding: 0 0.2em;
+  background: var(--bg-hover);
+  cursor: pointer;
+}
+.chat-md .wikilink[data-color] { color: var(--chip-fg); background: var(--chip-bg); }
+.chat-md .wikilink-unresolved { opacity: 0.5; cursor: default; text-decoration: underline dotted; text-underline-offset: 2px; }
+
+.chat-md code {
+  font-family: 'Overpass Mono', 'SF Mono', 'SFMono-Regular', 'JetBrains Mono', 'Roboto Mono', 'Liberation Mono', Consolas, ui-monospace, monospace;
+  font-size: 0.875em;
+  border-radius: 4px;
+  padding: 0.05em 0.3em;
+  background: var(--bg-hover);
+}
+.chat-md pre.chat-code {
+  padding: 0.6em 0.8em;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 6px;
+  color: var(--code-text);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre;
+  overflow-x: auto;
+  tab-size: 4;
+}
+.chat-md pre.chat-code code { background: none; padding: 0; font-size: inherit; color: inherit; }
+
+/* highlight.js scopes onto the `--code-*` tokens, as `editor/nodes/codeBlock.css` maps them. */
+.chat-md .hljs-keyword,
+.chat-md .hljs-doctag,
+.chat-md .hljs-selector-tag { color: var(--code-keyword); }
+.chat-md .hljs-literal,
+.chat-md .hljs-symbol,
+.chat-md .hljs-link { color: var(--code-bool); }
+.chat-md .hljs-regexp,
+.chat-md .hljs-char.escape_ { color: var(--code-regex); }
+.chat-md .hljs-addition,
+.chat-md .hljs-formula { color: var(--code-literal); }
+.chat-md .hljs-string,
+.chat-md .hljs-deletion { color: var(--code-string); }
+.chat-md .hljs-number { color: var(--code-number); }
+.chat-md .hljs-code { color: var(--code-string-2); }
+.chat-md .hljs-variable,
+.chat-md .hljs-template-variable { color: var(--code-variable-name); }
+.chat-md .hljs-params { color: var(--code-variable-name-local); }
+.chat-md .hljs-title,
+.chat-md .hljs-title.function_ { color: var(--code-variable-name-definition); }
+.chat-md .hljs-built_in,
+.chat-md .hljs-variable.language_ { color: var(--code-variable-name-2); }
+.chat-md .hljs-type,
+.chat-md .hljs-name { color: var(--code-type-name); }
+.chat-md .hljs-title.class_,
+.chat-md .hljs-title.class_.inherited__,
+.chat-md .hljs-class,
+.chat-md .hljs-selector-class,
+.chat-md .hljs-selector-id { color: var(--code-class-name); }
+.chat-md .hljs-selector-attr,
+.chat-md .hljs-selector-pseudo { color: var(--code-macro-name); }
+.chat-md .hljs-attr,
+.chat-md .hljs-attribute,
+.chat-md .hljs-property { color: var(--code-property-name); }
+.chat-md .hljs-operator,
+.chat-md .hljs-bullet { color: var(--code-operator); }
+.chat-md .hljs-comment,
+.chat-md .hljs-quote { color: var(--code-comment); }
+.chat-md .hljs-meta { color: var(--code-meta); }
+.chat-md .hljs-meta.hljs-keyword { color: var(--code-keyword); }
+.chat-md .hljs-meta.hljs-string { color: var(--code-string); }
+.chat-md .hljs-punctuation,
+.chat-md .hljs-tag { color: var(--code-punctuation); }
+.chat-md .hljs-tag.hljs-name { color: var(--code-type-name); }
+.chat-md .hljs-tag.hljs-attr { color: var(--code-property-name); }
+.chat-md .hljs-subst { color: var(--code-text); }
+.chat-md .hljs-section { font-weight: 700; text-decoration: underline; }
+.chat-md .hljs-emphasis { font-style: italic; }
+.chat-md .hljs-strong { font-weight: 700; }
+.chat-md .hljs-link { text-decoration: underline; }

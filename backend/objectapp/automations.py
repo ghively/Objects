@@ -66,6 +66,7 @@ from .automations_model import (
     PropertyChangedTrigger,
     ScheduleTrigger,
     Scope,
+    agent_action,
     origin_for,
 )
 from .dailynotes import DailyNoteExists
@@ -385,6 +386,20 @@ def _check_against_space(space: Space, rule: AutomationRule) -> None:
                 raise InvalidValue(f"“{trigger.to.option}” isn't a condition for {pdef.name}.")
     for n, a in enumerate(rule.actions, start=1):
         where = f"Action {n}"
+        if a.kind == "runAgent":
+            # M21: an agent schedule runs one of Object's own listed agents (late imports: the
+            # registry is machine state, and agentschedules imports this module).
+            from .agents import AgentNotFound, AgentRegistry
+            from .agentschedules import REMOTE_REFUSED
+            from .remotemodel import REMOTE_KIND
+
+            try:
+                record = AgentRegistry().get(a.agentId)  # type: ignore[union-attr]
+            except AgentNotFound as exc:
+                raise InvalidValue(str(exc)) from exc
+            if record.kind == REMOTE_KIND:
+                raise InvalidValue(REMOTE_REFUSED)
+            continue
         if a.kind in ("setProperty", "clearProperty") and types is not None:
             key = a.key  # type: ignore[union-attr]
             pdef = _key_def(space, types, key)
@@ -751,7 +766,9 @@ class AutomationScheduler:
         if catch_up:
             self.engine.announce_catch_up()
         for lr, inst in due:
-            runs.append(self.engine.run_scheduled(lr, inst, catch_up=False))
+            run = self.engine.run_scheduled(lr, inst, catch_up=False)
+            if run is not None:  # None: an agent schedule's run, handed to the agent jobs (M21)
+                runs.append(run)
         return runs
 
     # -- the catch-up --
@@ -786,6 +803,11 @@ class AutomationScheduler:
 
         Raises `KeyError` when the rule has nothing pending.
         """
+        return self.answer_counted(rule_id, choice)[0]
+
+    def answer_counted(self, rule_id: str, choice: str) -> tuple[list[dict[str, Any]], int]:
+        """`answer`'s runs and how many occurrences went to the agent jobs (M21: an agent
+        schedule's runs are queued, never run in the request)."""
         lr = self.engine.rules.get(rule_id)
         with self._lock:
             entry = self.state.rules.get(rule_id)
@@ -801,8 +823,33 @@ class AutomationScheduler:
             self._save()  # recorded before anything runs: each occurrence at most once
         self.engine.announce_catch_up()
         if not chosen:
-            return [self.engine.log_skipped_catch_up(lr, newest)]
-        return [self.engine.run_scheduled(lr, inst, catch_up=True) for inst in chosen]
+            return [self.engine.log_skipped_catch_up(lr, newest)], 0
+        runs: list[dict[str, Any]] = []
+        queued = 0
+        for inst in chosen:
+            run = self.engine.run_scheduled(lr, inst, catch_up=True)
+            if run is None:
+                queued += 1
+            else:
+                runs.append(run)
+        return runs, queued
+
+    def owe(self, rule_id: str, instants: list[datetime], trigger: dict[str, Any] | None = None) -> None:
+        """Put occurrences back into the rule's ``pending`` (M21: agent runs the space closed on),
+        the newest `MAX_PENDING`, so the catch-up asks. A rule with no entry (turned off or
+        deleted meanwhile) owes nothing, nor one rescheduled since: ``trigger`` (the one the
+        occurrences came due under, when given) is no longer its entry's."""
+        if not instants:
+            return
+        with self._lock:
+            entry = self.state.rules.get(rule_id)
+            if entry is None or (trigger is not None and entry.get("trigger") != trigger):
+                return
+            found = sorted(set(instants))
+            if not _merge_pending(entry, found[-MAX_PENDING:], len(found) > MAX_PENDING):
+                return
+            self._save()
+        self.engine.announce_catch_up()
 
 
 # -- placeholders --------------------------------------------------------------------------
@@ -882,12 +929,18 @@ class AutomationEngine:
         announce: Callable[[ChangeEvent], None],
         notifier: Notifier,
         interval: float = 30.0,
+        *,
+        base_url: Callable[[], str | None] = lambda: None,
     ) -> None:
+        from .schedulerun import AgentJobs  # late: schedulerun imports this module
+
         self.space = space
         self.announce = announce
         self.notifier = notifier
         self.rules = RuleCache(space)
         self.scheduler = AutomationScheduler(self, interval)
+        self.agent_jobs = AgentJobs(self, base_url=base_url)
+        """M21: agent schedule runs, one at a time on their own thread."""
         self._queue: deque[Any] = deque()
         self._cond = threading.Condition()
         self._busy = 0
@@ -907,14 +960,20 @@ class AutomationEngine:
                 return
             self._running = True
         self.prune_logs()
+        self.sync_schedule_index()
         self._worker = threading.Thread(target=self._work, name="object-automation-runs", daemon=True)
         self._worker.start()
+        self.agent_jobs.start()
         self.scheduler.start()
 
     def stop(self) -> None:
         """Quit: drop the triggered runs that haven't started (our choice: one log line), let
-        the one in progress finish (waiting at most `stop_wait` seconds), write the logs."""
+        the one in progress finish (waiting at most `stop_wait` seconds), write the logs.
+
+        M21: the scheduler stops first, then the agent jobs (which give what they couldn't run back
+        to the catch-up), then this worker."""
         self.scheduler.stop()
+        self.agent_jobs.stop()
         with self._cond:
             if not self._running:
                 return
@@ -1250,9 +1309,73 @@ class AutomationEngine:
         self._log(run, flush)
         return run
 
-    def run_scheduled(self, lr: LoadedRule, instant: datetime, catch_up: bool) -> dict[str, Any]:
-        """One occurrence of a schedule rule, with the occurrence as the run instant."""
+    def run_scheduled(self, lr: LoadedRule, instant: datetime, catch_up: bool) -> dict[str, Any] | None:
+        """One occurrence of a schedule rule, with the occurrence as the run instant. An agent
+        schedule's (M21) goes to the agent jobs instead: None."""
+        if lr.rule is not None and agent_action(lr.rule) is not None:
+            from .schedulerun import AgentJob
+
+            trigger = lr.rule.trigger.model_dump(mode="json")
+            self.agent_jobs.submit(AgentJob(lr.id, instant, catch_up, trigger))
+            return None
         return self._execute(lr, "schedule", None, instant, instant, catch_up, flush=True)
+
+    def execute_agent_job(self, job: Any, cancel: threading.Event) -> dict[str, Any]:
+        """Run one agent schedule occurrence (M21, on the agent jobs' thread); the logged run.
+
+        The rule is read again: a deleted one is neither run nor logged; a turned-off or read-only
+        one is logged ``skipped``. Otherwise `schedulerun.run_schedule` runs it as the rule's
+        origin, its one action result is logged (flushed) and the skills it loaded go to the
+        schedules index.
+        """
+        from . import schedulerun
+        from .agentschedules import ScheduleIndex
+        from .settings import read as read_settings
+
+        lr = self.rules.get(job.rule_id)
+        if lr is None:
+            return {"ruleId": job.rule_id, "status": "skipped", "actions": [], "error": None}
+        rule = lr.rule
+        action = agent_action(rule) if rule is not None else None
+        if rule is None or action is None or not rule.enabled:
+            run = self._new_run(lr, "schedule", None, job.instant, job.catch_up)
+            run["status"] = "skipped"
+            reason = (lr.read_only_reason or CANT_READ) if rule is None else TURNED_OFF
+            run["actions"] = [self._result(0, "runAgent", "skipped", None, reason)]
+            self._log(run, flush=True)
+            return run
+        try:
+            settings = read_settings()[0]
+        except (ReadOnly, OSError, ValueError):  # an unreadable settings file: the defaults
+            settings = {}
+        run = self._new_run(lr, "schedule", None, job.instant, job.catch_up)
+        with writeorigin.acting_as(origin_for(lr.id)):
+            result = schedulerun.run_schedule(
+                self.space, lr.id, rule.name, action, job.instant, job.catch_up,
+                registry=self.agent_jobs.registry(), settings=settings, base_url=self.agent_jobs.base_url(),
+                notifier=self.notifier, announce=self.announce, cancel=cancel,
+            )
+        run["status"] = result.status
+        run["actions"] = [self._result(0, "runAgent", result.status, result.path, result.detail)]
+        self._log(run, flush=True)
+        if result.used_skills:
+            try:
+                ScheduleIndex().record_used(self.space.root, lr.id, result.used_skills)
+            except OSError:
+                log.exception("Automations: could not record the skills schedule %s used", lr.id)
+        return run
+
+    def log_failed_agent_job(self, job: Any, detail: str) -> dict[str, Any] | None:
+        """Log an agent schedule occurrence whose run raised (M21 backstop): status ``failed``, one
+        ``runAgent`` result with ``detail``. A deleted rule logs nothing: None."""
+        lr = self.rules.get(job.rule_id)
+        if lr is None:
+            return None
+        run = self._new_run(lr, "schedule", None, job.instant, job.catch_up)
+        run["status"] = "failed"
+        run["actions"] = [self._result(0, "runAgent", "failed", None, detail)]
+        self._log(run, flush=True)
+        return run
 
     def log_skipped_catch_up(self, lr: LoadedRule, newest: datetime) -> dict[str, Any]:
         run = self._new_run(lr, "schedule", None, newest, True)
@@ -1582,6 +1705,17 @@ class AutomationEngine:
                 self.scheduler._save()
         if catch_up:
             self.announce_catch_up()
+        self.sync_schedule_index()
+
+    def sync_schedule_index(self) -> None:
+        """M21: this space's agent schedules in the machine-wide schedules index (written only
+        when its content changes)."""
+        from .agentschedules import ScheduleIndex
+
+        try:
+            ScheduleIndex().sync_space(self.space.root, self.space.name, self.rules.all())
+        except OSError:
+            log.exception("Automations: could not update the agent schedules index")
 
     def announce_catch_up(self) -> None:
         self.announce(ChangeEvent("automationRuns", CATCH_UP_PATH, None))
@@ -1684,3 +1818,8 @@ def _now_value(pdef: PropertyDefinition, instant: datetime, tz: Any) -> dict[str
         return {"start": to_local(instant, tz).date().isoformat(), "resolution": "day"}
     return {"start": _stamp(instant), "resolution": "time"}
 
+
+
+# M21: importing agentschedules sets M18's agentskills.SCHEDULE_SKILLS whenever the app runs. A late
+# import, since agentschedules imports this module's rules and schedule helpers.
+from . import agentschedules as _agentschedules  # noqa: E402, F401

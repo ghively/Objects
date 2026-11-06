@@ -9,9 +9,10 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api, RevisionConflictError } from '@/api/client'
 import type { ChangeEvent } from '@/api/types'
+import { resetAgents } from '@/agents/useAgents'
 import { resetAutomations } from '@/automations/useAutomations'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { automationRule, automationRun, objectSummary, typeDef } from '@/test/mockApi'
+import { agent, agentSchedule, automationRule, automationRun, objectSummary, typeDef } from '@/test/mockApi'
 import { resetSettingsModal } from '@/settings/useSettingsModal'
 import { AutomationsSection } from './Automations'
 
@@ -40,6 +41,7 @@ beforeEach(() => {
   resetAutomations()
   resetLinkIndex()
   resetSettingsModal()
+  resetAgents()
   useLinkIndex.setState({ types: [TASK] })
   mocked.automations.mockResolvedValue([BUTTON, CREATED, BROKEN, REPEAT])
   mocked.templates.mockResolvedValue([objectSummary({ path: 'Templates/Weekly review.md', id: 'tpl1', title: 'Weekly review', template: 'Weekly review' })])
@@ -166,5 +168,54 @@ describe('AutomationsSection', () => {
 
     await user.click(screen.getByRole('button', { name: 'Automations' }))
     expect(await screen.findByRole('listitem', { name: 'Stamp done' })).toBeInTheDocument()
+  })
+
+  // M21: agent schedules.
+  const RESEARCHER = '01JC7ZK3T9Q4M2X8B5N6R1V0WE'
+  const SCHEDULE = agentSchedule({
+    id: 'r5',
+    name: 'Weekly review',
+    revision: 's1',
+    actions: [{ kind: 'runAgent', agentId: RESEARCHER, prompt: 'Review last week.', model: null }],
+  })
+  const ORPHAN = agentSchedule({
+    id: 'r6',
+    name: 'Old digest',
+    actions: [{ kind: 'runAgent', agentId: '01JC7ZK3T9Q4M2X8B5N6R1V0ZZ', prompt: 'Digest.', model: null }],
+  })
+
+  test('test an agent schedule row names its agent', async () => {
+    mocked.automations.mockResolvedValue([BUTTON, SCHEDULE])
+    mocked.agents.mockResolvedValue([agent({ id: 'assistant' }), agent({ id: RESEARCHER, name: 'Researcher' })])
+    render(<AutomationsSection />)
+    const sched = await row('Weekly review')
+    await waitFor(() => expect(sched.getByTestId('rule-summary')).toHaveTextContent('Runs “Researcher” · Every week on Monday at'))
+    expect(sched.getByRole('switch', { name: 'Turned on: Weekly review' })).toBeInTheDocument()
+  })
+
+  test('test Edit of an agent schedule opens the schedule dialog', async () => {
+    mocked.automations.mockResolvedValue([SCHEDULE])
+    mocked.agents.mockResolvedValue([agent({ id: RESEARCHER, name: 'Researcher' })])
+    render(<AutomationsSection />)
+    const sched = await row('Weekly review')
+    await waitFor(() => expect(sched.getByTestId('rule-summary')).toHaveTextContent('Runs “Researcher”'))
+    await menu('Weekly review', 'Edit')
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Edit schedule')).toBeInTheDocument()
+    expect(within(dialog).getByRole('textbox', { name: 'Prompt' })).toHaveValue('Review last week.')
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  test('test a schedule of an unlisted agent says so', async () => {
+    mocked.automations.mockResolvedValue([ORPHAN])
+    mocked.agents.mockResolvedValue([agent({ id: RESEARCHER, name: 'Researcher' })])
+    render(<AutomationsSection />)
+    const sched = await row('Old digest')
+    await waitFor(() => expect(sched.getByTestId('rule-summary')).toHaveTextContent("Runs an agent that isn't listed · Every week on Monday at"))
+    await menu('Old digest', 'Edit')
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Edit schedule')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(within(dialog).getByRole('alert')).toHaveTextContent("That agent isn't listed any more.")
   })
 })

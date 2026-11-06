@@ -1,0 +1,127 @@
+/**
+ * M17: the agent page (spec section 2), a main-view target `{kind: 'agent', id, tab}`. The
+ * agent's icon and name, then its tabs (`AGENT_TABS`, sorted by order: Profile, Instructions,
+ * Tools, Memory, Skills, Learning, Chats). The agent comes from the shared list (`useAgents`),
+ * which the tabs update after a save; opening the page writes nothing. A changed `tab` prop (the
+ * agent opened again at another tab, e.g. "Memory & skills") switches to it, and so does every
+ * `openAgentTab` (the same target opened again after a tab was picked by hand).
+ *
+ * M20: the page shows the tabs for the agent's kind (`tabsFor`): a remote agent has Profile, Card
+ * and Chats, and its name carries the "remote" mark. A tab the agent doesn't have shows its first.
+ */
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { create } from 'zustand'
+import { IconOrEmoji } from '@/components/Icon'
+import { cn } from '@/lib/utils'
+import { useTabs } from '@/nav/tabs'
+import { AGENT_TABS, tabsFor } from './agentTabs'
+import { RemoteMark } from './RemoteMark'
+import { useAgents } from './useAgents'
+
+/**
+ * The last ask to show an agent's tab. Opening the target an open page already shows changes
+ * nothing in the tabs store, so `seq` tells the page to switch back to `tab` all the same.
+ */
+export const useAgentTabRequest = create<{ agentId: string | null; tab: string | null; seq: number }>(() => ({
+  agentId: null,
+  tab: null,
+  seq: 0,
+}))
+
+/** Ask an open page of the agent to show `tab` (call it with the open of `{kind: 'agent', id, tab}`). */
+export function requestAgentTab(agentId: string, tab: string): void {
+  useAgentTabRequest.setState((s) => ({ agentId, tab, seq: s.seq + 1 }))
+}
+
+/** Open the agent's page on `tab`, switching an open page to it even when it shows that target. */
+export function openAgentTab(agentId: string, tab: string): void {
+  requestAgentTab(agentId, tab)
+  useTabs.getState().open({ kind: 'agent', id: agentId, tab }, {})
+}
+
+export interface AgentPageProps {
+  id: string
+  /** The tab to show first (an `AGENT_TABS` id); Profile when absent or unknown. */
+  tab?: string
+}
+
+// Our strings.
+export const AGENT_PAGE_TEXT = {
+  tabs: 'Agent settings',
+  notListed: "This agent isn't listed any more.",
+  loading: 'Loading…',
+} as const
+
+export function AgentPage({ id, tab }: AgentPageProps) {
+  const agent = useAgents((s) => s.agents.find((a) => a.id === id))
+  const loaded = useAgents((s) => s.loaded)
+  const [active, setActive] = useState(() => (AGENT_TABS.some((t) => t.id === tab) ? tab! : AGENT_TABS[0].id))
+
+  useEffect(() => {
+    if (!useAgents.getState().loaded) void useAgents.getState().load()
+  }, [])
+
+  // M18: opening this agent again with another tab (the page stays mounted) shows that tab.
+  useEffect(() => {
+    if (tab && AGENT_TABS.some((t) => t.id === tab)) setActive(tab)
+  }, [tab])
+
+  // Every `openAgentTab` for this agent after the page mounted, the same tab again included.
+  const request = useAgentTabRequest()
+  const seenSeq = useRef(request.seq)
+  useEffect(() => {
+    if (request.seq === seenSeq.current) return
+    seenSeq.current = request.seq
+    if (request.agentId === id && request.tab && AGENT_TABS.some((t) => t.id === request.tab)) setActive(request.tab)
+  }, [request, id])
+
+  if (!agent) {
+    return (
+      <div className="flex h-full items-center justify-center p-8 text-center text-fg-muted">
+        {loaded ? AGENT_PAGE_TEXT.notListed : AGENT_PAGE_TEXT.loading}
+      </div>
+    )
+  }
+
+  const tabs = tabsFor(agent.kind)
+  const current = tabs.find((t) => t.id === active) ?? tabs[0]
+  const Body = current.component
+  const remote = agent.kind === 'remote'
+
+  return (
+    <div className="mx-auto flex w-full max-w-[760px] flex-col gap-4 px-8 py-8" data-agent-page={agent.id}>
+      <header className="flex items-center gap-3">
+        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-line">
+          <IconOrEmoji icon={agent.icon} fallback={remote ? 'ph-globe' : agent.default ? 'ph-sparkle' : 'ph-robot'} size={22} />
+        </span>
+        <h1 className="min-w-0 truncate text-[24px] font-semibold">{agent.name}</h1>
+        {remote && <RemoteMark />}
+        <span className="flex-1" />
+      </header>
+      <div role="tablist" aria-label={AGENT_PAGE_TEXT.tabs} className="flex flex-wrap items-center gap-1 border-b border-line pb-2">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            id={`agent-tab-${t.id}`}
+            aria-selected={t.id === current.id}
+            aria-controls={`agent-panel-${t.id}`}
+            onClick={() => setActive(t.id)}
+            className={cn(
+              'h-9 rounded-lg px-4 text-[15px]',
+              t.id === current.id ? 'bg-hover font-medium text-fg' : 'text-fg-muted hover:text-fg',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id={`agent-panel-${current.id}`} aria-labelledby={`agent-tab-${current.id}`}>
+        <Suspense fallback={<p className="text-[14px] text-fg-muted">{AGENT_PAGE_TEXT.loading}</p>}>
+          <Body key={`${agent.id}:${current.id}`} agent={agent} />
+        </Suspense>
+      </div>
+    </div>
+  )
+}

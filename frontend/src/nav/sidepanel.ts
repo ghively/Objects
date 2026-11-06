@@ -42,8 +42,10 @@ export function followsMain(t: SidepanelTarget | null | undefined): boolean {
   return t?.kind === 'localGraph' || isBacklinksTarget(t)
 }
 
-/** M10: the AI chat entry (`{kind: 'aiChat', path?}`). */
-export function isAiChatTarget(t: SidepanelTarget | null | undefined): t is { kind: 'aiChat'; path?: string } {
+/** M10: the AI chat entry (`{kind: 'aiChat', path?}`; M17 adds `agentId?` and `chatId?`). */
+export function isAiChatTarget(
+  t: SidepanelTarget | null | undefined,
+): t is Extract<SidepanelTarget, { kind: 'aiChat' }> {
   return t?.kind === 'aiChat'
 }
 

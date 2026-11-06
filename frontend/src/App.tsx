@@ -7,6 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { createAndOpen } from '@/create/createAndOpen'
 import { NewObjectMenu } from '@/create/NewObjectMenu'
 import { AllNotesView } from '@/allnotes/AllNotesView'
+import { AgentPage } from '@/agents/AgentPage'
 import { CollectionPage } from '@/collections/CollectionPage'
 import { QueriesPage } from '@/queries/QueriesPage'
 import { QueryPage } from '@/queries/QueryPage'
@@ -156,6 +157,9 @@ function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
     case 'search':
       // M8: the extended search page; a new query or toggle remounts it with what was typed.
       return <SearchPage key={`${target.q ?? ''}|${target.textOnly ? 1 : 0}`} q={target.q} textOnly={target.textOnly} />
+    case 'agent':
+      // M17: the agent page (Profile, Instructions, Tools, Chats).
+      return <AgentPage key={target.id} id={target.id} tab={target.tab} />
   }
 }
 
