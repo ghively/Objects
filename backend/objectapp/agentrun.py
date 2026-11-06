@@ -385,6 +385,13 @@ def _local_agent_folders(state: Path) -> list[Path]:
     return AgentRegistry(state).local_folders()
 
 
+def closed_agent_folders(state: Path) -> list[Path]:
+    """The agent folders the fence closes, for checks outside a run (an import's source):
+    ``<state>/agents`` (which holds the agent trash), every local agent folder, and the trash."""
+    agents = Path(state) / AGENTS_DIR
+    return _dedupe([*_both_forms(agents), *_local_agent_folders(state), *_both_forms(agents / TRASH_DIR)])
+
+
 def _space_folders(state: Path, current: Path) -> list[Path]:
     from .spaces import Registry
 
