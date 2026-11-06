@@ -484,8 +484,19 @@ class AlertWatch:
             }
             changed.append((p.name, got))
 
-        if changed:
-            self._apply(report, changed, old_files, new_files)
+        removed = sorted(n for n in old_files if n not in new_files)
+        if changed or removed:
+            failed = self._apply(report, changed, old_files, new_files, removed)
+            for name in failed:
+                if name in new_files:
+                    # Not applied: no signature, so the next scan reads it again; keys
+                    # that left it stay known so they are cleared once it applies.
+                    e = new_files[name]
+                    prev_keys = (old_files.get(name) or {}).get("keys") or []
+                    e["sig"] = None
+                    e["keys"] = [*e.get("keys", []), *(k for k in prev_keys if k not in e.get("keys", []))]
+                elif isinstance(old_files.get(name), dict):
+                    new_files[name] = old_files[name]  # a gone file whose alerts weren't cleared
 
         state = {"schemaVersion": _SCHEMA, "folder": str(folder), "files": new_files}
         if state != old:
@@ -501,7 +512,11 @@ class AlertWatch:
         changed: list[tuple[str, dict]],
         old_files: dict[str, dict],
         new_files: dict[str, dict],
-    ) -> None:
+        removed: list[str] | None = None,
+    ) -> set[str]:
+        """Write the changed files' alerts; the names of the files (changed or gone) whose
+        alerts could not all be written."""
+        failed: set[str] = set()
         space = self.space
         now = space.clock()
         t = alerttype.alert_type(space)
@@ -511,6 +526,18 @@ class AlertWatch:
             seen.update(e.get("keys") or [])
 
         with writeorigin.acting_as(writeorigin.ALERTS):
+            for name in removed or []:  # a file gone from the folder: its alerts clear
+                prev = old_files.get(name)
+                for key in sorted(set((prev or {}).get("keys") or []) - seen):
+                    if key not in index or index[key][1].get("clearedAt"):
+                        continue
+                    try:
+                        self._update(index[key][0], {"clearedAt": _instant(now)}, [])
+                        report.cleared += 1
+                    except Exception as exc:  # noqa: BLE001
+                        _log.warning("Alert %s could not be cleared", key, exc_info=True)
+                        report.errors.append(f"Can't write {key}: {exc}"[:MAX_FIELD])
+                        failed.add(name)
             for name, got in changed:
                 source = got["source"]
                 done: set[str] = set()
@@ -540,6 +567,7 @@ class AlertWatch:
                             "Alert %s could not be written", key, exc_info=True
                         )
                         report.errors.append(f"Can't write {key}: {exc}"[:MAX_FIELD])
+                        failed.add(name)
 
                 # Keys that left this file (which read fine) get Cleared at, once.
                 prev = old_files.get(name)
@@ -565,6 +593,8 @@ class AlertWatch:
                             "Alert %s could not be cleared", key, exc_info=True
                         )
                         report.errors.append(f"Can't write {key}: {exc}"[:MAX_FIELD])
+                        failed.add(name)
+        return failed
 
     def _announce(self, event: ChangeEvent) -> None:
         try:

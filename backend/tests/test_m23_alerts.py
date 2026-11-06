@@ -471,3 +471,38 @@ def test_redaction_covers_compound_keys_json_and_whole_values() -> None:
     assert c("token: abc seen") == "token: [redacted] seen"
     assert c("line one\nsecret=abc\nline three") == "line one\nsecret=[redacted]\nline three"
     assert c("nothing to hide here") == "nothing to hide here"
+
+
+def test_deleted_file_clears_its_alerts(space: Space, mon: Path, clock: Clock) -> None:
+    watch = _watch(space, mon)
+    watch.scan_once()
+    assert not any(fm.get("clearedAt") for _p, fm in _by_key(space).values()
+                   if fm["alertKey"].startswith("printer-watch|"))
+    (mon / "printer-watch.json").unlink()
+    clock.now = datetime(2026, 11, 5, 10, 5, tzinfo=UTC)
+    report = watch.scan_once()
+    assert report.cleared == 2
+    mine = [fm for _p, fm in _by_key(space).values() if fm["alertKey"].startswith("printer-watch|")]
+    assert mine and all(fm["clearedAt"] == "2026-11-05T10:05:00.000Z" for fm in mine)
+    assert all(s["file"] != "printer-watch.json" for s in watch.sources())
+    again = watch.scan_once()
+    assert again.cleared == 0
+
+
+def test_failed_apply_is_retried(space: Space, root: Path, mon: Path) -> None:
+    watch = _watch(space, mon)
+    real = watch._create
+    boom = {"on": True}
+
+    def create(*a, **k):
+        if boom["on"]:
+            raise OSError("disk says no")
+        return real(*a, **k)
+
+    watch._create = create  # type: ignore[method-assign]
+    first = watch.scan_once()
+    assert first.created == 0 and any("Can't write" in e for e in first.errors)
+    boom["on"] = False
+    second = watch.scan_once()
+    assert second.created > 0
+    assert any(k.startswith("printer-watch|") for k in _by_key(space))
