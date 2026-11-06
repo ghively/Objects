@@ -27,6 +27,7 @@ The reply is steered by markers in the user message's text parts:
 - ``A2A:slow:<s>``: ``TASK_STATE_WORKING``, then completes after ``<s>`` seconds;
 - ``A2A:long:<n>``: a text of ``n`` characters;
 - ``A2A:echo-parts``: every received text part, joined by blank lines.
+- ``A2A:message``: a ``{"message": ...}`` result (no task) with "Just a message: <first text part>".
 
 A message whose ``taskId`` the fake doesn't know answers the JSON-RPC error ``-32001``.
 Streaming answers send ``task`` (working), then ``artifactUpdate``s (the text in two chunks, the
@@ -345,6 +346,21 @@ class _Handler(BaseHTTPRequestHandler):
             message = params.get("message")
             if not isinstance(message, dict):
                 self._rpc_error(rpc_id, -32602, "Invalid params")
+                return
+            msg_text = [str(p["text"]) for p in message.get("parts") or []
+                        if isinstance(p, dict) and isinstance(p.get("text"), str)]
+            if any("A2A:message" in t for t in msg_text):
+                reply = _agent_message(f"Just a message: {msg_text[0]}",
+                                       str(message.get("contextId") or f"ctx-{uuid.uuid4().hex[:8]}"), None)
+                if method == "SendStreamingMessage":
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/event-stream")
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    self.close_connection = True
+                    self._event(rpc_id, {"message": reply})
+                else:
+                    self._json(200, {"jsonrpc": "2.0", "id": rpc_id, "result": {"message": reply}})
                 return
             planned = fake.plan(message)
             if isinstance(planned, str):
