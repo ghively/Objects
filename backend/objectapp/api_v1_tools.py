@@ -679,6 +679,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         refused it for want of ``confirm``), so the 428 can count only what the API may show.
         """
         from .typemodel import TypeDefinition, topup_task_type
+        from .workfields import topup_work_fields
 
         data = {**edited, "id": tid}
         data.setdefault("schemaVersion", 2)
@@ -691,7 +692,11 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
             if mem is None:
                 return []
             stored = space._stored_type(tid)
-            old = topup_task_type(stored) if stored is not None else mem
+            old = (  # as `Space.save_type` plans it (M22: the work fields too)
+                topup_work_fields(topup_task_type(stored), space.types)
+                if stored is not None
+                else mem
+            )
             new.id, new.folder, new.basic = old.id, old.folder, old.basic
             new.formerNames = list(old.formerNames)
             new.name = " ".join(str(new.name or "").split())
