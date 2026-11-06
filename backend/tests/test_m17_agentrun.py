@@ -263,6 +263,7 @@ def test_contributor_order(env) -> None:
     def gw2(scope: RunScope, parts: RunParts) -> None:
         parts.mcp_servers["gw2"] = {"command": "gw2"}
 
+    saved = dict(agentrun._contributors)  # M18 registers its own contributors; put them back after
     add_contributor("memory-snapshot", 10, mem)
     add_contributor("gateway", 35, gw)
     try:
@@ -278,9 +279,10 @@ def test_contributor_order(env) -> None:
         assert orders == sorted(orders)
         assert ("memory-snapshot" in [n for _, n in orders])
     finally:
-        agentrun._contributors.pop("memory-snapshot", None)
-        agentrun._contributors.pop("gateway", None)
-    assert [(o, n) for o, n, _ in contributors()] == [
+        agentrun._contributors.clear()
+        agentrun._contributors.update(saved)
+    m17 = {"folder-mcp", "object-mcp", "agent-mcp", "guidance", "tools", "fence"}
+    assert [(o, n) for o, n, _ in contributors() if n in m17] == [
         (20, "folder-mcp"), (30, "object-mcp"), (40, "agent-mcp"), (50, "guidance"), (60, "tools"), (70, "fence"),
     ]
 

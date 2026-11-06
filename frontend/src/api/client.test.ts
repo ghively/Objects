@@ -247,6 +247,34 @@ describe('api client v2 writes', () => {
     expect(sources[0].closed).toBe(true)
   })
 
+  test('test agentLearning is a resync event', async () => {
+    const sources: FakeSource[] = []
+    class FakeSource extends EventTarget {
+      onerror: (() => void) | null = null
+      onopen: (() => void) | null = null
+      readonly url: string
+      constructor(url: string) {
+        super()
+        this.url = url
+        sources.push(this)
+      }
+      close() {}
+    }
+    vi.stubGlobal('EventSource', FakeSource)
+    const seen: ChangeEvent[] = []
+    const off = api.onChange((e) => seen.push(e))
+    try {
+      sources[0].onerror?.()
+      sources[0].onopen?.()
+      expect(seen).toContainEqual({ kind: 'agentLearning', path: '*', version: null, origin: null })
+      expect(seen.map((e) => e.kind)).toEqual([
+        'types', 'views', 'ui', 'collections', 'queries', 'automations', 'agents', 'agentChats', 'agentLearning',
+      ])
+    } finally {
+      off()
+    }
+  })
+
   test('fileUrl points at the image route', () => {
     expect(api.fileUrl('Attachments/cover 1.png')).toBe('/api/file?path=Attachments%2Fcover+1.png')
   })

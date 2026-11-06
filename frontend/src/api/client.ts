@@ -6,6 +6,15 @@ import type {
   AgentTrashItem,
   CreateAgentRequest,
   ToolGroup,
+  ChatSearchHit,
+  LearningSettings,
+  LearningState,
+  LedgerEntry,
+  LedgerSummary,
+  MemoryFile,
+  ReviewStatus,
+  SkillDetail,
+  SkillSummary,
   RelationPairKind,
   RelationPairResult,
   SaveAiChatRequest,
@@ -436,6 +445,7 @@ const RESYNC_EVENTS: readonly ChangeEvent[] = [
   { kind: 'automations', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'agents', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'agentChats', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'agentLearning', path: RESYNC_PATH, version: null, origin: null },
 ]
 
 /**
@@ -1485,6 +1495,136 @@ export const api = {
   /** Show the agent's folder in the OS file manager. */
   revealAgentFolder(id: string): Promise<{ ok: boolean }> {
     return request<{ ok: boolean }>(`/agents/${seg(id)}/reveal`, json('POST', {}))
+  },
+
+  // ---- M18: learning ("Contract (T1)", routes filled by the plan's T6) ----
+
+  /** The agent's MEMORY.md and USER.md. Never writes. */
+  agentMemory(id: string): Promise<{ memory: MemoryFile; user: MemoryFile }> {
+    return request<{ memory: MemoryFile; user: MemoryFile }>(`/agents/${seg(id)}/memory`)
+  },
+
+  /** Save a whole memory file. Rejects with `RevisionConflictError` (409) or `ReadOnlyError` (423). */
+  saveAgentMemory(id: string, target: MemoryFile['target'], text: string, baseRevision: string | null): Promise<MemoryFile> {
+    return request<MemoryFile>(
+      `/agents/${seg(id)}/memory/${seg(target)}`,
+      json('PUT', { text, baseRevision, clientId: CLIENT_ID }),
+    )
+  },
+
+  /** The agent's skills (active and stale), or with `archived` the archived ones. */
+  async agentSkills(id: string, archived?: boolean): Promise<SkillSummary[]> {
+    const res = await request<{ skills: SkillSummary[] }>(
+      `/agents/${seg(id)}/skills${qs({ archived: archived ? 'true' : undefined })}`,
+    )
+    return res?.skills ?? []
+  },
+
+  /** Write a new skill (`createdBy: 'user'`). 404, 409 (the name is taken), 422. */
+  createAgentSkill(id: string, req: { name: string; description: string; body: string }): Promise<SkillDetail> {
+    return request<SkillDetail>(`/agents/${seg(id)}/skills`, json('POST', { ...req, clientId: CLIENT_ID }))
+  },
+
+  /** One skill with its SKILL.md text and files. */
+  agentSkill(id: string, name: string, archived?: boolean): Promise<SkillDetail> {
+    return request<SkillDetail>(`/agents/${seg(id)}/skills/${seg(name)}${qs({ archived: archived ? 'true' : undefined })}`)
+  },
+
+  /** One file of a skill; `binary` (and `text` null) when it isn't UTF-8. */
+  agentSkillFile(
+    id: string,
+    name: string,
+    path: string,
+    archived?: boolean,
+  ): Promise<{ path: string; text: string | null; revision: string; binary: boolean }> {
+    return request<{ path: string; text: string | null; revision: string; binary: boolean }>(
+      `/agents/${seg(id)}/skills/${seg(name)}/file${qs({ path, archived: archived ? 'true' : undefined })}`,
+    )
+  },
+
+  /** Save one file of a skill. Rejects with `ConflictError` (409); 413, 422. */
+  saveAgentSkillFile(id: string, name: string, path: string, text: string, baseRevision: string | null): Promise<{ revision: string }> {
+    return request<{ revision: string }>(
+      `/agents/${seg(id)}/skills/${seg(name)}/file`,
+      json('PUT', { path, text, baseRevision, clientId: CLIENT_ID }),
+    )
+  },
+
+  /** Move a skill to the archive (restorable). */
+  archiveAgentSkill(id: string, name: string): Promise<SkillSummary> {
+    return request<SkillSummary>(`/agents/${seg(id)}/skills/${seg(name)}/archive`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** Bring an archived skill back. 409 when a skill with its name is active. */
+  restoreAgentSkill(id: string, name: string): Promise<SkillSummary> {
+    return request<SkillSummary>(`/agents/${seg(id)}/skills/${seg(name)}/restore`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** Pin or unpin a skill (the curator never touches a pinned one). */
+  pinAgentSkill(id: string, name: string, pinned: boolean): Promise<SkillSummary> {
+    return request<SkillSummary>(`/agents/${seg(id)}/skills/${seg(name)}/pin`, json('POST', { pinned, clientId: CLIENT_ID }))
+  },
+
+  /** The agent's changes, newest first; `more` when older ones exist. */
+  async agentLedger(
+    id: string,
+    query?: { target?: string; skill?: string; run?: string; limit?: number; before?: string },
+  ): Promise<{ entries: LedgerSummary[]; more: boolean }> {
+    const res = await request<{ entries: LedgerSummary[]; more: boolean }>(
+      `/agents/${seg(id)}/ledger${qs({
+        target: query?.target,
+        skill: query?.skill,
+        run: query?.run,
+        limit: query?.limit === undefined ? undefined : String(query.limit),
+        before: query?.before,
+      })}`,
+    )
+    return { entries: res?.entries ?? [], more: Boolean(res?.more) }
+  },
+
+  /** One change with its before and after text. */
+  agentLedgerEntry(id: string, entryId: string): Promise<LedgerEntry> {
+    return request<LedgerEntry>(`/agents/${seg(id)}/ledger/${seg(entryId)}`)
+  },
+
+  /** Undo one change; resolves with the new undo entry. Rejects with `ConflictError` (409) when it changed again since. */
+  undoLedgerEntry(id: string, entryId: string): Promise<LedgerSummary> {
+    return request<LedgerSummary>(`/agents/${seg(id)}/ledger/${seg(entryId)}/undo`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** The agent's learning settings, their defaults and the curator's state. */
+  agentLearning(id: string): Promise<LearningState> {
+    return request<LearningState>(`/agents/${seg(id)}/learning`)
+  },
+
+  /** Save the learning settings. Rejects with `RevisionConflictError` (409) or `ReadOnlyError` (423); 422. */
+  saveAgentLearning(id: string, learning: Partial<LearningSettings>, baseRevision: string | null): Promise<LearningState> {
+    return request<LearningState>(
+      `/agents/${seg(id)}/learning`,
+      json('PUT', { learning, baseRevision, clientId: CLIENT_ID }),
+    )
+  },
+
+  /** "Tidy up now": the curator's consolidation run, once. 409 while one runs; 503 without claude. */
+  tidyAgentSkills(id: string): Promise<{ runId: string }> {
+    return request<{ runId: string }>(`/agents/${seg(id)}/curator/tidy`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** Full-text search over the agent's chats, best first. */
+  async searchAgentChats(id: string, q: string): Promise<ChatSearchHit[]> {
+    const res = await request<{ hits: ChatSearchHit[] }>(`/agents/${seg(id)}/chats/search${qs({ q })}`)
+    return res?.hits ?? []
+  },
+
+  /** "Learn from this chat": a review on demand. 409 while one runs for the chat; 422; 503. */
+  learnFromChat(id: string, chatId: string): Promise<ReviewStatus> {
+    return request<ReviewStatus>(`/agents/${seg(id)}/chats/${seg(chatId)}/learn`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** A chat's reviews, oldest first. */
+  async chatReviews(id: string, chatId: string): Promise<ReviewStatus[]> {
+    const res = await request<{ reviews: ReviewStatus[] }>(`/agents/${seg(id)}/chats/${seg(chatId)}/reviews`)
+    return res?.reviews ?? []
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */

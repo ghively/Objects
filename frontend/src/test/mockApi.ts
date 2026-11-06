@@ -21,6 +21,12 @@ import type {
   Collection,
   CreateAgentRequest,
   DeviceSettings,
+  LearningSettings,
+  LearningState,
+  LedgerSummary,
+  MemoryFile,
+  ReviewStatus,
+  SkillSummary,
   GraphData,
   ImportJob,
   ImportPreview,
@@ -348,6 +354,82 @@ export function agentTranscript(partial: Partial<AgentTranscript> & Pick<AgentTr
   }
 }
 
+/** M18: a skill (an agent-made, active one); `partial` overrides. */
+export function skillSummary(partial: Partial<SkillSummary> & Pick<SkillSummary, 'name'>): SkillSummary {
+  return {
+    description: 'How to label server racks',
+    createdBy: 'agent',
+    state: 'active',
+    pinned: false,
+    uses: 0,
+    lastUsed: null,
+    createdAt: '2026-11-05T09:00:00.000Z',
+    absorbedInto: null,
+    ...partial,
+  }
+}
+
+/** M18: a ledger entry without its before and after (a memory saved in a chat); `partial` overrides. */
+export function ledgerSummary(partial: Partial<LedgerSummary> & Pick<LedgerSummary, 'id'>): LedgerSummary {
+  return {
+    at: '2026-11-05T09:00:00.000Z',
+    target: 'memory',
+    action: 'add',
+    skill: null,
+    file: null,
+    absorbedInto: null,
+    source: { kind: 'chat', agentId: 'assistant', chatId: '01JCHAT0000000000000000000', run: null },
+    undoes: null,
+    line: 'Saved a memory',
+    ...partial,
+  }
+}
+
+/** M18: a finished automatic review of both kinds; `partial` overrides. */
+export function reviewStatus(partial: Partial<ReviewStatus> & Pick<ReviewStatus, 'id'>): ReviewStatus {
+  return {
+    agentId: 'assistant',
+    chatId: '01JCHAT0000000000000000000',
+    kinds: ['memory', 'skills'],
+    trigger: 'auto',
+    state: 'done',
+    startedAt: '2026-11-05T09:00:00.000Z',
+    endedAt: '2026-11-05T09:00:30.000Z',
+    summary: 'Saved 1 memory, updated 1 skill',
+    message: null,
+    entryIds: [],
+    ...partial,
+  }
+}
+
+const LEARNING_DEFAULTS: LearningSettings = {
+  memoryChars: 2200,
+  userChars: 1375,
+  memoryReviewEvery: 10,
+  skillReviewEvery: 10,
+  reviewModel: null,
+  curator: true,
+  curatorIdleHours: 2,
+  curatorEveryDays: 7,
+  consolidate: false,
+}
+
+/** M18: an agent's learning state with the default settings; `partial` overrides. */
+export function learningState(partial: Partial<LearningState> = {}): LearningState {
+  return {
+    settings: { ...LEARNING_DEFAULTS },
+    defaults: { ...LEARNING_DEFAULTS },
+    curator: { lastRunAt: null, nextDueAt: null, running: false, report: null },
+    revision: 'r1',
+    ...partial,
+  }
+}
+
+function memoryFile(target: MemoryFile['target'], text = '', revision: string | null = null): MemoryFile {
+  const entries = text ? text.split(/\n§\n/).filter((e) => e.trim() !== '') : []
+  return { target, text, entries, chars: text.length, cap: target === 'memory' ? 2200 : 1375, revision }
+}
+
 type Fn =(...args: never[]) => unknown
 
 function defaults(): Api {
@@ -634,6 +716,47 @@ function defaults(): Api {
     agentChats: async () => [],
     agentChat: async (id: string, chatId: string) => agentTranscript({ id: chatId, agentId: id }),
     revealAgentFolder: async () => ({ ok: true }),
+    // M18
+    agentMemory: async () => ({ memory: memoryFile('memory'), user: memoryFile('user') }),
+    saveAgentMemory: async (_id: string, target: MemoryFile['target'], text: string, baseRevision: string | null) =>
+      memoryFile(target, text, `${baseRevision ?? 'r0'}+1`),
+    agentSkills: async () => [],
+    createAgentSkill: async (_id: string, req: { name: string; description: string; body: string }) => ({
+      ...skillSummary({ name: req.name, description: req.description, createdBy: 'user' }),
+      text: req.body,
+      revision: 'r1',
+      files: [{ path: 'SKILL.md', size: req.body.length }],
+    }),
+    agentSkill: async (_id: string, name: string) => ({
+      ...skillSummary({ name }),
+      text: '',
+      revision: 'r1',
+      files: [{ path: 'SKILL.md', size: 0 }],
+    }),
+    agentSkillFile: async (_id: string, _name: string, path: string) => ({ path, text: '', revision: 'r1', binary: false }),
+    saveAgentSkillFile: async (_id: string, _name: string, _path: string, _text: string, baseRevision: string | null) => ({
+      revision: `${baseRevision ?? 'r0'}+1`,
+    }),
+    archiveAgentSkill: async (_id: string, name: string) => skillSummary({ name, state: 'archived' }),
+    restoreAgentSkill: async (_id: string, name: string) => skillSummary({ name }),
+    pinAgentSkill: async (_id: string, name: string, pinned: boolean) => skillSummary({ name, pinned }),
+    agentLedger: async () => ({ entries: [], more: false }),
+    agentLedgerEntry: async (_id: string, entryId: string) => ({
+      ...ledgerSummary({ id: entryId }),
+      before: null,
+      after: 'A memory',
+      encoding: 'text' as const,
+    }),
+    undoLedgerEntry: async (_id: string, entryId: string) =>
+      ledgerSummary({ id: '01JUNDO0000000000000000000', action: 'undo', undoes: entryId, line: 'Undid: Saved a memory' }),
+    agentLearning: async () => learningState(),
+    saveAgentLearning: async (_id: string, learning: Partial<LearningSettings>, baseRevision: string | null) =>
+      learningState({ settings: { ...LEARNING_DEFAULTS, ...learning }, revision: `${baseRevision ?? 'r0'}+1` }),
+    tidyAgentSkills: async () => ({ runId: '01JTIDY0000000000000000000' }),
+    searchAgentChats: async () => [],
+    learnFromChat: async (id: string, chatId: string) =>
+      reviewStatus({ id: '01JREVIEW00000000000000000', agentId: id, chatId, trigger: 'manual', state: 'running', endedAt: null, summary: null }),
+    chatReviews: async () => [],
     onChange: () => () => undefined,
   } as unknown as Api
 }

@@ -24,6 +24,7 @@ if TYPE_CHECKING:  # agents imports this module
 __all__ = [
     "AGENT_SERVER",
     "AGENT_TOOLS",
+    "AGENT_TOOL_LABELS",
     "ALWAYS_ALLOWED",
     "BUILTINS",
     "GROUP_LABELS",
@@ -69,8 +70,22 @@ OBJECT_WRITE: tuple[str, ...] = (
 )
 """The write tools of ``objectapp-mcp`` (short names). M22 appends 6."""
 
-AGENT_TOOLS: tuple[str, ...] = ("agent_info",)
+AGENT_TOOLS: tuple[str, ...] = (
+    "agent_info",
+    # M18
+    "memory", "skills_list", "skill_view", "skill_manage", "session_search",
+)
 """The ``object-agent`` server's tools. M18, M20, M21 and M24 append names here, in build order."""
+
+AGENT_TOOL_LABELS: dict[str, str] = {
+    # M18 (our strings)
+    "memory": "Memory",
+    "skills_list": "List skills",
+    "skill_view": "Read skills",
+    "skill_manage": "Change skills",
+    "session_search": "Search chats",
+}
+"""Row labels for agent tools whose `_label` form doesn't read well; the others use `_label`."""
 
 
 @dataclass(frozen=True)
@@ -133,7 +148,8 @@ def _mcp(server: str, tool: str) -> str:
 
 
 def _server_entries(server: str, names: Iterable[str]) -> tuple[ToolEntry, ...]:
-    return tuple(ToolEntry(_mcp(server, n), _label(n), (_mcp(server, n),)) for n in names)
+    labels = AGENT_TOOL_LABELS if server == AGENT_SERVER else {}
+    return tuple(ToolEntry(_mcp(server, n), labels.get(n) or _label(n), (_mcp(server, n),)) for n in names)
 
 
 def catalogue(folder_servers: Iterable[str] = ()) -> list[ToolGroup]:

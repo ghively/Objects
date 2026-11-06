@@ -132,7 +132,8 @@ def test_tool_modules_extend(http: TestClient, monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_default_tool_modules() -> None:
-    assert agent_mcp.TOOL_MODULES == ("objectapp.agent_tools_core",)
+    # M18 and later milestones append their modules after M17's.
+    assert agent_mcp.TOOL_MODULES[0] == "objectapp.agent_tools_core"
 
 
 def test_main_refuses_non_loopback(monkeypatch: pytest.MonkeyPatch) -> None:
