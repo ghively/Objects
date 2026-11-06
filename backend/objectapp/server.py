@@ -163,6 +163,8 @@ from starlette.background import BackgroundTask
 from starlette.middleware.gzip import GZipMiddleware
 
 from . import (
+    api_agent_v1,
+    api_agents,
     api_automations,
     api_ai,
     api_blocks,
@@ -175,6 +177,7 @@ from . import (
     api_spaces_m8,
     api_tasks,
     api_v1,
+    api_v1_tools,
     media,
 )
 from .apictx import ApiContext
@@ -250,7 +253,7 @@ EVENT_QUEUE_MAX = 1000
 
 RESYNC_EVENTS = tuple(
     ChangeEvent(kind, "*", None)
-    for kind in ("types", "views", "ui", "collections", "queries", "automations")
+    for kind in ("types", "views", "ui", "collections", "queries", "automations", "agents", "agentChats")
 )
 """What replaces a dropped backlog: the resync the client itself announces after a
 reconnect (``api/client.ts`` ``RESYNC_EVENTS``), on which every consumer reloads."""
@@ -2089,10 +2092,16 @@ def create_app(
     for module in (api_tasks, api_history, api_blocks, api_merge, api_spaces_m8):
         api.include_router(module.router(ctx))
     # M15: the import routes (`api_import`; the importers are in `importers/`).
-    api.include_router(api_import.router(ctx))
+    imports = api_import.router(ctx)
+    api.include_router(imports)
     api.include_router(api_automations.router(ctx, automations))
     # M11: the local API for agents and scripts (Bearer tokens) and its token routes.
     api.include_router(api_v1.router(ctx))
+    # M17: the v1 routes behind the expanded objectapp-mcp, an agent's own v1 routes and the
+    # agent routes (filled by the plan's T5, T6 and T7).
+    api.include_router(api_v1_tools.router(ctx, automations, imports))
+    api.include_router(api_agent_v1.router(ctx))
+    api.include_router(api_agents.router(ctx))
     # M10: the AI assistant (status, a chat turn over SSE, saved AI chats).
     api.include_router(api_ai.router(ctx))
     app.include_router(api)

@@ -49,6 +49,8 @@ export type Target =
   | { kind: 'graph' }
   /** M8: the extended search page ("Search"), with what was typed. */
   | { kind: 'search'; q?: string; textOnly?: boolean }
+  /** M17: an agent's page (Settings for one agent), on one of its tabs (`profile` when absent). */
+  | { kind: 'agent'; id: string; tab?: string }
 
 /**
  * What a side-panel entry shows (Task 15): a page target, M5's local graph of the tab's object,
@@ -56,7 +58,12 @@ export type Target =
  * object once the chat has been saved (none for a new chat). The AI chat is not a page target: it
  * can't swap with the main view or open as a page.
  */
-export type SidepanelTarget = Target | { kind: 'localGraph' } | { kind: 'backlinks' } | { kind: 'aiChat'; path?: string }
+export type SidepanelTarget =
+  | Target
+  | { kind: 'localGraph' }
+  | { kind: 'backlinks' }
+  /** M17: `agentId` (absent: the default agent) and `chatId` (the chat's transcript) join M10's `path`. */
+  | { kind: 'aiChat'; path?: string; agentId?: string; chatId?: string }
 
 /** One side-panel entry. `target: null` is the empty "Explore" entry. */
 export interface SidepanelEntry {
@@ -188,8 +195,18 @@ export function sameTarget(a: SidepanelTarget | null | undefined, b: SidepanelTa
     case 'localGraph':
     case 'backlinks':
       return true
-    case 'aiChat':
-      return (a.path ?? null) === ((b as typeof a).path ?? null)
+    case 'aiChat': {
+      const o = b as typeof a
+      return (
+        (a.path ?? null) === (o.path ?? null) &&
+        (a.agentId ?? null) === (o.agentId ?? null) &&
+        (a.chatId ?? null) === (o.chatId ?? null)
+      )
+    }
+    case 'agent': {
+      const o = b as typeof a
+      return a.id === o.id && (a.tab ?? null) === (o.tab ?? null)
+    }
     case 'type':
     case 'typeSettings':
       return a.typeId === (b as typeof a).typeId
