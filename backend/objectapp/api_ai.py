@@ -1,6 +1,8 @@
-"""The AI assistant's routes (M10), mounted on ``/api``.
+"""The AI assistant's routes (M10, M16), mounted on ``/api``.
 
 - ``GET  /ai/status`` -> `AiStatus` (is the Claude Code CLI there and does it answer)
+- ``GET  /ai/models`` -> `AiModels` (M16: `aimodels.MODELS` and the model-name pattern;
+  answered also when "Hide AI features" is on)
 - ``POST /ai/chat`` `AiChatRequest` -> ``text/event-stream``, one ``data: <AiEvent JSON>``
   frame per event, ending with ``done`` or ``error``. 403 when "Hide AI features" is on.
   A ``block`` is sent only when ``blockPath`` names an object the assistant may see (not
@@ -8,6 +10,9 @@
   ``history`` (rephrasing an answer); otherwise the stream is one ``error`` event and the
   CLI isn't started. ``history`` keeps its newest `MAX_HISTORY` messages within
   `MAX_TEXT` characters; a ``sessionId`` that isn't a UUID is ignored (a fresh session).
+  ``model`` (M16) is this chat's pick: empty means none; a name `aimodels.clean_model`
+  refuses is a 422 before the CLI is looked for. The turn runs on the pick, else the
+  ``aiModel`` setting, else the CLI's default (no ``--model``).
   The turn gets a read-only token held in memory (`TokenStore.ephemeral`, named "AI
   assistant") for Object's MCP read tools; it is revoked when the stream ends. Closing
   the stream stops the CLI.
@@ -33,7 +38,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
-from . import ai
+from . import ai, aimodels
 from .aichat import (
     chat_keys,
     default_title,
@@ -73,6 +78,7 @@ class ChatRequest(BaseModel):
     history: list[AiMessageModel] = []
     sessionId: str | None = None
     clientId: str | None = None
+    model: str | None = None
 
 
 class SaveChatRequest(BaseModel):
@@ -120,6 +126,10 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
     def ai_status():
         return ai.status(_settings().get("claudePath"))
 
+    @r.get("/ai/models")
+    def ai_models():
+        return aimodels.models_payload()
+
     @r.post("/ai/chat")
     async def ai_chat(req: ChatRequest, request: Request):
         settings = await asyncio.to_thread(_settings)
@@ -129,6 +139,10 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             return _error(422, f"At most {MAX_CONTEXT_PATHS} context pages.")
         if len(req.prompt) > MAX_TEXT or len(req.block or "") > MAX_TEXT:
             return _error(422, "The message is too long.")
+        try:
+            pick = aimodels.clean_model(req.model)
+        except ValueError:
+            return _error(422, aimodels.BAD_MODEL)
         claude = await asyncio.to_thread(ai.find_claude, settings.get("claudePath"))
         base = f"{request.url.scheme}://{request.url.netloc}"
 
@@ -164,7 +178,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         fresh = ai.build_prompt(req.mode, req.prompt, pack, req.block, history)
         resume = ai.build_prompt(req.mode, req.prompt, pack, req.block) if session_id else None
         allowed = {f["id"] for f in pack.fields} if req.mode == "autofill" else None
-        model = settings.get("aiModel") or None
+        model = aimodels.resolve_model(pick, settings.get("aiModel") or None)
 
         async def stream():
             _record, secret = tokens.ephemeral(ai.TOKEN_NAME, "read")
