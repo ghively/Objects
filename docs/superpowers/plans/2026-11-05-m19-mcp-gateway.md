@@ -2,7 +2,21 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Written 2026-11-05 against `master` at `0f4fde1`. It is built after M17 (`2026-11-05-m17-agents-and-tools.md`) and M18 are merged, on branch `feat/m19-mcp-gateway`. It consumes M16's and M17's Contract names exactly and redefines none of them. Every label and default not quoted from the spec is "our string" / "our choice".
+Written 2026-11-05 against `master` at `0f4fde1`; reconciled 2026-11-06 with the built M16-M18 code on branch `feat/m16-m24` at `745a2a5` (see "Reconciled with the built code" below). It is built after M17 (`2026-11-05-m17-agents-and-tools.md`) and M18, on the same branch `feat/m16-m24` (Gene builds M16-M24 straight through). It consumes M16's and M17's Contract names exactly and redefines none of them. Every label and default not quoted from the spec is "our string" / "our choice".
+
+**Reconciled with the built code (2026-11-06).** What M16-M18 built changed these points; the sections below already say it:
+
+1. `mcp` 2.3's `streamable_http_client(url, *, http_client=None, ...)` takes no `headers`. Headers go in an `httpx2.AsyncClient` made with `mcp.shared._httpx_utils.create_mcp_http_client(headers=...)` and passed as `http_client`. `sse_client(url, headers=...)` takes them directly. The `mcp` server library's class is `mcp.server.mcpserver.MCPServer` (as `mcp_server.py` uses it), not `FastMCP`. `mcp`'s HTTP client module is `httpx2`, not `httpx`.
+2. M18 already gave the fake `claude` a `FAKE:mcp:<server>:<tool>:<json args>` marker (stdio servers only, `${VAR}` filled from the fake's environment, the `dontAsk` denial "Permission to use <name> has been denied."), and its `init` event already lists every `--mcp-config` server as `{"name", "status": "connected"}` without connecting. T1 adds only what is missing: HTTP and SSE entries in that marker, `${VAR:-default}` in the fake's `_fill`, and `mcpServers` in the log line. The init event keeps M18's form (no "pending" status).
+3. M17's folder group `mcp:<name>` is not empty: it holds one whole-server row `mcp__<name>` (label `<name>`), and M17's `test_m17_routes.py::test_tools_routes` asserts that row is off after toolsOff `["Read", "mcp__gh"]`. The provider's folder group therefore keeps that row while the server's tools aren't known, or while `mcp__<name>` is in the agent's toolsOff (see "The Tools tab").
+4. M17's `toolcatalog.run_tool_lists` puts a folder server's `mcp__<name>` in `disallowed` when that id is in toolsOff. `gateway_tools_contributor` never adds `mcp__<name>` to `allowed` when it is already in `parts.disallowed`.
+5. M17's `agentfiles.sync_permissions` / `generated_denies` already write every switched-off `mcp__…` id into the agent folder's `.claude/settings.json` `permissions.deny` when the agent is saved, so off tools of folder and gateway servers are also denied through the project settings. `gateway-tools` still puts them in `--disallowedTools` (both lists, as M17 does for its own ids).
+6. The client drops a 409's text (`ConflictError('conflict')`, and a `RevisionConflictError` whenever the body has a `currentRevision` key, even `null`). So the name-clash 409 omits `currentRevision`, and `createMcpServer` passes `request`'s `on409` hook to throw `ApiError(409, detail)` so the dialog can show "Another server already has this name.". `api.agentTools(id)` answers `ToolGroup[]`, so `refreshAgentTools(agentId)` answers `Promise<ToolGroup[]>` too.
+7. Adding `mcpServers` to the resync kinds breaks two tests that pin the list: `backend/tests/test_audit2_api.py::test_event_hub_bounds_a_slow_subscriber` (9 kinds, then 10) and `frontend/src/api/client.test.ts` "test agentLearning is a resync event". T1 owns both edits.
+8. `GET /agents/{id}/tools`'s merge is inline in `api_agents.agent_tools`. T5 moves it into a module-level `api_agents.agent_tool_groups(rec: AgentRecord) -> list[dict[str, Any]]` (the `groups_out` list), which the route and T6's refresh both call, so their answers are equal.
+9. `useAiHidden` is in `frontend/src/ai/store.ts`. Settings > Integrations (M11) has three groups: "API tokens", "New token" and "Connect an AI assistant" (shown once the MCP template loads). "MCP servers" goes after all three so the token groups stay together. `INTEGRATIONS_SEARCH` already holds `'MCP'`.
+10. `agentrun.SECRET_LOOKUP` is read at call time already: `agentrun._folder_mcp` calls the module global, and `agents._secret_lookup` reads `getattr(agentrun, "SECRET_LOOKUP")` on each call (M17 T2's deviation). No `agentrun` change is needed.
+11. M10's `test_ai_modules_use_no_network_client` bans `httpx` but not `httpx2`. T9 adds `httpx2` to its banned set when it adds M19's modules.
 
 **Goal.** Gene adds outside MCP servers once, in Settings > Integrations > MCP servers, by command (stdio) or by URL (HTTP or SSE). Each one has a name, an enabled switch and a "Test" button that lists its tools. Its secrets go into a state-dir secrets file and are never shown again or logged. Every enabled server joins each agent turn's `--mcp-config` (with `--strict-mcp-config`, already in M17's flags), filtered by that agent's switches. An agent folder's own `.mcp.json` servers get their `${VAR}` values from the same secrets on each machine, and the agent page shows which ones are missing, with a way to set them. The agent page's Tools tab shows one group per outside server, with that server's tools listed under it.
 
@@ -21,7 +35,7 @@ Written 2026-11-05 against `master` at `0f4fde1`. It is built after M17 (`2026-1
 
 The front end gets `frontend/src/mcp/` (the MCP servers group of Settings > Integrations, the server dialog, the secret variables list, the set-a-secret dialog). Small explicit hooks go into M17's `ProfileTab`, `ToolsTab` and `ToolSwitches`.
 
-**Tech Stack.** Python 3 (FastAPI, pydantic, the `mcp` 2.3 client: `mcp.client.stdio`, `mcp.client.streamable_http`, `mcp.client.sse`, `ClientSession`), `uv`; React, TypeScript, zustand, shadcn/ui, Tailwind, vitest; Claude Code CLI **2.1.317** (checked with `claude --version`, `claude --help`, `claude mcp --help`, `claude mcp add --help`, `claude mcp add-json --help`, `claude mcp login --help`, all read-only).
+**Tech Stack.** Python 3 (FastAPI, pydantic, the `mcp` 2.3 client: `mcp.client.stdio`, `mcp.client.streamable_http`, `mcp.client.sse`, `mcp.shared._httpx_utils.create_mcp_http_client`, `ClientSession`; the server side `mcp.server.mcpserver.MCPServer`), `uv`; React, TypeScript, zustand, shadcn/ui, Tailwind, vitest; Claude Code CLI **2.1.317** (checked with `claude --version`, `claude --help`, `claude mcp --help`, `claude mcp add --help`, `claude mcp add-json --help`, `claude mcp login --help`, all read-only).
 
 **Spec.** `docs/superpowers/specs/2026-11-05-agents-design.md`:
 
@@ -237,7 +251,8 @@ def gateway_contributor(scope: RunScope, parts: RunParts) -> None
     #   else parts.mcp_servers[name] = entry and parts.env |= {secret_env_name(k): value}
 def gateway_tools_contributor(scope: RunScope, parts: RunParts) -> None
     # for every name in parts.mcp_servers except "object"/"object-agent" (gateway and folder servers):
-    #   "mcp__<name>" in parts.allowed (once);
+    #   "mcp__<name>" in parts.allowed (once), unless it is already in parts.disallowed
+    #     (M17's whole-server switch of a folder server, put there by M17's "tools" contributor);
     #   every toolsOff id starting "mcp__<name>__" in parts.disallowed (once)
 ```
 
@@ -254,7 +269,8 @@ def gateway_tools_contributor(scope: RunScope, parts: RunParts) -> None
   - first, one group per folder server (`id` `mcp:<name>`, label `"<name> · this agent's folder"`, our string);
   - then one group per gateway server, enabled or not (`id` `mcp:<name>`, label `<name>`). A folder server's name wins on a clash, and the gateway group is then left out.
   - Each group's tools come from `TOOL_CACHE`, as `ToolEntry(tool_id(name, t), t, (tool_id(name, t),))`.
-- **An explicit change to M17's `api_agents.py`.** `GET /agents/{id}/tools` puts each provider group in place of a catalogue group with the same `id`. M17's empty `mcp:<name>` folder groups are then the provider's, with tools. M17's assertion that "`mcp:gh` is added for a folder server" still holds.
+  - A folder group also keeps M17's whole-server row `ToolEntry("mcp__<name>", name, ("mcp__<name>",))` as its first row while `TOOL_CACHE` has no tools for it, or while `mcp__<name>` is in the agent's toolsOff, so a whole server switched off in M17 still shows (and can be switched back on through its group switch).
+- **An explicit change to M17's `api_agents.py`.** `GET /agents/{id}/tools` puts each provider group in place of a catalogue group with the same `id`. M17's `mcp:<name>` folder groups (each holding only the whole-server row `mcp__<name>`) are then the provider's, with tools. The merge moves into `api_agents.agent_tool_groups(rec)` (the route's `groups` list), which T6's refresh route calls too. M17's `test_tools_routes` (its last group is `mcp:gh`, and its `mcp__gh` row is off) still holds unchanged.
 - `POST /agents/{id}/tools/refresh` (M19, `api_mcp.py`) probes the agent's folder servers and its enabled gateway servers in parallel, puts each result in `TOOL_CACHE`, and answers the same `{groups}` as the GET.
 - Cache keys:
   - `gw:<serverId>:<revision>`, so an edited server is listed again;
@@ -288,7 +304,7 @@ def expand_refs(value: Any, env: Mapping[str, str]) -> Any            # ${VAR} a
 ```
 
 - `stdio`: `mcp.client.stdio.stdio_client(StdioServerParameters(command, args, env=get_default_environment() | expanded env, cwd))`, with stderr captured to a temp file and its last `PROBE_STDERR_CHARS` characters kept.
-- `http`: `mcp.client.streamable_http.streamable_http_client(url, headers=…)`. `sse`: `mcp.client.sse.sse_client(url, headers=…)`.
+- `http`: `mcp.client.streamable_http.streamable_http_client(url, http_client=create_mcp_http_client(headers=…))` (2.3's `streamable_http_client` takes no `headers`; the `httpx2` client from `mcp.shared._httpx_utils` carries them, and the probe closes it). `sse`: `mcp.client.sse.sse_client(url, headers=…)`.
 - Then `ClientSession.initialize()` and `list_tools()`, following pagination.
 - The T4 builder checks each signature against the installed `mcp` 2.3 and adapts the calls, not the Contract.
 - Errors (our strings; the details are redacted):
@@ -397,7 +413,9 @@ export interface McpGroupStatus {
 
 - `mcpServers()`, `createMcpServer(input)`, `saveMcpServer(id, input, baseRevision)`, `deleteMcpServer(id)`, `testMcpServer(id)`
 - `mcpSecrets()`, `setMcpSecret(name, value)`, `deleteMcpSecret(name)`
-- `refreshAgentTools(agentId)`
+- `refreshAgentTools(agentId): Promise<ToolGroup[]>` (the `groups` of the answer, as M17's `agentTools(id)`)
+
+`createMcpServer` passes `request`'s `on409` hook, throwing `ApiError(409, detail)`, so the name clash's message reaches the dialog (the client otherwise drops a 409's text). `saveMcpServer`'s stale-revision 409 is the usual `RevisionConflictError`. The back end's name-clash 409 body is `{detail}` with no `currentRevision` key; the stale-revision 409 is `{detail, currentRevision}` (M17's `api_agents._fail` shape).
 
 `mcpServers` joins the client's `RESYNC_EVENTS`. `test/mockApi.ts` (T1) adds the helpers `mcpServer()`, `mcpTestResult()`, `secretVar()` and the mocks for every method above.
 
@@ -427,7 +445,7 @@ Events:
 
 ### Labels (our strings, in `MCP_TEXT`)
 
-Settings > Integrations, a new group after "API tokens":
+Settings > Integrations, a new group after M11's token groups ("API tokens", "New token", "Connect an AI assistant"):
 
 - Heading "MCP servers". Help: "Outside MCP servers every agent on this computer can use. Each agent can switch them, or single tools, off on its Tools tab."
 - Empty list: "No MCP servers yet." Button: "Add MCP server".
@@ -467,15 +485,17 @@ The full list is in "Our calls" at the end.
   - `frontend/src/mcp/mcpText.ts`
   - `docs/superpowers/plans/m19-cli-spike.md`
 - Modify:
-  - `backend/objectapp/server.py`: mount `api_mcp.router(ctx)`; call `mcpgateway.install()` in `create_app`; add `mcpServers` to `RESYNC_EVENTS`.
-  - `backend/objectapp/watcher.py`: `"mcpServers"` in `ChangeEvent.kind`.
+  - `backend/objectapp/server.py`: mount `api_mcp.router(ctx)` (beside `api_agents.router(ctx)`, before it); call `mcpgateway.install()` in `create_app` next to M18's `learnhooks.install()`; add `"mcpServers"` to `RESYNC_EVENTS` (after `"agentLearning"`).
+  - `backend/objectapp/watcher.py`: `"mcpServers"` in `ChangeEvent.kind` (and its docstring: the server id, or `secrets`).
   - `backend/objectapp/toolcatalog.py` (M17): `ToolGroup.server` and its pass-through in `groups_out`. Nothing else changes.
-  - `backend/tests/fake_claude.py` (M17's version)
+  - `backend/tests/fake_claude.py` (the M18 version)
+  - `backend/tests/test_audit2_api.py`: `test_event_hub_bounds_a_slow_subscriber`'s resync kinds gain `"mcpServers"` (9 events become 10, and its slice and comment follow).
   - `frontend/src/api/types.ts`, `frontend/src/api/client.ts` (methods and `RESYNC_EVENTS`), `frontend/src/test/mockApi.ts`
+  - `frontend/src/api/client.test.ts`: "test agentLearning is a resync event"'s kind list gains `'mcpServers'`.
 
 **Interfaces.** Produces everything in the Contract marked T1, plus the two fakes, which T4, T5, T6 and T9 consume.
 
-**Fake MCP server** (`backend/tests/fake_mcp_server.py`, built on the `mcp` server library as `mcp_server.py` is; synthetic only; documented in its docstring):
+**Fake MCP server** (`backend/tests/fake_mcp_server.py`, built on the `mcp` server library's `MCPServer` as `mcp_server.py` is; synthetic only; documented in its docstring):
 
 - Tools:
   - `echo(text)` answers `text` (annotated `readOnlyHint: true`);
@@ -493,15 +513,13 @@ The full list is in "Our calls" at the end.
   - `--junk`: writes non-JSON lines on stdout first.
 - `serve_in_thread(mode, **kw) -> (url, stop)` starts the HTTP or SSE modes for tests on a free port.
 
-**Fake `claude` additions** (M10/M16/M17 markers unchanged):
+**Fake `claude` additions** (M10/M16/M17/M18 markers unchanged). M18 already built most of what M19 needs:
 
-- The `init` event's `mcp_servers` lists `{"name", "status": "connected"}` for each server in `--mcp-config`. Its `tools` adds `mcp__<name>__<tool>` for each tool the fake lists from that server. The fake connects only when a prompt holds a `FAKE:mcp` marker. Otherwise it lists the names it was given, with status `"pending"`, so M17's tests keep their speed.
-- `FAKE:mcp:<server>:<tool>[:<json args>]`:
-  1. expands the server's entry with the fake's own `${VAR}` rule (written from the CLI's documented form, not imported from `mcpprobe`) against its environment;
-  2. connects with the `mcp` client library and calls the tool;
-  3. emits a `tool_use` named `mcp__<server>__<tool>` and its `tool_result`.
-  - It is denied ("Permission to use mcp__<server>__<tool> has been denied.") when that name, or a matching rule, is in `--disallowedTools`, or when neither the name nor `mcp__<server>` is in `--allowedTools`. That is `dontAsk`'s rule.
-- The log line gains `mcpServers`: the names in the config.
+- Already there (M18), kept as it is: the `init` event's `mcp_servers` lists `{"name", "status": "connected"}` for each server in `--mcp-config` (without connecting), and its `tools` adds each allowed `mcp__…` name. `FAKE:mcp:<server>:<tool>[:<json args>]` (one per line) fills the stdio entry's `command`, `args` and `env` with the fake's own `${VAR}` rule (`_fill`, written from the CLI's documented form, not imported from `mcpprobe`) against its environment, connects with the `mcp` client library, calls the tool, and emits a `tool_use` named `mcp__<server>__<tool>` and its `tool_result`. It is denied ("Permission to use mcp__<server>__<tool> has been denied.") when that name or `mcp__<server>` is in `--disallowedTools` or the `--settings` deny list, or when `--allowedTools` is given and holds neither. That is `dontAsk`'s rule.
+- M19 adds:
+  - `FAKE:mcp` on a `{"type": "http"}` or `{"type": "sse"}` entry: `url` and `headers` filled with `_fill`, then `streamable_http_client` (headers through `create_mcp_http_client`) or `sse_client`. Today such an entry answers "No such tool available".
+  - `_fill` also takes `${VAR:-default}`.
+  - The log line gains `mcpServers`: the names in the config.
 
 **Steps.**
 
@@ -515,7 +533,8 @@ The full list is in "Our calls" at the end.
   - `test_tool_group_server_field`: `toolcatalog.groups_out([ToolGroup("mcp:x", "x", (), server={"status": "ok"})], [])[0]["server"] == {"status": "ok"}`. A group without it gives `server: None`. M17's `test_m17_contract.py` still passes.
   - `test_stub_router_mounted_and_resync`: `create_app` imports `api_mcp` and calls `mcpgateway.install` (patched to count, once); `"mcpServers" in server.RESYNC_EVENTS`.
   - `test_fake_mcp_server_modes`: stdio lists `echo`, `add` and `whoami` through `mcp.client.stdio`. `--http` with `--require-bearer s3cret-http` lists them with the header and answers 401 without it.
-  - `test_fake_claude_mcp_marker`: run the fake with a `--mcp-config` naming the stdio fake (`env: {"FAKE_KEY": "${OBJECT_MCP_TEST}"}`), `OBJECT_MCP_TEST=s3cret-stdio` in its environment, `--allowedTools mcp__fake` and the prompt `FAKE:mcp:fake:whoami`. The `tool_result` is the secret. With `--disallowedTools mcp__fake__whoami` it is the denial.
+  - `test_fake_claude_mcp_marker`: run the fake with a `--mcp-config` naming the stdio fake (`env: {"FAKE_KEY": "${OBJECT_MCP_TEST}"}`), `OBJECT_MCP_TEST=s3cret-stdio` in its environment, `--allowedTools mcp__fake` and the prompt `FAKE:mcp:fake:whoami`. The `tool_result` is the secret. With `--disallowedTools mcp__fake__whoami` it is the denial. The same call on an `{"type": "http"}` entry for the `--http` fake with `headers: {"Authorization": "Bearer ${OBJECT_MCP_TEST}"}` and `--require-bearer` answers too, and the log line's `mcpServers` names the config's servers.
+  - The resync tests: `test_audit2_api.py::test_event_hub_bounds_a_slow_subscriber` and `client.test.ts` "test agentLearning is a resync event" expect `mcpServers` last.
   - Front end: `npx tsc -b --noEmit`; `mcpText.test.ts` "test every label is a non-empty string".
 - [ ] **Step 2:** run them; they fail.
 - [ ] **Step 3:** implement the Contract signatures, the stubs and the fakes.
@@ -532,7 +551,7 @@ The full list is in "Our calls" at the end.
   - `test_tool_name_normalisation`: with `--odd-name`, the spike records the CLI's name for `get-item.v2`; `mcpgateway.tool_id` uses that rule.
   - **Stop-and-ask:** if `--strict-mcp-config` lets any other server in, or if `${VAR}` isn't expanded in any of `env`, `args` or `headers` (so a secret would have to be written into `mcp.json`), the build stops after T1. The builder writes the finding in `m19-cli-spike.md` and asks Gene. No later task runs.
   - `m19-cli-spike.md` records: the CLI version; each check's result; the three entry shapes as accepted; the tool-name rule; the `.cmd` finding; and the OAuth finding (no OAuth for `--mcp-config` servers without `claude mcp login`, which writes Gene's Claude Code config, so it is not offered).
-- [ ] **Step 5:** `uv run pytest backend/tests/test_m19_contract.py backend/tests/test_m17_contract.py -q`, `npx vitest run src/mcp` and `npx tsc -b --noEmit` pass. The live spike passed once with `OBJECT_LIVE_CLAUDE=1`.
+- [ ] **Step 5:** `uv run pytest backend/tests/test_m19_contract.py backend/tests/test_m17_contract.py backend/tests/test_m18_contract.py backend/tests/test_audit2_api.py backend/tests/test_m17_routes.py backend/tests/test_m17_agentrun.py -q`, `npx vitest run src/mcp src/api` and `npx tsc -b --noEmit` pass. The live spike passed once with `OBJECT_LIVE_CLAUDE=1`.
 - [ ] **Step 6:** commit `feat(m19): contract, fake MCP server and CLI spike`. The message ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ### Task 2: The secrets file (Lane A)
@@ -668,7 +687,7 @@ The full list is in "Our calls" at the end.
 **Files:**
 
 - Fill: `backend/objectapp/mcpgateway.py`
-- Modify: `backend/objectapp/api_agents.py` (M17): in `GET /agents/{id}/tools`, a provider group replaces a catalogue group with the same `id`. This is the one change to that file.
+- Modify: `backend/objectapp/api_agents.py` (M17): in `GET /agents/{id}/tools`, a provider group replaces a catalogue group with the same `id`, and the route's merge moves into the module-level `agent_tool_groups(rec: AgentRecord) -> list[dict[str, Any]]` that T6 calls. This is the one change to that file.
 - Create: `backend/tests/test_m19_gateway_run.py`
 
 **Interfaces.**
@@ -703,7 +722,7 @@ The full list is in "Our calls" at the end.
     - toolsOff with both left `fake` out of the config;
     - with the cache empty (after a restart), toolsOff with both keeps `fake` in the config and both in `disallowed`;
     - a tool the cache doesn't know is in neither list, so it runs (new tools on).
-  - `test_folder_server_off_tools_are_denied`: a folder `.mcp.json` server `gh` and toolsOff `["mcp__gh__create_issue"]` give `mcp__gh__create_issue` in `disallowed` and `mcp__gh` in `allowed` once. This covers the gap in M17's `run_tool_lists`.
+  - `test_folder_server_off_tools_are_denied`: a folder `.mcp.json` server `gh` and toolsOff `["mcp__gh__create_issue"]` give `mcp__gh__create_issue` in `disallowed` and `mcp__gh` in `allowed` once. This covers the gap in M17's `run_tool_lists`. With toolsOff `["mcp__gh"]` (M17's whole-server switch), `mcp__gh` is in `disallowed` and not in `allowed`.
   - `test_disabled_and_clashing_servers_left_out`:
     - a gateway server named `gh` and a folder server `gh`: the folder's entry is in the config, plus the note "Skipped the MCP server 'gh': this agent's folder has one with the same name.";
     - a gateway server whose secret was deleted from `secrets.json` is left out, with the missing-secret note;
@@ -716,7 +735,8 @@ The full list is in "Our calls" at the end.
   - `test_server_groups`:
     - for an agent with folder server `gh` and gateway servers `fake` (enabled, cache `echo`/`add`) and `off` (disabled), the groups are, in order, `mcp:gh` (label `"gh · this agent's folder"`, `server.source "folder"`), `mcp:fake` and `mcp:off` (`server.status "disabled"`);
     - `fake`'s rows are `mcp__fake__add` and `mcp__fake__echo`, with `on` reflecting toolsOff;
-    - with no cache, `status "unknown"` and no rows;
+    - with no cache, `status "unknown"`; a gateway group then has no rows, and a folder group only M17's whole-server row `mcp__gh`;
+    - with the cache filled and toolsOff `["mcp__gh"]`, the folder group keeps the `mcp__gh` row (off) before its tool rows;
     - a folder server missing a var gives `status "needsSecrets"` and `missingVars`.
   - `test_tools_route_uses_provider_groups`: M17's `GET /agents/{id}/tools` answers `mcp:gh` once, with the provider's rows, and M17's `test_tools_routes` still passes.
   - `test_probe_targets`: the folder servers have `cwd` = the agent folder and the gateway ones `None`; a server with missing secrets isn't a target; the keys follow the Contract's cache keys (an edited server gets a new key).
@@ -733,7 +753,7 @@ The full list is in "Our calls" at the end.
 
 **Interfaces.**
 
-- Consumes: `McpStore` (T3), `SecretStore` (T2), `mcpprobe.probe_sync`/`probe_many` (T4), `mcpgateway.TOOL_CACHE`/`probe_targets`/`server_groups` (T5), M17's `AgentRegistry`, `toolcatalog.groups_out`, and the M17 tools route's merge (T5), so the refresh answer equals the GET.
+- Consumes: `McpStore` (T3), `SecretStore` (T2), `mcpprobe.probe_sync`/`probe_many` (T4), `mcpgateway.TOOL_CACHE`/`probe_targets`/`server_groups` (T5), M17's `AgentRegistry` (`list()`, `get(id)`, `local_folders()`), `toolcatalog.groups_out`, and `api_agents.agent_tool_groups` (T5), so the refresh answer equals the GET.
 - Produces: the routes table and the `mcpServers` events.
 
 **Steps.**
@@ -773,13 +793,13 @@ The full list is in "Our calls" at the end.
 - Create:
   - `frontend/src/mcp/McpServersGroup.tsx`, `frontend/src/mcp/McpServerDialog.tsx`, `frontend/src/mcp/McpTestResult.tsx`, `frontend/src/mcp/SecretVariables.tsx`
   - tests beside each
-- Modify: `frontend/src/settings/sections/Integrations.tsx`:
-  - render `<McpServersGroup />` after the "API tokens" group, and nothing while `useAiHidden()`;
-  - add `MCP_TEXT.heading`, `'MCP servers'` and `'Secret variables'` to `INTEGRATIONS_SEARCH`.
+- Modify: `frontend/src/settings/sections/Integrations.tsx` (+ `Integrations.test.tsx`):
+  - render `<McpServersGroup />` after M11's token groups ("API tokens", "New token" and, once loaded, "Connect an AI assistant"), and nothing while `useAiHidden()`;
+  - add `MCP_TEXT`'s "MCP servers" and "Secret variables" strings to `INTEGRATIONS_SEARCH` (it already holds `'MCP'`).
 
 **Interfaces.**
 
-- Consumes: `MCP_TEXT` (T1), the `api` MCP methods (T1, mocked), `SettingGroup`/`errorText` from `settings/controls`, `useAiHidden`.
+- Consumes: `MCP_TEXT` (T1), the `api` MCP methods (T1, mocked), `SettingGroup`/`SaveError`/`errorText` from `settings/controls`, `useAiHidden` from `@/ai/store`.
 - Produces:
   - `McpServersGroup()`
   - `McpServerDialog(props: { open: boolean; onOpenChange(o: boolean): void; server?: McpServer | null; onSaved(s: McpServer): void })`
@@ -805,7 +825,7 @@ The full list is in "Our calls" at the end.
 **Steps.**
 
 - [ ] **Step 1: failing tests:**
-  - "test the group sits after API tokens and is hidden while AI features are hidden"
+  - "test the group sits after the API token groups and is hidden while AI features are hidden"
   - "test Add MCP server by command sends the rows with secret flags"
   - "test Add by URL sends transport, headers and a bearer with bearerAction set"
   - "test editing shows saved secrets masked and keeps them unless replaced": `saveMcpServer` gets `value: null` for an untouched secret row, and the DOM never holds the mocked value. The mock answers with no values, and the test also seeds a typed value then closes the dialog; the reopened dialog's inputs are empty.
@@ -858,7 +878,7 @@ The full list is in "Our calls" at the end.
 
 - Create: `scripts/m19_acceptance.py`, `docs/superpowers/plans/m19-acceptance.md`
 - Modify:
-  - `backend/tests/test_m10_ai.py`: `test_ai_modules_use_no_network_client` gains `mcpmodel`, `secretstore`, `mcpstore`, `mcpgateway` and `api_mcp`. `mcpprobe` is not added; it is the one network module.
+  - `backend/tests/test_m10_ai.py`: `test_ai_modules_use_no_network_client` gains `mcpmodel.py`, `secretstore.py`, `mcpstore.py`, `mcpgateway.py` and `api_mcp.py`, and its banned set gains `httpx2` (the `mcp` library's HTTP client). `mcpprobe.py` is not added; it is the one network module.
   - `frontend/src/mcp/SecretVariables.tsx`: use `SetSecretDialog`, if T7 shipped its local field.
   - `docs/superpowers/plans/remaining-work.md`: the M19 status line.
   - `CONTINUE.md`: one line.
@@ -943,6 +963,7 @@ Then the one milestone review (correctness, file safety, fidelity, the five Revi
 | `backend/objectapp/mcpmodel.py` | T1 | lanes report needs; they don't edit |
 | `backend/objectapp/secretstore.py`, `mcpstore.py`, `mcpprobe.py`, `mcpgateway.py`, `api_mcp.py` | T1 writes the stubs; then T2, T3, T4, T5 and T6 respectively fill each | none |
 | `backend/tests/fake_claude.py`, `backend/tests/fake_mcp_server.py` | T1 | T9 may add a marker it needs |
+| `backend/tests/test_audit2_api.py`, `frontend/src/api/client.test.ts` (resync lists) | T1 | none |
 | `frontend/src/api/types.ts`, `api/client.ts`, `test/mockApi.ts`, `frontend/src/mcp/mcpText.ts` | T1 | lanes report needs; they don't edit |
 | `frontend/src/settings/sections/Integrations.tsx` (+ test) | T7 | none |
 | `frontend/src/agents/ProfileTab.tsx`, `ToolsTab.tsx`, `ToolSwitches.tsx` (M17, + tests) | T8 | none |
@@ -959,7 +980,7 @@ Then the one milestone review (correctness, file safety, fidelity, the five Revi
 | C (front end: Settings) | T7 | only T1's contract |
 | D (front end: agent page) | T8 | only T1's contract |
 
-T9 runs last and alone. No two lanes edit the same file. M17 and M18 must be merged before T1: T1 edits M17's `toolcatalog.py` and `fake_claude.py`, and T5 and T8 edit M17 files.
+T9 runs last and alone. No two lanes edit the same file. M17 and M18 must be built before T1 (they are, on `feat/m16-m24`): T1 edits M17's `toolcatalog.py` and M18's `fake_claude.py`, and T5 and T8 edit M17 files.
 
 ## Our calls
 
@@ -987,4 +1008,4 @@ T9 runs last and alone. No two lanes edit the same file. M17 and M18 must be mer
 - **The `--mcp-config` entry shapes and `${VAR}` expansion** aren't printed by `--help`. The plan uses Claude Code's documented shapes and makes the T1 live spike prove them, with a stop-and-ask if expansion fails anywhere a secret goes.
 - **Whether native Windows needs `cmd /c` for `.cmd` commands** in the CLI's stdio servers. T1 finds out, and `cli_entry` wraps only if needed.
 - **The CLI's name for odd tool names** (dots, dashes). T1 records it, and `tool_id` follows it.
-- **Whether M17's `Agent.mcpServers`/`folder-mcp` read `SECRET_LOOKUP` at call time.** The plan assumes they do, or that T5 makes them do so (a one-line change in `agentrun`, which would then be added to the shared-files table under T5).
+- **Whether M17's `Agent.mcpServers`/`folder-mcp` read `SECRET_LOOKUP` at call time.** Settled by the built code: both do (`agentrun._folder_mcp` and `agents._secret_lookup`). T5's test keeps it so.
