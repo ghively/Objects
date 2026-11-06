@@ -369,9 +369,9 @@ A folder inside a registered space folder, or one holding a space folder, is ref
 
 ```python
 OBJECT_SERVER = "object"; AGENT_SERVER = "object-agent"
-OBJECT_READ: tuple[str, ...]    # the 20 read tools below (short names)
-OBJECT_WRITE: tuple[str, ...]   # the 35 write tools below
-AGENT_TOOLS: tuple[str, ...] = ("agent_info",)    # M18, M20 and M21 append names here, in build order
+OBJECT_READ: tuple[str, ...]    # the 20 read tools below (short names); M22 appends 2 (22)
+OBJECT_WRITE: tuple[str, ...]   # the 35 write tools below; M22 appends 6 (41)
+AGENT_TOOLS: tuple[str, ...] = ("agent_info",)    # M18, M20, M21 and M24 append names here, in build order
 
 @dataclass(frozen=True)
 class ToolEntry:
@@ -424,7 +424,8 @@ class RunScope:
     api_url: str; token: str           # the ephemeral token's secret (goes in env only)
     write: bool                        # False for proposal modes (and M18 reviews' read-only parts)
     chat_id: str
-    purpose: str                       # "chat" | "proposal"; M18 "review" / "curator", M20 "delegate", M21 "schedule"
+    purpose: str                       # "chat" | "proposal"; M18 "review" / "curator", M20 "delegate", M21 "schedule",
+                                       # M24 "work" / "work-read" / "work-file" / "work-sync"
     state: Path                        # appstate.state_dir()
 
 @dataclass
@@ -487,9 +488,9 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
     # mcp.json holds "${OBJECT_API_TOKEN}", never the secret. Raises RunRefused(message) for a nesting problem.
 ```
 
-`ai.Turn` gains `run: Callable[[str | None], RunCommand]` (the resume id in, a fresh command out). `_Attempt` uses its `cwd`, `env` and `args` and removes its `tmp` after the run. M10's `cli_args`, `mcp_config` and empty working folder are removed in T7.
+`ai.Turn` gains `run: Callable[[str | None], RunCommand]` (the resume id in, a fresh command out) and `timeout: float = TURN_TIMEOUT` (`run_turn`'s hard deadline and its "took too long (over {n} seconds)" message use `turn.timeout`; M10's 300 s stays the default, and M20's `headless.run_chat` passes its own `timeout` here). `_Attempt` uses its `cwd`, `env` and `args` and removes its `tmp` after the run. M10's `cli_args`, `mcp_config` and empty working folder are removed in T7.
 
-**Registry of contributor orders (M17-M21).** Every contributor has its own order; no two share one. A later milestone registers only the order listed here for it, and its plan refers to this table.
+**Registry of contributor orders (M17-M24).** Every contributor has its own order; no two share one. A later milestone registers only the order listed here for it, and its plan refers to this table.
 
 | Order | Name | Milestone | What it does |
 |---|---|---|---|
@@ -501,14 +502,16 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
 | 40 | `agent-mcp` | M17 | the `object-agent` tools server |
 | 50 | `guidance` | M17 | `OBJECT_GUIDANCE` / `PROPOSAL_GUIDANCE` |
 | 55 | `schedule-guidance` | M21 | `SCHEDULE_GUIDANCE` for `purpose == "schedule"` |
+| 57 | `work-guidance` | M24 | `WORK_GUIDANCE` (and `DESK_SYNC_GUIDANCE` for `"work-sync"`) for the four work purposes |
 | 60 | `tools` | M17 | `--allowedTools` / `--disallowedTools` from the switches |
 | 62 | `gateway-tools` | M19 | allow/deny entries for the outside and folder servers |
 | 64 | `delegation` | M20 | the flat rule for `purpose == "delegate"`; `MCP_TOOL_TIMEOUT` |
-| 68 | `review-tools` | M18 | replaces the tool lists and servers for `purpose` `"review"` / `"curator"`; last of the tool-list contributors so nothing re-adds a tool after it |
+| 66 | `work-tools` | M24 | replaces the tool lists (and drops unlisted servers) for the read-only work purposes `"work-read"`, `"work-file"`, `"work-sync"`; `"work"` is left as 60-64 built it |
+| 68 | `review-tools` | M18 | replaces the tool lists and servers for `purpose` `"review"` / `"curator"`; last of the tool-list contributors so nothing re-adds a tool after it (it and `work-tools` act on disjoint purposes) |
 | 70 | `fence` | M17 | the path deny rules |
 | 75 | `fence-remote` | M20 | deny rules for remote agents' folders |
 
-`RunScope.purpose` values: `"chat"`, `"proposal"` (M17), `"review"`, `"curator"` (M18), `"delegate"` (M20), `"schedule"` (M21). M17 adds no other `RunScope` field for later milestones.
+`RunScope.purpose` values: `"chat"`, `"proposal"` (M17), `"review"`, `"curator"` (M18), `"delegate"` (M20), `"schedule"` (M21), `"work"`, `"work-read"`, `"work-file"`, `"work-sync"` (M24). M17 adds no other `RunScope` field for later milestones.
 
 ### Tokens and the agent tools server
 
@@ -517,7 +520,7 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
 - A turn's token is `ephemeral(agent.name, "read-write" if write else "read", agent=agent.id, chat=chat_id)`. Writes made with it are announced `api:<agent name>` and logged in the activity log (M11's rules).
 - `backend/objectapp/agent_mcp.py` is run as `python -m objectapp.agent_mcp`.
   - Its environment holds `OBJECT_API_URL` (loopback only) and `OBJECT_API_TOKEN`.
-  - `TOOL_MODULES = ("objectapp.agent_tools_core",)`. Each module has `register(server: MCPServer, client: ObjectClient) -> None`. M18, M20 and M21 append their modules.
+  - `TOOL_MODULES = ("objectapp.agent_tools_core",)`. Each module has `register(server: MCPServer, client: ObjectClient) -> None`. M18, M20, M21 and M24 append their modules.
   - `build_server(client) -> MCPServer` (name `object-agent`).
 - M17's one tool is `agent_info()`, which calls `GET /api/v1/agent/info` and answers `{agent: {id, name, model, folder}, space: {name}}`.
 - `/api/v1/agent/*` routes (`api_agent_v1.py`) need a token whose `agent` is set (403 "This token isn't an agent's.") and act only on that agent. `v1guard.agent_auth(guard, registry, request) -> tuple[TokenRecord, AgentRecord]` (T5) is shared with M18's, M20's and M21's routes.
@@ -737,6 +740,7 @@ The full list is in "Our calls" at the end.
 - Create: `backend/objectapp/agentrun.py`, `backend/tests/test_m17_agentrun.py`
 - Modify: `backend/objectapp/ai.py`
   - `Turn.run`; `_Attempt` runs a `RunCommand` when `turn.run` is set and keeps M10's old path while it is None (T7 removes that path);
+  - `Turn.timeout: float = TURN_TIMEOUT`, used by `run_turn`'s deadline and its "took too long" message;
   - `build_prompt` drops `_INTRO` from the stdin prompt when `turn.run` is set, since it is in the guidance now.
 
 **Interfaces.**
@@ -768,6 +772,7 @@ The full list is in "Our calls" at the end.
     - toolsOff `["Bash"]` gives `Bash` and `PowerShell` in `--disallowedTools`;
     - toolsOff `[]` gives `Bash` and `PowerShell` in `--allowedTools`;
     - toolsOff with all `object-write` ids leaves no `mcp__object__<write>` in `--allowedTools`.
+  - `test_turn_timeout_is_per_turn` (with the fake): a `Turn(timeout=1.0)` whose prompt holds `FAKE:wait` ends with the "took too long (over 1 seconds)" error after about 1 s; a `Turn` without `timeout` has `TURN_TIMEOUT == 300`.
   - `test_attempt_uses_the_run_command` (with the fake): a `Turn` with `run=` set runs in the agent folder (the fake log's `cwd`); the tmp folder is gone afterwards; the M16 `tool` events still pair by id.
 - [ ] **Step 2-4:** fail, implement, pass (`uv run pytest backend/tests/test_m17_agentrun.py backend/tests/test_m10_ai.py backend/tests/test_m16_tool_events.py -q`; M10's tests still pass on the old path).
 - [ ] **Step 5:** commit `feat(m17): turn runner in the agent folder with fence and contributors`.
@@ -787,6 +792,7 @@ The full list is in "Our calls" at the end.
 - Consumes: the `Space` methods behind each app route; the history store `api_history` builds; `automations`; `api_import`'s job runner; `spaces.Registry` (the import refusal).
 - Produces:
   - the routes and tools in the Contract table;
+  - `v1guard.WRITE_GUARDS: list[Callable[[TokenRecord, Request], str | None]] = []`: `auth(request, write=True)` answers 403 with the first message a guard returns (M24 appends its read-only guard);
   - `v1guard.V1Guard(ctx, tokens)` with `auth(request, write=False) -> TokenRecord`, `visible_rel(path) -> str` (KeyError: 404), `hidden_paths() -> set[str]`, `visible_only(paths) -> tuple[list[str], int]` (the list and `hiddenCount`), `trash_entry_hidden(item) -> bool`, `announce(kind, path, version, token, **extra)`, `log(token, action, path, **extra)`;
   - `v1guard.agent_auth(guard, registry, request) -> tuple[TokenRecord, AgentRecord]` (403 "This token isn't an agent's.").
 
@@ -794,6 +800,7 @@ The full list is in "Our calls" at the end.
 
 - [ ] **Step 1: failing tests.** The fixture is a synthetic space with `Pages/Open.md`, `Pages/Secret.md` (tagged Exclude from AI, body holds `SECRET-MARKER`), a Task template, a whiteboard, a collection, a saved query and a second type. It uses the app's `TestClient` as `ObjectClient.http`, with a read-write token and a read token.
   - `test_tool_lists`: `build_server(client, write=True)` lists exactly `OBJECT_READ + OBJECT_WRITE`; `write=False` lists `OBJECT_READ` only.
+  - `test_write_guards`: `WRITE_GUARDS == []` by default; with a guard appended that answers "No." for one token, that token's write is 403 "No.", its reads pass, and another token's write passes.
   - `test_write_body_version_checked`: `write_body` with the version from `read` replaces the body (only body bytes change; a CRLF/BOM fixture keeps both); a stale version raises `ApiError` starting `"Conflict:"`; one history version is kept.
   - `test_open_daily_note`: the first call creates the note (`created: true`); the second gives the same path with `created: false`.
   - `test_types_collections_queries_round_trip`:

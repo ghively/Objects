@@ -537,8 +537,10 @@ async def run_chat(target: AgentRecord, *, settings: dict[str, Any], space_root:
     # 4. RunScope(target, space_root, space_name, api_url, secret, write=True, chat_id=chat_id, purpose=purpose,
     #             state=appstate.state_dir())
     # 5. ai.Turn(mode="chat", prompt_fresh=ai.build_prompt("chat", prompt, ai.ContextPack(), None, []), session_id=None,
+    #            timeout=timeout,   # M17's Turn.timeout: run_turn's own deadline is this run's, not M10's 300 s
     #            run=lambda resume: agentrun.build_run(scope, claude=<ai.find_claude(settings)>, model=model, resume=resume))
-    # 6. ai.run_turn under `timeout`; every event also goes to M18's reviews.watch(event, folder=, memo_key=<token id>);
+    # 6. ai.run_turn (its deadline is `timeout`; reaching it ends the result "stopped"); every event also goes to
+    #    M18's reviews.watch(event, folder=, memo_key=<token id>);
     #    stop() polled every 0.5 s: True closes the run (kills its process tree)
     # 7. the tool lines and the assistant line (stopped: true when cut short) or the error line appended in one write,
     #    as M17's chat route does; ChangeEvent("agentChats", target.id, chat_id) announced
@@ -950,6 +952,7 @@ Every commit message below ends with the trailer `Co-Authored-By: Claude Opus 5.
       - with `DELEGATE_TIMEOUT` patched to 1 and `FAKE:sleep`, the answer is 504 "Researcher didn't finish within 1 seconds; its chat so far is kept.";
       - the fake's pid is gone;
       - the transcript ends with an assistant line with `stopped: true`.
+    - `test_run_chat_timeout_is_its_own`: with `ai.TURN_TIMEOUT` patched to 1 and `FAKE:wait`, `run_chat(..., timeout=3)` runs past 1 s and ends `stopped` at about 3 s (the `timeout` argument governs, through `ai.Turn(timeout=)`).
     - `test_caller_going_away_stops_delegations`: an `httpx` request to the served app (a uvicorn thread, as M8's `Served`) with `FAKE:wait` is closed by the client. The delegated run's pid is gone within 3 s, and its transcript line is `stopped: true`.
     - `test_delegate_to_a_remote_agent`: with `call_remote` patched, `agent: "Fake Planner"` calls it with `timeout=DELEGATE_TIMEOUT`, `delegated_from="assistant"`, `from_chat=<caller chat>` and `cap=DELEGATE_SUMMARY_CAP`. The answer's `kind` is `"remote"`. After T4, `scripts/m20_acceptance.py` check 8 runs this end to end against the fake.
     - `test_caller_memory_untouched`:
