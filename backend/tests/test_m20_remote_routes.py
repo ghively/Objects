@@ -187,6 +187,34 @@ def test_add_lists_and_announces(api, fake: FakeA2A) -> None:
     assert (res.status_code, res.json()["detail"]) == (409, "This agent is already listed as Fake Planner.")
 
 
+def test_two_adds_at_once_list_one_agent(api, fake: FakeA2A, monkeypatch: pytest.MonkeyPatch) -> None:
+    import threading
+
+    from objectapp.agents import AgentRegistry
+
+    client = api["client"]
+    original = AgentRegistry.create_remote
+
+    def slow_create(self, *args, **kw):
+        time.sleep(0.3)  # widen the window between the check and the create
+        return original(self, *args, **kw)
+
+    monkeypatch.setattr(AgentRegistry, "create_remote", slow_create)
+    answers: list[Any] = []
+
+    def add() -> None:
+        answers.append(client.post("/api/remote-agents", json={"url": fake.base_url, "auth": _bearer()}))
+
+    threads = [threading.Thread(target=add) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(10)
+    assert sorted(r.status_code for r in answers) == [201, 409]
+    remotes = [a for a in client.get("/api/agents").json()["agents"] if a["kind"] == "remote"]
+    assert len(remotes) == 1
+
+
 def test_add_with_name_and_errors(api, fake: FakeA2A) -> None:
     client = api["client"]
     agent = _add(client, fake.base_url + "/.well-known/agent-card.json", name="Trips", icon="ph-airplane")

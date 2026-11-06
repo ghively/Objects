@@ -36,7 +36,7 @@ from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
 
-from . import a2a, secretstore
+from . import a2a, agents, secretstore
 from .agentmodel import AgentError, AgentInvalid, AgentNotFound
 from .agents import NOT_REMOTE, AgentRecord, AgentRegistry, endpoint_host, remote_auth
 from .api_agents import _fail
@@ -226,6 +226,16 @@ def router(ctx: ApiContext) -> APIRouter:
                 return name if isinstance(name, str) else rec.folder.name
         return None
 
+    def create_once(card: a2a.Card, card_url: str, auth: AuthInput, name: str | None,
+                    icon: str | None) -> AgentRecord | str:
+        """The new remote agent, or the name it is already listed as. The check and the create run
+        under the registry's lock, so two adds of the same card can't both pass the check."""
+        with agents._lock:
+            existing = listed_as(card_url, card.endpoint_url)
+            if existing is not None:
+                return existing
+            return registry().create_remote(card, card.raw, card_url, auth, name, icon)
+
     # -- preview and add ----------------------------------------------------------------------
 
     @r.post("/remote-agents/preview")
@@ -261,13 +271,11 @@ def router(ctx: ApiContext) -> APIRouter:
         if card is None:
             return failed
         try:
-            existing = await asyncio.to_thread(listed_as, card_url, card.endpoint_url)
-            if existing is not None:
-                return _error(409, ALREADY_LISTED.format(name=existing))
-            rec = await asyncio.to_thread(registry().create_remote, card, card.raw, card_url, auth,
-                                          req.name, req.icon)
+            rec = await asyncio.to_thread(create_once, card, card_url, auth, req.name, req.icon)
         except AgentError as exc:
             return _fail(exc)
+        if isinstance(rec, str):
+            return _error(409, ALREADY_LISTED.format(name=rec))
         announce(rec.id, rec.revision, req.clientId)
         return JSONResponse(out(rec), status_code=201)
 
