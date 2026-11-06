@@ -1,6 +1,6 @@
 # Object agents: design
 
-Date: 2026-11-05. Owner: Gene Hively. Status: draft for Gene's approval.
+Date: 2026-11-05. Owner: Gene Hively. Status: **approved by Gene, 2026-11-05** (the whole document, our calls included). Plans: `docs/superpowers/plans/2026-11-05-m16-*.md` to `2026-11-05-m21-*.md`.
 
 Builds on M10 (the AI assistant: `backend/objectapp/ai.py`, `api_ai.py`, `aichat.py`, `frontend/src/ai/AiChatPanel.tsx`) and M11 (the local API, tokens and the `objectapp-mcp` server: `backend/objectapp/mcp_server.py`).
 
