@@ -18,14 +18,16 @@ Fixtures the original checks used: `space-sample` (M2, M3), `space-calendar` (M4
 
 Behaviour checks compare against the behaviour catalog (`docs/behavior-catalog.md`). Look checks compare side by side with the original app you're modelling.
 
-## Decisions (walkthrough)
+## Decisions (settled by Gene, 2026-11-04, and built)
 
-- [ ] **(walkthrough)** The slash menu opens mid-word: typing `and/or` opens it, and Enter would create an object named "or". Decide: open only at line start, or also after a space.
-- [ ] **(walkthrough)** After the app is rebuilt while a window is open, clicking a lazily loaded feature (e.g. Help > Getting started) silently does nothing until a reload. Decide: show a "reload" prompt, or leave it.
-- [ ] **(walkthrough)** Many sidebar icon buttons have no accessible name. Decide the names (or let the fix pass choose them) so screen readers and tooltips read them.
-- [ ] **(walkthrough)** **(new 2026-11-04)** Deleting a type leaves its saved queries in `.object/queries/` pointing at the deleted type. Decide: trash them with the type, keep them as broken, or keep and show them as orphaned.
-- [ ] **(walkthrough)** **(new 2026-11-04)** The backend role values `RootPage`, `RootDailyNote`, etc. still use the original app's internal names. Decide: rename (with a migration) or keep.
-- [ ] **(open since 2026-11-01)** Should the object page title commit on Escape, as table title cells now do? Decide: yes (Escape keeps the typed title) or no (Escape reverts).
+Settled and built the same day; check each by hand:
+
+- [ ] Slash menu: `/` opens it only at the start of a block, after whitespace or after a line break. Type `and/or`, `11/04` and a URL: no menu. The block handle's + still opens it anywhere.
+- [ ] Update while a window is open: a lazily loaded feature whose file is gone saves pending edits, then reloads once. If saving fails or takes over 5 s, or a second failure comes within 60 s, a toast "Object was updated. Reload to continue." appears instead.
+- [ ] Icon buttons: every sidebar, tab bar and top bar button has a name and a tooltip (the walkthrough's "no name" finding was a tool artefact; the per-type collections fold now names its type).
+- [ ] Deleting a type moves its saved queries to the trash with it; a query over several types loses only that type. Restoring the type brings them back (byte-identical for the single-type ones).
+- [ ] Role values renamed to Object's own (`page`, `tag`, `task`, `dailyNote`, `entity`, `whiteboard`, media kinds); computed only, nothing on disk changed. Nothing to check by hand beyond backlinks, graph filters and duplicates behaving as before.
+- [ ] Page title: Escape keeps what you typed and leaves the field, like table cells (Escape with the `#` tag picker open closes only the picker; nothing commits during IME composition).
 
 ## Startup & spaces
 
