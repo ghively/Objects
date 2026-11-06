@@ -9,8 +9,10 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
+import { MCP_TEXT } from '@/mcp/mcpText'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { mcpConfig } from '@/test/mockApi'
-import { INTEGRATIONS_TEXT as T, IntegrationsSection } from './Integrations'
+import { INTEGRATIONS_SEARCH, INTEGRATIONS_TEXT as T, IntegrationsSection } from './Integrations'
 
 const mocked = vi.mocked(api)
 const TOKEN = { id: 't1', name: 'Claude Code', scope: 'read' as const, createdAt: '2026-11-05T12:00:00.000Z', lastUsedAt: null }
@@ -20,6 +22,7 @@ beforeEach(() => {
   mocked.apiTokens.mockReset()
   mocked.createApiToken.mockReset()
   mocked.revokeApiToken.mockReset()
+  useSettings.setState({ settings: settingsDefaults, revision: 'r0', loaded: true })
 })
 
 describe('Integrations', () => {
@@ -65,5 +68,29 @@ describe('Integrations', () => {
     await user.type(await screen.findByLabelText(T.nameLabel), 'One more')
     await user.click(screen.getByRole('button', { name: T.create }))
     expect(await screen.findByText(/at most 50 tokens/)).toBeInTheDocument()
+  })
+
+  test('test the group sits after the API token groups and is hidden while AI features are hidden', async () => {
+    const { unmount } = render(<IntegrationsSection />)
+    const mcp = await screen.findByRole('region', { name: MCP_TEXT.heading })
+    const titles = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))
+    expect(titles.indexOf(MCP_TEXT.heading)).toBeGreaterThan(titles.indexOf(T.mcp))
+    expect(titles.indexOf(T.mcp)).toBeGreaterThan(titles.indexOf(T.newToken))
+    expect(titles.indexOf(T.newToken)).toBeGreaterThan(titles.indexOf(T.tokens))
+    expect(titles.indexOf(MCP_TEXT.secretVariables)).toBeGreaterThan(titles.indexOf(MCP_TEXT.heading))
+    expect(mcp).toBeInTheDocument()
+    unmount()
+
+    useSettings.setState({ settings: { ...settingsDefaults, aiHidden: true }, revision: 'r0', loaded: true })
+    render(<IntegrationsSection />)
+    expect(await screen.findByText(T.empty)).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: MCP_TEXT.heading })).toBeNull()
+    expect(screen.queryByRole('region', { name: MCP_TEXT.secretVariables })).toBeNull()
+  })
+
+  test('test the search terms include MCP servers', () => {
+    expect(INTEGRATIONS_SEARCH).toContain(MCP_TEXT.heading)
+    expect(INTEGRATIONS_SEARCH).toContain(MCP_TEXT.secretVariables)
+    expect(INTEGRATIONS_SEARCH).toContain('MCP')
   })
 })
