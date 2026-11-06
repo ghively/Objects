@@ -45,12 +45,15 @@ export interface WorkViewDef {
 const items = (data: WorkDataState): WorkBoardItem[] => data.board?.items ?? []
 const active = (data: WorkDataState): WorkBoardItem[] => items(data).filter((i) => !i.done)
 
-/** The focus filter of today's selected focus line (null: none selected, or the line is gone). */
+/**
+ * The focus filter of today's selected focus line (null: none selected). A selected line that is
+ * not in the data (loading, failed, the list got shorter) filters to nothing, never to unrelated work.
+ */
 export function focusFilterFor(data: WorkDataState, ui: Pick<WorkUiValues, 'focusLine'>): FocusFilter | null {
   const n = focusLineToday(ui)
   if (n === null) return null
   const line = data.focus?.lines.find((l) => l.n === n)
-  return line ? { n, paths: linkedPaths(line, items(data)) } : null
+  return { n, paths: line ? linkedPaths(line, items(data)) : new Set<string>() }
 }
 
 /** Now's pool with the page's energy, today's Not now and the selected focus line. */
