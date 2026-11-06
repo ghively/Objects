@@ -38,7 +38,7 @@ describe('AgentPage', () => {
     useAgents.setState({ agents: [agent({ id: RESEARCHER })], loaded: true })
     render(<AgentPage id={RESEARCHER} tab="chats" />)
     expect(screen.getByRole('tab', { name: 'Chats' })).toHaveAttribute('aria-selected', 'true')
-    expect(await screen.findByRole('searchbox', { name: 'Filter chats' })).toBeInTheDocument()
+    expect(await screen.findByRole('searchbox', { name: 'Search chats' })).toBeInTheDocument()
   })
 
   test('test an open agent page switches to a newly opened tab', async () => {

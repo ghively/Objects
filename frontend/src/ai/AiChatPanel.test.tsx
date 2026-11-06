@@ -8,16 +8,19 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
-import { api, ConflictError } from '@/api/client'
-import type { AiChatRequest, AiEvent } from '@/api/types'
+import { api, ApiError, ConflictError } from '@/api/client'
+import type { AiChatRequest, AiEvent, ChangeEvent } from '@/api/types'
 import { resetAgents, useAgents } from '@/agents/useAgents'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { isAiChatTarget } from '@/nav/sidepanel'
-import { activeTab, useTabs } from '@/nav/tabs'
+import { activeTab, currentTarget, useTabs } from '@/nav/tabs'
 import { usePalette } from '@/palette/usePalette'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { resetSpaceInfo } from '@/settings/useSpaceInfo'
-import { agent, agentTranscript, objectDetail, objectSummary, references } from '@/test/mockApi'
+import { agent, agentTranscript, objectDetail, objectSummary, references, reviewStatus } from '@/test/mockApi'
+import { useLearningFocus } from '@/agents/learningFocus'
+import { CHAT_MENU_TEXT } from './ChatMenu'
+import { LEARNING_LINE_TEXT } from './LearningLine'
 import { AGENT_PICKER_TEXT } from './AgentPicker'
 import { AiChatHeader } from './AiChatHeader'
 import { AiChatPanel } from './AiChatPanel'
@@ -79,7 +82,7 @@ const CHAT_ID = '01JCHAT0000000000000000000'
 beforeEach(() => {
   vi.clearAllMocks()
   // Back to the mock's own answers (a test's mockResolvedValue would outlive it).
-  for (const fn of [mocked.aiStatus, mocked.aiChat, mocked.aiChatLoad, mocked.saveAiChat, mocked.object, mocked.saveBody, mocked.references, mocked.updateProperties, mocked.agentChat, mocked.agents])
+  for (const fn of [mocked.aiStatus, mocked.aiChat, mocked.aiChatLoad, mocked.saveAiChat, mocked.object, mocked.saveBody, mocked.references, mocked.updateProperties, mocked.agentChat, mocked.agents, mocked.chatReviews, mocked.learnFromChat, mocked.onChange])
     fn.mockReset()
   localStorage.clear()
   localStorage.setItem(noticeKey(null), '1')
@@ -919,5 +922,184 @@ describe('AiChatPanel', () => {
     act(() => useSettings.setState({ settings: { ...settingsDefaults, aiHidden: true } }))
     expect(screen.queryByRole('textbox', { name: T.inputLabel })).toBeNull()
     expect(aiEntry()).toBeUndefined()
+  })
+
+  // ---- M18: the Learning line and Learn from this chat ----
+
+  /** The panel's change listeners, and an `agentLearning` event to them. */
+  function learningEvents() {
+    const listeners = new Set<(e: ChangeEvent) => void>()
+    mocked.onChange.mockImplementation((cb) => {
+      listeners.add(cb)
+      return () => {
+        listeners.delete(cb)
+      }
+    })
+    return async (agentId = 'assistant') => {
+      await act(async () => {
+        for (const cb of [...listeners]) cb({ kind: 'agentLearning', path: agentId, version: 'r1', origin: null })
+      })
+    }
+  }
+
+  /** One turn of a chat that has a transcript id, answered "Hello". */
+  async function oneTurn() {
+    mocked.aiChat.mockImplementation(answer({ type: 'chat', chatId: CHAT_ID, agentId: 'assistant' }, { type: 'text', text: 'Hello' }, done('Hello')))
+    const view = setup()
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await view.user.type(input(), 'Hi{Enter}')
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mocked.chatReviews).toHaveBeenCalledWith('assistant', CHAT_ID))
+    return view
+  }
+
+  const later = () => new Date(Date.now() + 10).toISOString()
+
+  test('test a running review shows Learning… after the reply', async () => {
+    const emit = learningEvents()
+    await oneTurn()
+    mocked.chatReviews.mockResolvedValue([reviewStatus({ id: 'rv1', chatId: CHAT_ID, state: 'running', startedAt: later(), endedAt: null, summary: null })])
+    await emit()
+    const list = screen.getByRole('list', { name: T.title })
+    const line = await within(list).findByText(LEARNING_LINE_TEXT.running)
+    const reply = list.querySelector('[data-role="assistant"]') as HTMLElement
+    const row = line.closest('[data-role="learning"]') as HTMLElement
+    expect(row).not.toBeNull()
+    expect(reply.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(row.querySelector('[data-icon="ph-spinner-gap"]')).not.toBeNull()
+    expect(row.querySelector('.text-xs.text-fg-muted')).not.toBeNull()
+    // Another agent's event doesn't reload.
+    const calls = mocked.chatReviews.mock.calls.length
+    await emit(RESEARCHER)
+    expect(mocked.chatReviews).toHaveBeenCalledTimes(calls)
+  })
+
+  test('test the done line shows the summary and opens the skills tab with the entries focused', async () => {
+    const emit = learningEvents()
+    const { user } = await oneTurn()
+    mocked.chatReviews.mockResolvedValue([reviewStatus({ id: 'rv1', chatId: CHAT_ID, startedAt: later(), entryIds: ['e1', 'e2'] })])
+    await emit()
+    const button = await screen.findByRole('button', { name: 'Saved 1 memory, updated 1 skill' })
+    await user.click(button)
+    expect(useLearningFocus.getState()).toMatchObject({ agentId: 'assistant', entryIds: ['e1', 'e2'] })
+    expect(currentTarget(s())).toEqual({ kind: 'agent', id: 'assistant', tab: 'skills' })
+  })
+
+  test('test a memory-only summary opens the memory tab', async () => {
+    const emit = learningEvents()
+    const { user } = await oneTurn()
+    mocked.chatReviews.mockResolvedValue([
+      reviewStatus({ id: 'rv1', chatId: CHAT_ID, startedAt: later(), summary: 'Saved 2 memories', entryIds: ['e1', 'e2'] }),
+    ])
+    await emit()
+    await user.click(await screen.findByRole('button', { name: 'Saved 2 memories' }))
+    expect(currentTarget(s())).toEqual({ kind: 'agent', id: 'assistant', tab: 'memory' })
+    expect(useLearningFocus.getState().entryIds).toEqual(['e1', 'e2'])
+  })
+
+  test('test nothing learned and a failed review are plain lines', async () => {
+    const emit = learningEvents()
+    await oneTurn()
+    mocked.chatReviews.mockResolvedValue([
+      reviewStatus({ id: 'rv1', chatId: CHAT_ID, startedAt: later(), summary: 'Nothing new to learn', entryIds: [] }),
+      reviewStatus({ id: 'rv2', chatId: CHAT_ID, startedAt: later(), state: 'failed', summary: null, message: 'Claude Code stopped.' }),
+    ])
+    await emit()
+    expect(await screen.findByText(LEARNING_LINE_TEXT.nothing)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: LEARNING_LINE_TEXT.nothing })).toBeNull()
+    expect(screen.getByText('Learning stopped: Claude Code stopped.')).toBeInTheDocument()
+  })
+
+  test('test the input stays enabled while learning', async () => {
+    const emit = learningEvents()
+    const { user } = await oneTurn()
+    mocked.chatReviews.mockResolvedValue([reviewStatus({ id: 'rv1', chatId: CHAT_ID, state: 'running', startedAt: later(), summary: null })])
+    await emit()
+    await screen.findByText(LEARNING_LINE_TEXT.running)
+    expect(input()).toBeEnabled()
+    // Past the line's slack, so the next reply is clearly later than the review's start.
+    await new Promise((r) => setTimeout(r, 1100))
+    await user.type(input(), 'Next{Enter}')
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(2))
+    expect(mocked.aiChat.mock.calls[1][0]).toMatchObject({ prompt: 'Next', chatId: CHAT_ID })
+    // The line stays after the first reply, not the new one.
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(2))
+    const list = screen.getByRole('list', { name: T.title })
+    const replies = list.querySelectorAll('[data-role="assistant"]')
+    const row = list.querySelector('[data-role="learning"]') as HTMLElement
+    expect(replies[0].compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(replies[1].compareDocumentPosition(row) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+  })
+
+  test('test Learn from this chat calls the route and shows a 409 as a notice', async () => {
+    const { user } = await oneTurn()
+    mocked.learnFromChat.mockResolvedValueOnce(reviewStatus({ id: 'rv1', chatId: CHAT_ID, state: 'running', trigger: 'manual' }))
+    await user.click(screen.getByRole('button', { name: CHAT_MENU_TEXT.more }))
+    await user.click(await screen.findByRole('menuitem', { name: CHAT_MENU_TEXT.learn }))
+    expect(mocked.learnFromChat).toHaveBeenCalledWith('assistant', CHAT_ID)
+    mocked.learnFromChat.mockRejectedValueOnce(new ApiError(409, 'This chat is already being reviewed.'))
+    await user.click(screen.getByRole('button', { name: CHAT_MENU_TEXT.more }))
+    await user.click(await screen.findByRole('menuitem', { name: CHAT_MENU_TEXT.learn }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('This chat is already being reviewed.')
+  })
+
+  test('test Learn from this chat is disabled before the first reply', async () => {
+    const { user } = setup()
+    // The menu sits after New chat in the header.
+    const more = screen.getByRole('button', { name: CHAT_MENU_TEXT.more })
+    expect(screen.getByRole('button', { name: T.newChat }).compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await user.click(more)
+    const item = await screen.findByRole('menuitem', { name: CHAT_MENU_TEXT.learn })
+    expect(item).toHaveAttribute('aria-disabled', 'true')
+    expect(mocked.learnFromChat).not.toHaveBeenCalled()
+  })
+
+  test('test Learn from this chat is disabled while a review of it runs', async () => {
+    const emit = learningEvents()
+    const { user } = await oneTurn()
+    mocked.chatReviews.mockResolvedValue([reviewStatus({ id: 'rv1', chatId: CHAT_ID, state: 'running', startedAt: later(), summary: null })])
+    await emit()
+    await screen.findByText(LEARNING_LINE_TEXT.running)
+    await user.click(screen.getByRole('button', { name: CHAT_MENU_TEXT.more }))
+    expect(await screen.findByRole('menuitem', { name: CHAT_MENU_TEXT.learn })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  test("test a transcript's learning items show as lines", async () => {
+    mocked.agentChat.mockResolvedValue(
+      agentTranscript({
+        id: CHAT_ID,
+        agentId: RESEARCHER,
+        sessionId: 'sess-r',
+        items: [
+          { type: 'user', text: 'Remember I like short answers', at: '2026-11-05T09:00:00.000Z', contextPaths: [] },
+          { type: 'assistant', text: 'Noted.', at: '2026-11-05T09:00:02.000Z', model: 'sonnet', sessionId: 'sess-r' },
+          { type: 'learning', reviewId: 'rv1', kinds: ['memory'], state: 'done', summary: 'Saved 1 memory', message: null, at: '2026-11-05T09:00:03.000Z' },
+          { type: 'user', text: 'Thanks', at: '2026-11-05T09:01:00.000Z', contextPaths: [] },
+          { type: 'assistant', text: 'Any time.', at: '2026-11-05T09:01:02.000Z', model: 'sonnet', sessionId: 'sess-r' },
+        ],
+      }),
+    )
+    setup({ agentId: RESEARCHER, chatId: CHAT_ID })
+    const list = screen.getByRole('list', { name: T.title })
+    const line = await within(list).findByText('Saved 1 memory')
+    const row = line.closest('[data-role="learning"]') as HTMLElement
+    const replies = list.querySelectorAll('[data-role="assistant"]')
+    expect(replies[0].compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(replies[1].compareDocumentPosition(row) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+    await waitFor(() => expect(mocked.chatReviews).toHaveBeenCalledWith(RESEARCHER, CHAT_ID))
+  })
+
+  test('test Copy leaves out the learning line', async () => {
+    const emit = learningEvents()
+    const { user } = await oneTurn()
+    mocked.chatReviews.mockResolvedValue([reviewStatus({ id: 'rv1', chatId: CHAT_ID, startedAt: later(), entryIds: ['e1'] })])
+    await emit()
+    await screen.findByRole('button', { name: 'Saved 1 memory, updated 1 skill' })
+    const write = vi.spyOn(navigator.clipboard, 'writeText')
+    await user.click(screen.getByRole('button', { name: T.copy }))
+    expect(write).toHaveBeenCalledWith('Hello')
+    // The saved AI Chat holds the messages only.
+    const saved = mocked.saveAiChat.mock.calls[0][0].messages
+    expect(saved.map((m) => m.text)).toEqual(['Hi', 'Hello'])
   })
 })

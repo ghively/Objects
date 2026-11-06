@@ -156,7 +156,38 @@ function valueOf(input: Record<string, unknown> | null, clause: Clause): string 
   return s ? cut(s) : null
 }
 
+const str = (input: Record<string, unknown> | null, key: string): string | null => {
+  const v = input?.[key]
+  return typeof v === 'string' && v ? cut(v) : null
+}
+const quoted = (head: string, v: string | null): string => (v ? `${head} '${v}'` : head)
+
+/** M18: the learning tools' lines (our strings, the M18 plan's table): they depend on the action. */
+const LEARNING_LINES: Record<string, (input: Record<string, unknown> | null) => string> = {
+  memory: (input) => {
+    const action = input?.action
+    const verb = action === 'replace' ? 'Changed a memory' : action === 'remove' ? 'Removed a memory' : 'Saved a memory'
+    return input?.target === 'user' ? `${verb} about you` : verb
+  },
+  skills_list: () => 'Listed skills',
+  skill_view: (input) => quoted('Read the skill', str(input, 'name')),
+  skill_manage: (input) => {
+    const action = input?.action
+    const head = action === 'create' ? 'Created the skill' : action === 'archive' ? 'Archived the skill' : 'Updated the skill'
+    return quoted(head, str(input, 'name'))
+  },
+  session_search: (input) => {
+    const query = str(input, 'query')
+    if (query) return `Searched past chats for '${query}'`
+    return input?.chat_id ? 'Read a past chat' : 'Searched past chats'
+  },
+  // The CLI's own Skill tool
+  Skill: (input) => quoted('Used the skill', str(input, 'skill')),
+}
+
 function baseLine(step: ToolStepState): string {
+  const learning = LEARNING_LINES[step.name.replace(/^mcp__object-agent__/, '')]
+  if (learning) return learning(step.input)
   const pieces = LINES[step.name]
   if (pieces) {
     return pieces
