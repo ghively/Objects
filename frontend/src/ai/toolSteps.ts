@@ -129,6 +129,10 @@ const LINES: Record<string, Piece[]> = {
   start_import: ['Started an import'],
   import_status: ['Checked an import'],
   agent_info: ['Looked up this agent'],
+  // M20: the A2A and delegation tools (our strings, the M20 plan's table)
+  remote_agents_list: ['Listed remote agents'],
+  remote_agent_call: ['Asked', c(' ', 'agent')],
+  delegate: ['Handed a task to', c(' ', 'agent')],
   // Claude Code's built-ins
   Read: ['Read', c(' ', 'file_path')],
   Write: ['Wrote', c(' ', 'file_path')],

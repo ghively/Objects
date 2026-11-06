@@ -41,10 +41,28 @@
  *   followed, then its summary (`LearningLine`; `useChatReviews` over a loaded transcript's
  *   `learning` items). It is never a message: Copy and the save leave it out, and the input stays
  *   enabled. The header's `…` menu (`ChatMenu`) has "Learn from this chat"; a refusal is the notice.
+ * - M20: a remote (A2A) agent is an `agentId` like any other. Its header has no model picker, no
+ *   `…` menu and no "Learning…" lines (it has no model, memory or skills of Object's). The first
+ *   send with context to it opens `RemoteContextNotice` ("Send" records it with
+ *   `ackRemoteContext`, then sends; "Cancel" keeps the draft); a 428 from the server opens it too.
+ *   An `attachment` event adds a chip under the reply (`AttachmentChip`); a loaded transcript shows
+ *   its chips. Attachments are never saved into the AI Chat object. Since a remote chat needs no
+ *   Claude Code, the input stays usable for it when Claude Code isn't found (the plan's call 15).
  */
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { api, ConflictError } from '@/api/client'
-import type { AiEvent, AiMessage, AiMode, AiProposal, AiSkipped, AiStatus, ObjectSummary, ReviewStatus, TranscriptItem } from '@/api/types'
+import { api, ApiError, ConflictError } from '@/api/client'
+import type {
+  AiEvent,
+  AiMessage,
+  AiMode,
+  AiProposal,
+  AiSkipped,
+  AiStatus,
+  ObjectSummary,
+  RemoteAttachment,
+  ReviewStatus,
+  TranscriptItem,
+} from '@/api/types'
 import { useAgents } from '@/agents/useAgents'
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -62,10 +80,12 @@ import { useSettingsModal } from '@/settings/useSettingsModal'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { AgentPicker } from './AgentPicker'
 import { AiChatHeader } from './AiChatHeader'
+import { AttachmentChip } from './AttachmentChip'
 import { ChatMenu } from './ChatMenu'
+import { RemoteContextNotice } from './RemoteContextNotice'
 import { LearningLine } from './LearningLine'
 import { useChatReviews } from './useChatReviews'
-import { AI_CHAT_TEXT as T, MODE_LABELS, toolLine } from './aiText'
+import { AI_CHAT_TEXT as T, MODE_LABELS, REMOTE_CHAT_TEXT as R, toolLine } from './aiText'
 import { addTags, appendToObject, appendToTodaysNote, setProperties } from './aiWrites'
 import { ChatMarkdown } from './ChatMarkdown'
 import { ToolStep } from './ToolStep'
@@ -90,6 +110,8 @@ export interface ChatItem extends AiMessage {
   stopped?: boolean
   /** M16: an assistant turn of this panel: its texts and tool steps in stream order (not saved). */
   parts?: ChatPart[]
+  /** M20: a remote agent's file artifacts (kept in its transcript, never in the AI Chat object). */
+  attachments?: RemoteAttachment[]
 }
 
 interface Turn {
@@ -132,7 +154,15 @@ function fromTranscript(lines: TranscriptItem[]): ChatItem[] {
       })
     } else if (l.type === 'assistant') {
       const parts: ChatPart[] | null = steps.length ? [...steps, ...(l.text ? [{ kind: 'text' as const, text: l.text }] : [])] : null
-      out.push({ id: newItemId(), role: 'assistant', text: l.text, at: l.at, ...(l.stopped ? { stopped: true } : {}), ...(parts ? { parts } : {}) })
+      out.push({
+        id: newItemId(),
+        role: 'assistant',
+        text: l.text,
+        at: l.at,
+        ...(l.stopped ? { stopped: true } : {}),
+        ...(parts ? { parts } : {}),
+        ...(l.attachments?.length ? { attachments: l.attachments } : {}),
+      })
       steps = []
     } else {
       steps = []
@@ -227,6 +257,18 @@ function AssistantBody({ text, parts, streaming }: { text: string; parts?: ChatP
           <ChatMarkdown key={`t${i}`} source={p.text} streaming={streaming} className="text-[14px] break-words text-fg" />
         ),
       )}
+    </div>
+  )
+}
+
+/** M20: a reply's attachment chips. */
+function Attachments({ agentId, list }: { agentId: string; list: RemoteAttachment[] | undefined }) {
+  if (!list?.length) return null
+  return (
+    <div role="group" aria-label={R.attachments} className="flex flex-wrap gap-1">
+      {list.map((a, i) => (
+        <AttachmentChip key={`${a.kind}:${a.file ?? a.url ?? ''}:${i}`} agentId={agentId} attachment={a} />
+      ))}
     </div>
   )
 }
@@ -481,7 +523,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
   const [acked, setAcked] = useState(false)
   const showNotice = !acked && !noticeSeen(root)
 
-  const [busy, setBusy] = useState<{ text: string; tools: string[]; parts: ChatPart[] } | null>(null)
+  const [busy, setBusy] = useState<{ text: string; tools: string[]; parts: ChatPart[]; attachments: RemoteAttachment[] } | null>(null)
   /** This chat's model pick (null: Default); a ref too, for the turn being sent. */
   const [model, setModelState] = useState<string | null>(null)
   const modelRef = useRef<string | null>(null)
@@ -511,6 +553,12 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
   /** A transcript entry a seed replaced: not loaded. */
   const ignoreChat = useRef<string | null>(null)
   const agent = useAgents((st) => st.agents.find((a) => a.id === agentId))
+  /** M20: a remote (A2A) agent: no model, memory or skills of Object's. */
+  const isRemote = agent?.kind === 'remote'
+  /** M20: the turn waiting for the context notice; `fromInput`: it is the message box's draft. */
+  const [pendingNotice, setPendingNotice] = useState<{ turn: Turn; fromInput: boolean } | null>(null)
+  /** M20: remote agents whose notice was acknowledged here (until the `agents` reload says so). */
+  const noticeAcked = useRef<Set<string>>(new Set())
   const settingsModel = useSettings((st) => st.settings.aiModel ?? null)
   // The Default row names the agent's model; the default agent's is Settings' model.
   const defaultModel = agentId === DEFAULT_AGENT_ID || agent?.default ? settingsModel : (agent?.model ?? null)
@@ -524,7 +572,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
 
   // M18: this chat's background reviews: the route's (loaded on `agentLearning` events) over a
   // loaded transcript's own `learning` items.
-  const fetchedReviews = useChatReviews(agentId, chatId)
+  const fetchedReviews = useChatReviews(agentId, isRemote ? null : chatId)
   const reviews = useMemo(() => {
     const byId = new Map(transcriptReviews.map((r) => [r.id, r]))
     for (const r of fetchedReviews) byId.set(r.id, r)
@@ -587,6 +635,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
     setError(null)
     setSaveError(null)
     setQueued(null)
+    setPendingNotice(null)
     setBlock(null)
     setBlockPath(null)
     callbacks.current.release?.()
@@ -774,9 +823,12 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
       const seq = loadSeq.current
       let acc = ''
       let parts: ChatPart[] = []
+      let attachments: RemoteAttachment[] = []
       let done: Extract<AiEvent, { type: 'done' }> | null = null
       let failed: string | null = null
-      setBusy({ text: '', tools: [], parts: [] })
+      /** M20: the server's 428: the remote agent's context notice comes first. */
+      let needsNotice = false
+      setBusy({ text: '', tools: [], parts: [], attachments: [] })
       const onEvent = (e: AiEvent) => {
         if (ctl.signal.aborted) return
         if (e.type === 'chat') setChatId(e.chatId)
@@ -785,12 +837,16 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
           acc += e.text
           parts = applyEvent(parts, e)
           const now = parts
-          setBusy((b) => ({ text: acc, tools: b?.tools ?? [], parts: now }))
+          setBusy((b) => ({ text: acc, tools: b?.tools ?? [], parts: now, attachments }))
         } else if (e.type === 'tool') {
           parts = applyEvent(parts, e)
           const now = parts
           const call = e.result === undefined
-          setBusy((b) => ({ text: b?.text ?? acc, tools: call ? [...(b?.tools ?? []), e.name] : (b?.tools ?? []), parts: now }))
+          setBusy((b) => ({ text: b?.text ?? acc, tools: call ? [...(b?.tools ?? []), e.name] : (b?.tools ?? []), parts: now, attachments }))
+        } else if (e.type === 'attachment') {
+          attachments = [...attachments, e.attachment]
+          const now = attachments
+          setBusy((b) => ({ text: b?.text ?? acc, tools: b?.tools ?? [], parts: b?.parts ?? parts, attachments: now }))
         } else if (e.type === 'done') done = e
         else if (e.type === 'error') failed = e.message
       }
@@ -812,12 +868,23 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
           ctl.signal,
         )
       } catch (e) {
-        if (!isAbort(e)) failed = errorText(e)
+        if (e instanceof ApiError && e.status === 428) needsNotice = true
+        else if (!isAbort(e)) failed = errorText(e)
       }
       if (controller.current === ctl) controller.current = null
       // A reset (New chat, another seed) or unmount since: nothing to show.
       if (seq !== loadSeq.current || !alive.current) return
       setBusy(null)
+      if (needsNotice) {
+        // Nothing was sent: the turn is taken back (its draft into an empty message box) and
+        // waits for the notice.
+        noticeAcked.current.delete(agentRef.current)
+        setItems(base)
+        const restore = turn.mode === 'chat' && !inputRef.current?.value.trim()
+        if (restore) setInput(turn.prompt)
+        setPendingNotice({ turn: { ...turn, base }, fromInput: restore })
+        return
+      }
       const finished = done as Extract<AiEvent, { type: 'done' }> | null
       if (finished) {
         if (finished.sessionId) sessionId.current = finished.sessionId
@@ -838,6 +905,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
             skipped: finished.skipped,
             // A step still pending when 'done' arrives never got its result: it shows as stopped.
             ...(hasSteps(parts) ? { parts: stopSteps(parts) } : {}),
+            ...(attachments.length ? { attachments } : {}),
           },
         ])
         void save()
@@ -850,9 +918,10 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
         at: new Date().toISOString(),
         stopped: true,
         ...(hasSteps(parts) ? { parts: stopSteps(parts) } : {}),
+        ...(attachments.length ? { attachments } : {}),
       })
       // A stopped or failed turn keeps what it showed: its text, or its steps when no text came yet.
-      const keep = !!acc || hasSteps(parts)
+      const keep = !!acc || hasSteps(parts) || attachments.length > 0
       if (ctl.signal.aborted) {
         if (keep) setItems((prev) => [...prev, partial()])
         return
@@ -863,7 +932,35 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
     [save, setItems, setChatId],
   )
 
-  const ready = !!status?.available && !showNotice
+  // A remote chat needs no Claude Code (the plan's call 15), nor its first-use notice (it is about
+  // Anthropic); the remote agent has its own notice.
+  const ready = isRemote || (!!status?.available && !showNotice)
+
+  /** M20: whether sending now needs the context notice first (remote agent, context, not yet seen). */
+  const needsContextNotice = (): boolean => {
+    const a = useAgents.getState().byId(agentRef.current)
+    if (a?.kind !== 'remote' || contextRef.current.length === 0) return false
+    return !a.remote?.contextNoticeAt && !noticeAcked.current.has(a.id)
+  }
+
+  /** M20: "Send" on the notice: record it for the agent, then send the waiting turn. */
+  const confirmNotice = async () => {
+    const pending = pendingNotice
+    if (!pending) return
+    setPendingNotice(null)
+    const id = agentRef.current
+    const seq = loadSeq.current
+    try {
+      await api.ackRemoteContext(id)
+    } catch (e) {
+      if (seq === loadSeq.current && alive.current) setError(errorText(e))
+      return
+    }
+    noticeAcked.current.add(id)
+    if (seq !== loadSeq.current || !alive.current || agentRef.current !== id) return
+    if (pending.fromInput) setInput('')
+    void send(pending.turn)
+  }
 
   // A queued turn (from a seed) goes once Claude Code answers and the notice is acknowledged.
   useEffect(() => {
@@ -886,9 +983,15 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
 
   const submit = () => {
     const text = input.trim()
-    if (!text || !ready || controller.current) return
+    if (!text || !ready || controller.current || pendingNotice) return
+    const turn: Turn = { prompt: text, mode: 'chat', block, blockPath }
+    // M20: the draft stays in the box until the notice is answered ("Cancel" keeps it).
+    if (needsContextNotice()) {
+      setPendingNotice({ turn, fromInput: true })
+      return
+    }
     setInput('')
-    void send({ prompt: text, mode: 'chat', block, blockPath })
+    void send(turn)
   }
 
   const stop = () => controller.current?.abort()
@@ -907,7 +1010,12 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
     }
     if (at < 0) return
     const u = list[at]
-    void send({ prompt: u.prompt ?? u.text, mode: u.mode ?? 'chat', block: u.block ?? null, blockPath: u.blockPath ?? null, base: list.slice(0, at), fresh: true })
+    const turn: Turn = { prompt: u.prompt ?? u.text, mode: u.mode ?? 'chat', block: u.block ?? null, blockPath: u.blockPath ?? null, base: list.slice(0, at), fresh: true }
+    if (needsContextNotice()) {
+      setPendingNotice({ turn, fromInput: false })
+      return
+    }
+    void send(turn)
   }
 
   const rephrase = (item: ChatItem) => {
@@ -1006,7 +1114,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
 
   // M18: the "Learning" lines, each after the reply its review followed. Small and muted, never a
   // chat message (Copy and the save use the items only). A review never blocks the next turn.
-  const placed = placeReviews(items, reviews)
+  const placed = isRemote ? new Map<string, ReviewStatus[]>() : placeReviews(items, reviews)
   const learningLines = (key: string) =>
     (placed.get(key) ?? []).map((r) => (
       <li key={`review-${r.id}`} data-role="learning">
@@ -1023,7 +1131,18 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
         onModelChange={setModel}
         onNewChat={newChat}
         busy={!!busy}
-        menu={<ChatMenu agentId={agentId} chatId={chatId} disabled={reviewRunning} onNotice={setError} />}
+        modelHidden={isRemote}
+        menu={isRemote ? undefined : <ChatMenu agentId={agentId} chatId={chatId} disabled={reviewRunning} onNotice={setError} />}
+      />
+      <RemoteContextNotice
+        open={!!pendingNotice}
+        agentName={agent?.name ?? ''}
+        host={agent?.remote?.endpointHost ?? ''}
+        onSend={() => void confirmNotice()}
+        onCancel={() => {
+          setPendingNotice(null)
+          focusInput()
+        }}
       />
       <div className="flex shrink-0 items-center gap-1 border-b border-line px-3 py-1.5">
         <span className="text-[12px] font-medium text-fg-muted">{T.context}</span>
@@ -1074,7 +1193,8 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
             ) : (
               <li key={item.id} data-role="assistant" className="flex flex-col gap-1">
                 <AssistantBody text={item.text} parts={item.parts} />
-                {item.stopped && <p className="text-[12px] text-fg-muted">{T.stopped}</p>}
+                <Attachments agentId={agentId} list={item.attachments} />
+                {item.stopped &&<p className="text-[12px] text-fg-muted">{T.stopped}</p>}
                 {item.skipped && item.skipped.length > 0 && (
                   <p className="text-[12px] text-fg-muted">{T.skipped(item.skipped.map((sk) => ({ title: titleOf(sk.path), reason: sk.reason })))}</p>
                 )}
@@ -1116,6 +1236,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
           {busy && (
             <li data-role="assistant" data-streaming="" className="flex flex-col gap-1">
               <AssistantBody text={busy.text} parts={busy.parts} streaming />
+              <Attachments agentId={agentId} list={busy.attachments} />
               <p role="status" className="flex items-center gap-1.5 text-[13px] text-fg-muted">
                 <Icon name="ph-sparkle" size={13} />
                 {busyLine}
@@ -1132,11 +1253,11 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
         <div ref={listEnd} />
       </div>
 
-      {status && !status.available ? (
+      {status && !status.available && !isRemote ? (
         <StatusExplanation status={status} />
       ) : (
         <div className="shrink-0 border-t border-line px-3 py-2">
-          {showNotice && (
+          {showNotice && !isRemote && (
             <div role="note" className="mb-2 flex flex-col gap-2 rounded-lg border border-line bg-raised p-3 text-[13px] text-fg">
               <p>{T.notice}</p>
               <div>
@@ -1153,7 +1274,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
               </div>
             </div>
           )}
-          {!status && <p className="pb-1 text-[12px] text-fg-muted">{T.checking}</p>}
+          {!status && !isRemote && <p className="pb-1 text-[12px] text-fg-muted">{T.checking}</p>}
           <div className="flex items-end gap-2">
             <textarea
               ref={inputRef}

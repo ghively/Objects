@@ -80,6 +80,18 @@ export const AI_CHAT_TEXT = {
   relevantEmpty: 'Nothing related found yet.', // our string
 } as const
 
+/** M20: a chat with a remote (A2A) agent: the context notice and the attachment chips (our strings). */
+export const REMOTE_CHAT_TEXT = {
+  noticeTitle: 'This leaves your computer',
+  noticeBody: (name: string, host: string) =>
+    `${name} is a remote agent. The context pages you send go to ${host}, outside this computer. Pages excluded from AI are never sent.`,
+  noticeSend: 'Send',
+  noticeCancel: 'Cancel',
+  attachments: 'Attachments',
+  showInFolder: 'Show in folder',
+  revealFailed: (why: string) => `Could not show the file: ${why}`,
+} as const
+
 /** What the user bubble says for a request sent without words (our strings, catalog names where it has them). */
 export const MODE_LABELS: Record<AiMode, string> = {
   chat: '',
