@@ -131,6 +131,12 @@ Left/Right | Toggle calendar sidebar Ctrl+Alt+S.
 **AI Assistant**: open; copy message Ctrl+Alt+C; replace context; append message Ctrl+Alt+A; append to daily
 note; retry Ctrl+Alt+R; close chat Ctrl+Alt+X; rephrase Ctrl+Alt+U.
 
+**Work** (Object's own, M23; on the Work page only, never while typing in a field or editor): Search work / |
+Brain dump B | Go to Now, Flow, Projects map, Today, On the floor, Your queues, Agent queue, Stuck, Wins,
+Alerts, Everything: G then N, W, P, T, O, Q, H, S, Y, L, E (within 1.5 s; in Just one thing only G then N) |
+Next row J | Previous row K | Open Enter | Peek Space | Previous item [ | Next item ] | Close Esc (the work item
+panel first, else the focus line and the search) | Shortcuts ?.
+
 **Table**: expand selection in four directions (Shift+arrows) | fill selected cells Ctrl+resize | insert
 rows below / columns after | delete rows/columns Ctrl+Shift+Backspace-style | move row/column Alt+arrows |
 select all cells | enter cell editing | clear cells | toggle identifier reference mode F4.
@@ -157,6 +163,8 @@ Each starter template pre-fills the new type's properties.
   a `+` (the gallery above) on hover.
 - "Add Section" opens a small form: "Group pages and collections under a named heading in your space
   overview." with an Icon picker, Section Name and Create.
+- Work (Object's own, M23): one entry directly below the Agents section, above All notes, opening the Work
+  page; it shows while AI features are hidden.
 - Bottom row: settings gear, theme toggle, Shortcuts icon. (A profile menu with account and plan is
   **(out of scope)**.)
 - The calendar's Tasks rows: circle checkbox, title, status chip with a dropdown (Next Up, Someday/Maybe,
