@@ -379,6 +379,15 @@ def test_settings(env: Env) -> None:
     cleared = e.c.put("/api/space", json={"patch": {"jiraSite": None},
                                           "baseRevision": res.json()["revision"]})
     assert cleared.status_code == 200 and cleared.json()["jiraSite"] is None
+    # A hand-edited site that isn't a web address never becomes a ticket link.
+    import json as _json
+
+    cfg = e.root / ".object" / "space.json"
+    data = _json.loads(cfg.read_text(encoding="utf-8")) if cfg.exists() else {}
+    cfg.parent.mkdir(exist_ok=True)
+    cfg.write_text(_json.dumps({**data, "jiraSite": "javascript:alert(1)//"}), encoding="utf-8")
+    assert e.item(BADGE)["ticket"]["url"] is None
+    cfg.write_text(_json.dumps({**data, "jiraSite": None}), encoding="utf-8")
 
     settings = e.c.get("/api/settings").json()
     assert settings["settings"]["activityName"] == "Gene"
