@@ -51,6 +51,13 @@ Routes (all JSON):
 - M22: the work routes (``api_work``: ``/api/work/*``, ``POST /api/types/{id}/work-fields``)
   and the agents' (``api_v1_work``: ``/api/v1/work/*``) share one `WorkService`.
   ``GET /api/space`` also serves ``jiraSite``.
+- M23: the Work section's routes (``api_work_section``: ``GET /api/work/board``, ``/focus``
+  (and ``PUT``), ``/today``, ``/wins``, ``/alerts`` (``POST /alerts/scan``), ``POST
+  /alert-type``, ``/floor/general`` (and ``POST``), ``/agent`` (``PUT /agent/acts``, ``POST
+  /agent/retry``), ``/captures`` (and ``POST``), ``/keep-on-top`` (and ``POST``)), over the same
+  `WorkService`, the M24 seams (``workseams.build_seams``) and one `AlertWatch` per app (the
+  monitoring folder watch; ``workAlertFolder`` / ``workAlertIntervals`` settings). Events
+  ``work`` and ``workQueue`` join the resync.
 - ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
   ``{paths, typeIds, rewritten}`` (plus ``collectionIds``, ``queryIds``, ``skipped`` for a
   collection or query entry; ``rewritten``: other files written back, announced ``changed``;
@@ -187,10 +194,12 @@ from . import (
     api_v1_tools,
     api_v1_work,
     api_work,
+    api_work_section,
     learnhooks,
     mcpgateway,
     media,
 )
+from .alertwatch import AlertWatch
 from .apictx import ApiContext
 from .computed import Computer, Obj, has_computed
 from .curator import ActivityMiddleware, Curator, IdleClock
@@ -257,6 +266,7 @@ from .watcher import ChangeEvent, SpaceWatcher
 from .whiteboardapi import whiteboard_router
 from .whiteboardfile import sidecar_owner
 from .whiteboardstore import whiteboard_ui_problem
+from .workseams import build_seams
 from .workservice import WorkService
 from .workview import api_extra as query_api_extra
 
@@ -270,7 +280,7 @@ RESYNC_EVENTS = tuple(
     ChangeEvent(kind, "*", None)
     for kind in (
         "types", "views", "ui", "collections", "queries", "automations", "agents", "agentChats",
-        "agentLearning", "mcpServers",
+        "agentLearning", "work", "workQueue", "mcpServers",
     )
 )
 """What replaces a dropped backlog: the resync the client itself announces after a
@@ -915,6 +925,7 @@ def create_app(
         scheduler.start()
         search.start()
         automations.start()
+        alert_watch.start()
         curator.start()
         if not watch:
             try:
@@ -922,6 +933,7 @@ def create_app(
             finally:
                 await curator.stop()
                 await asyncio.to_thread(automations.stop)
+                await asyncio.to_thread(alert_watch.stop)
                 hub.close()
                 await asyncio.to_thread(search.stop)
                 await asyncio.to_thread(scheduler.stop)
@@ -939,6 +951,7 @@ def create_app(
         finally:
             await curator.stop()
             await asyncio.to_thread(automations.stop)
+            await asyncio.to_thread(alert_watch.stop)
             hub.close()
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -1146,6 +1159,25 @@ def create_app(
     automations = AutomationEngine(space, announce, notifier)
     space.after_write = automations.on_write
     app.state.automations = automations
+
+    # M23: the monitoring folder watch, one per app; it re-reads the settings on every poll
+    # and announces its own writes (the scan thread is no request).
+    def alert_folder() -> Path | None:
+        try:
+            value = read_settings()[0].get("workAlertFolder")
+        except (ReadOnly, OSError, ValueError):
+            return None
+        return Path(value) if isinstance(value, str) and value else None
+
+    def alert_intervals() -> dict[str, int]:
+        try:
+            value = read_settings()[0].get("workAlertIntervals")
+        except (ReadOnly, OSError, ValueError):
+            return {}
+        return dict(value) if isinstance(value, dict) else {}
+
+    alert_watch = AlertWatch(space, folder=alert_folder, intervals=alert_intervals, announce=announce)
+    app.state.alert_watch = alert_watch
 
     # M18: background reviews and the curator, one each per app.
     def claude_path() -> str | None:
@@ -2187,6 +2219,8 @@ def create_app(
     app.state.work = work
     api.include_router(api_work.router(ctx, work))
     api.include_router(api_v1_work.router(ctx, work))
+    # M23: the Work section's routes, over the same service, the M24 seams and the alert watch.
+    api.include_router(api_work_section.router(ctx, work, build_seams(space, work), alert_watch))
     # M18: the learning routes go before api_agents, whose GET /agents/{id}/chats/{chatId} would
     # otherwise take /agents/{id}/chats/search for a chat id.
     api.include_router(api_learning.router(ctx, reviews=reviews, curator=curator))

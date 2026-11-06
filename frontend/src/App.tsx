@@ -52,6 +52,7 @@ import { TrashView } from '@/trash/TrashView'
 import { CreateTypeDialog } from '@/types/CreateTypeDialog'
 import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
 import { TypePage } from '@/types/TypePage'
+import { WorkPage } from '@/work/page/WorkPage'
 
 // Pages whose code the shell does not need at start (the graph's sigma and graphology, the
 // calendar, type settings) load when first shown (audit 2026-11-01 F1).
@@ -160,6 +161,9 @@ function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
     case 'agent':
       // M17: the agent page (Profile, Instructions, Tools, Chats).
       return <AgentPage key={target.id} id={target.id} tab={target.tab} />
+    case 'work':
+      // M23: the Work section's page, on its view.
+      return <WorkPage view={target.view} />
   }
 }
 

@@ -44,6 +44,9 @@ CONTRACT_DEFAULTS = {
     "aiModel": None,
     # M22 (`test_m22_api.py` checks it)
     "activityName": "Gene",
+    # M23 (`test_m23_contract.py` checks their messages)
+    "workAlertFolder": None,
+    "workAlertIntervals": {},
 }
 
 

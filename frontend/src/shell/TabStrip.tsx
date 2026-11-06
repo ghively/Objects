@@ -72,6 +72,8 @@ export function useTargetTitle(space: SpaceInfo | null): (target: Target | null)
           return byPath.get(target.path)?.title ?? stemOf(target.path)
         case 'agent':
           return agents.find((a) => a.id === target.id)?.name ?? 'Agent'
+        case 'work':
+          return 'Work'
       }
     },
     [byPath, types, collections, queries, titleCtx, agents],

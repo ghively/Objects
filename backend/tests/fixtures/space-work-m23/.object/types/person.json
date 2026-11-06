@@ -1,0 +1,305 @@
+{
+  "schemaVersion": 2,
+  "id": "person",
+  "name": "Person",
+  "pluralName": "People",
+  "folder": "People",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-user"
+  },
+  "color": "blue",
+  "description": "Keep notes on people you meet, work with, or follow.",
+  "basic": false,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The title serves as the main identifier for any entry",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "Collections this content is included in",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "Additional information to further describe an item",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "Date and time of creation",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "Date and time of last edit",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "General tags of this content",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "A quick visual identifier",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Additional names for this content",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    },
+    {
+      "id": "coverImage",
+      "key": "coverImage",
+      "name": "Picture",
+      "type": "coverImage",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-image"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "01M6S1VGGH9ZA355QEYAP8KBS5",
+      "key": "category",
+      "name": "Category",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "set": [
+          {
+            "id": "friends",
+            "text": "Friends",
+            "icon": null,
+            "color": "blue"
+          },
+          {
+            "id": "family",
+            "text": "Family",
+            "icon": null,
+            "color": "sky"
+          },
+          {
+            "id": "colleague",
+            "text": "Colleague",
+            "icon": null,
+            "color": "cyan"
+          },
+          {
+            "id": "academic",
+            "text": "Academic",
+            "icon": null,
+            "color": "teal"
+          },
+          {
+            "id": "artist",
+            "text": "Artist",
+            "icon": null,
+            "color": "emerald"
+          },
+          {
+            "id": "author",
+            "text": "Author",
+            "icon": null,
+            "color": "green"
+          },
+          {
+            "id": "entrepreneur",
+            "text": "Entrepreneur",
+            "icon": null,
+            "color": "lime"
+          },
+          {
+            "id": "journalist",
+            "text": "Journalist",
+            "icon": null,
+            "color": "yellow"
+          },
+          {
+            "id": "philosopher",
+            "text": "Philosopher",
+            "icon": null,
+            "color": "amber"
+          },
+          {
+            "id": "politician",
+            "text": "Politician",
+            "icon": null,
+            "color": "orange"
+          },
+          {
+            "id": "scientist",
+            "text": "Scientist",
+            "icon": null,
+            "color": "red"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M6S1VGGHP4BTG005NDPT2Q63",
+      "key": "organizations",
+      "name": "Organizations",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [],
+        "hasFixedSet": false,
+        "fixedSet": []
+      }
+    },
+    {
+      "id": "01M6S1VGGHA1EB8HFF5MTEC2NZ",
+      "key": "projects",
+      "name": "Projects",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "project"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": []
+      }
+    },
+    {
+      "id": "01M6S1VGGHYSYF4MMBTN29D69S",
+      "key": "meetings",
+      "name": "Meetings",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "meeting"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": []
+      }
+    },
+    {
+      "id": "01M6S1VGGH68ZPDVTZXNPN63JF",
+      "key": "notes",
+      "name": "Notes",
+      "type": "blocks",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-dashes"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [],
+    "defaultTemplateId": null
+  }
+}

@@ -489,6 +489,11 @@ export interface DeviceSettings {
   // ---- M22 (the work model) ----
   /** "Your name in Activity": who the Activity and Work notes lines name (1-60 characters). */
   activityName: string
+  // ---- M23 (the Work section) ----
+  /** The monitoring folder the folder watch reads (an absolute path, at most 500 characters); `null` = off. */
+  workAlertFolder: string | null
+  /** Per-source staleness intervals, whole minutes 1-10080 (at most 50 sources). */
+  workAlertIntervals: Record<string, number>
 }
 
 /** M8 `DeviceSettings.language`. */
@@ -667,6 +672,10 @@ export type ChangeKind =
   | 'agentLearning'
   /** M19: an outside MCP server or a secret changed (`path` the server id, or `secrets`). */
   | 'mcpServers'
+  /** M23: the general floor list changed (`path` `floor`, `version` its revision). */
+  | 'work'
+  /** M23 (announced by M24): the work agent's queue changed. */
+  | 'workQueue'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {
@@ -2497,3 +2506,105 @@ export interface AddWorkFieldsResult {
   added: string[]
   skipped: { key: string; name: string; reason: string }[]
 }
+
+// ---- M23: the Work section (plan `2026-11-05-m23-work-section.md`, Contract) ----
+
+export type WorkViewId = 'now' | 'flow' | 'projects' | 'today' | 'floor' | 'queues' | 'agent' | 'stuck' | 'wins'
+  | 'alerts' | 'everything' | 'tickets' | (string & {}) // M24 adds 'captures'
+export type Energy = 'low' | 'medium' | 'high'
+export interface PersonRef { path: string; title: string }
+/** `GET /api/work/board`: M22's summary plus what the views need. */
+export interface WorkBoardItem extends WorkItemSummary {
+  typeName: string
+  isProject: boolean
+  steps: WorkStep[]
+  floorItems: FloorItemValue[]
+  hypothesis: string | null
+  /** YYYY-MM-DD */
+  deadline: string | null
+  blockedOnPeople: PersonRef[]
+}
+export interface WorkBoard { items: WorkBoardItem[]; now: string; today: string; timeZone: string }
+export interface FocusLine { n: number; text: string; label: string; links: { target: string; path: string | null }[] }
+export interface FocusDay { day: string; notePath: string | null; version: string | null; hasSection: boolean; lines: FocusLine[] }
+/** `startLocal` / `endLocal`: "HH:MM" in the space zone. */
+export interface MeetingSlot { path: string; title: string; start: string; end: string; startLocal: string; endLocal: string }
+export interface WorkToday { day: string; now: string; nowLocal: string; meetings: MeetingSlot[] }
+export interface WinDay { day: string; stepsDone: number; itemsClosed: number; objectsChanged: number }
+export interface WinEntry { at: string; kind: 'step' | 'closed'; path: string; title: string; text: string }
+export interface WorkWins {
+  /** Oldest first. */
+  days: WinDay[]
+  stepsDone: number
+  itemsClosed: number
+  objectsChanged: number
+  got: WinEntry[]
+}
+export type AlertSeverity = 'Critical' | 'Warning' | 'Info'
+export interface AlertRow {
+  path: string
+  title: string
+  source: string | null
+  severity: AlertSeverity
+  message: string | null
+  raisedAt: string | null
+  clearedAt: string | null
+  link: string | null
+  active: boolean
+}
+export interface AlertSourceStatus {
+  source: string
+  file: string
+  generated: string | null
+  ok: boolean
+  error: string | null
+  stale: boolean
+  staleAfterMinutes: number
+}
+export interface WorkAlerts {
+  /** Active first; Critical, Warning, Info; newest raised first. */
+  alerts: AlertRow[]
+  sources: AlertSourceStatus[]
+  /** Active only. */
+  counts: Record<AlertSeverity, number>
+  folder: string | null
+  typeExists: boolean
+}
+export interface AlertScanReport { files: number; created: number; updated: number; cleared: number; unchanged: number; errors: string[] }
+export type AgentQueueState = 'pending' | 'running' | 'done' | 'failed' | 'withdrawn'
+export interface AgentQueueRow {
+  id: string
+  path: string
+  title: string
+  stepId: string | null
+  n: number | null
+  stepText: string | null
+  /** M24's: what queued it. */
+  reason: string
+  state: AgentQueueState
+  notBefore: string | null
+  createdAt: string
+  claimedAt: string | null
+  finishedAt: string | null
+  result: string | null
+  error: string | null
+}
+export interface AgentStatus {
+  available: boolean
+  agentName: string | null
+  actsOnApprovals: boolean
+  carrying: number
+  rows: AgentQueueRow[]
+  note: string | null
+}
+export type CaptureFrom = WorkViewId | 'focusSession' | 'keepOnTop' | 'panel'
+export interface CaptureRequest { text: string; fromView: CaptureFrom; linkedPath?: string | null }
+export interface CaptureSummary {
+  path: string
+  text: string
+  status: 'new' | 'filed' | 'needsYou'
+  question: string | null
+  capturedAt: string
+  linkedPath: string | null
+}
+export interface GeneralFloor { items: FloorItemValue[]; revision: string }

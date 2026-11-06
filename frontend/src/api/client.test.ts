@@ -282,7 +282,7 @@ describe('api client v2 writes', () => {
       expect(seen).toContainEqual({ kind: 'agentLearning', path: '*', version: null, origin: null })
       expect(seen.map((e) => e.kind)).toEqual([
         'types', 'views', 'ui', 'collections', 'queries', 'automations', 'agents', 'agentChats', 'agentLearning',
-        'mcpServers',
+        'work', 'workQueue', 'mcpServers',
       ])
     } finally {
       off()
