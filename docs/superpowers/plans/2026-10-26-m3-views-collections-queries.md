@@ -110,7 +110,7 @@ ViewState   { viewDefinition: DataViewDefinition, filterGroup: FilterGroup, sort
 DashboardSection { key: 'allContent'|'recentlyAccessed'|'collections'|'queries'|'inNoCollection'|'notTagged'|'noBacklinks'|'pinned'
                         |`query:${id}`|`collection:${id}`,
               collapsed: boolean, viewDefinition?: DataViewDefinition, title?: string /* a tab rename; our addition */ }
-              /* Whether a section is also a header tab ("inFullView") is fixed per kind, not stored (reference RootEntity):
+              /* Whether a section is also a header tab ("inFullView") is fixed per kind, not stored (reference entity):
                  dashboard only: recentlyAccessed, collections, queries, pinned
                  dashboard and header tab: inNoCollection, notTagged, query:<id>, collection:<id> */
 Views       { activeTab: 'overview'|'all'|string /* a full-view section key */, all: ViewState,

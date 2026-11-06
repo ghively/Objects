@@ -54,7 +54,7 @@ Back end:
   - A whiteboard's new stem must be free for all three names. The sidecars move after the `.md`. If they can't move, the `.md` goes back and the title change stands, as when a file is locked.
   - Renaming any object also relinks every board file that links to it by its old name, using the same rule as `.md` referrers. Those board files are listed in `relinked`, and the server announces `whiteboard` for them, not `changed`.
 - **Change type is refused.** `changetype.type_category` returns `whiteboard` for the basic Whiteboard type, so M2's existing 422 messages refuse changing a board's type and changing an object to a board.
-- **Whiteboard is a basic type.** It is in `BASIC_TYPE_NAMES` with the icon `ph-presentation`. `roles.py` maps it to `RootWhiteboard`, which is in all four of M5's role lists.
+- **Whiteboard is a basic type.** It is in `BASIC_TYPE_NAMES` with the icon `ph-presentation`. `roles.py` maps it to `whiteboard`, which is in all four of M5's role lists.
 - **Ink files are not images.** `media.py` neither lists nor serves `<stem>.ink.svg` when `<stem>.md` sits beside it.
 - **Boards are in backlinks and search.**
   - New module `whiteboardindex.py` reads the board read-only, for both indexes.
