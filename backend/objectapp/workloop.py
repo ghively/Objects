@@ -72,6 +72,7 @@ POLL_SECONDS = 30.0
 RUNNER_ID = new_ulid()
 TEST_TIMEOUT_ENV = "OBJECT_TEST_WORK_TIMEOUT"
 """Seconds; honoured only while OBJECT_FAKE_NOTIFY_FILE is set (M14's test-hook rule)."""
+CAPTURE_UNREADABLE = "This brain dump couldn't be read. Try again."
 CHANGED_409 = "This step changed. Look again."
 
 _loops: dict[str, WorkLoop] = {}
@@ -129,6 +130,9 @@ def precheck(entry: dict, item: dict | None, capture: dict | None, now: datetime
                 return "wait", None, None
             return "run", "work", None
         return "run", "work-read", None
+    if kind in ("breakDown", "question") and entry.get("capturePath"):
+        if capture is not None and capture.get("status") != "new":
+            return "withdraw", None, ALREADY_FILED
     if kind == "breakDown":
         step = _step_of(item, entry.get("stepId"))
         if step is None or step.get("state") in ("done", "declined"):
@@ -191,6 +195,8 @@ class WorkLoop:
         self._current: dict[str, Any] | None = None
         self._stops: dict[str, threading.Event] = {}
         self._notices: list[WorkNotice] = []
+        self._cap_lock = threading.RLock()
+        self._queued: set[tuple[str, str]] = set()
         with _loops_lock:
             _loops[self._key(space)] = self
 
@@ -301,7 +307,8 @@ class WorkLoop:
             return None
 
     def _auto_check(self, path: str) -> bool:
-        if not self.read_settings().get("workAutoRun"):
+        settings = self.read_settings()
+        if not settings.get("workAutoRun") or not settings.get("workAgentActs"):
             return False
         item = self._item(path)
         if item is None or item.get("done"):
@@ -333,9 +340,18 @@ class WorkLoop:
     # -- captures ----------------------------------------------------------------------------
 
     def enqueue_capture(self, capture: dict, parsed: Any, item: dict | None) -> dict:
-        existing = [e for e in self.store.entries() if e.get("capturePath") == capture["path"]]
-        if existing:
-            return existing[-1]
+        with self._cap_lock:
+            return self._enqueue_capture(capture, parsed, item)
+
+    def _live_entry(self, capture_path: str) -> dict | None:
+        live = [e for e in self.store.entries()
+                if e.get("capturePath") == capture_path and e.get("state") in ("pending", "running")]
+        return live[-1] if live else None
+
+    def _enqueue_capture(self, capture: dict, parsed: Any, item: dict | None) -> dict:
+        live = self._live_entry(capture["path"])
+        if live is not None:
+            return live
         route = parsed.route
         full = self._item(item.get("path")) if item else None
         fields: dict[str, Any] = {"capturePath": capture["path"], "by": "Gene"}
@@ -353,24 +369,27 @@ class WorkLoop:
             if step is not None:
                 fields.update(stepId=step["id"], stepN=step["n"], stepKind=step["kind"], stepText=step["text"])
         entry = self.store.add(fields, now=self.clock())
+        self._queued.add((capture["path"], str(capture.get("version"))))
         self._event(entry["id"])
         self.wake()
         return entry
 
     def scan_unqueued_captures(self) -> int:
-        known = {e.get("capturePath") for e in self.store.entries() if e.get("capturePath")}
+        """Queue each New brain dump nothing carries. One whose filing run failed is not queued again
+        by the scan until it changes or the app restarts."""
         count = 0
         for cap in captures.list_captures(self.space, "new"):
-            if cap["path"] in known:
-                continue
-            parsed = captures.parse_prefix(cap["text"])
-            linked = None
-            if cap.get("linkedPath"):
-                linked = self._item(cap["linkedPath"])
-            elif parsed.item_ref:
-                linked = captures.resolve_item(self.service, parsed.item_ref)
-            self.enqueue_capture(cap, parsed, linked)
-            count += 1
+            with self._cap_lock:
+                if (cap["path"], str(cap.get("version"))) in self._queued or self._live_entry(cap["path"]):
+                    continue
+                parsed = captures.parse_prefix(cap["text"])
+                linked = None
+                if cap.get("linkedPath"):
+                    linked = self._item(cap["linkedPath"])
+                elif parsed.item_ref:
+                    linked = captures.resolve_item(self.service, parsed.item_ref)
+                self._enqueue_capture(cap, parsed, linked)
+                count += 1
         return count
 
     # -- retry and settings ------------------------------------------------------------------
@@ -421,10 +440,6 @@ class WorkLoop:
             return None
 
     def _work(self) -> None:
-        try:
-            self.scan_auto_runs()
-        except Exception:
-            log.exception("Initial auto-run scan failed")
         while not self._quit.is_set():
             try:
                 self._busy = True
@@ -458,16 +473,37 @@ class WorkLoop:
         self._event(entry["id"])
         item = self._item(entry.get("path"))
         cap = self._capture(entry.get("capturePath"))
+        if entry.get("capturePath") and cap is None:
+            self.store.update(entry["id"], state="failed", reason=CAPTURE_UNREADABLE, finishedAt=_iso(now))
+            self._event(entry["id"])
+            return True
         verdict, purpose, reason = precheck(entry, item, cap, now)
         if verdict == "withdraw":
             self.store.update(entry["id"], state="withdrawn", reason=reason, finishedAt=_iso(now))
             self._event(entry["id"])
             return True
         if verdict == "wait":
-            self.store.update(entry["id"], state="pending", runner=None, claimedAt=None)
-            return False
+            step = _step_of(item, entry.get("stepId")) or {}
+            moment = _parse(step.get("notBefore")) or _parse(entry.get("notBefore")) or now
+            self.store.update(entry["id"], state="pending", runner=None, claimedAt=None,
+                              notBefore=_iso(max(moment, now)))
+            self._event(entry["id"])
+            return True
         assert purpose is not None
-        self._run(entry, item, cap, agent, settings, purpose)
+        try:
+            self._run(entry, item, cap, agent, settings, purpose)
+        except Exception as exc:
+            log.exception("A work run failed before it finished")
+            with self._lock:
+                self._current = None
+                self._stops.pop(entry["id"], None)
+            try:
+                if self.store.get(entry["id"]).get("state") == "running":
+                    self.store.update(entry["id"], state="failed", finishedAt=_iso(self.clock()),
+                                      reason=one_line(str(exc) or "The run failed.", 500))
+                self._event(entry["id"])
+            except Exception:
+                log.exception("Failing the entry %s failed", entry["id"])
         return True
 
     def _run(self, entry: dict, item: dict | None, cap: dict | None, agent: Any, settings: dict[str, Any],
@@ -479,6 +515,8 @@ class WorkLoop:
             self._stops[eid] = flag
             self._current = entry
             self._notices = []
+        if self._is_withdrawn(eid) or self._quit.is_set():
+            flag.set()  # a withdraw or stop landed before the flag was registered
         entry = self.store.update(eid, purpose=purpose, agentId=agent.id)
         with self._lock:
             self._current = entry

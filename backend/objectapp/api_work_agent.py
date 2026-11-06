@@ -122,8 +122,6 @@ def router(ctx: ApiContext, loop: WorkLoop, service: WorkService) -> APIRouter:
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
         ctx.announce(ChangeEvent("workQueue", "settings", None, origin=req.clientId))
-        if req.autoRun:
-            loop.scan_auto_runs()
         loop.wake()
         return loop.settings_status()
 
