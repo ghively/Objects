@@ -16,6 +16,10 @@ holds for every tool an agent has.
   adds it to the activity log (``GET /api/v1/changes`` reads it).
 - `agent_auth` is for ``/api/v1/agent/*``: the token must name an agent (403 "This token
   isn't an agent's."), and the routes act only on that agent.
+- M18: `V1Guard.auth` spends one of the token's tool steps per call (`TokenStore.spend`) and
+  answers 429 "This run has used its {budget} tool steps." past its budget; every Object tool
+  makes exactly one ``/api/v1`` call, so the budget counts tool steps. `agent_tool_allowed`
+  answers 403 "This run can't use {tool}." for an agent tool outside the token's `tools`.
 """
 
 from __future__ import annotations
@@ -42,6 +46,7 @@ __all__ = [
     "Denied",
     "V1Guard",
     "agent_auth",
+    "agent_tool_allowed",
     "error",
     "guarded",
 ]
@@ -99,6 +104,8 @@ class V1Guard:
         token = self.tokens.verify(secret.strip())
         if token is None:
             raise Denied(401, "That token isn't valid for this space.")
+        if not self.tokens.spend(token):
+            raise Denied(429, f"This run has used its {token.budget} tool steps.")  # our string
         if write:
             if token.scope != "read-write":
                 raise Denied(403, "This token can only read.")
@@ -191,3 +198,10 @@ def agent_auth(guard: V1Guard, registry: Any, request: Request) -> tuple[TokenRe
     except AgentError as exc:
         raise Denied(exc.status, exc.message) from exc
     return token, agent
+
+
+def agent_tool_allowed(record: TokenRecord, tool: str) -> None:
+    """M18: raises `Denied` 403 "This run can't use {tool}." when the token's `tools` is set and
+    lacks `tool` (a short agent tool name)."""
+    if record.tools is not None and tool not in record.tools:
+        raise Denied(403, f"This run can't use {tool}.")  # our string

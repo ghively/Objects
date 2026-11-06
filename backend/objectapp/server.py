@@ -171,6 +171,8 @@ from . import (
     api_graph,
     api_history,
     api_import,
+    api_learning,
+    api_learning_v1,
     api_merge,
     api_references,
     api_search,
@@ -178,10 +180,12 @@ from . import (
     api_tasks,
     api_v1,
     api_v1_tools,
+    learnhooks,
     media,
 )
 from .apictx import ApiContext
 from .computed import Computer, Obj, has_computed
+from .curator import ActivityMiddleware, Curator, IdleClock
 from .appstate import state_dir
 from .automations import AutomationEngine
 from .collections import CollectionDef
@@ -213,6 +217,7 @@ from .formula import parse as parse_formula
 from .propvalues import InvalidValue
 from .queries import QueryDef
 from .reminders import ReminderScheduler, file_clock
+from .reviews import ReviewRunner
 from .searchindex import SearchIndex
 from .settings import SettingsProblem, time_zone
 from .settings import patch as patch_settings
@@ -253,7 +258,10 @@ EVENT_QUEUE_MAX = 1000
 
 RESYNC_EVENTS = tuple(
     ChangeEvent(kind, "*", None)
-    for kind in ("types", "views", "ui", "collections", "queries", "automations", "agents", "agentChats")
+    for kind in (
+        "types", "views", "ui", "collections", "queries", "automations", "agents", "agentChats",
+        "agentLearning",
+    )
 )
 """What replaces a dropped backlog: the resync the client itself announces after a
 reconnect (``api/client.ts`` ``RESYNC_EVENTS``), on which every consumer reloads."""
@@ -857,6 +865,11 @@ def create_app(
     and ``OBJECT_STATE_DIR`` (where the reminder ledger, the automation schedule state and
     run logs live). With the fake notifier, ``POST /api/_test/tick`` also runs one automation
     schedule tick and ``POST /api/_test/automations/idle`` waits for the trigger queue.
+
+    M18: one `ReviewRunner`, `IdleClock` and `Curator` per app (``app.state.reviews``, ``.idle``,
+    ``.curator``); `ActivityMiddleware` (inside `LocalOnlyMiddleware`) feeds the idle clock and the
+    curator ticks for the app's lifespan. With the fake notifier, ``POST /api/_test/reviews/idle``
+    waits for running reviews and ``POST /api/_test/curator/tick`` runs one curator tick.
     """
     hub = EventHub()
     clock_file = os.environ.get("OBJECT_CLOCK_FILE")
@@ -878,6 +891,11 @@ def create_app(
     with contextlib.suppress(ReadOnly):
         settings_changed(read_settings()[0])
 
+    # M18: the learning contributors (idempotent) and the curator's idle clock, on the space's
+    # clock so OBJECT_CLOCK_FILE moves it in tests.
+    learnhooks.install()
+    idle = IdleClock(lambda: space.clock())
+
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI):
         hub.loop = asyncio.get_running_loop()
@@ -885,10 +903,12 @@ def create_app(
         scheduler.start()
         search.start()
         automations.start()
+        curator.start()
         if not watch:
             try:
                 yield
             finally:
+                await curator.stop()
                 await asyncio.to_thread(automations.stop)
                 hub.close()
                 await asyncio.to_thread(search.stop)
@@ -905,6 +925,7 @@ def create_app(
         try:
             yield
         finally:
+            await curator.stop()
             await asyncio.to_thread(automations.stop)
             hub.close()
             task.cancel()
@@ -923,6 +944,7 @@ def create_app(
     # Level 1, not Starlette's 9: on the 9 MB all-rows answer level 9 cost 465 ms of
     # CPU for 1.5 MB on the wire, level 1 under 40 ms for 1.9 MB.
     app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=1)
+    app.add_middleware(ActivityMiddleware, idle=idle)  # M18: inside LocalOnlyMiddleware
     app.add_middleware(LocalOnlyMiddleware)  # added last: the outermost, so it checks first
     app.state.space = space
     app.state.hub = hub
@@ -1111,6 +1133,22 @@ def create_app(
     automations = AutomationEngine(space, announce, notifier)
     space.after_write = automations.on_write
     app.state.automations = automations
+
+    # M18: background reviews and the curator, one each per app.
+    def claude_path() -> str | None:
+        from . import ai
+
+        try:
+            setting = read_settings()[0].get("claudePath")
+        except (ReadOnly, OSError, ValueError):
+            setting = None
+        return ai.find_claude(setting)
+
+    reviews = ReviewRunner(announce, space.root, space.name)
+    curator = Curator(announce, idle, reviews, space.root, space.name, lambda: space.clock(), claude_path)
+    app.state.reviews = reviews
+    app.state.idle = idle
+    app.state.curator = curator
 
     def announce_relinked(paths: list[str], client_id: str | None) -> None:
         """``changed`` per relinked object; ``whiteboard`` (its .md) per relinked board file."""
@@ -2084,6 +2122,16 @@ def create_app(
             """Wait up to 10 s until the automation trigger queue is empty (test hook only)."""
             return {"idle": automations.wait_idle(10.0)}
 
+        @api.post("/_test/reviews/idle")
+        def test_reviews_idle():
+            """Wait up to 10 s until no background review runs (M18 test hook only)."""
+            return {"idle": reviews.wait_idle(10.0)}
+
+        @api.post("/_test/curator/tick")
+        async def test_curator_tick():
+            """Run one curator tick at the clock's instant (M18 test hook only)."""
+            return {"agents": await curator.tick()}
+
     ctx = ApiContext(space, announce, search, settings_changed)
     api.include_router(api_search.router(ctx))
     api.include_router(api_references.router(ctx))
@@ -2101,9 +2149,14 @@ def create_app(
     # agent routes (filled by the plan's T5, T6 and T7).
     api.include_router(api_v1_tools.router(ctx, automations, imports))
     api.include_router(api_agent_v1.router(ctx))
+    # M18: the agent tools' learning routes, beside M17's agent v1 routes.
+    api.include_router(api_learning_v1.router(ctx))
+    # M18: the learning routes go before api_agents, whose GET /agents/{id}/chats/{chatId} would
+    # otherwise take /agents/{id}/chats/search for a chat id.
+    api.include_router(api_learning.router(ctx, reviews=reviews, curator=curator))
     api.include_router(api_agents.router(ctx))
     # M10: the AI assistant (status, a chat turn over SSE, saved AI chats).
-    api.include_router(api_ai.router(ctx))
+    api.include_router(api_ai.router(ctx, reviews=reviews, curator=curator))
     app.include_router(api)
     # M6: the whiteboard routes carry their own /api prefix.
     app.include_router(whiteboard_router(space, announce_whiteboard))

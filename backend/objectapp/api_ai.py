@@ -48,7 +48,7 @@ import json
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -74,6 +74,10 @@ from .settings import read as read_settings
 from .space import Conflict, ReadOnly
 from .tokens import TokenStore
 from .watcher import ChangeEvent
+
+if TYPE_CHECKING:
+    from .curator import Curator
+    from .reviews import ReviewRunner
 
 __all__ = ["router"]
 
@@ -197,7 +201,15 @@ def _settings() -> dict[str, Any]:
         return {}
 
 
-def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
+def router(
+    ctx: ApiContext,
+    state_folder: Path | None = None,
+    *,
+    reviews: ReviewRunner | None = None,
+    curator: Curator | None = None,
+) -> APIRouter:
+    """M10's AI routes. M18: `reviews` and `curator` are the app's `ReviewRunner` and `Curator`
+    (unused until the plan's T7 wires the chat stream to them)."""
     space = ctx.space
     tokens = TokenStore(space.root, state_folder)
     r = APIRouter()

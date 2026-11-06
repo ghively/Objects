@@ -644,6 +644,9 @@ export type ChangeKind =
   | 'agents'
   /** M17: an agent's chat transcript was written (`path` the agent id, `version` the chat id). */
   | 'agentChats'
+  /** M18: an agent's memory, skills, ledger, reviews or curator changed (`path` the agent id,
+   * `version` the ledger entry, review or curator run id). */
+  | 'agentLearning'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {
@@ -2005,6 +2008,16 @@ export type TranscriptItem =
       at: string
     }
   | { type: 'error'; message: string; at: string }
+  /** M18: one background review of the chat (its start line's place, its end line's state). */
+  | {
+      type: 'learning'
+      reviewId: string
+      kinds: ('memory' | 'skills')[]
+      state: ReviewStatus['state']
+      summary: string | null
+      message: string | null
+      at: string
+    }
 
 /** GET /api/agents/{id}/chats/{chatId} */
 export interface AgentTranscript extends AgentChatSummary {
@@ -2012,4 +2025,126 @@ export interface AgentTranscript extends AgentChatSummary {
   sessionId: string | null
   objectPath: string | null
   items: TranscriptItem[]
+}
+
+// ---- M18: learning (docs/superpowers/plans/2026-11-05-m18-learning.md, "Contract (T1)") ----
+
+/** An agent's learning settings (`agent.json` `learning`, with every default filled in). */
+export interface LearningSettings {
+  memoryChars: number
+  userChars: number
+  /** User turns between memory reviews; 0 = off. */
+  memoryReviewEvery: number
+  /** Tool calls between skill reviews; 0 = off. */
+  skillReviewEvery: number
+  /** null = the chat's model. */
+  reviewModel: string | null
+  curator: boolean
+  curatorIdleHours: number
+  curatorEveryDays: number
+  /** The optional consolidation pass in scheduled curator runs. */
+  consolidate: boolean
+}
+
+/** One memory file: MEMORY.md (`memory`) or USER.md (`user`). */
+export interface MemoryFile {
+  target: 'memory' | 'user'
+  text: string
+  entries: string[]
+  chars: number
+  cap: number
+  /** null: no file yet. */
+  revision: string | null
+}
+
+/** GET /api/agents/{id}/skills: one skill. */
+export interface SkillSummary {
+  name: string
+  description: string
+  createdBy: 'agent' | 'user'
+  state: 'active' | 'stale' | 'archived'
+  pinned: boolean
+  uses: number
+  lastUsed: string | null
+  createdAt: string | null
+  absorbedInto: string | null
+}
+
+/** GET /api/agents/{id}/skills/{name}: a skill with its SKILL.md text and files. */
+export interface SkillDetail extends SkillSummary {
+  text: string
+  revision: string
+  files: { path: string; size: number }[]
+}
+
+/** Who made a ledger entry. */
+export interface LedgerSource {
+  kind: 'chat' | 'review' | 'curator' | 'user' | 'undo'
+  agentId?: string
+  chatId?: string | null
+  run?: string | null
+}
+
+/** GET /api/agents/{id}/ledger: one change, without its before and after text. */
+export interface LedgerSummary {
+  id: string
+  at: string
+  target: 'memory' | 'user' | 'skill'
+  action: string
+  skill: string | null
+  file: string | null
+  absorbedInto: string | null
+  source: LedgerSource
+  undoes: string | null
+  /** The history line ("Saved a memory", "Patched 'rack-labels'"...). */
+  line: string
+}
+
+/** GET /api/agents/{id}/ledger/{entryId}: one change with the whole file before and after. */
+export interface LedgerEntry extends LedgerSummary {
+  before: string | null
+  after: string | null
+  encoding: 'text' | 'base64'
+}
+
+/** One background review of a chat. */
+export interface ReviewStatus {
+  id: string
+  agentId: string
+  chatId: string
+  kinds: ('memory' | 'skills')[]
+  trigger: 'auto' | 'manual'
+  state: 'running' | 'done' | 'failed'
+  startedAt: string
+  endedAt: string | null
+  summary: string | null
+  message: string | null
+  entryIds: string[]
+}
+
+/** The curator's state for one agent. */
+export interface CuratorState {
+  lastRunAt: string | null
+  nextDueAt: string | null
+  running: boolean
+  report: { at: string; runId: string; text: string } | null
+}
+
+/** GET /api/agents/{id}/learning */
+export interface LearningState {
+  settings: LearningSettings
+  defaults: LearningSettings
+  curator: CuratorState
+  revision: string | null
+}
+
+/** GET /api/agents/{id}/chats/search: one matching chat. */
+export interface ChatSearchHit {
+  chatId: string
+  title: string
+  updatedAt: string
+  spaceName: string | null
+  /** At most 3, with matches marked «…». */
+  snippets: string[]
+  matches: number
 }

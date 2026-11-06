@@ -8,6 +8,11 @@ append starts on a fresh line so it isn't lost to the torn one.
 
 The header's ``title`` is fixed at the first message: callers pass
 ``aichat.default_title([{"role": "user", "text": <first message>}])``.
+
+M18 adds two line types. A ``memory`` line (the chat's frozen memory snapshot) is never an item.
+``review`` lines (a background review's start and end, sharing an ``id``) read as one
+``learning`` item per review, at the start line's place, with the end line's state, summary and
+message. Unknown line types are skipped. `raw_lines` gives every parsable line, header included.
 """
 
 from __future__ import annotations
@@ -136,6 +141,29 @@ def _item(line: dict[str, Any]) -> dict[str, Any]:
     return {"type": "error", "message": str(line.get("message") or ""), "at": at}
 
 
+def _learning(line: dict[str, Any]) -> dict[str, Any]:
+    kinds = line.get("kinds")
+    return {
+        "type": "learning",
+        "reviewId": str(line.get("id") or ""),
+        "kinds": [str(k) for k in kinds] if isinstance(kinds, list) else [],
+        "state": str(line.get("state") or "running"),
+        "summary": line.get("summary") if isinstance(line.get("summary"), str) else None,
+        "message": line.get("message") if isinstance(line.get("message"), str) else None,
+        "at": str(line.get("at") or ""),
+    }
+
+
+def _review_end(item: dict[str, Any], line: dict[str, Any]) -> None:
+    """A later ``review`` line of the same id: its state, summary and message win."""
+    item["state"] = str(line.get("state") or item["state"])
+    item["summary"] = line.get("summary") if isinstance(line.get("summary"), str) else None
+    item["message"] = line.get("message") if isinstance(line.get("message"), str) else None
+    kinds = line.get("kinds")
+    if isinstance(kinds, list) and not item["kinds"]:
+        item["kinds"] = [str(k) for k in kinds]
+
+
 def _summarize(chat_id: str, lines: list[dict[str, Any]]) -> dict[str, Any]:
     header = lines[0] if lines and lines[0].get("type") == "chat" else {}
     space = header.get("space")
@@ -144,6 +172,7 @@ def _summarize(chat_id: str, lines: list[dict[str, Any]]) -> dict[str, Any]:
     items: list[dict[str, Any]] = []
     session_id: str | None = None
     object_path: str | None = None
+    reviews: dict[str, dict[str, Any]] = {}
     for line in lines:
         kind = line.get("type")
         at = line.get("at")
@@ -156,6 +185,13 @@ def _summarize(chat_id: str, lines: list[dict[str, Any]]) -> dict[str, Any]:
                 session_id = item["sessionId"]
         elif kind == "object" and isinstance(line.get("path"), str):
             object_path = line["path"]
+        elif kind == "review" and isinstance(line.get("id"), str) and line["id"]:
+            known = reviews.get(line["id"])
+            if known is None:
+                reviews[line["id"]] = item = _learning(line)
+                items.append(item)
+            else:
+                _review_end(known, line)
     return {
         "id": chat_id,
         "title": str(header.get("title") or "AI chat"),
@@ -169,6 +205,12 @@ def _summarize(chat_id: str, lines: list[dict[str, Any]]) -> dict[str, Any]:
         "objectPath": object_path,
         "items": items,
     }
+
+
+def raw_lines(folder: Path, chat_id: str) -> list[dict[str, Any]]:
+    """Every parsable line of the chat's transcript, the header included (M18); FileNotFoundError
+    when there is no such chat, ValueError for a chat id that isn't a ULID."""
+    return _parse(path_for(folder, chat_id))
 
 
 def read(folder: Path, chat_id: str) -> dict[str, Any]:

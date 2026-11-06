@@ -7,8 +7,9 @@ token, and that token names one agent and one space.
 - The environment holds ``OBJECT_API_URL`` (a loopback address only) and
   ``OBJECT_API_TOKEN`` (the turn's ephemeral token).
 - Each module in `TOOL_MODULES` has ``register(server, client) -> None`` and adds its tools.
-  M17's one module (`objectapp.agent_tools_core`) adds ``agent_info``; M18, M20, M21 and M24
-  append theirs.
+  M17's one module (`objectapp.agent_tools_core`) adds ``agent_info``; M18's
+  (`objectapp.agent_tools_learning`) adds the memory, skill and chat-search tools; M20, M21 and
+  M24 append theirs.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ __all__ = ["INSTRUCTIONS", "SERVER_NAME", "TOOL_MODULES", "build_server", "main"
 
 SERVER_NAME = "object-agent"
 
-TOOL_MODULES: tuple[str, ...] = ("objectapp.agent_tools_core",)
+TOOL_MODULES: tuple[str, ...] = ("objectapp.agent_tools_core", "objectapp.agent_tools_learning")
 """The modules whose ``register(server, client)`` adds this server's tools, in build order."""
 
 INSTRUCTIONS = """\

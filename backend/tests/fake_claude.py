@@ -51,6 +51,28 @@ tool. It checks the ``--settings`` ``permissions.deny``, ``--disallowedTools`` a
 folder's ``.claude/settings.json`` ``permissions.deny``. Denied: ``is_error`` and "Permission to
 use <Tool> has been denied."; allowed: the file's first 200 characters, the matching file
 names (one per line), "wrote" or "ran".
+
+M18 (learning). The log line also holds ``forkSession`` (``--fork-session`` given),
+``noSessionPersistence`` (``--no-session-persistence`` given) and ``resume`` (the ``--resume`` id
+or null). ``--resume <id> --fork-session`` answers with a new session id (the original isn't
+reused). More markers and variables:
+
+- ``FAKE:mcp:<server>:<tool>:<json args>`` (one per line, any number, run in order): starts that
+  server from the run's ``--mcp-config`` (stdio: its ``command``, ``args`` and ``env``, ``${VAR}``
+  filled from the fake's own environment) with the ``mcp`` client library, calls the tool and
+  emits the ``tool_use`` and its ``tool_result`` (``is_error`` for a tool error). A tool that
+  ``--disallowedTools`` (or the ``--settings`` deny list) names, or that ``--allowedTools`` (when
+  given) doesn't, isn't called and its server isn't started: the result is "Permission to use
+  <name> has been denied." Each server is started once per run.
+- ``FAKE_CLAUDE_REVIEW_ACTIONS``: a JSON list of ``{"server", "tool", "args"}``. When the prompt
+  holds the review prompts' first line (`REVIEW_LINE`), these calls run after the markers, as if
+  they were ``FAKE:mcp`` markers. ``FAKE_CLAUDE_CURATOR_ACTIONS`` does the same for the
+  consolidation prompt's first line (`CURATOR_LINE`).
+- ``FAKE_CLAUDE_REVIEW_SLEEP`` (seconds): a review run (`REVIEW_LINE` in the prompt) waits that
+  long before its answer. ``FAKE_CLAUDE_REVIEW_FAIL=1``: a review run writes to stderr and exits 1
+  instead of answering.
+- ``FAKE:skilltool:<name>``: a call of the CLI's own ``Skill`` tool with input
+  ``{"skill": "<name>"}`` and its result (no MCP).
 """
 
 from __future__ import annotations
@@ -80,6 +102,11 @@ def install(folder: Path) -> Path:
         path.chmod(0o755)
     return path
 
+
+REVIEW_LINE = "Look back over this chat."
+"""The first line of the three review prompts (M18 `reviews`)."""
+CURATOR_LINE = "Tidy up your skills."
+"""The first line of the consolidation prompt (M18 `curator`)."""
 
 BUILTIN_NAMES = ("Bash", "PowerShell", "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit",
                  "WebFetch", "WebSearch", "Task", "TodoWrite", "Skill")
@@ -225,6 +252,132 @@ def _builtin_calls(prompt: str, argv: list[str], run_settings: dict | None, sess
         _out({"type": "user", "message": {"role": "user", "content": [block]}, "session_id": session})
 
 
+def _fill(value, env: dict[str, str]):
+    """``${VAR}`` filled from `env` in a string, or in each string of a list or dict."""
+    if isinstance(value, str):
+        return re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", lambda m: env.get(m.group(1), ""), value)
+    if isinstance(value, list):
+        return [_fill(v, env) for v in value]
+    if isinstance(value, dict):
+        return {k: _fill(v, env) for k, v in value.items()}
+    return value
+
+
+def _mcp_wanted(prompt: str) -> list[tuple[str, str, dict]]:
+    """The ``FAKE:mcp`` markers, then the review or curator actions the prompt asks for (M18)."""
+    calls: list[tuple[str, str, dict]] = []
+    for line in prompt.splitlines():
+        at = line.find("FAKE:mcp:")
+        if at < 0:
+            continue
+        server, _sep, rest = line[at + len("FAKE:mcp:"):].strip().partition(":")
+        tool, _sep, raw = rest.partition(":")
+        try:
+            args = json.loads(raw) if raw.strip() else {}
+        except ValueError:
+            args = {"unreadable": raw}
+        calls.append((server, tool, args if isinstance(args, dict) else {"value": args}))
+    for first_line, var in ((REVIEW_LINE, "FAKE_CLAUDE_REVIEW_ACTIONS"), (CURATOR_LINE, "FAKE_CLAUDE_CURATOR_ACTIONS")):
+        if first_line not in prompt or not os.environ.get(var):
+            continue
+        try:
+            actions = json.loads(os.environ[var])
+        except ValueError:
+            actions = []
+        for a in actions if isinstance(actions, list) else []:
+            if isinstance(a, dict):
+                args = a.get("args")
+                calls.append((str(a.get("server") or ""), str(a.get("tool") or ""),
+                              args if isinstance(args, dict) else {}))
+    return calls
+
+
+def _mcp_denied(name: str, server: str, argv: list[str], rules: list[str]) -> bool:
+    whole = f"mcp__{server}"
+    disallowed = _split(_arg(argv, "--disallowedTools")) + [r.strip() for r in rules]
+    if name in disallowed or whole in disallowed:
+        return True
+    if "--allowedTools" in argv:
+        allowed = _split(_arg(argv, "--allowedTools"))
+        return name not in allowed and whole not in allowed
+    return False
+
+
+def _mcp_calls(prompt: str, argv: list[str], config: dict | None, run_settings: dict | None, session: str) -> None:
+    """Run the ``FAKE:mcp`` markers and the review / curator actions against real MCP servers (M18)."""
+    calls = _mcp_wanted(prompt)
+    if not calls:
+        return
+    import asyncio
+    import contextlib
+
+    servers = (config or {}).get("mcpServers") if isinstance(config, dict) else None
+    servers = servers if isinstance(servers, dict) else {}
+    rules = _deny_list(run_settings)
+
+    async def run() -> None:
+        from mcp import ClientSession, StdioServerParameters
+        from mcp.client.stdio import stdio_client
+
+        sessions: dict[str, ClientSession] = {}
+        async with contextlib.AsyncExitStack() as stack:
+            devnull = stack.enter_context(open(os.devnull, "w", encoding="utf-8"))
+            for n, (server, tool, args) in enumerate(calls, start=1):
+                name = f"mcp__{server}__{tool}"
+                tool_id = f"toolu_mcp_{n}"
+                _out(_message(f"msg_m{n}", [{"type": "tool_use", "id": tool_id, "name": name, "input": args}],
+                              session))
+                block: dict = {"type": "tool_result", "tool_use_id": tool_id}
+                spec = servers.get(server)
+                if _mcp_denied(name, server, argv, rules):
+                    block |= {"is_error": True, "content": f"Permission to use {name} has been denied."}
+                elif not isinstance(spec, dict) or not spec.get("command"):
+                    block |= {"is_error": True, "content": f"No such tool available: {name}"}
+                else:
+                    try:
+                        client = sessions.get(server)
+                        if client is None:
+                            env = dict(os.environ)
+                            extra = _fill(spec.get("env") or {}, env)
+                            params = StdioServerParameters(
+                                command=str(_fill(spec["command"], env)),
+                                args=[str(a) for a in _fill(spec.get("args") or [], env)],
+                                env={**env, **{str(k): str(v) for k, v in extra.items()}},
+                                cwd=os.getcwd(),
+                            )
+                            read, write = await stack.enter_async_context(stdio_client(params, errlog=devnull))
+                            client = await stack.enter_async_context(ClientSession(read, write))
+                            await client.initialize()
+                            sessions[server] = client
+                        result = await client.call_tool(tool, args)
+                        block["content"] = [
+                            {"type": "text", "text": getattr(c, "text", "")}
+                            for c in getattr(result, "content", None) or []
+                        ]
+                        if getattr(result, "is_error", False):
+                            block["is_error"] = True
+                    except Exception as e:  # noqa: BLE001 - the fake reports any failure as a tool error
+                        block |= {"is_error": True, "content": f"MCP error: {e}"}
+                _out({"type": "user", "message": {"role": "user", "content": [block]}, "session_id": session})
+
+    asyncio.run(run())
+
+
+def _skill_tool_calls(prompt: str, session: str) -> None:
+    """The ``FAKE:skilltool:<name>`` markers: the CLI's own ``Skill`` tool (M18)."""
+    names = []
+    for line in prompt.splitlines():
+        at = line.find("FAKE:skilltool:")
+        if at >= 0:
+            names.append(line[at + len("FAKE:skilltool:"):].strip())
+    for n, name in enumerate(names, start=1):
+        tool_id = f"toolu_skill_{n}"
+        _out(_message(f"msg_s{n}", [{"type": "tool_use", "id": tool_id, "name": "Skill",
+                                     "input": {"skill": name}}], session))
+        block = {"type": "tool_result", "tool_use_id": tool_id, "content": f"Launching skill: {name}"}
+        _out({"type": "user", "message": {"role": "user", "content": [block]}, "session_id": session})
+
+
 def _out(obj: dict) -> None:
     sys.stdout.write(json.dumps(obj) + "\n")
     sys.stdout.flush()
@@ -312,6 +465,9 @@ def main(argv: list[str]) -> int:
             "allowed": allowed,
             "disallowed": disallowed,
             "env": {"CLAUDE_CONFIG_DIR": "CLAUDE_CONFIG_DIR" in os.environ},
+            "forkSession": "--fork-session" in argv,
+            "noSessionPersistence": "--no-session-persistence" in argv,
+            "resume": _arg(argv, "--resume"),
         }
         with open(log, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
@@ -322,9 +478,10 @@ def main(argv: list[str]) -> int:
         _result(f"No conversation found with session ID: {resume}", resume, error=True)
         sys.stderr.write(f"No conversation found with session ID: {resume}\n")
         return 1
-    session = resume or str(uuid.uuid4())
+    session = str(uuid.uuid4()) if resume and "--fork-session" in argv else (resume or str(uuid.uuid4()))
+    review = REVIEW_LINE in prompt
 
-    if "FAKE:fail" in prompt:
+    if "FAKE:fail" in prompt or (review and os.environ.get("FAKE_CLAUDE_REVIEW_FAIL") == "1"):
         sys.stderr.write("fake claude: something broke\n")
         return 1
     if "FAKE:auth" in prompt:
@@ -367,6 +524,13 @@ def main(argv: list[str]) -> int:
         _out({"type": "user", "message": {"role": "user", "content": [block]}, "session_id": session})
 
     _builtin_calls(prompt, argv, run_settings, session)
+    _mcp_calls(prompt, argv, config, run_settings, session)
+    _skill_tool_calls(prompt, session)
+    if review and os.environ.get("FAKE_CLAUDE_REVIEW_SLEEP"):
+        try:
+            time.sleep(float(os.environ["FAKE_CLAUDE_REVIEW_SLEEP"]))
+        except ValueError:
+            pass
 
     final = "Hello from the fake claude."
     if "FAKE:tags" in prompt:
