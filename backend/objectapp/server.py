@@ -163,6 +163,7 @@ from starlette.background import BackgroundTask
 from starlette.middleware.gzip import GZipMiddleware
 
 from . import (
+    api_agent_a2a_v1,
     api_agent_v1,
     api_agents,
     api_automations,
@@ -176,11 +177,13 @@ from . import (
     api_mcp,
     api_merge,
     api_references,
+    api_remote_agents,
     api_search,
     api_spaces_m8,
     api_tasks,
     api_v1,
     api_v1_tools,
+    delegation,
     learnhooks,
     mcpgateway,
     media,
@@ -898,6 +901,8 @@ def create_app(
     learnhooks.install()
     # M19: the MCP gateway's run contributors, Tools tab groups and secret lookup (idempotent).
     mcpgateway.install()
+    # M20: the delegation run contributors (idempotent; filled by the plan's T6).
+    delegation.install()
     idle = IdleClock(lambda: space.clock())
 
     @contextlib.asynccontextmanager
@@ -2155,11 +2160,15 @@ def create_app(
     api.include_router(api_agent_v1.router(ctx))
     # M18: the agent tools' learning routes, beside M17's agent v1 routes.
     api.include_router(api_learning_v1.router(ctx))
+    # M20: the agent tools' A2A and delegation routes (filled by the plan's T6).
+    api.include_router(api_agent_a2a_v1.router(ctx))
     # M18: the learning routes go before api_agents, whose GET /agents/{id}/chats/{chatId} would
     # otherwise take /agents/{id}/chats/search for a chat id.
     api.include_router(api_learning.router(ctx, reviews=reviews, curator=curator))
     # M19: the MCP server, secret and tool-refresh routes (filled by the plan's T6).
     api.include_router(api_mcp.router(ctx))
+    # M20: the remote-agent routes, before api_agents (filled by the plan's T5).
+    api.include_router(api_remote_agents.router(ctx))
     api.include_router(api_agents.router(ctx))
     # M10: the AI assistant (status, a chat turn over SSE, saved AI chats).
     api.include_router(api_ai.router(ctx, reviews=reviews, curator=curator))

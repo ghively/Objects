@@ -80,6 +80,12 @@ library's ``streamable_http_client`` (headers through ``create_mcp_http_client``
 ``sse_client`` connects. The ``${VAR}`` rule also takes ``${VAR:-default}`` (the default when the
 variable is unset or empty). The log line also holds ``mcpServers``: the server names in the
 ``--mcp-config`` (sorted).
+
+M20 (A2A and delegation). More markers:
+
+- ``FAKE:long:<n>``: the reply is ``n`` characters long (delegation's summary cap)
+- ``FAKE:echo-env``: the reply names ``MCP_TOOL_TIMEOUT``'s value
+  (``MCP_TOOL_TIMEOUT=<value, or unset>``)
 """
 
 from __future__ import annotations
@@ -573,6 +579,12 @@ def main(argv: list[str]) -> int:
         final = "Here it is.\n\n```text\nA clearer sentence.\nSecond line.\n```"
     elif "FAKE:badjson" in prompt:
         final = 'Oops.\n\n```json\n{"tags": [nope\n```'
+    long_text = re.search(r"FAKE:long:(\d+)", prompt)
+    if long_text:
+        size = int(long_text.group(1))
+        final = ("0123456789" * (size // 10 + 1))[:size]
+    elif "FAKE:echo-env" in prompt:
+        final = f"MCP_TOOL_TIMEOUT={os.environ.get('MCP_TOOL_TIMEOUT', 'unset')}"
     half = len(final) // 2
     _stream_text("msg_2", [final[:half], final[half:]], session)
     _result(final, session)

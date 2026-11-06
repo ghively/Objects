@@ -1875,6 +1875,8 @@ export type AiEvent =
   | { type: 'tool'; id: string; name: string; input: Record<string, unknown> | null; result?: string; isError?: boolean }
   | { type: 'done'; text: string; sessionId: string | null; proposal: AiProposal | null; skipped: AiSkipped[] }
   | { type: 'error'; message: string }
+  /** M20: a remote agent's file artifact, saved under its folder's files/ (or kept as a link). */
+  | { type: 'attachment'; agentId: string; chatId: string; attachment: RemoteAttachment }
 
 /** GET /api/ai/chat?path= */
 export interface AiChat {
@@ -1913,8 +1915,8 @@ export interface SaveAiChatRequest {
 /** GET /api/agents, /api/agents/{id}: one agent (a folder). */
 export interface Agent {
   id: string
-  /** M20 adds 'remote'. */
-  kind: 'local'
+  /** M20: 'remote' for an A2A agent added by its Agent Card URL. */
+  kind: 'local' | 'remote'
   name: string
   icon: string | null
   color: string | null
@@ -1938,6 +1940,92 @@ export interface Agent {
   revision: string | null
   /** The folder's .mcp.json servers. */
   mcpServers: { name: string; missingVars: string[]; usable: boolean }[]
+  /** M20: a remote agent's card and connection; null for a local agent. */
+  remote: RemoteInfo | null
+}
+
+// ---- M20: remote agents (A2A) ----
+
+/** One skill on a remote agent's Agent Card. */
+export interface RemoteSkill {
+  id: string
+  name: string
+  description: string
+  tags: string[]
+  examples: string[]
+}
+
+/** What a remote agent's Agent Card says. */
+export interface RemoteCard {
+  name: string
+  description: string
+  version: string | null
+  provider: string | null
+  documentationUrl: string | null
+  skills: RemoteSkill[]
+  streaming: boolean
+  inputModes: string[]
+  outputModes: string[]
+}
+
+/** `Agent.remote`: a remote agent's card URL, endpoint and auth (the secret only as `set`). */
+export interface RemoteInfo {
+  cardUrl: string
+  endpointUrl: string
+  endpointHost: string
+  protocolVersion: string
+  streaming: boolean
+  auth: { kind: 'none' | 'bearer' | 'header'; headerName: string | null; set: boolean }
+  card: RemoteCard
+  cardFetchedAt: string
+  contextNoticeAt: string | null
+}
+
+/** A remote agent's auth as entered (the value is sent once and never shown again). */
+export interface RemoteAuthInput {
+  kind: 'none' | 'bearer' | 'header'
+  headerName?: string | null
+  value?: string | null
+}
+
+/** POST /api/remote-agents/preview */
+export interface RemotePreview {
+  cardUrl: string
+  card: RemoteCard
+  endpointUrl: string
+  endpointHost: string
+  warnings: string[]
+}
+
+/** POST /api/remote-agents */
+export interface AddRemoteAgentRequest {
+  url: string
+  auth: RemoteAuthInput
+  name?: string | null
+  icon?: string | null
+  clientId?: string
+}
+
+/** PUT /api/remote-agents/{id}; `auth` null or absent leaves the secret as it is. */
+export interface SaveRemoteAgentRequest {
+  name: string
+  icon?: string | null
+  color?: string | null
+  auth?: RemoteAuthInput | null
+  baseRevision: string
+  clientId?: string
+}
+
+/** A remote agent's file artifact. */
+export interface RemoteAttachment {
+  name: string
+  mediaType: string | null
+  size: number | null
+  kind: 'file' | 'url'
+  /** "<chatId>/<safe name>" under the agent's files/ (kind file). */
+  file: string | null
+  /** http/https only (kind url). */
+  url: string | null
 }
 
 /** What create and save accept. */
@@ -1996,12 +2084,25 @@ export interface AgentChatSummary {
   messageCount: number
   spaceName: string | null
   delegated: boolean
+  /** M20: the delegating agent's id (with `delegated: true`), else null. */
+  from: string | null
 }
 
 /** One line of a chat transcript. */
 export type TranscriptItem =
   | { type: 'user'; text: string; at: string; contextPaths: string[] }
-  | { type: 'assistant'; text: string; at: string; model: string | null; sessionId: string | null; stopped?: boolean }
+  | {
+      type: 'assistant'
+      text: string
+      at: string
+      model: string | null
+      sessionId: string | null
+      stopped?: boolean
+      /** M20: a remote agent's file artifacts. */
+      attachments?: RemoteAttachment[]
+      /** M20: a remote agent's A2A ids and the task's state after this answer. */
+      a2a?: { contextId: string | null; taskId: string | null; state: string | null }
+    }
   | {
       type: 'tool'
       id: string

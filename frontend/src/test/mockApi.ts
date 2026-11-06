@@ -10,6 +10,7 @@
 import { vi } from 'vitest'
 import type { Api } from '@/api/client'
 import type {
+  AddRemoteAgentRequest,
   Agent,
   AgentInput,
   AgentTranscript,
@@ -40,6 +41,9 @@ import type {
   ObjectSummary,
   PropertyDef,
   Query,
+  RemoteAuthInput,
+  RemotePreview,
+  SaveRemoteAgentRequest,
   References,
   Row,
   SearchResult,
@@ -334,6 +338,63 @@ export function agent(partial: Partial<Agent> & Pick<Agent, 'id'>): Agent {
     readOnlyReason: null,
     revision: 'r1',
     mcpServers: [],
+    remote: null,
+    ...partial,
+  }
+}
+
+/** M20: a remote agent ("Fake Planner", bearer auth set, streaming); `partial` overrides. */
+export function remoteAgent(partial: Partial<Agent> & Pick<Agent, 'id'>): Agent {
+  return agent({
+    kind: 'remote',
+    name: 'Fake Planner',
+    icon: 'ph-globe',
+    model: null,
+    toolsOff: [],
+    learning: null,
+    folder: '/state/agents/Fake Planner',
+    mcpServers: [],
+    remote: {
+      cardUrl: 'http://127.0.0.1:8799/.well-known/agent-card.json',
+      endpointUrl: 'http://127.0.0.1:8799/a2a',
+      endpointHost: '127.0.0.1',
+      protocolVersion: '1.0',
+      streaming: true,
+      auth: { kind: 'bearer', headerName: null, set: true },
+      card: remotePreview().card,
+      cardFetchedAt: '2026-11-05T09:00:00.000Z',
+      contextNoticeAt: null,
+    },
+    ...partial,
+  })
+}
+
+/** M20: a remote agent's card preview (no warnings); `partial` overrides. */
+export function remotePreview(partial: Partial<RemotePreview> = {}): RemotePreview {
+  return {
+    cardUrl: 'http://127.0.0.1:8799/.well-known/agent-card.json',
+    card: {
+      name: 'Fake Planner',
+      description: "A synthetic agent for Object's tests.",
+      version: '1.0.0',
+      provider: 'Fake Org',
+      documentationUrl: 'https://example.org/docs',
+      skills: [
+        {
+          id: 'plan-trip',
+          name: 'Plan a trip',
+          description: 'Plans a short trip.',
+          tags: ['travel'],
+          examples: ['Plan two days in Lisbon.'],
+        },
+      ],
+      streaming: true,
+      inputModes: ['text/plain', 'text/markdown'],
+      outputModes: ['text/plain', 'application/json'],
+    },
+    endpointUrl: 'http://127.0.0.1:8799/a2a',
+    endpointHost: '127.0.0.1',
+    warnings: [],
     ...partial,
   }
 }
@@ -347,6 +408,7 @@ export function agentTranscript(partial: Partial<AgentTranscript> & Pick<AgentTr
     messageCount: 2,
     spaceName: 'space',
     delegated: false,
+    from: null,
     agentId: 'assistant',
     sessionId: 's1',
     objectPath: null,
@@ -766,6 +828,15 @@ function defaults(): Api {
     agentChats: async () => [],
     agentChat: async (id: string, chatId: string) => agentTranscript({ id: chatId, agentId: id }),
     revealAgentFolder: async () => ({ ok: true }),
+    // M20
+    previewRemoteAgent: async (_url: string, _auth: RemoteAuthInput) => remotePreview(),
+    addRemoteAgent: async (req: AddRemoteAgentRequest) =>
+      remoteAgent({ id: '01JNEWREMOTE00000000000000', name: req.name ?? 'Fake Planner', revision: 'r1' }),
+    saveRemoteAgent: async (id: string, req: SaveRemoteAgentRequest) =>
+      remoteAgent({ id, name: req.name, revision: `${req.baseRevision}+1` }),
+    refreshRemoteAgent: async (id: string) => remoteAgent({ id }),
+    ackRemoteContext: async () => ({ contextNoticeAt: '2026-11-05T09:00:00.000Z' }),
+    revealAgentFile: async () => ({ ok: true as const }),
     // M18
     agentMemory: async () => ({ memory: memoryFile('memory'), user: memoryFile('user') }),
     saveAgentMemory: async (_id: string, target: MemoryFile['target'], text: string, baseRevision: string | null) =>

@@ -1,10 +1,14 @@
 import type {
+  AddRemoteAgentRequest,
   Agent,
   AgentChatSummary,
   AgentInput,
   AgentTranscript,
   AgentTrashItem,
   CreateAgentRequest,
+  RemoteAuthInput,
+  RemotePreview,
+  SaveRemoteAgentRequest,
   ToolGroup,
   ChatSearchHit,
   LearningSettings,
@@ -1501,6 +1505,41 @@ export const api = {
   /** Show the agent's folder in the OS file manager. */
   revealAgentFolder(id: string): Promise<{ ok: boolean }> {
     return request<{ ok: boolean }>(`/agents/${seg(id)}/reveal`, json('POST', {}))
+  },
+
+  // ---- M20: remote agents ("Contract (T1)", routes filled by the plan's T5) ----
+
+  /** Fetch a remote agent's Agent Card without adding it. Writes nothing. 422, 502. */
+  previewRemoteAgent(url: string, auth: RemoteAuthInput): Promise<RemotePreview> {
+    return request<RemotePreview>('/remote-agents/preview', json('POST', { url, auth }))
+  },
+
+  /** Add a remote agent (its card is fetched again). 409 when it is already listed, 422, 502. */
+  addRemoteAgent(req: AddRemoteAgentRequest): Promise<Agent> {
+    return request<Agent>('/remote-agents', json('POST', { ...req, clientId: req.clientId ?? CLIENT_ID }), spaceConflict)
+  },
+
+  /** Save a remote agent's name, icon, colour and (when given) auth. Rejects with `RevisionConflictError` (409). */
+  saveRemoteAgent(id: string, req: SaveRemoteAgentRequest): Promise<Agent> {
+    return request<Agent>(`/remote-agents/${seg(id)}`, json('PUT', { ...req, clientId: req.clientId ?? CLIENT_ID }))
+  },
+
+  /** Fetch a remote agent's card again. 404, 422, 502. */
+  refreshRemoteAgent(id: string): Promise<Agent> {
+    return request<Agent>(`/remote-agents/${seg(id)}/refresh`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** Record that Gene confirmed context leaves this computer for this remote agent (once per agent). */
+  ackRemoteContext(id: string): Promise<{ contextNoticeAt: string }> {
+    return request<{ contextNoticeAt: string }>(
+      `/remote-agents/${seg(id)}/context-notice`,
+      json('POST', { clientId: CLIENT_ID }),
+    )
+  },
+
+  /** Show one of an agent's saved files ("<chatId>/<name>" under its files/) in the OS file manager. 404. */
+  revealAgentFile(id: string, file: string): Promise<{ ok: true }> {
+    return request<{ ok: true }>(`/agents/${seg(id)}/files/reveal`, json('POST', { file }))
   },
 
   // ---- M18: learning ("Contract (T1)", routes filled by the plan's T6) ----
