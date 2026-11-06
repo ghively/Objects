@@ -231,6 +231,9 @@ def _run(
         ))
     except agentrun.RunRefused as exc:
         return ScheduleResult("failed", None, exc.message, None), ""
+    except Exception as exc:  # OSError from the transcript, a token or build error: logged failed
+        log.exception("Schedules: the run of %s failed", rule_id)
+        return ScheduleResult("failed", None, str(exc) or "The run failed.", None), ""
     used = _used_skills(res.tool_lines)
     if res.state == "stopped":
         detail = STOPPED if cancel.is_set() else (
@@ -368,8 +371,12 @@ class AgentJobs:
             try:
                 run = self.engine.execute_agent_job(job, cancel)
                 status = str(run.get("status") or "failed")
-            except Exception:
+            except Exception as exc:  # the run is logged failed all the same, never lost unseen
                 log.exception("Schedules: the run of %s failed", job.rule_id)
+                try:
+                    self.engine.log_failed_agent_job(job, str(exc) or "The run failed.")
+                except Exception:
+                    log.exception("Schedules: could not log the failed run of %s", job.rule_id)
             finally:
                 with self._cond:
                     if cancel.is_set() and status != "ok":

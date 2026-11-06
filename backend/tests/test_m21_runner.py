@@ -325,6 +325,43 @@ def test_failures_are_logged_and_notified(env, case) -> None:
         assert chats(researcher.folder) == []
 
 
+def test_unexpected_error_is_logged_and_notified(env, monkeypatch) -> None:
+    """A run that raises something other than a refusal (here the transcript can't be written) is
+    logged failed with its message and notified, never lost unseen."""
+    def broken(*_a: Any, **_k: Any) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(transcripts, "start", broken)
+    with opened(env) as client:
+        rule = create(client, schedule(env["researcher"].id))
+        env["clock"].now = DUE
+        tick(client)
+        idle(client)
+        runs = runs_of(client, rule["id"])
+    assert [r["status"] for r in runs] == ["failed"]
+    assert runs[0]["actions"][0]["detail"] == "disk full"
+    [note] = notifications(env)
+    assert note["body"] == "Failed: disk full"
+    assert chat_objects(env["root"]) == {}
+
+
+def test_job_that_raises_is_still_logged(env, monkeypatch) -> None:
+    """The backstop: should the whole job raise, the worker logs a failed run for it."""
+    def boom(*_a: Any, **_k: Any) -> Any:
+        raise RuntimeError("broken run")
+
+    monkeypatch.setattr(schedulerun, "run_schedule", boom)
+    with opened(env) as client:
+        rule = create(client, schedule(env["researcher"].id))
+        env["clock"].now = DUE
+        tick(client)
+        idle(client)
+        runs = runs_of(client, rule["id"])
+    assert [r["status"] for r in runs] == ["failed"]
+    assert runs[0]["actions"][0] == {"index": 0, "kind": "runAgent", "status": "failed", "path": None,
+                                     "detail": "broken run"}
+
+
 def test_notifications_off(env) -> None:
     ui = env["root"] / ".object" / "ui.json"
     data = json.loads(ui.read_text(encoding="utf-8")) if ui.exists() else {}
