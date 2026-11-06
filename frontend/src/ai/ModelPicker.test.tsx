@@ -129,6 +129,7 @@ describe('ModelPicker', () => {
     const list = await openList(user)
     const options = within(list).getAllByRole('option')
     expect(options.map((o) => o.textContent)).toEqual(['Default (Sonnet 5.5)', 'Custom…'])
+    expect(screen.getByRole('button', { name: 'Model' })).toHaveTextContent(/^Default$/)
     expect(options[1]).toHaveAttribute('aria-disabled', 'true')
     expect(within(list).queryByText('Latest')).toBeNull()
   })
