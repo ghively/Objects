@@ -61,3 +61,74 @@ export const AGENT_TEXT = {
   turnOn: 'Turn on',
   groupSwitch: (label: string) => `All of ${label}`,
 } as const
+
+// M20: remote agents (docs/superpowers/plans/2026-11-05-m20-a2a-and-delegation.md, Task 7). Our
+// strings, except the "remote" mark (spec section 2: a small "remote" mark).
+export const REMOTE_TEXT = {
+  // The mark
+  mark: 'remote',
+  markLabel: 'Remote agent',
+
+  // The sidebar section
+  addRemote: 'Add remote agent…',
+
+  // The Add remote agent dialog
+  addTitle: 'Add remote agent',
+  addIntro: 'Adds an agent that runs elsewhere and speaks A2A, by its Agent Card URL.',
+  url: 'Agent Card URL or address',
+  urlPlaceholder: 'https://agents.example.com',
+  authentication: 'Authentication',
+  authNone: 'None',
+  authBearer: 'Bearer token',
+  authHeader: 'Header',
+  headerName: 'Header name',
+  token: 'Token',
+  value: 'Value',
+  lookUp: 'Look up',
+  lookingUp: 'Looking up…',
+  name: 'Name',
+  skills: 'Skills',
+  sendsTo: (host: string) => `Sends messages to ${host}`,
+  streaming: 'Streaming',
+  noStreaming: 'No streaming',
+  addButton: 'Add agent',
+  cancel: 'Cancel',
+
+  // The Profile tab
+  icon: 'Icon',
+  agentCard: 'Agent Card',
+  cardUrl: 'Card URL',
+  refreshCard: 'Refresh card',
+  protocol: (version: string) => `A2A ${version}`,
+  authNoneSet: 'None',
+  authBearerSet: 'Bearer token: set',
+  authHeaderSet: (name: string) => `Header ${name}: set`,
+  authNeeded: 'Token: needed',
+  replaceToken: 'Replace token…',
+  save: 'Save',
+  contextSent: 'Context sent',
+  notYet: 'Not yet',
+  firstSent: (date: string) => `First sent ${date}`,
+  folder: 'Folder',
+  openFolder: 'Open folder',
+  removeFromList: 'Remove from list',
+  removed: 'Removed from the list. Its folder was left where it is.',
+  conflict: 'This agent was changed elsewhere. Its latest settings are shown: apply your change again.',
+  refreshed: 'The card was fetched again.',
+
+  // The Card tab
+  description: 'Description',
+  provider: 'Provider',
+  version: 'Version',
+  documentation: 'Documentation',
+  inputModes: 'Input modes',
+  outputModes: 'Output modes',
+  tags: 'Tags',
+  examples: 'Examples',
+  noSkills: 'This card lists no skills.',
+  cardFetched: (date: string) => `Card fetched ${date}`,
+
+  // The Chats tab
+  delegatedBy: (name: string) => `Delegated by ${name}`,
+  delegatedByUnknown: 'Delegated by another agent',
+} as const

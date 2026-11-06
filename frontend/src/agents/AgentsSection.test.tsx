@@ -11,7 +11,7 @@ import { api } from '@/api/client'
 import { useTabs } from '@/nav/tabs'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { Sidebar } from '@/shell/Sidebar'
-import { agent } from '@/test/mockApi'
+import { agent, remoteAgent } from '@/test/mockApi'
 import { AgentsSection } from './AgentsSection'
 import { AGENT_TEXT } from './agentText'
 import { resetAgents } from './useAgents'
@@ -125,7 +125,7 @@ describe('AgentsSection', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
-  test('test the + menu holds New agent, Add agent folder and Deleted agents', async () => {
+  test('test the + menu holds New agent, Add agent folder, Add remote agent and Deleted agents', async () => {
     const user = userEvent.setup()
     render(<AgentsSection />)
     await user.click(screen.getByRole('button', { name: AGENT_TEXT.addMenu }))
@@ -133,8 +133,48 @@ describe('AgentsSection', () => {
     expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
       'New agent',
       'Add agent folder…',
+      'Add remote agent…',
       'Deleted agents…',
     ])
+    await user.click(within(menu).getByRole('menuitem', { name: 'Add remote agent…' }))
+    expect(await screen.findByRole('dialog', { name: 'Add remote agent' })).toBeInTheDocument()
+  })
+
+  test('test a remote agent row shows the remote mark and its three menu items', async () => {
+    const PLANNER = '01JREMOTE00000000000000001'
+    mocked.agents.mockResolvedValue([agent({ id: 'assistant' }), agent({ id: RESEARCHER }), remoteAgent({ id: PLANNER })])
+    mocked.deleteAgent.mockResolvedValue({ trashId: 'agent-trash-2' })
+    const onOpenTarget = vi.fn()
+    const openInSidepanel = vi.fn()
+    useTabs.setState({ openInSidepanel })
+    const user = userEvent.setup()
+    render(<AgentsSection onOpenTarget={onOpenTarget} />)
+    const row = await waitFor(() => {
+      const r = document.querySelector(`[data-agent="${PLANNER}"]`)
+      expect(r).not.toBeNull()
+      return r as HTMLElement
+    })
+    expect(row).toHaveTextContent('Fake Planner')
+    expect(within(row).getByLabelText('Remote agent')).toHaveTextContent('remote')
+    // A local row has no mark.
+    expect(within(document.querySelector(`[data-agent="${RESEARCHER}"]`) as HTMLElement).queryByLabelText('Remote agent')).toBeNull()
+
+    await user.click(within(row).getByRole('button', { name: AGENT_TEXT.rowMenu('Fake Planner') }))
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Open chat', 'Settings', 'Delete'])
+    await user.click(within(menu).getByRole('menuitem', { name: 'Open chat' }))
+    expect(openInSidepanel).toHaveBeenCalledWith({ kind: 'aiChat', agentId: PLANNER })
+
+    await user.click(within(row).getByRole('button', { name: AGENT_TEXT.rowMenu('Fake Planner') }))
+    await user.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Settings' }))
+    expect(onOpenTarget).toHaveBeenCalledWith({ kind: 'agent', id: PLANNER }, {})
+
+    // Delete: into the agent trash, no confirm, no notice.
+    await user.click(within(row).getByRole('button', { name: AGENT_TEXT.rowMenu('Fake Planner') }))
+    await user.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Delete' }))
+    expect(mocked.deleteAgent).toHaveBeenCalledWith(PLANNER)
+    await waitFor(() => expect(mocked.agents).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   test('test Deleted agents restores', async () => {

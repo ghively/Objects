@@ -5,13 +5,17 @@
  * which the tabs update after a save; opening the page writes nothing. A changed `tab` prop (the
  * agent opened again at another tab, e.g. "Memory & skills") switches to it, and so does every
  * `openAgentTab` (the same target opened again after a tab was picked by hand).
+ *
+ * M20: the page shows the tabs for the agent's kind (`tabsFor`): a remote agent has Profile, Card
+ * and Chats, and its name carries the "remote" mark. A tab the agent doesn't have shows its first.
  */
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
 import { IconOrEmoji } from '@/components/Icon'
 import { cn } from '@/lib/utils'
 import { useTabs } from '@/nav/tabs'
-import { AGENT_TABS } from './agentTabs'
+import { AGENT_TABS, tabsFor } from './agentTabs'
+import { RemoteMark } from './RemoteMark'
 import { useAgents } from './useAgents'
 
 /**
@@ -79,19 +83,23 @@ export function AgentPage({ id, tab }: AgentPageProps) {
     )
   }
 
-  const current = AGENT_TABS.find((t) => t.id === active) ?? AGENT_TABS[0]
+  const tabs = tabsFor(agent.kind)
+  const current = tabs.find((t) => t.id === active) ?? tabs[0]
   const Body = current.component
+  const remote = agent.kind === 'remote'
 
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-col gap-4 px-8 py-8" data-agent-page={agent.id}>
       <header className="flex items-center gap-3">
         <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-line">
-          <IconOrEmoji icon={agent.icon} fallback={agent.default ? 'ph-sparkle' : 'ph-robot'} size={22} />
+          <IconOrEmoji icon={agent.icon} fallback={remote ? 'ph-globe' : agent.default ? 'ph-sparkle' : 'ph-robot'} size={22} />
         </span>
-        <h1 className="min-w-0 flex-1 truncate text-[24px] font-semibold">{agent.name}</h1>
+        <h1 className="min-w-0 truncate text-[24px] font-semibold">{agent.name}</h1>
+        {remote && <RemoteMark />}
+        <span className="flex-1" />
       </header>
       <div role="tablist" aria-label={AGENT_PAGE_TEXT.tabs} className="flex flex-wrap items-center gap-1 border-b border-line pb-2">
-        {AGENT_TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             type="button"

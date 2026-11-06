@@ -6,6 +6,10 @@
  * agents…"; an agent outside the state dir is only unregistered, and the section says so). The
  * heading's `+` menu holds New agent, Add agent folder… and Deleted agents…; "+ New agent" is
  * also the last row. Nothing renders while AI features are hidden.
+ *
+ * M20: the `+` menu gains "Add remote agent…" after "Add agent folder…". A remote agent's row
+ * carries the "remote" mark, and its menu holds only Open chat, Settings and Delete (no Duplicate,
+ * no Memory & skills: a remote agent has neither in Object). Delete moves it to the agent trash.
  */
 import { useEffect, useState } from 'react'
 import { api } from '@/api/client'
@@ -22,11 +26,13 @@ import {
 import { useTabs, type Target } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
 import { AddAgentFolderDialog } from './AddAgentFolderDialog'
+import { AddRemoteAgentDialog } from './AddRemoteAgentDialog'
 import { requestAgentTab } from './AgentPage'
 import { AgentTrashDialog } from './AgentTrashDialog'
-import { AGENT_TEXT as T } from './agentText'
+import { AGENT_TEXT as T, REMOTE_TEXT } from './agentText'
 import { LEARNING_TEXT } from './learningText'
 import { NewAgentDialog } from './NewAgentDialog'
+import { RemoteMark } from './RemoteMark'
 import { useAgents } from './useAgents'
 
 export interface AgentsSectionProps {
@@ -58,6 +64,7 @@ function AgentRow({
   onDuplicate(): void
   onDelete(): void
 }) {
+  const remote = agent.kind === 'remote'
   return (
     <li data-agent={agent.id} className="group/agent relative">
       <button
@@ -70,9 +77,11 @@ function AgentRow({
         )}
       >
         <span className="inline-flex size-[22px] shrink-0 items-center justify-center">
-          <IconOrEmoji icon={agent.icon} fallback={agent.default ? 'ph-sparkle' : 'ph-robot'} size={16} />
+          <IconOrEmoji icon={agent.icon} fallback={remote ? 'ph-globe' : agent.default ? 'ph-sparkle' : 'ph-robot'} size={16} />
         </span>
-        <span className="min-w-0 flex-1 truncate">{agent.name}</span>
+        <span className="min-w-0 truncate">{agent.name}</span>
+        {remote && <RemoteMark />}
+        <span className="flex-1" />
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -94,14 +103,18 @@ function AgentRow({
             <Icon name="ph-gear" size={14} />
             {T.settings}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={onMemory}>
-            <Icon name="ph-lightbulb" size={14} />
-            {LEARNING_TEXT.memoryAndSkills}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={onDuplicate}>
-            <Icon name="ph-copy" size={14} />
-            {T.duplicate}
-          </DropdownMenuItem>
+          {!remote && (
+            <DropdownMenuItem onSelect={onMemory}>
+              <Icon name="ph-lightbulb" size={14} />
+              {LEARNING_TEXT.memoryAndSkills}
+            </DropdownMenuItem>
+          )}
+          {!remote && (
+            <DropdownMenuItem onSelect={onDuplicate}>
+              <Icon name="ph-copy" size={14} />
+              {T.duplicate}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem variant="destructive" disabled={agent.default} onSelect={onDelete}>
             <Icon name="ph-trash" size={14} />
             {T.delete}
@@ -118,6 +131,7 @@ export function AgentsSection({ onOpenTarget }: AgentsSectionProps) {
   const [newOpen, setNewOpen] = useState(false)
   const [duplicateOf, setDuplicateOf] = useState<Agent | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [remoteOpen, setRemoteOpen] = useState(false)
   const [trashOpen, setTrashOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -172,6 +186,7 @@ export function AgentsSection({ onOpenTarget }: AgentsSectionProps) {
           <DropdownMenuContent align="end" className="border-line bg-raised text-fg">
             <DropdownMenuItem onSelect={() => newAgent(null)}>{T.newAgent}</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setAddOpen(true)}>{T.addFolder}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setRemoteOpen(true)}>{REMOTE_TEXT.addRemote}</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setTrashOpen(true)}>{T.deletedAgents}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -212,6 +227,7 @@ export function AgentsSection({ onOpenTarget }: AgentsSectionProps) {
       )}
       <NewAgentDialog open={newOpen} onOpenChange={setNewOpen} duplicateOf={duplicateOf} />
       <AddAgentFolderDialog open={addOpen} onOpenChange={setAddOpen} />
+      <AddRemoteAgentDialog open={remoteOpen} onOpenChange={setRemoteOpen} />
       <AgentTrashDialog open={trashOpen} onOpenChange={setTrashOpen} />
     </section>
   )

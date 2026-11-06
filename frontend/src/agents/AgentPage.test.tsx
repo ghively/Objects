@@ -8,7 +8,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
-import { agent, ledgerSummary } from '@/test/mockApi'
+import { agent, ledgerSummary, remoteAgent } from '@/test/mockApi'
 import { AgentPage, AGENT_PAGE_TEXT, openAgentTab, requestAgentTab } from './AgentPage'
 import { LEARNING_TEXT } from './learningText'
 import { PROFILE_TEXT } from './ProfileTab'
@@ -32,6 +32,28 @@ describe('AgentPage', () => {
     expect(tabs.map((t) => t.textContent)).toEqual(['Profile', 'Instructions', 'Tools', 'Memory', 'Skills', 'Learning', 'Chats'])
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('textbox', { name: PROFILE_TEXT.name })).toHaveValue('Researcher')
+  })
+
+  test('test a remote agent page shows Profile, Card and Chats only', async () => {
+    const PLANNER = '01JREMOTE00000000000000001'
+    useAgents.setState({ agents: [agent({ id: 'assistant' }), remoteAgent({ id: PLANNER })], loaded: true })
+    const user = userEvent.setup()
+    // A tab a remote agent doesn't have shows its first tab.
+    render(<AgentPage id={PLANNER} tab="memory" />)
+    expect(screen.getByRole('heading', { name: 'Fake Planner' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Remote agent')).toBeInTheDocument()
+    const tabs = within(screen.getByRole('tablist', { name: AGENT_PAGE_TEXT.tabs })).getAllByRole('tab')
+    expect(tabs.map((t) => t.textContent)).toEqual(['Profile', 'Card', 'Chats'])
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true')
+    expect(document.querySelector('[data-agent-tab="remoteProfile"]')).not.toBeNull()
+    await user.click(screen.getByRole('tab', { name: 'Card' }))
+    expect(document.querySelector('[data-agent-tab="card"]')).not.toBeNull()
+    expect(screen.getByText("A synthetic agent for Object's tests.")).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Chats' }))
+    expect(await screen.findByRole('searchbox', { name: 'Search chats' })).toBeInTheDocument()
+    expect(mocked.agentChats).toHaveBeenCalledWith(PLANNER)
+    expect(mocked.agentTools).not.toHaveBeenCalled()
+    expect(mocked.agentInstructions).not.toHaveBeenCalled()
   })
 
   test('test the tab prop opens that tab', async () => {
