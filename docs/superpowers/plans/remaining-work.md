@@ -15,6 +15,11 @@ Status as of 2026-11-05. **All fifteen milestones (M1-M15) are built, reviewed, 
 5. ~~One known test failure on Windows~~ fixed 2026-11-03 (`ba43e66`): the gzip test compared newline-translated text; it now compares bytes.
 5b. ~~The M15 test `test_15_previews_of_several_sources_can_start` failing on Windows~~ fixed 2026-11-05: the test made a space "S1" next to its source folder "s1", the same name on a case-insensitive file system, so the app rightly answered 409; the spaces now go in their own folder.
 6. **Wiki import follow-ups** (outside the repo, in Gene's `ObjectSpaces` folder): review the 10 "possible secrets" pages listed in `ai-pass/review.md`; the wiki copy is a snapshot (refresh = recopy and AI-reread only new or changed pages).
+7. **M16: built on `feat/m16-m24`** and gated on Windows 2026-11-06 (see "2026-11-06: M16, chat Markdown, tool steps and the model picker" below). Gene asked on 2026-11-05 for M16-M24 to be built straight through; his 9 hand-checks in `m16-acceptance.md` are pending.
+
+## 2026-11-06: M16, chat Markdown, tool steps and the model picker
+
+The chat renders every message as safe Markdown (raw HTML shown as text), shows each tool call as a collapsed step between messages, and has a model picker in the chat header and in Settings > AI Assistant; the model list is one back-end constant (`aimodels.MODELS`, served by `GET /api/ai/models`). Built on `feat/m16-m24` (shared with M17-M24), commits `d4a9d89..ff60aea`. Plan `2026-11-05-m16-chat-polish-model-picker.md`; results, our calls and hand-checks in `m16-acceptance.md`. Gate on Windows: back end 2082 passed, 13 skipped, 3 xpassed (1 warning: a test's background server thread exiting at startup); front end 409 files passed, 1 skipped, 3173 tests passed, 1 skipped; `tsc` clean; lint 0 errors (526 warnings, of kinds the code base already has); build ok; `m1_roundtrip.py` PASS; `m2`-`m16_acceptance.py` PASS on `space-sample` and `space-v1` (30 runs), plus `m4` on `space-calendar`, `m5` on `space-links`, `m6` on `space-whiteboard`, `m7` on `space-blocks` and `m14` on `space-m8`. M11's run logs four "Tool ... failed" lines: its deliberate error-reply checks. Left for Gene by hand: the 9 checks in `m16-acceptance.md` (a real reply's rendering in both themes, Copy pasting the source, tool steps, object-link chips, a hostile reply staying inert, the picker's list and a mid-chat switch, the `haiku` alias with the installed CLI, the Settings picker, New chat resetting to Default), plus the real `claude` CLI and the app's own window.
 
 ## 2026-11-05: Windows gate (M10-M15, after the merge)
 
@@ -104,7 +109,7 @@ Each milestone's plan holds its full scope. Each acceptance doc holds its automa
 | **M13** calendar, timeline and chart layouts; sub-items and dependencies | `2026-11-05-m13-view-layouts.md` | `0d9b7db..` on `feat/m13-view-layouts`, gate 2026-11-05 (Linux) | `m13-acceptance.md` (5) |
 | **M14** local automations: rules, schedules and catch-up, template repeat, buttons | `2026-11-05-m14-automations.md` | `dbb09d9..` on `feat/m14-automations`, gate 2026-11-05 (Linux) | `m14-acceptance.md` (7) |
 | **M15** importers: Notion, Obsidian and Anytype exports | `2026-11-05-m15-importers.md` | `80973d0..` on `feat/m15-importers`, gate 2026-11-05 (Linux) | `m15-acceptance.md` (7) |
-| **M16** chat Markdown, tool steps and the model picker | `2026-11-05-m16-chat-polish-model-picker.md` | `d4a9d89..` on `feat/m16-m24`, gate 2026-11-05 (Windows) | `m16-acceptance.md` (9) |
+| **M16** chat Markdown, tool steps and the model picker | `2026-11-05-m16-chat-polish-model-picker.md` | `d4a9d89..ff60aea` on `feat/m16-m24`, gate 2026-11-06 (Windows) | `m16-acceptance.md` (9) |
 
 M8's "Coverage" section maps every deferred item to a task, or to a spec §2 exclusion: AI, network at runtime, accounts and sharing, mobile, telemetry.
 

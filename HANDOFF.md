@@ -4,6 +4,8 @@ Updated 2026-11-02. You are continuing "Object", a local, Markdown-backed notes 
 
 ## Where things stand
 
+**2026-11-06:** M10-M15 are built and on `master`. M16 (chat Markdown, tool steps and the model picker) is built and gated on branch `feat/m16-m24`; Gene on 2026-11-05 asked for M16-M24 to be built straight through on that branch, so M17-M24 continue there. His hand-checks are pending (`docs/superpowers/plans/m10-acceptance.md` onward, all unchecked). Current status: `docs/superpowers/plans/remaining-work.md`.
+
 **All nine milestones are built, reviewed, fixed and through their final gates.** Nothing is waiting on a build. M9 (the audit's completeness gaps) was built 2026-10-28 on a Linux cloud container on branch `ccr-bcf6e946-bf8moc`; results, open questions and Gene's hand-checks are in `docs/superpowers/plans/m9-acceptance.md`.
 
 **The 2026-10-28 audit is fixed** (on Gene's Windows PC, same day): every bug in `docs/superpowers/plans/audit-2026-10-28.md` and every real "unconfirmed" item, one per commit with a failing-first test. **The guessed values were checked and settled** (`docs/superpowers/plans/reference-check-2026-10-28.md`) and applied. Status and the gate numbers: `docs/superpowers/plans/remaining-work.md`.
