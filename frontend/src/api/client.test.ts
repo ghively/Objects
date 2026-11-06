@@ -247,6 +247,48 @@ describe('api client v2 writes', () => {
     expect(sources[0].closed).toBe(true)
   })
 
+  test('test createMcpServer keeps a name clash 409 message and saveMcpServer a stale revision', async () => {
+    vi.stubGlobal('fetch', respond(409, { detail: 'Another server already has this name.' }))
+    const clash = await api.createMcpServer({ name: 'gh', enabled: true, kind: 'command', command: 'npx' }).catch((e: unknown) => e)
+    expect(clash).toBeInstanceOf(ApiError)
+    expect(clash).not.toBeInstanceOf(ConflictError)
+    expect((clash as ApiError).status).toBe(409)
+    expect((clash as ApiError).message).toBe('Another server already has this name.')
+    vi.stubGlobal('fetch', respond(409, { detail: 'stale', currentRevision: 'r2' }))
+    const stale = await api.saveMcpServer('01J', { name: 'gh', enabled: false, kind: 'command' }, 'r1').catch((e: unknown) => e)
+    expect(stale).toBeInstanceOf(RevisionConflictError)
+    expect((stale as RevisionConflictError).currentRevision).toBe('r2')
+  })
+
+  test('test agentLearning is a resync event', async () => {
+    const sources: FakeSource[] = []
+    class FakeSource extends EventTarget {
+      onerror: (() => void) | null = null
+      onopen: (() => void) | null = null
+      readonly url: string
+      constructor(url: string) {
+        super()
+        this.url = url
+        sources.push(this)
+      }
+      close() {}
+    }
+    vi.stubGlobal('EventSource', FakeSource)
+    const seen: ChangeEvent[] = []
+    const off = api.onChange((e) => seen.push(e))
+    try {
+      sources[0].onerror?.()
+      sources[0].onopen?.()
+      expect(seen).toContainEqual({ kind: 'agentLearning', path: '*', version: null, origin: null })
+      expect(seen.map((e) => e.kind)).toEqual([
+        'types', 'views', 'ui', 'collections', 'queries', 'automations', 'agents', 'agentChats', 'agentLearning',
+        'mcpServers',
+      ])
+    } finally {
+      off()
+    }
+  })
+
   test('fileUrl points at the image route', () => {
     expect(api.fileUrl('Attachments/cover 1.png')).toBe('/api/file?path=Attachments%2Fcover+1.png')
   })

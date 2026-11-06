@@ -1,14 +1,14 @@
-"""The AI assistant's runner (M10): one ``claude -p`` subprocess per chat turn.
+"""The AI assistant's runner (M10, M17): one ``claude -p`` subprocess per chat turn.
 
 Object has no model of its own and makes no network call: the user's own Claude Code
-CLI does the work. Each turn runs ``claude -p --output-format stream-json`` with the
-prompt on stdin, in a new empty temporary folder (so the assistant never sees the space
-folder), with every built-in tool switched off and only Object's MCP read tools allowed.
-Those tools reach the space through the running app's ``/api/v1`` with a per-turn,
-read-only token held in memory (`tokens.TokenStore.ephemeral`), so "Exclude from AI",
-templates and the no-write rule are enforced in one place. The assistant never writes:
-what it suggests comes back as a proposal (tags, property values or text) that the user
-applies through the normal write paths.
+CLI does the work. Since M17 every turn is an agent run: `agentrun.build_run` gives the
+command (the agent's folder as the working folder, its settings only, Object's MCP servers,
+the tool switches and the fence), and `Turn.run` hands it to `_Attempt`. The prompt goes on
+stdin. Object's tools reach the space through the running app's ``/api/v1`` with a per-turn
+token held in memory (`tokens.TokenStore.ephemeral`), so "Exclude from AI", templates and
+the version checks are enforced in one place. The proposal modes run read-only: what they
+suggest comes back as a proposal (tags, property values or text) that the user applies
+through the normal write paths.
 
 Pieces:
 
@@ -22,7 +22,10 @@ Pieces:
 - `visible_path` / `valid_session`: the checks the route makes on a block's page and on a
   session id before a turn starts.
 - `parse_proposal`: the mode's proposal from the last fenced block of the answer.
-- `StreamParser`: Claude Code's stream-json lines -> `AiEvent` dicts.
+- `StreamParser`: Claude Code's stream-json lines -> `AiEvent` dicts. A tool call gives two
+  ``tool`` events with the same id (M16): one at the call (its input, see `short_input`),
+  one when its result arrives (`short_result`, capped at `TOOL_RESULT_CAP`). Tool results
+  never go into the answer's text.
 - `run_turn`: the subprocess, as an async generator of `AiEvent` dicts. The blocking I/O
   runs in threads; a timeout (`TURN_TIMEOUT`) or closing the generator (the client went
   away) kills the whole process tree.
@@ -38,34 +41,32 @@ import re
 import shutil
 import signal
 import subprocess
-import sys
-import tempfile
 import threading
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .agentrun import RunCommand, RunRefused
 from .apiquery import EXCLUDE_TAG, is_excluded
 
 __all__ = [
-    "ALLOWED_TOOLS",
-    "CLI_FLAGS",
-    "DISALLOWED_TOOLS",
+    "ELLIPSIS",
     "MAX_CONTEXT_CHARS",
     "MODES",
-    "READ_TOOLS",
+    "TOOL_INPUT_STRING_CAP",
+    "TOOL_RESULT_CAP",
     "TURN_TIMEOUT",
     "ContextPack",
     "StreamParser",
     "Turn",
     "build_prompt",
-    "cli_args",
     "find_claude",
     "gather_context",
-    "mcp_config",
     "parse_proposal",
     "run_turn",
+    "short_input",
+    "short_result",
     "status",
     "valid_session",
     "visible_path",
@@ -80,54 +81,6 @@ MAX_CONTEXT_CHARS = 60_000
 MAX_TAGS = 5
 MAX_EXISTING_TAGS = 300
 MCP_SERVER = "object"
-TOKEN_NAME = "AI assistant"
-
-READ_TOOLS = (
-    "schema",
-    "search",
-    "query",
-    "run_saved_query",
-    "peek",
-    "read",
-    "backlinks",
-    "daily_note",
-    "changes_since",
-)
-"""The ``objectapp-mcp`` read tools, the only tools the assistant may use."""
-ALLOWED_TOOLS = tuple(f"mcp__{MCP_SERVER}__{t}" for t in READ_TOOLS)
-DISALLOWED_TOOLS = (
-    "Bash",
-    "Write",
-    "Edit",
-    "MultiEdit",
-    "NotebookEdit",
-    "Read",
-    "Glob",
-    "Grep",
-    "WebFetch",
-    "WebSearch",
-    "Task",
-)
-"""Denied as well, in case a CLI version ignores ``--tools ""``."""
-
-# Every flag of a turn, in one place (checked against ``claude --help`` of Claude Code
-# 2.1.318). ``--tools ""`` switches off all built-in tools; ``--no-chrome`` keeps the
-# browser integration away; ``dontAsk`` denies whatever isn't allowed below instead of
-# asking; ``--strict-mcp-config`` ignores the user's other MCP servers;
-# ``--include-partial-messages`` streams the answer as it is written.
-CLI_FLAGS = (
-    "-p",
-    "--output-format",
-    "stream-json",
-    "--verbose",
-    "--include-partial-messages",
-    "--tools",
-    "",
-    "--no-chrome",
-    "--permission-mode",
-    "dontAsk",
-    "--strict-mcp-config",
-)
 
 NOT_FOUND = (
     "Claude Code was not found. Install it, or set where it is in Settings > AI Assistant."
@@ -199,35 +152,6 @@ def status(setting: str | None) -> dict[str, Any]:
     version = (out.stdout or "").strip().splitlines()
     return {"available": True, "reason": "ok", "claudePath": claude,
             "version": version[0].strip() if version else None, "message": None}
-
-
-def mcp_config(api_url: str) -> dict[str, Any]:
-    """The ``--mcp-config`` for a turn: the read-only ``objectapp-mcp`` over this app.
-
-    The token is not in it: ``${OBJECT_API_TOKEN}`` is expanded by the CLI from its own
-    environment, where `run_turn` puts it, so the secret is never written to a file.
-    """
-    return {
-        "mcpServers": {
-            MCP_SERVER: {
-                "command": sys.executable,
-                "args": ["-m", "objectapp.mcp_server", "--read-only"],
-                "env": {"OBJECT_API_URL": api_url, "OBJECT_API_TOKEN": "${OBJECT_API_TOKEN}"},
-            }
-        }
-    }
-
-
-def cli_args(claude: str, *, model: str | None, resume: str | None, mcp_config_path: str) -> list[str]:
-    """The full command line of one turn (the prompt goes on stdin)."""
-    args = [claude, *CLI_FLAGS, "--mcp-config", mcp_config_path,
-            "--allowedTools", ",".join(ALLOWED_TOOLS),
-            "--disallowedTools", ",".join(DISALLOWED_TOOLS)]
-    if model:
-        args += ["--model", model]
-    if resume:
-        args += ["--resume", resume]
-    return args
 
 
 # -- context and prompt ---------------------------------------------------------------
@@ -482,9 +406,15 @@ def build_prompt(
     pack: ContextPack,
     block: str | None = None,
     history: list[dict[str, Any]] | None = None,
+    *,
+    intro: bool = True,
 ) -> str:
-    """The text sent on stdin. `history` (earlier messages) only when no session resumes."""
-    parts = [_INTRO, _INSTRUCTIONS.get(mode, _INSTRUCTIONS["chat"])]
+    """The text sent on stdin. `history` (earlier messages) only when no session resumes.
+
+    ``intro=False`` (agent runs, M17) leaves out `_INTRO`: the run's appended guidance carries it.
+    """
+    parts = [_INTRO] if intro else []
+    parts.append(_INSTRUCTIONS.get(mode, _INSTRUCTIONS["chat"]))
     if pack.pages:
         ctx = ["# Context"]
         for page in pack.pages:
@@ -591,9 +521,67 @@ def parse_proposal(mode: str, text: str, allowed_keys: set[str] | None = None) -
 # -- the stream -----------------------------------------------------------------------
 
 
+TOOL_INPUT_STRING_CAP = 1_000
+"""Characters kept of each string value in a tool's input, at any depth (our number)."""
+TOOL_RESULT_CAP = 4_000
+"""Characters kept of a tool's result text (our number)."""
+ELLIPSIS = "…"
+
+
+_SHORT_PREFIXES = (f"mcp__{MCP_SERVER}__", "mcp__object-agent__")
+"""Object's tools and the agent tools (M17) are named by their short name in ``tool`` events."""
+
+
 def _short_tool(name: str) -> str:
-    prefix = f"mcp__{MCP_SERVER}__"
-    return name.removeprefix(prefix)
+    for prefix in _SHORT_PREFIXES:
+        if name.startswith(prefix):
+            return name.removeprefix(prefix)
+    return name
+
+
+def _cap(text: str, cap: int) -> str:
+    return text[:cap] + ELLIPSIS if len(text) > cap else text
+
+
+def _cap_strings(value: Any) -> Any:
+    if isinstance(value, str):
+        return _cap(value, TOOL_INPUT_STRING_CAP)
+    if isinstance(value, dict):
+        return {k: _cap_strings(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_cap_strings(v) for v in value]
+    return value
+
+
+def short_input(value: Any) -> dict[str, Any] | None:
+    """The call's input for the chat: a dict (None if it isn't one) whose string values,
+    at any depth, are cut to TOOL_INPUT_STRING_CAP characters + ELLIPSIS."""
+    if not isinstance(value, dict):
+        return None
+    return {str(k): _cap_strings(v) for k, v in value.items()}
+
+
+def short_result(content: Any) -> str:
+    """A tool_result's content as text: a string as is; a list of blocks joined with "\\n"
+    (text blocks' text, any other block as "[image]" or "[<type>]", our strings); cut to
+    TOOL_RESULT_CAP + ELLIPSIS."""
+    if isinstance(content, str):
+        text = content
+    elif isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str):
+                parts.append(block["text"])
+            elif isinstance(block, dict):
+                parts.append(f"[{block.get('type') or 'block'}]")
+            elif isinstance(block, str):
+                parts.append(block)
+        text = "\n".join(parts)
+    elif content is None:
+        text = ""
+    else:
+        text = str(content)
+    return _cap(text, TOOL_RESULT_CAP)
 
 
 class StreamParser:
@@ -614,7 +602,9 @@ class StreamParser:
         self._streamed: dict[str, str] = {}
         self._msg: str | None = None
         self._block_open = False
-        self._tools: set[str] = set()
+        self._tools: dict[str, str] = {}
+        """Announced tool calls: tool_use id -> short name."""
+        self._answered: set[str] = set()
         self._texts: set[tuple[str, str]] = set()
 
     def _emit_text(self, text: str, new_block: bool) -> list[dict[str, Any]]:
@@ -639,6 +629,8 @@ class StreamParser:
             return self._stream_event(obj.get("event") or {})
         if kind == "assistant":
             return self._assistant(obj.get("message") or {})
+        if kind == "user":
+            return self._user(obj.get("message") or {})
         if kind == "result":
             self.finished = True
             sid = obj.get("session_id")
@@ -694,8 +686,25 @@ class StreamParser:
                 tid = str(block.get("id") or len(self._tools))
                 if tid in self._tools:
                     continue
-                self._tools.add(tid)
-                out.append({"type": "tool", "name": _short_tool(str(block.get("name") or ""))})
+                name = _short_tool(str(block.get("name") or ""))
+                self._tools[tid] = name
+                out.append({"type": "tool", "id": tid, "name": name, "input": short_input(block.get("input"))})
+        return out
+
+    def _user(self, msg: Any) -> list[dict[str, Any]]:
+        """A ``user`` message's ``tool_result`` blocks -> result events, by announced id."""
+        if not isinstance(msg, dict) or not isinstance(msg.get("content"), list):
+            return []
+        out: list[dict[str, Any]] = []
+        for block in msg["content"]:
+            if not isinstance(block, dict) or block.get("type") != "tool_result":
+                continue
+            tid = block.get("tool_use_id")
+            if not isinstance(tid, str) or tid not in self._tools or tid in self._answered:
+                continue
+            self._answered.add(tid)
+            out.append({"type": "tool", "id": tid, "name": self._tools[tid], "input": None,
+                        "result": short_result(block.get("content")), "isError": bool(block.get("is_error"))})
         return out
 
 
@@ -721,6 +730,10 @@ class Turn:
     token: str
     skipped: list[dict[str, str]] = field(default_factory=list)
     allowed_keys: set[str] | None = None
+    run: Callable[[str | None], RunCommand] = field(kw_only=True)
+    """M17: the resume id in, a fresh agent-run command out (`agentrun.build_run`)."""
+    timeout: float = field(default_factory=lambda: TURN_TIMEOUT)
+    """Seconds this turn may run (`run_turn`'s deadline); the module constant when made."""
 
 
 def _kill_tree(proc: subprocess.Popen) -> None:
@@ -749,19 +762,14 @@ class _Attempt:
         self.resume = resume
         self.proc: subprocess.Popen | None = None
         self.stderr: list[str] = []
-        self.workdir = Path(tempfile.mkdtemp(prefix="object-ai-"))
-        self.cwd = self.workdir / "cwd"
-        self.cwd.mkdir()
-        self.config = Path(tempfile.mkdtemp(prefix="object-ai-config-")) / "mcp.json"
+        self.command: RunCommand | None = None
 
     def start(self, loop: asyncio.AbstractEventLoop, queue: asyncio.Queue) -> None:
-        self.config.write_text(json.dumps(mcp_config(self.turn.api_url)), encoding="utf-8")
-        env = {**os.environ, "OBJECT_API_TOKEN": self.turn.token, "OBJECT_API_URL": self.turn.api_url}
-        args = cli_args(self.turn.claude, model=self.turn.model, resume=self.resume,
-                        mcp_config_path=str(self.config))
+        self.command = self.turn.run(self.resume)
+        args, cwd, env = self.command.args, self.command.cwd, self.command.env
         self.proc = subprocess.Popen(
             args,
-            cwd=self.cwd,
+            cwd=cwd,
             env=env,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -802,8 +810,8 @@ class _Attempt:
     def stop(self) -> None:
         if self.proc is not None:
             _kill_tree(self.proc)
-        shutil.rmtree(self.workdir, ignore_errors=True)
-        shutil.rmtree(self.config.parent, ignore_errors=True)
+        if self.command is not None:
+            shutil.rmtree(self.command.tmp, ignore_errors=True)
 
     def stderr_text(self) -> str:
         return "".join(self.stderr).strip()[-800:]
@@ -820,8 +828,12 @@ async def _attempt_events(attempt: _Attempt, parser: StreamParser, deadline: flo
     queue: asyncio.Queue = asyncio.Queue()
     try:
         attempt.start(loop, queue)
+    except RunRefused as exc:
+        raise _Failed(exc.message, retryable=False) from exc
     except OSError as exc:
         raise _Failed(f"Claude Code couldn't be started: {exc.strerror or exc}", retryable=False) from exc
+    except Exception as exc:  # noqa: BLE001 - any other failure still ends the turn with ``error``
+        raise _Failed(f"Claude Code couldn't be started: {exc}", retryable=False) from exc
     while True:
         remaining = deadline - loop.time()
         if remaining <= 0:
@@ -863,12 +875,12 @@ def _wait(proc: subprocess.Popen, timeout: float) -> int | None:
 async def run_turn(turn: Turn) -> AsyncIterator[dict[str, Any]]:
     """The turn's `AiEvent` dicts, ending with one ``done`` or ``error``.
 
-    Closing the generator early (the client went away) or running past `TURN_TIMEOUT`
-    kills the CLI's process tree. A ``--resume`` that fails before any answer is tried
+    Closing the generator early (the client went away) or running past the turn's `timeout`
+    (`TURN_TIMEOUT` unless the caller set one) kills the CLI's process tree. A ``--resume`` that fails before any answer is tried
     once more as a fresh session with the earlier messages.
     """
     loop = asyncio.get_running_loop()
-    deadline = loop.time() + TURN_TIMEOUT
+    deadline = loop.time() + turn.timeout
     plans: list[tuple[str, str | None]] = []
     if turn.session_id and turn.prompt_resume is not None:
         plans.append((turn.prompt_resume, turn.session_id))
@@ -886,7 +898,7 @@ async def run_turn(turn: Turn) -> AsyncIterator[dict[str, Any]]:
             return
         except TimeoutError:
             yield {"type": "error",
-                   "message": f"Claude Code took too long (over {TURN_TIMEOUT:g} seconds) and was stopped."}
+                   "message": f"Claude Code took too long (over {turn.timeout:g} seconds) and was stopped."}
             return
         finally:
             await asyncio.shield(asyncio.to_thread(attempt.stop))

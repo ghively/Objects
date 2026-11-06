@@ -17,6 +17,9 @@ export const AI_CHAT_TEXT = {
   title: 'AI Chat',
   exploreCardHelp: 'Ask about your pages with Claude Code.', // our string
   newChat: 'New chat', // our string
+  modelForChat: 'Model for this chat', // our string (M16)
+  defaultModel: 'Default', // our string (M16)
+  defaultModelOf: (label: string) => `Default (${label})`, // our string (M16)
   context: 'Context', // our string
   addContext: 'Add a page to the context', // our string
   pickPage: 'Find a page', // our string
@@ -29,7 +32,6 @@ export const AI_CHAT_TEXT = {
   send: 'Send', // our string
   stop: 'Stop', // our string
   thinking: 'Thinking…', // our string
-  usedTools: 'Used:', // our string
   stopped: 'Stopped.', // our string
   emptyAnswer: 'No answer came back.', // our string
   empty: 'Ask a question about the pages in the context, or about anything in your space.', // our string
@@ -76,6 +78,18 @@ export const AI_CHAT_TEXT = {
   findMore: 'Find More',
   relevantNone: 'Open a page to see content related to it.', // our string
   relevantEmpty: 'Nothing related found yet.', // our string
+} as const
+
+/** M20: a chat with a remote (A2A) agent: the context notice and the attachment chips (our strings). */
+export const REMOTE_CHAT_TEXT = {
+  noticeTitle: 'This leaves your computer',
+  noticeBody: (name: string, host: string) =>
+    `${name} is a remote agent. The context pages you send go to ${host}, outside this computer. Pages excluded from AI are never sent.`,
+  noticeSend: 'Send',
+  noticeCancel: 'Cancel',
+  attachments: 'Attachments',
+  showInFolder: 'Show in folder',
+  revealFailed: (why: string) => `Could not show the file: ${why}`,
 } as const
 
 /** What the user bubble says for a request sent without words (our strings, catalog names where it has them). */

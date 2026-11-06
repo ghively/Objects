@@ -10,7 +10,8 @@
   object), 422 (not a button rule, turned off, out of scope, a template), 423.
 - ``GET /automations/{id}/runs?limit=`` (1-200, default 200) -> ``{runs}`` newest first; 404.
 - ``GET /automations/catch-up`` -> ``{items}``; ``POST /automations/catch-up``
-  ``{ruleId, choice, clientId?}`` -> ``{runs}``; 404 (no such rule or nothing pending).
+  ``{ruleId, choice, clientId?}`` -> ``{runs, queued}`` (M21: ``queued`` counts an agent
+  schedule's occurrences handed to the agent jobs); 404 (no such rule or nothing pending).
 
 Create, save, delete announce ``ChangeEvent("automations", id, revision or None,
 origin=clientId)``; the engine announces its own writes and runs.
@@ -98,10 +99,11 @@ def router(ctx: ApiContext, engine: AutomationEngine) -> APIRouter:
     @r.post("/automations/catch-up")
     def post_catch_up(req: CatchUpRequest):
         try:
-            runs = engine.scheduler.answer(req.ruleId, req.choice)
+            runs, queued = engine.scheduler.answer_counted(req.ruleId, req.choice)
         except KeyError:
             return _error(404, "This automation has no missed runs.")
-        return {"runs": runs}
+        # M21: an agent schedule's occurrences are queued for the agent jobs (`queued`), not run here.
+        return {"runs": runs, "queued": queued}
 
     @r.get("/automations/{rule_id}")
     def get_rule(rule_id: str):

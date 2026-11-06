@@ -1,95 +1,51 @@
-# Handoff: pick up Object from a clean clone
+# Handoff: pick up Object
 
-Updated 2026-11-02. You are continuing "Object", a local, Markdown-backed notes app with its own object model. A space keeps its metadata in `.object/` and its cache in `.object-cache/`; spaces made before 2026-11-04 are migrated to these folders automatically on open. Read this file, then `CLAUDE.md` (rules), then `CONTINUE.md` (process). Status lives in `docs/superpowers/plans/remaining-work.md`.
+Updated 2026-11-06 (end of day). You are continuing "Object", a local, Markdown-backed notes app with its own object model. A space keeps its metadata in `.object/` and its cache in `.object-cache/`. Read this file, then `CLAUDE.md` (rules), then `CONTINUE.md` (process). The long history and every gate's numbers live in `docs/superpowers/plans/remaining-work.md`.
 
 ## Where things stand
 
-**All nine milestones are built, reviewed, fixed and through their final gates.** Nothing is waiting on a build. M9 (the audit's completeness gaps) was built 2026-10-28 on a Linux cloud container on branch `ccr-bcf6e946-bf8moc`; results, open questions and Gene's hand-checks are in `docs/superpowers/plans/m9-acceptance.md`.
+- **`master`**: M1-M15, pushed. Gene's hand-checks for M1-M15 are still unticked (`docs/superpowers/plans/m1-acceptance.md` onward).
+- **Gene paused the M16-M24 build on 2026-11-06** ("stop all the tests, let the code finish, don't start any new"). All code for M16-M23 is written; nothing is running. Two branches, both pushed:
 
-**The 2026-10-28 audit is fixed** (on Gene's Windows PC, same day): every bug in `docs/superpowers/plans/audit-2026-10-28.md` and every real "unconfirmed" item, one per commit with a failing-first test. **The guessed values were checked and settled** (`docs/superpowers/plans/reference-check-2026-10-28.md`) and applied. Status and the gate numbers: `docs/superpowers/plans/remaining-work.md`.
+| Branch | Where | Holds | State |
+|---|---|---|---|
+| `feat/m16-m24` | `C:\Git\object` | M16-M21 (agents), plus the card/inline-link switch and the import design | M16-M18 fully gated. M19, M20, M21 each built, reviewed, fixed and quick-checked (their own tests, tsc, their acceptance script: green). **The track's full gate was stopped mid-run.** |
+| `feat/m22-m23` | worktree `C:\Git\object-work` (from `43a9407`) | M22-M23 (work dashboard) | M22 built, reviewed, fixed, quick-checked (green). **M23: every task committed** (last: `4fb8e94`, the Now view, written with no test run), **but its integrate task, review, fix pass and check never ran.** |
 
-**The 2026-11-01 full audit (bugs and optimization) is fixed, every item, in two passes,** (PR #4, merged; Linux cloud container): `docs/superpowers/plans/audit-2026-11-01.md` holds the findings, Gene's answers and the before/after numbers; the repro scripts are in `scripts/audit-2026-11-01/`. Headlines: opening a 5,000-object space warm 6 s → 0.6 s, a rename 4 s → 0.4 s, type saves no longer block reads for seconds, the kanban pages, the entry bundle 3.4 MB → 273 KB, and sixteen data-loss or security bugs closed.
+Milestones and plans (`docs/superpowers/plans/`): M16 chat polish and model picker, M17 agents and tools, M18 learning, M19 MCP gateway, M20 A2A and delegation, M21 schedules (designs: `specs/2026-11-05-agents-design.md`); M22 work model, M23 Work section, M24 brain dump and agent loop (design: `specs/2026-11-05-work-dashboard-design.md`). Each built milestone has `mNN-acceptance.md` (Gene's hand-checks, unticked, plus deviations) and `scripts/mNN_acceptance.py`.
 
-**2026-11-02 polish audit:** `docs/behavior-catalog.md` records how Object behaves (labels, menus, shortcuts, order); `docs/superpowers/plans/polish-audit-2026-11-02.md` lists the differences, the fixes made and a consolidated backlog (A-H). Unlinked mentions must be kept (already in M5). Several local commits on `master` are not pushed; push only when Gene says so.
+## What to do next, in order
 
-**AI (2026-11-02):** in scope as M10, through the Claude Code CLI; plan `docs/superpowers/plans/2026-11-02-m10-ai-assistant.md`, not built. Integrations come later at lower priority.
+1. **Set up** (fresh clone): install `uv` and Node 22+; `uv sync`; `cd frontend && npm ci` (not `npm install`). The worktree has its own `frontend/node_modules`. To recreate it: `git worktree add C:\Git\object-work feat/m22-m23`, then `npm ci` in its `frontend`.
+2. **Finish M23** in `C:\Git\object-work`: run its integrate task (the last task in `2026-11-05-m23-work-section.md`: wire the lanes together, write `scripts/m23_acceptance.py` and `m23-acceptance.md`). Then one whole-milestone review, one fix pass, and a quick check (M23's own test files, `npx tsc -b --noEmit`, `m23_acceptance.py`). Open item from Task 10: `NowSide.tsx` keeps three of our strings (`No more meetings today`, `Steps done today`, `Focus`) as local constants instead of in `WORK_TEXT`.
+3. **Full gate on each branch** (one per track): `uv run pytest backend/tests -q`; `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run lint && npm run build`; `m1_roundtrip.py` plus every `mN_acceptance.py` that exists, on copies of `space-sample` and `space-v1`. The two branches can be gated side by side, since the acceptance scripts pick free ports.
+4. **Merge** `feat/m22-m23` into `feat/m16-m24` (`git merge --no-ff`). Expect conflicts in `frontend/src/api/types.ts`, `api/client.ts`, `test/mockApi.ts`, `icons/appIcons.ts` (regenerate with `node scripts/app-icons.mjs`), `backend/objectapp/server.py`, `mcp_server.py` / `toolcatalog.py` and the catalogue-count test, the Settings sections, and the status docs. Keep both sides.
+5. **Build M24** (`2026-11-05-m24-brain-dump-and-agent-loop.md`). It needs both tracks.
+6. **Final full gate** (step 3's list, plus `m22`-`m24` acceptance on `space-work`), update `remaining-work.md` / `CONTINUE.md` / this file, and push. Then a PR `feat/m16-m24` to `master`, which Gene merges.
+7. **Then:** plan M25-M27 from the approved import design (`docs/superpowers/specs/2026-11-06-import-migration-design.md`: provenance and re-runs; Office/PDF readers and the sensitive scan; schema proposal, AI filing pass and the "Migrate a source" skill). Write the plans against the code as built after M24.
 
-**2026-11-03:** the polish backlog is built (nine parallel lanes, one review, one fix pass, full gate green); see `remaining-work.md`. Not pushed.
+How Gene wants it built (2026-11-06): **parallel tracks by file ownership, a quick check per milestone, and one full gate per track plus one at the end, not a full gate after every milestone.** A workflow must record task results sorted by task number, so a resumed run hits its cache. The previous script ordered them by finish time, which broke resumes and rebuilt finished milestones. The two-track script is at `~/.claude/projects/C--Git-object/412d563a-525c-462f-98d8-9a68624a5e84/workflows/scripts/object-build-two-tracks-wf_9e539a30-330.js`; it can only be resumed from the same session, so copy its structure instead.
 
-**Next:** Gene's decisions and the short open list at the top of `docs/superpowers/plans/remaining-work.md`; then Gene's hands-on checks, M1-M9. The audit fix pass (PR #4) and M9 (PR #3) are merged; `master` is the only branch to work on, and it is pushed (2026-11-02).
+## Decisions Gene made (2026-11-05 / 06)
 
-| Milestone | Scope | Plan |
-|---|---|---|
-| M1 | shell, objects on disk, block editor | `2026-10-23-m1-shell-objects-editor.md` |
-| M2 | object types and all property kinds | `2026-10-23-m2-types-properties.md` |
-| M3 | views, collections, queries, pinned, All notes | `2026-10-26-m3-views-collections-queries.md` |
-| M4 | calendar, daily notes, tasks (recurrence, reminders) | `2026-10-26-m4-calendar-daily-tasks.md` |
-| M5 | search (SQLite FTS5), Ctrl+K palette, backlinks, graph | `2026-10-26-m5-search-palette-backlinks-graph.md` |
-| M6 | whiteboards and pressure ink | `2026-10-26-m6-whiteboards-pen.md` |
-| M7 | remaining blocks, light mode, settings, spaces, tabs, side panel | `2026-10-26-m7-blocks-lightmode-polish.md` |
-| M8 | every feature M4–M7 deferred, local only | `2026-10-27-m8-deferred-features.md` |
-| M9 | the audit's completeness gaps | `2026-10-28-m9-completeness-gaps.md` |
+- Agents run only through the `claude` CLI under Gene's login. Never read `~/.claude/.credentials.json` or reuse a Claude token. Each agent is its own Claude Code project folder, loading only that folder's settings. **Agent runs get a `claudeMdExcludes` skip list** (Gene's `~/.claude/CLAUDE.md` and every ancestor folder's `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md`), because the M17 spike found those leaking in (`m17-cli-spike.md`).
+- Patterns from an open-source agent are adopted, but it is never named in the repo. The original notes app this project was modelled on is never named either.
+- The Work agent has shell on (Gene's choice, warned); other agents have shell off and file tools fenced from space folders.
+- Editor: a page link can switch between a card and an inline link (`3bc8925`): the card's `…` menu has **Turn into inline link**, and the block menu has **Turn into card** on a line holding only a link. "Always create inline links" (Settings > Editor) already existed.
+- Import and migration design approved (step 7 of "What to do next").
 
-Last full verification, 2026-11-02 on Linux after both audit fix passes (`71ef3b6`): 1469 back-end tests passed (1 skipped, 3 xpassed), 2284 front-end tests passed (1 skipped), `tsc` clean, lint 0 errors, build ok; every acceptance script PASS (`m1_roundtrip.py`, `m2`–`m9_acceptance.py` on `space-sample` and `space-v1`; `m9` on three more spaces). Details: `remaining-work.md`. Before that, 2026-10-29 on Windows after M9 was merged (`6ef3df8`): the same gate passed (1238 back-end, 1965 front-end), every acceptance script PASS; and at `35bbd88` on Linux:
-- 1239 back-end tests passed (1 skipped: it needs a non-root user).
-- 1966 front-end tests passed (1 skipped: it needs `OBJECT_ROUNDTRIP_SPACE`).
-- `tsc -b --noEmit` clean; lint 0 errors; `npm run build` ok.
-- `m9_acceptance.py` PASS on `space-m8`, `space-blocks`, `space-sample`, `space-v1`, `space-whiteboard`; `m1_roundtrip.py` and `m2`–`m8_acceptance.py` PASS on `space-sample` and `space-v1`.
-- The app was started with `uv run objectapp --browser` and driven in headless Chromium through every M9 feature with 0 console errors.
+## Open review items to look at during the final review
 
-## What to do first
-
-1. Set up: install `uv` and Node 22+; run `uv sync`, then `cd frontend && npm ci`. Use `npm ci`, not `npm install`: a newer npm rewrites `package-lock.json`.
-2. Run the baseline: `uv run pytest backend/tests -q`, then `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build`. Report any failure before changing code.
-3. **Both audits and M9 are done** (2026-10-28 and 2026-11-01). Don't redo them; `remaining-work.md`, `m9-acceptance.md` and `audit-2026-11-01.md` list what landed and what was left by choice.
-4. Pick up Gene's findings from his hand-checks (`docs/superpowers/plans/m1-acceptance.md` to `m9-acceptance.md`, 256 unchecked items) and fix them the same way. After each batch, rerun the full gate and every acceptance script on fixture copies.
-5. Keep `remaining-work.md`, `CONTINUE.md` and this file current, commit, and push.
-
-## Open items
-
-- **M9's rules for Gene to confirm:** see `m9-acceptance.md`, "Rules the build chose".
-
-- **Gene's hands-on checks, M1–M9.** Run them on a copy of the CPI export outside the repo, with `git init` there. Some things can only be checked on his Windows machine:
-  - the pywebview window
-  - Windows toast reminders
-  - Wacom pressure and tilt
-  - microphone and clipboard permissions
-  - real-size performance
-  - the look against the behaviour catalog and design spec, in all four themes
-- **Guessed values.** The catalog and spec don't settle these, so they are best guesses, marked "our choice" in the acceptance docs:
-  - the shortcut keys, all in `frontend/src/lib/shortcuts.ts`
-  - the side-panel area layout, breadcrumbs, pinned tabs, slash and block menu looks
-  - the search highlight colour and the graph limits
-  - the M8 file formats (block ids and references, inline colours, date tokens, table formulas, embeds)
-  - the layout switch points: a 480 px main-column minimum, and properties inline below 850 px
-  - M3's default dashboard section tabs
-- **Inferred Task types:** a Task type whose status options were inferred (as in the sample spaces) has no Done-category option, so tasks can't be completed until one is added. Check the CPI export for this (M4 finding).
-- **Deferred by Gene:** TODO handling in the editor. Logseq-style markers were considered and rejected; Object's own to-do blocks stay.
-- **Later:**
-  - an installer (spec §6)
-  - the in-app Claude Code agent (spec §2)
-  - migrating `C:\Git\wiki` into Object's format (a separate project)
+- M20 review item 5 (needs Gene's call): Refresh sends the stored token to the card's host even when the card moved its endpoint to another host. The plan contradicts itself here.
+- `scripts/m2_acceptance.py` got a retry around removing the copied space (`0288958`). The stopped gate left it uncommitted, and it hasn't been re-run.
+- Every milestone's deviations are listed in its `mNN-acceptance.md`.
 
 ## Rules that bite
 
-- Fidelity to the behaviour catalog (`docs/behavior-catalog.md`) and the design spec is the bar; don't over-engineer; no invented schema.
-- No per-task review loops. Review once at the end of a piece of work, fix once, then the gate.
-- No real CPI data in the repo; fixtures are synthetic. Never touch `C:\Git\wiki`.
-- Opening a space never writes `.md` files. Edits change only their own lines. Deletes go to trash. Preserve CRLF/BOM. Write atomically. The server binds 127.0.0.1 only.
-- Plan parallelism from file ownership (`docs/superpowers/build-process.md`): one owning task per shared file.
-- Commit trailers: `Co-Authored-By:` the model that wrote the commit.
-
-## Known gaps
-
-- Since M3 the code was built and tested in a Linux cloud container. Windows (Gene's platform) has not been re-run since M2, so expect small path, shell or notification fixes there.
-- Timing tests (`editor/preserve.test.ts` 1MB split, `test_search_p95_under_50ms_at_5000`) are sensitive to a busy machine. Rerun one alone before calling it a failure.
-- Gene's work-export copy stays on his machine.
-- Some audit findings show up on Windows but couldn't be tested in the container:
-  - reserved names (`con`, `aux`, `nul`) used as type or collection ids
-  - path-length limits
-  - the pywebview window
-  Re-check them on the PC.
-- **Audit gate at `04e9d07` (Linux):**
-  - pytest: 1122 passed.
-  - tsc: clean.
-  - vitest and build: passed on a clean rerun. In the first run, the 1MB timing test and `whiteboard/clipboard.test.tsx` failed only while seven audits were running alongside.
+- Fidelity to the behaviour catalog (`docs/behavior-catalog.md`), the design specs and the plans is the bar. Don't over-engineer, and don't invent schema.
+- Review once per milestone, fix once; no per-task review loops.
+- No real CPI data in the repo; fixtures are synthetic. Never touch `C:\Git\wiki`. `C:\Git\ticket-dashboard` may be read, never changed.
+- Opening a space never writes `.md` files. Edits change only their own lines. Deletes go to the Trash. Preserve CRLF/BOM. Write atomically. The server binds 127.0.0.1 only.
+- Tests use the fake `claude` (`backend/tests/fake_claude.py`) and `OBJECT_STATE_DIR` pointing at a temp folder; never write to `~/.claude`.
+- Commit only your own files, by explicit path. Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. The untracked `.claude/` folder stays untracked.
+- Windows: timing tests and acceptance scripts can flake under load (file-in-use on cleanup). Rerun one alone before calling it a failure.

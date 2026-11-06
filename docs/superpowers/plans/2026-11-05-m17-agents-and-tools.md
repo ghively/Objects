@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
-Written 2026-11-05 against `master` at `0f4fde1`, to be built after M16 (`2026-11-05-m16-chat-polish-model-picker.md`) is merged. Every label and default not quoted from the spec is "our string" / "our choice".
+Written 2026-11-05 against `master` at `0f4fde1`. Reconciled 2026-11-06 with the code built on `feat/m16-m24` at `7bee086`: M16 (`2026-11-05-m16-chat-polish-model-picker.md`, results in `m16-acceptance.md`) is built on this branch, not merged to `master`; M17 builds on the same branch. Reconciled again 2026-11-06 at `8099546`: Task 1 is built (`a4f42e9`, with the icon-subset fix `59b9df4`), and its live spike stopped and asked (`m17-cli-spike.md`: Gene's user `CLAUDE.md` and ancestor folders' `CLAUDE.md` files reach a run). Gene's answer, 2026-11-06: "Yes, add and continue", that is, adopt the spike's `claudeMdExcludes` run setting and go on with T2-T11. The changes that follow from it, and from the spike's other findings, are marked "(spike)" below. Every label and default not quoted from the spec is "our string" / "our choice".
+
+**Baseline before T2** (M16's gate re-run at `59b9df4`, after M17's T1, `remaining-work.md`): back end 2094 passed, 17 skipped, 3 xpassed (T1's four live spike tests skip without `OBJECT_LIVE_CLAUDE=1`); front end 410 files passed, 1 skipped (3177 tests passed, 1 skipped); `tsc` clean; lint 0 errors; build ok; `m1_roundtrip.py` and `m2`-`m16_acceptance.py` PASS on `space-sample` and `space-v1` (fixtures in `backend/tests/fixtures/`). The installed CLI is `2.1.317` (`claude --version`, checked 2026-11-06).
 
 **Goal.** Agents are folders. The default agent ("Assistant", M10's assistant) and Gene's own agents are listed at the top of the sidebar. Each one has a soul (`CLAUDE.md`), settings, tool switches and a chat history of its own. A chat turn runs `claude -p` inside the agent's folder and loads only that folder's settings. The agent acts directly through every Object tool and every built-in Claude Code tool. The file tools are fenced away from every space folder, and the shell is off by default.
 
@@ -66,6 +68,9 @@ Notes on flags:
 - **Delete** unregisters and moves the folder to `<state>/agents/.trash/` (restorable). This applies only to folders inside `<state>/agents/`. A folder outside the state dir is only unregistered, never moved or deleted.
 - A turn is one `claude -p` run with the agent folder as its working directory.
   - It runs with `--setting-sources project,local`.
+  - (spike) Its run settings carry `"autoMemoryEnabled": false` and `claudeMdExcludes` naming Gene's user `CLAUDE.md` and every ancestor folder's instruction files (`agentrun.claude_md_excludes`), because `--setting-sources` alone lets them through on CLI 2.1.317. Gene adopted this on 2026-11-06.
+  - (spike) Its working folder is the agent folder's resolved (long) path: under an 8.3 path the CLI took `~/.claude/skills` for project skills.
+  - (spike) Its environment drops `CLAUDE_CONFIG_DIR` and the variables a parent Claude Code session sets (`agentrun.RUN_ENV_DROP`), so Object started from a Claude Code terminal runs agents as Object started on its own does.
   - It never loads Gene's user `CLAUDE.md`, hooks, plugins, user skills, auto-memory or user permission rules.
   - **Stop-and-ask:** if the CLI can't keep one of these out, the build stops and asks Gene. It does not compromise silently.
 - The CLI never stops to ask (`--permission-mode dontAsk`, `--permission-prompts none`). Allowed tools run; switched-off tools are denied.
@@ -264,7 +269,7 @@ export interface AgentTranscript extends AgentChatSummary { agentId: string; ses
 | `GET /agents/{id}/tools` | | `{groups: ToolGroup[]}` with this agent's states and one group per folder MCP server | 404 |
 | `GET /agents/{id}/chats` | | `{chats: AgentChatSummary[]}` newest first | 404 |
 | `GET /agents/{id}/chats/{chatId}` | | `AgentTranscript` | 404 (also for a chat id that isn't a ULID) |
-| `POST /agents/{id}/reveal` | | `{ok}` (shows the folder in the OS file manager, as `/api/reveal`) | 404 |
+| `POST /agents/{id}/reveal` | | `{ok}` (shows the folder in the OS file manager, as `/api/reveal`: `server.reveal_in_file_manager`, imported inside the route because `server` imports `api_agents`) | 404 |
 
 Events:
 
@@ -297,10 +302,11 @@ The file is `<folder>/.object-agent/sessions/<chatId>.jsonl`, UTF-8, one JSON ob
 {"type":"object","path":"AI Chats/What do my notes say.md","at":"…"}                      // the AI Chat object it was saved as
 ```
 
-- `title` is `aichat.default_title` of the first user message and is never changed.
+- `title` is `aichat.default_title([{"role": "user", "text": <first user message>}])` (it takes a message list) and is never changed.
 - `delegated` is reserved for M20 (true plus `"from": <agentId>`). `schedule` is reserved for M21.
 - Tool lines join M16's call and result pair by id. Input and result are M16's capped forms.
 - The user line is appended when the turn starts. The tool lines and the assistant (or error) line are appended in one write when it ends, or when the client goes away (`stopped: true`, the text shown so far).
+- The assistant line's `text` is what the panel shows (M16's fix `b13752e`): when the turn had tool steps, every streamed `text` of the turn joined, since `done.text` is then only the CLI's last message; otherwise `done.text` (or the streamed text when that is empty). A stopped turn with steps and no text still writes its tool lines and an assistant line with `text: ""` and `stopped: true`.
 
 ```python
 TRANSCRIPT_VERSION = 1
@@ -317,8 +323,10 @@ def find_by_session(folder: Path, session_id: str) -> str | None       # newest 
 
 ### Agents and folders (`backend/objectapp/agents.py`, `agentfiles.py`)
 
+As built by T1, the errors live in `agentmodel.py` (so `clean_input` can raise `AgentInvalid` without importing the registry) and `agents.py` re-exports them; `agentmodel` also has `NEWER_VERSION` and `UNREADABLE`, the two read-only reasons, which T2 uses.
+
 ```python
-class AgentError(Exception): status: int; message: str
+class AgentError(Exception): status: int; message: str     # agentmodel; re-exported by agents
 class AgentNotFound(AgentError)   # 404
 class AgentConflict(AgentError)   # 409; .current_revision
 class AgentInvalid(AgentError)    # 422
@@ -391,9 +399,10 @@ BUILTINS: tuple[ToolEntry, ...] = (
     ToolEntry("Edit", "Edit files", ("Edit", "MultiEdit")), ToolEntry("Glob", "Find files", ("Glob",)),
     ToolEntry("Grep", "Search in files", ("Grep",)), ToolEntry("WebSearch", "Web search", ("WebSearch",)),
     ToolEntry("WebFetch", "Web fetch", ("WebFetch",)), ToolEntry("Task", "Subagents", ("Task", "Agent")),
-    ToolEntry("NotebookEdit", "Notebook edit", ("NotebookEdit",)), ToolEntry("TodoWrite", "To-do list", ("TodoWrite",)),
-)   # the cli tuples are fixed by the T1 spike from the init event's tool list
-ALWAYS_ALLOWED: tuple[str, ...] = ("Skill",)  # not a switch; the spike adds any other default tool a run needs
+    ToolEntry("NotebookEdit", "Notebook edit", ("NotebookEdit",)),
+    ToolEntry("TodoWrite", "To-do list", ("TodoWrite", "TaskCreate", "TaskGet", "TaskList", "TaskUpdate")),
+)   # (spike) CLI 2.1.317 has no TodoWrite; its to-do list is TaskCreate/TaskGet/TaskList/TaskUpdate, in some runs only
+ALWAYS_ALLOWED: tuple[str, ...] = ("Skill",)  # not a switch; (spike) T11's live check decides whether "ToolSearch" joins it
 
 GROUP_LABELS = {"object-read": "Object read", "object-write": "Object write",
                 "object-agent": "Object agent tools", "builtin": "Claude Code built-ins"}
@@ -473,6 +482,16 @@ def fence_rules(folders: list[Path], own: Path, state: Path, home: Path) -> list
     # forms if Read/Edit rules don't cover those tools; this function is the one place.
 def nesting_problem(own: Path, folders: list[Path]) -> str | None       # the 422/run-error message when own is in, or holds, a fenced folder
 
+# (spike, adopted by Gene 2026-11-06)
+RUN_SETTINGS_BASE: dict[str, Any] = {"autoMemoryEnabled": False}       # in every run-settings.json
+def claude_md_excludes(own: Path, home: Path) -> list[str]
+    # resolved, "/"-separated absolute paths (e.g. "C:/Users/x/.claude/CLAUDE.md"), duplicates removed:
+    # <home>/.claude/CLAUDE.md and <home>/.claude/rules/**, then for every ancestor folder a of own (own itself
+    # excluded) up to the drive root: a/CLAUDE.md, a/.claude/CLAUDE.md, a/CLAUDE.local.md. Never own's CLAUDE.md.
+RUN_ENV_DROP: tuple[str, ...] = ("CLAUDE_CONFIG_DIR", "CLAUDECODE", "CLAUDE_CODE_", "CLAUDE_AGENT_SDK_",
+                                 "CLAUDE_PLUGIN_ROOT", "CLAUDE_EFFORT", "CLAUDE_PID", "CLAUDE_PREVIEW_", "AI_AGENT")
+    # names or name prefixes dropped from a run's environment (the live test's PARENT_SESSION_VARS, minus BAGGAGE)
+
 @dataclass
 class RunCommand:
     args: list[str]; cwd: Path; env: dict[str, str]; tmp: Path; mcp_config: dict[str, Any]; run_settings: dict[str, Any]; append: str
@@ -484,11 +503,20 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
     # args = [claude, *CLI_FLAGS, "--mcp-config", tmp/mcp.json, "--settings", tmp/run-settings.json,
     #         "--append-system-prompt-file", tmp/append.md, "--allowedTools", ",".join(allowed),
     #         "--disallowedTools", ",".join(disallowed)] + ["--model", m] + ["--resume", s];
-    # cwd = agent folder; env = os.environ + OBJECT_API_URL/OBJECT_API_TOKEN + parts.env, minus CLAUDE_CONFIG_DIR;
+    # cwd = agent folder, resolved (long path); env = os.environ minus every RUN_ENV_DROP name/prefix,
+    # + OBJECT_API_URL/OBJECT_API_TOKEN + parts.env;
+    # run_settings = RUN_SETTINGS_BASE + {"claudeMdExcludes": claude_md_excludes(own, Path.home()),
+    #   "permissions": {"deny": parts.deny_rules}}, then parts.settings merged in (lists under
+    #   "claudeMdExcludes" and "permissions.deny" are extended, never replaced, so no contributor drops them);
     # mcp.json holds "${OBJECT_API_TOKEN}", never the secret. Raises RunRefused(message) for a nesting problem.
 ```
 
-`ai.Turn` gains `run: Callable[[str | None], RunCommand]` (the resume id in, a fresh command out) and `timeout: float = TURN_TIMEOUT` (`run_turn`'s hard deadline and its "took too long (over {n} seconds)" message use `turn.timeout`; M10's 300 s stays the default, and M20's `headless.run_chat` passes its own `timeout` here). `_Attempt` uses its `cwd`, `env` and `args` and removes its `tmp` after the run. M10's `cli_args`, `mcp_config` and empty working folder are removed in T7.
+`ai.Turn` gains `run: Callable[[str | None], RunCommand]` (the resume id in, a fresh command out) and `timeout: float = TURN_TIMEOUT` (`run_turn`'s hard deadline and its "Claude Code took too long (over {n} seconds) and was stopped." message use `turn.timeout`; M10's 300 s stays the default, and M20's `headless.run_chat` passes its own `timeout` here). The default is written `field(default_factory=lambda: TURN_TIMEOUT)` so it reads the module constant when the `Turn` is made: M10's `test_timeout_kills_the_process` monkeypatches `ai.TURN_TIMEOUT` and must keep passing. `_Attempt` uses its `cwd`, `env` and `args` and removes its `tmp` after the run. M10's `cli_args`, `mcp_config` and empty working folder are removed in T7.
+
+Two more `ai.py` changes (T4), from the built code:
+
+- `build_prompt` is called by `api_ai` before the `Turn` exists, so it gains a keyword `intro: bool = True`; T7 passes `intro=False` for agent runs (the guidance carries it). M10's callers and tests keep the default.
+- `_short_tool` also strips the `mcp__object-agent__` prefix, so `tool` events name the agent tools by short name (`agent_info`), as `toolSteps.ts` expects; other `mcp__…` names stay whole (M16's `test_other_tools_keep_their_names`).
 
 **Registry of contributor orders (M17-M24).** Every contributor has its own order; no two share one. A later milestone registers only the order listed here for it, and its plan refers to this table.
 
@@ -516,7 +544,7 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
 ### Tokens and the agent tools server
 
 - `tokens.TokenRecord` gains `agent: str | None = None` and `chat: str | None = None`. Stored tokens never have them.
-- `TokenStore.ephemeral(name, scope="read", agent=None, chat=None)` stamps them.
+- `TokenStore.ephemeral(name, scope="read", agent=None, chat=None) -> tuple[TokenRecord, str]` (the record and the secret, as built in M10) stamps them; `TokenStore.drop_ephemeral(secret)` is unchanged.
 - A turn's token is `ephemeral(agent.name, "read-write" if write else "read", agent=agent.id, chat=chat_id)`. Writes made with it are announced `api:<agent name>` and logged in the activity log (M11's rules).
 - `backend/objectapp/agent_mcp.py` is run as `python -m objectapp.agent_mcp`.
   - Its environment holds `OBJECT_API_URL` (loopback only) and `OBJECT_API_TOKEN`.
@@ -528,6 +556,12 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
 ### Expanded `objectapp-mcp` (T5: `api_v1_tools.py` routes, `mcp_server.py` tools)
 
 Every new tool calls a new `/api/v1` route through `ObjectClient`. Each route uses the same `Space` method as the app's route, plus `v1guard`.
+
+From the built code:
+
+- `api_v1_tools.router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> APIRouter`. Some app routes keep their state inside their router: the automation engine (`api_automations.router(ctx, engine)`) and M15's import previews and jobs (closures in `api_import.router(ctx)`, which exposes `jobs` as `router.jobs`). `server.py` keeps the import router it mounts in a variable and passes it and the engine in. The v1 import routes call the import router's own endpoints (`route.endpoint` for `/import/preview` and `/import/start`) and read `imports.jobs`; `api_import.py` is not changed. Version history uses a `HistoryStore(space.root, is_whiteboard=…)` built as `api_history` builds it (file-backed).
+- M15's start request needs a mapping, so the tool is `start_import(preview_id, target, mapping=None)`: `None` uses the `mapping` that preview answered with (the v1 route remembers each preview id's mapping it served).
+- `mcp_server.ObjectClient` has only `get` and `post`. T5 adds `put(route, body)` and `delete(route, **params)` with the same error handling, and `ApiError`'s 409 text also names `currentRevision` when the answer has one (definitions answer `currentRevision`, objects `currentVersion`).
 
 - Auth: `read` scope for reads, `read-write` scope for writes.
 - An excluded page or a template answers 404 for every path argument.
@@ -562,7 +596,7 @@ Every new tool calls a new `/api/v1` route through `ObjectClient`. Each route us
 | write | `create_query(name, definition)`, `edit_query(query_id, revision, query)`, `delete_query(query_id)` | `/v1/queries...` | revision; to the Trash |
 | write | `create_whiteboard(title)`, `edit_whiteboard(path, revision, board)` | `/v1/whiteboards`, `PUT /v1/whiteboard` | revision (409) |
 | write | `create_automation(rule)`, `run_automation(rule_id, path)` | `/v1/automations...` | M14 validation (422) |
-| write | `start_import(preview_id, target)` | `POST /v1/import/start` | M15's checks |
+| write | `start_import(preview_id, target, mapping=None)` | `POST /v1/import/start` | M15's checks |
 | write | `restore_from_trash(trash_id)` | `POST /v1/trash/{id}/restore` | 404 for a hidden entry |
 | write | `restore_version(path, version_id, version)` | `POST /v1/history/restore` | version check |
 
@@ -592,21 +626,33 @@ The full list is in "Our calls" at the end.
 
 ### Task 1: Contract and CLI spike (first, alone)
 
-**Files:**
+**Status (2026-11-06).** Built and committed (`a4f42e9`, `59b9df4`); its spike stopped and asked, and Gene adopted `claudeMdExcludes` (his decision, 2026-11-06: every run's `--settings` file excludes `~/.claude/CLAUDE.md` and every ancestor folder's `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md`, so only the agent's own `CLAUDE.md` loads). The **follow-up** below is done: the live re-run passed all four live tests with the excludes (`m17-cli-spike.md`, "Gene's decision (2026-11-06)"), and `test_m17_live_cli.py::test_claude_md_excludes_list` (not live) pins the list. T2-T10 may start. The Files and Steps after it record what was built.
+
+**T1 follow-up (run first and alone, before T2-T10).**
+
+- Files: `backend/tests/test_m17_live_cli.py` and `docs/superpowers/plans/m17-cli-spike.md` only.
+- In `test_m17_live_cli.py`: import `RUN_SETTINGS_BASE`, `claude_md_excludes` and `RUN_ENV_DROP` from `objectapp.agentrun` beside the other T4 names, with local stand-ins (the Contract's definitions) while T4 isn't there; `run_live` writes `{**RUN_SETTINGS_BASE, "claudeMdExcludes": claude_md_excludes(folder, Path.home()), "permissions": {"deny": ...}}` and drops `RUN_ENV_DROP` (plus `BAGGAGE`, locally) from the environment. The four tests' assertions are unchanged.
+- Run `OBJECT_LIVE_CLAUDE=1 uv run pytest backend/tests/test_m17_live_cli.py -q -s` (haiku, `--no-session-persistence`). `test_user_setup_never_reaches_a_run` must now pass. If any check still fails for a reason other than the model skipping a tool it was asked to call, stop and report: no later task runs.
+- `m17-cli-spike.md` gains a "Gene's decision (2026-11-06)" section: `claudeMdExcludes` adopted, the excludes' form, and the re-run's results.
+- `uv run pytest backend/tests/test_m17_contract.py -q` still passes. Commit `test(m17): the live spike keeps user CLAUDE.md files out with claudeMdExcludes`.
+
+**Files (as built):**
 
 - Create:
   - `backend/objectapp/agentmodel.py`, `backend/objectapp/toolcatalog.py`
-  - stub routers, each `def router(ctx) -> APIRouter` with no routes: `backend/objectapp/api_agents.py`, `backend/objectapp/api_v1_tools.py`, `backend/objectapp/api_agent_v1.py`
+  - stub routers with no routes: `backend/objectapp/api_agents.py` and `backend/objectapp/api_agent_v1.py` (each `def router(ctx) -> APIRouter`), `backend/objectapp/api_v1_tools.py` (`def router(ctx, engine, imports) -> APIRouter`, see the expanded `objectapp-mcp` section)
   - `frontend/src/agents/useAgents.ts`
   - `backend/tests/test_m17_contract.py`, `backend/tests/test_m17_live_cli.py`
   - `docs/superpowers/plans/m17-cli-spike.md`
 - Modify:
-  - `backend/objectapp/server.py`: mount the three stubs; add `agents` and `agentChats` to `RESYNC_EVENTS`.
+  - `backend/objectapp/server.py`: mount the three stubs (keep the `api_import.router(ctx)` it mounts in a variable and pass it and the automation engine to `api_v1_tools.router`); add `agents` and `agentChats` to `RESYNC_EVENTS`.
   - `backend/objectapp/watcher.py`: `"agents"` and `"agentChats"` in `ChangeEvent.kind`.
   - `backend/objectapp/tokens.py`: the `agent`/`chat` fields and `ephemeral(...)` parameters.
   - `backend/tests/fake_claude.py`
   - `frontend/src/api/types.ts`, `frontend/src/api/client.ts` (methods and `RESYNC_EVENTS`), `frontend/src/test/mockApi.ts`
-  - `frontend/src/nav/tabs.ts`: the `agent` target, the `sameTarget` case, the `aiChat` fields.
+  - `frontend/src/nav/tabs.ts`: the `agent` target, the `sameTarget` case, the `aiChat` fields (`sameTarget` for `aiChat` compares `path`, `agentId` and `chatId`).
+  - `frontend/src/nav/sidepanel.ts`: `isAiChatTarget`'s guard type becomes `Extract<SidepanelTarget, { kind: 'aiChat' }>`, so `agentId`/`chatId` survive the narrowing.
+  - `frontend/src/shell/TabStrip.tsx`: only a placeholder `case 'agent': return 'Agent'` in `useTargetTitle`'s switch. That callback returns `string`, so a new `Target` kind without a case fails `tsc`. T9 replaces it with the agent's name.
 
 **Interfaces.** Produces everything in the Contract marked T1, plus the fake's new behaviour, which T4, T7 and T11 consume.
 
@@ -740,18 +786,21 @@ The full list is in "Our calls" at the end.
 - Create: `backend/objectapp/agentrun.py`, `backend/tests/test_m17_agentrun.py`
 - Modify: `backend/objectapp/ai.py`
   - `Turn.run`; `_Attempt` runs a `RunCommand` when `turn.run` is set and keeps M10's old path while it is None (T7 removes that path);
-  - `Turn.timeout: float = TURN_TIMEOUT`, used by `run_turn`'s deadline and its "took too long" message;
-  - `build_prompt` drops `_INTRO` from the stdin prompt when `turn.run` is set, since it is in the guidance now.
+  - `Turn.timeout: float = field(default_factory=lambda: TURN_TIMEOUT)`, used by `run_turn`'s deadline and its "took too long" message;
+  - `build_prompt(..., intro: bool = True)`: with `intro=False` the stdin prompt leaves out `_INTRO`, since it is in the guidance now (T7 passes `intro=False`);
+  - `_short_tool` also strips `mcp__object-agent__`.
 
 **Interfaces.**
 
 - Consumes: `toolcatalog.run_tool_lists`, `agentfiles.folder_mcp_servers`/`var_refs`, `AgentRecord` (T2; a test double is fine until T2 lands), `spaces.Registry`, `appstate`.
-- Produces: `RunScope`, `RunParts`, `add_contributor`, `contributors`, `fence_folders`, `rule_path`, `fence_rules`, `nesting_problem`, `build_run`, `RunCommand`, `RunRefused`, `SECRET_LOOKUP`, `OBJECT_GUIDANCE`, `PROPOSAL_GUIDANCE`, `CLI_FLAGS`.
+- Produces: `RunScope`, `RunParts`, `add_contributor`, `contributors`, `fence_folders`, `rule_path`, `fence_rules`, `nesting_problem`, `build_run`, `RunCommand`, `RunRefused`, `SECRET_LOOKUP`, `OBJECT_GUIDANCE`, `PROPOSAL_GUIDANCE`, `CLI_FLAGS`, and (spike) `RUN_SETTINGS_BASE`, `claude_md_excludes`, `RUN_ENV_DROP` (the T1 follow-up's live test imports them once they exist).
 
 **Steps.**
 
 - [ ] **Step 1: failing tests:**
-  - `test_run_loads_only_project_and_local_settings`: `build_run(...).args` contains `["--setting-sources","project,local"]`; no element equals or contains `user`; `env` has no `CLAUDE_CONFIG_DIR` even when the test environment sets one; `cwd == agent.folder`.
+  - `test_run_loads_only_project_and_local_settings`: `build_run(...).args` contains `["--setting-sources","project,local"]`; no element equals or contains `user`; `env` has no `CLAUDE_CONFIG_DIR` even when the test environment sets one; `cwd == agent.folder.resolve()`.
+  - `test_run_settings_keep_user_instructions_out` (spike): `run_settings["autoMemoryEnabled"] is False`; `claudeMdExcludes` holds `<home>/.claude/CLAUDE.md` and, for each ancestor of the agent folder up to the root, its `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md`, and not the agent's own `CLAUDE.md`; a contributor whose `parts.settings` has its own `permissions.deny` or `claudeMdExcludes` extends them and never drops the fence or the excludes.
+  - `test_run_env_drops_parent_session_vars` (spike): with `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_AGENT_SDK_VERSION` and `AI_AGENT` set in the test environment, none is in `env`; `PATH` and `OBJECT_API_URL` are.
   - `test_cli_flags`: every `CLI_FLAGS` element appears in order; `--permission-mode dontAsk` and `--permission-prompts none`; `--strict-mcp-config`; `--tools default`; `--model` and `--resume` only when given.
   - `test_mcp_config`:
     - `object` server args `["-m","objectapp.mcp_server"]` (with `"--read-only"` when `write=False`);
@@ -772,7 +821,9 @@ The full list is in "Our calls" at the end.
     - toolsOff `["Bash"]` gives `Bash` and `PowerShell` in `--disallowedTools`;
     - toolsOff `[]` gives `Bash` and `PowerShell` in `--allowedTools`;
     - toolsOff with all `object-write` ids leaves no `mcp__object__<write>` in `--allowedTools`.
-  - `test_turn_timeout_is_per_turn` (with the fake): a `Turn(timeout=1.0)` whose prompt holds `FAKE:wait` ends with the "took too long (over 1 seconds)" error after about 1 s; a `Turn` without `timeout` has `TURN_TIMEOUT == 300`.
+  - `test_turn_timeout_is_per_turn` (with the fake): a `Turn(timeout=1.0)` whose prompt holds `FAKE:wait` ends with the "took too long (over 1 seconds)" error after about 1 s; a `Turn` without `timeout` has `timeout == TURN_TIMEOUT == 300`.
+  - `test_prompt_without_intro`: `build_prompt(..., intro=False)` leaves out `_INTRO`; the default keeps it.
+  - `test_agent_tools_short_names`: a `StreamParser` call named `mcp__object-agent__agent_info` streams `name == "agent_info"`.
   - `test_attempt_uses_the_run_command` (with the fake): a `Turn` with `run=` set runs in the agent folder (the fake log's `cwd`); the tmp folder is gone afterwards; the M16 `tool` events still pair by id.
 - [ ] **Step 2-4:** fail, implement, pass (`uv run pytest backend/tests/test_m17_agentrun.py backend/tests/test_m10_ai.py backend/tests/test_m16_tool_events.py -q`; M10's tests still pass on the old path).
 - [ ] **Step 5:** commit `feat(m17): turn runner in the agent folder with fence and contributors`.
@@ -785,7 +836,9 @@ The full list is in "Our calls" at the end.
 - Fill: `backend/objectapp/api_v1_tools.py`
 - Modify:
   - `backend/objectapp/api_v1.py`: use `v1guard`; `PropertiesRequest.subtract`; docstring route list.
-  - `backend/objectapp/mcp_server.py`: the new tools and the `INSTRUCTIONS` text naming them.
+  - `backend/objectapp/mcp_server.py`: the new tools, the `INSTRUCTIONS` text naming them, `ObjectClient.put`/`delete`, and `currentRevision` in `ApiError`'s 409 text.
+  - `backend/tests/test_m11_mcp.py`: only `test_tool_sets`, which compares the tool lists to M11's 9 + 9 names exactly; it now compares them to `set(toolcatalog.OBJECT_READ)` and `set(OBJECT_READ + OBJECT_WRITE)` (its annotation checks stay).
+  - `scripts/m11_acceptance.py`: only the "read token lists only the read tools" check (`names == READ_TOOLS`), which now compares to `set(toolcatalog.OBJECT_READ)`.
 
 **Interfaces.**
 
@@ -819,7 +872,7 @@ The full list is in "Our calls" at the end.
     - Secret's file bytes are unchanged.
   - `test_read_token_cannot_write`: every write route answers 403 to the read token.
   - `test_never_offered`: no tool permanently deletes, empties the trash or touches `/settings`, `/spaces` or `/integrations`. A static check of `api_v1_tools.py` finds no `purge` and no `settings`.
-- [ ] **Step 2-4:** fail, implement, pass (`uv run pytest backend/tests/test_m17_mcp_tools.py backend/tests/test_m11_*.py -q`; M11's tests unchanged).
+- [ ] **Step 2-4:** fail, implement, pass (`uv run pytest backend/tests/test_m17_mcp_tools.py backend/tests/test_m11_*.py -q`; M11's tests unchanged except `test_tool_sets`' expected sets; `uv run python scripts/m11_acceptance.py backend/tests/fixtures/space-sample` PASS).
 - [ ] **Step 5:** commit `feat(m17): objectapp-mcp covers the app's routes with their safety`.
 
 ### Task 6: The agent tools MCP server (Lane C, after T5 and T2)
@@ -851,10 +904,13 @@ The full list is in "Our calls" at the end.
 
 - Fill: `backend/objectapp/api_agents.py`
 - Modify:
-  - `backend/objectapp/api_ai.py`: `agentId`, `chatId`, the `chat` event, the run, transcripts, Agent property on save and load.
+  - `backend/objectapp/api_ai.py`: `agentId`, `chatId`, the `chat` event, the run (`ai.build_prompt(..., intro=False)`), transcripts, Agent property on save and load. The turn token replaces M10's `tokens.ephemeral(ai.TOKEN_NAME, "read")`.
   - `backend/objectapp/aichat.py`: `AGENT_KEY = "agent"`, `agent_key(t)`, `ensure_chat_type` adds the text property "Agent" (description "The agent this chat was with", our string).
   - `backend/objectapp/ai.py`: remove M10's empty-folder path, `cli_args`, `mcp_config`, `ALLOWED_TOOLS`/`DISALLOWED_TOOLS`; `Turn.run` becomes required.
-  - `backend/tests/test_m10_ai.py`: the tests pinned to M10's flags or working folder (`test_cli_flags_config_and_cwd`, `test_no_model_or_resume_flags_by_default`) are rewritten to M17's facts; every other M10 test keeps its assertions.
+  - `backend/tests/test_m10_ai.py`: the tests pinned to M10's flags, working folder, token or "no event" facts are rewritten to M17's facts; every other M10 test keeps its assertions:
+    - `test_cli_flags_config_and_cwd` (M10's flags, the read-only server, the empty working folder) and `test_no_model_or_resume_flags_by_default`;
+    - `test_turn_token_works_during_the_turn_only`: a `chat` turn's token is now named "Assistant" with scope `read-write`, so its 403-on-write check runs on a `tagObject` turn (a `read` token, still named "Assistant"); the token still stops working after the turn and is in no file;
+    - `test_a_turn_writes_no_file`: the space is still unchanged; `published` now holds only `agentChats` events (the transcripts), no space event.
 - Create: `backend/tests/test_m17_routes.py`, `backend/tests/test_m17_chat.py`
 
 **Interfaces.**
@@ -954,7 +1010,7 @@ The full list is in "Our calls" at the end.
   - tests beside each
 - Modify:
   - `frontend/src/App.tsx`: a `case 'agent'` rendering `<AgentPage key={target.id} id={target.id} tab={target.tab} />`.
-  - `frontend/src/shell/TabStrip.tsx`: the title is the agent's name, or "Agent".
+  - `frontend/src/shell/TabStrip.tsx`: the title is the agent's name, or "Agent" (replacing T1's placeholder case).
 
 **Interfaces.**
 
@@ -1002,7 +1058,7 @@ The full list is in "Our calls" at the end.
 
 - Create: `frontend/src/ai/AgentPicker.tsx`, `frontend/src/ai/AgentPicker.test.tsx`
 - Modify:
-  - `frontend/src/ai/AiChatPanel.tsx` (as merged by M16)
+  - `frontend/src/ai/AiChatPanel.tsx` (as built by M16; `AiChatPanelProps` gains `agentId?` and `chatId?` beside `entryId` and `path`)
   - `frontend/src/ai/AiChatPanel.test.tsx`
   - `frontend/src/ai/store.ts`: `AiSeed.agentId?: string`
   - `frontend/src/shell/SidePanelArea.tsx`: pass `agentId`/`chatId` from the target
@@ -1018,7 +1074,7 @@ The full list is in "Our calls" at the end.
 - **Picker.** The picker sits in the header's `leading` slot. Picking another agent starts a new chat with it (spec).
 - **Turns.**
   - Every turn sends `agentId` and the `chatId` from the stream's `chat` event.
-  - The model picker's default label is the agent's `model`.
+  - The model picker's `defaultLabel` names the agent's `model` (M16 shows it on the Default row; the trigger says "Default" with no pick).
   - A seed without `agentId` (Ctrl+Alt+J and every editor entry) uses the default agent.
 - **Opening chats.**
   - A target with `chatId` loads the transcript: messages, plus tool steps as M16 `parts`.
@@ -1059,7 +1115,7 @@ The full list is in "Our calls" at the end.
   - "test an editor entry's proposal still waits for Accept"
   - "test a transcript target shows its messages and tool steps"
   - "test a saved M10 chat continues with the default agent"
-  - "test the model default label is the agent's model"
+  - "test the model default label is the agent's model": the picker's Default row reads "Default (<the agent's model label>)"; with no pick the trigger still says "Default" (M16's T7 deviation)
   - `toolSteps.test.ts` "test the new tools' lines"
 - [ ] **Step 2-4:** fail, implement, pass (`npx vitest run src/ai src/shell`).
 - [ ] **Step 5:** commit `feat(m17): chat header agent picker; chats belong to agents`.
@@ -1126,12 +1182,13 @@ The full list is in "Our calls" at the end.
 
 **Steps.**
 
-- [ ] **Step 1:** write the script and checklist; run `uv run python scripts/m17_acceptance.py <fixture space>` until `RESULT: PASS`.
+- [ ] **Step 1:** write the script and checklist; run `uv run python scripts/m17_acceptance.py backend/tests/fixtures/<space>` on `space-sample` and `space-v1` until `RESULT: PASS`.
 - [ ] **Step 2:** run the full gate:
   - `uv run pytest backend/tests -q`
   - `npx vitest run`, `npx tsc -b --noEmit`, `npm run build`
   - every `scripts/mN_acceptance.py`
-  - the live spike once more with `OBJECT_LIVE_CLAUDE=1`
+  - the live spike once more with `OBJECT_LIVE_CLAUDE=1`, now through `agentrun`'s own names
+  - (spike) one live turn (haiku, `--no-session-persistence`) built by `build_run` with the real `objectapp-mcp` against a temp copy of `space-sample`, asking for a `search`: if the Object tool is refused or never offered under `dontAsk` because MCP tools are deferred behind `ToolSearch`, add `"ToolSearch"` to `toolcatalog.ALWAYS_ALLOWED`, record it in `m17-cli-spike.md`, and re-run; `test_m17_live_cli.py::test_object_tool_is_callable` holds the check
 - [ ] **Step 3:** commit `test(m17): acceptance script and hand-check list`.
 
 Then the one milestone review (correctness, file safety, fidelity, the five Review Focus items first), one fix pass, the final gate.
@@ -1143,27 +1200,31 @@ Then the one milestone review (correctness, file safety, fidelity, the five Revi
 | `backend/objectapp/server.py` | T1 (mounts the three stub routers, `RESYNC_EVENTS`) | none |
 | `backend/objectapp/tokens.py` | T1 | none |
 | `backend/tests/fake_claude.py` | T1 | T11 may add a marker it needs |
+| `backend/tests/test_m17_live_cli.py`, `docs/superpowers/plans/m17-cli-spike.md` | T1 (and its follow-up) | T11 (the `ToolSearch` live check) |
+| `backend/objectapp/toolcatalog.py`, `agentmodel.py` | T1 | T11 may add `"ToolSearch"` to `ALWAYS_ALLOWED` (spike); lanes report other needs, they don't edit |
 | `frontend/src/api/types.ts`, `api/client.ts`, `test/mockApi.ts` | T1 | lanes report needs; they don't edit |
-| `frontend/src/nav/tabs.ts` | T1 | none |
+| `frontend/src/nav/tabs.ts`, `nav/sidepanel.ts` | T1 | none |
+| `frontend/src/shell/TabStrip.tsx` | T1 (one placeholder `case 'agent'`), then T9 | T1 runs alone, so no overlap |
+| `backend/tests/test_m11_mcp.py`, `scripts/m11_acceptance.py` | T5 (the tool-set checks only) | none |
 | `frontend/src/agents/useAgents.ts` | T1 | none |
 | `backend/objectapp/ai.py` | T4, then T7 (same lane, in order) | |
 | `backend/tests/test_m10_ai.py` | T7, then T11 (one line) | |
 | `backend/objectapp/api_v1.py`, `mcp_server.py` | T5 | none |
 | `backend/objectapp/api_ai.py`, `aichat.py` | T7 | none |
 | `frontend/src/shell/Sidebar.tsx` | T8 | none |
-| `frontend/src/App.tsx`, `shell/TabStrip.tsx` | T9 | none |
+| `frontend/src/App.tsx` | T9 | none |
 | `frontend/src/ai/AiChatPanel.tsx`, `ai/store.ts`, `ai/toolSteps.ts`, `shell/SidePanelArea.tsx` | T10 | none |
 | `frontend/src/agents/ToolSwitches.tsx`, `agentText.ts` | T8 | T9 consumes |
 | `scripts/m10_acceptance.py`, `remaining-work.md`, `CONTINUE.md` | T11 | none |
 
-**Lanes** (counted from the Files lists). T1 runs first and alone. Then four lanes run:
+**Lanes** (counted from the Files lists). T1 (now its follow-up) runs first and alone. Then four lanes run:
 
 | Lane | Tasks | Waits for |
 |---|---|---|
 | A (back end, agent data) | T2, then T3 | |
 | B (back end, runner and routes) | T4, then T7 | T7 starts after T2 and T3 are done |
 | C (back end, Object tools) | T5, then T6 | T6 starts after T2 is done |
-| D (front end) | T8, then T9, then T10 | only T1's contract; T10 also needs M16 merged |
+| D (front end) | T8, then T9, then T10 | only T1's contract (M16 is already built on this branch) |
 
 T11 runs last and alone. No two lanes edit the same file.
 

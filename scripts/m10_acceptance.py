@@ -10,10 +10,13 @@ point outside the copy. No model runs: the ``claudePath`` setting (set through
 Code's stream-json format and logs its command line, working folder and token. Checks:
 
  1. ``GET /api/ai/status`` answers ``ok`` with the fake's version;
- 2. a chat turn over HTTP streams ``session``, ``text`` and ``done`` frames
+ 2. a chat turn over HTTP streams ``chat`` (M17), ``session``, ``text`` and ``done`` frames
     (``data: <json>`` separated by blank lines); a tag turn returns a tags proposal;
-    the CLI ran in an empty folder outside the space with only the MCP read tools
-    allowed and Read/Write/Edit/Bash denied, and its MCP config holds no secret;
+    (M17) the CLI ran in the default agent's folder (``<state>/agents/Assistant``) with
+    ``--setting-sources project,local``; the chat turn may use Object's write tools, the
+    tag turn only its read tools (``--read-only``); the shell is denied; the run's
+    ``permissions.deny`` fences the space folder (``Read``/``Edit`` on ``<space>/**``);
+    the MCP config holds no secret;
  3. the turns changed no file (``git status`` clean); the per-turn token is in no file
     of the space or the state dir and is refused (401) once the turn is over;
  4. saving a chat creates exactly the AI Chat type file and one chat file; loading it
@@ -39,6 +42,8 @@ from typing import Any
 
 from m2_acceptance import Run, commit, git, remove_tree
 from m8_acceptance import Served
+from objectapp import toolcatalog
+from objectapp.agentrun import rule_path
 from objectapp.space import Space
 
 REPO = Path(__file__).resolve().parents[1]
@@ -145,12 +150,15 @@ def main(argv: list[str] | None = None) -> int:
         code, raw, events = sse(base, {"mode": "chat", "prompt": "FAKE:tool What is here?",
                                        "contextPaths": [page] if page else [], "history": []})
         kinds = [e["type"] for e in events]
-        run.report(code == 200 and kinds[:1] == ["session"] and "text" in kinds and kinds[-1:] == ["done"],
-                   f"chat streams session, text, done: {kinds}")
+        run.report(code == 200 and kinds[:2] == ["chat", "session"] and "text" in kinds and kinds[-1:] == ["done"],
+                   f"chat streams chat, session, text, done: {kinds}")
         run.report("\r" not in raw and raw.startswith("data: "), "frames are 'data: <json>' + blank line")
-        run.report({"type": "tool", "name": "search"} in events, "the MCP tool use is reported by short name")
+        run.report(any(e["type"] == "tool" and e.get("name") == "search" for e in events),
+                   "the MCP tool use is reported by short name")
         done = events[-1] if events else {}
-        run.report(done.get("text") == "Hello from the fake claude." and done.get("sessionId") == events[0].get("sessionId"),
+        session_event = next((e for e in events if e["type"] == "session"), {})
+        run.report(done.get("text") == "Hello from the fake claude."
+                   and done.get("sessionId") == session_event.get("sessionId"),
                    f"done carries the answer and the session: {done.get('text')!r}")
         code, _raw, tag_events = sse(base, {"mode": "tagObject", "prompt": "FAKE:tags",
                                            "contextPaths": [page] if page else [], "history": []})
@@ -159,18 +167,30 @@ def main(argv: list[str] | None = None) -> int:
                    f"tag turn proposes tags: {proposal}")
         logged = runs(log)
         cli = logged[0] if logged else {}
-        argv_ = cli.get("argv", [])
-        allowed = set(argv_[argv_.index("--allowedTools") + 1].split(",")) if "--allowedTools" in argv_ else set()
-        denied = set(argv_[argv_.index("--disallowedTools") + 1].split(",")) if "--disallowedTools" in argv_ else set()
-        run.report(allowed == {f"mcp__object__{t}" for t in READ_TOOLS}, "allowed tools: the MCP read tools only")
-        run.report({"Read", "Write", "Edit", "Bash", "WebFetch"} <= denied, "Read, Write, Edit, Bash, WebFetch denied")
+        tag_cli = logged[1] if len(logged) > 1 else {}
+        read_names = {f"mcp__object__{t}" for t in READ_TOOLS}
+        allowed = set(cli.get("allowed") or [])
+        tag_object = {t for t in tag_cli.get("allowed") or [] if t.startswith("mcp__object__")}
+        run.report(read_names <= allowed and "mcp__object__write_body" in allowed,
+                   "chat turn: Object's read and write tools allowed")
+        run.report(read_names <= tag_object
+                   and tag_object <= {f"mcp__object__{t}" for t in toolcatalog.OBJECT_READ},
+                   "tag turn: Object's read tools only")
+        run.report({"Bash", "PowerShell"} <= set(cli.get("disallowed") or []), "the shell (Bash, PowerShell) denied")
+        home = (Path(os.environ["OBJECT_STATE_DIR"]) / "agents" / "Assistant").resolve()
         cwd = Path(cli.get("cwd", str(root))).resolve()
-        run.report(cli.get("cwdEntries") == [] and root not in (cwd, *cwd.parents),
-                   f"ran in an empty folder outside the space: {cwd}")
+        run.report(cwd == home and root not in (cwd, *cwd.parents),
+                   f"ran in the default agent's folder, outside the space: {cwd}")
+        run.report(cli.get("settingSources") == "project,local", f"--setting-sources {cli.get('settingSources')}")
+        deny = ((cli.get("runSettings") or {}).get("permissions") or {}).get("deny") or []
+        rp = rule_path(root)
+        run.report(f"Read({rp}/**)" in deny and f"Edit({rp}/**)" in deny, f"the space is fenced: Read/Edit({rp}/**)")
         server = (cli.get("mcpConfig") or {}).get("mcpServers", {}).get("object", {})
-        run.report(server.get("args") == ["-m", "objectapp.mcp_server", "--read-only"]
+        tag_server = (tag_cli.get("mcpConfig") or {}).get("mcpServers", {}).get("object", {})
+        run.report(server.get("args") == ["-m", "objectapp.mcp_server"]
+                   and tag_server.get("args") == ["-m", "objectapp.mcp_server", "--read-only"]
                    and server.get("env", {}).get("OBJECT_API_TOKEN") == "${OBJECT_API_TOKEN}",
-                   "MCP config: objectapp-mcp --read-only, no secret in the file")
+                   "MCP config: objectapp-mcp (--read-only for the tag turn), no secret in the file")
 
         print("\n3. Nothing written, token gone")
         run.report(clean(root), "the turns changed no file (git status clean)", git(root, "status", "--short"))

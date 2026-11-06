@@ -83,11 +83,16 @@ def _frames(raw: str) -> list[dict]:
 
 
 def _chat(client: TestClient, prompt: str = "Hi", **extra) -> list[dict]:
+    """M10's events of a turn: M17's leading ``chat`` event (checked here) is left out."""
     body = {"mode": "chat", "prompt": prompt, "contextPaths": [], "history": [], **extra}
     res = client.post("/api/ai/chat", json=body)
     assert res.status_code == 200, res.text
     assert res.headers["content-type"].startswith("text/event-stream")
-    return _frames(res.text)
+    events = _frames(res.text)
+    if events and events[0]["type"] == "chat":
+        assert events[0]["agentId"] == "assistant" and len(events[0]["chatId"]) == 26
+        return events[1:]
+    return events
 
 
 def _done(events: list[dict]) -> dict:
@@ -187,13 +192,17 @@ def test_chat_turn_streams_session_text_done(api, fake) -> None:
 def test_tool_use_and_text_are_not_repeated(api) -> None:
     _space, client, _ = api
     events = _chat(client, "FAKE:tool find alpha")
-    assert {"type": "tool", "name": "search"} in events
+    assert {"type": "tool", "id": "toolu_1", "name": "search", "input": {"query": "alpha"}} in events
     text = "".join(e["text"] for e in events if e["type"] == "text")
     assert text == "Let me look.\n\nHello from the fake claude."
     assert _done(events)["text"] == "Hello from the fake claude."
 
 
 def test_cli_flags_config_and_cwd(api, fake, space_dir: Path) -> None:
+    """M17: a chat turn is the default agent's run, in its folder, with Object's tools."""
+    from objectapp import agentrun, toolcatalog
+    from objectapp.appstate import state_dir
+
     _space, client, _ = api
     _set(aiModel="sonnet")
     _chat(client, "Hi", sessionId=SESSION_A)
@@ -205,24 +214,28 @@ def test_cli_flags_config_and_cwd(api, fake, space_dir: Path) -> None:
     assert argv[argv.index("--model") + 1] == "sonnet"
     assert argv[argv.index("--resume") + 1] == SESSION_A
     assert "--strict-mcp-config" in argv
+    assert argv[argv.index("--setting-sources") + 1] == "project,local"
     allowed = set(argv[argv.index("--allowedTools") + 1].split(","))
-    assert allowed == {f"mcp__object__{t}" for t in ai.READ_TOOLS}
-    assert all(not t.startswith("mcp__object__") or t[13:] in ai.READ_TOOLS for t in allowed)
+    assert {f"mcp__object__{t}" for t in toolcatalog.OBJECT_READ + toolcatalog.OBJECT_WRITE} <= allowed
     denied = set(argv[argv.index("--disallowedTools") + 1].split(","))
-    assert {"Read", "Write", "Edit", "MultiEdit", "Bash", "WebFetch", "WebSearch", "Glob", "Grep"} <= denied
+    assert {"Bash", "PowerShell"} <= denied  # the shell is off by default
     server = run["mcpConfig"]["mcpServers"]["object"]
     assert server["command"] == sys.executable
-    assert server["args"] == ["-m", "objectapp.mcp_server", "--read-only"]
+    assert server["args"] == ["-m", "objectapp.mcp_server"]
     assert server["env"]["OBJECT_API_URL"] == "http://testserver"
     # The secret travels in the environment, never in the config file.
     assert server["env"]["OBJECT_API_TOKEN"] == "${OBJECT_API_TOKEN}"
+    assert run["mcpConfig"]["mcpServers"]["object-agent"]["args"] == ["-m", "objectapp.agent_mcp"]
     assert run["token"].startswith("obj_") and run["url"] == "http://testserver"
     cwd = Path(run["cwd"]).resolve()
-    assert run["cwdEntries"] == []
+    assert cwd == (state_dir() / "agents" / "Assistant").resolve()
     assert space_dir.resolve() not in (cwd, *cwd.parents)
-    assert not cwd.exists()  # removed after the turn
+    # M18: the learning guidance (order 15) comes first, then Object's own guidance (order 50).
+    assert agentrun.OBJECT_GUIDANCE.format(agent="Assistant", space=_space.name)[:40] in run["appendPrompt"]
+    deny = run["runSettings"]["permissions"]["deny"]
+    assert f"Read({agentrun.rule_path(space_dir.resolve())}/**)" in deny
     config_file = Path(argv[argv.index("--mcp-config") + 1])
-    assert not config_file.exists()
+    assert not config_file.exists() and not config_file.parent.exists()  # removed after the turn
 
 
 def test_no_model_or_resume_flags_by_default(api, fake) -> None:
@@ -478,10 +491,13 @@ def test_a_session_id_that_is_not_a_uuid_is_ignored(api, fake, space_dir: Path) 
 def test_a_turn_writes_no_file(api, space_dir: Path, fake) -> None:
     _space, client, published = api
     before = _snapshot(space_dir)
-    _chat(client, "FAKE:tool hi", contextPaths=["People/Ada Lovelace.md", "Pages/Alpha.md"])
-    _chat(client, "FAKE:tags", mode="tagObject", contextPaths=["People/Ada Lovelace.md"])
+    with client:
+        _chat(client, "FAKE:tool hi", contextPaths=["People/Ada Lovelace.md", "Pages/Alpha.md"])
+        _chat(client, "FAKE:tags", mode="tagObject", contextPaths=["People/Ada Lovelace.md"])
+        _wait(published, 4)
     assert _snapshot(space_dir) == before
-    assert published == []
+    # M17: only the transcripts are written (in the agent's folder), announced as agentChats.
+    assert published and {e.kind for e in published} == {"agentChats"}
 
 
 # -- the token ------------------------------------------------------------------------
@@ -508,7 +524,8 @@ def test_turn_token_works_during_the_turn_only(space_dir: Path, fake) -> None:
     log: Path = fake["log"]
     answers: list = []
     with client:
-        worker = threading.Thread(target=lambda: answers.append(_chat(client, "FAKE:wait")))
+        # M17: a chat turn's token is read-write, so the no-write check runs on a proposal turn.
+        worker = threading.Thread(target=lambda: answers.append(_chat(client, "FAKE:wait", mode="tagObject")))
         worker.start()
         deadline = time.monotonic() + 20
         while not _runs(log) and time.monotonic() < deadline:
@@ -517,7 +534,7 @@ def test_turn_token_works_during_the_turn_only(space_dir: Path, fake) -> None:
         hdr = {"Authorization": f"Bearer {token}"}
         who = client.get("/api/v1/whoami", headers=hdr)
         assert who.status_code == 200, who.text
-        assert who.json()["name"] == "AI assistant" and who.json()["scope"] == "read"
+        assert who.json()["name"] == "Assistant" and who.json()["scope"] == "read"
         made = client.post("/api/v1/objects", headers=hdr, json={"type": "Page", "title": "AI wrote"})
         assert made.status_code == 403
         files = [
@@ -546,9 +563,25 @@ def test_timeout_kills_the_process(api, fake, monkeypatch) -> None:
     assert not _alive(run["pid"])
 
 
-def test_closing_the_stream_kills_the_process(space_dir: Path, fake) -> None:
+def _plain_run(claude: str, cwd: Path):
+    """A bare `RunCommand` for `Turn.run` (M17 made it required)."""
+    import tempfile
+
+    from objectapp.agentrun import RunCommand
+
+    def run(resume: str | None) -> RunCommand:
+        tmp = Path(tempfile.mkdtemp(prefix="object-test-run-"))
+        args = [claude, "-p", "--output-format", "stream-json"] + (["--resume", resume] if resume else [])
+        return RunCommand(args=args, cwd=cwd, env=dict(os.environ), tmp=tmp, mcp_config={},
+                          run_settings={}, append="")
+
+    return run
+
+
+def test_closing_the_stream_kills_the_process(space_dir: Path, fake, tmp_path: Path) -> None:
     space = Space(space_dir)
     turn = ai.Turn(
+        run=_plain_run(str(fake["path"]), tmp_path),
         claude=str(fake["path"]),
         mode="chat",
         prompt_resume=None,
@@ -578,7 +611,19 @@ def test_closing_the_stream_kills_the_process(space_dir: Path, fake) -> None:
 # -- no network -----------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("module", ["ai.py", "aichat.py", "api_ai.py"])
+@pytest.mark.parametrize("module", [
+    "ai.py", "aichat.py", "api_ai.py", "aimodels.py",
+    "agentmodel.py", "toolcatalog.py", "agents.py", "agentfiles.py", "transcripts.py", "agentrun.py", "api_agents.py",
+    "learningmodel.py", "ledger.py", "agentmemory.py", "agentskills.py", "learnundo.py", "chatsearch.py",
+    "reviews.py", "curator.py", "api_learning.py", "api_learning_v1.py", "learnhooks.py",
+    # M19: mcpprobe.py is left out on purpose; it is the one module that opens connections.
+    "mcpmodel.py", "secretstore.py", "mcpstore.py", "mcpgateway.py", "api_mcp.py",
+    # M20: a2a.py is left out on purpose; it is the one M20 module with a network client.
+    "remotemodel.py", "remotesecrets.py", "remotechat.py", "delegation.py", "headless.py",
+    "api_remote_agents.py", "api_agent_a2a_v1.py",
+    # M21
+    "agentschedules.py", "schedulerun.py", "api_schedules_v1.py",
+])
 def test_ai_modules_use_no_network_client(module: str) -> None:
     tree = ast.parse((BACKEND / module).read_text(encoding="utf-8"))
     names: set[str] = set()
@@ -586,8 +631,10 @@ def test_ai_modules_use_no_network_client(module: str) -> None:
         if isinstance(node, ast.Import):
             names |= {a.name.split(".")[0] for a in node.names}
         elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            if node.module == "urllib.parse":
+                continue  # string parsing only (mcpstore checks a server URL); urllib.request stays banned
             names.add(node.module.split(".")[0])
-    banned = {"httpx", "urllib", "urllib3", "requests", "socket", "http", "aiohttp", "ssl", "websockets"}
+    banned = {"httpx", "httpx2", "urllib", "urllib3", "requests", "socket", "http", "aiohttp", "ssl", "websockets"}
     assert not names & banned, names & banned
 
 

@@ -75,7 +75,16 @@ def remove_tree(path: Path) -> None:
         os.chmod(p, stat.S_IWRITE)
         func(p)
 
-    shutil.rmtree(path, onexc=writable_then_retry)
+    # A server thread still shutting down under load may write its cache for a moment after
+    # `stop()` returns ("directory is not empty" / "in use" on Windows): retry briefly.
+    for attempt in range(10):
+        try:
+            shutil.rmtree(path, onexc=writable_then_retry)
+            return
+        except OSError:
+            if attempt == 9 or not path.exists():
+                raise
+            time.sleep(1)
 
 
 def free_port() -> int:

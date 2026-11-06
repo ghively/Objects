@@ -640,6 +640,15 @@ export type ChangeKind =
   | 'automations'
   /** M14: a run was logged (`path` the rule id), or (`path` `catch-up`) the catch-up list changed. */
   | 'automationRuns'
+  /** M17: an agent was created, saved, deleted, unregistered or restored (`path` its id, or `trash`). */
+  | 'agents'
+  /** M17: an agent's chat transcript was written (`path` the agent id, `version` the chat id). */
+  | 'agentChats'
+  /** M18: an agent's memory, skills, ledger, reviews or curator changed (`path` the agent id,
+   * `version` the ledger entry, review or curator run id). */
+  | 'agentLearning'
+  /** M19: an outside MCP server or a secret changed (`path` the server id, or `secrets`). */
+  | 'mcpServers'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {
@@ -1646,6 +1655,17 @@ export interface NotifyAction {
   title: string
   body: string
 }
+/**
+ * M21: run `prompt` as a new chat of the agent `agentId` (an agent schedule: a schedule rule with
+ * this one action, no conditions, no template repeat). `model` null: the agent's default. Never
+ * offered in the rule editor's "+ Add action" menu.
+ */
+export interface RunAgentAction {
+  kind: 'runAgent'
+  agentId: string
+  prompt: string
+  model: string | null
+}
 
 export type AutomationAction =
   | SetPropertyAction
@@ -1657,6 +1677,7 @@ export type AutomationAction =
   | CreateFromTemplateAction
   | AppendToDailyNoteAction
   | NotifyAction
+  | RunAgentAction
 export type AutomationActionKind = AutomationAction['kind']
 
 /** The actions that edit the triggering object (not offered on a schedule). */
@@ -1794,6 +1815,18 @@ export interface AiStatus {
   message: string | null
 }
 
+/** GET /api/ai/models: the back end's one model list (aimodels.MODELS). */
+export interface AiModelChoice {
+  id: string
+  label: string
+  kind: 'alias' | 'id'
+}
+export interface AiModels {
+  models: AiModelChoice[]
+  /** aimodels.MODEL_PATTERN; the client matches it whole: new RegExp(`^(?:${pattern})$`). */
+  pattern: string
+}
+
 export interface AiMessage {
   role: 'user' | 'assistant'
   text: string
@@ -1820,6 +1853,12 @@ export interface AiChatRequest {
   history: AiMessage[]
   sessionId?: string | null
   clientId?: string
+  /** M16: this chat's model pick; null/absent = the default agent's model (Settings), else the CLI's. */
+  model?: string | null
+  /** M17: the agent the turn runs as; null/absent = the default agent ("assistant"). */
+  agentId?: string | null
+  /** M17: the chat's transcript id; null/absent (or not a ULID) starts a new chat. */
+  chatId?: string | null
 }
 
 /** A change the assistant suggests; nothing is applied until the user accepts it. */
@@ -1835,13 +1874,21 @@ export interface AiSkipped {
 }
 
 export type AiEvent =
+  /** M17: the first event of every turn: the chat's transcript id and the agent it runs as. */
+  | { type: 'chat'; chatId: string; agentId: string }
   | { type: 'session'; sessionId: string }
   /** A chunk to append to the answer so far. */
   | { type: 'text'; text: string }
-  /** The assistant used a tool (an Object MCP read tool, by its short name). */
-  | { type: 'tool'; name: string }
+  /**
+   * A tool step. Sent twice per call with the same `id`: at the call (`input` set, no `result`),
+   * then when its result arrives (`input` null, `result` set). `name` is the short name for
+   * Object's tools ("search"), the CLI's name otherwise ("Read", "mcp__srv__tool").
+   */
+  | { type: 'tool'; id: string; name: string; input: Record<string, unknown> | null; result?: string; isError?: boolean }
   | { type: 'done'; text: string; sessionId: string | null; proposal: AiProposal | null; skipped: AiSkipped[] }
   | { type: 'error'; message: string }
+  /** M20: a remote agent's file artifact, saved under its folder's files/ (or kept as a link). */
+  | { type: 'attachment'; agentId: string; chatId: string; attachment: RemoteAttachment }
 
 /** GET /api/ai/chat?path= */
 export interface AiChat {
@@ -1851,6 +1898,12 @@ export interface AiChat {
   contextPaths: string[]
   sessionId: string | null
   messages: AiMessage[]
+  /** M17: the chat's Agent property (the agent's name), null when it has none (an M10 chat). */
+  agent: string | null
+  /** M17: the first listed agent with that name (case-insensitive), else the default agent. */
+  agentId: string
+  /** M17: the transcript that carries its session id, else null. */
+  chatId: string | null
 }
 
 /** POST /api/ai/chat/save: creates the chat (no `path`) or replaces its messages (409 on a stale `baseVersion`). */
@@ -1863,4 +1916,460 @@ export interface SaveAiChatRequest {
   sessionId: string | null
   messages: AiMessage[]
   clientId?: string
+  /** M17: the agent the chat ran as (written as its Agent property); null/absent = the default agent. */
+  agentId?: string | null
+  /** M17: the transcript the saved object is recorded in. */
+  chatId?: string | null
+}
+
+// ---- M17: agents (docs/superpowers/plans/2026-11-05-m17-agents-and-tools.md, "Contract (T1)") ----
+
+/** GET /api/agents, /api/agents/{id}: one agent (a folder). */
+export interface Agent {
+  id: string
+  /** M20: 'remote' for an A2A agent added by its Agent Card URL. */
+  kind: 'local' | 'remote'
+  name: string
+  icon: string | null
+  color: string | null
+  description: string
+  /** The agent's default model; the default agent's is Settings' aiModel. */
+  model: string | null
+  /** The switched-off tool ids (toolcatalog). */
+  toolsOff: string[]
+  /** Reserved for M18. */
+  learning: Record<string, unknown> | null
+  createdAt: string | null
+  updatedAt: string | null
+  default: boolean
+  folder: string
+  inStateDir: boolean
+  /** false: the default agent before its first use (no folder yet). */
+  exists: boolean
+  /** A registered folder that is gone. */
+  missing: boolean
+  readOnlyReason: string | null
+  revision: string | null
+  /** The folder's .mcp.json servers. */
+  mcpServers: { name: string; missingVars: string[]; usable: boolean }[]
+  /** M20: a remote agent's card and connection; null for a local agent. */
+  remote: RemoteInfo | null
+}
+
+// ---- M20: remote agents (A2A) ----
+
+/** One skill on a remote agent's Agent Card. */
+export interface RemoteSkill {
+  id: string
+  name: string
+  description: string
+  tags: string[]
+  examples: string[]
+}
+
+/** What a remote agent's Agent Card says. */
+export interface RemoteCard {
+  name: string
+  description: string
+  version: string | null
+  provider: string | null
+  documentationUrl: string | null
+  skills: RemoteSkill[]
+  streaming: boolean
+  inputModes: string[]
+  outputModes: string[]
+}
+
+/** `Agent.remote`: a remote agent's card URL, endpoint and auth (the secret only as `set`). */
+export interface RemoteInfo {
+  cardUrl: string
+  endpointUrl: string
+  endpointHost: string
+  protocolVersion: string
+  streaming: boolean
+  auth: { kind: 'none' | 'bearer' | 'header'; headerName: string | null; set: boolean }
+  card: RemoteCard
+  cardFetchedAt: string
+  contextNoticeAt: string | null
+}
+
+/** A remote agent's auth as entered (the value is sent once and never shown again). */
+export interface RemoteAuthInput {
+  kind: 'none' | 'bearer' | 'header'
+  headerName?: string | null
+  value?: string | null
+}
+
+/** POST /api/remote-agents/preview */
+export interface RemotePreview {
+  cardUrl: string
+  card: RemoteCard
+  endpointUrl: string
+  endpointHost: string
+  warnings: string[]
+}
+
+/** POST /api/remote-agents */
+export interface AddRemoteAgentRequest {
+  url: string
+  auth: RemoteAuthInput
+  name?: string | null
+  icon?: string | null
+  clientId?: string
+}
+
+/** PUT /api/remote-agents/{id}; `auth` null or absent leaves the secret as it is. */
+export interface SaveRemoteAgentRequest {
+  name: string
+  icon?: string | null
+  color?: string | null
+  auth?: RemoteAuthInput | null
+  baseRevision: string
+  clientId?: string
+}
+
+/** A remote agent's file artifact. */
+export interface RemoteAttachment {
+  name: string
+  mediaType: string | null
+  size: number | null
+  kind: 'file' | 'url'
+  /** "<chatId>/<safe name>" under the agent's files/ (kind file). */
+  file: string | null
+  /** http/https only (kind url). */
+  url: string | null
+}
+
+/** What create and save accept. */
+export interface AgentInput {
+  name: string
+  icon?: string | null
+  color?: string | null
+  description?: string
+  model?: string | null
+  toolsOff?: string[]
+  learning?: Record<string, unknown> | null
+}
+
+/** POST /api/agents */
+export interface CreateAgentRequest {
+  agent: AgentInput
+  instructions: string
+  location?: string | null
+  duplicateOf?: { id: string; memory: boolean; skills: boolean } | null
+  clientId?: string
+}
+
+/** GET /api/agent-trash: one deleted agent's folder. */
+export interface AgentTrashItem {
+  trashId: string
+  agentId: string
+  name: string
+  icon: string | null
+  originalPath: string
+  deletedAt: string
+}
+
+/** One row of the Tools tab. */
+export interface ToolRow {
+  id: string
+  label: string
+  on: boolean
+  warning: string | null
+}
+
+/** One group of the Tools tab. */
+export interface ToolGroup {
+  id: string
+  label: string
+  tools: ToolRow[]
+  /** M19: an outside MCP server group's status; absent or null for the other groups. */
+  server?: McpGroupStatus | null
+}
+
+/** GET /api/agents/{id}/chats: one chat transcript. */
+export interface AgentChatSummary {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  messageCount: number
+  spaceName: string | null
+  delegated: boolean
+  /** M20: the delegating agent's id (with `delegated: true`), else null. */
+  from: string | null
+  /** M21: the schedule that started this chat (`scheduledFor` ISO UTC), else null. */
+  schedule: { ruleId: string; name: string; scheduledFor: string; catchUp: boolean } | null
+}
+
+/** One line of a chat transcript. */
+export type TranscriptItem =
+  | { type: 'user'; text: string; at: string; contextPaths: string[] }
+  | {
+      type: 'assistant'
+      text: string
+      at: string
+      model: string | null
+      sessionId: string | null
+      stopped?: boolean
+      /** M20: a remote agent's file artifacts. */
+      attachments?: RemoteAttachment[]
+      /** M20: a remote agent's A2A ids and the task's state after this answer. */
+      a2a?: { contextId: string | null; taskId: string | null; state: string | null }
+    }
+  | {
+      type: 'tool'
+      id: string
+      name: string
+      input: Record<string, unknown> | null
+      result: string | null
+      isError: boolean
+      at: string
+    }
+  | { type: 'error'; message: string; at: string }
+  /** M18: one background review of the chat (its start line's place, its end line's state). */
+  | {
+      type: 'learning'
+      reviewId: string
+      kinds: ('memory' | 'skills')[]
+      state: ReviewStatus['state']
+      summary: string | null
+      message: string | null
+      at: string
+    }
+
+/** GET /api/agents/{id}/chats/{chatId} */
+export interface AgentTranscript extends AgentChatSummary {
+  agentId: string
+  sessionId: string | null
+  objectPath: string | null
+  items: TranscriptItem[]
+}
+
+// ---- M18: learning (docs/superpowers/plans/2026-11-05-m18-learning.md, "Contract (T1)") ----
+
+/** An agent's learning settings (`agent.json` `learning`, with every default filled in). */
+export interface LearningSettings {
+  memoryChars: number
+  userChars: number
+  /** User turns between memory reviews; 0 = off. */
+  memoryReviewEvery: number
+  /** Tool calls between skill reviews; 0 = off. */
+  skillReviewEvery: number
+  /** null = the chat's model. */
+  reviewModel: string | null
+  curator: boolean
+  curatorIdleHours: number
+  curatorEveryDays: number
+  /** The optional consolidation pass in scheduled curator runs. */
+  consolidate: boolean
+}
+
+/** One memory file: MEMORY.md (`memory`) or USER.md (`user`). */
+export interface MemoryFile {
+  target: 'memory' | 'user'
+  text: string
+  entries: string[]
+  chars: number
+  cap: number
+  /** null: no file yet. */
+  revision: string | null
+}
+
+/** GET /api/agents/{id}/skills: one skill. */
+export interface SkillSummary {
+  name: string
+  description: string
+  createdBy: 'agent' | 'user'
+  state: 'active' | 'stale' | 'archived'
+  pinned: boolean
+  uses: number
+  lastUsed: string | null
+  createdAt: string | null
+  absorbedInto: string | null
+}
+
+/** GET /api/agents/{id}/skills/{name}: a skill with its SKILL.md text and files. */
+export interface SkillDetail extends SkillSummary {
+  text: string
+  revision: string
+  files: { path: string; size: number }[]
+}
+
+/** Who made a ledger entry. */
+export interface LedgerSource {
+  kind: 'chat' | 'review' | 'curator' | 'user' | 'undo'
+  agentId?: string
+  chatId?: string | null
+  run?: string | null
+}
+
+/** GET /api/agents/{id}/ledger: one change, without its before and after text. */
+export interface LedgerSummary {
+  id: string
+  at: string
+  target: 'memory' | 'user' | 'skill'
+  action: string
+  skill: string | null
+  file: string | null
+  absorbedInto: string | null
+  source: LedgerSource
+  undoes: string | null
+  /** The history line ("Saved a memory", "Patched 'rack-labels'"...). */
+  line: string
+}
+
+/** GET /api/agents/{id}/ledger/{entryId}: one change with the whole file before and after. */
+export interface LedgerEntry extends LedgerSummary {
+  before: string | null
+  after: string | null
+  encoding: 'text' | 'base64'
+}
+
+/** One background review of a chat. */
+export interface ReviewStatus {
+  id: string
+  agentId: string
+  chatId: string
+  kinds: ('memory' | 'skills')[]
+  trigger: 'auto' | 'manual'
+  state: 'running' | 'done' | 'failed'
+  startedAt: string
+  endedAt: string | null
+  summary: string | null
+  message: string | null
+  entryIds: string[]
+}
+
+/** The curator's state for one agent. */
+export interface CuratorState {
+  lastRunAt: string | null
+  nextDueAt: string | null
+  running: boolean
+  report: { at: string; runId: string; text: string } | null
+}
+
+/** GET /api/agents/{id}/learning */
+export interface LearningState {
+  settings: LearningSettings
+  defaults: LearningSettings
+  curator: CuratorState
+  revision: string | null
+}
+
+/** GET /api/agents/{id}/chats/search: one matching chat. */
+export interface ChatSearchHit {
+  chatId: string
+  title: string
+  updatedAt: string
+  spaceName: string | null
+  /** At most 3, with matches marked «…». */
+  snippets: string[]
+  matches: number
+}
+
+// ---- M19: the MCP gateway ("Contract (T1)") ----
+
+export type McpServerKind = 'command' | 'url'
+export type McpTransport = 'http' | 'sse'
+
+/** A stdio server's env row; a secret row has `value` null, `set` = stored. */
+export interface McpEnvRow {
+  key: string
+  value: string | null
+  secret: boolean
+  set: boolean
+}
+
+/** A URL server's header row; a secret row has `value` null, `set` = stored. */
+export interface McpHeaderRow {
+  name: string
+  value: string | null
+  secret: boolean
+  set: boolean
+}
+
+export interface McpToolInfo {
+  name: string
+  description: string
+}
+
+/** POST /api/mcp-servers/{id}/test */
+export interface McpTestResult {
+  ok: boolean
+  tools: McpToolInfo[]
+  error: string | null
+  elapsedMs: number
+  at: string
+}
+
+/** One outside MCP server (GET /api/mcp-servers). Never holds a secret value. */
+export interface McpServer {
+  id: string
+  name: string
+  enabled: boolean
+  kind: McpServerKind
+  command: string | null
+  args: string[]
+  env: McpEnvRow[]
+  transport: McpTransport | null
+  url: string | null
+  headers: McpHeaderRow[]
+  bearer: boolean
+  createdAt: string
+  updatedAt: string
+  revision: string
+  /** Row keys / header names whose secret is gone (secrets.json lost); usable = []. */
+  missingSecrets: string[]
+  /** From the tool cache (this run of Object only). */
+  lastTest: McpTestResult | null
+}
+
+/** POST / PUT /api/mcp-servers: a secret row's `value` null keeps the stored value. */
+export interface McpServerInput {
+  name: string
+  enabled: boolean
+  kind: McpServerKind
+  command?: string | null
+  args?: string[]
+  env?: { key: string; value?: string | null; secret: boolean }[]
+  transport?: McpTransport | null
+  url?: string | null
+  headers?: { name: string; value?: string | null; secret: boolean }[]
+  bearer?: string | null
+  bearerAction?: 'keep' | 'set' | 'remove'
+}
+
+/** GET /api/mcp-servers */
+export interface McpServersAnswer {
+  servers: McpServer[]
+  readOnlyReason: string | null
+  /** The file is there but can't be read: no servers are listed, and writes stay allowed (the
+   * next one copies the file aside first). */
+  unreadable: boolean
+}
+
+export interface SecretVarUse {
+  agentId: string
+  agentName: string
+  server: string
+}
+
+/** GET /api/mcp-secrets: one secret variable (never its value). */
+export interface SecretVar {
+  name: string
+  set: boolean
+  settable: boolean
+  usedBy: SecretVarUse[]
+}
+
+/** An outside MCP server group's status on the Tools tab (`ToolGroup.server`). */
+export interface McpGroupStatus {
+  source: 'gateway' | 'folder'
+  serverId: string | null
+  name: string
+  status: 'ok' | 'error' | 'unknown' | 'disabled' | 'needsSecrets'
+  error: string | null
+  fetchedAt: string | null
+  missingVars: string[]
 }

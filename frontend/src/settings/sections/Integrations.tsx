@@ -2,13 +2,17 @@
 // computer (an MCP client such as Claude Code or Claude Desktop, or a script) read the space
 // and, with a read-write token, change it through `/api/v1`. The secret is shown once, with a
 // ready-to-paste MCP config; only a hash is kept (in the app's state folder, never the space).
-// Objects marked "Exclude from AI" stay invisible to every token.
+// Objects marked "Exclude from AI" stay invisible to every token. M19 adds the outside MCP
+// servers and secret variables after the token groups (hidden while AI features are hidden).
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/api/client'
 import type { ApiToken, ApiTokenScope, CreatedApiToken } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useAiHidden } from '@/ai/store'
+import { McpServersGroup } from '@/mcp/McpServersGroup'
+import { MCP_TEXT } from '@/mcp/mcpText'
 import { OptionCards, SaveError, SectionHeader, SettingGroup, errorText } from '../controls'
 
 // our strings (no counterpart in the original app)
@@ -45,7 +49,7 @@ export const INTEGRATIONS_TEXT = {
 
 const T = INTEGRATIONS_TEXT
 
-export const INTEGRATIONS_SEARCH: string[] = [T.tokens, T.mcp, 'MCP', 'API']
+export const INTEGRATIONS_SEARCH: string[] = [T.tokens, T.mcp, 'MCP', 'API', MCP_TEXT.heading, MCP_TEXT.secretVariables]
 
 function when(stamp: string | null): string {
   if (!stamp) return T.never
@@ -98,6 +102,7 @@ export function IntegrationsSection() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState<string | null>(null)
+  const aiHidden = useAiHidden()
 
   const load = useCallback(() => {
     api
@@ -215,6 +220,8 @@ export function IntegrationsSection() {
           </div>
         </SettingGroup>
       )}
+      {/* M19: the machine's outside MCP servers and secret variables, after the token groups */}
+      {!aiHidden && <McpServersGroup />}
     </div>
   )
 }

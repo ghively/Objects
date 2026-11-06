@@ -1,10 +1,31 @@
 import type {
+  AddRemoteAgentRequest,
+  Agent,
+  AgentChatSummary,
+  AgentInput,
+  AgentTranscript,
+  AgentTrashItem,
+  CreateAgentRequest,
+  RemoteAuthInput,
+  RemotePreview,
+  SaveRemoteAgentRequest,
+  ToolGroup,
+  ChatSearchHit,
+  LearningSettings,
+  LearningState,
+  LedgerEntry,
+  LedgerSummary,
+  MemoryFile,
+  ReviewStatus,
+  SkillDetail,
+  SkillSummary,
   RelationPairKind,
   RelationPairResult,
   SaveAiChatRequest,
   AiChat,
   AiChatRequest,
   AiEvent,
+  AiModels,
   AiStatus,
   ApiTokenList,
   ApiTokenScope,
@@ -73,6 +94,11 @@ import type {
   UpdateResult,
   UploadedAttachment,
   Views,
+  McpServer,
+  McpServerInput,
+  McpServersAnswer,
+  McpTestResult,
+  SecretVar,
 } from './types'
 import type { WhiteboardSettings } from './whiteboardTypes'
 
@@ -426,6 +452,10 @@ const RESYNC_EVENTS: readonly ChangeEvent[] = [
   { kind: 'collections', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'queries', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'automations', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'agents', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'agentChats', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'agentLearning', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'mcpServers', path: RESYNC_PATH, version: null, origin: null },
 ]
 
 /**
@@ -997,6 +1027,11 @@ export const api = {
     return request<AiStatus>('/ai/status')
   },
 
+  /** M16: the model choices (the back end's one list) and the model-name pattern. */
+  aiModels(): Promise<AiModels> {
+    return request<AiModels>('/ai/models')
+  },
+
   /**
    * M10: one AI turn. Calls `onEvent` for each server-sent event until `done` or `error`;
    * aborting `signal` closes the stream, which stops the CLI. Resolves when the stream ends.
@@ -1380,6 +1415,309 @@ export const api = {
       json('POST', { ruleId, choice, clientId: CLIENT_ID }),
     )
     return res?.runs ?? []
+  },
+
+  // ---- M17: agents ("Contract (T1)", routes filled by the plan's T7) ----
+
+  /** Every agent: the default agent first, then the registry's order. Never writes. */
+  async agents(): Promise<Agent[]> {
+    const res = await request<{ agents: Agent[] }>('/agents')
+    return res?.agents ?? []
+  },
+
+  /** One agent. 404 when it isn't listed. */
+  agent(id: string): Promise<Agent> {
+    return request<Agent>(`/agents/${seg(id)}`)
+  },
+
+  /** Make an agent (blank or a duplicate). 404, 409 (a folder exists at the location), 422. */
+  createAgent(req: CreateAgentRequest): Promise<Agent> {
+    return request<Agent>('/agents', json('POST', { ...req, clientId: req.clientId ?? CLIENT_ID }), spaceConflict)
+  },
+
+  /** Register an existing agent folder; never writes into it. 404, 409 (its id is listed), 422. */
+  addAgentFolder(path: string): Promise<Agent> {
+    return request<Agent>('/agents/add-folder', json('POST', { path, clientId: CLIENT_ID }), spaceConflict)
+  },
+
+  /** Save an agent's fields. Rejects with `RevisionConflictError` (409) or `ReadOnlyError` (423). */
+  saveAgent(id: string, input: AgentInput, baseRevision: string | null): Promise<Agent> {
+    return request<Agent>(`/agents/${seg(id)}`, json('PUT', { agent: input, baseRevision, clientId: CLIENT_ID }))
+  },
+
+  /** Delete an agent: its folder goes to the agent trash; `trashId` null = only unregistered. */
+  deleteAgent(id: string): Promise<{ trashId: string | null }> {
+    return request<{ trashId: string | null }>(`/agents/${seg(id)}${qs({ clientId: CLIENT_ID })}`, { method: 'DELETE' })
+  },
+
+  /** Remove an agent from the list; its folder is left as it is. */
+  unregisterAgent(id: string): Promise<{ ok: true }> {
+    return request<{ ok: true }>(`/agents/${seg(id)}/unregister`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** The deleted agents, newest first. */
+  async agentTrash(): Promise<AgentTrashItem[]> {
+    const res = await request<{ items: AgentTrashItem[] }>('/agent-trash')
+    return res?.items ?? []
+  },
+
+  /** Put a deleted agent's folder back. 404; 409 when its id is listed again. */
+  restoreAgent(trashId: string): Promise<Agent> {
+    return request<Agent>(`/agent-trash/${seg(trashId)}/restore`, json('POST', { clientId: CLIENT_ID }), spaceConflict)
+  },
+
+  /** The agent's CLAUDE.md (`""` and `null` when there is none). */
+  agentInstructions(id: string): Promise<{ text: string; revision: string | null }> {
+    return request<{ text: string; revision: string | null }>(`/agents/${seg(id)}/instructions`)
+  },
+
+  /** Save the agent's CLAUDE.md. Rejects with `RevisionConflictError` (409) or `ReadOnlyError` (423). */
+  saveAgentInstructions(id: string, text: string, baseRevision: string | null): Promise<{ revision: string }> {
+    return request<{ revision: string }>(
+      `/agents/${seg(id)}/instructions`,
+      json('PUT', { text, baseRevision, clientId: CLIENT_ID }),
+    )
+  },
+
+  /** The tool catalogue with its default states (the New agent form). */
+  async agentToolDefaults(): Promise<ToolGroup[]> {
+    const res = await request<{ groups: ToolGroup[] }>('/agent-tools')
+    return res?.groups ?? []
+  },
+
+  /** One agent's tool switches, with a group per folder MCP server. */
+  async agentTools(id: string): Promise<ToolGroup[]> {
+    const res = await request<{ groups: ToolGroup[] }>(`/agents/${seg(id)}/tools`)
+    return res?.groups ?? []
+  },
+
+  /** One agent's chats, newest first. */
+  async agentChats(id: string): Promise<AgentChatSummary[]> {
+    const res = await request<{ chats: AgentChatSummary[] }>(`/agents/${seg(id)}/chats`)
+    return res?.chats ?? []
+  },
+
+  /** One chat's transcript. */
+  agentChat(id: string, chatId: string): Promise<AgentTranscript> {
+    return request<AgentTranscript>(`/agents/${seg(id)}/chats/${seg(chatId)}`)
+  },
+
+  /** Show the agent's folder in the OS file manager. */
+  revealAgentFolder(id: string): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>(`/agents/${seg(id)}/reveal`, json('POST', {}))
+  },
+
+  // ---- M20: remote agents ("Contract (T1)", routes filled by the plan's T5) ----
+
+  /** Fetch a remote agent's Agent Card without adding it. Writes nothing. 422, 502. */
+  previewRemoteAgent(url: string, auth: RemoteAuthInput): Promise<RemotePreview> {
+    return request<RemotePreview>('/remote-agents/preview', json('POST', { url, auth }))
+  },
+
+  /** Add a remote agent (its card is fetched again). 409 when it is already listed, 422, 502. */
+  addRemoteAgent(req: AddRemoteAgentRequest): Promise<Agent> {
+    return request<Agent>('/remote-agents', json('POST', { ...req, clientId: req.clientId ?? CLIENT_ID }), spaceConflict)
+  },
+
+  /** Save a remote agent's name, icon, colour and (when given) auth. Rejects with `RevisionConflictError` (409). */
+  saveRemoteAgent(id: string, req: SaveRemoteAgentRequest): Promise<Agent> {
+    return request<Agent>(`/remote-agents/${seg(id)}`, json('PUT', { ...req, clientId: req.clientId ?? CLIENT_ID }))
+  },
+
+  /** Fetch a remote agent's card again. 404, 422, 502. */
+  refreshRemoteAgent(id: string): Promise<Agent> {
+    return request<Agent>(`/remote-agents/${seg(id)}/refresh`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** Record that Gene confirmed context leaves this computer for this remote agent (once per agent). */
+  ackRemoteContext(id: string): Promise<{ contextNoticeAt: string }> {
+    return request<{ contextNoticeAt: string }>(
+      `/remote-agents/${seg(id)}/context-notice`,
+      json('POST', { clientId: CLIENT_ID }),
+    )
+  },
+
+  /** Show one of an agent's saved files ("<chatId>/<name>" under its files/) in the OS file manager. 404. */
+  revealAgentFile(id: string, file: string): Promise<{ ok: true }> {
+    return request<{ ok: true }>(`/agents/${seg(id)}/files/reveal`, json('POST', { file }))
+  },
+
+  // ---- M18: learning ("Contract (T1)", routes filled by the plan's T6) ----
+
+  /** The agent's MEMORY.md and USER.md. Never writes. */
+  agentMemory(id: string): Promise<{ memory: MemoryFile; user: MemoryFile }> {
+    return request<{ memory: MemoryFile; user: MemoryFile }>(`/agents/${seg(id)}/memory`)
+  },
+
+  /** Save a whole memory file. Rejects with `RevisionConflictError` (409) or `ReadOnlyError` (423). */
+  saveAgentMemory(id: string, target: MemoryFile['target'], text: string, baseRevision: string | null): Promise<MemoryFile> {
+    return request<MemoryFile>(
+      `/agents/${seg(id)}/memory/${seg(target)}`,
+      json('PUT', { text, baseRevision, clientId: CLIENT_ID }),
+    )
+  },
+
+  /** The agent's skills (active and stale), or with `archived` the archived ones. */
+  async agentSkills(id: string, archived?: boolean): Promise<SkillSummary[]> {
+    const res = await request<{ skills: SkillSummary[] }>(
+      `/agents/${seg(id)}/skills${qs({ archived: archived ? 'true' : undefined })}`,
+    )
+    return res?.skills ?? []
+  },
+
+  /** Write a new skill (`createdBy: 'user'`). 404, 409 (the name is taken), 422. */
+  createAgentSkill(id: string, req: { name: string; description: string; body: string }): Promise<SkillDetail> {
+    return request<SkillDetail>(`/agents/${seg(id)}/skills`, json('POST', { ...req, clientId: CLIENT_ID }))
+  },
+
+  /** One skill with its SKILL.md text and files. */
+  agentSkill(id: string, name: string, archived?: boolean): Promise<SkillDetail> {
+    return request<SkillDetail>(`/agents/${seg(id)}/skills/${seg(name)}${qs({ archived: archived ? 'true' : undefined })}`)
+  },
+
+  /** One file of a skill; `binary` (and `text` null) when it isn't UTF-8. */
+  agentSkillFile(
+    id: string,
+    name: string,
+    path: string,
+    archived?: boolean,
+  ): Promise<{ path: string; text: string | null; revision: string; binary: boolean }> {
+    return request<{ path: string; text: string | null; revision: string; binary: boolean }>(
+      `/agents/${seg(id)}/skills/${seg(name)}/file${qs({ path, archived: archived ? 'true' : undefined })}`,
+    )
+  },
+
+  /** Save one file of a skill. Rejects with `ConflictError` (409); 413, 422. */
+  saveAgentSkillFile(id: string, name: string, path: string, text: string, baseRevision: string | null): Promise<{ revision: string }> {
+    return request<{ revision: string }>(
+      `/agents/${seg(id)}/skills/${seg(name)}/file`,
+      json('PUT', { path, text, baseRevision, clientId: CLIENT_ID }),
+    )
+  },
+
+  /** Move a skill to the archive (restorable). */
+  archiveAgentSkill(id: string, name: string): Promise<SkillSummary> {
+    return request<SkillSummary>(`/agents/${seg(id)}/skills/${seg(name)}/archive`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** Bring an archived skill back. 409 when a skill with its name is active. */
+  restoreAgentSkill(id: string, name: string): Promise<SkillSummary> {
+    return request<SkillSummary>(`/agents/${seg(id)}/skills/${seg(name)}/restore`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** Pin or unpin a skill (the curator never touches a pinned one). */
+  pinAgentSkill(id: string, name: string, pinned: boolean): Promise<SkillSummary> {
+    return request<SkillSummary>(`/agents/${seg(id)}/skills/${seg(name)}/pin`, json('POST', { pinned, clientId: CLIENT_ID }))
+  },
+
+  /** The agent's changes, newest first; `more` when older ones exist. */
+  async agentLedger(
+    id: string,
+    query?: { target?: string; skill?: string; run?: string; limit?: number; before?: string },
+  ): Promise<{ entries: LedgerSummary[]; more: boolean }> {
+    const res = await request<{ entries: LedgerSummary[]; more: boolean }>(
+      `/agents/${seg(id)}/ledger${qs({
+        target: query?.target,
+        skill: query?.skill,
+        run: query?.run,
+        limit: query?.limit === undefined ? undefined : String(query.limit),
+        before: query?.before,
+      })}`,
+    )
+    return { entries: res?.entries ?? [], more: Boolean(res?.more) }
+  },
+
+  /** One change with its before and after text. */
+  agentLedgerEntry(id: string, entryId: string): Promise<LedgerEntry> {
+    return request<LedgerEntry>(`/agents/${seg(id)}/ledger/${seg(entryId)}`)
+  },
+
+  /** Undo one change; resolves with the new undo entry. Rejects with `ConflictError` (409) when it changed again since. */
+  undoLedgerEntry(id: string, entryId: string): Promise<LedgerSummary> {
+    return request<LedgerSummary>(`/agents/${seg(id)}/ledger/${seg(entryId)}/undo`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** The agent's learning settings, their defaults and the curator's state. */
+  agentLearning(id: string): Promise<LearningState> {
+    return request<LearningState>(`/agents/${seg(id)}/learning`)
+  },
+
+  /** Save the learning settings. Rejects with `RevisionConflictError` (409) or `ReadOnlyError` (423); 422. */
+  saveAgentLearning(id: string, learning: Partial<LearningSettings>, baseRevision: string | null): Promise<LearningState> {
+    return request<LearningState>(
+      `/agents/${seg(id)}/learning`,
+      json('PUT', { learning, baseRevision, clientId: CLIENT_ID }),
+    )
+  },
+
+  /** "Tidy up now": the curator's consolidation run, once. 409 while one runs; 503 without claude. */
+  tidyAgentSkills(id: string): Promise<{ runId: string }> {
+    return request<{ runId: string }>(`/agents/${seg(id)}/curator/tidy`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** Full-text search over the agent's chats, best first. */
+  async searchAgentChats(id: string, q: string): Promise<ChatSearchHit[]> {
+    const res = await request<{ hits: ChatSearchHit[] }>(`/agents/${seg(id)}/chats/search${qs({ q })}`)
+    return res?.hits ?? []
+  },
+
+  /** "Learn from this chat": a review on demand. 409 while one runs for the chat; 422; 503. */
+  learnFromChat(id: string, chatId: string): Promise<ReviewStatus> {
+    return request<ReviewStatus>(`/agents/${seg(id)}/chats/${seg(chatId)}/learn`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** A chat's reviews, oldest first. */
+  async chatReviews(id: string, chatId: string): Promise<ReviewStatus[]> {
+    const res = await request<{ reviews: ReviewStatus[] }>(`/agents/${seg(id)}/chats/${seg(chatId)}/reviews`)
+    return res?.reviews ?? []
+  },
+
+  // ---- M19: the MCP gateway ("Contract (T1)", routes filled by the plan's T6) ----
+  /** The outside MCP servers (file order) and why the list is read-only, if it is. Never a secret value. */
+  mcpServers(): Promise<McpServersAnswer> {
+    return request<McpServersAnswer>('/mcp-servers')
+  },
+
+  /** Add an MCP server. 409 `ApiError` with the server's message (name taken), 422, 423. */
+  createMcpServer(input: McpServerInput): Promise<McpServer> {
+    return request<McpServer>('/mcp-servers', json('POST', { server: input, clientId: CLIENT_ID }), spaceConflict)
+  },
+
+  /** Save an MCP server. Rejects with `RevisionConflictError` (409) or `ReadOnlyError` (423); 404, 422. */
+  saveMcpServer(id: string, input: McpServerInput, baseRevision: string): Promise<McpServer> {
+    return request<McpServer>(`/mcp-servers/${seg(id)}`, json('PUT', { server: input, baseRevision, clientId: CLIENT_ID }))
+  },
+
+  /** Delete an MCP server and its secrets. 404, 423. */
+  deleteMcpServer(id: string): Promise<{ ok: true }> {
+    return request<{ ok: true }>(`/mcp-servers/${seg(id)}${qs({ clientId: CLIENT_ID })}`, { method: 'DELETE' })
+  },
+
+  /** "Test": list the server's tools (also for a disabled server). 404; 422 when a secret is missing. */
+  testMcpServer(id: string): Promise<McpTestResult> {
+    return request<McpTestResult>(`/mcp-servers/${seg(id)}/test`, json('POST', {}))
+  },
+
+  /** The secret variables: every one set, plus every `${NAME}` an agent folder's `.mcp.json` uses. */
+  async mcpSecrets(): Promise<SecretVar[]> {
+    const res = await request<{ vars: SecretVar[] }>('/mcp-secrets')
+    return res?.vars ?? []
+  },
+
+  /** Set a secret variable; its value is never shown again. 422 (name rule, empty, too long). */
+  setMcpSecret(name: string, value: string): Promise<{ name: string; set: true }> {
+    return request<{ name: string; set: true }>(`/mcp-secrets/${seg(name)}`, json('PUT', { value, clientId: CLIENT_ID }))
+  },
+
+  /** Delete a secret variable. 404. */
+  deleteMcpSecret(name: string): Promise<{ ok: true }> {
+    return request<{ ok: true }>(`/mcp-secrets/${seg(name)}${qs({ clientId: CLIENT_ID })}`, { method: 'DELETE' })
+  },
+
+  /** List the agent's outside servers' tools again; answers the same groups as `agentTools`. 404. */
+  async refreshAgentTools(agentId: string): Promise<ToolGroup[]> {
+    const res = await request<{ groups: ToolGroup[] }>(`/agents/${seg(agentId)}/tools/refresh`, json('POST', {}))
+    return res?.groups ?? []
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */

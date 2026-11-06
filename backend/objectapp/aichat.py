@@ -3,7 +3,8 @@
 The type is made the first time a chat is saved (never on read): name "AI Chat", plural
 "AI Chats", with a relation property "Context" (``context``, many objects: the pages the
 chat was about) and a text property "Session" (``session``, the Claude Code session id a
-later turn resumes). A chat's body is Markdown in our own format::
+later turn resumes). M17 adds the text property "Agent" (``agent``, the name of the agent the
+chat was with), on the next save; existing chat files are never rewritten for it. A chat's body is Markdown in our own format::
 
     # <title>
 
@@ -27,13 +28,18 @@ from __future__ import annotations
 
 import copy
 import re
+from collections.abc import Callable
 from typing import Any
 
 from .ids import new_ulid
 from .typemodel import PROPERTY_ICONS, Icon, PropertyDefinition, TypeDefinition
+from .watcher import ChangeEvent
 
 __all__ = [
+    "AGENT_KEY",
     "CHAT_TYPE_NAME",
+    "agent_key",
+    "create_chat_object",
     "default_title",
     "ensure_chat_type",
     "find_chat_type",
@@ -47,6 +53,8 @@ CHAT_TYPE_ICON = "ph-chats-circle"
 CHAT_TYPE_COLOR = "violet"
 CONTEXT_KEY = "context"
 SESSION_KEY = "session"
+AGENT_KEY = "agent"
+AGENT_DESCRIPTION = "The agent this chat was with"  # our string
 TITLE_MAX = 60
 
 ROLE_HEADINGS = {"user": "You", "assistant": "Claude"}
@@ -90,8 +98,16 @@ def chat_keys(t: TypeDefinition | None) -> tuple[str | None, str | None]:
     return (ctx.key if ctx else None), (ses.key if ses else None)
 
 
+def agent_key(t: TypeDefinition | None) -> str | None:
+    """The key of the chat type's Agent property (M17), None where missing."""
+    if t is None:
+        return None
+    p = _prop(t, AGENT_KEY, "Agent", ("text", "textBlock"))
+    return p.key if p else None
+
+
 def ensure_chat_type(space) -> tuple[TypeDefinition, bool]:
-    """The AI Chat type with its Context and Session properties, made or completed as
+    """The AI Chat type with its Context, Session and Agent properties, made or completed as
     needed (through `Space.create_type` and `Space.save_type`); (type, changed)."""
     changed = False
     t = find_chat_type(space)
@@ -99,7 +115,8 @@ def ensure_chat_type(space) -> tuple[TypeDefinition, bool]:
         t = space.create_type(CHAT_TYPE_NAME, CHAT_TYPE_PLURAL, icon=CHAT_TYPE_ICON, color=CHAT_TYPE_COLOR)
         changed = True
     ctx, ses = chat_keys(t)
-    if ctx is None or ses is None:
+    agent = agent_key(t)
+    if ctx is None or ses is None or agent is None:
         taken = {p.key for p in t.propertyDefinitions}
         new = copy.deepcopy(t)
         if ctx is None:
@@ -116,6 +133,14 @@ def ensure_chat_type(space) -> tuple[TypeDefinition, bool]:
                 description="The Claude Code session this chat continues",
                 icon=Icon("iconify", PROPERTY_ICONS["text"]),
             ))
+        if agent is None:
+            taken = {p.key for p in new.propertyDefinitions}
+            key = AGENT_KEY if AGENT_KEY not in taken else f"{AGENT_KEY}-{new_ulid()[-6:].lower()}"
+            new.propertyDefinitions.append(PropertyDefinition(
+                id=key, key=key, name="Agent", type="text",
+                description=AGENT_DESCRIPTION,
+                icon=Icon("iconify", PROPERTY_ICONS["text"]),
+            ))
         _current, revision = space.refresh_type(t.id)
         space.save_type(new, revision)
         t = space.type_by_id(t.id) or new
@@ -124,6 +149,49 @@ def ensure_chat_type(space) -> tuple[TypeDefinition, bool]:
 
 
 # -- the body -------------------------------------------------------------------------
+
+
+def create_chat_object(
+    space,
+    *,
+    title: str,
+    messages: list[dict[str, Any]],
+    context_refs: list[dict[str, Any]],
+    session_id: str | None,
+    agent_name: str | None,
+    origin: str | None,
+    announce: Callable[[ChangeEvent], None],
+) -> tuple[str, str]:
+    """A new AI Chat object holding `messages` (M10's save, shared by the save route and M21's
+    schedule runs); ``(path, version)``.
+
+    Makes or completes the type first (announcing ``types`` when it changed), creates the object
+    with its Context (`context_refs`), Session (`ai.valid_session`) and Agent (`agent_name`)
+    values, then writes the body; announces ``created`` and, when the body moved the version,
+    ``changed``, all with `origin`. Raises what `Space.create_object` and `save_body` raise
+    (`InvalidValue`, `ReadOnly`, ...).
+    """
+    from .ai import valid_session  # late: ai is a large module this one doesn't otherwise need
+
+    t, type_changed = ensure_chat_type(space)
+    if type_changed:
+        announce(ChangeEvent("types", t.id, None, origin=origin))
+    ctx_key, ses_key = chat_keys(t)
+    values: dict[str, Any] = {}
+    if ctx_key:
+        values[ctx_key] = context_refs
+    if ses_key:
+        values[ses_key] = valid_session(session_id)
+    a_key = agent_key(t)
+    if a_key and agent_name is not None:
+        values[a_key] = agent_name
+    title = title or default_title(messages)
+    path, version = space.create_object(t.id, title, "none", values)
+    announce(ChangeEvent("created", path, version, origin=origin))
+    new = space.save_body(path, render_body(title, messages), version)
+    if new != version:
+        announce(ChangeEvent("changed", path, new, origin=origin))
+    return path, new
 
 
 def default_title(messages: list[dict[str, Any]]) -> str:
