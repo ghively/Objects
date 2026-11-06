@@ -28,15 +28,18 @@ from __future__ import annotations
 
 import copy
 import re
+from collections.abc import Callable
 from typing import Any
 
 from .ids import new_ulid
 from .typemodel import PROPERTY_ICONS, Icon, PropertyDefinition, TypeDefinition
+from .watcher import ChangeEvent
 
 __all__ = [
     "AGENT_KEY",
     "CHAT_TYPE_NAME",
     "agent_key",
+    "create_chat_object",
     "default_title",
     "ensure_chat_type",
     "find_chat_type",
@@ -146,6 +149,49 @@ def ensure_chat_type(space) -> tuple[TypeDefinition, bool]:
 
 
 # -- the body -------------------------------------------------------------------------
+
+
+def create_chat_object(
+    space,
+    *,
+    title: str,
+    messages: list[dict[str, Any]],
+    context_refs: list[dict[str, Any]],
+    session_id: str | None,
+    agent_name: str | None,
+    origin: str | None,
+    announce: Callable[[ChangeEvent], None],
+) -> tuple[str, str]:
+    """A new AI Chat object holding `messages` (M10's save, shared by the save route and M21's
+    schedule runs); ``(path, version)``.
+
+    Makes or completes the type first (announcing ``types`` when it changed), creates the object
+    with its Context (`context_refs`), Session (`ai.valid_session`) and Agent (`agent_name`)
+    values, then writes the body; announces ``created`` and, when the body moved the version,
+    ``changed``, all with `origin`. Raises what `Space.create_object` and `save_body` raise
+    (`InvalidValue`, `ReadOnly`, ...).
+    """
+    from .ai import valid_session  # late: ai is a large module this one doesn't otherwise need
+
+    t, type_changed = ensure_chat_type(space)
+    if type_changed:
+        announce(ChangeEvent("types", t.id, None, origin=origin))
+    ctx_key, ses_key = chat_keys(t)
+    values: dict[str, Any] = {}
+    if ctx_key:
+        values[ctx_key] = context_refs
+    if ses_key:
+        values[ses_key] = valid_session(session_id)
+    a_key = agent_key(t)
+    if a_key and agent_name is not None:
+        values[a_key] = agent_name
+    title = title or default_title(messages)
+    path, version = space.create_object(t.id, title, "none", values)
+    announce(ChangeEvent("created", path, version, origin=origin))
+    new = space.save_body(path, render_body(title, messages), version)
+    if new != version:
+        announce(ChangeEvent("changed", path, new, origin=origin))
+    return path, new
 
 
 def default_title(messages: list[dict[str, Any]]) -> str:

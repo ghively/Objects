@@ -17,6 +17,9 @@ message. Unknown line types are skipped. `raw_lines` gives every parsable line, 
 M20 adds a delegated chat's header keys ``from`` (the delegating agent's id) and ``fromChat`` (its
 chat), and a remote agent's assistant lines carry ``a2a`` (``{contextId, taskId, state}``) and
 ``attachments`` (`RemoteAttachment` list); `read` keeps both on the items.
+
+M21 adds a schedule run's header key ``schedule`` (``{ruleId, name, scheduledFor, catchUp}``);
+`read` and `list_chats` answer it (or null) as ``schedule``.
 """
 
 from __future__ import annotations
@@ -67,9 +70,11 @@ def path_for(folder: Path, chat_id: str) -> Path:
 
 def start(folder: Path, chat_id: str, *, agent_id: str, title: str, space_name: str | None,
           space_key: str | None, created_at: str, delegated: bool = False,
-          delegated_from: str | None = None, from_chat: str | None = None) -> None:
+          delegated_from: str | None = None, from_chat: str | None = None,
+          schedule: dict[str, Any] | None = None) -> None:
     """Write the header line, only when the transcript is new. A delegated chat's header also
-    names the delegating agent (``from``) and its chat (``fromChat``) when given."""
+    names the delegating agent (``from``) and its chat (``fromChat``) when given; a schedule run's
+    (M21) carries ``schedule`` (``{ruleId, name, scheduledFor, catchUp}``)."""
     path = path_for(folder, chat_id)
     header = {
         "type": "chat",
@@ -85,6 +90,8 @@ def start(folder: Path, chat_id: str, *, agent_id: str, title: str, space_name: 
         header["from"] = delegated_from
     if from_chat is not None:
         header["fromChat"] = from_chat
+    if schedule is not None:
+        header["schedule"] = schedule
     with _lock_for(path):
         path.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -215,6 +222,7 @@ def _summarize(chat_id: str, lines: list[dict[str, Any]]) -> dict[str, Any]:
         "spaceName": space.get("name") if isinstance(space, dict) else None,
         "delegated": bool(header.get("delegated")),
         "from": header.get("from") if isinstance(header.get("from"), str) else None,
+        "schedule": header.get("schedule") if isinstance(header.get("schedule"), dict) else None,
         "agentId": header.get("agentId"),
         "sessionId": session_id,
         "objectPath": object_path,
@@ -234,7 +242,8 @@ def read(folder: Path, chat_id: str) -> dict[str, Any]:
     return _summarize(chat_id, _parse(path))
 
 
-_SUMMARY_KEYS = ("id", "title", "createdAt", "updatedAt", "messageCount", "spaceName", "delegated", "from")
+_SUMMARY_KEYS = ("id", "title", "createdAt", "updatedAt", "messageCount", "spaceName", "delegated", "from",
+                 "schedule")
 
 
 def _all(folder: Path) -> list[dict[str, Any]]:

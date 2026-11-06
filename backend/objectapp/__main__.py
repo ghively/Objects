@@ -40,7 +40,8 @@ def build_server_config(
     on_switch: Callable[[Path], None] | None = None,
 ) -> uvicorn.Config:
     """The uvicorn config for `space`. Always bound to localhost."""
-    app = create_app(space, static_dir, on_switch=on_switch)
+    # M21: the app's own loopback URL, for the agent schedule runs it starts.
+    app = create_app(space, static_dir, on_switch=on_switch, base_url=f"http://{HOST}:{port}")
     # uvicorn runs off the main thread here, so it installs no signal handlers;
     # a short graceful timeout keeps a lingering connection from stalling exit.
     return uvicorn.Config(

@@ -188,6 +188,7 @@ from . import (
     learnhooks,
     mcpgateway,
     media,
+    schedulerun,
 )
 from .apictx import ApiContext
 from .computed import Computer, Obj, has_computed
@@ -856,8 +857,15 @@ def create_app(
     static_dir: Path | None = None,
     watch: bool = True,
     on_switch: Callable[[Path], None] | None = None,
+    base_url: str | None = None,
 ) -> FastAPI:
     """The app for `space`. With `watch`, a `SpaceWatcher` runs for the app's lifespan.
+
+    M21: `base_url` is the app's own loopback URL (``__main__.build_server_config`` passes it);
+    agent schedule runs give it to the agent as ``OBJECT_API_URL``. Without it (tests) they use
+    the last request's base URL the idle clock saw. With the fake notifier, ``POST
+    /api/_test/tick`` also answers ``agentJobs`` (queued or running) and ``POST
+    /api/_test/agent-schedules/idle`` waits up to 30 s for the agent jobs.
 
     `on_switch` is the launcher's ``SpaceHost.request_switch``: ``POST
     /api/spaces/switch`` calls it with the new space's folder once the response is
@@ -904,6 +912,8 @@ def create_app(
     mcpgateway.install()
     # M20: the delegation run contributors (idempotent; filled by the plan's T6).
     delegation.install()
+    # M21: the schedule-guidance run contributor (idempotent).
+    schedulerun.install()
     idle = IdleClock(lambda: space.clock())
 
     @contextlib.asynccontextmanager
@@ -1140,7 +1150,7 @@ def create_app(
 
     # M14: rules run on the engine's worker after the request returns; every write notice of
     # the space goes to it (it drops an automation's own writes: the loop guard).
-    automations = AutomationEngine(space, announce, notifier)
+    automations = AutomationEngine(space, announce, notifier, base_url=lambda: base_url or idle.base_url)
     space.after_write = automations.on_write
     app.state.automations = automations
 
@@ -2125,7 +2135,13 @@ def create_app(
                     for d in fired
                 ],
                 "automationRuns": runs,
+                "agentJobs": automations.agent_jobs.pending(),
             }
+
+        @api.post("/_test/agent-schedules/idle")
+        def test_agent_schedules_idle():
+            """Wait up to 30 s until no agent schedule job is queued or running (M21 test hook)."""
+            return {"idle": automations.agent_jobs.wait_idle(30.0)}
 
         @api.post("/_test/automations/idle")
         def test_automations_idle():
