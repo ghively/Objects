@@ -177,7 +177,7 @@ def test_full_tools_only_for_a_current_approved_approve_step(env: Env, monkeypat
     env.step(P, STEP, "approve")
     env.step(P, STEP, "decline")
     kinds = [(x["kind"], x["state"]) for x in env.entries()]
-    assert kinds == [("approve", "withdrawn"), ("approve", "withdrawn"), ("decline", "pending"), ("run", "pending")]
+    assert kinds == [("approve", "withdrawn"), ("approve", "withdrawn"), ("decline", "pending")]  # no auto-run while the agent does not act
     # reordered: a hand-written entry for an Agent step is withdrawn by the pre-run check
     env.loop.store.add({"kind": "approve", "path": P, "stepId": "t2n7vc", "stepN": 3, "stepKind": "agent",
                         "stepText": "x"}, now=NOW)
@@ -426,6 +426,75 @@ def test_failed_filing_keeps_the_capture_new(env: Env, monkeypatch: pytest.Monke
     assert not [e for e in env.entries() if e.get("capturePath") == lost["path"]]
     assert env.loop.scan_unqueued_captures() == 1
     assert [e for e in env.entries() if e.get("capturePath") == lost["path"]]
+
+
+def test_requeue_after_a_finished_entry(env: Env) -> None:
+    from objectapp import captures
+    cap = env.post("/api/work/captures", text="Printer jammed again", fromView="now")["capture"]
+    [first] = [e for e in env.entries() if e.get("capturePath") == cap["path"]]
+    again = env.loop.enqueue_capture(cap, captures.parse_prefix(cap["text"]), None)
+    assert again["id"] == first["id"]  # still pending: the same entry
+    env.loop.store.update(first["id"], state="failed", reason="x", finishedAt="2026-11-05T10:00:00Z")
+    new = env.loop.enqueue_capture(cap, captures.parse_prefix(cap["text"]), None)
+    assert new["id"] != first["id"] and new["state"] == "pending"
+    env.loop.store.update(new["id"], state="done")
+    assert env.loop.scan_unqueued_captures() == 0  # no loop-requeue of one already queued this run
+
+
+def test_opening_writes_nothing_and_auto_run_needs_acts(env: Env) -> None:
+    calls: list[int] = []
+    env.loop.stop()
+    env.loop.scan_auto_runs = lambda: calls.append(1) or 0  # type: ignore[method-assign]
+    env.loop.start()
+    env.loop.wake()
+    time.sleep(0.3)
+    assert calls == []
+    # auto-run is off while "Agent acts on my approvals" is off
+    do = env.service.item(B)["steps"][0]
+    env.service.edit_steps(B, [{"op": "add", "kind": "agent", "text": "Check the log"},
+                               {"op": "remove", "stepId": do["id"], "stepRev": do["rev"]}], GENE)
+    assert env.loop._auto_check(B) is False
+    assert not env.entries()
+
+
+def test_a_failure_before_the_run_fails_the_entry(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(*_a, **_k):
+        raise RuntimeError("prompt broke")
+
+    monkeypatch.setattr(workloop, "entry_prompt", boom)
+    env.acts()
+    env.post("/api/work/captures", text="Printer jammed again", fromView="now")
+    env.idle()
+    [e] = [x for x in env.entries() if x["kind"] == "capture"]
+    assert e["state"] == "failed" and "prompt broke" in e["reason"] and e["retryable"]
+
+
+def test_unreadable_capture_fails_and_non_new_capture_withdraws(env: Env) -> None:
+    from objectapp.workagentmodel import ALREADY_FILED
+    entry = {"kind": "breakDown", "stepId": "s", "capturePath": "x"}
+    item = {"path": P, "done": False, "steps": [{"id": "s", "state": "open"}]}
+    assert workloop.precheck(entry, item, {"status": "filed"}, NOW)[0:3:2] == ("withdraw", ALREADY_FILED)
+    assert workloop.precheck(entry, item, {"status": "new"}, NOW)[0] == "run"
+    q = {"kind": "question", "capturePath": "x"}
+    assert workloop.precheck(q, item, {"status": "filed"}, NOW)[0] == "withdraw"
+    env.acts()
+    env.loop.store.add({"kind": "capture", "capturePath": "Captures/nope.md", "by": "Gene"}, now=NOW)
+    env.loop.wake()
+    env.idle()
+    [e] = [x for x in env.entries() if x.get("capturePath") == "Captures/nope.md"]
+    assert e["state"] == "failed" and e["retryable"]
+
+
+def test_waiting_entry_does_not_starve_a_later_due_one(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    actions(monkeypatch, {"approve": [step_call("complete", "Done.")]})
+    env.acts()
+    env.step(P, STEP, "approve", not_before="2026-11-05T12:00:00Z")
+    env.loop.store.add({"kind": "capture", "capturePath": "Captures/nope.md", "by": "Gene"}, now=NOW)
+    env.loop.wake()
+    env.idle()
+    waiting = [x for x in env.entries() if x["kind"] == "approve"][0]
+    assert waiting["state"] == "pending" and waiting["notBefore"]
+    assert [x["state"] for x in env.entries() if x["kind"] == "capture"] == ["failed"]
 
 
 def test_no_agent_set(env: Env) -> None:

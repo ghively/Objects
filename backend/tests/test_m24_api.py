@@ -72,12 +72,12 @@ def test_remote_agent_is_refused(env: Env, monkeypatch: pytest.MonkeyPatch) -> N
     assert res.status_code == 422 and res.json()["detail"] == REMOTE_REFUSED
 
 
-def test_auto_run_switch_scans(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_auto_run_switch_does_not_scan_existing_items(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[int] = []
     monkeypatch.setattr(env.loop, "scan_auto_runs", lambda: calls.append(1) or 0)  # type: ignore[attr-defined]
     s = settings(env)
     assert put(env, s["settingsRevision"], autoRun=True).status_code == 200
-    assert calls == [1]
+    assert calls == []
 
 
 def test_create_info_and_create(env: Env, tmp_path: Path) -> None:
