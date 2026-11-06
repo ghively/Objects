@@ -70,8 +70,9 @@ describe('Sidebar workspaceOrder', () => {
     stored.workspaceOrder = ['objects', 'S2', 'pinned', 'S1']
     render(<Sidebar types={[SERVER]} />)
     await waitFor(() => expect(blocks()).toEqual(['objects', 'S2', 'pinned', 'S1']))
-    // The type list really sits first: "Object Types" comes before the sections' headings.
-    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    // The type list really sits first: "Object Types" comes before the sections' headings (M17's
+    // Agents section sits above the main navigation, outside the workspace blocks).
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent).filter((h) => h !== 'Agents')
     expect(headings.slice(0, 4)).toEqual(['Object Types', 'Later', 'Pinned', 'In Progress'])
   })
 
