@@ -621,6 +621,8 @@ def test_closing_the_stream_kills_the_process(space_dir: Path, fake, tmp_path: P
     # M20: a2a.py is left out on purpose; it is the one M20 module with a network client.
     "remotemodel.py", "remotesecrets.py", "remotechat.py", "delegation.py", "headless.py",
     "api_remote_agents.py", "api_agent_a2a_v1.py",
+    # M21
+    "agentschedules.py", "schedulerun.py", "api_schedules_v1.py",
 ])
 def test_ai_modules_use_no_network_client(module: str) -> None:
     tree = ast.parse((BACKEND / module).read_text(encoding="utf-8"))
