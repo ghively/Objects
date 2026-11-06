@@ -65,6 +65,7 @@ from .agents import AgentError, AgentNotFound, AgentRegistry, effective_model
 from .aichat import (
     agent_key,
     chat_keys,
+    create_chat_object,
     default_title,
     ensure_chat_type,
     find_chat_type,
@@ -527,6 +528,23 @@ def router(
         origin = req.clientId
         messages = [m.model_dump() for m in req.messages]
         title = " ".join(req.title.split())
+        agent = _agent_for(req.agentId)
+        agent_name = str(agent.data.get("name") or agent.id)
+        if not req.path:
+            # M21: the create branch is `aichat.create_chat_object`, shared with schedule runs.
+            try:
+                path, new = create_chat_object(
+                    space, title=title, messages=messages, context_refs=context_refs(req.contextPaths),
+                    session_id=req.sessionId, agent_name=agent_name, origin=origin, announce=ctx.announce,
+                )
+            except InvalidValue as exc:
+                return _error(422, str(exc))
+            except ReadOnly as exc:
+                return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+            except ValueError as exc:
+                return _error(400, str(exc))
+            record_object(agent.id, req.chatId, path)
+            return {"path": path, "version": new}
         try:
             t, type_changed = ensure_chat_type(space)
         except InvalidValue as exc:
@@ -536,19 +554,9 @@ def router(
         ctx_key, ses_key = chat_keys(t)
         values: dict[str, Any] = {ctx_key: context_refs(req.contextPaths), ses_key: ai.valid_session(req.sessionId)}
         a_key = agent_key(t)
-        agent = _agent_for(req.agentId)
         if a_key:
-            values[a_key] = str(agent.data.get("name") or agent.id)
+            values[a_key] = agent_name
         try:
-            if not req.path:
-                title = title or default_title(messages)
-                path, version = space.create_object(t.id, title, "none", values)
-                announce("created", path, version, origin)
-                new = space.save_body(path, render_body(title, messages), version)
-                if new != version:
-                    announce("changed", path, new, origin)
-                record_object(agent.id, req.chatId, path)
-                return {"path": path, "version": new}
             rel = space._rel(req.path)
             summary = space.get(rel)
             if summary.type != t.id:

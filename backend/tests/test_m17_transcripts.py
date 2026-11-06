@@ -123,7 +123,7 @@ def test_list_newest_first(folder: Path) -> None:
     assert {c["id"] for c in chats} == set(ids)
     first = chats[0]
     assert first == {"id": ids[0], "title": "Chat 0", "createdAt": T0, "updatedAt": T3, "messageCount": 2,
-                     "spaceName": "Space 0", "delegated": False, "from": None}
+                     "spaceName": "Space 0", "delegated": False, "from": None, "schedule": None}
     by_id = {c["id"]: c for c in chats}
     assert by_id[ids[1]]["spaceName"] is None
     assert by_id[ids[2]]["spaceName"] == "Space 2"
