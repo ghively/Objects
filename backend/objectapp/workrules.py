@@ -87,6 +87,10 @@ WITHDRAW_FIRST = "Withdraw the approval before changing this step."
 DONE_APPROVE_FIXED = "A done Approve step can't be changed."
 OPEN_ONLY_KIND = "Only an open step changes kind."
 AGENTS_CANT_CHANGE = "Agents can't change an approved or done Approve step."
+AGENTS_CANT_RESHAPE_APPROVE = (
+    "Agents can't move or remove an Approve step, or change a step to or from Approve."
+)
+AGENTS_CANT_PASS_APPROVE = "Agents can't put an Agent step ahead of an Approve step."
 STEP_ONE_LINE = "A step is one line."
 STEP_NEEDS_TEXT = "A step needs text."
 STEP_TOO_LONG = f"A step is at most {MAX_STEP_TEXT} characters."
@@ -451,6 +455,12 @@ def _locked_for_agent(step: Step) -> bool:
     return step.kind == "approve" and step.state in ("approved", "done")
 
 
+def _gate_in(steps: Sequence[Step]) -> bool:
+    """True when an Approve step among ``steps`` still waits (open, or approved and not done):
+    an Agent step the agent puts in front of it would run before the approval."""
+    return any(s.kind == "approve" and s.state in ("open", "approved") for s in steps)
+
+
 def apply_op(steps: Sequence[Step], op: Mapping[str, Any], role: WorkRole, *, now: datetime,
              new_id: Callable[[set[str]], str]) -> list[Step]:
     """The step list after one op (``add``, ``edit``, ``move``, ``remove``; a new list).
@@ -470,6 +480,8 @@ def apply_op(steps: Sequence[Step], op: Mapping[str, Any], role: WorkRole, *, no
         text = _step_text(op.get("text"))
         before = op.get("before")
         at = len(out) if before is None else _find(out, before)
+        if role == "agent" and kind == "agent" and _gate_in(out[at:]):
+            raise IllegalMove(AGENTS_CANT_PASS_APPROVE)
         out.insert(at, Step(id=new_id(_taken(out)), kind=kind, state="open", text=text,
                             addedAt=iso_instant(now)))
         return out
@@ -479,6 +491,14 @@ def apply_op(steps: Sequence[Step], op: Mapping[str, Any], role: WorkRole, *, no
     step = out[i]
     if role == "agent" and _locked_for_agent(step):
         raise IllegalMove(AGENTS_CANT_CHANGE)
+    # The approval gate: an agent can't take an open Approve step out of the way either (remove
+    # it, move it, or turn it into another kind), nor turn a step into an Approve step.
+    if role == "agent":
+        if name in ("remove", "move") and step.kind == "approve":
+            raise IllegalMove(AGENTS_CANT_RESHAPE_APPROVE)
+        if name == "edit" and op.get("kind") is not None:
+            if (step.kind == "approve") != (_kind(op.get("kind")) == "approve"):
+                raise IllegalMove(AGENTS_CANT_RESHAPE_APPROVE)
     if name == "remove":
         del out[i]
         return out
@@ -488,6 +508,9 @@ def apply_op(steps: Sequence[Step], op: Mapping[str, Any], role: WorkRole, *, no
         target = None if before is None else out[_find(out, before)]
         if target is step:
             return out
+        to = len(out) if target is None else next(j for j, s in enumerate(out) if s is target)
+        if role == "agent" and step.kind == "agent" and to < i and _gate_in(out[to:i]):
+            raise IllegalMove(AGENTS_CANT_PASS_APPROVE)
         out.pop(i)
         if target is None:
             out.append(step)
