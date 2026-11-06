@@ -19,7 +19,7 @@ from typing import Any
 import pytest
 from fake_claude import install
 from objectapp import agentrun, ai, toolcatalog
-from objectapp.agentmodel import DEFAULT_AGENT_ID, PROTECTED
+from objectapp.agentmodel import DEFAULT_AGENT_ID, PROTECTED, SELF_LOADED
 from objectapp.agentrun import (
     CLI_FLAGS,
     NESTED_MESSAGE,
@@ -336,14 +336,20 @@ def test_fence_rules_cover_awkward_paths(env) -> None:
         rp = rule_path(f.resolve())
         assert key(f"Read({rp}/**)") in deny_keys, rp
         assert key(f"Edit({rp}/**)") in deny_keys, rp
-    if linked:
+    if linked:  # the registry keeps resolved paths: a registered link is fenced at its target
         assert not any("link-to-space" in r for r in deny)
+        # A space opened through the link is fenced under the link path and its target.
+        via = _build(_scope(env, space=tmp / "link-to-space")).run_settings["permissions"]["deny"]
+        via_keys = {key(r) for r in via}
+        for p in (Path(os.path.abspath(tmp / "link-to-space")), target.resolve()):
+            assert key(f"Read({rule_path(p)}/**)") in via_keys and key(f"Edit({rule_path(p)}/**)") in via_keys
     for f in folders:
         assert not any(_form(f) in t for t in cmd.args)  # path rules never reach the command line
     assert all("(" not in t for t in _value(cmd.args, "--disallowedTools").split(","))
     own = rule_path(env["folder"].resolve())
-    for p in PROTECTED:
+    for p in (*PROTECTED, *SELF_LOADED):
         assert f"Edit({own}/{p})" in deny
+    assert f"Edit({own}/.mcp.json)" in deny and f"Edit({own}/CLAUDE.local.md)" in deny
     st = rule_path(env["state"].resolve())
     assert {f"Read({st}/*)", f"Edit({st}/*)", f"Read({st}/automation-logs-*/**)"} <= set(deny)
     home = rule_path(Path.home().resolve())
@@ -356,7 +362,51 @@ def test_fence_rules_shape(tmp_path: Path) -> None:
     rules = fence_rules([tmp_path / "S"], tmp_path / "A", tmp_path / "st", tmp_path / "h")
     s = rule_path((tmp_path / "S").resolve())
     assert rules[:2] == [f"Read({s}/**)", f"Edit({s}/**)"]
-    assert len(rules) == 2 + 3 + 3 + 3
+    assert len(rules) == 2 + 5 + 3 + 3
+
+
+def test_fake_write_to_own_server_and_local_files_is_denied(env) -> None:
+    """The agent's own .mcp.json and CLAUDE.local.md load on its next turn: Write is denied on
+    them, so a prompt-injected Write can't add a server or rewrite the soul."""
+    from fake_claude import __file__ as fake_path
+
+    folder = env["folder"]
+    cmd = _build(_scope(env))
+    settings = cmd.tmp / "run-settings.json"
+    assert settings.is_file()
+    prompt = "\n".join([
+        f"FAKE:write:{folder / '.mcp.json'}",
+        f"FAKE:write:{folder / 'CLAUDE.local.md'}",
+        f"FAKE:write:{folder / 'notes.md'}",
+    ])
+    run_env = {k: v for k, v in os.environ.items() if k != "FAKE_CLAUDE_LOG"}
+    import subprocess
+
+    res = subprocess.run(
+        [sys.executable, fake_path, "-p", "--output-format", "stream-json", "--settings", str(settings)],
+        input=prompt, capture_output=True, text=True, encoding="utf-8", cwd=folder, env=run_env, timeout=60,
+    )
+    assert res.returncode == 0, res.stderr
+    results = [
+        b for line in res.stdout.splitlines() if line.strip()
+        for e in [json.loads(line)] if e.get("type") == "user"
+        for b in e["message"]["content"] if b.get("type") == "tool_result"
+    ]
+    assert [r.get("content") for r in results] == [
+        "Permission to use Write has been denied.", "Permission to use Write has been denied.", "wrote",
+    ]
+
+
+def test_fence_covers_the_cache_dir_override(env, monkeypatch) -> None:
+    cache = env["tmp"] / "cache-override"
+    cache.mkdir()
+    monkeypatch.setenv("OBJECT_CACHE_DIR", str(cache))
+    deny = _build(_scope(env)).run_settings["permissions"]["deny"]
+    rp = rule_path(cache.resolve())
+    assert f"Read({rp}/**)" in deny and f"Edit({rp}/**)" in deny
+    monkeypatch.delenv("OBJECT_CACHE_DIR")
+    deny = _build(_scope(env)).run_settings["permissions"]["deny"]
+    assert f"Read({rp}/**)" not in deny
 
 
 def test_fence_folders(env) -> None:

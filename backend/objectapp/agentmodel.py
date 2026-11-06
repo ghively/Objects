@@ -34,6 +34,7 @@ __all__ = [
     "PROTECTED",
     "REGISTRY_FILE",
     "SCHEMA_VERSION",
+    "SELF_LOADED",
     "SESSIONS_DIR",
     "SHELL_WARNING",
     "TRASH_DIR",
@@ -62,6 +63,9 @@ AGENT_FILE = ".object-agent/agent.json"
 SESSIONS_DIR = ".object-agent/sessions"
 PROTECTED = ("CLAUDE.md", ".claude/**", ".object-agent/**")
 """Built-in Write/Edit is denied on these in the agent's own folder (spec section 3)."""
+SELF_LOADED = (".mcp.json", "CLAUDE.local.md")
+"""Files the CLI loads from the agent's folder on the next turn (its servers, extra instructions):
+denied to Write/Edit beside `PROTECTED`, so the agent can't add a server or rewrite its soul."""
 GITIGNORE = "settings.local.json\ncache/\n"
 """Written on create (spec section 1, verbatim)."""
 AGENT_ID = r"^(?:assistant|[0-9A-HJKMNP-TV-Z]{26})$"

@@ -25,7 +25,8 @@ from objectapp.spaces import Registry
 
 ULID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 NESTED = "An agent folder can't be inside a space folder or hold one."
-PROTECTED_RULES = ["Edit(./CLAUDE.md)", "Edit(./.claude/**)", "Edit(./.object-agent/**)"]
+PROTECTED_RULES = ["Edit(./CLAUDE.md)", "Edit(./.claude/**)", "Edit(./.object-agent/**)", "Edit(./.mcp.json)",
+                   "Edit(./CLAUDE.local.md)"]
 
 
 @pytest.fixture

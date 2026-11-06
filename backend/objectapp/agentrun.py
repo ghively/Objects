@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from . import toolcatalog
-from .agentmodel import AGENTS_DIR, TRASH_DIR
+from .agentmodel import AGENTS_DIR, PROTECTED, SELF_LOADED, TRASH_DIR
 from .jsonstore import dump_json
 
 if TYPE_CHECKING:  # agents (T2) imports toolcatalog; this module only needs the type
@@ -212,16 +212,28 @@ def _dedupe(paths: Iterable[Path]) -> list[Path]:
 
 
 def fence_folders(scope: RunScope, spaces: list[Path], agents: list[Path]) -> list[Path]:
-    """The folders a run's file tools are fenced away from, resolved, duplicates removed.
+    """The folders a run's file tools are fenced away from, absolute, duplicates removed.
 
     Every registered space (`spaces`, plus the open one even when it isn't registered), every
-    other local agent folder (`agents` minus the run's own) and ``<state>/agents/.trash``.
+    other local agent folder (`agents` minus the run's own) and ``<state>/agents/.trash``. Each
+    folder is listed as given (made absolute) and resolved, so a space registered through a
+    junction or symlink is fenced under both paths.
     """
     own = Path(scope.agent.folder).resolve()
-    found = [Path(p).resolve() for p in [*spaces, scope.space_root]]
-    found += [Path(p).resolve() for p in agents if _key(Path(p).resolve()) != _key(own)]
-    found.append((Path(scope.state) / AGENTS_DIR / TRASH_DIR).resolve())
+    found: list[Path] = []
+    for p in [*spaces, scope.space_root]:
+        found += _both_forms(Path(p))
+    for p in agents:
+        if _key(Path(p).resolve()) != _key(own):
+            found += _both_forms(Path(p))
+    found += _both_forms(Path(scope.state) / AGENTS_DIR / TRASH_DIR)
     return _dedupe(found)
+
+
+def _both_forms(p: Path) -> list[Path]:
+    """`p` made absolute (links kept) and `p` resolved (links followed)."""
+    given = Path(os.path.abspath(p))
+    return [given, p.resolve()]
 
 
 def rule_path(p: Path) -> str:
@@ -244,10 +256,10 @@ def fence_rules(folders: list[Path], own: Path, state: Path, home: Path) -> list
     """
     rules: list[str] = []
     for f in folders:
-        rp = rule_path(Path(f).resolve())
+        rp = rule_path(Path(os.path.abspath(f)))
         rules += [f"Read({rp}/**)", f"Edit({rp}/**)"]
     o = rule_path(Path(own).resolve())
-    rules += [f"Edit({o}/CLAUDE.md)", f"Edit({o}/.claude/**)", f"Edit({o}/.object-agent/**)"]
+    rules += [f"Edit({o}/{p})" for p in (*PROTECTED, *SELF_LOADED)]
     s = rule_path(Path(state).resolve())
     rules += [f"Read({s}/*)", f"Edit({s}/*)", f"Read({s}/automation-logs-*/**)"]
     h = rule_path(Path(home).resolve())
@@ -387,6 +399,9 @@ def _fence(scope: RunScope, parts: RunParts) -> None:
     problem = nesting_problem(own, folders)
     if problem:
         raise RunRefused(problem)
+    cache = os.environ.get("OBJECT_CACHE_DIR")
+    if cache:  # spaces' search index and frontmatter cache live here, outside the space folders
+        folders = _dedupe([*folders, *_both_forms(Path(cache))])
     for rule in fence_rules(folders, own, scope.state, Path.home()):
         if rule not in parts.deny_rules:
             parts.deny_rules.append(rule)

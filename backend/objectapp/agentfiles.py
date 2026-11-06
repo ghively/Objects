@@ -25,7 +25,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from .agentmodel import AGENT_FILE, GITIGNORE, PROTECTED, SESSIONS_DIR
+from .agentmodel import AGENT_FILE, GITIGNORE, PROTECTED, SELF_LOADED, SESSIONS_DIR
 from .jsonstore import dump_json, parse_json_object
 from .textfile import atomic_write, create_new
 from .toolcatalog import catalogue
@@ -54,9 +54,9 @@ def _revision(data: bytes) -> str:
 
 
 def _protected_rules() -> list[str]:
-    """`PROTECTED` as folder-relative deny rules: ``Edit(./CLAUDE.md)``... (the agent's folder is
-    the run's working folder, so the rules travel with a copied or shared folder)."""
-    return [f"Edit(./{p})" for p in PROTECTED]
+    """`PROTECTED` and `SELF_LOADED` as folder-relative deny rules: ``Edit(./CLAUDE.md)``... (the
+    agent's folder is the run's working folder, so the rules travel with a copied or shared folder)."""
+    return [f"Edit(./{p})" for p in (*PROTECTED, *SELF_LOADED)]
 
 
 def _create_if_absent(path: Path, data: bytes) -> None:
