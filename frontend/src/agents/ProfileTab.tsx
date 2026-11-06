@@ -4,7 +4,7 @@
  * is Settings' model (`aiModel`): the route writes it there, and Settings is reloaded after. On a
  * 409 the tab reloads the agent and asks for the change again. "Folder" shows the path with an
  * "Open folder" button; folder MCP servers missing secrets say so (the values come in M19);
- * "Remove from list" unregisters an agent that isn't the default one. A read-only agent shows
+ * "Remove" unregisters an agent that isn't the default one. A read-only agent shows
  * its reason and every field is disabled.
  *
  * M19: each variable in "Needs secrets: …" has a "Set…" button that opens the Set dialog; after
@@ -35,7 +35,7 @@ export const PROFILE_TEXT = {
   openFolder: 'Open folder',
   servers: 'Folder MCP servers',
   needsSecrets: (vars: string[]) => `Needs secrets: ${vars.join(', ')}`,
-  removeFromList: 'Remove from list',
+  removeFromList: 'Remove',
   removed: 'Removed from the list. Its folder was left where it is.',
   conflict: 'This agent was changed elsewhere. Its latest settings are shown: apply your change again.',
   missing: "This agent's folder is missing.",
