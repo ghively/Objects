@@ -8,6 +8,7 @@ import { api } from '@/api/client'
 import type { AlertRow, AlertSeverity, AlertSourceStatus } from '@/api/types'
 import { formatInZone } from '@/lib/zonedTime'
 import { Chip, type ChipTone } from '../components/Chip'
+import { safeUrl } from '../panel/WorkHeader'
 import { openItemPanel } from '../state/workActions'
 import { workToast } from '../state/workToasts'
 import { useWorkData, type WorkDataState } from '../state/useWorkData'
@@ -29,6 +30,7 @@ const time = (iso: string, zone: string | undefined, today: string | undefined) 
 }
 
 function Row({ a, zone, today }: { a: AlertRow; zone: string | undefined; today: string | undefined }): JSX.Element {
+  const link = safeUrl(a.link)
   return (
     <li data-alert={a.path} className="flex min-h-9 min-w-0 flex-wrap items-center gap-x-2 border-b border-line px-1 py-1 text-[13px]">
       <Chip tone={TONE[a.severity]}>
@@ -41,8 +43,8 @@ function Row({ a, zone, today }: { a: AlertRow; zone: string | undefined; today:
       {(a.clearedAt ?? a.raisedAt) && (
         <span className="shrink-0 text-[12px] tabular-nums text-fg-muted">{time((a.clearedAt ?? a.raisedAt) as string, zone, today)}</span>
       )}
-      {a.link && (
-        <a href={a.link} target="_blank" rel="noreferrer" className="shrink-0 text-[12px] text-[var(--work-you)] hover:underline">
+      {link && (
+        <a href={link} target="_blank" rel="noreferrer" className="shrink-0 text-[12px] text-[var(--work-you)] hover:underline">
           {OPEN_LINK}
         </a>
       )}
