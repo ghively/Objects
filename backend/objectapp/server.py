@@ -239,7 +239,6 @@ from .space import (
     Space,
 )
 from .spaceconfig import SpaceConfigProblem, space_fields
-from .spaceconfig import read as read_space_config
 from .spaceconfig import patch as patch_space_config
 from .spaces import Registry, SpaceNameProblem, create_space, normalize
 from .typedefs import has_undecodable
@@ -2172,7 +2171,9 @@ def create_app(
     api.include_router(api_learning_v1.router(ctx))
     # M22: one work service per app; the app's work routes and the agents' (filled by T9).
     def jira_site() -> str | None:
-        site = read_space_config(space.root)[0].get("jiraSite")
+        # `space_fields` checks the address (http(s) only), so a hand-edited value never
+        # becomes a ticket link.
+        site = space_fields(space.root)["jiraSite"]
         return site if isinstance(site, str) and site else None
 
     def activity_name() -> str:
