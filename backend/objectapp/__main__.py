@@ -22,7 +22,7 @@ from pathlib import Path
 
 import uvicorn
 
-from . import settings
+from . import settings, windowhost
 from .appstate import state_dir
 from .server import create_app
 from .space import ReadOnly, Space
@@ -194,6 +194,12 @@ def main(argv: list[str] | None = None) -> None:
             import webview
 
             webview.create_window("Object", url, width=1440, height=900)
+            # M23: Keep on top opens a small always-on-top window at /?mini=work.
+            windowhost.set_opener(
+                lambda u: webview.create_window(
+                    "Object focus", u, width=360, height=470, on_top=True
+                )
+            )
             webview.start()
     except KeyboardInterrupt:
         pass
