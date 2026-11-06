@@ -282,13 +282,17 @@ class M23:
 
     # 9 ---------------------------------------------------------------------------------
     def seams(self) -> None:
-        print("\n9. The M24 seams")
+        print("\n9. The agent and capture routes (M24 fills M23's seams)")
         code, a = self.http("GET", "/work/agent")
         carrying = sum(1 for i in self.board().values() if i["turn"] == "agent")
-        self.run.report(code == 200 and a["available"] is False and a["carrying"] == carrying,
+        self.run.report(code == 200 and a["available"] is True and a["carrying"] == carrying,
                         f"agent: available {a.get('available')}, carrying {a.get('carrying')} (board {carrying})")
         code, r = self.http("POST", "/work/captures", {"text": "x", "fromView": "now"})
-        self.run.report(code == 501 and r.get("detail") == "Saving a brain dump comes with M24.", f"capture: {code} {r}")
+        path = r.get("capture", {}).get("path") if isinstance(r, dict) else None
+        self.run.report(code == 201 and path, f"capture saved: {code} {path}")
+        if path:
+            self.made.add(path)
+            self.made.add(".object/types/capture.json")
         code, r = self.http("POST", "/work/keep-on-top", {})
         self.run.report(code == 501 and r.get("detail") == "Keep on top needs the Object window.", f"keep on top: {code} {r}")
 
@@ -303,7 +307,7 @@ class M23:
         missing = sorted(self.made - set(changed))
         self.run.report(not extra and not missing, f"{len(changed)} files changed",
                         *([f"unexpected {extra}"] if extra else []), *([f"missing {missing}"] if missing else []))
-        work = sorted(f for f in self.state_files() if "work" in f.lower() and not f.startswith("work-alerts-")
+        work = sorted(f for f in self.state_files() if "work" in f.lower() and not f.startswith(("work-alerts-", "work-queue-"))
                       and "history" not in f.lower() and not f.endswith("/"))
         work = [f for f in work if Path(self.state, f).is_file()]
         self.run.report(not work, f"no other work files in the state dir {work}")
