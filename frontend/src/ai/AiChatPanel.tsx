@@ -629,7 +629,8 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
             proposal: finished.proposal,
             target,
             skipped: finished.skipped,
-            ...(hasSteps(parts) ? { parts } : {}),
+            // A step still pending when 'done' arrives never got its result: it shows as stopped.
+            ...(hasSteps(parts) ? { parts: stopSteps(parts) } : {}),
           },
         ])
         void save()
