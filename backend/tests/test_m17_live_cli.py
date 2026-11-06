@@ -445,3 +445,83 @@ def test_builtin_names(tmp_path: Path) -> None:
     assert set(missing) <= {"TodoWrite"}, missing
     for name in toolcatalog.ALWAYS_ALLOWED:
         assert name in tools
+
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+
+
+@live
+def test_object_tool_is_callable(tmp_path: Path) -> None:
+    """(spike, T11) One turn built by ``agentrun.build_run`` with the real ``objectapp-mcp``
+    against a temp copy of ``space-sample``: under ``dontAsk`` the Object ``search`` tool is
+    offered and runs (not refused, not hidden behind a deferred-tool step)."""
+    import socket
+    import threading
+    import time
+
+    import httpx
+    import uvicorn
+
+    from objectapp import agentrun
+    from objectapp.agents import AgentRegistry
+    from objectapp.server import create_app
+    from objectapp.space import Space
+    from objectapp.tokens import TokenStore
+
+    root = Path(tmp_path).resolve() / "space-sample"
+    shutil.copytree(FIXTURES / "space-sample", root, ignore=shutil.ignore_patterns(".git", ".object-cache"))
+    space = Space(root)
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    server = uvicorn.Server(uvicorn.Config(create_app(space, None, watch=False), host="127.0.0.1",
+                                           port=port, log_level="warning"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{port}"
+    for _ in range(400):
+        try:
+            if httpx.get(base + "/api/space", timeout=2).status_code == 200:
+                break
+        except httpx.HTTPError:
+            pass
+        time.sleep(0.05)
+    registry = AgentRegistry()
+    agent = registry.ensure_default()
+    _record, secret = TokenStore(root).ephemeral(agent.data["name"], "read", agent=agent.id, chat=None)
+    cmd = None
+    try:
+        scope = agentrun.RunScope(
+            agent=agent, space_root=root, space_name=space.name, api_url=base, token=secret, write=False,
+            chat_id="01JC7ZK3T9Q4M2X8B5N6R1V0WE", purpose="chat", state=registry.state,
+        )
+        cmd = agentrun.build_run(scope, claude=_claude(), model=MODEL, resume=None)
+        debug = Path(tmp_path).resolve() / "object-tool-debug.log"
+        args = [*cmd.args, "--no-session-persistence", "--debug-file", str(debug)]
+        res = subprocess.run(
+            args, input="Use the Object search tool to search the notes for \"Ada\", then say how many results "
+                         "it found. Don't use any other tool.",
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            cwd=cmd.cwd, env=cmd.env, timeout=TIMEOUT,
+        )
+    finally:
+        TokenStore.drop_ephemeral(secret)
+        if cmd is not None:
+            shutil.rmtree(cmd.tmp, ignore_errors=True)
+        server.should_exit = True
+        thread.join(timeout=10)
+    events = []
+    for line in res.stdout.splitlines():
+        try:
+            events.append(json.loads(line))
+        except ValueError:
+            continue
+    assert any(e.get("type") == "result" for e in events), res.stderr[-2000:]
+    tools = _init(events).get("tools") or []
+    print("init tools:", tools)
+    calls = _tool_calls(events)
+    print("tool calls:", [(u.get("name"), _result_text(r)[:120]) for u, r in calls])
+    print("answer:", _final(events)[:300])
+    searches = [(u, r) for u, r in calls if u.get("name") == "mcp__object__search"]
+    assert searches, f"search was never called; tools offered: {tools}"
+    assert all(r is not None and not r.get("is_error") for _u, r in searches), searches

@@ -610,7 +610,10 @@ def test_closing_the_stream_kills_the_process(space_dir: Path, fake, tmp_path: P
 # -- no network -----------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("module", ["ai.py", "aichat.py", "api_ai.py", "aimodels.py"])
+@pytest.mark.parametrize("module", [
+    "ai.py", "aichat.py", "api_ai.py", "aimodels.py",
+    "agentmodel.py", "toolcatalog.py", "agents.py", "agentfiles.py", "transcripts.py", "agentrun.py", "api_agents.py",
+])
 def test_ai_modules_use_no_network_client(module: str) -> None:
     tree = ast.parse((BACKEND / module).read_text(encoding="utf-8"))
     names: set[str] = set()

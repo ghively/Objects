@@ -22,7 +22,7 @@ import { AGENT_PICKER_TEXT } from './AgentPicker'
 import { AiChatHeader } from './AiChatHeader'
 import { AiChatPanel } from './AiChatPanel'
 import { assertInert } from './markdown'
-import { noticeKey, revealAiChat } from './reveal'
+import { noticeKey, revealAiChat, useAiFocus } from './reveal'
 import { AI_CHAT_TEXT as T } from './aiText'
 import { openAiChat, resetAiStore, useAi } from './store'
 
@@ -86,6 +86,9 @@ beforeEach(() => {
   localStorage.setItem(noticeKey('/space'), '1')
   s().reset()
   resetAiStore()
+  // A focus request from an earlier test (Ctrl+Alt+J) would focus the input on the next mount
+  // and close a popover opened before the frame runs.
+  useAiFocus.setState({ n: 0 })
   resetLinkIndex()
   resetSpaceInfo()
   resetAgents()

@@ -167,3 +167,19 @@ from inside a Claude Code terminal, `build_run`'s environment (today `os.environ
   call it did make on the space was denied)
 - `test_builtin_names`: pass (with the To-do list row allowed to be absent)
 - `test_user_setup_never_reaches_a_run`: **fails** on Gene's user `CLAUDE.md` (the stop-and-ask above)
+
+## The Object tool under `dontAsk` (T11, 2026-11-06)
+
+`OBJECT_LIVE_CLAUDE=1 uv run pytest backend/tests/test_m17_live_cli.py -q -s -k object_tool` (CLI
+2.1.317, `haiku`, `--no-session-persistence`): one turn built by `agentrun.build_run` (the default
+agent, `write=False`, a `read` token) with the real `objectapp-mcp` against a temp copy of
+`space-sample` served on `127.0.0.1`, asked to search the notes for "Ada".
+
+- `init.tools` lists all 20 Object read tools and `mcp__object-agent__agent_info`, and `ToolSearch`.
+- The model called `ToolSearch` first (its result was empty text, not an error), then
+  `mcp__object__search`, which ran and answered 5 results. Nothing was refused.
+- So `ToolSearch` is offered under `--tools default` and isn't refused under `dontAsk` without being
+  in `--allowedTools`: `toolcatalog.ALWAYS_ALLOWED` stays `("Skill",)`.
+  `test_object_tool_is_callable` holds the check.
+
+The whole live file then passed once through `agentrun`'s own names (7 passed in 96 s).
