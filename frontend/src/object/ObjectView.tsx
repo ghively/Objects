@@ -79,6 +79,7 @@ import { TaskStatsSection } from '@/tasks/TaskStatsSection'
 import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 import { isWorkType } from '@/types/WorkFieldsSection'
 import { ResolutionNoteSection } from '@/work/ResolutionNote'
+import { WorkHeader } from '@/work/panel/WorkHeader'
 
 // Raw mode (CodeMirror) loads when first switched to, not with the shell (audit 2026-11-01 F1).
 const RawMode = lazyWithReload(() => import('@/editor/RawMode').then((m) => ({ default: m.RawMode })))
@@ -115,6 +116,12 @@ export interface ObjectViewProps {
   onDismiss?: () => void
   /** Bottom-right slot (the peek's pager). */
   footer?: ReactNode
+  /**
+   * M23: the item panel. A work item shows the work header above its title (its writes go through
+   * this view's `writes.work`), and the header carries the Resolution note, so M22's under-panel
+   * copy is left out.
+   */
+  workHeader?: boolean
 }
 
 /** The summary fields a property write changes, read back from the written frontmatter. */
@@ -264,6 +271,7 @@ export function ObjectView({
   onVersion,
   menuSlot,
   onDeleted,
+  workHeader,
 }: ObjectViewProps) {
   const [detail, setDetail] = useState<ObjectDetail | null>(null)
   /** Mirrors `detail` for callbacks that must not wait for a render (a work write's result). */
@@ -909,6 +917,8 @@ export function ObjectView({
   /** M22: a work item with a Ticket ID shows its resolution note. */
   const ticketId = detail?.frontmatter.ticketId
   const isTicket = !!summary && !isTemplate && isWorkType(type) && typeof ticketId === 'string' && ticketId.trim() !== ''
+  /** M23: the item panel's work header (a work item, not a template). */
+  const showWorkHeader = !!workHeader && !!summary && !isTemplate && isWorkType(type)
   // M22: a work item's steps and floor items are shown as the server decodes them (each with its
   // id and rev, which step actions send back): read once per stored value (a load, an external
   // change), taken from a work write's result otherwise. Reading never writes.
@@ -964,7 +974,7 @@ export function ObjectView({
         variant={variant}
       />
       {/* M22: a ticket's resolution note (two copy-ready texts), collapsed by default. */}
-      {isTicket && (
+      {isTicket && !showWorkHeader && (
         <ResolutionNoteSection
           path={path}
           version={version}
@@ -1461,14 +1471,17 @@ export function ObjectView({
         onLayoutChange={propsReadOnly ? undefined : (patch) => writeProperties({ ...patch })}
         inspector={mode === 'page' ? { getMarkdown, dailyNote } : undefined}
         header={
-          <ObjectHeader
-            summary={summary}
-            type={type}
-            readOnly={propsReadOnly}
-            onRename={(title) => void writes.rename(title)}
-            onPropertiesChange={writeProperties}
-            onOpenTag={onOpenTag}
-          />
+          <>
+            {showWorkHeader && <WorkHeader path={path} work={writes.work} />}
+            <ObjectHeader
+              summary={summary}
+              type={type}
+              readOnly={propsReadOnly}
+              onRename={(title) => void writes.rename(title)}
+              onPropertiesChange={writeProperties}
+              onOpenTag={onOpenTag}
+            />
+          </>
         }
         body={
           <>
