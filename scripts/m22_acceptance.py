@@ -394,7 +394,7 @@ class M22:
                         f"changed: {changed}", *([f"unexpected {extra}"] if extra else []),
                         *([f"missing {missing}"] if missing else []))
         work_state = sorted(str(p.relative_to(self.state)) for p in self.state.rglob("*")
-                            if "work" in p.name.lower())
+                            if "work" in p.name.lower() and not p.name.startswith("work-queue-"))  # M24's queue
         self.run.report(not work_state, f"no work files in the state dir {work_state}")
 
 
