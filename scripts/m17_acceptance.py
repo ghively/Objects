@@ -262,7 +262,8 @@ def main(argv: list[str] | None = None) -> int:
         rchat = next((e for e in events if e["type"] == "chat"), {}).get("chatId", "?")
         file = rfolder / ".object-agent" / "sessions" / f"{rchat}.jsonl"
         lines = [json.loads(x) for x in file.read_text(encoding="utf-8").splitlines()] if file.is_file() else []
-        run.report([x.get("type") for x in lines] == ["chat", "user", "assistant"],
+        # M18: a chat's first run also writes the frozen memory snapshot line.
+        run.report([x.get("type") for x in lines] == ["chat", "user", "memory", "assistant"],
                    f"transcript lines: {[x.get('type') for x in lines]}")
         code, chats = run.http("GET", f"/agents/{rid}/chats")
         run.report(code == 200 and [c["id"] for c in chats.get("chats", [])] == [rchat],

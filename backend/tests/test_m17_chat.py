@@ -208,8 +208,9 @@ def test_transcript_written(api, fake) -> None:
     _wait(published, 2)
     folder = state_dir() / "agents" / "Assistant"
     lines = [json.loads(x) for x in transcripts.path_for(folder, chat_id).read_text(encoding="utf-8").splitlines()]
-    assert [x["type"] for x in lines] == ["chat", "user", "tool", "assistant"]
-    header, user, tool, answer = lines
+    # M18: the chat's first run also writes the frozen memory snapshot line.
+    assert [x["type"] for x in lines] == ["chat", "user", "memory", "tool", "assistant"]
+    header, user, _memory, tool, answer = lines
     assert header["agentId"] == "assistant" and header["id"] == chat_id and header["v"] == 1
     assert header["title"] == "FAKE:tool find alpha" and header["space"]["name"] == _space.name
     assert user["text"] == "FAKE:tool find alpha" and user["contextPaths"] == ["People/Ada Lovelace.md"]

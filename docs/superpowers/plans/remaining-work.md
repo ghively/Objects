@@ -17,6 +17,7 @@ Status as of 2026-11-05. **All fifteen milestones (M1-M15) are built, reviewed, 
 6. **Wiki import follow-ups** (outside the repo, in Gene's `ObjectSpaces` folder): review the 10 "possible secrets" pages listed in `ai-pass/review.md`; the wiki copy is a snapshot (refresh = recopy and AI-reread only new or changed pages).
 7. **M16: built on `feat/m16-m24`** and gated on Windows 2026-11-06, re-gated at `59b9df4` (see "2026-11-06: M16, chat Markdown, tool steps and the model picker" below). Gene asked on 2026-11-05 for M16-M24 to be built straight through; his 9 hand-checks in `m16-acceptance.md` are pending.
 8. **M17: built on `feat/m16-m24`** and gated on Windows 2026-11-06, re-gated at `3c1857f` after the review fixes (see "2026-11-06: M17, agents, agent folders and full tooling" below) (agents as folders, the default agent Assistant, the turn runner with its fence, 20 read and 35 write Object tools, the Agents section, agent page and chat agent picker). Results, every deviation and Gene's 13 hand-checks (pending) in `m17-acceptance.md`; the live spike's findings in `m17-cli-spike.md` (`ToolSearch` did not need to join `ALWAYS_ALLOWED`).
+9. **M18: built on `feat/m16-m24`** and gated on Windows 2026-11-06 (agent memory with caps and the per-chat snapshot, self-written skills with the ledger and Undo, background reviews after replies and "Learn from this chat", the curator and "Tidy up now", chat search; the Memory, Skills and Learning tabs and the chat's Learning line). Commits `bcc01de..e80afac` plus the integration commit. Gate: back end 2359 passed, 19 skipped, 3 xpassed; front end 434 files, 3284 tests passed; `tsc`, lint (0 errors) and build ok; `m18_acceptance.py` and every earlier acceptance script PASS; live checks 8 passed. Results, every deviation and Gene's 15 hand-checks (pending) in `m18-acceptance.md`. The one milestone review and its fix pass follow.
 
 ## 2026-11-06: M17, agents, agent folders and full tooling
 
@@ -116,6 +117,7 @@ Each milestone's plan holds its full scope. Each acceptance doc holds its automa
 | **M15** importers: Notion, Obsidian and Anytype exports | `2026-11-05-m15-importers.md` | `80973d0..` on `feat/m15-importers`, gate 2026-11-05 (Linux) | `m15-acceptance.md` (7) |
 | **M16** chat Markdown, tool steps and the model picker | `2026-11-05-m16-chat-polish-model-picker.md` | `d4a9d89..ff60aea` on `feat/m16-m24`, gate 2026-11-06 (Windows) | `m16-acceptance.md` (9) |
 | **M17** agents, agent folders and full tooling | `2026-11-05-m17-agents-and-tools.md` | `a4f42e9..3c1857f` on `feat/m16-m24`, gate 2026-11-06 (Windows) | `m17-acceptance.md` (13) |
+| **M18** learning: memory, skills, ledger and Undo, reviews, curator, chat search | `2026-11-05-m18-learning.md` | `bcc01de..` on `feat/m16-m24`, gate 2026-11-06 (Windows) | `m18-acceptance.md` (15) |
 
 M8's "Coverage" section maps every deferred item to a task, or to a spec §2 exclusion: AI, network at runtime, accounts and sharing, mobile, telemetry.
 

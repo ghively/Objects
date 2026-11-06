@@ -230,7 +230,8 @@ def test_cli_flags_config_and_cwd(api, fake, space_dir: Path) -> None:
     cwd = Path(run["cwd"]).resolve()
     assert cwd == (state_dir() / "agents" / "Assistant").resolve()
     assert space_dir.resolve() not in (cwd, *cwd.parents)
-    assert run["appendPrompt"].startswith(agentrun.OBJECT_GUIDANCE.format(agent="Assistant", space=_space.name)[:40])
+    # M18: the learning guidance (order 15) comes first, then Object's own guidance (order 50).
+    assert agentrun.OBJECT_GUIDANCE.format(agent="Assistant", space=_space.name)[:40] in run["appendPrompt"]
     deny = run["runSettings"]["permissions"]["deny"]
     assert f"Read({agentrun.rule_path(space_dir.resolve())}/**)" in deny
     config_file = Path(argv[argv.index("--mcp-config") + 1])
@@ -613,6 +614,8 @@ def test_closing_the_stream_kills_the_process(space_dir: Path, fake, tmp_path: P
 @pytest.mark.parametrize("module", [
     "ai.py", "aichat.py", "api_ai.py", "aimodels.py",
     "agentmodel.py", "toolcatalog.py", "agents.py", "agentfiles.py", "transcripts.py", "agentrun.py", "api_agents.py",
+    "learningmodel.py", "ledger.py", "agentmemory.py", "agentskills.py", "learnundo.py", "chatsearch.py",
+    "reviews.py", "curator.py", "api_learning.py", "api_learning_v1.py", "learnhooks.py",
 ])
 def test_ai_modules_use_no_network_client(module: str) -> None:
     tree = ast.parse((BACKEND / module).read_text(encoding="utf-8"))
