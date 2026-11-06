@@ -183,6 +183,12 @@ def test_unreadable_list_refuses_writes_and_keeps_bytes(space: Space):
         ([{"kind": "do", "state": "maybe", "text": "x"}], 'Step 1 has an unknown state "maybe".'),
         ([{"kind": "do", "text": "  "}], "Step 1 has no text."),
         ([{"text": "x"}], "Step 1 has no kind."),
+        # a known key holding a mapping or a list can't be kept: refuse rather than drop it
+        ([{"kind": "question", "state": "done", "text": "Which tray?", "answer": ["tray 2", "tray 3"]}],
+         "Step 1's answer isn't text."),
+        ([{"kind": "do", "text": "x"}, {"kind": "agent", "text": "Run it", "result": {"a": 1}}],
+         "Step 2's result isn't text."),
+        ([{"kind": "do", "text": "x", "doneAt": ["2026-11-05"]}], "Step 1's doneAt isn't text."),
     ]:
         assert read_steps(bad)[1] == [problem]
         with pytest.raises(UnreadableList):
@@ -195,6 +201,11 @@ def test_unreadable_list_refuses_writes_and_keeps_bytes(space: Space):
         floor_from_api([{"id": "f3k9wz", "place": "Line 3"}], stored)
     with pytest.raises(InvalidValue, match="can't be read"):
         encode_value(FLOOR_DEF, [{"place": "Line 3"}], stored)
+    for key in ("place", "what", "collected", "found"):
+        nested = [{"id": "f3k9wz", "place": "Line 3", "what": "Toner", key: {"a": [1]}}]
+        assert read_floor(nested)[1] == [f"Floor item 1's {key} isn't text."]
+        with pytest.raises(UnreadableList):
+            floor_from_api([{"id": "f3k9wz", "place": "Line 3"}], nested)
     assert _bytes(space) == before
 
 
