@@ -55,7 +55,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
-from . import agentrun, ai, aimodels, transcripts
+from . import agentrun, agentskills, ai, aimodels, transcripts
+from . import reviews as review_hooks
 from .agentmodel import DEFAULT_AGENT_ID
 from .agents import AgentError, AgentNotFound, AgentRegistry, effective_model
 from .aichat import (
@@ -208,8 +209,10 @@ def router(
     reviews: ReviewRunner | None = None,
     curator: Curator | None = None,
 ) -> APIRouter:
-    """M10's AI routes. M18: `reviews` and `curator` are the app's `ReviewRunner` and `Curator`
-    (unused until the plan's T7 wires the chat stream to them)."""
+    """M10's AI routes. M18: `reviews` and `curator` are the app's `ReviewRunner` and `Curator`.
+    A turn's stream passes each event to `reviews.watch` (the CLI's own Skill tool counts as a
+    use and a read), counts as busy for the curator while it runs, drops the run's read memo
+    with its token, and hands the chat to `ReviewRunner.after_turn` once ``done`` was sent."""
     space = ctx.space
     tokens = TokenStore(space.root, state_folder)
     r = APIRouter()
@@ -351,12 +354,15 @@ def router(
             written()
 
         async def stream():
-            _record, secret = tokens.ephemeral(
+            token_record, secret = tokens.ephemeral(
                 name, "read-write" if write else "read", agent=agent.id, chat=chat_id
             )
             record = _TurnRecord()
             started = ended = False
             gen = None
+            last: dict[str, Any] | None = None
+            if curator is not None:
+                curator.busy_turns(1)
             try:
                 yield frame({"type": "chat", "chatId": chat_id, "agentId": agent.id})
                 await asyncio.to_thread(begin)
@@ -379,19 +385,34 @@ def router(
                 gen = ai.run_turn(turn)
                 async for event in gen:
                     record.see(event)
+                    if event.get("type") == "tool":  # only tool events can touch a file
+                        await asyncio.to_thread(review_hooks.watch, event, folder=folder,
+                                                memo_key=token_record.id)
+                    else:
+                        review_hooks.watch(event, folder=folder, memo_key=token_record.id)
                     if event.get("type") in ("done", "error"):
                         ended = True
+                        last = event
                         # Written before the last frame goes out, so a client that reloads the
                         # chat on ``done`` finds the answer in it.
                         await asyncio.to_thread(finish, record, event)
                     yield frame(event)
             finally:
                 TokenStore.drop_ephemeral(secret)
+                agentskills.MEMO.forget(token_record.id)
                 if gen is not None:
                     with contextlib.suppress(BaseException):  # the stream is closing anyway
                         await asyncio.shield(gen.aclose())
                 if started and not ended:
                     finish(record, None)  # the client went away: what was shown so far, stopped
+                if curator is not None:
+                    curator.busy_turns(-1)
+                if reviews is not None and last is not None and last.get("type") == "done":
+                    # After the reply was shown; the review runs as a task nobody awaits.
+                    reviews.after_turn(
+                        agent=agent, chat_id=chat_id, mode=req.mode, purpose=purpose, chat_model=model,
+                        session_id=last.get("sessionId") or record.session_id, api_url=base, claude=claude,
+                    )
 
         return EventSourceResponse(stream(), ping=15, sep="\n")
 
