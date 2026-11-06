@@ -9,6 +9,8 @@ import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
 import { useSettings } from '@/settings/useSettings'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
+import { WorkAgentSettings } from '@/work/agent/WorkAgentSettings'
+import { WORK_AGENT_TEXT } from '@/work/agent/workAgentText'
 import { SaveError, SecondaryButton, SectionHeader, SettingGroup, errorText } from '../controls'
 
 export const WORK_TEXT = {
@@ -39,7 +41,7 @@ export const WORK_TEXT = {
 
 const T = WORK_TEXT
 
-export const WORK_SEARCH: string[] = [T.yourName, T.jiraSite, T.alertFolder, T.alertIntervals, T.addAlertType]
+export const WORK_SEARCH: string[] = [T.yourName, T.jiraSite, T.alertFolder, T.alertIntervals, T.addAlertType, WORK_AGENT_TEXT.group, WORK_AGENT_TEXT.acts, WORK_AGENT_TEXT.autoRun, WORK_AGENT_TEXT.readTools, WORK_AGENT_TEXT.deskSync]
 
 /** Longest alert folder path the server accepts (`settings.WORK_ALERT_FOLDER_MAX`). */
 export const MAX_ALERT_FOLDER = 500
@@ -139,6 +141,7 @@ export function WorkSection() {
       <AlertFolderGroup />
       <AlertIntervalsGroup />
       <AlertTypeGroup />
+      <WorkAgentSettings />
     </div>
   )
 }
