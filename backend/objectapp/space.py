@@ -77,6 +77,7 @@ from .objfile import ObjectFile, join_object, split_object
 from .computed import COMPUTED_KINDS, check_type, rename_in_formulas
 from .rows import member_of
 from .propvalues import (
+    GATED_KINDS,
     KIND_TRANSFORMS,
     InvalidValue,
     convert_value,
@@ -87,6 +88,10 @@ from .propvalues import (
 from .spaceconfig import SPACE_REL, space_fields
 from .recurrence import week_start_of
 from .taskhook import TaskResult, on_status_change
+from .workfields import topup_work_fields, work_type_ids
+from .workhook import STEPS_GATED, on_work_write
+from .workview import BUILT_IN as TICKETS_BUILT_IN
+from .workview import TICKETS_ID, apply_structures, for_storage, tickets_default
 from .linkindex import LinkIndex
 from .relink import (
     code_ranges,
@@ -152,6 +157,7 @@ __all__ = [
     "SyncResult",
     "TrashItem",
     "UpdateResult",
+    "WorkWriteOutcome",
     "WriteNotice",
     "now_stamp",
     "safe_filename",
@@ -533,6 +539,19 @@ class UpdateResult:
     """Other objects relation syncing could not write."""
     task: TaskResult | None = None
     """What the Task status hook did (only when a Task's status changed category)."""
+
+
+@dataclass
+class WorkWriteOutcome:
+    """What `Space.write_work` wrote (M22)."""
+
+    version: str
+    frontmatter: dict
+    body: str
+    synced: list[str]
+    """Other objects written by relation syncing."""
+    skipped: list[Skip]
+    """Other objects relation syncing could not write."""
 
 
 class RestoreConflict(Exception):
@@ -1017,6 +1036,7 @@ class Space:
         self._merge_types(inferred)
         for t in self.types:
             topup_task_type(t)
+            topup_work_fields(t, self.types)
         self._loaded_revisions: dict[str, str] = {
             t.id: type_revision(self.root, t.id) for t in self.types if not t.readOnlyReason
         }
@@ -1082,6 +1102,7 @@ class Space:
                 stored = self._stored_type(type_id)
                 if stored is not None:
                     topup_task_type(stored)
+                    topup_work_fields(stored, self.types)
                 if stored is not None and stored.id == type_id:
                     self.types = [stored if x.id == type_id else x for x in self.types]
                     self._sort_types()
@@ -1645,13 +1666,30 @@ class Space:
         return q
 
     def list_queries(self) -> list[QueryDef]:
-        """Every query, by name (case-insensitive). An unreadable file lists with ``readOnlyReason``."""
+        """Every query, by name (case-insensitive). An unreadable file lists with ``readOnlyReason``.
+
+        M22: when the space has a work type, the built-in Tickets view (`workview.TICKETS_ID`)
+        is listed too: its stored file when there is one, else the default; either way its
+        ``structures`` are every work type, set here. Without a work type it isn't listed.
+        """
         with self._lock:
             found = [
                 self._load_query(qid, data, err)
                 for qid, data, _rev, err in self.store("queries").list()
             ]
+            work_types = work_type_ids(self.types)
+        found = [q for q in found if q.id != TICKETS_ID] + (
+            [self._tickets_query(found, work_types)] if work_types else []
+        )
         return sorted(found, key=lambda q: (q.name.casefold(), q.id))
+
+    @staticmethod
+    def _tickets_query(found: list[QueryDef], work_types: list[str]) -> QueryDef:
+        """The Tickets view: the stored one in ``found``, else the default, over ``work_types``."""
+        q = next((x for x in found if x.id == TICKETS_ID), None)
+        if q is None:
+            q = QueryDef.from_json(tickets_default(), fallback_id=TICKETS_ID)
+        return apply_structures(q, work_types)
 
     def query_revision(self, query_id: str) -> str:
         return self.store("queries").revision(query_id)
@@ -1710,6 +1748,8 @@ class Space:
                 stored, _rev = store.read(q.id)
             except DefinitionUnreadable as exc:
                 raise ReadOnly(exc.error) from exc
+            if q.id == TICKETS_ID:
+                return self._save_tickets_query(q, stored, base_revision)
             if stored is None:
                 raise KeyError(q.id)
             before = QueryDef.from_json(stored, fallback_id=q.id)
@@ -1718,11 +1758,31 @@ class Space:
             revision = store.write(q.id, q.to_json(), base_revision)
             return q, revision
 
+    def _save_tickets_query(
+        self, q: QueryDef, stored: dict | None, base_revision: str
+    ) -> tuple[QueryDef, str]:
+        """Save the Tickets view (M22): base ``""`` creates its file the first time.
+
+        The file holds ``structures: []`` (the live ones are set at read) and no ``builtIn``.
+        Raises `KeyError` when the space has no work type (the view isn't listed then).
+        """
+        work_types = work_type_ids(self.types)
+        if not work_types and stored is None:
+            raise KeyError(q.id)
+        out = for_storage(q)
+        self._check_query_definition(out.definition, set())
+        out.readOnlyReason = None
+        revision = self.store("queries").write(out.id, out.to_json(), base_revision)
+        return apply_structures(out, work_types), revision
+
     def delete_query(self, query_id: str) -> str:
         """Move a query's file to ``trash/queries/<ulid>.json`` unchanged; return the trash id.
 
-        No confirmation: it is restorable and touches no object. Raises `KeyError`, `ReadOnly`.
+        No confirmation: it is restorable and touches no object. Raises `KeyError`, `ReadOnly`;
+        M22: the built-in Tickets view raises `InvalidValue` ("The Tickets view is built in.").
         """
+        if query_id == TICKETS_ID:
+            raise InvalidValue(TICKETS_BUILT_IN)
         with self._lock:
             store = self.store("queries")
             try:
@@ -2491,21 +2551,14 @@ class Space:
             pdef = t.prop(key) if t is not None else None
             if pdef is not None and pdef.type in _READ_ONLY_VALUE_KINDS:
                 raise InvalidValue(f"{pdef.name} can't be edited")
+            if pdef is not None and pdef.type in GATED_KINDS:
+                # M22: steps change only through the work service (`write_work`).
+                raise InvalidValue(STEPS_GATED)
         before: dict = {}
         task: list[TaskResult | None] = [None]
         requested: dict[str, Any] = {}
         now = self.clock()  # one instant for `completed`, `lastUpdated` and "today"
-
-        def hook(fm: dict, sets: dict[str, Any], removals: list[str]) -> None:
-            asked = dict(sets)
-            task[0] = on_status_change(
-                t, fm, sets, removals, now, self.tz, explicit={*updates, *remove},
-                week_start=week_start_of(self.root),
-            )
-            if task[0] is not None and task[0].advanced:
-                # M14: the notice says which asked-for values the recurrence replaced (the
-                # status set to Done, reset to Not Started), so "changes to Done" still fires.
-                requested.update({k: v for k, v in asked.items() if sets.get(k) != v})
+        hook = self._value_hook(t, now, {*updates, *remove}, task, requested)
 
         def apply(src: str, fm: dict) -> str:
             before.update(fm)
@@ -2523,6 +2576,110 @@ class Space:
             synced=synced,
             skipped=skipped,
             task=task[0],
+        )
+
+    def _value_hook(
+        self,
+        t: TypeDefinition | None,
+        now: datetime,
+        explicit: set[str],
+        task: list[TaskResult | None],
+        requested: dict[str, Any],
+    ) -> Callable[[dict, dict[str, Any], list[str]], None]:
+        """The `_apply_values` hook of a property write: the Task status hook, then M22's
+        `workhook.on_work_write` (System from the Ticket ID, ``completed`` on other work types).
+
+        ``task[0]`` receives the Task hook's result; ``requested`` the asked-for values a
+        recurrence replaced.
+        """
+
+        def hook(fm: dict, sets: dict[str, Any], removals: list[str]) -> None:
+            asked = dict(sets)
+            task[0] = on_status_change(
+                t, fm, sets, removals, now, self.tz, explicit=explicit,
+                week_start=week_start_of(self.root),
+            )
+            if task[0] is not None and task[0].advanced:
+                # M14: the notice says which asked-for values the recurrence replaced (the
+                # status set to Done, reset to Not Started), so "changes to Done" still fires.
+                requested.update({k: v for k, v in asked.items() if sets.get(k) != v})
+            on_work_write(t, fm, sets, removals, now, explicit)
+
+        return hook
+
+    def write_work(
+        self,
+        path: str,
+        base_version: str | None,
+        *,
+        updates: dict[str, Any] | None = None,
+        remove: Iterable[str] = (),
+        raw: Callable[[dict], dict[str, Any]] | None = None,
+        body: Callable[[str, dict], str] | None = None,
+    ) -> WorkWriteOutcome:
+        """M22: one work write (the work service's only write), as one stamped `_write`.
+
+        ``updates``/``remove`` are encoded as `update_properties` does (the Task hook and
+        `workhook.on_work_write` run; the gated ``steps`` kind is allowed here, open steps
+        only). Then ``raw(fm)`` returns front-matter keys set as given (the encoded ``steps``
+        and ``floorItems`` lists; ``None`` removes the key), and ``body(body, fm_after)``
+        returns the new body (LF; the file's CRLF/BOM are restored on write). ``fm`` is the
+        front matter freshly read under the space lock, ``fm_after`` the one about to be
+        written. ``raw`` and ``body`` may raise (`IllegalMove`, `InvalidValue`, the service's
+        `StepChanged`): the write is then aborted with nothing written. ``base_version`` None
+        means whatever is current (step and floor actions check their own revision). One
+        history snapshot, one ``lastUpdated`` stamp, one `after_write` notice; a write that
+        changes nothing writes nothing. Relation syncs run after, as in `update_properties`.
+        Raises `KeyError`, `Conflict`, `ReadOnly`, `InvalidValue`.
+        """
+        rel = self._rel(path)
+        updates = dict(updates or {})
+        remove = list(remove)
+        for key in (*updates, *remove):
+            if key in _LOCKED_KEYS:
+                raise InvalidValue(f"{key!r} can't be changed as a property")
+        t = self._type_of(rel)
+        for key in (*updates, *remove):
+            pdef = t.prop(key) if t is not None else None
+            if pdef is not None and pdef.type in _READ_ONLY_VALUE_KINDS:
+                raise InvalidValue(f"{pdef.name} can't be edited")
+        before: dict = {}
+        task: list[TaskResult | None] = [None]
+        requested: dict[str, Any] = {}
+        now = self.clock()  # one instant for `completed`, `lastUpdated` and the callbacks
+        hook = self._value_hook(t, now, {*updates, *remove}, task, requested)
+
+        def edit(of: ObjectFile, fm: dict) -> ObjectFile | None:
+            before.clear()
+            before.update(fm)
+            task[0] = None
+            requested.clear()
+            src = of.frontmatter_src or ""
+            out = src
+            if updates or remove:
+                out = self._apply_values(t, rel, out, dict(fm), updates, remove, hook=hook)
+            if raw is not None:
+                keys = raw(copy.deepcopy(fm)) or {}
+                sets = {k: v for k, v in keys.items() if v is not None}
+                drops = [k for k, v in keys.items() if v is None]
+                if sets:
+                    out = set_keys(out, sets)
+                if drops:
+                    out = delete_keys(out, drops)
+            new_body = of.body
+            if body is not None:
+                fm_after = dict(fm) if out == src else (parse_fm(out) if out else {})
+                new_body = body(of.body, fm_after)
+            if out == src and new_body == of.body:
+                return None
+            return replace(of, frontmatter_src=out if out != src else of.frontmatter_src,
+                           body=new_body)
+
+        version = self._write(rel, base_version, edit, now=now, requested=requested)
+        of, fm, _v = self.read(rel)
+        synced, skipped = self._sync_relations(rel, t, before, fm)
+        return WorkWriteOutcome(
+            version=version, frontmatter=fm, body=of.body, synced=synced, skipped=skipped
         )
 
     def _apply_values(
@@ -4758,7 +4915,11 @@ class Space:
             if current != (base_revision or ""):
                 raise RevisionConflict(current)
             stored = self._stored_type(mem.id)
-            old = topup_task_type(stored) if stored is not None else mem
+            old = (
+                topup_work_fields(topup_task_type(stored), self.types)
+                if stored is not None
+                else mem
+            )
             new = copy.deepcopy(t)
             new.id, new.folder, new.basic = old.id, old.folder, old.basic
             new.formerNames = list(old.formerNames)

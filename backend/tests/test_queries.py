@@ -41,6 +41,12 @@ def _old_ulid(days: int) -> str:
     return "".join(reversed(chars))
 
 
+def _listed(c) -> list:
+    """``GET /api/queries`` without M22's built-in Tickets view (listed in every space whose
+    basic Task type, topped up with the work fields, makes it a work type)."""
+    return [q for q in c.get("/api/queries").json() if q["id"] != "work-tickets"]
+
+
 def _create(c, name="Open tasks", **extra):
     return c.post("/api/queries", json={"name": name, **extra})
 
@@ -57,7 +63,7 @@ def test_create_query_writes_one_file_and_event(space_dir: Path):
     }
     with c:
         r = _create(c, "Open tasks", definition=definition, view={"viewDefinition": {"dataViewLayout": "table"}})
-        listed = c.get("/api/queries").json()
+        listed = _listed(c)
     assert r.status_code == 201
     body = r.json()
     assert body["id"] == "open-tasks" and body["name"] == "Open tasks"
@@ -183,7 +189,7 @@ def test_delete_query_restorable(space_dir: Path):
         assert [(e["kind"], e["id"], e["queryId"], e["name"]) for e in entries] == [
             ("query", trash_id, "open-tasks", "Open tasks")
         ]
-        assert c.get("/api/queries").json() == []
+        assert _listed(c) == []
         assert [(e.kind, e.path) for e in published] == [("queries", "open-tasks")]
         published.clear()
         restored = c.post(f"/api/trash/{trash_id}/restore")
@@ -197,7 +203,7 @@ def test_delete_query_restorable(space_dir: Path):
             "rewritten": [],
         }
         assert c.get("/api/trash").json() == []
-        again = c.get("/api/queries").json()
+        again = _listed(c)
         missing = c.delete("/api/queries/open-tasks-9")
     assert live.read_bytes() == original
     assert [q["revision"] for q in again] == [made["revision"]]
@@ -258,7 +264,7 @@ def test_view_filter_keys_kept_but_never_read(space_dir: Path):
     (qdir / "v.json").write_text(json.dumps(stored), encoding="utf-8")
     _space, c, _pub = _client(space_dir)
     with c:
-        q = c.get("/api/queries").json()[0]
+        q = _listed(c)[0]
         saved = c.put("/api/queries/v", json={"query": q, "baseRevision": q["revision"]}).json()["query"]
     assert q["definition"]["sorts"] == []
     assert saved["view"]["sorts"] == [{"propertyId": "x"}]

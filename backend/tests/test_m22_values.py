@@ -334,7 +334,6 @@ def test_generic_paths_refuse_steps(space: Space):
         assert "can't be set by an automation" in str(exc.value)
 
 
-@pytest.mark.xfail(strict=True, reason="T6")
 def test_update_properties_refuses_steps(space: Space):
     _of, _fm, v = space.read(TONER)
     with pytest.raises(InvalidValue, match="Steps change with the step actions."):

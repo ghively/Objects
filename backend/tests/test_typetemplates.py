@@ -160,7 +160,8 @@ def test_template_creates_one_valid_query(tmp_path: Path, key: str):
         assert s["propertyId"] in props and s["option"] in _SORTS
     assert q["view"]["viewDefinition"]["dataViewLayout"] in _LAYOUTS
     # it reads back as a valid query
-    [loaded] = sp.list_queries()
+    # M22: a Project is a work type, so the built-in Tickets view lists beside it.
+    [loaded] = [x for x in sp.list_queries() if x.id != "work-tickets"]
     assert loaded.readOnlyReason is None and loaded.definition == d
 
 
@@ -218,7 +219,8 @@ def test_a_template_query_with_a_missing_option_still_creates_the_type(
             time.sleep(0.01)
         assert ("types", type_id, "w1") in {(e.kind, e.path, e.origin) for e in published}
         assert any(t["id"] == type_id for t in c.get("/api/space").json()["types"])
-        assert c.get("/api/queries").json() == []
+        # M22: only the built-in Tickets view (a Project is a work type) is listed.
+        assert [q["id"] for q in c.get("/api/queries").json()] == ["work-tickets"]
     assert _stored(space_dir, type_id)["templateKey"] == "project"
     assert _queries(space_dir) == []
     assert "Lost projects" in caplog.text
