@@ -151,6 +151,10 @@ def router(ctx: ApiContext) -> APIRouter:
             raise Denied(422, NOT_REMOTE)
         timeout = _timeout(req.timeoutSeconds)
         name = _name(target)
+        try:
+            delegation.can_run(target, name)
+        except delegation.DelegationError as exc:
+            raise Denied(exc.status, exc.message) from exc
         from . import a2a, remotechat
 
         try:
@@ -160,9 +164,10 @@ def router(ctx: ApiContext) -> APIRouter:
                 space_name=ctx.space.name, space_key=space_key(ctx.space.root), cap=REMOTE_TEXT_CAP,
             )
         except a2a.A2AError as exc:
-            if exc.status == 504:
-                raise Denied(504, TOO_LONG.format(name=name, n=f"{timeout:g}")) from exc
-            raise Denied(502, exc.message) from exc
+            if exc.chat_id:  # the chat was written (the user line, then an error or stopped line)
+                ctx.announce(ChangeEvent("agentChats", target.id, exc.chat_id, origin=None))
+            failure = delegation.remote_error(exc, name, timeout)
+            raise Denied(failure.status, failure.message) from exc
         except AgentError as exc:
             raise Denied(exc.status, exc.message) from exc
         if res.chat_id:

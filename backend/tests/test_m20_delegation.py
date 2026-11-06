@@ -27,7 +27,7 @@ from fake_claude import install
 from fastapi.testclient import TestClient
 from mcp.server.mcpserver.exceptions import ToolError
 
-from objectapp import a2a, agent_mcp, agentrun, ai, delegation, headless, transcripts
+from objectapp import a2a, agent_mcp, agentrun, ai, delegation, headless, remotesecrets, transcripts
 from objectapp import settings as device_settings
 from objectapp.agentmodel import DEFAULT_AGENT_ID, AgentInput
 from objectapp.agents import AgentRegistry
@@ -363,6 +363,23 @@ def test_self_and_unknown_targets(env: Env, tmp_path: Path) -> None:
     assert res.status_code == 409
     assert res.json()["detail"] == "Holder can't run: An agent folder can't be inside a space folder or hold one."
     assert transcripts.list_chats(Path(holder.folder)) == []
+    # remote targets: a missing folder, a removed secret and an unreadable agent.json are 409 too
+    far = add_remote("Far Planner")
+    shutil.rmtree(far.folder)
+    res = env.delegate(agent="Far Planner")
+    assert res.status_code == 409
+    assert res.json()["detail"] == f"Far Planner can't run: This agent's folder is missing: {far.folder}"
+    tokenless = add_remote("Tokenless Planner")
+    remotesecrets.remove(tokenless.id)
+    res = env.delegate(agent="Tokenless Planner")
+    assert res.status_code == 409
+    assert res.json()["detail"] == ("Tokenless Planner can't run: This remote agent needs its token again "
+                                    "(its page > Replace token).")
+    broken = add_remote("Broken Planner")
+    (Path(broken.folder) / ".object-agent" / "agent.json").write_text("{}", encoding="utf-8")
+    res = env.delegate(agent=broken.id)
+    assert res.status_code == 409
+    assert res.json()["detail"].startswith(f"{broken.folder.name} can't run: ")
     assert _runs(env.fake["log"]) == []
     assert delegation.LIMITER.in_flight(env.caller.id) == 0
 
@@ -476,6 +493,25 @@ def test_delegate_to_a_remote_agent(env: Env, monkeypatch: pytest.MonkeyPatch) -
     assert call["from_chat"] == CALLER_CHAT and call["cap"] == DELEGATE_SUMMARY_CAP
     assert "Goal: Plan the offsite" in call["text"] and "Two days" in call["text"]
     assert _runs(env.fake["log"]) == []
+    chats = [e for e in env.events if e.kind == "agentChats"]
+    assert [(e.path, e.version) for e in chats] == [(remote.id, "01KCCCCCCCCCCCCCCCCCCCCCCC")]
+
+
+def test_delegate_to_a_remote_agent_error_announces_the_chat(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    remote = add_remote()
+    err = a2a.A2AError("Fake Planner sent an answer Object can't read.")
+    err.chat_id = "01KCCCCCCCCCCCCCCCCCCCCCCC"
+
+    async def failing(record, text, **kw):
+        raise err
+
+    from objectapp import remotechat
+
+    monkeypatch.setattr(remotechat, "call_remote", failing)
+    res = env.delegate(agent="Fake Planner", goal="Plan the offsite")
+    assert res.status_code == 502 and res.json()["detail"] == "Fake Planner sent an answer Object can't read."
+    chats = [e for e in env.events if e.kind == "agentChats"]
+    assert [(e.path, e.version) for e in chats] == [(remote.id, "01KCCCCCCCCCCCCCCCCCCCCCCC")]
 
 
 # -- the caller's memory and the fences -----------------------------------------------------------
