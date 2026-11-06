@@ -150,7 +150,9 @@ def test_tool_lists(env: Env) -> None:
 
 
 def test_write_guards(env: Env) -> None:
-    assert v1guard.WRITE_GUARDS == []
+    # M24 installs its read-only guard at app start; the test adds only its own.
+    assert [g.__name__ for g in v1guard.WRITE_GUARDS] == ["read_only_write_guard"]
+    base_guards = list(v1guard.WRITE_GUARDS)
     blocked = _client(env.http, "read-write", name="blocked")
 
     def no_for_blocked(token, _request) -> str | None:
@@ -168,7 +170,7 @@ def test_write_guards(env: Env) -> None:
         assert env.call("create_tag", name="Allowed tag")["created"] is True
     finally:
         v1guard.WRITE_GUARDS.remove(no_for_blocked)
-    assert v1guard.WRITE_GUARDS == []
+    assert v1guard.WRITE_GUARDS == base_guards
 
 
 def test_read_token_cannot_write(env: Env) -> None:

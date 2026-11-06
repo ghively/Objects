@@ -159,7 +159,8 @@ def test_second_action_on_the_same_step_is_409(env: Env) -> None:
 
 
 def _changed(e: Env) -> list[tuple[str, str, str | None]]:
-    return [(ev.kind, ev.path, ev.origin) for ev in e.published]
+    # M24's work queue announces `workQueue` on a step action; this test is about the object.
+    return [(ev.kind, ev.path, ev.origin) for ev in e.published if ev.kind != "workQueue"]
 
 
 def test_route_shapes(env: Env) -> None:
@@ -189,7 +190,7 @@ def _test_route_shapes(env: Env) -> None:
     assert out["workNote"].startswith("[2026-11-05] Gene: approved step 2")
     assert out["item"]["steps"][1]["state"] == "approved"
     assert _changed(e) == [("changed", PRINTER, "win-1")]
-    assert e.published[0].version == out["version"]
+    assert [ev for ev in e.published if ev.kind != "workQueue"][0].version == out["version"]
 
     # Step ops, in one write.
     e.published.clear()
