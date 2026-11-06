@@ -76,6 +76,8 @@ AGENT_TOOLS: tuple[str, ...] = (
     "memory", "skills_list", "skill_view", "skill_manage", "session_search",
     # M20
     "remote_agents_list", "remote_agent_call", "delegate",
+    # M21
+    "schedule_manage",
 )
 """The ``object-agent`` server's tools. M18, M20, M21 and M24 append names here, in build order."""
 
@@ -90,6 +92,8 @@ AGENT_TOOL_LABELS: dict[str, str] = {
     "remote_agents_list": "List remote agents",
     "remote_agent_call": "Call a remote agent",
     "delegate": "Delegate to another agent",
+    # M21 (our string)
+    "schedule_manage": "Schedules",
 }
 """Row labels for agent tools whose `_label` form doesn't read well; the others use `_label`."""
 

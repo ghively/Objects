@@ -29,11 +29,16 @@ from pydantic import (
     model_validator,
 )
 
+from .agentmodel import AGENT_ID
+from .aimodels import clean_model
+
 __all__ = [
     "ACTION_KINDS",
+    "AGENT_ACTION_KINDS",
     "API_ONLY_KEYS",
     "MAX_ACTIONS",
     "MAX_NAME",
+    "MAX_PROMPT",
     "OBJECT_ACTION_KINDS",
     "SCHEMA_VERSION",
     "TRIGGER_KINDS",
@@ -52,11 +57,13 @@ __all__ = [
     "PropertyChangedTrigger",
     "RemoveFromCollectionAction",
     "RemoveTagAction",
+    "RunAgentAction",
     "ScheduleTrigger",
     "Scope",
     "SetPropertyAction",
     "TemplateRepeat",
     "Trigger",
+    "agent_action",
     "origin_for",
 ]
 
@@ -67,6 +74,8 @@ MAX_ACTIONS = 20
 """Actions in one rule (our choice)."""
 MAX_TEXT = 2000
 """Characters in an action's text fields (title, line, notification) (our choice)."""
+MAX_PROMPT = 20_000
+"""Characters in an agent schedule's prompt (M21, our choice)."""
 MAX_FILTER_DEPTH = 3
 """Nesting of condition groups, the top group counting as 1 (our choice)."""
 
@@ -269,6 +278,26 @@ class NotifyAction(_Strict):
     body: str = Field(default="", max_length=MAX_TEXT)
 
 
+class RunAgentAction(_Strict):
+    """M21: run ``prompt`` as a new chat of the agent ``agentId`` (an agent schedule). ``model``
+    null: the agent's default. Only as a schedule rule's one action (`AutomationRule._shape`)."""
+
+    kind: Literal["runAgent"]
+    agentId: str = Field(pattern=AGENT_ID)
+    prompt: str
+    model: str | None = None
+
+    @field_validator("prompt")
+    @classmethod
+    def _strip(cls, v: str) -> str:
+        return v.strip()
+
+    @field_validator("model", mode="before")
+    @classmethod
+    def _model(cls, v: Any) -> str | None:
+        return clean_model(v)  # ValueError(aimodels.BAD_MODEL)
+
+
 Action = Annotated[
     SetPropertyAction
     | ClearPropertyAction
@@ -278,7 +307,8 @@ Action = Annotated[
     | RemoveFromCollectionAction
     | CreateFromTemplateAction
     | AppendToDailyNoteAction
-    | NotifyAction,
+    | NotifyAction
+    | RunAgentAction,
     Field(discriminator="kind"),
 ]
 ACTION_KINDS = (
@@ -291,9 +321,13 @@ ACTION_KINDS = (
     "createFromTemplate",
     "appendToDailyNote",
     "notify",
+    # M21, at the end so the slice below is unchanged
+    "runAgent",
 )
 OBJECT_ACTION_KINDS = frozenset(ACTION_KINDS[:6])
 """Actions that edit the triggering object (one write per run; refused on schedule rules)."""
+AGENT_ACTION_KINDS = frozenset({"runAgent"})
+"""Actions that run an agent (M21): an agent schedule's one action."""
 
 
 # -- the rule ------------------------------------------------------------------------------
@@ -341,6 +375,20 @@ class AutomationRule(BaseModel):
     def _shape(self) -> AutomationRule:
         if self.conditions.depth() > MAX_FILTER_DEPTH:
             raise ValueError(f"Conditions nest at most {MAX_FILTER_DEPTH} groups deep")
+        if any(a.kind in AGENT_ACTION_KINDS for a in self.actions):
+            # M21's agent schedules (our strings).
+            if not isinstance(self.trigger, ScheduleTrigger):
+                raise ValueError("An agent schedule runs on a schedule.")
+            if len(self.actions) != 1:
+                raise ValueError("An agent schedule has exactly one action.")
+            if self.templateRepeat is not None:
+                raise ValueError("An agent schedule can't repeat a template.")
+            action = self.actions[0]
+            assert isinstance(action, RunAgentAction)
+            if not action.prompt:
+                raise ValueError("A schedule needs a prompt.")
+            if len(action.prompt) > MAX_PROMPT:
+                raise ValueError(f"The prompt is too long (at most {MAX_PROMPT:,} characters).")
         if isinstance(self.trigger, ScheduleTrigger):
             if not self.conditions.is_empty():
                 raise ValueError("A scheduled rule has no conditions")
@@ -367,5 +415,13 @@ class AutomationRule(BaseModel):
     def to_json(self) -> dict[str, Any]:
         """The file's JSON: the declared keys in order, then the kept unknown ones."""
         return self.model_dump(mode="json")
+
+
+def agent_action(rule: AutomationRule) -> RunAgentAction | None:
+    """The rule's ``runAgent`` action (an M21 agent schedule), or None."""
+    for a in rule.actions:
+        if isinstance(a, RunAgentAction):
+            return a
+    return None
 
 

@@ -303,6 +303,20 @@ export function automationRule(partial: Partial<AutomationRule> & Pick<Automatio
   }
 }
 
+/**
+ * M21: an agent schedule (a weekly schedule rule whose one action runs the default agent), built on
+ * `automationRule`; `partial` overrides.
+ */
+export function agentSchedule(partial: Partial<AutomationRule> = {}): AutomationRule {
+  return automationRule({
+    id: '01JSCHED000000000000000000',
+    name: 'Weekly review',
+    trigger: { kind: 'schedule', repeat: 'every week on monday', time: '09:00', start: '2026-11-09' },
+    actions: [{ kind: 'runAgent', agentId: 'assistant', prompt: 'Review last week’s notes.', model: null }],
+    ...partial,
+  })
+}
+
 /** An M14 run-log entry (a button run that succeeded) unless overridden. */
 export function automationRun(partial: Partial<AutomationRun> & Pick<AutomationRun, 'ruleId'>): AutomationRun {
   return {
@@ -409,6 +423,7 @@ export function agentTranscript(partial: Partial<AgentTranscript> & Pick<AgentTr
     spaceName: 'space',
     delegated: false,
     from: null,
+    schedule: null,
     agentId: 'assistant',
     sessionId: 's1',
     objectPath: null,
