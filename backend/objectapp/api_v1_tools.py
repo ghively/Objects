@@ -660,9 +660,53 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
              "clientId": origin(token)},
             type_id=tid,
         )
+        if status == 428:
+            shown, hidden = guard.visible_only(type_edit_removes(tid, req.type))
+            n = len(shown)
+            return error(
+                428,
+                f"This change removes values from {n} object{'s' if n != 1 else ''}.",
+                affected=n, hiddenCount=hidden,
+            )
         if status < 400:
             guard.log(token, "edit-type", tid)
         return answer(status, body, "rewritten", "skipped")
+
+    def type_edit_removes(tid: str, edited: dict[str, Any]) -> list[str]:
+        """The objects (templates included) a type edit would remove values from.
+
+        Plans the edit as `Space.save_type` does (nothing is written: the app's route has just
+        refused it for want of ``confirm``), so the 428 can count only what the API may show.
+        """
+        from .typemodel import TypeDefinition, topup_task_type
+
+        data = {**edited, "id": tid}
+        data.setdefault("schemaVersion", 2)
+        try:
+            new = TypeDefinition.from_json(data, fallback_id=tid)
+        except (TypeError, ValueError, KeyError):
+            return []
+        with space._lock:
+            mem = space.type_by_id(tid)
+            if mem is None:
+                return []
+            stored = space._stored_type(tid)
+            old = topup_task_type(stored) if stored is not None else mem
+            new.id, new.folder, new.basic = old.id, old.folder, old.basic
+            new.formerNames = list(old.formerNames)
+            new.name = " ".join(str(new.name or "").split())
+            new.pluralName = " ".join(str(new.pluralName or "").split())
+            try:
+                ops, _ = space._plan_type_ops(old, new)
+            except ValueError:
+                return []
+            confirming = [op for op in ops if op.confirm]
+            return [
+                rel
+                for rel in space._type_members(old.id)
+                if rel in space._raw
+                and any(op.applies(space._raw[rel].fm, rel) for op in confirming)
+            ]
 
     @r.post("/v1/types/{type_id}/properties/{pid}/change-kind")
     @run
