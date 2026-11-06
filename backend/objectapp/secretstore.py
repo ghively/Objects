@@ -102,11 +102,17 @@ class SecretStore:
             return None
         return data
 
-    def _load(self) -> dict[str, Any]:
-        """The whole file (unknown top-level keys kept); empty when missing or unreadable."""
+    def _load(self, strict: bool = False) -> dict[str, Any]:
+        """The whole file (unknown top-level keys kept); empty when missing or unreadable.
+        `strict` (the write paths) re-raises an OSError other than FileNotFoundError, so a
+        passing read failure (a sharing violation) never lets a write drop the other secrets."""
         try:
             raw = self.path.read_bytes()
+        except FileNotFoundError:
+            return {"version": FILE_VERSION, "secrets": {}}
         except OSError:
+            if strict:
+                raise
             return {"version": FILE_VERSION, "secrets": {}}
         data = self._parse(raw)
         if data is None:
@@ -175,7 +181,7 @@ class SecretStore:
             _check_key(key)
             _check_value(value)
         with _lock:
-            data = self._load()
+            data = self._load(strict=True)
             secrets = dict(data["secrets"])
             changed = False
             for key in remove:
@@ -191,7 +197,7 @@ class SecretStore:
 
     def delete(self, key: str) -> bool:
         with _lock:
-            data = self._load()
+            data = self._load(strict=True)
             if key not in data["secrets"]:
                 return False
             secrets = {k: v for k, v in data["secrets"].items() if k != key}
@@ -200,7 +206,7 @@ class SecretStore:
 
     def delete_prefix(self, prefix: str) -> int:
         with _lock:
-            data = self._load()
+            data = self._load(strict=True)
             secrets = {k: v for k, v in data["secrets"].items() if not k.startswith(prefix)}
             gone = len(data["secrets"]) - len(secrets)
             if gone:

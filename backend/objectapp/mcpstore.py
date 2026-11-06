@@ -265,14 +265,18 @@ class McpStore:
             return None
         return data
 
-    def _read(self) -> tuple[dict[str, Any], bool]:
-        """(the whole file with unknown keys kept, whether it exists but can't be read)."""
+    def _read(self, strict: bool = False) -> tuple[dict[str, Any], bool]:
+        """(the whole file with unknown keys kept, whether it exists but can't be read).
+        `strict` (the write paths) re-raises an OSError other than FileNotFoundError, so a
+        passing read failure never lets a write replace the file with fewer servers."""
         empty: dict[str, Any] = {"schemaVersion": SCHEMA_VERSION, "servers": []}
         try:
             raw = self.path.read_bytes()
         except FileNotFoundError:
             return empty, False
         except OSError:
+            if strict:
+                raise
             return empty, True
         data = self._parse(raw)
         if data is None:
@@ -303,7 +307,7 @@ class McpStore:
     # -- writing ----------------------------------------------------------------
 
     def _writable(self) -> dict[str, Any]:
-        data, unreadable = self._read()
+        data, unreadable = self._read(strict=True)
         if not unreadable and _newer(data):
             raise McpReadOnly(NEWER_VERSION)
         return data
@@ -333,7 +337,8 @@ class McpStore:
     def _commit(self, data: dict[str, Any], to_set: dict[str, str], to_remove: list[str]) -> None:
         """Secrets first, then the servers file; the old secrets are put back if that write fails."""
         touched = list(dict.fromkeys([*to_set, *to_remove]))
-        old = {k: self.secrets.get(k) for k in touched}
+        stored = self.secrets._load(strict=True)["secrets"]  # a read failure stops the write
+        old = {k: stored.get(k) for k in touched}
         self.secrets.set_many(to_set, remove=to_remove)
         try:
             self._write(data)

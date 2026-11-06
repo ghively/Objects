@@ -453,6 +453,30 @@ def test_unreadable_file_is_kept_aside(state: Path, store: McpStore) -> None:
     assert store.unreadable() is False
 
 
+@pytest.mark.parametrize("target", ["mcp-servers.json", "secrets.json"])
+def test_a_passing_read_failure_never_drops_servers(state: Path, store: McpStore, secrets: SecretStore,
+                                                     monkeypatch, target: str) -> None:
+    first = store.create(_cmd("first", env=[{"key": "A", "value": "s3cret-a", "secret": True}]))
+    secrets.set("var:GH_TOKEN", "s3cret-var")
+    servers_before = (state / "mcp-servers.json").read_bytes()
+    secrets_before = (state / "secrets.json").read_bytes()
+    real = Path.read_bytes
+
+    def flaky(self: Path) -> bytes:  # the file is locked while the write runs (antivirus, backup)
+        if self.name == target:
+            raise PermissionError(13, "sharing violation")
+        return real(self)
+
+    monkeypatch.setattr(Path, "read_bytes", flaky)
+    with pytest.raises(PermissionError):
+        store.create(_cmd("second", env=[{"key": "B", "value": "s3cret-b", "secret": True}]))
+    monkeypatch.undo()
+    assert (state / "mcp-servers.json").read_bytes() == servers_before
+    assert (state / "secrets.json").read_bytes() == secrets_before
+    assert [r.data["name"] for r in store.list()] == ["first"]
+    assert first.data["id"] in (state / "mcp-servers.json").read_text(encoding="utf-8")
+
+
 def test_delete_removes_its_secrets(store: McpStore, secrets: SecretStore) -> None:
     gone = store.create(_cmd("gone", env=[{"key": "A", "value": "s3cret-a", "secret": True}]))
     kept = store.create(_cmd("kept", env=[{"key": "B", "value": "s3cret-b", "secret": True}]))

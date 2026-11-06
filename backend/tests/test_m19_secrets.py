@@ -120,6 +120,45 @@ def test_unreadable_file_is_kept_aside(state: Path) -> None:
     assert store.get("var:GH_TOKEN") == "s3cret-new"
 
 
+@pytest.mark.parametrize("write", ["set", "delete", "delete_prefix"])
+def test_a_passing_read_failure_never_drops_secrets(state: Path, monkeypatch, write: str) -> None:
+    store = SecretStore(state)
+    store.set_many({"var:GH_TOKEN": "s3cret-gh", "var:OTHER": "s3cret-other"})
+    before = (state / "secrets.json").read_bytes()
+    real = Path.read_bytes
+    calls = {"n": 0}
+
+    def flaky(self: Path) -> bytes:
+        if self.name == "secrets.json" and calls["n"] == 0:
+            calls["n"] += 1
+            raise PermissionError(13, "sharing violation")
+        return real(self)
+
+    monkeypatch.setattr(Path, "read_bytes", flaky)
+    with pytest.raises(PermissionError):
+        if write == "set":
+            store.set("var:NEW_ONE", "s3cret-new")
+        elif write == "delete":
+            store.delete("var:OTHER")
+        else:
+            store.delete_prefix("var:OTHER")
+    monkeypatch.undo()
+    assert (state / "secrets.json").read_bytes() == before
+    assert store.get("var:GH_TOKEN") == "s3cret-gh" and store.get("var:OTHER") == "s3cret-other"
+    assert _files(state) == ["secrets.json"]
+
+
+def test_a_read_failure_reads_as_empty(state: Path, monkeypatch) -> None:
+    store = SecretStore(state)
+    store.set("var:GH_TOKEN", "s3cret-gh")
+
+    def denied(self: Path) -> bytes:
+        raise PermissionError(13, "sharing violation")
+
+    monkeypatch.setattr(Path, "read_bytes", denied)
+    assert store.get("var:GH_TOKEN") is None
+
+
 def test_unknown_top_level_keys_kept(state: Path) -> None:
     state.mkdir(parents=True)
     (state / "secrets.json").write_text(
