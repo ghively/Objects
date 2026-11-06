@@ -404,6 +404,26 @@ def test_unreadable_registry_is_kept_aside(reg: AgentRegistry, state: Path) -> N
     assert [e["id"] for e in _registry(state)] == [rec.id]
 
 
+@pytest.mark.parametrize("raw", [
+    {"agents": {"not": "a list"}},
+    {"agents": [{"id": "not-a-ulid", "path": "C:/x"}]},
+    {"agents": [{"id": "01JC7ZK3T9Q4M2X8B5N6R1V0WE"}]},
+])
+def test_registry_with_dropped_entries_is_kept_aside(reg: AgentRegistry, state: Path, raw: dict) -> None:
+    state.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(raw)
+    (state / "agents.json").write_text(text, encoding="utf-8")
+    reg.create(AgentInput(name="R"), "x")
+    aside = list(state.glob("agents.unreadable-*.json"))
+    assert len(aside) == 1 and aside[0].read_text(encoding="utf-8") == text
+
+
+def test_a_clean_registry_is_not_kept_aside(reg: AgentRegistry, state: Path) -> None:
+    reg.create(AgentInput(name="R"), "x")
+    reg.create(AgentInput(name="S"), "x")
+    assert not list(state.glob("agents.unreadable-*.json"))
+
+
 def test_unreadable_agent_file_is_read_only(reg: AgentRegistry) -> None:
     rec = reg.create(AgentInput(name="R"), "x")
     (rec.folder / ".object-agent" / "agent.json").write_text("{bad", encoding="utf-8")
