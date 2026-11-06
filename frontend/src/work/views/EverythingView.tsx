@@ -1,9 +1,8 @@
 // M23 Task 11: Everything: every work item (board `all`, loaded on first show) in a sortable table.
 // A header click sorts by it (again: reverses), kept in `useWorkUi.everythingSort` (default Score
-// descending); the top bar's search filters it by title, ticket id or area; a row opens the item
-// panel; the shown rows are the `j`/`k` order.
+// descending); the top bar's search filters it (the page passes the board already filtered by
+// title, ticket id or area); a row opens the item panel; the shown rows are the `j`/`k` order.
 import { useEffect, useMemo, type JSX } from 'react'
-import { create } from 'zustand'
 import { STAGE_LABELS, TURN_LABELS } from '@/api/types'
 import { cn } from '@/lib/utils'
 import { everythingRows, type EverythingKey } from '../logic/everything'
@@ -13,15 +12,6 @@ import { useWorkData, type WorkDataState } from '../state/useWorkData'
 import { useWorkSelection } from '../state/useWorkSelection'
 import { useWorkUi } from '../state/useWorkUi'
 import { WORK_TEXT } from '../workText'
-
-/**
- * The top bar's search text (T9's `Search work` box sets it; Everything filters by it). Not in
- * the Contract's state block: kept here, next to its one reader, and reported.
- */
-export const useWorkSearch = create<{ query: string; setQuery(query: string): void }>()((set) => ({
-  query: '',
-  setQuery: (query) => set({ query }),
-}))
 
 const COLUMNS: { key: EverythingKey; label: string; numeric?: boolean }[] = [
   { key: 'type', label: WORK_TEXT.colType },
@@ -35,16 +25,9 @@ const COLUMNS: { key: EverythingKey; label: string; numeric?: boolean }[] = [
   { key: 'score', label: WORK_TEXT.colScore, numeric: true },
 ]
 
-/** Title, ticket id or area holds the query (case-insensitive). */
-function matches(i: { title: string; ticket: { id: string } | null; area: string | null }, q: string): boolean {
-  if (!q) return true
-  return [i.title, i.ticket?.id ?? '', i.area ?? ''].some((v) => v.toLowerCase().includes(q))
-}
-
 export function EverythingView({ data, now }: { data: WorkDataState; now: Date }): JSX.Element {
   const sort = useWorkUi((s) => s.everythingSort)
   const setSort = useWorkUi((s) => s.setEverythingSort)
-  const query = useWorkSearch((s) => s.query.trim().toLowerCase())
   const index = useWorkSelection((s) => s.index)
   const allLoaded = data.all !== null
 
@@ -54,8 +37,8 @@ export function EverythingView({ data, now }: { data: WorkDataState; now: Date }
 
   const source = data.all ?? data.board
   const rows = useMemo(
-    () => everythingRows((source?.items ?? []).filter((i) => matches(i, query)), now, sort),
-    [source, query, now, sort],
+    () => everythingRows(source?.items ?? [], now, sort),
+    [source, now, sort],
   )
   const paths = useMemo(() => rows.map((r) => r.path), [rows])
 

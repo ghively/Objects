@@ -1,5 +1,5 @@
 // M23 Task 11: Everything: every item (board `all`) in a sortable table the top bar's search filters.
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 vi.mock('@/api/client', async (orig) => ({
@@ -20,7 +20,7 @@ import { openItemPanel } from '../state/workActions'
 import { resetWorkData, useWorkData } from '../state/useWorkData'
 import { useWorkSelection } from '../state/useWorkSelection'
 import { useWorkUi } from '../state/useWorkUi'
-import { EverythingView, useWorkSearch } from './EverythingView'
+import { EverythingView } from './EverythingView'
 
 const BOARD = boardJson as unknown as WorkBoard
 const NOW = new Date('2026-11-05T10:00:00.000Z')
@@ -52,7 +52,6 @@ describe('EverythingView', () => {
     vi.clearAllMocks()
     resetWorkData()
     useWorkUi.setState({ everythingSort: { key: 'score', dir: -1 } })
-    useWorkSearch.setState({ query: '' })
     useWorkSelection.setState({ list: [], index: -1 })
     mocked.workBoard.mockImplementation(async (scope) => (scope === 'all' ? ALL : BOARD))
   })
@@ -91,17 +90,21 @@ describe('EverythingView', () => {
     expect(screen.getByRole('columnheader', { name: 'Title' })).toHaveAttribute('aria-sort', 'descending')
   })
 
-  test('test the search filters by title, ticket id or area', () => {
+  test('test the search filter: only the rows the page passes show, and all stays loaded', () => {
+    // The top bar's search filters the board the page hands its view (WorkPage, T9); Everything
+    // shows exactly those rows and doesn't reload the all board because it is filtered.
     useWorkData.setState({ all: ALL })
-    render(<View />)
-    act(() => useWorkSearch.getState().setQuery('printer'))
-    expect(titles()).toEqual(['Printer jams on line 3'])
-    act(() => useWorkSearch.getState().setQuery('ops-123'))
+    const narrowed = (q: string): WorkBoard => ({
+      ...ALL,
+      items: ALL.items.filter((i) => [i.title, i.ticket?.id ?? '', i.area ?? ''].some((v) => v.toLowerCase().includes(q))),
+    })
+    const r = render(<EverythingView data={{ ...useWorkData.getState(), all: narrowed('ops-123') }} now={NOW} />)
     expect(titles()).toEqual(['Badge reader audit'])
-    act(() => useWorkSearch.getState().setQuery('Scanners'))
-    expect(titles()).toEqual(['Scanner firmware'])
-    act(() => useWorkSearch.getState().setQuery(''))
+    r.rerender(<EverythingView data={{ ...useWorkData.getState(), all: narrowed('') }} now={NOW} />)
     expect(titles()).toHaveLength(ALL.items.length)
+    r.rerender(<EverythingView data={{ ...useWorkData.getState(), all: { ...ALL, items: [] } }} now={NOW} />)
+    expect(screen.getAllByRole('row')).toHaveLength(1)
+    expect(mocked.workBoard).not.toHaveBeenCalled()
   })
 
   test('test the rows are the j/k order and a row click opens the panel', () => {
