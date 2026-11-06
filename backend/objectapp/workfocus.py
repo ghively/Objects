@@ -68,6 +68,26 @@ def _section(lines: list[str]) -> tuple[int, int] | None:
     return None
 
 
+_FENCE = re.compile(r"^ {0,3}(```|~~~)")
+
+
+def _fenced(lines: list[str]) -> set[int]:
+    """Indices of the lines of fenced code blocks (the fence lines included)."""
+    out: set[int] = set()
+    fence: str | None = None
+    for i, line in enumerate(lines):
+        m = _FENCE.match(_bare(line))
+        if m:
+            out.add(i)
+            if fence is None:
+                fence = m.group(1)
+            elif m.group(1) == fence:
+                fence = None
+        elif fence is not None:
+            out.add(i)
+    return out
+
+
 def _items(lines: list[str], start: int, end: int) -> list[tuple[int, int, str]]:
     """The section's top-level items: (first line, end line exclusive, text).
 
@@ -75,10 +95,11 @@ def _items(lines: list[str], start: int, end: int) -> list[tuple[int, int, str]]
     between them); a heading inside the section never belongs to an item.
     """
     heading_lines = {i for i, _l, _t in _headings(lines)}
+    fenced = _fenced(lines)
     out: list[tuple[int, int, str]] = []
     i = start
     while i < end:
-        if i in heading_lines:
+        if i in heading_lines or i in fenced:
             i += 1
             continue
         m = _ITEM.match(_bare(lines[i]))

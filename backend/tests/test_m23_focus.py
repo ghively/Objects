@@ -268,3 +268,16 @@ def test_meetings_on_today(root: Path, state: Path) -> None:
     assert workday.today(space, "2026-11-06")["day"] == "2026-11-06"
     with pytest.raises(InvalidValue):
         workday.today(space, "not a day")
+
+
+def test_fenced_code_in_focus_is_not_focus(space: Space) -> None:
+    body = (
+        "## Focus\n\n- Real one\n\n```\n- not focus\n1. nor this\n```\n\n"
+        "~~~\n- tilde\n~~~\n\n## Notes\n\ntext\n"
+    )
+    assert workfocus.parse_focus(body) == ["Real one"]
+    out = workfocus.replace_focus(body, ["New"])
+    assert out == body.replace("- Real one\n", "- New\n")
+    only = "## Focus\n\n```\n- x\n```\n"
+    assert workfocus.parse_focus(only) == []
+    assert workfocus.replace_focus(only, ["A"]) == "## Focus\n\n- A\n\n```\n- x\n```\n"
