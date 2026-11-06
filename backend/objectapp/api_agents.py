@@ -23,7 +23,7 @@
 - ``GET  /agent-tools`` -> ``{groups}``: the catalogue with the defaults (the New agent form)
 - ``GET  /agents/{id}/tools`` -> ``{groups}``: this agent's switches, one group per folder MCP
   server, then `toolcatalog.GROUP_PROVIDERS`' groups (a provider group replaces the catalogue
-  group with the same ``id``; `agent_tool_groups`)
+  group with the same ``id``; `agent_tool_groups`); ``{groups: []}`` for a remote agent (M20)
 - ``GET  /agents/{id}/chats`` -> ``{chats}`` newest first; ``GET /agents/{id}/chats/{chatId}``
   -> ``AgentTranscript`` (404, also for a chat id that isn't a ULID)
 - ``POST /agents/{id}/reveal`` -> ``{ok}``: shows the folder in the OS file manager
@@ -291,6 +291,8 @@ def router(ctx: ApiContext) -> APIRouter:
             rec = registry().get(agent_id)
         except AgentError as exc:
             return _fail(exc)
+        if rec.kind == "remote":
+            return {"groups": []}  # M20: a remote agent has no tool switches in Object
         return {"groups": agent_tool_groups(rec)}
 
     # -- chats ------------------------------------------------------------------------------
