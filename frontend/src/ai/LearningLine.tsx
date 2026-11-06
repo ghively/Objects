@@ -19,10 +19,10 @@ export const LEARNING_LINE_TEXT = {
 /**
  * Whether a done review changed only memory. Its summary (reviews.summary_text) names every kind
  * of change it made ("saved/changed n memories", "created/updated/archived n skills"), so a summary
- * without "skill" is memory-only; a review of the memory kind alone can change nothing else.
+ * that names memories and no skill is memory-only. The review's kinds don't settle it: every
+ * review may use the skill tools, a memory-kind one included.
  */
 export function memoryOnly(review: ReviewStatus): boolean {
-  if (review.kinds.length > 0 && review.kinds.every((k) => k === 'memory')) return true
   return !!review.summary && /memor/i.test(review.summary) && !/skill/i.test(review.summary)
 }
 

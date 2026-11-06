@@ -40,8 +40,11 @@ describe('LearningLine', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 
-  test('test memoryOnly reads the kinds and the summary', () => {
+  test('test memoryOnly reads the summary, not the kinds', () => {
     expect(memoryOnly(reviewStatus({ id: 'r', kinds: ['memory'], summary: 'Saved 1 memory' }))).toBe(true)
+    // a memory-kind review may still patch a skill: the Skills tab opens
+    expect(memoryOnly(reviewStatus({ id: 'r', kinds: ['memory'], summary: 'Updated 1 skill' }))).toBe(false)
+    expect(memoryOnly(reviewStatus({ id: 'r', kinds: ['memory'], summary: 'Saved 1 memory, updated 1 skill' }))).toBe(false)
     expect(memoryOnly(reviewStatus({ id: 'r', summary: 'Saved 2 memories, changed 1 memory' }))).toBe(true)
     expect(memoryOnly(reviewStatus({ id: 'r', summary: 'Saved 1 memory, updated 1 skill' }))).toBe(false)
     expect(memoryOnly(reviewStatus({ id: 'r', summary: 'Created 1 skill' }))).toBe(false)
