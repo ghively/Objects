@@ -30,6 +30,30 @@ describe('toolStepLine', () => {
     expect(line('move_to_trash', { path: 'C.md' })).toBe('Moved C.md to the Trash')
   })
 
+  test("test the learning tools' lines", () => {
+    // M18's table.
+    expect(line('memory', { action: 'add', target: 'memory', content: 'x' })).toBe('Saved a memory')
+    expect(line('memory', { action: 'replace', target: 'memory' })).toBe('Changed a memory')
+    expect(line('memory', { action: 'remove', target: 'memory' })).toBe('Removed a memory')
+    expect(line('memory', { action: 'add', target: 'user' })).toBe('Saved a memory about you')
+    expect(line('memory', { action: 'replace', target: 'user' })).toBe('Changed a memory about you')
+    expect(line('memory', { action: 'remove', target: 'user' })).toBe('Removed a memory about you')
+    expect(line('skills_list')).toBe('Listed skills')
+    expect(line('skill_view', { name: 'rack-labels' })).toBe("Read the skill 'rack-labels'")
+    expect(line('skill_manage', { action: 'create', name: 'rack-labels' })).toBe("Created the skill 'rack-labels'")
+    for (const a of ['patch', 'edit', 'write_file', 'remove_file']) {
+      expect(line('skill_manage', { action: a, name: 'rack-labels' })).toBe("Updated the skill 'rack-labels'")
+    }
+    expect(line('skill_manage', { action: 'archive', name: 'rack-labels' })).toBe("Archived the skill 'rack-labels'")
+    expect(line('session_search', { query: 'rack' })).toBe("Searched past chats for 'rack'")
+    expect(line('session_search', { chat_id: '01JCHAT' })).toBe('Read a past chat')
+    expect(line('Skill', { skill: 'rack-labels' })).toBe("Used the skill 'rack-labels'")
+    // A failed call gets the suffix.
+    expect(toolStepLine(step('skill_view', { name: 'rack-labels' }, { isError: true }))).toBe("Read the skill 'rack-labels' (failed)")
+    // An unshortened name gets the same line.
+    expect(line('mcp__object-agent__skills_list')).toBe('Listed skills')
+  })
+
   test('test a missing value drops the clause', () => {
     expect(line('search', {})).toBe('Searched notes')
     expect(line('search', null)).toBe('Searched notes')

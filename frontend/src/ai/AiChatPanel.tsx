@@ -37,10 +37,14 @@
  *   `agentId` and the `chatId` the stream's `chat` event gave; the save sends both. An entry with
  *   `chatId` loads that transcript (messages, with tool steps as parts). The model picker's Default
  *   row names the agent's model (the default agent's is Settings' model).
+ * - M18: a background review of the chat shows as a small "Learning…" line after the reply it
+ *   followed, then its summary (`LearningLine`; `useChatReviews` over a loaded transcript's
+ *   `learning` items). It is never a message: Copy and the save leave it out, and the input stays
+ *   enabled. The header's `…` menu (`ChatMenu`) has "Learn from this chat"; a refusal is the notice.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { api, ConflictError } from '@/api/client'
-import type { AiEvent, AiMessage, AiMode, AiProposal, AiSkipped, AiStatus, ObjectSummary, TranscriptItem } from '@/api/types'
+import type { AiEvent, AiMessage, AiMode, AiProposal, AiSkipped, AiStatus, ObjectSummary, ReviewStatus, TranscriptItem } from '@/api/types'
 import { useAgents } from '@/agents/useAgents'
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -58,6 +62,9 @@ import { useSettingsModal } from '@/settings/useSettingsModal'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { AgentPicker } from './AgentPicker'
 import { AiChatHeader } from './AiChatHeader'
+import { ChatMenu } from './ChatMenu'
+import { LearningLine } from './LearningLine'
+import { useChatReviews } from './useChatReviews'
 import { AI_CHAT_TEXT as T, MODE_LABELS, toolLine } from './aiText'
 import { addTags, appendToObject, appendToTodaysNote, setProperties } from './aiWrites'
 import { ChatMarkdown } from './ChatMarkdown'
@@ -130,6 +137,55 @@ function fromTranscript(lines: TranscriptItem[]): ChatItem[] {
     } else {
       steps = []
     }
+  }
+  return out
+}
+
+/** M18: a transcript's `learning` items as reviews (no entry ids: `GET …/reviews` gives those). */
+function reviewsOf(lines: TranscriptItem[], agentId: string): ReviewStatus[] {
+  return lines.flatMap((l) =>
+    l.type === 'learning'
+      ? [
+          {
+            id: l.reviewId,
+            agentId,
+            chatId: '',
+            kinds: l.kinds,
+            trigger: 'auto' as const,
+            state: l.state,
+            startedAt: l.at,
+            endedAt: null,
+            summary: l.summary,
+            message: l.message,
+            entryIds: [],
+          },
+        ]
+      : [],
+  )
+}
+
+/** How far a reply's own time may lag its review's start (the reply's time is this window's clock). */
+const REVIEW_SLACK_MS = 1000
+
+const timeOf = (iso: string | undefined): number => {
+  const t = iso ? Date.parse(iso) : NaN
+  return Number.isNaN(t) ? 0 : t
+}
+
+/**
+ * M18: where each review's line goes: after the last assistant message at or before the review's
+ * start (by `startedAt`), else after the last one. Keyed by item id; `''` is the end of the list.
+ */
+function placeReviews(items: ChatItem[], reviews: ReviewStatus[]): Map<string, ReviewStatus[]> {
+  const out = new Map<string, ReviewStatus[]>()
+  const replies = items.filter((i) => i.role === 'assistant')
+  const sorted = [...reviews].sort((a, b) => timeOf(a.startedAt) - timeOf(b.startedAt))
+  for (const r of sorted) {
+    const start = timeOf(r.startedAt) + REVIEW_SLACK_MS
+    let after: ChatItem | undefined
+    for (const i of replies) if (timeOf(i.at) <= start) after = i
+    const key = (after ?? replies[replies.length - 1])?.id ?? ''
+    out.set(key, [...(out.get(key) ?? []), r])
   }
   return out
 }
@@ -444,6 +500,14 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
   const agentPropSeen = useRef(agentProp)
   /** The chat's transcript id (from the stream's `chat` event, a loaded chat or a transcript entry). */
   const chatIdRef = useRef<string | null>(null)
+  /** M18: the same id as state, for this chat's reviews and its `…` menu. */
+  const [chatId, setChatIdState] = useState<string | null>(null)
+  const setChatId = useCallback((next: string | null) => {
+    chatIdRef.current = next
+    setChatIdState(next)
+  }, [])
+  /** M18: the reviews a loaded transcript's `learning` items name (until `GET …/reviews` answers). */
+  const [transcriptReviews, setTranscriptReviews] = useState<ReviewStatus[]>([])
   /** A transcript entry a seed replaced: not loaded. */
   const ignoreChat = useRef<string | null>(null)
   const agent = useAgents((st) => st.agents.find((a) => a.id === agentId))
@@ -457,6 +521,16 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
   const [input, setInput] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const listEnd = useRef<HTMLDivElement>(null)
+
+  // M18: this chat's background reviews: the route's (loaded on `agentLearning` events) over a
+  // loaded transcript's own `learning` items.
+  const fetchedReviews = useChatReviews(agentId, chatId)
+  const reviews = useMemo(() => {
+    const byId = new Map(transcriptReviews.map((r) => [r.id, r]))
+    for (const r of fetchedReviews) byId.set(r.id, r)
+    return [...byId.values()]
+  }, [transcriptReviews, fetchedReviews])
+  const reviewRunning = reviews.some((r) => r.state === 'running')
 
   const chat = useRef<{ path: string | null; version: string | null }>({ path: null, version: null })
   const sessionId = useRef<string | null>(null)
@@ -505,7 +579,8 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
     loadSeq.current++
     chat.current = { path: null, version: null }
     sessionId.current = null
-    chatIdRef.current = null
+    setChatId(null)
+    setTranscriptReviews([])
     setModel(null)
     setItems([])
     setBusy(null)
@@ -518,7 +593,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
     callbacks.current = {}
     setCanReplace(false)
     setCanInsert(false)
-  }, [setItems, setModel])
+  }, [setItems, setModel, setChatId])
 
   // Seeds from `openAiChat`: each one starts a new chat.
   const pendingN = useAi((s) => s.pending?.n ?? 0)
@@ -570,7 +645,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
         sessionId.current = c.sessionId
         // M17: an M10 chat (no Agent property) answers the default agent and no transcript.
         setAgentId(c.agentId || DEFAULT_AGENT_ID)
-        chatIdRef.current = c.chatId ?? null
+        setChatId(c.chatId ?? null)
         setModel(null)
         contextChosen.current = true
         setContext(c.contextPaths)
@@ -579,7 +654,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
       .catch((e: unknown) => {
         if (mine === loadSeq.current && alive.current) setError(errorText(e))
       })
-  }, [path, reset, setItems, setModel, setAgentId])
+  }, [path, reset, setItems, setModel, setAgentId, setChatId])
 
   // M17: the entry names another agent (a sidebar row): a new chat with it.
   useEffect(() => {
@@ -606,13 +681,14 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
     const owner = agentProp ?? DEFAULT_AGENT_ID
     setAgentId(owner)
     agentPropSeen.current = agentProp
-    chatIdRef.current = chatProp
+    setChatId(chatProp)
     const mine = loadSeq.current
     api
       .agentChat(owner, chatProp)
       .then(async (t) => {
         if (mine !== loadSeq.current || !alive.current) return
-        chatIdRef.current = t.id
+        setChatId(t.id)
+        setTranscriptReviews(reviewsOf(t.items, owner))
         sessionId.current = t.sessionId
         contextChosen.current = true
         const lastUser = [...t.items].reverse().find((i) => i.type === 'user')
@@ -632,7 +708,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
       })
     // `agentProp` is read as it is when the transcript changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatProp, reset, setAgentId, setItems])
+  }, [chatProp, reset, setAgentId, setItems, setChatId])
 
   const save = useCallback(() => {
     const run = async () => {
@@ -703,7 +779,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
       setBusy({ text: '', tools: [], parts: [] })
       const onEvent = (e: AiEvent) => {
         if (ctl.signal.aborted) return
-        if (e.type === 'chat') chatIdRef.current = e.chatId
+        if (e.type === 'chat') setChatId(e.chatId)
         else if (e.type === 'session') sessionId.current = e.sessionId
         else if (e.type === 'text') {
           acc += e.text
@@ -784,7 +860,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
       if (keep) setItems((prev) => [...prev, partial()])
       setError(failed ?? T.emptyAnswer)
     },
-    [save, setItems],
+    [save, setItems, setChatId],
   )
 
   const ready = !!status?.available && !showNotice
@@ -928,6 +1004,16 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
 
   const busyLine = busy ? (busy.tools.length ? toolLine(busy.tools[busy.tools.length - 1]) : T.thinking) : null
 
+  // M18: the "Learning" lines, each after the reply its review followed. Small and muted, never a
+  // chat message (Copy and the save use the items only). A review never blocks the next turn.
+  const placed = placeReviews(items, reviews)
+  const learningLines = (key: string) =>
+    (placed.get(key) ?? []).map((r) => (
+      <li key={`review-${r.id}`} data-role="learning">
+        <LearningLine review={r} agentId={agentId} />
+      </li>
+    ))
+
   return (
     <div data-ai-chat="" className="flex h-full min-h-0 flex-col" onKeyDown={onKeyDown}>
       <AiChatHeader
@@ -937,6 +1023,7 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
         onModelChange={setModel}
         onNewChat={newChat}
         busy={!!busy}
+        menu={<ChatMenu agentId={agentId} chatId={chatId} disabled={reviewRunning} onNotice={setError} />}
       />
       <div className="flex shrink-0 items-center gap-1 border-b border-line px-3 py-1.5">
         <span className="text-[12px] font-medium text-fg-muted">{T.context}</span>
@@ -978,8 +1065,9 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3" aria-live="polite">
         {items.length === 0 && !busy && <p className="px-1 py-6 text-center text-[13px] text-fg-muted">{T.empty}</p>}
         <ol className="flex flex-col gap-3" aria-label={T.title}>
-          {items.map((item) =>
-            item.role === 'user' ? (
+          {items.map((item) => (
+            <Fragment key={item.id}>
+            {item.role === 'user' ? (
               <li key={item.id} data-role="user" className="flex justify-end">
                 <ChatMarkdown source={item.text} className="max-w-[85%] rounded-lg bg-hover px-3 py-2 text-[14px] break-words" />
               </li>
@@ -1020,8 +1108,11 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
                   {canInsert && <IconButton label={T.insertBelow} icon="ph-text-indent" onClick={() => callbacks.current.onInsertBelow?.(item.text)} />}
                 </div>
               </li>
-            ),
-          )}
+            )}
+            {learningLines(item.id)}
+            </Fragment>
+          ))}
+          {learningLines('')}
           {busy && (
             <li data-role="assistant" data-streaming="" className="flex flex-col gap-1">
               <AssistantBody text={busy.text} parts={busy.parts} streaming />

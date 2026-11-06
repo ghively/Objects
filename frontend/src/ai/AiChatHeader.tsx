@@ -1,5 +1,5 @@
 // M16: the AI chat's header row (spec section 10): [leading] · spacer · this chat's model picker ·
-// New chat. M17 puts its agent picker in `leading`. The context chips sit in the row under it.
+// New chat · [menu]. M17 puts its agent picker in `leading`; M18 its `…` menu in `menu`. The context chips sit in the row under it.
 import type { ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
 import { AI_CHAT_TEXT as T } from './aiText'
@@ -15,9 +15,11 @@ export interface AiChatHeaderProps {
   onModelChange(next: string | null): void
   onNewChat(): void
   busy?: boolean
+  /** M18: the chat's `…` menu (`ChatMenu`), after New chat. */
+  menu?: ReactNode
 }
 
-export function AiChatHeader({ leading, model, defaultModel, onModelChange, onNewChat }: AiChatHeaderProps) {
+export function AiChatHeader({ leading, model, defaultModel, onModelChange, onNewChat, menu }: AiChatHeaderProps) {
   const models = useAiModels()
   const defaultLabel = defaultModel ? T.defaultModelOf(modelLabel(defaultModel, models, defaultModel)) : T.defaultModel
   return (
@@ -34,6 +36,7 @@ export function AiChatHeader({ leading, model, defaultModel, onModelChange, onNe
       >
         <Icon name="ph-note-pencil" size={15} />
       </button>
+      {menu}
     </div>
   )
 }
