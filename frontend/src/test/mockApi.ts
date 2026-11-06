@@ -24,7 +24,11 @@ import type {
   LearningSettings,
   LearningState,
   LedgerSummary,
+  McpServer,
+  McpServerInput,
+  McpTestResult,
   MemoryFile,
+  SecretVar,
   ReviewStatus,
   SkillSummary,
   GraphData,
@@ -430,6 +434,52 @@ function memoryFile(target: MemoryFile['target'], text = '', revision: string | 
   return { target, text, entries, chars: text.length, cap: target === 'memory' ? 2200 : 1375, revision }
 }
 
+/** M19: a stdio MCP server with one plain and one stored secret env row (no value ever); `partial` overrides. */
+export function mcpServer(partial: Partial<McpServer> & Pick<McpServer, 'id'>): McpServer {
+  return {
+    name: 'fake',
+    enabled: true,
+    kind: 'command',
+    command: 'npx',
+    args: ['-y', 'some-mcp-server'],
+    env: [
+      { key: 'LOG_LEVEL', value: 'info', secret: false, set: false },
+      { key: 'API_KEY', value: null, secret: true, set: true },
+    ],
+    transport: null,
+    url: null,
+    headers: [],
+    bearer: false,
+    createdAt: '2026-11-05T09:00:00.000Z',
+    updatedAt: '2026-11-05T09:00:00.000Z',
+    revision: 'r1',
+    missingSecrets: [],
+    lastTest: null,
+    ...partial,
+  }
+}
+
+/** M19: a passing Test listing `echo`, `add` and `whoami`; `partial` overrides. */
+export function mcpTestResult(partial: Partial<McpTestResult> = {}): McpTestResult {
+  return {
+    ok: true,
+    tools: [
+      { name: 'add', description: 'Add two numbers.' },
+      { name: 'echo', description: 'Echo the text back.' },
+      { name: 'whoami', description: 'The value of the variable named by --require-env.' },
+    ],
+    error: null,
+    elapsedMs: 120,
+    at: '2026-11-05T09:00:00.000Z',
+    ...partial,
+  }
+}
+
+/** M19: a secret variable (never its value); `partial` overrides. */
+export function secretVar(partial: Partial<SecretVar> & Pick<SecretVar, 'name'>): SecretVar {
+  return { set: false, settable: true, usedBy: [], ...partial }
+}
+
 type Fn =(...args: never[]) => unknown
 
 function defaults(): Api {
@@ -757,6 +807,18 @@ function defaults(): Api {
     learnFromChat: async (id: string, chatId: string) =>
       reviewStatus({ id: '01JREVIEW00000000000000000', agentId: id, chatId, trigger: 'manual', state: 'running', endedAt: null, summary: null }),
     chatReviews: async () => [],
+    // M19
+    mcpServers: async () => ({ servers: [], readOnlyReason: null }),
+    createMcpServer: async (input: McpServerInput) =>
+      mcpServer({ id: '01JNEWMCPSERVER00000000000', name: input.name, enabled: input.enabled, kind: input.kind, env: [], args: [] }),
+    saveMcpServer: async (id: string, input: McpServerInput, baseRevision: string) =>
+      mcpServer({ id, name: input.name, enabled: input.enabled, kind: input.kind, revision: `${baseRevision}+1` }),
+    deleteMcpServer: async () => ({ ok: true as const }),
+    testMcpServer: async () => mcpTestResult(),
+    mcpSecrets: async () => [],
+    setMcpSecret: async (name: string) => ({ name, set: true as const }),
+    deleteMcpSecret: async () => ({ ok: true as const }),
+    refreshAgentTools: async () => [],
     onChange: () => () => undefined,
   } as unknown as Api
 }

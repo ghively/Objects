@@ -647,6 +647,8 @@ export type ChangeKind =
   /** M18: an agent's memory, skills, ledger, reviews or curator changed (`path` the agent id,
    * `version` the ledger entry, review or curator run id). */
   | 'agentLearning'
+  /** M19: an outside MCP server or a secret changed (`path` the server id, or `secrets`). */
+  | 'mcpServers'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {
@@ -1981,6 +1983,8 @@ export interface ToolGroup {
   id: string
   label: string
   tools: ToolRow[]
+  /** M19: an outside MCP server group's status; absent or null for the other groups. */
+  server?: McpGroupStatus | null
 }
 
 /** GET /api/agents/{id}/chats: one chat transcript. */
@@ -2147,4 +2151,107 @@ export interface ChatSearchHit {
   /** At most 3, with matches marked «…». */
   snippets: string[]
   matches: number
+}
+
+// ---- M19: the MCP gateway ("Contract (T1)") ----
+
+export type McpServerKind = 'command' | 'url'
+export type McpTransport = 'http' | 'sse'
+
+/** A stdio server's env row; a secret row has `value` null, `set` = stored. */
+export interface McpEnvRow {
+  key: string
+  value: string | null
+  secret: boolean
+  set: boolean
+}
+
+/** A URL server's header row; a secret row has `value` null, `set` = stored. */
+export interface McpHeaderRow {
+  name: string
+  value: string | null
+  secret: boolean
+  set: boolean
+}
+
+export interface McpToolInfo {
+  name: string
+  description: string
+}
+
+/** POST /api/mcp-servers/{id}/test */
+export interface McpTestResult {
+  ok: boolean
+  tools: McpToolInfo[]
+  error: string | null
+  elapsedMs: number
+  at: string
+}
+
+/** One outside MCP server (GET /api/mcp-servers). Never holds a secret value. */
+export interface McpServer {
+  id: string
+  name: string
+  enabled: boolean
+  kind: McpServerKind
+  command: string | null
+  args: string[]
+  env: McpEnvRow[]
+  transport: McpTransport | null
+  url: string | null
+  headers: McpHeaderRow[]
+  bearer: boolean
+  createdAt: string
+  updatedAt: string
+  revision: string
+  /** Row keys / header names whose secret is gone (secrets.json lost); usable = []. */
+  missingSecrets: string[]
+  /** From the tool cache (this run of Object only). */
+  lastTest: McpTestResult | null
+}
+
+/** POST / PUT /api/mcp-servers: a secret row's `value` null keeps the stored value. */
+export interface McpServerInput {
+  name: string
+  enabled: boolean
+  kind: McpServerKind
+  command?: string | null
+  args?: string[]
+  env?: { key: string; value?: string | null; secret: boolean }[]
+  transport?: McpTransport | null
+  url?: string | null
+  headers?: { name: string; value?: string | null; secret: boolean }[]
+  bearer?: string | null
+  bearerAction?: 'keep' | 'set' | 'remove'
+}
+
+/** GET /api/mcp-servers */
+export interface McpServersAnswer {
+  servers: McpServer[]
+  readOnlyReason: string | null
+}
+
+export interface SecretVarUse {
+  agentId: string
+  agentName: string
+  server: string
+}
+
+/** GET /api/mcp-secrets: one secret variable (never its value). */
+export interface SecretVar {
+  name: string
+  set: boolean
+  settable: boolean
+  usedBy: SecretVarUse[]
+}
+
+/** An outside MCP server group's status on the Tools tab (`ToolGroup.server`). */
+export interface McpGroupStatus {
+  source: 'gateway' | 'folder'
+  serverId: string | null
+  name: string
+  status: 'ok' | 'error' | 'unknown' | 'disabled' | 'needsSecrets'
+  error: string | null
+  fetchedAt: string | null
+  missingVars: string[]
 }
