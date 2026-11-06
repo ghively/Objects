@@ -4,6 +4,7 @@ property kinds' icons and default options, the stub routers, and the synthetic f
 
 from __future__ import annotations
 
+import inspect
 import json
 import re
 from pathlib import Path
@@ -120,8 +121,12 @@ def test_icons_and_default_options() -> None:
 
 
 def test_stub_routers() -> None:
-    assert isinstance(api_work.router(None, None), APIRouter)  # type: ignore[arg-type]
-    assert isinstance(api_v1_work.router(None, None), APIRouter)  # type: ignore[arg-type]
+    # T8 and T9 filled the stubs, which now need a real context (their routes are tested in
+    # test_m22_api.py and test_m22_mcp.py); the Contract's signature stands.
+    for module in (api_work, api_v1_work):
+        sig = inspect.signature(module.router)
+        assert list(sig.parameters) == ["ctx", "service"], module.__name__
+        assert sig.return_annotation in (APIRouter, "APIRouter"), module.__name__
 
 
 def _texts() -> dict[str, str]:
