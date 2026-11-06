@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
-Written 2026-11-05 against `master` at `0f4fde1`. Reconciled 2026-11-06 with the code built on `feat/m16-m24` at `7bee086`: M16 (`2026-11-05-m16-chat-polish-model-picker.md`, results in `m16-acceptance.md`) is built on this branch, not merged to `master`; M17 builds on the same branch. Every label and default not quoted from the spec is "our string" / "our choice".
+Written 2026-11-05 against `master` at `0f4fde1`. Reconciled 2026-11-06 with the code built on `feat/m16-m24` at `7bee086`: M16 (`2026-11-05-m16-chat-polish-model-picker.md`, results in `m16-acceptance.md`) is built on this branch, not merged to `master`; M17 builds on the same branch. Reconciled again 2026-11-06 at `8099546`: Task 1 is built (`a4f42e9`, with the icon-subset fix `59b9df4`), and its live spike stopped and asked (`m17-cli-spike.md`: Gene's user `CLAUDE.md` and ancestor folders' `CLAUDE.md` files reach a run). Gene's answer, 2026-11-06: "Yes, add and continue", that is, adopt the spike's `claudeMdExcludes` run setting and go on with T2-T11. The changes that follow from it, and from the spike's other findings, are marked "(spike)" below. Every label and default not quoted from the spec is "our string" / "our choice".
 
-**Baseline before M17** (M16's gate, `remaining-work.md`): back end 2082 passed, 13 skipped, 3 xpassed; front end 409 files passed, 1 skipped (3173 tests passed, 1 skipped); `tsc` clean; lint 0 errors; build ok; `m1_roundtrip.py` and `m2`-`m16_acceptance.py` PASS on `space-sample` and `space-v1` (fixtures in `backend/tests/fixtures/`). The installed CLI is `2.1.317` (`claude --version`, checked 2026-11-06).
+**Baseline before T2** (M16's gate re-run at `59b9df4`, after M17's T1, `remaining-work.md`): back end 2094 passed, 17 skipped, 3 xpassed (T1's four live spike tests skip without `OBJECT_LIVE_CLAUDE=1`); front end 410 files passed, 1 skipped (3177 tests passed, 1 skipped); `tsc` clean; lint 0 errors; build ok; `m1_roundtrip.py` and `m2`-`m16_acceptance.py` PASS on `space-sample` and `space-v1` (fixtures in `backend/tests/fixtures/`). The installed CLI is `2.1.317` (`claude --version`, checked 2026-11-06).
 
 **Goal.** Agents are folders. The default agent ("Assistant", M10's assistant) and Gene's own agents are listed at the top of the sidebar. Each one has a soul (`CLAUDE.md`), settings, tool switches and a chat history of its own. A chat turn runs `claude -p` inside the agent's folder and loads only that folder's settings. The agent acts directly through every Object tool and every built-in Claude Code tool. The file tools are fenced away from every space folder, and the shell is off by default.
 
@@ -68,6 +68,9 @@ Notes on flags:
 - **Delete** unregisters and moves the folder to `<state>/agents/.trash/` (restorable). This applies only to folders inside `<state>/agents/`. A folder outside the state dir is only unregistered, never moved or deleted.
 - A turn is one `claude -p` run with the agent folder as its working directory.
   - It runs with `--setting-sources project,local`.
+  - (spike) Its run settings carry `"autoMemoryEnabled": false` and `claudeMdExcludes` naming Gene's user `CLAUDE.md` and every ancestor folder's instruction files (`agentrun.claude_md_excludes`), because `--setting-sources` alone lets them through on CLI 2.1.317. Gene adopted this on 2026-11-06.
+  - (spike) Its working folder is the agent folder's resolved (long) path: under an 8.3 path the CLI took `~/.claude/skills` for project skills.
+  - (spike) Its environment drops `CLAUDE_CONFIG_DIR` and the variables a parent Claude Code session sets (`agentrun.RUN_ENV_DROP`), so Object started from a Claude Code terminal runs agents as Object started on its own does.
   - It never loads Gene's user `CLAUDE.md`, hooks, plugins, user skills, auto-memory or user permission rules.
   - **Stop-and-ask:** if the CLI can't keep one of these out, the build stops and asks Gene. It does not compromise silently.
 - The CLI never stops to ask (`--permission-mode dontAsk`, `--permission-prompts none`). Allowed tools run; switched-off tools are denied.
@@ -303,6 +306,7 @@ The file is `<folder>/.object-agent/sessions/<chatId>.jsonl`, UTF-8, one JSON ob
 - `delegated` is reserved for M20 (true plus `"from": <agentId>`). `schedule` is reserved for M21.
 - Tool lines join M16's call and result pair by id. Input and result are M16's capped forms.
 - The user line is appended when the turn starts. The tool lines and the assistant (or error) line are appended in one write when it ends, or when the client goes away (`stopped: true`, the text shown so far).
+- The assistant line's `text` is what the panel shows (M16's fix `b13752e`): when the turn had tool steps, every streamed `text` of the turn joined, since `done.text` is then only the CLI's last message; otherwise `done.text` (or the streamed text when that is empty). A stopped turn with steps and no text still writes its tool lines and an assistant line with `text: ""` and `stopped: true`.
 
 ```python
 TRANSCRIPT_VERSION = 1
@@ -319,8 +323,10 @@ def find_by_session(folder: Path, session_id: str) -> str | None       # newest 
 
 ### Agents and folders (`backend/objectapp/agents.py`, `agentfiles.py`)
 
+As built by T1, the errors live in `agentmodel.py` (so `clean_input` can raise `AgentInvalid` without importing the registry) and `agents.py` re-exports them; `agentmodel` also has `NEWER_VERSION` and `UNREADABLE`, the two read-only reasons, which T2 uses.
+
 ```python
-class AgentError(Exception): status: int; message: str
+class AgentError(Exception): status: int; message: str     # agentmodel; re-exported by agents
 class AgentNotFound(AgentError)   # 404
 class AgentConflict(AgentError)   # 409; .current_revision
 class AgentInvalid(AgentError)    # 422
@@ -393,9 +399,10 @@ BUILTINS: tuple[ToolEntry, ...] = (
     ToolEntry("Edit", "Edit files", ("Edit", "MultiEdit")), ToolEntry("Glob", "Find files", ("Glob",)),
     ToolEntry("Grep", "Search in files", ("Grep",)), ToolEntry("WebSearch", "Web search", ("WebSearch",)),
     ToolEntry("WebFetch", "Web fetch", ("WebFetch",)), ToolEntry("Task", "Subagents", ("Task", "Agent")),
-    ToolEntry("NotebookEdit", "Notebook edit", ("NotebookEdit",)), ToolEntry("TodoWrite", "To-do list", ("TodoWrite",)),
-)   # the cli tuples are fixed by the T1 spike from the init event's tool list
-ALWAYS_ALLOWED: tuple[str, ...] = ("Skill",)  # not a switch; the spike adds any other default tool a run needs
+    ToolEntry("NotebookEdit", "Notebook edit", ("NotebookEdit",)),
+    ToolEntry("TodoWrite", "To-do list", ("TodoWrite", "TaskCreate", "TaskGet", "TaskList", "TaskUpdate")),
+)   # (spike) CLI 2.1.317 has no TodoWrite; its to-do list is TaskCreate/TaskGet/TaskList/TaskUpdate, in some runs only
+ALWAYS_ALLOWED: tuple[str, ...] = ("Skill",)  # not a switch; (spike) T11's live check decides whether "ToolSearch" joins it
 
 GROUP_LABELS = {"object-read": "Object read", "object-write": "Object write",
                 "object-agent": "Object agent tools", "builtin": "Claude Code built-ins"}
@@ -475,6 +482,16 @@ def fence_rules(folders: list[Path], own: Path, state: Path, home: Path) -> list
     # forms if Read/Edit rules don't cover those tools; this function is the one place.
 def nesting_problem(own: Path, folders: list[Path]) -> str | None       # the 422/run-error message when own is in, or holds, a fenced folder
 
+# (spike, adopted by Gene 2026-11-06)
+RUN_SETTINGS_BASE: dict[str, Any] = {"autoMemoryEnabled": False}       # in every run-settings.json
+def claude_md_excludes(own: Path, home: Path) -> list[str]
+    # resolved, "/"-separated absolute paths (e.g. "C:/Users/x/.claude/CLAUDE.md"), duplicates removed:
+    # <home>/.claude/CLAUDE.md and <home>/.claude/rules/**, then for every ancestor folder a of own (own itself
+    # excluded) up to the drive root: a/CLAUDE.md, a/.claude/CLAUDE.md, a/CLAUDE.local.md. Never own's CLAUDE.md.
+RUN_ENV_DROP: tuple[str, ...] = ("CLAUDE_CONFIG_DIR", "CLAUDECODE", "CLAUDE_CODE_", "CLAUDE_AGENT_SDK_",
+                                 "CLAUDE_PLUGIN_ROOT", "CLAUDE_EFFORT", "CLAUDE_PID", "CLAUDE_PREVIEW_", "AI_AGENT")
+    # names or name prefixes dropped from a run's environment (the live test's PARENT_SESSION_VARS, minus BAGGAGE)
+
 @dataclass
 class RunCommand:
     args: list[str]; cwd: Path; env: dict[str, str]; tmp: Path; mcp_config: dict[str, Any]; run_settings: dict[str, Any]; append: str
@@ -486,7 +503,11 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
     # args = [claude, *CLI_FLAGS, "--mcp-config", tmp/mcp.json, "--settings", tmp/run-settings.json,
     #         "--append-system-prompt-file", tmp/append.md, "--allowedTools", ",".join(allowed),
     #         "--disallowedTools", ",".join(disallowed)] + ["--model", m] + ["--resume", s];
-    # cwd = agent folder; env = os.environ + OBJECT_API_URL/OBJECT_API_TOKEN + parts.env, minus CLAUDE_CONFIG_DIR;
+    # cwd = agent folder, resolved (long path); env = os.environ minus every RUN_ENV_DROP name/prefix,
+    # + OBJECT_API_URL/OBJECT_API_TOKEN + parts.env;
+    # run_settings = RUN_SETTINGS_BASE + {"claudeMdExcludes": claude_md_excludes(own, Path.home()),
+    #   "permissions": {"deny": parts.deny_rules}}, then parts.settings merged in (lists under
+    #   "claudeMdExcludes" and "permissions.deny" are extended, never replaced, so no contributor drops them);
     # mcp.json holds "${OBJECT_API_TOKEN}", never the secret. Raises RunRefused(message) for a nesting problem.
 ```
 
@@ -605,7 +626,17 @@ The full list is in "Our calls" at the end.
 
 ### Task 1: Contract and CLI spike (first, alone)
 
-**Files:**
+**Status (2026-11-06).** Built and committed (`a4f42e9`, `59b9df4`); its spike stopped and asked, and Gene adopted `claudeMdExcludes`. What is left of T1 is the **follow-up** below; the Files and Steps after it record what was built.
+
+**T1 follow-up (run first and alone, before T2-T10).**
+
+- Files: `backend/tests/test_m17_live_cli.py` and `docs/superpowers/plans/m17-cli-spike.md` only.
+- In `test_m17_live_cli.py`: import `RUN_SETTINGS_BASE`, `claude_md_excludes` and `RUN_ENV_DROP` from `objectapp.agentrun` beside the other T4 names, with local stand-ins (the Contract's definitions) while T4 isn't there; `run_live` writes `{**RUN_SETTINGS_BASE, "claudeMdExcludes": claude_md_excludes(folder, Path.home()), "permissions": {"deny": ...}}` and drops `RUN_ENV_DROP` (plus `BAGGAGE`, locally) from the environment. The four tests' assertions are unchanged.
+- Run `OBJECT_LIVE_CLAUDE=1 uv run pytest backend/tests/test_m17_live_cli.py -q -s` (haiku, `--no-session-persistence`). `test_user_setup_never_reaches_a_run` must now pass. If any check still fails for a reason other than the model skipping a tool it was asked to call, stop and report: no later task runs.
+- `m17-cli-spike.md` gains a "Gene's decision (2026-11-06)" section: `claudeMdExcludes` adopted, the excludes' form, and the re-run's results.
+- `uv run pytest backend/tests/test_m17_contract.py -q` still passes. Commit `test(m17): the live spike keeps user CLAUDE.md files out with claudeMdExcludes`.
+
+**Files (as built):**
 
 - Create:
   - `backend/objectapp/agentmodel.py`, `backend/objectapp/toolcatalog.py`
@@ -762,12 +793,14 @@ The full list is in "Our calls" at the end.
 **Interfaces.**
 
 - Consumes: `toolcatalog.run_tool_lists`, `agentfiles.folder_mcp_servers`/`var_refs`, `AgentRecord` (T2; a test double is fine until T2 lands), `spaces.Registry`, `appstate`.
-- Produces: `RunScope`, `RunParts`, `add_contributor`, `contributors`, `fence_folders`, `rule_path`, `fence_rules`, `nesting_problem`, `build_run`, `RunCommand`, `RunRefused`, `SECRET_LOOKUP`, `OBJECT_GUIDANCE`, `PROPOSAL_GUIDANCE`, `CLI_FLAGS`.
+- Produces: `RunScope`, `RunParts`, `add_contributor`, `contributors`, `fence_folders`, `rule_path`, `fence_rules`, `nesting_problem`, `build_run`, `RunCommand`, `RunRefused`, `SECRET_LOOKUP`, `OBJECT_GUIDANCE`, `PROPOSAL_GUIDANCE`, `CLI_FLAGS`, and (spike) `RUN_SETTINGS_BASE`, `claude_md_excludes`, `RUN_ENV_DROP` (the T1 follow-up's live test imports them once they exist).
 
 **Steps.**
 
 - [ ] **Step 1: failing tests:**
-  - `test_run_loads_only_project_and_local_settings`: `build_run(...).args` contains `["--setting-sources","project,local"]`; no element equals or contains `user`; `env` has no `CLAUDE_CONFIG_DIR` even when the test environment sets one; `cwd == agent.folder`.
+  - `test_run_loads_only_project_and_local_settings`: `build_run(...).args` contains `["--setting-sources","project,local"]`; no element equals or contains `user`; `env` has no `CLAUDE_CONFIG_DIR` even when the test environment sets one; `cwd == agent.folder.resolve()`.
+  - `test_run_settings_keep_user_instructions_out` (spike): `run_settings["autoMemoryEnabled"] is False`; `claudeMdExcludes` holds `<home>/.claude/CLAUDE.md` and, for each ancestor of the agent folder up to the root, its `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md`, and not the agent's own `CLAUDE.md`; a contributor whose `parts.settings` has its own `permissions.deny` or `claudeMdExcludes` extends them and never drops the fence or the excludes.
+  - `test_run_env_drops_parent_session_vars` (spike): with `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_AGENT_SDK_VERSION` and `AI_AGENT` set in the test environment, none is in `env`; `PATH` and `OBJECT_API_URL` are.
   - `test_cli_flags`: every `CLI_FLAGS` element appears in order; `--permission-mode dontAsk` and `--permission-prompts none`; `--strict-mcp-config`; `--tools default`; `--model` and `--resume` only when given.
   - `test_mcp_config`:
     - `object` server args `["-m","objectapp.mcp_server"]` (with `"--read-only"` when `write=False`);
@@ -1154,7 +1187,8 @@ The full list is in "Our calls" at the end.
   - `uv run pytest backend/tests -q`
   - `npx vitest run`, `npx tsc -b --noEmit`, `npm run build`
   - every `scripts/mN_acceptance.py`
-  - the live spike once more with `OBJECT_LIVE_CLAUDE=1`
+  - the live spike once more with `OBJECT_LIVE_CLAUDE=1`, now through `agentrun`'s own names
+  - (spike) one live turn (haiku, `--no-session-persistence`) built by `build_run` with the real `objectapp-mcp` against a temp copy of `space-sample`, asking for a `search`: if the Object tool is refused or never offered under `dontAsk` because MCP tools are deferred behind `ToolSearch`, add `"ToolSearch"` to `toolcatalog.ALWAYS_ALLOWED`, record it in `m17-cli-spike.md`, and re-run; `test_m17_live_cli.py::test_object_tool_is_callable` holds the check
 - [ ] **Step 3:** commit `test(m17): acceptance script and hand-check list`.
 
 Then the one milestone review (correctness, file safety, fidelity, the five Review Focus items first), one fix pass, the final gate.
@@ -1166,6 +1200,8 @@ Then the one milestone review (correctness, file safety, fidelity, the five Revi
 | `backend/objectapp/server.py` | T1 (mounts the three stub routers, `RESYNC_EVENTS`) | none |
 | `backend/objectapp/tokens.py` | T1 | none |
 | `backend/tests/fake_claude.py` | T1 | T11 may add a marker it needs |
+| `backend/tests/test_m17_live_cli.py`, `docs/superpowers/plans/m17-cli-spike.md` | T1 (and its follow-up) | T11 (the `ToolSearch` live check) |
+| `backend/objectapp/toolcatalog.py`, `agentmodel.py` | T1 | T11 may add `"ToolSearch"` to `ALWAYS_ALLOWED` (spike); lanes report other needs, they don't edit |
 | `frontend/src/api/types.ts`, `api/client.ts`, `test/mockApi.ts` | T1 | lanes report needs; they don't edit |
 | `frontend/src/nav/tabs.ts`, `nav/sidepanel.ts` | T1 | none |
 | `frontend/src/shell/TabStrip.tsx` | T1 (one placeholder `case 'agent'`), then T9 | T1 runs alone, so no overlap |
@@ -1181,7 +1217,7 @@ Then the one milestone review (correctness, file safety, fidelity, the five Revi
 | `frontend/src/agents/ToolSwitches.tsx`, `agentText.ts` | T8 | T9 consumes |
 | `scripts/m10_acceptance.py`, `remaining-work.md`, `CONTINUE.md` | T11 | none |
 
-**Lanes** (counted from the Files lists). T1 runs first and alone. Then four lanes run:
+**Lanes** (counted from the Files lists). T1 (now its follow-up) runs first and alone. Then four lanes run:
 
 | Lane | Tasks | Waits for |
 |---|---|---|
