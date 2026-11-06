@@ -11,7 +11,8 @@ empty properties are filled from there. Content is added on." So `merge_objects`
    property the target's type has and the target leaves empty takes the source's value; list
    values (relations, multi labels, tags, aliases, collections) are unioned, target first;
    values of properties the target's type lacks are dropped and listed in ``dropped`` (our
-   choice); the source body is appended after the target body with one blank line;
+   choice), and so are the source's steps (M22: steps are never merged, the target keeps its
+   own); the source body is appended after the target body with one blank line;
 3. relinks every link to the source (bodies, frontmatter values, board entity blocks and text
    links, and for a tag every ``tags:`` list) to the target with M2/M6's rename relinking;
 4. adds ``[[Target]]`` to the synced property of each object newly related to the target
@@ -31,7 +32,7 @@ from typing import TYPE_CHECKING, Any
 
 from .frontmatter import remove_items
 from .objfile import ObjectFile
-from .propvalues import InvalidValue, _is_array, decode_value, label_lookup
+from .propvalues import GATED_KINDS, InvalidValue, _is_array, decode_value, label_lookup
 from .relink import rewrite_tag_lists
 from .space import Conflict, Skip
 
@@ -123,6 +124,9 @@ def _merged_updates(
                 dropped.append(key)
             continue
         if pdef.type in _NOT_MERGED_KINDS:
+            continue
+        if pdef.type in GATED_KINDS:
+            dropped.append(key)  # M22: the target keeps its own steps
             continue
         traw = tfm.get(key)
         try:

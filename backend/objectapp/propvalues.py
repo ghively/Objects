@@ -28,7 +28,13 @@ email, phone        string (checked on write)                   ``str | None``
 uniqueId            ``TASK-12`` or ``12`` (read-only)           ``str | None``
 files               flow list of ``'[[Attachments/a.pdf]]'``     ``[str]`` (space paths)
 formula, rollup     never stored (computed, read-only)          ``None`` here
+steps (M22)         block list of mappings (``workvalues``)     ``[StepValue]``
+textList (M22)      block list of one-line strings              ``[str]``
+floorItems (M22)    block list of mappings (``workvalues``)     ``[FloorItemValue]``
 ==================  ==========================================  ============================
+
+``steps`` is gated (`GATED_KINDS`): it changes only through the work service's step actions;
+`encode_value` takes only open steps (a create may carry them).
 """
 
 from __future__ import annotations
@@ -47,6 +53,7 @@ from .ids import new_ulid
 from .typemodel import THEME_COLORS, Icon, LabelOption, PropertyDefinition
 
 __all__ = [
+    "GATED_KINDS",
     "KIND_TRANSFORMS",
     "InvalidValue",
     "convert_value",
@@ -74,7 +81,11 @@ _STRING_KINDS = frozenset({"text", "textBlock", "url", "coverImage", "entity_des
 _BLOCK_KINDS = frozenset({"blocks", "simpleTableBlock"})
 _DATE_KINDS = frozenset({"datetime", "datetimeSimple"})
 _STRING_LIST_KINDS = frozenset({"entity_tags", "entity_aliases"})
-_LIST_KINDS = frozenset({"label", "entity", "files"}) | _STRING_LIST_KINDS
+# M22: the work kinds, read and written by `workvalues`.
+_WORK_KINDS = frozenset({"steps", "textList", "floorItems"})
+_LIST_KINDS = frozenset({"label", "entity", "files"}) | _STRING_LIST_KINDS | _WORK_KINDS
+# M22: kinds no generic property write may set (only the work service's step actions).
+GATED_KINDS = frozenset({"steps"})
 # System kinds whose values are not edited through the property codec (title and
 # type have their own routes; the rest are maintained by the app).
 _READ_ONLY_KINDS = frozenset(
@@ -333,6 +344,8 @@ def decode_value(pdef: PropertyDefinition, raw: Any, fm: dict[str, Any] | None =
     Entity references come back with ``path: None`` (the space resolves them).
     """
     kind = pdef.type
+    if kind in _WORK_KINDS:
+        return _decode_work(kind, raw)
     if kind == "button":
         return None  # M14: a button never has a value, whatever the frontmatter holds
     if kind in COMPUTED_KINDS:
@@ -393,7 +406,32 @@ def decode_value(pdef: PropertyDefinition, raw: Any, fm: dict[str, Any] | None =
     return text if text else None
 
 
+def _decode_work(kind: str, raw: Any) -> Any:
+    from . import workvalues  # M22 (workvalues imports this module)
+
+    if kind == "textList":
+        return workvalues.read_text_list(raw)
+    if kind == "steps":
+        at, _problems = workvalues.read_steps_at(raw)
+        return [workvalues.step_api(s, n) for n, s in at]
+    at, _problems = workvalues.read_floor_at(raw)
+    return [workvalues.floor_api(i, n) for n, i in at]
+
+
 # -- encode ----------------------------------------------------------------------
+
+
+def _encode_work(kind: str, value: Any, existing_raw: Any) -> Any:
+    from . import workvalues  # M22 (workvalues imports this module)
+
+    try:
+        if kind == "textList":
+            return workvalues.encode_text_list(value)
+        if kind == "steps":
+            return workvalues.encode_steps(workvalues.steps_from_api(value))
+        return workvalues.encode_floor(workvalues.floor_from_api(value, existing_raw))
+    except workvalues.UnreadableList as exc:
+        raise InvalidValue(str(exc)) from exc
 
 
 def _encode_string(value: Any) -> str | None:
@@ -590,6 +628,8 @@ def encode_value(
         return _encode_phone(value)
     if kind == "files":
         return _encode_files(value)
+    if kind in _WORK_KINDS:
+        return _encode_work(kind, value, existing_raw)
     raise InvalidValue(f"Properties of kind {kind!r} can't be edited")
 
 
