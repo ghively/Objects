@@ -62,11 +62,32 @@ MAX_FIELD = 1200
 _SCHEMA = 1
 _SEVERITY = {"crit": "Critical", "warn": "Warning", "info": "Info"}
 _SEVERITY_ORDER = {"Critical": 0, "Warning": 1, "Info": 2}
-# Ported: a secret's value after its name and ``:``, ``=`` or ``|`` is redacted.
+# A secret's value after a key that names one (``password``, ``db_password``, ``access_token``,
+# a JSON ``"api_key"`` ...) and ``:``, ``=`` or ``|`` is redacted. A quoted value goes whole;
+# a password-like key's unquoted value goes to the end of the line or the next delimiter
+# (passwords may hold spaces); any other key's unquoted value is its first word.
 _SECRET = re.compile(
-    r"(?i)\b(password|passwd|pwd|secret|api[_ -]?key|token|apikey|client[_ -]?secret)\b"
-    r"(\s*[:=|]\s*)(\S+)"
+    r"(?i)(?<![\w])(?P<key>[\"']?[\w.-]*"
+    r"(?:password|passwd|pwd|passphrase|secret|token|api[_ -]?key|apikey|credentials?"
+    r"|private[_-]?key)[\w.-]*[\"']?)"
+    r"(?P<sep>\s*[:=|]\s*)"
+    r"(?P<val>\"[^\"]*\"|'[^']*'|[^\n,;&\"'}\]]+)"
 )
+_PASSWORD_KEY = re.compile(r"(?i)password|passwd|pwd|passphrase")
+
+
+def _redact(m: re.Match[str]) -> str:
+    key, sep, val = m.group("key"), m.group("sep"), m.group("val")
+    if val[0] in "\"'":
+        rest = ""
+    elif _PASSWORD_KEY.search(key):
+        rest = val[len(val.rstrip()) :]
+    else:
+        word = val.split(None, 1)[0] if val.strip() else val
+        rest = val[len(word) :]
+    return f"{key}{sep}[redacted]{rest}"
+
+
 _HTTP = re.compile(r"(?i)^https?://")
 
 
@@ -93,7 +114,7 @@ def _clean(v: Any) -> str:
         s = json.dumps(v, ensure_ascii=False)
     else:
         s = str(v)
-    return _SECRET.sub(lambda m: f"{m.group(1)}{m.group(2)}[redacted]", s)[:MAX_FIELD]
+    return _SECRET.sub(_redact, s)[:MAX_FIELD]
 
 
 def _alert(a: Any) -> dict[str, str]:
