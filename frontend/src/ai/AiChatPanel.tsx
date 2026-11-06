@@ -5,8 +5,12 @@
  * first context page under it.
  *
  * - A turn streams from `api.aiChat` (the server runs Claude Code; this window never calls out).
- *   While it runs the panel shows "Thinking…" and the tools used ("Searching your notes…"); Stop
+ *   While it runs the panel shows "Thinking…" or the tool in use ("Searching your notes…"); Stop
  *   aborts it (our choice: the partial answer stays, unsaved).
+ * - M16: messages render as Markdown (`ChatMarkdown`, inert); an answer's tool calls show as
+ *   collapsed steps between its texts (`ToolStep`, not saved). `text` stays the Markdown source,
+ *   and Copy, the appends, Rephrase and the save use it. The header (`AiChatHeader`) holds this
+ *   chat's model pick (panel state only: New chat and loading a saved chat go back to Default).
  * - Nothing is written without a click: a proposal (tags, properties, text) shows Accept/Dismiss
  *   (or Replace/Insert below/Copy for text); "Append to page" and "Append to daily note" write
  *   through the normal object calls (`aiWrites.ts`).
@@ -42,10 +46,15 @@ import { usePalette } from '@/palette/usePalette'
 import { PASTE_TEXT } from '@/palette/paste'
 import { EntryHeader } from '@/references/BacklinksTab'
 import { useReferences } from '@/references/useReferences'
+import { useSettings } from '@/settings/useSettings'
 import { useSettingsModal } from '@/settings/useSettingsModal'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
+import { AiChatHeader } from './AiChatHeader'
 import { AI_CHAT_TEXT as T, MODE_LABELS, toolLine } from './aiText'
 import { addTags, appendToObject, appendToTodaysNote, setProperties } from './aiWrites'
+import { ChatMarkdown } from './ChatMarkdown'
+import { ToolStep } from './ToolStep'
+import { applyEvent, stopSteps, type ChatPart } from './toolSteps'
 import { noticeSeen, rememberNotice, useAiFocus } from './reveal'
 import { useAi, useAiHidden, type AiSeed } from './store'
 
@@ -64,6 +73,8 @@ export interface ChatItem extends AiMessage {
   skipped?: AiSkipped[]
   proposalState?: 'accepted' | 'dismissed'
   stopped?: boolean
+  /** M16: an assistant turn of this panel: its texts and tool steps in stream order (not saved). */
+  parts?: ChatPart[]
 }
 
 interface Turn {
@@ -105,6 +116,24 @@ function chatTitle(items: ChatItem[]): string {
   const line = (first?.text ?? '').split(/\r?\n/).find((l) => l.trim())?.trim() ?? ''
   if (!line) return T.title
   return line.length > 60 ? `${line.slice(0, 59).trimEnd()}…` : line
+}
+
+const hasSteps = (parts: ChatPart[] | undefined): parts is ChatPart[] => !!parts?.some((p) => p.kind === 'tool')
+
+/** An assistant turn's body: its parts in order when it had tool steps, else its Markdown. */
+function AssistantBody({ text, parts, streaming }: { text: string; parts?: ChatPart[]; streaming?: boolean }) {
+  if (!hasSteps(parts)) return text ? <ChatMarkdown source={text} streaming={streaming} className="text-[14px] break-words text-fg" /> : null
+  return (
+    <div className="flex flex-col">
+      {parts.map((p, i) =>
+        p.kind === 'tool' ? (
+          <ToolStep key={p.step.id} step={p.step} />
+        ) : (
+          <ChatMarkdown key={`t${i}`} source={p.text} streaming={streaming} className="text-[14px] break-words text-fg" />
+        ),
+      )}
+    </div>
+  )
 }
 
 function errorText(e: unknown): string {
@@ -353,7 +382,15 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
   const [acked, setAcked] = useState(false)
   const showNotice = !acked && !noticeSeen(root)
 
-  const [busy, setBusy] = useState<{ text: string; tools: string[] } | null>(null)
+  const [busy, setBusy] = useState<{ text: string; tools: string[]; parts: ChatPart[] } | null>(null)
+  /** This chat's model pick (null: Default); a ref too, for the turn being sent. */
+  const [model, setModelState] = useState<string | null>(null)
+  const modelRef = useRef<string | null>(null)
+  const setModel = useCallback((next: string | null) => {
+    modelRef.current = next
+    setModelState(next)
+  }, [])
+  const defaultModel = useSettings((st) => st.settings.aiModel ?? null)
   const controller = useRef<AbortController | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -409,6 +446,7 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
     loadSeq.current++
     chat.current = { path: null, version: null }
     sessionId.current = null
+    setModel(null)
     setItems([])
     setBusy(null)
     setError(null)
@@ -420,7 +458,7 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
     callbacks.current = {}
     setCanReplace(false)
     setCanInsert(false)
-  }, [setItems])
+  }, [setItems, setModel])
 
   // Seeds from `openAiChat`: each one starts a new chat.
   const pendingN = useAi((s) => s.pending?.n ?? 0)
@@ -465,6 +503,7 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
         if (mine !== loadSeq.current || !alive.current) return
         chat.current = { path: c.path, version: c.version }
         sessionId.current = c.sessionId
+        setModel(null)
         contextChosen.current = true
         setContext(c.contextPaths)
         setItems(c.messages.map(toItem))
@@ -472,7 +511,7 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
       .catch((e: unknown) => {
         if (mine === loadSeq.current && alive.current) setError(errorText(e))
       })
-  }, [path, reset, setItems])
+  }, [path, reset, setItems, setModel])
 
   const save = useCallback(() => {
     const run = async () => {
@@ -535,17 +574,24 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
       controller.current = ctl
       const seq = loadSeq.current
       let acc = ''
+      let parts: ChatPart[] = []
       let done: Extract<AiEvent, { type: 'done' }> | null = null
       let failed: string | null = null
-      setBusy({ text: '', tools: [] })
+      setBusy({ text: '', tools: [], parts: [] })
       const onEvent = (e: AiEvent) => {
         if (ctl.signal.aborted) return
         if (e.type === 'session') sessionId.current = e.sessionId
         else if (e.type === 'text') {
           acc += e.text
-          setBusy((b) => ({ text: acc, tools: b?.tools ?? [] }))
-        } else if (e.type === 'tool') setBusy((b) => ({ text: b?.text ?? acc, tools: [...(b?.tools ?? []), e.name] }))
-        else if (e.type === 'done') done = e
+          parts = applyEvent(parts, e)
+          const now = parts
+          setBusy((b) => ({ text: acc, tools: b?.tools ?? [], parts: now }))
+        } else if (e.type === 'tool') {
+          parts = applyEvent(parts, e)
+          const now = parts
+          const call = e.result === undefined
+          setBusy((b) => ({ text: b?.text ?? acc, tools: call ? [...(b?.tools ?? []), e.name] : (b?.tools ?? []), parts: now }))
+        } else if (e.type === 'done') done = e
         else if (e.type === 'error') failed = e.message
       }
       try {
@@ -558,6 +604,7 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
             blockPath: user.blockPath,
             history: base.map(toMessage),
             sessionId: sessionId.current,
+            model: modelRef.current,
           },
           onEvent,
           ctl.signal,
@@ -582,16 +629,25 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
             proposal: finished.proposal,
             target,
             skipped: finished.skipped,
+            ...(hasSteps(parts) ? { parts } : {}),
           },
         ])
         void save()
         return
       }
+      const partial = (): ChatItem => ({
+        id: newItemId(),
+        role: 'assistant',
+        text: acc,
+        at: new Date().toISOString(),
+        stopped: true,
+        ...(hasSteps(parts) ? { parts: stopSteps(parts) } : {}),
+      })
       if (ctl.signal.aborted) {
-        if (acc) setItems((prev) => [...prev, { id: newItemId(), role: 'assistant', text: acc, at: new Date().toISOString(), stopped: true }])
+        if (acc) setItems((prev) => [...prev, partial()])
         return
       }
-      if (acc) setItems((prev) => [...prev, { id: newItemId(), role: 'assistant', text: acc, at: new Date().toISOString(), stopped: true }])
+      if (acc) setItems((prev) => [...prev, partial()])
       setError(failed ?? T.emptyAnswer)
     },
     [save, setItems],
@@ -720,10 +776,10 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
   // ---- render ----
 
   const busyLine = busy ? (busy.tools.length ? toolLine(busy.tools[busy.tools.length - 1]) : T.thinking) : null
-  const usedTools = busy ? [...new Set(busy.tools)] : []
 
   return (
     <div data-ai-chat="" className="flex h-full min-h-0 flex-col" onKeyDown={onKeyDown}>
+      <AiChatHeader model={model} defaultModel={defaultModel} onModelChange={setModel} onNewChat={newChat} busy={!!busy} />
       <div className="flex shrink-0 items-center gap-1 border-b border-line px-3 py-1.5">
         <span className="text-[12px] font-medium text-fg-muted">{T.context}</span>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1" aria-label={T.context} role="list">
@@ -759,7 +815,6 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
           )}
           <AddContext onPick={addContext} exclude={context} />
         </div>
-        <IconButton label={T.newChat} icon="ph-note-pencil" onClick={newChat} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3" aria-live="polite">
@@ -768,11 +823,11 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
           {items.map((item) =>
             item.role === 'user' ? (
               <li key={item.id} data-role="user" className="flex justify-end">
-                <p className="max-w-[85%] rounded-lg bg-hover px-3 py-2 text-[14px] whitespace-pre-wrap break-words">{item.text}</p>
+                <ChatMarkdown source={item.text} className="max-w-[85%] rounded-lg bg-hover px-3 py-2 text-[14px] break-words" />
               </li>
             ) : (
               <li key={item.id} data-role="assistant" className="flex flex-col gap-1">
-                <p className="text-[14px] whitespace-pre-wrap break-words text-fg">{item.text}</p>
+                <AssistantBody text={item.text} parts={item.parts} />
                 {item.stopped && <p className="text-[12px] text-fg-muted">{T.stopped}</p>}
                 {item.skipped && item.skipped.length > 0 && (
                   <p className="text-[12px] text-fg-muted">{T.skipped(item.skipped.map((sk) => ({ title: titleOf(sk.path), reason: sk.reason })))}</p>
@@ -811,16 +866,11 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
           )}
           {busy && (
             <li data-role="assistant" data-streaming="" className="flex flex-col gap-1">
-              {busy.text && <p className="text-[14px] whitespace-pre-wrap break-words text-fg">{busy.text}</p>}
+              <AssistantBody text={busy.text} parts={busy.parts} streaming />
               <p role="status" className="flex items-center gap-1.5 text-[13px] text-fg-muted">
                 <Icon name="ph-sparkle" size={13} />
                 {busyLine}
               </p>
-              {usedTools.length > 0 && (
-                <p className="text-[12px] text-fg-muted">
-                  {T.usedTools} {usedTools.join(', ')}
-                </p>
-              )}
             </li>
           )}
         </ol>
