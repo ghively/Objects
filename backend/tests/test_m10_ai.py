@@ -616,6 +616,8 @@ def test_closing_the_stream_kills_the_process(space_dir: Path, fake, tmp_path: P
     "agentmodel.py", "toolcatalog.py", "agents.py", "agentfiles.py", "transcripts.py", "agentrun.py", "api_agents.py",
     "learningmodel.py", "ledger.py", "agentmemory.py", "agentskills.py", "learnundo.py", "chatsearch.py",
     "reviews.py", "curator.py", "api_learning.py", "api_learning_v1.py", "learnhooks.py",
+    # M19: mcpprobe.py is left out on purpose; it is the one module that opens connections.
+    "mcpmodel.py", "secretstore.py", "mcpstore.py", "mcpgateway.py", "api_mcp.py",
 ])
 def test_ai_modules_use_no_network_client(module: str) -> None:
     tree = ast.parse((BACKEND / module).read_text(encoding="utf-8"))
@@ -624,8 +626,10 @@ def test_ai_modules_use_no_network_client(module: str) -> None:
         if isinstance(node, ast.Import):
             names |= {a.name.split(".")[0] for a in node.names}
         elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            if node.module == "urllib.parse":
+                continue  # string parsing only (mcpstore checks a server URL); urllib.request stays banned
             names.add(node.module.split(".")[0])
-    banned = {"httpx", "urllib", "urllib3", "requests", "socket", "http", "aiohttp", "ssl", "websockets"}
+    banned = {"httpx", "httpx2", "urllib", "urllib3", "requests", "socket", "http", "aiohttp", "ssl", "websockets"}
     assert not names & banned, names & banned
 
 

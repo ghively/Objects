@@ -5,96 +5,15 @@
  * "Delete". A name Object can't set (it comes from this computer's environment) shows a note
  * instead. Values are never shown. The list reloads on `mcpServers` and `agents` events.
  *
- * `LocalSetSecretDialog` has the props of the agent page's `SetSecretDialog` (built in another
- * lane); the integration step swaps that one in.
+ * "Set…" / "Replace…" open the agent page's `SetSecretDialog`, so both places share one dialog.
  */
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/api/client'
 import type { SecretVar } from '@/api/types'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { SaveError, SettingGroup, errorText } from '@/settings/controls'
 import { MCP_TEXT as T } from './mcpText'
-
-function LocalSetSecretDialog({
-  name,
-  onOpenChange,
-  onSaved,
-}: {
-  name: string | null
-  onOpenChange(o: boolean): void
-  onSaved?(): void
-}) {
-  return (
-    <Dialog open={name !== null} onOpenChange={onOpenChange}>
-      <DialogContent aria-describedby={undefined} className="border-line bg-raised-2 text-fg sm:max-w-[440px]">
-        <DialogHeader>
-          <DialogTitle className="text-[18px]">{name !== null ? T.setTitle(name) : ''}</DialogTitle>
-        </DialogHeader>
-        {name !== null && (
-          <SetForm
-            key={name}
-            name={name}
-            onCancel={() => onOpenChange(false)}
-            onSaved={() => {
-              onSaved?.()
-              onOpenChange(false)
-            }}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-/** Unmounts with the dialog's content, so the typed value never outlives the dialog. */
-function SetForm({ name, onCancel, onSaved }: { name: string; onCancel(): void; onSaved(): void }) {
-  const [value, setValue] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
-    if (value === '' || busy) return
-    setBusy(true)
-    setError(null)
-    try {
-      await api.setMcpSecret(name, value)
-      setValue('')
-      onSaved()
-    } catch (err) {
-      setError(errorText(err))
-      setBusy(false)
-    }
-  }
-
-  return (
-    <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1 text-[13px] font-semibold">
-        {T.value}
-        <Input
-          type="password"
-          autoComplete="off"
-          autoFocus
-          spellCheck={false}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          className="font-normal"
-        />
-      </label>
-      <SaveError error={error} />
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          {T.cancel}
-        </Button>
-        <Button type="submit" disabled={value === '' || busy}>
-          {T.save}
-        </Button>
-      </div>
-    </form>
-  )
-}
+import { SetSecretDialog } from './SetSecretDialog'
 
 export function SecretVariables() {
   const [vars, setVars] = useState<SecretVar[] | null>(null)
@@ -172,7 +91,7 @@ export function SecretVariables() {
         </ul>
       )}
       <SaveError error={error} />
-      <LocalSetSecretDialog name={setting} onOpenChange={(o) => !o && setSetting(null)} onSaved={load} />
+      <SetSecretDialog name={setting} onOpenChange={(o) => !o && setSetting(null)} onSaved={load} />
     </SettingGroup>
   )
 }
