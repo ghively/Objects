@@ -1,5 +1,5 @@
 // M17: the chat header's agent picker.
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -10,7 +10,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import { resetAgents, useAgents } from '@/agents/useAgents'
-import { agent } from '@/test/mockApi'
+import { agent, remoteAgent } from '@/test/mockApi'
 import { AGENT_PICKER_TEXT as T, AgentPicker } from './AgentPicker'
 
 const mocked = vi.mocked(api)
@@ -52,6 +52,20 @@ describe('AgentPicker', () => {
     expect(screen.getByRole('button', { name: T.label })).toHaveTextContent(T.defaultName)
     await waitFor(() => expect(mocked.agents).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(useAgents.getState().loaded).toBe(true))
+  })
+
+  test('test the agent picker marks remote agents', async () => {
+    const PLANNER = '01JREMOTE00000000000000001'
+    useAgents.setState({ agents: [agent({ id: 'assistant' }), agent({ id: RESEARCHER }), remoteAgent({ id: PLANNER })], loaded: true })
+    const user = userEvent.setup()
+    render(<AgentPicker value={PLANNER} onChange={() => {}} />)
+    const trigger = screen.getByRole('button', { name: T.label })
+    expect(trigger).toHaveTextContent('Fake Planner')
+    expect(within(trigger).getByLabelText('Remote agent')).toHaveTextContent('remote')
+    await user.click(trigger)
+    const items = await screen.findAllByRole('menuitemradio')
+    expect(items.map((i) => i.querySelector('[data-remote-mark]') !== null)).toEqual([false, false, true])
+    expect(items[2]).toHaveTextContent('Fake Planner')
   })
 
   test('test disabled', () => {

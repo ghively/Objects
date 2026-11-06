@@ -1,8 +1,10 @@
 // M17: the chat header's agent picker (spec section 10), in `AiChatHeader`'s `leading` slot. It
 // lists every agent (`useAgents`: the default agent first); picking another one is the panel's to
 // act on (it starts a new chat with that agent).
+// M20: remote agents carry the "remote" mark (spec section 2), in the list and on the button.
 import { useEffect } from 'react'
 import type { Agent } from '@/api/types'
+import { RemoteMark } from '@/agents/RemoteMark'
 import { useAgents } from '@/agents/useAgents'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import {
@@ -31,7 +33,8 @@ export interface AgentPickerProps {
   disabled?: boolean
 }
 
-const fallbackIcon = (a: Pick<Agent, 'default'> | undefined, id: string) => (a?.default || id === DEFAULT_AGENT_ID ? 'ph-sparkle' : 'ph-robot')
+const fallbackIcon = (a: Pick<Agent, 'default' | 'kind'> | undefined, id: string) =>
+  a?.kind === 'remote' ? 'ph-globe' : a?.default || id === DEFAULT_AGENT_ID ? 'ph-sparkle' : 'ph-robot'
 
 export function AgentPicker({ value, onChange, disabled }: AgentPickerProps) {
   const agents = useAgents((s) => s.agents)
@@ -53,6 +56,7 @@ export function AgentPicker({ value, onChange, disabled }: AgentPickerProps) {
         >
           <IconOrEmoji icon={current?.icon ?? null} fallback={fallbackIcon(current, value)} size={14} />
           <span className="truncate">{name}</span>
+          {current?.kind === 'remote' && <RemoteMark />}
           <Icon name="ph-caret-down" size={12} />
         </button>
       </DropdownMenuTrigger>
@@ -62,6 +66,7 @@ export function AgentPicker({ value, onChange, disabled }: AgentPickerProps) {
             <DropdownMenuRadioItem key={a.id} value={a.id}>
               <IconOrEmoji icon={a.icon} fallback={fallbackIcon(a, a.id)} size={14} />
               <span className="truncate">{a.name}</span>
+              {a.kind === 'remote' && <RemoteMark className="ml-auto" />}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

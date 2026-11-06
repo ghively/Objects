@@ -11,7 +11,8 @@ import { api } from '@/api/client'
 import type { AgentChatSummary, ChangeEvent } from '@/api/types'
 import { useTabs } from '@/nav/tabs'
 import { agent } from '@/test/mockApi'
-import { CHATS_TEXT, ChatsTab, snippetPieces } from './ChatsTab'
+import { CHATS_TEXT, ChatsTab, delegatedLine, snippetPieces } from './ChatsTab'
+import { resetAgents, useAgents } from './useAgents'
 
 const mocked = vi.mocked(api)
 const RESEARCHER = '01JC7ZK3T9Q4M2X8B5N6R1V0WE'
@@ -126,6 +127,25 @@ describe('ChatsTab', () => {
     expect(within(list).getAllByRole('listitem').map((r) => r.getAttribute('data-chat'))).toEqual([CHAT_B])
     await new Promise((r) => setTimeout(r, 300))
     expect(mocked.searchAgentChats).not.toHaveBeenCalled()
+  })
+
+  test('test a delegated chat shows who delegated it', async () => {
+    resetAgents()
+    useAgents.setState({ agents: [agent({ id: 'assistant' }), agent({ id: RESEARCHER })], loaded: true })
+    mocked.agentChats.mockResolvedValue([
+      chat(CHAT_B, 'Find rack pages', { delegated: true, from: 'assistant' }),
+      chat(CHAT_A, 'Asked by a gone agent', { delegated: true, from: '01JGONE0000000000000000000' }),
+      chat('01JD0000000000000000000003', 'My own chat'),
+    ])
+    render(<ChatsTab agent={agent({ id: RESEARCHER })} />)
+    const list = await screen.findByRole('list', { name: CHATS_TEXT.list })
+    const rows = within(list).getAllByRole('listitem')
+    expect(rows[0].querySelector('[data-delegated]')).toHaveTextContent('Delegated by Assistant')
+    expect(rows[1].querySelector('[data-delegated]')).toHaveTextContent('Delegated by another agent')
+    expect(rows[2].querySelector('[data-delegated]')).toBeNull()
+    expect(delegatedLine({ delegated: true, from: null }, [])).toBe('Delegated by another agent')
+    expect(delegatedLine({ delegated: false, from: null }, [])).toBeNull()
+    resetAgents()
   })
 
   test('test the list reloads on agentChats events for this agent', async () => {
