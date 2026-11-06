@@ -126,7 +126,7 @@ REVIEW_LINE = "Look back over this chat."
 CURATOR_LINE = "Tidy up your skills."
 """The first line of the consolidation prompt (M18 `curator`)."""
 
-WORK_LINE = re.compile(r"\AWork queue entry (\S+): (\w+)\.")
+WORK_LINE = re.compile(r"(?:\A|^# The user's message\n)Work queue entry (\S+): (\w+)\.", re.MULTILINE)
 """The first line of every work queue entry prompt (M24 `workprompts.ENTRY_PROMPT_FIRST`)."""
 WORK_REF = re.compile(r"^Ref: path=(.*?) step=(\S+) rev=(\S+) capture=(.*)$", re.MULTILINE)
 
@@ -134,7 +134,7 @@ WORK_REF = re.compile(r"^Ref: path=(.*?) step=(\S+) rev=(\S+) capture=(.*)$", re
 def _work_actions(prompt: str) -> list[tuple[str, str, dict]]:
     """The calls ``FAKE_CLAUDE_WORK_ACTIONS`` lists for this work queue entry's kind (M24)."""
     raw = os.environ.get("FAKE_CLAUDE_WORK_ACTIONS")
-    first = WORK_LINE.match(prompt)
+    first = WORK_LINE.search(prompt)
     if not raw or first is None:
         return []
     try:
