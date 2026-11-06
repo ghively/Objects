@@ -129,8 +129,8 @@ def test_custom_model_id_passes_through(api, fake) -> None:
     assert _model(run) == "claude-opus-5-5[1m]"
 
 
-@pytest.mark.parametrize("bad", ["-p", "--dangerously-skip-permissions", "a b", "$(x)", "x" * 81])
-def test_bad_model_is_422_and_cli_not_run(api, fake, bad: str) -> None:
+@pytest.mark.parametrize("bad", ["-p", "--dangerously-skip-permissions", "a b", "$(x)", "x" * 81, 5, ["sonnet"], {"m": 1}, True])
+def test_bad_model_is_422_and_cli_not_run(api, fake, bad: object) -> None:
     _space, client = api
     res = _post(client, model=bad)
     assert res.status_code == 422

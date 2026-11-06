@@ -78,7 +78,7 @@ class ChatRequest(BaseModel):
     history: list[AiMessageModel] = []
     sessionId: str | None = None
     clientId: str | None = None
-    model: str | None = None
+    model: Any = None  # any value reaches aimodels.clean_model, so a bad one gets BAD_MODEL
 
 
 class SaveChatRequest(BaseModel):
