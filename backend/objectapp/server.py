@@ -178,6 +178,7 @@ from . import (
     api_merge,
     api_references,
     api_remote_agents,
+    api_schedules_v1,
     api_search,
     api_spaces_m8,
     api_tasks,
@@ -2160,6 +2161,8 @@ def create_app(
     api.include_router(api_agent_v1.router(ctx))
     # M18: the agent tools' learning routes, beside M17's agent v1 routes.
     api.include_router(api_learning_v1.router(ctx))
+    # M21: the agent tools' schedule routes (filled by the plan's T4).
+    api.include_router(api_schedules_v1.router(ctx, automations))
     # M20: the agent tools' A2A and delegation routes (filled by the plan's T6).
     api.include_router(api_agent_a2a_v1.router(ctx))
     # M18: the learning routes go before api_agents, whose GET /agents/{id}/chats/{chatId} would

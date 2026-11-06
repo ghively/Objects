@@ -1655,6 +1655,17 @@ export interface NotifyAction {
   title: string
   body: string
 }
+/**
+ * M21: run `prompt` as a new chat of the agent `agentId` (an agent schedule: a schedule rule with
+ * this one action, no conditions, no template repeat). `model` null: the agent's default. Never
+ * offered in the rule editor's "+ Add action" menu.
+ */
+export interface RunAgentAction {
+  kind: 'runAgent'
+  agentId: string
+  prompt: string
+  model: string | null
+}
 
 export type AutomationAction =
   | SetPropertyAction
@@ -1666,6 +1677,7 @@ export type AutomationAction =
   | CreateFromTemplateAction
   | AppendToDailyNoteAction
   | NotifyAction
+  | RunAgentAction
 export type AutomationActionKind = AutomationAction['kind']
 
 /** The actions that edit the triggering object (not offered on a schedule). */
@@ -2086,6 +2098,8 @@ export interface AgentChatSummary {
   delegated: boolean
   /** M20: the delegating agent's id (with `delegated: true`), else null. */
   from: string | null
+  /** M21: the schedule that started this chat (`scheduledFor` ISO UTC), else null. */
+  schedule: { ruleId: string; name: string; scheduledFor: string; catchUp: boolean } | null
 }
 
 /** One line of a chat transcript. */

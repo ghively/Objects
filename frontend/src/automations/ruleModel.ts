@@ -16,6 +16,7 @@ import type {
   FilterGroup,
   PropertyDef,
   PropertyType,
+  ScheduleTrigger,
   TypeDef,
 } from '@/api/types'
 import { OBJECT_ACTION_KINDS } from '@/api/types'
@@ -44,6 +45,8 @@ export const RULE_TEXT = {
     createFromTemplate: 'Create an object',
     appendToDailyNote: 'Add to the daily note',
     notify: 'Send a notification',
+    // M21: an agent schedule's one action; only here so the record stays exhaustive (never offered).
+    runAgent: 'Run an agent',
   } satisfies Record<AutomationActionKind, string>,
   whenPressed: 'When pressed',
   never: 'Never ran',
@@ -57,9 +60,13 @@ export const RULE_TEXT = {
   needActionField: (n: number) => `Action ${n} isn't finished.`,
   repeatsTemplate: (name: string) => `Repeats template “${name}”`,
   repeatName: (name: string) => `Repeat “${name}”`,
+  // M21 (our strings)
+  runsAgent: (name: string) => `Runs “${name}”`,
+  runsMissingAgent: "Runs an agent that isn't listed",
 } as const
 
-/** The nine action kinds in the "+ Add action" menu's order (the object ones first). */
+/** The nine action kinds in the "+ Add action" menu's order (the object ones first). M21's
+ * `runAgent` is never here: agent schedules are made on the agent page. */
 export const ACTION_KINDS: readonly AutomationActionKind[] = [
   'setProperty',
   'clearProperty',
@@ -207,7 +214,36 @@ export function newAction(kind: AutomationActionKind): AutomationAction {
       return { kind, text: '' }
     case 'notify':
       return { kind, title: '', body: '' }
+    case 'runAgent':
+      // M21: never offered; only keeps the switch exhaustive.
+      return { kind, agentId: 'assistant', prompt: '', model: null }
   }
+}
+
+// ---- M21: agent schedules (a schedule rule whose one action is runAgent) ----
+
+/** Whether the rule is an agent schedule: its one action is `runAgent`. */
+export const isAgentSchedule = (r: Pick<AutomationRule, 'actions'>): boolean =>
+  r.actions.length === 1 && r.actions[0].kind === 'runAgent'
+
+/** A new agent schedule's fields: one `runAgent` action, no conditions, no template repeat. */
+export function agentScheduleInput(
+  agentId: string,
+  name: string,
+  prompt: string,
+  trigger: ScheduleTrigger,
+  model: string | null,
+  enabled = true,
+): RuleFields {
+  return newRuleInput({ name, enabled, trigger, actions: [{ kind: 'runAgent', agentId, prompt, model }] })
+}
+
+/** The agent's schedules among `rules`, by name (ignoring case), then id. */
+export function schedulesOf(rules: readonly AutomationRule[], agentId: string): AutomationRule[] {
+  const key = (r: AutomationRule) => r.name.toLowerCase()
+  return rules
+    .filter((r) => isAgentSchedule(r) && r.actions[0].kind === 'runAgent' && r.actions[0].agentId === agentId)
+    .sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
 }
 
 // ---- Summaries ----
@@ -379,6 +415,8 @@ function actionComplete(a: AutomationAction): boolean {
       return a.text.trim() !== ''
     case 'notify':
       return true
+    case 'runAgent':
+      return a.prompt.trim() !== ''
   }
 }
 

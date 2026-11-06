@@ -30,6 +30,7 @@ function chat(id: string, title: string, partial: Partial<AgentChatSummary> = {}
     spaceName: 'Notes',
     delegated: false,
     from: null,
+    schedule: null,
     ...partial,
   }
 }
