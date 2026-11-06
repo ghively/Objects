@@ -11,7 +11,8 @@ Run it by hand with ``python backend/tests/fake_a2a.py --port 8799 [--no-streami
 - `requests` holds every request (method, path, headers, the JSON-RPC method and params; the
   ``Authorization`` header is kept so tests can assert it). With `log`, each is also appended to
   that file as one JSON line.
-- `card_override` serves that card instead; `raw_override(method)` answers a JSON-RPC method with
+- `card_override` serves that card instead (`card_raw`: those bytes as the card body);
+  `raw_override(method)` answers a JSON-RPC method with
   ``(status, headers, body)`` as given (hostile answers).
 
 The reply is steered by markers in the user message's text parts:
@@ -93,6 +94,7 @@ class FakeA2A:
         self.port = port
         self.requests: list[dict[str, Any]] = []
         self.card_override: dict[str, Any] | None = None
+        self.card_raw: bytes | None = None
         self.raw_override: Callable[[str], tuple[int, dict[str, str], bytes]] | None = None
         self.base_url = ""
         self._lock = threading.Lock()
@@ -307,6 +309,9 @@ class _Handler(BaseHTTPRequestHandler):
             return
         if self.path.split("?")[0] != CARD_PATH:
             self._json(404, {"error": "not found"})
+            return
+        if fake.card_raw is not None:
+            self._send(200, fake.card_raw)
             return
         self._json(200, fake.card())
 
