@@ -84,6 +84,10 @@ FILTER_OPTIONS: dict[str, list[str]] = {
     "simpleTableBlock": _BLOCKS,
     "coverImage": _BLOCKS,
     "button": [],
+    # M22: a list matches as Aliases do; steps and floor items are only empty or not.
+    "textList": ["contains", "notContains", *_EMPTY],
+    "steps": _EMPTY,
+    "floorItems": _EMPTY,
 }
 """Every operator per property kind (``filter.ts`` ``FILTER_OPTIONS``, keys only)."""
 
@@ -577,6 +581,20 @@ def _match_kind(
             return _match_set([s.get("type")], _ref_ids(f), f)
         case "entity_aliases":
             have = [a for a in s.get("aliases") or [] if isinstance(a, str)]
+            option = f.get("option")
+            if option == "isEmpty":
+                return not have
+            if option == "isNotEmpty":
+                return bool(have)
+            ref = f.get("referenceValue")
+            ref = ref.lower() if isinstance(ref, str) else ""
+            if ref == "":
+                return True
+            hit = any(ref in a.lower() for a in have)
+            return not hit if option == "notContains" else hit
+        case "textList":
+            # M22: as Aliases, on the row's value: a case-insensitive substring of any item.
+            have = [a for a in value if isinstance(a, str)] if isinstance(value, list) else []
             option = f.get("option")
             if option == "isEmpty":
                 return not have
