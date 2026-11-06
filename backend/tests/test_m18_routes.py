@@ -308,7 +308,14 @@ def test_learn_and_reviews_routes(env: Env, monkeypatch) -> None:
     assert env.http.post(env.url("/chats/not-a-chat/learn"), json={}).status_code == 404
     assert env.http.get(env.url(f"/chats/{UNKNOWN_CHAT}/reviews")).status_code == 404
 
-    AgentRegistry().save(env.id, AgentInput(name="Researcher", toolsOff=["memory", "skill_manage"]),
+    # One learning tool off is not enough to refuse.
+    AgentRegistry().save(env.id, AgentInput(name="Researcher", toolsOff=["mcp__object-agent__memory"]),
+                         AgentRegistry().get(env.id).revision)
+    monkeypatch.setattr(reviews, "learn_now", busy)
+    assert env.http.post(env.url(f"/chats/{CHAT}/learn"), json={}).status_code == 409
+    # Both catalogue ids off, as ToolsTab saves them.
+    AgentRegistry().save(env.id, AgentInput(name="Researcher",
+                                            toolsOff=["mcp__object-agent__memory", "mcp__object-agent__skill_manage"]),
                          AgentRegistry().get(env.id).revision)
     res = env.http.post(env.url(f"/chats/{CHAT}/learn"), json={})
     assert res.status_code == 422 and res.json()["detail"] == "Learning tools are switched off for this agent."
