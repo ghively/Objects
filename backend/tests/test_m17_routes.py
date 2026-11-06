@@ -224,6 +224,37 @@ def test_put_default_model_writes_ai_model(api) -> None:
     assert device_settings.read()[0]["aiModel"] is None
 
 
+def test_put_default_model_failure_still_hands_back_the_revision(api, monkeypatch) -> None:
+    """agent.json was saved, the aiModel write was refused: the new revision is announced and
+    returned, so the client's retry is no conflict."""
+    from objectapp import api_agents
+    from objectapp.space import ReadOnly
+
+    client, published = api["client"], api["published"]
+    made = client.put("/api/agents/assistant", json={"agent": {"name": "Assistant"}, "baseRevision": None})
+    assert made.status_code == 200, made.text
+    real = api_agents.read_settings
+
+    def locked():
+        raise ReadOnly("The settings file can't be read.")
+
+    monkeypatch.setattr(api_agents, "read_settings", locked)
+    before = len(published)
+    body = {"agent": {"name": "Assistant", "model": "sonnet"}, "baseRevision": made.json()["revision"]}
+    res = client.put("/api/agents/assistant", json=body)
+    assert res.status_code == 423
+    rev = res.json()["currentRevision"]
+    assert rev and rev != made.json()["revision"]
+    assert rev == client.get("/api/agents/assistant").json()["revision"]
+    _wait(published, before + 1)
+    assert any(getattr(e, "kind", None) == "agents" and getattr(e, "version", None) == rev
+               for e in published[before:])
+    monkeypatch.setattr(api_agents, "read_settings", real)
+    retry = client.put("/api/agents/assistant", json={**body, "baseRevision": rev})
+    assert retry.status_code == 200, retry.text
+    assert device_settings.read()[0]["aiModel"] == "sonnet"
+
+
 # -- delete, unregister, trash, restore ---------------------------------------------------------
 
 

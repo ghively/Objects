@@ -10,7 +10,8 @@
   folder, writing nothing in it. 404, 409 (its id is already listed), 422.
 - ``PUT  /agents/{id}`` ``{agent, baseRevision, clientId?}`` -> ``Agent``. The default agent's
   ``model`` is written to the ``aiModel`` device setting. 404, 409 ``{currentRevision}``, 422,
-  423.
+  423. When ``agent.json`` was saved but the ``aiModel`` write failed, the error carries the
+  saved ``currentRevision`` too (and the ``agents`` event went out).
 - ``DELETE /agents/{id}?clientId=`` -> ``{trashId}``: to the agent trash, or ``null`` when the
   folder is outside the state dir (only unregistered). 422 for the default agent.
 - ``POST /agents/{id}/unregister`` ``{clientId?}`` -> ``{ok: true}``. 422 for the default agent.
@@ -33,6 +34,7 @@ These routes stay available while "Hide AI features" is on; only the UI hides th
 from __future__ import annotations
 
 import contextlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -173,11 +175,14 @@ def router(ctx: ApiContext) -> APIRouter:
             rec = reg.save(agent_id, cleaned, req.baseRevision)
         except AgentError as exc:
             return _fail(exc)
-        if rec.default:
-            problem = _save_ai_model(cleaned.model)
-            if problem is not None:
-                return problem
+        problem = _save_ai_model(cleaned.model) if rec.default else None
+        # agent.json is saved either way, so its new revision goes out (and comes back with a
+        # failed model write as ``currentRevision``): the client's retry doesn't hit a 409.
         announce(rec.id, rec.revision, req.clientId)
+        if problem is not None:
+            body = json.loads(bytes(problem.body))
+            body["currentRevision"] = rec.revision
+            return JSONResponse(body, status_code=problem.status_code)
         return out(rec)
 
     def _save_ai_model(model: str | None) -> JSONResponse | None:
