@@ -458,7 +458,9 @@ def test_topup_adds_occurrence_log_once(space: Space, m8_space_dir: Path):
     assert b"occurrenceLog" not in stored
     t = space.type_by_id("task")
     keys = [p.key for p in t.propertyDefinitions]
-    assert keys.count("occurrenceLog") == 1 and keys[-1] == "occurrenceLog"
+    assert keys.count("occurrenceLog") == 1
+    # M22 appends its work fields after the top-ups, so it is no longer the last key.
+    assert keys.index("occurrenceLog") > keys.index("remind")
     log = t.prop("occurrenceLog")
     assert (log.type, log.name, log.visibility) == ("text", "Occurrence log", "hidden")
     topup_task_type(t)
