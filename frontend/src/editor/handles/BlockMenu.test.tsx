@@ -81,6 +81,17 @@ describe('<BlockMenu>', () => {
     ])
   })
 
+  test('turn into card shows only on a line holding just a link, and makes a card', async () => {
+    const editor = headless('See [[Ada Lovelace]] here\n\n[[Ada Lovelace|Ada]]\n')
+    selectBlocks(editor, blockPos(editor, 0))
+    const first = renderMenu(editor)
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).queryByRole('menuitem', { name: /Turn into card/ })).toBeNull()
+    first.unmount()
+    await pick(editor, 1, 'Turn into card')
+    expect(serializeBody(editor)).toBe('See [[Ada Lovelace]] here\n\n![[Ada Lovelace|Ada]]\n')
+  })
+
   test('the block menu has the catalogued set, in its order, with key hints', async () => {
     const editor = headless(BODY)
     selectBlocks(editor, blockPos(editor, 0))
