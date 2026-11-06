@@ -81,6 +81,7 @@ __all__ = ["SPACE_FOLDER_IMPORT", "router"]
 SPACE_FOLDER_IMPORT = "Importing from a space folder isn't available to agents."
 AGENT_FOLDER_IMPORT = "Importing from an agent folder isn't available to agents."  # our string
 EXCLUSION_RULE = "An automation made by an agent can't remove “Exclude from AI” or change tags."  # our string
+AGENT_SCHEDULE_RULE = "Agent schedules are made with schedule_manage."  # our string (M21)
 OBJECT_CONFLICT = "The object changed since that version. Read it again and retry."
 DEFINITION_CONFLICT = "The definition changed since that revision. Read it again and retry."  # our string
 MAX_BODY = 2_000_000
@@ -907,10 +908,19 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
                     return True
         return False
 
+    def runs_agent(rule: dict[str, Any]) -> bool:
+        """M21: whether a rule has a ``runAgent`` action (an agent schedule, made only with
+        ``schedule_manage``, which can't name another agent)."""
+        actions = rule.get("actions") if isinstance(rule, dict) else None
+        return any(isinstance(a, dict) and a.get("kind") == "runAgent"
+                   for a in (actions if isinstance(actions, list) else []))
+
     @r.post("/v1/automations", status_code=201)
     @run
     def create_automation(req: RuleRequest, request: Request):
         token = auth(request, write=True)
+        if runs_agent(req.rule):
+            return error(422, AGENT_SCHEDULE_RULE)
         if lifts_exclusion(req.rule):
             return error(422, EXCLUSION_RULE)
         status, body = app(request, "POST", "/api/automations", {"rule": req.rule, "clientId": origin(token)})

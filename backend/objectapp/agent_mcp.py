@@ -32,6 +32,8 @@ TOOL_MODULES: tuple[str, ...] = (
     "objectapp.agent_tools_core", "objectapp.agent_tools_learning",
     # M20
     "objectapp.agent_tools_a2a",
+    # M21
+    "objectapp.agent_tools_schedules",
 )
 """The modules whose ``register(server, client)`` adds this server's tools, in build order."""
 
