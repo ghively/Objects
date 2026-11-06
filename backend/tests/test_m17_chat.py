@@ -233,6 +233,36 @@ def test_error_turn_is_recorded(api, fake) -> None:
     assert [i["type"] for i in t["items"]] == ["user", "error"]
 
 
+def test_unwritable_transcript_ends_with_error(api, fake, monkeypatch) -> None:
+    """The chat can't be started on disk: the stream still closes with one ``error``."""
+    _space, client, _ = api
+
+    def fail(*_a, **_k):
+        raise PermissionError(13, "Access is denied")
+
+    monkeypatch.setattr(transcripts, "start", fail)
+    events = _chat(client, "Hello")
+    assert [e["type"] for e in events] == ["chat", "error"]
+    assert events[-1]["message"] == "The chat couldn't be saved: Access is denied"
+    assert _runs(fake["log"]) == []
+
+
+def test_unexpected_start_failure_is_an_error_turn(api, fake, monkeypatch) -> None:
+    """A failure other than a refusal or an OSError while starting the run: ``error``, recorded."""
+    _space, client, _ = api
+    from objectapp import ai
+
+    def boom(*_a, **_k):
+        raise RuntimeError("bad run")
+
+    monkeypatch.setattr(ai._Attempt, "start", boom)
+    events = _chat(client, "Hello")
+    assert events[-1] == {"type": "error", "message": "Claude Code couldn't be started: bad run"}
+    t = transcripts.read(state_dir() / "agents" / "Assistant", events[0]["chatId"])
+    assert [i["type"] for i in t["items"]] == ["user", "error"]
+    assert not any(i.get("stopped") for i in t["items"])
+
+
 def test_stopped_turn_is_marked(space_dir: Path, fake) -> None:
     """Closing the stream during ``FAKE:wait`` records what was shown so far, ``stopped``."""
     _space, app, _published = _app(space_dir)

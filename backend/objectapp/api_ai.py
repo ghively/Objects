@@ -365,7 +365,14 @@ def router(
                 curator.busy_turns(1)
             try:
                 yield frame({"type": "chat", "chatId": chat_id, "agentId": agent.id})
-                await asyncio.to_thread(begin)
+                try:
+                    await asyncio.to_thread(begin)
+                except OSError as exc:
+                    # The agent folder can't be written (or vanished): one closing error.
+                    last = {"type": "error",
+                            "message": f"The chat couldn't be saved: {exc.strerror or exc}"}
+                    yield frame(last)
+                    return
                 started = True
                 turn = ai.Turn(
                     claude=claude,

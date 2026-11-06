@@ -832,6 +832,8 @@ async def _attempt_events(attempt: _Attempt, parser: StreamParser, deadline: flo
         raise _Failed(exc.message, retryable=False) from exc
     except OSError as exc:
         raise _Failed(f"Claude Code couldn't be started: {exc.strerror or exc}", retryable=False) from exc
+    except Exception as exc:  # noqa: BLE001 - any other failure still ends the turn with ``error``
+        raise _Failed(f"Claude Code couldn't be started: {exc}", retryable=False) from exc
     while True:
         remaining = deadline - loop.time()
         if remaining <= 0:
