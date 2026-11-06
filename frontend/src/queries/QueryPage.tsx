@@ -46,6 +46,13 @@ export const QUERY_TEXT = {
   unknown: 'Unknown query',
 }
 
+/**
+ * M22: the note on the built-in Tickets view (`builtIn: 'tickets'`, our string). Its structures are
+ * every work type, set by the server at each read, so it has no type picker (no query builder) and
+ * no Delete (the server refuses it: "The Tickets view is built in.").
+ */
+export const TICKETS_NOTE = 'Lists every work item with a Ticket ID.'
+
 /** The tag titles and types a title is built from. */
 export function useTitleCtx(types: TypeDef[]): TitleCtx {
   const objects = useLinkIndex((s) => s.objects)
@@ -126,6 +133,7 @@ export function QueryPage({ id }: { id: string }) {
   }
 
   const readOnly = !!q.readOnlyReason
+  const tickets = q.builtIn === 'tickets'
   const title = queryTitle(q, titleCtx)
   const structures = def.structures.map((s) => allTypes.find((t) => t.id === s.id)).filter((t): t is TypeDef => !!t)
   const pausedNow = isSearching(def)
@@ -222,16 +230,18 @@ export function QueryPage({ id }: { id: string }) {
           }}
           className="dataview-heading min-w-0 flex-1 bg-transparent text-[20px] font-bold outline-none md:text-[22px]"
         />
-        <button
-          type="button"
-          aria-pressed={editing}
-          disabled={readOnly}
-          onClick={() => setEditing((v) => !v)}
-          className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[14px] font-medium hover:bg-hover disabled:opacity-50"
-        >
-          <Icon name="ph-pencil-simple" size={14} />
-          {editing ? QUERY_TEXT.closeEditor : QUERY_TEXT.edit}
-        </button>
+        {!tickets && (
+          <button
+            type="button"
+            aria-pressed={editing}
+            disabled={readOnly}
+            onClick={() => setEditing((v) => !v)}
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[14px] font-medium hover:bg-hover disabled:opacity-50"
+          >
+            <Icon name="ph-pencil-simple" size={14} />
+            {editing ? QUERY_TEXT.closeEditor : QUERY_TEXT.edit}
+          </button>
+        )}
         <DropdownMenu onOpenChange={loadTypePins}>
           <DropdownMenuTrigger asChild>
             <button
@@ -270,14 +280,19 @@ export function QueryPage({ id }: { id: string }) {
                 ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" disabled={readOnly} onSelect={doDelete}>
-              <Icon name="ph-trash" size={14} />
-              {QUERY_TEXT.delete}
-            </DropdownMenuItem>
+            {!tickets && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" disabled={readOnly} onSelect={doDelete}>
+                  <Icon name="ph-trash" size={14} />
+                  {QUERY_TEXT.delete}
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
+      {tickets && <p className="px-4 pb-2 text-[13px] text-fg-muted">{TICKETS_NOTE}</p>}
       {readOnly && (
         <p role="status" className="px-4 pb-2 text-[13px] text-fg-muted">
           {`This query's file couldn't be read, so it opens read-only. Fix the file to edit it.`}
@@ -292,7 +307,7 @@ export function QueryPage({ id }: { id: string }) {
         </div>
       )}
       <div className="mx-auto flex w-full flex-col gap-4 px-6 pt-2 pb-16">
-        {editing && <QueryBuilder query={q as Query} types={allTypes} collections={defs.collections} onChange={editDefinition} />}
+        {editing && !tickets && <QueryBuilder query={q as Query} types={allTypes} collections={defs.collections} onChange={editDefinition} />}
         {!ready ? (
           <div className="flex flex-col items-center gap-1 py-10 text-center">
             <p className="text-[15px] text-fg">{QUERY_TEXT.notReadyTitle}</p>

@@ -99,6 +99,24 @@ import type {
   McpServersAnswer,
   McpTestResult,
   SecretVar,
+  AddWorkFieldsResult,
+  StepOp,
+  WorkFloorRequest,
+  WorkItem,
+  WorkItemSummary,
+  WorkStep,
+  WorkStepRequest,
+  WorkWriteResult,
+  AgentStatus,
+  AlertScanReport,
+  CaptureRequest,
+  CaptureSummary,
+  FocusDay,
+  GeneralFloor,
+  WorkAlerts,
+  WorkBoard,
+  WorkToday,
+  WorkWins,
 } from './types'
 import type { WhiteboardSettings } from './whiteboardTypes'
 
@@ -134,6 +152,50 @@ export class RevisionConflictError extends ConflictError {
   get currentRevision(): string {
     return this.currentVersion
   }
+}
+
+/**
+ * M22: 409 from a step or floor-item action (`workStep`, `workSteps`, `workFloor`): the step (or
+ * floor item) changed since its `rev` was read. Nothing was written. `message` is the server's
+ * detail ("This step changed. Look again."); `step` is the step as it is now, when the server sends it.
+ */
+export class StepChangedError extends ConflictError {
+  readonly step: WorkStep | null
+  constructor(message: string, currentVersion: string, step: WorkStep | null = null) {
+    super(currentVersion)
+    this.name = 'StepChangedError'
+    this.message = message
+    this.step = step
+  }
+}
+
+/**
+ * M23: 501 from a seam M24 fills (the brain-dump save, the agent switch and retry) or from Keep on
+ * top outside the Object window. `message` is the server's detail ("Saving a brain dump comes with
+ * M24."). Nothing was written.
+ */
+export class UnavailableError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'UnavailableError'
+  }
+}
+
+/** A call whose 501 becomes `UnavailableError` (other routes keep their `ApiError` 501). */
+async function seamCall<T>(call: Promise<T>): Promise<T> {
+  try {
+    return await call
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 501) throw new UnavailableError(e.message)
+    throw e
+  }
+}
+
+/** The `StepChangedError` a work action's 409 detail becomes. */
+function stepChanged(d: Record<string, unknown>): Error {
+  const message = typeof d.detail === 'string' ? d.detail : 'This step changed. Look again.'
+  const step = d.step && typeof d.step === 'object' ? (d.step as WorkStep) : null
+  return new StepChangedError(message, String(d.currentVersion ?? ''), step)
 }
 
 /** 428: the write needs `confirm: true`; `affected` files would change. Nothing was written. */
@@ -424,6 +486,11 @@ function defEvent(kind: 'collections' | 'queries' | 'views' | 'ui' | 'automation
   return { kind, path, version, origin: CLIENT_ID }
 }
 
+/** M22: a work write's `changed` events: the item, then each relation-synced object. */
+function workEvents(path: string, res: WorkWriteResult): ChangeEvent[] {
+  return [changed(path, res.version ?? null), ...(res.synced ?? []).map((p) => changed(p))]
+}
+
 /** `renamed` when the write moved the file, else `changed`. */
 function movedOrChanged(oldPath: string, path: string, version: string | null): ChangeEvent {
   if (path === oldPath) return changed(path, version)
@@ -455,6 +522,8 @@ const RESYNC_EVENTS: readonly ChangeEvent[] = [
   { kind: 'agents', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'agentChats', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'agentLearning', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'work', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'workQueue', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'mcpServers', path: RESYNC_PATH, version: null, origin: null },
 ]
 
@@ -1718,6 +1787,189 @@ export const api = {
   async refreshAgentTools(agentId: string): Promise<ToolGroup[]> {
     const res = await request<{ groups: ToolGroup[] }>(`/agents/${seg(agentId)}/tools/refresh`, json('POST', {}))
     return res?.groups ?? []
+  },
+
+  // ---- M22: the work model (every write goes through the server's one work service) ----
+
+  /** The work items: `active` (default) = active items plus the recently done; `all` = every one. */
+  async workItems(scope?: 'active' | 'all'): Promise<WorkItemSummary[]> {
+    const res = await request<{ items: WorkItemSummary[] }>(`/work/items${qs({ scope })}`)
+    return res?.items ?? []
+  },
+
+  /** One work item. 404; 422 when the object has no work fields. */
+  workItem(path: string): Promise<WorkItem> {
+    return request<WorkItem>(`/work/item${qs({ path })}`)
+  },
+
+  /**
+   * Act on one step (answer, done, approve, decline, run, reopen). A stale `stepRev` rejects with
+   * `StepChangedError` (409); a move the rules refuse is an `ApiError` 422 with the reason.
+   */
+  async workStep(req: WorkStepRequest): Promise<WorkWriteResult> {
+    const res = await request<WorkWriteResult>('/work/step', json('POST', { ...req, clientId: CLIENT_ID }), stepChanged)
+    emitLocal(workEvents(req.path, res))
+    return res
+  },
+
+  /** Add, edit, move or remove steps: every op in one write, in order. 409 `StepChangedError`. */
+  async workSteps(path: string, ops: StepOp[]): Promise<WorkWriteResult> {
+    const res = await request<WorkWriteResult>('/work/steps', json('POST', { path, ops, clientId: CLIENT_ID }), stepChanged)
+    emitLocal(workEvents(path, res))
+    return res
+  },
+
+  /** Set (and `remove`) work and ticket fields with one Activity line. 409 `ConflictError`. */
+  async workFields(
+    path: string,
+    set: Record<string, unknown>,
+    remove: string[],
+    baseVersion: string,
+  ): Promise<WorkWriteResult> {
+    const res = await request<WorkWriteResult>(
+      '/work/fields',
+      json('POST', { path, baseVersion, set, remove, clientId: CLIENT_ID }),
+    )
+    emitLocal(workEvents(path, res))
+    return res
+  },
+
+  /** Add a note, or a request for the agent, to Activity and Work notes. */
+  async workNote(path: string, kind: 'note' | 'request', text: string): Promise<WorkWriteResult> {
+    const res = await request<WorkWriteResult>('/work/note', json('POST', { path, kind, text, clientId: CLIENT_ID }))
+    emitLocal(workEvents(path, res))
+    return res
+  },
+
+  /** Close the item: Object's own done status (Task Done, Project Completed). 409 `ConflictError`. */
+  async workClose(path: string, baseVersion: string): Promise<WorkWriteResult> {
+    const res = await request<WorkWriteResult>('/work/close', json('POST', { path, baseVersion, clientId: CLIENT_ID }))
+    emitLocal(workEvents(path, res))
+    return res
+  },
+
+  /** Add, edit, collect, un-tick or remove a floor item. A stale `itemRev` rejects with `StepChangedError`. */
+  async workFloor(req: WorkFloorRequest): Promise<WorkWriteResult> {
+    const res = await request<WorkWriteResult>('/work/floor', json('POST', { ...req, clientId: CLIENT_ID }), stepChanged)
+    emitLocal(workEvents(req.path, res))
+    return res
+  },
+
+  /** "Add work fields" to a type. 409 `RevisionConflictError`; 422 for a basic type. */
+  async addWorkFields(typeId: string, baseRevision: string): Promise<AddWorkFieldsResult> {
+    const res = await request<AddWorkFieldsResult>(
+      `/types/${seg(typeId)}/work-fields`,
+      json('POST', { baseRevision, clientId: CLIENT_ID }),
+    )
+    emitLocal([typesEvent(res.type?.id ?? typeId, res.type?.revision ?? null), defEvent('queries', 'work-tickets')])
+    return res
+  },
+
+  // ---- M23: the Work section (reads write nothing; item writes stay M22's calls above) ----
+
+  /** The board every Work view is computed from: `active` (default) or `all`. */
+  workBoard(scope?: 'active' | 'all'): Promise<WorkBoard> {
+    return request<WorkBoard>(`/work/board${qs({ scope })}`)
+  },
+
+  /** A day's focus lines (default today); reading never creates the daily note. */
+  workFocus(day?: string): Promise<FocusDay> {
+    return request<FocusDay>(`/work/focus${qs({ day })}`)
+  },
+
+  /**
+   * Replace the day's focus lines (only the Focus section's list lines change; the daily note is
+   * created when missing). A stale `baseVersion` rejects with `ConflictError` (409).
+   */
+  async saveWorkFocus(day: string, lines: string[], baseVersion: string | null): Promise<FocusDay> {
+    const res = await request<FocusDay>('/work/focus', json('PUT', { day, lines, baseVersion, clientId: CLIENT_ID }))
+    if (res?.notePath) {
+      emitLocal([baseVersion === null ? created(res.notePath, res.version) : changed(res.notePath, res.version)])
+    }
+    return res
+  },
+
+  /** Today's (or `day`'s) meetings and the current local time. */
+  workToday(day?: string): Promise<WorkToday> {
+    return request<WorkToday>(`/work/today${qs({ day })}`)
+  },
+
+  /** Steps done, items closed and objects changed over the last `days` (1-31, default 14). */
+  workWins(days?: number): Promise<WorkWins> {
+    return request<WorkWins>(`/work/wins${qs({ days: days === undefined ? undefined : String(days) })}`)
+  },
+
+  /** The Alert objects and the monitoring folder's sources. */
+  workAlerts(): Promise<WorkAlerts> {
+    return request<WorkAlerts>('/work/alerts')
+  },
+
+  /** Scan the monitoring folder now (Check now). The watch announces its own writes. */
+  scanAlerts(): Promise<{ report: AlertScanReport; alerts: WorkAlerts }> {
+    return request<{ report: AlertScanReport; alerts: WorkAlerts }>('/work/alerts/scan', json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** "Add the Alert type" (idempotent: `created` is false when it exists). */
+  async ensureAlertType(): Promise<{ type: TypeDef; created: boolean }> {
+    const res = await request<{ type: TypeDef; created: boolean }>('/work/alert-type', json('POST', { clientId: CLIENT_ID }))
+    if (res?.created) emitLocal([typesEvent(res.type.id, res.type.revision ?? null)])
+    return res
+  },
+
+  /** The general floor list (floor items no work item owns). */
+  generalFloor(): Promise<GeneralFloor> {
+    return request<GeneralFloor>('/work/floor/general')
+  },
+
+  /** Add, edit, collect, un-tick or remove a general floor item. A stale `itemRev` rejects with `StepChangedError`. */
+  async generalFloorOp(req: Omit<WorkFloorRequest, 'path'>): Promise<GeneralFloor> {
+    const res = await request<GeneralFloor>('/work/floor/general', json('POST', { ...req, clientId: CLIENT_ID }), stepChanged)
+    emitLocal([{ kind: 'work', path: 'floor', version: res?.revision ?? null, origin: CLIENT_ID }])
+    return res
+  },
+
+  /** The work agent's status and queue (M23: `available: false`, `carrying` from the board). */
+  workAgent(): Promise<AgentStatus> {
+    return request<AgentStatus>('/work/agent')
+  },
+
+  /** "Agent acts on my approvals". 501 `UnavailableError` until M24. */
+  async setAgentActs(on: boolean): Promise<AgentStatus> {
+    const res = await seamCall(request<AgentStatus>('/work/agent/acts', json('PUT', { on, clientId: CLIENT_ID })))
+    emitLocal([{ kind: 'workQueue', path: RESYNC_PATH, version: null, origin: CLIENT_ID }])
+    return res
+  },
+
+  /** Retry one agent queue entry. 404; 501 `UnavailableError` until M24. */
+  async retryAgentEntry(id: string): Promise<AgentStatus> {
+    const res = await seamCall(request<AgentStatus>('/work/agent/retry', json('POST', { id, clientId: CLIENT_ID })))
+    emitLocal([{ kind: 'workQueue', path: id, version: null, origin: CLIENT_ID }])
+    return res
+  },
+
+  /** Save a brain dump. 501 `UnavailableError` ("Saving a brain dump comes with M24.") until M24. */
+  async workCapture(req: CaptureRequest): Promise<CaptureSummary> {
+    const res = await seamCall(
+      request<{ capture: CaptureSummary }>('/work/captures', json('POST', { ...req, clientId: CLIENT_ID })),
+    )
+    if (res?.capture?.path) emitLocal([created(res.capture.path)])
+    return res.capture
+  },
+
+  /** Saved brain dumps, newest first (M23: none). */
+  async workCaptures(status?: 'new' | 'filed' | 'needsYou'): Promise<CaptureSummary[]> {
+    const res = await request<{ captures: CaptureSummary[] }>(`/work/captures${qs({ status })}`)
+    return res?.captures ?? []
+  },
+
+  /** Whether the Object window can open the keep-on-top window. */
+  keepOnTopInfo(): Promise<{ window: boolean }> {
+    return request<{ window: boolean }>('/work/keep-on-top')
+  },
+
+  /** Open the keep-on-top window (`/?mini=work`). 501 `UnavailableError` outside the Object window. */
+  async openKeepOnTop(): Promise<void> {
+    await seamCall(request<null>('/work/keep-on-top', json('POST', { clientId: CLIENT_ID })))
   },
 
   /** Subscribe to file changes pushed over SSE. Returns an unsubscribe function. */

@@ -1,0 +1,7 @@
+{
+  "source": "backup-check",
+  "generated": "2026-11-01T06:00:00Z",
+  "ok": false,
+  "error": "share unreachable",
+  "alerts": []
+}

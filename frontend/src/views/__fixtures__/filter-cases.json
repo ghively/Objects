@@ -113,6 +113,20 @@
           "name": "remind",
           "type": "text",
           "options": {}
+        },
+        {
+          "id": "verified",
+          "key": "verified",
+          "name": "verified",
+          "type": "textList",
+          "options": {}
+        },
+        {
+          "id": "steps",
+          "key": "steps",
+          "name": "steps",
+          "type": "steps",
+          "options": {}
         }
       ]
     },
@@ -207,7 +221,27 @@
           }
         ],
         "repeat": "every week",
-        "remind": "1 day before at 09:00"
+        "remind": "1 day before at 09:00",
+        "verified": [
+          "The spooler log shows 3 crashes",
+          "Tray 2 jams most"
+        ],
+        "steps": [
+          {
+            "id": "r8k1pd",
+            "rev": "0123456789ab",
+            "kind": "approve",
+            "state": "open",
+            "text": "Restart the print spooler on PRN-TEST-01",
+            "notBefore": null,
+            "answer": null,
+            "result": null,
+            "addedAt": null,
+            "approvedAt": null,
+            "doneAt": null,
+            "declinedAt": null
+          }
+        ]
       },
       "links": {
         "owner": [
@@ -254,7 +288,9 @@
         "span": null,
         "owner": [],
         "repeat": "",
-        "remind": ""
+        "remind": "",
+        "verified": [],
+        "steps": []
       },
       "links": {
         "owner": []
@@ -1190,6 +1226,66 @@
       },
       "matches": [
         "Tasks/Alpha.md",
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "list includes, any case",
+      "filter": {
+        "type": "filter",
+        "propertyId": "verified",
+        "option": "contains",
+        "referenceValue": "TRAY"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "list does not include",
+      "filter": {
+        "type": "filter",
+        "propertyId": "verified",
+        "option": "notContains",
+        "referenceValue": "spooler"
+      },
+      "matches": [
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "list is empty",
+      "filter": {
+        "type": "filter",
+        "propertyId": "verified",
+        "option": "isEmpty"
+      },
+      "matches": [
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "list is not empty",
+      "filter": {
+        "type": "filter",
+        "propertyId": "verified",
+        "option": "isNotEmpty"
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "steps is empty",
+      "filter": {
+        "type": "filter",
+        "propertyId": "steps",
+        "option": "isEmpty"
+      },
+      "matches": [
         "Tasks/Beta.md",
         "Pages/Gamma.md"
       ]

@@ -8,7 +8,17 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, ty
 import { createPortal } from 'react-dom'
 import { api, ConflictError, isResync } from '@/api/client'
 import { openAiChat, useAiHidden } from '@/ai/store'
-import { COMPUTED_KINDS, type ObjectDetail, type ObjectSummary, type PropertyType, type RenameResult, type TypeDef, type UpdateResult } from '@/api/types'
+import {
+  COMPUTED_KINDS,
+  type ObjectDetail,
+  type ObjectSummary,
+  type PropertyType,
+  type RenameResult,
+  type ResolutionNote,
+  type TypeDef,
+  type UpdateResult,
+  type WorkWriteResult,
+} from '@/api/types'
 import { CollectionPicker } from '@/collections/CollectionPicker'
 import { Icon } from '@/components/Icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -67,6 +77,9 @@ import { usePresentation } from '@/present/usePresentation'
 import { CompletionLog } from '@/tasks/CompletionLog'
 import { TaskStatsSection } from '@/tasks/TaskStatsSection'
 import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
+import { isWorkType } from '@/types/WorkFieldsSection'
+import { ResolutionNoteSection } from '@/work/ResolutionNote'
+import { WorkHeader } from '@/work/panel/WorkHeader'
 
 // Raw mode (CodeMirror) loads when first switched to, not with the shell (audit 2026-11-01 F1).
 const RawMode = lazyWithReload(() => import('@/editor/RawMode').then((m) => ({ default: m.RawMode })))
@@ -103,6 +116,12 @@ export interface ObjectViewProps {
   onDismiss?: () => void
   /** Bottom-right slot (the peek's pager). */
   footer?: ReactNode
+  /**
+   * M23: the item panel. A work item shows the work header above its title (its writes go through
+   * this view's `writes.work`), and the header carries the Resolution note, so M22's under-panel
+   * copy is left out.
+   */
+  workHeader?: boolean
 }
 
 /** The summary fields a property write changes, read back from the written frontmatter. */
@@ -229,6 +248,17 @@ function typeHas(typeId: string | null | undefined, test: (kind: PropertyType) =
   return !!typeOf(typeId)?.propertyDefinitions.some((d) => test(d.type))
 }
 
+/** M22: the keys of a work type's `steps` and `floorItems` properties (decoded by the server). */
+function workKeysOf(type: TypeDef | undefined): string[] {
+  if (!isWorkType(type)) return []
+  return type!.propertyDefinitions.filter((d) => d.type === 'steps' || d.type === 'floorItems').map((d) => d.key)
+}
+
+/** The stored values of `keys`, as one string (what a decoded read belongs to). */
+function rawWorkValues(frontmatter: Record<string, unknown>, keys: string[]): string {
+  return JSON.stringify(keys.map((k) => frontmatter[k] ?? null))
+}
+
 export function ObjectView({
   path,
   mode,
@@ -241,8 +271,19 @@ export function ObjectView({
   onVersion,
   menuSlot,
   onDeleted,
+  workHeader,
 }: ObjectViewProps) {
   const [detail, setDetail] = useState<ObjectDetail | null>(null)
+  /** Mirrors `detail` for callbacks that must not wait for a render (a work write's result). */
+  const detailRef = useRef<ObjectDetail | null>(null)
+  detailRef.current = detail
+  /** M22: the resolution note the last work write handed back, at that write's version. */
+  const [workNote, setWorkNote] = useState<{ version: string; note: ResolutionNote | null } | null>(null)
+  /**
+   * M22: the decoded `steps` and `floorItems` values (each step's id and rev) of a work item, read
+   * with `api.workItem` (the front matter holds them as stored), for the raw values in `raw`.
+   */
+  const [decoded, setDecoded] = useState<{ path: string; raw: string; fields: Record<string, unknown> } | null>(null)
   const [version, setVersion] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [raw, setRaw] = useState(false)
@@ -434,6 +475,38 @@ export function ObjectView({
       })
       if (typeHas(typeIdRef.current, (k) => COMPUTED_KINDS.has(k))) refreshComputed()
     },
+    // M22: a work write changed the front matter and appended Activity (and Work notes) lines to
+    // the body. The body was flushed before the write, so a clean editor loads the returned body
+    // at the returned version; edits typed while the write was in flight are kept and asked about,
+    // as for an external change. The item's decoded values (`item.fields`) are kept for the panel.
+    onWorkWritten: (res: WorkWriteResult) => {
+      const d = detailRef.current
+      if (!d) return
+      const frontmatter: Record<string, unknown> = { ...d.frontmatter, ...res.frontmatter }
+      const keys = workKeysOf(typeOf(typeIdRef.current))
+      if (res.item?.fields) setDecoded({ path, raw: rawWorkValues(frontmatter, keys), fields: res.item.fields })
+      const next: ObjectDetail = {
+        ...d,
+        frontmatter,
+        body: res.body,
+        summary: patchSummary(d.summary, res.frontmatter ?? {}),
+        version: res.version,
+      }
+      setWorkNote({ version: res.version, note: res.item?.resolution ?? null })
+      const h = editorRef.current
+      if (h && h.isDirty() && h.getBody() !== res.body) {
+        h.hold()
+        setDetail({ ...next, body: d.body })
+        blockedRef.current = true
+        pendingRef.current = true
+        setPending({ mine: h.getBody() ?? '', theirs: next })
+        return
+      }
+      setDetail(next)
+      if (h) h.reload(res.body, res.version)
+      if (typeHas(typeIdRef.current, (k) => COMPUTED_KINDS.has(k))) refreshComputed()
+    },
+    onWorkError: (err: unknown) => showToast(err instanceof Error ? err.message : String(err)),
     onRenamed: (res: RenameResult, oldPath: string, title: string) => {
       // The title changed even when the path didn't (safe_filename may map both titles to one name).
       setDetail((d) =>
@@ -841,6 +914,33 @@ export function ObjectView({
   const canTemplate = !!type && !isTemplate && templatesAllowed(type)
   const isTag = !!summary && isTagType(type, summary.type)
   const isTask = !!summary && !isTemplate && isTaskRoleType(type, summary.type)
+  /** M22: a work item with a Ticket ID shows its resolution note. */
+  const ticketId = detail?.frontmatter.ticketId
+  const isTicket = !!summary && !isTemplate && isWorkType(type) && typeof ticketId === 'string' && ticketId.trim() !== ''
+  /** M23: the item panel's work header (a work item, not a template). */
+  const showWorkHeader = !!workHeader && !!summary && !isTemplate && isWorkType(type)
+  // M22: a work item's steps and floor items are shown as the server decodes them (each with its
+  // id and rev, which step actions send back): read once per stored value (a load, an external
+  // change), taken from a work write's result otherwise. Reading never writes.
+  const workKeys = workKeysOf(type)
+  const workRaw = detail && workKeys.length > 0 ? rawWorkValues(detail.frontmatter, workKeys) : null
+  const decodedNow = decoded && workRaw !== null && decoded.path === path && decoded.raw === workRaw ? decoded : null
+  useEffect(() => {
+    if (workRaw === null || decodedNow) return
+    let alive = true
+    api
+      .workItem(path)
+      .then((item) => alive && setDecoded({ path, raw: workRaw, fields: item.fields ?? {} }))
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [path, workRaw, decodedNow])
+  let panelFrontmatter = detail?.frontmatter ?? {}
+  if (decodedNow) {
+    panelFrontmatter = { ...panelFrontmatter }
+    for (const k of workKeys) if (Array.isArray(decodedNow.fields[k])) panelFrontmatter[k] = decodedNow.fields[k]
+  }
   const focusOn = useFocusMode((s) => s.on)
   const aiHidden = useAiHidden()
   // M9: the object's own layout keys override the type's.
@@ -858,7 +958,7 @@ export function ObjectView({
       <>
       <PropertyPanel
         type={type}
-        frontmatter={detail.frontmatter}
+        frontmatter={panelFrontmatter}
         links={detail.links}
         summary={detail.summary}
         backlinks={detail.backlinks ?? []}
@@ -867,11 +967,20 @@ export function ObjectView({
         onChange={(key, value) => writeProperties({ [key]: value })}
         onChangeMany={(u, r) => void writes.updateProperties(u, r)}
         onSetReminder={(key, remind) => void writes.setReminder(key, remind)}
+        onWorkWrite={propsReadOnly ? undefined : (run) => writes.work(run)}
         onTypeChange={onTypeChange}
         onOpenTag={onOpenTag}
         onOpenObject={onOpenObject}
         variant={variant}
       />
+      {/* M22: a ticket's resolution note (two copy-ready texts), collapsed by default. */}
+      {isTicket && !showWorkHeader && (
+        <ResolutionNoteSection
+          path={path}
+          version={version}
+          note={workNote && workNote.version === version ? workNote.note : undefined}
+        />
+      )}
       {/* M8: "Task Stats" under the property panel of a recurring task-role object. */}
       {isTask && typeof detail.frontmatter.repeat === 'string' && detail.frontmatter.repeat.trim() !== '' && (
         <>
@@ -1362,14 +1471,17 @@ export function ObjectView({
         onLayoutChange={propsReadOnly ? undefined : (patch) => writeProperties({ ...patch })}
         inspector={mode === 'page' ? { getMarkdown, dailyNote } : undefined}
         header={
-          <ObjectHeader
-            summary={summary}
-            type={type}
-            readOnly={propsReadOnly}
-            onRename={(title) => void writes.rename(title)}
-            onPropertiesChange={writeProperties}
-            onOpenTag={onOpenTag}
-          />
+          <>
+            {showWorkHeader && <WorkHeader path={path} work={writes.work} />}
+            <ObjectHeader
+              summary={summary}
+              type={type}
+              readOnly={propsReadOnly}
+              onRename={(title) => void writes.rename(title)}
+              onPropertiesChange={writeProperties}
+              onOpenTag={onOpenTag}
+            />
+          </>
         }
         body={
           <>

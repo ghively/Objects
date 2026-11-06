@@ -215,7 +215,9 @@ export function togglePersistentEntry(entries: SidepanelEntry[], id: string): Si
 export function retargetEntries(entries: SidepanelEntry[], oldPath: string, newPath: string): SidepanelEntry[] {
   const hit = (t: SidepanelTarget | null | undefined) => t?.kind === 'object' && t.path === oldPath
   if (!entries.some((e) => hit(e.target) || (e.history ?? []).some(hit))) return entries
-  const moved = (t: SidepanelTarget): SidepanelTarget => (hit(t) ? { kind: 'object', path: newPath } : t)
+  // M23: the item panel's `work` flag moves with the object.
+  const moved = (t: SidepanelTarget): SidepanelTarget =>
+    t.kind === 'object' && t.path === oldPath ? { kind: 'object', path: newPath, ...(t.work ? { work: true as const } : {}) } : t
   return entries.map((e) => ({
     ...e,
     target: e.target ? moved(e.target) : null,

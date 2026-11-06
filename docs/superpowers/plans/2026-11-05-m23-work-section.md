@@ -10,7 +10,7 @@
 
 **Spec.** `docs/superpowers/specs/2026-11-05-work-dashboard-design.md`: section **5** (the Work section: top bar, brain-dump bar's place and `B`, focus rail, the views table, Now scoring, item panel, step actions, focus session, Keep on top, Make it smaller, keyboard), section **6** (focus lines, meetings, alerts with the folder watch, wins), and **Design language**. Section 7's capture save and section 8's agent loop are M24's; this plan defines the seams M24 fills (Contract, "Seams for M24"). Behaviour details the spec leaves to "today's dashboard" (energy matching, Up next, day slots, Make it smaller, the monitoring file format) were read read-only from `C:\Git\ticket-dashboard\tracker.html` and `monitoring.py` and are marked "ported". The wiki was not read.
 
-Built on `master` after M22 (and M16-M21). Consumes M22's Contract as written (`docs/superpowers/plans/2026-11-05-m22-work-model.md`): `workrules`, `workfields`, `workread`, `workservice.WorkService`, the `/api/work/*` routes, the `steps`/`textList`/`floorItems` kinds, `StepList.tsx`, `ResolutionNote.tsx`, `stepRules.ts`, the Tickets view `work-tickets`, `ObjectWrites.work`, and its TS types. Nothing here redefines them. Every label the spec gives is verbatim; every other label and default is "our string" or "our choice".
+Built on `feat/m22-m23` (worktree `C:\Git\object-work`, the second of the two parallel tracks Gene chose on 2026-11-06) after M22 (`822e467..bc53bab`, see `m22-acceptance.md` for its deviations). This track has M16-M18 and part of M19 but not M20-M21; M23 uses none of them. Reconciled with the built code on 2026-11-06. Consumes M22's Contract as written (`docs/superpowers/plans/2026-11-05-m22-work-model.md`): `workrules`, `workfields`, `workread`, `workservice.WorkService`, the `/api/work/*` routes, the `steps`/`textList`/`floorItems` kinds, `StepList.tsx`, `ResolutionNote.tsx`, `stepRules.ts`, the Tickets view `work-tickets`, `ObjectWrites.work`, and its TS types. Nothing here redefines them. Every label the spec gives is verbatim; every other label and default is "our string" or "our choice".
 
 ## Global Constraints
 
@@ -58,8 +58,8 @@ The five failure modes no task's ordinary tests would catch, most likely first. 
 | General floor list | `.object/work/floor.json` (`space.store("work")`, id `floor`): `{"schemaVersion": 1, "items": [<M22 floor mapping>]}`, `jsonstore.dump_json` | `POST /api/work/floor/general` |
 | Alert type | `.object/types/<id>.json` made by `Space.create_type("Alert", "Alerts", …)` then `save_type` with the Alert fields (below) | `alerttype.ensure_alert_type`, on the first alert or "Add the Alert type" |
 | Alert objects | ordinary objects in the type's folder (`Alerts/`) | the folder watch; agents and automations through the generic object routes |
-| Folder-watch state | `<state dir>/work-alerts-<hash>.json` (`<hash>`: `reminders.ledger_path_for`'s rule, as M14) | `AlertWatch` |
-| Alert folder, per-source intervals | device settings `workAlertFolder` (absolute path or null, at most 500 characters), `workAlertIntervals` (`{source: minutes}`, 1-10080, at most 50 entries) | `PUT /api/settings` |
+| Folder-watch state | `<state dir>/work-alerts-<hash>.json` (`<hash>`: `reminders.space_key(space.root)`, the hash `reminders.ledger_path_for` uses) | `AlertWatch` |
+| Alert folder, per-source intervals | device settings `workAlertFolder` (absolute path or null, at most 500 characters), `workAlertIntervals` (`{source: minutes}`, 1-10080, at most 50 entries); defaults also in `frontend/src/settings/defaults.ts` and `backend/tests/test_settings.py`'s `CONTRACT_DEFAULTS` | `PUT /api/settings` |
 | Work page UI state | browser storage `object.work:<space root>` (energy, calm, view, Not now of today, selected focus line, Flow area, Everything sort) | the front end |
 
 Nothing is written into the state dir for the board, focus, today, wins or the seams.
@@ -87,7 +87,10 @@ POLL_SECONDS = 60.0; DEFAULT_INTERVAL_MIN = 1440; MAX_ALERTS_PER_FILE = 200; MAX
 class AlertScanReport: files: int; created: int; updated: int; cleared: int; unchanged: int; errors: list[str]
 class AlertWatch:
     def __init__(self, space: Space, *, folder: Callable[[], Path | None], intervals: Callable[[], dict[str, int]],
+                 announce: Callable[[ChangeEvent], None] = lambda _e: None,
                  poll_seconds: float = POLL_SECONDS) -> None
+    # `announce`: server.py passes its own (the SSE hub); the scan thread is no request, and the
+    # file watcher is silent about the app's own writes, so the watch announces its writes itself.
     def start(self) -> None          # a daemon thread scanning every poll_seconds; idle while folder() is None
     def stop(self) -> None
     def scan_once(self) -> AlertScanReport
@@ -107,7 +110,7 @@ def is_stale(generated: datetime | None, interval_min: int, now: datetime) -> bo
 
 - `source` defaults to the file's stem. Severity `crit` → Critical, `warn` → Warning, `info` → Info, anything else → Warning (ported: shown rather than hidden). At most 200 alerts per file; each field cut to 1200 characters; values after `password|passwd|pwd|secret|api key|token|apikey|client secret` followed by `:`, `=` or `|` become `[redacted]` (ported regex). A link written `[[x|y]]` is unwrapped to `x` (ported).
 - **One Alert object per `alertKey = "{source}|{key or title}"`**: title = the alert's title (`"(no title)"` when empty); Source; Severity; Message = `"{host}: {detail}"` (or the part that exists); Raised at = `since` when it parses, else the scan instant; Link = the link when it is `http(s)://`, else appended to the Message as `" See: {link}"`; Cleared at empty.
-- An existing object whose values differ is updated in **one** `update_properties` write (only the changed keys); a re-raised alert clears Cleared at. A key no longer in its file (the file read fine) gets Cleared at = the scan instant (once). Writes are announced with origin `alerts` (a new `writeorigin` value, ours).
+- An existing object whose values differ is updated in **one** `update_properties` write (only the changed keys); a re-raised alert clears Cleared at. A key no longer in its file (the file read fine) gets Cleared at = the scan instant (once). Writes run inside `writeorigin.acting_as(writeorigin.ALERTS)` (`ALERTS = "alerts"`, a new constant in `writeorigin.py`, ours; `writeorigin` is a context variable, not a list of values) and are announced through `announce` as `ChangeEvent("created" | "changed", path, version, origin="alerts")`, plus `ChangeEvent("types", id, revision, origin="alerts")` when the scan makes the type.
 - A file whose `(mtime_ns, size, sha256)` equals the state file's entry is skipped (`unchanged`). A file that can't be read or isn't a JSON object becomes a source with `error` `"Can't read {name}: {reason}"` and `stale: true`; its alerts are left as they are.
 - The type is ensured only when an alert is about to be created; a folder with no alerts creates nothing.
 
@@ -199,12 +202,12 @@ class AgentRetryRequest(BaseModel): id: str; clientId: str | None = None
 class ClientOnly(BaseModel): clientId: str | None = None
 ```
 
-- **Board item** = every `WorkItemSummary` key of the item, plus `steps`, `floorItems` (from M22's `WorkItem`), `typeName`, `isProject` (`typetemplates.template_for(type) == "project"`), `deadline` (the object's `deadline` value as a day when its type has a `deadline` property of a date kind, else null), `blockedOnPeople` (each `[[link]]` in Blocked on resolving, with `space.resolve(link, path)`, to an object whose type's template is `person` or whose type id is `person`: `{path, title}`). No other key of `WorkItem` (fields, activity, work notes, resolution) is sent.
-- **Focus section**: the first heading whose text is `Focus` (any level, case-insensitive, outside fenced code; M22's `apiquery._headings` scan), up to the next heading of the same or a higher level. Its **top-level list items** are lines `^ {0,3}([-*+]|\d+[.)])\s+(\[[ xX]\]\s+)?(.+)$` (a to-do box is dropped from the text); indented lines under an item belong to it and are dropped on save. `replace_focus` puts `- {line}` lines where the first item was (right after the heading, one blank line between, when there was none) and removes the old items; every other line of the body is kept byte for byte. A body without the section gets `## Focus`, a blank line and the list at its end, after one blank line. Lines: 1-20, each 1-500 characters on one line, whitespace trimmed (422 `"Write at least one line."` (ported), `"A focus line is one line."`, `"At most 20 focus lines."`). A missing note is created with `create_daily_note(day)` (its default template applies) and the section is then written with `save_body` against the created version.
+- **Board item** = every `WorkItemSummary` key of the item (`workread.summary`), plus `steps`, `floorItems` and `hypothesis` (from M22's `WorkItem`, `service.item(path)`; the Now card shows the Hypothesis, which the built summary doesn't carry), `typeName`, `isProject` (`typetemplates.template_for(type) == "project"`), `deadline` (the object's `deadline` value as a day when its type has a `deadline` property of a date kind, `datetime` or `datetimeSimple` (the basic Task's is `datetimeSimple`), else null), `blockedOnPeople` (each `[[link]]` in Blocked on resolving, with `space.resolve(link, path)`, to an object whose type's template is `person` or whose type id is `person`: `{path, title}`). No other key of `WorkItem` (fields, verified, assumed, toRaiseConfidence, findings, confidenceReason, activity, work notes, resolution) is sent.
+- **Focus section**: the first heading whose text is `Focus` (any level, case-insensitive, outside fenced code; the `apiquery._headings(lines)` scan, which gives `(line index, level, text)` for `body.splitlines(keepends=True)`), up to the next heading of the same or a higher level. Its **top-level list items** are lines `^ {0,3}([-*+]|\d+[.)])\s+(\[[ xX]\]\s+)?(.+)$` (a to-do box is dropped from the text); indented lines under an item belong to it and are dropped on save. `replace_focus` puts `- {line}` lines where the first item was (right after the heading, one blank line between, when there was none) and removes the old items; every other line of the body is kept byte for byte. A body without the section gets `## Focus`, a blank line and the list at its end, after one blank line. Lines: 1-20, each 1-500 characters on one line, whitespace trimmed (422 `"Write at least one line."` (ported), `"A focus line is one line."`, `"At most 20 focus lines."`). A missing note is created with `create_daily_note(day)` (its default template applies) and the section is then written with `save_body` against the created version.
 - **Focus line** `label`: the text with each `[[a|b]]` shown as `b` and `[[a]]` as `a`; `links`: each `[[target]]` with its resolved path or null.
 - **Meetings**: objects of a type whose template is `meeting` or whose id is `meeting`, with a `date` datetime value that has a time and starts on the local `day` (`space.tz`); `end` = the value's end when it has one, else start + 30 minutes (ours); templates excluded.
 - **Wins** over the last `days` local days (today included): `stepsDone` = steps with state `done` whose `doneAt` falls on the day, over `service.items("all")`; `itemsClosed` = done items whose `doneAt` falls on the day; `objectsChanged` = the number of distinct objects with a version-history entry on the day, plus objects whose `lastUpdated` is on the day (keys unified with `HistoryStore.key_for`), templates excluded. `got`: one entry per done step (`text` = `Step {n}: {one_line(step text, 70)}`) and per closed item (`text` = `Closed`), newest first, at most 50.
-- **General floor**: M22's floor mapping keys, codec (`workvalues.read_floor_strict`, `floor_api`, `encode_floor`), caps (50), ids, revisions and op rules (`collect` sets `collected` to today in `space.tz`, `found` optional; `uncollect` clears both; `edit` changes `place`/`what`); a stale `itemRev` raises M22's `FloorItemChanged`.
+- **General floor**: M22's floor mapping keys, codec (`workvalues.read_floor_strict`, `floor_api`, `floor_rev`, `encode_floor`, `new_id`), caps (`workmodel.MAX_FLOOR` 50, message `At most 50 floor items.` as `WorkService.floor`), ids, revisions and op rules as `WorkService.floor` applies them (`collect` sets `collected` to today in `space.tz`, `found` optional; `uncollect` clears `collected` (as M22 does); `edit` changes `place`/`what`/`found`; neither place nor what → `workservice.FLOOR_NEEDS`); a stale `itemRev` raises M22's `workservice.FloorItemChanged`. `FloorOp` is `Literal["add", "edit", "collect", "uncollect", "remove"]` (M22 has no named alias; `workfloor.py` defines it).
 
 ### Routes (`api_work_section.py`, mounted on `/api`)
 
@@ -228,7 +231,7 @@ class ClientOnly(BaseModel): clientId: str | None = None
 | `GET /work/keep-on-top` | | `{window: boolean}` | |
 | `POST /work/keep-on-top` | `ClientOnly` | 204 (the window opened at `{base}/?mini=work`) | 501 |
 
-Events: a Focus save announces `changed` (and `created` when it made the note); a general floor op announces `ChangeEvent("work", "floor", revision, origin)`; `work` and `workQueue` (announced by M24 on every queue change; nothing in M23 announces it) join `watcher.ChangeEvent.kind`, `server.RESYNC_EVENTS` and the client's `ChangeKind` and `RESYNC_EVENTS`; "Add the Alert type" announces `("types", id, revision, origin)`; the folder watch's writes announce like any object write. `server.py` builds one `AlertWatch` per app (folder and intervals from `settings.read()`), starts and stops it in the lifespan beside the automation engine, and mounts the router with `build_seams(space, service)`. `server._UI_PATCH_KEYS` is unchanged (the Work page writes no `ui.json`).
+Events: a Focus save announces `changed` (and `created` when it made the note); a general floor op announces `ChangeEvent("work", "floor", revision, origin)`; `work` and `workQueue` (announced by M24 on every queue change; nothing in M23 announces it) join `watcher.ChangeEvent.kind`, `server.RESYNC_EVENTS` (a tuple of `ChangeEvent(kind, "*", None)`: two more entries) and the client's `ChangeKind` and `RESYNC_EVENTS` (`api/client.ts`); "Add the Alert type" announces `("types", id, revision, origin)`; the folder watch's writes are announced by the watch (`announce`, above). `server.py` builds one `AlertWatch` per app (folder and intervals from `read_settings()[0]`, the server's import of `settings.read`, which returns `(merged, revision)`; `announce=announce`), starts it in the lifespan beside `automations.start()` and stops it in both of the lifespan's `finally` branches beside `automations.stop`, and mounts the router with `build_seams(space, work)` right after M22's `api_work`/`api_v1_work` routers (the app's `WorkService` is the local `work`). `server._UI_PATCH_KEYS` is unchanged (the Work page writes no `ui.json`).
 
 ### API types (`frontend/src/api/types.ts`)
 
@@ -239,7 +242,7 @@ export type Energy = 'low' | 'medium' | 'high'
 export interface PersonRef { path: string; title: string }
 export interface WorkBoardItem extends WorkItemSummary {
   typeName: string; isProject: boolean
-  steps: WorkStep[]; floorItems: FloorItemValue[]
+  steps: WorkStep[]; floorItems: FloorItemValue[]; hypothesis: string | null
   deadline: string | null                 // YYYY-MM-DD
   blockedOnPeople: PersonRef[]
 }
@@ -272,20 +275,22 @@ export interface CaptureSummary { path: string; text: string; status: 'new' | 'f
 export interface GeneralFloor { items: FloorItemValue[]; revision: string }
 ```
 
-`ChangeKind` gains `'work'` and `'workQueue'`; `DeviceSettings` gains `workAlertFolder: string | null` and `workAlertIntervals: Record<string, number>`.
+`ChangeKind` gains `'work'` and `'workQueue'`; `DeviceSettings` gains `workAlertFolder: string | null` and `workAlertIntervals: Record<string, number>` (and `settings/defaults.ts`' `settingsDefaults` gains `workAlertFolder: null, workAlertIntervals: {}`, which `mockApi.deviceSettings()` spreads).
 
 ### Client (`frontend/src/api/client.ts`)
 
-`api.workBoard(scope?)`, `api.workFocus(day?)`, `api.saveWorkFocus(day, lines, baseVersion)`, `api.workToday(day?)`, `api.workWins(days?)`, `api.workAlerts()`, `api.scanAlerts()`, `api.ensureAlertType()`, `api.generalFloor()`, `api.generalFloorOp(req)`, `api.workAgent()`, `api.setAgentActs(on)`, `api.retryAgentEntry(id)`, `api.workCapture(req)`, `api.workCaptures(status?)`, `api.keepOnTopInfo()`, `api.openKeepOnTop()`. A 501 throws `UnavailableError extends Error` (`message` = the detail); the focus 409 throws `ConflictError`; the general floor 409 throws M22's `StepChangedError`. Every write emits its own event locally (as `saveBody`), so this window's views refresh. Test helpers in `test/mockApi.ts`: `workBoardItem(over?)`, `workBoard(items)`, `focusDay(lines)`, `agentStatus(over?)`, `workAlerts(over?)`.
+`api.workBoard(scope?)`, `api.workFocus(day?)`, `api.saveWorkFocus(day, lines, baseVersion)`, `api.workToday(day?)`, `api.workWins(days?)`, `api.workAlerts()`, `api.scanAlerts()`, `api.ensureAlertType()`, `api.generalFloor()`, `api.generalFloorOp(req)`, `api.workAgent()`, `api.setAgentActs(on)`, `api.retryAgentEntry(id)`, `api.workCapture(req)`, `api.workCaptures(status?)`, `api.keepOnTopInfo()`, `api.openKeepOnTop()`. A 501 throws `UnavailableError extends Error` (`message` = the detail); the focus 409 throws `ConflictError` (its constructor takes only `currentVersion`; its `message` is `conflict`, so the UI shows `FOCUS_CHANGED`'s text from `WORK_TEXT`); the general floor 409 throws M22's `StepChangedError` (through the same `stepChanged` handler `api.workFloor` uses). Every write emits its own event locally (as `saveBody`), so this window's views refresh. Test helpers in `test/mockApi.ts`: `workBoardItem(over?)`, `workBoard(items)`, `focusDay(lines)`, `agentStatus(over?)`, `workAlerts(over?)`.
 
 ### Navigation (`frontend/src/nav/tabs.ts`)
 
-`Target` gains `{ kind: 'work'; view?: WorkViewId }` (tab title "Work"), and the object target gains an optional flag: `{ kind: 'object'; path: string; work?: true }`. `work: true` in the side panel is the **item panel** (the object page with the work header). `sameTarget` compares `work` too; `retarget` keeps it.
+`Target` gains `{ kind: 'work'; view?: WorkViewId }` (tab title "Work"), and the object target gains an optional flag: `{ kind: 'object'; path: string; work?: true }`. `work: true` in the side panel is the **item panel** (the object page with the work header). `sameTarget` compares `work` too (and `view` for a work target); `retarget` keeps it (both the tabs store's `retarget` in `nav/tabs.ts` and `retargetEntries` in `nav/sidepanel.ts` rebuild `{kind: 'object', path}` today, so both must carry `work` over). Adding the `work` kind makes the exhaustive switches in `nav/tabs.ts` (`sameTarget`) and `shell/TabStrip.tsx` (`useTargetTitle`) fail to type-check, so T1 adds the target types with those two cases and `App.tsx`'s `pageFor` case `'work'` (rendering the stub `WorkPage`); T17 does the rest.
 
 ### Front-end modules (exact exports; under `frontend/src/work/`)
 
 ```ts
-// workText.ts: WORK_TEXT (every string below; spec labels verbatim, the rest ours)
+// workText.ts: WORK_TEXT (every string below; spec labels verbatim, the rest ours). M22's
+//   settings/sections/Work.tsx already exports its own `WORK_TEXT` (the settings section's strings):
+//   a file that needs both imports this one under another name.
 // workIcons.ts: WORK_ICONS: open 'ph-circle', doing 'ph-circle-half', done 'ph-check-circle', parked 'ph-circle-dashed',
 //   you 'ph-user', agent 'ph-robot', approval 'ph-shield-check', work 'ph-briefcase', capture 'ph-lightbulb',
 //   low 'ph-battery-low', medium 'ph-lightning', high 'ph-flame', focus 'ph-target', meeting 'ph-users-three',
@@ -340,6 +345,8 @@ export const useWorkUi                           // persisted per space: {energy
 export const useWorkSelection                    // {list: string[], index: number, setList(paths), move(delta), selected(): string | null}
 export const useWorkOverlay                      // {session: {path} | null, smaller: {path, stepId} | null, openSession(path), openSmaller(path, stepId), close()}
 export type WorkRunner = (call: (path: string) => Promise<WorkWriteResult>) => Promise<WorkWriteResult | null>
+//   (M22's `ObjectWrites.work` takes `run: (path, baseVersion) => Promise<WorkWriteResult>`; a step,
+//    steps, note or floor call ignores `baseVersion`, so a header runner is `(call) => work((p) => call(p))`)
 export function directRunner(path: string): WorkRunner
 export function stepAction(o: { item: { path: string }; step: WorkStep; action: StepAction; text?: string; notBefore?: string; run?: WorkRunner }): Promise<boolean>
 export function openItemPanel(path: string): void   // openInSidepanel({kind: 'object', path, work: true})
@@ -371,7 +378,7 @@ export function useWorkKeys(): void                  // mounted by WorkPage
 export const WORK_SHORTCUTS: ShortcutDef[]
 ```
 
-`ObjectPage` gains `workHeader?: boolean` and passes it to `ObjectView`, which renders `<WorkHeader path work={writes.work} />` above the title when set and the object is a work item, and then leaves out M22's under-panel Resolution note (the header carries it).
+`ObjectPage` (`object/ObjectPage.tsx`, today `({ path })`) gains `workHeader?: boolean` and passes it to `ObjectView` (`ObjectViewProps.workHeader?: boolean`), which renders `<WorkHeader path work={writes.work} />` above the title when set and the object is a work item, and then leaves out M22's under-panel `ResolutionNoteSection` (the `isTicket` mount under the property panel; the header carries the note). `App.tsx`'s `pageFor` renders `ObjectPage` for both the main panel and side-panel entries, so passing `workHeader={target.work}` there covers the item panel.
 
 ### Theme tokens (`theme/tokens.css`, T17)
 
@@ -391,19 +398,20 @@ Components use these through Tailwind arbitrary values (`text-[var(--work-agent)
 
 ## Tasks
 
-Each task: write the failing test, run it and see it fail, implement, run it and see it pass, commit. Each task runs only its own tests and those of modules it touched (`uv run pytest backend/tests/test_m23_<x>.py -q`, `npx vitest run <files>`); the full suites run in T18. Back-end tests use a copy of the fixture space (`m23_helpers.copy_space(tmp_path)`), `OBJECT_STATE_DIR` and `OBJECT_CLOCK_FILE` (2026-11-05T10:00:00Z) in `tmp_path`, and the space time zone UTC. Commit messages end with the trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+Each task: write the failing test, run it and see it fail, implement, run it and see it pass, commit. Each task runs only its own tests and those of modules it touched (`uv run pytest backend/tests/test_m23_<x>.py -q`, `npx vitest run <files>`); T18 runs M23's set and the track's full gate runs the full suites. Back-end tests use a copy of the fixture space (`m23_helpers.copy_space(tmp_path)`), `OBJECT_STATE_DIR` and `OBJECT_CLOCK_FILE` (2026-11-05T10:00:00Z) in `tmp_path`, and the space time zone UTC. Commit messages end with the trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ### Task 1: Contract, stubs and fixtures
 
 **Files**
 - Create: `backend/objectapp/worksection_model.py`, `backend/objectapp/workseams.py` (final: it is small), `backend/objectapp/windowhost.py` (final), stubs `backend/objectapp/api_work_section.py` (`router(...)` with no routes) and `backend/objectapp/alertwatch.py` (`AlertWatch` whose `start`/`stop` do nothing, `scan_once` returns an empty report, `sources()` returns `[]`), `backend/tests/m23_helpers.py`, `backend/tests/fixtures/space-work-m23/` (overlay, below), `backend/tests/fixtures/monitoring/` (below), `backend/tests/test_m23_contract.py`, `frontend/src/work/workText.ts`, `frontend/src/work/workIcons.ts`, `frontend/src/work/__fixtures__/board.json`, `frontend/src/work/section.contract.test.ts`, stub components (each renders its name as text and has the Contract signature): `frontend/src/work/page/WorkPage.tsx`, `frontend/src/work/views/{Now,Flow,ProjectsMap,Today,Floor,Queues,AgentQueue,Stuck,Wins,Alerts,Everything,Tickets}View.tsx`, `frontend/src/work/panel/WorkHeader.tsx`, `frontend/src/work/session/{WorkOverlays,KeepOnTopButton,WorkMini}.tsx`, `frontend/src/work/state/WorkToasts.tsx`, `frontend/src/work/keys/useWorkKeys.ts` (a no-op hook)
-- Modify: `backend/objectapp/server.py` (build one `AlertWatch` from settings, start/stop it in the lifespan beside `automations`; mount `api_work_section.router(ctx, service, build_seams(space, service), watch)` beside M22's work routers; `work` and `workQueue` in `RESYNC_EVENTS`; route docstring lines), `backend/objectapp/watcher.py` (`"work"` and `"workQueue"` in `ChangeEvent.kind`), `backend/objectapp/settings.py` (`workAlertFolder` default None: null or an absolute path of at most 500 characters, else `SettingsProblem("workAlertFolder", "Pick a folder (a full path).")`; `workAlertIntervals` default `{}`: at most 50 entries, keys 1-100 characters, whole minutes 1-10080, else `"Intervals are whole minutes from 1 to 10080."`), `backend/objectapp/writeorigin.py` (the `alerts` origin), `frontend/src/api/types.ts`, `frontend/src/api/client.ts` (the calls, `UnavailableError`, local announcement), `frontend/src/test/mockApi.ts` (helpers), `frontend/src/icons/appIcons.ts` (regenerated with `node scripts/app-icons.mjs`)
+- Modify: `backend/objectapp/server.py` (build one `AlertWatch` from `read_settings()[0]` with `announce=announce`, start it beside `automations.start()` and stop it in both lifespan `finally` branches beside `automations.stop`; mount `api_work_section.router(ctx, work, build_seams(space, work), watch)` right after M22's `api_work`/`api_v1_work` routers; `ChangeEvent("work", "*", None)` and `ChangeEvent("workQueue", "*", None)` in `RESYNC_EVENTS`; route docstring lines), `backend/objectapp/watcher.py` (`"work"` and `"workQueue"` in `ChangeEvent.kind`), `backend/objectapp/settings.py` (`workAlertFolder` default None: null or an absolute path of at most 500 characters, else `SettingsProblem("workAlertFolder", "Pick a folder (a full path).")`; `workAlertIntervals` default `{}`: at most 50 entries, keys 1-100 characters, whole minutes 1-10080, else `"Intervals are whole minutes from 1 to 10080."`. The built `SettingsProblem(key)` takes only the key and its `message` is `Cannot patch: {key}`, which `PUT /api/settings` answers as the 422 detail; it gains an optional second argument `message` (default unchanged), and `patch` raises the two keys' own messages), `backend/tests/test_settings.py` (`CONTRACT_DEFAULTS` gains the two keys; its `test_defaults` compares `settings.DEFAULTS` whole), `backend/objectapp/writeorigin.py` (`ALERTS = "alerts"`, used with `acting_as`), `frontend/src/api/types.ts`, `frontend/src/api/client.ts` (the calls, `UnavailableError`, local announcement, `'work'`/`'workQueue'` in `RESYNC_EVENTS`), `frontend/src/settings/defaults.ts` (`workAlertFolder: null`, `workAlertIntervals: {}`), `frontend/src/test/mockApi.ts` (helpers), `frontend/src/nav/tabs.ts` (the `Target` variants of "Navigation" and their `sameTarget` cases only), `frontend/src/shell/TabStrip.tsx` (`useTargetTitle`'s `case 'work'` → `'Work'` only), `frontend/src/App.tsx` (`pageFor`'s `case 'work'` → `<WorkPage view={target.view} />` only), `frontend/src/icons/appIcons.ts` (regenerated with `node scripts/app-icons.mjs`)
 
 **Interfaces**
-- Produces: every type, call, model, seam class, constant and stub signature in the Contract; `m23_helpers.copy_space(tmp: Path) -> Path` (copies `space-work`, then `space-work-m23` over it), `m23_helpers.monitoring(tmp: Path) -> Path` (a copy of `fixtures/monitoring`).
+- Produces: every type, call, model, seam class, constant and stub signature in the Contract; `m23_helpers.copy_space(tmp: Path) -> Path` (copies `space-work`, then `space-work-m23` over it), `m23_helpers.monitoring(tmp: Path) -> Path` (a copy of `fixtures/monitoring`), `m23_helpers.service(space: Space) -> WorkService` (`WorkService(space, jira_site=lambda: None, user_name=lambda: "Gene")`, the built constructor), `m23_helpers.add_project_work_fields(space: Space) -> None` (what `POST /api/types/project/work-fields` does: `t, rev = space.refresh_type("project")`, `new, _added, _skipped = workfields.with_work_fields(t, space.types)`, `space.save_type(new, rev)`).
+- `test_m23_contract.py` checks signatures, constants, models, the seams and the fixtures only, never a stub's empty behaviour (M22's `test_stub_routers` called its stub routers with `None` and broke once they were filled; check `inspect.signature` instead).
 
 **Fixture overlay** `backend/tests/fixtures/space-work-m23/` (synthetic; added on top of M22's `space-work`, whose own tests stay as they are):
-- `.object/types/meeting.json` and `.object/types/person.json`: the basic-setup Meeting and Person types.
+- `.object/types/meeting.json` and `.object/types/person.json`: the basic-setup Meeting and Person types (`basicsetup.basic_types()`, written as `write_basic_types` does). `.object/types/dailynote.json`: the DailyNote type as `space-m8` has it. Without a stored file an inferred type is written the first time an object of it is created (`Space._persist_type`; `create_daily_note` calls it), so a focus save for a new day would add `dailynote.json` to the changed files.
 - `DailyNotes/2026-11-05.md` (CRLF, UTF-8 BOM, `type: DailyNote`, `date: 2026-11-05`): a `## Plan` paragraph, then `## Focus` with a prose line `Keep it to three.` and the items `- Clear the jams on [[Printer jams on line 3]]`, `- [ ] Finish [[Scanner rollout]]`, `- Plan next week`, then `## Notes` with one line.
 - `Meetings/Line 3 standup.md`: Meeting, `date` 2026-11-05T09:00:00.000Z with end 09:30. `Meetings/Vendor call.md`: 2026-11-05T13:00:00.000Z, no end. `Meetings/Tomorrow sync.md`: 2026-11-06T09:00:00.000Z.
 - `People/Pat Example.md`: Person.
@@ -416,11 +424,11 @@ Each task: write the failing test, run it and see it fail, implement, run it and
 
 **Steps**
 1. Failing tests:
-   - `test_m23_contract.py::test_models_and_constants` (`AGENT_LATER == "The agent loop comes with M24."`, `CAPTURE_LATER`, `KEEP_ON_TOP_LATER`; the request models parse the Contract's bodies; `GeneralFloorRequest(op="burn")` fails), `::test_seam_defaults` (`NoAgent().status(space, [{"turn": "agent"}, {"turn": "you"}])["carrying"] == 1` and `available` False; `NoCaptures().save(...)` raises `SeamUnavailable` with `CAPTURE_LATER`; `windowhost.open_window("x")` without an opener raises it with `KEEP_ON_TOP_LATER`, with one calls it; `SeamRefused(409, "x")` keeps `status` and `detail`; `ChangeEvent("workQueue", "x", None)` constructs and `"workQueue" in server.RESYNC_EVENTS`), `::test_settings_keys` (a relative `workAlertFolder` and `{"printer-watch": 0}` give their messages; defaults null and `{}`), `::test_fixtures_are_synthetic` (no fixture names a real host, person or job; the daily note starts with the BOM and has `\r\n`).
+   - `test_m23_contract.py::test_models_and_constants` (`AGENT_LATER == "The agent loop comes with M24."`, `CAPTURE_LATER`, `KEEP_ON_TOP_LATER`; the request models parse the Contract's bodies; `GeneralFloorRequest(op="burn")` fails), `::test_seam_defaults` (`NoAgent().status(space, [{"turn": "agent"}, {"turn": "you"}])["carrying"] == 1` and `available` False; `NoCaptures().save(...)` raises `SeamUnavailable` with `CAPTURE_LATER`; `windowhost.open_window("x")` without an opener raises it with `KEEP_ON_TOP_LATER`, with one calls it; `SeamRefused(409, "x")` keeps `status` and `detail`; `ChangeEvent("workQueue", "x", None)` constructs and `{"work", "workQueue"} <= {e.kind for e in server.RESYNC_EVENTS}`), `::test_settings_keys` (a relative `workAlertFolder` and `{"printer-watch": 0}` give their messages; defaults null and `{}`), `::test_fixtures_are_synthetic` (no fixture names a real host, person or job; the daily note starts with the BOM and has `\r\n`).
    - `section.contract.test.ts`: every `WORK_ICONS` id exists in the full Phosphor set and in `appIcons`; `WORK_TEXT.approveArmed === 'Press again to approve'`, `WORK_TEXT.focusCleared(2) === 'Focus 2 cleared'`, `WORK_TEXT.agentPill(3, 1) === 'Agent is carrying 3 · 1 alerts'`; `api.workCapture` posts to `/api/work/captures` and a 501 rejects with `UnavailableError` whose `message` is the detail; `api.saveWorkFocus`'s 409 rejects with `ConflictError`; `board.json` type-checks as `WorkBoard` (`satisfies`).
 2. Run: `uv run pytest backend/tests/test_m23_contract.py -q`; `npx vitest run src/work/section.contract.test.ts`; `npx tsc -b --noEmit`. They fail.
 3. Implement the contract files, stubs and fixtures; regenerate `appIcons.ts`.
-4. Run again: pass; `tsc` clean; `uv run pytest backend/tests/test_m22_api.py -q` (server touched) passes.
+4. Run again: pass; `tsc` clean; `uv run pytest backend/tests/test_m22_api.py backend/tests/test_settings.py -q` (server and settings touched) passes; `npx vitest run src/nav src/icons src/work/contract.test.ts` (tabs, the icon subset, M22's contract test reading `settingsDefaults`) passes.
 5. Commit: `feat(m23): Work section contract, seams, stubs and fixtures`.
 
 ### Task 2: The board and the general floor list
@@ -429,7 +437,7 @@ Each task: write the failing test, run it and see it fail, implement, run it and
 - Create: `backend/objectapp/workboard.py`, `backend/objectapp/workfloor.py`, `backend/tests/test_m23_board.py`
 
 **Interfaces**
-- Consumes: M22's `WorkService.items`/`item`, `workvalues.read_floor_strict`/`floor_api`/`encode_floor`/`new_id`, `FloorItemChanged`, `MAX_FLOOR`; `space.resolve`, `space.store("work")`, `typetemplates.template_for`.
+- Consumes: M22's `WorkService.items`/`item`, `workvalues.read_floor_strict`/`floor_api`/`floor_rev`/`encode_floor`/`new_id`, `workservice.FloorItemChanged` and `FLOOR_NEEDS`, `workmodel.MAX_FLOOR` and `FloorItem`, `workbody.floor_label` (none needed for the general list, which has no Activity); `space.resolve`, `space.get`, `space.type_by_id`, `space.store("work")` (a `JsonStore`: `read(id) -> (data | None, revision)`, `write(id, data, base_revision) -> revision`), `typetemplates.template_for`; `m23_helpers.service`/`add_project_work_fields` in the tests.
 - Produces: `board_item`, `board`, `general_floor`, `general_floor_op` (Contract).
 
 **Steps**
@@ -437,7 +445,7 @@ Each task: write the failing test, run it and see it fail, implement, run it and
    - `test_board_items_and_extras`: `board(space, service, "active")["items"]` has the paths of `service.items("active")` in the same order; Waiting on Pat has `deadline == "2026-11-12"` and `blockedOnPeople == [{"path": "People/Pat Example.md", "title": "Pat Example"}]`; after Add work fields on Project, Scanner firmware has `projectPath == "Projects/Scanner rollout.md"` and two `steps`, Scanner rollout `isProject` True; every item has `typeName` and `floorItems`; no item has `fields`, `activity`, `workNotes` or `resolution`.
    - `test_board_all_scope`: `"all"` adds Old cleanup.
    - `test_board_reads_write_nothing`: file bytes, the `.object` listing and the state dir listing are unchanged after both scopes.
-   - `test_general_floor_ops`: a missing file gives `{"items": [], "revision": ""}` and writes nothing; `add` (place "Line 3", what "Photo of the panel") writes `.object/work/floor.json` with one item and a 6-character id; `collect` with found "E-12" sets `collected: "2026-11-05"`; `uncollect` clears both; `remove` empties the list; a stale `itemRev` raises `FloorItemChanged`; no place and no what raises M22's message; the 51st item raises the cap.
+   - `test_general_floor_ops`: a missing file gives `{"items": [], "revision": ""}` and writes nothing; `add` (place "Line 3", what "Photo of the panel") writes `.object/work/floor.json` with one item and a 6-character id; `collect` with found "E-12" sets `collected: "2026-11-05"` and `found: "E-12"`; `uncollect` clears `collected` (M22's rule keeps `found`); `remove` empties the list; a stale `itemRev` raises `FloorItemChanged`; no place and no what raises M22's message; the 51st item raises the cap.
 2. Run: `uv run pytest backend/tests/test_m23_board.py -q`. Fails.
 3. Implement.
 4. Run: pass.
@@ -472,7 +480,7 @@ Each task: write the failing test, run it and see it fail, implement, run it and
 - Modify: `backend/objectapp/history.py` (`key_for`, `changed_keys_by_day`: read only, create no folder)
 
 **Interfaces**
-- Consumes: `HistoryStore._keys_for`, `_load_index`, `_parse_iso`, `WorkService.items("all")`/`item`, `localtime.to_local`, `workbody.one_line`.
+- Consumes: `HistoryStore._keys_for`, `_load_index`, `dir` (the space's history folder under the state dir; not created on access), the module's `_parse_iso` (index entries carry `"at"`), `HistoryStore(space.root)` as `api_history.py` builds it, `snapshot(rel, data, now, force=True)` in the tests, `WorkService.items("all")`/`item`, `localtime.to_local`, `workbody.one_line(text, limit)`, `m23_helpers.service`.
 - Produces: `wins(...)`, `HistoryStore.key_for`, `HistoryStore.changed_keys_by_day` (Contract).
 
 **Steps**
@@ -492,11 +500,12 @@ Each task: write the failing test, run it and see it fail, implement, run it and
 - Fill: `backend/objectapp/alertwatch.py` (T1's stub)
 
 **Interfaces**
-- Consumes: `Space.create_type`, `save_type`, `create_object`, `update_properties`, `type_by_id`, `writeorigin` (`alerts`), `workfields.FieldSpec`, `reminders.ledger_path_for`'s hash rule, `appstate.state_dir`, `textfile.atomic_write`, `jsonstore.dump_json`.
+- Consumes: `Space.create_type(name, plural_name, icon, color)`, `refresh_type`, `save_type(t, base_revision)`, `create_object(type_id, title, values=…)`, `update_properties(path, updates, base_version)`, `type_by_id`, `list(type_id)`, `writeorigin.acting_as` and `ALERTS` (T1), `workfields.FieldSpec` (`key, name, kind, options, visibility`), `reminders.space_key`, `appstate.state_dir`, `textfile.atomic_write`, `jsonstore.dump_json`, `watcher.ChangeEvent` (for `announce`).
 - Produces: the Contract's `alerttype` and `alertwatch` APIs; `alertwatch.alerts_view(space, watch) -> dict` (`WorkAlerts`, used by T6's routes; reads only).
 
 **Steps**
-1. Failing tests in `test_m23_alerts.py` (`watch = AlertWatch(space, folder=lambda: mon, intervals=lambda: {})`, no thread):
+1. Failing tests in `test_m23_alerts.py` (`watch = AlertWatch(space, folder=lambda: mon, intervals=lambda: {}, announce=events.append)`, no thread):
+   - `test_scan_announces`: the first scan announces `types` once and `created` for each new Alert object with origin `alerts`; a scan that changes nothing announces nothing.
    - `test_ensure_alert_type`: the first call creates the type (`.object/types/<id>.json` with the seven fields in order, `alertKey` hidden, Severity options Critical/Warning/Info) and returns `created` True; a second call returns the same type, `created` False, and writes nothing; `is_alert_type` is False for Task.
    - `test_scan_creates_alerts`: `scan_once()` reports `files == 3` (`*.json` only), `created == 2`, `errors == ["Can't read broken.json: …"]`; the Tray 2 object has title "Tray 2 jammed", Severity Critical, Message `PRN-TEST-01: …`, Raised at 2026-11-05T09:40Z, Link `https://example.org/prn`, `alertKey == "printer-watch|tray-2"`; the Toner object's Message contains `token: [redacted]` and ends `See: Order toner`, Severity Warning.
    - `test_rescan_and_restart_write_nothing` (Review Focus 5): a second `scan_once()` reports `unchanged == 3`, `created == updated == 0`, and no file changes (bytes, history, `lastUpdated`); a new `AlertWatch` on the same state dir does the same; touching `printer-watch.json` without changing its alerts updates nothing.
@@ -515,10 +524,10 @@ Each task: write the failing test, run it and see it fail, implement, run it and
 **Files**
 - Create: `backend/tests/test_m23_api.py`
 - Fill: `backend/objectapp/api_work_section.py` (T1's stub, already mounted)
-- Modify: `backend/objectapp/__main__.py` (pywebview mode: `windowhost.set_opener(...)` as the Contract says, before `webview.start()`)
+- Modify: `backend/objectapp/__main__.py` (pywebview mode: `windowhost.set_opener(...)` as the Contract says, after `webview.create_window("Object", url, width=1440, height=900)` and before `webview.start()`)
 
 **Interfaces**
-- Consumes: `workboard`, `workfocus`, `workday`, `workwins`, `workfloor`, `alerttype`, `alertwatch.alerts_view`, `workseams`, `windowhost`, M22's `WorkService` and `StepChanged`/`FloorItemChanged` mapping, `HistoryStore`, `ApiContext` (`announce`, read-only space check for 423).
+- Consumes: `workboard`, `workfocus`, `workday`, `workwins`, `workfloor`, `alerttype`, `alertwatch.alerts_view`, `workseams`, `windowhost`, M22's `WorkService` and its `StepChanged`/`FloorItemChanged` → 409 mapping as `api_work.py` writes it, `HistoryStore(space.root, is_whiteboard=…)` built per call as `api_history.py` does, `ApiContext` (`ctx.space`, `ctx.announce`), `space.Conflict`/`ReadOnly` (409/423) and `propvalues.InvalidValue` (422) as `api_work.py` maps them.
 - Produces: every route in the Contract's table with its status codes and bodies.
 
 **Steps**
@@ -729,11 +738,11 @@ Each task: write the failing test, run it and see it fail, implement, run it and
 **Files**
 - Create: `frontend/src/work/panel/NoteBox.tsx`, `ConfidenceMeter.tsx`, `EvidenceColumns.tsx`, `ActivityList.tsx`, `FloorList.tsx`, tests `frontend/src/work/panel/WorkHeader.test.tsx`, `ConfidenceMeter.test.tsx`
 - Fill: `frontend/src/work/panel/WorkHeader.tsx` (T1's stub)
-- Modify: `frontend/src/object/ObjectPage.tsx` (`workHeader?: boolean`, passed on), `frontend/src/object/ObjectView.tsx` (renders `<WorkHeader path work={writes.work} />` above the title when `workHeader` is set; leaves out M22's Resolution note mount then)
+- Modify: `frontend/src/object/ObjectPage.tsx` (`workHeader?: boolean`, passed on; the whiteboard branch ignores it), `frontend/src/object/ObjectView.tsx` (`ObjectViewProps.workHeader?: boolean`; renders `<WorkHeader path work={writes.work} />` above the title when `workHeader` is set; leaves out M22's `ResolutionNoteSection` mount then)
 
 **Interfaces**
 - Consumes: `api.workItem`, `api.workSteps`, `api.workStep`, `api.workFloor`, `api.workNote`, `api.workClose` (M22); M22's `StepList`, `ResolutionNote`, `ObjectWrites.work`; T8's `StepActions`, `stepAction`, `ItemChips`, `useWorkOverlay`.
-- Produces: `WorkHeader` (Contract). It loads `api.workItem(path)` (nothing for a non-work object), then shows, in this order: the chips (plus Object's status and `Desk says Resolved/Closed`), **Open ticket** (the ticket's `url`, a new browser window; hidden without one), the current step with its `StepActions`, **Start together**, **Make it smaller**, **Waiting on** (Blocked on), **Findings**, **Hypothesis** and **Confidence** (a three-segment meter: High 3, Medium 2, Low 1, N/A 0, with the reason under it), **Verified** and **Assumed** as two columns (and To raise confidence under them), the step list (M22's `StepList` wired to `api.workSteps`/`api.workStep`), **Floor items** (each with collect/un-tick, `api.workFloor`), the note box (**Add note** → `api.workNote(path, 'note', text)`, **Ask the agent** → `api.workNote(path, 'request', text)`, the M24 seam row), **Close** when the turn is `close` (`api.workClose`), the **Resolution note** for a ticket (M22's `ResolutionNote`, open), and **Activity** newest first (the last 20, then `Show all`, ours). Every write goes through the given `work` (M22's `ObjectWrites.work`): the runner is `(call) => work((p) => call(p))`, and the header adopts the returned `item`.
+- Produces: `WorkHeader` (Contract). It loads `api.workItem(path)` (nothing for a non-work object), then shows, in this order: the chips (plus Object's status and `Desk says Resolved/Closed`), **Open ticket** (the ticket's `url`, a new browser window; hidden without one), the current step with its `StepActions`, **Start together**, **Make it smaller**, **Waiting on** (Blocked on), **Findings**, **Hypothesis** and **Confidence** (a three-segment meter: High 3, Medium 2, Low 1, N/A 0, with the reason under it), **Verified** and **Assumed** as two columns (and To raise confidence under them), the step list (M22's `StepList` wired to `api.workSteps`/`api.workStep`), **Floor items** (each with collect/un-tick, `api.workFloor`), the note box (**Add note** → `api.workNote(path, 'note', text)`, **Ask the agent** → `api.workNote(path, 'request', text)`, the M24 seam row), **Close** when the turn is `close` (`api.workClose`), the **Resolution note** for a ticket (M22's `ResolutionNote`, open), and **Activity** newest first (the last 20, then `Show all`, ours). Every write goes through the given `work` (M22's `ObjectWrites.work(run: (path, baseVersion) => Promise<WorkWriteResult>)`, which flushes the body first, then `onWorkWritten` merges `res.frontmatter` and loads `res.body` at `res.version`): the runner is `(call) => work((p) => call(p))`, Close is `work((p, v) => api.workClose(p, v))` (the flushed version), and the header adopts the returned `item`.
 
 **Steps**
 1. Failing tests in `WorkHeader.test.tsx` (rendering `ObjectView` with `workHeader` on the mock API):
@@ -799,10 +808,10 @@ Each task: write the failing test, run it and see it fail, implement, run it and
 
 **Files**
 - Create: `frontend/src/work/work.css`, tests `frontend/src/shell/Sidebar.work.test.tsx`, `frontend/src/App.work.test.tsx`, `frontend/src/theme/workTokens.test.ts`, `frontend/src/settings/sections/Work.m23.test.tsx`, `frontend/src/queries/QueriesPage.tickets.test.tsx`
-- Modify: `frontend/src/shell/Sidebar.tsx` (a `<nav aria-label="Work">` with one `MainNavButton` (`ph-briefcase`, "Work") directly below `<AgentsSection>`, above Main; prop `workActive`; Ctrl+click opens a new tab), `frontend/src/App.tsx` (`case 'work'` → `<WorkPage view={target.view} />`; the object case passes `workHeader={target.work}`; `workActive`; mounts `<WorkToasts />` and `<WorkOverlays />` once), `frontend/src/nav/tabs.ts` (the targets, `sameTarget`, `retarget` keeps `work`), `frontend/src/shell/TabStrip.tsx` (the Work tab's label and icon), `frontend/src/queries/QueriesPage.tsx` (the built-in Tickets view is listed under Work, not here), `frontend/src/settings/sections/Work.tsx` (adds **Alert folder** (`workAlertFolder`; a path field, empty = off), **Alert intervals** (rows source + minutes, `workAlertIntervals`), **Add the Alert type** (`api.ensureAlertType()`; disabled with `The Alert type exists.` once it does, ours)), `frontend/src/theme/tokens.css` (the work tokens), `frontend/src/index.css` (imports `work/work.css`)
+- Modify: `frontend/src/shell/Sidebar.tsx` (a `<nav aria-label="Work">` with one `MainNavButton` (`ph-briefcase`, "Work") directly below `<AgentsSection onOpenTarget>`, above `<nav aria-label="Main">`; prop `workActive`, beside `allNotesActive` and the others; Ctrl+click opens a new tab), `frontend/src/App.tsx` (T1 added `pageFor`'s `case 'work'`; here the object case passes `workHeader={target.work}` (T14's prop); `workActive`; mounts `<WorkToasts />` and `<WorkOverlays />` once), `frontend/src/nav/tabs.ts` (T1 added the targets and `sameTarget`; here the store's `retarget` keeps `work`), `frontend/src/nav/sidepanel.ts` (`retargetEntries` keeps `work`), `frontend/src/shell/TabStrip.tsx` (T1 added the title; here `TargetLabel`'s icon `ph-briefcase` for the Work tab), `frontend/src/queries/QueriesPage.tsx` (the built-in Tickets view, the query with `builtIn === 'tickets'` (id `work-tickets`), is listed under Work, not here), `frontend/src/settings/sections/Work.tsx` (adds **Alert folder** (`workAlertFolder`; a path field, empty = off), **Alert intervals** (rows source + minutes, `workAlertIntervals`), **Add the Alert type** (`api.ensureAlertType()`; disabled with `The Alert type exists.` once it does, ours)), `frontend/src/theme/tokens.css` (the work tokens), `frontend/src/index.css` (imports `work/work.css`)
 
 **Interfaces**
-- Consumes: T1's stubs and targets; `useSettings`, `api.ensureAlertType`, `api.workAlerts` (`typeExists`).
+- Consumes: T1's stubs and targets; T14's `ObjectPage` `workHeader` prop (T17 runs after T14); `useSettings`, `api.ensureAlertType`, `api.workAlerts` (`typeExists`). `settings/sections/Work.tsx` keeps M22's own `WORK_TEXT` export and adds its strings there (M23's `work/workText.ts` is imported under another name if needed).
 - Produces: the sidebar entry and routing; `work.css`: `html[data-work-calm]` dims the sidebar, the tab strip and the breadcrumbs to 35 % opacity (full on hover, 150 ms); `[data-work-vanish]` collapses a row (opacity and height, 200 ms); `@media print` shows only `[data-work-print]`; the work tokens.
 
 **Steps**
@@ -858,14 +867,16 @@ Each task: write the failing test, run it and see it fail, implement, run it and
    - [ ] Light and dark themes: the you (indigo), agent (teal), approve (amber), critical (red) and brain-dump (pink) colours read well in both.
    - [ ] The brain-dump bar, the agent switch and Ask the agent to break it down say they come with M24; nothing else is missing.
    - [ ] Opening Work and browsing every view changes no file (git status clean).
-3. Run the gate: `uv run pytest backend/tests -q`; `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build`; `uv run python scripts/m23_acceptance.py` (prints `RESULT: PASS`); `uv run python scripts/m22_acceptance.py` and `uv run python scripts/m14_acceptance.py backend/tests/fixtures/space-m8` (modules touched).
-4. Commit: `test(m23): acceptance script and hand checks; docs status`.
+3. Run M23's own checks (the machine is shared with the other track; the full suites, `npm run lint` and the earlier milestones' acceptance scripts run once in this track's full gate, after the review and fix pass, as M22 did): `uv run pytest backend/tests/test_m23_*.py backend/tests/test_m22_api.py backend/tests/test_settings.py backend/tests/test_history.py -q`; `cd frontend && node scripts/app-icons.mjs --check` (regenerate `src/icons/appIcons.ts` when a task added a `ph-` id it didn't), `npx vitest run src/work src/lib/shortcuts src/shell src/App.work.test.tsx src/theme src/settings/sections src/queries src/object src/nav src/icons`, `npx tsc -b --noEmit`, `npm run build`; `uv run python scripts/m23_acceptance.py` (prints `RESULT: PASS`) and `uv run python scripts/m22_acceptance.py` (M22's routes are touched by the board).
+4. Commit: `test(m23): acceptance script and hand checks; docs status`. The acceptance doc lists every task's reported deviations, as `m22-acceptance.md` does.
 
 ## Shared files and ordering
 
 | Shared file | Owner | Others needing a change say so in their report |
 |---|---|---|
-| `frontend/src/api/types.ts`, `api/client.ts`, `test/mockApi.ts` | T1 | T7-T17 |
+| `frontend/src/api/types.ts`, `api/client.ts`, `test/mockApi.ts`, `settings/defaults.ts` | T1 | T7-T17 |
+| `backend/tests/test_settings.py` | T1 | |
+| `frontend/src/nav/tabs.ts`, `App.tsx`, `shell/TabStrip.tsx` | T1 (the `Target` variants, `sameTarget`, `pageFor`'s `work` case, the tab title), then T17 | |
 | `frontend/src/work/workText.ts`, `work/workIcons.ts`, `icons/appIcons.ts` (generated) | T1 | every front-end task (a missing string stays a local constant in the task's own file until the review; a missing icon is reported) |
 | `frontend/src/work/__fixtures__/board.json`; `backend/tests/fixtures/space-work-m23/`, `fixtures/monitoring/`, `backend/tests/m23_helpers.py` | T1 | T2-T17 read them |
 | `backend/objectapp/server.py`, `watcher.py`, `settings.py`, `writeorigin.py`, `workseams.py`, `windowhost.py`, `worksection_model.py` | T1 | T6 (M24 later replaces only `build_seams`' body) |
@@ -879,7 +890,7 @@ Each task: write the failing test, run it and see it fail, implement, run it and
 | `frontend/src/work/panel/WorkHeader.tsx`; `object/ObjectPage.tsx`, `object/ObjectView.tsx` | T1 stub; T14 | |
 | `frontend/src/work/session/*.tsx`; `main.tsx` | T1 stubs; T15 | |
 | `frontend/src/work/keys/useWorkKeys.ts`; `lib/shortcuts.ts`, `lib/shortcuts.test.ts`; `docs/behavior-catalog.md` | T1 stub; T16 | |
-| `frontend/src/shell/Sidebar.tsx`, `App.tsx`, `nav/tabs.ts`, `shell/TabStrip.tsx`, `queries/QueriesPage.tsx`, `theme/tokens.css`, `index.css`, `work/work.css` | T17 | T12 (print rule), T9 (calm attribute) rely on `work.css` |
+| `frontend/src/shell/Sidebar.tsx`, `nav/sidepanel.ts`, `queries/QueriesPage.tsx`, `theme/tokens.css`, `index.css`, `work/work.css` (and the T17 parts of `App.tsx`, `nav/tabs.ts`, `shell/TabStrip.tsx`) | T17 | T12 (print rule), T9 (calm attribute) rely on `work.css` |
 | `frontend/src/settings/sections/Work.tsx` (M22's file; M23 adds its alert rows after M22's two rows, and M24 later adds its work agent group after them) | T17 | |
 | `docs/superpowers/plans/remaining-work.md`, `CONTINUE.md` | T18 | |
 
@@ -889,12 +900,14 @@ T1 runs first, alone. Then four tracks (counted from the Files lists; no file is
 
 | Track | Tasks, in order | Waits for |
 |---|---|---|
-| B (back end) | T2, T3, T4, T5, T6 | |
-| F1 (logic and views) | T7, T10, T11, T12 | T10 waits for T8 (F2) |
+| B (back end) | T2, T3, T4, T5, T6 | T6 waits for T2-T5 (its routes call them) |
+| F1 (logic and views) | T7, T11, T12, T10 | T11 and T12 wait for T8 (F2: stores, `ItemChips`, `openItemPanel`); T10 waits for T8 and T9 (F2: `FocusEditor`) |
 | F2 (state, frame, views) | T8, T9, T13 | T9 waits for T7 (F1) |
-| F3 (panel, session, keys, shell) | T17, T14, T15, T16 | T14 and T15 wait for T8; T15 for T7; T16 for T9 |
+| F3 (panel, session, keys, shell) | T14, T17, T15, T16 | T14 and T15 wait for T8; T15 for T7; T17 for T14 (`ObjectPage`'s `workHeader`); T16 for T9 |
 
-Front-end tests use the mock API and `board.json`, so no front-end task waits for the back end. T18 integrates after all tracks. Then one whole-milestone review (correctness, file safety, fidelity to the spec and catalog), one fix pass, the final gate (T18 step 3), and Gene's hands-on check.
+Reconciled 2026-11-06: T10 was after T7 in F1 although it consumes T9's `FocusEditor`, and T17 was first in F3 although `App.tsx` passes T14's `workHeader` prop, so both moved later; T1 now also adds the `work` target types (T8's `openItemPanel` needs `work: true` on the object target, and the new kind breaks two exhaustive switches). No file is in two tracks.
+
+Front-end tests use the mock API and `board.json`, so no front-end task waits for the back end. T18 integrates after all tracks. Then one whole-milestone review (correctness, file safety, fidelity to the spec and catalog), one fix pass, this track's full gate (every suite, `npm run lint`, `npm run build`, the acceptance scripts), and Gene's hands-on check.
 
 ## Our calls
 

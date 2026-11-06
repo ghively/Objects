@@ -18,6 +18,8 @@ Take the current state from `docs/superpowers/plans/remaining-work.md` and `git 
 
 **2026-11-06:** M21 (agent schedules: the Schedules tab, `runAgent` rules, `schedule_manage`, runs saved as AI Chats, no reviews, curator protection, catch-up after a close) is built and integrated on `feat/m16-m24` (`m21_acceptance.py` PASS); the track's full gate and review are next, and his 11 hand-checks in `plans/m21-acceptance.md` are pending.
 
+**2026-11-06:** M22 (the work model: work and ticket fields, steps with whose turn and the approval gate, Activity and Work notes, the resolution note, the Tickets view, the work routes and MCP tools) is built and integrated on `feat/m22-m23` in the worktree `C:\Git\object-work` (Gene chose two parallel tracks on 2026-11-06, one full gate per track); `scripts/m22_acceptance.py` passes. The track's review, fix pass and gate come next, and his 10 hand-checks in `plans/m22-acceptance.md` are pending. Next on this track: M23 (the Work section).
+
 As of 2026-11-02:
 - **Built:** M1–M9 are built, reviewed, fixed and gated, all on `master`. M8 covers every feature M4–M7 had deferred, local only; M9 the audit's completeness gaps. The 2026-11-01 full audit's fixes (bugs and optimization) are merged (PR #4).
 - **Out of scope by the spec:** AI, network integrations, accounts, mobile, telemetry.

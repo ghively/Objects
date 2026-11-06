@@ -1,0 +1,51 @@
+/* M23: the Work section's own rules (T17). Colours come from the work tokens in theme/tokens.css. */
+
+/* Just one thing: the sidebar, the tab strip and the breadcrumbs step back (full on hover). */
+html[data-work-calm] aside[aria-label='Sidebar'],
+html[data-work-calm] [role='tablist'][aria-label='Tabs'],
+html[data-work-calm] nav[aria-label='Breadcrumbs'] {
+  opacity: 0.35;
+  transition: opacity 150ms ease;
+}
+
+html[data-work-calm] aside[aria-label='Sidebar']:hover,
+html[data-work-calm] [role='tablist'][aria-label='Tabs']:hover,
+html[data-work-calm] nav[aria-label='Breadcrumbs']:hover {
+  opacity: 1;
+}
+
+/* A row acted on vanishes at once: it fades and collapses. */
+[data-work-vanish] {
+  opacity: 0;
+  max-height: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  overflow: hidden;
+  pointer-events: none;
+  transition:
+    opacity 200ms ease,
+    max-height 200ms ease,
+    margin 200ms ease,
+    padding 200ms ease;
+}
+
+/* Print checklist: only the marked list prints. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  [data-work-print],
+  [data-work-print] * {
+    visibility: visible;
+  }
+
+  [data-work-print] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}

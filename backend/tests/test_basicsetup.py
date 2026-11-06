@@ -12,6 +12,7 @@ from objectapp.server import create_app
 from objectapp.space import Space
 from objectapp.spaces import create_space
 from objectapp.typemodel import TypeDefinition
+from objectapp.workfields import FIELD_KEYS
 
 
 @pytest.fixture
@@ -66,6 +67,16 @@ def test_basic_setup_writes_four_types(tmp_path: Path, state: Path):
         ("Status", "label"), ("Type", "label"), ("Timeframe", "datetime"),
         ("Collaborators", "entity"), ("Organizations", "entity"), ("Meetings", "entity"),
         ("Cover image", "coverImage"), ("Notes", "blocks"),
+        # M22: the ticket and work fields (no Project relation), then the hidden Completed
+        ("Ticket ID", "text"), ("System", "label"), ("Ticket link", "url"),
+        ("Desk status", "label"), ("Desk priority", "label"), ("Requester", "text"),
+        ("Group", "text"), ("Location", "text"), ("Opened", "datetime"),
+        ("Desk updated", "datetime"), ("Resolved", "datetime"),
+        ("Rank", "number"), ("Area", "label"), ("Cause", "label"), ("Priority note", "text"),
+        ("Blocked on", "text"), ("Findings", "textBlock"), ("Hypothesis", "textBlock"),
+        ("Confidence", "label"), ("Confidence reason", "text"), ("Verified", "textList"),
+        ("Assumed", "textList"), ("To raise confidence", "textList"),
+        ("Floor items", "floorItems"), ("Steps", "steps"), ("Completed", "datetimeSimple"),
     ]
     assert custom["book"] == [
         ("Authors", "entity"), ("Genre", "label"), ("Type", "label"), ("Rating", "number"),
@@ -112,7 +123,12 @@ def test_blank_setup_unchanged(tmp_path: Path, state: Path):
 
 
 def test_basic_types_have_fresh_property_ids():
+    # M22: the work fields keep `id == key` (as the Task fields), so they are left out here.
     a, b = basic_types(), basic_types()
-    ids_a = {p.id for t in a for p in t.propertyDefinitions if p.type in ("label", "entity")}
-    ids_b = {p.id for t in b for p in t.propertyDefinitions if p.type in ("label", "entity")}
+
+    def ids(types):
+        return {p.id for t in types for p in t.propertyDefinitions
+                if p.type in ("label", "entity") and p.key not in FIELD_KEYS}
+
+    ids_a, ids_b = ids(a), ids(b)
     assert ids_a and not ids_a & ids_b

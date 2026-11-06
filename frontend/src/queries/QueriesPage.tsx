@@ -45,6 +45,8 @@ export function QueriesPage() {
   const rows = useMemo(
     () =>
       queries
+        // M23: the built-in Tickets view (`work-tickets`) is listed under Work, not here.
+        .filter((q) => q.builtIn !== 'tickets')
         .map((q) => ({
           q,
           title: queryTitle(q, ctx),

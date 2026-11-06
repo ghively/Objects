@@ -17,6 +17,11 @@ those are **our choice** (listed for Gene in the M8 plan, Task 8):
   (number shown as progress out of 5), Reading timeline (date range), Cover image,
   Notes.
 
+M22: Project also has the ticket and work fields (``workfields.field_defs``, without the
+Project relation, which is on Tasks only) and a hidden ``completed`` (Task's), appended
+after Notes, so a new Project is a work type. Those keep ``id == key``; the properties
+above get fresh ids.
+
 "Notes" is each type's ``blocks`` property (the object's body). There is no
 Organization type in the basic setup, so "Organizations" relations allow any type.
 `write_basic_types` writes only ``.object/types/<id>.json`` for the four types.
@@ -34,10 +39,12 @@ from .typemodel import (
     Icon,
     PropertyDefinition,
     TypeDefinition,
+    _task_field_defs,
     label_options,
     system_property_defs,
     write_type_json,
 )
+from .workfields import field_defs
 
 __all__ = ["BASIC_TYPE_IDS", "basic_types", "write_basic_types"]
 
@@ -110,6 +117,11 @@ def _cover(name: str = "Cover image") -> PropertyDefinition:
 
 def _notes() -> PropertyDefinition:
     return _prop("notes", "Notes", "blocks")
+
+
+def _completed() -> PropertyDefinition:
+    """Task's hidden ``completed`` (M22: the 14-day Done clock on a Project)."""
+    return next(p for p in _task_field_defs() if p.key == "completed")
 
 
 def _status() -> PropertyDefinition:
@@ -188,6 +200,8 @@ def basic_types() -> list[TypeDefinition]:
             _relation("meetings", "Meetings", ["meeting"]),
             _cover(),
             _notes(),
+            *field_defs(task=False, project_type_ids=["project"]),
+            _completed(),
         ],
     )
     book = _type(

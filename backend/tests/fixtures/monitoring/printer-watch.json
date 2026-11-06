@@ -1,0 +1,29 @@
+{
+  "source": "printer-watch",
+  "generated": "2026-11-05T09:50:00Z",
+  "ok": true,
+  "error": null,
+  "intervalMinutes": 15,
+  "alerts": [
+    {
+      "key": "tray-2",
+      "severity": "crit",
+      "title": "Tray 2 jammed",
+      "detail": "Paper stuck at the fuser",
+      "host": "PRN-TEST-01",
+      "since": "2026-11-05T09:40:00Z",
+      "due": null,
+      "link": "https://example.org/prn"
+    },
+    {
+      "key": "toner",
+      "severity": "warn",
+      "title": "Toner low",
+      "detail": "token: abc123 seen",
+      "host": "PRN-TEST-01",
+      "since": "2026-11-05T08:00:00Z",
+      "due": null,
+      "link": "[[Order toner]]"
+    }
+  ]
+}

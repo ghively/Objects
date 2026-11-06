@@ -6,6 +6,8 @@
  * `Meta`, `Alt`, `AltCtrl` (Alt on Windows/Linux, Ctrl on macOS: the Ctrl+Alt+L / ⌃⌘L
  * pattern), `Shift`, then one key: a letter, a digit, a punctuation character, or a
  * `KeyboardEvent.key` name (`Escape`, `ArrowUp`, `Enter`, `Tab`, `Backspace`, `Delete`, `Space`).
+ * A spec with a space is a two-key sequence (M23: `g n` is G, then N): the Shortcuts sheet shows
+ * it, but `matches` never matches it (its handler reads the sequence itself).
  *
  * The keys follow the shortcut table checked in
  * `docs/superpowers/plans/reference-check-2026-10-28.md` §1. An id the table lists no key for
@@ -16,8 +18,8 @@
  */
 import { useEffect, useRef } from 'react'
 
-/** `aiChat`: bound while focus is inside the AI chat panel (M10). */
-export type ShortcutScope = 'global' | 'editor' | 'calendar' | 'table' | 'whiteboard' | 'aiChat'
+/** `aiChat`: bound while focus is inside the AI chat panel (M10). `work`: on the Work page (M23). */
+export type ShortcutScope = 'global' | 'editor' | 'calendar' | 'table' | 'whiteboard' | 'aiChat' | 'work'
 
 export interface ShortcutDef {
   id: string
@@ -48,6 +50,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   text: 'Text editing',
   weblink: 'Weblink',
   whiteboard: 'Whiteboard',
+  work: 'Work',
 }
 
 const registry = new Map<string, ShortcutDef>()
@@ -162,6 +165,7 @@ type KeyEventLike = Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' |
 export function matches(e: KeyEventLike, keys: string[]): boolean {
   const mac = isMacPlatform()
   for (const spec of keys) {
+    if (isSequence(spec)) continue
     const c = parseKeys(spec, mac)
     if (!!e.ctrlKey !== c.ctrl || !!e.metaKey !== c.meta || !!e.altKey !== c.alt || !!e.shiftKey !== c.shift) continue
     if (keyMatches(e, c.key)) return true
@@ -171,8 +175,23 @@ export function matches(e: KeyEventLike, keys: string[]): boolean {
 
 const ARROW_GLYPHS: Record<string, string> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }
 
-/** How a key is shown in the Shortcuts sheet (`Ctrl+Shift+K`, or `⌘⇧K` on macOS; arrows as `↑`). */
+/** Whether `spec` is a two-key sequence (`g n`). */
+export function isSequence(spec: string): boolean {
+  return spec.includes(' ')
+}
+
+/**
+ * How a key is shown in the Shortcuts sheet (`Ctrl+Shift+K`, or `⌘⇧K` on macOS; arrows as `↑`).
+ * A sequence shows its keys joined by "then" (`G then N`, our string).
+ */
 export function formatKeys(spec: string, mac = isMacPlatform()): string {
+  if (isSequence(spec)) {
+    return spec
+      .split(' ')
+      .filter(Boolean)
+      .map((k) => formatKeys(k, mac))
+      .join(' then ')
+  }
   const c = parseKeys(spec, mac)
   const key = ARROW_GLYPHS[c.key] ?? (c.key === 'Space' ? 'Space' : c.key.length === 1 ? c.key.toUpperCase() : c.key)
   if (mac) return `${c.ctrl ? '⌃' : ''}${c.alt ? '⌥' : ''}${c.shift ? '⇧' : ''}${c.meta ? '⌘' : ''}${key}`

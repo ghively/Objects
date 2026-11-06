@@ -53,6 +53,15 @@ import type {
   TypeDef,
   ViewState,
   Views,
+  WorkItem,
+  WorkStep,
+  WorkWriteResult,
+  AgentStatus,
+  FocusDay,
+  FocusLine,
+  WorkAlerts,
+  WorkBoard,
+  WorkBoardItem,
 } from '@/api/types'
 import { settingsDefaults } from '@/settings/defaults'
 
@@ -557,6 +566,163 @@ export function secretVar(partial: Partial<SecretVar> & Pick<SecretVar, 'name'>)
   return { set: false, settable: true, usedBy: [], ...partial }
 }
 
+/** M22: a work step: an open Do step, first and current, unless `partial` says otherwise. */
+export function workStep(partial: Partial<WorkStep> = {}): WorkStep {
+  return {
+    id: 'q4m2xa',
+    rev: '0123456789ab',
+    kind: 'do',
+    state: 'open',
+    text: 'Check the printer cable',
+    notBefore: null,
+    answer: null,
+    result: null,
+    addedAt: null,
+    approvedAt: null,
+    doneAt: null,
+    declinedAt: null,
+    n: 1,
+    current: true,
+    actions: [],
+    ...partial,
+  }
+}
+
+/** M22: a work item with every contract field; the title follows `path` unless given. */
+export function workItem(partial: Partial<WorkItem> = {}): WorkItem {
+  const path = partial.path ?? 'Tasks/Printer jams on line 3.md'
+  const steps = partial.steps ?? []
+  const current = steps.find((s) => s.current) ?? null
+  return {
+    path,
+    objectId: null,
+    title: path.replace(/^.*\//, '').replace(/\.md$/, ''),
+    typeId: 'task',
+    version: 'v1',
+    ticket: null,
+    rank: null,
+    area: null,
+    cause: null,
+    priority: null,
+    priorityNote: null,
+    blockedOn: null,
+    confidence: null,
+    status: 'In Progress',
+    stage: 'doing',
+    done: false,
+    doneAt: null,
+    recentlyDone: false,
+    turn: steps.length === 0 ? 'none' : 'you',
+    deskSays: null,
+    current,
+    stepCount: steps.length,
+    stepsFinished: steps.filter((s) => s.state === 'done' || s.state === 'declined').length,
+    projectPath: null,
+    lastActivity: null,
+    lastTouched: '2026-11-05T10:00:00.000Z',
+    problems: [],
+    fields: {},
+    steps,
+    verified: [],
+    assumed: [],
+    toRaiseConfidence: [],
+    floorItems: [],
+    findings: null,
+    hypothesis: null,
+    confidenceReason: null,
+    activity: [],
+    workNotes: [],
+    resolution: null,
+    ...partial,
+  }
+}
+
+/** M22: what a work write answers: the item at `version`, one Activity line, no Work notes line. */
+export function workWriteResult(partial: Partial<WorkWriteResult> = {}): WorkWriteResult {
+  const version = partial.version ?? 'v2'
+  const item = partial.item ?? workItem({ version })
+  return {
+    version,
+    frontmatter: {},
+    body: '',
+    item,
+    synced: [],
+    activity: '2026-11-05 10:00 Gene marked done step 1 "Check the printer cable"',
+    workNote: null,
+    ...partial,
+  }
+}
+
+/** M23: a board item: `workItem`'s summary fields plus the board's, without the item-only keys. */
+export function workBoardItem(over: Partial<WorkBoardItem> = {}): WorkBoardItem {
+  const {
+    fields: _fields, verified: _verified, assumed: _assumed, toRaiseConfidence: _raise, findings: _findings,
+    confidenceReason: _reason, activity: _activity, workNotes: _notes, resolution: _resolution, ...summary
+  } = workItem(over as Partial<WorkItem>)
+  return {
+    ...summary,
+    typeName: 'Task',
+    isProject: false,
+    deadline: null,
+    blockedOnPeople: [],
+    ...over,
+  }
+}
+
+/** M23: a board at the fixtures' clock (2026-11-05T10:00Z, UTC). */
+export function workBoard(items: WorkBoardItem[] = []): WorkBoard {
+  return { items, now: '2026-11-05T10:00:00.000Z', today: '2026-11-05', timeZone: 'UTC' }
+}
+
+/** M23: today's focus lines from their raw texts (`[[a|b]]` shows `b`; links unresolved). */
+export function focusDay(lines: string[] = [], over: Partial<FocusDay> = {}): FocusDay {
+  const focus: FocusLine[] = lines.map((text, i) => ({
+    n: i + 1,
+    text,
+    label: text.replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g, '$2').replace(/\[\[([^\]]*)\]\]/g, '$1'),
+    links: [...text.matchAll(/\[\[([^\]|]*)(?:\|[^\]]*)?\]\]/g)].map((m) => ({ target: m[1], path: null })),
+  }))
+  return {
+    day: '2026-11-05',
+    notePath: lines.length ? 'DailyNotes/2026-11-05.md' : null,
+    version: lines.length ? 'v1' : null,
+    hasSection: lines.length > 0,
+    lines: focus,
+    ...over,
+  }
+}
+
+/** M23: the agent status before M24 (no agent; nothing carried unless `over` says so). */
+export function agentStatus(over: Partial<AgentStatus> = {}): AgentStatus {
+  return {
+    available: false,
+    agentName: null,
+    actsOnApprovals: false,
+    carrying: 0,
+    rows: [],
+    note: 'The agent loop comes with M24.',
+    ...over,
+  }
+}
+
+/** M23: no alerts, no folder, no Alert type. */
+export function workAlerts(over: Partial<WorkAlerts> = {}): WorkAlerts {
+  return {
+    alerts: [],
+    sources: [],
+    counts: { Critical: 0, Warning: 0, Info: 0 },
+    folder: null,
+    typeExists: false,
+    ...over,
+  }
+}
+
+/** The client's `UnavailableError` (imported when thrown: a module that mocks `@/api/client` loads this one). */
+async function unavailable(detail: string): Promise<Error> {
+  const { UnavailableError } = await import('@/api/client')
+  return new UnavailableError(detail)
+}
+
 type Fn =(...args: never[]) => unknown
 
 function defaults(): Api {
@@ -905,6 +1071,55 @@ function defaults(): Api {
     setMcpSecret: async (name: string) => ({ name, set: true as const }),
     deleteMcpSecret: async () => ({ ok: true as const }),
     refreshAgentTools: async () => [],
+    // M22
+    workItems: async () => [],
+    workItem: async (path: string) => workItem({ path }),
+    workStep: async (req: { path: string }) => workWriteResult({ item: workItem({ path: req.path }) }),
+    workSteps: async (path: string) => workWriteResult({ item: workItem({ path }) }),
+    workFields: async (path: string) => workWriteResult({ item: workItem({ path }) }),
+    workNote: async (path: string) => workWriteResult({ item: workItem({ path }) }),
+    workClose: async (path: string) => workWriteResult({ item: workItem({ path }) }),
+    workFloor: async (req: { path: string }) => workWriteResult({ item: workItem({ path: req.path }) }),
+    addWorkFields: async (typeId: string, baseRevision: string) => ({
+      type: typeDef({ id: typeId, revision: `${baseRevision}+1` }),
+      added: [],
+      skipped: [],
+    }),
+    // M23 (the seams answer as the M23 server does: 501 until M24)
+    workBoard: async () => workBoard(),
+    workFocus: async (day?: string) => focusDay([], day ? { day } : {}),
+    saveWorkFocus: async (day: string, lines: string[]) =>
+      focusDay(lines, { day, notePath: `DailyNotes/${day}.md`, version: 'v2', hasSection: true }),
+    workToday: async (day?: string) => ({
+      day: day ?? '2026-11-05',
+      now: '2026-11-05T10:00:00.000Z',
+      nowLocal: '10:00',
+      meetings: [],
+    }),
+    workWins: async () => ({ days: [], stepsDone: 0, itemsClosed: 0, objectsChanged: 0, got: [] }),
+    workAlerts: async () => workAlerts(),
+    scanAlerts: async () => ({
+      report: { files: 0, created: 0, updated: 0, cleared: 0, unchanged: 0, errors: [] },
+      alerts: workAlerts(),
+    }),
+    ensureAlertType: async () => ({ type: typeDef({ id: 'alert', name: 'Alert', pluralName: 'Alerts' }), created: true }),
+    generalFloor: async () => ({ items: [], revision: '' }),
+    generalFloorOp: async () => ({ items: [], revision: 'r1' }),
+    workAgent: async () => agentStatus(),
+    setAgentActs: async () => {
+      throw await unavailable('The agent loop comes with M24.')
+    },
+    retryAgentEntry: async () => {
+      throw await unavailable('The agent loop comes with M24.')
+    },
+    workCapture: async () => {
+      throw await unavailable('Saving a brain dump comes with M24.')
+    },
+    workCaptures: async () => [],
+    keepOnTopInfo: async () => ({ window: false }),
+    openKeepOnTop: async () => {
+      throw await unavailable('Keep on top needs the Object window.')
+    },
     onChange: () => () => undefined,
   } as unknown as Api
 }

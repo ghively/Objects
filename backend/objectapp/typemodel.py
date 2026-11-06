@@ -113,6 +113,10 @@ PROPERTY_ICONS = {
     "entity_type": "ph-notebook",
     # M14 (our choice): a button runs an automation on its object; it holds no value.
     "button": "ph-cursor-click",
+    # M22 (our kinds): a work item's steps, a list of short texts and its floor items.
+    "steps": "ph-list-checks",
+    "textList": "ph-list-bullets",
+    "floorItems": "ph-clipboard-text",
 }
 
 # (key, kind, en-US name, description) of the system properties, in order.
@@ -433,6 +437,7 @@ def _default_options(kind: str, is_array: bool | None) -> dict[str, Any]:
         return {"isArray": True}
     if is_array:
         return {"isArray": True}
+    # M22: `steps`, `textList` and `floorItems` take no options; they fall through to `{}`.
     return {}
 
 

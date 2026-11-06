@@ -637,7 +637,7 @@ def test_delete_type_trashes_its_queries_and_restore_brings_them_back(space_dir:
 
     item = space.delete_type("server", confirm=True)
     assert not live.exists()
-    assert [q.id for q in space.list_queries()] == []
+    assert [q.id for q in space.list_queries()] == ["work-tickets"]  # M22: built in, no file
     manifest = space.trash.manifest(item.id)
     assert manifest["queries"] == ["my-servers"]
     # Grouped under the type, as its templates are: no separate entry in the listing.
@@ -803,12 +803,13 @@ def test_delete_type_route_announces_its_queries(space_dir: Path):
         assert r.status_code == 200, r.text
         assert r.json()["queryIds"] == ["my-servers"]
         _wait_for(published, ("queries", "my-servers", "w1"))
-        assert c.get("/api/queries").json() == []
+        # M22: only the built-in Tickets view (no file) is listed.
+        assert [q["id"] for q in c.get("/api/queries").json()] == ["work-tickets"]
         published.clear()
         r = c.post(f"/api/trash/{r.json()['trashId']}/restore?clientId=w1")
         assert r.status_code == 200, r.text
         _wait_for(published, ("queries", "my-servers", "w1"))
-        assert [q["id"] for q in c.get("/api/queries").json()] == ["my-servers"]
+        assert [q["id"] for q in c.get("/api/queries").json()] == ["my-servers", "work-tickets"]
 
 
 def _wait_for(published: list, event: tuple) -> None:
