@@ -143,6 +143,8 @@ class A2AError(Exception):
         self.status = status
         self.code = code
         """The JSON-RPC error code, when the agent answered one."""
+        self.chat_id: str | None = None
+        """The chat ``remotechat.call_remote`` wrote before the trouble, if any."""
 
 
 class _Deadline(Exception):
@@ -292,7 +294,7 @@ async def fetch_card(card_url: str, auth: Auth, *, client: httpx.AsyncClient | N
             await http.aclose()
     try:
         data = json.loads(body.decode("utf-8-sig"))
-    except (UnicodeDecodeError, ValueError):
+    except (UnicodeDecodeError, ValueError, RecursionError):  # RecursionError: deeply nested JSON
         raise A2AError(NOT_A_CARD, 422) from None
     return parse_card(data)
 
@@ -406,7 +408,7 @@ class _Run:
     def _json(self, body: bytes) -> Any:
         try:
             return json.loads(body.decode("utf-8-sig"))
-        except (UnicodeDecodeError, ValueError):
+        except (UnicodeDecodeError, ValueError, RecursionError):  # RecursionError: deeply nested JSON
             raise self._unreadable() from None
 
     def _result(self, envelope: Any) -> Any:
@@ -581,8 +583,8 @@ class _Run:
                 async for data in self._sse(resp):
                     try:
                         envelope = json.loads(data)
-                    except ValueError:
-                        continue  # a malformed line is skipped
+                    except (ValueError, RecursionError):
+                        continue  # a malformed (or deeply nested) line is skipped
                     updates, final = self._event(self._result(envelope))
                     for u in updates:
                         yield u

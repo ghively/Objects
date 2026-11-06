@@ -363,6 +363,42 @@ def test_terminal_states(api, fake, prompt, message) -> None:
     assert last["type"] == "error" and last["message"] == message
 
 
+def test_nested_json_answer_is_an_error_event(api, fake) -> None:
+    _space, client, _ = api
+    rec = _add_remote(fake)
+    fake.raw_override = lambda m: (200, {"Content-Type": "application/json"}, b"[" * 200_000)
+    events = _chat(client, "hi", rec.id)
+    message = "Fake Planner sent an answer Object can't read."
+    assert [e["type"] for e in events] == ["chat", "error"] and events[-1]["message"] == message
+    last = _lines(rec, events[0]["chatId"])[-1]
+    assert last["type"] == "error" and last["message"] == message
+
+
+def test_unexpected_send_failure_is_an_error_event(api, fake, monkeypatch) -> None:
+    _space, client, _ = api
+    rec = _add_remote(fake)
+
+    async def broken(*_a, **_kw):
+        raise RuntimeError("boom")
+        yield  # pragma: no cover - makes this an async generator
+
+    monkeypatch.setattr(a2a, "send", broken)
+    events = _chat(client, "hi", rec.id)
+    message = "Fake Planner sent an answer Object can't read."
+    assert [e["type"] for e in events] == ["chat", "error"] and events[-1]["message"] == message
+    lines = _lines(rec, events[0]["chatId"])
+    assert lines[-1]["type"] == "error" and not any(line.get("stopped") for line in lines)
+    result_err = None
+    try:
+        asyncio.run(remotechat.call_remote(
+            rec, "hi", context_id=None, task_id=None, timeout=30, delegated_from="assistant",
+            from_chat=None, space_name="Notes", space_key=None, cap=100))
+    except a2a.A2AError as exc:
+        result_err = exc
+    assert result_err is not None and (result_err.status, result_err.message) == (502, message)
+    assert result_err.chat_id and _lines(rec, result_err.chat_id)[-1]["type"] == "error"
+
+
 def test_canceled_state(tmp_path: Path) -> None:
     reply = remotechat._Reply(tmp_path, transcripts.new_chat_id())
     reply.take(a2a.Update("state", state="TASK_STATE_CANCELED", context_id="c", task_id="t"))
@@ -455,6 +491,15 @@ def test_call_remote_marks_delegated(fake, tmp_path: Path) -> None:
     header = _lines(rec, result.chat_id)[0]
     assert header["delegated"] is True and header["from"] == "assistant"
     assert len(_lines(rec, result.chat_id)[-1]["text"]) == 50  # the transcript keeps it whole
+
+    fake.raw_override = lambda m: (200, {"Content-Type": "application/json"}, b"x")
+    with pytest.raises(a2a.A2AError) as err:
+        asyncio.run(remotechat.call_remote(
+            rec, "broken", context_id=None, task_id=None, timeout=30, delegated_from="assistant",
+            from_chat=None, space_name="Notes", space_key=None, cap=10))
+    assert err.value.status == 502 and err.value.chat_id
+    assert _lines(rec, err.value.chat_id)[-1]["type"] == "error"
+    fake.raw_override = None
 
     again = asyncio.run(remotechat.call_remote(
         rec, "more", context_id=result.context_id, task_id=None, timeout=30, delegated_from="assistant",

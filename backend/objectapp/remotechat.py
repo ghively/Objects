@@ -359,6 +359,8 @@ async def stream_turn(record: AgentRecord, *, chat_id: str, prompt: str, pack: a
                     yield event
         except a2a.A2AError as exc:
             error = _error_text(exc, name, auth, ai.TURN_TIMEOUT)
+        except Exception:  # noqa: BLE001 - anything else a hostile answer causes ends the turn as an error
+            error = a2a.UNREADABLE.format(name=name)
         else:
             error = reply.error_message(name)
         if error is not None:
@@ -453,7 +455,8 @@ async def call_remote(record: AgentRecord, text: str, *, context_id: str | None,
 
     A failed, rejected, canceled or auth-required task is an answer (its `state`, the error as the
     text when nothing else came). Raises `a2a.A2AError`: 409 (no token, an unreadable card), 504
-    (past `timeout`; the chat so far is kept, ``stopped``), else the remote's trouble (redacted)."""
+    (past `timeout`; the chat so far is kept, ``stopped``), else the remote's trouble (redacted).
+    Once the chat is written, the error's ``chat_id`` names it."""
     name = _name(record)
     folder = record.folder
     card, auth = await asyncio.to_thread(_load, record)
@@ -487,7 +490,17 @@ async def call_remote(record: AgentRecord, text: str, *, context_id: str | None,
             transcripts.append(folder, chat_id, [reply.assistant_line(stopped=True)])
         else:
             transcripts.append(folder, chat_id, [{"type": "error", "message": message_text, "at": _now()}])
-        raise a2a.A2AError(message_text, exc.status) from None
+        err = a2a.A2AError(message_text, exc.status)
+        err.chat_id = chat_id
+        raise err from None
+    except Exception:  # anything else a hostile answer causes: an error line, then a 502
+        if reply.task_id and not reply.final:
+            await _cancel_shielded(card, auth, reply.task_id)
+        message_text = a2a.UNREADABLE.format(name=name)
+        transcripts.append(folder, chat_id, [{"type": "error", "message": message_text, "at": _now()}])
+        err = a2a.A2AError(message_text, 502)
+        err.chat_id = chat_id
+        raise err from None
     except BaseException:
         if reply.task_id and not reply.final:
             await _cancel_shielded(card, auth, reply.task_id)

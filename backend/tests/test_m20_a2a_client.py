@@ -168,6 +168,14 @@ def test_card_not_json(fake: fake_a2a.FakeA2A) -> None:
     assert err.value.message == f"{fake.base_url.removeprefix('http://')} answered 404."
 
 
+def test_card_deeply_nested_json(fake: fake_a2a.FakeA2A) -> None:
+    # json.loads raises RecursionError (not ValueError) on deeply nested input.
+    fake.card_raw = b"[" * 200_000
+    with pytest.raises(A2AError) as err:
+        _card(fake)
+    assert (err.value.status, err.value.message) == (422, "That address didn't answer with an Agent Card.")
+
+
 def test_card_url_must_be_http() -> None:
     with pytest.raises(A2AError) as err:
         asyncio.run(a2a.fetch_card("file:///etc/passwd", BEARER))
@@ -354,6 +362,12 @@ HOSTILE: list[tuple[str, bool, Callable[[str], tuple[int, dict[str, str], bytes]
      (502, "Fake Planner sent an answer Object can't read.")),
     ("not-json", False, lambda m: (200, _JSON, b"<html>"), (502, "Fake Planner sent an answer Object can't read.")),
     ("sse-bad-line", True, lambda m: (200, _SSE, _sse(b"data: {not json", _artifact({"text": "fine"}), _DONE)),
+     ["fine"]),
+    ("nested-json", False, lambda m: (200, _JSON, b"[" * 10_000),
+     (502, "Fake Planner sent an answer Object can't read.")),
+    ("nested-json-streaming", True, lambda m: (200, _JSON, b"[" * 10_000),
+     (502, "Fake Planner sent an answer Object can't read.")),
+    ("sse-nested-line", True, lambda m: (200, _SSE, _sse(b"data: " + b"[" * 10_000, _artifact({"text": "fine"}), _DONE)),
      ["fine"]),
     ("sse-kind-ignored", True, lambda m: (200, _SSE, _sse(_artifact({"kind": "text", "text": "typed"}), _DONE)),
      ["typed"]),
