@@ -578,6 +578,23 @@ describe('AiChatPanel', () => {
     expect(mocked.saveAiChat.mock.calls[0][0].messages[1].text).toBe('Let me look.Found it.')
   })
 
+  test("test a step still pending when 'done' arrives is marked stopped", async () => {
+    mocked.aiChat.mockImplementation(
+      answer(
+        { type: 'tool', id: 't1', name: 'search', input: { query: 'rack' } },
+        { type: 'text', text: 'Found it.' },
+        done('Found it.'),
+      ),
+    )
+    const { user } = setup()
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'Find rack{Enter}')
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalled())
+    const reply = screen.getByRole('list', { name: T.title }).querySelector('[data-role="assistant"]') as HTMLElement
+    expect(within(reply).getByRole('button', { name: "Searched notes for 'rack' (stopped)" })).toBeInTheDocument()
+    expect(within(reply).getByText('Found it.')).toBeInTheDocument()
+  })
+
   test('test Stop leaves a pending step marked stopped', async () => {
     mocked.aiChat.mockImplementation(async (_req, onEvent, sig) => {
       onEvent({ type: 'text', text: 'Looking' })
