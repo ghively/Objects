@@ -72,7 +72,9 @@ MAX_SECRET_CHARS = 16384
 PROBE_TIMEOUT_S = 20
 PROBE_STDERR_CHARS = 2000
 TOOL_DESCRIPTION_MAX = 300
-GATEWAY_PURPOSES: tuple[str, ...] = ("chat", "delegate", "schedule")
+GATEWAY_PURPOSES: tuple[str, ...] = (
+    "chat", "delegate", "schedule", "work", "work-read", "work-file", "work-sync",
+)
 """`RunScope.purpose` values that get gateway servers. M24 appends "work", "work-read",
 "work-file" and "work-sync"."""
 

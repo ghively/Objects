@@ -50,4 +50,9 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
   // M23
   workAlertFolder: null,
   workAlertIntervals: {},
+  // M24
+  workAgentId: null,
+  workAgentActs: false,
+  workAutoRun: true,
+  workReadTools: [],
 }) as DeviceSettings

@@ -68,6 +68,11 @@ reused). More markers and variables:
   holds the review prompts' first line (`REVIEW_LINE`), these calls run after the markers, as if
   they were ``FAKE:mcp`` markers. ``FAKE_CLAUDE_CURATOR_ACTIONS`` does the same for the
   consolidation prompt's first line (`CURATOR_LINE`).
+- ``FAKE_CLAUDE_WORK_ACTIONS`` (M24): JSON ``{"<entry kind>": [{"server", "tool", "args"}]}``. When the
+  prompt's first line is ``Work queue entry <id>: <kind>.`` (`WORK_LINE`), that kind's calls run after
+  the markers, as ``FAKE:mcp`` markers do (the same allow/deny matcher), with ``{path}``, ``{stepId}``,
+  ``{stepRev}`` and ``{capture}`` in string arguments filled from the prompt's ``Ref:`` line
+  (``Ref: path=<path> step=<stepId or -> rev=<rev or -> capture=<path or ->``; ``-`` fills as ``""``).
 - ``FAKE_CLAUDE_REVIEW_SLEEP`` (seconds): a review run (`REVIEW_LINE` in the prompt) waits that
   long before its answer. ``FAKE_CLAUDE_REVIEW_FAIL=1``: a review run writes to stderr and exits 1
   instead of answering.
@@ -120,6 +125,48 @@ REVIEW_LINE = "Look back over this chat."
 """The first line of the three review prompts (M18 `reviews`)."""
 CURATOR_LINE = "Tidy up your skills."
 """The first line of the consolidation prompt (M18 `curator`)."""
+
+WORK_LINE = re.compile(r"\AWork queue entry (\S+): (\w+)\.")
+"""The first line of every work queue entry prompt (M24 `workprompts.ENTRY_PROMPT_FIRST`)."""
+WORK_REF = re.compile(r"^Ref: path=(.*?) step=(\S+) rev=(\S+) capture=(.*)$", re.MULTILINE)
+
+
+def _work_actions(prompt: str) -> list[tuple[str, str, dict]]:
+    """The calls ``FAKE_CLAUDE_WORK_ACTIONS`` lists for this work queue entry's kind (M24)."""
+    raw = os.environ.get("FAKE_CLAUDE_WORK_ACTIONS")
+    first = WORK_LINE.match(prompt)
+    if not raw or first is None:
+        return []
+    try:
+        table = json.loads(raw)
+    except ValueError:
+        return []
+    actions = table.get(first.group(2)) if isinstance(table, dict) else None
+    ref = WORK_REF.search(prompt)
+    fill = {"path": "", "stepId": "", "stepRev": "", "capture": ""}
+    if ref:
+        values = [v.strip() for v in ref.groups()]
+        fill = dict(zip(("path", "stepId", "stepRev", "capture"), ("" if v == "-" else v for v in values)))
+
+    def filled(value):
+        if isinstance(value, str):
+            for key, text in fill.items():
+                value = value.replace("{" + key + "}", text)
+            return value
+        if isinstance(value, dict):
+            return {k: filled(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [filled(v) for v in value]
+        return value
+
+    out: list[tuple[str, str, dict]] = []
+    for a in actions if isinstance(actions, list) else []:
+        if isinstance(a, dict):
+            args = a.get("args")
+            out.append((str(a.get("server") or ""), str(a.get("tool") or ""),
+                        filled(args) if isinstance(args, dict) else {}))
+    return out
+
 
 BUILTIN_NAMES = ("Bash", "PowerShell", "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit",
                  "WebFetch", "WebSearch", "Task", "TodoWrite", "Skill")
@@ -304,6 +351,7 @@ def _mcp_wanted(prompt: str) -> list[tuple[str, str, dict]]:
                 args = a.get("args")
                 calls.append((str(a.get("server") or ""), str(a.get("tool") or ""),
                               args if isinstance(args, dict) else {}))
+    calls.extend(_work_actions(prompt))
     return calls
 
 

@@ -139,7 +139,8 @@ def test_seam_defaults(space: Space) -> None:
 
     seams = build_seams(space, m23_helpers.service(space))
     assert isinstance(seams, WorkSeams)
-    assert isinstance(seams.agent, NoAgent) and isinstance(seams.captures, NoCaptures)
+    # M24 fills `build_seams` with its own seams (NoAgent / NoCaptures stay as M23's defaults).
+    assert type(seams.agent).__name__ == "AgentSeam" and type(seams.captures).__name__ == "CaptureSeam"
 
     refused = SeamRefused(409, "x")
     assert (refused.status, refused.detail) == (409, "x")

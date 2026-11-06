@@ -494,6 +494,15 @@ export interface DeviceSettings {
   workAlertFolder: string | null
   /** Per-source staleness intervals, whole minutes 1-10080 (at most 50 sources). */
   workAlertIntervals: Record<string, number>
+  // ---- M24 (the work agent) ----
+  /** The work agent (an M17 agent id); `null` = none yet. */
+  workAgentId: string | null
+  /** "Agent acts on my approvals". */
+  workAgentActs: boolean
+  /** "Auto-run read-only steps". */
+  workAutoRun: boolean
+  /** MCP tools (`mcp__<server>__<tool>`) a read-only run may use (at most 500). */
+  workReadTools: string[]
 }
 
 /** M8 `DeviceSettings.language`. */
@@ -2724,5 +2733,23 @@ export interface CaptureSummary {
   question: string | null
   capturedAt: string
   linkedPath: string | null
+}
+// ---- M24: the work agent, captures and Desk sync ----
+export interface WorkAgentSettings {
+  agentId: string | null; agent: Agent | null; problem: string | null   // NOT_SET, M17's texts, REMOTE_REFUSED
+  acts: boolean; autoRun: boolean; readTools: string[]; settingsRevision: string
+}
+export type CaptureRoute = 'file' | 'breakDown' | 'question'
+export interface CaptureItem extends CaptureSummary {   // what M24's sink answers for every capture
+  objectId: string | null; version: string; title: string; fromView: string | null; linkedTitle: string | null
+  filedTo: { path: string; title: string } | null
+  route: CaptureRoute                              // parse_prefix of the text, at read
+}
+export interface ReadToolRow { id: string; name: string; description: string; marked: boolean; serverSaysReadOnly: boolean }
+export interface ReadToolServer { name: string; source: 'gateway' | 'folder'; listed: boolean; tools: ReadToolRow[] }
+export interface DeskSyncStatus {
+  ruleId: string | null; enabled: boolean; repeat: string | null; time: string | null
+  lastRun: { at: string; status: string; detail: string | null } | null
+  markedReadTools: number                          // marked tools listed right now
 }
 export interface GeneralFloor { items: FloorItemValue[]; revision: string }

@@ -94,6 +94,12 @@ DEFAULTS: dict[str, Any] = {
     # None: off), and per-source staleness intervals in minutes.
     "workAlertFolder": None,
     "workAlertIntervals": {},
+    # M24: the work agent (an M17 agent id or None), "Agent acts on my approvals",
+    # "Auto-run read-only steps" and the MCP tools a read-only run may use.
+    "workAgentId": None,
+    "workAgentActs": False,
+    "workAutoRun": True,
+    "workReadTools": [],
 }
 
 # A model name or alias for ``claude --model``: the one rule, in `aimodels` (M16).
@@ -145,7 +151,12 @@ WORK_ALERT_FOLDER_MAX = 500
 WORK_ALERT_INTERVALS_MAX = 50
 WORK_ALERT_INTERVAL_MIN = 1
 WORK_ALERT_INTERVAL_MAX = 10080
+WORK_READ_TOOLS_MAX = 500
+_READ_TOOL_ID = re.compile(r"mcp__[A-Za-z0-9_-]{1,64}__\S{1,128}")
+_AGENT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 _PROBLEM_MESSAGES = {
+    "workReadTools": "A read tool is mcp__<server>__<tool> (at most 500).",
+    "workAgentId": "The work agent is one of Object's agents.",
     "workAlertFolder": "Pick a folder (a full path).",
     "workAlertIntervals": "Intervals are whole minutes from 1 to 10080.",
 }
@@ -210,6 +221,14 @@ def _valid(key: str, value: Any) -> bool:
                 and WORK_ALERT_INTERVAL_MIN <= v <= WORK_ALERT_INTERVAL_MAX
                 for k, v in value.items()
             )
+        )
+    if key == "workAgentId":
+        return value is None or (isinstance(value, str) and _AGENT_ID.fullmatch(value) is not None)
+    if key == "workReadTools":
+        return (
+            isinstance(value, list)
+            and len(value) <= WORK_READ_TOOLS_MAX
+            and all(isinstance(v, str) and _READ_TOOL_ID.fullmatch(v) is not None for v in value)
         )
     if key == "startupSpacePath":
         return value is None or isinstance(value, str)
