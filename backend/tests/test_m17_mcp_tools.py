@@ -402,6 +402,18 @@ def test_import_from_a_space_folder_is_refused(env: Env) -> None:
     for path in (env.root, env.root / "Pages"):
         with pytest.raises(ApiError, match="422: Importing from a space folder isn't available to agents."):
             env.call("import_preview", path=str(path))
+    # The folders the run fence closes: other agents' folders, the agent trash, the state dir.
+    from objectapp.appstate import state_dir
+
+    state = state_dir()
+    other = state / "agents" / "Other"
+    (other / ".object-agent" / "memory").mkdir(parents=True)
+    (other / "CLAUDE.md").write_text("Other agent's soul.", encoding="utf-8")
+    trashed = state / "agents" / ".trash" / "Gone"
+    trashed.mkdir(parents=True)
+    for path in (other, other / ".object-agent" / "memory", trashed, state / "agents" / ".trash", state):
+        with pytest.raises(ApiError, match="422: Importing from an agent folder isn't available to agents."):
+            env.call("import_preview", path=str(path))
 
 
 def test_trash_and_versions(env: Env) -> None:
@@ -519,7 +531,33 @@ def _hidden_cases() -> dict[str, Callable[[Env], list[Any]]]:
         out.append(not_found(env, "run_automation", rule_id=rule["id"], path=SECRET))
         return out
 
+    def automation_lifting_exclusion(env: Env) -> list[Any]:
+        tag_id = "01JBQ4Z7S3N8V2K5D9X6T10099"
+        (env.root / "Tags").mkdir(exist_ok=True)
+        (env.root / "Tags" / "Exclude from AI.md").write_text(
+            f"---\nid: {tag_id}\ntype: 'Tag'\ntitle: Exclude from AI\n" + STAMP + "---\n", encoding="utf-8"
+        )
+        env.space.rescan_file("Tags/Exclude from AI.md")
+        trigger = {"kind": "propertyChanged", "scope": {"kind": "type", "id": "page"}, "propertyKey": "title"}
+        out = []
+        for action in (
+            {"kind": "removeTag", "tagId": tag_id},
+            {"kind": "setProperty", "key": "tags", "value": []},
+            {"kind": "clearProperty", "key": "tags"},
+            {"kind": "setProperty", "key": "excludeFromAI", "value": False},
+        ):
+            got = attempt(env, "create_automation", rule={"name": "Lift", "trigger": trigger, "actions": [action]})
+            assert got == "422: An automation made by an agent can't remove “Exclude from AI” or change tags.", got
+            out.append(got)
+        assert "Lift" not in json.dumps(env.call("automations"))
+        # The same rule with a harmless action is accepted, so the refusal is ours.
+        ok = env.call("create_automation", rule={"name": "Keep", "trigger": trigger,
+                                                 "actions": [{"kind": "addTag", "tagId": tag_id}]})
+        assert ok["id"]
+        return out
+
     return {
+        "automation": automation_lifting_exclusion,
         "trash": trash_listing,
         "unlinked_mentions": mentions,
         "delete_type": delete_type_affected,

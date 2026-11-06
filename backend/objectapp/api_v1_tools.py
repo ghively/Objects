@@ -12,7 +12,10 @@ own endpoints and read its ``jobs``.
 "Exclude from AI" keeps its promise here too: an excluded object or a template named by a path
 answers 404; result lists leave them out and add ``hiddenCount`` where a count matters (428
 answers count only visible objects); a trash entry of such an object is neither listed nor
-restorable; an import source inside or holding a registered space folder is refused (422).
+restorable; an import source inside or holding a registered space folder, or a folder the run
+fence closes (``<state>/agents``, every local agent folder, the agent trash), is refused (422); an
+automation whose actions remove the "Exclude from AI" tag or set or clear ``tags`` or
+``excludeFromAI`` is refused (422), so a rule can't lift the exclusion later.
 
 Routes (all JSON; ``read`` scope for the GETs and the import preview, ``read-write`` for the rest):
 
@@ -76,6 +79,8 @@ if TYPE_CHECKING:
 __all__ = ["SPACE_FOLDER_IMPORT", "router"]
 
 SPACE_FOLDER_IMPORT = "Importing from a space folder isn't available to agents."
+AGENT_FOLDER_IMPORT = "Importing from an agent folder isn't available to agents."  # our string
+EXCLUSION_RULE = "An automation made by an agent can't remove “Exclude from AI” or change tags."  # our string
 OBJECT_CONFLICT = "The object changed since that version. Read it again and retry."
 DEFINITION_CONFLICT = "The definition changed since that revision. Read it again and retry."  # our string
 MAX_BODY = 2_000_000
@@ -479,6 +484,19 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
                 continue
             if _within(source, folder) or _within(folder, source):
                 return error(422, SPACE_FOLDER_IMPORT)
+        from .agentrun import closed_agent_folders
+
+        try:
+            closed = closed_agent_folders(state_dir())
+        except (OSError, ValueError):
+            closed = []
+        for root in closed:  # the folders the run fence closes (spec section 3)
+            try:
+                folder = normalize(root)
+            except (ValueError, OSError):
+                continue
+            if _within(source, folder) or _within(folder, source):
+                return error(422, AGENT_FOLDER_IMPORT)
         return None
 
     @r.post("/v1/import/preview")
@@ -822,10 +840,35 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
 
     # automations
 
+    def lifts_exclusion(rule: dict[str, Any]) -> bool:
+        """Whether a rule's actions could take "Exclude from AI" off a page later: removing the
+        tag of that name, or setting or clearing ``tags`` or ``excludeFromAI``."""
+        from .apiquery import EXCLUDE_TAG
+
+        actions = rule.get("actions") if isinstance(rule, dict) else None
+        for a in actions if isinstance(actions, list) else []:
+            if not isinstance(a, dict):
+                continue
+            kind = a.get("kind")
+            if kind in ("setProperty", "clearProperty") and a.get("key") in ("tags", "excludeFromAI"):
+                return True
+            if kind == "removeTag":
+                tag_id = a.get("tagId")
+                with space._lock:
+                    titles = [
+                        x.title for x in space._summaries.values()
+                        if x.type == "tag" and x.id == tag_id
+                    ]
+                if any((t or "").strip().casefold() == EXCLUDE_TAG for t in titles):
+                    return True
+        return False
+
     @r.post("/v1/automations", status_code=201)
     @run
     def create_automation(req: RuleRequest, request: Request):
         token = auth(request, write=True)
+        if lifts_exclusion(req.rule):
+            return error(422, EXCLUSION_RULE)
         status, body = app(request, "POST", "/api/automations", {"rule": req.rule, "clientId": origin(token)})
         if status < 400:
             guard.log(token, "create-automation", body.get("id", ""))
