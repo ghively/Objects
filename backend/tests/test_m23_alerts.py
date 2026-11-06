@@ -456,3 +456,18 @@ def test_thread_starts_and_stops(space: Space, mon: Path) -> None:
         watch.stop()
         assert (datetime.now(UTC) - t0).total_seconds() < 1.5
     assert len(_by_key(space)) == 2
+
+
+def test_redaction_covers_compound_keys_json_and_whole_values() -> None:
+    c = alertwatch._clean
+    assert c("db_password=x") == "db_password=[redacted]"
+    assert c("access_token: abc") == "access_token: [redacted]"
+    assert c({"password": "abc def"}) == '{"password": [redacted]}'
+    assert c({"api_key": "k1"}) == '{"api_key": [redacted]}'
+    assert c("password: two words here") == "password: [redacted]"
+    assert c("login failed, password: two words here; retry") == (
+        "login failed, password: [redacted]; retry"
+    )
+    assert c("token: abc seen") == "token: [redacted] seen"
+    assert c("line one\nsecret=abc\nline three") == "line one\nsecret=[redacted]\nline three"
+    assert c("nothing to hide here") == "nothing to hide here"
