@@ -5,6 +5,7 @@ import type {
   AiChat,
   AiChatRequest,
   AiEvent,
+  AiModels,
   AiStatus,
   ApiTokenList,
   ApiTokenScope,
@@ -995,6 +996,11 @@ export const api = {
   /** M10: whether the Claude Code CLI is there and signed in. */
   aiStatus(): Promise<AiStatus> {
     return request<AiStatus>('/ai/status')
+  },
+
+  /** M16: the model choices (the back end's one list) and the model-name pattern. */
+  aiModels(): Promise<AiModels> {
+    return request<AiModels>('/ai/models')
   },
 
   /**

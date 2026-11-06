@@ -412,6 +412,19 @@ function defaults(): Api {
     search: async () => ({ results: [], partial: false }),
     reindex: async () => ({ started: true }),
     aiStatus: async () => ({ available: true, reason: 'ok' as const, claudePath: '/usr/bin/claude', version: '2.0.0', message: null }),
+    aiModels: async () => ({
+      models: [
+        { id: 'fable', label: 'Fable (latest)', kind: 'alias' as const },
+        { id: 'opus', label: 'Opus (latest)', kind: 'alias' as const },
+        { id: 'sonnet', label: 'Sonnet (latest)', kind: 'alias' as const },
+        { id: 'haiku', label: 'Haiku (latest)', kind: 'alias' as const },
+        { id: 'claude-fable-5-1', label: 'Fable 5.1', kind: 'id' as const },
+        { id: 'claude-opus-5-5', label: 'Opus 5.5', kind: 'id' as const },
+        { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5', kind: 'id' as const },
+        { id: 'claude-haiku-5-5', label: 'Haiku 5.5', kind: 'id' as const },
+      ],
+      pattern: '[A-Za-z0-9][A-Za-z0-9._:\\[\\]-]{0,79}',
+    }),
     aiChat: async (_req: unknown, onEvent: (e: import('@/api/types').AiEvent) => void) => {
       onEvent({ type: 'text', text: 'Hello' })
       onEvent({ type: 'done', text: 'Hello', sessionId: 's1', proposal: null, skipped: [] })

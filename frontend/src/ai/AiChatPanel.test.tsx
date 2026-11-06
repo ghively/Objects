@@ -135,7 +135,7 @@ describe('AiChatPanel', () => {
     let signal: AbortSignal | undefined
     mocked.aiChat.mockImplementation(async (_req, onEvent, sig) => {
       signal = sig
-      onEvent({ type: 'tool', name: 'search' })
+      onEvent({ type: 'tool', id: 't1', name: 'search', input: { query: 'rack' } })
       onEvent({ type: 'text', text: 'Partial' })
       await new Promise<void>((_resolve, reject) => sig?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))))
     })
