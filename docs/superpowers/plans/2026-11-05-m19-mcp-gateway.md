@@ -164,7 +164,8 @@ ENV_PASSTHROUGH = ("HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TM
 ENV_PREFIX = "OBJECT_MCP_"                               # env names of gateway secrets in a run
 MAX_SERVERS = 50; MAX_ROWS = 50; MAX_ARGS = 50; MAX_VALUE_CHARS = 4000; MAX_SECRET_CHARS = 16384
 PROBE_TIMEOUT_S = 20; PROBE_STDERR_CHARS = 2000; TOOL_DESCRIPTION_MAX = 300
-GATEWAY_PURPOSES = ("chat", "delegate", "schedule")      # RunScope.purpose values that get gateway servers
+GATEWAY_PURPOSES = ("chat", "delegate", "schedule")      # RunScope.purpose values that get gateway servers;
+                                                         # M24 appends "work", "work-read", "work-file", "work-sync"
 
 class EnvRow(BaseModel):        # stored; extra="allow"
     key: str; value: str | None = None; secret: bool = False
@@ -264,6 +265,8 @@ def gateway_tools_contributor(scope: RunScope, parts: RunParts) -> None
 class ProbeResult:                  # mcpprobe
     ok: bool; tools: tuple[tuple[str, str], ...]   # (name, description capped at TOOL_DESCRIPTION_MAX)
     error: str | None; elapsed_ms: int; at: str    # error already redacted
+    read_only: tuple[str, ...] = ()                # names of the listed tools whose annotations.readOnlyHint is true
+                                                   # (a hint only: M19 never acts on it; M24 shows it in Settings > Work)
 class ToolCache:                    # mcpgateway, thread-safe, memory only
     def get(self, key: str) -> ProbeResult | None
     def put(self, key: str, result: ProbeResult) -> None
@@ -475,7 +478,7 @@ The full list is in "Our calls" at the end.
 **Fake MCP server** (`backend/tests/fake_mcp_server.py`, built on the `mcp` server library as `mcp_server.py` is; synthetic only; documented in its docstring):
 
 - Tools:
-  - `echo(text)` answers `text`;
+  - `echo(text)` answers `text` (annotated `readOnlyHint: true`);
   - `add(a, b)` answers the sum;
   - `whoami()` answers the value of the env var named by `--require-env`, so a test can prove the secret arrived (tests compare it and never print it);
   - with `--many N`, `t0…t<N-1>`;
@@ -506,7 +509,7 @@ The full list is in "Our calls" at the end.
   - `test_model_constants`:
     - `NAME_PATTERN` matches `github` and `a_b-1` but not `my server`, `a/b`, `""` or 65 characters;
     - `RESERVED_NAMES == ("object", "object-agent")` equals `(toolcatalog.OBJECT_SERVER, toolcatalog.AGENT_SERVER)`;
-    - `GATEWAY_PURPOSES == ("chat", "delegate", "schedule")`;
+    - `GATEWAY_PURPOSES[:3] == ("chat", "delegate", "schedule")` (M24 appends after them, so the test doesn't assume they are last);
     - `PROBE_TIMEOUT_S == 20`.
   - `test_server_file_keeps_unknown_keys`: `McpServerFile.model_validate({... , "extra": [1]}).model_dump()` keeps `extra`.
   - `test_tool_group_server_field`: `toolcatalog.groups_out([ToolGroup("mcp:x", "x", (), server={"status": "ok"})], [])[0]["server"] == {"status": "ok"}`. A group without it gives `server: None`. M17's `test_m17_contract.py` still passes.
@@ -651,6 +654,7 @@ The full list is in "Our calls" at the end.
     - 401 without the bearer: the OAuth message; 404 (a wrong path) gives "The server answered 404.";
     - `--many 0` gives `ok` with no tools; `--many 500` gives 500 tools (pagination followed).
   - `test_descriptions_capped`: a 1,000-character description comes back as 300 characters.
+  - `test_read_only_hints`: the stdio fake gives `read_only == ("echo",)`; a server with no annotations gives `()`.
   - `test_errors_are_redacted`:
     - `--print-env-and-exit` with `FAKE_KEY=s3cret-redact-me`: the error holds its stderr tail, and `s3cret-redact-me` appears in neither the error nor `caplog`;
     - an HTTP server answering 401 with a body echoing the header gives no bearer value in the error.
