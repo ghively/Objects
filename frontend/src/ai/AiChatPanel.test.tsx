@@ -1,4 +1,4 @@
-// M10 (and M16): the AI chat side-panel entry.
+// M10 (and M16, M17): the AI chat side-panel entry.
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -10,17 +10,19 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api, ConflictError } from '@/api/client'
 import type { AiChatRequest, AiEvent } from '@/api/types'
+import { resetAgents, useAgents } from '@/agents/useAgents'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { isAiChatTarget } from '@/nav/sidepanel'
 import { activeTab, useTabs } from '@/nav/tabs'
 import { usePalette } from '@/palette/usePalette'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { resetSpaceInfo } from '@/settings/useSpaceInfo'
-import { objectDetail, objectSummary, references } from '@/test/mockApi'
+import { agent, agentTranscript, objectDetail, objectSummary, references } from '@/test/mockApi'
+import { AGENT_PICKER_TEXT } from './AgentPicker'
 import { AiChatHeader } from './AiChatHeader'
 import { AiChatPanel } from './AiChatPanel'
 import { assertInert } from './markdown'
-import { noticeKey } from './reveal'
+import { noticeKey, revealAiChat } from './reveal'
 import { AI_CHAT_TEXT as T } from './aiText'
 import { openAiChat, resetAiStore, useAi } from './store'
 
@@ -33,7 +35,8 @@ const aiEntry = () => (tab().sidepanel ?? []).find((e) => isAiChatTarget(e.targe
 function Harness() {
   const entry = useTabs((st) => (activeTab(st)?.sidepanel ?? []).find((e) => isAiChatTarget(e.target)))
   if (!entry || !isAiChatTarget(entry.target)) return null
-  return <AiChatPanel key={entry.id} entryId={entry.id} path={entry.target.path} />
+  const t = entry.target
+  return <AiChatPanel key={entry.id} entryId={entry.id} path={t.path} agentId={t.agentId} chatId={t.chatId} />
 }
 
 type OnEvent = (e: AiEvent) => void
@@ -54,20 +57,29 @@ const done = (text: string, extra: Partial<Extract<AiEvent, { type: 'done' }>> =
   ...extra,
 })
 
-function setup(opts: { path?: string } = {}) {
+function setup(opts: { path?: string; agentId?: string; chatId?: string } = {}) {
   s().open({ kind: 'object', path: 'Pages/A.md' })
-  s().openInSidepanel(opts.path ? { kind: 'aiChat', path: opts.path } : { kind: 'aiChat' })
+  s().openInSidepanel({
+    kind: 'aiChat',
+    ...(opts.path ? { path: opts.path } : {}),
+    ...(opts.agentId ? { agentId: opts.agentId } : {}),
+    ...(opts.chatId ? { chatId: opts.chatId } : {}),
+  })
   const user = userEvent.setup()
   const view = render(<Harness />)
   return { user, ...view }
 }
 
 const input = () => screen.getByRole('textbox', { name: T.inputLabel })
+const picker = () => screen.getByRole('button', { name: AGENT_PICKER_TEXT.label })
+
+const RESEARCHER = '01JRESEARCHER0000000000000'
+const CHAT_ID = '01JCHAT0000000000000000000'
 
 beforeEach(() => {
   vi.clearAllMocks()
   // Back to the mock's own answers (a test's mockResolvedValue would outlive it).
-  for (const fn of [mocked.aiStatus, mocked.aiChat, mocked.aiChatLoad, mocked.saveAiChat, mocked.object, mocked.saveBody, mocked.references, mocked.updateProperties])
+  for (const fn of [mocked.aiStatus, mocked.aiChat, mocked.aiChatLoad, mocked.saveAiChat, mocked.object, mocked.saveBody, mocked.references, mocked.updateProperties, mocked.agentChat, mocked.agents])
     fn.mockReset()
   localStorage.clear()
   localStorage.setItem(noticeKey(null), '1')
@@ -76,6 +88,8 @@ beforeEach(() => {
   resetAiStore()
   resetLinkIndex()
   resetSpaceInfo()
+  resetAgents()
+  useAgents.setState({ agents: [agent({ id: 'assistant' }), agent({ id: RESEARCHER, model: 'claude-opus-5-5' })], loaded: true })
   useSettings.setState({ settings: settingsDefaults, revision: 'r0', loaded: true })
   usePalette.setState({ open: false, mode: 'search' })
   useLinkIndex.setState({
@@ -711,6 +725,189 @@ describe('AiChatPanel', () => {
     expect(screen.getByText('Agent')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: T.modelForChat })).toHaveTextContent('Default')
     expect(screen.getByRole('button', { name: T.newChat })).toBeInTheDocument()
+  })
+
+  // ---- M17: chats belong to agents ----
+
+  test('test the header shows the agent picker in the leading slot', async () => {
+    const { user } = setup()
+    expect(picker()).toHaveTextContent('Assistant')
+    // The picker comes before the model picker and New chat in the header row.
+    const model = screen.getByRole('button', { name: T.modelForChat })
+    expect(picker().compareDocumentPosition(model) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await user.click(picker())
+    const items = await screen.findAllByRole('menuitemradio')
+    expect(items.map((i) => i.textContent)).toEqual(['Assistant', 'Researcher'])
+    expect(items[0]).toHaveAttribute('aria-checked', 'true')
+  })
+
+  test('test switching agent starts a new chat with that agent', async () => {
+    const { user } = setup()
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'One{Enter}')
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+    expect(screen.getByText('Hello')).toBeInTheDocument()
+    await user.click(picker())
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Researcher' }))
+    expect(picker()).toHaveTextContent('Researcher')
+    expect(screen.queryByText('Hello')).toBeNull()
+    expect(aiEntry()?.target).toEqual({ kind: 'aiChat', agentId: RESEARCHER })
+    await user.type(input(), 'Two{Enter}')
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(2))
+    expect(mocked.aiChat.mock.calls[1][0]).toMatchObject({ agentId: RESEARCHER, chatId: null, sessionId: null, history: [] })
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(2))
+    // A new AI Chat object, not the first chat's.
+    expect(mocked.saveAiChat.mock.calls[1][0]).toMatchObject({ path: null, agentId: RESEARCHER })
+  })
+
+  test('test turns send agentId and the chatId from the chat event', async () => {
+    mocked.aiChat.mockImplementation(answer({ type: 'chat', chatId: CHAT_ID, agentId: 'assistant' }, { type: 'text', text: 'Hi' }, done('Hi')))
+    const { user } = setup()
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'One{Enter}')
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+    expect(mocked.aiChat.mock.calls[0][0]).toMatchObject({ agentId: 'assistant', chatId: null })
+    expect(mocked.saveAiChat.mock.calls[0][0]).toMatchObject({ agentId: 'assistant', chatId: CHAT_ID })
+    await user.type(input(), 'Two{Enter}')
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(2))
+    expect(mocked.aiChat.mock.calls[1][0]).toMatchObject({ agentId: 'assistant', chatId: CHAT_ID })
+    // New chat forgets the transcript.
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(2))
+    await user.click(screen.getByRole('button', { name: T.newChat }))
+    await user.type(input(), 'Three{Enter}')
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(3))
+    expect(mocked.aiChat.mock.calls[2][0]).toMatchObject({ agentId: 'assistant', chatId: null })
+  })
+
+  test('test Ctrl+Alt+J seed opens the default agent', async () => {
+    // "Open AI chat" (Ctrl+Alt+J) opens the entry with no agent: the default agent's chat.
+    s().open({ kind: 'object', path: 'Pages/A.md' })
+    act(() => revealAiChat())
+    const user = userEvent.setup()
+    render(<Harness />)
+    expect(picker()).toHaveTextContent('Assistant')
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'Hi{Enter}')
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(1))
+    expect(mocked.aiChat.mock.calls[0][0]).toMatchObject({ agentId: 'assistant' })
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+
+    // A seed without agentId moves even a Researcher chat to the default agent.
+    await user.click(picker())
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Researcher' }))
+    expect(picker()).toHaveTextContent('Researcher')
+    act(() => openAiChat({ mode: 'chat', prompt: 'From a seed' }))
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(2))
+    expect(mocked.aiChat.mock.calls[1][0]).toMatchObject({ agentId: 'assistant', prompt: 'From a seed', chatId: null })
+    expect(picker()).toHaveTextContent('Assistant')
+    expect(aiEntry()?.target).not.toHaveProperty('agentId')
+  })
+
+  test("test an editor entry's proposal still waits for Accept", async () => {
+    mocked.object.mockResolvedValue(objectDetail({ summary: objectSummary({ path: 'Pages/A.md', tags: [] }), version: 'v2' }))
+    mocked.aiChat.mockImplementation(answer(done('Try these.', { proposal: { kind: 'tags', tags: ['runbook'] } })))
+    const onReplace = vi.fn()
+    const { user } = setup({ agentId: RESEARCHER })
+    act(() => openAiChat({ mode: 'tagBlock', block: 'Some text', blockPath: 'Pages/A.md', onReplace }))
+    const box = await screen.findByRole('region', { name: T.proposedTags })
+    expect(mocked.aiChat.mock.calls[0][0]).toMatchObject({ mode: 'tagBlock', agentId: 'assistant' })
+    // Nothing is written before Accept.
+    expect(mocked.updateProperties).not.toHaveBeenCalled()
+    await user.click(within(box).getByRole('button', { name: T.accept }))
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Pages/A.md', { tags: ['runbook'] }, 'v2'))
+  })
+
+  test('test a transcript target shows its messages and tool steps', async () => {
+    mocked.agentChat.mockResolvedValue(
+      agentTranscript({
+        id: CHAT_ID,
+        agentId: RESEARCHER,
+        sessionId: 'sess-r',
+        items: [
+          { type: 'user', text: 'Find rack', at: '2026-11-05T09:00:00.000Z', contextPaths: ['Pages/B.md'] },
+          { type: 'tool', id: 't1', name: 'search', input: { query: 'rack' }, result: '[]', isError: false, at: '2026-11-05T09:00:01.000Z' },
+          { type: 'assistant', text: 'Nothing found.', at: '2026-11-05T09:00:02.000Z', model: 'sonnet', sessionId: 'sess-r' },
+          { type: 'user', text: 'Try again', at: '2026-11-05T09:01:00.000Z', contextPaths: ['Pages/B.md'] },
+          { type: 'error', message: 'Claude Code stopped.', at: '2026-11-05T09:01:01.000Z' },
+        ],
+      }),
+    )
+    const { user } = setup({ agentId: RESEARCHER, chatId: CHAT_ID })
+    const list = screen.getByRole('list', { name: T.title })
+    expect(await within(list).findByText('Nothing found.')).toBeInTheDocument()
+    expect(mocked.agentChat).toHaveBeenCalledWith(RESEARCHER, CHAT_ID)
+    expect(within(list).getByText('Find rack')).toBeInTheDocument()
+    expect(within(list).getByText('Try again')).toBeInTheDocument()
+    const reply = list.querySelector('[data-role="assistant"]') as HTMLElement
+    const step = within(reply).getByRole('button', { name: "Searched notes for 'rack'" })
+    expect(step.compareDocumentPosition(within(reply).getByText('Nothing found.')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(screen.getByRole('list', { name: T.context })).getByText('Beta')).toBeInTheDocument()
+    expect(picker()).toHaveTextContent('Researcher')
+
+    // The next turn continues that transcript and session with its agent.
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'More{Enter}')
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(1))
+    expect(mocked.aiChat.mock.calls[0][0]).toMatchObject({ agentId: RESEARCHER, chatId: CHAT_ID, sessionId: 'sess-r' })
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+    expect(mocked.saveAiChat.mock.calls[0][0]).toMatchObject({ agentId: RESEARCHER, chatId: CHAT_ID })
+    // Loaded once: the panel's own target changes don't load it again.
+    expect(mocked.agentChat).toHaveBeenCalledTimes(1)
+  })
+
+  test('test a transcript saved as an AI Chat object saves to that object', async () => {
+    mocked.agentChat.mockResolvedValue(agentTranscript({ id: CHAT_ID, agentId: RESEARCHER, objectPath: 'AI Chats/Rack.md' }))
+    mocked.aiChatLoad.mockResolvedValue({
+      path: 'AI Chats/Rack.md',
+      version: 'v9',
+      title: 'Rack',
+      contextPaths: [],
+      sessionId: 's1',
+      messages: [],
+      agent: 'Researcher',
+      agentId: RESEARCHER,
+      chatId: CHAT_ID,
+    })
+    const { user } = setup({ agentId: RESEARCHER, chatId: CHAT_ID })
+    await waitFor(() => expect(mocked.aiChatLoad).toHaveBeenCalledWith('AI Chats/Rack.md'))
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'More{Enter}')
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+    expect(mocked.saveAiChat.mock.calls[0][0]).toMatchObject({ path: 'AI Chats/Rack.md', baseVersion: 'v9', chatId: CHAT_ID })
+  })
+
+  test('test a saved M10 chat continues with the default agent', async () => {
+    mocked.aiChatLoad.mockResolvedValue({
+      path: 'AI Chats/Old.md',
+      version: 'v3',
+      title: 'Old',
+      contextPaths: [],
+      sessionId: 'sess-old',
+      agent: null,
+      agentId: 'assistant',
+      chatId: null,
+      messages: [
+        { role: 'user', text: 'Earlier question', at: '2026-11-05T10:00:00Z' },
+        { role: 'assistant', text: 'Earlier answer', at: '2026-11-05T10:00:01Z' },
+      ],
+    })
+    const { user } = setup({ path: 'AI Chats/Old.md' })
+    expect(await screen.findByText('Earlier answer')).toBeInTheDocument()
+    expect(picker()).toHaveTextContent('Assistant')
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'Next{Enter}')
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalled())
+    expect(mocked.aiChat.mock.calls[0][0]).toMatchObject({ agentId: 'assistant', chatId: null, sessionId: 'sess-old' })
+    expect(mocked.saveAiChat.mock.calls[0][0]).toMatchObject({ path: 'AI Chats/Old.md', baseVersion: 'v3', agentId: 'assistant' })
+  })
+
+  test("test the model default label is the agent's model", async () => {
+    const { user } = setup({ agentId: RESEARCHER })
+    const trigger = screen.getByRole('button', { name: T.modelForChat })
+    // No pick: the trigger still says Default.
+    expect(trigger).toHaveTextContent(/^Default$/)
+    await user.click(trigger)
+    expect(await screen.findByRole('option', { name: 'Default (Opus 5.5)' })).toHaveAttribute('aria-selected', 'true')
   })
 
   test('test hidden: nothing shows and the entry closes', async () => {
