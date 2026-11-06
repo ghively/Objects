@@ -11,7 +11,7 @@ import { MODEL_TEXT as T, isModelName, modelLabel, useAiModels } from './models'
 export interface ModelPickerProps {
   value: string | null
   onChange(next: string | null): void
-  /** The "Default" row's text, e.g. "Default" or "Default (Sonnet 5.5)". */
+  /** The "Default" row's text, e.g. "Default" or "Default (Sonnet 5.5)". The trigger says "Default" with no pick. */
   defaultLabel: string
   ariaLabel: string
   /** Header use: a small borderless trigger. */
@@ -145,7 +145,7 @@ export function ModelPicker({ value, onChange, defaultLabel, ariaLabel, compact,
               : 'h-8 w-full max-w-[420px] rounded-md border border-line bg-transparent px-2 text-[14px] text-fg hover:border-fg-muted',
           )}
         >
-          <span className="min-w-0 flex-1 truncate">{modelLabel(value, models, defaultLabel)}</span>
+          <span className="min-w-0 flex-1 truncate">{value === null ? T.default : modelLabel(value, models, defaultLabel)}</span>
           <Icon name="ph-caret-down" size={compact ? 12 : 14} />
         </button>
       </PopoverTrigger>

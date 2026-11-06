@@ -645,9 +645,10 @@ describe('AiChatPanel', () => {
     useSettings.setState({ settings: { ...settingsDefaults, aiModel: 'claude-sonnet-5-5' } })
     const { user } = setup()
     const trigger = screen.getByRole('button', { name: T.modelForChat })
-    await waitFor(() => expect(trigger).toHaveTextContent('Default (Sonnet 5.5)'))
     await user.click(trigger)
     expect(await screen.findByRole('option', { name: 'Default (Sonnet 5.5)' })).toHaveAttribute('aria-selected', 'true')
+    // The trigger says Default; only the Default row names the Settings model.
+    expect(trigger).toHaveTextContent(/^Default$/)
   })
 
   test('test the header renders the leading slot', () => {
