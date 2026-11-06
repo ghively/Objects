@@ -9,6 +9,7 @@ import type {
   PropertyDef,
   PropertyType,
   TypeDef,
+  WorkWriteResult,
 } from '@/api/types'
 import { Icon, IconOrEmoji, isIconifyId } from '@/components/Icon'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -208,6 +209,15 @@ export function cellValue(
       return asList(raw)
         .map(linkTarget)
         .filter((t): t is string => !!t)
+    case 'textList':
+      // M22: a list of one-line texts (a scalar reads as a one-item list).
+      return asList(raw)
+        .map(scalarText)
+        .filter((t): t is string => !!t)
+    case 'steps':
+    case 'floorItems':
+      // M22: the decoded list (ObjectView puts the server's decoding, with ids and revs, here).
+      return Array.isArray(raw) ? raw : null
     default:
       if (typeof raw === 'number' || typeof raw === 'boolean') return String(raw)
       return scalarText(raw)
@@ -233,6 +243,8 @@ export interface PropertyPanelProps {
   onChangeMany?(updates: Record<string, unknown>, remove?: string[]): void
   /** M8: a date property's reminder (`PUT /api/tasks/reminder`). */
   onSetReminder?(key: string, remind: string | null): void
+  /** M22: run a work write (steps, floor items) through the object's write queue (`writes.work`). */
+  onWorkWrite?(run: (path: string, baseVersion: string) => Promise<WorkWriteResult>): Promise<WorkWriteResult | null>
   /** Save the type (a label option set changed); awaited before the cell's value is applied. */
   onTypeChange?(next: TypeDef): Promise<unknown> | void
   onOpenTag?(name: string): void
@@ -301,6 +313,7 @@ interface RowHandlers {
   onChange(key: string, value: unknown): void
   onChangeMany?(updates: Record<string, unknown>, remove?: string[]): void
   onSetReminder?(key: string, remind: string | null): void
+  onWorkWrite?(run: (path: string, baseVersion: string) => Promise<WorkWriteResult>): Promise<WorkWriteResult | null>
   onDefChange(next: PropertyDef): Promise<unknown>
   onTypeChange(next: TypeDef): Promise<unknown> | void
   onOpenTag?(name: string): void
@@ -372,6 +385,7 @@ const PropertyRow = memo(
             frontmatter={frontmatter}
             onChangeMany={readOnly ? undefined : h.onChangeMany}
             onSetReminder={readOnly ? undefined : h.onSetReminder}
+            onWorkWrite={readOnly ? undefined : h.onWorkWrite}
             onDefChange={h.onDefChange}
             onOpenTag={h.onOpenTag}
             onOpenObject={h.onOpenObject}
@@ -409,6 +423,7 @@ export function PropertyPanel({
   onChange,
   onChangeMany,
   onSetReminder,
+  onWorkWrite,
   onTypeChange,
   onOpenTag,
   onOpenObject,
@@ -438,14 +453,22 @@ export function PropertyPanel({
 
   // The handlers rows get are stable (they read the newest props through `latest`), so a value
   // change re-renders only its own row, whatever handlers the parent passes per render.
-  const latest = useRef({ type, onChange, onChangeMany, onSetReminder, onTypeChange, onOpenTag, onOpenObject, onChangeType, typeEditor })
-  latest.current = { type, onChange, onChangeMany, onSetReminder, onTypeChange, onOpenTag, onOpenObject, onChangeType, typeEditor }
-  const has = { onChangeMany: !!onChangeMany, onSetReminder: !!onSetReminder, onOpenTag: !!onOpenTag, onOpenObject: !!onOpenObject, onChangeType: !!onChangeType }
+  const latest = useRef({ type, onChange, onChangeMany, onSetReminder, onWorkWrite, onTypeChange, onOpenTag, onOpenObject, onChangeType, typeEditor })
+  latest.current = { type, onChange, onChangeMany, onSetReminder, onWorkWrite, onTypeChange, onOpenTag, onOpenObject, onChangeType, typeEditor }
+  const has = {
+    onChangeMany: !!onChangeMany,
+    onSetReminder: !!onSetReminder,
+    onWorkWrite: !!onWorkWrite,
+    onOpenTag: !!onOpenTag,
+    onOpenObject: !!onOpenObject,
+    onChangeType: !!onChangeType,
+  }
   const handlers = useMemo<RowHandlers>(
     () => ({
       onChange: (key, next) => latest.current.onChange?.(key, next),
       onChangeMany: has.onChangeMany ? (u, r) => latest.current.onChangeMany?.(u, r) : undefined,
       onSetReminder: has.onSetReminder ? (key, remind) => latest.current.onSetReminder?.(key, remind) : undefined,
+      onWorkWrite: has.onWorkWrite ? async (run) => (await latest.current.onWorkWrite?.(run)) ?? null : undefined,
       // Resolves the save's result (null when it failed), so a new label is applied only once saved.
       onDefChange: async (next) => {
         const { type: t, onTypeChange: save } = latest.current
@@ -469,7 +492,7 @@ export function PropertyPanel({
       },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only whether each handler is given matters
-    [has.onChangeMany, has.onSetReminder, has.onOpenTag, has.onOpenObject, has.onChangeType],
+    [has.onChangeMany, has.onSetReminder, has.onWorkWrite, has.onOpenTag, has.onOpenObject, has.onChangeType],
   )
 
   // Without a type definition (M1 inference) the row is a plain read-only value.
