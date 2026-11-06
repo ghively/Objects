@@ -28,6 +28,9 @@ before its folder exists makes the folder first (`AgentRegistry.ensure_default`)
 answer its empty state and write nothing. While "Hide AI features" is on, ``learn`` and
 ``curator/tidy`` answer 403 (they start the CLI); the other routes stay available.
 
+M20: on a remote agent every route answers 422 "This is a remote agent; it has no memory or skills
+in Object.", except ``chats/search`` (its transcripts) and ``chats/{chatId}/reviews`` (none).
+
 `server.create_app` mounts this router **before** `api_agents` so ``GET /agents/{id}/chats/search``
 isn't taken for a chat id. No route here reads a space file.
 """
@@ -42,8 +45,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from . import agentmemory, agentskills, ai, chatsearch, learnundo, ledger, toolcatalog, transcripts
-from .agentmodel import AgentError, AgentInput, AgentNotFound, AgentReadOnly
-from .agents import AgentRecord, AgentRegistry
+from .agentmodel import AgentError, AgentInput, AgentInvalid, AgentNotFound, AgentReadOnly
+from .agents import REMOTE_HAS_NO, AgentRecord, AgentRegistry
 from .api_agents import _fail
 from .api_agents import _settings as _device_settings
 from .apictx import ApiContext
@@ -65,6 +68,7 @@ TIDY_BUSY = "Tidying up is already running."
 LEARNING_TOOLS = ("memory", "skill_manage")
 LEDGER_LIMIT_MAX = 500  # our number
 SEARCH_LIMIT_MAX = 25  # as session_search
+REMOTE_NO_LEARNING = REMOTE_HAS_NO.format(what="memory or skills")  # M20 (our string)
 
 
 class ClientRequest(BaseModel):
@@ -135,8 +139,15 @@ def router(ctx: ApiContext, *, reviews: ReviewRunner | None = None, curator: Cur
     def registry() -> AgentRegistry:
         return AgentRegistry()  # the state dir is read per request (tests point it elsewhere)
 
-    def agent_of(agent_id: str) -> AgentRecord:
+    def any_agent(agent_id: str) -> AgentRecord:
         return registry().get(agent_id)
+
+    def agent_of(agent_id: str) -> AgentRecord:
+        """A local agent; a remote one has no memory or skills in Object (M20: 422)."""
+        agent = any_agent(agent_id)
+        if agent.kind == "remote":
+            raise AgentInvalid(REMOTE_NO_LEARNING)
+        return agent
 
     def writable(agent: AgentRecord) -> AgentRecord:
         """The agent ready for a write: 404 for a missing folder, 423 for an unreadable
@@ -361,7 +372,7 @@ def router(ctx: ApiContext, *, reviews: ReviewRunner | None = None, curator: Cur
     def save_learning(agent_id: str, req: LearningRequest):
         reg = registry()
         try:
-            agent = reg.get(agent_id)
+            agent = agent_of(agent_id)
             try:
                 cleaned = clean_learning(req.learning)
             except LearningInvalid as exc:
@@ -416,7 +427,7 @@ def router(ctx: ApiContext, *, reviews: ReviewRunner | None = None, curator: Cur
     @r.get("/agents/{agent_id}/chats/search")
     def search_chats(agent_id: str, q: str = "", limit: int = 10):
         try:
-            agent = agent_of(agent_id)
+            agent = any_agent(agent_id)
         except AgentError as exc:
             return _fail(exc)
         if not _readable(agent):
@@ -454,12 +465,12 @@ def router(ctx: ApiContext, *, reviews: ReviewRunner | None = None, curator: Cur
     @r.get("/agents/{agent_id}/chats/{chat_id}/reviews")
     def chat_reviews(agent_id: str, chat_id: str):
         try:
-            agent = agent_of(agent_id)
+            agent = any_agent(agent_id)
         except AgentError as exc:
             return _fail(exc)
         if not chat_exists(agent, chat_id):
             return _error(404, NO_CHAT)
-        found = reviews.statuses(agent, chat_id) if reviews is not None else []
+        found = reviews.statuses(agent, chat_id) if reviews is not None and agent.kind != "remote" else []
         return {"reviews": [s.to_api() for s in found]}
 
     return r

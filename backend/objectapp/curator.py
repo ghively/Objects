@@ -338,7 +338,8 @@ class Curator:
     # -- the tick ---------------------------------------------------------------------------------
 
     async def tick(self) -> list[str]:
-        """The agent ids it ran for. For each due local agent with a folder: the deterministic
+        """The agent ids it ran for (M20: remote agents are skipped). For each due local agent
+        with a folder: the deterministic
         pass, then the consolidation run when ``learning["consolidate"]`` and a base URL is known;
         then usage.json ``curator.lastRunAt`` = now. Nothing while "Hide AI features" is on, or
         while another tick runs."""
@@ -368,6 +369,8 @@ class Curator:
         idle = self.idle.idle_for()
         ran: list[str] = []
         for agent in agents:
+            if agent.kind == "remote":
+                continue  # M20: a remote agent has no memory or skills in Object
             if not agent.exists or agent.missing or agent.read_only_reason:
                 continue  # the default agent before its folder exists; a missing or read-only one
             usage, ok = await asyncio.to_thread(_usage, agent.folder)
