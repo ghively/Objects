@@ -88,7 +88,7 @@ describe('ProfileTab', () => {
     expect(screen.queryByRole('button', { name: PROFILE_TEXT.removeFromList })).toBeNull()
   })
 
-  test('test Remove from list unregisters and folder servers missing secrets say so', async () => {
+  test('test Remove unregisters and folder servers missing secrets say so', async () => {
     seed(
       agent({
         id: RESEARCHER,
