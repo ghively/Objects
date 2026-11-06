@@ -213,9 +213,20 @@ def work_note_text(event: WorkEvent) -> str | None:
 # -- appending ------------------------------------------------------------------------------------
 
 
+# A later line of an entry that would open a block of its own (a code fence or a heading: the two
+# spaces of indent are within CommonMark's three) gets a backslash, so it stays text in the list
+# item and an unbalanced fence can't swallow the sections after it.
+_OPENS_BLOCK = re.compile(r"^(\s*)(`{3,}|~{3,}|#{1,6}(?:\s|$))")
+_ESCAPED_BLOCK = re.compile(r"^\\(`{3,}|~{3,}|#{1,6}(?:\s|$))")
+
+
+def _continuation(part: str) -> str:
+    return "  " + _OPENS_BLOCK.sub(lambda m: m.group(1) + "\\" + m.group(2), part, count=1)
+
+
 def _entry(line: str) -> list[str]:
     parts = line.replace("\r\n", "\n").split("\n")
-    return ["- " + parts[0] + "\n"] + ["  " + p + "\n" for p in parts[1:]]
+    return ["- " + parts[0] + "\n"] + [_continuation(p) + "\n" for p in parts[1:]]
 
 
 def append_line(body: str, heading: str, line: str) -> str:
@@ -224,7 +235,8 @@ def append_line(body: str, heading: str, line: str) -> str:
 
     A missing section is created as ``## <heading>``, a blank line and the line: before the
     ``Wrap-up`` heading when there is one (one blank line after it), else at the end of the body
-    after one blank line. Later lines of a multi-line ``line`` are indented two spaces.
+    after one blank line. Later lines of a multi-line ``line`` are indented two spaces (one that
+    would open a code fence or a heading gets a backslash in front).
     """
     lines = body.splitlines(keepends=True)
     entry = _entry(line)
@@ -304,7 +316,7 @@ def work_note_lines(body: str) -> list[WorkNoteLine]:
             current = [m.group(1).rstrip()]
             entries.append(current)
         elif current is not None and ln.startswith("  ") and ln.strip():
-            current.append(ln.strip())
+            current.append(_ESCAPED_BLOCK.sub(r"\1", ln.strip(), count=1))
         else:
             current = None
     for parts in entries:

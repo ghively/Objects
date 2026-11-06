@@ -116,6 +116,28 @@ def test_multiline_entry_indents_later_lines():
     assert WRAP_UP == "Wrap-up"
 
 
+def test_note_lines_cant_open_a_fence_or_a_heading():
+    body = "## Work notes\n\n- [2026-11-04] Gene: start\n\n## Wrap-up\n\nResult:: x\n"
+    note = "[2026-11-05] Work: note: run this\n```\nnet stop spooler\n## Wrap-up\n  ~~~ tilde\n#tag stays"
+    out = append_line(body, WORK_NOTES, note)
+    assert out == (
+        "## Work notes\n\n- [2026-11-04] Gene: start\n"
+        "- [2026-11-05] Work: note: run this\n  \\```\n  net stop spooler\n  \\## Wrap-up\n"
+        "    \\~~~ tilde\n  #tag stays\n\n## Wrap-up\n\nResult:: x\n"
+    )
+    # The sections after it are still found: the next lines land in their own sections, once.
+    out = append_line(out, ACTIVITY, "2026-11-05 10:00 Gene answered step 1")
+    out = append_line(out, WORK_NOTES, "[2026-11-05] Gene: later")
+    lines = out.splitlines()
+    assert lines.count("## Wrap-up") == 1 and lines.count("## Activity") == 1
+    assert out.index("## Activity") < out.index("## Wrap-up\n\nResult")
+    assert out.index("- [2026-11-05] Gene: later") < out.index("## Activity")
+    # ... and the note reads back as written.
+    notes = work_note_lines(out)
+    assert notes[1]["text"] == "note: run this\n```\nnet stop spooler\n## Wrap-up\n~~~ tilde\n#tag stays"
+    assert notes[2]["text"] == "later"
+
+
 # -- texts ----------------------------------------------------------------------------------------
 
 
