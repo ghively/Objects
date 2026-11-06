@@ -187,7 +187,7 @@ def test_chat_turn_streams_session_text_done(api, fake) -> None:
 def test_tool_use_and_text_are_not_repeated(api) -> None:
     _space, client, _ = api
     events = _chat(client, "FAKE:tool find alpha")
-    assert {"type": "tool", "name": "search"} in events
+    assert {"type": "tool", "id": "toolu_1", "name": "search", "input": {"query": "alpha"}} in events
     text = "".join(e["text"] for e in events if e["type"] == "text")
     assert text == "Let me look.\n\nHello from the fake claude."
     assert _done(events)["text"] == "Hello from the fake claude."

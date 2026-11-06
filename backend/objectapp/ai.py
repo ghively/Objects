@@ -22,7 +22,10 @@ Pieces:
 - `visible_path` / `valid_session`: the checks the route makes on a block's page and on a
   session id before a turn starts.
 - `parse_proposal`: the mode's proposal from the last fenced block of the answer.
-- `StreamParser`: Claude Code's stream-json lines -> `AiEvent` dicts.
+- `StreamParser`: Claude Code's stream-json lines -> `AiEvent` dicts. A tool call gives two
+  ``tool`` events with the same id (M16): one at the call (its input, see `short_input`),
+  one when its result arrives (`short_result`, capped at `TOOL_RESULT_CAP`). Tool results
+  never go into the answer's text.
 - `run_turn`: the subprocess, as an async generator of `AiEvent` dicts. The blocking I/O
   runs in threads; a timeout (`TURN_TIMEOUT`) or closing the generator (the client went
   away) kills the whole process tree.
@@ -52,9 +55,12 @@ __all__ = [
     "ALLOWED_TOOLS",
     "CLI_FLAGS",
     "DISALLOWED_TOOLS",
+    "ELLIPSIS",
     "MAX_CONTEXT_CHARS",
     "MODES",
     "READ_TOOLS",
+    "TOOL_INPUT_STRING_CAP",
+    "TOOL_RESULT_CAP",
     "TURN_TIMEOUT",
     "ContextPack",
     "StreamParser",
@@ -66,6 +72,8 @@ __all__ = [
     "mcp_config",
     "parse_proposal",
     "run_turn",
+    "short_input",
+    "short_result",
     "status",
     "valid_session",
     "visible_path",
@@ -591,9 +599,61 @@ def parse_proposal(mode: str, text: str, allowed_keys: set[str] | None = None) -
 # -- the stream -----------------------------------------------------------------------
 
 
+TOOL_INPUT_STRING_CAP = 1_000
+"""Characters kept of each string value in a tool's input, at any depth (our number)."""
+TOOL_RESULT_CAP = 4_000
+"""Characters kept of a tool's result text (our number)."""
+ELLIPSIS = "…"
+
+
 def _short_tool(name: str) -> str:
     prefix = f"mcp__{MCP_SERVER}__"
     return name.removeprefix(prefix)
+
+
+def _cap(text: str, cap: int) -> str:
+    return text[:cap] + ELLIPSIS if len(text) > cap else text
+
+
+def _cap_strings(value: Any) -> Any:
+    if isinstance(value, str):
+        return _cap(value, TOOL_INPUT_STRING_CAP)
+    if isinstance(value, dict):
+        return {k: _cap_strings(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_cap_strings(v) for v in value]
+    return value
+
+
+def short_input(value: Any) -> dict[str, Any] | None:
+    """The call's input for the chat: a dict (None if it isn't one) whose string values,
+    at any depth, are cut to TOOL_INPUT_STRING_CAP characters + ELLIPSIS."""
+    if not isinstance(value, dict):
+        return None
+    return {str(k): _cap_strings(v) for k, v in value.items()}
+
+
+def short_result(content: Any) -> str:
+    """A tool_result's content as text: a string as is; a list of blocks joined with "\\n"
+    (text blocks' text, any other block as "[image]" or "[<type>]", our strings); cut to
+    TOOL_RESULT_CAP + ELLIPSIS."""
+    if isinstance(content, str):
+        text = content
+    elif isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str):
+                parts.append(block["text"])
+            elif isinstance(block, dict):
+                parts.append(f"[{block.get('type') or 'block'}]")
+            elif isinstance(block, str):
+                parts.append(block)
+        text = "\n".join(parts)
+    elif content is None:
+        text = ""
+    else:
+        text = str(content)
+    return _cap(text, TOOL_RESULT_CAP)
 
 
 class StreamParser:
@@ -614,7 +674,9 @@ class StreamParser:
         self._streamed: dict[str, str] = {}
         self._msg: str | None = None
         self._block_open = False
-        self._tools: set[str] = set()
+        self._tools: dict[str, str] = {}
+        """Announced tool calls: tool_use id -> short name."""
+        self._answered: set[str] = set()
         self._texts: set[tuple[str, str]] = set()
 
     def _emit_text(self, text: str, new_block: bool) -> list[dict[str, Any]]:
@@ -639,6 +701,8 @@ class StreamParser:
             return self._stream_event(obj.get("event") or {})
         if kind == "assistant":
             return self._assistant(obj.get("message") or {})
+        if kind == "user":
+            return self._user(obj.get("message") or {})
         if kind == "result":
             self.finished = True
             sid = obj.get("session_id")
@@ -694,8 +758,25 @@ class StreamParser:
                 tid = str(block.get("id") or len(self._tools))
                 if tid in self._tools:
                     continue
-                self._tools.add(tid)
-                out.append({"type": "tool", "name": _short_tool(str(block.get("name") or ""))})
+                name = _short_tool(str(block.get("name") or ""))
+                self._tools[tid] = name
+                out.append({"type": "tool", "id": tid, "name": name, "input": short_input(block.get("input"))})
+        return out
+
+    def _user(self, msg: Any) -> list[dict[str, Any]]:
+        """A ``user`` message's ``tool_result`` blocks -> result events, by announced id."""
+        if not isinstance(msg, dict) or not isinstance(msg.get("content"), list):
+            return []
+        out: list[dict[str, Any]] = []
+        for block in msg["content"]:
+            if not isinstance(block, dict) or block.get("type") != "tool_result":
+                continue
+            tid = block.get("tool_use_id")
+            if not isinstance(tid, str) or tid not in self._tools or tid in self._answered:
+                continue
+            self._answered.add(tid)
+            out.append({"type": "tool", "id": tid, "name": self._tools[tid], "input": None,
+                        "result": short_result(block.get("content")), "isError": bool(block.get("is_error"))})
         return out
 
 
