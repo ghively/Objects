@@ -3,7 +3,8 @@
 The type is made the first time a chat is saved (never on read): name "AI Chat", plural
 "AI Chats", with a relation property "Context" (``context``, many objects: the pages the
 chat was about) and a text property "Session" (``session``, the Claude Code session id a
-later turn resumes). A chat's body is Markdown in our own format::
+later turn resumes). M17 adds the text property "Agent" (``agent``, the name of the agent the
+chat was with), on the next save; existing chat files are never rewritten for it. A chat's body is Markdown in our own format::
 
     # <title>
 
@@ -33,7 +34,9 @@ from .ids import new_ulid
 from .typemodel import PROPERTY_ICONS, Icon, PropertyDefinition, TypeDefinition
 
 __all__ = [
+    "AGENT_KEY",
     "CHAT_TYPE_NAME",
+    "agent_key",
     "default_title",
     "ensure_chat_type",
     "find_chat_type",
@@ -47,6 +50,8 @@ CHAT_TYPE_ICON = "ph-chats-circle"
 CHAT_TYPE_COLOR = "violet"
 CONTEXT_KEY = "context"
 SESSION_KEY = "session"
+AGENT_KEY = "agent"
+AGENT_DESCRIPTION = "The agent this chat was with"  # our string
 TITLE_MAX = 60
 
 ROLE_HEADINGS = {"user": "You", "assistant": "Claude"}
@@ -90,8 +95,16 @@ def chat_keys(t: TypeDefinition | None) -> tuple[str | None, str | None]:
     return (ctx.key if ctx else None), (ses.key if ses else None)
 
 
+def agent_key(t: TypeDefinition | None) -> str | None:
+    """The key of the chat type's Agent property (M17), None where missing."""
+    if t is None:
+        return None
+    p = _prop(t, AGENT_KEY, "Agent", ("text", "textBlock"))
+    return p.key if p else None
+
+
 def ensure_chat_type(space) -> tuple[TypeDefinition, bool]:
-    """The AI Chat type with its Context and Session properties, made or completed as
+    """The AI Chat type with its Context, Session and Agent properties, made or completed as
     needed (through `Space.create_type` and `Space.save_type`); (type, changed)."""
     changed = False
     t = find_chat_type(space)
@@ -99,7 +112,8 @@ def ensure_chat_type(space) -> tuple[TypeDefinition, bool]:
         t = space.create_type(CHAT_TYPE_NAME, CHAT_TYPE_PLURAL, icon=CHAT_TYPE_ICON, color=CHAT_TYPE_COLOR)
         changed = True
     ctx, ses = chat_keys(t)
-    if ctx is None or ses is None:
+    agent = agent_key(t)
+    if ctx is None or ses is None or agent is None:
         taken = {p.key for p in t.propertyDefinitions}
         new = copy.deepcopy(t)
         if ctx is None:
@@ -114,6 +128,14 @@ def ensure_chat_type(space) -> tuple[TypeDefinition, bool]:
             new.propertyDefinitions.append(PropertyDefinition(
                 id=key, key=key, name="Session", type="text",
                 description="The Claude Code session this chat continues",
+                icon=Icon("iconify", PROPERTY_ICONS["text"]),
+            ))
+        if agent is None:
+            taken = {p.key for p in new.propertyDefinitions}
+            key = AGENT_KEY if AGENT_KEY not in taken else f"{AGENT_KEY}-{new_ulid()[-6:].lower()}"
+            new.propertyDefinitions.append(PropertyDefinition(
+                id=key, key=key, name="Agent", type="text",
+                description=AGENT_DESCRIPTION,
                 icon=Icon("iconify", PROPERTY_ICONS["text"]),
             ))
         _current, revision = space.refresh_type(t.id)

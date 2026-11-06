@@ -1,14 +1,14 @@
-"""The AI assistant's runner (M10): one ``claude -p`` subprocess per chat turn.
+"""The AI assistant's runner (M10, M17): one ``claude -p`` subprocess per chat turn.
 
 Object has no model of its own and makes no network call: the user's own Claude Code
-CLI does the work. Each turn runs ``claude -p --output-format stream-json`` with the
-prompt on stdin, in a new empty temporary folder (so the assistant never sees the space
-folder), with every built-in tool switched off and only Object's MCP read tools allowed.
-Those tools reach the space through the running app's ``/api/v1`` with a per-turn,
-read-only token held in memory (`tokens.TokenStore.ephemeral`), so "Exclude from AI",
-templates and the no-write rule are enforced in one place. The assistant never writes:
-what it suggests comes back as a proposal (tags, property values or text) that the user
-applies through the normal write paths.
+CLI does the work. Since M17 every turn is an agent run: `agentrun.build_run` gives the
+command (the agent's folder as the working folder, its settings only, Object's MCP servers,
+the tool switches and the fence), and `Turn.run` hands it to `_Attempt`. The prompt goes on
+stdin. Object's tools reach the space through the running app's ``/api/v1`` with a per-turn
+token held in memory (`tokens.TokenStore.ephemeral`), so "Exclude from AI", templates and
+the version checks are enforced in one place. The proposal modes run read-only: what they
+suggest comes back as a proposal (tags, property values or text) that the user applies
+through the normal write paths.
 
 Pieces:
 
@@ -41,8 +41,6 @@ import re
 import shutil
 import signal
 import subprocess
-import sys
-import tempfile
 import threading
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
@@ -53,13 +51,9 @@ from .agentrun import RunCommand, RunRefused
 from .apiquery import EXCLUDE_TAG, is_excluded
 
 __all__ = [
-    "ALLOWED_TOOLS",
-    "CLI_FLAGS",
-    "DISALLOWED_TOOLS",
     "ELLIPSIS",
     "MAX_CONTEXT_CHARS",
     "MODES",
-    "READ_TOOLS",
     "TOOL_INPUT_STRING_CAP",
     "TOOL_RESULT_CAP",
     "TURN_TIMEOUT",
@@ -67,10 +61,8 @@ __all__ = [
     "StreamParser",
     "Turn",
     "build_prompt",
-    "cli_args",
     "find_claude",
     "gather_context",
-    "mcp_config",
     "parse_proposal",
     "run_turn",
     "short_input",
@@ -89,54 +81,6 @@ MAX_CONTEXT_CHARS = 60_000
 MAX_TAGS = 5
 MAX_EXISTING_TAGS = 300
 MCP_SERVER = "object"
-TOKEN_NAME = "AI assistant"
-
-READ_TOOLS = (
-    "schema",
-    "search",
-    "query",
-    "run_saved_query",
-    "peek",
-    "read",
-    "backlinks",
-    "daily_note",
-    "changes_since",
-)
-"""The ``objectapp-mcp`` read tools, the only tools the assistant may use."""
-ALLOWED_TOOLS = tuple(f"mcp__{MCP_SERVER}__{t}" for t in READ_TOOLS)
-DISALLOWED_TOOLS = (
-    "Bash",
-    "Write",
-    "Edit",
-    "MultiEdit",
-    "NotebookEdit",
-    "Read",
-    "Glob",
-    "Grep",
-    "WebFetch",
-    "WebSearch",
-    "Task",
-)
-"""Denied as well, in case a CLI version ignores ``--tools ""``."""
-
-# Every flag of a turn, in one place (checked against ``claude --help`` of Claude Code
-# 2.1.318). ``--tools ""`` switches off all built-in tools; ``--no-chrome`` keeps the
-# browser integration away; ``dontAsk`` denies whatever isn't allowed below instead of
-# asking; ``--strict-mcp-config`` ignores the user's other MCP servers;
-# ``--include-partial-messages`` streams the answer as it is written.
-CLI_FLAGS = (
-    "-p",
-    "--output-format",
-    "stream-json",
-    "--verbose",
-    "--include-partial-messages",
-    "--tools",
-    "",
-    "--no-chrome",
-    "--permission-mode",
-    "dontAsk",
-    "--strict-mcp-config",
-)
 
 NOT_FOUND = (
     "Claude Code was not found. Install it, or set where it is in Settings > AI Assistant."
@@ -208,35 +152,6 @@ def status(setting: str | None) -> dict[str, Any]:
     version = (out.stdout or "").strip().splitlines()
     return {"available": True, "reason": "ok", "claudePath": claude,
             "version": version[0].strip() if version else None, "message": None}
-
-
-def mcp_config(api_url: str) -> dict[str, Any]:
-    """The ``--mcp-config`` for a turn: the read-only ``objectapp-mcp`` over this app.
-
-    The token is not in it: ``${OBJECT_API_TOKEN}`` is expanded by the CLI from its own
-    environment, where `run_turn` puts it, so the secret is never written to a file.
-    """
-    return {
-        "mcpServers": {
-            MCP_SERVER: {
-                "command": sys.executable,
-                "args": ["-m", "objectapp.mcp_server", "--read-only"],
-                "env": {"OBJECT_API_URL": api_url, "OBJECT_API_TOKEN": "${OBJECT_API_TOKEN}"},
-            }
-        }
-    }
-
-
-def cli_args(claude: str, *, model: str | None, resume: str | None, mcp_config_path: str) -> list[str]:
-    """The full command line of one turn (the prompt goes on stdin)."""
-    args = [claude, *CLI_FLAGS, "--mcp-config", mcp_config_path,
-            "--allowedTools", ",".join(ALLOWED_TOOLS),
-            "--disallowedTools", ",".join(DISALLOWED_TOOLS)]
-    if model:
-        args += ["--model", model]
-    if resume:
-        args += ["--resume", resume]
-    return args
 
 
 # -- context and prompt ---------------------------------------------------------------
@@ -815,9 +730,8 @@ class Turn:
     token: str
     skipped: list[dict[str, str]] = field(default_factory=list)
     allowed_keys: set[str] | None = None
-    run: Callable[[str | None], RunCommand] | None = None
-    """M17: the resume id in, a fresh agent-run command out (`agentrun.build_run`). While it is
-    None the M10 path runs (an empty temp folder, `cli_args`, `mcp_config`); T7 removes that."""
+    run: Callable[[str | None], RunCommand] = field(kw_only=True)
+    """M17: the resume id in, a fresh agent-run command out (`agentrun.build_run`)."""
     timeout: float = field(default_factory=lambda: TURN_TIMEOUT)
     """Seconds this turn may run (`run_turn`'s deadline); the module constant when made."""
 
@@ -849,25 +763,10 @@ class _Attempt:
         self.proc: subprocess.Popen | None = None
         self.stderr: list[str] = []
         self.command: RunCommand | None = None
-        self.workdir: Path | None = None
-        self.config: Path | None = None
-        if turn.run is None:  # M10's path (T7 removes it)
-            self.workdir = Path(tempfile.mkdtemp(prefix="object-ai-"))
-            self.cwd = self.workdir / "cwd"
-            self.cwd.mkdir()
-            self.config = Path(tempfile.mkdtemp(prefix="object-ai-config-")) / "mcp.json"
 
     def start(self, loop: asyncio.AbstractEventLoop, queue: asyncio.Queue) -> None:
-        if self.turn.run is not None:
-            self.command = self.turn.run(self.resume)
-            args, cwd, env = self.command.args, self.command.cwd, self.command.env
-        else:
-            assert self.config is not None
-            self.config.write_text(json.dumps(mcp_config(self.turn.api_url)), encoding="utf-8")
-            env = {**os.environ, "OBJECT_API_TOKEN": self.turn.token, "OBJECT_API_URL": self.turn.api_url}
-            args = cli_args(self.turn.claude, model=self.turn.model, resume=self.resume,
-                            mcp_config_path=str(self.config))
-            cwd = self.cwd
+        self.command = self.turn.run(self.resume)
+        args, cwd, env = self.command.args, self.command.cwd, self.command.env
         self.proc = subprocess.Popen(
             args,
             cwd=cwd,
@@ -913,10 +812,6 @@ class _Attempt:
             _kill_tree(self.proc)
         if self.command is not None:
             shutil.rmtree(self.command.tmp, ignore_errors=True)
-        if self.workdir is not None:
-            shutil.rmtree(self.workdir, ignore_errors=True)
-        if self.config is not None:
-            shutil.rmtree(self.config.parent, ignore_errors=True)
 
     def stderr_text(self) -> str:
         return "".join(self.stderr).strip()[-800:]

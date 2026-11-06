@@ -153,7 +153,8 @@ def _chat(client: TestClient, prompt: str) -> list[dict]:
     body = {"mode": "chat", "prompt": prompt, "contextPaths": [], "history": []}
     res = client.post("/api/ai/chat", json=body)
     assert res.status_code == 200, res.text
-    return _frames(res.text)
+    events = _frames(res.text)
+    return events[1:] if events and events[0]["type"] == "chat" else events  # M17's leading event
 
 
 def test_tool_results_never_reach_text(client) -> None:
