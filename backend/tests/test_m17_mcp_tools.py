@@ -50,7 +50,8 @@ FILES = {
     ),
     MENTIONER: "---\ntype: 'Page'\ntitle: Mentioner\n" + STAMP + "---\n\nSee Open for the details.\n",
     SECRET_PROJECT: (
-        "---\ntype: 'Project'\ntitle: Secret project\n" + STAMP + f"excludeFromAI: true\n---\n\n{MARKER}\n"
+        "---\ntype: 'Project'\ntitle: Secret project\n" + STAMP
+        + f"budget: 7\nexcludeFromAI: true\n---\n\n{MARKER}\n"
     ),
 }
 
@@ -483,6 +484,19 @@ def _hidden_cases() -> dict[str, Callable[[Env], list[Any]]]:
         assert _extra(out) == {"affected": 1, "hiddenCount": 1}
         return [out]
 
+    def edit_type_affected(env: Env) -> list[Any]:
+        # Removing Budget takes a value from the visible "Object app" and from the excluded
+        # Secret project: the 428 counts only the first.
+        secret = env.bytes_of(SECRET_PROJECT)
+        t = env.call("type_definition", type="Project")
+        t["propertyDefinitions"] = [p for p in t["propertyDefinitions"] if p["key"] != "budget"]
+        out = attempt(env, "edit_type", type_id=t["id"], revision=t["revision"], type=t)
+        assert isinstance(out, str) and out.startswith("428"), out
+        assert _extra(out) == {"affected": 1, "hiddenCount": 1}
+        assert "removes values from 1 object." in out and "2 objects" not in out
+        assert env.bytes_of(SECRET_PROJECT) == secret
+        return [out]
+
     def delete_collection_lists(env: Env) -> list[Any]:
         ask = attempt(env, "delete_collection", collection_id=env.collection)
         assert _extra(ask) == {"affected": 1, "hiddenCount": 1}
@@ -561,6 +575,7 @@ def _hidden_cases() -> dict[str, Callable[[Env], list[Any]]]:
         "trash": trash_listing,
         "unlinked_mentions": mentions,
         "delete_type": delete_type_affected,
+        "edit_type": edit_type_affected,
         "delete_collection": delete_collection_lists,
         "merge": merge_either_side,
         "history": history,
