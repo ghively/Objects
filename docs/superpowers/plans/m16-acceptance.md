@@ -59,6 +59,8 @@ One whole-milestone review after integration, Review Focus first: hostile replie
 
 Not verified here: the real `claude` CLI (no live spike in M16), the app's own window (pywebview), and the chat in a real browser (jsdom only).
 
+**Re-run 2026-11-06** (HEAD `a4f42e9`, after M17's contract commit): `m16_acceptance.py` and `m10_acceptance.py` PASS on `space-sample` and `space-m8`; back end 2090 passed, 17 skipped, 3 xpassed; `tsc` clean, lint 0 errors, build ok. Front end 3173 passed, 2 failed, 1 skipped: both failures are `src/icons/appIcons.test.ts`, because M17's contract commit added `ph-robot` to `src/test/mockApi.ts` without regenerating the icon subset (`node scripts/app-icons.mjs`). That is M17's to fix; no M16 file is involved.
+
 ## Hand checks for Gene
 
 - [ ] A real reply with headings, a table, a task list, a Python fence and `$e^{i\pi}+1=0$` renders properly in the chat, in light and dark themes.
