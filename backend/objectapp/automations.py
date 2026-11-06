@@ -75,7 +75,7 @@ from .jsonstore import DefinitionUnreadable, dump_json
 from .localtime import from_local, to_local
 from .notify import Notifier
 from .objfile import ObjectFile
-from .propvalues import _READ_ONLY_KINDS, InvalidValue, decode_value, encode_value
+from .propvalues import _READ_ONLY_KINDS, GATED_KINDS, InvalidValue, decode_value, encode_value
 from .recurrence import scheduled_between, week_start_of
 from .reminders import reminders_enabled
 from .rows import member_of
@@ -405,7 +405,8 @@ def _check_against_space(space: Space, rule: AutomationRule) -> None:
             pdef = _key_def(space, types, key)
             if pdef is None:
                 raise InvalidValue(f"{where}: “{key}” isn't a property of {_type_names(types)}.")
-            if pdef.type in _READ_ONLY_KINDS or key in _LOCKED_KEYS:
+            # M22: steps change only through the step actions (`GATED_KINDS`).
+            if pdef.type in _READ_ONLY_KINDS or pdef.type in GATED_KINDS or key in _LOCKED_KEYS:
                 raise InvalidValue(f"{where}: “{pdef.name}” can't be set by an automation.")
             if a.kind == "setProperty":
                 if a.now:  # type: ignore[union-attr]
@@ -1514,7 +1515,7 @@ class AutomationEngine:
             if pdef is None:
                 name = t.name if t is not None else "this object"
                 raise _ActionFailed(f"“{a.key}” isn't a property of {name}.")
-            if pdef.type in _READ_ONLY_KINDS or a.key in _LOCKED_KEYS:
+            if pdef.type in _READ_ONLY_KINDS or pdef.type in GATED_KINDS or a.key in _LOCKED_KEYS:
                 raise _ActionFailed(f"“{pdef.name}” can't be set by an automation.")
             if a.kind == "clearProperty":
                 value: Any = None

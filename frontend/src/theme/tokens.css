@@ -238,6 +238,24 @@
   color-scheme: dark;
 }
 
+/* M23: the Work section's tones, as Object's label tokens (which every theme redefines), so all four
+   themes follow with no per-theme values: you indigo, agent teal, others gray, approve and high
+   amber, critical red, ok green, capture pink. Its own :root block, outside the theme token table. */
+:root {
+  --work-you: var(--label-text-indigo);
+  --work-you-bg: var(--label-bg-indigo);
+  --work-agent: var(--label-text-teal);
+  --work-agent-bg: var(--label-bg-teal);
+  --work-others: var(--label-text-gray);
+  --work-others-bg: var(--label-bg-gray);
+  --work-approve: var(--label-text-amber);
+  --work-high: var(--label-text-amber);
+  --work-critical: var(--label-text-red);
+  --work-ok: var(--label-text-green);
+  --work-capture: var(--label-text-pink);
+  --work-capture-bg: var(--label-bg-pink);
+}
+
 @theme {
   --color-app: var(--bg-app);
   --color-panel: var(--bg-panel);

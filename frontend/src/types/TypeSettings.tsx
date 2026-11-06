@@ -1,6 +1,7 @@
 /**
  * Object Type Settings, in this order: breadcrumb; icon, name, plural, colour and
- * description; Properties; Templates; Configuration › Page, Card view and linking; Delete Object Type.
+ * description; Properties; Templates; Work (M22: "Add work fields"); Configuration › Page, Card view
+ * and linking; Delete Object Type.
  *
  * Every edit saves at once through `useTypeEditor` (text fields 400 ms after the last keystroke,
  * and on blur). A type whose file can't be read shows why and disables every control. The
@@ -43,6 +44,15 @@ import { isBasicDailyNote } from './dashboardSections'
 import { DeleteTypeDialog } from './DeleteTypeDialog'
 import { PageLayoutCards } from './PageLayoutCards'
 import { TemplateManager, TEMPLATE_TEXT } from './TemplateManager'
+import { WorkFieldsSection, WORK_FIELDS_TEXT } from './WorkFieldsSection'
+
+/** Put a type the server saved outside the type editor (Add work fields) into the index. */
+function adoptSavedType(t: TypeDef) {
+  useLinkIndex.setState((s) => ({
+    types: s.types.some((x) => x.id === t.id) ? s.types.map((x) => (x.id === t.id ? t : x)) : [...s.types, t],
+    revision: s.revision + 1,
+  }))
+}
 
 export const SAVE_DELAY_MS = 400
 
@@ -490,6 +500,10 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
 
           <Section title={TYPE_SETTINGS_TEXT.templates} explanation={TEMPLATE_TEXT.explanation}>
             <TemplateManager typeId={type.id} editor={editor} onOpenTemplate={onOpenTemplate} disabled={readOnly} />
+          </Section>
+
+          <Section title={WORK_FIELDS_TEXT.heading}>
+            <WorkFieldsSection type={type} onSaved={adoptSavedType} />
           </Section>
 
           <Section title={TYPE_SETTINGS_TEXT.configuration} explanation={TYPE_SETTINGS_TEXT.configurationExplanation}>

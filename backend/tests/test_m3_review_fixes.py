@@ -107,6 +107,7 @@ def test_duplicated_query_file_keeps_its_own_id(space_dir: Path):
     _space, c, _pub = _client(space_dir)
     with c:
         listed = {q["id"]: q for q in c.get("/api/queries").json()}
+        listed.pop("work-tickets", None)  # M22: the built-in Tickets view
         assert sorted(listed) == ["copy", "orig"]
         assert listed["copy"]["revision"]
         r = c.put(

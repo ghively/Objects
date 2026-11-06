@@ -34,6 +34,10 @@ const VALUE_KINDS = new Set<PropertyType>([
   'email',
   'phone',
   'files',
+  // M22: the count kinds only, as Files
+  'steps',
+  'textList',
+  'floorItems',
 ])
 const NUMBER_CALCS: CalcKind[] = ['sum', 'average', 'median', 'min', 'max', 'range']
 const DATE_CALCS: CalcKind[] = ['earliestDate', 'latestDate', 'dateRange']
@@ -142,6 +146,16 @@ function cellOf(row: Row, propertyId: string, kind: PropertyType): Cell {
       return { keys: text(v) }
     case 'files':
       return { keys: filePaths(v) }
+    // M22: a List's items; a step or floor item by its id.
+    case 'textList':
+      return { keys: (Array.isArray(v) ? (v as unknown[]) : []).filter((t): t is string => typeof t === 'string' && t !== '') }
+    case 'steps':
+    case 'floorItems':
+      return {
+        keys: (Array.isArray(v) ? (v as { id?: unknown }[]) : [])
+          .map((x) => (x && typeof x.id === 'string' ? x.id : ''))
+          .filter((k) => k !== ''),
+      }
     case 'entity_title':
       return { keys: text(displayTitle(row)) }
     case 'label':

@@ -13,10 +13,18 @@
  * A 409 on the write itself calls `onConflict` and stops the queue too. Once the owner has
  * resolved the conflict (reload, or keep mine) it calls `replay()`, and the queued writes are
  * sent again on the resolved version; they are key-level, so replaying them is safe.
+ *
+ * M22 `work(run)` queues a work write (a step action or edit, a floor-item op, work fields) the
+ * same way: the body is flushed first, then `run(path, baseVersion)`; its result's version is
+ * adopted and the result goes to `onWorkWritten` (the view merges the front matter and loads
+ * `res.body`, which gained an Activity line, into the editor). A step or floor item that changed
+ * meanwhile (`StepChangedError`, a 409 checked per step, not per object) or a move the rules refuse
+ * goes to `onWorkError` and resolves null without blocking the queue; a stale object version
+ * (a plain `ConflictError`) is a conflict as for property writes.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, type MutableRefObject } from 'react'
-import { api, ConflictError } from '@/api/client'
-import type { RenameResult, UpdateResult } from '@/api/types'
+import { api, ConflictError, StepChangedError } from '@/api/client'
+import type { RenameResult, UpdateResult, WorkWriteResult } from '@/api/types'
 import { taskClient } from '@/tasks/taskContract'
 
 export interface BodyControl {
@@ -40,6 +48,10 @@ export interface ObjectWritesOptions {
   onRenamed?(res: RenameResult, oldPath: string, title: string): void
   /** A write failed for another reason (read-only, invalid value, gone). */
   onError?(err: unknown): void
+  /** M22: a work write succeeded: merge `res.frontmatter` and load `res.body` at `res.version`. */
+  onWorkWritten?(res: WorkWriteResult): void
+  /** M22: a work write was refused (a step that changed meanwhile, a move the rules refuse, …). */
+  onWorkError?(err: unknown): void
 }
 
 export interface ObjectWrites {
@@ -47,6 +59,11 @@ export interface ObjectWrites {
   updateProperties(updates: Record<string, unknown>, remove?: string[]): Promise<UpdateResult | null>
   /** M8: set (or clear with `null`) the reminder of date property `key` (`PUT /api/tasks/reminder`). */
   setReminder(key: string, remind: string | null): Promise<UpdateResult | null>
+  /**
+   * M22: run a work write after the body is flushed; resolves its result, or null when it was
+   * refused (`onWorkError` has it).
+   */
+  work(run: (path: string, baseVersion: string) => Promise<WorkWriteResult>): Promise<WorkWriteResult | null>
   /** Retitle the object (renames its file and relinks). Resolves null when it failed. */
   rename(title: string): Promise<RenameResult | null>
   /** The conflict that stopped the queue is resolved: send the queued writes again. */
@@ -151,6 +168,30 @@ export function useObjectWrites(opts: ObjectWritesOptions): ObjectWrites {
     [enqueue],
   )
 
+  const work = useCallback(
+    (run: (path: string, baseVersion: string) => Promise<WorkWriteResult>) =>
+      enqueue(async (path, baseVersion) => {
+        let res: WorkWriteResult
+        try {
+          res = await run(path, baseVersion)
+        } catch (err) {
+          // A stale object version is a conflict (reconcile, then replay); anything else is refused.
+          if (err instanceof ConflictError && !(err instanceof StepChangedError)) throw err
+          const o = optsRef.current
+          if (o.onWorkError) o.onWorkError(err)
+          else if (o.onError) o.onError(err)
+          else console.error('work write failed', err)
+          return null
+        }
+        const o = optsRef.current
+        o.adoptVersion(res.version)
+        if (o.onWorkWritten) o.onWorkWritten(res)
+        else void o.bodyControl.resume(res.version)
+        return res
+      }),
+    [enqueue],
+  )
+
   const rename = useCallback(
     (title: string) =>
       enqueue(async (path, baseVersion) => {
@@ -174,5 +215,5 @@ export function useObjectWrites(opts: ObjectWritesOptions): ObjectWrites {
 
   const pending = useCallback(() => opsRef.current.length, [])
 
-  return { updateProperties, setReminder, rename, replay, pending }
+  return { updateProperties, setReminder, work, rename, replay, pending }
 }

@@ -1,4 +1,5 @@
-"""``.object/space.json``: the space's name, icon, description and "hide task management".
+"""``.object/space.json``: the space's name, icon, description, "hide task management" and
+(M22) the Jira site that makes a Jira ticket's browse link.
 
 Absent file = the folder name and defaults; reading never creates or changes it.
 A patch writes only the patched keys over what the file already holds (unknown
@@ -9,6 +10,7 @@ that exists but is not a JSON object is never replaced (`ReadOnly`, 423).
 from __future__ import annotations
 
 import hashlib
+import re
 import threading
 from pathlib import Path
 from typing import Any
@@ -18,6 +20,8 @@ from .textfile import atomic_write
 from .typemodel import RevisionConflict
 
 __all__ = [
+    "JIRA_SITE_PROBLEM",
+    "MAX_JIRA_SITE_LENGTH",
     "MAX_NAME_LENGTH",
     "PATCH_KEYS",
     "SPACE_REL",
@@ -29,7 +33,10 @@ __all__ = [
 
 SPACE_REL = ".object/space.json"
 MAX_NAME_LENGTH = 120
-PATCH_KEYS = ("name", "icon", "description", "hideTaskManagement")
+PATCH_KEYS = ("name", "icon", "description", "hideTaskManagement", "jiraSite")
+MAX_JIRA_SITE_LENGTH = 300
+JIRA_SITE_PROBLEM = "The Jira site is a web address (https://…)."
+_WEB_ADDRESS = re.compile(r"https?://\S+", re.IGNORECASE)
 
 _lock = threading.RLock()
 
@@ -66,7 +73,8 @@ def read(root: Path) -> tuple[dict[str, Any], str, str | None]:
 
 
 def space_fields(root: Path) -> dict[str, Any]:
-    """The ``SpaceInfo`` fields from ``space.json``: name, icon, description, hideTaskManagement, revision."""
+    """The ``SpaceInfo`` fields from ``space.json``: name, icon, description, hideTaskManagement,
+    jiraSite (null when absent or not a web address), revision."""
     data, revision, _error = read(root)
     name = data.get("name")
     icon = data.get("icon")
@@ -76,8 +84,18 @@ def space_fields(root: Path) -> dict[str, Any]:
         "icon": icon if isinstance(icon, str) else None,
         "description": description if isinstance(description, str) else None,
         "hideTaskManagement": data.get("hideTaskManagement") is True,
+        "jiraSite": data.get("jiraSite") if _jira_site_ok(data.get("jiraSite")) else None,
         "revision": revision,
     }
+
+
+def _jira_site_ok(value: Any) -> bool:
+    """A Jira site: an ``http(s)://`` address of at most 300 characters (None is not one)."""
+    return (
+        isinstance(value, str)
+        and len(value) <= MAX_JIRA_SITE_LENGTH
+        and _WEB_ADDRESS.fullmatch(value) is not None
+    )
 
 
 def _checked(patch_: dict[str, Any]) -> dict[str, Any]:
@@ -96,6 +114,9 @@ def _checked(patch_: dict[str, Any]) -> dict[str, Any]:
                 raise SpaceConfigProblem(
                     key, f"A space name can have at most {MAX_NAME_LENGTH} characters."
                 )
+        elif key == "jiraSite":
+            if value is not None and not _jira_site_ok(value):
+                raise SpaceConfigProblem(key, JIRA_SITE_PROBLEM)
         elif key in ("icon", "description"):
             if value is not None and not isinstance(value, str):
                 raise SpaceConfigProblem(key)

@@ -7,6 +7,7 @@ import {
   EXISTING_SHORTCUTS,
   formatKeys,
   isEditableTarget,
+  isSequence,
   keysFor,
   M7_SHORTCUTS,
   matches,
@@ -158,8 +159,9 @@ describe('shortcuts', () => {
       const seen = new Map<string, string>()
       for (const d of all) {
         for (const k of d.keys) {
+          // A sequence (`g n`) is compared as a whole string.
           const c = parseKeys(k, mac)
-          const sig = `${d.scope}|${c.ctrl}|${c.meta}|${c.alt}|${c.shift}|${c.key.toLowerCase()}`
+          const sig = isSequence(k) ? `${d.scope}|seq|${k.toLowerCase()}` : `${d.scope}|${c.ctrl}|${c.meta}|${c.alt}|${c.shift}|${c.key.toLowerCase()}`
           const other = seen.get(sig)
           // Context-dependent keys (Mod-e: code token or code block, …).
           if (other && sharesKeyByDesign(other, d.id)) continue

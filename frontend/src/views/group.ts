@@ -36,8 +36,8 @@ export interface GroupOption {
 const o = (key: string, label: string): GroupOption => ({ key, label })
 
 const DATE_KINDS = new Set<PropertyType>(['datetime', 'datetimeSimple', 'entity_lastUpdated', 'entity_createdAt'])
-// M12: files are not grouped by (our choice).
-const NOT_GROUPABLE = new Set<PropertyType>(['blocks', 'simpleTableBlock', 'files'])
+// M12: files are not grouped by (our choice). M22: nor are steps, lists and floor items.
+const NOT_GROUPABLE = new Set<PropertyType>(['blocks', 'simpleTableBlock', 'files', 'steps', 'textList', 'floorItems'])
 
 /** Group-by option of a status label: one group per status category ("By category" is our string). */
 export const STATUS_CATEGORY_OPTION = 'statusCategory'

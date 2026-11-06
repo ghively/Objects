@@ -35,6 +35,7 @@ __all__ = [
     "ToolEntry",
     "ToolGroup",
     "ToolLists",
+    "WORK_STEP_TOOLS",
     "catalogue",
     "default_off",
     "groups_out",
@@ -51,8 +52,10 @@ OBJECT_READ: tuple[str, ...] = (
     # M17
     "type_definition", "collection", "saved_query", "read_whiteboard", "version_history",
     "read_version", "unlinked_mentions", "trash", "automations", "import_preview", "import_status",
+    # M22
+    "work_items", "work_item",
 )
-"""The read tools of ``objectapp-mcp`` (short names). M22 appends 2."""
+"""The read tools of ``objectapp-mcp`` (short names)."""
 
 OBJECT_WRITE: tuple[str, ...] = (
     # M11
@@ -67,8 +70,14 @@ OBJECT_WRITE: tuple[str, ...] = (
     "create_whiteboard", "edit_whiteboard",
     "create_automation", "run_automation", "start_import",
     "restore_from_trash", "restore_version",
+    # M22
+    "step_action", "edit_steps", "log_activity", "add_work_note", "set_work_fields",
+    "update_floor_item",
 )
-"""The write tools of ``objectapp-mcp`` (short names). M22 appends 6."""
+"""The write tools of ``objectapp-mcp`` (short names)."""
+
+WORK_STEP_TOOLS: tuple[str, ...] = ("step_action", "edit_steps", "log_activity", "add_work_note")
+"""M22: the write tools M24's narrowed work runs keep (with every `OBJECT_READ` tool)."""
 
 AGENT_TOOLS: tuple[str, ...] = (
     "agent_info",

@@ -38,8 +38,9 @@ describe('AgentsSection', () => {
     const section = await screen.findByRole('region', { name: AGENT_TEXT.heading })
     const nav = screen.getByRole('navigation', { name: 'Main' })
     expect(section.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    // Directly above: the next element after the section is the main navigation.
-    expect(section.nextElementSibling).toBe(nav)
+    // Directly above: the next element after the section is M23's Work entry, then the main navigation.
+    expect(section.nextElementSibling).toBe(screen.getByRole('navigation', { name: 'Work' }))
+    expect(section.nextElementSibling?.nextElementSibling).toBe(nav)
     await waitFor(() => expect(section.querySelectorAll('[data-agent]')).toHaveLength(2))
     const rows = [...section.querySelectorAll('[data-agent]')].map((r) => r.getAttribute('data-agent'))
     expect(rows).toEqual(['assistant', RESEARCHER])

@@ -1,0 +1,4048 @@
+[
+  {
+    "name": "user answers an open Question",
+    "steps": [
+      {
+        "id": "s00001",
+        "kind": "question",
+        "state": "open",
+        "text": "Which tray jams most often?"
+      },
+      {
+        "id": "s00002",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "answer",
+    "text": "Tray 2",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "answer"
+      ],
+      "result": [
+        "done",
+        "open"
+      ]
+    }
+  },
+  {
+    "name": "user marks an open Do done",
+    "steps": [
+      {
+        "id": "s00003",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "user marks an open Agent step done",
+    "steps": [
+      {
+        "id": "s00004",
+        "kind": "agent",
+        "state": "open",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "run"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "user marks an approved Agent step done",
+    "steps": [
+      {
+        "id": "s00005",
+        "kind": "agent",
+        "state": "approved",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "reopen"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "agent marks an open Agent step done with a result",
+    "steps": [
+      {
+        "id": "s00006",
+        "kind": "agent",
+        "state": "open",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "done",
+    "text": "Ran it",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "complete"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "agent marks an approved Agent step done",
+    "steps": [
+      {
+        "id": "s00007",
+        "kind": "agent",
+        "state": "approved",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "complete",
+        "fail"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "user approves an open Approve step with a Not before time",
+    "steps": [
+      {
+        "id": "s00008",
+        "kind": "question",
+        "state": "done",
+        "text": "Question step"
+      },
+      {
+        "id": "s00009",
+        "kind": "approve",
+        "state": "open",
+        "text": "Restart the print spooler on PRN-TEST-01"
+      },
+      {
+        "id": "s00010",
+        "kind": "agent",
+        "state": "open",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 1,
+    "action": "approve",
+    "notBefore": "2026-11-06T07:00:00.000Z",
+    "expect": {
+      "current": 1,
+      "stage": "doing",
+      "turn": "approve",
+      "actions": [
+        "approve",
+        "decline"
+      ],
+      "result": [
+        "done",
+        "approved",
+        "open"
+      ]
+    }
+  },
+  {
+    "name": "user declines an open Approve step with a reason",
+    "steps": [
+      {
+        "id": "s00011",
+        "kind": "approve",
+        "state": "open",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "decline",
+    "text": "Not during the shift",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "approve",
+      "actions": [
+        "approve",
+        "decline"
+      ],
+      "result": [
+        "declined"
+      ]
+    }
+  },
+  {
+    "name": "user declines an approved Approve step",
+    "steps": [
+      {
+        "id": "s00012",
+        "kind": "approve",
+        "state": "approved",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "decline",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "decline",
+        "reopen"
+      ],
+      "result": [
+        "declined"
+      ]
+    }
+  },
+  {
+    "name": "user asks the agent to run an open Agent step",
+    "steps": [
+      {
+        "id": "s00013",
+        "kind": "agent",
+        "state": "open",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "run",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "run"
+      ],
+      "result": [
+        "approved"
+      ]
+    }
+  },
+  {
+    "name": "Object itself runs an open Agent step",
+    "steps": [
+      {
+        "id": "s00014",
+        "kind": "agent",
+        "state": "open",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "app",
+    "index": 0,
+    "action": "run",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "run"
+      ],
+      "result": [
+        "approved"
+      ]
+    }
+  },
+  {
+    "name": "user withdraws an approval",
+    "steps": [
+      {
+        "id": "s00015",
+        "kind": "approve",
+        "state": "approved",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "reopen",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "decline",
+        "reopen"
+      ],
+      "result": [
+        "open"
+      ]
+    }
+  },
+  {
+    "name": "user withdraws a queued Agent step",
+    "steps": [
+      {
+        "id": "s00016",
+        "kind": "agent",
+        "state": "approved",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "reopen",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "reopen"
+      ],
+      "result": [
+        "open"
+      ]
+    }
+  },
+  {
+    "name": "user reopens an earlier done Do step",
+    "steps": [
+      {
+        "id": "s00017",
+        "kind": "do",
+        "state": "done",
+        "text": "Do step"
+      },
+      {
+        "id": "s00018",
+        "kind": "question",
+        "state": "open",
+        "text": "Question step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "reopen",
+    "expect": {
+      "current": 1,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "reopen"
+      ],
+      "result": [
+        "open",
+        "open"
+      ]
+    }
+  },
+  {
+    "name": "user reopens a done Question",
+    "steps": [
+      {
+        "id": "s00019",
+        "kind": "question",
+        "state": "done",
+        "text": "Question step",
+        "answer": "Tray 2"
+      },
+      {
+        "id": "s00020",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "reopen",
+    "expect": {
+      "current": 1,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "reopen"
+      ],
+      "result": [
+        "open",
+        "open"
+      ]
+    }
+  },
+  {
+    "name": "user reopens a declined Approve step",
+    "steps": [
+      {
+        "id": "s00021",
+        "kind": "approve",
+        "state": "declined",
+        "text": "Approve step"
+      },
+      {
+        "id": "s00022",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "reopen",
+    "expect": {
+      "current": 1,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "reopen"
+      ],
+      "result": [
+        "open",
+        "open"
+      ]
+    }
+  },
+  {
+    "name": "user reopens a done Agent step",
+    "steps": [
+      {
+        "id": "s00023",
+        "kind": "agent",
+        "state": "done",
+        "text": "Agent step",
+        "result": "Ran it"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "reopen",
+    "expect": {
+      "current": null,
+      "stage": "doing",
+      "turn": "close",
+      "actions": [
+        "reopen"
+      ],
+      "result": [
+        "open"
+      ]
+    }
+  },
+  {
+    "name": "agent completes an approved Approve step",
+    "steps": [
+      {
+        "id": "s00024",
+        "kind": "question",
+        "state": "done",
+        "text": "Question step"
+      },
+      {
+        "id": "s00025",
+        "kind": "approve",
+        "state": "approved",
+        "text": "Approve step"
+      },
+      {
+        "id": "s00026",
+        "kind": "agent",
+        "state": "open",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 1,
+    "action": "complete",
+    "text": "Spooler restarted",
+    "expect": {
+      "current": 1,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "complete",
+        "fail"
+      ],
+      "result": [
+        "done",
+        "done",
+        "open"
+      ]
+    }
+  },
+  {
+    "name": "agent completes an open Agent step",
+    "steps": [
+      {
+        "id": "s00027",
+        "kind": "agent",
+        "state": "open",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "complete",
+    "text": "20 test prints clean",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "complete"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "agent completes an approved Agent step",
+    "steps": [
+      {
+        "id": "s00028",
+        "kind": "agent",
+        "state": "approved",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "complete",
+    "text": "Done",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "complete",
+        "fail"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "agent fails an approved Approve step",
+    "steps": [
+      {
+        "id": "s00029",
+        "kind": "approve",
+        "state": "approved",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "fail",
+    "text": "The host did not answer",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "complete",
+        "fail"
+      ],
+      "result": [
+        "open"
+      ]
+    }
+  },
+  {
+    "name": "agent fails an approved Agent step",
+    "steps": [
+      {
+        "id": "s00030",
+        "kind": "agent",
+        "state": "approved",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "fail",
+    "text": "No access",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "complete",
+        "fail"
+      ],
+      "result": [
+        "open"
+      ]
+    }
+  },
+  {
+    "name": "agent fails with a question inserted before the step",
+    "steps": [
+      {
+        "id": "s00031",
+        "kind": "question",
+        "state": "done",
+        "text": "Question step"
+      },
+      {
+        "id": "s00032",
+        "kind": "approve",
+        "state": "approved",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 1,
+    "action": "fail",
+    "text": "Two hosts match",
+    "ask": "Which host?",
+    "expect": {
+      "current": 1,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "complete",
+        "fail"
+      ],
+      "result": [
+        "done",
+        "open",
+        "open"
+      ]
+    }
+  },
+  {
+    "name": "approve on step 3 while step 1 is open",
+    "steps": [
+      {
+        "id": "s00033",
+        "kind": "question",
+        "state": "open",
+        "text": "Question step"
+      },
+      {
+        "id": "s00034",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      },
+      {
+        "id": "s00035",
+        "kind": "approve",
+        "state": "open",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 2,
+    "action": "approve",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [],
+      "error": "Finish the steps before this one first."
+    }
+  },
+  {
+    "name": "reopen of a done step after the current one",
+    "steps": [
+      {
+        "id": "s00036",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      },
+      {
+        "id": "s00037",
+        "kind": "do",
+        "state": "done",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 1,
+    "action": "reopen",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [],
+      "error": "Finish the steps before this one first."
+    }
+  },
+  {
+    "name": "answer on a Do step",
+    "steps": [
+      {
+        "id": "s00038",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "answer",
+    "text": "x",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "done"
+      ],
+      "error": "This doesn't apply to a Do step."
+    }
+  },
+  {
+    "name": "run on an Approve step",
+    "steps": [
+      {
+        "id": "s00039",
+        "kind": "approve",
+        "state": "open",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "run",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "approve",
+      "actions": [
+        "approve",
+        "decline"
+      ],
+      "error": "This doesn't apply to a Approve step."
+    }
+  },
+  {
+    "name": "user marks an Approve step done",
+    "steps": [
+      {
+        "id": "s00040",
+        "kind": "approve",
+        "state": "approved",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "decline",
+        "reopen"
+      ],
+      "error": "Only the agent marks an Approve step done."
+    }
+  },
+  {
+    "name": "approve an approved step",
+    "steps": [
+      {
+        "id": "s00041",
+        "kind": "approve",
+        "state": "approved",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "approve",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "decline",
+        "reopen"
+      ],
+      "error": "This step is already approved."
+    }
+  },
+  {
+    "name": "run an approved Agent step",
+    "steps": [
+      {
+        "id": "s00042",
+        "kind": "agent",
+        "state": "approved",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "run",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "reopen"
+      ],
+      "error": "This step is already approved."
+    }
+  },
+  {
+    "name": "reopen a done Approve step",
+    "steps": [
+      {
+        "id": "s00043",
+        "kind": "approve",
+        "state": "done",
+        "text": "Approve step"
+      },
+      {
+        "id": "s00044",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "reopen",
+    "expect": {
+      "current": 1,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [],
+      "error": "A done Approve step never reopens."
+    }
+  },
+  {
+    "name": "reopen an open step",
+    "steps": [
+      {
+        "id": "s00045",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "reopen",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "done"
+      ],
+      "error": "This step is already open."
+    }
+  },
+  {
+    "name": "answer an earlier done Question",
+    "steps": [
+      {
+        "id": "s00046",
+        "kind": "question",
+        "state": "done",
+        "text": "Question step"
+      },
+      {
+        "id": "s00047",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "answer",
+    "text": "again",
+    "expect": {
+      "current": 1,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "reopen"
+      ],
+      "error": "This step is already done."
+    }
+  },
+  {
+    "name": "user completes a step",
+    "steps": [
+      {
+        "id": "s00048",
+        "kind": "approve",
+        "state": "approved",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "complete",
+    "text": "x",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "decline",
+        "reopen"
+      ],
+      "error": "Only the agent reports a step's result."
+    }
+  },
+  {
+    "name": "user fails a step",
+    "steps": [
+      {
+        "id": "s00049",
+        "kind": "agent",
+        "state": "approved",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "fail",
+    "text": "x",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "reopen"
+      ],
+      "error": "Only the agent reports a step's result."
+    }
+  },
+  {
+    "name": "agent approves",
+    "steps": [
+      {
+        "id": "s00050",
+        "kind": "approve",
+        "state": "open",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "approve",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "approve",
+      "actions": [],
+      "error": "Only you can do this to a step."
+    }
+  },
+  {
+    "name": "agent declines",
+    "steps": [
+      {
+        "id": "s00051",
+        "kind": "approve",
+        "state": "open",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "decline",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "approve",
+      "actions": [],
+      "error": "Only you can do this to a step."
+    }
+  },
+  {
+    "name": "agent withdraws an approval",
+    "steps": [
+      {
+        "id": "s00052",
+        "kind": "approve",
+        "state": "approved",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "reopen",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "complete",
+        "fail"
+      ],
+      "error": "Only you can do this to a step."
+    }
+  },
+  {
+    "name": "agent answers a Question",
+    "steps": [
+      {
+        "id": "s00053",
+        "kind": "question",
+        "state": "open",
+        "text": "Question step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "answer",
+    "text": "x",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [],
+      "error": "Only you can do this to a step."
+    }
+  },
+  {
+    "name": "agent marks a Do step done",
+    "steps": [
+      {
+        "id": "s00054",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [],
+      "error": "Only you can do this to a step."
+    }
+  },
+  {
+    "name": "agent asks to run",
+    "steps": [
+      {
+        "id": "s00055",
+        "kind": "agent",
+        "state": "open",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "run",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "complete"
+      ],
+      "error": "Only you can do this to a step."
+    }
+  },
+  {
+    "name": "Object itself marks an Agent step done",
+    "steps": [
+      {
+        "id": "s00056",
+        "kind": "agent",
+        "state": "open",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "app",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "run"
+      ],
+      "error": "Only you can do this to a step."
+    }
+  },
+  {
+    "name": "Object itself completes a step",
+    "steps": [
+      {
+        "id": "s00057",
+        "kind": "agent",
+        "state": "open",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "app",
+    "index": 0,
+    "action": "complete",
+    "text": "x",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "run"
+      ],
+      "error": "Only you can do this to a step."
+    }
+  },
+  {
+    "name": "an answer without text",
+    "steps": [
+      {
+        "id": "s00058",
+        "kind": "question",
+        "state": "open",
+        "text": "Question step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "answer",
+    "text": "  ",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "answer"
+      ],
+      "error": "An answer needs text."
+    }
+  },
+  {
+    "name": "complete without text",
+    "steps": [
+      {
+        "id": "s00059",
+        "kind": "agent",
+        "state": "approved",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "complete",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "complete",
+        "fail"
+      ],
+      "error": "Say what happened."
+    }
+  },
+  {
+    "name": "fail without text",
+    "steps": [
+      {
+        "id": "s00060",
+        "kind": "approve",
+        "state": "approved",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "fail",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "complete",
+        "fail"
+      ],
+      "error": "Say what happened."
+    }
+  },
+  {
+    "name": "agent fails an open Agent step",
+    "steps": [
+      {
+        "id": "s00061",
+        "kind": "agent",
+        "state": "open",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "fail",
+    "text": "x",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "complete"
+      ],
+      "error": "This step is already open."
+    }
+  },
+  {
+    "name": "a Not before time on a Do step",
+    "steps": [
+      {
+        "id": "s00062",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "notBefore": "2026-11-06T07:00:00.000Z",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "done"
+      ],
+      "error": "Only an Approve step takes a Not before time."
+    }
+  },
+  {
+    "name": "agent completes an open Approve step",
+    "steps": [
+      {
+        "id": "s00063",
+        "kind": "approve",
+        "state": "open",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "complete",
+    "text": "x",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "approve",
+      "actions": [],
+      "error": "This step is already open."
+    }
+  },
+  {
+    "name": "Task Not Started is Not started",
+    "steps": [
+      {
+        "id": "s00064",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "Not Started",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "notStarted",
+      "turn": "you",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "Task Next Up is Ready",
+    "steps": [
+      {
+        "id": "s00065",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "Next Up",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "ready",
+      "turn": "you",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "Task In Progress is Doing",
+    "steps": [
+      {
+        "id": "s00066",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "Task On Hold is parked",
+    "steps": [
+      {
+        "id": "s00067",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "On Hold",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "parked",
+      "turn": "parked",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "Task Done is Done",
+    "steps": [
+      {
+        "id": "s00068",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "Done",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "done",
+      "turn": "none",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "Project Planned is Not started",
+    "steps": [
+      {
+        "id": "s00069",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "Planned",
+    "statusOptions": [
+      {
+        "id": "planned",
+        "text": "Planned"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold"
+      },
+      {
+        "id": "completed",
+        "text": "Completed"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "notStarted",
+      "turn": "you",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "Project In Progress is Doing",
+    "steps": [
+      {
+        "id": "s00070",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "planned",
+        "text": "Planned"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold"
+      },
+      {
+        "id": "completed",
+        "text": "Completed"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "Project On Hold is parked",
+    "steps": [
+      {
+        "id": "s00071",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "On Hold",
+    "statusOptions": [
+      {
+        "id": "planned",
+        "text": "Planned"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold"
+      },
+      {
+        "id": "completed",
+        "text": "Completed"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "parked",
+      "turn": "parked",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "Project Completed is Done",
+    "steps": [
+      {
+        "id": "s00072",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "Completed",
+    "statusOptions": [
+      {
+        "id": "planned",
+        "text": "Planned"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold"
+      },
+      {
+        "id": "completed",
+        "text": "Completed"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "done",
+      "turn": "none",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "another text by its category: not started",
+    "steps": [
+      {
+        "id": "s00073",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "Someday",
+    "statusOptions": [
+      {
+        "id": "someday",
+        "text": "Someday",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "blocked-by-vendor",
+        "text": "Blocked by vendor",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "shipped",
+        "text": "Shipped",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "notStarted",
+      "turn": "you",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "another text by its category: blocked",
+    "steps": [
+      {
+        "id": "s00074",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "Blocked by vendor",
+    "statusOptions": [
+      {
+        "id": "someday",
+        "text": "Someday",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "blocked-by-vendor",
+        "text": "Blocked by vendor",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "shipped",
+        "text": "Shipped",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "parked",
+      "turn": "parked",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "another text by its category: done",
+    "steps": [
+      {
+        "id": "s00075",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "Shipped",
+    "statusOptions": [
+      {
+        "id": "someday",
+        "text": "Someday",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "blocked-by-vendor",
+        "text": "Blocked by vendor",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "shipped",
+        "text": "Shipped",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "done",
+      "turn": "none",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "no status is Not started",
+    "steps": [
+      {
+        "id": "s00076",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": null,
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "notStarted",
+      "turn": "you",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "status text matches case-insensitively",
+    "steps": [
+      {
+        "id": "s00077",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "in progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "a done item is nobody's turn, desk Resolved too",
+    "steps": [
+      {
+        "id": "s00078",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "Done",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": "Resolved",
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "done",
+      "turn": "none",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "desk Resolved with an open step is close",
+    "steps": [
+      {
+        "id": "s00079",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": "Resolved",
+    "role": "user",
+    "index": 0,
+    "action": "done",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "close",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "desk Closed beats On Hold",
+    "steps": [
+      {
+        "id": "s00080",
+        "kind": "question",
+        "state": "open",
+        "text": "Question step"
+      }
+    ],
+    "status": "On Hold",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": "Closed",
+    "role": "user",
+    "index": 0,
+    "action": "answer",
+    "text": "x",
+    "expect": {
+      "current": 0,
+      "stage": "parked",
+      "turn": "close",
+      "actions": [
+        "answer"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "desk In progress changes nothing",
+    "steps": [
+      {
+        "id": "s00081",
+        "kind": "question",
+        "state": "open",
+        "text": "Question step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": "In progress",
+    "role": "user",
+    "index": 0,
+    "action": "answer",
+    "text": "x",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "answer"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "On Hold is parked",
+    "steps": [
+      {
+        "id": "s00082",
+        "kind": "approve",
+        "state": "open",
+        "text": "Approve step"
+      }
+    ],
+    "status": "On Hold",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "approve",
+    "expect": {
+      "current": 0,
+      "stage": "parked",
+      "turn": "parked",
+      "actions": [
+        "approve",
+        "decline"
+      ],
+      "result": [
+        "approved"
+      ]
+    }
+  },
+  {
+    "name": "every step finished is close",
+    "steps": [
+      {
+        "id": "s00083",
+        "kind": "do",
+        "state": "done",
+        "text": "Do step"
+      },
+      {
+        "id": "s00084",
+        "kind": "approve",
+        "state": "declined",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "reopen",
+    "expect": {
+      "current": null,
+      "stage": "doing",
+      "turn": "close",
+      "actions": [
+        "reopen"
+      ],
+      "result": [
+        "open",
+        "declined"
+      ]
+    }
+  },
+  {
+    "name": "current Question is you",
+    "steps": [
+      {
+        "id": "s00085",
+        "kind": "do",
+        "state": "done",
+        "text": "Do step"
+      },
+      {
+        "id": "s00086",
+        "kind": "question",
+        "state": "open",
+        "text": "Question step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 1,
+    "action": "answer",
+    "text": "x",
+    "expect": {
+      "current": 1,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "answer"
+      ],
+      "result": [
+        "done",
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "current Do is you",
+    "steps": [
+      {
+        "id": "s00087",
+        "kind": "question",
+        "state": "done",
+        "text": "Question step"
+      },
+      {
+        "id": "s00088",
+        "kind": "do",
+        "state": "open",
+        "text": "Do step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 1,
+    "action": "done",
+    "expect": {
+      "current": 1,
+      "stage": "doing",
+      "turn": "you",
+      "actions": [
+        "done"
+      ],
+      "result": [
+        "done",
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "current open Approve is approve",
+    "steps": [
+      {
+        "id": "s00089",
+        "kind": "approve",
+        "state": "open",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 0,
+    "action": "approve",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "approve",
+      "actions": [
+        "approve",
+        "decline"
+      ],
+      "result": [
+        "approved"
+      ]
+    }
+  },
+  {
+    "name": "current approved Approve is agent",
+    "steps": [
+      {
+        "id": "s00090",
+        "kind": "approve",
+        "state": "approved",
+        "text": "Approve step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "agent",
+    "index": 0,
+    "action": "complete",
+    "text": "x",
+    "expect": {
+      "current": 0,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "complete",
+        "fail"
+      ],
+      "result": [
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "current Agent step is agent",
+    "steps": [
+      {
+        "id": "s00091",
+        "kind": "do",
+        "state": "declined",
+        "text": "Do step"
+      },
+      {
+        "id": "s00092",
+        "kind": "agent",
+        "state": "open",
+        "text": "Agent step"
+      }
+    ],
+    "status": "In Progress",
+    "statusOptions": [
+      {
+        "id": "not-started",
+        "text": "Not Started",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "next-up",
+        "text": "Next Up",
+        "statusCategory": "not-started"
+      },
+      {
+        "id": "in-progress",
+        "text": "In Progress",
+        "statusCategory": "in-progress"
+      },
+      {
+        "id": "on-hold",
+        "text": "On Hold",
+        "statusCategory": "blocked"
+      },
+      {
+        "id": "done",
+        "text": "Done",
+        "statusCategory": "done"
+      }
+    ],
+    "deskStatus": null,
+    "role": "user",
+    "index": 1,
+    "action": "run",
+    "expect": {
+      "current": 1,
+      "stage": "doing",
+      "turn": "agent",
+      "actions": [
+        "done",
+        "run"
+      ],
+      "result": [
+        "declined",
+        "approved"
+      ]
+    }
+  }
+]

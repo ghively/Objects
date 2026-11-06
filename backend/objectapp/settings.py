@@ -1,7 +1,9 @@
 """Device settings: ``<state dir>/settings.json`` (outside every space).
 
 The keys are the M7 contract's ``DeviceSettings`` plus M8's (language, decimal
-separator, time zone, backlink defaults, presentation); `read` merges the file over
+separator, time zone, backlink defaults, presentation), M22's ``activityName`` (your
+name in a work item's Activity, 1-60 characters, one line) and M23's ``workAlertFolder``
+and ``workAlertIntervals`` (the Work section's monitoring folder watch); `read` merges the file over
 `DEFAULTS` (a missing file reads as the defaults, revision ``''``, and is not
 created). `patch` checks each key's shape, replaces the patched top-level keys,
 keeps unknown keys already in the file, and writes atomically against the
@@ -86,6 +88,12 @@ DEFAULTS: dict[str, Any] = {
     "aiHidden": False,
     "claudePath": None,
     "aiModel": None,
+    # M22: who "you" are in a work item's Activity and Work notes lines.
+    "activityName": "Gene",
+    # M23: the monitoring folder the Work section's folder watch reads (absolute path or
+    # None: off), and per-source staleness intervals in minutes.
+    "workAlertFolder": None,
+    "workAlertIntervals": {},
 }
 
 # A model name or alias for ``claude --model``: the one rule, in `aimodels` (M16).
@@ -125,10 +133,22 @@ _lock = threading.RLock()
 class SettingsProblem(ValueError):
     """A ``PUT /api/settings`` patch has an unknown key or a value of the wrong shape (422)."""
 
-    def __init__(self, key: str) -> None:
-        super().__init__(f"Cannot patch: {key}")
+    def __init__(self, key: str, message: str | None = None) -> None:
+        text = message if message is not None else f"Cannot patch: {key}"
+        super().__init__(text)
         self.key = key
-        self.message = f"Cannot patch: {key}"
+        self.message = text
+
+
+# M23: the two Work alert keys answer with their own messages.
+WORK_ALERT_FOLDER_MAX = 500
+WORK_ALERT_INTERVALS_MAX = 50
+WORK_ALERT_INTERVAL_MIN = 1
+WORK_ALERT_INTERVAL_MAX = 10080
+_PROBLEM_MESSAGES = {
+    "workAlertFolder": "Pick a folder (a full path).",
+    "workAlertIntervals": "Intervals are whole minutes from 1 to 10080.",
+}
 
 
 def settings_path() -> Path:
@@ -162,6 +182,35 @@ def _valid(key: str, value: Any) -> bool:
         return value is None or (isinstance(value, str) and 0 < len(value) <= 1024 and "\x00" not in value)
     if key == "aiModel":
         return value is None or (isinstance(value, str) and _AI_MODEL.fullmatch(value) is not None)
+    if key == "activityName":
+        return (
+            isinstance(value, str)
+            and 1 <= len(value) <= 60
+            and value.strip() != ""
+            and "\n" not in value
+            and "\r" not in value
+        )
+    if key == "workAlertFolder":
+        return value is None or (
+            isinstance(value, str)
+            and 0 < len(value) <= WORK_ALERT_FOLDER_MAX
+            and value == value.strip()
+            and not any(c in value for c in "\x00\r\n")
+            and Path(value).is_absolute()
+        )
+    if key == "workAlertIntervals":
+        return (
+            isinstance(value, dict)
+            and len(value) <= WORK_ALERT_INTERVALS_MAX
+            and all(
+                isinstance(k, str)
+                and 1 <= len(k) <= 100
+                and isinstance(v, int)
+                and not isinstance(v, bool)
+                and WORK_ALERT_INTERVAL_MIN <= v <= WORK_ALERT_INTERVAL_MAX
+                for k, v in value.items()
+            )
+        )
     if key == "startupSpacePath":
         return value is None or isinstance(value, str)
     if key == "spellCheckLang":
@@ -245,7 +294,7 @@ def patch(patch: dict[str, Any], base_revision: str | None) -> tuple[dict[str, A
         raise SettingsProblem("patch")
     for key, value in patch.items():
         if key not in DEFAULTS or not _valid(key, value):
-            raise SettingsProblem(key)
+            raise SettingsProblem(key, _PROBLEM_MESSAGES.get(key))
     path = settings_path()
     with _lock:
         data, current, error = _load()
