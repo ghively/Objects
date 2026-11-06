@@ -22,6 +22,7 @@ import {
 import { useTabs, type Target } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
 import { AddAgentFolderDialog } from './AddAgentFolderDialog'
+import { requestAgentTab } from './AgentPage'
 import { AgentTrashDialog } from './AgentTrashDialog'
 import { AGENT_TEXT as T } from './agentText'
 import { LEARNING_TEXT } from './learningText'
@@ -182,7 +183,10 @@ export function AgentsSection({ onOpenTarget }: AgentsSectionProps) {
             agent={a}
             onOpen={() => openAgentChat(a)}
             onSettings={() => open({ kind: 'agent', id: a.id }, {})}
-            onMemory={() => open({ kind: 'agent', id: a.id, tab: 'memory' }, {})}
+            onMemory={() => {
+              requestAgentTab(a.id, 'memory')
+              open({ kind: 'agent', id: a.id, tab: 'memory' }, {})
+            }}
             onDuplicate={() => newAgent(a)}
             onDelete={() => void remove(a)}
           />

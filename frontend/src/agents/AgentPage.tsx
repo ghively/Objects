@@ -3,13 +3,37 @@
  * agent's icon and name, then its tabs (`AGENT_TABS`, sorted by order: Profile, Instructions,
  * Tools, Memory, Skills, Learning, Chats). The agent comes from the shared list (`useAgents`),
  * which the tabs update after a save; opening the page writes nothing. A changed `tab` prop (the
- * agent opened again at another tab, e.g. "Memory & skills") switches to it.
+ * agent opened again at another tab, e.g. "Memory & skills") switches to it, and so does every
+ * `openAgentTab` (the same target opened again after a tab was picked by hand).
  */
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { create } from 'zustand'
 import { IconOrEmoji } from '@/components/Icon'
 import { cn } from '@/lib/utils'
+import { useTabs } from '@/nav/tabs'
 import { AGENT_TABS } from './agentTabs'
 import { useAgents } from './useAgents'
+
+/**
+ * The last ask to show an agent's tab. Opening the target an open page already shows changes
+ * nothing in the tabs store, so `seq` tells the page to switch back to `tab` all the same.
+ */
+export const useAgentTabRequest = create<{ agentId: string | null; tab: string | null; seq: number }>(() => ({
+  agentId: null,
+  tab: null,
+  seq: 0,
+}))
+
+/** Ask an open page of the agent to show `tab` (call it with the open of `{kind: 'agent', id, tab}`). */
+export function requestAgentTab(agentId: string, tab: string): void {
+  useAgentTabRequest.setState((s) => ({ agentId, tab, seq: s.seq + 1 }))
+}
+
+/** Open the agent's page on `tab`, switching an open page to it even when it shows that target. */
+export function openAgentTab(agentId: string, tab: string): void {
+  requestAgentTab(agentId, tab)
+  useTabs.getState().open({ kind: 'agent', id: agentId, tab }, {})
+}
 
 export interface AgentPageProps {
   id: string
@@ -37,6 +61,15 @@ export function AgentPage({ id, tab }: AgentPageProps) {
   useEffect(() => {
     if (tab && AGENT_TABS.some((t) => t.id === tab)) setActive(tab)
   }, [tab])
+
+  // Every `openAgentTab` for this agent after the page mounted, the same tab again included.
+  const request = useAgentTabRequest()
+  const seenSeq = useRef(request.seq)
+  useEffect(() => {
+    if (request.seq === seenSeq.current) return
+    seenSeq.current = request.seq
+    if (request.agentId === id && request.tab && AGENT_TABS.some((t) => t.id === request.tab)) setActive(request.tab)
+  }, [request, id])
 
   if (!agent) {
     return (
