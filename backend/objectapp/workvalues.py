@@ -116,6 +116,12 @@ def _text(v: Any) -> str | None:
     return str(v)
 
 
+def _nested_key(entry: dict[str, Any], keys: Sequence[str]) -> str | None:
+    """The first known key whose value is a mapping or a list (it can't be kept as text, so the
+    entry is a problem and the strict reads refuse writes instead of dropping it)."""
+    return next((k for k in keys if isinstance(entry.get(k), (dict, list))), None)
+
+
 def _valid_id(v: Any) -> str | None:
     if isinstance(v, bool) or not isinstance(v, (str, int)):
         return None
@@ -211,6 +217,10 @@ def read_steps_at(raw: Any) -> tuple[list[tuple[int, Step]], list[str]]:
             continue
         if not isinstance(entry, dict):
             problems.append(f"Step {n} can't be read.")
+            continue
+        nested = _nested_key(entry, STEP_KEYS)
+        if nested is not None:
+            problems.append(f"Step {n}'s {nested} isn't text.")
             continue
         kind_text = _text(entry.get("kind"))
         kind = kind_text.strip().lower() if kind_text is not None else ""
@@ -396,6 +406,10 @@ def read_floor_at(raw: Any) -> tuple[list[tuple[int, FloorItem]], list[str]]:
     for n, entry in enumerate(_as_list(raw), start=1):
         if not isinstance(entry, dict):
             problems.append(f"Floor item {n} can't be read.")
+            continue
+        nested = _nested_key(entry, FLOOR_KEYS)
+        if nested is not None:
+            problems.append(f"Floor item {n}'s {nested} isn't text.")
             continue
         place, what = _text(entry.get("place")), _text(entry.get("what"))
         place = place if place and place.strip() else None
