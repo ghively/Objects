@@ -9,6 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api, RevisionConflictError } from '@/api/client'
 import type { Agent } from '@/api/types'
+import { MCP_TEXT } from '@/mcp/mcpText'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { agent } from '@/test/mockApi'
 import { PROFILE_TEXT, ProfileTab } from './ProfileTab'
@@ -104,5 +105,39 @@ describe('ProfileTab', () => {
     await user.click(screen.getByRole('button', { name: PROFILE_TEXT.removeFromList }))
     expect(mocked.unregisterAgent).toHaveBeenCalledWith(RESEARCHER)
     expect(mocked.deleteAgent).not.toHaveBeenCalled()
+  })
+})
+
+describe('ProfileTab: missing secrets', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetAgents()
+  })
+  afterEach(() => resetAgents())
+
+  test('test Needs secrets shows Set… per variable and saving calls setMcpSecret', async () => {
+    seed(agent({ id: RESEARCHER, revision: 'r1', mcpServers: [{ name: 'github', missingVars: ['GH_TOKEN', 'GH_ORG'], usable: false }] }))
+    mocked.agent.mockResolvedValueOnce(
+      agent({ id: RESEARCHER, revision: 'r1', mcpServers: [{ name: 'github', missingVars: ['GH_ORG'], usable: false }] }),
+    )
+    const user = userEvent.setup()
+    render(<Live id={RESEARCHER} />)
+    const row = screen.getByText('github').closest('li') as HTMLElement
+    expect(within(row).getByText('Needs secrets: GH_TOKEN, GH_ORG')).toBeInTheDocument()
+    const buttons = within(row).getAllByRole('button', { name: new RegExp(`^${MCP_TEXT.setVar}`) })
+    expect(buttons).toHaveLength(2)
+    expect(buttons.map((b) => b.textContent)).toEqual([MCP_TEXT.setVar, MCP_TEXT.setVar])
+
+    await user.click(within(row).getByRole('button', { name: `${MCP_TEXT.setVar} GH_TOKEN` }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: MCP_TEXT.setTitle('GH_TOKEN') })).toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText(MCP_TEXT.value), 's3cret-profile')
+    await user.click(within(dialog).getByRole('button', { name: MCP_TEXT.save }))
+    await waitFor(() => expect(mocked.setMcpSecret).toHaveBeenCalledWith('GH_TOKEN', 's3cret-profile'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    // The agent reloads: GH_TOKEN is no longer missing.
+    expect(mocked.agent).toHaveBeenCalledWith(RESEARCHER)
+    await waitFor(() => expect(screen.getByText('Needs secrets: GH_ORG')).toBeInTheDocument())
+    expect(document.body.innerHTML).not.toContain('s3cret-profile')
   })
 })
