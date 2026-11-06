@@ -280,7 +280,7 @@ const STATUS_ICON: Record<AutomationRun['status'], string> = {
 }
 
 /** A rule's run log, newest first; it refreshes on that rule's `automationRuns` events. */
-function RunLog({ ruleId, name, onBack }: { ruleId: string; name: string; onBack(): void }) {
+export function RunLog({ ruleId, name, onBack }: { ruleId: string; name: string; onBack(): void }) {
   const [runs, setRuns] = useState<AutomationRun[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {

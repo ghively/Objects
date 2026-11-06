@@ -4,6 +4,8 @@
 //
 // M20: each tab names the agent kinds it is shown for (`kinds`, default local only). A remote agent
 // has Profile (its own, 10), Card (15) and Chats (70); `tabsFor` picks an agent's tabs.
+//
+// M21: Schedules (80), the last tab, local agents only.
 import type { ComponentType } from 'react'
 import type { Agent } from '@/api/types'
 import { lazyWithReload } from '@/lib/lazyReload'
@@ -19,6 +21,8 @@ import { ToolsTab } from './ToolsTab'
 
 /** M18: the Skills tab, loaded when first shown (`AgentPage` wraps the tab in `Suspense`). */
 const SkillsTab = lazyWithReload(() => import('./SkillsTab').then((m) => ({ default: m.SkillsTab })))
+/** M21: the Schedules tab, loaded when first shown. */
+const SchedulesTab = lazyWithReload(() => import('./SchedulesTab').then((m) => ({ default: m.SchedulesTab })))
 
 export interface AgentTab {
   id: string
@@ -39,6 +43,7 @@ export const AGENT_TABS: AgentTab[] = [
   { id: 'skills', label: LEARNING_TEXT.skillsTab, order: 50, component: SkillsTab },
   { id: 'learning', label: LEARNING_TEXT.learningTab, order: 60, component: LearningTab },
   { id: 'chats', label: 'Chats', order: 70, component: ChatsTab, kinds: ['local', 'remote'] },
+  { id: 'schedules', label: 'Schedules', order: 80, component: SchedulesTab },
 ]
 
 /** The tabs an agent of `kind` shows, in order (a tab without `kinds` is local only). */
