@@ -41,7 +41,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from . import agentmemory, agentskills, ai, chatsearch, learnundo, ledger, transcripts
+from . import agentmemory, agentskills, ai, chatsearch, learnundo, ledger, toolcatalog, transcripts
 from .agentmodel import AgentError, AgentInput, AgentNotFound, AgentReadOnly
 from .agents import AgentRecord, AgentRegistry
 from .api_agents import _fail
@@ -437,7 +437,8 @@ def router(ctx: ApiContext, *, reviews: ReviewRunner | None = None, curator: Cur
             return _error(404, NO_CHAT)
         if agent.read_only_reason:
             return _fail(AgentReadOnly(agent.read_only_reason))
-        if all(t in _tools_off(agent) for t in LEARNING_TOOLS):
+        off = _tools_off(agent)
+        if all(f"mcp__{toolcatalog.AGENT_SERVER}__{t}" in off for t in LEARNING_TOOLS):
             return _error(422, TOOLS_OFF)
         claude = await asyncio.to_thread(claude_or_none, settings)
         if claude is None or reviews is None:
