@@ -48,6 +48,10 @@ Routes (all JSON; ``read`` scope for the GETs and the import preview, ``read-wri
 - ``POST /v1/import/start`` ``{previewId, target, mapping?}`` -> 202 ``{jobId, targetPath}``
 - ``POST /v1/trash/{id}/restore``; ``POST /v1/history/restore`` ``{path, versionId, version}``
 
+M22: on a work item, ``/v1/object/duplicate`` and ``/v1/history/restore`` answer ``422`` ("Steps
+change with the step actions.") when the copy or the restored version would hold an approved or
+done Approve step the file doesn't have now (the app's own routes are unchanged).
+
 Never offered: permanent delete and emptying the trash, the app's preferences, tokens, spaces, UI state,
 attachments, export, reminders, templates.
 """
@@ -291,6 +295,19 @@ def _failed(status: int, body: Any) -> JSONResponse:
     return JSONResponse(data, status_code=status)
 
 
+def _approvals(fm: dict[str, Any]) -> set[tuple[Any, ...]]:
+    """The Approve steps in ``fm`` that Gene has let through (approved or done), as comparable
+    keys: a version restore or a copy must not bring back one the file doesn't have now."""
+    from .workvalues import read_steps
+
+    steps, _problems = read_steps(fm.get("steps"))
+    return {
+        (s.id, s.text, s.state, s.approvedAt, s.notBefore, s.doneAt)
+        for s in steps
+        if s.kind == "approve" and s.state in ("approved", "done")
+    }
+
+
 def _within(child: Path, parent: Path) -> bool:
     c, p = os.path.normcase(str(child)), os.path.normcase(str(parent))
     return c == p or c.startswith(p.rstrip("\\/") + os.sep)
@@ -298,7 +315,9 @@ def _within(child: Path, parent: Path) -> bool:
 
 def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> APIRouter:
     """The v1 tool routes, mounted on the app's ``/api`` router (so no prefix here)."""
-    from .history import HistoryStore, VersionNotFound
+    from .history import HistoryStore, VersionNotFound, _fm_of
+    from .workfields import is_work_type
+    from .workhook import STEPS_GATED
     from .references import unlinked_mentions
     from .whiteboardstore import is_whiteboard
 
@@ -311,6 +330,12 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
     previews: OrderedDict[str, dict[str, Any]] = OrderedDict()
     previews_lock = threading.Lock()
     r = APIRouter()
+
+    def is_work(rel: str) -> bool:
+        try:
+            return is_work_type(space.type_by_id(space.get(rel).type))
+        except (KeyError, ValueError):
+            return False
 
     def origin(token: TokenRecord) -> str:
         return f"api:{token.name}"
@@ -563,6 +588,9 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
     def duplicate(req: PathRequest, request: Request):
         token = auth(request, write=True)
         rel = visible(req.path)
+        # M22: a copy of a work item would hold Gene's approvals for the agent to use again.
+        if is_work(rel) and _approvals(space.read(rel)[1]):
+            return error(422, STEPS_GATED)
         status, body = app(request, "POST", "/api/object/duplicate", {"path": rel, "clientId": origin(token)})
         if status >= 400:
             return _failed(status, body)
@@ -977,6 +1005,16 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
     def restore_version(req: RestoreVersionRequest, request: Request):
         token = auth(request, write=True)
         rel = visible(req.path)
+        # M22: an earlier version may hold an approval Gene has since withdrawn or declined.
+        if is_work(rel):
+            try:
+                old = history.content(rel, req.versionId).get("text")
+            except (KeyError, ValueError):  # VersionNotFound: the app route answers it
+                old = None
+            if isinstance(old, str) and _approvals(_fm_of(old.encode("utf-8"))) - _approvals(
+                space.read(rel)[1]
+            ):
+                return error(422, STEPS_GATED)
         status, body = app(
             request, "POST", "/api/history/restore",
             {"path": rel, "id": req.versionId, "baseVersion": req.version, "clientId": origin(token)},
