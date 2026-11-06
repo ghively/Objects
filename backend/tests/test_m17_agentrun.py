@@ -463,7 +463,20 @@ def _runs(log: Path) -> list[dict]:
     return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def _plain_run(claude: str):
+    """A bare `RunCommand` (T7 made `Turn.run` required)."""
+    import tempfile
+
+    def run(resume: str | None) -> agentrun.RunCommand:
+        tmp = Path(tempfile.mkdtemp(prefix="object-test-run-"))
+        return agentrun.RunCommand(args=[claude, "-p", "--output-format", "stream-json"], cwd=tmp,
+                                   env=dict(os.environ), tmp=tmp, mcp_config={}, run_settings={}, append="")
+
+    return run
+
+
 def _turn(claude: str, prompt: str, **kw: Any) -> ai.Turn:
+    kw.setdefault("run", _plain_run(claude))
     return ai.Turn(claude=claude, mode="chat", prompt_resume=None, prompt_fresh=prompt, session_id=None,
                    model=None, api_url="http://127.0.0.1:1", token="t", **kw)
 
