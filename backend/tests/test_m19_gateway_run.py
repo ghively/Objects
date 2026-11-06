@@ -276,6 +276,37 @@ def test_disabled_and_clashing_servers_left_out(env) -> None:
     assert "plain" in parts.mcp_servers and parts.mcp_servers["gh"] == {"command": "gh-folder-mcp"}
 
 
+@pytest.mark.parametrize("bad", [
+    {"kind": "command", "command": None},
+    {"kind": "command", "command": "  "},
+    {"kind": "pipe", "command": "python"},
+    {"kind": "url", "url": None, "transport": "http"},
+    {"kind": "url", "url": "ftp://host.example/mcp", "transport": "http"},
+    {"kind": "command", "command": "python", "args": "srv.py"},
+])
+def test_unreadable_entries_left_out(env, bad: dict[str, Any]) -> None:
+    store = McpStore()
+    store.create(_cmd_server("good"))
+    path = env["state"] / "mcp-servers.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["servers"].append({"id": "01JC7ZK3T9Q4M2X8B5N6R1V0WZ", "name": "broken", "enabled": True,
+                            "createdAt": "2026-11-06T09:00:00.000Z", "updatedAt": "2026-11-06T09:00:00.000Z",
+                            **bad})
+    path.write_text(json.dumps(data), encoding="utf-8")
+    agent = _agent()
+    parts = agentrun.RunParts()
+    scope = _scope(env, agent)
+    for _order, _name, fn in contributors():
+        fn(scope, parts)
+    assert "good" in parts.mcp_servers and "broken" not in parts.mcp_servers
+    assert "Skipped the MCP server 'broken': it can't be read." in parts.notes
+    cmd = _build(scope)
+    assert set(_servers(cmd)) >= {"good"} and "broken" not in _servers(cmd)
+    targets = probe_targets(agent)
+    assert gateway_key(_record("good")) in targets
+    assert gateway_key(_record("broken")) not in targets
+
+
 def test_purposes_without_gateway(env) -> None:
     McpStore().create(_cmd_server("alpha", env=[{"key": "API_KEY", "value": ENV_SECRET, "secret": True}]))
     agent = _agent()

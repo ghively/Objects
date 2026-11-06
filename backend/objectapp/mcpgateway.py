@@ -23,10 +23,13 @@ import re
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
+
+from pydantic import ValidationError
 
 from . import agentfiles, agentrun, secretstore, toolcatalog
 from .jsonstore import dump_json
-from .mcpmodel import GATEWAY_PURPOSES, NAME_PATTERN, RESERVED_NAMES
+from .mcpmodel import GATEWAY_PURPOSES, NAME_PATTERN, RESERVED_NAMES, McpServerFile
 from .mcpprobe import ProbeResult
 from .mcpstore import McpServerRecord, McpStore, MissingSecret, cli_entry, secret_env_name
 
@@ -53,6 +56,7 @@ __all__ = [
 FOLDER_LABEL = "{name} · this agent's folder"  # our string
 CLASH_NOTE = "Skipped the MCP server '{name}': this agent's folder has one with the same name."  # our string
 MISSING_NOTE = "Skipped the MCP server '{name}': a secret is missing. Set it again in Settings."  # our string
+UNREADABLE_NOTE = "Skipped the MCP server '{name}': it can't be read."  # our string
 
 _NAME = re.compile(NAME_PATTERN)
 _CLI_CHARS = re.compile(r"[^A-Za-z0-9_-]")
@@ -124,6 +128,27 @@ def _usable_name(name: Any) -> bool:
     return isinstance(name, str) and bool(_NAME.fullmatch(name)) and name not in RESERVED_NAMES
 
 
+def _runnable(data: dict[str, Any]) -> bool:
+    """A stored server a run can use: it fits `McpServerFile`, a command server has a command and
+    a URL server an http(s) address with a host. Anything else (a hand edit, a newer version's
+    entry) is left out, so one bad entry never breaks every run's ``--mcp-config``."""
+    try:
+        McpServerFile.model_validate(data)
+    except ValidationError:
+        return False
+    if data.get("kind") == "command":
+        command = data.get("command")
+        return isinstance(command, str) and command.strip() != ""
+    url = data.get("url")
+    if not isinstance(url, str):
+        return False
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return False
+    return parts.scheme in ("http", "https") and bool(parts.hostname)
+
+
 def _folder_servers(agent: Any) -> dict[str, dict[str, Any]]:
     if not getattr(agent, "exists", True) or getattr(agent, "missing", False):
         return {}
@@ -146,8 +171,9 @@ def _cached_names(result: ProbeResult | None) -> list[str]:
 
 def gateway_contributor(scope: RunScope, parts: RunParts) -> None:
     """Each enabled server (file order) into ``parts.mcp_servers`` and its secrets into ``parts.env``,
-    for `mcpmodel.GATEWAY_PURPOSES` only; skips a name the folder already has (a note), a server
-    whose every known tool is off (no note) and one with a missing secret (a note)."""
+    for `mcpmodel.GATEWAY_PURPOSES` only; skips a name the folder already has (a note), a stored
+    entry that can't be read (a note), a server whose every known tool is off (no note) and one
+    with a missing secret (a note)."""
     if scope.purpose not in GATEWAY_PURPOSES:
         return
     store = McpStore(scope.state)
@@ -161,6 +187,9 @@ def gateway_contributor(scope: RunScope, parts: RunParts) -> None:
             continue
         if name in parts.mcp_servers:
             parts.notes.append(CLASH_NOTE.format(name=name))
+            continue
+        if not _runnable(data):
+            parts.notes.append(UNREADABLE_NOTE.format(name=name))
             continue
         known = _cached_names(TOOL_CACHE.get(gateway_key(rec)))
         if known and all(tool_id(name, t) in off for t in known):
@@ -290,6 +319,8 @@ def probe_targets(agent: AgentRecord) -> dict[str, tuple[dict[str, Any], dict[st
     for rec in store.list():
         name = rec.data.get("name")
         if not rec.data.get("enabled", True) or not _usable_name(name) or name in folder:
+            continue
+        if not _runnable(rec.data):
             continue
         try:
             entry, env = cli_entry(rec.data, store.secrets)
