@@ -81,7 +81,16 @@ def set_clock(path: Path, iso: str) -> None:
     """Replace the clock file atomically (a half-written file reads as the system clock)."""
     tmp = path.with_suffix(".tmp")
     tmp.write_text(iso, encoding="utf-8")
-    os.replace(tmp, path)
+    # On Windows the replace is refused while the server has the clock file open for a read,
+    # so retry briefly instead of failing the run on that race.
+    for attempt in range(50):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if attempt == 49:
+                raise
+            time.sleep(0.02)
 
 
 def wait_up(http: Http) -> None:
