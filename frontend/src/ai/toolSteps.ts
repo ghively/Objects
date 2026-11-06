@@ -65,6 +65,10 @@ type Piece = string | Clause
 const c = (pre: string, key: string, post = '', firstLine = false): Clause => ({ key, pre, post, firstLine })
 
 const EDITED: Piece[] = ['Edited', c(' ', 'path')]
+const CREATED_NAME: Piece[] = ['Created', c(" '", 'name', "'")]
+const EDITED_DEFINITION: Piece[] = ['Edited a definition']
+const TRASHED_DEFINITION: Piece[] = ['Moved a definition to the Trash']
+const HISTORY_OF: Piece[] = ['Looked at the history of', c(' ', 'path')]
 
 const LINES: Record<string, Piece[]> = {
   // Object's tools (short names)
@@ -86,6 +90,45 @@ const LINES: Record<string, Piece[]> = {
   replace_section: EDITED,
   rename: ['Renamed', c(' ', 'path'), c(" to '", 'title', "'")],
   move_to_trash: ['Moved', c(' ', 'path'), ' to the Trash'],
+  // M17: the expanded Object tools and the agent tools (our strings, the M17 plan's table)
+  write_body: EDITED,
+  remove_tags: EDITED,
+  remove_from_collection: EDITED,
+  link_mention: EDITED,
+  open_daily_note: ['Opened the daily note', c(' for ', 'date')],
+  duplicate: ['Duplicated', c(' ', 'path')],
+  change_type: ['Changed the type of', c(' ', 'path')],
+  merge: ['Merged', c(' ', 'source'), c(' into ', 'target')],
+  create_tag: CREATED_NAME,
+  create_type: CREATED_NAME,
+  create_collection: CREATED_NAME,
+  create_query: CREATED_NAME,
+  create_whiteboard: ['Created', c(" '", 'title', "'")],
+  create_automation: CREATED_NAME,
+  edit_type: EDITED_DEFINITION,
+  edit_collection: EDITED_DEFINITION,
+  edit_query: EDITED_DEFINITION,
+  edit_whiteboard: EDITED_DEFINITION,
+  change_property_kind: EDITED_DEFINITION,
+  delete_type: TRASHED_DEFINITION,
+  delete_collection: TRASHED_DEFINITION,
+  delete_query: TRASHED_DEFINITION,
+  type_definition: ["Read the space's types"],
+  collection: ["Read the space's types"],
+  saved_query: ["Read the space's types"],
+  read_whiteboard: ['Read', c(' ', 'path')],
+  version_history: HISTORY_OF,
+  read_version: HISTORY_OF,
+  restore_version: ['Restored a version of', c(' ', 'path')],
+  unlinked_mentions: ['Found mentions of', c(' ', 'path')],
+  trash: ['Looked in the Trash'],
+  restore_from_trash: ['Restored from the Trash'],
+  automations: ['Listed automations'],
+  run_automation: ['Ran an automation'],
+  import_preview: ['Previewed an import'],
+  start_import: ['Started an import'],
+  import_status: ['Checked an import'],
+  agent_info: ['Looked up this agent'],
   // Claude Code's built-ins
   Read: ['Read', c(' ', 'file_path')],
   Write: ['Wrote', c(' ', 'file_path')],

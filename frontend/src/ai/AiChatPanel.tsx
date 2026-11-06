@@ -31,10 +31,17 @@
  *   last answer. In the message box, a Ctrl+Alt (AltGr on Windows) character that isn't a Latin
  *   letter is typed, not taken as a shortcut ("ą" is AltGr+A on a Polish keyboard).
  * - "Hide AI features" on: the panel shows nothing and closes its entry.
+ * - M17: every chat is with an agent. The header's agent picker (`AgentPicker`, the `leading` slot)
+ *   names it; picking another agent starts a new chat with it. An entry or seed without `agentId`
+ *   (Ctrl+Alt+J, every editor entry, an M10 saved chat) is with the default agent. Each turn sends
+ *   `agentId` and the `chatId` the stream's `chat` event gave; the save sends both. An entry with
+ *   `chatId` loads that transcript (messages, with tool steps as parts). The model picker's Default
+ *   row names the agent's model (the default agent's is Settings' model).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { api, ConflictError } from '@/api/client'
-import type { AiEvent, AiMessage, AiMode, AiProposal, AiSkipped, AiStatus, ObjectSummary } from '@/api/types'
+import type { AiEvent, AiMessage, AiMode, AiProposal, AiSkipped, AiStatus, ObjectSummary, TranscriptItem } from '@/api/types'
+import { useAgents } from '@/agents/useAgents'
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { showToast } from '@/editor/media/upload'
@@ -49,6 +56,7 @@ import { useReferences } from '@/references/useReferences'
 import { useSettings } from '@/settings/useSettings'
 import { useSettingsModal } from '@/settings/useSettingsModal'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
+import { AgentPicker } from './AgentPicker'
 import { AiChatHeader } from './AiChatHeader'
 import { AI_CHAT_TEXT as T, MODE_LABELS, toolLine } from './aiText'
 import { addTags, appendToObject, appendToTodaysNote, setProperties } from './aiWrites'
@@ -94,6 +102,37 @@ const newItemId = () => `m${Date.now().toString(36)}${(++itemSeq).toString(36)}`
 
 const toItem = (m: AiMessage): ChatItem => ({ ...m, id: newItemId() })
 const toMessage = (i: ChatItem): AiMessage => ({ role: i.role, text: i.text, at: i.at })
+
+/** agentmodel.DEFAULT_AGENT_ID */
+const DEFAULT_AGENT_ID = 'assistant'
+
+/**
+ * A transcript's lines as the panel's items: user and assistant messages; an answer's tool lines
+ * (written before it) become its parts, then its text. Error lines show nothing (as a failed turn).
+ */
+function fromTranscript(lines: TranscriptItem[]): ChatItem[] {
+  const out: ChatItem[] = []
+  let steps: ChatPart[] = []
+  for (const l of lines) {
+    if (l.type === 'user') {
+      steps = []
+      out.push({ id: newItemId(), role: 'user', text: l.text, at: l.at, prompt: l.text, mode: 'chat' })
+    } else if (l.type === 'tool') {
+      const done = l.result !== null
+      steps.push({
+        kind: 'tool',
+        step: { id: l.id, name: l.name, input: l.input, result: l.result, isError: l.isError, done, ...(done ? {} : { stopped: true }) },
+      })
+    } else if (l.type === 'assistant') {
+      const parts: ChatPart[] | null = steps.length ? [...steps, ...(l.text ? [{ kind: 'text' as const, text: l.text }] : [])] : null
+      out.push({ id: newItemId(), role: 'assistant', text: l.text, at: l.at, ...(l.stopped ? { stopped: true } : {}), ...(parts ? { parts } : {}) })
+      steps = []
+    } else {
+      steps = []
+    }
+  }
+  return out
+}
 
 const sameMessage = (a: AiMessage, b: AiMessage) => a.role === b.role && (a.at ?? '') === (b.at ?? '') && a.text.trim() === b.text.trim()
 
@@ -338,6 +377,10 @@ export interface AiChatPanelProps {
   entryId: string
   /** The saved AI Chat object it shows (none: a new chat). */
   path?: string
+  /** M17: the agent the chat is with (none: the default agent). */
+  agentId?: string
+  /** M17: the chat transcript it shows (with `agentId`). */
+  chatId?: string
 }
 
 export function AiChatPanel(props: AiChatPanelProps) {
@@ -350,7 +393,7 @@ export function AiChatPanel(props: AiChatPanelProps) {
   return <AiChat {...props} />
 }
 
-function AiChat({ entryId, path }: AiChatPanelProps) {
+function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatPanelProps) {
   const main = useTabs((s) => currentTarget(s))
   const mainPath = main?.kind === 'object' ? main.path : null
   const root = useSpaceInfo((s) => s.space?.root ?? null)
@@ -390,7 +433,23 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
     modelRef.current = next
     setModelState(next)
   }, [])
-  const defaultModel = useSettings((st) => st.settings.aiModel ?? null)
+  /** The agent this chat is with; a ref too, for the turn being sent. */
+  const [agentId, setAgentIdState] = useState<string>(() => agentProp ?? DEFAULT_AGENT_ID)
+  const agentRef = useRef(agentId)
+  const setAgentId = useCallback((next: string) => {
+    agentRef.current = next
+    setAgentIdState(next)
+  }, [])
+  /** The entry's `agentId` last acted on (the panel's own target changes are not acted on again). */
+  const agentPropSeen = useRef(agentProp)
+  /** The chat's transcript id (from the stream's `chat` event, a loaded chat or a transcript entry). */
+  const chatIdRef = useRef<string | null>(null)
+  /** A transcript entry a seed replaced: not loaded. */
+  const ignoreChat = useRef<string | null>(null)
+  const agent = useAgents((st) => st.agents.find((a) => a.id === agentId))
+  const settingsModel = useSettings((st) => st.settings.aiModel ?? null)
+  // The Default row names the agent's model; the default agent's is Settings' model.
+  const defaultModel = agentId === DEFAULT_AGENT_ID || agent?.default ? settingsModel : (agent?.model ?? null)
   const controller = useRef<AbortController | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -446,6 +505,7 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
     loadSeq.current++
     chat.current = { path: null, version: null }
     sessionId.current = null
+    chatIdRef.current = null
     setModel(null)
     setItems([])
     setBusy(null)
@@ -466,10 +526,15 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
     const seed = useAi.getState().take()
     if (!seed) return
     reset()
-    if (path) {
-      // The entry named a saved chat: the new one replaces it (and that chat is not loaded).
-      ignorePath.current = path
-      useTabs.getState().replaceSidepanelEntryTarget(entryId, { kind: 'aiChat' })
+    // No agentId (Ctrl+Alt+J, every editor entry): the default agent.
+    const seedAgent = seed.agentId ?? DEFAULT_AGENT_ID
+    setAgentId(seedAgent)
+    if (path || chatProp || (agentProp ?? DEFAULT_AGENT_ID) !== seedAgent) {
+      // The entry named a saved chat or another agent's: the new one replaces it (and that chat is not loaded).
+      if (path) ignorePath.current = path
+      if (chatProp) ignoreChat.current = chatProp
+      agentPropSeen.current = seed.agentId
+      useTabs.getState().replaceSidepanelEntryTarget(entryId, { kind: 'aiChat', ...(seed.agentId ? { agentId: seed.agentId } : {}) })
     }
     contextChosen.current = true
     const current = currentTarget(useTabs.getState())
@@ -503,6 +568,9 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
         if (mine !== loadSeq.current || !alive.current) return
         chat.current = { path: c.path, version: c.version }
         sessionId.current = c.sessionId
+        // M17: an M10 chat (no Agent property) answers the default agent and no transcript.
+        setAgentId(c.agentId || DEFAULT_AGENT_ID)
+        chatIdRef.current = c.chatId ?? null
         setModel(null)
         contextChosen.current = true
         setContext(c.contextPaths)
@@ -511,7 +579,60 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
       .catch((e: unknown) => {
         if (mine === loadSeq.current && alive.current) setError(errorText(e))
       })
-  }, [path, reset, setItems, setModel])
+  }, [path, reset, setItems, setModel, setAgentId])
+
+  // M17: the entry names another agent (a sidebar row): a new chat with it.
+  useEffect(() => {
+    if (agentProp === agentPropSeen.current) return
+    agentPropSeen.current = agentProp
+    if (!agentProp || chatProp || path || agentProp === agentRef.current) return
+    reset()
+    setAgentId(agentProp)
+    contextChosen.current = false
+    const current = currentTarget(useTabs.getState())
+    setContext(current?.kind === 'object' ? [current.path] : [])
+    // `chatProp` and `path` are read as they are when the agent changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentProp, reset, setAgentId])
+
+  // M17: the entry names a transcript (an agent's Chats tab): loaded when it isn't the one shown.
+  useEffect(() => {
+    if (!chatProp || chatProp === chatIdRef.current) return
+    if (chatProp === ignoreChat.current) {
+      ignoreChat.current = null
+      return
+    }
+    reset()
+    const owner = agentProp ?? DEFAULT_AGENT_ID
+    setAgentId(owner)
+    agentPropSeen.current = agentProp
+    chatIdRef.current = chatProp
+    const mine = loadSeq.current
+    api
+      .agentChat(owner, chatProp)
+      .then(async (t) => {
+        if (mine !== loadSeq.current || !alive.current) return
+        chatIdRef.current = t.id
+        sessionId.current = t.sessionId
+        contextChosen.current = true
+        const lastUser = [...t.items].reverse().find((i) => i.type === 'user')
+        setContext(lastUser && lastUser.type === 'user' ? lastUser.contextPaths : [])
+        setItems(fromTranscript(t.items))
+        // Saved as an AI Chat object: later saves go to it, by its version.
+        if (!t.objectPath) return
+        try {
+          const c = await api.aiChatLoad(t.objectPath)
+          if (mine === loadSeq.current && alive.current) chat.current = { path: c.path, version: c.version }
+        } catch {
+          // The object is gone: the next save makes a new one.
+        }
+      })
+      .catch((e: unknown) => {
+        if (mine === loadSeq.current && alive.current) setError(errorText(e))
+      })
+    // `agentProp` is read as it is when the transcript changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatProp, reset, setAgentId, setItems])
 
   const save = useCallback(() => {
     const run = async () => {
@@ -522,6 +643,8 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
         contextPaths: contextRef.current,
         sessionId: sessionId.current,
         messages,
+        agentId: agentRef.current,
+        chatId: chatIdRef.current,
       }
       const seq = loadSeq.current
       try {
@@ -580,7 +703,8 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
       setBusy({ text: '', tools: [], parts: [] })
       const onEvent = (e: AiEvent) => {
         if (ctl.signal.aborted) return
-        if (e.type === 'session') sessionId.current = e.sessionId
+        if (e.type === 'chat') chatIdRef.current = e.chatId
+        else if (e.type === 'session') sessionId.current = e.sessionId
         else if (e.type === 'text') {
           acc += e.text
           parts = applyEvent(parts, e)
@@ -605,6 +729,8 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
             history: base.map(toMessage),
             sessionId: sessionId.current,
             model: modelRef.current,
+            agentId: agentRef.current,
+            chatId: chatIdRef.current,
           },
           onEvent,
           ctl.signal,
@@ -768,11 +894,28 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
     if (!contextRef.current.includes(p)) setContext([...contextRef.current, p])
   }
 
+  /** The entry's target for a new chat with agent `id`. */
+  const newChatTarget = (id: string) => {
+    agentPropSeen.current = id === DEFAULT_AGENT_ID ? undefined : id
+    return { kind: 'aiChat' as const, ...(id === DEFAULT_AGENT_ID ? {} : { agentId: id }) }
+  }
+
   const newChat = () => {
     reset()
     contextChosen.current = false
     setContext(mainPath ? [mainPath] : [])
-    if (path) useTabs.getState().replaceSidepanelEntryTarget(entryId, { kind: 'aiChat' })
+    if (path || chatProp) useTabs.getState().replaceSidepanelEntryTarget(entryId, newChatTarget(agentRef.current))
+    focusInput()
+  }
+
+  // M17: picking another agent starts a new chat with it (spec).
+  const pickAgent = (id: string) => {
+    if (id === agentRef.current) return
+    reset()
+    setAgentId(id)
+    contextChosen.current = false
+    setContext(mainPath ? [mainPath] : [])
+    useTabs.getState().replaceSidepanelEntryTarget(entryId, newChatTarget(id))
     focusInput()
   }
 
@@ -787,7 +930,14 @@ function AiChat({ entryId, path }: AiChatPanelProps) {
 
   return (
     <div data-ai-chat="" className="flex h-full min-h-0 flex-col" onKeyDown={onKeyDown}>
-      <AiChatHeader model={model} defaultModel={defaultModel} onModelChange={setModel} onNewChat={newChat} busy={!!busy} />
+      <AiChatHeader
+        leading={<AgentPicker value={agentId} onChange={pickAgent} />}
+        model={model}
+        defaultModel={defaultModel}
+        onModelChange={setModel}
+        onNewChat={newChat}
+        busy={!!busy}
+      />
       <div className="flex shrink-0 items-center gap-1 border-b border-line px-3 py-1.5">
         <span className="text-[12px] font-medium text-fg-muted">{T.context}</span>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1" aria-label={T.context} role="list">

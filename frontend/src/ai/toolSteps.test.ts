@@ -54,6 +54,43 @@ describe('toolStepLine', () => {
     expect(line('Mystery')).toBe('Used Mystery')
   })
 
+  test("test the new tools' lines", () => {
+    // M17: the expanded Object tools and the agent tools.
+    for (const n of ['write_body', 'remove_tags', 'remove_from_collection', 'link_mention']) {
+      expect(line(n, { path: 'C.md' })).toBe('Edited C.md')
+    }
+    expect(line('open_daily_note', { date: '2026-11-06' })).toBe('Opened the daily note for 2026-11-06')
+    expect(line('duplicate', { path: 'C.md' })).toBe('Duplicated C.md')
+    expect(line('change_type', { path: 'C.md' })).toBe('Changed the type of C.md')
+    expect(line('merge', { source: 'A.md', target: 'B.md' })).toBe('Merged A.md into B.md')
+    for (const n of ['create_tag', 'create_type', 'create_collection', 'create_query', 'create_automation']) {
+      expect(line(n, { name: 'Rack' })).toBe("Created 'Rack'")
+    }
+    expect(line('create_whiteboard', { title: 'Plan' })).toBe("Created 'Plan'")
+    for (const n of ['edit_type', 'edit_collection', 'edit_query', 'edit_whiteboard', 'change_property_kind']) {
+      expect(line(n, { path: 'W.md' })).toBe('Edited a definition')
+    }
+    for (const n of ['delete_type', 'delete_collection', 'delete_query']) {
+      expect(line(n)).toBe('Moved a definition to the Trash')
+    }
+    for (const n of ['type_definition', 'collection', 'saved_query']) {
+      expect(line(n)).toBe("Read the space's types")
+    }
+    expect(line('read_whiteboard', { path: 'W.md' })).toBe('Read W.md')
+    expect(line('version_history', { path: 'C.md' })).toBe('Looked at the history of C.md')
+    expect(line('read_version', { path: 'C.md', version_id: 'v1' })).toBe('Looked at the history of C.md')
+    expect(line('restore_version', { path: 'C.md' })).toBe('Restored a version of C.md')
+    expect(line('unlinked_mentions', { path: 'C.md' })).toBe('Found mentions of C.md')
+    expect(line('trash')).toBe('Looked in the Trash')
+    expect(line('restore_from_trash', { trash_id: 'x' })).toBe('Restored from the Trash')
+    expect(line('automations')).toBe('Listed automations')
+    expect(line('run_automation', { rule_id: 'r' })).toBe('Ran an automation')
+    expect(line('import_preview', { path: '/x' })).toBe('Previewed an import')
+    expect(line('start_import', { preview_id: 'p' })).toBe('Started an import')
+    expect(line('import_status', { job_id: 'j' })).toBe('Checked an import')
+    expect(line('agent_info')).toBe('Looked up this agent')
+  })
+
   test('test long values are cut at 60 characters', () => {
     const q = 'x'.repeat(61)
     expect(line('search', { query: q })).toBe(`Searched notes for '${'x'.repeat(60)}…'`)

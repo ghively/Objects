@@ -8,6 +8,8 @@ import { useSettings } from '@/settings/useSettings'
 
 export interface AiSeed {
   mode: AiMode
+  /** M17: the agent the chat runs as; absent = the default agent (Ctrl+Alt+J and every editor entry). */
+  agentId?: string
   /** An instruction or question to send at once; empty = let the user type. */
   prompt?: string
   /** Pages the request is about (default: the tab's open object). */
