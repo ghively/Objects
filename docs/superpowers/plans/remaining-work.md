@@ -16,6 +16,7 @@ Status as of 2026-11-05. **All fifteen milestones (M1-M15) are built, reviewed, 
 5b. ~~The M15 test `test_15_previews_of_several_sources_can_start` failing on Windows~~ fixed 2026-11-05: the test made a space "S1" next to its source folder "s1", the same name on a case-insensitive file system, so the app rightly answered 409; the spaces now go in their own folder.
 6. **Wiki import follow-ups** (outside the repo, in Gene's `ObjectSpaces` folder): review the 10 "possible secrets" pages listed in `ai-pass/review.md`; the wiki copy is a snapshot (refresh = recopy and AI-reread only new or changed pages).
 7. **M16: built on `feat/m16-m24`** and gated on Windows 2026-11-06, re-gated at `59b9df4` (see "2026-11-06: M16, chat Markdown, tool steps and the model picker" below). Gene asked on 2026-11-05 for M16-M24 to be built straight through; his 9 hand-checks in `m16-acceptance.md` are pending.
+8. **M17: built on `feat/m16-m24`** and gated on Windows 2026-11-06 (agents as folders, the default agent Assistant, the turn runner with its fence, 20 read and 35 write Object tools, the Agents section, agent page and chat agent picker). Results, every deviation and Gene's 13 hand-checks (pending) in `m17-acceptance.md`; the live spike's findings in `m17-cli-spike.md` (`ToolSearch` did not need to join `ALWAYS_ALLOWED`).
 
 ## 2026-11-06: M16, chat Markdown, tool steps and the model picker
 
@@ -110,6 +111,7 @@ Each milestone's plan holds its full scope. Each acceptance doc holds its automa
 | **M14** local automations: rules, schedules and catch-up, template repeat, buttons | `2026-11-05-m14-automations.md` | `dbb09d9..` on `feat/m14-automations`, gate 2026-11-05 (Linux) | `m14-acceptance.md` (7) |
 | **M15** importers: Notion, Obsidian and Anytype exports | `2026-11-05-m15-importers.md` | `80973d0..` on `feat/m15-importers`, gate 2026-11-05 (Linux) | `m15-acceptance.md` (7) |
 | **M16** chat Markdown, tool steps and the model picker | `2026-11-05-m16-chat-polish-model-picker.md` | `d4a9d89..ff60aea` on `feat/m16-m24`, gate 2026-11-06 (Windows) | `m16-acceptance.md` (9) |
+| **M17** agents, agent folders and full tooling | `2026-11-05-m17-agents-and-tools.md` | `a4f42e9..` on `feat/m16-m24`, gate 2026-11-06 (Windows) | `m17-acceptance.md` (13) |
 
 M8's "Coverage" section maps every deferred item to a task, or to a spec §2 exclusion: AI, network at runtime, accounts and sharing, mobile, telemetry.
 
