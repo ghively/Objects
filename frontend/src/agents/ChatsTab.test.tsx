@@ -28,6 +28,7 @@ function chat(id: string, title: string, partial: Partial<AgentChatSummary> = {}
     messageCount: 2,
     spaceName: 'Notes',
     delegated: false,
+    from: null,
     ...partial,
   }
 }

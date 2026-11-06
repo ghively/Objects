@@ -28,7 +28,11 @@ __all__ = ["INSTRUCTIONS", "SERVER_NAME", "TOOL_MODULES", "build_server", "main"
 
 SERVER_NAME = "object-agent"
 
-TOOL_MODULES: tuple[str, ...] = ("objectapp.agent_tools_core", "objectapp.agent_tools_learning")
+TOOL_MODULES: tuple[str, ...] = (
+    "objectapp.agent_tools_core", "objectapp.agent_tools_learning",
+    # M20
+    "objectapp.agent_tools_a2a",
+)
 """The modules whose ``register(server, client)`` adds this server's tools, in build order."""
 
 INSTRUCTIONS = """\
