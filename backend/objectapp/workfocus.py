@@ -267,11 +267,11 @@ def save_focus(space: Space, day: str, lines: list[str], base_version: str | Non
             except KeyError:
                 current = None
             raise Conflict(current) from None  # type: ignore[arg-type]
+        of, _fm, version = space.read(path)
     else:
-        version = space.read(path)[2]
+        of, _fm, version = space.read(path)  # the one read that is checked, edited, saved
         if base_version != version:
             raise Conflict(version)
-    of, _fm, version = space.read(path)
     new_body = replace_focus(of.body, clean)
     if new_body != of.body:
         space.save_body(path, new_body, version)
