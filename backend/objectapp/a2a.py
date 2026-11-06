@@ -18,7 +18,7 @@ import binascii
 import json
 import re
 import uuid
-from collections.abc import AsyncIterator, Awaitable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal, TypeVar
 from urllib.parse import urlsplit
@@ -375,6 +375,8 @@ class _Run:
         self.task_id: str | None = None
         self.context_id: str | None = None
         self.seen_artifacts: set[str] = set()
+        self.on_ids: Callable[[str | None, str | None], None] | None = None
+        """Told the task and context ids whenever one changes (M20 T4: Stop cancels the running task)."""
 
     # -- the wire ---------------------------------------------------------------------------
 
@@ -465,10 +467,13 @@ class _Run:
         return self._parts(artifact.get("parts"), aid, name)
 
     def _ids(self, task_id: Any, context_id: Any) -> None:
+        before = (self.task_id, self.context_id)
         if isinstance(task_id, str) and task_id:
             self.task_id = task_id
         if isinstance(context_id, str) and context_id:
             self.context_id = context_id
+        if self.on_ids is not None and (self.task_id, self.context_id) != before:
+            self.on_ids(self.task_id, self.context_id)
 
     def _state(self, status: Any) -> tuple[str | None, list[Update]]:
         """The status's state and, when it is final, the state `Update`."""
@@ -624,16 +629,21 @@ class _Run:
 
 
 async def send(card: Card, auth: Auth, message: dict[str, Any], *, deadline: float,
-               client: httpx.AsyncClient | None = None) -> AsyncIterator[Update]:
+               client: httpx.AsyncClient | None = None,
+               on_ids: Callable[[str | None, str | None], None] | None = None) -> AsyncIterator[Update]:
     """``SendStreamingMessage`` when ``card.streaming``, else ``SendMessage`` (+ ``GetTask`` polling
     while running). Raises `A2AError` (504) at the deadline (``loop.time()``) after a best-effort
     ``CancelTask``.
+
+    `on_ids` (M20 T4), when given, is told the task and context ids as soon as they arrive, so a
+    caller that closes the generator early can still cancel the running task.
 
     A ``-32001`` (TaskNotFound) answered to a message that carried a ``taskId``, before anything
     arrived, sends the message once more without it."""
     own = client is None
     http = client if client is not None else _new_client(max(1.0, _remaining(deadline)))
     run = _Run(card, auth, http, deadline)
+    run.on_ids = on_ids
     try:
         retried = False
         while True:

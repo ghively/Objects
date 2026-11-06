@@ -24,6 +24,9 @@
   stops the CLI. The turn is recorded in the agent's transcript (`transcripts`): the user line
   when it starts, the tool lines and the answer (or error) when it ends, ``stopped`` when the
   client went away; each write announces ``agentChats``.
+  M20: a remote agent (``kind: "remote"``) is answered by `remotechat.respond` right after these
+  checks (before the CLI is looked for): ``chat`` only, over A2A; context needs the agent's
+  context notice first (428).
 - ``GET  /ai/chat?path=`` -> `AiChat` (a saved chat; 404 when the path isn't one). M17 adds
   ``agent`` (its Agent property), ``agentId`` (the first listed agent of that name, any case,
   else the default agent) and ``chatId`` (the transcript carrying its session, else null).
@@ -55,7 +58,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
-from . import agentrun, agentskills, ai, aimodels, transcripts
+from . import agentrun, agentskills, ai, aimodels, remotechat, transcripts
 from . import reviews as review_hooks
 from .agentmodel import DEFAULT_AGENT_ID
 from .agents import AgentError, AgentNotFound, AgentRegistry, effective_model
@@ -71,6 +74,7 @@ from .aichat import (
 from .apictx import ApiContext
 from .appstate import space_key
 from .propvalues import InvalidValue
+from .remotemodel import REMOTE_KIND
 from .settings import read as read_settings
 from .space import Conflict, ReadOnly
 from .tokens import TokenStore
@@ -270,6 +274,8 @@ def router(
             return one_error(MISSING_FOLDER.format(path=agent.folder))
         if agent.read_only_reason:
             return one_error(agent.read_only_reason)
+        if agent.kind == REMOTE_KIND:  # M20: over A2A; works without Claude Code installed
+            return await asyncio.to_thread(remotechat.respond, ctx, registry, agent, req)
 
         if claude is None:
             return one_error(ai.NOT_FOUND)
