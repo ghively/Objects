@@ -24,6 +24,7 @@ Object's API like any agent turn. Imports no network client.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import threading
 import time
@@ -88,6 +89,9 @@ class AgentJob:
     instant: datetime
     """The occurrence (UTC)."""
     catch_up: bool
+    trigger: dict[str, Any] | None = field(default=None, compare=False)
+    """The rule's trigger (``model_dump(mode="json")``) the occurrence came due under: owing it
+    back is skipped once the rule was rescheduled (`AutomationScheduler.owe`)."""
 
 
 @dataclass
@@ -308,7 +312,7 @@ class AgentJobs:
                 self._queue.append(job)
                 self._cond.notify_all()
                 return True
-        self.engine.scheduler.owe(job.rule_id, [job.instant])
+        self.engine.scheduler.owe(job.rule_id, [job.instant], job.trigger)
         return False
 
     def pending(self) -> int:
@@ -347,12 +351,13 @@ class AgentJobs:
             if self._running is not None and thread is not None and thread.is_alive():
                 owed.append(self._running)  # still closing: its occurrence isn't lost either
             self._cond.notify_all()
-        by_rule: dict[str, list[datetime]] = {}
+        by_rule: dict[tuple[str, str], tuple[dict[str, Any] | None, list[datetime]]] = {}
         for job in owed:
-            by_rule.setdefault(job.rule_id, []).append(job.instant)
-        for rule_id, instants in by_rule.items():
+            key = (job.rule_id, json.dumps(job.trigger, sort_keys=True))
+            by_rule.setdefault(key, (job.trigger, []))[1].append(job.instant)
+        for (rule_id, _t), (trigger, instants) in by_rule.items():
             try:
-                self.engine.scheduler.owe(rule_id, instants)
+                self.engine.scheduler.owe(rule_id, instants, trigger)
             except Exception:
                 log.exception("Schedules: could not owe the stopped runs of %s", rule_id)
 

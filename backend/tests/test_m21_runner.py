@@ -448,6 +448,27 @@ def test_stop_reowes_queued_and_running(env) -> None:
     assert len(fake_runs(env["log"])) == 1  # nothing ran on start
 
 
+def test_rescheduled_rule_owes_nothing_on_stop(env) -> None:
+    """An occurrence queued under the old trigger isn't owed back once the rule was rescheduled."""
+    researcher = env["researcher"]
+    with opened(env) as client:
+        first = create(client, schedule(researcher.id, prompt="FAKE:wait Review", name="A first"))
+        second = create(client, schedule(researcher.id, name="B second"))
+        env["clock"].now = DUE
+        assert tick(client)["agentJobs"] == 2
+        wait_runs(env["log"], 1)
+        body = {k: v for k, v in second.items() if k not in ("id", "revision", "readOnlyReason", "lastRun")}
+        moved = {**body["trigger"], "time": "10:00"}
+        res = client.put(f"/api/automations/{second['id']}",
+                         json={"rule": {**body, "trigger": moved}, "baseRevision": second["revision"]})
+        assert res.status_code == 200, res.text
+    with opened(env) as client:
+        idle(client)
+        items = {i["ruleId"]: i["count"] for i in client.get("/api/automations/catch-up").json()["items"]}
+        assert items == {first["id"]: 1}
+        assert runs_of(client, second["id"]) == []
+
+
 def test_sleep_gap_owes(env) -> None:
     with opened(env) as client:
         rule = create(client, schedule(env["researcher"].id))

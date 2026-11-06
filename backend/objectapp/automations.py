@@ -834,15 +834,16 @@ class AutomationScheduler:
                 runs.append(run)
         return runs, queued
 
-    def owe(self, rule_id: str, instants: list[datetime]) -> None:
+    def owe(self, rule_id: str, instants: list[datetime], trigger: dict[str, Any] | None = None) -> None:
         """Put occurrences back into the rule's ``pending`` (M21: agent runs the space closed on),
         the newest `MAX_PENDING`, so the catch-up asks. A rule with no entry (turned off or
-        deleted meanwhile) owes nothing."""
+        deleted meanwhile) owes nothing, nor one rescheduled since: ``trigger`` (the one the
+        occurrences came due under, when given) is no longer its entry's."""
         if not instants:
             return
         with self._lock:
             entry = self.state.rules.get(rule_id)
-            if entry is None:
+            if entry is None or (trigger is not None and entry.get("trigger") != trigger):
                 return
             found = sorted(set(instants))
             if not _merge_pending(entry, found[-MAX_PENDING:], len(found) > MAX_PENDING):
@@ -1314,7 +1315,8 @@ class AutomationEngine:
         if lr.rule is not None and agent_action(lr.rule) is not None:
             from .schedulerun import AgentJob
 
-            self.agent_jobs.submit(AgentJob(lr.id, instant, catch_up))
+            trigger = lr.rule.trigger.model_dump(mode="json")
+            self.agent_jobs.submit(AgentJob(lr.id, instant, catch_up, trigger))
             return None
         return self._execute(lr, "schedule", None, instant, instant, catch_up, flush=True)
 
