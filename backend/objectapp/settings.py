@@ -20,6 +20,7 @@ import zoneinfo
 from pathlib import Path
 from typing import Any
 
+from .aimodels import MODEL_PATTERN
 from .appstate import state_dir
 from .jsonstore import dump_json, parse_json_object
 from .textfile import atomic_write
@@ -87,8 +88,8 @@ DEFAULTS: dict[str, Any] = {
     "aiModel": None,
 }
 
-# A model name or alias for ``claude --model`` ("sonnet", "claude-sonnet-4-5", "opus[1m]").
-_MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,79}")
+# A model name or alias for ``claude --model``: the one rule, in `aimodels` (M16).
+_AI_MODEL = re.compile(MODEL_PATTERN)
 
 # A BCP 47 language tag as the normaliser accepts it ("fr", "de-CH", "en_GB",
 # "es-419"), at most 35 characters.
@@ -160,7 +161,7 @@ def _valid(key: str, value: Any) -> bool:
     if key == "claudePath":
         return value is None or (isinstance(value, str) and 0 < len(value) <= 1024 and "\x00" not in value)
     if key == "aiModel":
-        return value is None or (isinstance(value, str) and _MODEL_NAME.fullmatch(value) is not None)
+        return value is None or (isinstance(value, str) and _AI_MODEL.fullmatch(value) is not None)
     if key == "startupSpacePath":
         return value is None or isinstance(value, str)
     if key == "spellCheckLang":

@@ -1794,6 +1794,18 @@ export interface AiStatus {
   message: string | null
 }
 
+/** GET /api/ai/models: the back end's one model list (aimodels.MODELS). */
+export interface AiModelChoice {
+  id: string
+  label: string
+  kind: 'alias' | 'id'
+}
+export interface AiModels {
+  models: AiModelChoice[]
+  /** aimodels.MODEL_PATTERN; the client matches it whole: new RegExp(`^(?:${pattern})$`). */
+  pattern: string
+}
+
 export interface AiMessage {
   role: 'user' | 'assistant'
   text: string
@@ -1820,6 +1832,8 @@ export interface AiChatRequest {
   history: AiMessage[]
   sessionId?: string | null
   clientId?: string
+  /** M16: this chat's model pick; null/absent = the default agent's model (Settings), else the CLI's. */
+  model?: string | null
 }
 
 /** A change the assistant suggests; nothing is applied until the user accepts it. */
@@ -1838,8 +1852,12 @@ export type AiEvent =
   | { type: 'session'; sessionId: string }
   /** A chunk to append to the answer so far. */
   | { type: 'text'; text: string }
-  /** The assistant used a tool (an Object MCP read tool, by its short name). */
-  | { type: 'tool'; name: string }
+  /**
+   * A tool step. Sent twice per call with the same `id`: at the call (`input` set, no `result`),
+   * then when its result arrives (`input` null, `result` set). `name` is the short name for
+   * Object's tools ("search"), the CLI's name otherwise ("Read", "mcp__srv__tool").
+   */
+  | { type: 'tool'; id: string; name: string; input: Record<string, unknown> | null; result?: string; isError?: boolean }
   | { type: 'done'; text: string; sessionId: string | null; proposal: AiProposal | null; skipped: AiSkipped[] }
   | { type: 'error'; message: string }
 
