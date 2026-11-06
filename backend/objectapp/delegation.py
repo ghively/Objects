@@ -46,10 +46,12 @@ __all__ = [
     "DelegationError",
     "DelegationResult",
     "Limiter",
+    "can_run",
     "delegate",
     "delegate_prompt",
     "install",
     "is_delegated_chat",
+    "remote_error",
     "state_name",
 ]
 
@@ -184,6 +186,25 @@ def _settings() -> dict[str, Any]:
         return {}
 
 
+def can_run(target: AgentRecord, name: str) -> None:
+    """`DelegationError` (409 "{name} can't run: {reason}") for a missing folder or a read-only
+    agent, local or remote."""
+    if target.missing:
+        raise DelegationError(409, CANT_RUN.format(name=name, reason=f"This agent's folder is missing: {target.folder}"))
+    if target.read_only_reason:
+        raise DelegationError(409, CANT_RUN.format(name=name, reason=target.read_only_reason))
+
+
+def remote_error(exc: Any, name: str, timeout: float) -> DelegationError:
+    """An `a2a.A2AError` from ``remotechat.call_remote`` as the routes answer it: 504 too long, 409
+    can't run (no token, an unreadable card), else 502 (the remote's own trouble)."""
+    if exc.status == 504:
+        return DelegationError(504, TOO_LONG.format(name=name, n=f"{timeout:g}"))
+    if exc.status == 409:
+        return DelegationError(409, CANT_RUN.format(name=name, reason=exc.message))
+    return DelegationError(502, exc.message)
+
+
 async def _until_done(task: asyncio.Future, disconnected: Callable[[], Awaitable[bool]]) -> bool:
     """Wait for `task`; True when `disconnected()` said the caller went away first (the task is
     then cancelled)."""
@@ -218,17 +239,13 @@ async def delegate(
     space = ctx.space
     key = space_key(space.root)
     timeout = DELEGATE_TIMEOUT
-    if target.kind != "remote":
-        if target.missing:
-            raise DelegationError(409, CANT_RUN.format(name=name, reason=f"This agent's folder is missing: {target.folder}"))
-        if target.read_only_reason:
-            raise DelegationError(409, CANT_RUN.format(name=name, reason=target.read_only_reason))
+    can_run(target, name)
     LIMITER.enter(caller_token.id)
     chat_id: str | None = None
     try:
         prompt = delegate_prompt(_name(caller), goal, context)
         if target.kind == "remote":
-            return await _delegate_remote(target, name, prompt, caller, caller_token, space.name, key,
+            return await _delegate_remote(ctx, target, name, prompt, caller, caller_token, space.name, key,
                                           timeout, disconnected)
 
         def announce(event: ChangeEvent) -> None:
@@ -271,7 +288,7 @@ async def delegate(
         LIMITER.leave(caller_token.id)
 
 
-async def _delegate_remote(target: AgentRecord, name: str, prompt: str, caller: AgentRecord,
+async def _delegate_remote(ctx: ApiContext, target: AgentRecord, name: str, prompt: str, caller: AgentRecord,
                            caller_token: TokenRecord, space_name: str, key: str | None, timeout: float,
                            disconnected: Callable[[], Awaitable[bool]]) -> DelegationResult:
     from . import a2a, remotechat
@@ -287,14 +304,16 @@ async def _delegate_remote(target: AgentRecord, name: str, prompt: str, caller: 
             return DelegationResult(agent=target, chat_id="", state="canceled", summary="", cut=False)
         res = task.result()
     except a2a.A2AError as exc:
-        if exc.status == 504:
-            raise DelegationError(504, TOO_LONG.format(name=name, n=f"{timeout:g}")) from exc
-        raise DelegationError(502, exc.message) from exc
+        if exc.chat_id:  # the chat was written (the user line, then an error or stopped line)
+            ctx.announce(ChangeEvent("agentChats", target.id, exc.chat_id, origin=None))
+        raise remote_error(exc, name, timeout) from exc
     except AgentError as exc:
         raise DelegationError(exc.status, exc.message) from exc
     finally:
         if not task.done():
             task.cancel()
+    if res.chat_id:
+        ctx.announce(ChangeEvent("agentChats", target.id, res.chat_id, origin=None))
     state = state_name(res.state)
     if state == "timeout":
         raise DelegationError(504, TOO_LONG.format(name=name, n=f"{timeout:g}"))

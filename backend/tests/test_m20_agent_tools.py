@@ -224,6 +224,34 @@ def test_long_calls_outlive_the_default_client() -> None:
         own.http.close()
 
 
+def test_remote_agent_call_cant_run_is_409(env: Env) -> None:
+    gone = add_remote("Gone Planner")
+    import shutil
+
+    shutil.rmtree(gone.folder)
+    no_token = add_remote()
+    remotesecrets.remove(no_token.id)
+    _rec, secret = env.token()
+    server = env.server(secret)
+    with pytest.raises(ApiError, match=r"Conflict: Gone Planner can't run: This agent's folder is missing"):
+        _call(server, "remote_agent_call", agent="Gone Planner", message="Hi")
+    with pytest.raises(ApiError, match=r"Conflict: Fake Planner can't run: This remote agent needs its token again"):
+        _call(server, "remote_agent_call", agent="Fake Planner", message="Hi")
+
+
+def test_remote_agent_call_error_announces_the_chat(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    remote = add_remote()
+    _rec, secret = env.token()
+    server = env.server(secret)
+    err = a2a.A2AError("Fake Planner sent an answer Object can't read.")
+    err.chat_id = "01KCCCCCCCCCCCCCCCCCCCCCCC"
+    patch_call_remote(monkeypatch, err)
+    with pytest.raises(ApiError, match="502: Fake Planner sent an answer Object can't read."):
+        _call(server, "remote_agent_call", agent="Fake Planner", message="Hi")
+    chats = [e for e in env.events if e.kind == "agentChats"]
+    assert [(e.path, e.version) for e in chats] == [(remote.id, "01KCCCCCCCCCCCCCCCCCCCCCCC")]
+
+
 def test_token_without_agent_is_403(env: Env) -> None:
     _rec, secret = TokenStore(env.space_dir).ephemeral("Plain", "read-write")
     env.secrets.append(secret)
