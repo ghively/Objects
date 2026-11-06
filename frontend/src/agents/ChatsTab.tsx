@@ -9,6 +9,9 @@
  *
  * M20: a delegated chat shows "Delegated by {agent name}" under its title ("Delegated by another
  * agent" when the delegating agent isn't listed).
+ *
+ * M21: a chat started by a schedule shows a small "Scheduled" mark, and its row's tooltip names the
+ * schedule ("Scheduled: {name}").
  */
 import { useCallback, useEffect, useState } from 'react'
 import { api, RESYNC_PATH } from '@/api/client'
@@ -28,6 +31,9 @@ export const CHATS_TEXT = {
   messages: (n: number) => (n === 1 ? '1 message' : `${n} messages`),
   loading: 'Loading…',
   searching: 'Searching…',
+  // M21 (our strings)
+  scheduled: 'Scheduled',
+  scheduledTip: (name: string) => `Scheduled: ${name}`,
 } as const
 
 /** From this many characters the field searches the chats' text (our number). */
@@ -194,11 +200,22 @@ export function ChatsTab({ agent }: { agent: Agent }) {
               <li key={c.id} data-chat={c.id}>
                 <button
                   type="button"
+                  title={c.schedule ? CHATS_TEXT.scheduledTip(c.schedule.name) : undefined}
                   onClick={() => openAgentTranscript(id, c.id)}
                   className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-[14px] hover:bg-hover"
                 >
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-medium">{c.title}</span>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-medium">{c.title}</span>
+                      {c.schedule && (
+                        <span
+                          data-scheduled=""
+                          className="shrink-0 rounded border border-line px-1.5 text-[11px] leading-[18px] text-fg-muted"
+                        >
+                          {CHATS_TEXT.scheduled}
+                        </span>
+                      )}
+                    </span>
                     {by && (
                       <span data-delegated="" className="truncate text-[13px] text-fg-muted">
                         {by}
