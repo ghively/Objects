@@ -70,6 +70,8 @@ export interface SidebarProps {
   tasksActive?: boolean
   /** Highlights the "Graph" entry. */
   graphActive?: boolean
+  /** M23: highlights the "Work" entry. */
+  workActive?: boolean
   /** Highlights the collection row of the open collection's page. */
   activeCollectionId?: string | null
 }
@@ -133,6 +135,9 @@ export const SEARCH_THIS_SPACE = 'Search this space'
 
 /** The sidebar entry for the All notes view. */
 export const ALL_NOTES_LABEL = 'All notes'
+
+/** M23: the sidebar entry for the Work section. */
+export const WORK_LABEL = 'Work'
 
 /** The sidebar entry for the query list. */
 export const QUERIES_LABEL = 'Queries'
@@ -279,6 +284,7 @@ export function Sidebar({
   calendarActive,
   tasksActive,
   graphActive,
+  workActive,
   activeCollectionId,
 }: SidebarProps) {
   // "Tasks" is hidden while the space hides task management (`space.json` `hideTaskManagement`).
@@ -485,6 +491,16 @@ export function Sidebar({
 
       {/* M17: the agents, at the top, directly above the main navigation (nothing while AI is hidden). */}
       <AgentsSection onOpenTarget={onOpenTarget} />
+
+      {/* M23: the Work section, directly below the agents (shown while AI features are hidden too). */}
+      <nav aria-label="Work" className="flex flex-col gap-0.5">
+        <MainNavButton
+          icon="ph-briefcase"
+          label={WORK_LABEL}
+          active={workActive}
+          onClick={(e) => onOpenTarget?.({ kind: 'work' }, { newTab: e.ctrlKey || e.metaKey })}
+        />
+      </nav>
 
       <nav aria-label="Main" className="flex flex-col gap-0.5">
         <MainNavButton

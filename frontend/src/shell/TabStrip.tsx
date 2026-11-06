@@ -105,6 +105,8 @@ export function TargetLabel({ target, space }: { target: Target | null; space: S
     icon = <Icon name="ph-magnifying-glass" size={15} />
   } else if (target?.kind === 'trash') {
     icon = <Icon name="ph-trash" size={15} />
+  } else if (target?.kind === 'work') {
+    icon = <Icon name="ph-briefcase" size={15} />
   } else if (target?.kind === 'type' || target?.kind === 'typeSettings') {
     const type = types.find((t) => t.id === target.typeId)
     icon = type ? <TypeChip type={type} size={22} /> : null
