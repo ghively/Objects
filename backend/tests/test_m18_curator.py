@@ -242,6 +242,24 @@ def test_tick_runs_each_due_agent_once(space_dir: Path) -> None:
     assert any(e.kind == "agentLearning" and e.path == one.id for e in events)
 
 
+def test_one_run_touching_the_clock_does_not_stop_the_rest(space_dir: Path) -> None:
+    reg = AgentRegistry()
+    one = reg.create(AgentInput(name="One"), "One.\n")
+    two = reg.create(AgentInput(name="Two"), "Two.\n")
+    clock = Clock(datetime.now(UTC).replace(microsecond=0))
+    cur = _curator(space_dir, clock, [])
+    clock.at += timedelta(hours=3)
+    seen: list[str] = []
+
+    async def run_for(agent, learning, settings, now) -> None:
+        seen.append(agent.id)
+        cur.idle.touch(None)  # the consolidation run's MCP calls are /api/v1 requests
+
+    cur._run_for = run_for  # type: ignore[method-assign]
+    assert sorted(asyncio.run(cur.tick())) == sorted([one.id, two.id])
+    assert sorted(seen) == sorted([one.id, two.id])
+
+
 def test_hidden_ai_skips_ticks(space_dir: Path) -> None:
     one = AgentRegistry().create(AgentInput(name="One"), "One.\n")
     clock = Clock(datetime.now(UTC))
