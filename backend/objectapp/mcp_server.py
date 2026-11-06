@@ -57,7 +57,12 @@ the user's real notes, so change only what was asked: `write_body` replaces a wh
 first answers how many objects it affects; call again with `confirm` once that is what the
 user wants. `move_to_trash`, `delete_type`, `delete_collection`, `delete_query` and `merge`
 are undoable from the app's trash (`restore_from_trash`), and `restore_version` brings back
-an earlier version; nothing here deletes for good."""
+an earlier version; nothing here deletes for good.
+
+A work item (a Task or Project with a `steps` property) is changed with the work tools:
+`step_action` and `edit_steps` check the step rules and log Activity; set_properties can't
+change steps. Read the item first: each step has an `id` and a `rev`, and a stale `rev` is
+refused with "This step changed. Look again.\""""
 
 
 class ApiError(ToolError):
@@ -77,7 +82,7 @@ class ObjectClient:
     def _url(self, route: str) -> str:
         return f"{self.base}/api/v1{route}"
 
-    def _answer(self, res: httpx.Response) -> Any:
+    def _answer(self, res: httpx.Response, plain: bool = False) -> Any:
         if 200 <= res.status_code < 300:
             return res.json()
         try:
@@ -85,6 +90,9 @@ class ObjectClient:
         except ValueError:
             body = {"detail": res.text[:300]}
         detail = body.get("detail") if isinstance(body, dict) else None
+        if plain and isinstance(detail, str) and detail:
+            # M22's work routes: the app's sentence as it is ("This step changed. Look again.").
+            raise ApiError(detail)
         if res.status_code == 409 and isinstance(body, dict):
             if "currentRevision" in body:
                 raise ApiError(f"Conflict: {detail} Current revision: {body.get('currentRevision')}.")
@@ -98,21 +106,21 @@ class ObjectClient:
             raise ApiError(f"{res.status_code}: {detail} {json.dumps(extra, default=str)}")
         raise ApiError(f"{res.status_code}: {detail or body}")
 
-    def get(self, route: str, **params: Any) -> Any:
+    def get(self, route: str, plain: bool = False, **params: Any) -> Any:
         clean = {k: v for k, v in params.items() if v is not None}
         try:
             res = self.http.get(self._url(route), params=clean, headers=self.headers)
         except httpx.TransportError as exc:
             raise ApiError(f"Object isn't reachable at {self.base}: is the app running? ({exc})") from exc
-        return self._answer(res)
+        return self._answer(res, plain)
 
-    def post(self, route: str, body: dict[str, Any]) -> Any:
+    def post(self, route: str, body: dict[str, Any], plain: bool = False) -> Any:
         clean = {k: v for k, v in body.items() if v is not None}
         try:
             res = self.http.post(self._url(route), json=clean, headers=self.headers)
         except httpx.TransportError as exc:
             raise ApiError(f"Object isn't reachable at {self.base}: is the app running? ({exc})") from exc
-        return self._answer(res)
+        return self._answer(res, plain)
 
     def put(self, route: str, body: dict[str, Any]) -> Any:
         clean = {k: v for k, v in body.items() if v is not None}
@@ -281,6 +289,21 @@ def build_server(client: ObjectClient, write: bool = True) -> MCPServer:
     def import_status(job_id: str) -> dict:
         """The progress and result of an import started with `start_import`."""
         return client.get(f"/import/jobs/{_seg(job_id)}")
+
+    # -- work (M22) -----------------------------------------------------------------
+
+    @server.tool(annotations=READ)
+    def work_items(scope: str = "active") -> dict:
+        """The work items (Tasks and Projects with steps): each one's ticket, stage, whose
+        turn it is and its current step. `scope` is active (open items and the recently
+        done) or all."""
+        return client.get("/work/items", plain=True, scope=scope)
+
+    @server.tool(annotations=READ)
+    def work_item(path: str) -> dict:
+        """One work item in full: its steps (each with `id`, `rev` and the actions open to
+        the user), lists, floor items, Activity, Work notes and `version`."""
+        return client.get("/work/item", plain=True, path=path)
 
     if not write:
         return server
@@ -538,6 +561,69 @@ def build_server(client: ObjectClient, write: bool = True) -> MCPServer:
         current one is kept in the history."""
         return client.post(
             "/history/restore", {"path": path, "versionId": version_id, "version": version}
+        )
+
+    # -- work (M22) -----------------------------------------------------------------
+
+    @server.tool(annotations=WRITE)
+    def step_action(
+        path: str, step_id: str, step_rev: str, action: str, text: str | None = None,
+        not_before: str | None = None, ask: str | None = None,
+    ) -> dict:
+        """Act on a work item's step (`id` and `rev` from `work_item`). An agent may
+        `complete` an approved Approve step or an Agent step (`text`: what happened), `fail`
+        one (`text`: why; `ask` adds a question for the user before it) or mark an Agent step
+        `done`. Approving, declining and answering are the user's. Logs one Activity line."""
+        return client.post(
+            "/work/step",
+            {"path": path, "stepId": step_id, "stepRev": step_rev, "action": action,
+             "text": text, "notBefore": not_before, "ask": ask},
+            plain=True,
+        )
+
+    @server.tool(annotations=WRITE)
+    def edit_steps(path: str, ops: list[dict]) -> dict:
+        """Change a work item's step list in one write: ops are {"op": "add", "kind":
+        "question"|"do"|"approve"|"agent", "text", "before"?}, {"op": "edit", "stepId",
+        "stepRev", "text"?, "kind"?}, {"op": "move", "stepId", "stepRev", "before"} and
+        {"op": "remove", "stepId", "stepRev"}. Approved or done Approve steps can't be
+        changed."""
+        return client.post("/work/steps", {"path": path, "ops": ops}, plain=True)
+
+    @server.tool(annotations=WRITE)
+    def log_activity(path: str, text: str) -> dict:
+        """Add one line to a work item's Activity (what you did or found)."""
+        return client.post("/work/activity", {"path": path, "text": text}, plain=True)
+
+    @server.tool(annotations=WRITE)
+    def add_work_note(path: str, text: str, kind: str = "note") -> dict:
+        """Add a work note (`kind` note) or a request (`kind` request) to a work item; it
+        goes to Activity and Work notes."""
+        return client.post("/work/note", {"path": path, "kind": kind, "text": text}, plain=True)
+
+    @server.tool(annotations=WRITE)
+    def set_work_fields(path: str, version: str, values: dict, remove: list[str] | None = None) -> dict:
+        """Set or remove a work item's ticket and work fields (keyed by field id: rank, area,
+        cause, findings, hypothesis, confidence, verified...). `version` is the item's from
+        your last read. Not for steps or floor items."""
+        return client.post(
+            "/work/fields",
+            {"path": path, "baseVersion": version, "set": values, "remove": remove or []},
+            plain=True,
+        )
+
+    @server.tool(annotations=WRITE)
+    def update_floor_item(
+        path: str, op: str, item_id: str | None = None, item_rev: str | None = None,
+        place: str | None = None, what: str | None = None, found: str | None = None,
+    ) -> dict:
+        """Add, edit, collect, uncollect or remove a work item's floor item (things to look
+        at or collect on the floor). `item_id` and `item_rev` come from `work_item`."""
+        return client.post(
+            "/work/floor",
+            {"path": path, "op": op, "itemId": item_id, "itemRev": item_rev, "place": place,
+             "what": what, "found": found},
+            plain=True,
         )
 
     return server

@@ -70,9 +70,9 @@ def test_catalogue_groups() -> None:
     groups = toolcatalog.catalogue()
     assert [g.id for g in groups] == ["object-read", "object-write", "object-agent", "builtin"]
     assert [g.label for g in groups] == ["Object read", "Object write", "Object agent tools", "Claude Code built-ins"]
-    assert len(toolcatalog.OBJECT_READ) == 20 and len(toolcatalog.OBJECT_WRITE) == 35
+    assert len(toolcatalog.OBJECT_READ) == 22 and len(toolcatalog.OBJECT_WRITE) == 41
     names = set(toolcatalog.OBJECT_READ) | set(toolcatalog.OBJECT_WRITE)
-    assert len(names) == 55
+    assert len(names) == 63
     assert M11_TOOLS <= names
     for name in names:
         for bad in ("delete_forever", "purge", "empty_trash", "settings"):
