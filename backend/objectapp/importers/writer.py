@@ -583,6 +583,8 @@ def _record(state: WriteState, w: Any, system: str, ident_: str, action: str, **
 def _objects(planned: Planned, space: Space, state: WriteState, src: Source) -> None:
     state.progress("objects", state.done, state.total, None)
     budget = TextBudget(limit=1 << 62)
+    for sp, (dup_id, first, _n) in provenance.duplicates(planned.read).items():
+        state.losses.append((sp, f"Has the same id ({dup_id}) as {first} in this source; kept as a separate object"))
     for w in planned.writes:
         _check(state)
         sp = w.read.sourcePath

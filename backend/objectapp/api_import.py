@@ -85,7 +85,7 @@ def _reuse(space, read) -> dict[str, str]:
         return {}
     out: dict[str, str] = {}
     for o in read.objects:
-        hit = index.get(provenance.ident(read, o))
+        hit = provenance.find(index, read, o)
         if hit is not None:
             out[o.sourcePath] = hit.path
     return out
