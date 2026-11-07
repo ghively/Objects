@@ -40,6 +40,7 @@ __all__ = [
     "PropertyOverride",
     "SkipReason",
     "SkippedItem",
+    "SpaceCopyTarget",
     "StartImportRequest",
     "StartImportResponse",
     "SystemKey",
@@ -48,7 +49,7 @@ __all__ = [
 
 # -- vocabulary ---------------------------------------------------------------------
 
-ImportSourceKind = Literal["notion", "obsidian", "anytype"]
+ImportSourceKind = Literal["notion", "obsidian", "anytype", "files"]
 """Which reader reads the source. ``auto`` in a request means "detect it"."""
 
 ImportKind = Literal["text", "number", "boolean", "url", "datetime", "label", "entity"]
@@ -140,7 +141,18 @@ class CurrentSpaceTarget(BaseModel):
     kind: Literal["currentSpace"] = "currentSpace"
 
 
-ImportTarget = Annotated[NewSpaceTarget | CurrentSpaceTarget, Field(discriminator="kind")]
+class SpaceCopyTarget(BaseModel):
+    """M25 "Try on a copy of this space": the open space is copied to ``location/name`` and the
+    import goes into the copy."""
+
+    kind: Literal["spaceCopy"] = "spaceCopy"
+    name: str
+    location: str
+
+
+ImportTarget = Annotated[NewSpaceTarget | CurrentSpaceTarget | SpaceCopyTarget, Field(discriminator="kind")]
+
+KeepOriginals = Literal["attachments", "fileObjects"]
 
 
 class StartImportRequest(BaseModel):
@@ -148,6 +160,8 @@ class StartImportRequest(BaseModel):
     mapping: ImportMapping
     target: ImportTarget
     clientId: str | None = None
+    keepOriginals: KeepOriginals = "attachments"
+    """M25: keep each non-Markdown original as an attachment (default) or as a File object."""
 
 
 # -- API: responses -----------------------------------------------------------------
@@ -255,6 +269,16 @@ class ImportResult(BaseModel):
     reportPath: str | None
     """The "Import report" object's space path (None when even that could not be written)."""
     cancelled: bool = False
+    batch: str | None = None
+    """M25: the batch id (records in ``.object/imports/<batch>/`` of the target space)."""
+    updated: int = 0
+    unchanged: int = 0
+    changedInBoth: int = 0
+    removed: int = 0
+    leftOut: int = 0
+    failed: int = 0
+    originals: int = 0
+    sourceItems: int = 0
 
 
 class ImportJob(BaseModel):

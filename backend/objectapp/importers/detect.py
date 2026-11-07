@@ -5,9 +5,10 @@ Detection (contract "Sources and detection"), in order:
 1. Obsidian: a ``.obsidian/`` folder at the root (or under the zip's single top folder).
 2. Notion: at least half of the ``.md`` and ``.csv`` files have a stem ending in a space and
    32 hex digits, or a dashed UUID (our choice to accept both).
-3. Anytype: never. Its export's layout isn't documented and no real export was available, so
+3. Files (M25): a ``_manifest.jsonl`` at the root, or no Markdown or CSV file at all.
+4. Anytype: never. Its export's layout isn't documented and no real export was available, so
    the user picks it (unverified, see ``anytype``).
-4. Anything else with Markdown files: ``None``; it is read with the Obsidian rules and the
+5. Anything else with Markdown files: ``None``; it is read with the Obsidian rules and the
    preview warns (`UNKNOWN_SOURCE`).
 
 A chosen kind always wins; `read_source` answers what detection found as ``detected``.
@@ -18,6 +19,7 @@ from __future__ import annotations
 from pathlib import Path, PurePosixPath
 
 from .anytype import read_anytype
+from .files import MANIFEST_NAME, read_files
 from .notion import read_notion, suggested_name
 from .obsidian import read_markdown_folder
 from .readmodel import ReadResult, notion_id
@@ -32,11 +34,15 @@ NO_PAGES = "No Markdown files were found in this source."
 def detect(src: Source) -> str | None:
     if src.has_obsidian:
         return "obsidian"
+    if MANIFEST_NAME in src.files:
+        return "files"  # M25: a manifest beside the files
     stems = [PurePosixPath(r).stem for r in src.files if is_markdown(r) or is_csv(r)]
     if stems:
         with_id = sum(1 for s in stems if notion_id(s.removesuffix("_all")))
         if with_id * 2 >= len(stems):
             return "notion"
+    elif any(not is_csv(r) for r in src.files):
+        return "files"  # M25: no Markdown at all, only other files
     return None
 
 
@@ -54,6 +60,8 @@ def read_source(src: Source, kind: str = "auto", budget: TextBudget | None = Non
     suggested = suggested_name(name) if chosen == "notion" else name
     if chosen == "notion":
         read = read_notion(src, detected=detected, suggested=suggested, budget=budget)
+    elif chosen == "files":
+        read = read_files(src, detected=detected, suggested=suggested, budget=budget)
     elif chosen == "anytype":
         read = read_anytype(src, detected=detected, suggested=suggested, budget=budget)
     else:

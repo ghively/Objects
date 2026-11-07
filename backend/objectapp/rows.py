@@ -370,6 +370,13 @@ def _row(
         # type hasn't added the definition: the "No backlinks" section, the Task "Context"
         # section and backlinks filters/groups read them (M5 Task 13).
         values["backlinks"] = space.backlinks(summary.path)
+    # M25: the import provenance is queryable ("Imported from", "Import batch", "Source modified").
+    source = raw.fm.get("importSource")
+    if isinstance(source, dict):
+        for key, field in (("importedFrom", "system"), ("importBatch", "batch"), ("sourceModified", "modified")):
+            v = source.get(field)
+            if isinstance(v, str) and v:
+                values[key] = v
     return Row(
         summary=summary,
         version=version,

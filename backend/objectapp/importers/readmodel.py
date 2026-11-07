@@ -68,6 +68,12 @@ class ReadObject:
     """Notion row pages: the ``Key: value`` lines under the heading to drop (CSV columns)."""
     badFrontmatter: str | None = None
     """Frontmatter that didn't parse: kept in the body as a ``yaml`` code block."""
+    native: str | None = None
+    """M25 Files kind: ``"file"`` for a source file that isn't Markdown (read by the readers
+    when written, original kept); None for a Markdown page."""
+    prov: dict[str, Any] = field(default_factory=dict)
+    """M25: provenance the source gives beside the file (a manifest line): system, url, id,
+    version, author, created, modified."""
 
 
 @dataclass
