@@ -81,19 +81,29 @@ def scan_text(text: str) -> list[Finding]:
     """Findings (kind and line only) in ``text``, in line order; one per kind per line."""
     out: list[Finding] = []
     for n, line in enumerate(text.splitlines(), 1):
-        if len(line) > 20000:
-            line = line[:20000]
         seen: set[str] = set()
-        for kind, rx in _PATTERNS:
-            if rx.search(line):
-                seen.add(kind)
-        for m in _CARD.finditer(line):
-            digits = re.sub(r"\D", "", m.group())
-            if 13 <= len(digits) <= 19 and luhn(digits) and len(set(digits)) > 1:
-                seen.add("card-number")
+        # A very long line is scanned in overlapping chunks, never cut short.
+        for start in range(0, max(len(line), 1), CHUNK - OVERLAP):
+            _scan_line(line[start : start + CHUNK], seen)
+            if start + CHUNK >= len(line):
                 break
         out += [Finding(k, n) for k in KINDS if k in seen]
     return out
+
+
+CHUNK = 20000
+OVERLAP = 1000
+
+
+def _scan_line(line: str, seen: set[str]) -> None:
+    for kind, rx in _PATTERNS:
+        if rx.search(line):
+            seen.add(kind)
+    for m in _CARD.finditer(line):
+        digits = re.sub(r"\D", "", m.group())
+        if 13 <= len(digits) <= 19 and luhn(digits) and len(set(digits)) > 1:
+            seen.add("card-number")
+            break
 
 
 def _text_of(path: Path) -> str | None:
@@ -174,8 +184,14 @@ def scan_tree(root: Path, leave_out: list[str] | None = None) -> ScanReport:
     patterns = list(leave_out or [])
     report = ScanReport()
     if root.is_file():
-        found = scan_file(root)
+        if root.suffix.lower() == ".zip":
+            return _scan_zip(root, patterns, report)
+        text = None if root.stat().st_size > MAX_SCAN_BYTES else _text_or_none(root)
+        if text is None:
+            report.unscanned = 1
+            return report
         report.scanned = 1
+        found = scan_text(text)
         if found:
             report.findings[root.name] = found
         return report
@@ -210,3 +226,72 @@ def _text_or_none(p: Path) -> str | None:
         return _text_of(p)
     except Exception:
         return None
+
+
+MAX_ZIP_MEMBER_BYTES = 20 * 1024 * 1024
+MAX_ZIP_TOTAL_BYTES = 500 * 1024 * 1024
+
+
+def _safe_member(name: str) -> bool:
+    parts = PurePosixPath(name.replace("\\", "/")).parts
+    return bool(parts) and not name.startswith(("/", "\\")) and ".." not in parts and ":" not in parts[0] and "\x00" not in name
+
+
+def _scan_zip(path: Path, patterns: list[str], report: ScanReport) -> ScanReport:
+    """Scan the members of a zip: safe names only, text-like members by their text, documents through
+    their readable text (a temporary copy), each capped in size. What can't be scanned (an unsafe name,
+    an encrypted, nested or over-size member, a binary file) is counted as unscanned, never as clean."""
+    import tempfile
+    import zipfile
+
+    total = 0
+    try:
+        zf = zipfile.ZipFile(path)
+    except (zipfile.BadZipFile, OSError):
+        report.unscanned = 1
+        return report
+    with zf, tempfile.TemporaryDirectory() as tmp:
+        for info in zf.infolist():
+            if info.is_dir():
+                continue
+            name = info.filename
+            if not _safe_member(name):
+                report.unscanned += 1
+                continue
+            rel = PurePosixPath(name.replace("\\", "/")).as_posix()
+            if is_left_out(rel, patterns):
+                report.left_out.append(rel)
+                continue
+            total += info.file_size
+            if info.flag_bits & 0x1 or info.file_size > MAX_ZIP_MEMBER_BYTES or total > MAX_ZIP_TOTAL_BYTES \
+                    or rel.lower().endswith(".zip"):
+                report.unscanned += 1
+                continue
+            try:
+                data = zf.read(info)
+                text = _member_text(rel, data, Path(tmp))
+            except Exception:  # noqa: BLE001 - a damaged member is unscanned
+                text = None
+            if text is None:
+                report.unscanned += 1
+                continue
+            report.scanned += 1
+            found = scan_text(text)
+            if found:
+                report.findings[rel] = found
+    return report
+
+
+def _member_text(rel: str, data: bytes, tmp: Path) -> str | None:
+    suffix = PurePosixPath(rel).suffix.lower()
+    if suffix in readers.supported_suffixes():
+        copy = tmp / f"member{suffix}"
+        copy.write_bytes(data)
+        r = readers.read_file(copy)
+        copy.unlink()
+        return None if r.original_only else r.markdown
+    if b"\x00" in data[:8192]:
+        return None
+    from .readers.textfiles import decode
+
+    return decode(data)

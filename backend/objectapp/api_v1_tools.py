@@ -584,7 +584,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         root = Path(req.path.strip().strip('"')).expanduser()
         if not root.exists():
             return error(404, "There is no file or folder at this path.")
-        scan = scan_tree(root, req.leaveOut).to_json() if root.is_dir() else scan_tree(root).to_json()
+        scan = scan_tree(root, req.leaveOut).to_json()
         batch = None
         if token.scope == "read-write":
             batch = req.batch

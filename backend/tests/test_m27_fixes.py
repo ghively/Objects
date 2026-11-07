@@ -138,3 +138,59 @@ def test_rerun_keeps_exclude_from_ai(client, tmp_path):
     second = do_import(client, src)
     assert second["updated"] == 1
     assert _fm(root, rel)["excludeFromAI"] is True
+
+
+# -- 4. zip sources are scanned, long lines are scanned in chunks ---------------------------------
+
+import zipfile  # noqa: E402
+
+from objectapp.importscan import scan_text, scan_tree  # noqa: E402
+
+AWS = "AKIA" + "FAKEFAKEFAKEFAKE"
+
+
+def test_long_lines_are_scanned_in_chunks():
+    assert [(f.kind, f.line) for f in scan_text("x" * 30000 + f" {AWS}\nok\n")] == [("api-key", 1)]
+    assert [(f.kind, f.line) for f in scan_text(("y" * 19990) + f" {AWS}")] == [("api-key", 1)]  # across a chunk edge
+
+
+def make_zip(tmp_path: Path) -> Path:
+    z = tmp_path / "export.zip"
+    with zipfile.ZipFile(z, "w") as f:
+        f.writestr("Notes/ok.md", "# ok\n\nnothing here\n")
+        f.writestr("Notes/bad.md", f"# bad\n\nkey {AWS}\n")
+        f.writestr("../evil.md", f"key {AWS}\n")
+        f.writestr("img.png", b"\x89PNG\x00\x00")
+    return z
+
+
+def test_zip_members_are_scanned(tmp_path):
+    report = scan_tree(make_zip(tmp_path))
+    assert list(report.findings) == ["Notes/bad.md"]
+    assert [(f.kind, f.line) for f in report.findings["Notes/bad.md"]] == [("api-key", 3)]
+    assert report.scanned == 2 and report.unscanned >= 2  # the png and the unsafe name are not scanned
+    assert scan_tree(make_zip(tmp_path), ["Notes/bad.md"]).findings == {}
+
+
+def test_a_binary_file_is_not_reported_as_scanned(tmp_path):
+    p = tmp_path / "x.bin"
+    p.write_bytes(b"\x00\x01\x02")
+    report = scan_tree(p)
+    assert report.scanned == 0 and report.unscanned == 1
+
+
+def test_draft_and_import_of_a_zip_use_the_scan(client, tmp_path):
+    from test_m27_agent import do_import
+
+    z = make_zip(tmp_path)
+    res = client.post("/api/import/batches", json={"path": str(z)}).json()
+    assert list(res["scan"]["findings"]) == ["Notes/bad.md"]
+    result = do_import(client, z)
+    root = client.space_root
+    bad = next(p for p in root.rglob("bad.md"))
+    assert _fm(root, bad.relative_to(root).as_posix())["excludeFromAI"] is True
+    ok = next(p for p in root.rglob("ok.md"))
+    assert "excludeFromAI" not in _fm(root, ok.relative_to(root).as_posix())
+    from objectapp.importers import batches
+
+    assert "Notes/bad.md" in batches.load_scan(root, result["batch"])["findings"]
