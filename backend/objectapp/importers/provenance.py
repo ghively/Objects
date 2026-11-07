@@ -23,6 +23,8 @@ Nothing here reads or writes a file; the writer places the block and a re-run re
 from __future__ import annotations
 
 import hashlib
+import os
+from urllib.parse import urlsplit
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
@@ -40,14 +42,17 @@ __all__ = [
     "block",
     "hash_bytes",
     "ident",
+    "duplicates",
+    "find",
     "index_space",
+    "scope",
     "read_block",
     "system_of",
 ]
 
 BLOCK_KEY = "importSource"
 SYSTEMS = ("sharepoint", "notion", "wiki", "obsidian", "anytype", "files", "markdown")
-_ORDER = ("system", "url", "id", "version", "author", "created", "modified", "original", "contentHash", "batch", "importedAt")
+_ORDER = ("system", "url", "id", "source", "version", "author", "created", "modified", "original", "contentHash", "batch", "importedAt")
 
 
 def hash_bytes(data: bytes) -> str:
@@ -65,6 +70,8 @@ class Prov:
     modified: str | None = None
     original: str | None = None
     contentHash: str | None = None
+    source: str | None = None
+    """Which source the id belongs to (ids that are paths mean nothing across two sources)."""
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -81,8 +88,7 @@ def system_of(read: ReadResult, o: ReadObject | None = None) -> str:
     return "obsidian" if read.detected == "obsidian" else "markdown"
 
 
-def ident(read: ReadResult, o: ReadObject) -> tuple[str, str]:
-    """(system, id) of a source item: what a re-run matches on. Needs no file bytes."""
+def _raw_ident(read: ReadResult, o: ReadObject) -> tuple[str, str]:
     system = system_of(read, o)
     manifest_id = o.prov.get("id")
     if manifest_id:
@@ -96,6 +102,52 @@ def ident(read: ReadResult, o: ReadObject) -> tuple[str, str]:
         if isinstance(oid, (str, int)) and str(oid).strip():
             return system, str(oid).strip()
     return system, o.sourcePath
+
+
+def duplicates(read: ReadResult) -> dict[str, tuple[str, str, int]]:
+    """Source paths whose id repeats an earlier item's in the same source: path -> (id as the source
+    writes it, the path of the first item, its number from 2). Such an item gets ``<id>#<n>`` as its
+    id, so each can be matched on a re-run and none collapses into another."""
+    cached = read.__dict__.get("_dup_ids")
+    if cached is not None and cached[0] == len(read.objects):
+        return cached[1]
+    first: dict[tuple[str, str], str] = {}
+    seen: dict[tuple[str, str], int] = {}
+    out: dict[str, tuple[str, str, int]] = {}
+    for o in read.objects:
+        key = _raw_ident(read, o)
+        if key in first:
+            seen[key] = seen.get(key, 1) + 1
+            out[o.sourcePath] = (key[1], first[key], seen[key])
+        else:
+            first[key] = o.sourcePath
+    read.__dict__["_dup_ids"] = (len(read.objects), out)
+    return out
+
+
+def ident(read: ReadResult, o: ReadObject) -> tuple[str, str]:
+    """(system, id) of a source item: what a re-run matches on (with `scope`). Needs no file bytes."""
+    system, ident_ = _raw_ident(read, o)
+    dup = duplicates(read).get(o.sourcePath)
+    if dup is not None:
+        ident_ = f"{ident_}#{dup[2]}"
+    return system, ident_
+
+
+def scope(read: ReadResult, o: ReadObject) -> str | None:
+    """Which source an item's id belongs to, or None when the id is global (Notion and Anytype ids,
+    stable across exports). A manifest id belongs to its site (the url's origin) when it has a url;
+    a path-like id to the source folder or zip."""
+    if o.prov.get("id"):
+        url = str(o.prov.get("url") or "")
+        parts = urlsplit(url)
+        if parts.scheme in ("http", "https") and parts.netloc:
+            return f"{parts.scheme}://{parts.netloc.lower()}"
+    elif (read.kind == "notion" and _raw_ident(read, o)[1] != o.sourcePath) or (
+        read.kind == "anytype" and _raw_ident(read, o)[1] != o.sourcePath
+    ):
+        return None
+    return os.path.normcase(os.path.normpath(str(read.sourcePath)))
 
 
 def _file_url(read: ReadResult, rel: str) -> str | None:
@@ -112,7 +164,7 @@ def prov_for(read: ReadResult, o: ReadObject, data: bytes | None, original: str 
     file (its hash is ``contentHash``); ``original`` the kept original's space path."""
     system, ident_ = ident(read, o)
     m = o.prov
-    p = Prov(system=system, id=ident_)
+    p = Prov(system=system, id=ident_, source=scope(read, o))
     p.contentHash = hash_bytes(data) if data is not None else None
     p.url = m.get("url") or None
     p.version = m.get("version") or None
@@ -165,15 +217,27 @@ class Existing:
     block: dict[str, Any]
 
 
-def index_space(space: Space) -> dict[tuple[str, str], Existing]:
+def index_space(space: Space) -> dict[tuple[str, str], list[Existing]]:
     """Every object of ``space`` that carries an ``importSource`` block, by (system, id).
 
-    Read from the space's in-memory raw objects (no file is read here)."""
-    out: dict[tuple[str, str], Existing] = {}
+    Several sources can share an id (two vaults with ``Notes/Meeting.md``), so each key keeps all of
+    them; `find` picks the one from the right source. Read from the space's in-memory raw objects."""
+    out: dict[tuple[str, str], list[Existing]] = {}
     with space._lock:
-        raws = list(space._raw.values())
+        raws = sorted(space._raw.values(), key=lambda r: r.path)
     for raw in raws:
         b = read_block(raw.fm)
         if b is not None:
-            out.setdefault((str(b["system"]), str(b["id"])), Existing(raw.path, dict(b)))
+            out.setdefault((str(b["system"]), str(b["id"])), []).append(Existing(raw.path, dict(b)))
     return out
+
+
+def find(index: dict[tuple[str, str], list[Existing]], read: ReadResult, o: ReadObject) -> Existing | None:
+    """The earlier object made from ``o``: same system and id, and the same source (a block with no
+    source, written before sources were recorded, or a global id, matches any)."""
+    here = scope(read, o)
+    for hit in index.get(ident(read, o), []):
+        there = hit.block.get("source")
+        if here is None or there is None or os.path.normcase(os.path.normpath(str(there))) == here or there == here:
+            return hit
+    return None
