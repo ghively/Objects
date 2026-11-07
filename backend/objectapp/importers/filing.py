@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any
 from ..apiquery import is_excluded
 from ..propvalues import InvalidValue, label_lookup
 from ..typedefs import SYSTEM_KEYS
-from . import batches, kinds, proposal
+from . import batches, kinds, planner, proposal
 
 if TYPE_CHECKING:
     from ..space import Space
@@ -141,13 +141,24 @@ def _doc_text(of: Any, fm: dict[str, Any], title: str) -> str:
     return _norm(f"{title}\n{of.body}\n{extra}")
 
 
+_YES = frozenset({"yes", "true", "on", "enabled", "checked", "done", "y"})
+_NO = frozenset({"no", "false", "off", "disabled", "unchecked", "n"})
+MIN_QUOTE = 3
+"""The least a quote can be (characters, after tidying): one letter proves nothing."""
+
+
 def _supported(kind: str, value: Any, quote: str) -> bool:
     """Whether the quote says what the value says."""
     q = _norm(quote)
     if isinstance(value, list):
         return bool(value) and all(_supported(kind, v, quote) for v in value)
     if kind == "boolean":
-        return True  # a yes/no has no text of its own; the quote must still be in the document
+        # A yes/no has no text of its own: the quote has to say yes or no (or true/false) the right way.
+        words = set(q.split())
+        yes, no = bool(words & _YES), bool(words & _NO)
+        if isinstance(value, str):
+            value = value.strip().casefold() in _YES
+        return (yes and not no) if value else (no and not yes)
     if kind == "number":
         nums = [n.replace(",", "") for n in re.findall(r"-?\d[\d,]*\.?\d*", str(quote))]
         try:
@@ -178,6 +189,8 @@ def _check_quote(doc: str, value: Any, quote: Any, kind: str) -> str | None:
     """None when it passes, else why not."""
     if not isinstance(quote, str) or not quote.strip():
         return "no quote"
+    if len(_norm(quote)) < MIN_QUOTE:
+        return "the quote is too short to be evidence"
     if _norm(quote) not in doc:
         return "the quote is not in the document"
     if not _supported(kind, value, quote):
@@ -250,8 +263,11 @@ def apply_decision(
     wanted = str(decision.get("type") or "").strip()
     tid = space._type_id(wanted) if wanted else ""
     t = space.type_by_id(tid) if tid else None
-    if t is not None and type_names is not None and t.name.casefold() not in type_names and t.id != summary.type:
-        t = None
+    if t is not None and t.id != summary.type:
+        # A type change needs a type an approved proposal makes (or uses); with no proposal there is
+        # none, and a system type (Task, Tag, Daily note...) or a read-only one is never a target.
+        if type_names is None or t.name.casefold() not in type_names or not planner.importable_type(t):
+            t = None
     res["type"] = t.name if t is not None else (wanted or None)
     res["suggestedType"] = wanted if t is None and wanted else None
     if res["confidence"] == "low" or t is None:

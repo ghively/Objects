@@ -234,12 +234,12 @@ def test_filing_does_not_overwrite_a_value_that_is_set(client, tmp_path, monkeyp
     batch, paths = _filing_setup(client, tmp_path, monkeypatch)
     sp = Space(client.space_root)
     p = paths["Runbook 0"]
-    p = filing.apply_decision(sp, _decision(p), allowed={p})["path"]  # the type only
+    p = filing.apply_decision(sp, _decision(p), allowed={p}, type_names={"playbook"})["path"]  # the type only
     version = sp.read(p)[2]
     sp.update_properties(p, {"owner": "Gene"}, version)
     res = filing.apply_decision(sp, _decision(p, values=[
         {"key": "owner", "value": "Ann", "quote": "Owner: Ann"},
-        {"key": "environment", "value": "Prod", "quote": "Environment: Prod"}]), allowed={p})
+        {"key": "environment", "value": "Prod", "quote": "Environment: Prod"}]), allowed={p}, type_names={"playbook"})
     ok = {v["key"]: v["ok"] for v in res["values"]}
     assert ok == {"owner": False, "environment": True}
     assert "already has a value" in next(v for v in res["values"] if v["key"] == "owner")["reason"]
@@ -257,3 +257,33 @@ def test_filing_skips_objects_edited_since_the_import(client, tmp_path, monkeypa
     sp.save_body(paths["Runbook 0"], of.body + "\nMy own note.\n", version)
     eligible = fil.eligible(batch)
     assert paths["Runbook 0"] not in eligible and paths["Runbook 1"] in eligible
+
+
+# -- 8. quotes must say it; no proposal means no type change ----------------------------------------
+
+
+def test_boolean_and_short_quotes_are_not_accepted():
+    from objectapp.importers.filing import _check_quote, _norm
+
+    doc = _norm("Reviewed: yes\nEnvironment: Prod\nA note about A")
+    assert _check_quote(doc, True, "Environment: Prod", "boolean") is not None  # says nothing about yes/no
+    assert _check_quote(doc, True, "Reviewed: yes", "boolean") is None
+    assert _check_quote(doc, False, "Reviewed: yes", "boolean") is not None
+    assert _check_quote(doc, "A", "A", "text") is not None  # too short to be evidence
+    assert _check_quote(doc, "Prod", "Environment: Prod", "text") is None
+
+
+def test_without_a_proposal_the_pass_changes_no_type(client, tmp_path):
+    from test_m27_agent import do_import
+
+    from objectapp.importers import batches, filing
+
+    result = do_import(client, make_source(tmp_path))
+    sp = Space(client.space_root)
+    _d, items = batches.load_batch(client.space_root, result["batch"])
+    path = next(i["path"] for i in items if i["title"] == "Runbook 0")
+    before = sp.get(path).type
+    for wanted in ("Task", "Tag", "Page"):
+        res = filing.apply_decision(sp, {"path": path, "type": wanted, "confidence": "high"}, allowed={path}, type_names=None)
+        assert res["inbox"] is True and res["path"] == path, wanted
+        assert sp.get(path).type == before
