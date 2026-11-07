@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from . import a2a, agentfiles, remotesecrets
+from . import a2a, agentfiles, importskill, remotesecrets
 from .agentmodel import (
     AGENT_ID,
     AGENTS_DIR,
@@ -608,6 +608,7 @@ class AgentRegistry:
             self._check_nesting(rec.folder)
             rec.folder.mkdir(parents=True, exist_ok=True)
             agentfiles.write_skeleton(rec.folder, data, DEFAULT_SOUL)
+            importskill.install(rec.folder)  # M27: "Migrate a source" ships with Object's agents
             return self._default()
 
     def create(self, inp: AgentInput, instructions: str, location: Path | None = None) -> AgentRecord:
@@ -616,6 +617,7 @@ class AgentRegistry:
             folder = self._claim_folder(inp.name, location)
             data = self._new_data(inp)
             agentfiles.write_skeleton(folder, data, instructions)
+            importskill.install(folder)
             self._register(data["id"], folder)
             return self._record(data["id"], folder, default=False)
 

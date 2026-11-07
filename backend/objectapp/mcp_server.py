@@ -49,7 +49,9 @@ Start with `schema` to learn the types and property ids, then `search` or `query
 objects and `peek` before `read` (peek is small: title, properties, outline, links).
 `type_definition`, `collection` and `saved_query` give a full definition and its `revision`;
 `read_whiteboard`, `version_history`, `read_version`, `unlinked_mentions`, `trash`,
-`automations`, `import_preview` and `import_status` read the rest.
+`automations`, `import_preview`, `import_status`, `import_scan`, `import_proposal` and
+`import_report` read the rest. To move a folder of files into Object, read the prompt
+`migrate_a_source` first.
 Every write needs the `version` from your last read of that object (definitions and
 whiteboards need their `revision`); on a conflict, read it again, then retry. Writes go to
 the user's real notes, so change only what was asked: `write_body` replaces a whole body,
@@ -282,13 +284,49 @@ def build_server(client: ObjectClient, write: bool = True) -> MCPServer:
     def import_preview(path: str, kind: str = "auto") -> dict:
         """What importing a folder or .zip (an Obsidian vault, a Notion or Anytype export)
         would make: types, counts, samples and the mapping `start_import` uses. Writes
-        nothing. `kind` is auto, obsidian, notion or anytype."""
+        nothing. `kind` is auto, obsidian, notion, anytype or files (Word, Excel, PowerPoint, PDF,
+        images; a `_manifest.jsonl` beside the files gives each file's url, author, dates and fields)."""
         return client.post("/import/preview", {"path": path, "kind": kind})
 
     @server.tool(annotations=READ)
     def import_status(job_id: str) -> dict:
         """The progress and result of an import started with `start_import`."""
         return client.get(f"/import/jobs/{_seg(job_id)}")
+
+    @server.tool(annotations=READ)
+    def import_scan(path: str, leave_out: list[str] | None = None, batch: str | None = None) -> dict:
+        """Scan a folder for sensitive content before anything reads it: private keys, API keys and
+        tokens, password assignments, connection strings and card numbers. Answers file, kind and
+        line, never the value; `leave_out` names folders and patterns that are never opened. Keeps
+        the findings in an import batch and answers its id (`batch`): use it for `save_import_proposal`,
+        `start_import` and `save_import_decisions`."""
+        return client.post("/import/scan", {"path": path, "leaveOut": leave_out or [], "batch": batch})
+
+    @server.tool(annotations=READ)
+    def import_proposal(batch: str) -> dict:
+        """The schema proposal saved for an import batch, with the user's decisions (accepted, edited,
+        rejected) and its `revision`. Only the user applies it, in Object."""
+        return client.get("/import/proposal", batch=batch)
+
+    @server.tool(annotations=READ)
+    def import_report(batch: str) -> dict:
+        """An import batch's report (counts that reconcile, losses, scan findings, the AI pass) and
+        the state of its filing pass."""
+        return client.get("/import/report", batch=batch)
+
+    # -- the migration skill (M27) --------------------------------------------------
+
+    @server.prompt(name="migrate_a_source", description="How to move a folder of notes or files into Object, stage by stage.")
+    def migrate_a_source() -> str:
+        from .importskill import TEXT
+
+        return TEXT
+
+    @server.resource("object://skills/migrate-a-source", mime_type="text/markdown")
+    def migrate_skill() -> str:
+        from .importskill import TEXT
+
+        return TEXT
 
     # -- work (M22) -----------------------------------------------------------------
 
@@ -542,13 +580,39 @@ def build_server(client: ObjectClient, write: bool = True) -> MCPServer:
         return client.post(f"/automations/{_seg(rule_id)}/run", {"path": path})
 
     @server.tool(annotations=WRITE)
-    def start_import(preview_id: str, target: dict, mapping: dict | None = None) -> dict:
+    def start_import(
+        preview_id: str, target: dict, mapping: dict | None = None, batch: str | None = None, scan: dict | None = None
+    ) -> dict:
         """Start the import `import_preview` described. `target` is {"kind": "newSpace",
         "name": ..., "location": <folder>} or {"kind": "currentSpace"}; without `mapping`
-        the preview's is used. Follow it with `import_status`."""
+        the preview's is used. Refused when the mapping would create a type no approved
+        schema proposal creates. `batch` is the id `import_scan` answered; `scan` carries
+        {leaveOut, leaveOutFiles, excludeFromAi}. Follow it with `import_status`."""
         return client.post(
-            "/import/start", {"previewId": preview_id, "target": target, "mapping": mapping}
+            "/import/start",
+            {"previewId": preview_id, "target": target, "mapping": mapping, "batch": batch, "scan": scan},
         )
+
+    @server.tool(annotations=WRITE)
+    def save_import_proposal(batch: str, proposal: dict, revision: str | None = None) -> dict:
+        """Store a schema proposal for the user to review in Object: {summary?, items: [{action:
+        use|extend|create, name, group, documents, examples, properties: [{name, kind, share,
+        options?, target?}]}]}. Follow the skill "Migrate a source". The app checks the rules (a new
+        type needs 10 documents and properties of its own; a property needs a value in 30% of its
+        group; options are merged by case and spacing) and answers what it dropped. Saving over a
+        stored proposal needs its `revision`. You can't approve or apply it: the user does.
+        """
+        return client.post("/import/proposal", {"batch": batch, "proposal": proposal, "revision": revision})
+
+    @server.tool(annotations=WRITE)
+    def save_import_decisions(batch: str, decisions: list[dict]) -> dict:
+        """Hand over filing decisions for imported objects: [{path, type, confidence: high|medium|low,
+        values: [{key, value, quote}], tags: [{value, quote}], collections: [{value, quote}], links:
+        [{key, target, quote}]}]. Every value needs a quote copied from the document. The app checks each
+        value against its quote and the property's kind and writes only what passes; low confidence goes
+        to the Import inbox. The first hand-over of a source is a trial of at most 50 objects the user
+        marks in Object."""
+        return client.post("/import/decisions", {"batch": batch, "decisions": decisions})
 
     @server.tool(annotations=WRITE)
     def restore_from_trash(trash_id: str) -> dict:

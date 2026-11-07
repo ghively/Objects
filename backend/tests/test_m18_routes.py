@@ -140,7 +140,7 @@ def test_skill_routes(env: Env) -> None:
                          json={"name": "Bad Name", "description": "x", "body": "x"}).status_code == 422
 
     listed = env.http.get(env.url("/skills")).json()["skills"]
-    assert [s["name"] for s in listed] == ["rack-labels"]
+    assert [s["name"] for s in listed if s["name"] != "migrate-a-source"] == ["rack-labels"]  # M27 ships one
 
     detail = env.http.get(env.url("/skills/rack-labels")).json()
     assert detail["text"] and detail["revision"] and detail["files"][0]["path"] == "SKILL.md"
@@ -173,9 +173,9 @@ def test_skill_routes(env: Env) -> None:
 
     archived = env.http.post(env.url("/skills/rack-labels/archive"), json={})
     assert archived.status_code == 200 and archived.json()["state"] == "archived"
-    assert env.http.get(env.url("/skills")).json()["skills"] == []
+    assert [s["name"] for s in env.http.get(env.url("/skills")).json()["skills"]] == ["migrate-a-source"]
     with_archived = env.http.get(env.url("/skills"), params={"archived": "true"}).json()["skills"]
-    assert [s["state"] for s in with_archived] == ["archived"]
+    assert sorted(s["state"] for s in with_archived) == ["active", "archived"]
     arch_detail = env.http.get(env.url("/skills/rack-labels"), params={"archived": "true"})
     assert arch_detail.status_code == 200 and arch_detail.json()["state"] == "archived"
 
@@ -200,7 +200,7 @@ def test_ledger_routes(env: Env) -> None:
     assert first["entries"][0]["action"] == "create" and first["entries"][0]["line"] == "Created the skill 'alpha'"
     assert "before" not in first["entries"][0]
     rest = env.http.get(env.url("/ledger"), params={"limit": 5, "before": first["entries"][-1]["id"]}).json()
-    assert rest["more"] is False and len(rest["entries"]) == 2
+    assert rest["more"] is False and len([e for e in rest["entries"] if e.get("skill") != "migrate-a-source"]) == 2
 
     only = env.http.get(env.url("/ledger"), params={"skill": "alpha"}).json()["entries"]
     assert [e["skill"] for e in only] == ["alpha"]

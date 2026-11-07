@@ -54,6 +54,8 @@ OBJECT_READ: tuple[str, ...] = (
     "read_version", "unlinked_mentions", "trash", "automations", "import_preview", "import_status",
     # M22
     "work_items", "work_item",
+    # M27
+    "import_scan", "import_proposal", "import_report",
 )
 """The read tools of ``objectapp-mcp`` (short names)."""
 
@@ -73,6 +75,8 @@ OBJECT_WRITE: tuple[str, ...] = (
     # M22
     "step_action", "edit_steps", "log_activity", "add_work_note", "set_work_fields",
     "update_floor_item",
+    # M27
+    "save_import_proposal", "save_import_decisions",
 )
 """The write tools of ``objectapp-mcp`` (short names)."""
 

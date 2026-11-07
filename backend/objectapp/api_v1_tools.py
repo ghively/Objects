@@ -45,7 +45,13 @@ Routes (all JSON; ``read`` scope for the GETs and the import preview, ``read-wri
   ``DELETE /v1/queries/{id}``
 - ``POST /v1/whiteboards`` ``{title?}``; ``PUT /v1/whiteboard`` ``{path, revision, board}``
 - ``POST /v1/automations`` ``{rule}`` -> 201; ``POST /v1/automations/{id}/run`` ``{path}``
-- ``POST /v1/import/start`` ``{previewId, target, mapping?}`` -> 202 ``{jobId, targetPath}``
+- ``POST /v1/import/start`` ``{previewId, target, mapping?, batch?, scan?}`` -> 202 ``{jobId, targetPath}``
+  (M27: ``422`` when the mapping makes a type no approved proposal makes)
+- M27: ``POST /v1/import/scan`` ``{path, leaveOut?, batch?}`` -> ``{batch, scan}`` (the scan names kinds and
+  lines, never values; with a ``read-write`` token it is kept in a draft batch);
+  ``GET /v1/import/proposal?batch=`` -> ``{proposal, decisions, applied}``;
+  ``POST /v1/import/proposal`` ``{batch, proposal, revision?}``; ``POST /v1/import/decisions``
+  ``{batch, decisions}``; ``GET /v1/import/report?batch=`` -> ``{report, batch, filing}``
 - ``POST /v1/trash/{id}/restore``; ``POST /v1/history/restore`` ``{path, versionId, version}``
 
 M22: on a work item, ``/v1/object/duplicate`` and ``/v1/history/restore`` answer ``422`` ("Steps
@@ -199,6 +205,25 @@ class StartRequest(BaseModel):
     previewId: str
     target: dict[str, Any] | str
     mapping: dict[str, Any] | None = None
+    batch: str | None = None
+    scan: dict[str, Any] | None = None
+
+
+class ScanRequest(BaseModel):
+    path: str
+    leaveOut: list[str] = []
+    batch: str | None = None
+
+
+class ProposalSaveRequest(BaseModel):
+    batch: str
+    proposal: dict[str, Any]
+    revision: str | None = None
+
+
+class DecisionsRequest(BaseModel):
+    batch: str
+    decisions: list[dict[str, Any]]
 
 
 class RestoreVersionRequest(BaseModel):
@@ -544,6 +569,100 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
             while len(previews) > MAX_PREVIEWS:
                 previews.popitem(last=False)
         return JSONResponse(body)
+
+    @r.post("/v1/import/scan")
+    @run
+    def import_scan(req: ScanRequest, request: Request):
+        from .importers import batches
+        from .importscan import scan_tree
+
+        token = auth(request)
+        refused = refuse_space_source(req.path)
+        if refused is not None:
+            return refused
+        root = Path(req.path.strip().strip('"')).expanduser()
+        if not root.exists():
+            return error(404, "There is no file or folder at this path.")
+        scan = scan_tree(root, req.leaveOut).to_json() if root.is_dir() else scan_tree(root).to_json()
+        batch = None
+        if token.scope == "read-write":
+            batch = req.batch
+            if batch is None:
+                batch = batches.create_draft(space.root, str(root), req.leaveOut)
+            try:
+                batches.batch_dir(space.root, batch)
+                batches.store_scan(space.root, batch, scan)
+            except KeyError:
+                return error(404, "No such import batch.")
+        return JSONResponse({"batch": batch, "scan": scan})
+
+    @r.get("/v1/import/proposal")
+    @run
+    def import_proposal(batch: str, request: Request):
+        from .importers import batches, proposal
+
+        auth(request)
+        try:
+            batches.load_batch(space.root, batch)
+        except KeyError:
+            return error(404, "No such import batch.")
+        stored = proposal.load_proposal(space.root, batch)
+        review = proposal.load_review(space.root, batch)
+        return JSONResponse({"proposal": stored, "decisions": review.get("items", {}), "applied": review.get("applied")})
+
+    @r.post("/v1/import/proposal")
+    @run
+    def save_import_proposal(req: ProposalSaveRequest, request: Request):
+        from .importers import proposal
+
+        token = auth(request, write=True)
+        try:
+            stored = proposal.save_proposal(space, req.batch, req.proposal, req.revision, origin=origin(token))
+        except KeyError:
+            return error(404, "No such import batch.")
+        except proposal.ProposalConflict as exc:
+            return JSONResponse({"detail": str(exc), "currentRevision": exc.current}, status_code=409)
+        except proposal.ProposalInvalid as exc:
+            return error(422, str(exc))
+        guard.log(token, "import-proposal", req.batch)
+        problems = [{"id": i["id"], "problems": i["problems"], "dropped": i["dropped"]}
+                    for i in stored["items"] if i["problems"] or i["dropped"]]
+        return JSONResponse({"revision": stored["revision"], "items": len(stored["items"]), "checks": problems})
+
+    @r.post("/v1/import/decisions")
+    @run
+    def save_import_decisions(req: DecisionsRequest, request: Request):
+        from .importers import batches, filing
+
+        token = auth(request, write=True)
+        try:
+            batches.load_batch(space.root, req.batch)
+        except KeyError:
+            return error(404, "No such import batch.")
+        try:
+            out = imports.filing.apply_external(req.batch, req.decisions)  # type: ignore[attr-defined]
+        except (filing.Busy, filing.NotAllowed) as exc:
+            return error(409, str(exc))
+        guard.log(token, "import-decisions", req.batch)
+        return JSONResponse(out)
+
+    @r.get("/v1/import/report")
+    @run
+    def import_report(batch: str, request: Request):
+        from .importers import batches
+
+        auth(request)
+        try:
+            data, _items = batches.load_batch(space.root, batch)
+        except KeyError:
+            return error(404, "No such import batch.")
+        try:
+            text = (batches.batch_dir(space.root, batch) / "report.md").read_text(encoding="utf-8")
+        except OSError:
+            text = ""
+        filing_state = imports.filing.status(batch)  # type: ignore[attr-defined]
+        return JSONResponse({"report": text, "batch": data, "filing": {
+            "state": filing_state["state"], "rightShare": filing_state["trial"]["rightShare"]}})
 
     @r.get("/v1/import/jobs/{job_id}")
     @run
@@ -989,7 +1108,8 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
                 return error(404, "This preview has expired. Preview the source again.")
         status, body = _call(
             next(rt for rt in imports.routes if getattr(rt, "path", "") == "/import/start"),
-            {"previewId": req.previewId, "mapping": mapping, "target": target, "clientId": origin(token)},
+            {"previewId": req.previewId, "mapping": mapping, "target": target, "clientId": origin(token),
+             "batch": req.batch, "scan": req.scan, "requireApproved": True},
         )
         if status >= 400:
             return _failed(status, body)

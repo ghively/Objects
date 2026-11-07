@@ -135,9 +135,9 @@ def test_tool_lists(env: Env) -> None:
     assert WORK_READ <= ro and not (WORK_WRITE & ro)
     assert toolcatalog.WORK_STEP_TOOLS == ("step_action", "edit_steps", "log_activity", "add_work_note")
     assert set(toolcatalog.WORK_STEP_TOOLS) <= set(toolcatalog.OBJECT_WRITE)
-    assert len(toolcatalog.OBJECT_READ) == 22 and len(toolcatalog.OBJECT_WRITE) == 41
-    assert toolcatalog.OBJECT_READ[-2:] == ("work_items", "work_item")
-    assert toolcatalog.OBJECT_WRITE[-6:] == (
+    assert len(toolcatalog.OBJECT_READ) == 25 and len(toolcatalog.OBJECT_WRITE) == 43
+    assert toolcatalog.OBJECT_READ[-5:-3] == ("work_items", "work_item")
+    assert toolcatalog.OBJECT_WRITE[-8:-2] == (
         "step_action", "edit_steps", "log_activity", "add_work_note", "set_work_fields",
         "update_floor_item",
     )
