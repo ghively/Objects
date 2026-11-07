@@ -1,9 +1,11 @@
 # M26 acceptance: readers and the scan
 
+Status (2026-11-07): built 2026-11-06/07, one review and one fix pass, gated 2026-11-07; on `master`. Gene's 6 hand-checks below are unticked.
+
 Run: `uv run python scripts/m26_acceptance.py` (builds a synthetic mixed folder in a temp dir; prints `RESULT: PASS`). Tests: `uv run pytest backend/tests/test_m26_readers.py backend/tests/test_m26_scan.py -q`; `cd frontend && npx vitest run src/import/scan && npx tsc -b --noEmit`.
 
 ## What was built
-`objectapp.readers` (`read_file`, `supported_suffixes`, `ReadResult`, `ExtractedImage`, `ocr_engine`), `objectapp.importscan` (`scan_file`, `scan_text`, `scan_tree`, `Finding`, `ScanReport`), `POST /api/import/scan` (`api_importscan.py`, mounted in `server.py`), and the wizard step `frontend/src/import/scan/ScanStep.tsx` (not yet placed in the import dialog; M25 or the integrator mounts it and passes `leaveOut`, `leaveOutFiles`, `excludeFromAi` on).
+`objectapp.readers` (`read_file`, `supported_suffixes`, `ReadResult`, `ExtractedImage`, `ocr_engine`), `objectapp.importscan` (`scan_file`, `scan_text`, `scan_tree`, `Finding`, `ScanReport`), `POST /api/import/scan` (`api_importscan.py`, mounted in `server.py`), and the wizard step `frontend/src/import/scan/ScanStep.tsx` (mounted in the import dialog by M27, between the source and the mapping steps; it passes `leaveOut`, `leaveOutFiles` and `excludeFromAi` on as `scan`; see `m27-ui-acceptance.md`).
 Libraries: python-docx, pypdf, openpyxl, python-pptx, markdownify, beautifulsoup4, Pillow (all MIT/BSD/HPND; pure Python or wheels).
 
 ## Deviations and calls

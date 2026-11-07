@@ -7,7 +7,7 @@ them without choosing anything; nothing was created or changed, and the view was
 afterwards. Object was then opened at the same width and compared control by control; the "Catalog"
 column below is the expected behaviour.
 
-## Fixed (commits on `master`, not yet pushed)
+## Fixed (commits on `master`)
 
 | Area | Catalog | Object before | Now |
 |---|---|---|---|
@@ -222,7 +222,7 @@ debugger, which makes list shortcuts unreliable to judge, so treat "did not conv
 ## Consolidated backlog (everything above, in one list, 2026-11-02)
 
 Full behaviour is in `docs/behavior-catalog.md`; item numbers refer to this file. Status: **open**
-unless marked. Order is a suggestion, highest value first.
+unless marked (as of 2026-11-07 the backlog is built, see "2026-11-04: the last open items" below and `remaining-work.md`; only "Not yet poked" is open). Order is a suggestion, highest value first.
 
 **Keep (Gene's explicit requirements)**
 - **Unlinked mentions stay.** Object already has them (M5: `backend/objectapp/references.py`,
@@ -298,7 +298,7 @@ unless marked. Order is a suggestion, highest value first.
   imported wiki space).
 - Scrub credentials found in the Work and Personal spaces before any of it is imported or shared.
 
-## Progress on the backlog (updated 2026-11-02, commits on `master`, not pushed)
+## Progress on the backlog (updated 2026-11-02, commits on `master`)
 
 | Backlog item | State | Commit |
 |---|---|---|
@@ -386,14 +386,14 @@ Everything not done, with the behaviour to match (catalog section in brackets) a
 25. Language (decimal separator), Date & Time (time zone, format, start of week), Offline & Sync (index recalculation, media loading), Space Settings. Check what Object has. S-M.
 
 **AI and integrations**
-30. **M10, the AI assistant** (L): the plan is written, not built (`2026-11-02-m10-ai-assistant.md`): Settings > AI Assistant, AI Chat panel and chat objects, block/slash/toolbar entries, tags and property auto-fill, chat shortcuts. Three small questions for Gene are listed in the plan.
-31. **Integrations, later** (each L, lower priority): calendar feeds, task actions, local API with tokens, email capture, Readwise, Kindle, Telegram, WhatsApp, Raycast, web extension.
+30. **M10, the AI assistant** (L): built as M10 (`2026-11-02-m10-ai-assistant.md`): Settings > AI Assistant, AI Chat panel and chat objects, block/slash/toolbar entries, tags and property auto-fill, chat shortcuts. Three small questions for Gene are listed in the plan.
+31. **Integrations, later** (each L, lower priority; the local API with tokens is built as M11): calendar feeds, task actions, email capture, Readwise, Kindle, Telegram, WhatsApp, Raycast, web extension.
 
 **Decisions and housekeeping**
 26. **Decided (Gene, 2026-11-02): unlock every feature, nothing gated.** The spec already said so ("Every feature is simply available; nothing is gated behind a paid tier"). Checked: Object has no gating, badge or upsell anywhere, and Tasks, Queries, version history, extended search, focus mode and unlinked mentions all exist. Do not add rocket badges, blurred previews or upgrade cards. Update the same day: **AI is now in scope** (M10, through the Claude Code CLI; `2026-11-02-m10-ai-assistant.md`) and the integrations are wanted later at lower priority; accounts, sync, sharing and mobile stay out.
 27. Decide whether the how-to guides ship as built-in seeds.
-28. Investigate `test_static_files_are_gzipped` (fails on Windows `master`, also before these changes).
-29. Gene's hands-on checks, M1-M9 (256 items), and wiki-import follow-ups (see `remaining-work.md`).
+28. `test_static_files_are_gzipped` on Windows: fixed 2026-11-03 (`ba43e66`).
+29. Gene's hands-on checks (now M1-M27; see `remaining-work.md`) and wiki-import follow-ups.
 
 **Still to look at for the catalog** (the "Not yet poked" list below).
 

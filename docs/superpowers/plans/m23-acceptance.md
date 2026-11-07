@@ -1,5 +1,7 @@
 # Milestone 23 acceptance: the Work section
 
+Status (2026-11-07): built, merged to `master` and gated 2026-11-06. Gene's 19 hand-checks below are unticked.
+
 Plan: `2026-11-05-m23-work-section.md`. Design: `specs/2026-11-05-work-dashboard-design.md`, sections 5 and 6 and "Design language". Date: 2026-11-06. Built on `feat/m22-m23`, merged to `master` with M16-M21 on 2026-11-06.
 
 ## What was built

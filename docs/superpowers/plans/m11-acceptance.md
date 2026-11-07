@@ -1,5 +1,7 @@
 # Milestone 11 acceptance: local API and MCP server
 
+Status (2026-11-07): built, reviewed and gated (Linux and, after the merge, Windows, 2026-11-05); merged to `master`. Gene's 4 hand-checks below are unticked.
+
 Plan: `2026-11-04-notion-anytype-features-plan.md`, M11 (built first, before M10, Gene's order of 2026-11-04). Date: 2026-11-05. Built on a Linux cloud container, not on Gene's Windows PC, on branch `feat/m11-local-api-mcp` off `master` at `c72567f`.
 
 ## What was built

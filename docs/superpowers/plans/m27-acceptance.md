@@ -1,5 +1,7 @@
 # M27 acceptance: the agent workflow (back end)
 
+Status (2026-11-07): built 2026-11-06/07, one review and one fix pass, gated 2026-11-07; on `master`. Gene's 6 hand-checks below are unticked.
+
 Run: `cd backend && uv run python ../scripts/m27_acceptance.py` (copy of `space-sample`, synthetic mixed folder, fake claude; prints `RESULT: PASS`). Tests: `uv run pytest tests/test_m27_agent.py tests/test_m17_contract.py tests/test_m22_mcp.py tests/test_m11_mcp.py tests/test_m17_mcp_tools.py tests/test_m18_routes.py tests/test_m20_delegation.py`.
 
 ## Routes (as the frontend uses them)

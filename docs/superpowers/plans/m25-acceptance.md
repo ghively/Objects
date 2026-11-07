@@ -1,5 +1,7 @@
 # M25 acceptance: provenance and re-runs
 
+Status (2026-11-07): built 2026-11-06/07, one review and one fix pass, gated 2026-11-07; on `master`. Gene's 10 hand-checks below are unticked.
+
 Design: `specs/2026-11-06-import-migration-design.md` sections 1, 2, 4, 5, 7, 10. Plan: `2026-11-06-m25-provenance-and-reruns.md`. Built 2026-11-07.
 
 ## How to run

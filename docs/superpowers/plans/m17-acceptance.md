@@ -1,5 +1,7 @@
 # Milestone 17 acceptance: agents, agent folders and full tooling
 
+Status (2026-11-07): built and gated 2026-11-06 (Windows); merged to `master` 2026-11-06. Gene's 13 hand-checks below are unticked.
+
 Plan: `2026-11-05-m17-agents-and-tools.md`. Design: `specs/2026-11-05-agents-design.md`, sections 1-4 and section 10's agent picker. Date: 2026-11-06. Built on Gene's Windows 11 PC on branch `feat/m16-m24` (shared with M16-M24), commits `a4f42e9..f67a82b` plus this integration commit. Gene asked for M16-M24 to be built straight through; his hand checks below come later.
 
 ## What was built

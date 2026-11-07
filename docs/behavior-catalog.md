@@ -21,11 +21,13 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 | Sidebar rest, top bar, search, New menu | specified (sections 4, 8) |
 | Calendar Month and Week views, backlinks, Export dialog | specified (section 10) |
 | Unlinked mentions | built in Object (section 11); its look is Object's own |
+| Brain dump, Work agent | Object's own (section 10b) |
+| Import: Source line, Files source, scan, proposal, trial, normalise, Import inbox | Object's own (section 10c); the strings are ours, not catalogued |
 | Tab and sidebar context menus, Overview tab, collection page, outline | specified (section 9) |
 | Views: layouts, toolbar, Overview | specified (sections 8, 9); the inner screens of the filter, sort and group editors and Customize are not specified yet |
 | Object page: header, properties, side panel | specified (section 5); outline and stats in section 9; backlinks in section 10; unlinked mentions in section 11 |
 | Editor: block menu, selection toolbar, slash, @ | specified (section 6); the default table in section 10; the look of Two Columns, Code, Math, Toggle, Group and Horizontal line blocks is not specified yet |
-| Graph, Trash, Explore panel, shortcuts | specified (section 7); export dialog in section 10 (PDF, Markdown; Word and LaTeX options not specified yet); the import dialog is not specified yet |
+| Graph, Trash, Explore panel, shortcuts | specified (section 7); export dialog in section 10 (PDF, Markdown; Word and LaTeX options not specified yet); the original app's import dialog is not specified; Object's own import dialog is described in section 10c |
 
 ## 1. Settings
 
@@ -310,6 +312,53 @@ Each starter template pre-fills the new type's properties.
 - **Queue entry states**: pending, running, done, failed (reason + **Retry**), withdrawn. A failed run says why
   ("The run didn't finish within 30 minutes.", "The agent finished without marking the step done.", "Object closed
   during this run.") or asks Gene one question (a Question step is inserted before the step).
+
+## 10c. Import and migration (Object's own, M15 and M25-M27)
+
+The catalog has no import dialog (only the Import menu entries in sections 4 and 9), so everything here is Object's
+own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` and `import/agent/text.ts`.
+
+- **Import dialog** ("Import from another app"): **Zip file or folder** path; **Exported from** Detect automatically
+  | Notion | Obsidian | Anytype | Files (a folder, with an optional `_manifest.jsonl`); **Preview** writes nothing.
+  Steps in order: source, **Check for sensitive content** (scan), **Review mappings** (types, properties, options),
+  progress with **Stop import**, finish. **Import into**: A new space | This space; the review step also offers
+  **Keep originals as** Attachments (default) | File objects, and **Try on a copy of this space** (imports into a copy
+  named "<space> (trial)" next to the open space; on by default for a first run into this space).
+- **Source line** (object page, under the properties; hidden when the object was not imported): **Source**
+  "Imported from <system> (author, modified <date>, version <v>)", **Open original** (the web url, else the kept
+  file) and **Show file** (shows the kept original in the file manager). Every imported object carries the system
+  frontmatter block `importSource` (system, url, id, version, author, created, modified, original, contentHash, batch,
+  importedAt).
+- **Queryable import fields**: filters, sorts and columns offer **Imported from**, **Import batch** and **Source modified**
+  (the last is a text filter on the ISO date).
+- **Files source**: every non-Markdown file is one page (text and images where they appeared) with the untouched
+  original kept in `Attachments/Originals/` (over 100 MB: not copied, listed in the report). A file that cannot be
+  read becomes an "Original only" page. Sheets over 200 rows or 20 columns are not shown ("see the original").
+- **Check for sensitive content** (local, nothing sent anywhere; findings never show the matched text): **Leave out**
+  (one folder or pattern per line; left-out files are never read), then **Flagged files** with a kind (Private key, API
+  key or token, Password assignment, Connection string, Card number) and line; each defaults to **Import, excluded from AI**
+  and can be switched to **Leave out**.
+- **Re-runs**: the same source updates its objects in place (the old text goes to version history), reuses identical
+  attachments and never overwrites Gene's edits. Finish step and Import report: counts that add up (source items =
+  imported + updated + unchanged + changed in both + left out + failed), **Changed in both** (**Take source** /
+  **Keep mine**, and **Take source for all** / **Keep mine for all**), **Removed at source** (listed, never trashed).
+  **Move batch to Trash** moves the objects the batch created (not the ones it only updated) to the Trash.
+- **Proposed schema** (finish step offers **Review proposed schema**): each group is **Use existing type**, **Extend
+  existing type** or **Create type**, with document counts, examples, "N% have a value" fill rates, options and merges;
+  **Accept**, **Edit** (Name, Plural name, Keep <property>) or **Turn down**; **Apply** stays disabled until every
+  item is decided and creates only what was accepted. A new type needs 10 documents; a property needs 30% of its
+  group. Only the app applies a proposal; no MCP tool can.
+- **Trial on the first 50 objects**: **Start trial**; each result shows a confidence (High, Medium, Low), the value
+  and its **Quote**, and **Right** / **Wrong** marks with an accuracy line ("N of M marked right (P%)"); a value that
+  failed the app's check says **Did not pass the check**. **Continue with the rest** starts the bulk pass (40 objects
+  per agent turn). Flagged files are not in the trial.
+- **Normalise tags and options**: near-duplicate tags and option values (for example Prod / prod / Production) with
+  **Merge into** and **Merge N groups**; "Nothing looks like a duplicate." when there are none.
+- **Import inbox**: low-confidence pages land in a collection named "Import inbox"; the last step says
+  "N objects in the Import inbox for you to look at." with **Open Import inbox**.
+- **MCP**: `import_scan`, `import_proposal`, `import_report` (read) and `save_import_proposal`, `save_import_decisions`
+  (write), the prompt `migrate_a_source` and the resource `object://skills/migrate-a-source` let an outside agent run the
+  same workflow; `start_import` refuses a mapping that creates types outside an approved proposal (for the open space or a trial copy; a brand-new space is not checked).
 
 ## 11. Unlinked mentions (kept in Object)
 

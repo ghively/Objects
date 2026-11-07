@@ -1,5 +1,7 @@
 # Milestone 9 acceptance
 
+Status (2026-11-07): built, reviewed, fixed and gated; on `master`. Gene's 19 hand-checks below are unticked.
+
 Plan: `2026-10-28-m9-completeness-gaps.md`, Task 22. Date: 2026-10-28. Built on a Linux cloud container, not on Gene's Windows PC: Task 1 first, then five lanes in parallel worktrees (B back end, O object page, E editor, P properties and settings, V views and sidebar), merged, then one review, one fix pass and the gate. The walkthrough ran headless (Playwright with Chromium).
 
 ## Automated results

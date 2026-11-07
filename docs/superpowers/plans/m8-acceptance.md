@@ -1,5 +1,7 @@
 # Milestone 8 acceptance
 
+Status (2026-11-07): built, reviewed, fixed and gated; on `master`. Gene's 40 hand-checks below are unticked.
+
 Plan: `2026-10-27-m8-deferred-features.md`, Task 31. Date: 2026-10-27/28. This was built on a Linux cloud container, not on Gene's Windows PC. The walkthrough ran headless (Playwright with Chromium), because the container has no display for the pywebview window.
 
 ## Automated results

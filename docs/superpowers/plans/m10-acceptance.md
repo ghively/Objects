@@ -1,5 +1,7 @@
 # Milestone 10 acceptance: the AI assistant
 
+Status (2026-11-07): built, reviewed and gated (Linux and, after the merge, Windows, 2026-11-05); merged to `master`. Gene's 7 hand-checks below are unticked.
+
 Plan: `2026-11-02-m10-ai-assistant.md`, revised by `2026-11-04-notion-anytype-features-plan.md` ("How this fits with M10") to use M11's MCP read tools. Date: 2026-11-05. Built on a Linux cloud container, not on Gene's Windows PC, on branch `feat/m10-ai-assistant`, which stacks on `feat/m11-local-api-mcp` (PR #5): merge that first.
 
 ## What was built

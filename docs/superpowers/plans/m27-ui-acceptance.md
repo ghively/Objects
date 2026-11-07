@@ -1,5 +1,7 @@
 # M27 UI acceptance: the agent workflow in the import wizard
 
+Status (2026-11-07): built with M27 and gated 2026-11-07; on `master`. Gene's 9 hand-checks below are unticked.
+
 Tests: `cd frontend && npx vitest run src/import && npx tsc -b --noEmit && node scripts/app-icons.mjs --check`.
 
 ## What was built (frontend)

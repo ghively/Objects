@@ -1,5 +1,7 @@
 # Milestone 18 acceptance: learning
 
+Status (2026-11-07): built and gated 2026-11-06 (Windows); merged to `master` 2026-11-06. Gene's 15 hand-checks below are unticked.
+
 Plan: `2026-11-05-m18-learning.md`. Design: `specs/2026-11-05-agents-design.md`, section 5 (Learning), with the agent page tabs (section 2), the memory snapshot (section 3), the chat's Learning line (section 10) and the review model (section 11). Date: 2026-11-06. Built on Gene's Windows 11 PC on branch `feat/m16-m24` (shared with M16-M24), commits `bcc01de..e80afac` plus this integration commit. Gene asked for M16-M24 to be built straight through; his hand checks below come later.
 
 ## What was built

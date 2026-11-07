@@ -8,6 +8,10 @@ A local, Markdown-backed notes app with its own object model, stored as a folder
 - **Search and links:** full-text search and the Ctrl+K palette, backlinks and references, global and local graph.
 - **Whiteboards:** with pressure-sensitive pen ink.
 - **Editor:** a block editor that writes plain Markdown and never rewrites what you didn't edit; light and dark themes; version history.
+- **Computed properties, more layouts, automations:** Formula, Rollup, ID, Email, Phone and Files properties; calendar, timeline and chart layouts; local rules (create, property change, schedule and button triggers).
+- **AI and agents (run through your own `claude` CLI):** a chat panel with a model picker, agents that are Claude Code project folders (memory, self-written skills, an MCP gateway, A2A remote agents, delegation, schedules), and the local API and MCP server below. Nothing is written without your say, and "Exclude from AI" objects are never sent.
+- **Work section:** a ticket dashboard built on Tasks and Projects (Now, Flow, Projects map, queues, Alerts and more), a brain-dump bar that saves Captures, and a Work agent that files them.
+- **Import and migration:** import a Notion, Obsidian or Anytype export, a Markdown folder or a Files folder (Word, PDF, Excel, PowerPoint, HTML, images) into a new space, this space or a trial copy; every imported object keeps a Source line (open the original, show the kept file); re-runs update instead of duplicating; a local sensitive-content scan runs first; an agent can propose a schema, which only you approve, then file the pages.
 
 Opening a space never modifies its files, edits change only their own lines, and deletes go to a restorable trash. A space keeps its metadata in `.object/` and its search cache in `.object-cache/`; spaces made before 2026-11-04 are migrated to these folders automatically on open.
 
@@ -45,6 +49,8 @@ cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build
 uv run python scripts/m8_acceptance.py backend/tests/fixtures/space-sample
 uv run python scripts/m11_acceptance.py backend/tests/fixtures/space-sample
 ```
+
+Every milestone has an acceptance script (`scripts/m1_roundtrip.py`, `scripts/m2_acceptance.py` to `scripts/m27_acceptance.py`) that runs on a copy of a fixture space; the exact command is in each `docs/superpowers/plans/mN-acceptance.md`.
 
 Rules for contributors (human or agent) are in `CLAUDE.md`. Status is in `docs/superpowers/plans/remaining-work.md`. To pick the work up, read `HANDOFF.md`.
 

@@ -1,5 +1,7 @@
 # Milestone 5 acceptance
 
+Status (2026-11-07): built, reviewed, fixed and gated; on `master`. Gene's 23 hand-checks below are unticked.
+
 Plan: `2026-10-26-m5-search-palette-backlinks-graph.md`, Task 13. Date: 2026-10-27. Built on a Linux cloud container, not Gene's Windows PC.
 
 ## Automated results

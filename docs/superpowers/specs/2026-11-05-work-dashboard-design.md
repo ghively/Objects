@@ -1,6 +1,6 @@
 # Object work dashboard: design
 
-Date: 2026-11-05. Owner: Gene Hively. Status: **approved by Gene, 2026-11-05** (the whole document, our calls included). Plans: `docs/superpowers/plans/2026-11-05-m22-*.md` to `2026-11-05-m24-*.md`.
+Date: 2026-11-05. Owner: Gene Hively. Status: **approved by Gene, 2026-11-05** (the whole document, our calls included). Built as M22-M24 (on `master`). Plans: `docs/superpowers/plans/2026-11-05-m22-*.md` to `2026-11-05-m24-*.md`.
 
 Builds on M1-M15 (types, properties, queries, daily notes, Tasks, calendar, automations, version history) and on the agents milestones M16-M21 (`specs/2026-11-05-agents-design.md`).
 
@@ -199,7 +199,7 @@ Object's look stays (its fonts, spacing, shadcn components, light/dark themes). 
 - **Density**: list rows about 36 px; the Now card is the one large element on the page.
 - Exact token values (the dashboard's dark palette for reference: background `#0e0f14`, accent `#7b8cff`, agent teal `#2cc7b0`, ok `#34c37a`, warn `#f5b041`, critical `#ef5a5f`, capture `#e0479e`) are mapped to Object's theme variables by the builder, so both themes work.
 
-## Phases (milestones after M21; order is ours)
+## Phases (M22-M24, built; order is ours)
 
 1. **M22: work model** — sections 1-4: work and ticket fields on Task and Project, the list, step list and floor item property kinds, Activity and Work notes, the Tickets view, the resolution note. Needs no agent.
 2. **M23: the Work section** — sections 5-6 and the design language: every view, the panel's work header, step actions (with agent actions queued but not yet run), focus lines, focus session, keep on top, alerts (type and folder watch), wins.

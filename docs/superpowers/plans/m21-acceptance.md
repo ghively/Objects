@@ -1,5 +1,7 @@
 # Milestone 21 acceptance: agent schedules
 
+Status (2026-11-07): built, merged to `master` and gated 2026-11-06. Gene's 11 hand-checks below are unticked.
+
 Plan: `2026-11-05-m21-schedules.md`. Design: `specs/2026-11-05-agents-design.md`, section 9 (Schedules), with the curator line of section 5, the agent page of section 2 and "Where chats live". Date: 2026-11-06. Built on Gene's Windows 11 PC on branch `feat/m16-m24` (shared with M16-M24), commits `02c584d..40e8cec` plus this integration commit. Gene asked for M16-M24 to be built straight through, and on 2026-11-06 for two parallel tracks with one full gate per track; his hand checks below come later.
 
 ## What was built
