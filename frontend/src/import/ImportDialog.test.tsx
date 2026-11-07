@@ -285,7 +285,7 @@ describe('ImportDialog: source and preview', () => {
     expect(mocked.startImport).not.toHaveBeenCalled()
   })
 
-  test('test exported from lists detect automatically and the three apps', async () => {
+  test('test exported from lists detect automatically, the three apps and Files', async () => {
     await openDialog()
     const select = screen.getByRole('combobox', { name: T.kind })
     expect(select).toHaveValue('auto')
@@ -294,6 +294,7 @@ describe('ImportDialog: source and preview', () => {
       'Notion',
       'Obsidian',
       'Anytype',
+      T.kinds.files,
     ])
   })
 
@@ -560,6 +561,7 @@ describe('ImportDialog: target, progress and finish', () => {
     const user = await previewVault()
     expect(within(typeRow('Folder Books')).queryByRole('combobox', { name: T.existingType })).toBeNull()
     await user.click(screen.getByRole('radio', { name: T.thisSpaceNamed('Work') }))
+    await user.click(await screen.findByRole('checkbox', { name: T.tryCopy })) // M25: a first run starts on a copy
     expect(screen.getByText(T.thisSpaceNote)).toBeInTheDocument()
     expect(within(screen.getByRole('group', { name: T.target })).queryByRole('textbox')).toBeNull()
     await waitFor(() => expect(mocked.importPreview.mock.lastCall?.[0].target).toBe('currentSpace'))
@@ -616,6 +618,7 @@ describe('ImportDialog: target, progress and finish', () => {
     await waitFor(() =>
       expect(mocked.importPreview.mock.lastCall?.[0].mapping?.properties).toEqual({ 'folder:Books': { rating: { kind: 'label' } } }),
     )
+    await user.click(screen.getByRole('checkbox', { name: T.tryCopy })) // M25: not the scratch copy
     await waitFor(() => expect(screen.getByRole('button', { name: T.import })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: T.import }))
     await waitFor(() =>
@@ -711,6 +714,7 @@ describe('ImportDialog: target, progress and finish', () => {
     mocked.importJob.mockResolvedValue(job({ phase: 'failed', error: 'Disk full', result: { ...RESULT, objects: 2 } }))
     const user = await previewVault()
     await user.click(screen.getByRole('radio', { name: T.thisSpaceNamed('Work') }))
+    await user.click(await screen.findByRole('checkbox', { name: T.tryCopy }))
     await waitFor(() => expect(screen.getByRole('button', { name: T.import })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: T.import }))
     await screen.findByRole('heading', { name: T.failed })
@@ -777,5 +781,47 @@ describe('ImportDialog: target, progress and finish', () => {
     await waitFor(() => expect(status).toHaveTextContent(T.progressStatus(T.phases.report, 19, 100)))
     now = job({ phase: 'done', done: 100, total: 100, result: RESULT })
     await screen.findByRole('heading', { name: T.finished })
+  })
+})
+
+describe('ImportDialog: M25 originals, scratch copy and batches', () => {
+  test('test a first run into this space starts on a copy of it, and starts a spaceCopy target', async () => {
+    const user = await previewVault()
+    await user.click(screen.getByRole('radio', { name: T.thisSpaceNamed('Work') }))
+    const box = await screen.findByRole('checkbox', { name: T.tryCopy })
+    await waitFor(() => expect(box).toBeChecked())
+    expect(screen.getByRole('textbox', { name: T.copyName })).toHaveValue(T.copyDefaultName('Work'))
+    await waitFor(() => expect(screen.getByRole('button', { name: T.import })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: T.import }))
+    await waitFor(() => expect(mocked.startImport).toHaveBeenCalled())
+    expect(mocked.startImport.mock.lastCall?.[0].target).toEqual({
+      kind: 'spaceCopy',
+      name: 'Work (trial)',
+      location: '/home/gene/Spaces',
+    })
+  })
+
+  test('test a source imported before is not copied by default; Keep originals shows only for Files', async () => {
+    mocked.importBatches.mockResolvedValue([
+      { id: 'b1', startedAt: '', source: { path: '/home/gene/Downloads/vault.zip', kind: 'obsidian', system: 'obsidian' }, counts: {} },
+    ])
+    const user = await previewVault()
+    await user.click(screen.getByRole('radio', { name: T.thisSpaceNamed('Work') }))
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: T.tryCopy })).not.toBeChecked())
+    expect(screen.queryByRole('combobox', { name: T.keepOriginals })).toBeNull()
+  })
+
+  test('test Keep originals as is sent for a Files source', async () => {
+    mocked.importPreview.mockImplementation(async (req) => ({ ...vaultPreview(req), kind: 'files' as const }))
+    const user = await openDialog()
+    await user.type(screen.getByRole('textbox', { name: T.source }), '/home/gene/Library{Enter}')
+    await screen.findByRole('heading', { name: T.summaryHeading })
+    const keep = screen.getByRole('combobox', { name: new RegExp(T.keepOriginals) })
+    expect(keep).toHaveValue('attachments')
+    await user.selectOptions(keep, 'fileObjects')
+    await waitFor(() => expect(screen.getByRole('button', { name: T.import })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: T.import }))
+    await waitFor(() => expect(mocked.startImport).toHaveBeenCalled())
+    expect(mocked.startImport.mock.lastCall?.[0]).toMatchObject({ keepOriginals: 'fileObjects' })
   })
 })

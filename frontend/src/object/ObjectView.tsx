@@ -65,6 +65,7 @@ import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
 import { ensureNewTags, HeaderTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
 import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type PanelVariant } from './PageLayout'
+import { ImportSourceLine } from './ImportSourceLine'
 import { PropertyPanel } from './PropertyPanel'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
 import { useTypeEditor } from './useTypeEditor'
@@ -973,6 +974,8 @@ export function ObjectView({
         onOpenObject={onOpenObject}
         variant={variant}
       />
+      {/* M25: where an imported object came from, under its properties. */}
+      <ImportSourceLine source={detail.frontmatter.importSource} />
       {/* M22: a ticket's resolution note (two copy-ready texts), collapsed by default. */}
       {isTicket && !showWorkHeader && (
         <ResolutionNoteSection

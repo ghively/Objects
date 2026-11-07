@@ -201,6 +201,10 @@ const BUILTIN_KINDS: Record<string, PropertyType> = {
   createdAt: 'entity_createdAt',
   lastUpdated: 'entity_lastUpdated',
   backlinks: 'entity_backlinks',
+  // M25: import provenance, read from the row's values.
+  importedFrom: 'text',
+  importBatch: 'text',
+  sourceModified: 'text',
 }
 
 /** The untitled fallback the UI shows for an empty title. */

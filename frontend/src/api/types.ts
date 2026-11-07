@@ -1410,7 +1410,7 @@ export type SpaceSetup = 'blank' | 'basic'
 // Mirrors backend/objectapp/importers/model.py; field names match exactly.
 
 /** Which reader reads an import source. */
-export type ImportSourceKind = 'notion' | 'obsidian' | 'anytype'
+export type ImportSourceKind = 'notion' | 'obsidian' | 'anytype' | 'files'
 
 /** The property kinds an import can make (a subset of `PropertyType`). */
 export type ImportKind = Extract<PropertyType, 'text' | 'number' | 'boolean' | 'url' | 'datetime' | 'label' | 'entity'>
@@ -1478,7 +1478,14 @@ export interface ImportPreviewRequest {
   target?: 'newSpace' | 'currentSpace'
 }
 
-export type ImportTarget = { kind: 'newSpace'; name: string; location: string } | { kind: 'currentSpace' }
+export type ImportTarget =
+  | { kind: 'newSpace'; name: string; location: string }
+  | { kind: 'currentSpace' }
+  /** M25 "Try on a copy of this space": the open space is copied to `location/name` and the import goes there. */
+  | { kind: 'spaceCopy'; name: string; location: string }
+
+/** M25 "Keep originals as" (design section 2). */
+export type ImportKeepOriginals = 'attachments' | 'fileObjects'
 
 /** POST /api/import/start */
 export interface StartImportRequest {
@@ -1486,6 +1493,7 @@ export interface StartImportRequest {
   mapping: ImportMapping
   target: ImportTarget
   clientId?: string | null
+  keepOriginals?: ImportKeepOriginals
 }
 
 export interface ImportPlannedProperty {
@@ -1577,6 +1585,52 @@ export interface ImportResult {
   /** The "Import report" object's space path. */
   reportPath: string | null
   cancelled: boolean
+  /** M25: the batch id, and the counts that reconcile: sourceItems = objects + updated + unchanged + changedInBoth + leftOut + failed. */
+  batch?: string | null
+  updated?: number
+  unchanged?: number
+  changedInBoth?: number
+  removed?: number
+  leftOut?: number
+  failed?: number
+  originals?: number
+  sourceItems?: number
+}
+
+/** M25: the `importSource` block in an imported object's frontmatter (design section 1). */
+export interface ImportSourceBlock {
+  system: string
+  id: string
+  url?: string
+  version?: string
+  author?: string
+  created?: string
+  modified?: string
+  original?: string
+  contentHash?: string
+  batch?: string
+  importedAt?: string
+}
+
+/** One source item of a batch (`.object/imports/<batch>/items.json`). */
+export interface ImportBatchItem {
+  sourcePath: string
+  system: string
+  id: string
+  title: string
+  path: string | null
+  action: 'created' | 'updated' | 'unchanged' | 'conflict' | 'resolvedTake' | 'resolvedKeep' | 'failed' | 'trashed'
+}
+
+/** GET /api/import/batches/{id} -> `batch` (`batch.json`). */
+export interface ImportBatch {
+  id: string
+  startedAt: string
+  finishedAt?: string
+  source: { path: string; kind: string; system: string }
+  counts: Record<string, number>
+  reportPath?: string | null
+  trashedAt?: string
 }
 
 /** GET /api/import/jobs/{id} */

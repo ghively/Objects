@@ -39,6 +39,8 @@ import type {
   BlockInfo,
   CatchUp,
   DuplicatedObject,
+  ImportBatch,
+  ImportBatchItem,
   ImportJob,
   ImportPreview,
   ImportPreviewRequest,
@@ -1413,6 +1415,39 @@ export const api = {
   /** An import job's progress and, once over, its result. 404 unknown job. */
   importJob(jobId: string): Promise<ImportJob> {
     return request<ImportJob>(`/import/jobs/${encodeURIComponent(jobId)}`)
+  },
+
+  /** M25: the open space's import batches, newest first. */
+  async importBatches(): Promise<ImportBatch[]> {
+    const res = await request<{ batches: ImportBatch[] }>('/import/batches')
+    return res?.batches ?? []
+  },
+
+  /** M25: one batch with its items. 404 unknown. */
+  importBatch(batchId: string): Promise<{ batch: ImportBatch; items: ImportBatchItem[] }> {
+    return request<{ batch: ImportBatch; items: ImportBatchItem[] }>(`/import/batches/${encodeURIComponent(batchId)}`)
+  },
+
+  /** M25 "Move batch to Trash": every object the batch created goes to the Trash (restorable). 409 while an import runs. */
+  trashImportBatch(batchId: string): Promise<{ trashed: number; missing: number }> {
+    return request<{ trashed: number; missing: number }>(`/import/batches/${encodeURIComponent(batchId)}/trash`, json('POST', {}))
+  },
+
+  /** M25 "Take source" / "Keep mine" for a batch's changed-in-both items (all, or the named objects). */
+  resolveImportBatch(
+    batchId: string,
+    action: 'take' | 'keep',
+    paths?: string[],
+  ): Promise<{ resolved: string[]; failed: string[]; pending: number }> {
+    return request<{ resolved: string[]; failed: string[]; pending: number }>(
+      `/import/batches/${encodeURIComponent(batchId)}/resolve`,
+      json('POST', { action, paths: paths ?? null }),
+    )
+  },
+
+  /** M25 "Show file": a kept original in the OS file manager. */
+  revealImportOriginal(path: string): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>('/import/original/reveal', json('POST', { path }))
   },
 
   /** Stop an import after the file being written (what was written stays). */

@@ -18,13 +18,23 @@
  */
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { announceResync, api, ApiError } from '@/api/client'
-import type { ImportJob, ImportMapping, ImportPhase, ImportPreview, ImportSourceKind, ImportTarget } from '@/api/types'
+import type {
+  ImportJob,
+  ImportKeepOriginals,
+  ImportMapping,
+  ImportPhase,
+  ImportPreview,
+  ImportSourceKind,
+  ImportTarget,
+} from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { openObject } from '@/create/createAndOpen'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { parentFolder } from '@/spaces/CreateSpaceDialog'
 import { switchSpace } from '@/spaces/switchSpace'
+import { BatchPanel } from './BatchPanel'
+import { ImportOptions } from './ImportOptions'
 import { MappingEditor } from './MappingEditor'
 import { cleanMapping, cleanSourcePath, emptyMapping, seedMapping, type ImportTargetKind } from './mapping'
 import { PreviewSummary } from './PreviewSummary'
@@ -36,7 +46,7 @@ export { IMPORT_TEXT } from './text'
 
 const T = IMPORT_TEXT
 
-const KINDS: (ImportSourceKind | 'auto')[] = ['auto', 'notion', 'obsidian', 'anytype']
+const KINDS: (ImportSourceKind | 'auto')[] = ['auto', 'notion', 'obsidian', 'anytype', 'files']
 
 /** How often a running job is polled, and how long a mapping change waits before re-previewing (our choices; tests shorten them). */
 export const importTiming = { pollMs: 500, debounceMs: 300 }
@@ -86,6 +96,12 @@ export function ImportDialog() {
   const [name, setName] = useState('')
   const [nameTouched, setNameTouched] = useState(false)
   const [location, setLocation] = useState('')
+  // M25: keep originals as, and the scratch copy (the default for a first run into this space).
+  const [keepOriginals, setKeepOriginals] = useState<ImportKeepOriginals>('attachments')
+  const [tryCopy, setTryCopy] = useState(false)
+  const [copyTouched, setCopyTouched] = useState(false)
+  const [copyName, setCopyName] = useState('')
+  const [firstRun, setFirstRun] = useState(true)
   const [rev, setRev] = useState(0)
   const [updating, setUpdating] = useState(false)
   const [stale, setStale] = useState(false)
@@ -123,6 +139,11 @@ export function ImportDialog() {
     setName(preset.name ?? '')
     setNameTouched(!!preset.name)
     setLocation(preset.location ?? '')
+    setKeepOriginals('attachments')
+    setTryCopy(false)
+    setCopyTouched(false)
+    setCopyName('')
+    setFirstRun(true)
     setRev(0)
     setUpdating(false)
     setStale(false)
@@ -136,6 +157,27 @@ export function ImportDialog() {
     setStopping(false)
     setLost(false)
   }, [isOpen, preset])
+
+  // M25: a source never imported into this space before starts on a copy of it (design section 7).
+  useEffect(() => {
+    if (step !== 'review' || !source) return
+    let alive = true
+    api
+      .importBatches()
+      .then((all) => {
+        if (alive) setFirstRun(!all.some((b) => b.source.path === source.path))
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [step, source])
+  useEffect(() => {
+    if (!copyTouched) setTryCopy(target === 'currentSpace' && firstRun)
+  }, [target, firstRun, copyTouched])
+  useEffect(() => {
+    if (space?.name) setCopyName((n) => n || T.copyDefaultName(space.name))
+  }, [space?.name])
 
   // The new space's location defaults to the folder that holds the open space.
   const root = space?.root ?? null
@@ -232,22 +274,33 @@ export function ImportDialog() {
     return () => clearTimeout(timer)
   }, [rev, source, mapping, target])
 
-  const newSpaceReady = target === 'currentSpace' || (name.trim() !== '' && location.trim() !== '')
+  const copying = target === 'currentSpace' && tryCopy
+  const newSpaceReady =
+    target === 'currentSpace' ? !copying || (copyName.trim() !== '' && location.trim() !== '') : name.trim() !== '' && location.trim() !== ''
   const canImport = !!preview && !updating && !stale && !starting && newSpaceReady
 
   const start = async () => {
     if (!preview || !canImport) return
     const into: ImportTarget =
-      target === 'newSpace' ? { kind: 'newSpace', name: name.trim(), location: location.trim() } : { kind: 'currentSpace' }
+      target === 'newSpace'
+        ? { kind: 'newSpace', name: name.trim(), location: location.trim() }
+        : copying
+          ? { kind: 'spaceCopy', name: copyName.trim(), location: location.trim() }
+          : { kind: 'currentSpace' }
     setStarting(true)
     setError(null)
     setNotice(null)
     try {
-      const res = await api.startImport({ previewId: preview.previewId, mapping: cleanMapping(mapping, target), target: into })
+      const res = await api.startImport({
+        previewId: preview.previewId,
+        mapping: cleanMapping(mapping, target),
+        target: into,
+        ...(preview.kind === 'files' ? { keepOriginals } : {}),
+      })
       reread.current = false
       setJobId(res.jobId)
       setTargetPath(res.targetPath)
-      setStartedInto(target)
+      setStartedInto(into.kind === 'currentSpace' ? 'currentSpace' : 'newSpace')
       setJob(null)
       setStep('running')
     } catch (err) {
@@ -421,6 +474,19 @@ export function ImportDialog() {
               onLocation={setLocation}
               spaceName={space?.name ?? null}
             />
+            <ImportOptions
+              kind={preview.kind}
+              target={target}
+              keepOriginals={keepOriginals}
+              onKeepOriginals={setKeepOriginals}
+              tryCopy={tryCopy}
+              onTryCopy={(v) => {
+                setCopyTouched(true)
+                setTryCopy(v)
+              }}
+              copyName={copyName}
+              onCopyName={setCopyName}
+            />
             {notice && (
               <p role="alert" className="text-[13px]">
                 {notice}
@@ -480,6 +546,7 @@ export function ImportDialog() {
               <>
                 <p className="text-[14px]">{T.result(result)}</p>
                 {result.skipped > 0 && <p className="text-[13px] text-fg-muted">{T.resultSkipped(result.skipped)}</p>}
+                <BatchPanel result={result} inOpenSpace={startedInto === 'currentSpace'} />
               </>
             )}
             {offerSwitch && (

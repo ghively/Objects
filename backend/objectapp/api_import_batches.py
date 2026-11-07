@@ -9,6 +9,8 @@
   ``{resolved, failed, pending}``: **Take source** / **Keep mine** for the batch's "changed in
   both" items (all, or the named objects). ``409`` while an import runs.
 
+- ``POST /api/import/original/reveal`` ``{path}`` -> ``{ok}``: **Show file** for a kept original.
+
 Batch records live in ``.object/imports/<batch>/`` (`importers.batches`).
 """
 
@@ -28,6 +30,10 @@ from .importers.jobs import Jobs
 __all__ = ["router"]
 
 _log = logging.getLogger(__name__)
+
+
+class OriginalRequest(BaseModel):
+    path: str
 
 
 class ResolveRequest(BaseModel):
@@ -82,5 +88,21 @@ def router(ctx: ApiContext, jobs: Jobs, announce_resync) -> APIRouter:
             return _error(404, "No such import batch.")
         changed()
         return out
+
+    @r.post("/import/original/reveal")
+    def post_reveal_original(req: OriginalRequest):
+        """"Show file" on the Source line: the kept original in the OS file manager (an
+        attachment of this space; ``404`` otherwise)."""
+        from . import server
+        from .media import attachment_path
+
+        try:
+            full = attachment_path(ctx.space.root, req.path)
+        except (FileNotFoundError, OSError, ValueError):
+            return _error(404, f"No file at {req.path!r}")
+        except Exception:  # noqa: BLE001 - NotServed for a .md
+            return _error(404, f"No file at {req.path!r}")
+        server.reveal_in_file_manager(full)
+        return {"ok": True}
 
     return r

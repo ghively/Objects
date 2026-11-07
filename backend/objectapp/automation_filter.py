@@ -108,7 +108,7 @@ _BUILTIN_KINDS = {
     # M25: import provenance, read from the row's values (`rows._row`)
     "importedFrom": "text",
     "importBatch": "text",
-    "sourceModified": "entity_createdAt",
+    "sourceModified": "text",
 }
 _DATE_KINDS = frozenset({"datetime", "datetimeSimple", "entity_createdAt", "entity_lastUpdated"})
 _UNTITLED = "Untitled"
