@@ -136,7 +136,7 @@ export const IMPORT_TEXT = {
   keepOriginalsNote:
     'Each file that is not Markdown is kept untouched in Attachments/Originals. File objects also make a File, PDF or Image object for each.',
   tryCopy: 'Try on a copy of this space',
-  tryCopyNote: 'Imports into a copy of this space under a new name, for you to look at before the real run.',
+  tryCopyNote: 'Imports into a copy of this space, made next to it under the name below, for you to look at before the real run.',
   copyName: 'Name of the copy',
   copyDefaultName: (space: string) => `${space} (trial)`,
   accountedFor: (r: Pick<ImportResult, 'sourceItems' | 'objects' | 'updated' | 'unchanged' | 'changedInBoth' | 'leftOut' | 'failed'>) =>
