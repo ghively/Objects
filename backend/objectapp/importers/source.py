@@ -133,6 +133,8 @@ class Source:
     skipped: list[SkippedItem] = field(default_factory=list)
     has_obsidian: bool = False
     """A ``.obsidian/`` folder at the root (detection)."""
+    left_out: list[str] = field(default_factory=list)
+    """M27: files matching a "Leave out" pattern: listed here, never added to `files`, so never read."""
     fingerprint: str = ""
     _zips: list[zipfile.ZipFile] = field(default_factory=list)
     _handles: list[object] = field(default_factory=list)
@@ -229,9 +231,16 @@ def _local_epoch(date_time: tuple[int, ...]) -> float:
 # -- opening ------------------------------------------------------------------------
 
 
-def open_source(path: str | Path) -> Source:
+def _left_out(rel: str, patterns: tuple[str, ...]) -> bool:
+    from ..importscan import is_left_out
+
+    return is_left_out(rel, list(patterns))
+
+
+def open_source(path: str | Path, leave_out: tuple[str, ...] | list[str] = ()) -> Source:
     """List the source at ``path``. Raises `SourceMissing` (404), `NotASource` (415) or
-    `LimitExceeded` (413). The caller closes it (it holds the zip open)."""
+    `LimitExceeded` (413). The caller closes it (it holds the zip open). Files matching a
+    ``leave_out`` pattern (M27, design section 6) are noted in `Source.left_out` and never listed."""
     text = os.path.expanduser(str(path))
     if "\x00" in text or not text.strip():
         raise SourceMissing(text)
@@ -245,13 +254,13 @@ def open_source(path: str | Path) -> Source:
     if stat.S_ISDIR(st.st_mode):
         src = Source(Path(os.path.realpath(p)), "folder")
         src._root_real = str(src.path)
-        _list_folder(src)
+        _list_folder(src, tuple(leave_out))
         return src
     if stat.S_ISREG(st.st_mode) and p.suffix.lower() == ".zip":
         src = Source(p.resolve(), "zip")
         src._root_real = str(src.path.parent)
         try:
-            _list_zip(src, st)
+            _list_zip(src, st, tuple(leave_out))
         except (zipfile.BadZipFile, zlib.error, OSError, EOFError, ValueError) as exc:
             src.close()
             raise NotASource(f"The zip file can't be opened: {exc}") from exc
@@ -265,8 +274,9 @@ def open_source(path: str | Path) -> Source:
 class _Lister:
     """Collects one source's files: skip rules, dot-folders, nested zips and the fingerprint."""
 
-    def __init__(self, src: Source) -> None:
+    def __init__(self, src: Source, leave_out: tuple[str, ...] = ()) -> None:
         self.src = src
+        self.leave_out = leave_out
         self.count = 0
         self.dot_listed: set[str] = set()
         self.hash = hashlib.sha256()
@@ -302,6 +312,9 @@ class _Lister:
         return False
 
     def add(self, entry: Entry) -> None:
+        if self.leave_out and _left_out(entry.path, self.leave_out):
+            self.src.left_out.append(entry.path)
+            return
         if entry.path in self.src.files:
             self.skip(entry.path, "damaged", "The same path appears twice")
             return
@@ -361,8 +374,8 @@ def _display(name: str) -> str:
     return text[:300]
 
 
-def _list_zip(src: Source, st: os.stat_result) -> None:
-    lister = _Lister(src)
+def _list_zip(src: Source, st: os.stat_result, leave_out: tuple[str, ...] = ()) -> None:
+    lister = _Lister(src, leave_out)
     lister.hash.update(f"zip\x00{st.st_size}\x00{st.st_mtime_ns}\n".encode())
     fh = open(src.path, "rb")  # noqa: SIM115 - closed by Source.close
     src._handles.append(fh)
@@ -539,8 +552,8 @@ def _nested_zip(src: Source, lister: _Lister, rel: str, opener) -> None:
         lister.add(Entry(inner_rel, info.file_size, _local_epoch(info.date_time), index, info))
 
 
-def _list_folder(src: Source) -> None:
-    lister = _Lister(src)
+def _list_folder(src: Source, leave_out: tuple[str, ...] = ()) -> None:
+    lister = _Lister(src, leave_out)
     root = str(src.path)
     lister.hash.update(b"folder\n")
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):

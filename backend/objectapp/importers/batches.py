@@ -41,13 +41,17 @@ if TYPE_CHECKING:
 __all__ = [
     "Prior",
     "batch_dir",
+    "copy_records",
     "copy_space",
+    "create_draft",
     "imports_root",
     "list_batches",
+    "load_scan",
     "load_batch",
     "load_prior",
     "resolve_conflicts",
     "same_source",
+    "store_scan",
     "snapshot",
     "trash_batch",
     "write_json",
@@ -248,3 +252,48 @@ def copy_space(src_root: Path, dest: Path) -> Path:
     skip = {".object-cache", ".git"}
     shutil.copytree(src_root, dest, ignore=lambda _d, names: [n for n in names if n in skip])
     return dest
+
+
+# -- M27: a batch before its import (scan, proposal), and the scan records ---------------------------
+
+
+def create_draft(space_root: Path | str, source_path: str, leave_out: list[str] | None = None) -> str:
+    """A batch with only ``batch.json`` (``state: "draft"``), so the scan and the schema proposal have
+    a place before the import runs; the import then adopts it (`StartImportRequest.batch`)."""
+    from ..ids import new_ulid
+
+    batch = new_ulid()
+    write_json(
+        batch_dir(space_root, batch) / "batch.json",
+        {
+            "id": batch,
+            "state": "draft",
+            "startedAt": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+            "finishedAt": None,
+            "source": {"path": source_path, "kind": None, "system": None},
+            "leaveOut": list(leave_out or []),
+            "counts": {},
+        },
+    )
+    return batch
+
+
+def store_scan(space_root: Path | str, batch: str, scan: dict[str, Any]) -> None:
+    """``scan.json``: the scan's findings (kinds and lines, never values) with the choices made."""
+    write_json(batch_dir(space_root, batch) / "scan.json", scan)
+
+
+def load_scan(space_root: Path | str, batch: str) -> dict[str, Any] | None:
+    try:
+        data = _read_json(batch_dir(space_root, batch) / "scan.json")
+    except KeyError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def copy_records(src_root: Path | str, dest_root: Path | str, batch: str, names: tuple[str, ...]) -> None:
+    """Copy some of a draft batch's record files into another space (an import into a new space)."""
+    for name in names:
+        src = batch_dir(src_root, batch) / name
+        if src.is_file():
+            write_json(batch_dir(dest_root, batch) / name, _read_json(src))
