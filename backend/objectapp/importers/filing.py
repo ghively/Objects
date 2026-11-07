@@ -273,6 +273,8 @@ def apply_decision(
             return res
     res["path"] = path
 
+    rows = space.rows(None, None, [path], None, False)
+    have = rows[0].values if rows else {}
     updates: dict[str, Any] = {}
     for row in _items(decision.get("values")):
         key = str(row.get("key") or "")
@@ -284,6 +286,9 @@ def apply_decision(
             continue
         kind = pdef.type
         value = row.get("value")
+        if _has_value(have.get(key)) or key in updates:
+            entry["reason"] = "already has a value; the pass only fills empty properties"
+            continue
         if kind not in kinds_supported():
             entry["reason"] = f"{kind} properties are not filled by the pass"
             continue
@@ -307,8 +312,6 @@ def apply_decision(
         updates[key] = value
         entry["ok"] = True
 
-    rows = space.rows(None, None, [path], None, False)
-    have = rows[0].values if rows else {}
     for field_, label in (("tags", "tags"), ("collections", "collections")):
         add: list[str] = []
         for row in _items(decision.get(field_)):
@@ -335,6 +338,10 @@ def apply_decision(
         for r in _items(decision.get("links"))
     ]
     return res
+
+
+def _has_value(v: Any) -> bool:
+    return not (v is None or v == "" or v == [] or v == {})
 
 
 def kinds_supported() -> tuple[str, ...]:
@@ -445,8 +452,11 @@ class Filing:
                 "error": d["error"]}
 
     def eligible(self, batch: str) -> list[str]:
-        """Paths of the batch's objects the pass may read: written by the import, not kept from AI."""
-        _data, items = batches.load_batch(self.space.root, batch)
+        """Paths of the batch's objects the pass may read: written by the import and not changed since, not kept from AI."""
+        from ..space import version_of
+
+        data, items = batches.load_batch(self.space.root, batch)
+        recorded = batches.load_prior(self.space.root, str(data.get("source", {}).get("path", ""))).versions
         out: list[str] = []
         for it in items:
             if it.get("action") not in ("created", "updated", "unchanged", "resolvedTake", "resolvedKeep"):
@@ -456,6 +466,10 @@ class Filing:
                 continue
             try:
                 _of, fm, _v = self.space.read(p)
+                # Edited (or already filed) since the import wrote it: the pass leaves it alone.
+                want = it.get("version") or recorded.get(str(p))
+                if want and version_of((self.space.root / p).read_bytes()) != want:
+                    continue
                 tags = self.space.rows(None, None, [p], None, False)[0].values.get("tags") or []
             except (KeyError, ValueError, OSError, IndexError):
                 continue

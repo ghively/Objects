@@ -18,7 +18,7 @@ from objectapp.space import Space
 def client(space_dir):
     app = create_app(Space(space_dir), watch=False)
     with TestClient(app) as c:
-        c.space_root = space_dir  # type: ignore[attr-defined]
+        c.space_root = c.root = space_dir  # type: ignore[attr-defined]
         yield c
 
 
@@ -213,3 +213,47 @@ def test_import_scan_refuses_a_finished_batch(client, tmp_path):
     r = client.post("/api/v1/import/scan", headers=headers, json={"path": str(src), "batch": result["batch"]})
     assert r.status_code == 409, r.text
     assert batches.load_scan(client.space_root, result["batch"]) == before
+
+
+# -- 5. the filing pass only fills what is empty and leaves edited objects alone ---------------------
+
+
+def _filing_setup(client, tmp_path, monkeypatch):
+    from test_m27_agent import prepare
+
+    return prepare(client, tmp_path, monkeypatch)
+
+
+def _decision(path, **extra):
+    return {"path": path, "type": "Playbook", "confidence": "high", **extra}
+
+
+def test_filing_does_not_overwrite_a_value_that_is_set(client, tmp_path, monkeypatch):
+    from objectapp.importers import filing
+
+    batch, paths = _filing_setup(client, tmp_path, monkeypatch)
+    sp = Space(client.space_root)
+    p = paths["Runbook 0"]
+    p = filing.apply_decision(sp, _decision(p), allowed={p})["path"]  # the type only
+    version = sp.read(p)[2]
+    sp.update_properties(p, {"owner": "Gene"}, version)
+    res = filing.apply_decision(sp, _decision(p, values=[
+        {"key": "owner", "value": "Ann", "quote": "Owner: Ann"},
+        {"key": "environment", "value": "Prod", "quote": "Environment: Prod"}]), allowed={p})
+    ok = {v["key"]: v["ok"] for v in res["values"]}
+    assert ok == {"owner": False, "environment": True}
+    assert "already has a value" in next(v for v in res["values"] if v["key"] == "owner")["reason"]
+    assert _fm(client.space_root, res["path"])["owner"] == "Gene"
+
+
+def test_filing_skips_objects_edited_since_the_import(client, tmp_path, monkeypatch):
+    from objectapp.importers import filing
+
+    batch, paths = _filing_setup(client, tmp_path, monkeypatch)
+    sp = Space(client.space_root)
+    fil = filing.Filing(sp)
+    assert paths["Runbook 0"] in fil.eligible(batch)
+    of, _fm_, version = sp.read(paths["Runbook 0"])
+    sp.save_body(paths["Runbook 0"], of.body + "\nMy own note.\n", version)
+    eligible = fil.eligible(batch)
+    assert paths["Runbook 0"] not in eligible and paths["Runbook 1"] in eligible
