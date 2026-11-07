@@ -194,3 +194,22 @@ def test_draft_and_import_of_a_zip_use_the_scan(client, tmp_path):
     from objectapp.importers import batches
 
     assert "Notes/bad.md" in batches.load_scan(root, result["batch"])["findings"]
+
+
+# -- 11. import_scan never overwrites a finished batch's scan --------------------------------------
+
+
+def test_import_scan_refuses_a_finished_batch(client, tmp_path):
+    from test_m27_agent import do_import
+
+    from objectapp.importers import batches
+
+    src = make_source(tmp_path)
+    result = do_import(client, src)
+    before = batches.load_scan(client.space_root, result["batch"])
+    assert before and before["choices"]
+    res = client.post("/api/integrations/tokens", json={"name": "agent", "scope": "read-write"})
+    headers = {"Authorization": f"Bearer {res.json()['secret']}"}
+    r = client.post("/api/v1/import/scan", headers=headers, json={"path": str(src), "batch": result["batch"]})
+    assert r.status_code == 409, r.text
+    assert batches.load_scan(client.space_root, result["batch"]) == before

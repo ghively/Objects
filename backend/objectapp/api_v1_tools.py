@@ -591,10 +591,12 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
             if batch is None:
                 batch = batches.create_draft(space.root, str(root), req.leaveOut)
             try:
-                batches.batch_dir(space.root, batch)
-                batches.store_scan(space.root, batch, scan)
+                bdata, _items = batches.load_batch(space.root, batch)
             except KeyError:
                 return error(404, "No such import batch.")
+            if bdata.get("state") != "draft":
+                return error(409, "That batch has already been imported; its scan can't be replaced.")
+            batches.store_scan(space.root, batch, scan)
         return JSONResponse({"batch": batch, "scan": scan})
 
     @r.get("/v1/import/proposal")
