@@ -28,3 +28,10 @@ Additions: `POST /api/import/batches` `{path, leaveOut}` -> `{batch, scan}` (a d
 - [ ] Low-confidence pages land in the Import inbox collection.
 - [ ] An outside agent (Claude Desktop) reads the `migrate_a_source` prompt and calls `import_scan`, `save_import_proposal`.
 - [ ] Normalise merges "Prod / prod / Production" tags.
+
+## Open review items
+Left for a design decision (from the review of 2026-11-07); the other findings were fixed in the `fix(m27)` commits.
+- 7, 10, 12 (design-level, not touched in the fix pass; see the review notes).
+- Held back on purpose: a "changed in both" re-run still keeps the new original and images it needs for a later "Take source" (the held-back page links them); identical bytes are reused, so repeated re-runs add nothing. Deferring them to "Take source" would need the source read again then.
+- Matching across moved sources: an id that is a path (Obsidian, folders, Files without a manifest id) belongs to the source folder or zip it came from, so moving or renaming the source folder makes the next run create new objects. Notion and Anytype ids and manifest ids with a url are matched across locations. Blocks written before this fix have no source and match as before.
+- `leaveOutFiles`/`excludeFromAi`: a flagged file can only be left out or imported excluded from AI; there is no choice to import it plain (the scan choices cannot turn the protection off).
