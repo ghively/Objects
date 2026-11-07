@@ -63,6 +63,10 @@ import type {
   FormulaPreviewResult,
   NumberExistingResult,
   Collection,
+  FilingStatus,
+  FilingVerdict,
+  ImportProposalResponse,
+  ProposalReviewItem,
   CreatedDailyNote,
   GraphCustomization,
   GraphData,
@@ -1426,6 +1430,47 @@ export const api = {
   /** M25: one batch with its items. 404 unknown. */
   importBatch(batchId: string): Promise<{ batch: ImportBatch; items: ImportBatchItem[] }> {
     return request<{ batch: ImportBatch; items: ImportBatchItem[] }>(`/import/batches/${encodeURIComponent(batchId)}`)
+  },
+
+  // ---- M27 the agent workflow: schema proposal, filing pass (trial, normalise) ----
+
+  /** The batch's schema proposal and Gene's review of it (`proposal` is null until an agent writes one). */
+  importProposal(batchId: string): Promise<ImportProposalResponse> {
+    return request<ImportProposalResponse>(`/import/batches/${seg(batchId)}/proposal`)
+  },
+
+  saveProposalReview(batchId: string, items: ProposalReviewItem[]): Promise<{ ok?: boolean }> {
+    return request<{ ok?: boolean }>(`/import/batches/${seg(batchId)}/proposal/review`, json('PUT', { items }))
+  },
+
+  /** "Apply": creates and extends the accepted types. App only, never an MCP tool. */
+  async applyProposal(batchId: string): Promise<{ created: string[]; extended: string[] }> {
+    const res = await request<{ created: string[]; extended: string[] }>(
+      `/import/batches/${seg(batchId)}/proposal/apply`,
+      json('POST', {}),
+    )
+    announceResync()
+    return res
+  },
+
+  startFiling(batchId: string, trial: boolean): Promise<{ ok?: boolean }> {
+    return request<{ ok?: boolean }>(`/import/batches/${seg(batchId)}/filing/start`, json('POST', { trial }))
+  },
+
+  filingStatus(batchId: string): Promise<FilingStatus> {
+    return request<FilingStatus>(`/import/batches/${seg(batchId)}/filing`)
+  },
+
+  markFiling(batchId: string, path: string, verdict: FilingVerdict): Promise<{ ok?: boolean }> {
+    return request<{ ok?: boolean }>(`/import/batches/${seg(batchId)}/filing/mark`, json('POST', { path, verdict }))
+  },
+
+  continueFiling(batchId: string): Promise<{ ok?: boolean }> {
+    return request<{ ok?: boolean }>(`/import/batches/${seg(batchId)}/filing/continue`, json('POST', {}))
+  },
+
+  normaliseFiling(batchId: string, merges: { from: string[]; to: string }[]): Promise<{ ok?: boolean }> {
+    return request<{ ok?: boolean }>(`/import/batches/${seg(batchId)}/filing/normalise`, json('POST', { merges }))
   },
 
   /** M25 "Move batch to Trash": every object the batch created goes to the Trash (restorable). 409 while an import runs. */

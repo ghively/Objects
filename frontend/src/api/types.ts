@@ -1494,6 +1494,15 @@ export interface StartImportRequest {
   target: ImportTarget
   clientId?: string | null
   keepOriginals?: ImportKeepOriginals
+  /** M27: the scan step's choices (design section 6); omitted when there is nothing to carry. */
+  scan?: ImportScanChoices
+}
+
+/** M27: what the scan step hands to the import: patterns to leave out, flagged files to leave out, flagged files imported with `excludeFromAI`. */
+export interface ImportScanChoices {
+  leaveOut: string[]
+  leaveOutFiles: string[]
+  excludeFromAi: string[]
 }
 
 export interface ImportPlannedProperty {
@@ -2807,3 +2816,93 @@ export interface DeskSyncStatus {
   markedReadTools: number                          // marked tools listed right now
 }
 export interface GeneralFloor { items: FloorItemValue[]; revision: string }
+
+
+// ---- M27 the agent workflow (design sections 8 and 9) ----
+
+export type ProposalAction = 'use' | 'extend' | 'create'
+
+export interface ProposalProperty {
+  key: string
+  name: string
+  kind: string
+  /** 0..1, how often the property has a value in its group. */
+  fillRate: number
+  options?: string[]
+  /** Option value -> the source spellings merged into it. */
+  mergedFrom?: Record<string, string[]>
+  relationTo?: string
+}
+
+export interface ProposalGroup {
+  id: string
+  action: ProposalAction
+  typeId?: string
+  name: string
+  plural?: string
+  icon?: string
+  color?: string
+  documentCount: number
+  examples: string[]
+  properties: ProposalProperty[]
+}
+
+export interface SchemaProposal {
+  groups: ProposalGroup[]
+}
+
+export type ProposalStatus = 'accepted' | 'edited' | 'rejected'
+
+export interface ProposalEdit {
+  name?: string
+  plural?: string
+  /** Keys of the properties left out. */
+  dropProperties?: string[]
+}
+
+export interface ProposalReviewItem {
+  id: string
+  status: ProposalStatus
+  edited?: ProposalEdit
+}
+
+export interface ProposalReview {
+  items: ProposalReviewItem[]
+}
+
+export interface ImportProposalResponse {
+  proposal: SchemaProposal | null
+  review: ProposalReview | null
+}
+
+export type FilingState = 'idle' | 'running' | 'trial' | 'done' | 'failed'
+export type FilingConfidence = 'high' | 'medium' | 'low'
+export type FilingVerdict = 'right' | 'wrong'
+
+export interface FilingValue {
+  key: string
+  value: unknown
+  quote: string
+  ok: boolean
+}
+
+export interface FilingTrialItem {
+  path: string
+  title: string
+  type: string
+  confidence: FilingConfidence
+  values: FilingValue[]
+  verdict: FilingVerdict | null
+}
+
+export interface FilingMergeSuggestion {
+  kind: 'tag' | 'option'
+  values: string[]
+  suggested: string
+}
+
+export interface FilingStatus {
+  state: FilingState
+  trial: { items: FilingTrialItem[]; rightShare: number | null }
+  normalise: FilingMergeSuggestion[]
+}

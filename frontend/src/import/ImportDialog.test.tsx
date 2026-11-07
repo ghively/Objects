@@ -9,6 +9,14 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
   announceResync: vi.fn(),
 }))
+vi.mock('./scan/scanApi', () => ({
+  scanSource: vi.fn(async () => ({
+    findings: {},
+    leftOut: [],
+    counts: { scanned: 1, unscanned: 0, flagged: 0, findings: 0, leftOut: 0 },
+    defaultChoice: 'excludeFromAi',
+  })),
+}))
 vi.mock('@/spaces/switchSpace', async (orig) => ({
   ...(await orig()),
   switchSpace: vi.fn(async () => true),
@@ -205,6 +213,12 @@ afterEach(() => {
   Object.assign(importTiming, saved)
 })
 
+/** The scan step sits between the preview and the review: scan, then continue. */
+async function passScan(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'Scan' }))
+  await user.click(await screen.findByRole('button', { name: 'Continue' }))
+}
+
 async function openDialog(preset: ImportDialogPreset = {}) {
   const user = userEvent.setup()
   render(<ImportDialog />)
@@ -218,6 +232,7 @@ async function previewVault(preset: ImportDialogPreset = {}) {
   mocked.importPreview.mockImplementation(async (req) => vaultPreview(req))
   const user = await openDialog(preset)
   await user.type(screen.getByRole('textbox', { name: T.source }), '/home/gene/Downloads/vault.zip{Enter}')
+  await passScan(user)
   await screen.findByRole('heading', { name: T.summaryHeading })
   return user
 }
@@ -261,6 +276,7 @@ async function previewWith(fn: (req: ImportPreviewRequest) => ImportPreview) {
   mocked.importPreview.mockImplementation(async (req) => fn(req))
   const user = await openDialog()
   await user.type(screen.getByRole('textbox', { name: T.source }), '/home/gene/Downloads/vault.zip{Enter}')
+  await passScan(user)
   await screen.findByRole('heading', { name: T.summaryHeading })
   return user
 }
@@ -281,6 +297,7 @@ describe('ImportDialog: source and preview', () => {
     await waitFor(() =>
       expect(mocked.importPreview).toHaveBeenCalledWith({ source: { path: '/home/gene/Downloads/export.zip', kind: 'notion' } }),
     )
+    await passScan(user)
     expect(await screen.findByRole('status')).toHaveTextContent(T.summary(0, 0, 0))
     expect(mocked.startImport).not.toHaveBeenCalled()
   })
@@ -466,6 +483,7 @@ describe('ImportDialog: mapping step', () => {
     mocked.importPreview.mockImplementation(async (req) => ({ ...vaultPreview(req), kind: 'notion', detected: 'notion' }))
     const user = await openDialog()
     await user.type(screen.getByRole('textbox', { name: T.source }), '/x.zip{Enter}')
+    await passScan(user)
     await screen.findByRole('heading', { name: T.summaryHeading })
     expect(screen.queryByRole('group', { name: T.typesFrom })).toBeNull()
   })
@@ -663,6 +681,45 @@ describe('ImportDialog: target, progress and finish', () => {
     expect(mocked.importPreview.mock.lastCall?.[0].mapping?.types).toEqual({})
   })
 
+  test('test the scan step runs before the review and its choices go to the import (M27)', async () => {
+    const { scanSource } = await import('./scan/scanApi')
+    vi.mocked(scanSource).mockResolvedValueOnce({
+      findings: { 'a.md': [{ kind: 'api-key', line: 3 }], 'b.md': [{ kind: 'password', line: 1 }] },
+      leftOut: [],
+      counts: { scanned: 2, unscanned: 0, flagged: 2, findings: 2, leftOut: 0 },
+      defaultChoice: 'excludeFromAi',
+    })
+    mocked.importPreview.mockImplementation(async (req) => vaultPreview(req))
+    const user = await openDialog()
+    await user.type(screen.getByRole('textbox', { name: T.source }), '/home/gene/Downloads/vault.zip{Enter}')
+    expect(await screen.findByRole('heading', { name: 'Check for sensitive content' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: T.summaryHeading })).toBeNull()
+    await user.type(screen.getByRole('textbox'), 'Credentials')
+    await user.click(screen.getByRole('button', { name: 'Scan' }))
+    await user.selectOptions(await screen.findByRole('combobox', { name: /b\.md/ }), 'leaveOut')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await screen.findByRole('heading', { name: T.summaryHeading })
+    await user.click(screen.getByRole('button', { name: T.import }))
+    await waitFor(() =>
+      expect(mocked.startImport).toHaveBeenCalledWith(
+        expect.objectContaining({ scan: { leaveOut: ['Credentials'], leaveOutFiles: ['b.md'], excludeFromAi: ['a.md'] } }),
+      ),
+    )
+  })
+
+  test('test an import into this space with a batch offers the agent workflow (M27)', async () => {
+    mocked.importJob.mockResolvedValue(job({ phase: 'done', result: { ...RESULT, batch: 'batch-1' } }))
+    mocked.importProposal.mockResolvedValue({ proposal: null, review: null })
+    const user = await previewVault()
+    await user.click(screen.getByRole('radio', { name: T.thisSpaceNamed('Work') }))
+    await user.click(screen.getByRole('checkbox', { name: T.tryCopy }))
+    await waitFor(() => expect(screen.getByRole('button', { name: T.import })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: T.import }))
+    await user.click(await screen.findByRole('button', { name: 'Review proposed schema' }))
+    expect(await screen.findByRole('heading', { name: 'Proposed schema' })).toBeInTheDocument()
+    expect(mocked.importProposal).toHaveBeenCalledWith('batch-1')
+  })
+
   test('test stop import cancels the job and the finish says it stopped', async () => {
     let cancelled = false
     mocked.importJob.mockImplementation(async () =>
@@ -815,6 +872,7 @@ describe('ImportDialog: M25 originals, scratch copy and batches', () => {
     mocked.importPreview.mockImplementation(async (req) => ({ ...vaultPreview(req), kind: 'files' as const }))
     const user = await openDialog()
     await user.type(screen.getByRole('textbox', { name: T.source }), '/home/gene/Library{Enter}')
+    await passScan(user)
     await screen.findByRole('heading', { name: T.summaryHeading })
     const keep = screen.getByRole('combobox', { name: new RegExp(T.keepOriginals) })
     expect(keep).toHaveValue('attachments')
