@@ -4,11 +4,11 @@ Updated 2026-11-06 (after M24; M1-M24 are built). You are continuing "Object", a
 
 ## Where things stand
 
-- **M1-M24 are all built and on `master`** (2026-11-06). `master` is the default branch (no `main`). The feature branches are merged and can be deleted.
-- **Gate (Linux, 2026-11-06):** back-end 3058+ tests passed (3 tests that pinned pre-M24 defaults were updated), front-end 3775 passed, `tsc` clean, lint clean, `npm run build` ok. Every acceptance script PASS: `m1_roundtrip.py`, `m2`-`m21` on `space-sample` and `space-v1`, `m22`-`m24` on `space-work`.
-- **Reviews done:** M23 (8 fixes) and M24 (5 fixes) were reviewed once and fixed. M19-M22 had their per-milestone reviews on their build tracks.
-- **Open items from the M24 review, for Gene's call (not changed):** Retry re-runs a timed-out or crashed Approve step with the full tool set and no new approval; the learning and A2A agent routes are not covered by the read-only write guard (only the CLI tool lists block them); a full-tool work run can reach the app's local routes (self-approval, marking tools read-only); `file_capture` is not atomic (a conflict can duplicate a note); the auto-run chain has no depth cap; the answer/question prompts mention fields that the read-only tools can't change; a restart can queue a failed capture once more. Details in the M24 review notes in `m24-acceptance.md`.
-- **Not done:** Gene's hand-checks for M1-M24 (none ticked); his decisions at the top of `remaining-work.md`; M25-M27 (import and migration) are designed but not planned.
+- **M1-M27 are all built and on `master`** (2026-11-07). `master` is the default branch (no `main`).
+- **Gate (Linux):** back-end 3139 passed (15 skipped, 3 xpassed; `test_m24_loop.py::test_not_before_and_reorder` failed once under full-suite load and passes alone and with its file, a timing flake), front-end 3803 passed, `tsc`, lint and `npm run build` clean. Every acceptance script PASS: `m1_roundtrip.py`, `m2`-`m21` and `m25`-`m27` on `space-sample` and `space-v1`; `m15`, `m22`-`m27` on their default spaces.
+- **Reviews done:** M23, M24 and M25-M27 each had one review and one fix pass. M19-M22 were reviewed on their build tracks.
+- **Open review items for Gene's call (not changed):** the M24 list (Retry re-runs a timed-out Approve step with full tools and no new approval; learning and A2A routes rely on the CLI tool lists only; a full-tool work run can reach local app routes; `file_capture` is not atomic; no auto-run depth cap) and the M25-M27 list in `m27-acceptance.md` under "Open review items" (agents with a shell can reach the import routes, so 'an agent cannot approve its own schema' rests on the missing MCP tool; MCP `start_import` into a new space skips the proposal check; moving a source folder makes the next run create new objects).
+- **Not done:** Gene's hand-checks for M1-M27 (none ticked, `docs/superpowers/plans/mN-acceptance.md`, plus `m27-ui-acceptance.md`); his decisions at the top of `remaining-work.md`; pywebview window, Windows toasts, Wacom, OCR (needs `tesseract` installed) and the real `claude` CLI/Atlassian MCP were never exercised.
 
 Milestones and plans (`docs/superpowers/plans/`): M16 chat polish and model picker, M17 agents and tools, M18 learning, M19 MCP gateway, M20 A2A and delegation, M21 schedules (designs: `specs/2026-11-05-agents-design.md`); M22 work model, M23 Work section, M24 brain dump and agent loop (design: `specs/2026-11-05-work-dashboard-design.md`). Each built milestone has `mNN-acceptance.md` (Gene's hand-checks, unticked, plus deviations) and `scripts/mNN_acceptance.py`.
 
@@ -17,8 +17,8 @@ Milestones and plans (`docs/superpowers/plans/`): M16 chat polish and model pick
 ## What to do next, in order
 
 1. **Set up** (fresh clone): install `uv` and Node 22+; `uv sync`; `cd frontend && npm ci` (not `npm install`).
-2. **Gene's hands-on checks**, M1-M24 (`docs/superpowers/plans/mN-acceptance.md`), on a copy of his space, and the fixes they produce.
-3. **The open review items** above, then **plan M25-M27** from `docs/superpowers/specs/2026-11-06-import-migration-design.md` against the code as built.
+2. **Gene's hands-on checks**, M1-M27, on a copy of his space (never his real data first), and the fixes they produce.
+3. **The open review items** above.
 
 How Gene wants it built (2026-11-06): **parallel tracks by file ownership, a quick check per milestone, and one full gate per track plus one at the end, not a full gate after every milestone.** A workflow must record task results sorted by task number, so a resumed run hits its cache. The previous script ordered them by finish time, which broke resumes and rebuilt finished milestones. The two-track script is at `~/.claude/projects/C--Git-object/412d563a-525c-462f-98d8-9a68624a5e84/workflows/scripts/object-build-two-tracks-wf_9e539a30-330.js`; it can only be resumed from the same session, so copy its structure instead.
 
