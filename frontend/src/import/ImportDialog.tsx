@@ -33,10 +33,13 @@ import { openObject } from '@/create/createAndOpen'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { parentFolder } from '@/spaces/CreateSpaceDialog'
 import { switchSpace } from '@/spaces/switchSpace'
+import { AgentFlow } from './agent/AgentFlow'
+import { AGENT_TEXT } from './agent/text'
 import { BatchPanel } from './BatchPanel'
 import { ImportOptions } from './ImportOptions'
 import { MappingEditor } from './MappingEditor'
 import { cleanMapping, cleanSourcePath, emptyMapping, seedMapping, type ImportTargetKind } from './mapping'
+import { ScanStep, type ScanOutcome } from './scan/ScanStep'
 import { PreviewSummary } from './PreviewSummary'
 import { TargetPicker } from './TargetPicker'
 import { IMPORT_TEXT } from './text'
@@ -53,14 +56,16 @@ export const importTiming = { pollMs: 500, debounceMs: 300 }
 
 const OVER: ReadonlySet<ImportPhase> = new Set(['done', 'failed', 'cancelled'])
 
-type Step = 'source' | 'review' | 'running' | 'finished'
+type Step = 'source' | 'scan' | 'review' | 'running' | 'finished' | 'agent'
 
 /** Ids the dialog moves focus to when a step opens. */
 const FOCUS_ID: Record<Step, string> = {
   source: 'import-source-path',
+  scan: 'scan-heading',
   review: 'import-summary-heading',
   running: 'import-progress-heading',
   finished: 'import-finish-heading',
+  agent: 'proposal-heading',
 }
 
 function previewError(err: unknown): string {
@@ -102,6 +107,8 @@ export function ImportDialog() {
   const [copyTouched, setCopyTouched] = useState(false)
   const [copyName, setCopyName] = useState('')
   const [firstRun, setFirstRun] = useState(true)
+  // M27: the scan step's choices, carried into the import request.
+  const [scanOutcome, setScanOutcome] = useState<ScanOutcome | null>(null)
   const [rev, setRev] = useState(0)
   const [updating, setUpdating] = useState(false)
   const [stale, setStale] = useState(false)
@@ -144,6 +151,7 @@ export function ImportDialog() {
     setCopyTouched(false)
     setCopyName('')
     setFirstRun(true)
+    setScanOutcome(null)
     setRev(0)
     setUpdating(false)
     setStale(false)
@@ -224,7 +232,8 @@ export function ImportDialog() {
       setNotice(null)
       reread.current = false
       if (!nameTouched) setName(res.suggestedName)
-      setStep('review')
+      setScanOutcome(null)
+      setStep('scan')
     } catch (err) {
       if (my === seq.current) setError(previewError(err))
     } finally {
@@ -296,6 +305,16 @@ export function ImportDialog() {
         mapping: cleanMapping(mapping, target),
         target: into,
         ...(preview.kind === 'files' ? { keepOriginals } : {}),
+        ...(scanOutcome &&
+        (scanOutcome.leaveOut.length || scanOutcome.leaveOutFiles.length || scanOutcome.excludeFromAi.length)
+          ? {
+              scan: {
+                leaveOut: scanOutcome.leaveOut,
+                leaveOutFiles: scanOutcome.leaveOutFiles,
+                excludeFromAi: scanOutcome.excludeFromAi,
+              },
+            }
+          : {}),
       })
       reread.current = false
       setJobId(res.jobId)
@@ -450,6 +469,17 @@ export function ImportDialog() {
           </form>
         )}
 
+        {step === 'scan' && source && (
+          <ScanStep
+            sourcePath={source.path}
+            onBack={() => setStep('source')}
+            onDone={(o) => {
+              setScanOutcome(o)
+              setStep('review')
+            }}
+          />
+        )}
+
         {step === 'review' && preview && (
           // Not a form: Enter in a name field never starts the import, only the Import button does.
           <div className="flex flex-col gap-4">
@@ -522,6 +552,8 @@ export function ImportDialog() {
           </div>
         )}
 
+        {step === 'agent' && result?.batch && <AgentFlow batch={result.batch} onClose={close} />}
+
         {step === 'running' && <Progress job={job} stopping={stopping} onStop={stop} error={error} />}
 
         {step === 'finished' && (
@@ -548,6 +580,17 @@ export function ImportDialog() {
                 {result.skipped > 0 && <p className="text-[13px] text-fg-muted">{T.resultSkipped(result.skipped)}</p>}
                 <BatchPanel result={result} inOpenSpace={startedInto === 'currentSpace'} />
               </>
+            )}
+            {startedInto === 'currentSpace' && result?.batch && !lost && job?.phase === 'done' && (
+              <div className="flex flex-col gap-1 rounded-md border border-line p-3">
+                <h4 className="text-[13px] font-semibold">{AGENT_TEXT.continueHeading}</h4>
+                <p className="text-[13px] text-fg-muted">{AGENT_TEXT.continueIntro}</p>
+                <div>
+                  <Button type="button" variant="outline" onClick={() => setStep('agent')}>
+                    {AGENT_TEXT.continueButton}
+                  </Button>
+                </div>
+              </div>
             )}
             {offerSwitch && (
               <p className="truncate font-mono text-[12px] text-fg-muted" title={finalPath ?? undefined}>

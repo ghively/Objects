@@ -1,0 +1,241 @@
+// M27 UI: Proposed schema, Trial, Normalise and the inbox finish, against the mock API.
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+
+vi.mock('@/api/client', async (orig) => ({
+  ...(await orig()),
+  api: (await import('@/test/mockApi')).mockApi(),
+  announceResync: vi.fn(),
+}))
+
+import { api } from '@/api/client'
+import type { FilingStatus, SchemaProposal } from '@/api/types'
+import { useTabs } from '@/nav/tabs'
+import { AgentFlow } from './AgentFlow'
+import { NormaliseStep } from './NormaliseStep'
+import { ProposalStep } from './ProposalStep'
+import { AGENT_TEXT as T } from './text'
+import { agentTiming, TrialStep } from './TrialStep'
+
+const m = vi.mocked(api)
+
+const PROPOSAL: SchemaProposal = {
+  groups: [
+    {
+      id: 'g1',
+      action: 'create',
+      name: 'Meeting',
+      plural: 'Meetings',
+      documentCount: 24,
+      examples: ['Standup 3 Nov', 'Retro'],
+      properties: [
+        { key: 'status', name: 'Status', kind: 'select', fillRate: 0.8, options: ['Prod', 'Dev'], mergedFrom: { Prod: ['prod', 'PRD'] } },
+        { key: 'owner', name: 'Owner', kind: 'relation', fillRate: 0.5, relationTo: 'Person' },
+      ],
+    },
+    { id: 'g2', action: 'use', typeId: 'book', name: 'Book', documentCount: 12, examples: ['Dune'], properties: [] },
+  ],
+}
+
+function trialStatus(over: Partial<FilingStatus> = {}): FilingStatus {
+  return {
+    state: 'trial',
+    trial: {
+      items: [
+        {
+          path: 'a.md',
+          title: 'Alpha',
+          type: 'Meeting',
+          confidence: 'high',
+          verdict: null,
+          values: [{ key: 'status', value: 'Prod', quote: 'We shipped to prod', ok: true }],
+        },
+        {
+          path: 'b.md',
+          title: 'Beta',
+          type: 'Meeting',
+          confidence: 'low',
+          verdict: null,
+          values: [{ key: 'owner', value: 'Zed', quote: 'cc Zed', ok: false }],
+        },
+      ],
+      rightShare: null,
+    },
+    normalise: [],
+    ...over,
+  }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  agentTiming.pollMs = 10
+})
+
+describe('ProposalStep', () => {
+  test('shows evidence and enables Apply only when every item is decided', async () => {
+    m.importProposal.mockResolvedValue({ proposal: PROPOSAL, review: null })
+    m.applyProposal.mockResolvedValue({ created: ['meeting'], extended: [] })
+    const onApplied = vi.fn()
+    const user = userEvent.setup()
+    render(<ProposalStep batch="b1" onApplied={onApplied} />)
+    const card = await screen.findByRole('group', { name: T.itemLabel('Meeting') })
+    expect(within(card).getByText(T.actions.create)).toBeInTheDocument()
+    expect(within(card).getByText(T.documents(24))).toBeInTheDocument()
+    expect(within(card).getByText(/Standup 3 Nov, Retro/)).toBeInTheDocument()
+    expect(within(card).getByText(/80% have a value/)).toBeInTheDocument()
+    expect(within(card).getByText(/Prod, Dev/)).toBeInTheDocument()
+    expect(within(card).getByText(T.mergedLabel('Prod', ['prod', 'PRD']))).toBeInTheDocument()
+    expect(within(card).getByText(/Relation to Person/)).toBeInTheDocument()
+    const apply = screen.getByRole('button', { name: T.apply })
+    expect(apply).toBeDisabled()
+    expect(screen.getByText(T.undecidedCount(2))).toBeInTheDocument()
+
+    await user.click(within(card).getByRole('button', { name: T.accept }))
+    expect(apply).toBeDisabled()
+    const book = screen.getByRole('group', { name: T.itemLabel('Book') })
+    await user.click(within(book).getByRole('button', { name: T.reject }))
+    expect(apply).toBeEnabled()
+    expect(m.saveProposalReview).toHaveBeenLastCalledWith('b1', [
+      { id: 'g1', status: 'accepted' },
+      { id: 'g2', status: 'rejected' },
+    ])
+    await user.click(apply)
+    expect(m.applyProposal).toHaveBeenCalledWith('b1')
+    expect(await screen.findByText(T.applied(1, 0))).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: T.next }))
+    expect(onApplied).toHaveBeenCalled()
+  })
+
+  test('edit saves the new name and the dropped properties', async () => {
+    m.importProposal.mockResolvedValue({ proposal: PROPOSAL, review: null })
+    const user = userEvent.setup()
+    render(<ProposalStep batch="b1" onApplied={vi.fn()} />)
+    const card = await screen.findByRole('group', { name: T.itemLabel('Meeting') })
+    await user.click(within(card).getByRole('button', { name: T.edit }))
+    await user.click(within(card).getByRole('checkbox', { name: T.keepProperty('Owner') }))
+    const name = within(card).getByRole('textbox', { name: T.nameLabel })
+    await user.clear(name)
+    await user.type(name, 'Sync')
+    const last = m.saveProposalReview.mock.lastCall?.[1]
+    expect(last).toEqual([{ id: 'g1', status: 'edited', edited: { name: 'Sync', plural: 'Meetings', dropProperties: ['owner'] } }])
+  })
+
+  test('a saved review is restored, and no proposal says so', async () => {
+    m.importProposal.mockResolvedValueOnce({ proposal: null, review: null })
+    render(<ProposalStep batch="b1" onApplied={vi.fn()} />)
+    expect(await screen.findByText(T.noProposal)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: T.apply })).toBeDisabled()
+    m.importProposal.mockResolvedValueOnce({
+      proposal: PROPOSAL,
+      review: { items: [{ id: 'g1', status: 'accepted' }, { id: 'g2', status: 'accepted' }] },
+    })
+    await userEvent.setup().click(screen.getByRole('button', { name: T.refresh }))
+    await screen.findByRole('group', { name: T.itemLabel('Meeting') })
+    expect(screen.getByRole('button', { name: T.apply })).toBeEnabled()
+  })
+})
+
+describe('TrialStep', () => {
+  test('shows values with quotes, marks them, shows accuracy and continues with the rest', async () => {
+    m.filingStatus.mockResolvedValue(trialStatus())
+    const onDone = vi.fn()
+    const user = userEvent.setup()
+    render(<TrialStep batch="b1" onDone={onDone} />)
+    const alpha = await screen.findByRole('group', { name: 'Alpha' })
+    expect(within(alpha).getByText('We shipped to prod')).toBeInTheDocument()
+    expect(within(alpha).getByText(T.confidence.high)).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'Beta' })).getByText(`(${T.valueRejected})`)).toBeInTheDocument()
+    expect(screen.getByText(T.noMarks)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: T.markLabel(T.right, 'Alpha') }))
+    await user.click(screen.getByRole('button', { name: T.markLabel(T.wrong, 'Beta') }))
+    expect(m.markFiling).toHaveBeenCalledWith('b1', 'a.md', 'right')
+    expect(m.markFiling).toHaveBeenCalledWith('b1', 'b.md', 'wrong')
+    expect(screen.getByText(T.accuracy(1, 2, 50))).toBeInTheDocument()
+
+    m.filingStatus.mockResolvedValue(trialStatus({ state: 'done', normalise: [{ kind: 'tag', values: ['Prod', 'PRD'], suggested: 'Prod' }] }))
+    await user.click(screen.getByRole('button', { name: T.continueRest }))
+    expect(m.continueFiling).toHaveBeenCalledWith('b1')
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
+    expect(onDone.mock.calls[0][0].normalise).toHaveLength(1)
+  })
+
+  test('an idle pass offers to start the trial, then polls while it runs', async () => {
+    m.filingStatus.mockResolvedValueOnce(trialStatus({ state: 'idle', trial: { items: [], rightShare: null } }))
+    const user = userEvent.setup()
+    render(<TrialStep batch="b1" onDone={vi.fn()} />)
+    m.filingStatus.mockResolvedValue(trialStatus({ state: 'running', trial: { items: [], rightShare: null } }))
+    await user.click(await screen.findByRole('button', { name: T.startTrial }))
+    expect(m.startFiling).toHaveBeenCalledWith('b1', true)
+    expect(await screen.findByText(T.trialRunning)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: T.continueRest })).toBeDisabled()
+    m.filingStatus.mockResolvedValue(trialStatus())
+    await screen.findByRole('group', { name: 'Alpha' })
+    expect(screen.getByRole('button', { name: T.continueRest })).toBeEnabled()
+  })
+
+  test('a failed run says so', async () => {
+    m.filingStatus.mockResolvedValue(trialStatus({ state: 'failed' }))
+    render(<TrialStep batch="b1" onDone={vi.fn()} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent(T.failed)
+  })
+})
+
+describe('NormaliseStep', () => {
+  test('merges the accepted groups into the chosen value', async () => {
+    const onDone = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <NormaliseStep
+        batch="b1"
+        suggestions={[
+          { kind: 'tag', values: ['Prod', 'Production', 'PRD'], suggested: 'Production' },
+          { kind: 'option', values: ['Dev', 'dev'], suggested: 'Dev' },
+        ]}
+        onDone={onDone}
+      />,
+    )
+    await user.click(screen.getByRole('checkbox', { name: T.mergeLabel(['Dev', 'dev']) }))
+    await user.click(screen.getByRole('button', { name: T.mergeCount(1) }))
+    expect(m.normaliseFiling).toHaveBeenCalledWith('b1', [{ from: ['Prod', 'PRD'], to: 'Production' }])
+    await waitFor(() => expect(onDone).toHaveBeenCalled())
+  })
+
+  test('nothing to merge offers Continue', async () => {
+    const onDone = vi.fn()
+    render(<NormaliseStep batch="b1" suggestions={[]} onDone={onDone} />)
+    expect(screen.getByText(T.normaliseNone)).toBeInTheDocument()
+    await userEvent.setup().click(screen.getByRole('button', { name: T.next }))
+    expect(onDone).toHaveBeenCalled()
+  })
+})
+
+describe('AgentFlow finish', () => {
+  test('the Import inbox count links to that collection', async () => {
+    m.collections.mockResolvedValue([{ id: 'inbox', name: 'Import inbox' } as never])
+    m.rows.mockResolvedValue([{}, {}, {}] as never)
+    const onClose = vi.fn()
+    const open = vi.spyOn(useTabs.getState(), 'open')
+    const user = userEvent.setup()
+    render(<AgentFlow batch="b1" initial="done" onClose={onClose} />)
+    expect(await screen.findByText(T.inboxCount(3))).toBeInTheDocument()
+    expect(m.rows).toHaveBeenCalledWith({ collectionIds: ['inbox'], preview: false })
+    await user.click(screen.getByRole('button', { name: T.openInbox }))
+    expect(onClose).toHaveBeenCalled()
+    expect(open).toHaveBeenCalledWith({ kind: 'collection', id: 'inbox' })
+  })
+
+  test('walks proposal, trial, normalise, done', async () => {
+    m.importProposal.mockResolvedValue({ proposal: { groups: [PROPOSAL.groups[1]] }, review: { items: [{ id: 'g2', status: 'accepted' }] } })
+    m.applyProposal.mockResolvedValue({ created: [], extended: [] })
+    m.filingStatus.mockResolvedValue(trialStatus({ state: 'done' }))
+    m.collections.mockResolvedValue([])
+    const user = userEvent.setup()
+    render(<AgentFlow batch="b1" onClose={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: T.apply }))
+    await user.click(await screen.findByRole('button', { name: T.next }))
+    await screen.findByRole('heading', { name: T.normaliseHeading })
+    await user.click(screen.getByRole('button', { name: T.next }))
+    expect(await screen.findByText(T.inboxEmpty)).toBeInTheDocument()
+  })
+})

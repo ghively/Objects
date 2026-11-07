@@ -1021,6 +1021,15 @@ function defaults(): Api {
     cancelImport: async () => ({ ok: true }),
     // M25
     importBatches: async () => [],
+    // M27
+    importProposal: async () => ({ proposal: null, review: null }),
+    saveProposalReview: async () => ({ ok: true }),
+    applyProposal: async () => ({ created: [], extended: [] }),
+    startFiling: async () => ({ ok: true }),
+    filingStatus: async () => ({ state: 'idle', trial: { items: [], rightShare: null }, normalise: [] }),
+    markFiling: async () => ({ ok: true }),
+    continueFiling: async () => ({ ok: true }),
+    normaliseFiling: async () => ({ ok: true }),
     importBatch: async (id: string) => ({
       batch: { id, startedAt: '', source: { path: '', kind: '', system: '' }, counts: {} },
       items: [],
