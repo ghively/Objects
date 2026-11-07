@@ -151,7 +151,7 @@ def test_tool_lists(env: Env) -> None:
 
 def test_write_guards(env: Env) -> None:
     # M24 installs its read-only guard at app start; the test adds only its own.
-    assert [g.__name__ for g in v1guard.WRITE_GUARDS] == ["read_only_write_guard"]
+    assert sorted(g.__name__ for g in v1guard.WRITE_GUARDS) == ["filing_write_guard", "read_only_write_guard"]
     base_guards = list(v1guard.WRITE_GUARDS)
     blocked = _client(env.http, "read-write", name="blocked")
 

@@ -91,6 +91,11 @@ M20 (A2A and delegation). More markers:
 - ``FAKE:long:<n>``: the reply is ``n`` characters long (delegation's summary cap)
 - ``FAKE:echo-env``: the reply names ``MCP_TOOL_TIMEOUT``'s value
   (``MCP_TOOL_TIMEOUT=<value, or unset>``)
+
+M27 (import filing). When the prompt holds ``Filing pass for an import batch.``, the reply is a fenced
+``json`` block ``{"decisions": [...]}`` with one decision per ``Object: <path>`` line, taken from
+``FAKE_CLAUDE_FILING`` (JSON ``{"<path>": decision, "*": default decision}``; a path with no entry
+and no ``*`` gets a ``low`` confidence decision). ``FAKE_CLAUDE_FILING_RAW`` replaces the whole reply.
 """
 
 from __future__ import annotations
@@ -166,6 +171,24 @@ def _work_actions(prompt: str) -> list[tuple[str, str, dict]]:
             out.append((str(a.get("server") or ""), str(a.get("tool") or ""),
                         filled(args) if isinstance(args, dict) else {}))
     return out
+
+
+def _filing_reply(prompt: str) -> str:
+    """M27: the decisions ``FAKE_CLAUDE_FILING`` lists for the ``Object: <path>`` lines of the prompt."""
+    raw = os.environ.get("FAKE_CLAUDE_FILING_RAW")
+    if raw is not None:
+        return raw
+    try:
+        table = json.loads(os.environ.get("FAKE_CLAUDE_FILING") or "{}")
+    except ValueError:
+        table = {}
+    out = []
+    for line in prompt.splitlines():
+        if line.startswith("Object: "):
+            path = re.sub(r"  \(.*\)$", "", line[len("Object: "):]).strip()
+            d = table.get(path) or table.get("*") or {"confidence": "low"}
+            out.append({"path": path, **d})
+    return "Filed.\n\n```json\n" + json.dumps({"decisions": out}) + "\n```"
 
 
 BUILTIN_NAMES = ("Bash", "PowerShell", "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit",
@@ -627,6 +650,8 @@ def main(argv: list[str]) -> int:
         final = "Here it is.\n\n```text\nA clearer sentence.\nSecond line.\n```"
     elif "FAKE:badjson" in prompt:
         final = 'Oops.\n\n```json\n{"tags": [nope\n```'
+    if "Filing pass for an import batch." in prompt:
+        final = _filing_reply(prompt)
     long_text = re.search(r"FAKE:long:(\d+)", prompt)
     if long_text:
         size = int(long_text.group(1))
