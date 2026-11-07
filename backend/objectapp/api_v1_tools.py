@@ -199,6 +199,7 @@ class PreviewRequest(BaseModel):
     path: str
     kind: str = "auto"
     target: str = "newSpace"
+    leaveOut: list[str] = []
 
 
 class StartRequest(BaseModel):
@@ -560,7 +561,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         target = req.target if req.target in ("newSpace", "currentSpace") else "newSpace"
         status, body = _call(
             next(rt for rt in imports.routes if getattr(rt, "path", "") == "/import/preview"),
-            {"source": {"path": req.path, "kind": req.kind}, "target": target},
+            {"source": {"path": req.path, "kind": req.kind}, "target": target, "leaveOut": req.leaveOut},
         )
         if status >= 400:
             return _failed(status, body)

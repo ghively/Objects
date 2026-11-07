@@ -281,12 +281,13 @@ def build_server(client: ObjectClient, write: bool = True) -> MCPServer:
         return client.get("/automations")
 
     @server.tool(annotations=READ)
-    def import_preview(path: str, kind: str = "auto") -> dict:
+    def import_preview(path: str, kind: str = "auto", leave_out: list[str] | None = None) -> dict:
         """What importing a folder or .zip (an Obsidian vault, a Notion or Anytype export)
         would make: types, counts, samples and the mapping `start_import` uses. Writes
         nothing. `kind` is auto, obsidian, notion, anytype or files (Word, Excel, PowerPoint, PDF,
-        images; a `_manifest.jsonl` beside the files gives each file's url, author, dates and fields)."""
-        return client.post("/import/preview", {"path": path, "kind": kind})
+        images; a `_manifest.jsonl` beside the files gives each file's url, author, dates and fields).
+        `leave_out` names folders and patterns that are never read (use the ones given to `import_scan`)."""
+        return client.post("/import/preview", {"path": path, "kind": kind, "leaveOut": leave_out or []})
 
     @server.tool(annotations=READ)
     def import_status(job_id: str) -> dict:

@@ -63,3 +63,78 @@ def test_two_manifest_rows_with_one_id_are_not_collapsed(client, tmp_path, monke
     assert len(set(ids)) == 2
     second = run(client, src)["result"]
     assert second["unchanged"] == 2 and second["objects"] == 0 and second["updated"] == 0
+
+
+# -- 2 and 3. scan choices over the MCP routes -----------------------------------------------------
+
+from test_m27_agent import _fm, make_source  # noqa: E402
+
+
+def v1(client):
+    res = client.post("/api/integrations/tokens", json={"name": "agent", "scope": "read-write"})
+    headers = {"Authorization": f"Bearer {res.json()['secret']}"}
+
+    def preview(path, **extra):
+        r = client.post("/api/v1/import/preview", headers=headers, json={"path": str(path), "kind": "obsidian", **extra})
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    def start(pv, tmp_path, name="Copy", **extra):
+        target = {"kind": "newSpace", "name": name, "location": str(tmp_path)}
+        r = client.post("/api/v1/import/start", headers=headers, json={"previewId": pv["previewId"], "target": target, **extra})
+        assert r.status_code == 202, r.text
+        job = wait_job(client, r.json()["jobId"])
+        assert job["phase"] == "done", job
+        return job["result"], tmp_path / name
+
+    return preview, start
+
+
+def test_mcp_scan_choices_without_exclude_list_still_exclude_flagged(client, tmp_path):
+    preview, start = v1(client)
+    src = make_source(tmp_path / "s")
+    out = tmp_path / "out"
+    out.mkdir()
+    result, space = start(preview(src), out, scan={"leaveOut": ["Credentials"]})
+    secret = next(space.rglob("Secrets.md"))
+    assert _fm(space, secret.relative_to(space).as_posix())["excludeFromAI"] is True
+    assert not list(space.rglob("keys.md"))
+
+
+def test_mcp_leave_out_is_applied_at_preview_and_start(client, tmp_path):
+    preview, start = v1(client)
+    src = make_source(tmp_path / "s")
+    out = tmp_path / "out"
+    out.mkdir()
+    pv = preview(src, leaveOut=["Credentials"])
+    assert "Credentials" not in [f for f, _n in pv["folders"]]
+    # patterns first given at start are applied to what the preview already read
+    result, space = start(preview(src, leaveOut=["Credentials"]), out, scan={"leaveOut": ["Runbooks/Runbook 1*"]})
+    names = {p.name for p in space.rglob("*.md")}
+    assert "keys.md" not in names
+    assert "Runbook 1.md" not in names and "Runbook 10.md" not in names and "Runbook 2.md" in names
+    assert result["leftOut"] >= 3
+
+
+def test_left_out_patterns_of_the_draft_batch_apply_at_start(client, tmp_path):
+    preview, start = v1(client)
+    src = make_source(tmp_path / "s")
+    out = tmp_path / "out"
+    out.mkdir()
+    res = client.post("/api/import/batches", json={"path": str(src), "leaveOut": ["Credentials"]}).json()
+    result, space = start(preview(src), out, batch=res["batch"])
+    assert not list(space.rglob("keys.md"))
+
+
+def test_rerun_keeps_exclude_from_ai(client, tmp_path):
+    from test_m27_agent import do_import
+
+    src = make_source(tmp_path)
+    root = client.space_root
+    do_import(client, src)
+    rel = next(p for p in root.rglob("Secrets.md")).relative_to(root).as_posix()
+    assert _fm(root, rel)["excludeFromAI"] is True
+    (src / "Runbooks" / "Secrets.md").write_text("# Secrets\n\nrotated and removed\n", encoding="utf-8")
+    second = do_import(client, src)
+    assert second["updated"] == 1
+    assert _fm(root, rel)["excludeFromAI"] is True

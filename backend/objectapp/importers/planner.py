@@ -281,8 +281,12 @@ def plan(
     target: Target,
     now: datetime | None = None,
     reuse: dict[str, str] | None = None,
+    lenient: bool = False,
 ) -> Planned:
     """Plan the import of ``read`` with ``mapping`` (None: the defaults) into ``target``.
+
+    ``lenient``: a mapping entry for a type the source no longer has (everything of it was left out
+    after the preview) is dropped instead of refused.
 
     ``reuse`` (M25 re-runs): source path -> the space path of the object an earlier import made
     from it; such an object keeps that path (no `` (2)`` name) and the writer updates or skips it."""
@@ -336,7 +340,10 @@ def plan(
     known_keys = {k for k, *_ in order}
     for key in list(mapping.types) + list(mapping.properties):
         if key not in known_keys:
-            raise MappingProblem(f"The mapping names an unknown type {key!r}.")
+            if not lenient:
+                raise MappingProblem(f"The mapping names an unknown type {key!r}.")
+            mapping.types.pop(key, None)
+            mapping.properties.pop(key, None)
 
     taken_type_names = {t.name.casefold() for t in existing_types}
     taken_folders = {t.folder.strip("/").casefold() for t in existing_types} | {ATTACHMENTS.casefold()}
