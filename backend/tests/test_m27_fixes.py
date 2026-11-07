@@ -287,3 +287,57 @@ def test_without_a_proposal_the_pass_changes_no_type(client, tmp_path):
         res = filing.apply_decision(sp, {"path": path, "type": wanted, "confidence": "high"}, allowed={path}, type_names=None)
         assert res["inbox"] is True and res["path"] == path, wanted
         assert sp.get(path).type == before
+
+
+# -- 6. Move batch to Trash finds objects that moved and reports the ones it can't ------------------
+
+
+def test_trash_batch_follows_moved_objects_and_reports_missing(client, tmp_path):
+    from test_m25_provenance import run as run_import
+
+    from objectapp.importers import batches
+
+    src = tmp_path / "S"
+    src.mkdir()
+    for n in "abc":
+        (src / f"{n}.md").write_text(f"# {n}\n\ntext {n}\n", encoding="utf-8")
+    result = run_import(client, src, kind="obsidian")["result"]
+    root = client.space_root
+    _d, items = batches.load_batch(root, result["batch"])
+    path_of = {i["title"]: i["path"] for i in items}
+    from objectapp.space import version_of
+
+    old = path_of["a"]
+    r = client.post("/api/object/change-type", json={
+        "path": old, "typeId": "task", "mapping": {}, "baseVersion": version_of((root / old).read_bytes())})
+    assert r.status_code == 200, r.text
+    assert r.json()["path"] != old  # a moved to another folder
+    assert client.delete("/api/object", params={"path": path_of["b"]}).status_code == 200  # b was trashed by hand
+    # an item whose object is nowhere (a phantom row)
+    items.append({"sourcePath": "z.md", "system": "obsidian", "id": "z.md", "title": "z", "path": "Pages/z.md", "action": "created"})
+    batches.write_json(batches.batch_dir(root, result["batch"]) / "items.json", items)
+
+    out = client.post(f"/api/import/batches/{result['batch']}/trash").json()
+    assert out["trashed"] == 2 and out["alreadyTrashed"] == 1  # a (found by its id) and c; b was trashed before
+    assert out["notFound"] == ["Pages/z.md"] and out["missing"] == 1
+    data, _ = batches.load_batch(root, result["batch"])
+    assert "trashedAt" not in data  # not complete: one object was not found
+    titles = {o["title"] for o in client.get("/api/objects").json()}
+    assert not ({"a", "b", "c"} & titles)
+    # trying again does not touch what is done, and reports the same missing one
+    again = client.post(f"/api/import/batches/{result['batch']}/trash").json()
+    assert again["trashed"] == 0 and again["notFound"] == ["Pages/z.md"]
+
+
+def test_trash_batch_complete_is_stamped(client, tmp_path):
+    from test_m25_provenance import run as run_import
+
+    from objectapp.importers import batches
+
+    src = tmp_path / "S"
+    src.mkdir()
+    (src / "a.md").write_text("# a\n\ntext\n", encoding="utf-8")
+    result = run_import(client, src, kind="obsidian")["result"]
+    out = client.post(f"/api/import/batches/{result['batch']}/trash").json()
+    assert out["trashed"] == 1 and out["notFound"] == []
+    assert batches.load_batch(client.space_root, result["batch"])[0]["trashedAt"]
