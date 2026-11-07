@@ -1,5 +1,7 @@
 # Milestone 16 acceptance: chat polish and model picker
 
+Status (2026-11-07): built and gated 2026-11-06 (Windows); merged to `master` 2026-11-06. Gene's 9 hand-checks below are unticked.
+
 Plan: `2026-11-05-m16-chat-polish-model-picker.md`. Design: `specs/2026-11-05-agents-design.md`, sections 10 and 11. Date: 2026-11-05. Built on Gene's Windows 11 PC on branch `feat/m16-m24` (shared with M17-M24), commits `d4a9d89..6841eab` plus this integration commit. Gene asked for M16-M24 to be built straight through; his hand checks below come later.
 
 ## What was built

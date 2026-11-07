@@ -1,6 +1,6 @@
 # Object: design
 
-Status: approved and implemented (M1–M8 built by 2026-10-28) · written 2026-10-23 (third revision), amended per milestone where marked
+Status: approved and implemented (M1–M9 built by 2026-10-28; later milestones M10–M27 built by 2026-11-07 under their own specs and plans, see `plans/remaining-work.md`) · written 2026-10-23 (third revision), amended per milestone where marked
 Working name: **Object**.
 
 ## 1. What we're building
@@ -24,7 +24,7 @@ It's a new code base, written from scratch.
 - anything that only exists because of the cloud: accounts, login, billing and Pro gating, sync, sharing and publishing, mobile
 - telemetry
 
-**Later (wanted, lower priority, each needs its own spec change):** integrations (calendar feeds, task actions, the API, email, Readwise, Kindle, Telegram, WhatsApp, Raycast).
+**Later (wanted, lower priority, each needs its own spec change):** integrations (calendar feeds, task actions, email, Readwise, Kindle, Telegram, WhatsApp, Raycast). The local API and MCP server (M11) are built.
 
 Every feature is simply available; nothing is gated behind a paid tier.
 

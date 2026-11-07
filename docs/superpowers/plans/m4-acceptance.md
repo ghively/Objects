@@ -1,5 +1,7 @@
 # Milestone 4 acceptance
 
+Status (2026-11-07): built, reviewed, fixed and gated; on `master`. Gene's 22 hand-checks below are unticked.
+
 Plan: `2026-10-26-m4-calendar-daily-tasks.md`, Task 16. Date: 2026-10-26. Built on a Linux cloud container, not Gene's Windows PC.
 
 ## Automated results

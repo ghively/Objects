@@ -1,5 +1,7 @@
 # Milestone 13 acceptance: calendar, timeline and chart layouts
 
+Status (2026-11-07): built, reviewed and gated (Linux and, after the merge, Windows, 2026-11-05); merged to `master`. Gene's 5 hand-checks below are unticked.
+
 Plan: `2026-11-05-m13-view-layouts.md` (expanded from the 2026-11-04 features plan, M13). Date: 2026-11-05. Built on a Linux cloud container, not on Gene's Windows PC, on branch `feat/m13-view-layouts` off `master` at `c72567f` (it does not need M10, M11 or M12).
 
 ## What was built

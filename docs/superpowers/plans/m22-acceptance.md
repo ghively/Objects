@@ -1,5 +1,7 @@
 # Milestone 22 acceptance: the work model
 
+Status (2026-11-07): built, merged to `master` and gated 2026-11-06. Gene's 10 hand-checks below are unticked.
+
 Plan: `2026-11-05-m22-work-model.md`. Design: `specs/2026-11-05-work-dashboard-design.md`, sections 1-4 and "Add work fields". Date: 2026-11-06. Built on Gene's Windows 11 PC on branch `feat/m22-m23` (worktree `C:\Git\object-work`, the second of the two parallel tracks Gene chose on 2026-11-06), commits `822e467..31f4045` plus this integration commit. Gene asked for M16-M24 to be built straight through; his hand checks below come later.
 
 ## What was built

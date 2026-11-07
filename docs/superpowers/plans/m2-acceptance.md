@@ -1,5 +1,7 @@
 # Milestone 2 acceptance
 
+Status (2026-11-07): built, reviewed, fixed and gated; on `master`. Gene's 20 hand-checks below are unticked.
+
 Plan: `2026-10-23-m2-types-properties.md`, Task 20. Date: 2026-10-26.
 
 ## Automated results

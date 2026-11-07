@@ -1,5 +1,7 @@
 # Milestone 20 acceptance: A2A (outbound) and delegation
 
+Status (2026-11-07): built, merged to `master` and gated 2026-11-06. Gene's 12 hand-checks below are unticked.
+
 Plan: `2026-11-05-m20-a2a-and-delegation.md`. Design: `specs/2026-11-05-agents-design.md`, sections 7 (A2A outbound) and 8 (Agents working together), with their mentions in sections 1, 2 and 4 and the Constraints line on A2A tokens. Date: 2026-11-06. Built on Gene's Windows 11 PC on branch `feat/m16-m24` (shared with M16-M24), commits `d2554b3..2b26f0b` plus this integration commit. Gene asked for M16-M24 to be built straight through, and on 2026-11-06 for two parallel tracks with one full gate per track; his hand checks below come later.
 
 ## What was built

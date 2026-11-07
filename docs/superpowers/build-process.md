@@ -1,6 +1,6 @@
 # How Object milestones are built
 
-Lessons from M1–M8. Read this before planning or running the next build.
+Lessons from M1–M8, with a note on M16–M27 at the end. Read this before planning or running the next build.
 
 ## Pipeline
 
@@ -49,6 +49,10 @@ A running workflow can't be edited. Stop it with `TaskStop` and relaunch with th
 - **Verify the gate yourself.** M8's gate reported one known timing flake. A fresh run on a quiet machine showed a deterministic failure as well: a palette test that expected 11 actions when there were 12. Rerun the full suites and every acceptance script after each workflow, on a quiet machine, before calling it done.
 - **Timing tests need a quiet box.** The 1MB split test is now best-of-5 after a warm-up, with the same 300 ms bar, because single runs failed 1 in 3 even on old code. Rerun any timing failure alone before calling it real.
 - **Never `pkill -f` a pattern that also matches your own shell's command line.** It kills the shell running the command.
+
+## M16–M27 (2026-11-05 to 2026-11-07)
+
+Gene's way of building these (see `HANDOFF.md`): parallel tracks by file ownership (M16-M21 on `feat/m16-m24`, M22-M23 on `feat/m22-m23`, merged to `master` on 2026-11-06; M24-M27 after), a quick check per milestone (its own tests and `scripts/mN_acceptance.py`), and one full gate per track plus one at the end, not after every milestone. One review and one fix pass per milestone or track (M23, M24 and M25-M27 each had one). A workflow records task results sorted by task number, so a resumed run hits its cache. Sessions that run the real `claude` CLI use the fake one in tests (`backend/tests/fake_claude.py`) and point `OBJECT_STATE_DIR` at a temp folder.
 
 ## Ground rules
 

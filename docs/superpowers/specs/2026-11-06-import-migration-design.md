@@ -1,6 +1,6 @@
 # Object import and migration: design
 
-Date: 2026-11-06. Owner: Gene Hively. Status: **approved by Gene, 2026-11-06** (the whole document, our calls included). Plans: none yet (milestones after M24; see "Phases").
+Date: 2026-11-06. Owner: Gene Hively. Status: **approved by Gene, 2026-11-06** (the whole document, our calls included). Built 2026-11-06/07 as M25-M27. Plans: `docs/superpowers/plans/2026-11-06-m25-provenance-and-reruns.md`, `2026-11-06-m26-readers-and-scan.md`, `2026-11-06-m27-agent-workflow.md` (acceptance: `m25-acceptance.md`, `m26-acceptance.md`, `m27-acceptance.md`, `m27-ui-acceptance.md`).
 
 Builds on M1-M15 (types, properties, media blocks, File/Image/PDF types, the importer, version history, Trash, "Exclude from AI"), on the agents milestones M16-M21 (`specs/2026-11-05-agents-design.md`: skills, the MCP gateway, schedules) and on the MCP server (M11).
 
@@ -200,7 +200,7 @@ New tools (write tools follow M11's rules: revision-checked, off when the MCP se
 
 There is no tool to approve a proposal or to apply decisions without the app's checks.
 
-## Phases (milestones after M24; order is ours)
+## Phases (M25-M27, built; order is ours)
 
 - **M25, provenance and re-runs**: the `importSource` block and its Source line, filters, keep-originals, batches and Move batch to Trash, the Files source kind with the manifest, re-runs (section 5), the report's counts.
 - **M26, readers and the scan**: docx, pdf (with optional OCR), xlsx/csv, pptx, images and media; the sensitive scan and "Leave out".

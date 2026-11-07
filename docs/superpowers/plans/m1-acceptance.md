@@ -1,5 +1,7 @@
 # Milestone 1 acceptance
 
+Status (2026-11-07): built, reviewed, fixed and gated; on `master`. Gene's 9 hand-checks below are unticked.
+
 Plan: `2026-10-23-m1-shell-objects-editor.md`, Task 11. Date: 2026-10-23.
 
 ## Automated results

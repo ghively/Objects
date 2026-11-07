@@ -1,5 +1,7 @@
 # Milestone 3 acceptance
 
+Status (2026-11-07): built, reviewed, fixed and gated; on `master`. Gene's 13 hand-checks below are unticked.
+
 Plan: `2026-10-26-m3-views-collections-queries.md`, Task 16. Date: 2026-10-26.
 
 ## Automated results

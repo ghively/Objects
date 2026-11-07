@@ -1,5 +1,7 @@
 # Milestone 7 acceptance
 
+Status (2026-11-07): built, reviewed, fixed and gated; on `master`. Gene's 56 hand-checks below are unticked.
+
 Plan: `2026-10-26-m7-blocks-lightmode-polish.md`, Task 19. Date: 2026-10-27. This was built on a Linux cloud container, not on Gene's Windows PC. The walkthrough ran headless (Playwright with Chromium), because the container has no display for the pywebview window.
 
 ## Automated results

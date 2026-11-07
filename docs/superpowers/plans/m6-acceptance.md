@@ -1,5 +1,7 @@
 # Milestone 6 acceptance
 
+Status (2026-11-07): built, reviewed, fixed and gated; on `master`. Gene's 53 hand-checks below are unticked.
+
 Plan: `2026-10-26-m6-whiteboards-pen.md`, Task 13. Date: 2026-10-27. Built on a Linux cloud container, not Gene's Windows PC, so the Wacom checks below have not been run on real hardware.
 
 ## Automated results

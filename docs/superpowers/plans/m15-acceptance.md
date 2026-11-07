@@ -1,5 +1,7 @@
 # Milestone 15 acceptance: importers
 
+Status (2026-11-07): built, reviewed and gated (Linux and, after the merge, Windows, 2026-11-05); merged to `master`. Gene's 7 hand-checks below are unticked.
+
 Plan: `2026-11-05-m15-importers.md` (expanded from the 2026-11-04 features plan, M15). Date: 2026-11-05. Built on a Linux cloud container, not on Gene's Windows PC, on branch `feat/m15-importers` off `master` at `c72567f` (it does not need M10 to M14).
 
 ## What was built

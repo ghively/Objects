@@ -1,5 +1,7 @@
 # Milestone 24 acceptance: brain dump and the agent loop
 
+Status (2026-11-07): built, merged to `master` and gated 2026-11-06. Gene's 12 hand-checks below are unticked.
+
 Plan: `2026-11-05-m24-brain-dump-and-agent-loop.md`. Design: `specs/2026-11-05-work-dashboard-design.md`. Date: 2026-11-06. Built on `ccr-381ccf85-cjstne` after M22 and M23 (Tasks 1-10 are commits `f348dd8..c45b4ae`).
 
 ## What was built

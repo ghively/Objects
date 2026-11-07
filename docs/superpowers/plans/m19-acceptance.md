@@ -1,5 +1,7 @@
 # Milestone 19 acceptance: MCP gateway (in)
 
+Status (2026-11-07): built, merged to `master` and gated 2026-11-06. Gene's 11 hand-checks below are unticked.
+
 Plan: `2026-11-05-m19-mcp-gateway.md`. Design: `specs/2026-11-05-agents-design.md`, section 6 (MCP gateway (in)), with "Moving between machines" and the `.mcp.json` row (section 1), the Tools bullet (section 3), the Switches paragraph (section 4) and the Constraints line on secrets. Date: 2026-11-06. Built on Gene's Windows 11 PC on branch `feat/m16-m24` (shared with M16-M24), commits `0ced74b..bf6efce` plus this integration commit. Gene asked for M16-M24 to be built straight through, and on 2026-11-06 for two parallel tracks with one full gate per track; his hand checks below come later.
 
 ## What was built
