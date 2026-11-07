@@ -551,7 +551,7 @@ def test_native_skill_tool_bumps_usage(live: Live, monkeypatch) -> None:
 
     monkeypatch.setattr(agentskills.RunMemo, "mark_read", spy)
     live.chat("FAKE:skilltool:rack-labels", agent_id)
-    (info,) = agentskills.list_skills(folder)
+    (info,) = [i for i in agentskills.list_skills(folder) if i.name == "rack-labels"]
     assert info.uses == 1 and info.last_used
     assert marked and marked[-1][1] == "rack-labels" and marked[-1][0].startswith("ephemeral-")
 
@@ -584,7 +584,7 @@ def test_memo_dropped_with_the_token(live: Live, monkeypatch) -> None:
     monkeypatch.setattr(TokenStore, "ephemeral", spy)
     live.chat("FAKE:skilltool:rack-labels", agent_id)
     (record,) = made
-    assert agentskills.list_skills(folder)[0].uses == 1
+    assert next(i for i in agentskills.list_skills(folder) if i.name == "rack-labels").uses == 1
     assert not agentskills.MEMO.was_read(record.id, "rack-labels")
 
 

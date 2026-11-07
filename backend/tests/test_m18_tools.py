@@ -124,18 +124,19 @@ def test_skill_tools_round_trip(env: Env) -> None:
                     content="# Steps\nPrint the label.\n")
     assert created["ok"] is True and created["skill"]["createdBy"] == "agent"
     listed = _call(server, "skills_list")
-    assert [s["name"] for s in listed["skills"]] == ["rack-labels"]
+    # Object's shipped "Migrate a source" skill is in every agent's list; only the agent's own is checked.
+    assert [s["name"] for s in listed["skills"] if s["name"] != "migrate-a-source"] == ["rack-labels"]
     viewed = _call(server, "skill_view", name="rack-labels")
     assert viewed["name"] == "rack-labels" and viewed["file"] == "SKILL.md"
     assert "Print the label." in viewed["text"] and viewed["files"]
-    assert agentskills.list_skills(env.agent.folder)[0].uses == 1
+    assert next(i for i in agentskills.list_skills(env.agent.folder) if i.name == "rack-labels").uses == 1
     patched = _call(server, "skill_manage", action="patch", name="rack-labels",
                     old_string="Print the label.", new_string="Print two labels.")
     assert patched["ok"] is True
     assert "Print two labels." in (env.agent.folder / ".claude/skills/rack-labels/SKILL.md").read_text(encoding="utf-8")
     archived = _call(server, "skill_manage", action="archive", name="rack-labels")
     assert archived["skill"]["state"] == "archived"
-    assert _call(server, "skills_list")["skills"] == []
+    assert [s["name"] for s in _call(server, "skills_list")["skills"]] == ["migrate-a-source"]
     with pytest.raises(ApiError, match="404: There's no active skill named 'nope'."):
         _call(server, "skill_view", name="nope")
     with pytest.raises(ApiError, match="404: There's no active skill named 'nope'."):

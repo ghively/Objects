@@ -99,12 +99,22 @@ Say where new documents get written from now on, and remind the user to make the
 
 
 def install(folder: Path) -> bool:
-    """Put the skill in an agent folder when it has none of that name; True when it was added."""
-    from . import agentskills
+    """Put the skill in an agent folder when it has none of that name; True when it was added.
+
+    It ships with Object, so it is written as a plain file: no ledger entry and no usage record (those
+    are for what a person or an agent did), and it reads as a user skill, which the curator never touches.
+    """
+    from . import agentskills, textfile
 
     try:
-        agentskills.user_create(Path(folder), NAME, DESCRIPTION, TEXT)
-    except agentskills.SkillConflict:
+        folder = Path(folder)
+        if agentskills._taken(folder, NAME):  # noqa: SLF001
+            return False
+        text = agentskills._skill_md_text(NAME, DESCRIPTION, TEXT, None)  # noqa: SLF001
+        skill_dir = agentskills._skills_root(folder) / NAME  # noqa: SLF001
+        skill_dir.mkdir(parents=True)
+        textfile.create_new(skill_dir / agentskills.SKILL_FILE, text.encode("utf-8"))
+    except FileExistsError:
         return False
     except Exception:  # noqa: BLE001 - an agent without the skill still works
         _log.exception("Could not add the %s skill to %s", NAME, folder)
