@@ -77,7 +77,7 @@ def router(ctx: ApiContext, jobs: Jobs, announce_resync) -> APIRouter:
         if not root.exists():
             return _error(404, "There is no file or folder at this path.")
         batch = batches.create_draft(ctx.space.root, str(root), req.leaveOut)
-        scan = scan_tree(root, req.leaveOut).to_json() if root.is_dir() else {"findings": {}, "leftOut": [], "counts": {}}
+        scan = scan_tree(root, req.leaveOut).to_json()
         batches.store_scan(ctx.space.root, batch, scan)
         return {"batch": batch, "scan": scan}
 

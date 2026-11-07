@@ -56,7 +56,7 @@ def prepare(state: Any, read: ReadResult, req: StartImportRequest, target_root: 
     stored = batches.load_scan(target_root, batch)
     choices = req.scan
     patterns = list(read.leave_out)  # the preview's, the scan choices' and the draft batch's (apply_leave_out)
-    if stored is None and read.container == "folder":
+    if stored is None:
         try:
             stored = scan_tree(Path(read.sourcePath), patterns).to_json()
         except OSError:
