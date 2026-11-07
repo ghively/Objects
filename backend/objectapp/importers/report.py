@@ -19,7 +19,7 @@ __all__ = ["MAX_LINES", "REPORT_TITLE", "build_report"]
 REPORT_TITLE = "Import report"
 MAX_LINES = 5000
 
-KIND_NAMES = {"notion": "Notion", "obsidian": "Obsidian", "anytype": "Anytype"}
+KIND_NAMES = {"notion": "Notion", "obsidian": "Obsidian", "anytype": "Anytype", "files": "Files"}
 REASON_TEXT = {
     "unsafePath": "Unsafe path, not read",
     "symlink": "Link, not followed",
@@ -83,6 +83,7 @@ def build_report(
     stopped: str | None = None,
     not_written: int = 0,
     warnings: Iterable[str] = (),
+    extra: dict | None = None,
 ) -> str:
     """The report's body. ``link_for(source path)`` is the ``[[…]]`` of the object imported
     from it (None when there is none); ``stopped`` says why the import stopped early and
@@ -104,6 +105,8 @@ def build_report(
         f"{_count(counts.get('attachments', 0), 'attachment')} and {_count(counts.get('tags', 0), 'tag')}."
     )
     lines.append("")
+    if extra and extra.get("counts"):
+        lines += _counts_section(extra["counts"])
     warnings = list(warnings)
     if warnings:
         lines += _section("Warnings", [f"- {w}" for w in warnings])
@@ -124,4 +127,58 @@ def build_report(
         "Values not converted",
         [f"- {code(t)} › {code(p)}, {obj(src)}: {code(v)}" for t, p, src, v in not_converted],
     )
+    if extra:
+        lines += _extra_sections(extra, obj)
     return "\n".join(lines).rstrip("\n") + "\n"
+
+
+def _counts_section(c: dict[str, int]) -> list[str]:
+    """The counts that reconcile (design section 10)."""
+    parts = [
+        ("Imported", c.get("imported", 0)),
+        ("Updated", c.get("updated", 0)),
+        ("Unchanged", c.get("unchanged", 0)),
+        ("Changed in both", c.get("changedInBoth", 0)),
+        ("Left out", c.get("leftOut", 0)),
+        ("Failed", c.get("failed", 0)),
+    ]
+    total = sum(n for _, n in parts)
+    lines = ["## Counts", "", f"- Source items: {c.get('sourceItems', 0):,}"]
+    lines += [f"- {name}: {n:,}" for name, n in parts]
+    ok = total == c.get("sourceItems", 0)
+    lines.append(f"- Check: {total:,} accounted for of {c.get('sourceItems', 0):,}" + ("" if ok else " (does not add up)"))
+    if c.get("notWritten"):
+        lines.append(f"- Failed includes {c['notWritten']:,} not written because the import stopped")
+    if c.get("removed"):
+        lines.append(f"- Removed at source (not counted above, still in the space): {c['removed']:,}")
+    lines.append("")
+    return lines
+
+
+def _extra_sections(extra: dict, obj: Callable[[str], str]) -> list[str]:
+    out: list[str] = []
+    if extra.get("batch"):
+        out += [f"Batch: {code(extra['batch'])}", ""]
+    kept = extra.get("originals", 0)
+    large = extra.get("originalsLarge") or []
+    if kept or large:
+        how = "File objects" if extra.get("keep") == "fileObjects" else "attachments"
+        lines = [f"- Kept {_count(kept, 'original')} in Attachments/Originals ({how})."]
+        lines += [f"- {obj(p)}: over 100 MB, the original was not copied" for p in large]
+        out += _section("Originals", lines)
+    losses = extra.get("losses") or []
+    if losses:
+        out += _section("Conversion notes", [f"- {obj(s)}: {code(n)}" for s, n in losses])
+    conflicts = extra.get("conflicts") or []
+    if conflicts or extra.get("counts", {}).get("changedInBoth"):
+        out += _section(
+            "Changed in both",
+            [f"- {link}: changed at the source and edited in Object; choose Take source or Keep mine" for link, _p in conflicts],
+        )
+    removed = extra.get("removed") or []
+    if removed or extra.get("counts", {}).get("removed"):
+        out += _section(
+            "Removed at source",
+            [f"- [[{p[:-3]}]]: no longer in the source; left in the space" for _t, p in removed],
+        )
+    return out

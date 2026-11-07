@@ -53,6 +53,8 @@ SYSTEM_KEYS = frozenset(
         "wideLayoutMode", "wideCoverImage", "coverImageOffset", "defaultPageViewId",
         # the property-pane toggle (hideProperties; polish item 17)
         "hideProperties",
+        # M25 import provenance (one nested system block, never a property)
+        "importSource",
     }
 )
 
@@ -62,7 +64,7 @@ SYSTEM_KEYS = frozenset(
 _UNINFERRED_KEYS = frozenset(
     {"id", "type", "template", "title", "icon", "iconColor", "description", "aliases",
      "createdAt", "lastUpdated", "wideLayoutMode", "wideCoverImage", "coverImageOffset",
-     "defaultPageViewId", "hideProperties"}
+     "defaultPageViewId", "hideProperties", "importSource"}
 )
 
 _ICONS = {

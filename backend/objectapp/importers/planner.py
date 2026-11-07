@@ -177,6 +177,8 @@ class ObjectWrite:
     description: str | None = None
     createdAt: str = ""
     lastUpdated: str = ""
+    existing: str | None = None
+    """M25 re-run: the space path of the object an earlier import made from this source item."""
 
 
 @dataclass
@@ -278,8 +280,13 @@ def plan(
     mapping: ImportMapping | None,
     target: Target,
     now: datetime | None = None,
+    reuse: dict[str, str] | None = None,
 ) -> Planned:
-    """Plan the import of ``read`` with ``mapping`` (None: the defaults) into ``target``."""
+    """Plan the import of ``read`` with ``mapping`` (None: the defaults) into ``target``.
+
+    ``reuse`` (M25 re-runs): source path -> the space path of the object an earlier import made
+    from it; such an object keeps that path (no `` (2)`` name) and the writer updates or skips it."""
+    reuse = reuse or {}
     now_iso = _stamp(now or datetime.now(UTC))
     if mapping is None:
         mapping = ImportMapping(typeSource=read.defaultTypeSource, typeKey=read.defaultTypeKey)  # type: ignore[arg-type]
@@ -581,7 +588,11 @@ def plan(
     tag_folded: set[str] = set()
     for o, pt in kept:
         tw = type_writes[pt.key]
-        rel, was_renamed = free(tw.folder, safe_filename(o.title))
+        reused = reuse.get(o.sourcePath)
+        if reused:
+            rel, was_renamed = reused, False
+        else:
+            rel, was_renamed = free(tw.folder, safe_filename(o.title))
         po = PlanObject(o.sourcePath, o.title, pt.key, targetPath=rel, mtime=o.mtime)
         if was_renamed:
             po.renamedFrom = o.title
@@ -609,7 +620,7 @@ def plan(
         by_source[o.sourcePath] = po
         w = ObjectWrite(po, o, tw.name, tags=system.get("tags", []), aliases=system.get("aliases", []),
                         description=system.get("description"), createdAt=system["createdAt"],
-                        lastUpdated=system["lastUpdated"])
+                        lastUpdated=system["lastUpdated"], existing=reused)
         writes.append(w)
         write_by_source[o.sourcePath] = w
 
@@ -628,6 +639,7 @@ def plan(
         ObjectSummary(po.targetPath, None, type_writes[po.typeKey].name, po.title, None,
                       po.system["createdAt"], po.system["lastUpdated"], aliases=po.system.get("aliases", []))
         for po in objects
+        if po.targetPath not in reuse.values()
     ]
     summaries = existing_summaries + planned_summaries + tag_paths
     resolver = Resolver.build(summaries, {s.path: s.aliases for s in summaries})
@@ -766,8 +778,9 @@ def plan(
         skipped.append(SkippedItem(path=s, reason="valueNotConverted", detail=f"{t} › {p}: {v}"[:300]))
 
     # 10. Files no page links to.
+    native_files = {w.obj.sourcePath for w in writes if w.read.native}
     for f in sorted(read.files):
-        if f not in attachments and f not in too_large:
+        if f not in attachments and f not in too_large and f not in native_files:
             skipped.append(SkippedItem(path=f, reason="unsupported", detail="Not linked from any page"))
 
     final_plan = ImportPlan(

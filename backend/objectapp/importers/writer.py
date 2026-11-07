@@ -20,26 +20,45 @@ caller announces one resync when the job ends (`WriteState.wrote_anything`).
 from __future__ import annotations
 
 import copy
+import json
 import logging
 import os
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 from ..frontmatter import FlowList, set_keys
 from ..ids import new_ulid
-from ..media import MAX_ATTACHMENT_BYTES
+from ..media import (
+    MAX_ATTACHMENT_BYTES,
+    _safe_attachment_name,
+    attachment_media_type,
+    kind_of,
+)
 from ..objfile import ObjectFile, join_object, split_object
 from ..space import now_stamp, safe_filename, unique_path, yaml_single_quoted
-from ..textfile import create_new
-from . import markdown
+from ..textfile import atomic_write, create_new
+from ..whiteboardfile import BOARD_SUFFIX, INK_SUFFIX
+from . import batches, markdown, provenance
+from .files import FilePage, file_page
 from .model import ImportResult, SkippedItem
 from .notion import page_heading, split_property_lines
 from .planner import Planned
 from .readmodel import read_page_text
 from .report import REPORT_TITLE, build_report
-from .source import LimitExceeded, NotASource, Source, SourceDamaged, SourceMissing, TextBudget, open_source
+from .source import (
+    MAX_TEXT_FILE,
+    LimitExceeded,
+    NotASource,
+    Source,
+    SourceDamaged,
+    SourceMissing,
+    TextBudget,
+    open_source,
+)
 
 if TYPE_CHECKING:
     from ..space import Space
@@ -77,11 +96,34 @@ class WriteState:
     """Plan type key -> the name of the type its objects got."""
     stopped: str | None = None
     report_path: str | None = None
+    # -- M25: provenance, originals, re-runs, batch records --
+    keep_originals: str = "attachments"
+    """``attachments`` or ``fileObjects`` (design section 2)."""
+    batch: str = ""
+    imported_at: str = ""
+    prior: batches.Prior = field(default_factory=batches.Prior)
+    items: list[dict[str, Any]] = field(default_factory=list)
+    """The batch records' per-item entries."""
+    updated: int = 0
+    unchanged: int = 0
+    processed: int = 0
+    failed_objects: list[str] = field(default_factory=list)
+    conflicts: list[dict[str, Any]] = field(default_factory=list)
+    removed: list[dict[str, Any]] = field(default_factory=list)
+    losses: list[tuple[str, str]] = field(default_factory=list)
+    """(source path, what the conversion lost or couldn't do)."""
+    originals_kept: int = 0
+    originals_large: list[str] = field(default_factory=list)
+    attachment_records: dict[str, dict[str, str]] = field(default_factory=dict)
+    pending: dict[str, bytes] = field(default_factory=dict)
+    taken: dict[str, set[str]] = field(default_factory=dict)
+    counts: dict[str, int] = field(default_factory=dict)
+    report_body: str = ""
 
     @property
     def wrote_anything(self) -> bool:
         """Whether any file was written (an object, a type, an attachment, a tag, the report)."""
-        return bool(self.objects or self.types or self.attachments or self.tags or self.report_path)
+        return bool(self.objects or self.types or self.attachments or self.tags or self.report_path or self.updated)
 
 
 def _check(state: WriteState) -> None:
@@ -115,11 +157,17 @@ def write_import(planned: Planned, space: Space, state: WriteState, src: Source 
     state.progress("preparing", 0, state.total, None)
     if src is None:
         src = open_checked(planned)
+    state.batch = state.batch or new_ulid()
+    state.imported_at = now_stamp()
+    started = state.imported_at
+    state.prior = batches.load_prior(space.root, planned.plan.sourcePath)
     try:
         try:
             _types(planned, space, state)
             _attachments(planned, space, state, src)
             _objects(planned, space, state, src)
+            if not state.stopped:
+                _removed_at_source(planned, space, state)
         except Cancelled:
             state.stopped = "it was stopped"
         except Exception as exc:  # noqa: BLE001 - the report says what was written
@@ -128,11 +176,17 @@ def write_import(planned: Planned, space: Space, state: WriteState, src: Source 
     finally:
         src.close()
     state.progress("report", state.done, state.total, None)
+    _count(planned, state)
     try:
         _report(planned, space, state)
     except Exception:  # noqa: BLE001
         _log.exception("Could not write the import report")
+    try:
+        _records(planned, space, state, started)
+    except Exception:  # noqa: BLE001
+        _log.exception("Could not write the batch records")
     state.done = state.total
+    c = state.counts
     return ImportResult(
         targetPath=str(space.root),
         spaceName=space.name,
@@ -143,6 +197,15 @@ def write_import(planned: Planned, space: Space, state: WriteState, src: Source 
         skipped=len(planned.plan.skipped) + len(state.skipped),
         reportPath=state.report_path,
         cancelled=state.stopped == "it was stopped",
+        batch=state.batch,
+        updated=state.updated,
+        unchanged=state.unchanged,
+        changedInBoth=len(state.conflicts),
+        removed=len(state.removed),
+        leftOut=c.get("leftOut", 0),
+        failed=c.get("failed", 0),
+        originals=state.originals_kept,
+        sourceItems=c.get("sourceItems", 0),
     )
 
 
@@ -231,12 +294,34 @@ def _names_in(folder: os.PathLike[str] | str) -> set[str]:
         return set()
 
 
+def _put(state: WriteState, folder: Path, name: str, data: bytes) -> str:
+    """Write ``data`` into ``folder`` as ``name`` (the next free `` (n)`` name when it is taken);
+    never overwrites. Returns the name written. Raises `OSError` when it can't be written."""
+    folder.mkdir(parents=True, exist_ok=True)
+    taken = state.taken.get(str(folder))
+    if taken is None:
+        taken = state.taken[str(folder)] = _names_in(folder)  # listed once; a name taken meanwhile fails `create_new`
+    stem, dot, ext = name.rpartition(".")
+    if not dot:
+        stem, ext = name, ""
+    n = 1
+    while n <= 10_000:
+        candidate = name if n == 1 else (f"{stem} ({n}).{ext}" if ext else f"{stem} ({n})")
+        n += 1
+        if candidate.lower() in taken:
+            continue
+        taken.add(candidate.lower())
+        try:
+            create_new(folder / candidate, data)
+        except FileExistsError:
+            continue
+        return candidate
+    raise OSError("No free file name")
+
+
 def _attachments(planned: Planned, space: Space, state: WriteState, src: Source) -> None:
     state.progress("attachments", state.done, state.total, None)
     folder = space.root / "Attachments"
-    if planned.plan.attachments:
-        folder.mkdir(parents=True, exist_ok=True)
-    taken = _names_in(folder)  # listed once; a name taken meanwhile fails `create_new`
     for sp, att in planned.plan.attachments.items():
         _check(state)
         try:
@@ -245,43 +330,172 @@ def _attachments(planned: Planned, space: Space, state: WriteState, src: Source)
             state.skipped.append(SkippedItem(path=sp, reason="damaged", detail=str(exc)[:200]))
             _step(state, "attachments", sp)
             continue
+        digest = provenance.hash_bytes(data)
+        before = state.prior.attachments.get(sp)
+        if before and before.get("hash") == digest and (space.root / str(before.get("path", ""))).is_file():
+            # A re-run: the same bytes are already in the space (M25 design section 5).
+            state.attachment_paths[sp] = str(before["path"])
+            state.attachment_records[sp] = dict(before)
+            _step(state, "attachments", sp)
+            continue
         name = att.targetName.split("/", 1)[1]
-        stem, dot, ext = name.rpartition(".")
-        if not dot:
-            stem, ext = name, ""
-        n = 1
-        written = None
-        while n <= 10_000:
-            candidate = name if n == 1 else (f"{stem} ({n}).{ext}" if ext else f"{stem} ({n})")
-            n += 1
-            if candidate.lower() in taken:
-                continue
-            taken.add(candidate.lower())
-            try:
-                create_new(folder / candidate, data)
-            except FileExistsError:
-                continue
-            except OSError as exc:
-                state.skipped.append(SkippedItem(path=sp, reason="damaged", detail=f"Couldn't be written: {exc}"[:200]))
-                break
-            written = candidate
-            break
-        if written is None:
+        try:
+            written = _put(state, folder, name, data)
+        except OSError as exc:
+            state.skipped.append(SkippedItem(path=sp, reason="damaged", detail=f"Couldn't be written: {exc}"[:200]))
             _step(state, "attachments", sp)
             continue
         state.attachment_paths[sp] = f"Attachments/{written}"
+        state.attachment_records[sp] = {"path": f"Attachments/{written}", "hash": digest}
         state.attachments += 1
         _step(state, "attachments", sp)
+
+
+# -- originals and the readable page of a file -------------------------------------------------
+
+ORIGINALS = "Attachments/Originals"
+_MEDIA_TYPE_NAMES = {"image": "Image", "pdf": "PDF", "audio": "Audio", "video": "Video", "file": "File"}
+_MEDIA_PLURALS = {"Image": "Images", "PDF": "PDFs", "Audio": "Audio", "Video": "Videos", "File": "Files"}
+
+
+def _keep_original(space: Space, state: WriteState, sp: str, data: bytes) -> str | None:
+    """The original's bytes into ``Attachments/Originals/`` (design section 2): its space path, or
+    None when it is over the attachment limit (listed in the report) or can't be written."""
+    name = PurePosixPath(sp).name
+    if len(data) > MAX_ATTACHMENT_BYTES:
+        state.originals_large.append(sp)
+        return None
+    if not data:
+        return None
+    try:
+        stem, ext = _safe_attachment_name(name)
+    except ValueError:
+        stem, ext = "Original", PurePosixPath(name).suffix.lower()
+    if f"{stem}{ext}".lower().endswith((BOARD_SUFFIX, INK_SUFFIX)):
+        stem += " file"
+    try:
+        written = _put(state, space.root / ORIGINALS, f"{stem}{ext}", data)
+    except OSError as exc:
+        state.skipped.append(SkippedItem(path=sp, reason="damaged", detail=f"The original couldn't be kept: {exc}"[:200]))
+        return None
+    state.originals_kept += 1
+    return f"{ORIGINALS}/{written}"
+
+
+def _media_block(path: str) -> str:
+    enc = markdown.encode_markdown_path(path)
+    return f"![]({enc})" if kind_of(path) == "image" else f"![[{path}]]"
+
+
+def _place_unique(space: Space, rel: str, title: str, data: bytes) -> str | None:
+    """Place a new object file at ``rel`` (another free name when taken); its path, or None."""
+    folder = rel.rpartition("/")[0]
+    if space.place_new(rel, data):
+        return rel
+    for _attempt in range(100):
+        rel = unique_path(space.root, folder, safe_filename(title))
+        if space.place_new(rel, data):
+            return rel
+    return None
+
+
+def _file_object(space: Space, state: WriteState, sp: str, orig_rel: str, size: int) -> str | None:
+    """"Keep originals as File objects": a File/PDF/Image object for the original (its ``source`` is
+    the kept file). Its space path, or None."""
+    name = PurePosixPath(orig_rel).name
+    type_name = _MEDIA_TYPE_NAMES[kind_of(name)]
+    t = space.type_by_id(space._type_id(type_name))
+    if t is None:
+        t = space.create_type(type_name, _MEDIA_PLURALS[type_name])
+        state.types += 1
+    folder = (t.folder or "").strip("/") or _MEDIA_PLURALS[type_name]
+    stamp = now_stamp()
+    fm = set_keys(
+        f"type: {yaml_single_quoted(t.name)}\n",
+        {
+            "title": name,
+            "mimeType": attachment_media_type(name),
+            "fileSize": size,
+            "source": orig_rel,
+            "createdAt": stamp,
+            "lastUpdated": stamp,
+        },
+        insert_first={"id": new_ulid()},
+    )
+    data = join_object(ObjectFile(fm, f"# {name}\n", True, None)).encode("utf-8")
+    rel = _place_unique(space, unique_path(space.root, folder, safe_filename(name)), name, data)
+    if rel is None:
+        return None
+    state.items.append(
+        {"sourcePath": f"{sp}#original", "title": name, "path": rel, "action": "created", "system": "files", "id": f"{sp}#original"}
+    )
+    return rel
+
+
+def _place_images(space: Space, state: WriteState, md: str, images: list[Any], sp: str) -> str:
+    """The reader's images written to ``Attachments/``; ``![](NAME)`` in ``md`` pointed at them."""
+    folder = space.root / "Attachments"
+    for img in images:
+        name = str(getattr(img, "name", "") or "image")
+        data = getattr(img, "data", b"")
+        if not data:
+            continue
+        try:
+            stem, ext = _safe_attachment_name(name)
+        except ValueError:
+            stem, ext = "image", PurePosixPath(name).suffix.lower()
+        try:
+            written = _put(state, folder, f"{stem}{ext}", data)
+        except OSError as exc:
+            state.skipped.append(SkippedItem(path=sp, reason="damaged", detail=f"An image couldn't be kept: {exc}"[:200]))
+            continue
+        state.attachments += 1
+        final = markdown.encode_markdown_path(f"Attachments/{written}")
+        pattern = r"(!\[[^\]]*\]\()\s*<?" + re.escape(name) + r">?(\s*(?:\"[^\"]*\")?\))"
+        md = re.sub(pattern, lambda m, f=final: m.group(1) + f + m.group(2), md)
+    return md
+
+
+def _native_body(
+    space: Space, state: WriteState, w: Any, page: FilePage, orig_rel: str | None, file_obj: str | None
+) -> str:
+    sp = w.read.sourcePath
+    title = w.obj.title
+    media = _media_block(orig_rel) if orig_rel else None
+    if page.original_only or not page.markdown.strip():
+        lines = [f"# {title}", ""]
+        if media:
+            lines.append(media)
+        elif sp in state.originals_large:
+            lines.append("The original is larger than 100 MB and was not copied.")
+        else:
+            lines.append("The original could not be kept.")
+        state.losses.append((sp, "Original only: no readable page could be made"))
+        out = "\n".join(lines) + "\n"
+    else:
+        md = _place_images(space, state, page.markdown.replace("\r\n", "\n"), page.images, sp)
+        if page_heading(md) is None:
+            md = f"# {title}\n\n{md.lstrip(chr(10))}"
+        if media and PurePosixPath(sp).suffix.lower() == ".pdf":
+            first, _, rest = md.partition("\n")
+            md = f"{first}\n\n{media}\n{rest}" if first.startswith("#") else f"{media}\n\n{md}"
+        out = md if md.endswith("\n") else md + "\n"
+    for note in page.notes:
+        state.losses.append((sp, note))
+    if file_obj:
+        out += f"\nOriginal: [[{file_obj[:-3]}]]\n"
+    return out
 
 
 # -- objects ---------------------------------------------------------------------------
 
 
-def _frontmatter(w: Any, type_name: str) -> str:
+def _frontmatter(w: Any, type_name: str, block: dict[str, Any] | None = None, keep_id: str | None = None,
+                 created: str | None = None) -> str:
     fm = set_keys(
         f"type: {yaml_single_quoted(type_name)}\n",
         {"title": w.obj.title},
-        insert_first={"id": new_ulid()},
+        insert_first={"id": keep_id or new_ulid()},
     )
     values: dict[str, Any] = {}
     for k, v in w.values:
@@ -292,8 +506,10 @@ def _frontmatter(w: Any, type_name: str) -> str:
         values["aliases"] = FlowList(w.aliases)
     if w.description:
         values["description"] = w.description
-    values["createdAt"] = w.createdAt
+    values["createdAt"] = created or w.createdAt
     values["lastUpdated"] = w.lastUpdated
+    if block:
+        values[provenance.BLOCK_KEY] = block
     return set_keys(fm, values)
 
 
@@ -329,35 +545,233 @@ def _body(planned: Planned, w: Any, src: Source, budget: TextBudget, state: Writ
     return out
 
 
+def _edited_since_import(space: Space, rel: str, state: WriteState, block: dict[str, Any]) -> bool:
+    """Whether the object's file changed after the import wrote it (our call 5): its bytes differ
+    from what the last batch wrote there; without such a record, its modification time is after
+    ``importedAt``."""
+    from ..space import version_of
+
+    full = space.root / rel
+    try:
+        current = version_of(full.read_bytes())
+    except OSError:
+        return False
+    recorded = state.prior.versions.get(rel)
+    if recorded:
+        return current != recorded
+    try:
+        at = datetime.fromisoformat(str(block.get("importedAt", "")).replace("Z", "+00:00"))
+        return full.stat().st_mtime > at.timestamp() + 2.0
+    except (ValueError, OSError):
+        return True  # can't tell: treat as edited, never overwrite
+
+
+def _record(state: WriteState, w: Any, system: str, ident_: str, action: str, **extra: Any) -> None:
+    state.items.append(
+        {"sourcePath": w.read.sourcePath, "system": system, "id": ident_, "title": w.obj.title, "path": extra.pop("path", None),
+         "action": action, **extra}
+    )
+
+
 def _objects(planned: Planned, space: Space, state: WriteState, src: Source) -> None:
     state.progress("objects", state.done, state.total, None)
     budget = TextBudget(limit=1 << 62)
     for w in planned.writes:
         _check(state)
-        type_name = state.type_names.get(w.obj.typeKey, w.typeName)
-        fm = _frontmatter(w, type_name)
-        body = _body(planned, w, src, budget, state)
-        data = join_object(ObjectFile(fm, body, True, None)).encode("utf-8")
-        rel = w.obj.targetPath
-        folder = rel.rpartition("/")[0]
+        sp = w.read.sourcePath
         try:
-            placed = space.place_new(rel, data)
-            attempt = 0
-            while not placed and attempt < 100:
-                attempt += 1
-                rel = unique_path(space.root, folder, safe_filename(w.obj.title))
-                placed = space.place_new(rel, data)
-        except OSError as exc:  # a name the file system refuses, permissions: skip this one
-            state.skipped.append(SkippedItem(path=w.obj.sourcePath, reason="damaged", detail=f"Couldn't be written: {exc}"[:200]))
-            _step(state, "objects", w.obj.sourcePath)
+            _write_one(planned, space, state, src, budget, w)
+        except Cancelled:
+            raise
+        except (OSError, SourceDamaged, KeyError) as exc:  # a name the file system refuses, permissions, a damaged entry
+            state.skipped.append(SkippedItem(path=sp, reason="damaged", detail=f"Couldn't be written: {exc}"[:200]))
+            state.failed_objects.append(sp)
+            system, ident_ = provenance.ident(planned.read, w.read)
+            _record(state, w, system, ident_, "failed")
+        state.processed += 1
+        _step(state, "objects", sp)
+
+
+def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, budget: TextBudget, w: Any) -> None:
+    from ..space import version_of
+
+    o = w.read
+    sp = o.sourcePath
+    system, ident_ = provenance.ident(planned.read, o)
+    entry = src.files.get(sp)
+    data: bytes | None = None
+    if o.native:
+        assert entry is not None
+        if entry.size <= MAX_ATTACHMENT_BYTES:
+            data = src.read(sp, MAX_ATTACHMENT_BYTES)
+    elif entry is not None:
+        data = src.read(sp, MAX_TEXT_FILE)
+    else:  # a Notion database row with no page of its own
+        data = json.dumps(o.fields, sort_keys=True, default=str).encode("utf-8")
+    if data is not None:
+        chash = provenance.hash_bytes(data)
+    else:
+        assert entry is not None
+        chash = f"stat:{entry.size}:{int(entry.mtime * 1000)}"
+
+    # A re-run: the same source item, matched by (system, id) before planning.
+    ex_raw = None
+    if w.existing:
+        with space._lock:
+            ex_raw = space._raw.get(w.existing)
+    ex_block = provenance.read_block(ex_raw.fm) if ex_raw is not None else None
+    if ex_raw is not None and ex_block is not None and ex_block.get("contentHash") == chash:
+        state.unchanged += 1
+        state.written[sp] = w.existing
+        _record(state, w, system, ident_, "unchanged", path=w.existing, contentHash=chash)
+        return
+
+    type_name = state.type_names.get(w.obj.typeKey, w.typeName)
+    page: FilePage | None = None
+    orig_rel: str | None = None
+    file_obj: str | None = None
+    if o.native:
+        name = PurePosixPath(sp).name
+        if data is not None:
+            page = file_page(name, data)
+            orig_rel = _keep_original(space, state, sp, data)
+            if orig_rel and state.keep_originals == "fileObjects":
+                file_obj = _file_object(space, state, sp, orig_rel, len(data))
+        else:
+            page = FilePage(markdown="", original_only=True)
+            state.originals_large.append(sp)
+        body = _native_body(space, state, w, page, orig_rel, file_obj)
+    else:
+        body = _body(planned, w, src, budget, state)
+    prov = provenance.prov_for(planned.read, o, data, orig_rel)
+    prov.contentHash = chash
+    if page is not None:
+        prov.author = prov.author or page.author
+        prov.created = prov.created or page.created
+        prov.modified = prov.modified or page.modified
+    blk = provenance.block(prov, state.batch, state.imported_at)
+
+    keep_id = created = None
+    if ex_raw is not None:
+        keep_id = ex_raw.fm.get("id") if isinstance(ex_raw.fm.get("id"), str) else None
+        created = ex_raw.fm.get("createdAt") if isinstance(ex_raw.fm.get("createdAt"), str) else None
+    fm = _frontmatter(w, type_name, blk, keep_id, created)
+    new_of = ObjectFile(fm, body, True, None)
+    out = join_object(new_of).encode("utf-8")
+
+    if ex_raw is not None and ex_block is not None:
+        rel = w.existing
+        cur = (space.root / rel).read_bytes()
+        if _edited_since_import(space, rel, state, ex_block):
+            name = f"{len(state.pending) + 1}.md"
+            state.pending[name] = out
+            state.conflicts.append({"path": rel, "title": w.obj.title, "sourcePath": sp})
+            state.written[sp] = rel
+            _record(state, w, system, ident_, "conflict", path=rel, contentHash=chash, pending=f"pending/{name}")
+            return
+        batches.snapshot(space, rel, cur)
+        space._write(rel, None, lambda _of, _fm, o2=new_of: o2, stamp=False, history=False)
+        state.updated += 1
+        state.written[sp] = rel
+        _record(state, w, system, ident_, "updated", path=rel, contentHash=chash,
+                version=version_of((space.root / rel).read_bytes()), original=orig_rel)
+        return
+
+    rel = _place_unique(space, w.obj.targetPath, w.obj.title, out)
+    if rel is None:
+        state.skipped.append(SkippedItem(path=sp, reason="damaged", detail="No free file name"))
+        state.failed_objects.append(sp)
+        _record(state, w, system, ident_, "failed")
+        return
+    state.written[sp] = rel
+    state.objects += 1
+    _record(state, w, system, ident_, "created", path=rel, contentHash=chash, version=version_of(out), original=orig_rel)
+
+
+def _removed_at_source(planned: Planned, space: Space, state: WriteState) -> None:
+    """Objects an earlier batch of this source made whose source item is gone: listed, never trashed."""
+    seen = {provenance.ident(planned.read, o) for o in planned.read.objects}
+    for key, it in state.prior.items.items():
+        if key in seen:
             continue
-        if not placed:
-            state.skipped.append(SkippedItem(path=w.obj.sourcePath, reason="damaged", detail="No free file name"))
-            _step(state, "objects", w.obj.sourcePath)
+        rel = str(it.get("path", ""))
+        with space._lock:
+            raw = space._raw.get(rel)
+        if raw is None or provenance.read_block(raw.fm) is None:
             continue
-        state.written[w.obj.sourcePath] = rel
-        state.objects += 1
-        _step(state, "objects", w.obj.sourcePath)
+        state.removed.append({"path": rel, "title": it.get("title") or rel, "system": key[0], "id": key[1]})
+
+
+_PAGE_FAILS = frozenset({"emptyFile", "damaged", "tooLarge", "unsafePath", "symlink", "encrypted"})
+
+
+def _count(planned: Planned, state: WriteState) -> None:
+    """The reconciling counts (design section 10): source items = imported + updated + unchanged +
+    changed in both + left out + failed."""
+    plan = planned.plan
+    read = planned.read
+    objects = {o.sourcePath for o in read.objects}
+    kept = {w.read.sourcePath for w in planned.writes}
+    unread = {
+        s.path
+        for s in plan.skipped
+        if s.reason in _PAGE_FAILS
+        and not s.path.endswith("/")
+        and s.path not in objects
+        and s.path not in read.files
+        and (s.path.lower().endswith(".md") or read.kind == "files")
+    }
+    left_out = len(objects - kept)
+    not_written = len(planned.writes) - state.processed
+    failed = len(unread) + len(state.failed_objects) + max(not_written, 0)
+    state.counts = {
+        "sourceItems": len(objects) + len(unread),
+        "imported": state.objects,
+        "updated": state.updated,
+        "unchanged": state.unchanged,
+        "changedInBoth": len(state.conflicts),
+        "leftOut": left_out,
+        "failed": failed,
+        "notWritten": max(not_written, 0),
+        "unreadPages": len(unread),
+        "removed": len(state.removed),
+        "originals": state.originals_kept,
+    }
+
+
+def _records(planned: Planned, space: Space, state: WriteState, started: str) -> None:
+    """The batch records (design section 7) in ``.object/imports/<batch>/``."""
+    d = batches.batch_dir(space.root, state.batch)
+    src_kind = planned.plan.kind
+    system = provenance.system_of(planned.read)
+    c = dict(state.counts)
+    c["pending"] = len(state.conflicts)
+    batches.write_json(
+        d / "batch.json",
+        {
+            "id": state.batch,
+            "startedAt": started,
+            "finishedAt": now_stamp(),
+            "source": {"path": planned.plan.sourcePath, "kind": src_kind, "system": system},
+            "target": {"kind": planned.target, "path": str(space.root)},
+            "mapping": planned.mapping.model_dump(),
+            "keepOriginals": state.keep_originals,
+            "counts": c,
+            "stopped": state.stopped,
+            "reportPath": state.report_path,
+            "types": state.types,
+            "attachments": state.attachments,
+            "tags": state.tags,
+        },
+    )
+    batches.write_json(d / "items.json", state.items)
+    batches.write_json(d / "attachments.json", state.attachment_records)
+    batches.write_json(d / "removed.json", state.removed)
+    if state.report_body:
+        atomic_write(d / "report.md", state.report_body.encode("utf-8"))
+    for name, data in state.pending.items():
+        (d / "pending").mkdir(parents=True, exist_ok=True)
+        atomic_write(d / "pending" / name, data)
 
 
 # -- the report ------------------------------------------------------------------------
@@ -393,6 +807,13 @@ def _report(planned: Planned, space: Space, state: WriteState) -> None:
         if (rel := state.written.get(po.sourcePath)) is not None
         and (po.renamedFrom is not None or rel != po.targetPath)
     ]
+    def link_for_path(rel: str) -> str:
+        try:
+            summary = space.get(rel)
+        except (KeyError, ValueError):
+            return rel
+        return f"[[{rel[:-3]}]]" if any(c in summary.title for c in "[]|#\n") else f"[[{summary.title}]]"
+
     body = build_report(
         title=title,
         source_path=planned.plan.sourcePath,
@@ -405,9 +826,20 @@ def _report(planned: Planned, space: Space, state: WriteState) -> None:
         not_converted=planned.not_converted,
         link_for=link_for,
         stopped=state.stopped,
-        not_written=len(planned.writes) - state.objects if state.stopped else 0,
+        not_written=len(planned.writes) - state.processed if state.stopped else 0,
         warnings=planned.plan.warnings,
+        extra={
+            "batch": state.batch,
+            "counts": state.counts,
+            "originals": state.originals_kept,
+            "originalsLarge": state.originals_large,
+            "keep": state.keep_originals,
+            "losses": state.losses,
+            "conflicts": [(link_for_path(c["path"]), c["path"]) for c in state.conflicts],
+            "removed": [(r["title"], r["path"]) for r in state.removed],
+        },
     )
+    state.report_body = body
     stamp = now_stamp()
     fm = set_keys(
         f"type: {yaml_single_quoted(type_name)}\n",

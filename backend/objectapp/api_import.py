@@ -38,9 +38,15 @@ from fastapi.responses import JSONResponse
 
 from .apictx import ApiContext
 from .appstate import state_dir
+from .importers import batches, provenance
 from .importers.detect import read_source
 from .importers.jobs import Busy, JobHandle, Jobs
-from .importers.model import ImportResult, PreviewRequest, StartImportRequest
+from .importers.model import (
+    ImportMapping,
+    ImportResult,
+    PreviewRequest,
+    StartImportRequest,
+)
 from .importers.planner import MappingProblem, Target, plan, to_preview
 from .importers.readmodel import ReadResult
 from .importers.source import LimitExceeded, NotASource, SourceMissing, open_source
@@ -70,6 +76,30 @@ class _Cached:
     read: ReadResult
     at: float
     previews: set[str]
+
+
+def _reuse(space, read) -> dict[str, str]:
+    """M25 re-runs: source path -> the path of the object an earlier import made from it."""
+    index = provenance.index_space(space)
+    if not index:
+        return {}
+    out: dict[str, str] = {}
+    for o in read.objects:
+        hit = index.get(provenance.ident(read, o))
+        if hit is not None:
+            out[o.sourcePath] = hit.path
+    return out
+
+
+def _last_mapping(space, source_path: str) -> ImportMapping | None:
+    """The mapping the last finished import of this source used (design section 5)."""
+    prior = batches.load_prior(space.root, source_path)
+    if not prior.mapping:
+        return None
+    try:
+        return ImportMapping.model_validate(prior.mapping)
+    except ValueError:
+        return None
 
 
 def _within(child: Path, parent: Path) -> bool:
@@ -136,8 +166,19 @@ def router(ctx: ApiContext) -> APIRouter:
         finally:
             src.close()
         target = Target("currentSpace", ctx.space) if req.target == "currentSpace" else Target("newSpace")
+        reuse: dict[str, str] = {}
+        mapping = req.mapping
+        if req.target == "currentSpace":
+            reuse = _reuse(ctx.space, c.read)
+            if mapping is None:
+                mapping = _last_mapping(ctx.space, c.read.sourcePath)
         try:
-            planned = plan(c.read, req.mapping, target)
+            try:
+                planned = plan(c.read, mapping, target, reuse=reuse)
+            except MappingProblem:
+                if mapping is req.mapping:
+                    raise
+                planned = plan(c.read, None, target, reuse=reuse)  # the remembered mapping no longer fits
         except MappingProblem as exc:
             return _error(422, str(exc))
         preview_id = secrets.token_hex(8)
@@ -157,7 +198,7 @@ def router(ctx: ApiContext) -> APIRouter:
             return _error(409, "Another import is running.")
         source = Path(read.sourcePath)
         source_folder = source if read.container == "folder" else source.parent
-        if req.target.kind == "newSpace":
+        if req.target.kind in ("newSpace", "spaceCopy"):
             name = req.target.name.strip()
             if not name:
                 return _error(422, "A space needs a name.")
@@ -174,7 +215,9 @@ def router(ctx: ApiContext) -> APIRouter:
                 return _error(409, "A file or folder with this name already exists there.")
             if read.container == "folder" and _within(target_path, source):
                 return _error(422, "The new space can't be inside the folder being imported.")
-            target = Target("newSpace")
+            if req.target.kind == "spaceCopy" and _within(target_path, ctx.space.root):
+                return _error(422, "The copy can't be inside this space.")
+            target = Target("newSpace") if req.target.kind == "newSpace" else Target("currentSpace", ctx.space)
         else:
             target_path = ctx.space.root
             if _within(source, target_path) or (read.container == "folder" and _within(target_path, source_folder)):
@@ -188,8 +231,9 @@ def router(ctx: ApiContext) -> APIRouter:
             fingerprint = ""
         if fingerprint != read.fingerprint:
             return _error(409, "The source changed since the preview. Preview it again.")
+        reuse = _reuse(ctx.space, read) if target.kind == "currentSpace" else {}
         try:
-            planned = plan(read, req.mapping, target)
+            planned = plan(read, req.mapping, target, reuse=reuse)
         except MappingProblem as exc:
             return _error(422, str(exc))
         try:
@@ -200,18 +244,22 @@ def router(ctx: ApiContext) -> APIRouter:
             if reads.get(c.key) is c:
                 reads.pop(c.key, None)
 
-        if req.target.kind == "newSpace":
+        if req.target.kind in ("newSpace", "spaceCopy"):
             space_name, where = req.target.name.strip(), str(location)
+            is_copy = req.target.kind == "spaceCopy"
 
             def work(h: JobHandle) -> ImportResult:
                 src = open_checked(planned)  # before the space is made: a source gone leaves nothing
                 try:
-                    folder = create_space(space_name, where, "blank")
+                    if is_copy:  # M25 "Try on a copy of this space"
+                        folder = batches.copy_space(ctx.space.root, target_path)
+                    else:
+                        folder = create_space(space_name, where, "blank")
                 except BaseException:
                     src.close()
                     raise
                 try:
-                    state = WriteState(progress=h.progress, cancelled=h.cancelled)
+                    state = WriteState(progress=h.progress, cancelled=h.cancelled, keep_originals=req.keepOriginals)
                     result = write_import(planned, Space(folder), state, src)
                 finally:
                     try:
@@ -225,7 +273,7 @@ def router(ctx: ApiContext) -> APIRouter:
         else:
 
             def work(h: JobHandle) -> ImportResult:
-                state = WriteState(progress=h.progress, cancelled=h.cancelled)
+                state = WriteState(progress=h.progress, cancelled=h.cancelled, keep_originals=req.keepOriginals)
                 try:
                     result = write_import(planned, ctx.space, state)
                 finally:
@@ -241,6 +289,10 @@ def router(ctx: ApiContext) -> APIRouter:
 
         jobs.run(handle, work)
         return {"jobId": handle.job.id, "targetPath": str(target_path)}
+
+    from .api_import_batches import router as batches_router
+
+    r.include_router(batches_router(ctx, jobs, announce_resync))
 
     @r.get("/import/jobs/{job_id}")
     def get_job(job_id: str):
