@@ -38,7 +38,7 @@ from fastapi.responses import JSONResponse
 
 from .apictx import ApiContext
 from .appstate import state_dir
-from .importers import batches, provenance
+from .importers import agentwire, batches, provenance
 from .importers.detect import read_source
 from .importers.jobs import Busy, JobHandle, Jobs
 from .importers.model import (
@@ -145,7 +145,7 @@ def router(ctx: ApiContext) -> APIRouter:
     @r.post("/import/preview")
     def post_preview(req: PreviewRequest):
         try:
-            src = open_source(req.source.path)
+            src = open_source(req.source.path, req.leaveOut)
         except SourceMissing:
             return _error(404, "There is no file or folder at this path.")
         except NotASource as exc:
@@ -153,7 +153,7 @@ def router(ctx: ApiContext) -> APIRouter:
         except LimitExceeded as exc:
             return _error(413, str(exc))
         try:
-            key = (str(src.path), req.source.kind, src.fingerprint)
+            key = (str(src.path), req.source.kind, src.fingerprint + "|" + "\x00".join(req.leaveOut))
             with lock:
                 expire()
                 c = reads.get(key)
@@ -162,6 +162,8 @@ def router(ctx: ApiContext) -> APIRouter:
                     read = read_source(src, req.source.kind)
                 except LimitExceeded as exc:
                     return _error(413, str(exc))
+                read.leave_out = list(req.leaveOut)
+                read.left_out = list(src.left_out)
                 c = _Cached(key, read, time.monotonic(), set())
         finally:
             src.close()
@@ -225,17 +227,30 @@ def router(ctx: ApiContext) -> APIRouter:
             target = Target("currentSpace", ctx.space)
         # The source must still be what was previewed.
         try:
-            with open_source(read.sourcePath) as src:
+            with open_source(read.sourcePath, read.leave_out) as src:
                 fingerprint = src.fingerprint
         except (SourceMissing, NotASource, LimitExceeded):
             fingerprint = ""
         if fingerprint != read.fingerprint:
             return _error(409, "The source changed since the preview. Preview it again.")
+        if req.batch:
+            try:
+                bdata, _items = batches.load_batch(ctx.space.root, req.batch)
+            except KeyError:
+                return _error(404, "No such import batch.")
+            if bdata.get("state") != "draft":
+                return _error(409, "That batch has already been imported.")
+        read = agentwire.apply_leave_out(read, req)
         reuse = _reuse(ctx.space, read) if target.kind == "currentSpace" else {}
         try:
             planned = plan(read, req.mapping, target, reuse=reuse)
         except MappingProblem as exc:
             return _error(422, str(exc))
+        if req.requireApproved and req.target.kind != "newSpace":
+            names = agentwire.unapproved_types(planned, ctx.space.root, req.batch)
+            if names:
+                return _error(422, "The mapping would create types no approved schema proposal creates: "
+                                   + ", ".join(sorted(names)) + ". Save a proposal and ask the user to approve and apply it in Object.")
         try:
             handle = jobs.reserve(str(target_path))
         except Busy as exc:
@@ -260,6 +275,7 @@ def router(ctx: ApiContext) -> APIRouter:
                     raise
                 try:
                     state = WriteState(progress=h.progress, cancelled=h.cancelled, keep_originals=req.keepOriginals)
+                    agentwire.prepare(state, read, req, Path(folder), ctx.space.root)
                     result = write_import(planned, Space(folder), state, src)
                 finally:
                     try:
@@ -274,6 +290,7 @@ def router(ctx: ApiContext) -> APIRouter:
 
             def work(h: JobHandle) -> ImportResult:
                 state = WriteState(progress=h.progress, cancelled=h.cancelled, keep_originals=req.keepOriginals)
+                agentwire.prepare(state, read, req, ctx.space.root, ctx.space.root)
                 try:
                     result = write_import(planned, ctx.space, state)
                 finally:
@@ -293,6 +310,11 @@ def router(ctx: ApiContext) -> APIRouter:
     from .api_import_batches import router as batches_router
 
     r.include_router(batches_router(ctx, jobs, announce_resync))
+    from .api_import_agent import router as agent_router
+
+    agent = agent_router(ctx, jobs, announce_resync)
+    r.filing = agent.filing  # type: ignore[attr-defined]
+    r.include_router(agent)
 
     @r.get("/import/jobs/{job_id}")
     def get_job(job_id: str):

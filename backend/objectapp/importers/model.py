@@ -129,6 +129,8 @@ class PreviewRequest(BaseModel):
     mapping: ImportMapping | None = None
     target: Literal["newSpace", "currentSpace"] = "newSpace"
     """Which target the preview is for: ``currentSpace`` matches types and titles against the open space."""
+    leaveOut: list[str] = Field(default_factory=list)
+    """M27: "Leave out" folders and patterns (design section 6): matching files are never read."""
 
 
 class NewSpaceTarget(BaseModel):
@@ -155,6 +157,17 @@ ImportTarget = Annotated[NewSpaceTarget | CurrentSpaceTarget | SpaceCopyTarget, 
 KeepOriginals = Literal["attachments", "fileObjects"]
 
 
+class ScanChoices(BaseModel):
+    """What the wizard's scan step hands to the import (design section 6)."""
+
+    leaveOut: list[str] = Field(default_factory=list)
+    """Folders and patterns never read."""
+    leaveOutFiles: list[str] = Field(default_factory=list)
+    """Flagged source paths not imported."""
+    excludeFromAi: list[str] = Field(default_factory=list)
+    """Flagged source paths imported with ``excludeFromAI: true``."""
+
+
 class StartImportRequest(BaseModel):
     previewId: str
     mapping: ImportMapping
@@ -162,6 +175,12 @@ class StartImportRequest(BaseModel):
     clientId: str | None = None
     keepOriginals: KeepOriginals = "attachments"
     """M25: keep each non-Markdown original as an attachment (default) or as a File object."""
+    batch: str | None = None
+    """M27: a draft batch (scan, schema proposal) this import adopts; the run is that batch."""
+    scan: ScanChoices | None = None
+    """M27: the scan step's choices (absent: nothing left out, nothing flagged is excluded)."""
+    requireApproved: bool = False
+    """M27: refuse a mapping that makes a type no approved proposal makes (the MCP start sets it)."""
 
 
 # -- API: responses -----------------------------------------------------------------

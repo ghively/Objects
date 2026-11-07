@@ -175,6 +175,11 @@ def _extra_sections(extra: dict, obj: Callable[[str], str]) -> list[str]:
             "Changed in both",
             [f"- {link}: changed at the source and edited in Object; choose Take source or Keep mine" for link, _p in conflicts],
         )
+    scanned = extra.get("scan") or {}
+    if scanned.get("leftOut") or scanned.get("excluded"):
+        lines = [f"- {code(f)}: left out, not read or imported" for f in scanned.get("leftOut", [])]
+        lines += [f"- {code(f)}: imported, excluded from AI (the scan flagged it)" for f in scanned.get("excluded", [])]
+        out += _section("Sensitive content scan", lines)
     removed = extra.get("removed") or []
     if removed or extra.get("counts", {}).get("removed"):
         out += _section(

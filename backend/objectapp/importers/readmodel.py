@@ -107,6 +107,10 @@ class ReadResult:
     defaultTypeKey: str | None = None
     entity_items: Callable[[str, str, bool], list[tuple[str | None, str]]] | None = None
     """(cell or value text, the linking page, cells?) -> [(target source path or None, text)]."""
+    leave_out: list[str] = field(default_factory=list)
+    """M27: the "Leave out" patterns the source was listed with."""
+    left_out: list[str] = field(default_factory=list)
+    """M27: source files those patterns matched (never listed, never read)."""
 
 
 class SourceIndex:

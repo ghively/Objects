@@ -119,6 +119,11 @@ class WriteState:
     taken: dict[str, set[str]] = field(default_factory=dict)
     counts: dict[str, int] = field(default_factory=dict)
     report_body: str = ""
+    # -- M27: the scan's choices --
+    exclude_ai: set[str] = field(default_factory=set)
+    """Source paths written with ``excludeFromAI: true``."""
+    left_out_files: list[str] = field(default_factory=list)
+    """Source paths left out (by pattern or by choice): never read or imported."""
 
     @property
     def wrote_anything(self) -> bool:
@@ -491,7 +496,7 @@ def _native_body(
 
 
 def _frontmatter(w: Any, type_name: str, block: dict[str, Any] | None = None, keep_id: str | None = None,
-                 created: str | None = None) -> str:
+                 created: str | None = None, exclude_ai: bool = False) -> str:
     fm = set_keys(
         f"type: {yaml_single_quoted(type_name)}\n",
         {"title": w.obj.title},
@@ -508,6 +513,8 @@ def _frontmatter(w: Any, type_name: str, block: dict[str, Any] | None = None, ke
         values["description"] = w.description
     values["createdAt"] = created or w.createdAt
     values["lastUpdated"] = w.lastUpdated
+    if exclude_ai:
+        values["excludeFromAI"] = True
     if block:
         values[provenance.BLOCK_KEY] = block
     return set_keys(fm, values)
@@ -655,7 +662,7 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
     if ex_raw is not None:
         keep_id = ex_raw.fm.get("id") if isinstance(ex_raw.fm.get("id"), str) else None
         created = ex_raw.fm.get("createdAt") if isinstance(ex_raw.fm.get("createdAt"), str) else None
-    fm = _frontmatter(w, type_name, blk, keep_id, created)
+    fm = _frontmatter(w, type_name, blk, keep_id, created, exclude_ai=sp in state.exclude_ai)
     new_of = ObjectFile(fm, body, True, None)
     out = join_object(new_of).encode("utf-8")
 
@@ -721,11 +728,11 @@ def _count(planned: Planned, state: WriteState) -> None:
         and s.path not in read.files
         and (s.path.lower().endswith(".md") or read.kind == "files")
     }
-    left_out = len(objects - kept)
+    left_out = len(objects - kept) + len(state.left_out_files)
     not_written = len(planned.writes) - state.processed
     failed = len(unread) + len(state.failed_objects) + max(not_written, 0)
     state.counts = {
-        "sourceItems": len(objects) + len(unread),
+        "sourceItems": len(objects) + len(unread) + len(state.left_out_files),
         "imported": state.objects,
         "updated": state.updated,
         "unchanged": state.unchanged,
@@ -762,6 +769,8 @@ def _records(planned: Planned, space: Space, state: WriteState, started: str) ->
             "types": state.types,
             "attachments": state.attachments,
             "tags": state.tags,
+            "leftOutFiles": sorted(state.left_out_files),
+            "excludedFromAi": sorted(state.exclude_ai),
         },
     )
     batches.write_json(d / "items.json", state.items)
@@ -837,6 +846,7 @@ def _report(planned: Planned, space: Space, state: WriteState) -> None:
             "losses": state.losses,
             "conflicts": [(link_for_path(c["path"]), c["path"]) for c in state.conflicts],
             "removed": [(r["title"], r["path"]) for r in state.removed],
+            "scan": {"leftOut": sorted(state.left_out_files), "excluded": sorted(state.exclude_ai)},
         },
     )
     state.report_body = body
