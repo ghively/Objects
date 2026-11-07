@@ -154,28 +154,68 @@ def load_prior(space_root: Path | str, source_path: str, *, exclude: str | None 
 # -- Move batch to Trash -----------------------------------------------------------------------
 
 
+def _batch_objects(space: Space, batch: str) -> dict[tuple[str, str], str]:
+    """(system, id) -> current path, for every object whose provenance names ``batch``."""
+    from . import provenance
+
+    with space._lock:
+        raws = list(space._raw.values())
+    out: dict[tuple[str, str], str] = {}
+    for raw in raws:
+        b = provenance.read_block(raw.fm)
+        if b is not None and b.get("batch") == batch:
+            out.setdefault((str(b["system"]), str(b["id"])), raw.path)
+    return out
+
+
 def trash_batch(space: Space, batch: str) -> dict[str, Any]:
     """Move every object the batch created (not ones it only updated) to the Trash.
 
-    Answers ``{trashed, missing}`` (missing: already gone). Restorable as any Trash item."""
+    Each object is found by its provenance (source id and batch), so one that was moved since (a
+    type change, a rename) is found too; the recorded path is the first guess. Answers ``{trashed,
+    alreadyTrashed, missing, notFound}``: ``notFound`` lists recorded paths with no object (and not
+    in the Trash); the batch is stamped ``trashedAt`` only when none is missing, and a second call
+    skips what is already done. Restorable as any Trash item."""
+    from . import provenance
+
     root = space.root
     data, items = load_batch(root, batch)
-    trashed = missing = 0
+    by_id = _batch_objects(space, batch)
+    in_trash = {t.originalPath for t in space.list_trash() if t.kind == "object"}
+    trashed = already = 0
+    not_found: list[str] = []
     for it in items:
         if it.get("action") != "created" or not it.get("path"):
             continue
+        recorded = str(it["path"])
+        key = (str(it.get("system")), str(it.get("id")))
+        with space._lock:
+            raw = space._raw.get(recorded)
+        block = provenance.read_block(raw.fm) if raw is not None else None
+        if raw is not None and (block is None or (str(block["system"]), str(block["id"])) == key):
+            rel: str | None = recorded
+        else:
+            rel = by_id.get(key)  # moved: found by the source id and batch it carries
+        if rel is None:
+            if recorded in in_trash:
+                already += 1
+                it["action"] = "trashed"
+            else:
+                not_found.append(recorded)
+            continue
         try:
-            space.delete_object(str(it["path"]))
+            space.delete_object(rel)
         except (KeyError, FileNotFoundError):
-            missing += 1
+            not_found.append(recorded)
             continue
         it["action"] = "trashed"
         trashed += 1
-    data["trashedAt"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    if not not_found:
+        data["trashedAt"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     d = batch_dir(root, batch)
     write_json(d / "items.json", items)
     write_json(d / "batch.json", data)
-    return {"trashed": trashed, "missing": missing}
+    return {"trashed": trashed, "alreadyTrashed": already, "missing": len(not_found), "notFound": not_found}
 
 
 # -- Changed in both: Take source / Keep mine ---------------------------------------------------
