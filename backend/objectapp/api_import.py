@@ -233,6 +233,7 @@ def router(ctx: ApiContext) -> APIRouter:
             fingerprint = ""
         if fingerprint != read.fingerprint:
             return _error(409, "The source changed since the preview. Preview it again.")
+        draft_patterns: list[str] = []
         if req.batch:
             try:
                 bdata, _items = batches.load_batch(ctx.space.root, req.batch)
@@ -240,10 +241,12 @@ def router(ctx: ApiContext) -> APIRouter:
                 return _error(404, "No such import batch.")
             if bdata.get("state") != "draft":
                 return _error(409, "That batch has already been imported.")
-        read = agentwire.apply_leave_out(read, req)
+            draft_patterns = [str(x) for x in bdata.get("leaveOut") or []]
+        previewed = read
+        read = agentwire.apply_leave_out(read, req, draft_patterns)
         reuse = _reuse(ctx.space, read) if target.kind == "currentSpace" else {}
         try:
-            planned = plan(read, req.mapping, target, reuse=reuse)
+            planned = plan(read, req.mapping, target, reuse=reuse, lenient=read is not previewed)
         except MappingProblem as exc:
             return _error(422, str(exc))
         if req.requireApproved and req.target.kind != "newSpace":

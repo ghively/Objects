@@ -664,7 +664,9 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
     if ex_raw is not None:
         keep_id = ex_raw.fm.get("id") if isinstance(ex_raw.fm.get("id"), str) else None
         created = ex_raw.fm.get("createdAt") if isinstance(ex_raw.fm.get("createdAt"), str) else None
-    fm = _frontmatter(w, type_name, blk, keep_id, created, exclude_ai=sp in state.exclude_ai)
+    # A re-run never drops the flag: once an object is excluded from AI it stays so.
+    kept_flag = ex_raw is not None and ex_raw.fm.get("excludeFromAI") is True
+    fm = _frontmatter(w, type_name, blk, keep_id, created, exclude_ai=sp in state.exclude_ai or kept_flag)
     new_of = ObjectFile(fm, body, True, None)
     out = join_object(new_of).encode("utf-8")
 
