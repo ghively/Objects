@@ -120,6 +120,8 @@ class WriteState:
     counts: dict[str, int] = field(default_factory=dict)
     report_body: str = ""
     # -- M27: the scan's choices --
+    file_index: Any = None
+    """Provenance index of the space for File objects (made on first use)."""
     exclude_ai: set[str] = field(default_factory=set)
     """Source paths written with ``excludeFromAI: true``."""
     left_out_files: list[str] = field(default_factory=list)
@@ -324,6 +326,27 @@ def _put(state: WriteState, folder: Path, name: str, data: bytes) -> str:
     raise OSError("No free file name")
 
 
+def _put_once(state: WriteState, folder: Path, name: str, data: bytes) -> tuple[str, bool]:
+    """Like `_put`, but a file of the same name family (``name``, ``name (2)``...) with exactly these
+    bytes is reused instead of written again. Returns (name, written)."""
+    stem, dot, ext = name.rpartition(".")
+    if not dot:
+        stem, ext = name, ""
+    family = re.compile(re.escape(stem) + r"(?: \(\d+\))?" + (r"\." + re.escape(ext) if ext else "") + r"$", re.I)
+    try:
+        existing = sorted(n for n in os.listdir(folder) if family.match(n))
+    except FileNotFoundError:
+        existing = []
+    for n in existing:
+        full = folder / n
+        try:
+            if full.is_file() and full.stat().st_size == len(data) and full.read_bytes() == data:
+                return n, False
+        except OSError:
+            continue
+    return _put(state, folder, name, data), True
+
+
 def _attachments(planned: Planned, space: Space, state: WriteState, src: Source) -> None:
     state.progress("attachments", state.done, state.total, None)
     folder = space.root / "Attachments"
@@ -379,7 +402,7 @@ def _keep_original(space: Space, state: WriteState, sp: str, data: bytes) -> str
     if f"{stem}{ext}".lower().endswith((BOARD_SUFFIX, INK_SUFFIX)):
         stem += " file"
     try:
-        written = _put(state, space.root / ORIGINALS, f"{stem}{ext}", data)
+        written, _new = _put_once(state, space.root / ORIGINALS, f"{stem}{ext}", data)  # the same bytes: kept already
     except OSError as exc:
         state.skipped.append(SkippedItem(path=sp, reason="damaged", detail=f"The original couldn't be kept: {exc}"[:200]))
         return None
@@ -404,10 +427,41 @@ def _place_unique(space: Space, rel: str, title: str, data: bytes) -> str | None
     return None
 
 
-def _file_object(space: Space, state: WriteState, sp: str, orig_rel: str, size: int) -> str | None:
+def _file_object(space: Space, state: WriteState, sp: str, orig_rel: str, size: int, scope: str | None,
+                 chash: str) -> str | None:
     """"Keep originals as File objects": a File/PDF/Image object for the original (its ``source`` is
-    the kept file). Its space path, or None."""
+    the kept file). Its space path, or None. It carries an ``importSource`` block (system ``files``,
+    id ``<source path>#original``), so a re-run finds it again and updates it instead of adding another."""
     name = PurePosixPath(orig_rel).name
+    ident_ = f"{sp}#original"
+    values = {"system": "files", "id": ident_, "source": scope, "original": orig_rel, "contentHash": chash,
+              "batch": state.batch, "importedAt": state.imported_at}
+    blk = {k: v for k, v in values.items() if v not in (None, "")}
+    if state.file_index is None:
+        state.file_index = provenance.index_space(space)
+    ex = next((e for e in state.file_index.get(("files", ident_), [])
+               if e.block.get("source") in (None, scope)), None)
+    if ex is not None:
+        with space._lock:
+            raw = space._raw.get(ex.path)
+        if raw is not None:
+            if ex.block.get("contentHash") == chash and raw.fm.get("source") == orig_rel:
+                state.items.append({"sourcePath": f"{sp}#original", "title": name, "path": ex.path, "action": "unchanged",
+                                    "system": "files", "id": ident_, "contentHash": chash})
+                return ex.path
+
+            def edit(of: Any, _fm: Any) -> Any:
+                from dataclasses import replace
+
+                src = set_keys(of.frontmatter_src or "", {"source": orig_rel, "fileSize": size, "lastUpdated": now_stamp(),
+                                                          provenance.BLOCK_KEY: blk})
+                return replace(of, frontmatter_src=src)
+
+            batches.snapshot(space, ex.path, (space.root / ex.path).read_bytes())
+            space._write(ex.path, None, edit, stamp=False, history=False)
+            state.items.append({"sourcePath": f"{sp}#original", "title": name, "path": ex.path, "action": "updated",
+                                "system": "files", "id": ident_, "contentHash": chash})
+            return ex.path
     type_name = _MEDIA_TYPE_NAMES[kind_of(name)]
     t = space.type_by_id(space._type_id(type_name))
     if t is None:
@@ -424,6 +478,7 @@ def _file_object(space: Space, state: WriteState, sp: str, orig_rel: str, size: 
             "source": orig_rel,
             "createdAt": stamp,
             "lastUpdated": stamp,
+            provenance.BLOCK_KEY: blk,
         },
         insert_first={"id": new_ulid()},
     )
@@ -432,7 +487,8 @@ def _file_object(space: Space, state: WriteState, sp: str, orig_rel: str, size: 
     if rel is None:
         return None
     state.items.append(
-        {"sourcePath": f"{sp}#original", "title": name, "path": rel, "action": "created", "system": "files", "id": f"{sp}#original"}
+        {"sourcePath": f"{sp}#original", "title": name, "path": rel, "action": "created", "system": "files", "id": ident_,
+         "contentHash": chash}
     )
     return rel
 
@@ -450,11 +506,11 @@ def _place_images(space: Space, state: WriteState, md: str, images: list[Any], s
         except ValueError:
             stem, ext = "image", PurePosixPath(name).suffix.lower()
         try:
-            written = _put(state, folder, f"{stem}{ext}", data)
+            written, new = _put_once(state, folder, f"{stem}{ext}", data)
         except OSError as exc:
             state.skipped.append(SkippedItem(path=sp, reason="damaged", detail=f"An image couldn't be kept: {exc}"[:200]))
             continue
-        state.attachments += 1
+        state.attachments += 1 if new else 0
         final = markdown.encode_markdown_path(f"Attachments/{written}")
         pattern = r"(!\[[^\]]*\]\()\s*<?" + re.escape(name) + r">?(\s*(?:\"[^\"]*\")?\))"
         md = re.sub(pattern, lambda m, f=final: m.group(1) + f + m.group(2), md)
@@ -645,7 +701,7 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
             page = file_page(name, data)
             orig_rel = _keep_original(space, state, sp, data)
             if orig_rel and state.keep_originals == "fileObjects":
-                file_obj = _file_object(space, state, sp, orig_rel, len(data))
+                file_obj = _file_object(space, state, sp, orig_rel, len(data), provenance.scope(planned.read, o), chash)
         else:
             page = FilePage(markdown="", original_only=True)
             state.originals_large.append(sp)
@@ -702,9 +758,12 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
 def _removed_at_source(planned: Planned, space: Space, state: WriteState) -> None:
     """Objects an earlier batch of this source made whose source item is gone: listed, never trashed."""
     seen = {provenance.ident(planned.read, o) for o in planned.read.objects}
+    present = {o.sourcePath for o in planned.read.objects}
     for key, it in state.prior.items.items():
         if key in seen:
             continue
+        if key[1].endswith("#original") and key[1][: -len("#original")] in present:
+            continue  # the File object of an original that is still at the source
         rel = str(it.get("path", ""))
         with space._lock:
             raw = space._raw.get(rel)

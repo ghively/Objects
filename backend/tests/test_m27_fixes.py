@@ -341,3 +341,105 @@ def test_trash_batch_complete_is_stamped(client, tmp_path):
     out = client.post(f"/api/import/batches/{result['batch']}/trash").json()
     assert out["trashed"] == 1 and out["notFound"] == []
     assert batches.load_batch(client.space_root, result["batch"])[0]["trashedAt"]
+
+
+# -- 9. a re-run adds no duplicate originals, images or File objects ---------------------------------
+
+
+def _files(root: Path, folder: str) -> list[str]:
+    d = root / folder
+    return sorted(p.name for p in d.iterdir()) if d.is_dir() else []
+
+
+def test_rerun_with_a_change_adds_no_duplicate_images_or_originals(client, tmp_path, monkeypatch):
+    from test_m25_provenance import make_files
+
+    fake_readers(monkeypatch)
+    src = make_files(tmp_path)
+    root = client.space_root
+    run(client, src)
+    assert "image1.png" in _files(root, "Attachments")
+    (src / "Runbooks" / "DNS.docx").write_bytes(b"PK-docx-bytes-v2")
+    res = run(client, src)["result"]
+    assert res["updated"] == 1
+    assert _files(root, "Attachments") .count("image1 (2).png") == 0  # same bytes: the image is reused
+    assert sorted(_files(root, "Attachments/Originals")) == ["DNS (2).docx", "DNS.docx", "Manual.pdf", "Network.vsdx", "Broken.boom"] \
+        or len([n for n in _files(root, "Attachments/Originals") if n.startswith("DNS")]) == 2
+    assert (root / "Attachments/Originals/DNS.docx").read_bytes() == b"PK-docx-bytes"  # the old original is untouched
+
+
+def test_conflicting_reruns_write_the_original_once(client, tmp_path, monkeypatch):
+    from test_m25_provenance import blocks, make_files
+
+    fake_readers(monkeypatch)
+    src = make_files(tmp_path)
+    root = client.space_root
+    run(client, src)
+    page = next(r for r, b in blocks(root).items() if b["id"] == "01ABC")
+    version = Space(root).read(page)[2]
+    assert client.put("/api/object/body", json={"path": page, "body": "# DNS\n\nmine\n", "baseVersion": version}).status_code == 200
+    (src / "Runbooks" / "DNS.docx").write_bytes(b"PK-docx-bytes-v2")
+    first = run(client, src)["result"]
+    second = run(client, src)["result"]
+    assert first["changedInBoth"] == 1 and second["changedInBoth"] == 1
+    assert [n for n in _files(root, "Attachments/Originals") if n.startswith("DNS")] == ["DNS (2).docx", "DNS.docx"]
+    assert "image1 (2).png" not in _files(root, "Attachments")
+
+
+def test_file_objects_match_on_a_rerun(client, tmp_path, monkeypatch):
+    from test_m25_provenance import make_files
+
+    fake_readers(monkeypatch)
+    src = make_files(tmp_path)
+    root = client.space_root
+    run(client, src, keepOriginals="fileObjects")
+
+    def file_objects():
+        return [o for o in client.get("/api/objects").json() if o["title"] == "DNS.docx"]
+
+    assert len(file_objects()) == 1
+    run(client, src, keepOriginals="fileObjects")
+    assert len(file_objects()) == 1
+    (src / "Runbooks" / "DNS.docx").write_bytes(b"PK-docx-bytes-v2")
+    run(client, src, keepOriginals="fileObjects")
+    objs = file_objects()
+    assert len(objs) == 1  # the same File object, now pointing at the new original
+    assert _fm(root, objs[0]["path"])["source"] == "Attachments/Originals/DNS (2).docx"
+    assert (_fm(root, objs[0]["path"]).get("importSource") or {}).get("system") == "files"
+
+
+def test_originals_are_byte_exact(client, tmp_path, monkeypatch):
+    from test_m25_provenance import no_readers
+
+    no_readers(monkeypatch)
+    src = tmp_path / "Lib"
+    src.mkdir()
+    raw = b"\xef\xbb\xbfline one\r\nline two\r\n\xff"
+    (src / "notes.bin").write_bytes(raw)
+    (src / "Doc.docx").write_bytes(b"PK\r\n\x00\x01")
+    root = client.space_root
+    run(client, src, kind="files")
+    run(client, src, kind="files")
+    assert (root / "Attachments/Originals/notes.bin").read_bytes() == raw
+    assert (root / "Attachments/Originals/Doc.docx").read_bytes() == b"PK\r\n\x00\x01"
+    assert not [n for n in _files(root, "Attachments/Originals") if "(2)" in n]
+
+
+def test_take_source_keeps_the_files_crlf_and_bom(client, tmp_path):
+    from test_m25_provenance import blocks
+
+    src = tmp_path / "S"
+    src.mkdir()
+    (src / "a.md").write_text("# a\n\nversion one\n", encoding="utf-8")
+    root = client.space_root
+    run(client, src, kind="obsidian")
+    page = next(r for r, b in blocks(root).items() if b["id"] == "a.md")
+    raw = (root / page).read_bytes()
+    (root / page).write_bytes(b"\xef\xbb\xbf" + raw.replace(b"\n", b"\r\n") + b"mine\r\n")  # edited in a CRLF + BOM editor
+    (src / "a.md").write_text("# a\n\nversion two\n", encoding="utf-8")
+    res = run(client, src, kind="obsidian")["result"]
+    assert res["changedInBoth"] == 1
+    client.post(f"/api/import/batches/{res['batch']}/resolve", json={"action": "take", "paths": [page]})
+    out = (root / page).read_bytes()
+    assert b"version two" in out
+    assert out.startswith(b"\xef\xbb\xbf") and b"\r\n" in out and b"\n" not in out.replace(b"\r\n", b"")
