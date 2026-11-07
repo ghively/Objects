@@ -19,6 +19,10 @@ const SYSTEM: { key: string; name: string; kind: PropertyType }[] = [
   { key: 'collections', name: 'Collections', kind: 'entity_collections' },
   { key: 'createdAt', name: 'Created at', kind: 'entity_createdAt' },
   { key: 'lastUpdated', name: 'Last updated', kind: 'entity_lastUpdated' },
+  // M25: where an imported object came from (read from its `importSource` block; the rows carry them).
+  { key: 'importedFrom', name: 'Imported from', kind: 'text' },
+  { key: 'importBatch', name: 'Import batch', kind: 'text' },
+  { key: 'sourceModified', name: 'Source modified', kind: 'text' },
 ]
 
 /** One choice per key across `viewTypes`; a key found in only one of several types carries its `structureId`. */

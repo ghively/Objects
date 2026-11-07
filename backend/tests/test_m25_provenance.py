@@ -495,3 +495,17 @@ def test_notion_rerun_is_idempotent(client, tmp_path):
     second = run(client, z)["result"]
     assert second["objects"] == 0 and second["unchanged"] == first["objects"], (first, second)
     reconciles(second)
+
+
+def test_reveal_original(client, tmp_path, monkeypatch):
+    no_readers(monkeypatch)
+    from objectapp import server
+
+    seen = []
+    monkeypatch.setattr(server, "reveal_in_file_manager", lambda p: seen.append(p))
+    src = make_files(tmp_path)
+    run(client, src)
+    r = client.post("/api/import/original/reveal", json={"path": "Attachments/Originals/DNS.docx"})
+    assert r.status_code == 200 and seen and seen[0].name == "DNS.docx"
+    assert client.post("/api/import/original/reveal", json={"path": "../x"}).status_code == 404
+    assert client.post("/api/import/original/reveal", json={"path": "Pages/Import report.md"}).status_code == 404

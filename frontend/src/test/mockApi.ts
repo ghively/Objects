@@ -1019,6 +1019,15 @@ function defaults(): Api {
       error: null,
     }),
     cancelImport: async () => ({ ok: true }),
+    // M25
+    importBatches: async () => [],
+    importBatch: async (id: string) => ({
+      batch: { id, startedAt: '', source: { path: '', kind: '', system: '' }, counts: {} },
+      items: [],
+    }),
+    trashImportBatch: async () => ({ trashed: 0, missing: 0 }),
+    resolveImportBatch: async () => ({ resolved: [], failed: [], pending: 0 }),
+    revealImportOriginal: async () => ({ ok: true }),
     // M14
     automations: async () => [],
     automation: async (id: string) => automationRule({ id }),

@@ -12,7 +12,13 @@ export const IMPORT_TEXT = {
   source: 'Zip file or folder',
   sourcePlaceholder: 'Full path of the .zip file or folder',
   kind: 'Exported from',
-  kinds: { auto: 'Detect automatically', notion: 'Notion', obsidian: 'Obsidian', anytype: 'Anytype' } as Record<
+  kinds: {
+    auto: 'Detect automatically',
+    notion: 'Notion',
+    obsidian: 'Obsidian',
+    anytype: 'Anytype',
+    files: 'Files (a folder, with an optional _manifest.jsonl)',
+  } as Record<
     ImportSourceKind | 'auto',
     string
   >,
@@ -122,6 +128,37 @@ export const IMPORT_TEXT = {
     `${plural(r.objects, 'object', 'objects')}, ${plural(r.types, 'type', 'types')}, ` +
     `${plural(r.attachments, 'attachment', 'attachments')}, ${plural(r.tags, 'tag', 'tags')}`,
   resultSkipped: (n: number) => `${plural(n, 'item was', 'items were')} skipped; the Import report lists them.`,
+
+  // M25: originals, scratch copy, batches, re-runs (our strings).
+  keepOriginals: 'Keep originals as',
+  keepAttachments: 'Attachments',
+  keepFileObjects: 'File objects',
+  keepOriginalsNote:
+    'Each file that is not Markdown is kept untouched in Attachments/Originals. File objects also make a File, PDF or Image object for each.',
+  tryCopy: 'Try on a copy of this space',
+  tryCopyNote: 'Imports into a copy of this space under a new name, for you to look at before the real run.',
+  copyName: 'Name of the copy',
+  copyDefaultName: (space: string) => `${space} (trial)`,
+  accountedFor: (r: Pick<ImportResult, 'sourceItems' | 'objects' | 'updated' | 'unchanged' | 'changedInBoth' | 'leftOut' | 'failed'>) =>
+    `${plural(r.sourceItems ?? 0, 'source item', 'source items')}: ${r.objects} imported, ${r.updated ?? 0} updated, ` +
+    `${r.unchanged ?? 0} unchanged, ${r.changedInBoth ?? 0} changed in both, ${r.leftOut ?? 0} left out, ${r.failed ?? 0} failed`,
+  removedAtSource: (n: number) => `${plural(n, 'object is', 'objects are')} no longer in the source. They stay in the space; the Import report lists them.`,
+  moveBatch: 'Move batch to Trash',
+  moveBatchConfirm: (n: number) => `Move the ${plural(n, 'object', 'objects')} this import created to the Trash?`,
+  moveBatchDo: 'Move to Trash',
+  moveBatchDone: (n: number) => `${plural(n, 'object was', 'objects were')} moved to the Trash.`,
+  moveBatchOther: 'To move this batch to the Trash, open the space it went into.',
+  changedInBothHeading: 'Changed in both',
+  changedInBothNote: 'These changed at the source and were edited in Object, so they were not overwritten.',
+  takeSource: 'Take source',
+  keepMine: 'Keep mine',
+  takeAll: 'Take source for all',
+  keepAll: 'Keep mine for all',
+  resolved: 'Done',
+  sourceHeading: 'Source',
+  openOriginal: 'Open original',
+  showFile: 'Show file',
+  importedFrom: (system: string) => `Imported from ${system}`,
 
   // Errors.
   notFound: 'There is no file or folder at that path.',
