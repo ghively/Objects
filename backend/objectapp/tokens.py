@@ -65,6 +65,8 @@ _EPHEMERAL: dict[str, TokenRecord] = {}
 _EPHEMERAL_LOCK = threading.Lock()
 _FILE_LOCK = threading.RLock()
 """Guards ``api-tokens.json`` across every `TokenStore` in the process (audit 2026-11-07 #22)."""
+_ACTIVITY_LOCK = threading.Lock()
+"""Guards ``api-activity.jsonl`` across every `ActivityLog` in the process (its append and trim)."""
 
 
 def _hash(secret: str) -> str:
@@ -295,7 +297,7 @@ class ActivityLog:
     def __init__(self, root: Path, folder: Path | None = None) -> None:
         self.space = _space_key(root)
         self._folder = folder
-        self._lock = threading.Lock()
+        self._lock = _ACTIVITY_LOCK  # every instance on the file (the router's, each guard's)
 
     @property
     def path(self) -> Path:
@@ -323,9 +325,7 @@ class ActivityLog:
     def _trim(self) -> None:
         lines = self.path.read_text(encoding="utf-8").splitlines()
         if len(lines) > 2 * ACTIVITY_KEEP:
-            tmp = self.path.with_suffix(".jsonl.tmp")
-            tmp.write_text("\n".join(lines[-ACTIVITY_KEEP:]) + "\n", encoding="utf-8")
-            os.replace(tmp, self.path)
+            atomic_write(self.path, ("\n".join(lines[-ACTIVITY_KEEP:]) + "\n").encode("utf-8"))
 
     def since(self, at: str | None, limit: int = 200) -> list[dict[str, Any]]:
         with self._lock:
