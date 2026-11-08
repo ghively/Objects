@@ -5,6 +5,11 @@ nothing here keeps a matched string beyond the test that made it. "Leave out" fo
 are never opened. Documents (docx, xlsx, pptx, pdf, html) are scanned through their readable text,
 so a line is a line of the page the importer would write; plain text and unknown text-like files
 (``.env``, ``.json``, ``.yml``...) are scanned as they are.
+
+The scan reads the same files the import's source lister (`importers.source`) reads: a zip at the
+top level of the source (Notion's multi-part export, a ``part.zip`` at the top of a folder) is
+opened one level deep, a zip deeper than that is counted as unscanned, and a zip source whose
+every entry sits under one folder is read as that folder.
 """
 
 from __future__ import annotations
@@ -159,7 +164,7 @@ class ScanReport:
     findings: dict[str, list[Finding]] = field(default_factory=dict)  # relative path -> findings
     left_out: list[str] = field(default_factory=list)  # relative paths never read
     scanned: int = 0
-    unscanned: int = 0  # binary or over-size files with no text to look at
+    unscanned: int = 0  # binary, over-size or too deeply nested files with no text to look at
 
     @property
     def counts(self) -> dict[str, int]:
@@ -188,7 +193,7 @@ def scan_tree(root: Path, leave_out: list[str] | None = None) -> ScanReport:
     report = ScanReport()
     if root.is_file():
         if root.suffix.lower() == ".zip":
-            return _scan_zip(root, patterns, report)
+            return _scan_zip(root, patterns, report, as_source=True)
         text = None if root.stat().st_size > MAX_SCAN_BYTES else _text_or_none(root)
         if text is None:
             report.unscanned = 1
@@ -214,6 +219,11 @@ def scan_tree(root: Path, leave_out: list[str] | None = None) -> ScanReport:
             except OSError:
                 report.unscanned += 1
                 continue
+            if rel.lower().endswith(".zip") and "/" not in rel:
+                # The lister reads a zip at the top of a folder as part of the source, one level
+                # deep (its own nested zips are never imported): so does the scan.
+                _scan_zip(p, patterns, report, as_source=False)
+                continue
             text = None if too_big else _text_or_none(p)
             if text is None:
                 report.unscanned += 1
@@ -234,6 +244,9 @@ def _text_or_none(p: Path) -> str | None:
 
 MAX_ZIP_MEMBER_BYTES = 20 * 1024 * 1024
 MAX_ZIP_TOTAL_BYTES = 500 * 1024 * 1024
+MAX_NESTED_ZIP_BYTES = 256 * 1024 * 1024
+"""A zip at the top level of a zip source is read into memory up to this (the lister's
+`NESTED_IN_MEMORY`); a bigger one is counted as unscanned."""
 
 
 def _safe_member(name: str) -> bool:
@@ -241,52 +254,103 @@ def _safe_member(name: str) -> bool:
     return bool(parts) and not name.startswith(("/", "\\")) and ".." not in parts and ":" not in parts[0] and "\x00" not in name
 
 
-def _scan_zip(path: Path, patterns: list[str], report: ScanReport) -> ScanReport:
+def _single_top(names: list[str]) -> str:
+    """The one folder every (non-``__MACOSX``) entry sits under, or ``""`` (the lister's rule: a zip
+    whose every entry sits under one folder is read as that folder)."""
+    top: str | None = None
+    for n in names:
+        parts = n.split("/")
+        if parts[0] == "__MACOSX":
+            continue
+        if len(parts) < 2:
+            return ""
+        if top is None:
+            top = parts[0]
+        elif top != parts[0]:
+            return ""
+    return (top + "/") if top else ""
+
+
+def _scan_zip(path: Path, patterns: list[str], report: ScanReport, *, as_source: bool) -> ScanReport:
     """Scan the members of a zip: safe names only, text-like members by their text, documents through
     their readable text (a temporary copy), each capped in size. What can't be scanned (an unsafe name,
-    an encrypted, nested or over-size member, a binary file) is counted as unscanned, never as clean."""
+    an encrypted, too deeply nested or over-size member, a binary file) is counted as unscanned, never
+    as clean.
+
+    ``as_source`` says the zip is the source itself: a single top folder is stripped from its member
+    names and a zip at its top level is opened one level deep, as the lister reads it. A zip at the
+    top of a folder source (``as_source`` False) is read as part of the folder: its members by their
+    own names, its own nested zips unscanned."""
     import tempfile
     import zipfile
 
-    total = 0
     try:
         if not stat.S_ISREG(os.stat(path).st_mode):
-            report.unscanned = 1
+            report.unscanned += 1
             return report
         zf = zipfile.ZipFile(path)
     except (zipfile.BadZipFile, OSError):
-        report.unscanned = 1
+        report.unscanned += 1
         return report
     with zf, tempfile.TemporaryDirectory() as tmp:
-        for info in zf.infolist():
-            if info.is_dir():
-                continue
-            name = info.filename
-            if not _safe_member(name):
-                report.unscanned += 1
-                continue
-            rel = PurePosixPath(name.replace("\\", "/")).as_posix()
-            if is_left_out(rel, patterns):
-                report.left_out.append(rel)
-                continue
-            total += info.file_size
-            if info.flag_bits & 0x1 or info.file_size > MAX_ZIP_MEMBER_BYTES or total > MAX_ZIP_TOTAL_BYTES \
-                    or rel.lower().endswith(".zip"):
+        _scan_zip_members(zf, patterns, report, Path(tmp), [0], strip_top=as_source, nested=as_source)
+    return report
+
+
+def _scan_zip_members(zf, patterns: list[str], report: ScanReport, tmp: Path, total: list[int], *,
+                      strip_top: bool, nested: bool) -> None:
+    """Scan the members of the open zip ``zf``; ``total[0]`` is the running byte total across the
+    source and its nested zips. With ``nested``, a safe ``.zip`` at the top level is opened (in
+    memory, within `MAX_NESTED_ZIP_BYTES`) and its members scanned by their own names."""
+    import io
+    import zipfile
+
+    members: list[tuple[str, zipfile.ZipInfo]] = []
+    for info in zf.infolist():
+        if info.is_dir():
+            continue
+        name = info.filename
+        if not _safe_member(name):
+            report.unscanned += 1
+            continue
+        members.append((PurePosixPath(name.replace("\\", "/")).as_posix(), info))
+    top = _single_top([rel for rel, _ in members]) if strip_top else ""
+    for rel, info in members:
+        if top and rel.startswith(top):
+            rel = rel[len(top):]
+        if is_left_out(rel, patterns):
+            report.left_out.append(rel)
+            continue
+        total[0] += info.file_size
+        encrypted = bool(info.flag_bits & 0x1)
+        if rel.lower().endswith(".zip"):
+            if not nested or "/" in rel or encrypted or info.file_size > MAX_NESTED_ZIP_BYTES \
+                    or total[0] > MAX_ZIP_TOTAL_BYTES:
                 report.unscanned += 1
                 continue
             try:
-                data = zf.read(info)
-                text = _member_text(rel, data, Path(tmp))
-            except Exception:  # noqa: BLE001 - a damaged member is unscanned
-                text = None
-            if text is None:
+                inner = zipfile.ZipFile(io.BytesIO(zf.read(info)))
+            except Exception:  # noqa: BLE001 - a damaged nested zip is unscanned (the lister skips it)
                 report.unscanned += 1
                 continue
-            report.scanned += 1
-            found = scan_text(text)
-            if found:
-                report.findings[rel] = found
-    return report
+            with inner:
+                _scan_zip_members(inner, patterns, report, tmp, total, strip_top=False, nested=False)
+            continue
+        if encrypted or info.file_size > MAX_ZIP_MEMBER_BYTES or total[0] > MAX_ZIP_TOTAL_BYTES:
+            report.unscanned += 1
+            continue
+        try:
+            data = zf.read(info)
+            text = _member_text(rel, data, tmp)
+        except Exception:  # noqa: BLE001 - a damaged member is unscanned
+            text = None
+        if text is None:
+            report.unscanned += 1
+            continue
+        report.scanned += 1
+        found = scan_text(text)
+        if found:
+            report.findings.setdefault(rel, []).extend(found)
 
 
 def _member_text(rel: str, data: bytes, tmp: Path) -> str | None:
