@@ -142,6 +142,39 @@ def test_run_loads_only_project_and_local_settings(env, monkeypatch) -> None:
     assert cmd.cwd == env["folder"].resolve()
 
 
+def test_relative_or_linked_config_dir_is_passed_absolute_and_fenced(env, monkeypatch) -> None:
+    """Review of audit 20: a relative CLAUDE_CONFIG_DIR would mean another folder to the CLI (its
+    cwd is the agent folder) than the one fenced: the run gets the absolute path Object fences, and
+    a config dir reached through a link is fenced by both its paths."""
+    import fake_claude
+
+    start = env["tmp"] / "start"
+    real = env["tmp"] / "real-config"
+    for d in (start, real):
+        d.mkdir()
+    monkeypatch.chdir(start)
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", "cfg")
+    cmd = _build(_scope(env))
+    config = start / "cfg"
+    assert cmd.env["CLAUDE_CONFIG_DIR"] == str(config)
+    deny = cmd.run_settings["permissions"]["deny"]
+    assert fake_claude._denied("Read", str(config / ".credentials.json"), deny)
+    assert fake_claude._denied("Edit", str(config / "settings.json"), deny)
+
+    link = start / "linked"
+    try:
+        link.symlink_to(real, target_is_directory=True)
+    except OSError:
+        pytest.skip("no symlinks here")
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", "linked")
+    cmd = _build(_scope(env))
+    assert cmd.env["CLAUDE_CONFIG_DIR"] == str(link)
+    deny = cmd.run_settings["permissions"]["deny"]
+    for base in (link, real.resolve()):
+        assert fake_claude._denied("Read", str(base / ".credentials.json"), deny), base
+        assert fake_claude._denied("Edit", str(base / "CLAUDE.md"), deny), base
+
+
 def test_run_settings_keep_user_instructions_out(env) -> None:
     def extra(scope: RunScope, parts: RunParts) -> None:
         parts.settings["permissions"] = {"deny": ["Read(//x/**)"], "ask": []}
@@ -183,11 +216,13 @@ def test_run_env_drops_parent_session_vars(env, monkeypatch) -> None:
                "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY")
     for name in (*session, *sign_in):
         monkeypatch.setenv(name, "1")
+    config = str(env["tmp"] / "config")  # absolute: a relative one is made absolute for the run
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", config)
     cmd = _build(_scope(env))
     for name in session:
         assert name not in cmd.env
     for name in sign_in:  # audit 20: how the user signs in to Claude Code reaches every turn
-        assert cmd.env[name] == "1", name
+        assert cmd.env[name] == (config if name == "CLAUDE_CONFIG_DIR" else "1"), name
     assert not any(k.upper().startswith(RUN_ENV_DROP) for k in cmd.env if k not in agentrun.RUN_ENV_KEEP)
     different = {k for k, v in agentrun.run_base_env().items() if cmd.env.get(k) != v}
     assert different <= {"OBJECT_API_URL", "MCP_TOOL_TIMEOUT"}, different  # set by the run itself

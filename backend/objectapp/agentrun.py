@@ -30,8 +30,9 @@ with commas or spaces needs no quoting.
 ``--setting-sources`` alone lets them through on CLI 2.1.317. The working folder is the agent
 folder's resolved (long) path, and the run's environment drops the variables a parent Claude
 Code session sets (`RUN_ENV_DROP`) but keeps how the user signs in to Claude Code
-(``CLAUDE_CONFIG_DIR``, `RUN_ENV_KEEP`; audit 20). A ``CLAUDE_CONFIG_DIR``'s ``CLAUDE.md`` and
-rules are excluded and its files fenced, as ``~/.claude``'s are.
+(``CLAUDE_CONFIG_DIR``, `RUN_ENV_KEEP`; audit 20). A ``CLAUDE_CONFIG_DIR`` is passed to the run
+made absolute, and its ``CLAUDE.md`` and rules are excluded and its files fenced (by its given and
+its resolved path), as ``~/.claude``'s are.
 
 No network client here: this module only builds a command and writes temp files.
 """
@@ -146,12 +147,14 @@ def run_base_env() -> dict[str, str]:
 
 
 def _claude_config_dir() -> Path | None:
-    """The user's ``CLAUDE_CONFIG_DIR`` (resolved), when set: their Claude Code files live there."""
+    """The user's ``CLAUDE_CONFIG_DIR`` made absolute against Object's own working folder (links
+    kept), when set: their Claude Code files live there. A run gets this absolute form, since its
+    CLI's working folder is the agent folder."""
     value = os.environ.get("CLAUDE_CONFIG_DIR", "").strip()
     if not value:
         return None
     try:
-        return Path(os.path.expanduser(value)).resolve()
+        return Path(os.path.abspath(os.path.expanduser(value)))
     except (OSError, ValueError):
         return None
 
@@ -504,8 +507,9 @@ def _fence(scope: RunScope, parts: RunParts) -> None:
     rules = fence_rules(folders, own, scope.state, Path.home())
     config = _claude_config_dir()
     if config is not None:  # as ~/.claude's: the login and the user's Claude Code files
-        c = rule_path(config)
-        rules += [f"Read({c}/.credentials.json)", f"Edit({c}/**)"]
+        for form in _both_forms(config):
+            c = rule_path(form)
+            rules += [f"Read({c}/.credentials.json)", f"Edit({c}/**)"]
     for rule in rules:
         if rule not in parts.deny_rules:
             parts.deny_rules.append(rule)
@@ -546,8 +550,9 @@ def _run_settings(own: Path, parts: RunParts) -> dict[str, Any]:
     out["claudeMdExcludes"] = claude_md_excludes(own, Path.home())
     config = _claude_config_dir()
     if config is not None:  # the user CLAUDE.md lives there instead of ~/.claude
-        form = str(config).replace("\\", "/")
-        _extend(out["claudeMdExcludes"], [form + "/CLAUDE.md", form + "/rules/**"])
+        for p in reversed(_both_forms(config)):  # resolved first, as the other excludes are
+            form = str(p).replace("\\", "/")
+            _extend(out["claudeMdExcludes"], [form + "/CLAUDE.md", form + "/rules/**"])
     out["permissions"] = {"deny": list(parts.deny_rules)}
     for key, value in parts.settings.items():
         if key == "claudeMdExcludes":
@@ -567,6 +572,9 @@ def _run_settings(own: Path, parts: RunParts) -> dict[str, Any]:
 def _run_env(scope: RunScope, parts: RunParts) -> dict[str, str]:
     env = run_base_env()  # no OBJECT_API_TOKEN: only Object's own servers get it (their env blocks)
     env["OBJECT_API_URL"] = scope.api_url
+    config = _claude_config_dir()
+    if config is not None:  # the folder the fence covers, not one relative to the agent folder
+        env["CLAUDE_CONFIG_DIR"] = str(config)
     env.update(parts.env)
     return env
 
