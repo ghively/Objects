@@ -2,6 +2,7 @@ import type {
   AddRemoteAgentRequest,
   Agent,
   AgentChatSummary,
+  AppInfo,
   AgentInput,
   AgentTranscript,
   AgentTrashItem,
@@ -607,6 +608,11 @@ function ensureSource(resyncOnOpen = false) {
 }
 
 export const api = {
+  /** The app's version, for the Settings nav's footer. */
+  appInfo(): Promise<AppInfo> {
+    return request<AppInfo>('/app')
+  },
+
   space(): Promise<SpaceInfo> {
     return request<SpaceInfo>('/space')
   },

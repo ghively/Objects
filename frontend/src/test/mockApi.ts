@@ -769,6 +769,7 @@ type Fn =(...args: never[]) => unknown
 
 function defaults(): Api {
   return {
+    appInfo: async () => ({ version: '0.1.0' }),
     space: async () => ({
       name: 'space',
       root: '/space',
