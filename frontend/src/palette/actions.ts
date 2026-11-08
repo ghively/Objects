@@ -12,7 +12,7 @@ export const ACTION_TEXT = {
   openGlobalGraph: 'Open global graph',
   openGraphView: 'Open graph view',
   toggleLeftSidebar: 'Toggle left sidebar',
-  toggleSidepanel: 'Toggle right sidepanel',
+  toggleSidepanel: 'Toggle right side panel',
   openEmptyLocalSpaceQuery: 'Open extended search',
   openSettings: 'Open settings',
   openSpace: (spaceName: string) => `Open space "${spaceName}"`,

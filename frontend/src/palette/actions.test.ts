@@ -26,7 +26,7 @@ describe('buildActions', () => {
       'Open today',
       'Open global graph',
       'Toggle left sidebar',
-      'Toggle right sidepanel',
+      'Toggle right side panel',
     ])
   })
 
@@ -77,7 +77,7 @@ describe('buildActions', () => {
       'Open settings',
       'Toggle focus mode',
       'Toggle left sidebar',
-      'Toggle right sidepanel',
+      'Toggle right side panel',
       'Open space "Work"',
     ])
     const byId = Object.fromEntries(actions.map((a) => [a.id, a]))
@@ -108,7 +108,7 @@ describe('matchActions', () => {
     expect(labels('create')).toEqual(['Create Page', 'Create Person'])
     expect(labels('cr pe')).toEqual(['Create Person'])
     expect(labels('cal')).toEqual(['Open calendar'])
-    expect(labels('Toggle')).toEqual(['Toggle left sidebar', 'Toggle right sidepanel'])
+    expect(labels('Toggle')).toEqual(['Toggle left sidebar', 'Toggle right side panel'])
     expect(labels('graph')).toEqual(['Open global graph'])
     expect(labels('alendar')).toEqual(['Open calendar'])
     expect(labels('zzz')).toEqual([])

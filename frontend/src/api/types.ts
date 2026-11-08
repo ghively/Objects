@@ -460,7 +460,7 @@ export interface DeviceSettings {
   workAgentId: string | null
   /** "Agent acts on my approvals". */
   workAgentActs: boolean
-  /** "Auto-run read-only steps". */
+  /** "Agent runs by itself". */
   workAutoRun: boolean
   /** MCP tools (`mcp__<server>__<tool>`) a read-only run may use (at most 500). */
   workReadTools: string[]
