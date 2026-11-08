@@ -241,6 +241,27 @@ class QueueStore:
             self._save(data, now)
         return dict(entry)
 
+    def requeue_withdrawn(self, path: str, step_id: str, kind: str, fields: dict[str, Any], *,
+                          now: datetime) -> dict[str, Any] | None:
+        """Add the step's entry again when its last ``kind`` entry is withdrawn (checked and added
+        under the lock, so two callers can't both add); else None. The new entry keeps the last
+        one's who-and-what fields, takes `fields`, and its ``notBefore`` (when `fields` has none)."""
+        with _LOCK:
+            data = self._load()
+            mine = [e for e in data["entries"]
+                    if e.get("path") == path and e.get("stepId") == step_id and e.get("kind") == kind]
+            mine.sort(key=lambda e: (e.get("createdAt") or "", e["id"]))
+            if not mine or mine[-1].get("state") != "withdrawn":
+                return None
+            last = mine[-1]
+            new = {k: last.get(k) for k in ("kind", "path", "objectId", "title", "auto", "by")}
+            new.update(fields)
+            new["notBefore"] = fields.get("notBefore") or last.get("notBefore")
+            entry = self._new(new, now)
+            data["entries"].append(entry)
+            self._save(data, now)
+        return dict(entry)
+
     def _withdraw(self, data: dict[str, Any], plan: QueuePlan, now: datetime) -> list[dict]:
         out = []
         for e in data["entries"]:

@@ -36,7 +36,7 @@ M17 (agent runs). The log line also holds ``appendPrompt`` (the text of
 ``--append-system-prompt-file``), ``runSettings`` (the JSON of ``--settings``, a file or inline
 JSON), ``settingSources``, ``tools`` (the value of ``--tools``), ``allowed`` / ``disallowed``
 (``--allowedTools`` / ``--disallowedTools`` split on commas) and ``env``
-(``{"CLAUDE_CONFIG_DIR": <whether it is set>}``). The ``init`` event's ``tools`` lists the
+(``{"CLAUDE_CONFIG_DIR": <whether it is set>}``), ``configDir`` (its value, or null). The ``init`` event's ``tools`` lists the
 built-in names (`BUILTIN_NAMES`) minus the disallowed ones, plus each allowed ``mcp__...``
 name (without ``--allowedTools``: M10's two Object tools).
 
@@ -586,6 +586,7 @@ def main(argv: list[str]) -> int:
             "allowed": allowed,
             "disallowed": disallowed,
             "env": {"CLAUDE_CONFIG_DIR": "CLAUDE_CONFIG_DIR" in os.environ},
+            "configDir": os.environ.get("CLAUDE_CONFIG_DIR"),
             "forkSession": "--fork-session" in argv,
             "noSessionPersistence": "--no-session-persistence" in argv,
             "resume": _arg(argv, "--resume"),

@@ -45,6 +45,7 @@ try:  # pragma: no cover - which branch runs depends on the build order
     from objectapp.agentrun import (  # type: ignore[attr-defined]
         CLI_FLAGS,
         RUN_ENV_DROP,
+        RUN_ENV_KEEP,
         RUN_SETTINGS_BASE,
         claude_md_excludes,
         fence_rules,
@@ -53,8 +54,11 @@ try:  # pragma: no cover - which branch runs depends on the build order
 except ImportError:  # T4 isn't there yet
     RUN_SETTINGS_BASE: dict[str, Any] = {"autoMemoryEnabled": False}  # type: ignore[no-redef]
 
-    RUN_ENV_DROP = ("CLAUDE_CONFIG_DIR", "CLAUDECODE", "CLAUDE_CODE_", "CLAUDE_AGENT_SDK_",  # type: ignore[no-redef]
+    RUN_ENV_DROP = ("CLAUDECODE", "CLAUDE_CODE_", "CLAUDE_AGENT_SDK_",  # type: ignore[no-redef]
                     "CLAUDE_PLUGIN_ROOT", "CLAUDE_EFFORT", "CLAUDE_PID", "CLAUDE_PREVIEW_", "AI_AGENT")
+    RUN_ENV_KEEP = ("CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK",  # type: ignore[no-redef]
+                    "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "CLAUDE_CODE_SKIP_BEDROCK_AUTH",
+                    "CLAUDE_CODE_SKIP_VERTEX_AUTH", "CLAUDE_CODE_SKIP_FOUNDRY_AUTH")
 
     def claude_md_excludes(own: Path, home: Path) -> list[str]:  # type: ignore[no-redef]
         def form(p: Path) -> str:
@@ -186,10 +190,10 @@ def run_live(
 ) -> tuple[list[dict[str, Any]], str]:
     """One real ``claude -p`` run in `folder`; (stream events, debug log text).
 
-    The environment is this process's minus ``RUN_ENV_DROP`` (as ``agentrun.build_run``:
-    ``CLAUDE_CONFIG_DIR`` and the variables a parent Claude Code session sets, ``CLAUDECODE``,
-    ``CLAUDE_CODE_*``...) and ``BAGGAGE``, so the run sees what Object started on its own would
-    give it. The settings file holds ``RUN_SETTINGS_BASE``, the ``claudeMdExcludes`` list and the
+    The environment is this process's minus ``RUN_ENV_DROP`` (as ``agentrun.build_run``: the
+    variables a parent Claude Code session sets, ``CLAUDECODE``, ``CLAUDE_CODE_*``...) and
+    ``BAGGAGE``, but keeping ``RUN_ENV_KEEP`` and ``CLAUDE_CONFIG_DIR`` (how the user signs in,
+    audit 20), so the run sees what Object started on its own would give it. The settings file holds ``RUN_SETTINGS_BASE``, the ``claudeMdExcludes`` list and the
     deny rules.
     """
     run = Path(tmp).resolve() / "run"
@@ -213,7 +217,8 @@ def run_live(
         "--disallowedTools", ",".join(disallowed if disallowed is not None else lists.disallowed),
         "--model", MODEL, "--no-session-persistence", "--debug-file", str(debug),
     ]
-    run_env = {k: v for k, v in os.environ.items() if not k.startswith(PARENT_SESSION_VARS)}
+    run_env = {k: v for k, v in os.environ.items()
+               if k.upper() in RUN_ENV_KEEP or not k.upper().startswith(PARENT_SESSION_VARS)}
     run_env.update(env or {})
     res = subprocess.run(
         args, input=prompt, capture_output=True, text=True, encoding="utf-8", errors="replace",

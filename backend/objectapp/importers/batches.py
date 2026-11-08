@@ -168,6 +168,20 @@ def _batch_objects(space: Space, batch: str) -> dict[tuple[str, str], str]:
     return out
 
 
+def _updated_by(root: Path, other: str, key: tuple[str, str],
+                seen: dict[str, dict[tuple[str, str], str]]) -> bool:
+    """Whether batch ``other``'s own items hold ``key`` as an object it updated, not created."""
+    if other not in seen:
+        try:
+            _d, items = load_batch(root, other)
+        except KeyError:
+            items = []
+        seen[other] = {(str(i.get("system")), str(i.get("id"))): str(i.get("action"))
+                       for i in items if isinstance(i, dict)}
+    action = seen[other].get(key)
+    return action is not None and action not in ("created", "trashed")
+
+
 def trash_batch(space: Space, batch: str) -> dict[str, Any]:
     """Move every object the batch created (not ones it only updated) to the Trash.
 
@@ -184,6 +198,7 @@ def trash_batch(space: Space, batch: str) -> dict[str, Any]:
     in_trash = {t.originalPath for t in space.list_trash() if t.kind == "object"}
     trashed = already = 0
     not_found: list[str] = []
+    seen: dict[str, dict[tuple[str, str], str]] = {}
     for it in items:
         if it.get("action") != "created" or not it.get("path"):
             continue
@@ -193,9 +208,11 @@ def trash_batch(space: Space, batch: str) -> dict[str, Any]:
             raw = space._raw.get(recorded)
         block = provenance.read_block(raw.fm) if raw is not None else None
         # Only the object this batch created: another batch's (a re-run that created it again) or
-        # one with no provenance (Gene's own) at the recorded path is never trashed.
-        if (block is not None and block.get("batch") == batch
-                and (str(block["system"]), str(block["id"])) == key):
+        # one with no provenance (Gene's own) at the recorded path is never trashed. A re-run that
+        # only updated it stamps its own batch in the block; that object is still this batch's.
+        if (block is not None and (str(block["system"]), str(block["id"])) == key
+                and (block.get("batch") == batch
+                     or _updated_by(root, str(block.get("batch") or ""), key, seen))):
             rel: str | None = recorded
         else:
             rel = by_id.get(key)  # moved: found by the source id and batch it carries
