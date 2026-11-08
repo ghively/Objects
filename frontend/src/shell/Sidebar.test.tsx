@@ -284,4 +284,18 @@ describe('Sidebar theme button (M7)', () => {
     expect(useSettingsModal.getState().isOpen).toBe(true)
     resetSettingsModal()
   })
+
+  it('test sidebar footer has a Shortcuts icon and no dead Profile or Share buttons', async () => {
+    resetSettingsModal()
+    render(<Sidebar types={TYPES} />)
+    expect(screen.queryByRole('button', { name: 'Profile' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Share' })).toBeNull()
+    const shortcuts = screen.getByRole('button', { name: 'Shortcuts' })
+    expect(shortcuts).toBeEnabled()
+    expect(shortcuts).toHaveAttribute('title', 'Shortcuts')
+    await userEvent.click(shortcuts)
+    expect(useSettingsModal.getState().shortcutsOpen).toBe(true)
+    expect(useSettingsModal.getState().isOpen).toBe(false)
+    resetSettingsModal()
+  })
 })
