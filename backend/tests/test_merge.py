@@ -114,6 +114,63 @@ def test_merge_values_lists_and_body(client: TestClient, space: Space):
     assert body == "\nTarget body paragraph.\n\nSource body paragraph.\n"
 
 
+TASK = "Tasks/Shelf task.md"
+
+
+def _write_task(space: Space, collections: str) -> None:
+    (space.root / TASK).write_bytes(
+        (
+            f"---\ntype: 'Task'\ntitle: Shelf task\ncollections: {collections}\n---\n\n"
+            "To do.\n"
+        ).encode()
+    )
+    space.rescan_file(TASK)
+
+
+def test_merge_drops_a_collection_the_target_type_is_not_in(client: TestClient, space: Space):
+    # Sweep 2026-11-08: a Task in a Tasks-only collection merged into a Page answered 422.
+    space.create_collection("Task shelf", ["task"], None)
+    _write_task(space, "[Task shelf]")
+    r = _merge(client, TASK, TARGET)
+    assert r.status_code == 200, r.text
+    assert r.json()["dropped"] == ["collections"]
+    fm, body = _fm_body(space.root, TARGET)
+    assert "collections" not in fm
+    assert body.endswith("Target body paragraph.\n\nTo do.\n")
+    assert not (space.root / TASK).exists()
+
+
+def test_merge_drops_a_collection_that_no_longer_exists(client: TestClient, space: Space):
+    _write_task(space, "[Ghost]")
+    r = _merge(client, TASK, TARGET)
+    assert r.status_code == 200, r.text
+    assert r.json()["dropped"] == ["collections"]
+    assert "collections" not in _fm_body(space.root, TARGET)[0]
+
+
+def test_merge_keeps_the_collections_the_target_may_join(client: TestClient, space: Space):
+    # The target's own collection (whatever its types) and one holding Pages are kept.
+    space.create_collection("Task shelf", ["task"], None)
+    tgt = space.root / TARGET
+    tgt.write_bytes(tgt.read_bytes().replace(b"tags:", b"collections: [Task shelf]\ntags:"))
+    space.rescan_file(TARGET)
+    _write_task(space, "[Ghost, Reading list, task shelf]")
+    r = _merge(client, TASK, TARGET)
+    assert r.status_code == 200, r.text
+    assert r.json()["dropped"] == ["collections"]
+    assert _fm_body(space.root, TARGET)[0]["collections"] == ["Task shelf", "Reading list"]
+
+
+def test_merge_unions_collections_without_dropping_when_all_fit(client: TestClient, space: Space):
+    src = space.root / SOURCE
+    src.write_bytes(src.read_bytes().replace(b"tags:", b"collections: [Reading list]\ntags:"))
+    space.rescan_file(SOURCE)
+    r = _merge(client, SOURCE, TARGET)
+    assert r.status_code == 200, r.text
+    assert r.json()["dropped"] == []
+    assert _fm_body(space.root, TARGET)[0]["collections"] == ["Reading list"]
+
+
 def test_merge_relinks_and_trashes_source(client: TestClient, space: Space):
     refers = space.root / REFERS
     old = refers.read_bytes()

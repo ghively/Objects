@@ -2889,8 +2889,14 @@ class Space:
 
         return self._fm_edit(apply)
 
-    def ensure_id(self, path: str) -> tuple[str, str]:
-        """The object's ``id``, inserted first in its frontmatter if missing (unstamped)."""
+    def ensure_id(
+        self, path: str, base_version: str | None = None, *, history: bool = True
+    ) -> tuple[str, str]:
+        """The object's ``id``, inserted first in its frontmatter if missing (unstamped).
+
+        ``base_version`` and ``history`` are passed on to `_write` (the file is left alone,
+        and no version kept, when it has an id already).
+        """
         found: list[str] = []
 
         def apply(src: str, fm: dict) -> str:
@@ -2902,7 +2908,9 @@ class Space:
             found.append(new)
             return set_keys(src, {}, insert_first={"id": new})
 
-        version = self._write(path, None, self._fm_edit(apply), stamp=False)
+        version = self._write(
+            path, base_version, self._fm_edit(apply), stamp=False, history=history
+        )
         return found[-1], version
 
     # -- rename -------------------------------------------------------------
@@ -3140,6 +3148,10 @@ class Space:
             return replace(of, frontmatter_src=src, body=body)
 
         with self._lock:
+            # An object without an `id` gets one first (unstamped, no version kept), so the
+            # title write's history snapshot is keyed by the id that follows the file to its
+            # new name, not by the old path (sweep 2026-11-08). A file with an id is untouched.
+            _, base_version = self.ensure_id(rel, base_version, history=False)
             version = self._write(rel, base_version, edit)
             new_rel = self._rename_target(rel, new_title)
             if new_rel != rel:

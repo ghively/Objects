@@ -58,8 +58,13 @@ __all__ = [
     "referenced_media",
 ]
 
-# ``![alt](path "title")`` / ``[text](<path with spaces>)``: the destination only.
-_MD_LINK_RE = re.compile(r"!?\[[^\]\n]*\]\(\s*(?:<([^>\n]*)>|([^)\s]+))[^)\n]*\)")
+# ``![alt](path "title")`` / ``[text](<path with spaces>)``: the destination only. A bare
+# destination may hold one level of balanced parentheses (``shot%20(2).png``) and, since this
+# only names files to look for, spaces too (``shot (2).png`` as hand-written Markdown has it).
+_MD_LINK_RE = re.compile(
+    r"!?\[[^\]\n]*\]\(\s*(?:<([^>\n]*)>|((?:[^()\n]|\([^()\n]*\))+?))"
+    r"\s*(?:\"[^\"\n]*\"|'[^'\n]*')?\s*\)"
+)
 _SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 
 

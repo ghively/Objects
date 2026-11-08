@@ -101,6 +101,21 @@ def test_parse_inline_styles_and_links():
     assert runs[-1].text.endswith("snake_case_name") and not runs[-1].italic
 
 
+def test_parse_inline_link_destination_with_parentheses():
+    # Sweep 2026-11-08: the href was cut at the first `)` and a stray `)` was left in the text.
+    runs = parse_inline("See [w](https://en.wikipedia.org/wiki/Foo_(bar)) and ![i](a%20(2).png) end")
+    by_text = {r.text: r for r in runs}
+    assert by_text["w"].href == "https://en.wikipedia.org/wiki/Foo_(bar)"
+    assert "".join(r.text for r in runs) == "See w and i end"
+
+
+def test_image_block_with_parentheses_in_the_path():
+    seen: list[str] = []
+    blocks = parse_blocks("![shot](Attachments/shot%20(2).png)\n", media=lambda t: seen.append(t) or t)
+    assert [b.kind for b in blocks] == ["image"]
+    assert seen == ["Attachments/shot%20(2).png"]
+
+
 # -- Markdown options ------------------------------------------------------------------
 
 
