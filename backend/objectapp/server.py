@@ -177,6 +177,7 @@ from . import (
     api_agent_a2a_v1,
     api_agent_v1,
     api_agents,
+    api_app,
     api_automations,
     api_ai,
     api_blocks,
@@ -2228,6 +2229,7 @@ def create_app(
             return {"agents": await curator.tick()}
 
     ctx = ApiContext(space, announce, search, settings_changed)
+    api.include_router(api_app.router())  # GET /api/app: the version (Settings footer)
     api.include_router(api_search.router(ctx))
     api.include_router(api_references.router(ctx))
     api.include_router(api_graph.router(ctx))

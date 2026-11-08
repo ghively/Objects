@@ -348,6 +348,11 @@ export interface ObjectSummary {
   collections?: string[]
 }
 
+/** GET /api/app: the app's version (`"dev"` when the package is not installed). */
+export interface AppInfo {
+  version: string
+}
+
 /** GET /api/space */
 export interface SpaceInfo {
   /** `.object/space.json`'s `name`, else the folder name. */

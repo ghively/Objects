@@ -3,7 +3,8 @@
 // section. Changes save at once: device settings through `useSettings().patch`, `ui.json` keys
 // through `api.patchUi`, space keys through `api.patchSpace` (each reloads and re-applies once on
 // a 409).
-import { useMemo, useState, type ComponentType } from 'react'
+import { useEffect, useMemo, useState, type ComponentType } from 'react'
+import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
@@ -31,6 +32,8 @@ export const SETTINGS_TEXT = {
   general: 'General',
   space: 'Space',
   shortcuts: SHORTCUTS_TEXT.heading,
+  /** The nav footer's version line (catalog section 1): "Object 0.1.0". */
+  version: (v: string) => `Object ${v}`,
 } as const
 
 export interface SettingsSectionDef {
@@ -141,6 +144,24 @@ export function SettingsModal() {
   const shown = useMemo(() => filterSections(query), [query])
   const current = shown.find((s) => s.id === section) ?? shown[0]
   const Current = current?.Component
+  // The version, loaded once the modal first opens; nothing is shown until it arrives, and a
+  // failed load shows nothing (never blocks the modal).
+  const [version, setVersion] = useState<string | null>(null)
+  useEffect(() => {
+    if (!isOpen || version !== null) return
+    let live = true
+    api
+      .appInfo()
+      .then((info) => {
+        if (live) setVersion(info.version)
+      })
+      .catch(() => {
+        /* no version line */
+      })
+    return () => {
+      live = false
+    }
+  }, [isOpen, version])
 
   return (
     <Dialog
@@ -193,6 +214,11 @@ export function SettingsModal() {
           </div>
           <div className="border-t border-line pt-2">
             <NavRow icon="ph-keyboard" label={SETTINGS_TEXT.shortcuts} onClick={() => useSettingsModal.getState().openShortcuts()} />
+            {version !== null && (
+              <p data-app-version={version} className="px-2 pt-1.5 pb-0.5 text-[12px] text-fg-muted">
+                {SETTINGS_TEXT.version(version)}
+              </p>
+            )}
           </div>
         </nav>
         <div data-settings-content={current?.id ?? ''} className="min-w-0 flex-1 overflow-y-auto px-8 pt-7 pb-10">
