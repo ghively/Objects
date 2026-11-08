@@ -515,3 +515,66 @@ def test_a_fifo_in_the_source_is_not_opened(tmp_path):
     assert got["file"] == []
     assert got["zip"].scanned == 0
     assert all(r.original_only and r.markdown == "" for r in got["read"])
+
+
+def _save_between(path: Path, text: str):
+    """A user save landing on ``path`` right after the call it wraps."""
+
+    def wrap(fn):
+        def inner(*a, **k):
+            out = fn(*a, **k)
+            path.write_text(path.read_text(encoding="utf-8") + text, encoding="utf-8")
+            return out
+
+        return inner
+
+    return wrap
+
+
+def test_a_save_between_the_check_and_the_rerun_write_is_changed_in_both(client, tmp_path, monkeypatch):
+    """Audit 34: a re-run update wrote with no base version, so a save between its edited-since
+    check and its write was overwritten (and not in version history)."""
+    from test_m25_provenance import blocks
+    from test_m25_provenance import run as run_import
+
+    from objectapp.importers import writer
+
+    src = tmp_path / "S"
+    src.mkdir()
+    (src / "a.md").write_text("# a\n\nversion one\n", encoding="utf-8")
+    root = client.space_root
+    run_import(client, src, kind="obsidian")
+    pa = next(r for r, b in blocks(root).items() if b["id"] == "a.md")
+    (src / "a.md").write_text("# a\n\nversion two\n", encoding="utf-8")
+    monkeypatch.setattr(writer, "_edited_since_import",
+                        _save_between(root / pa, "\nmy late words\n")(writer._edited_since_import))
+    res = run_import(client, src, kind="obsidian")["result"]
+    text = (root / pa).read_text(encoding="utf-8")
+    assert "my late words" in text and "version two" not in text
+    assert res["changedInBoth"] == 1 and res["updated"] == 0
+
+
+def test_take_source_does_not_overwrite_a_save_made_meanwhile(client, tmp_path, monkeypatch):
+    """Audit 34: Take source wrote with no base version: a save after it read the file was lost."""
+    from test_m25_provenance import blocks
+    from test_m25_provenance import run as run_import
+
+    from objectapp.importers import batches
+
+    src = tmp_path / "S"
+    src.mkdir()
+    (src / "a.md").write_text("# a\n\nversion one\n", encoding="utf-8")
+    root = client.space_root
+    run_import(client, src, kind="obsidian")
+    pa = next(r for r, b in blocks(root).items() if b["id"] == "a.md")
+    _of, _fm, version = Space(root).read(pa)
+    r = client.put("/api/object/body", json={"path": pa, "body": "# edited\n\nmy words\n", "baseVersion": version})
+    assert r.status_code == 200, r.text
+    (src / "a.md").write_text("# a\n\nversion two\n", encoding="utf-8")
+    res = run_import(client, src, kind="obsidian")["result"]
+    assert res["changedInBoth"] == 1
+    monkeypatch.setattr(batches, "snapshot", _save_between(root / pa, "\nmy late words\n")(batches.snapshot))
+    out = client.post(f"/api/import/batches/{res['batch']}/resolve", json={"action": "take"}).json()
+    assert out["failed"] == [pa] and out["resolved"] == [] and out["pending"] == 1
+    text = (root / pa).read_text(encoding="utf-8")
+    assert "my late words" in text and "version two" not in text

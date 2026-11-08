@@ -262,7 +262,8 @@ def resolve_conflicts(space: Space, batch: str, action: str, paths: list[str] | 
             current = full.read_bytes()
             if action == "take":
                 snapshot(space, rel, current)
-                space._write(rel, None, lambda _of, _fm, o=new_of: o, stamp=False, history=False)
+                # at the version just read and kept: a save made since fails this item, never lost
+                space._write(rel, version_of(current), lambda _of, _fm, o=new_of: o, stamp=False, history=False)
             else:
                 if not isinstance(block, dict):
                     raise ValueError("no provenance in the held-back file")
