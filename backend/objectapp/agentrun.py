@@ -15,7 +15,8 @@ Object stopped mid-run). Secrets never go into
 the CLI's own environment, since the CLI hands its whole environment to every stdio MCP server:
 each server gets only its own secrets, filled into its own entry in ``mcp.json`` (`fill_refs`).
 The turn's token is in the ``env`` blocks of Object's two servers (``object``, ``object-agent``)
-only (audit 7).
+only (audit 7). Every other stdio server's ``env`` sets the sign-in names (`SERVER_ENV_BLANK`)
+empty, unless its own config sets them, so it doesn't inherit how the user signs in.
 
 The fence: every run denies the file tools on every registered space folder, every other
 agent's folder and the agent trash (``Read(...)`` covers Read, Glob and Grep; ``Edit(...)``
@@ -129,6 +130,10 @@ RUN_ENV_KEEP: tuple[str, ...] = (
     "CLAUDE_CODE_SKIP_FOUNDRY_AUTH",
 )
 """Names `RUN_ENV_DROP`'s prefixes would drop that say how the user signs in (audit 20)."""
+
+SERVER_ENV_BLANK: tuple[str, ...] = (*RUN_ENV_KEEP, "ANTHROPIC_API_KEY")
+"""Set empty in every outside stdio MCP server's ``env`` (unless its config sets the name): the
+CLI hands its whole environment, with how the user signs in, to each stdio server it starts."""
 
 
 def run_base_env() -> dict[str, str]:
@@ -566,6 +571,20 @@ def _run_env(scope: RunScope, parts: RunParts) -> dict[str, str]:
     return env
 
 
+def _without_sign_in(name: str, server: Any) -> Any:
+    """`server` with each `SERVER_ENV_BLANK` name its ``env`` doesn't set added as ``""``, when it
+    is an outside stdio server (Object's own two get nothing; a remote one inherits no env)."""
+    if name in _RESERVED_SERVERS or not isinstance(server, dict) or "command" not in server:
+        return server
+    if server.get("type", "stdio") != "stdio":
+        return server
+    raw = server.get("env")
+    env = dict(raw) if isinstance(raw, dict) else {}
+    have = {str(k).upper() for k in env}
+    env.update({n: "" for n in SERVER_ENV_BLANK if n not in have})
+    return {**server, "env": env}
+
+
 RUN_TMP_PREFIX = "object-agent-run-"
 _STALE_RUN_SECONDS = 86400
 
@@ -603,7 +622,7 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
     for _order, _name, fn in contributors():
         fn(scope, parts)
     own = Path(scope.agent.folder).resolve()
-    mcp = {"mcpServers": parts.mcp_servers}
+    mcp = {"mcpServers": {n: _without_sign_in(n, s) for n, s in parts.mcp_servers.items()}}
     append = "\n\n".join(p for p in parts.append_prompt if p)
     _sweep_stale_run_folders()
     tmp = Path(tempfile.mkdtemp(prefix=RUN_TMP_PREFIX))
