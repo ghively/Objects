@@ -12,6 +12,7 @@ import { M7_SHORTCUTS, M8_SHORTCUTS, allShortcuts, isMacPlatform, keysFor, regis
 import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
 import { showToast } from './media/upload'
 import { blockSelectionKey } from './extensions/blockSelection'
+import { PasteAsPlainText, armPlainPaste } from './extensions/pasteAsPlainText'
 import { copyBlockReference } from './nodes/blockRef'
 import { runHighlightText } from './nodes/textStyle'
 import { turnIntoObject, turnIntoTask, turnTodoIntoTask } from './turnInto'
@@ -96,11 +97,18 @@ export function indentAtCursor(editor: Editor, dir: 1 | -1): boolean {
   return true
 }
 
-/** The editor's M8 key bindings, from the registry's keys. */
+/**
+ * The editor's M8 key bindings, from the registry's keys; and the 2026-11-08 sweep's editor
+ * keys (`pasteAsPlainText`), whose extensions it brings along so the editor needs no other wiring.
+ */
 export const M8Keys = Extension.create({
   name: 'm8Keys',
   // After `BlockSelection` (900), before the built-in keymaps and the tables'.
   priority: 850,
+
+  addExtensions() {
+    return [PasteAsPlainText]
+  },
 
   addKeyboardShortcuts() {
     const editor = this.editor
@@ -113,6 +121,11 @@ export const M8Keys = Extension.create({
       turnIntoTask: () => runAction(() => turnIntoTask(editor)),
       turnBlockIntoTaskObject: () => runAction(() => turnTodoIntoTask(editor)),
       highlightText: () => runHighlightText(editor),
+      // Arms the next paste and lets the browser fire it (the key is not consumed).
+      pasteAsPlainText: () => {
+        armPlainPaste()
+        return false
+      },
     })
   },
 })

@@ -547,9 +547,12 @@ export const AI_SHORTCUTS: ShortcutDef[] = [
  * The 2026-11-08 sweep: catalogued keys Object had not bound ("bind the easy ones", Gene).
  * `createNewTask` (General, Ctrl+Shift+T) is bound by `shell/shortcuts.ts` outside editable
  * targets; inside the editor the key stays `turnBlockIntoTaskObject` (a shared pair).
+ * `pasteAsPlainText` (Text editing, Ctrl+Shift+V) is bound by `editor/shortcuts.ts` through
+ * `editor/extensions/pasteAsPlainText.ts`.
  */
 export const SWEEP_SHORTCUTS: ShortcutDef[] = [
   def('createNewTask', 'global', 'Create new task', ['Mod-Shift-t'], 'global', V, true),
+  def('pasteAsPlainText', 'text', 'Paste as plain text', ['Mod-Shift-v'], 'editor', V, true),
 ]
 
 registerShortcuts(EXISTING_SHORTCUTS)

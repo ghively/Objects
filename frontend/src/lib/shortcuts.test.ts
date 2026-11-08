@@ -138,7 +138,9 @@ describe('shortcuts', () => {
     for (const d of [...M7_SHORTCUTS, ...EXISTING_SHORTCUTS]) expect(ids).toContain(d.id)
     expect(new Set(ids).size).toBe(ids.length)
     const groups = shortcutsByCategory()
-    expect(groups.get('text')?.map((d) => d.id)).toEqual(['bold', 'italic', 'underline', 'strikethrough', 'codeToken', 'mathToken', 'highlightText'])
+    expect(groups.get('text')?.map((d) => d.id)).toEqual([
+      'bold', 'italic', 'underline', 'strikethrough', 'codeToken', 'mathToken', 'highlightText', 'pasteAsPlainText',
+    ])
     expect(groups.get('navigation')?.map((d) => d.id)).toContain('closeTab')
     for (const cat of groups.keys()) expect(CATEGORY_LABELS[cat]).toBeTruthy()
     expect(keysFor('openSettings')).toEqual(['Mod-,'])
@@ -202,6 +204,17 @@ describe('sweep 2026-11-08: catalogued keys', () => {
     expect(keysFor('turnBlockIntoTaskObject')).toEqual(['Mod-Shift-t'])
     expect(byId().get('turnBlockIntoTaskObject')?.scope).toBe('editor')
     expect(sharesKeyByDesign('createNewTask', 'turnBlockIntoTaskObject')).toBe(true)
+  })
+
+  test('Ctrl+Shift+V is "Paste as plain text" under Text editing, bound in the editor', () => {
+    const d = byId().get('pasteAsPlainText')
+    expect(d).toBeTruthy()
+    expect(d?.category).toBe('text')
+    expect(d?.scope).toBe('editor')
+    expect(d?.name).toBe('Paste as plain text')
+    expect(d?.provisional).toBe(false)
+    expect(d?.bound).toBe(true)
+    expect(keysFor('pasteAsPlainText')).toEqual(['Mod-Shift-v'])
   })
 
   test('no two registered ids in one scope share a key, except the declared pairs', () => {
