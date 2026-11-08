@@ -4,7 +4,7 @@
 // Assistant group is left out while "Hide AI features" is on.
 import { useAiHidden } from '@/ai/store'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { CATEGORY_LABELS, formatKeys, shortcutsByCategory, type ShortcutDef } from '@/lib/shortcuts'
+import { CATEGORY_LABELS, formatKeys, shortcutsByCategory, sortCategories, type ShortcutDef } from '@/lib/shortcuts'
 import { useSettingsModal } from './useSettingsModal'
 
 export const SHORTCUTS_TEXT = {
@@ -38,11 +38,12 @@ export function ShortcutsSheet() {
   const open = useSettingsModal((s) => s.shortcutsOpen)
   const close = useSettingsModal((s) => s.closeShortcuts)
   const aiHidden = useAiHidden()
-  const groups = open
-    ? [...shortcutsByCategory()]
-        .filter(([c]) => !(aiHidden && c === 'ai'))
-        .map(([c, defs]) => [c, defs.filter((d) => d.keys.length > 0)] as const).filter(([, defs]) => defs.length > 0)
-    : []
+  // The groups in the catalog's order (`CATEGORY_ORDER`), the uncatalogued ones after.
+  const byCategory = open ? shortcutsByCategory() : new Map<string, ShortcutDef[]>()
+  const groups = sortCategories([...byCategory.keys()])
+    .filter((c) => !(aiHidden && c === 'ai'))
+    .map((c) => [c, (byCategory.get(c) ?? []).filter((d) => d.keys.length > 0)] as const)
+    .filter(([, defs]) => defs.length > 0)
   return (
     <Dialog open={open} onOpenChange={(o) => !o && close()}>
       <DialogContent className="flex max-h-[80vh] flex-col gap-3 border-line bg-panel text-fg sm:max-w-[640px]">

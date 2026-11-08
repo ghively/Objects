@@ -53,6 +53,34 @@ export const CATEGORY_LABELS: Record<string, string> = {
   work: 'Work',
 }
 
+/**
+ * The order the Shortcuts sheet shows the groups in (the catalog's section 2). A category not
+ * listed here (Whiteboard, Work) follows, in first-registration order.
+ */
+export const CATEGORY_ORDER: readonly string[] = [
+  'global',
+  'text',
+  'markdown',
+  'block',
+  'page',
+  'navigation',
+  'calendar',
+  'ai',
+  'table',
+  'date',
+  'pdf',
+  'weblink',
+]
+
+/** `categories` sorted for the sheet: `CATEGORY_ORDER` first, the rest in the order given. */
+export function sortCategories(categories: readonly string[]): string[] {
+  const rank = (c: string) => {
+    const i = CATEGORY_ORDER.indexOf(c)
+    return i === -1 ? CATEGORY_ORDER.length : i
+  }
+  return [...categories].sort((a, b) => rank(a) - rank(b))
+}
+
 const registry = new Map<string, ShortcutDef>()
 
 /** Add `defs` (an entry with an id already registered replaces it, keeping its place). */
