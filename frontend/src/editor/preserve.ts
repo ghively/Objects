@@ -28,8 +28,9 @@ export type EditorBlock = {
 
 // ---------------------------------------------------------------- helpers
 
-function eolOf(s: string): string {
-  return s.includes('\r\n') ? '\r\n' : '\n'
+/** CRLF when `s` has one, else LF, else a lone CR (an old Mac file: no mixed endings on save). */
+export function eolOf(s: string): string {
+  return s.includes('\r\n') ? '\r\n' : s.includes('\n') || !s.includes('\r') ? '\n' : '\r'
 }
 
 function toLF(s: string): string {
@@ -65,9 +66,10 @@ function exactNorm(s: string): string {
 type RowStyle = { indent: string; lead: boolean; trail: boolean; pad: string }
 
 /**
- * The cells of a row: split at every `|` that is neither escaped nor inside a
- * code span (the serializer writes such a pipe `\|`, as GFM asks; a file may
- * hold it bare, and the parser reads both as one cell).
+ * The cells of a row, as GFM splits them: at every `|` that is not escaped.
+ * A code span does not protect a bare pipe (GFM splits the cell there; the
+ * serializer writes such a pipe `\|`). A table whose source holds one loads as
+ * a raw block (`hasPipeInCodeSpan`), since the editor's parser reads one cell.
  */
 function splitCellsRaw(line: string): string[] {
   let s = line.trim()
@@ -79,13 +81,7 @@ function splitCellsRaw(line: string): string[] {
   while (i < s.length) {
     const ch = s[i]
     if (ch === '\\') i += 2
-    else if (ch === '`') {
-      // A code span runs to the next backtick run of the same length (or the line end).
-      let n = 1
-      while (s[i + n] === '`') n++
-      const close = s.indexOf('`'.repeat(n), i + n)
-      i = close < 0 ? s.length : close + n
-    } else if (ch === '|') {
+    else if (ch === '|') {
       cells.push(s.slice(start, i))
       start = ++i
     } else i++
@@ -94,12 +90,38 @@ function splitCellsRaw(line: string): string[] {
   return cells
 }
 
+/**
+ * True when a table row holds a bare `|` inside a code span (`` `a|b` ``):
+ * GFM splits the cell there, while the editor's table parser reads one cell
+ * with the pipe in its code, so an edit would move the row's cells (audit
+ * 2026-11-07 #38). Such a table loads as a raw block.
+ */
+export function hasPipeInCodeSpan(line: string): boolean {
+  let i = 0
+  while (i < line.length) {
+    const ch = line[i]
+    if (ch === '\\') i += 2
+    else if (ch === '`') {
+      // A code span runs to the next backtick run of the same length; an unclosed run is text.
+      let n = 1
+      while (line[i + n] === '`') n++
+      const close = line.indexOf('`'.repeat(n), i + n)
+      if (close < 0) i += n
+      else {
+        if (/(?<!\\)\|/.test(line.slice(i + n, close))) return true
+        i = close + n
+      }
+    } else i++
+  }
+  return false
+}
+
 function isSeparatorCell(c: string): boolean {
   return /^:?-+:?$/.test(c.trim())
 }
 
 function tableKey(line: string): string {
-  // `\|` and a bare pipe inside a code span are the same cell text.
+  // An escaped pipe is the cell's text `|`.
   const cells = splitCellsRaw(line).map((c) => c.trim().replace(/\\\|/g, '|'))
   if (cells.length > 0 && cells.every(isSeparatorCell)) {
     return (
@@ -177,7 +199,8 @@ function indentWidth(ws: string): number {
  * Parse list lines, giving each item a nesting depth as CommonMark does: an
  * item is nested in the previous one when its indent reaches that item's
  * content column (indent, marker and gap; a tab is four columns), so `   - b`
- * and `\t- c` are siblings.
+ * and `\t- c` are siblings. A marker four or more columns past the column it
+ * would start an item at is not an item but text (a continuation line).
  */
 function parseList(lines: string[]): (ListLine | null)[] {
   const columns: number[] = [] // content column of the open item at each depth
@@ -185,8 +208,10 @@ function parseList(lines: string[]): (ListLine | null)[] {
     const m = LIST_ITEM.exec(line)
     if (!m) return null
     const w = indentWidth(m[1])
-    while (columns.length && w < columns[columns.length - 1]) columns.pop()
-    const depth = columns.length
+    let depth = columns.length
+    while (depth && w < columns[depth - 1]) depth--
+    if (w - (depth ? columns[depth - 1] : 0) >= 4) return null
+    columns.length = depth
     columns.push(indentWidth(m[1] + m[2] + (m[3] || ' ')))
     return { indent: m[1], marker: m[2], gap: m[3], content: m[4], depth }
   })
@@ -194,7 +219,8 @@ function parseList(lines: string[]): (ListLine | null)[] {
 
 function listKey(line: string, parsed: ListLine | null): string {
   // A continuation line (a later paragraph's, too) ends in a hard break written either way.
-  if (!parsed) return 'C\0' + line.trim().replace(/\\$/, '').trimEnd()
+  // It may start with a marker the serializer escapes (`\- e`, `1\. e`): the same text.
+  if (!parsed) return 'C\0' + line.trim().replace(/^(\d{0,9})\\(?=[-+*.)])/, '$1').replace(/\\$/, '').trimEnd()
   const ordered = /\d/.test(parsed.marker) ? 'o' : 'b'
   // A hard break may be written `\` or as trailing blanks, and a done box `[x]` or `[X]`: the same line.
   const content = parsed.content.replace(/^\[X\](?=[ \t]|$)/, '[x]')
@@ -258,9 +284,18 @@ function preserveList(origLines: string[], regenInput: string[]): string[] {
 
   // Original style: bullet char, gap after the marker, indent per depth,
   // ordered delimiter ('.' or ')') and a repeated number ('1.' on every item).
-  const firstBullet = origParsed.find((p) => p && !/\d/.test(p.marker))
-  const origOrdered = origParsed.filter((p): p is ListLine => !!p && /\d/.test(p.marker))
-  const delimiter = origOrdered[0]?.marker.slice(-1)
+  const isOrdered = (p: ListLine) => /\d/.test(p.marker)
+  const firstBullet = origParsed.find((p) => p && !isOrdered(p))
+  const origOrdered = origParsed.filter((p): p is ListLine => !!p && isOrdered(p))
+  // A nested list may use another delimiter or bullet than its parent: the style of an item is
+  // that of the line it replaces, else of the first item of its kind at its depth, else the first
+  // of its kind (one style for every depth wrote `   1) b` in `1) a` / `   1. b`, splitting it).
+  const styleOf = (p: ListLine, replaced: ListLine | null): ListLine | undefined => {
+    const ordered = isOrdered(p)
+    if (replaced && replaced.depth === p.depth && isOrdered(replaced) === ordered) return replaced
+    const sameKind = (q: ListLine | null): q is ListLine => !!q && isOrdered(q) === ordered
+    return origParsed.find((q): q is ListLine => sameKind(q) && q.depth === p.depth) ?? (ordered ? origOrdered[0] : firstBullet ?? undefined)
+  }
   const repeated =
     origOrdered.length > 1 && origOrdered.every((p) => p.marker === origOrdered[0].marker)
       ? origOrdered[0].marker.slice(0, -1)
@@ -275,12 +310,17 @@ function preserveList(origLines: string[], regenInput: string[]): string[] {
   const restyle = (line: string, i: number): string => {
     const p = regenParsed[i]
     if (!p) return continuation(line, i)
-    const indent = indentByDepth.get(p.depth) ?? unit.repeat(p.depth)
-    const ordered = /\d/.test(p.marker)
+    // An edited item keeps the indent of the item line it replaces (a sibling may sit a column
+    // or two in, `- a` then ` - b`): the depth's usual indent could nest the next item in it.
+    const replaced = replacedOriginal(i)
+    const same = replaced !== null ? origParsed[replaced] : null
+    const indent = same && same.depth === p.depth ? same.indent : indentByDepth.get(p.depth) ?? unit.repeat(p.depth)
+    const ordered = isOrdered(p)
+    const style = styleOf(p, same)
     let marker = p.marker
-    if (ordered && delimiter) marker = (repeated ?? p.marker.slice(0, -1)) + delimiter
-    else if (!ordered && firstBullet) marker = firstBullet.marker
-    const gap = p.content === '' ? '' : firstBullet && !ordered ? firstBullet.gap || ' ' : p.gap || ' '
+    if (ordered && style) marker = (repeated ?? p.marker.slice(0, -1)) + style.marker.slice(-1)
+    else if (!ordered && style) marker = style.marker
+    const gap = p.content === '' ? '' : style && !ordered ? style.gap || ' ' : p.gap || ' '
     return indent + marker + gap + p.content
   }
 
@@ -378,7 +418,9 @@ function preserveList(origLines: string[], regenInput: string[]): string[] {
   // regenerated ending (restyled), or the break would be saved as a soft one.
   const kept = origLines.slice()
   match.forEach((o, k) => {
-    if (o >= 0 && HARD_BREAK.test(regenLines[k]) && !HARD_BREAK.test(origLines[o])) kept[o] = restyle(regenLines[k], k)
+    // (A blank line is no break: the blanks of an empty line in an item are not one.)
+    if (o >= 0 && !isBlank(regenLines[k]) && HARD_BREAK.test(regenLines[k]) && !HARD_BREAK.test(origLines[o]))
+      kept[o] = restyle(regenLines[k], k)
   })
   return keepListStarts(weaveBlankLines(kept, regenLines, match, restyle), regenParsed)
 }
@@ -436,9 +478,19 @@ function weaveBlankLines(
 ): string[] {
   const out: string[] = []
   const last = () => out[out.length - 1]
-  const pushBlank = (line: string) => {
-    // No blank first line, and no stacked blanks where an item was removed.
-    if (out.length > 0 && !isBlank(last())) out.push(line)
+  // The original index of the blank line `out` ends with, when it ends with one pushed from it.
+  let lastBlank = -2
+  const push = (line: string) => {
+    out.push(line)
+    lastBlank = -2
+  }
+  const pushBlank = (i: number) => {
+    // No blank first line, and no stacked blanks where an item was removed; blank lines that
+    // follow each other in the original stay as many.
+    if (out.length > 0 && (!isBlank(last()) || lastBlank === i - 1)) {
+      out.push(origLines[i])
+      lastBlank = i
+    }
   }
   let prevOrig = -1
   let j = 0
@@ -450,14 +502,14 @@ function weaveBlankLines(
     const pending = regenLines.slice(j, k).map((line, n) => restyle(line, j + n))
     let p = 0
     for (let i = prevOrig + 1; i < nextOrig; i++) {
-      if (isBlank(origLines[i])) pushBlank(origLines[i])
-      else if (p < pending.length) out.push(pending[p++])
+      if (isBlank(origLines[i])) pushBlank(i)
+      else if (p < pending.length) push(pending[p++])
     }
-    while (p < pending.length) out.push(pending[p++])
+    while (p < pending.length) push(pending[p++])
     if (k >= regenLines.length) break
     const kept = origLines[match[k]]
-    if (isBlank(kept)) pushBlank(kept)
-    else out.push(kept)
+    if (isBlank(kept)) pushBlank(match[k])
+    else push(kept)
     prevOrig = match[k]
     j = k + 1
   }

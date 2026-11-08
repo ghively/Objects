@@ -9,8 +9,11 @@ lines the way Claude Code does: a ``system``/``init`` line with the session id, 
 ``stream_event`` text deltas, the full ``assistant`` message, and a ``result``.
 
 ``FAKE_CLAUDE_LOG``: a file it appends one JSON line to per run (argv, cwd, pid, the
-prompt, the MCP config it was given, the ``OBJECT_API_*`` variables, the ``--model``
-value), so tests can check the flags, the working folder, the token and the model.
+prompt, the MCP config it was given, the ``OBJECT_API_*`` values, the ``--model``
+value), so tests can check the flags, the working folder, the token and the model. ``token``
+and ``url`` are the ``object`` server's ``env`` values in the MCP config (filled from the fake's
+environment), else the fake's own ``OBJECT_API_*`` variables; ``envToken`` tells whether
+``OBJECT_API_TOKEN`` is in the fake's own environment (which every stdio server inherits).
 
 Steered by markers in the prompt (the user's message is part of it):
 
@@ -33,7 +36,7 @@ M17 (agent runs). The log line also holds ``appendPrompt`` (the text of
 ``--append-system-prompt-file``), ``runSettings`` (the JSON of ``--settings``, a file or inline
 JSON), ``settingSources``, ``tools`` (the value of ``--tools``), ``allowed`` / ``disallowed``
 (``--allowedTools`` / ``--disallowedTools`` split on commas) and ``env``
-(``{"CLAUDE_CONFIG_DIR": <whether it is set>}``). The ``init`` event's ``tools`` lists the
+(``{"CLAUDE_CONFIG_DIR": <whether it is set>}``), ``configDir`` (its value, or null). The ``init`` event's ``tools`` lists the
 built-in names (`BUILTIN_NAMES`) minus the disallowed ones, plus each allowed ``mcp__...``
 name (without ``--allowedTools``: M10's two Object tools).
 
@@ -528,6 +531,16 @@ def _result(text: str, session: str, error: bool = False) -> None:
     })
 
 
+def _object_env(config: dict | None, name: str) -> str | None:
+    """`name` as the ``object`` server would see it: its ``env`` entry (filled), else the fake's own."""
+    servers = (config or {}).get("mcpServers") if isinstance(config, dict) else None
+    spec = servers.get("object") if isinstance(servers, dict) else None
+    block = spec.get("env") if isinstance(spec, dict) else None
+    if isinstance(block, dict) and isinstance(block.get(name), str):
+        return _fill(block[name], dict(os.environ))
+    return os.environ.get(name)
+
+
 def main(argv: list[str]) -> int:
     if "--version" in argv:
         if os.environ.get("FAKE_CLAUDE_VERSION_FAIL") == "1":
@@ -562,8 +575,9 @@ def main(argv: list[str]) -> int:
             "pid": os.getpid(),
             "prompt": prompt,
             "mcpConfig": config,
-            "token": os.environ.get("OBJECT_API_TOKEN"),
-            "url": os.environ.get("OBJECT_API_URL"),
+            "token": _object_env(config, "OBJECT_API_TOKEN"),
+            "url": _object_env(config, "OBJECT_API_URL"),
+            "envToken": "OBJECT_API_TOKEN" in os.environ,
             "model": _arg(argv, "--model"),
             "appendPrompt": append_prompt,
             "runSettings": run_settings,
@@ -572,6 +586,7 @@ def main(argv: list[str]) -> int:
             "allowed": allowed,
             "disallowed": disallowed,
             "env": {"CLAUDE_CONFIG_DIR": "CLAUDE_CONFIG_DIR" in os.environ},
+            "configDir": os.environ.get("CLAUDE_CONFIG_DIR"),
             "forkSession": "--fork-session" in argv,
             "noSessionPersistence": "--no-session-persistence" in argv,
             "resume": _arg(argv, "--resume"),

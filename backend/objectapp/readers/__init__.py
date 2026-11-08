@@ -8,10 +8,13 @@ original kept by the importer.
 
 from __future__ import annotations
 
+import os
+import stat
 from pathlib import Path
 
 from . import docx, media, pdf, pptx, sheets, textfiles
 from .model import TABLE_MAX_COLS, TABLE_MAX_ROWS, ExtractedImage, ReadResult
+from .util import TooLarge
 
 __all__ = ["ExtractedImage", "ReadResult", "TABLE_MAX_COLS", "TABLE_MAX_ROWS", "ocr_engine", "read_file", "supported_suffixes"]
 
@@ -46,7 +49,15 @@ def read_file(path: Path) -> ReadResult:
     path = Path(path)
     reader = _READERS.get(path.suffix.lower(), media.read_binary)
     try:
+        regular = stat.S_ISREG(os.stat(path).st_mode)
+    except OSError:
+        regular = True  # the reader reports a missing or unreadable file as before
+    if not regular:  # a FIFO, socket or device: opening it can block forever
+        return ReadResult(title=path.stem, notes=["Not a regular file", "Original only"], original_only=True)
+    try:
         result = reader(path)
+    except TooLarge:
+        return ReadResult(title=path.stem, notes=["Too large to read", "Original only"], original_only=True)
     except Exception as e:  # a damaged document must not stop an import
         return ReadResult(title=path.stem, notes=[f"Could not read ({type(e).__name__})", "Original only"], original_only=True)
     if result.created is None or result.modified is None:

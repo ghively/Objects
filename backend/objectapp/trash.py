@@ -111,7 +111,8 @@ def ulid_time(ulid: str) -> datetime | None:
 
 
 def _dump(data: dict[str, Any]) -> bytes:
-    return (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    # ASCII: a name that is not valid UTF-8 (surrogate-escaped) survives the round trip
+    return (json.dumps(data, indent=2, ensure_ascii=True) + "\n").encode("utf-8")
 
 
 def _load(path: Path) -> dict[str, Any] | None:
@@ -179,8 +180,8 @@ class Trash:
         try:
             fm = read_raw(self.dir, f"{trash_id}.md", cache=False).fm  # no cache under the trash
             title = fm.get("title") if isinstance(fm.get("title"), str) else ""
-        except OSError:
-            pass
+        except (OSError, TypeError, ValueError, RecursionError):
+            pass  # unreadable frontmatter: named after its id
         title = title.strip() or trash_id
         return {
             "id": trash_id,

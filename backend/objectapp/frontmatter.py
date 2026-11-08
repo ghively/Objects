@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import io
 import json
+import math
 import re
 import threading
 from collections.abc import Callable, Iterable
@@ -129,9 +130,17 @@ def _discard_yaml(kind: str) -> None:
     setattr(_local, kind, None)
 
 
+def _plain_key(key: Any) -> Any:
+    # A sequence key (`? [a, b]`) loads as a tuple. No property can have it as a
+    # name and it isn't JSON, so the file is refused (read-only), never crashed on.
+    if isinstance(key, (list, tuple, dict)):
+        raise FrontmatterError("Frontmatter has a key that is a list or mapping")
+    return _plain(key)
+
+
 def _plain(value: Any) -> Any:
     if isinstance(value, dict):
-        return {_plain(k): _plain(v) for k, v in value.items()}
+        return {_plain_key(k): _plain(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [_plain(v) for v in value]
     if isinstance(value, bool) or value is None:
@@ -141,7 +150,8 @@ def _plain(value: Any) -> Any:
     if isinstance(value, int):
         return int(value)
     if isinstance(value, float):
-        return float(value)
+        # `.nan` and `.inf` have no JSON form: they read as empty (the file keeps them).
+        return float(value) if math.isfinite(value) else None
     return value
 
 
@@ -162,6 +172,11 @@ def parse_fm(src: str) -> dict:
         # not a crash of the whole space.
         _discard_yaml("plain")
         raise FrontmatterError("Frontmatter is nested too deeply") from exc
+    except (TypeError, ValueError) as exc:
+        # The constructor's own failures: an integer over Python's 4300-digit limit,
+        # an unhashable key inside a value (bug audit 2026-11-07, 1).
+        _discard_yaml("plain")
+        raise FrontmatterError(str(exc)) from exc
     if data is None:
         return {}
     if not isinstance(data, dict):
@@ -178,6 +193,9 @@ def _load_rt(src: str) -> CommentedMap | None:
     except RecursionError as exc:
         _discard_yaml("rt")
         raise FrontmatterError("Frontmatter is nested too deeply") from exc
+    except (TypeError, ValueError) as exc:
+        _discard_yaml("rt")
+        raise FrontmatterError(str(exc)) from exc
     if data is None:
         return None
     if not isinstance(data, CommentedMap):
@@ -262,14 +280,30 @@ def _lines(src: str) -> list[str]:
     return lines
 
 
+_DOC_END_RE = re.compile(r"\.\.\.(?:[ \t]|\r|\n|$)")
+
+
+def _doc_end(lines: list[str]) -> int:
+    """Index of the YAML document-end line (``...`` at column 0), else ``len(lines)``.
+
+    Only blank and comment lines can follow it, so the mapping's keys all come before it:
+    a key appended after it would be a second document (bug audit 2026-11-07, 19).
+    """
+    for i, line in enumerate(lines):
+        if _DOC_END_RE.match(line):
+            return i
+    return len(lines)
+
+
 def _key_spans(data: CommentedMap | None, lines: list[str]) -> dict[Any, tuple[int, int]]:
     """Line range ``[start, end)`` of each top-level key, trailing blank/comment lines excluded."""
     if data is None:
         return {}
     starts = sorted((data.lc.key(k)[0], k) for k in data.keys())
     spans: dict[Any, tuple[int, int]] = {}
+    last = _doc_end(lines)
     for i, (start, k) in enumerate(starts):
-        end = starts[i + 1][0] if i + 1 < len(starts) else len(lines)
+        end = starts[i + 1][0] if i + 1 < len(starts) else last
         while end > start + 1 and _is_filler(lines[end - 1]):
             end -= 1
         spans[k] = (start, end)
@@ -323,8 +357,12 @@ def set_keys(
                 target.extend(_render(k, v))
 
     out: list[str] = list(prepended)
+    tail = _doc_end(lines)
     i = 0
     while i < len(lines):
+        if i == tail:
+            out.extend(appended)  # new keys go before a `...` document-end line
+            appended = []
         if i in replacements:
             end, new_lines = replacements[i]
             out.extend(new_lines)

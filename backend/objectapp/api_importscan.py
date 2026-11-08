@@ -26,8 +26,10 @@ def router(ctx=None) -> APIRouter:
 
     @r.post("/import/scan")
     def scan(req: ScanRequest):
-        root = Path(req.path.strip().strip('"')).expanduser()
-        if not root.exists():
+        text = req.path.strip().strip('"')
+        # A blank path is ``Path(".")``, the server's working folder (audit 2026-11-07 #12).
+        root = Path(text).expanduser() if text.strip() else None
+        if root is None or not root.exists():
             return JSONResponse({"error": "No such file or folder"}, status_code=404)
         return scan_tree(root, req.leaveOut).to_json()
 

@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 
+from .api_v1 import without_hidden
 from .apictx import ApiContext
 from .propvalues import InvalidValue
 from .space import Conflict, ReadOnly
@@ -77,6 +78,15 @@ def router(ctx: ApiContext, service: WorkService) -> APIRouter:
         except (KeyError, ValueError, OSError):
             return ""
 
+    def shown_item(item: dict) -> dict:
+        """``item`` without a hidden project: its path and its ``fields`` entry (#23)."""
+        hidden = guard.hidden_paths()
+        if item.get("projectPath") in hidden:
+            item = {**item, "projectPath": None}
+        if isinstance(item.get("fields"), dict):
+            item = {**item, "fields": without_hidden(item["fields"], hidden)}
+        return item
+
     def visible(path: str) -> str | JSONResponse:
         try:
             return guard.visible_rel(path)
@@ -118,6 +128,8 @@ def router(ctx: ApiContext, service: WorkService) -> APIRouter:
             return error(404, f"No object at {path!r}")
         except ValueError as exc:
             return error(400, str(exc))
+        if isinstance(result.get("item"), dict):
+            result = {**result, "item": shown_item(result["item"])}
         done = result["item"]["path"]
         guard.announce("changed", done, result["version"], token)
         for synced in result.get("synced") or []:
@@ -153,9 +165,7 @@ def router(ctx: ApiContext, service: WorkService) -> APIRouter:
             return error(404, f"No object at {path!r}")
         except ValueError as exc:
             return error(400, str(exc))
-        if item.get("projectPath") in guard.hidden_paths():
-            item["projectPath"] = None
-        return _safe(item)
+        return _safe(shown_item(item))
 
     # -- writes ---------------------------------------------------------------------------------
 

@@ -760,36 +760,47 @@ function AiChat({ entryId, path, agentId: agentProp, chatId: chatProp }: AiChatP
   }, [chatProp, reset, setAgentId, setItems, setChatId])
 
   const save = useCallback(() => {
+    // Audit 2026-11-07 #40: what the save writes is taken now, not when the queue reaches it: a
+    // "New chat" (or another chat) in between must not turn it into a save of the empty new chat.
+    const seq = loadSeq.current
+    // This chat's saved object; a new chat gets a new holder, so this one stays with this chat.
+    const held = chat.current
+    const items = itemsRef.current
+    const messages = items.filter((i) => !i.stopped).map(toMessage)
+    const title = chatTitle(items)
+    const fields = {
+      contextPaths: contextRef.current,
+      sessionId: sessionId.current,
+      messages,
+      agentId: agentRef.current,
+      chatId: chatIdRef.current,
+    }
     const run = async () => {
-      const messages = itemsRef.current.filter((i) => !i.stopped).map(toMessage)
-      const base = {
-        // The title only when the chat is made: a saved chat keeps its own (a rename stays).
-        ...(chat.current.path ? {} : { title: chatTitle(itemsRef.current) }),
-        contextPaths: contextRef.current,
-        sessionId: sessionId.current,
-        messages,
-        agentId: agentRef.current,
-        chatId: chatIdRef.current,
-      }
-      const seq = loadSeq.current
+      if (messages.length === 0) return
+      // Still the chat shown: its current holder (a load may have set it); else the one it had.
+      const target = seq === loadSeq.current ? chat.current : held
+      // The title only when the chat is made: a saved chat keeps its own (a rename stays).
+      const base = { ...(target.path ? {} : { title }), ...fields }
       try {
         let res
         try {
-          res = await api.saveAiChat({ ...base, path: chat.current.path, baseVersion: chat.current.version })
+          res = await api.saveAiChat({ ...base, path: target.path, baseVersion: target.version })
         } catch (e) {
-          if (!(e instanceof ConflictError) || !chat.current.path) throw e
-          const fresh = await api.aiChatLoad(chat.current.path)
+          if (!(e instanceof ConflictError) || !target.path) throw e
+          const fresh = await api.aiChatLoad(target.path)
           // Saved over only when nothing but this panel's own turns were added: else stop, and keep
           // what was changed elsewhere.
           if (!isPrefix(fresh.messages, messages)) {
             if (seq === loadSeq.current && alive.current) setSaveError(T.changedElsewhere)
             return
           }
-          res = await api.saveAiChat({ ...base, path: chat.current.path, baseVersion: fresh.version })
+          res = await api.saveAiChat({ ...base, path: target.path, baseVersion: fresh.version })
         }
+        // Kept in the holder, so a later queued save of this chat goes to the same object.
+        target.path = res.path
+        target.version = res.version
         // A "New chat" (or another chat) since: this save no longer names what is shown.
         if (seq !== loadSeq.current) return
-        chat.current = { path: res.path, version: res.version }
         setSaveError(null)
         if (alive.current) useTabs.getState().replaceSidepanelEntryTarget(entryId, { kind: 'aiChat', path: res.path })
       } catch (e) {

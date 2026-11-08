@@ -188,6 +188,22 @@ describe('valueForGroup', () => {
     expect(valueForGroup(by('due', 'day'), doing, { type: 'datetime', options: {} })).toBeNull()
   })
 
+  // Audit 2026-11-07 #41: a textBlock column is its value's first paragraph, so a drop would write
+  // only that and lose the rest: such a card isn't dropped into another column (as dates and
+  // formulas). Fix-pass L3: a card whose value is one paragraph loses nothing, so it still moves.
+  test('a drop that would lose text from a textBlock value is refused; one paragraph still moves', () => {
+    const body = propertyDef({ id: 'body', type: 'textBlock' })
+    const withBody = typeDef({ id: 'page', propertyDefinitions: [propertyDef({ id: 'title', type: 'entity_title' }), body] })
+    const rows = [R('a', { body: 'First\n\nSecond paragraph' }), R('b', { body: 'Other' }), R('c', { body: 'Third\n\n' })]
+    const { groups } = groupRows(rows, by('body'), undefined, ctx({ types: [withBody] }))
+    const [ga, gb, gc] = ['a', 'b', 'c'].map((p) => groups.find((g) => g.rows[0].summary.path === p)!)
+    expect(ga.label).toBe('First')
+    expect(valueForGroup(by('body'), gb, body, { row: ga.rows[0], from: ga })).toBeNull()
+    expect(valueForGroup(by('body'), ga, body, { row: gb.rows[0], from: gb })).toEqual({ key: 'body', value: 'First' })
+    expect(valueForGroup(by('body'), gb, body, { row: gc.rows[0], from: gc })).toEqual({ key: 'body', value: 'Other' })
+    expect(valueForGroup(by('body'), gb, body)).toEqual({ key: 'body', value: 'Other' })
+  })
+
   test('collection ids resolve in groups', () => {
     const c = collection({ id: 'tools', name: 'Tooling' })
     const { groups } = groupRows([R('a', {}, { collections: ['tooling'] })], by('collections'), undefined, ctx({ collections: [c] }))

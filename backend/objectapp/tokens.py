@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any
 
 from .appstate import state_dir
+from .textfile import atomic_write
 
 __all__ = [
     "SCOPES",
@@ -62,6 +63,10 @@ def _now() -> str:
 # ``/api/v1`` router's store accepts the token the AI router made. Never written to disk.
 _EPHEMERAL: dict[str, TokenRecord] = {}
 _EPHEMERAL_LOCK = threading.Lock()
+_FILE_LOCK = threading.RLock()
+"""Guards ``api-tokens.json`` across every `TokenStore` in the process (audit 2026-11-07 #22)."""
+_ACTIVITY_LOCK = threading.Lock()
+"""Guards ``api-activity.jsonl`` across every `ActivityLog` in the process (its append and trim)."""
 
 
 def _hash(secret: str) -> str:
@@ -131,7 +136,9 @@ class TokenStore:
     def __init__(self, root: Path, folder: Path | None = None) -> None:
         self.space = _space_key(root)
         self._folder = folder
-        self._lock = threading.Lock()
+        # Each router makes its own store on the same file: one lock for them all, or one
+        # store's read-modify-write loses another's token (audit 2026-11-07 #22).
+        self._lock = _FILE_LOCK
 
     @property
     def path(self) -> Path:
@@ -156,11 +163,11 @@ class TokenStore:
 
     def _save(self, tokens: list[TokenRecord]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".json.tmp")
-        tmp.write_text(
-            json.dumps({"tokens": [_stored(t) for t in tokens]}, indent=2), encoding="utf-8"
+        # A temp file of its own (never a fixed ``.json.tmp`` another writer also renames).
+        atomic_write(
+            self.path,
+            json.dumps({"tokens": [_stored(t) for t in tokens]}, indent=2).encode("utf-8"),
         )
-        os.replace(tmp, self.path)
 
     # -- API ------------------------------------------------------------------
 
@@ -290,7 +297,7 @@ class ActivityLog:
     def __init__(self, root: Path, folder: Path | None = None) -> None:
         self.space = _space_key(root)
         self._folder = folder
-        self._lock = threading.Lock()
+        self._lock = _ACTIVITY_LOCK  # every instance on the file (the router's, each guard's)
 
     @property
     def path(self) -> Path:
@@ -318,9 +325,7 @@ class ActivityLog:
     def _trim(self) -> None:
         lines = self.path.read_text(encoding="utf-8").splitlines()
         if len(lines) > 2 * ACTIVITY_KEEP:
-            tmp = self.path.with_suffix(".jsonl.tmp")
-            tmp.write_text("\n".join(lines[-ACTIVITY_KEEP:]) + "\n", encoding="utf-8")
-            os.replace(tmp, self.path)
+            atomic_write(self.path, ("\n".join(lines[-ACTIVITY_KEEP:]) + "\n").encode("utf-8"))
 
     def since(self, at: str | None, limit: int = 200) -> list[dict[str, Any]]:
         with self._lock:

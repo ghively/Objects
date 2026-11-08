@@ -121,7 +121,8 @@ def _form(p: Path) -> str:
 
 
 def test_run_loads_only_project_and_local_settings(env, monkeypatch) -> None:
-    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(env["tmp"] / "elsewhere"))
+    config = env["tmp"] / "elsewhere"
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(config))
     cmd = _build(_scope(env))
     i = cmd.args.index("--setting-sources")
     assert cmd.args[i : i + 2] == ["--setting-sources", "project,local"]
@@ -129,8 +130,49 @@ def test_run_loads_only_project_and_local_settings(env, monkeypatch) -> None:
         assert a != "user"
         assert "user" not in a.split(","), a
     assert _value(cmd.args, "--setting-sources") == "project,local"
-    assert "CLAUDE_CONFIG_DIR" not in cmd.env
+    # Audit 20: the user's config dir (where their login lives) is kept, and its CLAUDE.md, rules
+    # and credentials are kept out of the run as ~/.claude's are.
+    assert cmd.env["CLAUDE_CONFIG_DIR"] == str(config)
+    form = str(config.resolve()).replace("\\", "/")
+    excludes = cmd.run_settings["claudeMdExcludes"]
+    assert form + "/CLAUDE.md" in excludes and form + "/rules/**" in excludes
+    deny = cmd.run_settings["permissions"]["deny"]
+    rp = rule_path(config.resolve())
+    assert f"Read({rp}/.credentials.json)" in deny and f"Edit({rp}/**)" in deny
     assert cmd.cwd == env["folder"].resolve()
+
+
+def test_relative_or_linked_config_dir_is_passed_absolute_and_fenced(env, monkeypatch) -> None:
+    """Review of audit 20: a relative CLAUDE_CONFIG_DIR would mean another folder to the CLI (its
+    cwd is the agent folder) than the one fenced: the run gets the absolute path Object fences, and
+    a config dir reached through a link is fenced by both its paths."""
+    import fake_claude
+
+    start = env["tmp"] / "start"
+    real = env["tmp"] / "real-config"
+    for d in (start, real):
+        d.mkdir()
+    monkeypatch.chdir(start)
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", "cfg")
+    cmd = _build(_scope(env))
+    config = start / "cfg"
+    assert cmd.env["CLAUDE_CONFIG_DIR"] == str(config)
+    deny = cmd.run_settings["permissions"]["deny"]
+    assert fake_claude._denied("Read", str(config / ".credentials.json"), deny)
+    assert fake_claude._denied("Edit", str(config / "settings.json"), deny)
+
+    link = start / "linked"
+    try:
+        link.symlink_to(real, target_is_directory=True)
+    except OSError:
+        pytest.skip("no symlinks here")
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", "linked")
+    cmd = _build(_scope(env))
+    assert cmd.env["CLAUDE_CONFIG_DIR"] == str(link)
+    deny = cmd.run_settings["permissions"]["deny"]
+    for base in (link, real.resolve()):
+        assert fake_claude._denied("Read", str(base / ".credentials.json"), deny), base
+        assert fake_claude._denied("Edit", str(base / "CLAUDE.md"), deny), base
 
 
 def test_run_settings_keep_user_instructions_out(env) -> None:
@@ -168,15 +210,26 @@ def test_run_settings_keep_user_instructions_out(env) -> None:
 
 
 def test_run_env_drops_parent_session_vars(env, monkeypatch) -> None:
-    for name in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_AGENT_SDK_VERSION", "AI_AGENT"):
+    session = ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SSE_PORT", "CLAUDE_CODE_USE_CCR_V2",
+               "CLAUDE_AGENT_SDK_VERSION", "AI_AGENT")
+    sign_in = ("CLAUDE_CONFIG_DIR", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK",
+               "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY")
+    for name in (*session, *sign_in):
         monkeypatch.setenv(name, "1")
+    config = str(env["tmp"] / "config")  # absolute: a relative one is made absolute for the run
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", config)
     cmd = _build(_scope(env))
-    for name in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_AGENT_SDK_VERSION", "AI_AGENT"):
+    for name in session:
         assert name not in cmd.env
-    assert not any(k.upper().startswith(RUN_ENV_DROP) for k in cmd.env)
+    for name in sign_in:  # audit 20: how the user signs in to Claude Code reaches every turn
+        assert cmd.env[name] == (config if name == "CLAUDE_CONFIG_DIR" else "1"), name
+    assert not any(k.upper().startswith(RUN_ENV_DROP) for k in cmd.env if k not in agentrun.RUN_ENV_KEEP)
+    different = {k for k, v in agentrun.run_base_env().items() if cmd.env.get(k) != v}
+    assert different <= {"OBJECT_API_URL", "MCP_TOOL_TIMEOUT"}, different  # set by the run itself
     assert "PATH" in {k.upper() for k in cmd.env}
     assert cmd.env["OBJECT_API_URL"] == "http://127.0.0.1:8765"
-    assert cmd.env["OBJECT_API_TOKEN"] == SECRET
+    # Audit 7: every stdio server inherits the CLI's environment, so the token isn't in it.
+    assert "OBJECT_API_TOKEN" not in cmd.env and SECRET not in cmd.env.values()
 
 
 def test_cli_flags(env) -> None:
@@ -200,17 +253,18 @@ def test_mcp_config(env) -> None:
     assert servers["object-agent"]["args"] == ["-m", "objectapp.agent_mcp"]
     for name in ("object", "object-agent"):
         assert servers[name]["command"] == sys.executable
-        assert servers[name]["env"]["OBJECT_API_TOKEN"] == "${OBJECT_API_TOKEN}"
+        assert servers[name]["env"]["OBJECT_API_TOKEN"] == SECRET  # Object's own servers only (audit 7)
         assert servers[name]["env"]["OBJECT_API_URL"] == "http://127.0.0.1:8765"
     assert json.loads((cmd.tmp / "mcp.json").read_text(encoding="utf-8")) == cmd.mcp_config
     assert _value(cmd.args, "--mcp-config") == str(cmd.tmp / "mcp.json")
     ro = _build(_scope(env, write=False, purpose="proposal"))
     assert ro.mcp_config["mcpServers"]["object"]["args"] == ["-m", "objectapp.mcp_server", "--read-only"]
     for c in (cmd, ro):
-        assert c.env["OBJECT_API_TOKEN"] == SECRET
-        for f in c.tmp.rglob("*"):
-            if f.is_file():
-                assert SECRET not in f.read_text(encoding="utf-8"), f
+        assert "OBJECT_API_TOKEN" not in c.env
+        assert SECRET not in json.dumps({k: v for k, v in c.mcp_config["mcpServers"].items()
+                                          if k not in ("object", "object-agent")})
+        for name in ("run-settings.json", "append.md"):
+            assert SECRET not in (c.tmp / name).read_text(encoding="utf-8"), name
         assert SECRET not in " ".join(c.args)
 
 
@@ -235,10 +289,39 @@ def test_folder_servers(env, monkeypatch) -> None:
 
     monkeypatch.setattr(agentrun, "SECRET_LOOKUP", lambda name: "gh-value-9" if name == "GH_TOKEN" else None)
     cmd = _build(_scope(env))
-    assert cmd.mcp_config["mcpServers"]["gh"]["env"]["GH_TOKEN"] == "${GH_TOKEN}"
-    assert cmd.env["GH_TOKEN"] == "gh-value-9"
-    assert "gh-value-9" not in (cmd.tmp / "mcp.json").read_text(encoding="utf-8")
+    # Audit 7: the value is filled into the server's own entry, never the CLI's environment.
+    assert cmd.mcp_config["mcpServers"]["gh"]["env"]["GH_TOKEN"] == "gh-value-9"
+    assert "gh-value-9" not in cmd.env.values()
+    assert "gh-value-9" not in json.dumps(cmd.mcp_config["mcpServers"]["plain"])
     assert "mcp__gh" in _value(cmd.args, "--allowedTools").split(",")
+
+
+def test_outside_stdio_servers_dont_inherit_the_claude_sign_in(env, monkeypatch) -> None:
+    """Review of audit 20: the CLI hands its environment (with how the user signs in to Claude
+    Code) to every stdio server; each outside one gets those names set empty in its own env,
+    unless its config sets the name itself. Object's own servers and remote ones are left alone."""
+    names = (*agentrun.RUN_ENV_KEEP, "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+    for name in names:
+        monkeypatch.setenv(name, "sign-in-7")
+    mcp = {"mcpServers": {
+        "plain": {"command": "node", "args": ["srv.js"]},
+        "own-key": {"type": "stdio", "command": "x", "env": {"ANTHROPIC_API_KEY": "its-own", "A": "1"}},
+        "remote": {"type": "http", "url": "https://example.test/mcp"},
+    }}
+    (env["folder"] / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
+    cmd = _build(_scope(env))
+    servers = cmd.mcp_config["mcpServers"]
+    for name in names:
+        assert cmd.env[name] == "sign-in-7"  # the CLI itself still signs in
+        assert servers["plain"]["env"][name] == "", name
+    assert servers["own-key"]["env"]["ANTHROPIC_API_KEY"] == "its-own"
+    assert servers["own-key"]["env"]["A"] == "1"
+    assert all(servers["own-key"]["env"][n] == "" for n in agentrun.RUN_ENV_KEEP)
+    assert servers["remote"] == mcp["mcpServers"]["remote"]
+    for own in ("object", "object-agent"):
+        assert set(servers[own]["env"]) == {"OBJECT_API_URL", "OBJECT_API_TOKEN"}
+    assert json.loads((cmd.tmp / "mcp.json").read_text(encoding="utf-8")) == cmd.mcp_config
+    assert "sign-in-7" not in json.dumps(servers)
 
 
 def test_guidance_appended(env) -> None:
@@ -364,7 +447,7 @@ def test_fence_rules_shape(tmp_path: Path) -> None:
     rules = fence_rules([tmp_path / "S"], tmp_path / "A", tmp_path / "st", tmp_path / "h")
     s = rule_path((tmp_path / "S").resolve())
     assert rules[:2] == [f"Read({s}/**)", f"Edit({s}/**)"]
-    assert len(rules) == 2 + 5 + 3 + 3
+    assert len(rules) == 2 + 5 + 3 + 4 + 3  # + history and fake-trash (audit 3)
 
 
 def test_fake_write_to_own_server_and_local_files_is_denied(env) -> None:
@@ -409,6 +492,63 @@ def test_fence_covers_the_cache_dir_override(env, monkeypatch) -> None:
     monkeypatch.delenv("OBJECT_CACHE_DIR")
     deny = _build(_scope(env)).run_settings["permissions"]["deny"]
     assert f"Read({rp}/**)" not in deny
+
+
+def test_fence_covers_version_history_and_deleted_spaces(env) -> None:
+    """Audit 3: saved versions (``<state>/history``) and deleted spaces (``<state>/fake-trash``)
+    are fenced at every depth, while the agent's own folder under ``<state>/agents`` stays open."""
+    import fake_claude
+
+    state = env["state"].resolve()
+    deny = _build(_scope(env)).run_settings["permissions"]["deny"]
+    for target in (state / "history" / "0123abcd" / "Notes%2FSecret.md" / "20261107T120000Z.md",
+                   state / "history" / "0123abcd" / "index.json",
+                   state / "fake-trash" / "Old Space" / "Secret.md"):
+        assert fake_claude._denied("Read", str(target), deny), target
+        assert fake_claude._denied("Edit", str(target), deny), target
+        assert fake_claude._denied("Grep", str(target.parent), deny), target
+    mine = env["folder"].resolve() / "notes" / "draft.md"
+    assert not fake_claude._denied("Read", str(mine), deny)
+    assert not fake_claude._denied("Edit", str(mine), deny)
+
+
+def test_fence_covers_the_runs_own_temp_folder(env) -> None:
+    """Review of audit 7: the run's temp folder holds mcp.json with the servers' secrets; the file
+    tools are denied on it, by its given and its resolved path."""
+    import fake_claude
+
+    cmd = _build(_scope(env))
+    deny = cmd.run_settings["permissions"]["deny"]
+    assert json.loads((cmd.tmp / "run-settings.json").read_text(encoding="utf-8")) == cmd.run_settings
+    for tmp in (Path(os.path.abspath(cmd.tmp)), cmd.tmp.resolve()):
+        for tool in ("Read", "Edit", "Write"):
+            assert fake_claude._denied(tool, str(tmp / "mcp.json"), deny), (tool, tmp)
+        for tool in ("Grep", "Glob"):
+            assert fake_claude._denied(tool, str(tmp), deny), (tool, tmp)
+
+
+def test_stale_run_folders_are_swept_at_the_next_run(env, monkeypatch) -> None:
+    """A run folder left behind (Object stopped mid-run) holds secrets: the next run removes every
+    ``object-agent-run-*`` folder older than a day, and nothing else."""
+    import tempfile
+    import time
+
+    temp = env["tmp"] / "temp"
+    temp.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(temp))
+    old = time.time() - 2 * 86400
+    stale, fresh, other = temp / "object-agent-run-old1", temp / "object-agent-run-new1", temp / "other-old"
+    for d in (stale, fresh, other):
+        d.mkdir()
+        (d / "mcp.json").write_text("{}", encoding="utf-8")
+    stale_file = temp / "object-agent-run-file"
+    stale_file.write_text("x", encoding="utf-8")
+    for p in (stale, stale / "mcp.json", other, stale_file):
+        os.utime(p, (old, old))
+    cmd = _build(_scope(env))
+    assert cmd.tmp.parent == temp and cmd.tmp.is_dir()
+    assert not stale.exists()
+    assert fresh.is_dir() and other.is_dir() and stale_file.is_file()
 
 
 def test_fence_folders(env) -> None:
@@ -467,6 +607,24 @@ def test_nested_agent_and_space_refuse_to_run(env) -> None:
     assert nesting_problem(env["folder"], [space]) is None
     if WINDOWS:
         assert nesting_problem(Path(str(inside).upper()), [space]) == NESTED_MESSAGE
+
+
+def test_nested_agent_names_what_it_hit(env) -> None:
+    """Audit 13: an agent inside another agent's folder, inside the agent trash, or that is the
+    agents folder itself, is refused with a message that says which."""
+    from objectapp.agentrun import NESTED_AGENT, NESTED_AGENTS_DIR, NESTED_TRASH
+
+    outer = env["state"] / "agents" / "Outer"
+    inner = outer / "Inner"
+    (inner / ".claude").mkdir(parents=True)
+    env["others"].extend([outer, inner])
+    for agent, message in ((inner, NESTED_AGENT), (outer, NESTED_AGENT),
+                           (env["state"] / "agents" / ".trash" / "Old", NESTED_TRASH),
+                           (env["state"] / "agents", NESTED_AGENTS_DIR)):
+        agent.mkdir(parents=True, exist_ok=True)
+        with pytest.raises(RunRefused) as e:
+            build_run(_scope(env, agent=_agent(agent)), claude="claude", model=None, resume=None)
+        assert e.value.message == message, agent
 
 
 # -- tool switches ------------------------------------------------------------------------------

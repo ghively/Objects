@@ -272,7 +272,7 @@ async def delegate(
                 api_url=api_url, prompt=prompt, title=default_title([{"role": "user", "text": goal}]),
                 purpose="delegate", model=effective_model(target, settings), timeout=timeout,
                 header={"delegated": True, "delegated_from": caller.id, "from_chat": caller_token.chat},
-                stop=stop, announce=announce,
+                stop=stop, announce=announce, scope=caller_token.scope, budget=_left(caller_token),
             )
         except agentrun.RunRefused as exc:
             raise DelegationError(409, CANT_RUN.format(name=name, reason=exc.message)) from exc
@@ -286,6 +286,13 @@ async def delegate(
     finally:
         _unmark(chat_id)
         LIMITER.leave(caller_token.id)
+
+
+def _left(token: TokenRecord) -> int | None:
+    """The tool steps the caller's token has left (None: no budget)."""
+    if token.budget is None:
+        return None
+    return max(token.budget - token.used, 0)
 
 
 async def _delegate_remote(ctx: ApiContext, target: AgentRecord, name: str, prompt: str, caller: AgentRecord,
@@ -325,8 +332,8 @@ async def _delegate_remote(ctx: ApiContext, target: AgentRecord, name: str, prom
 
 def delegation_contributor(scope: agentrun.RunScope, parts: agentrun.RunParts) -> None:
     """Order 64 ``delegation``: a ``delegate`` run loses ``delegate`` and ``remote_agent_call``
-    (one level only); every run's MCP tool calls may last as long as a delegation, plus a minute."""
-    if scope.purpose == "delegate":
+    (one level only), and so does a read-only run (it would hand writes on); every run's MCP tool calls may last as long as a delegation, plus a minute."""
+    if scope.purpose == "delegate" or not scope.write:
         for tool in FLAT_TOOLS:
             while tool in parts.allowed:
                 parts.allowed.remove(tool)

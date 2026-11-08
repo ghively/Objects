@@ -128,3 +128,60 @@ def test_finished_entries_capped(tmp_path):
     ents = s.entries()
     assert sum(e["state"] == "done" for e in ents) == 500
     assert {p["id"], f["id"]} <= {e["id"] for e in ents}
+
+
+def test_a_no_op_edit_of_an_approved_step_withdraws_nothing():
+    """Audit 10: an approved step's text and kind can't change, so an edit of one changed nothing
+    and must not withdraw its entry."""
+    assert plan_for_notice(notice("edit", before="approved", after="approved")) is None
+    plan = plan_for_notice(notice("edit", before="open", after="open"))
+    assert plan.withdraw_step == "r8k1pd" and plan.stop_running
+
+
+def test_failed_entries_capped_too(tmp_path):
+    """Audit 33: failed entries were kept forever; the most recent KEEP_FINISHED stay."""
+    s = store(tmp_path)
+    for i in range(510):
+        s.add({"kind": "note", "path": P, "state": "failed"}, now=NOW + timedelta(seconds=i))
+    pending = s.add({"kind": "note", "path": P}, now=NOW)
+    ents = s.entries()
+    failed = [e for e in ents if e["state"] == "failed"]
+    assert len(failed) == 500
+    assert failed[0]["createdAt"] == (NOW + timedelta(seconds=10)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    assert pending["id"] in {e["id"] for e in ents}
+
+
+def test_two_concurrent_requeues_add_one_entry(tmp_path, monkeypatch):
+    """Review of audit 10: "the last entry for this step is withdrawn, then add" runs under the
+    queue's lock, so two callers at once (the watcher and a route) can't both queue the step."""
+    import contextlib
+    import threading
+    from types import SimpleNamespace
+
+    from objectapp.workloop import WorkLoop
+
+    s = store(tmp_path)
+    first = s.add({"kind": "approve", "path": P, "stepId": "r8k1pd", "stepKind": "approve", "by": "Gene"},
+                  now=NOW)
+    s.update(first["id"], state="withdrawn", reason=WITHDRAWN_REDECIDED)
+    # both callers read the queue before either adds: the window the lock closes
+    both_read = threading.Barrier(2, timeout=2)
+    entries = QueueStore.entries
+
+    def slow_entries(self):
+        out = entries(self)
+        with contextlib.suppress(threading.BrokenBarrierError):
+            both_read.wait()
+        return out
+
+    monkeypatch.setattr(QueueStore, "entries", slow_entries)
+    loop = SimpleNamespace(store=s, clock=lambda: NOW, _event=lambda _id: None, wake=lambda: None)
+    item = {"path": P, "steps": [{"id": "r8k1pd", "n": 2, "kind": "approve", "state": "approved",
+                                  "current": True, "text": "Restart the print spooler"}]}
+    threads = [threading.Thread(target=WorkLoop._requeue_approved, args=(loop, item)) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(10)
+    monkeypatch.setattr(QueueStore, "entries", entries)
+    assert [e["state"] for e in s.entries()] == ["withdrawn", "pending"]

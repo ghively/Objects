@@ -183,3 +183,117 @@ def test_supported_suffixes_and_no_write(tmp_path):
     before = (p.stat().st_mtime_ns, sorted(tmp_path.iterdir()))
     readers.read_file(p)
     assert before == (p.stat().st_mtime_ns, sorted(tmp_path.iterdir()))
+
+
+def test_office_files_over_the_unpacked_size_cap_are_not_parsed(tmp_path, monkeypatch):
+    """Audit 30: a small docx/pptx/xlsx can inflate to hundreds of MB; its parts' unpacked size is
+    checked before any parser opens it, and it is kept as Original only."""
+    import docx as docx_lib
+    import openpyxl
+    import pptx as pptx_lib
+
+    from objectapp.readers import docx as docx_reader
+    from objectapp.readers import pptx as pptx_reader
+    from objectapp.readers import util
+
+    d = tmp_path / "bomb.docx"
+    Document().save(d)
+    s = tmp_path / "bomb.pptx"
+    Presentation().save(s)
+    x = tmp_path / "bomb.xlsx"
+    Workbook().save(x)
+    sizes = {p: sum(i.file_size for i in zipfile.ZipFile(p).infolist()) for p in (d, s, x)}
+    monkeypatch.setattr(util, "MAX_OFFICE_UNPACKED_BYTES", min(sizes.values()) - 1)
+
+    def boom(*_a, **_k):
+        raise AssertionError("parsed a file over the cap")
+
+    monkeypatch.setattr(docx_reader, "Document", boom)
+    monkeypatch.setattr(pptx_reader, "Presentation", boom)
+    monkeypatch.setattr(openpyxl, "load_workbook", boom)
+    for p in (d, s, x):
+        r = readers.read_file(p)
+        assert r.original_only and r.markdown == "" and r.notes == ["Too large to read", "Original only"]
+    assert docx_lib and pptx_lib
+
+
+def test_xlsx_is_read_streaming(tmp_path, monkeypatch):
+    """Audit 30: xlsx is opened read-only (streamed) and keeps only the rows a table can show, while
+    a too-large sheet is still found past trailing blank rows and merged cells are still noted."""
+    import openpyxl
+
+    p = tmp_path / "s.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Gap"
+    for i in range(150):
+        ws.append([i, 1])
+    ws.cell(row=300, column=1, value="late")  # rows 151-299 blank: still 300 rows
+    m = wb.create_sheet("Merged")
+    m.append(["a", "b"])
+    m.merge_cells("A1:B1")
+    wb.save(p)
+    seen: list[dict] = []
+    real = openpyxl.load_workbook
+
+    def spy(*a, **k):
+        seen.append(k)
+        return real(*a, **k)
+
+    monkeypatch.setattr(openpyxl, "load_workbook", spy)
+    r = readers.read_file(p)
+    assert seen and all(k.get("read_only") for k in seen)
+    assert "Sheet 'Gap' has 300 rows x 2 columns" in r.markdown and "| 100 |" not in r.markdown
+    assert "## Merged" in r.markdown and "Merged cells flattened" in r.notes
+
+
+def test_html_drops_unsafe_links_and_never_keeps_a_remote_image(tmp_path):
+    """Audit 31: only http(s), mailto and relative links are kept; a javascript:, file: or data:
+    link becomes its text. A remote image becomes a plain link (its alt text, or "Image"), so the
+    page never fetches it; a data: or file: image keeps only its alt text."""
+    p = tmp_path / "x.html"
+    p.write_text(
+        "<html><body>"
+        "<p><a href='javascript:alert(1)'>js</a> <a href=' JaVa\tScript:alert(1)'>js2</a> "
+        "<a href='file:///etc/passwd'>pw</a> <a href='data:text/html,hi'>dt</a> "
+        "<a href='https://ok.example/a'>web</a> <a href='mailto:a@b.example'>mail</a> "
+        "<a href='other.html'>rel</a> <a href='//cdn.example/x'>proto</a></p>"
+        "<p><img src='https://evil.example/pixel.png?u=1' alt='Chart'> <img src='http://evil.example/b.png'> "
+        "<img src='data:image/png;base64,AAAA' alt='Inline'> <img src='file:///c/x.png'> "
+        "<img src='pics/local.png' alt='Local'></p>"
+        "</body></html>",
+        encoding="utf-8",
+    )
+    md = readers.read_file(p).markdown
+    for bad in ("javascript", "JaVa", "file:", "data:", "//cdn.example", "![Chart]", "![](http"):
+        assert bad not in md, (bad, md)
+    for text in ("js", "js2", "pw", "dt", "proto", "Inline"):
+        assert text in md
+    assert "[web](https://ok.example/a)" in md and "[mail](mailto:a@b.example)" in md and "[rel](other.html)" in md
+    assert "[Chart](https://evil.example/pixel.png?u=1)" in md and "[Image](http://evil.example/b.png)" in md
+    assert "![Local](pics/local.png)" in md
+
+
+def test_docx_drops_unsafe_hyperlinks(tmp_path):
+    """Audit 31: a docx hyperlink to javascript: or file: keeps only its text."""
+    from docx.opc.constants import RELATIONSHIP_TYPE as RT
+    from docx.oxml.ns import qn
+    from docx.oxml.parser import OxmlElement
+
+    p = tmp_path / "links.docx"
+    d = Document()
+    para = d.add_paragraph("See ")
+    for url, text in (("javascript:alert(1)", "js"), ("file:///etc/passwd", "pw"), ("https://ok.example/", "web")):
+        rid = d.part.relate_to(url, RT.HYPERLINK, is_external=True)
+        h = OxmlElement("w:hyperlink")
+        h.set(qn("r:id"), rid)
+        r = OxmlElement("w:r")
+        t = OxmlElement("w:t")
+        t.text = text
+        r.append(t)
+        h.append(r)
+        para._p.append(h)
+    d.save(p)
+    md = readers.read_file(p).markdown
+    assert "javascript" not in md and "file:" not in md
+    assert "js" in md and "pw" in md and "[web](https://ok.example/)" in md

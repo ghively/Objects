@@ -136,7 +136,8 @@ def iter_object_paths(root: Path) -> Iterator[str]:
     """Every ``*.md`` object file under `root`, as sorted space-relative POSIX paths.
 
     The suffix matches in any case (``Note.MD``), as `Space._rel` and the watcher accept
-    it on every system; dot-folders are not entered.
+    it on every system; dot-folders and symlinked folders are not entered, and symlinked
+    files are skipped.
     """
     root = Path(root)
     found = []
@@ -146,13 +147,24 @@ def iter_object_paths(root: Path) -> Iterator[str]:
         for name in files:
             if name.startswith(".") or not name.lower().endswith(".md"):
                 continue
-            if not os.path.isfile(os.path.join(folder, name)):
+            full = os.path.join(folder, name)
+            # A symlinked file is skipped: its target may lie outside the space (where
+            # every per-object call refuses it) and its text must not be listed or searched.
+            if os.path.islink(full) or not os.path.isfile(full):
                 continue
             rel = base / name
             if is_ignored(rel):
                 continue
             found.append(rel.as_posix())
     yield from sorted(found)
+
+
+def _lone_cr_endings(text: str) -> bool:
+    """Whether ``text`` (``\\r\\n`` already normalised) ends its lines with a lone ``\\r``:
+    mostly, or on its opening ``---`` fence."""
+    if "\r" not in text:
+        return False
+    return text.startswith("---\r") or text.count("\r") > text.count("\n")
 
 
 def read_raw(root: Path, rel: str, cache: bool = True) -> RawObject:
@@ -180,7 +192,8 @@ def read_raw(root: Path, rel: str, cache: bool = True) -> RawObject:
         else:
             try:
                 fm = parse_fm(of.frontmatter_src)
-            except FrontmatterError as exc:
+            except (FrontmatterError, TypeError, ValueError, RecursionError) as exc:
+                # Any parse failure is a bad file, never a space that can't open.
                 fm = {}
                 read_only = True
                 reason = f"Frontmatter is not valid YAML: {exc}"
@@ -196,6 +209,11 @@ def read_raw(root: Path, rel: str, cache: bool = True) -> RawObject:
         # Saving would have to re-encode bytes the editor never saw correctly.
         read_only = True
         reason = "The file is not valid UTF-8 text"
+    if not read_only and _lone_cr_endings(text):
+        # Its `---` fence isn't seen as one, so a property edit would put a second
+        # frontmatter block above it (bug audit 2026-11-07, 26).
+        read_only = True
+        reason = "The file's line endings are CR only, which can't be edited"
     return RawObject(
         path=rel,
         data=data,

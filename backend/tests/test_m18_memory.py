@@ -251,6 +251,31 @@ def test_torn_ledger_line_is_skipped(folder: Path) -> None:
     assert len(_ledger(folder)) == 3
 
 
+def test_ledger_reads_reuse_the_parse_of_an_unchanged_file(folder: Path, monkeypatch) -> None:
+    """Audit 36: reading an unchanged ledger doesn't parse the whole file again; a change does."""
+    _add(folder, "one")
+    _add(folder, "two")
+    real = ledger.json.loads
+    calls: list[int] = []
+
+    def counting(*args, **kw):
+        calls.append(1)
+        return real(*args, **kw)
+
+    monkeypatch.setattr(ledger.json, "loads", counting)
+    first = _ledger(folder)
+    parsed = len(calls)
+    assert len(first) == 2
+    first[0]["after"] = "changed by a caller"  # a caller's copy, not the cache
+    again = _ledger(folder)
+    assert len(calls) == parsed  # no parse
+    assert again[0]["after"] == "one\n§\ntwo"
+    assert ledger.get(folder, again[1]["id"])["after"] == "one" and len(calls) == parsed
+    _add(folder, "three")  # the file grew: parsed again
+    assert _ledger(folder)[0]["after"] == "one\n§\ntwo\n§\nthree"
+    assert len(calls) > parsed
+
+
 def test_ledger_filters_and_lines(folder: Path) -> None:
     run_source = dict(SOURCE, kind="review", run="R1")
     apply(folder, "add", "memory", content="a", old_text=None, source=run_source, caps=CAPS)

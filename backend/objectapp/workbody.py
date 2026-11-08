@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from typing import TypedDict
 
-from .apiquery import _find, _headings
+from .apiquery import _FENCE, _find
 from .workmodel import KIND_LABELS, StepKind
 
 __all__ = [
@@ -229,6 +229,27 @@ def _entry(line: str) -> list[str]:
     return ["- " + parts[0] + "\n"] + [_continuation(p) + "\n" for p in parts[1:]]
 
 
+_FENCE_RUN = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+
+
+def _open_fence(lines: list[str]) -> str | None:
+    """The fence (its full run of backticks or tildes) that is still open at the end of
+    ``lines``, read the way ``_find`` reads fences; None when every fence is closed."""
+    fence: str | None = None
+    run = ""
+    for line in lines:
+        bare = line.rstrip("\r\n")
+        m = _FENCE.match(bare)
+        if not m:
+            continue
+        if fence is None:
+            fence = m.group(1)
+            run = _FENCE_RUN.match(bare).group(1)  # type: ignore[union-attr]
+        elif m.group(1) == fence:
+            fence = None
+    return run if fence is not None else None
+
+
 def append_line(body: str, heading: str, line: str) -> str:
     """``body`` with ``- <line>`` after the last non-blank line of the ``heading`` section (any
     level, case-insensitive, outside fenced code), with no blank line between list lines.
@@ -236,7 +257,9 @@ def append_line(body: str, heading: str, line: str) -> str:
     A missing section is created as ``## <heading>``, a blank line and the line: before the
     ``Wrap-up`` heading when there is one (one blank line after it), else at the end of the body
     after one blank line. Later lines of a multi-line ``line`` are indented two spaces (one that
-    would open a code fence or a heading gets a backslash in front).
+    would open a code fence or a heading gets a backslash in front). A body that ends inside a code
+    fence (a pasted log never closed) gets the closing fence first, so the new section is a section
+    (the fence ran to the end anyway, so the text in it reads the same).
     """
     lines = body.splitlines(keepends=True)
     entry = _entry(line)
@@ -267,6 +290,9 @@ def append_line(body: str, heading: str, line: str) -> str:
         return "".join(block)
     if not body.endswith("\n"):
         body += "\n"
+    fence = _open_fence(lines)
+    if fence is not None:
+        body += fence + "\n"
     if not body.endswith("\n\n"):
         body += "\n"
     return body + "".join(block)
@@ -285,10 +311,8 @@ def _section_lines(body: str, heading: str) -> list[str]:
     if span is None:
         return []
     start, end = span
-    # a sub-heading ends this section's own list
-    for i, _lvl, _t in _headings(lines[start + 1 : end]):
-        end = start + 1 + i
-        break
+    # Lines under a sub-heading are read too: ``append_line`` appends at the end of the whole
+    # section, so they can be the newest lines. The sub-heading lines themselves match no line form.
     return [ln.rstrip("\r\n") for ln in lines[start + 1 : end]]
 
 

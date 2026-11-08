@@ -72,6 +72,8 @@ def plan_for_notice(notice: WorkNotice) -> QueuePlan | None:
         return None
     if event not in _STEP_EVENTS and event not in ("note", "request", "close"):
         return None
+    if event == "edit" and notice.before == "approved":
+        return None  # an approved step's text and kind can't change: the edit changed nothing
     step = notice.step_id if event in _STEP_EVENTS else None
     item = event == "close"
     create: dict[str, Any] | None = None
@@ -190,10 +192,12 @@ class QueueStore:
     def _save(self, data: dict[str, Any], now: datetime | None = None) -> None:
         self._settle(data, now)
         entries = data["entries"]
-        keep_ids = {e["id"] for e in entries if e.get("state") not in ("done", "withdrawn")}
-        finished = [e for e in entries if e["id"] not in keep_ids]
-        finished.sort(key=lambda e: (e.get("createdAt") or "", e["id"]))
-        drop = {e["id"] for e in finished[: max(0, len(finished) - KEEP_FINISHED)]}
+        drop: set[str] = set()
+        # done and withdrawn entries share one cap; failed ones (kept for Retry) have their own
+        for states in (("done", "withdrawn"), ("failed",)):
+            finished = [e for e in entries if e.get("state") in states]
+            finished.sort(key=lambda e: (e.get("createdAt") or "", e["id"]))
+            drop |= {e["id"] for e in finished[: max(0, len(finished) - KEEP_FINISHED)]}
         data["entries"] = [e for e in entries if e["id"] not in drop]
         data["autoRuns"] = data["autoRuns"][-KEEP_AUTO_RUNS:]
         path = self.file
@@ -233,6 +237,27 @@ class QueueStore:
         with _LOCK:
             data = self._load()
             entry = self._new(fields, now)
+            data["entries"].append(entry)
+            self._save(data, now)
+        return dict(entry)
+
+    def requeue_withdrawn(self, path: str, step_id: str, kind: str, fields: dict[str, Any], *,
+                          now: datetime) -> dict[str, Any] | None:
+        """Add the step's entry again when its last ``kind`` entry is withdrawn (checked and added
+        under the lock, so two callers can't both add); else None. The new entry keeps the last
+        one's who-and-what fields, takes `fields`, and its ``notBefore`` (when `fields` has none)."""
+        with _LOCK:
+            data = self._load()
+            mine = [e for e in data["entries"]
+                    if e.get("path") == path and e.get("stepId") == step_id and e.get("kind") == kind]
+            mine.sort(key=lambda e: (e.get("createdAt") or "", e["id"]))
+            if not mine or mine[-1].get("state") != "withdrawn":
+                return None
+            last = mine[-1]
+            new = {k: last.get(k) for k in ("kind", "path", "objectId", "title", "auto", "by")}
+            new.update(fields)
+            new["notBefore"] = fields.get("notBefore") or last.get("notBefore")
+            entry = self._new(new, now)
             data["entries"].append(entry)
             self._save(data, now)
         return dict(entry)

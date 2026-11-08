@@ -490,4 +490,23 @@ describe('useViewState', () => {
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 3000 })
     expect(save.mock.calls[0][0].sorts).toEqual([{ propertyId: 'b', option: 'ascending' }])
   })
+
+  // Audit 2026-11-07 #44: a save in flight counts as pending, so a stored state arriving meanwhile
+  // (another window's) does not replace the one being saved.
+  test('a stored state that arrives while a save is in flight does not replace ours', async () => {
+    let finish: () => void = () => undefined
+    const save = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)))
+    const { result, rerender } = renderHook(({ initial }) => useViewState(initial, save), { initialProps: { initial: base() } })
+    const mine = [{ propertyId: 'mine', option: 'ascending' as const }]
+    act(() => result.current[1]({ sorts: mine }))
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 3000 })
+    rerender({ initial: { ...base(), sorts: [{ propertyId: 'theirs', option: 'ascending' }] } })
+    expect(result.current[0].sorts).toEqual(mine)
+    await act(async () => finish())
+    expect(result.current[0].sorts).toEqual(mine)
+    // Once the save has landed, a new stored state is taken again.
+    const later = [{ propertyId: 'later', option: 'ascending' as const }]
+    rerender({ initial: { ...base(), sorts: later } })
+    expect(result.current[0].sorts).toEqual(later)
+  })
 })

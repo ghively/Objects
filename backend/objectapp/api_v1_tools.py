@@ -356,7 +356,10 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
     history = HistoryStore(space.root, is_whiteboard=lambda md: is_whiteboard(space, md))
     previews: OrderedDict[str, dict[str, Any]] = OrderedDict()
     previews_lock = threading.Lock()
-    r = APIRouter()
+    from .server import SafeJSONResponse  # lazy: server.py imports this module
+
+    # A file name that is not UTF-8 holds surrogate escapes (audit 2026-11-07 #4).
+    r = APIRouter(default_response_class=SafeJSONResponse)
 
     def is_work(rel: str) -> bool:
         try:
@@ -432,7 +435,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         if found is None:
             return error(404, f"No object type {type_id!r}")
         t, rev = found
-        return JSONResponse(_jsonable(t.to_api(rev)))
+        return SafeJSONResponse(_jsonable(t.to_api(rev)))
 
     def find_collection(collection_id: str):
         for c, rev in space.collections_with_revisions():
@@ -448,7 +451,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         if found is None:
             return error(404, f"No collection {collection_id!r}")
         c, rev = found
-        return JSONResponse(_jsonable(c.to_api(rev)))
+        return SafeJSONResponse(_jsonable(c.to_api(rev)))
 
     def find_query(query_id: str):
         for q in space.list_queries():
@@ -463,7 +466,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         q = find_query(query_id)
         if q is None:
             return error(404, f"No query {query_id!r}")
-        return JSONResponse(_jsonable(q.to_api(space.query_revision(q.id))))
+        return SafeJSONResponse(_jsonable(q.to_api(space.query_revision(q.id))))
 
     @r.get("/v1/whiteboard")
     @run
@@ -477,7 +480,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
     def version_history(request: Request, path: str):
         auth(request)
         rel = visible(path)
-        return JSONResponse(_jsonable({"versions": history.versions(rel)}))
+        return SafeJSONResponse(_jsonable({"versions": history.versions(rel)}))
 
     @r.get("/v1/history/version")
     @run
@@ -485,7 +488,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         auth(request)
         rel = visible(path)
         try:
-            return JSONResponse(_jsonable(history.content(rel, id)))
+            return SafeJSONResponse(_jsonable(history.content(rel, id)))
         except VersionNotFound:
             return error(404, f"No version {id!r} of {path!r}")
         except ValueError as exc:
@@ -498,14 +501,14 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         rel = visible(path)
         hidden = guard.hidden_paths()
         found = [m for m in unlinked_mentions(space, ctx.search, rel) if m.get("path") not in hidden]
-        return JSONResponse(_jsonable({"mentions": found}))
+        return SafeJSONResponse(_jsonable({"mentions": found}))
 
     @r.get("/v1/trash")
     @run
     def trash(request: Request):
         auth(request)
         items = [i.to_api() for i in space.list_trash() if not guard.trash_entry_hidden(i)]
-        return JSONResponse(_jsonable({"items": items}))
+        return SafeJSONResponse(_jsonable({"items": items}))
 
     @r.get("/v1/automations")
     @run
@@ -578,10 +581,13 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         from .importscan import scan_tree
 
         token = auth(request)
+        text = req.path.strip().strip('"')
+        if not text.strip():  # ``Path("")`` is the server's working folder (audit 2026-11-07 #12)
+            return error(404, "There is no file or folder at this path.")
         refused = refuse_space_source(req.path)
         if refused is not None:
             return refused
-        root = Path(req.path.strip().strip('"')).expanduser()
+        root = Path(text).expanduser()
         if not root.exists():
             return error(404, "There is no file or folder at this path.")
         scan = scan_tree(root, req.leaveOut).to_json()
@@ -674,7 +680,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         job = imports.jobs.get(job_id)  # type: ignore[attr-defined]
         if job is None:
             return error(404, "No such import.")
-        return JSONResponse(_jsonable(job.model_dump()))
+        return SafeJSONResponse(_jsonable(job.model_dump()))
 
     # -- write -------------------------------------------------------------------------
 

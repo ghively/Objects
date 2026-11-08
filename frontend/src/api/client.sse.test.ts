@@ -12,6 +12,8 @@ class FakeEventSource {
   onopen: Listener | null = null
   onerror: Listener | null = null
   closed = false
+  /** 0 connecting, 1 open, 2 closed (the browser gave up). */
+  readyState = 0
   constructor(url: string) {
     this.url = url
     FakeEventSource.instances.push(this)
@@ -40,6 +42,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 async function fresh() {
@@ -98,5 +101,47 @@ describe('api.onChange over SSE', () => {
     expect(es.closed).toBe(true)
     api.onChange(() => undefined)
     expect(FakeEventSource.instances).toHaveLength(2)
+  })
+
+  // Audit 2026-11-07 #39: when the browser closes the stream for good (readyState CLOSED), it is
+  // made again after a growing wait, and its open resyncs every consumer.
+  test('a stream the browser closed is made again with backoff, and its open resyncs', async () => {
+    vi.useFakeTimers()
+    const { seen, es, off } = await fresh()
+    es.readyState = 2
+    es.dispatch('error')
+    expect(es.closed).toBe(true)
+    expect(FakeEventSource.instances).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(FakeEventSource.instances).toHaveLength(2)
+    // Closed again before it opened: the wait doubles.
+    const es2 = FakeEventSource.instances[1]
+    es2.readyState = 2
+    es2.dispatch('error')
+    es2.dispatch('error')
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(FakeEventSource.instances).toHaveLength(2)
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(FakeEventSource.instances).toHaveLength(3)
+    expect(seen).toEqual([])
+    // The stream that opens resyncs every consumer, once.
+    const es3 = FakeEventSource.instances[2]
+    es3.dispatch('open')
+    expect(seen.find((e) => e.kind === 'types')?.path).toBe('*')
+    const n = seen.length
+    expect(n).toBeGreaterThan(0)
+    es3.dispatch('open')
+    expect(seen).toHaveLength(n)
+    // A drop the browser retries itself (not CLOSED) makes no new stream.
+    es3.readyState = 0
+    es3.dispatch('error')
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(FakeEventSource.instances).toHaveLength(3)
+    // With no subscriber left, a closed stream is not made again.
+    es3.readyState = 2
+    es3.dispatch('error')
+    off()
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(FakeEventSource.instances).toHaveLength(3)
   })
 })

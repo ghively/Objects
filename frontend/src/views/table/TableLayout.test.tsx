@@ -110,6 +110,22 @@ describe('TableLayout', () => {
     expect(note?.colWidth).toBe(17)
   })
 
+  // Audit 2026-11-07 #45: a table unmounted mid-drag drops its document listeners.
+  test('a resize under way when the table goes away leaves no listener behind', () => {
+    const onState = vi.fn()
+    const removed = vi.spyOn(document, 'removeEventListener')
+    const { unmount } = render(<Harness onState={onState} />)
+    fireEvent.mouseDown(screen.getByLabelText('Resize Note'), { clientX: 100 })
+    fireEvent.mouseMove(document, { clientX: 164 })
+    unmount()
+    const types = removed.mock.calls.map((c) => c[0])
+    expect(types).toEqual(expect.arrayContaining(['mousemove', 'mouseup']))
+    fireEvent.mouseMove(document, { clientX: 200 })
+    fireEvent.mouseUp(document)
+    expect(onState).not.toHaveBeenCalled()
+    removed.mockRestore()
+  })
+
   test('pinned column is sticky', () => {
     const cfg = {
       wrapAllContent: true,

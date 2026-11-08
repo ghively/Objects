@@ -199,3 +199,120 @@ describe('ImportCsvDialog', () => {
     expect(await screen.findByText('Add 2 new Books to')).toBeInTheDocument()
   })
 })
+
+// Audit 2026-11-07 #15: an import that fails part-way resumes from the failed row on the next Import
+// (into the collection it already made); rows already created are never created again.
+describe('ImportCsvDialog retry after a failure', () => {
+  const failSecond = () => {
+    let calls = 0
+    mocked.createObject.mockImplementation(async (_t, opts) => {
+      calls += 1
+      if (calls === 2) throw new Error('disk full')
+      return { path: `Books/${opts?.title}.md`, version: 'v1' }
+    })
+  }
+
+  test('Import again resumes from the failed row', async () => {
+    failSecond()
+    const user = userEvent.setup()
+    const onOpenChange = vi.fn()
+    render(<ImportCsvDialog type={BOOK} open onOpenChange={onOpenChange} />)
+    await upload(user, 'Name,Author\nDune,Herbert\nEmma,Austen\nIt,King\n')
+    await screen.findByText('Add 3 new Books to')
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+    expect(await screen.findByText('disk full')).toBeInTheDocument()
+    expect(mocked.createObject.mock.calls.map((c) => c[1]?.title)).toEqual(['Dune', 'Emma'])
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    expect(mocked.createObject.mock.calls.map((c) => c[1]?.title)).toEqual(['Dune', 'Emma', 'Emma', 'It'])
+  })
+
+  test('the new collection is made once and reused on the retry', async () => {
+    failSecond()
+    const user = userEvent.setup()
+    const onOpenChange = vi.fn()
+    render(<ImportCsvDialog type={BOOK} open onOpenChange={onOpenChange} />)
+    await upload(user, 'Name,Author\nDune,Herbert\nEmma,Austen\n')
+    await screen.findByText('Add 2 new Books to')
+    await user.selectOptions(screen.getByLabelText('Import into'), 'newCollection')
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+    expect(await screen.findByText('disk full')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    expect(mocked.createCollection).toHaveBeenCalledTimes(1)
+    const sent = mocked.createObject.mock.calls.map((c) => [c[1]?.title, (c[1]?.values as { collections?: string[] } | undefined)?.collections])
+    expect(sent).toEqual([
+      ['Dune', ['Reading list']],
+      ['Emma', ['Reading list']],
+      ['Emma', ['Reading list']],
+    ])
+  })
+
+  test('a new file starts a fresh import', async () => {
+    failSecond()
+    const user = userEvent.setup()
+    render(<ImportCsvDialog type={BOOK} open onOpenChange={() => undefined} />)
+    await upload(user, 'Name\nDune\nEmma\n')
+    await screen.findByText('Add 2 new Books to')
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+    expect(await screen.findByText('disk full')).toBeInTheDocument()
+    await upload(user, 'Name\nDune\nEmma\n', 'Other.csv')
+    await screen.findByText('Other.csv')
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledTimes(4))
+    expect(mocked.createObject.mock.calls.map((c) => c[1]?.title)).toEqual(['Dune', 'Emma', 'Dune', 'Emma'])
+  })
+
+  // Fix-pass L4: a change to what the import does makes the next Import a new run from the first row.
+  test('a changed mapping after a failure starts again from the first row', async () => {
+    failSecond()
+    const user = userEvent.setup()
+    const onOpenChange = vi.fn()
+    render(<ImportCsvDialog type={BOOK} open onOpenChange={onOpenChange} />)
+    await upload(user, 'Name,Author\nDune,Herbert\nEmma,Austen\n')
+    await screen.findByText('Add 2 new Books to')
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+    expect(await screen.findByText('disk full')).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Map Author'), '')
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    expect(mocked.createObject.mock.calls.map((c) => c[1]?.title)).toEqual(['Dune', 'Emma', 'Dune', 'Emma'])
+    expect(mocked.createObject.mock.calls[2][1]?.values).toEqual({})
+  })
+
+  test('a changed header option after a failure starts again from the first row', async () => {
+    failSecond()
+    const user = userEvent.setup()
+    const onOpenChange = vi.fn()
+    render(<ImportCsvDialog type={BOOK} open onOpenChange={onOpenChange} />)
+    await upload(user, 'Dune\nEmma\nIt\n')
+    await screen.findByText('Add 2 new Books to')
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+    expect(await screen.findByText('disk full')).toBeInTheDocument()
+    await user.click(screen.getByRole('switch', { name: 'Has a header row' }))
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    expect(mocked.createObject.mock.calls.map((c) => c[1]?.title)).toEqual(['Emma', 'It', 'Dune', 'Emma', 'It'])
+  })
+
+  test('a changed destination after a failure starts again from the first row, into it', async () => {
+    failSecond()
+    const user = userEvent.setup()
+    const onOpenChange = vi.fn()
+    render(<ImportCsvDialog type={BOOK} open onOpenChange={onOpenChange} />)
+    await upload(user, 'Name\nDune\nEmma\n')
+    await screen.findByText('Add 2 new Books to')
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+    expect(await screen.findByText('disk full')).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Import into'), 'newCollection')
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    const sent = mocked.createObject.mock.calls.map((c) => [c[1]?.title, (c[1]?.values as { collections?: string[] } | undefined)?.collections])
+    expect(sent).toEqual([
+      ['Dune', undefined],
+      ['Emma', undefined],
+      ['Dune', ['Reading list']],
+      ['Emma', ['Reading list']],
+    ])
+  })
+})

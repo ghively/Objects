@@ -48,20 +48,93 @@ export function protectLinkText(content: JSONContent[] | undefined): JSONContent
 /**
  * A full or collapsed reference link (`[a][r]`, `[a][]`) or a footnote
  * reference (`[^1]`), but not a footnote definition (`[^1]:` at a line start,
- * which stays escaped so the line remains a paragraph).
+ * which stays escaped unless the body refers to it: `protectReferences`).
  */
 const REFERENCE = /(?<![^\n])\[\^[^\]\s]+\](?!:)|(?<=[^\n])\[\^[^\]\s]+\]|\[[^[\]\n]+\]\[[^[\]\n]*\]/g
+
+/**
+ * The link definitions and footnote references of the body being saved
+ * (`withReferences`): a shortcut reference `[foo]` is a link only when the
+ * body defines `[foo]:`, and a footnote definition line `[^1]: …` is one only
+ * when the body refers to `[^1]` (audit 2026-11-07 #37).
+ */
+export type BodyReferences = { labels: Set<string>; footnotes: Set<string> }
+let bodyReferences: BodyReferences | null = null
+
+/** A link label as Markdown matches it: case-folded, inner blanks collapsed. */
+const labelKey = (label: string) => label.trim().replace(/\s+/g, ' ').toLowerCase()
+
+/**
+ * A link definition's label at a line start, also inside quotes and list items
+ * (`> [foo]: …`, `- [foo]: …`, an item's indented line): a raw block's text
+ * keeps those prefixes. Counting a label too many (in indented code, say) is
+ * harmless: a bare `[foo]` that defines nothing reads as the same text.
+ */
+const LINK_DEFINITION = /^(?:[ \t]*(?:>|(?:[*+-]|\d{1,9}[.)])(?=[ \t])))*[ \t]*\[([^\]\n^][^\]\n]*)\]:/gm
+
+/** The link definitions (`[foo]: …` at a line start) and footnote references (`[^1]`) in `text`. */
+export function referencesIn(text: string): BodyReferences {
+  const labels = new Set<string>()
+  const footnotes = new Set<string>()
+  if (!text.includes('[')) return { labels, footnotes }
+  for (const m of text.matchAll(LINK_DEFINITION)) labels.add(labelKey(m[1]))
+  for (const m of text.matchAll(/\[\^([^\]\s]+)\]/g)) {
+    const at = m.index ?? 0
+    const lineStart = text.lastIndexOf('\n', at - 1) + 1
+    const definition = /^ {0,3}$/.test(text.slice(lineStart, at)) && text[at + m[0].length] === ':'
+    if (!definition) footnotes.add(m[1])
+  }
+  return { labels, footnotes }
+}
+
+/** Run `fn` (a serialize) with the body's references known to `protectReferences`. */
+export function withReferences<T>(refs: BodyReferences | null, fn: () => T): T {
+  const previous = bodyReferences
+  bodyReferences = refs
+  try {
+    return fn()
+  } finally {
+    bodyReferences = previous
+  }
+}
+
+/** A shortcut reference `[foo]` (not followed by a link's `(` or `[`). */
+const SHORTCUT = /\[([^[\]\n^][^[\]\n]*)\](?![[(])/g
+/** What follows a label when its line is a link definition: one destination, maybe a title. */
+const LINK_DEFINITION_REST = /^:[ \t]*\S+[ \t]*(?:(?:"[^"]*"|'[^']*'|\([^)]*\))[ \t]*)?$/
+/** A footnote definition's label at a line start. */
+const FOOTNOTE_DEFINITION = /(?<![^\n])( {0,3})\[\^([^\]\s]+)\](?=:)/g
 
 /**
  * `text` with the brackets of reference links and footnote references
  * protected from escaping: their definitions live in other blocks, and
  * escaped brackets would turn them into plain text for other Markdown readers.
+ * With the body's references known (`withReferences`), a shortcut reference
+ * whose label the body defines and a footnote definition the body refers to
+ * are protected too.
  */
 export function protectReferences(text: string): string {
   if (!text.includes('[')) return text
   const open = STAND_IN[ESCAPED.indexOf('[')]
   const close = STAND_IN[ESCAPED.indexOf(']')]
-  return text.replace(REFERENCE, (m) => m.replaceAll('[', open).replaceAll(']', close))
+  const protect = (m: string) => m.replaceAll('[', open).replaceAll(']', close)
+  let out = text.replace(REFERENCE, protect)
+  const refs = bodyReferences
+  if (refs && refs.labels.size)
+    out = out.replace(SHORTCUT, (m, label: string, at: number, s: string) => {
+      // `[foo]:` at a line start would be a definition: it stays escaped (a paragraph).
+      const lineStart = s.lastIndexOf('\n', at - 1) + 1
+      if (s[at + m.length] === ':' && /^ {0,3}$/.test(s.slice(lineStart, at))) return m
+      return refs.labels.has(labelKey(label)) ? protect(m) : m
+    })
+  if (refs && refs.footnotes.size)
+    out = out.replace(FOOTNOTE_DEFINITION, (m, indent: string, label: string, at: number, s: string) => {
+      // `[^1]: word` (or `word "title"`) would read back as a link definition: it stays escaped.
+      const rest = s.slice(at + m.length).split('\n')[0]
+      if (LINK_DEFINITION_REST.test(rest)) return m
+      return refs.footnotes.has(label) ? indent + protect(m.slice(indent.length)) : m
+    })
+  return out
 }
 
 export function restoreLinkText(md: string): string {

@@ -22,6 +22,7 @@ import { TableKit } from '@tiptap/extension-table'
 import { Markdown } from '@tiptap/markdown'
 import type { Node as PMNode, Schema } from '@tiptap/pm/model'
 import StarterKit from '@tiptap/starter-kit'
+import { Marked, type Token } from 'marked'
 import {
   classifyEmbedLine,
   formatAnnotation,
@@ -32,7 +33,7 @@ import {
 } from './annotations'
 import { splitBlocks, type SourceBlock } from './blocks'
 import { buildTree, flattenTree, isOneLine, type TreeNode } from './blockTree'
-import { preserveBlock, serializeWithPreservation, type EditorBlock } from './preserve'
+import { eolOf, hasPipeInCodeSpan, preserveBlock, serializeWithPreservation, type EditorBlock } from './preserve'
 import {
   BLOCK_SOURCE_META,
   BlockSource,
@@ -66,7 +67,7 @@ import { Highlight, TextColor } from './nodes/textStyle'
 import { blockRefMarkdown } from './blocks'
 import { M8Keys } from './shortcuts'
 import { withTextEscapes } from './textEscapes'
-import { NbspEntity, withLinkForms } from './extensions/linkForms'
+import { NbspEntity, referencesIn, withLinkForms, withReferences } from './extensions/linkForms'
 import { RecordAudio } from './media/recordAudio'
 import { LazyTable } from './table/LazyTable'
 
@@ -284,6 +285,8 @@ function sourceToNode(editor: Editor, block: SourceBlock, options?: readonly Opt
 
 function parseSourceBlock(editor: Editor, block: SourceBlock): JSONContent {
   const md = editor.markdown!
+  // A bare pipe in a code span splits a GFM cell, but not the editor's (audit 2026-11-07 #38).
+  if (block.kind === 'table' && block.raw.split(/\r\n|\n|\r/).some(hasPipeInCodeSpan)) return rawNode(block.raw)
   try {
     const parsed = md.parse(block.raw.replace(/\r\n?/g, '\n'))
     const nodes = parsed.content ?? []
@@ -294,10 +297,65 @@ function parseSourceBlock(editor: Editor, block: SourceBlock): JSONContent {
     const plain = plainTextOf(node)
     const regenerated = plain ?? md.serialize({ type: 'doc', content: [node] })
     if (contentKey(regenerated) !== contentKey(block.raw)) return rawNode(block.raw)
+    if (!sameListShape(node, block)) return rawNode(block.raw)
     return node
   } catch {
     return rawNode(block.raw)
   }
+}
+
+/** A plain GFM lexer: how other Markdown readers nest a block's lists (audit 2026-11-07 #5). */
+const gfmLexer = new Marked({ gfm: true })
+
+const LIST_ITEMS = new Set(['listItem', 'taskItem'])
+
+/** Each list item's depth and list kind (`o` ordered, `b` bullet), in document order. */
+function nodeListShape(node: JSONContent, depth = 0, kind = '', out: string[] = []): string[] {
+  const isItem = LIST_ITEMS.has(node.type ?? '')
+  if (isItem) out.push(depth + kind)
+  const childKind = node.type === 'orderedList' ? 'o' : node.type === 'bulletList' || node.type === 'taskList' ? 'b' : kind
+  for (const child of node.content ?? []) nodeListShape(child, isItem ? depth + 1 : depth, childKind, out)
+  return out
+}
+
+/**
+ * The same for the lexed source; `null` when the source holds an indented code
+ * block inside a list item or a quote, which the editor cannot write back in
+ * place (audit 2026-11-07 #17: it would come back fenced at the wrong column).
+ * An ordered item that starts with a bare box (`1. [ ] a`) is a GFM task item
+ * the editor has no node for: it would show the box as text and save it
+ * escaped, so it is kind `ot`, which no parsed item matches, and the list loads
+ * raw (audit 2026-11-07 #18).
+ */
+function tokenListShape(tokens: Token[], depth = 0, nested = false, out: string[] = []): string[] | null {
+  for (const t of tokens) {
+    if (t.type === 'code' && nested && (t as { codeBlockStyle?: string }).codeBlockStyle === 'indented') return null
+    if (t.type === 'list') {
+      const ordered = (t as { ordered?: boolean }).ordered
+      for (const item of (t as { items: { task?: boolean; tokens?: Token[] }[] }).items) {
+        out.push(depth + (ordered ? (item.task ? 'ot' : 'o') : 'b'))
+        if (!tokenListShape(item.tokens ?? [], depth + 1, true, out)) return null
+      }
+    } else if (t.type === 'blockquote' && 'tokens' in t && t.tokens) {
+      if (!tokenListShape(t.tokens, depth, true, out)) return null
+    }
+  }
+  return out
+}
+
+const LIST_LINE = /^[ \t>]*(?:[*+-]|\d{1,9}[.)])(?:[ \t]|$)/m
+
+/**
+ * Did the parse keep the block's list structure? `@tiptap/markdown`'s list
+ * tokenizer mis-nests some lists (an ordered list in a bullet in an ordered
+ * list comes out a sibling of its parent), which `contentKey` cannot see; an
+ * edit would then save the wrong nesting. Such a block loads raw.
+ */
+function sameListShape(node: JSONContent, block: SourceBlock): boolean {
+  const parsed = nodeListShape(node)
+  if (parsed.length === 0 && !LIST_LINE.test(block.raw)) return true
+  const source = tokenListShape(gfmLexer.lexer(block.raw.replace(/\r\n?/g, '\n')))
+  return source !== null && source.join(' ') === parsed.join(' ')
 }
 
 /**
@@ -451,7 +509,8 @@ export function loadBody(editor: Editor, body: string): void {
   editor.view.dispatch(tr)
   takeSnapshots(editor, editor.state.doc)
   const final = /(?:\r\n|\n|\r)$/.exec(body)?.[0] ?? ''
-  edges.set(editor, { leading, trailing, eol: body.includes('\r\n') ? '\r\n' : '\n', final })
+  // A lone-CR body keeps CR for the lines an edit adds (audit 2026-11-07 #26: not mixed endings).
+  edges.set(editor, { leading, trailing, eol: eolOf(body), final })
 }
 
 // ---------------------------------------------------------------------------
@@ -630,8 +689,18 @@ function containerText(editor: Editor, node: PMNode, eol: string): string {
   return out + (close ?? formatAnnotation({ type: 'close', name: node.type.name as 'toggle', options: [] }))
 }
 
-/** Serialize the document, re-emitting every unedited block's original source. */
+/**
+ * Serialize the document, re-emitting every unedited block's original source.
+ * An edited paragraph keeps the brackets of a shortcut reference the body
+ * defines, and of a footnote definition the body refers to (`withReferences`).
+ */
 export function serializeBody(editor: Editor): string {
+  const { doc } = editor.state
+  const text = doc.textBetween(0, doc.content.size, '\n', '\n')
+  return withReferences(referencesIn(text), () => serializeDoc(editor))
+}
+
+function serializeDoc(editor: Editor): string {
   const loaded = edges.get(editor)
   const { leading, trailing, eol, final } = loaded ?? { leading: '', trailing: '', eol: '\n', final: '' }
   const blocks: EditorBlock[] = []
