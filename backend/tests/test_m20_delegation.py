@@ -27,7 +27,8 @@ from fake_claude import install
 from fastapi.testclient import TestClient
 from mcp.server.mcpserver.exceptions import ToolError
 
-from objectapp import a2a, agent_mcp, agentrun, ai, delegation, headless, remotesecrets, transcripts
+from objectapp import a2a, agent_mcp, agentrun, ai, delegation, headless, importfiling, remotesecrets, transcripts
+from objectapp import worktools
 from objectapp import settings as device_settings
 from objectapp.agentmodel import DEFAULT_AGENT_ID, AgentInput
 from objectapp.agents import AgentRegistry
@@ -320,6 +321,26 @@ def test_read_token_cannot_delegate_or_call_remote(env: Env, tokens_made: list[d
         res = env.post(route, body, secret)
         assert res.status_code == 403, res.text
         assert res.json()["detail"] == "This token can only read."
+    assert _runs(env.fake["log"]) == []
+    assert not [t for t in tokens_made if t.get("purpose") == "delegate"]
+
+
+@pytest.mark.parametrize("purpose", [worktools.WORK_READ, worktools.WORK_FILE, worktools.WORK_SYNC,
+                                     importfiling.PURPOSE])
+def test_read_only_purpose_cannot_delegate_or_call_remote(env: Env, tokens_made: list[dict], purpose: str) -> None:
+    """Sweep 2026-11-08 (1): a read-only work run or an import-filing run has a ``read-write``
+    token kept read-only by `v1guard.WRITE_GUARDS`; handing work on is a write, so those guards
+    hold on ``delegate`` and ``remote-call`` too, and no run starts."""
+    record, secret = TokenStore(env.space_dir).ephemeral(
+        "Assistant", "read-write", agent=DEFAULT_AGENT_ID, chat=OTHER_CHAT, purpose=purpose
+    )
+    env.secrets.append(secret)
+    assert record.scope == "read-write"
+    for route, body in (("delegate", {"agent": "researcher", "goal": "write things"}),
+                        ("remote-call", {"agent": "Fake Planner", "message": "hi"})):
+        res = env.post(route, body, secret)
+        assert res.status_code == 403, res.text
+        assert res.json()["detail"] == "This run is read-only."
     assert _runs(env.fake["log"]) == []
     assert not [t for t in tokens_made if t.get("purpose") == "delegate"]
 
