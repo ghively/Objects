@@ -309,21 +309,10 @@ const gfmLexer = new Marked({ gfm: true })
 
 const LIST_ITEMS = new Set(['listItem', 'taskItem'])
 
-/** An ordered item's text that GFM reads as a task item (`1. [ ] a`), as `marked` tells it. */
-const ORDERED_BOX = /^\[[ xX]\] +\S/
-
-/**
- * Each list item's depth and list kind (`o` ordered, `b` bullet), in document
- * order; an ordered item whose text starts with a box adds `t` (audit
- * 2026-11-07 #18: the box is written bare, so the source's must be bare too).
- */
+/** Each list item's depth and list kind (`o` ordered, `b` bullet), in document order. */
 function nodeListShape(node: JSONContent, depth = 0, kind = '', out: string[] = []): string[] {
   const isItem = LIST_ITEMS.has(node.type ?? '')
-  if (isItem) {
-    const first = node.content?.[0]
-    const text = first?.type === 'paragraph' ? (first.content ?? []).map((n) => n.text ?? '').join('') : ''
-    out.push(depth + kind + (kind === 'o' && ORDERED_BOX.test(text) ? 't' : ''))
-  }
+  if (isItem) out.push(depth + kind)
   const childKind = node.type === 'orderedList' ? 'o' : node.type === 'bulletList' || node.type === 'taskList' ? 'b' : kind
   for (const child of node.content ?? []) nodeListShape(child, isItem ? depth + 1 : depth, childKind, out)
   return out
@@ -333,6 +322,10 @@ function nodeListShape(node: JSONContent, depth = 0, kind = '', out: string[] = 
  * The same for the lexed source; `null` when the source holds an indented code
  * block inside a list item or a quote, which the editor cannot write back in
  * place (audit 2026-11-07 #17: it would come back fenced at the wrong column).
+ * An ordered item that starts with a bare box (`1. [ ] a`) is a GFM task item
+ * the editor has no node for: it would show the box as text and save it
+ * escaped, so it is kind `ot`, which no parsed item matches, and the list loads
+ * raw (audit 2026-11-07 #18).
  */
 function tokenListShape(tokens: Token[], depth = 0, nested = false, out: string[] = []): string[] | null {
   for (const t of tokens) {
