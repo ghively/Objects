@@ -33,18 +33,18 @@ describe('taskSections', () => {
     // In tab order: Inbox, Today, Scheduled, Status, Context, Tags, Open, Deadline,
     // Recurring, Reminders, Completed, then All.
     const want: Record<string, [string, string]> = {
-      inbox: ['Inbox', 'All tasks that have no status or have not been scheduled'],
-      today: ['Today', 'All tasks relevant today'],
-      scheduled: ['Scheduled', 'All upcoming tasks based on their date'],
-      status: ['Status', 'All tasks grouped by their status'],
-      source: ['Context', 'Tasks organized by the objects they are mentioned in.'],
-      tags: ['Tags', 'All tasks grouped by their tags'],
+      inbox: ['Inbox', 'Tasks with no status or no date yet'],
+      today: ['Today', 'Tasks that matter today'],
+      scheduled: ['Scheduled', 'Tasks coming up, ordered by date'],
+      status: ['Status', 'Every task, grouped by status'],
+      source: ['Context', 'Tasks grouped by the object that mentions them.'],
+      tags: ['Tags', 'Every task, grouped by tag'],
       open: ['Open', 'All tasks not done yet'],
-      deadline: ['Deadline', 'All open tasks with a deadline, sorted by the nearest deadline first'],
-      recurring: ['Recurring', 'All open tasks that repeat on a schedule, grouped by date'],
-      reminders: ['Reminders', 'All open tasks with an active reminder, grouped by date'],
-      completed: ['Completed', 'All tasks marked as done'],
-      all: ['All', 'All objects of this object type with filter and sort options.'],
+      deadline: ['Deadline', 'Open tasks that have a deadline, soonest first'],
+      recurring: ['Recurring', 'Open repeating tasks, grouped by date'],
+      reminders: ['Reminders', 'Open tasks with a reminder set, grouped by date'],
+      completed: ['Completed', 'Tasks that are finished'],
+      all: ['All', 'Every object of this type, ready to filter and sort.'],
     }
     expect(TASK_SECTION_KEYS).toEqual(Object.keys(want))
     expect(DEFAULT_TASK_SECTION).toBe('inbox')

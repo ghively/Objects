@@ -50,11 +50,11 @@ describe('Calendar settings', () => {
     expect(within(group).getByText('Calendar Settings')).toBeInTheDocument()
     expect(
       within(group).getByText(
-        'This object type has a date property. It is therefore integrated in the calendar. You can select your preferences here.',
+        'Because this type has a date property, its objects show up in the calendar. Set how below.',
       ),
     ).toBeInTheDocument()
-    expect(within(group).getByText('Create object from calendar')).toBeInTheDocument()
-    expect(within(group).getByText('Hide object in calendar sidebar')).toBeInTheDocument()
+    expect(within(group).getByText('Quick-create from the calendar')).toBeInTheDocument()
+    expect(within(group).getByText('Keep out of the calendar sidebar')).toBeInTheDocument()
     unmount()
     for (const id of ['project', 'task', 'dailynote']) {
       const r = render(<TypeSettings typeId={id} />)
@@ -66,17 +66,17 @@ describe('Calendar settings', () => {
   test('test create-from-calendar choices write createInCalendarOption (absent, createOnce, disabled)', async () => {
     const user = userEvent.setup()
     render(<TypeSettings typeId="meeting" />)
-    const choices = screen.getByRole('group', { name: 'Create object from calendar' })
+    const choices = screen.getByRole('group', { name: 'Quick-create from the calendar' })
     expect(within(choices).getAllByRole('button').map((b) => b.textContent)).toEqual(['Show', 'Show for one per day', 'Hide'])
     expect(within(choices).getByRole('button', { name: 'Show' })).toHaveAttribute('aria-pressed', 'true')
     await user.click(within(choices).getByRole('button', { name: 'Show for one per day' }))
     await waitFor(() => expect(mocked.saveType).toHaveBeenCalledTimes(1))
     expect(savedType(0).createInCalendarOption).toBe('createOnce')
     expect(mocked.saveType.mock.calls[0][1]).toEqual({ baseRevision: 'rm' })
-    await user.click(within(screen.getByRole('group', { name: 'Create object from calendar' })).getByRole('button', { name: 'Hide' }))
+    await user.click(within(screen.getByRole('group', { name: 'Quick-create from the calendar' })).getByRole('button', { name: 'Hide' }))
     await waitFor(() => expect(mocked.saveType).toHaveBeenCalledTimes(2))
     expect(savedType(1).createInCalendarOption).toBe('disabled')
-    await user.click(within(screen.getByRole('group', { name: 'Create object from calendar' })).getByRole('button', { name: 'Show' }))
+    await user.click(within(screen.getByRole('group', { name: 'Quick-create from the calendar' })).getByRole('button', { name: 'Show' }))
     await waitFor(() => expect(mocked.saveType).toHaveBeenCalledTimes(3))
     expect('createInCalendarOption' in savedType(2)).toBe(false)
   })
@@ -84,7 +84,7 @@ describe('Calendar settings', () => {
   test('test hide in sidebar switch writes hideFromCalendarSidebar', async () => {
     const user = userEvent.setup()
     render(<TypeSettings typeId="meeting" />)
-    const sw = screen.getByRole('switch', { name: 'Hide object in calendar sidebar' })
+    const sw = screen.getByRole('switch', { name: 'Keep out of the calendar sidebar' })
     expect(sw).not.toBeChecked()
     await user.click(sw)
     await waitFor(() => expect(mocked.saveType).toHaveBeenCalledTimes(1))
@@ -107,7 +107,7 @@ describe('Calendar settings', () => {
     const user = userEvent.setup()
     render(<TypeSettings typeId="dailynote" />)
     const group = screen.getByRole('region', { name: 'Reviewing' })
-    expect(within(group).getByText('Daily notes can be marked as reviewed. Hide this if you do not use reviewing.')).toBeInTheDocument()
+    expect(within(group).getByText("You can mark daily notes as reviewed. Hide the option if you don't need it.")).toBeInTheDocument()
     expect(buildSections(DAILYNOTE, defaultViews(), { collections: [], queries: [] }).map((s) => s.key)).toContain('unreviewed')
     await user.click(within(group).getByRole('switch', { name: 'Hide reviewing' }))
     await waitFor(() => expect(mocked.saveType).toHaveBeenCalledTimes(1))

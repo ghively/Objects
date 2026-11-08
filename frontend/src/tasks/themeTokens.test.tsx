@@ -28,10 +28,10 @@ describe('theme tokens in tasks and trash', () => {
     expect(offenders).toEqual([])
   })
 
-  test('"Missed" is the danger token, "Scheduled after deadline" the warning token', () => {
+  test('"Missed" is the danger token, "Planned past the deadline" the warning token', () => {
     const today = new Date(2026, 9, 31)
     render(<DeadlineLabel deadline={{ start: '2026-10-25', resolution: 'day' }} date={{ start: '2026-10-28', resolution: 'day' }} today={today} />)
     expect(screen.getByText('Missed').className).toContain('var(--danger)')
-    expect(screen.getByText('Scheduled after deadline').className).toContain('var(--warning)')
+    expect(screen.getByText('Planned past the deadline').className).toContain('var(--warning)')
   })
 })

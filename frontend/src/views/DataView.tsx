@@ -750,8 +750,8 @@ export function DataView(props: DataViewProps) {
         props.emptyState
       ) : empty ? (
         <div className="flex flex-col items-center gap-1 py-10 text-center">
-          <p className="text-[15px] text-fg">There&apos;s nothing here (yet).</p>
-          <p className="text-[14px] text-fg-muted">You can change this by creating a new object.</p>
+          <p className="text-[15px] text-fg">Nothing to show yet.</p>
+          <p className="text-[14px] text-fg-muted">Create an object to see it here.</p>
           {props.allowCreate && props.onCreate && createType && (
             <button
               type="button"

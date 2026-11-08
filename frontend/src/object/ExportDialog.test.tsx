@@ -50,9 +50,9 @@ describe('Export dialog (polish item 23)', () => {
     expect(tiles.map((t) => t.textContent)).toEqual(['PDF', 'Markdown', 'Microsoft Word', 'Latex'])
     expect(within(dialog).getByRole('radio', { name: 'Markdown' })).toHaveAttribute('aria-checked', 'true')
     for (const name of [
-      'Export folder containing all subpages',
+      'Include subpages (as a folder)',
       'Include media',
-      'Include title as heading 1',
+      'Add the title as a top heading',
       'Links as wikilinks',
     ]) {
       expect(within(dialog).getByRole('switch', { name })).toBeInTheDocument()
@@ -71,8 +71,8 @@ describe('Export dialog (polish item 23)', () => {
 
     cleanup()
     ;({ dialog } = open())
-    await user.click(within(dialog).getByRole('switch', { name: 'Export folder containing all subpages' }))
-    await user.click(within(dialog).getByRole('switch', { name: 'Include title as heading 1' }))
+    await user.click(within(dialog).getByRole('switch', { name: 'Include subpages (as a folder)' }))
+    await user.click(within(dialog).getByRole('switch', { name: 'Add the title as a top heading' }))
     await user.click(within(dialog).getByRole('switch', { name: 'Links as wikilinks' }))
     await user.click(within(dialog).getByRole('button', { name: 'Export' }))
     await waitFor(() => expect(clicked).toHaveLength(2))

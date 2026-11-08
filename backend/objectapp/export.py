@@ -209,8 +209,8 @@ def _media_resolver(root: Path, rel: str):
 class ExportOptions:
     """The dialog's choices (`entity.settings.export.options.*`, `typesetPdf.mode.*`).
 
-    Markdown: ``subpages`` ("Export folder containing all subpages"), ``media``, ``title_h1``
-    ("Include title as heading 1") and ``wikilinks`` ("Links as wikilinks"; on by default,
+    Markdown: ``subpages`` ("Include subpages (as a folder)"), ``media``, ``title_h1``
+    ("Add the title as a top heading") and ``wikilinks`` ("Links as wikilinks"; on by default,
     our choice, so the default export is the file's own bytes). PDF: ``style``, ``paper``,
     ``embedded``, ``outline``, ``hide_empty`` (on by default), ``type_labels``
     and ``hidden`` (deselected property keys). Word and LaTeX use the property choices.

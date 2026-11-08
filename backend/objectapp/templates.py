@@ -26,7 +26,7 @@ __all__ = [
     "resolve_date_variable",
 ]
 
-TEMPLATE_FAILED = "Could not apply the template"
+TEMPLATE_FAILED = "The template couldn't be applied"
 
 _MONTHS = [
     "January", "February", "March", "April", "May", "June",
@@ -40,7 +40,7 @@ _CREATION_RE = re.compile(r"^\{creation:([A-Za-z]+)\}$")
 
 
 class TemplateError(InvalidValue):
-    """A template can't be applied (the API answers 422 "Could not apply the template")."""
+    """A template can't be applied (the API answers 422 "The template couldn't be applied")."""
 
     def __init__(self, reason: str = "") -> None:
         super().__init__(TEMPLATE_FAILED)

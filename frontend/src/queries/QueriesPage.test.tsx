@@ -50,7 +50,7 @@ describe('QueriesPage', () => {
     mocked.queries.mockResolvedValue([])
     render(<QueriesPage />)
     expect(await screen.findByText('No queries')).toBeInTheDocument()
-    expect(screen.getByText('Queries you create in this database will appear here.')).toBeInTheDocument()
+    expect(screen.getByText('Queries you save show up here.')).toBeInTheDocument()
   })
 
   test('test Queries sidebar item opens QueriesPage listing every query; New creates and opens one', async () => {

@@ -107,7 +107,7 @@ describe('AliasesCell', () => {
     )
     const input = screen.getByRole('textbox', { name: 'Add alias' })
     await user.type(input, 'one{Enter}')
-    expect(screen.getByText('An alias with this name already exists.')).toBeInTheDocument()
+    expect(screen.getByText('That alias is already in the list.')).toBeInTheDocument()
     expect(onChange).not.toHaveBeenCalled()
     await user.clear(input)
     await user.type(input, 'Two{Enter}')

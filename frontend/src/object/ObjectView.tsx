@@ -803,7 +803,7 @@ export function ObjectView({
     } catch (err) {
       if (err instanceof ConflictError) onConflict()
       else void editorRef.current?.resume(versionRef.current)
-      console.warn('Could not apply the template:', err)
+      console.warn("The template couldn't be applied:", err)
     }
   }
 

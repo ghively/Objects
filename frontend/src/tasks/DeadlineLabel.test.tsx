@@ -19,10 +19,10 @@ describe('DeadlineLabel', () => {
     expect(deadlineText(null, TODAY)).toBeNull()
   })
 
-  test('shows "Scheduled after deadline" when the date is after the deadline', () => {
+  test('shows "Planned past the deadline" when the date is after the deadline', () => {
     render(<DeadlineLabel deadline={day('2026-10-30')} date={day('2026-11-02')} today={TODAY} />)
     expect(screen.getByText('4 days left')).toBeInTheDocument()
-    expect(screen.getByText('Scheduled after deadline')).toBeInTheDocument()
+    expect(screen.getByText('Planned past the deadline')).toBeInTheDocument()
   })
 
   test('renders nothing without a deadline', () => {

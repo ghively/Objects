@@ -101,7 +101,7 @@ describe('CreateSpaceDialog', () => {
 
   test('test create dialog offers basic setup', async () => {
     const user = await openDialog()
-    expect(screen.getByText('How do you want to start?')).toBeInTheDocument()
+    expect(screen.getByText('Pick a starting point')).toBeInTheDocument()
     expect(screen.getByText('Comes with types for people, meetings, projects and books.')).toBeInTheDocument()
     expect(screen.getByText('Starts with no extra types; create them as you go.')).toBeInTheDocument()
     const basic = screen.getByRole('radio', { name: 'Start with basic setup' })

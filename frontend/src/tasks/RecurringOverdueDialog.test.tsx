@@ -21,18 +21,18 @@ describe('RecurringOverdueDialog', () => {
     const cases = [
       {
         action: 'complete' as const,
-        title: 'Mark recurring task done',
-        description: '"Water plants" is overdue by 3 occurrences. Which instance are you marking done?',
+        title: 'Complete a repeating task',
+        description: '"Water plants" has 3 missed dates. Which one do you want to mark done?',
         buttons: [
           [`Mark as done for ${day('2026-10-24')}`, 'This occurrence only'],
           [`Mark as done for ${day('2026-10-26')}`, 'All missed before today'],
-          [`Mark as done for ${day('2026-10-26')}`, 'Also logs all missed as done'],
+          [`Mark as done for ${day('2026-10-26')}`, 'Marks every missed date done too'],
         ],
       },
       {
         action: 'skip' as const,
         title: 'Skip recurring task',
-        description: '"Water plants" is overdue by 3 occurrences. Which instance are you skipping?',
+        description: '"Water plants" has 3 missed dates. Which one do you want to skip?',
         buttons: [
           [`Skip to ${day('2026-10-25')}`, 'This occurrence only'],
           [`Skip to ${day('2026-10-27')}`, 'All missed before today'],
@@ -41,8 +41,8 @@ describe('RecurringOverdueDialog', () => {
       },
       {
         action: 'excuse' as const,
-        title: 'Excuse recurring occurrence',
-        description: '"Water plants" is overdue by 3 occurrences. Which occurrence are you excusing?',
+        title: 'Excuse a missed repeat',
+        description: '"Water plants" has 3 missed dates. Which one do you want to excuse?',
         buttons: [
           [`Excuse for ${day('2026-10-24')}`, 'This occurrence only'],
           [`Excuse for ${day('2026-10-26')}`, 'All missed before today'],
@@ -76,7 +76,7 @@ describe('RecurringOverdueDialog', () => {
         onOpenChange={() => {}}
       />,
     )
-    expect(screen.getByText('"T" is overdue by 99+ occurrences. Which instance are you marking done?')).toBeInTheDocument()
+    expect(screen.getByText('"T" has 99+ missed dates. Which one do you want to mark done?')).toBeInTheDocument()
   })
 
   test('a choice reports its catch-up; skip names the next day of a custom rule', async () => {

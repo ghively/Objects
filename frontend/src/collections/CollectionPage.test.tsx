@@ -157,6 +157,6 @@ describe('CollectionPage', () => {
   test('shows the empty state for an empty collection', async () => {
     setup(TOOLING(), [])
     render(<CollectionPage id="tooling" />)
-    expect(await screen.findByText('This collection is empty. Create a record or add existing content.')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing in this collection yet. Add a new record or existing content.')).toBeInTheDocument()
   })
 })

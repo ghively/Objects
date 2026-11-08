@@ -254,10 +254,10 @@ describe('No backlinks section (M5)', () => {
       label: 'No backlinks',
       icon: 'ph-line-segment',
       inFullView: true,
-      description: 'All objects that are not linked in any other content.',
+      description: 'Objects that nothing else links to.',
     })
     expect(SECTION_TEXT.noBacklinks).toBe('No backlinks')
-    expect(SECTION_TEXT.noBacklinksDescription).toBe('All objects that are not linked in any other content.')
+    expect(SECTION_TEXT.noBacklinksDescription).toBe('Objects that nothing else links to.')
 
     // Added: a visible section and a header tab; buildSections keeps it.
     const v = showSection(views(OLD), all, add[0])

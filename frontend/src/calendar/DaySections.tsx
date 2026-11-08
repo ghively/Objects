@@ -46,7 +46,7 @@ export const SECTIONS_TEXT = {
   noTasksToday: 'No tasks today',
   noTasksOnDay: 'No tasks on this day',
   /** M3's empty state line. */
-  emptyHint: 'You can change this by creating a new object.',
+  emptyHint: 'Create an object to see it here.',
   statsToday: (open: number, done: number) => `${open} open, ${done} done`,
   statsFuture: (n: number) => `${n} open`,
   statsPast: (n: number) => `${n} done`,

@@ -235,9 +235,9 @@ describe('FilterEditor', () => {
     }
   })
 
-  test('shows "No eligible properties available" without properties', () => {
+  test('shows "No properties can be filtered here" without properties', () => {
     render(<FilterEditor group={emptyFilterGroup()} onChange={() => undefined} choices={[]} types={[]} collections={[]} />)
-    expect(screen.getByText('No eligible properties available')).toBeInTheDocument()
+    expect(screen.getByText('No properties can be filtered here')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '+ Filter' })).not.toBeInTheDocument()
   })
 

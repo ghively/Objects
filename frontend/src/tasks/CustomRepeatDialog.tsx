@@ -30,8 +30,8 @@ const UNITS: { unit: Unit; one: string; many: string }[] = [
 ]
 
 const SCHEDULED_TOOLTIP =
-  'Repeats on a fixed schedule relative to the due date, regardless of when you complete the task.'
-const COMPLETED_TOOLTIP = 'The next occurrence is scheduled relative to when you actually complete the task.'
+  'Each repeat is counted from the due date, no matter when you finish the task.'
+const COMPLETED_TOOLTIP = 'Each repeat is counted from the day you actually finish the task.'
 
 export interface CustomRepeatDialogProps {
   /** The current rule, if any (a weekday rule starts the panel at every 1 day). */

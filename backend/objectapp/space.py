@@ -799,7 +799,7 @@ def unique_key(name: str, taken: Iterable[str]) -> str:
 
 
 # The en-US texts.
-BASIC_LOCKED = "Properties of basic object types cannot be edited."
+BASIC_LOCKED = "The properties of basic types are fixed."
 NO_TRANSFORMATIONS = (
     "This property type cannot be changed. If you need to change it, please add a ticket "
     "to our feedback board including the types you need."

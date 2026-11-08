@@ -201,7 +201,7 @@ describe('TypePage', () => {
     expect(screen.getByText('Hidden Sections')).toBeInTheDocument()
     const hidden = await screen.findAllByTestId('hidden-section')
     expect(hidden.map((e) => e.querySelector('.truncate')?.textContent)).toEqual(['Backlog', 'Not in any collection', 'Not tagged', 'No backlinks'])
-    expect(within(hidden[3]).getByText('All objects that are not linked in any other content.')).toBeInTheDocument()
+    expect(within(hidden[3]).getByText('Objects that nothing else links to.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Show No backlinks' }))
     await waitFor(() => expect(lastSaved()[1].dashboard.sections.at(-1)).toEqual({ key: 'noBacklinks', collapsed: false }))
   })
@@ -249,8 +249,8 @@ describe('TypePage', () => {
   test('the recently opened section is empty without recent objects of the type', async () => {
     load(views({ activeTab: 'overview' }, ['recentlyAccessed']))
     render(<TypePage type={TASK} />)
-    expect(await screen.findByText('No recently accessed content')).toBeInTheDocument()
-    expect(screen.getByText('Objects you recently accessed will appear here.')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing opened recently')).toBeInTheDocument()
+    expect(screen.getByText('Objects you open show up here.')).toBeInTheDocument()
   })
 
   test('an uncustomised query shows its automatic title in the Queries section and as a tab', async () => {
@@ -271,10 +271,10 @@ describe('TypePage', () => {
     load(views({ activeTab: 'overview' }, ['collections', 'queries']))
     render(<TypePage type={TASK} />)
     expect(await screen.findByText('No collections')).toBeInTheDocument()
-    expect(screen.getByText('You can change this by creating a new collection.')).toBeInTheDocument()
+    expect(screen.getByText('Create a collection to see it here.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create collection' })).toBeEnabled()
     expect(screen.getByText('No queries')).toBeInTheDocument()
-    expect(screen.getByText('Queries you create in this database will appear here.')).toBeInTheDocument()
+    expect(screen.getByText('Queries you save show up here.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create query' })).toBeInTheDocument()
   })
 

@@ -53,7 +53,7 @@ describe('MonthView', () => {
     render(<MonthView anchor={TODAY} weekStart="sunday" />)
     expect(await screen.findByText('This month has no daily notes yet.')).toBeInTheDocument()
     expect(screen.queryByTestId('grid-layout')).toBeNull()
-    expect(screen.getByText('You can change this by creating a new object.')).toBeInTheDocument()
+    expect(screen.getByText('Create an object to see it here.')).toBeInTheDocument()
     expect(mocked.rows).not.toHaveBeenCalled()
   })
 

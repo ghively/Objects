@@ -74,7 +74,7 @@ describe('taskRowExtras', () => {
     expect(within(li).getByTestId('task-repeat')).toHaveAttribute('title', 'Weekly on Friday')
     expect(within(li).getByTestId('task-reminder')).toBeInTheDocument()
     expect(within(li).getByText('2 days left')).toBeInTheDocument()
-    expect(within(li).getByText('Scheduled after deadline')).toBeInTheDocument()
+    expect(within(li).getByText('Planned past the deadline')).toBeInTheDocument()
     expect(within(li).getByText('High')).toBeInTheDocument()
     expect(within(li).getByTestId('badge-deadline')).toHaveTextContent('Deadline')
     expect(within(li).getByTestId('badge-occurrence')).toBeInTheDocument()

@@ -15,9 +15,9 @@ import { SmallCard } from '@/views/cards/SmallCard'
 export const CARD_VIEW_TEXT = {
   group: 'Card view and linking',
   linkView: 'Default link view',
-  linkViewExplanation: 'Set a default view to be used when linking or creating an object as a block somewhere in your content.',
+  linkViewExplanation: 'The view used when an object of this type is linked or added as a block in your content.',
   cardView: 'Default card view',
-  cardViewExplanation: 'Set which properties should be shown on the small card by default for this object type.',
+  cardViewExplanation: 'The properties a small card of this type shows by default.',
   selected: 'Selected Properties',
   addProperties: 'Add Properties',
 }
@@ -184,7 +184,7 @@ export function CardViewSettings({ typeId, editor, disabled }: { typeId: string;
           </button>
           {adding &&
             (available.length === 0 ? (
-              <p className="px-2 py-1 text-[13px] text-fg-muted">No further properties available</p>
+              <p className="px-2 py-1 text-[13px] text-fg-muted">All properties are already added</p>
             ) : (
               available.map((c) => (
                 <button

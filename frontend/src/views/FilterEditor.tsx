@@ -73,7 +73,7 @@ export function FilterEditor(props: FilterEditorProps) {
     <div className="flex w-[34rem] max-w-full flex-col gap-1.5 p-2 text-[13px]">
       <Rows {...props} depth={0} />
       {usable.length === 0 ? (
-        <p className="px-1 text-fg-muted">No eligible properties available</p>
+        <p className="px-1 text-fg-muted">No properties can be filtered here</p>
       ) : (
         <div className="flex gap-1">
           <button type="button" onClick={add} className="flex items-center gap-1 rounded-md px-2 py-1 text-fg-muted hover:bg-hover">

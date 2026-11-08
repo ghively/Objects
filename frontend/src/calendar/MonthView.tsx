@@ -20,7 +20,7 @@ import { useCalendarRange } from './useCalendarRange'
 export const MONTH_TEXT = {
   empty: 'This month has no daily notes yet.',
   /** Shown under the month's empty line. */
-  emptyHint: 'You can change this by creating a new object.',
+  emptyHint: 'Create an object to see it here.',
   /** Capitalised in the Month view ("New Object", not "New object"). */
   newObject: 'New Object',
   /** Our string: the month strip's accessible name. */

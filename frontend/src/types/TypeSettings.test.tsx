@@ -74,10 +74,10 @@ describe('TypeSettings', () => {
       'Encyclopedia',
     ])
     expect(within(config).getByRole('radio', { name: 'Standard' })).toHaveTextContent(
-      'Neutral default focused on functionality.',
+      'A plain, all-purpose layout.',
     )
     expect(
-      within(config).getByText('Customize how objects of this type look and behave across pages, cards, and the calendar.'),
+      within(config).getByText("Settings for how this type's objects appear and act on pages, on cards and in the calendar."),
     ).toBeInTheDocument()
     expect(within(config).getByRole('option', { name: 'Sans Serif' })).toBeInTheDocument()
     // No Calendar settings group (M13's Calendar layout is only an option of the default list view).

@@ -6,7 +6,7 @@
  *   labels), Format A4 | Letter and Properties (All properties plus one per property). The
  *   server builds a printable page (`format=html`); the dialog prints it from a hidden frame, so
  *   "Save as PDF" in the print dialog writes the file (our choice: no PDF library, no network).
- * - Markdown: Export folder containing all subpages (zip), Include media, Include title as
+ * - Markdown: Include subpages (as a folder) (zip), Include media, Include title as
  *   heading 1, Links as wikilinks (on by default: the file's own form; our choice).
  * - Microsoft Word (.docx) and Latex (.tex): they take the
  *   Properties list and Hide empty properties / Show type labels (our choice).
@@ -35,7 +35,7 @@ export const EXPORT_TEXT = {
   latex: 'Latex',
   style: 'Style',
   notes: 'Notes',
-  notesDescription: 'A PDF that matches the styling of the current page, including colors and embeds.',
+  notesDescription: 'A PDF that looks like the page on screen, with its colors and embeds.',
   essay: 'Essay',
   essayDescription: 'A single-column typeset PDF for reading and sharing. This is a layout, not a citation style.',
   academic: 'Academic',
@@ -48,11 +48,11 @@ export const EXPORT_TEXT = {
   includeOutlineDescription: 'Adds an outline of all headings at the top.',
   hideEmptyProperties: 'Hide empty properties',
   showTypeLabels: 'Show type labels',
-  includeTreedown: 'Export folder containing all subpages',
+  includeTreedown: 'Include subpages (as a folder)',
   includeTreedownDescription: 'Also exports linked subpages as a zip.',
   includeMedia: 'Include media',
   includeMediaDescription: 'Adds files and images to the zip.',
-  includeTitleAsHeading: 'Include title as heading 1',
+  includeTitleAsHeading: 'Add the title as a top heading',
   includeTitleAsHeadingDescription: 'Starts each item with its title as H1.',
   asWikiLink: 'Links as wikilinks',
   asWikiLinkDescription: 'Export links as [[title]] instead of [title](path).',

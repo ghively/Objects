@@ -54,7 +54,7 @@ import { queryTitle, type TitleCtx } from '@/queries/autoTitle'
 import { useTitleCtx } from '@/queries/QueryPage'
 
 export const COLLECTION_PAGE_TEXT = {
-  empty: 'This collection is empty. Create a record or add existing content.',
+  empty: 'Nothing in this collection yet. Add a new record or existing content.',
   addExisting: 'Add existing',
   createEntry: 'Create entry',
   pinned: 'Pinned',

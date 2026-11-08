@@ -23,7 +23,7 @@ export const RELATION_PICKER_TEXT = {
   // searchOrCreate: a relation to the Tag type (catalog section 5)
   searchOrCreate: 'Search or Create',
   nothingFound: 'Nothing found',
-  nothingToSelect: 'Nothing to select in this set. Search the whole database to add objects to the set.',
+  nothingToSelect: 'This set has nothing to pick from. Search everything to add objects to it.',
   editProperty: 'Edit Property',
 }
 

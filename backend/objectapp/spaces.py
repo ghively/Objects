@@ -252,7 +252,7 @@ class Registry:
 def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
     """Create ``<location>/<safe_filename(name)>`` holding only ``.object/space.json``.
 
-    `setup` is M8's "How do you want to start?": ``'blank'`` is the behaviour above;
+    `setup` is M8's "Pick a starting point": ``'blank'`` is the behaviour above;
     ``'basic'`` also writes the Person, Meeting, Project and Book types
     (``.object/types/{person,meeting,project,book}.json``, see `basicsetup`).
 

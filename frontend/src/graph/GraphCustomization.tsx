@@ -13,11 +13,11 @@ export const CUSTOMIZATION_TEXT = {
   deselectAll: 'Deselect all',
   showCompletedTasks: 'Show completed tasks',
   alwaysMinimalNodes: 'Show simplified graph',
-  hideLargeNodes: 'Hide objects with many links',
+  hideLargeNodes: 'Hide heavily linked objects',
   hideLargeNodesTooltip: (limit: number) => `Nodes with more than ${limit} links are hidden`,
   hideDates: 'Hide dates',
   hideIndirectLinks: 'Hide indirect links',
-  hideIndirectLinksTooltip: 'Links that only pass through a hidden object are not shown.',
+  hideIndirectLinksTooltip: 'A link that runs only through hidden objects is hidden too.',
   showTagsNetwork: 'Show tags network',
 }
 

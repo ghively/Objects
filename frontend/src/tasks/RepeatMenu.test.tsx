@@ -54,7 +54,7 @@ describe('RepeatMenu', () => {
     await userEvent.click(screen.getByRole('menuitem', { name: 'Remove recurrence' }))
     const confirm = screen.getByRole('alertdialog', { name: 'Remove recurrence?' })
     expect(confirm).toHaveTextContent(
-      'This recurring task already has completed or skipped occurrences. Removing the recurrence will discard its history.',
+      'Some repeats of this task are already done or skipped. Turning off the repeat throws that history away.',
     )
     await userEvent.click(screen.getByRole('button', { name: 'Keep recurrence' }))
     expect(onChange).not.toHaveBeenCalled()

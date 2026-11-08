@@ -19,14 +19,14 @@ import { localDayOf, nextDay, type WeekStart } from './repeat'
 
 export const OVERDUE_TEXT = {
   title: {
-    complete: 'Mark recurring task done',
+    complete: 'Complete a repeating task',
     skip: 'Skip recurring task',
-    excuse: 'Excuse recurring occurrence',
+    excuse: 'Excuse a missed repeat',
   },
   description: {
-    complete: '"{title}" is overdue by {count} occurrences. Which instance are you marking done?',
-    skip: '"{title}" is overdue by {count} occurrences. Which instance are you skipping?',
-    excuse: '"{title}" is overdue by {count} occurrences. Which occurrence are you excusing?',
+    complete: '"{title}" has {count} missed dates. Which one do you want to mark done?',
+    skip: '"{title}" has {count} missed dates. Which one do you want to skip?',
+    excuse: '"{title}" has {count} missed dates. Which one do you want to excuse?',
   },
   action: {
     complete: 'Mark as done for {date}',
@@ -36,7 +36,7 @@ export const OVERDUE_TEXT = {
   hint: {
     advanceOne: 'This occurrence only',
     catchUpBeforeNow: 'All missed before today',
-    catchUpThroughNow: { complete: 'Also logs all missed as done', skip: 'Also skips all missed' },
+    catchUpThroughNow: { complete: 'Marks every missed date done too', skip: 'Also skips all missed' },
   },
   capped: '{count}+',
 } as const

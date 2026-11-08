@@ -49,7 +49,7 @@ describe('TaskCheckbox (M8 recurrence)', () => {
     render(<TaskCheckbox row={recurring(today)} type={TASK_TYPE} taskApi={taskApi} onResult={onResult} />)
     let menu = await openMenu(user)
     const skip = within(menu).getByRole('menuitem', { name: 'Skip' })
-    expect(skip).toHaveAttribute('title', 'Move to the next occurrence without marking done. Resets your streak and counts as skipped in stats.')
+    expect(skip).toHaveAttribute('title', 'Jump to the next date without completing this one. Breaks your streak and counts as a skip.')
     await user.click(skip)
     await waitFor(() => expect(onResult).toHaveBeenCalledTimes(1))
     expect(taskApi.occurrence).toHaveBeenCalledWith('Tasks/Water plants.md', 'skip', { baseVersion: 'v7' })
@@ -59,7 +59,7 @@ describe('TaskCheckbox (M8 recurrence)', () => {
     menu = await openMenu(user)
     const excuse = within(menu).getByRole('menuitem', { name: 'Excuse' })
     expect(within(menu).queryByRole('menuitem', { name: /Excuse for/ })).toBeNull()
-    expect(excuse).toHaveAttribute('title', "Move to the next occurrence without marking done. Keeps your streak; excused days don't affect completion rate.")
+    expect(excuse).toHaveAttribute('title', "Jump to the next date without completing this one. Your streak survives, and excused days are left out of the completion rate.")
     await user.click(excuse)
     await waitFor(() => expect(onResult).toHaveBeenCalledTimes(2))
     expect(taskApi.occurrence).toHaveBeenLastCalledWith('Tasks/Water plants.md', 'excuse', { baseVersion: 'v7' })
@@ -92,7 +92,7 @@ describe('TaskCheckbox (M8 recurrence)', () => {
     const choices = [
       ['complete', /This occurrence only/, 'advanceOne'],
       ['complete', /All missed before today/, 'catchUpBeforeNow'],
-      ['complete', /Also logs all missed as done/, 'catchUpThroughNow'],
+      ['complete', /Marks every missed date done too/, 'catchUpThroughNow'],
       ['skip', /This occurrence only/, 'advanceOne'],
       ['skip', /All missed before today/, 'catchUpBeforeNow'],
       ['skip', /Also skips all missed/, 'catchUpThroughNow'],

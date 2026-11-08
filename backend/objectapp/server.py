@@ -87,7 +87,7 @@ Routes (all JSON):
   ``201 {path, version}``; ``422`` (a type without templates), ``423``, ``404``. Announces
   ``created`` and ``types``.
 - ``POST /api/object/apply-template`` ``{path, templateId, baseVersion, clientId?}`` ->
-  ``{version}``; ``409 {currentVersion}``, ``422 {detail}`` ("Could not apply the template"),
+  ``{version}``; ``409 {currentVersion}``, ``422 {detail}`` ("The template couldn't be applied"),
   ``423``, ``404``. Announces ``changed``. ``POST /api/objects`` applies the type's default
   template unless ``templateId`` is ``"none"``; ``DELETE /api/object`` on a template also
   drops it from its type's ``templates`` (announcing ``types``).

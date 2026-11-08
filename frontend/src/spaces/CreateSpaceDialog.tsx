@@ -2,7 +2,7 @@
  * "Create new space": a name and a location (the current space's parent folder by default), then
  * "Create space" makes `<location>/<safe name>/.object/space.json` through `POST /api/spaces`
  * and offers to switch to it. An existing folder is never touched (the server answers 409, shown
- * as "A folder with that name already exists here."). M8: "How do you want to start?" picks
+ * as "A folder with that name already exists here."). M8: "Pick a starting point" picks
  * "Start with basic setup" (the server also writes the Person, Meeting, Project and Book types)
  * or "Empty space" (nothing else is created; the default, our choice).
  * M15: "Import from…" below the choices closes this dialog and opens the import dialog with the
@@ -32,7 +32,7 @@ export const CREATE_SPACE_TEXT = {
   created: 'Space created. Switch to it now?', // our string
   switchNow: 'Switch space', // our string
   later: 'Later', // our string
-  howToStart: 'How do you want to start?',
+  howToStart: 'Pick a starting point',
   basicLabel: 'Start with basic setup',
   basicDescription: 'Comes with types for people, meetings, projects and books.',
   blankLabel: 'Empty space',

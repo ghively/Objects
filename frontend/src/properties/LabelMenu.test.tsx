@@ -88,7 +88,7 @@ describe('LabelMenu', () => {
     expect(screen.queryByRole('button', { name: /^New / })).not.toBeInTheDocument()
   })
 
-  it('test duplicate label name warns "A label with this name already exists…"', async () => {
+  it('test duplicate label name warns that the name is taken', async () => {
     const user = userEvent.setup()
     const onDefChange = vi.fn()
     render(
@@ -103,7 +103,7 @@ describe('LabelMenu', () => {
     const name = screen.getByRole('textbox', { name: 'Label name' })
     await user.clear(name)
     await user.type(name, 'alpha')
-    expect(screen.getByText(/A label with this name already exists/)).toBeInTheDocument()
+    expect(screen.getByText(/That label name is taken/)).toBeInTheDocument()
     await user.tab()
     expect(onDefChange).not.toHaveBeenCalled()
   })

@@ -1,6 +1,6 @@
 /**
  * "Import CSV" on a type page: the
- * "Batch import to collection" modal. Every data row of the file becomes one object of the
+ * "Bulk import from CSV" modal. Every data row of the file becomes one object of the
  * type; each column maps to a property ("Property Mappings", the first column to the title by
  * default, the others to a property of the same name). The objects go into the type, or into a
  * new collection named after the file. Nothing but the new objects (and that collection) is written.
@@ -27,20 +27,20 @@ import { isValidEmail, isValidPhone } from '@/properties/contact'
 
 export const IMPORT_CSV_TEXT = {
   menu: 'Import CSV',
-  heading: 'Batch import to collection',
-  description: 'You can upload a CSV that will be transformed into a collection. Every row will create one entity.',
-  chooseFile: 'Choose file or drop here.',
+  heading: 'Bulk import from CSV',
+  description: 'Upload a CSV file to turn it into a collection, one object per row.',
+  chooseFile: 'Pick a file, or drag one here.',
   headerRow: 'Has a header row',
-  headerRowDescription: 'First row in CSV holds column names and is not itself a data row.',
+  headerRowDescription: 'The first row has the column names, so it is not imported as an object.',
   warningHeading: 'Use this with caution',
-  warningText: 'Every row in your table will be transformed into a new object. You can quickly spam your whole space if you import big tables.',
-  readingError: 'Some issues were found while parsing your file. Make sure to use a valid CSV file to ensure the import you expect.',
-  notSupported: (rowLimit: number) => `This file is not supported. We only support CSV imports up to ${rowLimit} rows.`,
+  warningText: 'Each row becomes its own object, so a large table can flood your space with new objects.',
+  readingError: 'Parts of this file could not be read. Check that it is a valid CSV so the import comes out as expected.',
+  notSupported: (rowLimit: number) => `This file can't be imported. CSV files of up to ${rowLimit} rows are supported.`,
   newCollection: (title: string) => `New collection "${title}"`,
   /** The mapping info, before the target. */
   info: (count: number, plural: string) => `Add ${count} new ${plural} to`,
   mappings: 'Property Mappings',
-  mappingsDescription: 'Multiple values can be mapped to the same property, but only the first transferred value is kept.',
+  mappingsDescription: 'Several columns can go into one property; only the first value that arrives is kept.',
   import: 'Import',
   importing: 'Importing...',
   cancel: 'Cancel',

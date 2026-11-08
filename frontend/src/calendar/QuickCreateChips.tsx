@@ -14,9 +14,9 @@ import type { Day } from './dates'
 export const CHIPS_TEXT = {
   create: (object: string) => `Create ${object} linked to this day.`,
   createObjects:
-    'Create an object with the date property set to this day. You can remove an object type from this list in the settings of that object type.',
-  hide: 'Click to hide these buttons.',
-  show: 'Click to show options to create objects for this day.',
+    "Makes an object dated this day. To take a type off this list, change that type's settings.",
+  hide: 'Hide the quick-create buttons.',
+  show: 'Show buttons that create objects on this day.',
 }
 
 const DATE_KINDS = new Set(['datetime', 'datetimeSimple'])

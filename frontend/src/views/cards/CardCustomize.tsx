@@ -111,7 +111,7 @@ function TypeCard({ type, state, onState }: { type: TypeDef; state: ViewState; o
           </button>
           {adding &&
             (available.length === 0 ? (
-              <p className="px-2 py-1 text-[13px] text-fg-muted">No further properties available</p>
+              <p className="px-2 py-1 text-[13px] text-fg-muted">All properties are already added</p>
             ) : (
               available.map((c) => (
                 <button

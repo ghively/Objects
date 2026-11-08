@@ -12,11 +12,11 @@ describe('CustomRepeatDialog', () => {
     for (const s of ['Every', 'Based on', 'Ends', 'Never', 'On date (inclusive)', 'Cancel', 'Save']) expect(screen.getByText(s)).toBeInTheDocument()
     expect(screen.getByText('Scheduled date').closest('label')).toHaveAttribute(
       'title',
-      'Repeats on a fixed schedule relative to the due date, regardless of when you complete the task.',
+      'Each repeat is counted from the due date, no matter when you finish the task.',
     )
     expect(screen.getByText('Completed date').closest('label')).toHaveAttribute(
       'title',
-      'The next occurrence is scheduled relative to when you actually complete the task.',
+      'Each repeat is counted from the day you actually finish the task.',
     )
     const every = screen.getByLabelText('Every')
     await userEvent.clear(every)

@@ -16,7 +16,7 @@ export function AliasesCell({ def, value, readOnly, density, inTable, onChange }
     const name = draft.trim()
     if (!name) return
     if (aliases.some((a) => a.toLowerCase() === name.toLowerCase())) {
-      setError('An alias with this name already exists.')
+      setError('That alias is already in the list.')
       return
     }
     if (aliases.length >= MAX_ALIASES) {

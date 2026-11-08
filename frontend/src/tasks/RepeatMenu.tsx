@@ -63,7 +63,7 @@ export function RepeatMenu({ value, date, onChange, onCustom, hasHistory = false
       <div role="alertdialog" aria-label="Remove recurrence?" className="flex flex-col gap-2 px-2 py-1 text-fg" data-testid="repeat-row">
         <h2 className="text-[15px] font-semibold">Remove recurrence?</h2>
         <p className="text-[13px] text-fg-muted">
-          This recurring task already has completed or skipped occurrences. Removing the recurrence will discard its history.
+          Some repeats of this task are already done or skipped. Turning off the repeat throws that history away.
         </p>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={() => setConfirming(false)} className="rounded-md px-3 py-1 text-[14px] hover:bg-hover">

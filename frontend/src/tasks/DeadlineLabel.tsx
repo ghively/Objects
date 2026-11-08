@@ -48,7 +48,7 @@ export function DeadlineLabel({
   className,
 }: {
   deadline: DateValue | null | undefined
-  /** The task's date, for "Scheduled after deadline". */
+  /** The task's date, for "Planned past the deadline". */
   date?: DateValue | null
   today?: Date
   className?: string
@@ -59,7 +59,7 @@ export function DeadlineLabel({
   return (
     <span data-testid="deadline-label" className={cn('inline-flex items-center gap-1.5 text-[13px]', className)}>
       <span className={missed ? 'text-[var(--danger)]' : 'text-fg-muted'}>{text}</span>
-      {scheduledAfterDeadline(date, deadline) && <span className="text-[var(--warning)]">Scheduled after deadline</span>}
+      {scheduledAfterDeadline(date, deadline) && <span className="text-[var(--warning)]">Planned past the deadline</span>}
     </span>
   )
 }

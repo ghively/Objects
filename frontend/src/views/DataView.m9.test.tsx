@@ -138,8 +138,8 @@ describe('DataView multi-select (Task 18)', () => {
     await user.click(screen.getByText('C'))
     const bar = screen.getByTestId('selection-bar')
     expect(bar).toHaveTextContent('2 selected')
-    expect(within(bar).getByRole('button', { name: 'Change type of selected objects' })).toBeInTheDocument()
-    expect(within(bar).getByRole('button', { name: 'Open selected objects in side panel' })).toBeInTheDocument()
+    expect(within(bar).getByRole('button', { name: 'Change the type of the selection' })).toBeInTheDocument()
+    expect(within(bar).getByRole('button', { name: 'Open the selection in the side panel' })).toBeInTheDocument()
     expect(within(bar).getByRole('button', { name: 'Delete objects' })).toBeInTheDocument()
   })
 
@@ -152,7 +152,7 @@ describe('DataView multi-select (Task 18)', () => {
     const dialog = await screen.findByRole('alertdialog')
     // The fallback heading and description.
     expect(within(dialog).getByRole('heading', { name: 'Delete?' })).toBeInTheDocument()
-    expect(within(dialog).getByText('Review the items below, then confirm.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Check the list below before you confirm.')).toBeInTheDocument()
     expect(within(within(dialog).getByRole('list', { name: 'Items' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['A', 'B'])
     await user.click(within(dialog).getByRole('button', { name: 'Delete 2 objects' }))
     await waitFor(() => expect(mocked.deleteObject).toHaveBeenCalledTimes(2))
@@ -174,7 +174,7 @@ describe('DataView multi-select (Task 18)', () => {
     render(<Harness />)
     await startSelecting(user, 'A')
     await user.click(screen.getByText('B'))
-    await user.click(screen.getByRole('button', { name: 'Change type of selected objects' }))
+    await user.click(screen.getByRole('button', { name: 'Change the type of the selection' }))
     await user.click(await screen.findByRole('menuitem', { name: 'Book' }))
     // One dialog per object, in view order.
     await waitFor(() => expect(mocked.suggestMapping).toHaveBeenCalledWith('Pages/A.md', 'book'))
@@ -191,7 +191,7 @@ describe('DataView multi-select (Task 18)', () => {
     await startSelecting(user, 'A')
     await user.click(screen.getByText('B'))
     const spy = vi.spyOn(useTabs.getState(), 'openInSidepanel')
-    await user.click(screen.getByRole('button', { name: 'Open selected objects in side panel' }))
+    await user.click(screen.getByRole('button', { name: 'Open the selection in the side panel' }))
     expect(spy.mock.calls.map((c) => c[0])).toEqual([
       { kind: 'object', path: 'Pages/A.md' },
       { kind: 'object', path: 'Pages/B.md' },

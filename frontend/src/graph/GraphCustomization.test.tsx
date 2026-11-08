@@ -22,16 +22,16 @@ describe('GraphCustomization', () => {
     const pop = await screen.findByRole('dialog')
     for (const label of ['Filter object types', 'Exclude object types']) expect(within(pop).getByRole('region', { name: label })).toBeInTheDocument()
     expect(within(pop).getAllByRole('button', { name: 'Deselect all' })).toHaveLength(2)
-    for (const label of ['Show completed tasks', 'Show simplified graph', 'Hide objects with many links', 'Hide dates', 'Hide indirect links', 'Show tags network']) {
+    for (const label of ['Show completed tasks', 'Show simplified graph', 'Hide heavily linked objects', 'Hide dates', 'Hide indirect links', 'Show tags network']) {
       expect(within(pop).getByRole('switch', { name: label })).toBeInTheDocument()
     }
-    expect(within(pop).getByRole('switch', { name: 'Hide objects with many links' }).closest('label')).toHaveAttribute(
+    expect(within(pop).getByRole('switch', { name: 'Hide heavily linked objects' }).closest('label')).toHaveAttribute(
       'title',
       'Nodes with more than 20 links are hidden',
     )
     expect(within(pop).getByRole('switch', { name: 'Hide indirect links' }).closest('label')).toHaveAttribute(
       'title',
-      'Links that only pass through a hidden object are not shown.',
+      'A link that runs only through hidden objects is hidden too.',
     )
   })
 

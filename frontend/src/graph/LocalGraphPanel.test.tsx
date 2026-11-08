@@ -179,7 +179,7 @@ describe('LocalGraphPanel', () => {
   test('an object missing from the graph shows the empty state', async () => {
     render(<LocalGraphPanel path="Template.md" />)
     expect(await screen.findByText('Nothing to show')).toBeInTheDocument()
-    expect(screen.getByText('There is nothing in this graph yet.')).toBeInTheDocument()
+    expect(screen.getByText('This graph has no nodes yet.')).toBeInTheDocument()
     expect(screen.queryByTestId('graph-canvas')).toBeNull()
   })
 
@@ -206,7 +206,7 @@ describe('LocalGraphPanel', () => {
     expect(screen.getByText('Maximum distance')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Show more' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Fit graph to view' })).toBeInTheDocument()
-    expect(screen.getByRole('searchbox', { name: 'Search for a note in the graph' })).toBeInTheDocument()
+    expect(screen.getByRole('searchbox', { name: 'Find a note in this graph' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Customize' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Show more' }))
     expect(screen.getByRole('button', { name: 'Show less' })).toBeInTheDocument()
