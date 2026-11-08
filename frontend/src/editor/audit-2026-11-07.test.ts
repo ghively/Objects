@@ -91,6 +91,18 @@ describe('#5 a nested list the editor would mis-nest', () => {
     })
   }
 
+  test('an edited sibling item keeps its own indent, so the next item does not nest in it', () => {
+    // GFM: four sibling items (` - b` and `  - c` sit short of the previous item's text).
+    const body = '- a\n - b\n  - c\n   - d\n    - e\n'
+    expect(topTypes(headless(body))).toEqual(['bulletList'])
+    expect(editWhere(body, 'b')).toBe('- a\n - bZ\n  - c\n   - d\n    - e\n')
+    expect(editWhere(body, 'c')).toBe('- a\n - b\n  - cZ\n   - d\n    - e\n')
+    // `    - e` is text of item d (GFM: "d - e"); typed at, its line takes the escaped form.
+    const saved = editWhere(body, 'd')
+    expect(saved).toBe('- a\n - b\n  - c\n   - d\n    \\- eZ\n')
+    expect(html(saved.replace('Z', ''))).toBe(html(body))
+  })
+
   // The inputs the editor nests as GFM does still load as editable lists.
   const nestedOk: [string, string][] = [
     ['1. a\n   - b\n     - c\n2. e\n', 'orderedList'],
