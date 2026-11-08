@@ -82,6 +82,31 @@ def _error(status: int, detail: str, **extra: Any) -> JSONResponse:
     return JSONResponse({"detail": detail, **extra}, status_code=status)
 
 
+def _hidden_ref(value: Any, hidden: set[str]) -> bool:
+    return isinstance(value, dict) and value.get("path") in hidden
+
+
+def without_hidden(values: dict[str, Any], hidden: set[str]) -> dict[str, Any]:
+    """``values`` without the relation items (``{target, path}``) that point at a hidden object
+    (a template or one excluded from AI); a single one becomes None (audit 2026-11-07 #23)."""
+    out: dict[str, Any] = {}
+    for key, value in values.items():
+        if isinstance(value, list):
+            value = [x for x in value if not _hidden_ref(x, hidden)]
+        elif _hidden_ref(value, hidden):
+            value = None
+        out[key] = value
+    return out
+
+
+def links_hidden(values: dict[str, Any], hidden: set[str]) -> bool:
+    """Whether any relation item of ``values`` points at a hidden object."""
+    return any(
+        any(_hidden_ref(x, hidden) for x in v) if isinstance(v, list) else _hidden_ref(v, hidden)
+        for v in values.values()
+    )
+
+
 def mcp_config(base_url: str, secret: str = "<token>") -> dict[str, Any]:
     """The ``mcpServers`` entry a client (Claude Code, Claude Desktop) needs."""
     return {
@@ -289,6 +314,17 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         hidden = hidden_paths()
         found = ctx.search.search(q, types=types, limit=min(200, limit + len(hidden)), mode=mode)
         results = [x for x in found.get("results", []) if x.get("path") not in hidden][:limit]
+        if hidden and results:
+            # A properties snippet shows a relation's target by its title: leave it out for an
+            # object that links a hidden one (audit 2026-11-07 #23).
+            rows = space.rows(None, None, [x["path"] for x in results], None, False)
+            linking = {x.summary.path for x in rows if links_hidden(x.values, hidden)}
+            results = [
+                {**x, "highlights": [
+                    hl for hl in x.get("highlights") or [] if hl.get("field") != "properties"
+                ]} if x["path"] in linking else x
+                for x in results
+            ]
         return {"results": results, "partial": found.get("partial", False)}
 
     def run_query(
@@ -324,7 +360,8 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         page = rows[offset : offset + limit]
         return {
             "rows": [
-                {**summary_out(x.summary), "version": x.version, "values": x.values}
+                {**summary_out(x.summary), "version": x.version,
+                 "values": without_hidden(x.values, hidden)}
                 for x in page
             ],
             "total": total,
@@ -415,7 +452,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
                     {
                         **summary_out(space.get(rel)),
                         "version": version,
-                        "values": values,
+                        "values": without_hidden(values, hidden),
                         "outline": outline(body),
                         "size": {"characters": len(body), "words": len(body.split())},
                         "links": links,
@@ -444,8 +481,8 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         return SafeJSONResponse(
             json.loads(
                 json.dumps(
-                    {**summary_out(space.get(rel)), "version": version, "values": values,
-                     "body": body},
+                    {**summary_out(space.get(rel)), "version": version,
+                     "values": without_hidden(values, hidden_paths()), "body": body},
                     default=str,
                 )
             )
@@ -488,7 +525,12 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         if at:
             objs = [s for s in objs if s.lastUpdated[: len(at)] >= at]
         objs.sort(key=lambda s: s.lastUpdated or "", reverse=True)
-        log = [e for e in activity.since(at, limit) if e.get("path") not in hidden]
+        log = [
+            # A rename's old path or a merge's source can name a hidden object (#23).
+            {k: v for k, v in e.items() if not (k in ("oldPath", "source") and v in hidden)}
+            for e in activity.since(at, limit)
+            if e.get("path") not in hidden
+        ]
         return {"objects": [summary_out(s) for s in objs[:limit]], "activity": log}
 
     # -- write ---------------------------------------------------------------------
@@ -581,7 +623,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         return SafeJSONResponse(
             json.loads(
                 json.dumps(
-                    {"version": result.version, "values": values,
+                    {"version": result.version, "values": without_hidden(values, hidden_paths()),
                      "skipped": [asdict(s) for s in result.skipped]},
                     default=str,
                 )
