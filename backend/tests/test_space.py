@@ -349,3 +349,24 @@ def test_a_stray_lone_cr_in_the_body_stays_editable(tmp_path):
     assert not s.get("Cr value.md").readOnly
     s.update_properties("Cr value.md", {"description": "d"}, version_of(data))
     assert (tmp_path / "Cr value.md").read_bytes().count(b"---\n") == 2
+
+
+# -- bug audit 2026-11-07, finding 27: a symlinked .md is not an object -----------------
+
+
+def test_symlinked_md_is_not_listed_or_searched(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "Secret.md").write_text("---\ntitle: Secret\n---\nzebracorn words\n", "utf-8")
+    root = tmp_path / "space"
+    root.mkdir()
+    (root / "Real.md").write_text("---\ntitle: Real\n---\nbody\n", "utf-8")
+    try:
+        (root / "Link.md").symlink_to(outside / "Secret.md")
+        (root / "Alias.md").symlink_to(root / "Real.md")
+    except OSError:
+        pytest.skip("symlinks are not available here")
+    assert list(iter_object_paths(root)) == ["Real.md"]
+    s = Space(root)
+    assert [o.path for o in s.list()] == ["Real.md"]
+    assert not any("zebracorn" in (o.of.body or "") for o in s._raw.values())

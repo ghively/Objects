@@ -258,6 +258,23 @@ def test_watcher_silent_for_rename_and_relinked_referrer(space_dir: Path):
     _run(space_dir, scenario)
 
 
+def test_relpath_ignores_symlinked_md(space_dir: Path, tmp_path: Path):
+    """Bug audit 2026-11-07, 27: a symlinked `.md` is not an object, as on open."""
+    space = Space(space_dir)
+    watcher = SpaceWatcher(space, asyncio.new_event_loop())
+    outside = tmp_path / "Secret.md"
+    outside.write_text("secret\n", "utf-8")
+    try:
+        (space.root / "Pages" / "Link.md").symlink_to(outside)
+        (space.root / "Pages" / "Alias.md").symlink_to(space.root / "Pages" / "Alpha.md")
+    except OSError:
+        pytest.skip("symlinks are not available here")
+    assert watcher._relpath(str(space.root / "Pages" / "Link.md")) is None
+    assert watcher._relpath(str(space.root / "Pages" / "Alias.md")) is None
+    assert watcher._relpath(str(space.root / "Pages" / "Alpha.md")) == "Pages/Alpha.md"
+    watcher.stop()
+
+
 def test_relpath_survives_vanished_parent(space_dir: Path, monkeypatch):
     """Emptying the Trash removes a type's folder while watchdog still reports files in it.
 
