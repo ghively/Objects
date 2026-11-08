@@ -93,7 +93,7 @@ def router(ctx: ApiContext, service: WorkService) -> APIRouter:
         except ValueError as exc:
             return error(400, str(exc))
         except KeyError:
-            return error(404, f"No object at {path!r}")
+            return error(404, f'There is no object at "{path}".')
 
     def write(token: TokenRecord, path: str, action: str, call: Callable[[str], dict]) -> Any:
         """``call(rel)`` for a visible object, with the work errors mapped to the app's answers;
@@ -125,7 +125,7 @@ def router(ctx: ApiContext, service: WorkService) -> APIRouter:
         except (NotWorkItem, IllegalMove, UnreadableList, InvalidValue) as exc:
             return error(422, str(exc))
         except (KeyError, FileNotFoundError):
-            return error(404, f"No object at {path!r}")
+            return error(404, f'There is no object at "{path}".')
         except ValueError as exc:
             return error(400, str(exc))
         if isinstance(result.get("item"), dict):
@@ -162,7 +162,7 @@ def router(ctx: ApiContext, service: WorkService) -> APIRouter:
         except NotWorkItem as exc:
             return error(422, str(exc))
         except (KeyError, FileNotFoundError):
-            return error(404, f"No object at {path!r}")
+            return error(404, f'There is no object at "{path}".')
         except ValueError as exc:
             return error(400, str(exc))
         return _safe(shown_item(item))

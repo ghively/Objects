@@ -2468,7 +2468,7 @@ class Space:
                 raise InvalidValue(str(exc)) from exc
             with self._lock:
                 if rel not in self._summaries:
-                    raise InvalidValue(f"No object at {path!r}")
+                    raise InvalidValue(f'There is no object at "{path}".')
             return rel
         target = ref.get("target")
         return self.resolve(target, from_rel) if isinstance(target, str) else None

@@ -214,7 +214,7 @@ def test_hidden_items(env: Env) -> None:
     for route, body in writes:
         assert _v1(env, secret, "POST", route, json=body).status_code == 404, route
     assert (env.root / HIDDEN).read_bytes() == before
-    assert _error_text(server, "work_item", path=HIDDEN) == f"No object at {HIDDEN!r}"
+    assert _error_text(server, "work_item", path=HIDDEN) == f'There is no object at "{HIDDEN}".'
 
 
 def test_read_scope(env: Env) -> None:

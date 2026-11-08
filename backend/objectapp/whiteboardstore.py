@@ -76,7 +76,7 @@ WHITEBOARD_UI_KEYS = (
 )
 
 # Our string.
-_UI_PROBLEM = "whiteboard must be an object of true/false settings."
+_UI_PROBLEM = 'The key "whiteboard" must be an object of true/false settings.'
 
 
 class NotAWhiteboard(Exception):

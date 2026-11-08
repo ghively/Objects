@@ -26,7 +26,7 @@ __all__ = [
     "resolve_date_variable",
 ]
 
-TEMPLATE_FAILED = "The template couldn't be applied"
+TEMPLATE_FAILED = "The template couldn't be applied."
 
 _MONTHS = [
     "January", "February", "March", "April", "May", "June",

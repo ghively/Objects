@@ -114,16 +114,16 @@ def load_task(space: Any, path: str) -> TaskState:
     try:
         _of, fm, version = space.read(rel)
     except (KeyError, FileNotFoundError, IsADirectoryError, NotADirectoryError):
-        raise Problem(404, f"No object at {path!r}") from None
+        raise Problem(404, f'There is no object at "{path}".') from None
     except ValueError as exc:  # outside the space, or not an object
         raise Problem(400, str(exc)) from None
     t = space._type_of(rel)
     if not is_task_type(t):
-        raise Problem(422, "Not a recurring task")
+        raise Problem(422, "This is not a recurring task.")
     raw = fm.get("repeat")
     rule = parse_repeat(raw) if isinstance(raw, str) else None
     if rule is None:
-        raise Problem(422, "Not a recurring task")
+        raise Problem(422, "This is not a recurring task.")
     date_def = t.prop("date")
     value = decode_value(date_def, fm.get("date"), fm) if date_def is not None else None
     current = _current_date(value) if isinstance(value, dict) else None
@@ -210,7 +210,7 @@ def plan_occurrence(
     today = to_local(now, tz).date()
     if rule.mode == "completionDate":
         if catch_up != "advanceOne":
-            raise Problem(422, "Catching up needs a by-due-date rule")
+            raise Problem(422, "Catching up needs a by-due-date rule.")
         return [current], next_date(rule, current, now, today, tz, week_start)
     if catch_up == "advanceOne":
         return [current], _step_once(rule, current, tz, week_start)
@@ -456,7 +456,7 @@ def router(ctx: ApiContext) -> APIRouter:
         try:
             state = load_task(space, path)
             if state.rule.mode != "dueDate":
-                raise Problem(422, "Not a recurring by-due-date task")
+                raise Problem(422, "This is not a recurring by-due-date task.")
         except Problem as exc:
             return _problem(exc)
         return overdue_info(state, space.clock(), space.tz, week_start())
@@ -487,16 +487,16 @@ def router(ctx: ApiContext) -> APIRouter:
         catch_up = req.catchUp or "advanceOne"
         try:
             if action not in _LOGGED_ACTION:
-                raise Problem(422, f"Unknown action {action!r}")
+                raise Problem(422, f'There is no action "{action}".')
             if catch_up not in ("advanceOne", "catchUpBeforeNow", "catchUpThroughNow"):
-                raise Problem(422, f"Unknown catch-up choice {catch_up!r}")
+                raise Problem(422, f'There is no catch-up choice "{catch_up}".')
             if action == "excuse" and catch_up == "catchUpThroughNow":
-                raise Problem(422, "Excuse offers only this occurrence or all missed before today")
+                raise Problem(422, "Excuse offers only this occurrence or all missed before today.")
             state = load_task(space, req.path)
             if state.version != req.baseVersion:
                 return JSONResponse({"currentVersion": state.version}, status_code=409)
             if state.current is None or state.date_def is None:
-                raise Problem(422, "The recurring task has no date")
+                raise Problem(422, "The recurring task has no date.")
             now = space.clock()
             tz = space.tz
             acted, nxt = plan_occurrence(state, action, catch_up, now, tz, week_start())
@@ -528,7 +528,7 @@ def router(ctx: ApiContext) -> APIRouter:
         except InvalidValue as exc:
             return JSONResponse({"detail": str(exc)}, status_code=422)
         except (KeyError, FileNotFoundError):
-            return JSONResponse({"detail": f"No object at {req.path!r}"}, status_code=404)
+            return JSONResponse({"detail": f'There is no object at "{req.path}".'}, status_code=404)
         if result.version != req.baseVersion:
             ctx.announce(ChangeEvent("changed", state.rel, result.version, origin=req.clientId))
         for path in result.synced:
@@ -556,14 +556,14 @@ def router(ctx: ApiContext) -> APIRouter:
         try:
             _of, fm, version = space.read(rel)
         except (KeyError, FileNotFoundError, IsADirectoryError, NotADirectoryError):
-            return JSONResponse({"detail": f"No object at {req.path!r}"}, status_code=404)
+            return JSONResponse({"detail": f'There is no object at "{req.path}".'}, status_code=404)
         except ValueError as exc:  # outside the space, or not an object
             return JSONResponse({"detail": str(exc)}, status_code=400)
         t = space._type_of(rel)
         pdef = t.prop(req.key) if t is not None else None
         if pdef is None or not supports_reminders(pdef):
             return JSONResponse(
-                {"detail": f"{req.key!r} is not a date property that supports reminders"},
+                {"detail": f'The property "{req.key}" is not a date property that supports reminders.'},
                 status_code=422,
             )
         if version != req.baseVersion:
@@ -574,7 +574,7 @@ def router(ctx: ApiContext) -> APIRouter:
             rule = parse_remind(req.remind, resolution)  # type: ignore[arg-type]
             if rule is None:
                 return JSONResponse(
-                    {"detail": f"{req.remind!r} doesn't fit a {resolution} date"}, status_code=422
+                    {"detail": f"The reminder \"{req.remind}\" doesn't fit a {resolution} date."}, status_code=422
                 )
             text = format_remind(rule, resolution)  # type: ignore[arg-type]
         try:
@@ -604,7 +604,7 @@ def router(ctx: ApiContext) -> APIRouter:
         except InvalidValue as exc:
             return JSONResponse({"detail": str(exc)}, status_code=422)
         except (KeyError, FileNotFoundError):
-            return JSONResponse({"detail": f"No object at {req.path!r}"}, status_code=404)
+            return JSONResponse({"detail": f'There is no object at "{req.path}".'}, status_code=404)
         if new_version != req.baseVersion:
             ctx.announce(ChangeEvent("changed", rel, new_version, origin=req.clientId))
         for path in synced:

@@ -214,7 +214,7 @@ def router(ctx: ApiContext, service: WorkService, seams: WorkSeams, watch: Alert
         except (SeamRefused, SeamUnavailable) as exc:
             return _seam_error(exc)
         except KeyError:
-            return _error(404, f"No agent queue entry {req.id!r}")
+            return _error(404, f'There is no agent queue entry "{req.id}".')
 
     @api.post("/work/captures", status_code=201)
     def save_capture(req: CaptureRequestModel):

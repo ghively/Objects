@@ -1394,7 +1394,7 @@ class AutomationEngine:
         """Press a button: run the rule on the object now. Raises `RuleRefused`."""
         lr = self.rules.get(rule_id)
         if lr is None:
-            raise RuleRefused(404, f"No automation {rule_id!r}")
+            raise RuleRefused(404, f'There is no automation "{rule_id}".')
         if lr.rule is None:
             raise RuleRefused(423, lr.read_only_reason or CANT_READ)
         rule = lr.rule
@@ -1405,13 +1405,13 @@ class AutomationEngine:
         try:
             rel = self.space._rel(path)
         except ValueError as exc:
-            raise RuleRefused(404, f"No object at {path!r}") from exc
+            raise RuleRefused(404, f'There is no object at "{path}".') from exc
         if not (self.space.root / rel).is_file():
-            raise RuleRefused(404, f"No object at {path!r}")
+            raise RuleRefused(404, f'There is no object at "{path}".')
         try:
             _of, fm, _v = self.space.read(rel)
         except (KeyError, OSError) as exc:
-            raise RuleRefused(404, f"No object at {path!r}") from exc
+            raise RuleRefused(404, f'There is no object at "{path}".') from exc
         if str(fm.get("template") or "").strip():
             raise RuleRefused(422, IN_TEMPLATE)
         if not self._in_scope(rule.trigger.scope, fm):

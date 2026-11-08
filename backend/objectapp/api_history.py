@@ -59,7 +59,7 @@ def router(ctx: ApiContext) -> APIRouter:
         except ValueError as exc:
             return _error(400, str(exc))
         except KeyError:
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
         return {"versions": store.versions(rel)}
 
     @r.get("/history/version")
@@ -70,9 +70,9 @@ def router(ctx: ApiContext) -> APIRouter:
         except ValueError as exc:
             return _error(400, str(exc))
         except VersionNotFound:
-            return _error(404, f"No version {id!r} of {path!r}")
+            return _error(404, f'There is no version "{id}" of "{path}".')
         except KeyError:
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
 
     @r.post("/history/restore")
     def post_restore(req: RestoreRequest):
@@ -82,9 +82,9 @@ def router(ctx: ApiContext) -> APIRouter:
         except ValueError as exc:
             return _error(400, str(exc))
         except VersionNotFound:
-            return _error(404, f"No version {req.id!r} of {req.path!r}")
+            return _error(404, f'There is no version "{req.id}" of "{req.path}".')
         except KeyError:
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         except Conflict as exc:
             return JSONResponse({"currentVersion": exc.current_version}, status_code=409)
         except BoardReadOnly as exc:

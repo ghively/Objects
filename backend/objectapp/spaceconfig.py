@@ -49,9 +49,9 @@ class SpaceConfigProblem(ValueError):
     """A ``PUT /api/space`` patch has an unknown key or a value of the wrong shape (422)."""
 
     def __init__(self, key: str, message: str | None = None) -> None:
-        super().__init__(message or f"Cannot patch: {key}")
+        super().__init__(message or f"The setting \"{key}\" can't be saved.")
         self.key = key
-        self.message = message or f"Cannot patch: {key}"
+        self.message = message or f"The setting \"{key}\" can't be saved."
 
 
 def _path(root: Path) -> Path:

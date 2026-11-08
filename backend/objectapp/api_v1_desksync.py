@@ -80,7 +80,7 @@ def router(ctx: ApiContext, loop: WorkLoop, service: WorkService) -> APIRouter:
         except (NotWorkItem, IllegalMove, InvalidValue) as exc:
             return error(422, str(exc))
         except (KeyError, FileNotFoundError):
-            return error(404, f"No object at {req.path!r}")
+            return error(404, f'There is no object at "{req.path}".')
         except ValueError as exc:
             return error(400, str(exc))
         done = result["item"]["path"]

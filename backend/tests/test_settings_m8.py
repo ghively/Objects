@@ -125,7 +125,7 @@ def test_m8_keys_shape_checks(state: Path, tmp_path: Path):
             for value in values:
                 r = _put(client, {key: value})
                 assert r.status_code == 422, (key, value)
-                assert r.json()["detail"] == f"Cannot patch: {key}"
+                assert r.json()["detail"] == f"The setting \"{key}\" can't be saved."
         assert not (state / "settings.json").exists()  # nothing written on a 422
 
         r = _put(client, copy.deepcopy(GOOD))

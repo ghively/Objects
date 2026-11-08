@@ -186,7 +186,7 @@ def test_settings_keys(state: Path) -> None:
     # Other keys keep the built message.
     with pytest.raises(settings.SettingsProblem) as exc:
         settings.patch({"nope": 1}, None)
-    assert exc.value.message == "Cannot patch: nope"
+    assert exc.value.message == "The setting \"nope\" can't be saved."
     assert not state.exists()  # nothing was written
 
     folder = str(state.parent / "monitoring")

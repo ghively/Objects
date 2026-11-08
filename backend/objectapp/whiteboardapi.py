@@ -93,7 +93,7 @@ def _failure(exc: Exception, path: str) -> JSONResponse:
     if isinstance(exc, NotAWhiteboard):
         return _error(422, str(exc))
     if isinstance(exc, KeyError):
-        return _error(404, f"No object at {path!r}")
+        return _error(404, f'There is no object at "{path}".')
     return _error(400, str(exc))
 
 
