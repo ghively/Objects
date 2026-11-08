@@ -128,3 +128,11 @@ def test_finished_entries_capped(tmp_path):
     ents = s.entries()
     assert sum(e["state"] == "done" for e in ents) == 500
     assert {p["id"], f["id"]} <= {e["id"] for e in ents}
+
+
+def test_a_no_op_edit_of_an_approved_step_withdraws_nothing():
+    """Audit 10: an approved step's text and kind can't change, so an edit of one changed nothing
+    and must not withdraw its entry."""
+    assert plan_for_notice(notice("edit", before="approved", after="approved")) is None
+    plan = plan_for_notice(notice("edit", before="open", after="open"))
+    assert plan.withdraw_step == "r8k1pd" and plan.stop_running
