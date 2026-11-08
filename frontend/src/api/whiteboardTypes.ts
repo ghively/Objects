@@ -44,7 +44,7 @@ export type WhiteboardShape =
   | 'blockArrowLeft'
   | 'heart'
 
-/** Shapes offered in the picker (`whiteboardPickerShapes`). */
+/** Shapes offered in the picker. */
 export type WhiteboardPickerShape =
   | 'rectangle'
   | 'ellipse'
@@ -70,11 +70,11 @@ export type WhiteboardConnectorTool = 'line' | 'arrow'
 export type WhiteboardPointerTool = 'select' | 'hand'
 export type WhiteboardShapeMenuTool = WhiteboardConnectorTool | WhiteboardPickerShape
 
-/** The media tools (`whiteboardMediaTools`, M8): pick a file (or type a URL) and place it. */
+/** The media tools (M8): pick a file (or type a URL) and place it. */
 export type WhiteboardMediaTool = 'image' | 'pdf' | 'audio' | 'file' | 'weblink'
 
 /**
- * The canvas tools (`whiteboardTools`, in its order).
+ * The canvas tools, in toolbar order.
  * The pen group (pen, highlighter, eraser) belongs to the ink plugin, not to this union.
  */
 export type WhiteboardTool =
