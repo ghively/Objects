@@ -11,7 +11,7 @@ Plan: `2026-11-02-m10-ai-assistant.md`, revised by `2026-11-04-notion-anytype-fe
 - **AI Chat objects** (`backend/objectapp/aichat.py`): the "AI Chat" type is made the first time a chat is saved (or an existing type of that name is reused). A chat is ordinary Markdown: `# Title`, then `## You` / `## Claude` sections, each with an `<!-- at: … -->` line; Context (relation) and Session (text) are properties.
 - **Exclude from AI**: pages tagged "Exclude from AI" (or `excludeFromAI: true`) and templates are never put in a prompt and are invisible to the MCP tools (M11's rule); a context page that was left out is listed back to the chat ("Left out (Exclude from AI): …").
 - **Chat panel** (`frontend/src/ai/AiChatPanel.tsx`): in the side panel, from the Explore "AI Chat" card or Ctrl+Alt+J. Context chips (the open page by default, + to add, × to remove), messages, a "Thinking…" / tool line while a turn runs, Stop, Relevant Content and Find More, a first-use notice, status help when Claude Code is missing. Per message: Copy, Append to page, Append to daily note, Retry, Rephrase, and Replace / Insert below when the chat came from a block. Proposals (tags, property values, text) are shown with Accept and Dismiss: nothing is written without a click, and writes go through the normal object routes with version checks.
-- **Entries** (`frontend/src/editor/aiEntries.ts` and the menus): slash menu "Ask AI about this block" and "Add tags to block using AI"; block handle "AI assistant..."; selection toolbar and block selection bar "AI"; object `…` menu "Add tags using AI" and "Fill empty properties using AI"; peek header "AI Chat". All hidden by Settings > AI Assistant > "Hide AI features".
+- **Entries** (`frontend/src/editor/aiEntries.ts` and the menus): slash menu "Ask AI about this block" and "Let AI suggest tags for this block"; block handle "AI assistant..."; selection toolbar and block selection bar "AI"; object `…` menu "Add tags using AI" and "Fill empty properties using AI"; peek header "AI Chat". All hidden by Settings > AI Assistant > "Hide AI features".
 - **Settings > AI Assistant**: Hide AI features, Claude Code path, Model, and a status row with Recheck.
 - **Shortcuts** (catalog section 2): copy message Ctrl+Alt+C, append message Ctrl+Alt+A, retry Ctrl+Alt+R, close chat Ctrl+Alt+X, rephrase Ctrl+Alt+U, while focus is in the chat.
 
@@ -19,7 +19,7 @@ Plan: `2026-11-02-m10-ai-assistant.md`, revised by `2026-11-04-notion-anytype-fe
 
 Answers to the plan's open questions, as its brackets proposed: (1) the assistant reads only through Object's MCP read tools, never the folder; (2) "Exclude from AI" pages are never sent; (3) chats are saved by default.
 
-1. Open AI chat is Ctrl+Alt+J (ours, next to Explore's Ctrl+J). "Replace context" and "Append message to daily note" have no key (the catalog gives none); the chat's buttons do both.
+1. Open AI chat is Ctrl+Alt+J (ours, next to Explore's Ctrl+J). "Replace context" and "Send a message to the daily note" have no key (the catalog gives none); the chat's buttons do both.
 2. The chat window's whole layout (header with New chat, context chips, messages, tool line, notice and input, Relevant Content limited to 6 at the bottom).
 3. One AI chat per tab: opening it again shows the existing one. Every entry (`openAiChat`) starts a new chat; switching tabs stops a running turn and drops its partial answer.
 4. Stop keeps the partial answer marked "Stopped." and that turn isn't saved; Retry starts a fresh session so the saved history drives it.

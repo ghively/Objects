@@ -52,7 +52,7 @@ On a scratch copy of `space-m8` (`uv run objectapp --space <copy> --browser`), e
 | Import CSV | dialog strings and mapping; two rows made two objects |
 | Query tab | Edit query locks the type; Release opens the query page |
 | Template date variable | Week of creation → `{creation:week}`; New from template → `2026-10-26 -> 2026-11-01` |
-| Recalculate content index | calls reindex; button disabled while polling |
+| Rebuild search index | calls reindex; button disabled while polling |
 | Sidebar order | saved in `ui.json` and kept after reload (the handle was hard to grab: fixed, below) |
 | Whiteboard edit | only `lastUpdated` changed in the `.md`; the Notes save after it succeeded |
 
@@ -73,7 +73,7 @@ Front end:
 - **Shift-click in a grouped view** (`3d46450`) selects the on-screen range only.
 - **Import CSV:** blank lines are not imported (`6b88504`); the drop zone accepts a dropped file (`9728d26`).
 - **Sidebar:** a section added after the order was saved appears above Pinned (`cc941e1`); the reorder handle is inside the sidebar's visible area and keyboard reorder moves past the tall Object Types block (`16125b5`).
-- **Bulk delete dialog** (`e83e32a`): "Delete?" and "Review the items below, then confirm.", with the selected titles listed.
+- **Bulk delete dialog** (`e83e32a`): "Delete?" and "Check the list below before you confirm.", with the selected titles listed.
 - **Stats and Text Stats** refresh "Last updated" after a property write (`f717d36`).
 - **The page inspector** sits below a shown cover, clear of its buttons (`4b5c2e0`).
 - **`[[` picker** (`669cafa`): characters typed after `[[` before the picker takes focus become its query (body and property cells). Not reproduced in jsdom; fixed from the code and covered by a simulation.
@@ -96,7 +96,7 @@ Each is marked "our choice" or "our string" in the plan or by the lane that buil
 - **Embedded views:** saved 300 ms after the last change; a read-only editor keeps changes in memory; toggling "Show details" alone never writes `localDataViewInfo`.
 - **Alignment:** the block-menu submenu (after "Color") also offers alignment outside table cells; table-cell alignment sets the whole column (GFM has only column alignment); "left" removes the option.
 - **Date variables:** the picker sits at the top of the date popover; "Template variable" is its accessible label only.
-- **Recalculate content index:** in Space settings; polls every 1 s.
+- **Rebuild search index:** in Space settings (since moved to Offline & Sync); polls every 1 s.
 - **Row menu:** Change type is a submenu of types; Copy object reference copies `[[Title]]`; Shift-click selects without "Select multiple"; Ctrl-click still opens a new tab; the selection bar has "Clear selection" (ours).
 - **Bulk change type** runs the one-object dialog once per object. Not built: bulk Edit property, Edit tags, Export.
 - **Import CSV:** 1000-row limit (our choice); header row on by default; no template; labels take existing options only; tags, aliases and multi-entity cells split on commas; a new collection is named after the file; strings "Column {n}", "Import into", "Title" are ours.
@@ -124,7 +124,7 @@ On a copy of the CPI export outside the repo, with `git init` done there:
 - [ ] Import CSV into a type (with and without a header row, and a new collection); the warning shows.
 - [ ] A single-type query tab: the type is locked and the release button works.
 - [ ] Sidebar sections: drag to reorder, restart, and the order is kept.
-- [ ] "Recalculate content index" runs and the indexing state shows.
+- [ ] "Rebuild search index" (Settings > Offline & Sync) runs and the indexing state shows.
 - [ ] Draw on a whiteboard: its "Last updated" moves, at most once a minute. The board's Notes still save.
 - [ ] Every rule in "Rules the build chose", against the behaviour catalog.
 - [ ] The look of every M9 screen against the spec and catalog, in Light and Dark.

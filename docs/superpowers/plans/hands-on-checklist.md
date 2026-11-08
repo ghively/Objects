@@ -98,7 +98,7 @@ Settled and built the same day; check each by hand:
 - [ ] Alignment from the block menu and from the table bar. (M9 #11)
 - [ ] The slash menu's grouping and look (order, icons, search-only colour and Mermaid items, hover descriptions, 22rem width); "Create bookmark" and "Reuse any content" are ours. (M7 #16)
 - [ ] The block menu's look (sections, labels, icons, Hierarchy order Standard, Small, Heading 1–4; no AI row; Color, Standout, Indent/Unindent in a last section as ours). (M7 #17)
-- [ ] **(new 2026-11-03)** `@` or `[[` in an empty block inserts an object block; with Settings > Editor > Always create inline links on, it inserts an inline link.
+- [ ] **(new 2026-11-03)** `@` or `[[` in an empty block inserts an object block; with Settings > Editor > Insert links inline by default on, it inserts an inline link.
 - [ ] **(new 2026-11-04)** An empty icon list item loads as a list item, not as a raw (monospace) block.
 - [ ] Copy a block reference: one line changes (the block's last line gains ` ^id`). (M8 #3)
 - [ ] The editor's M8 features: tokens menu and colours, date tokens, indent and item colours, block references and "Referenced in", Turn into object/task/whiteboard, formulas, sorting and CSV, highlighting and Mermaid export, collection and query embeds, recording. (M8 #38)
@@ -264,7 +264,7 @@ Look checks: compare against the design spec and the behaviour catalog, in Light
 - [ ] **(new 2026-11-03)** The root font is 15.5px, so the whole app is about 3 % smaller and still reads comfortably.
 - [ ] Focus mode and its timer, Present, and the Language, Date & Time (time zone, decimal separator), Editor and Space settings. (M8 #39)
 - [ ] The focus presets (our choice). (M8 #16)
-- [ ] "Recalculate content index" runs, and the indexing state shows. (M9 #16)
+- [ ] "Rebuild search index" (Settings > Offline & Sync) runs, and the indexing state shows. (M9 #16)
 - [ ] The Settings modal, every section. (M7 #55)
 - [ ] The app shell, sidebar (section headings, "+ New" and search, footer) and the peek with its pager and property panel. (M1 #9, M7 #34, M7 #39)
 - [ ] The tab strip, the tab menu and pinned tabs. (M7 #12, M7 #35)

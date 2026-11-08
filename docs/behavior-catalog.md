@@ -9,6 +9,8 @@ Items that would need an account or a cloud service are marked **(out of scope)*
 Companion: `docs/superpowers/plans/polish-audit-2026-11-02.md` (where Object differed from this catalog and what
 was fixed).
 
+Labels aligned to the app on 2026-11-08 (PR #13's wording, Gene's decision): the quoted labels below are the words the screens show today.
+
 ## Coverage checklist
 
 The list of what this catalog does not yet specify is in `docs/superpowers/plans/polish-audit-2026-11-02.md`
@@ -41,27 +43,27 @@ Object has no accounts.
 - Appearance: Light theme (Light, Light Dimmed), Dark theme (Dark, Dark Dimmed), App icon (colored icon per
   device).
 - AI Assistant: "Hide AI features" switch.
-- Editor: Disable spellcheck; Spellcheck language (Experimental); Always open as full page (Alt+Shift click
-  opens the preview instead); Always create inline links; Show object type icon for inline object links;
-  Disable automatic detection of numbered lists (so `1. ` at block start converts by default); Default
-  display of nested backlinks (Only block with backlink | Full path above); Hide object type settings
-  outside of settings; Hide outliner lines; Toggle style (Toggle | Bullet); Hide App Menu; When Object
+- Editor: Disable spellcheck; Spellcheck language (Experimental); Open objects as a full page (Alt+Shift click
+  opens the preview instead); Insert links inline by default; Type icons on inline links;
+  Turn off automatic numbered lists (so `1. ` at block start converts by default); How nested backlinks
+  show at first (Just the linking block | Full path above); Keep type settings inside Settings only;
+  Hide outliner lines; Toggle style (Toggle | Bullet); Hide App Menu; When Object
   starts (Space on this device: Last opened space | Specific space; When this space opens, per space and per
   device: Where I left off | Calendar | Calendar today | Specific object); Highlight Style (Default with a
-  rail and notes section | Minimal); Default state for backlink sections (Backlinks Open | Closed; Unlinked
+  rail and notes section | Minimal); Backlink sections start as (Backlinks Open | Closed; Unlinked
   Mentions Open | Closed | Hidden); Backlink content view (Embed default).
-- Language: interface language list (English, English UK, Deutsch, Francais, Espanol, Dutch, Portugues BR,
+- Language: interface language list (English, English (UK), Deutsch, Français, Español, Dutch, Português (BR),
   Magyar, Italian); Decimal separator (Automatic | Dot | Comma).
-- Date & Time: Time zone (list); Date formatting with a live preview (Localized | ISO 8601; date order
-  Automatic | day-month-year | month/day/year); Time format (24 hours | 12 hours); Start of the week
+- Date & Time: Time zone (list); Date formatting with a live preview (Localized | ISO 8601 (year-month-day); date order
+  Automatic | day-month-year | month/day/year); 24-hour time (a switch); Start of the week
   (Monday | Sunday).
 - Offline & Sync: sync status and cloud media storage are **(out of scope)** (no sync). The local parts apply:
-  "Recalculate content index"; Local Storage (size estimate); Media loading (Everything | Required only);
+  "Rebuild search index"; Local Storage (size estimate); Media loading (Everything | Required only);
   Clear media cache.
 - Import Content: migration guides per source tool (Notion, Obsidian, Evernote, Apple Notes, Tana, Other tool);
   Bulk import "Start importing" (upload files, review mappings).
 - Full Export: Automated Full Exports (desktop app only); Manual Full Export with Spaces (All Spaces) and
-  options Include media, Links as wikilinks (`[[title]]`), Include title as heading 1; "Export All Spaces".
+  options Include media, Links as wikilinks (`[[title]]`), Add the title as a top heading; "Export All Spaces".
 
 **Space**
 - Space Settings: Icon, Name, Description, Delete space.
@@ -92,45 +94,45 @@ Ctrl means Cmd on Mac. "Shift" is written as Shift here.
 this space Ctrl+P or Ctrl+K | Open extended search Ctrl+Shift+P | Toggle dark mode Ctrl+Shift+L |
 Toggle focus mode Ctrl+Shift+M | Toggle left sidebar Ctrl+Shift+Left | Toggle right side panel
 Ctrl+Shift+Right | Toggle side panel entry list Ctrl+Shift+Down | Toggle media sidebar Ctrl+Alt+Right | Close
-current tab Ctrl+W | Toggle tab menu when several tabs are open Ctrl+Shift+Up | Undo Ctrl+Z | Redo Ctrl+Shift+Z
+current tab Ctrl+W | Show or hide the list of open tabs Ctrl+Shift+Up | Undo Ctrl+Z | Redo Ctrl+Shift+Z
 or Ctrl+Y | Go to Calendar Ctrl+Alt+H (press twice to jump to today) | Open Explore Ctrl+J | Open Explore in the
-side panel Ctrl+Shift+J | Multi-select blocks and objects Ctrl+Shift+Click | Show/hide shortcuts Ctrl+Shift+B |
+side panel Ctrl+Shift+J | Multi-select blocks and objects Ctrl+Shift+Click | Show or hide the shortcuts list Ctrl+Shift+B |
 Show/hide the getting-started checklist Ctrl+Shift+A.
 
-**Text editing**: Cut, copy, paste Ctrl+X/C/V | Paste as plain text Ctrl+Shift+V | Turn block into task object
-(unbound) | Format as code Ctrl+E | Format as TeX formula Ctrl+M | Insert/format as link Ctrl+K | Bold Ctrl+B |
-Italic Ctrl+I | Strikethrough Ctrl+Shift+S | Underline (unbound) | Highlight Ctrl+Shift+H | Move active block up or
-down Alt+Up/Down | Move on the same level Alt+Shift+Up/Down | Check/uncheck to-do Ctrl+Enter | Open/close toggle
-Ctrl+Up/Down (inserts and focuses a child block if none) | Set active block as block selection Esc or Ctrl+A |
-Insert block below Alt+Enter, above Alt+Shift+Enter | Run default task action; open task actions menu.
+**Text editing**: Cut, copy, paste Ctrl+X/C/V | Paste as plain text Ctrl+Shift+V | Make this block a task
+Ctrl+Shift+T | Format as code Ctrl+E | Format as TeX formula Ctrl+M | Insert/format as link Ctrl+K | Format bold Ctrl+B |
+Italicize Ctrl+I | Strikethrough Ctrl+Shift+S | Underline (unbound) | Highlight the selected text Ctrl+Shift+H | Move active block up or
+down Alt+Up/Down | Move this block up or down among its siblings Alt+Shift+Up/Down | Tick or untick the to-do in this block Ctrl+Enter | Expand or collapse the toggle in this block
+Ctrl+Up/Down (inserts and focuses a child block if none) | Select this block as a whole Esc or Ctrl+A |
+New block below, with the cursor in it Alt+Enter, above Alt+Shift+Enter | Run default task action; open task actions menu.
 
 **Markdown shortcuts** (at the start of a block, combinable, Space only after the last one; `>#Space` makes a
 heading 1 with a toggle): Quote `|` Space | Toggle `>` Space | Bullet `*` or `-` Space | Numbered `1.` Space |
 Alphabetical `a)` Space | Roman `i)` Space | To-do `[]` Space | Icon `()` Space | Horizontal line `---` |
 Heading 1-4 `#` to `####` Space.
 
-**Block editing** (with a block selection): cut, copy, copy as markdown Ctrl+Shift+C, paste, paste as plain text |
-Indent Tab, unindent Shift+Tab | Open block styling Ctrl+Shift+E, remove styles Ctrl+Shift+X, copy styles
-Ctrl+Shift+C, paste styles | Duplicate Ctrl+D | Delete Backspace | Turn into object `I` | Group/ungroup Ctrl+G |
+**Block editing** (with a block selection): cut, copy, copy the selected blocks as Markdown text Ctrl+Shift+C, paste, paste as plain text |
+Indent selected blocks Tab, outdent the selected blocks Shift+Tab | Open block styling Ctrl+Shift+E, remove styles Ctrl+Shift+X, copy styles
+Ctrl+Shift+C, paste styles | Make a copy of the selected blocks Ctrl+D | Delete selected blocks Backspace | Turn into object `I` | Group the selected blocks, or ungroup a selected group Ctrl+G |
 Increase/decrease text hierarchy Ctrl+Plus/Minus | Copy block reference Ctrl+Alt+L | Add to selection
-Ctrl+Click | Select above/below Up/Down, expand Shift+Up/Down | Select all on this level (then the next higher)
-Ctrl+A | Extend to clicked block Shift+Click | Move selected blocks Alt+Up/Down (same level: Shift+Alt+Up/Down) |
-Check/uncheck to-dos Ctrl+Enter | Open/close all toggles in the view Ctrl+O | Open toggles Right, close Left |
+Ctrl+Click | Select above/below Up/Down, grow the block selection up/down Shift+Up/Down | Select the blocks at this level, then the level above
+Ctrl+A | Extend to clicked block Shift+Click | Move selected blocks Alt+Up/Down (among their siblings: Shift+Alt+Up/Down) |
+Tick or untick to-dos Ctrl+Enter | Open/close all toggles in the view Ctrl+O | Open toggles Right, close Left |
 Code block: leave downwards or upwards (Ctrl+Shift+Down/Up) | Math block likewise | Merge text blocks
 Ctrl+Shift+G.
 
-**Page**: Add/remove from favorites Ctrl+Shift+* | Import menu, Export menu (Ctrl+E), Share menu Ctrl+S |
-Start presentation Ctrl+Alt+P; previous/next slide; exit Esc | Find in page Ctrl+F | Select all top-level blocks |
+**Page**: Favorite or unfavorite this page Ctrl+Shift+* | Import, Export this page (Ctrl+E), Share menu Ctrl+S |
+Start presentation mode Ctrl+Alt+P; back one slide / next presentation slide; exit presentation mode Esc | Find in page Ctrl+F | Select all top-level blocks |
 Copy deep link | Delete current page Ctrl+Backspace | Focus the last block (Down) | Scroll to top Home, bottom End,
 page up/down.
 
-**Navigation**: Back Ctrl+Left or Ctrl+[ | Forward Ctrl+Right or Ctrl+] | Open in new tab Ctrl+Click | Open in
+**Navigation**: Navigate back Ctrl+Left or Ctrl+[ | Navigate forward Ctrl+Right or Ctrl+] | Open in new tab Ctrl+Click | Open in
 side panel (Shift+Click) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+Tab | "Open Minigame" Ctrl+Shift+Y.
 
-**Calendar**: Month M | Week W | 3 days rolling R | Day D | Today T | Previous/next day, week or month
+**Calendar**: Go to monthly view M | Go to weekly view W | Show three days from today R | Go to daily view D | Jump to today T | Back / forward one day, week or month
 Left/Right | Toggle calendar sidebar Ctrl+Alt+S.
 
-**AI Assistant**: open; copy message Ctrl+Alt+C; replace context; append message Ctrl+Alt+A; append to daily
+**AI Assistant**: open; copy message Ctrl+Alt+C; replace context; append message Ctrl+Alt+A; send a message to the daily
 note; retry Ctrl+Alt+R; close chat Ctrl+Alt+X; rephrase Ctrl+Alt+U.
 
 **Work** (M23; on the Work page only, never while typing in a field or editor): Search work / |
@@ -209,7 +211,7 @@ Each starter template pre-fills the new type's properties.
   quote, to-do, icon dropdown, color dropdown; right: "Turn blocks into" dropdown, "Tag" dropdown, "Move"
   dropdown, delete (red), AI, close.
 - **Inline code** renders as a purple monospace token with a tinted background; **tables** are bordered with a
-  header row; a text block placeholder reads "Text"; the title placeholder "Title".
+  header row; the empty body's placeholder reads "Start writing, or type / for blocks..."; the title placeholder "Untitled".
 - **Slash menu**, **@ picker**, **markdown shortcuts**: see audit items 41-43 and section 2.
 - **Object `...` menu**: see audit item 44. **Delete** asks for confirmation then moves to Trash (30 days).
 - **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves.
@@ -219,8 +221,8 @@ Each starter template pre-fills the new type's properties.
 - **Graph**: a force-directed canvas; one dot per object, colored by its type color, bigger when more linked;
   links drawn as thin lines. Top right: a count pill (objects shown), a document icon and a history icon.
   Bottom right: zoom out, a zoom dropdown (Page Fit, 5% ... 300%), zoom in, download (image), and a settings
-  dropdown: Show tags network, Filter object types, Exclude object types, Show completed tasks, Hide objects
-  with many links, Hide dates, Hide indirect links.
+  dropdown: Show tags network, Filter object types, Exclude object types, Show completed tasks, Hide heavily
+  linked objects, Hide dates, Hide indirect links, Show simplified graph (Object's own, last).
 - **Trash**: a list of deleted objects, "Empty Trash", 30-day retention, and "object types and collections cannot
   be restored completely".
 - **Explore** as a side panel: tabs "Explore" with two cards (AI Chat, Search), "Relevant Content"
@@ -284,9 +286,9 @@ Each starter template pre-fills the new type's properties.
 - **Inline tag**: a `#tag` typed in a paragraph renders as a colored chip in the text.
 - **Export dialog** (object `...` > Export, Ctrl+E): a modal with format tiles PDF, Markdown, Microsoft Word,
   Latex. PDF: Style cards (Notes: matches the page's styling; Essay and Academic, both Experimental),
-  Options (Include embedded content; Include outline; Hide empty properties, on by default; Show type labels),
+  Options (Include embeds; Include outline; Hide empty properties, on by default; Show type labels),
   Format (A4 | Letter), Properties (All properties, with a per-property list), and an Export button.
-  Markdown: "Export folder containing all subpages" (zip), Include media, Include title as heading 1, Links as
+  Markdown: "Include subpages (as a folder)" (zip), Include media, Add the title as a top heading, Links as
   wikilinks. The Word and Latex options are not specified yet.
 - **Table block** (slash > Table): a 2 column by 3 row empty table with a rounded border, header row styling,
   and cells that edit in place. The look of Two Columns, Code, Math, Toggle, Group and Horizontal line blocks is
@@ -364,7 +366,7 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 
 An "Unlinked Mentions" section sits under Backlinks on an object's page; it lists text elsewhere that matches
 this object's title or an alias without being a link ("Unlinked name matches", section label "Mentions"; an
-alias counts as a mention of the original object). Settings > Editor > "Default state for backlink sections"
+alias counts as a mention of the original object). Settings > Editor > "Backlink sections start as"
 has Backlinks Open | Closed and Unlinked Mentions Open | Closed | Hidden.
 
 Object builds it in full (M5): `backend/objectapp/references.py` (matching on Unicode word
