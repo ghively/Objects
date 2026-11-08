@@ -157,3 +157,111 @@ def test_token_stores_sharing_a_file_lose_nothing(tmp_path: Path, monkeypatch):
     for _id, secret in made:
         assert fresh.verify(secret) is not None
     assert [p.name for p in state.iterdir()] == ["api-tokens.json"]  # no temp file left
+
+
+# -- 23: "Exclude from AI" paths in the values of visible objects ----------------------------
+
+
+SECRET = "Pages/Secret.md"
+LINKER = "Pages/Linker.md"
+
+
+@pytest.fixture
+def hidden_space(space_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    _env(tmp_path, monkeypatch)
+    (space_dir / SECRET).write_text(
+        "---\nid: secret1\ntype: Page\ntitle: Secret\nexcludeFromAI: true\nrelated:\n"
+        "  - '[[Alpha]]'\nlastUpdated: 2026-11-06T10:00:00.000Z\n---\nThe secret body.\n",
+        encoding="utf-8",
+    )
+    (space_dir / LINKER).write_text(
+        "---\nid: linker1\ntype: Page\ntitle: Linker\nrelated:\n  - '[[Secret]]'\n  - '[[Alpha]]'\n"
+        "lastUpdated: 2026-11-06T10:00:00.000Z\n---\nA body about quillwort.\n",
+        encoding="utf-8",
+    )
+    with TestClient(
+        create_app(Space(space_dir), watch=False), raise_server_exceptions=False
+    ) as c:
+        deadline = time.monotonic() + 30
+        while c.get("/api/search", params={"q": "zzz"}).json().get("partial"):
+            assert time.monotonic() < deadline, "the search index did not finish its sync"
+            time.sleep(0.05)
+        yield c, space_dir
+
+
+def _no_secret(value) -> None:
+    text = repr(value)
+    assert SECRET not in text and "Secret" not in text, text
+
+
+def test_values_of_visible_objects_leave_out_hidden_paths(hidden_space):
+    c, space_dir = hidden_space
+    h = _bearer(space_dir, "read")
+    r = c.get("/api/v1/object/peek", params={"path": LINKER}, headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["values"]["related"] == [{"target": "Alpha", "path": "Pages/Alpha.md"}]
+    _no_secret(r.json())
+    r = c.get("/api/v1/object", params={"path": LINKER}, headers=h)
+    assert r.json()["values"]["related"] == [{"target": "Alpha", "path": "Pages/Alpha.md"}]
+    _no_secret(r.json()["values"])
+    r = c.post("/api/v1/query", json={"typeIds": ["page"]}, headers=h)
+    rows = {x["path"]: x for x in r.json()["rows"]}
+    assert SECRET not in rows
+    _no_secret(rows[LINKER]["values"])
+    _no_secret(rows["Pages/Alpha.md"]["values"])  # its backlinks
+    r = c.get("/api/v1/object/peek", params={"path": "Pages/Alpha.md"}, headers=h)
+    _no_secret(r.json()["values"])
+    # Search: Linker is found by its body; its properties snippet would name Secret.
+    r = c.get("/api/v1/search", params={"q": "quillwort secret"}, headers=h)
+    assert r.status_code == 200
+    _no_secret(r.json())
+    r = c.get("/api/v1/search", params={"q": "secret"}, headers=h)
+    _no_secret(r.json())
+    # The app's own search (no token) still shows everything.
+    r = c.get("/api/search", params={"q": "secret"})
+    assert SECRET in [x["path"] for x in r.json()["results"]]
+
+
+def test_changes_leave_out_hidden_old_paths_and_sources(hidden_space):
+    c, space_dir = hidden_space
+    from objectapp.tokens import ActivityLog
+
+    record, secret = TokenStore(space_dir).create("rw", "read-write")
+    log = ActivityLog(space_dir)
+    log.add(record, "rename", LINKER, oldPath=SECRET)
+    log.add(record, "merge", LINKER, source=SECRET)
+    log.add(record, "rename", LINKER, oldPath="Pages/Old linker.md")
+    r = c.get("/api/v1/changes", headers={"Authorization": f"Bearer {secret}"})
+    assert r.status_code == 200, r.text
+    activity = r.json()["activity"]
+    _no_secret(activity)
+    assert "Pages/Old linker.md" in [e.get("oldPath") for e in activity]
+
+
+def test_work_item_fields_leave_out_a_hidden_project(tmp_path: Path, monkeypatch):
+    import shutil
+
+    _env(tmp_path, monkeypatch)
+    root = tmp_path / "space"
+    shutil.copytree(Path(__file__).parent / "fixtures" / "space-work", root)
+    project = root / "Projects" / "Scanner rollout.md"
+    project.write_text(
+        project.read_text(encoding="utf-8").replace("\n---\n", "\nexcludeFromAI: true\n---\n", 1),
+        encoding="utf-8",
+    )
+    task = root / "Tasks" / "Order toner.md"
+    task.write_text(
+        task.read_text(encoding="utf-8").replace(
+            "\n---\n", "\nproject:\n  - '[[Scanner rollout]]'\n---\n", 1
+        ),
+        encoding="utf-8",
+    )
+    with TestClient(create_app(Space(root), watch=False), raise_server_exceptions=False) as c:
+        h = _bearer(root, "read")
+        r = c.get("/api/v1/work/item", params={"path": "Tasks/Order toner.md"}, headers=h)
+        assert r.status_code == 200, r.text
+        assert r.json()["projectPath"] is None
+        assert "Scanner rollout" not in repr(r.json()["fields"]), r.json()["fields"]
+        r = c.get("/api/work/item", params={"path": "Tasks/Order toner.md"})  # the app's own
+        if r.status_code == 200:
+            assert "Scanner rollout" in repr(r.json())
