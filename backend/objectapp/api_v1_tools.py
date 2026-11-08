@@ -581,10 +581,13 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         from .importscan import scan_tree
 
         token = auth(request)
+        text = req.path.strip().strip('"')
+        if not text.strip():  # ``Path("")`` is the server's working folder (audit 2026-11-07 #12)
+            return error(404, "There is no file or folder at this path.")
         refused = refuse_space_source(req.path)
         if refused is not None:
             return refused
-        root = Path(req.path.strip().strip('"')).expanduser()
+        root = Path(text).expanduser()
         if not root.exists():
             return error(404, "There is no file or folder at this path.")
         scan = scan_tree(root, req.leaveOut).to_json()
