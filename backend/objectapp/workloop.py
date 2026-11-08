@@ -346,12 +346,14 @@ class WorkLoop:
         key = auto_run_key(path, str(step["id"]), str(step.get("text") or ""))
         if self.store.has_auto_run(key):
             return False
-        self.store.record_auto_run(key)
         try:
             self.service.step(path, step["id"], step["rev"], "run", Actor("app", "Object"))
         except (StepChanged, IllegalMove):
             log.info("Auto-run of %s step %s was dropped", path, step["id"])
             return False
+        # Recorded only once the step is running: a write that failed (read-only, disk error) is
+        # tried again on the next change or scan.
+        self.store.record_auto_run(key)
         return True
 
     def scan_auto_runs(self) -> int:

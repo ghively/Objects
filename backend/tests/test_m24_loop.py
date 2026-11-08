@@ -562,3 +562,28 @@ def test_an_approved_step_moved_away_and_back_is_queued_again(env: Env, monkeypa
     assert approve[1]["purpose"] == "work" and approve[1]["by"] == "Gene"
     assert next(s for s in env.service.item(P)["steps"] if s["id"] == STEP)["state"] == "done"
     assert len(env.runs()) == 1
+
+
+def test_auto_run_whose_write_failed_is_tried_again(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Audit 32: the auto-run key was recorded before the step write, so a failed write (read-only
+    space, disk error) meant the step never auto-ran again until its text changed."""
+    env.setting(workAgentActs=True)
+    real = env.service.step
+    calls: list[str] = []
+
+    def failing(path, step_id, rev, action, actor, **kw):
+        if action == "run" and not calls:
+            calls.append(step_id)
+            raise OSError("disk full")
+        return real(path, step_id, rev, action, actor, **kw)
+
+    monkeypatch.setattr(env.service, "step", failing)
+    steps = env.service.item(P)["steps"]
+    agent = next(s for s in steps if s["kind"] == "agent")
+    # make the Agent step current: the Approve step before it goes after it
+    approve = next(s for s in steps if s["id"] == STEP)
+    env.service.edit_steps(P, [{"op": "move", "stepId": STEP, "stepRev": approve["rev"], "before": None}], GENE)
+    assert calls == [agent["id"]]  # the auto-run was tried, and its write failed
+    assert not [e for e in env.entries() if e["kind"] == "run"]
+    assert env.loop.scan_auto_runs() == 1  # not given up on
+    assert [e["auto"] for e in env.entries() if e["kind"] == "run"] == [True]
