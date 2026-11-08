@@ -212,6 +212,32 @@ def test_restore_returns_to_original_path(space_dir: Path):
     assert not any(_trash_dir(space_dir).glob("*.json"))
 
 
+def test_trash_and_restore_a_file_whose_name_is_not_utf8(space_dir: Path):
+    """Review: a trash entry's metadata for a file named in another encoding (Latin-1 bytes on
+    Linux) failed to write; it is written as ASCII JSON and restore gives the same name back."""
+    import os
+    import sys
+
+    if not sys.platform.startswith("linux"):
+        pytest.skip("only Linux file systems hold names that are not valid UTF-8")
+    raw = os.fsencode(space_dir) + b"/Caf\xe9 notes.md"
+    try:
+        with open(raw, "wb") as f:
+            f.write(b"---\ntype: Page\ntitle: Cafe\n---\nhi\n")
+    except OSError:
+        pytest.skip("this file system refuses names that are not valid UTF-8")
+    rel = os.fsdecode(b"Caf\xe9 notes.md")
+    space = Space(space_dir)
+
+    item = space.delete_object(rel, version_of(b"---\ntype: Page\ntitle: Cafe\n---\nhi\n"))
+
+    assert not os.path.exists(raw)
+    assert [t.originalPath for t in space.list_trash()] == [rel]
+    assert space.restore(item.id) == {"paths": [rel], "typeIds": []}
+    with open(raw, "rb") as f:
+        assert f.read() == b"---\ntype: Page\ntitle: Cafe\n---\nhi\n"
+
+
 def test_restore_collision_suffix(space_dir: Path):
     space = Space(space_dir)
     before = (space_dir / "Tasks" / "Write docs.md").read_bytes()
