@@ -28,7 +28,7 @@ describe('TaskStatsSection', () => {
     const section = await screen.findByRole('region', { name: 'Task Stats' })
     expect(client.taskStats).toHaveBeenCalledWith('Tasks/Water plants.md')
     expect(within(section).getByRole('heading', { name: 'Task Stats' })).toBeInTheDocument()
-    for (const s of ['Streak', '3 days', 'Keep it up', 'Best', '1 day', 'Completions', '7', 'All-time', 'Completion rate', '75%', 'Completed vs skipped or missed'])
+    for (const s of ['Streak', '3 days', 'Keep it up', 'Best', '1 day', 'Completions', '7', 'All-time', 'Completion rate', '75%', 'Done out of all occurrences due'])
       expect(within(section).getByText(s)).toBeInTheDocument()
     const cells = within(section).getAllByRole('listitem')
     expect(cells.map((c) => c.getAttribute('title'))).toEqual(['Completed', 'Excused', 'Skipped', 'Missed', 'Scheduled', 'No occurrence'])

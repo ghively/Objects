@@ -148,11 +148,11 @@ const DATE_LABELS: Record<string, string> = {
   earlier: 'Earlier',
   lastWeek: 'Last week',
   thisWeek: 'This week',
-  theDayBeforeYesterday: 'The day before yesterday',
+  theDayBeforeYesterday: '2 days ago',
   yesterday: 'Yesterday',
   today: 'Today',
   tomorrow: 'Tomorrow',
-  theDayAfterTomorrow: 'The day after tomorrow',
+  theDayAfterTomorrow: 'In 2 days',
   nextWeek: 'Next week',
   later: 'Later', // our string: dates beyond next week
 }

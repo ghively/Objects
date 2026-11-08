@@ -14,12 +14,12 @@ import { MAX_TERMS, MIN_TERM, PAUSED_HINT, isSearching, searchTermsOf } from './
 export const BUILDER_TEXT = {
   types: 'Types',
   allTypes: 'All',
-  allTypesTooltip: 'Do not filter by object type',
+  allTypesTooltip: 'Include every type',
   addType: 'Add object type',
   moreTypes: (n: number) => `+${n} more`,
   excludeTypes: 'Exclude object types',
-  excludeTypesHint: 'Add a search term or tag to exclude object types.',
-  excludeTypesInactive: 'Has no effect when specific types are selected.',
+  excludeTypesHint: 'Excluding types needs a search term or a tag first.',
+  excludeTypesInactive: 'Ignored while particular types are picked.',
   clear: 'Clear',
   collectionAll: 'All',
   inAnyCollection: 'In any collection',
@@ -28,22 +28,22 @@ export const BUILDER_TEXT = {
   tags: 'Tags or backlinks',
   anyOf: 'Any of',
   allOf: 'All of',
-  allOfHint: 'An object has one type, so All of is not available.',
+  allOfHint: 'Each object has just one type, so All of does not apply here.',
   addTag: 'Add tag or backlink',
-  excludeTags: 'Exclude tags or backlinks',
-  excludeTagsDisabled: 'Excluding tags requires a search term or an included tag.',
+  excludeTags: 'Leave out tags or backlinks',
+  excludeTagsDisabled: 'To exclude tags, first add a search term or include a tag.',
   search: 'Search',
   searchPlaceholder: 'Search terms…',
-  searchHint: 'Press Enter to add',
-  termCount: 'Use at least 2 characters',
-  addTerm: 'Add another term, and a result can match any of them.',
+  searchHint: 'Enter adds the term',
+  termCount: 'Type 2 or more characters',
+  addTerm: 'With more than one term, a result needs to match only one.',
   mode: 'Mode',
   modeNote: 'Works like Auto until full-text search arrives.',
   limit: 'Limit',
   noLimit: 'No limit',
   paused: PAUSED_HINT,
   releaseConstraintTooltip:
-    'Turn into a normal query and remove the single type constraint. Opens the query as a page and removes this tab from the type dashboard.',
+    'Makes this a regular query that can cover any type. It opens as its own page and leaves the dashboard of this type.',
   /** Our string: the release button's accessible name (the tooltip is the visible hint). */
   releaseConstraint: 'Release type constraint',
 }
@@ -66,10 +66,10 @@ export interface QueryConstraint {
 type SearchMode = NonNullable<QueryDefinition['search']>['searchMode']
 
 export const SEARCH_MODES: { key: SearchMode; label: string; tooltip: string; note?: boolean }[] = [
-  { key: 'auto', label: 'Auto', tooltip: 'Combines search modes to find most relevant matches.' },
-  { key: 'fullText', label: 'Exact', tooltip: 'Searches all content and matches exact terms.', note: true },
-  { key: 'semantic', label: 'Semantic', tooltip: 'Returns semantically related content to the search terms.', note: true },
-  { key: 'title', label: 'Title', tooltip: 'Searches only title and matches exact terms.' },
+  { key: 'auto', label: 'Auto', tooltip: 'Mixes the other modes for the best results.' },
+  { key: 'fullText', label: 'Exact', tooltip: 'Looks for the exact words anywhere in the object.', note: true },
+  { key: 'semantic', label: 'Semantic', tooltip: 'Finds objects about the same idea, even in other words.', note: true },
+  { key: 'title', label: 'Title', tooltip: 'Looks for the exact words in titles only.' },
 ]
 
 export const LIMIT_SIZES = [1, 3, 5, 10, 25, 50] as const

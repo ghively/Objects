@@ -15,7 +15,7 @@ test('test clear whiteboard dialog strings and confirm', async () => {
 
   const dialog = screen.getByRole('alertdialog')
   expect(within(dialog).getByText('Clear this whiteboard?')).toBeInTheDocument()
-  expect(within(dialog).getByText('This removes every object and connector from the canvas. You can undo it.')).toBeInTheDocument()
+  expect(within(dialog).getByText('Everything on the canvas, objects and connectors, will be removed. Undo brings it back.')).toBeInTheDocument()
   // Cancel closes without clearing.
   await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
   expect(onClear).not.toHaveBeenCalled()

@@ -5,7 +5,7 @@ import { applyFilters, matchFilter, matchGroup } from '@/views/filter'
 import { groupRows, type Group, type GroupCtx } from '@/views/group'
 import { applySorts } from '@/views/sort'
 
-export const PAUSED_HINT = 'Sort and property filters pause while searching.'
+export const PAUSED_HINT = 'Sorting and property filters are off during a search.'
 export const MIN_TERM = 2
 export const MAX_TERMS = 5
 

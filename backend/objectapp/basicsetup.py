@@ -152,7 +152,7 @@ def basic_types() -> list[TypeDefinition]:
     """Fresh Person, Meeting, Project and Book definitions (new property ids each call)."""
     person = _type(
         "person", "Person", "People",
-        "Keep notes on people you meet, work with, or follow.",
+        "A page for each person you know or work with.",
         "ph-user", "blue",
         [
             _cover("Picture"),
@@ -170,7 +170,7 @@ def basic_types() -> list[TypeDefinition]:
     )
     meeting = _type(
         "meeting", "Meeting", "Meetings",
-        "Capture conversations with attendees and a date.",
+        "Notes from a meeting: who came, when, and what was said.",
         "ph-users-three", "orange",
         [
             _prop("date", "Date", "datetime",
@@ -189,12 +189,12 @@ def basic_types() -> list[TypeDefinition]:
     )
     project = _type(
         "project", "Project", "Projects",
-        "Track work with status, collaborators, and meetings.",
+        "Projects with a status, a timeframe and the people involved.",
         "ph-kanban", "violet",
         [
             _status(),
             _label("projectType", "Type", ("Work", "Personal")),
-            _range("timeframe", "Timeframe", "Start when it begins, end when it's done"),
+            _range("timeframe", "Timeframe", "When the project starts and ends"),
             _relation("collaborators", "Collaborators", ["person"]),
             _relation("organizations", "Organizations", []),
             _relation("meetings", "Meetings", ["meeting"]),
@@ -206,7 +206,7 @@ def basic_types() -> list[TypeDefinition]:
     )
     book = _type(
         "book", "Book", "Books",
-        "Build a reading library with authors, rating, and genre.",
+        "Books you read, with authors, genre and a rating.",
         "ph-book-open", "emerald",
         [
             _relation("authors", "Authors", ["person"]),
@@ -217,7 +217,7 @@ def basic_types() -> list[TypeDefinition]:
                 {"numberFormat": {"type": "progress",
                                   "options": {"progress": {"steps": 5, "color": "yellow"}}}},
             ),
-            _range("readingTimeline", "Reading timeline", "Start when you begin, end when you finish"),
+            _range("readingTimeline", "Reading timeline", "When you started and finished reading"),
             _cover(),
             _notes(),
         ],

@@ -34,9 +34,9 @@ def test_the_gallery_has_the_starter_templates_in_order():
     assert [c["name"] for c in cat][:3] == ["Meeting", "Person", "Project"]
     day = next(c for c in cat if c["key"] == "day")
     assert day["pluralName"] == "Days"
-    assert day["description"] == "Log a day with energy, mood, and what stood out."
+    assert day["description"] == "One entry per day: energy, mood and a highlight."
     assert [p["name"] for p in day["properties"]] == [
-        "Date", "Energy", "Mood", "Highlight of the day", "Grateful For", "Content",
+        "Date", "Energy", "Mood", "Highlight", "Gratitude", "Content",
     ]  # fmt: skip
     assert {c["section"] for c in cat} == {"useCases", "research", "media", "planningAndReflection", None}
 

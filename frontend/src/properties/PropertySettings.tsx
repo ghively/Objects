@@ -32,32 +32,32 @@ import { ButtonSettingsSection } from './settings/ButtonSettings'
 // The property settings texts.
 const TEXT = {
   heading: 'Property settings',
-  explanation: 'Edit name, description, and customize this property.',
+  explanation: 'Rename this property, describe it, and adjust how it works.',
   applyExplanation:
-    "You've made some changes to the configuration of this property. Applying those changes will enforce these rules to the whole database. Links will get removed if they don't follow the above set of rules. Do you really want to proceed?",
+    "These changes apply to every object of this type. Links that no longer fit the rules above will be removed. Apply them?",
   syncExplanation:
-    'Link this property with a property in your linked object type. When you update one property, the other is automatically updated.',
+    'Pair this property with one on the linked type, so a change on either side shows on both.',
   multiSelectOnly:
-    'Synced properties are only available for multi-select properties without a fixed set. You need to change your settings above or in your linked object type to enable synchronization.',
+    'Syncing needs multi-select properties with no fixed set, both here and on the linked type. Change the settings above or on that type to turn it on.',
   notAllowed:
-    'Property syncing is not available for basic object types. You need to link to your own custom object types above.',
+    'Syncing works only with types you made, not basic ones. Pick one of your own types above.',
   changeTypeExplanation:
-    'When changing the type of your property, a new property of the new type is created and your existing property values are matched as best as possible to the new property. You can afterwards check the result and then delete the deprecated property.',
+    'Object makes a new property of the chosen kind and copies each value across as closely as it can. Check the result, then delete the old property.',
   changeTypeWarning:
-    'Changing the type of a property can lead to data loss as some values might not be compatible with the new type.',
+    'Some values may not fit the new kind and can be lost.',
   noTransformations: 'This property type cannot be changed.',
-  confirmText: 'I understand the process and know that some data might be lost.',
-  deleteDescription: 'Deleting a property will be applied to all objects of this type. This action cannot be reverted.',
+  confirmText: 'I know some values may be lost.',
+  deleteDescription: 'This removes the property from every object of this type, and it cannot be undone.',
   blocksPropertyWarning:
-    "A content property generally is the main body of an object. Only if you have several content properties, they will be distinguished with a label. Make sure you don't accidentally delete the main content of your notes!",
+    "A content property usually holds the body of an object; a label shows only when a type has more than one. Check this is not the body of your notes before deleting it.",
   onlyBlocksPropertyWarning:
-    'This is the only content property present in this object type. This will delete the main content (body) for all objects of this type.',
+    'This type has no other content property. Deleting it removes the body of every object of this type.',
   datePickerHeading: 'Settings for dates',
-  timeDescription: 'Choose if you want to include time in the date and time picker.',
-  timePreferenceDescription: 'Choose if you want to initialize your date.',
-  rangePreferenceDescription: 'Choose if you want your date to be initialized as a range.',
-  defaultDescription: 'Choose a default start date for the date and time picker.',
-  descriptionPlaceholder: 'Give others an idea of what this property means',
+  timeDescription: 'Let values carry a time as well as a date.',
+  timePreferenceDescription: 'Start new values as:',
+  rangePreferenceDescription: 'Start new values as a single date or as a range:',
+  defaultDescription: 'The date a new value starts from.',
+  descriptionPlaceholder: 'What is this property for?',
   // Our strings: the `hideCalendarEvents` flag has no other property-settings label.
   /** Our string (M8): the switch that sets `options.constraints.supportsReminders`. */
   reminders: 'Reminders',
@@ -332,7 +332,7 @@ function DateSection({ def, save, taskDate }: { def: PropertyDef; save(next: Pro
           </div>
         )}
       </Section>
-      <Section title="Range" description="Choose if you want to include a range in the date and time picker.">
+      <Section title="Range" description="Let values span a start and an end date.">
         <Segmented label="Range" options={RULES} value={range} onChange={setRange} />
         {range === 'optional' && <p className="mt-2 text-[13px] text-fg-muted">{TEXT.rangePreferenceDescription}</p>}
         {range === 'optional' && (
@@ -491,7 +491,7 @@ function RelationSection({
 
   return (
     <>
-      <Section title="Linked object type" description="Choose which object type this property is connected to.">
+      <Section title="Linked object type" description="The type this property points to.">
         <select
           aria-label="Linked object type"
           value={rules.allowedTypes[0] ?? ''}
@@ -508,7 +508,7 @@ function RelationSection({
       </Section>
       <Section
         title="Single or Multi-Select"
-        description="Choose whether this property can link to just one object or multiple objects at the same time."
+        description="Allow one linked object, or several."
       >
         <div className="flex gap-1.5">
           {SINGLE_MULTI.map((o) => (
@@ -524,7 +524,7 @@ function RelationSection({
       </Section>
       <Section
         title="Enable fixed set"
-        description="Limit selection to a predefined list of objects. Only objects from this fixed set will appear in the selection dropdown."
+        description="Offer only the objects you pick here when choosing a value."
       >
         <label className="flex items-center gap-2 text-[13px]">
           <input
@@ -617,7 +617,7 @@ function LabelSection({ type, def, save }: { type: TypeDef; def: PropertyDef; sa
   return (
     <>
       {!type.basic && (
-        <Section title="Single or Multi-Select" description="Set whether a single label or multiple labels can be selected.">
+        <Section title="Single or Multi-Select" description="Allow one label per object, or several.">
           <div className="flex gap-1.5">
             {SINGLE_MULTI.map((o) => (
               <Choice
@@ -636,7 +636,7 @@ function LabelSection({ type, def, save }: { type: TypeDef; def: PropertyDef; sa
       )}
       <Section
         title="Label set"
-        description="Edit the list of available labels. Note that deleting a label here will also remove it from all objects where it is currently applied."
+        description="Add, rename or remove labels. Removing one here also clears it from every object that has it."
       >
         <div className="rounded border border-line p-1">
           <LabelMenu def={def} value={[]} onChange={() => undefined} onDefChange={(next) => save(next)} />
@@ -669,7 +669,7 @@ function ChangeKindSection({
     if (res) onOpenProperty?.(res.newPropertyId)
   }
   return (
-    <Section title="Change property type" description="Turn this property into a property of another type for all objects of this type.">
+    <Section title="Change property type" description="Switch this property to a different kind, for every object of this type.">
       {kinds.length === 0 ? (
         <p className="text-[13px] text-fg-muted">{TEXT.noTransformations}</p>
       ) : (
@@ -828,7 +828,7 @@ export function PropertySettings({
             {def.type === 'rollup' && <RollupSection type={type} def={def} save={save} />}
             {def.type === 'uniqueId' && <UniqueIdSection type={type} def={def} save={save} />}
             {canChangeVisibility(def) && (
-              <Section title="Visibility" description="Decide whether you want this property to be visible on your object's page.">
+              <Section title="Visibility" description="Show or hide this property on the object page.">
                 <div className="flex gap-1.5">
                   {VISIBILITY_OPTIONS.map((o) => (
                     <Choice

@@ -14,8 +14,8 @@ those are **our choice**:
 - TV series: Cover image, Director and Actors (relations to Person), Genre (multi label),
   Rating, Watched on (date), Notes.
 - Podcast: URL, People (relation to Person), Listened on (date), Notes.
-- Day: Date (day), Energy and Mood (labels, options in rising order), Highlight of the day
-  and Grateful For (text), Content.
+- Day: Date (day), Energy and Mood (labels, options in rising order), Highlight
+  and Gratitude (text), Content.
 - Week, Month: Date (a day range), Notes.
 - Organization: Category (label), People (relation to Person), Projects (relation to
   Project), Cover image, Notes.
@@ -160,11 +160,11 @@ def _day():
     return [
         _date("day", "Date"),
         _label("energy", "Energy", ("Very low", "Low", "Medium", "High", "Very high"),
-               description="How's your energy?"),
+               description="Your energy level that day"),
         _label("mood", "Mood", ("Rough", "Low", "Okay", "Good", "Great"),
-               description="How are you feeling?"),
-        b._prop("highlight", "Highlight of the day", "text", description="What stood out today?"),
-        b._prop("gratefulFor", "Grateful For", "text", description="What are you grateful for?"),
+               description="Your overall mood that day"),
+        b._prop("highlight", "Highlight", "text", description="The best moment of the day"),
+        b._prop("gratefulFor", "Gratitude", "text", description="Things you were thankful for"),
         b._prop("content", "Content", "blocks"),
     ]  # fmt: skip
 
@@ -192,46 +192,46 @@ def _area():
 # In the gallery's order (catalog section 3).
 _TEMPLATES: tuple[TypeTemplate, ...] = (
     TypeTemplate("meeting", "useCases", "Meeting", "Meetings",
-                 "Capture conversations with attendees and a date.",
+                 "Notes from a meeting: who came, when, and what was said.",
                  "ph-users-three", "orange", _from_basic("meeting")),
     TypeTemplate("person", "useCases", "Person", "People",
-                 "Keep notes on people you meet, work with, or follow.",
+                 "A page for each person you know or work with.",
                  "ph-user", "blue", _from_basic("person")),
     TypeTemplate("project", "useCases", "Project", "Projects",
-                 "Track work with status, collaborators, and meetings.",
+                 "Projects with a status, a timeframe and the people involved.",
                  "ph-kanban", "violet", _from_basic("project")),
     TypeTemplate("atomicNote", "research", "Atomic note", "Atomic notes",
-                 "Write small standalone notes you can reuse later.",
+                 "One idea per note, small enough to link from anywhere.",
                  "ph-note", "amber", _atomic_note),
     TypeTemplate("definition", "research", "Definition", "Definitions",
-                 "Capture a term you want to remember.",
+                 "A term and what it means.",
                  "ph-book-bookmark", "teal", _definition),
     TypeTemplate("book", "media", "Book", "Books",
-                 "Build a reading library with authors, rating, and genre.",
+                 "Books you read, with authors, genre and a rating.",
                  "ph-book-open", "emerald", _from_basic("book")),
     TypeTemplate("film", "media", "Film", "Films",
-                 "Collect films you watch and want to remember.",
+                 "Films you have seen, with director, genre and a rating.",
                  "ph-film-strip", "red", _film),
     TypeTemplate("tvSeries", "media", "TV series", "TV series",
-                 "Track series you watch and want to come back to.",
+                 "Shows you follow, with cast, genre and a rating.",
                  "ph-television", "indigo", _tv_series),
     TypeTemplate("podcast", "media", "Podcast", "Podcasts",
-                 "Save podcasts you listen to and want to revisit.",
+                 "Episodes you have heard, with a link and the people in them.",
                  "ph-microphone", "fuchsia", _podcast),
     TypeTemplate("day", "planningAndReflection", "Day", "Days",
-                 "Log a day with energy, mood, and what stood out.",
+                 "One entry per day: energy, mood and a highlight.",
                  "ph-sun", "yellow", _day),
     TypeTemplate("week", "planningAndReflection", "Week", "Weeks",
-                 "Plan or review a single week.",
+                 "One entry per week, for plans and look-backs.",
                  "ph-calendar", "sky", _period),
     TypeTemplate("month", "planningAndReflection", "Month", "Months",
-                 "Plan or review a month.",
+                 "One entry per month, for plans and look-backs.",
                  "ph-calendar-dots", "cyan", _period),
     TypeTemplate("organization", None, "Organization", "Organizations",
-                 "Keep notes on companies and other institutions.",
+                 "Companies, schools and other groups, with their people.",
                  "ph-buildings", "gray", _organization),
     TypeTemplate("area", None, "Area", "Areas",
-                 "Group work and life into areas of responsibility.",
+                 "Ongoing parts of your life or work, such as Health or Home.",
                  "ph-squares-four", "lime", _area),
 )  # fmt: skip
 

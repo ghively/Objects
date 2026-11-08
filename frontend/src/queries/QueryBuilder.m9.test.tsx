@@ -77,7 +77,7 @@ describe('type-constrained query tabs', () => {
     expect(within(builder).queryByRole('button', { name: 'Remove Book' })).toBeNull()
     expect(within(lock).getByRole('button', { name: BUILDER_TEXT.releaseConstraint })).toHaveAttribute(
       'title',
-      'Turn into a normal query and remove the single type constraint. Opens the query as a page and removes this tab from the type dashboard.',
+      'Makes this a regular query that can cover any type. It opens as its own page and leaves the dashboard of this type.',
     )
   })
 

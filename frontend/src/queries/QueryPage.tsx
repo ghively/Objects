@@ -41,7 +41,7 @@ export const QUERY_TEXT = {
   unpinFromDashboard: 'Unpin from dashboard',
   delete: 'Delete',
   notReadyTitle: 'Query isn’t ready',
-  notReadyBody: 'This draft is saved, but returns no results until you add a search term, choose a tag, or select an object type.',
+  notReadyBody: 'The draft is kept, but it lists nothing until it has a search term, a tag or an object type.',
   empty: 'No content found',
   unknown: 'Unknown query',
 }

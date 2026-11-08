@@ -92,7 +92,7 @@ describe('inline view emptiness', () => {
     const pm = await mount('')
     keystrokes(pm, 1)
     expect(screen.getByTestId('inline-placeholder')).toBeInTheDocument()
-    // The editor's own "Write your text or search for blocks..." is off while the view has one.
+    // The editor's own "Start writing, or type / for blocks..." is off while the view has one.
     expect(pm.querySelector('[data-placeholder]')).toBeNull()
     expect(pm.querySelector('.is-editor-empty')).toBeNull()
   })
@@ -107,7 +107,7 @@ describe('inline view emptiness', () => {
     })
     expect(screen.queryByTestId('inline-placeholder')).toBeNull()
     expect(pm.querySelector('p.is-editor-empty')?.getAttribute('data-placeholder')).toBe(
-      'Write your text or search for blocks...',
+      'Start writing, or type / for blocks...',
     )
   })
 })

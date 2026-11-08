@@ -49,7 +49,7 @@ def test_basic_setup_writes_four_types(tmp_path: Path, state: Path):
         ("Project", "Projects", "Projects"),
         ("Book", "Books", "Books"),
     ]
-    assert loaded["person"].description == "Keep notes on people you meet, work with, or follow."
+    assert loaded["person"].description == "A page for each person you know or work with."
     custom = {
         tid: [(p.name, p.type) for p in t.propertyDefinitions
               if not p.type.startswith("entity_")]

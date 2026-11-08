@@ -137,23 +137,23 @@ export const WB = {
   weblinkInvalid: s('Invalid URL format'),
 
   // Empty and lost states
-  emptyStateDescription: s('You can change this by creating a new node.'),
+  emptyStateDescription: s('Add a block or object to get started.'),
   lostTitle: s('Nothing in this view'),
-  lostDescription: s("But don't worry, we can just take you back."),
+  lostDescription: s("Jump back to the content to carry on."),
   lostBackToContent: s('Back to content'),
 
   // Clear Whiteboard
   clearWhiteboard: s('Clear Whiteboard'),
   clearWhiteboardHeading: s('Clear this whiteboard?'),
   clearWhiteboardExplanation: s(
-    'This removes every object and connector from the canvas. You can undo it.',
+    'Everything on the canvas, objects and connectors, will be removed. Undo brings it back.',
   ),
   clearWhiteboardConfirm: s('Clear Whiteboard'),
 
   // The Whiteboard type
   typeName: s('Whiteboard'),
   typePluralName: s('Whiteboards'),
-  typeDescription: s('An infinite canvas for arranging blocks and objects'),
+  typeDescription: s('A boundless board for laying out blocks and objects'),
   typeCreate: s('Create whiteboard'),
   propCanvas: s('Canvas'),
   propNotes: s('Notes'),

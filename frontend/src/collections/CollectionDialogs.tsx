@@ -18,15 +18,15 @@ import { invalidateLinkIndex } from '@/links/linkIndex'
 
 export const COLLECTION_DIALOG_TEXT = {
   createTitle: 'Create collection',
-  createTooltip: 'Organize content of this type in collections. One entry can be part of several collections.',
+  createTooltip: 'Sort objects of this type into collections; an object can sit in more than one.',
   defaultName: 'New Collection',
-  deleteTitle: 'Do you really want to delete this collection?',
+  deleteTitle: 'Delete this collection?',
   deleteBody:
-    'By deleting a collection all entries will be removed as well. Entries that exist in other collections will be kept there.',
+    'Its entries are deleted with it, except those that also belong to another collection, which stay there.',
   deleteTrash: 'Everything moves to the Trash, where you can restore it for 30 days.',
   deleteAction: 'Delete collection',
   removeTitle: 'Remove from collection?',
-  removeBody: 'Remove from this collection, or delete everywhere below.',
+  removeBody: 'Take it out of just this collection, or use the option below to delete it everywhere.',
   removeAction: 'Remove from collection',
 }
 
@@ -123,7 +123,7 @@ export interface DeleteCollectionDialogProps {
 }
 
 /**
- * "Do you really want to delete this collection?" The affected count comes from the server's 428
+ * "Delete this collection?" The affected count comes from the server's 428
  * (it refuses a delete without `confirm`); the confirmed request then moves everything to the Trash.
  */
 export function DeleteCollectionDialog({ collection, open, onOpenChange, onDeleted }: DeleteCollectionDialogProps) {

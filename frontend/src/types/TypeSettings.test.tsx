@@ -100,7 +100,7 @@ describe('TypeSettings', () => {
     await waitFor(() => expect(useLinkIndex.getState().types.find((t) => t.id === 'project')?.revision).toBe('r1+1'))
   })
 
-  test('test basic type shows "Properties of basic object types cannot be edited.", disables Add Property and Name, and hides Delete', () => {
+  test('test basic type shows "The properties of basic types are fixed.", disables Add Property and Name, and hides Delete', () => {
     render(<TypeSettings typeId="page" />)
     expect(screen.getByRole('note')).toHaveTextContent(BASIC_TYPE_INFO)
     expect(screen.getByRole('button', { name: 'Add Property' })).toBeDisabled()

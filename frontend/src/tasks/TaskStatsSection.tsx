@@ -1,6 +1,6 @@
 // "Task Stats" under the property panel of a recurring Task:
 // Streak (with "At risk" / "Keep it up" / "Start today"), Best, Completions (All-time), Completion
-// rate ("Completed vs skipped or missed") and the occurrence grid (the last 26 scheduled
+// rate ("Done out of all occurrences due") and the occurrence grid (the last 26 scheduled
 // occurrences and the next 4), each cell's state name its tooltip. The server computes everything
 // (`GET /api/tasks/stats`); a task that isn't recurring (422) shows nothing. Reading writes nothing.
 import { useEffect, useState } from 'react'

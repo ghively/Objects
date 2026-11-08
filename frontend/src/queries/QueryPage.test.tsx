@@ -68,7 +68,7 @@ describe('QueryPage', () => {
     render(<QueryPage id="q1" />)
     expect(await screen.findByText('Query isn’t ready')).toBeInTheDocument()
     expect(
-      screen.getByText('This draft is saved, but returns no results until you add a search term, choose a tag, or select an object type.'),
+      screen.getByText('The draft is kept, but it lists nothing until it has a search term, a tag or an object type.'),
     ).toBeInTheDocument()
   })
 
@@ -112,9 +112,9 @@ describe('QueryPage', () => {
     setup(Q({ definition: emptyDef() }))
     render(<QueryPage id="q1" />)
     await user.click(await screen.findByRole('button', { name: 'Edit query' }))
-    expect(screen.getByText('Excluding tags requires a search term or an included tag.')).toBeInTheDocument()
-    expect(screen.getByText('Add a search term or tag to exclude object types.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Exclude tags or backlinks' })).toBeDisabled()
+    expect(screen.getByText('To exclude tags, first add a search term or include a tag.')).toBeInTheDocument()
+    expect(screen.getByText('Excluding types needs a search term or a tag first.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Leave out tags or backlinks' })).toBeDisabled()
     expect(screen.getByRole('button', { name: /Exclude object types/ })).toBeDisabled()
   })
 
@@ -123,10 +123,10 @@ describe('QueryPage', () => {
     setup(Q({ definition: emptyDef({ structures: [{ id: 'server' }], search: { searchTerms: [{ text: 'alp' }], searchMode: 'auto' } }) }))
     render(<QueryPage id="q1" />)
     await user.click(await screen.findByRole('button', { name: 'Edit query' }))
-    expect(screen.getByText('Has no effect when specific types are selected.')).toBeInTheDocument()
+    expect(screen.getByText('Ignored while particular types are picked.')).toBeInTheDocument()
     // While searching, the toolbar and the builder say filters and sorts pause.
-    expect(screen.getAllByText('Sort and property filters pause while searching.').length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: 'Filter' })).toHaveAttribute('title', 'Sort and property filters pause while searching.')
+    expect(screen.getAllByText('Sorting and property filters are off during a search.').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Filter' })).toHaveAttribute('title', 'Sorting and property filters are off during a search.')
   })
 
   test('test builder All clears structures; Exclude object types writes excludeStructureIds', async () => {
@@ -152,10 +152,10 @@ describe('QueryPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Edit query' }))
     await user.type(screen.getByRole('textbox', { name: 'Search' }), 'x{Enter}')
     expect(mocked.saveQuery).not.toHaveBeenCalled()
-    expect(screen.getByText('Use at least 2 characters')).toBeInTheDocument()
+    expect(screen.getByText('Type 2 or more characters')).toBeInTheDocument()
     await user.clear(screen.getByRole('textbox', { name: 'Search' }))
     await user.type(screen.getByRole('textbox', { name: 'Search' }), 'plan{Enter}')
-    expect(await screen.findByText('Add another term, and a result can match any of them.')).toBeInTheDocument()
+    expect(await screen.findByText('With more than one term, a result needs to match only one.')).toBeInTheDocument()
     await user.click(screen.getByRole('radio', { name: 'Exact' }))
     expect(screen.getByText('Works like Auto until full-text search arrives.')).toBeInTheDocument()
 

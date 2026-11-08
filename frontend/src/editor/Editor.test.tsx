@@ -684,7 +684,7 @@ describe('<Editor> M7 settings, flusher and chrome', () => {
     const first = editor.view.dom.firstElementChild!
     expect(first.classList.contains('is-editor-empty')).toBe(true)
     expect(first.getAttribute('data-placeholder')).toBe(EDITOR_PLACEHOLDER)
-    expect(EDITOR_PLACEHOLDER).toBe('Write your text or search for blocks...')
+    expect(EDITOR_PLACEHOLDER).toBe('Start writing, or type / for blocks...')
     act(() => {
       fireEvent.mouseOver(first)
     })

@@ -233,11 +233,11 @@ describe('DataView', () => {
         state={base()}
         onState={() => undefined}
         layouts={['list']}
-        pausedHint="Sort and property filters pause while searching."
+        pausedHint="Sorting and property filters are off during a search."
       />,
     )
-    expect(screen.getByRole('button', { name: 'Filter' })).toHaveAttribute('title', 'Sort and property filters pause while searching.')
-    expect(screen.getByTestId('view-summary')).toHaveTextContent('pause while searching')
+    expect(screen.getByRole('button', { name: 'Filter' })).toHaveAttribute('title', 'Sorting and property filters are off during a search.')
+    expect(screen.getByTestId('view-summary')).toHaveTextContent('off during a search')
   })
 
   test('the layout picker offers only the given layouts', async () => {

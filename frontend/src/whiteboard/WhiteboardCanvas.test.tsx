@@ -243,15 +243,15 @@ describe('WhiteboardCanvas', () => {
   test('empty and lost states', async () => {
     const empty = renderCanvas()
     await act(async () => {})
-    expect(screen.getByText('You can change this by creating a new node.')).toBeInTheDocument()
+    expect(screen.getByText('Add a block or object to get started.')).toBeInTheDocument()
     empty.unmount()
 
     const far = board([node({ id: 'far', position: { x: 50000, y: 50000 }, width: 420, height: 60 })], [], {}, { viewport: { x: 0, y: 0, zoom: 1 } })
     renderCanvas({ doc: { board: far, strokes: [] } })
     await act(async () => {})
-    expect(screen.queryByText('You can change this by creating a new node.')).toBeNull()
+    expect(screen.queryByText('Add a block or object to get started.')).toBeNull()
     expect(screen.getByText('Nothing in this view')).toBeInTheDocument()
-    expect(screen.getByText("But don't worry, we can just take you back.")).toBeInTheDocument()
+    expect(screen.getByText("Jump back to the content to carry on.")).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Back to content' }))
     await act(async () => {})
     expect(screen.queryByText('Nothing in this view')).toBeNull()

@@ -121,21 +121,21 @@ PROPERTY_ICONS = {
 
 # (key, kind, en-US name, description) of the system properties, in order.
 _SYSTEM_DEFS = (
-    ("title", "entity_title", "Title", "The title serves as the main identifier for any entry"),
-    ("collections", "entity_collections", "Collections", "Collections this content is included in"),
+    ("title", "entity_title", "Title", "The name of the object, shown wherever it appears"),
+    ("collections", "entity_collections", "Collections", "The collections this object belongs to"),
     (
         "description",
         "entity_description",
         "Description",
-        "Additional information to further describe an item",
+        "A short summary of what the object is about",
     ),
-    ("createdAt", "entity_createdAt", "Created at", "Date and time of creation"),
-    ("lastUpdated", "entity_lastUpdated", "Last updated", "Date and time of last edit"),
-    ("tags", "entity_tags", "Tags", "General tags of this content"),
-    ("icon", "entity_icon", "Icon", "A quick visual identifier"),
-    ("aliases", "entity_aliases", "Aliases", "Additional names for this content"),
+    ("createdAt", "entity_createdAt", "Created at", "When the object was made"),
+    ("lastUpdated", "entity_lastUpdated", "Last updated", "When the object last changed"),
+    ("tags", "entity_tags", "Tags", "Tags attached to the object"),
+    ("icon", "entity_icon", "Icon", "An emoji or icon shown beside the title"),
+    ("aliases", "entity_aliases", "Aliases", "Other names the object goes by"),
 )
-_TYPE_DEF = ("type", "entity_type", "Object type", "The type of this content")
+_TYPE_DEF = ("type", "entity_type", "Object type", "What kind of object this is")
 # System properties a type only has once they are added.
 _OPTIONAL_SYSTEM_DEFS = {
     "type": _TYPE_DEF,

@@ -18,7 +18,7 @@ import './editor.css'
 import './handles/handles.css'
 
 /** The empty-body placeholder. */
-export const EDITOR_PLACEHOLDER = 'Write your text or search for blocks...'
+export const EDITOR_PLACEHOLDER = 'Start writing, or type / for blocks...'
 
 /** Shows the placeholder on an editable body that is one empty paragraph. */
 const EmptyPlaceholder = Extension.create({

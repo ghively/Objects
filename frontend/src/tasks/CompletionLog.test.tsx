@@ -32,8 +32,8 @@ describe('CompletionLog', () => {
     render(<CompletionLog log={LOG} onChange={onChange} />)
     await user.click(screen.getByRole('button', { name: `Delete ${day('2026-10-22')}` }))
     const dialog = await screen.findByRole('alertdialog')
-    expect(within(dialog).getByText('Delete completion log entry')).toBeInTheDocument()
-    expect(within(dialog).getByText('This log entry will be permanently removed from the completion history.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Remove this entry from the log?')).toBeInTheDocument()
+    expect(within(dialog).getByText('It will be gone from the task history for good.')).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     expect(onChange).not.toHaveBeenCalled()
 

@@ -268,7 +268,7 @@ describe('placeholders', () => {
   })
 
   it('test empty table cells show no placeholder, wrapped or not', () => {
-    const d = def('text', { description: 'Additional information to further describe an item' })
+    const d = def('text', { description: 'A short summary of what the object is about' })
     const { unmount } = render(<TextCell def={d} value={null} density="table" inTable onChange={() => {}} />)
     expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', '')
     unmount()
