@@ -13,7 +13,8 @@
 ``agent`` is an id or a name (any case) of any listed agent (404 "No agent named {agent}.").
 ``message``, ``goal`` and ``context`` are 1..200,000, 1..20,000 and 0..200,000 characters (422).
 A delegated run's token gets 403 "A delegated agent can't delegate further." on ``remote-call``
-and ``delegate``. Each route calls `v1guard.agent_tool_allowed` for its tool.
+and ``delegate``; a ``read`` token (a proposal turn's) gets 403 "This token can only read." there,
+since the other agent would act with write tools. Each route calls `v1guard.agent_tool_allowed` for its tool.
 
 Imports no network client: a remote call goes through ``remotechat`` (and its ``a2a``).
 """
@@ -42,6 +43,7 @@ GOAL_MAX = 20_000  # our number
 CONTEXT_MAX = 200_000  # our number
 NOT_REMOTE = "That isn't a remote agent."  # our string
 TOO_LONG = delegation.TOO_LONG
+READ_ONLY = "This token can only read."  # `v1guard.V1Guard.auth`'s string
 
 
 class RemoteCallRequest(BaseModel):
@@ -104,6 +106,8 @@ def router(ctx: ApiContext) -> APIRouter:
     def flat(token: TokenRecord) -> None:
         if token.purpose == "delegate" or delegation.is_delegated_chat(token.chat):
             raise Denied(403, delegation.FLAT)
+        if token.scope != "read-write":  # handing work on would lift a read-only turn to writes
+            raise Denied(403, READ_ONLY)
 
     def find(registry: AgentRegistry, name: str) -> AgentRecord:
         try:

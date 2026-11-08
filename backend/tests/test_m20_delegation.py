@@ -308,6 +308,48 @@ def test_delegated_run_cannot_delegate(env: Env) -> None:
     assert delegation.DELEGATED_CHATS == set()
 
 
+def test_read_token_cannot_delegate_or_call_remote(env: Env, tokens_made: list[dict]) -> None:
+    """Audit 2: a proposal-mode turn's ``read`` token can't hand work to another agent."""
+    record, secret = TokenStore(env.space_dir).ephemeral(
+        "Assistant", "read", agent=DEFAULT_AGENT_ID, chat=OTHER_CHAT, purpose="proposal"
+    )
+    env.secrets.append(secret)
+    assert record.scope == "read"
+    for route, body in (("delegate", {"agent": "researcher", "goal": "write things"}),
+                        ("remote-call", {"agent": "Fake Planner", "message": "hi"})):
+        res = env.post(route, body, secret)
+        assert res.status_code == 403, res.text
+        assert res.json()["detail"] == "This token can only read."
+    assert _runs(env.fake["log"]) == []
+    assert not [t for t in tokens_made if t.get("purpose") == "delegate"]
+
+
+def test_proposal_runs_lose_the_handoff_tools(env: Env) -> None:
+    """Audit 2: a read-only (proposal) run has no ``delegate`` or ``remote_agent_call``."""
+    scope = agentrun.RunScope(
+        agent=env.registry.get(DEFAULT_AGENT_ID), space_root=env.space_dir, space_name="s",
+        api_url="http://127.0.0.1:9", token="", write=False, chat_id=OTHER_CHAT, purpose="proposal",
+        state=state_dir(),
+    )
+    parts = agentrun.RunParts(allowed=[DELEGATE, REMOTE_CALL, REMOTE_LIST])
+    delegation.delegation_contributor(scope, parts)
+    assert parts.allowed == [REMOTE_LIST]
+    assert DELEGATE in parts.disallowed and REMOTE_CALL in parts.disallowed
+
+
+def test_delegated_run_inherits_the_callers_scope_and_budget(env: Env, tokens_made: list[dict]) -> None:
+    """Audit 2: the delegated run's token is never stronger than its caller's."""
+    record, secret = TokenStore(env.space_dir).ephemeral(
+        "Assistant", "read-write", agent=DEFAULT_AGENT_ID, chat=OTHER_CHAT, budget=10
+    )
+    env.secrets.append(secret)
+    res = env.delegate(secret=secret)
+    assert res.status_code == 200, res.text
+    [made] = [t for t in tokens_made if t.get("purpose") == "delegate"]
+    assert made["scope"] == "read-write"
+    assert made["budget"] == 10 - record.used  # what the caller has left after this call
+
+
 def test_non_delegated_runs_keep_the_tools(env: Env) -> None:
     body = {"mode": "chat", "prompt": "FAKE:echo-env", "contextPaths": [], "history": []}
     res = env.http.post("/api/ai/chat", json=body)
