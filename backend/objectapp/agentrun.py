@@ -132,7 +132,7 @@ RUN_ENV_KEEP: tuple[str, ...] = (
 )
 """Names `RUN_ENV_DROP`'s prefixes would drop that say how the user signs in (audit 20)."""
 
-SERVER_ENV_BLANK: tuple[str, ...] = (*RUN_ENV_KEEP, "ANTHROPIC_API_KEY")
+SERVER_ENV_BLANK: tuple[str, ...] = (*RUN_ENV_KEEP, "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 """Set empty in every outside stdio MCP server's ``env`` (unless its config sets the name): the
 CLI hands its whole environment, with how the user signs in, to each stdio server it starts."""
 
