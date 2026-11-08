@@ -33,7 +33,7 @@ import {
 } from './annotations'
 import { splitBlocks, type SourceBlock } from './blocks'
 import { buildTree, flattenTree, isOneLine, type TreeNode } from './blockTree'
-import { eolOf, preserveBlock, serializeWithPreservation, type EditorBlock } from './preserve'
+import { eolOf, hasPipeInCodeSpan, preserveBlock, serializeWithPreservation, type EditorBlock } from './preserve'
 import {
   BLOCK_SOURCE_META,
   BlockSource,
@@ -285,6 +285,8 @@ function sourceToNode(editor: Editor, block: SourceBlock, options?: readonly Opt
 
 function parseSourceBlock(editor: Editor, block: SourceBlock): JSONContent {
   const md = editor.markdown!
+  // A bare pipe in a code span splits a GFM cell, but not the editor's (audit 2026-11-07 #38).
+  if (block.kind === 'table' && block.raw.split(/\r\n|\n|\r/).some(hasPipeInCodeSpan)) return rawNode(block.raw)
   try {
     const parsed = md.parse(block.raw.replace(/\r\n?/g, '\n'))
     const nodes = parsed.content ?? []
