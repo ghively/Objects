@@ -248,6 +248,57 @@ describe('sweep 2026-11-08: catalogued keys', () => {
     expect(keysFor('toggleAllToggles')).toEqual(['Mod-o'])
   })
 
+  test('Ctrl+Plus and Ctrl+Minus are "Increase / decrease text hierarchy" under Block editing, bound in the editor', () => {
+    const up = byId().get('increaseTextHierarchy')
+    const down = byId().get('decreaseTextHierarchy')
+    expect(up).toBeTruthy()
+    expect(down).toBeTruthy()
+    for (const d of [up, down]) {
+      expect(d?.category).toBe('block')
+      expect(d?.scope).toBe('editor')
+      expect(d?.provisional).toBe(false)
+      expect(d?.bound).toBe(true)
+    }
+    expect(up?.name).toBe('Increase text hierarchy')
+    expect(down?.name).toBe('Decrease text hierarchy')
+    // One registry key each (the editor's key map also answers the shifted `+` of Ctrl+Shift+=).
+    expect(keysFor('increaseTextHierarchy')).toEqual(['Mod-='])
+    expect(keysFor('decreaseTextHierarchy')).toEqual(['Mod--'])
+    // Shown as Ctrl+Plus / Ctrl+Minus (⌘+ / ⌘- on macOS), as the catalog writes them.
+    expect(formatKeys('Mod-=', false)).toBe('Ctrl+Plus')
+    expect(formatKeys('Mod-+', false)).toBe('Ctrl+Plus')
+    expect(formatKeys('Mod--', false)).toBe('Ctrl+Minus')
+    expect(formatKeys('Mod-=', true)).toBe('⌘+')
+    expect(formatKeys('Mod--', true)).toBe('⌘-')
+    // `Mod--` still parses as Mod with the minus key.
+    expect(parseKeys('Mod--', false)).toEqual({ ctrl: true, meta: false, alt: false, shift: false, key: '-' })
+  })
+
+  test('Ctrl+Shift+G is "Merge the selected text blocks" under Block editing, bound in the editor, apart from Group (Ctrl+G)', () => {
+    const d = byId().get('mergeTextBlocks')
+    expect(d).toBeTruthy()
+    expect(d?.category).toBe('block')
+    expect(d?.scope).toBe('editor')
+    expect(d?.name).toBe('Merge the selected text blocks')
+    expect(d?.provisional).toBe(false)
+    expect(d?.bound).toBe(true)
+    expect(keysFor('mergeTextBlocks')).toEqual(['Mod-Shift-g'])
+    expect(keysFor('groupBlocks')).toEqual(['Mod-g'])
+    expect(formatKeys('Mod-Shift-g', false)).toBe('Ctrl+Shift+G')
+  })
+
+  test('Ctrl+Shift+X is "Remove block styles" under Block editing, bound in the editor', () => {
+    const d = byId().get('removeBlockStyles')
+    expect(d).toBeTruthy()
+    expect(d?.category).toBe('block')
+    expect(d?.scope).toBe('editor')
+    expect(d?.name).toBe('Remove block styles')
+    expect(d?.provisional).toBe(false)
+    expect(d?.bound).toBe(true)
+    expect(keysFor('removeBlockStyles')).toEqual(['Mod-Shift-x'])
+    expect(formatKeys('Mod-Shift-x', false)).toBe('Ctrl+Shift+X')
+  })
+
   test('no two registered ids in one scope share a key, except the declared pairs', () => {
     for (const mac of [false, true]) {
       const seen = new Map<string, string>()
