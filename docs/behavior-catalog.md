@@ -19,7 +19,7 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 | Area | Status |
 |---|---|
 | Settings (all pages) | specified (section 1) |
-| Sidebar footer: Shortcuts panel (section 2), Add Section, type gallery | specified (sections 2-3) |
+| Sidebar footer: Shortcuts panel (section 2), Add section, type gallery | specified (sections 2-3) |
 | Sidebar rest, top bar, search, New menu | specified (sections 4, 8) |
 | Calendar Month and Week views, backlinks, Export dialog | specified (section 10) |
 | Unlinked mentions | specified (section 11) |
@@ -69,7 +69,7 @@ Object has no accounts.
 - Space Settings: Icon, Name, Description, Delete space.
 - Object Types: "Custom object types" and "Basic object types" tile grids plus Create; per type: Icon, Name,
   Plural, Color, Description, Properties (Add Property), Templates (New Template), Configuration (see the
-  audit doc item 27), Delete Object Type. Basic types' properties cannot be edited. Field lists per built-in
+  audit doc item 27), Delete object Type. Basic types' properties cannot be edited. Field lists per built-in
   type are in audit item 28.
 - Task management: "Hide Task Management" per space.
 
@@ -163,9 +163,9 @@ Each starter template pre-fills the new type's properties.
 
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
-- Object Types header: fold chevron, count, a `...` menu (Sort Manually with a check, Sort Alphabetically) and
+- Object Types header: fold chevron, count, a `...` menu (Sort manually with a check, Sort alphabetically) and
   a `+` (the gallery above) on hover.
-- "Add Section" opens a small form (a one-line explanation that a section is a named heading for pages
+- "Add section" opens a small form (a one-line explanation that a section is a named heading for pages
   and collections in the sidebar) with an Icon picker, Section Name and Create.
 - Work (M23): one entry directly below the Agents section, above All notes, opening the Work
   page; it shows while AI features are hidden.
@@ -240,8 +240,8 @@ Each starter template pre-fills the new type's properties.
   - Filter popover: "where" row builder with "Filter" and "Filter group" buttons. Sort popover: "+ Sort".
     Group by: a "Group by" button. Customize: "Card view" and "Calculations".
   - Tab strip: Overview | All | custom tabs (including Query-backed ones) | `+` to add a tab.
-  - Type page header: type icon + plural name; search icon; `...` (New from Template >, New Collection, Pin to
-    Sidebar, Object Type Settings, Export, Import); a split "New" button.
+  - Type page header: type icon + plural name; search icon; `...` (New from template >, New collection, Pin to
+    sidebar, Object type settings, Export, Import); a split "New" button.
 - **Wall cards** show: the type label, the icon and title, the description, then one row per card-view property
   with its icon and value or "Empty" (Collaborators, Time frame, Status on Projects).
 
@@ -255,13 +255,13 @@ Each starter template pre-fills the new type's properties.
   moved into view. The "Not in any collection / Not tagged / No backlinks" sections are cleanup tools.
 - **Collection page**: opens in a peek: collection icon + name, the full view toolbar (count, Filter, Sort,
   Group, layout, Customize), search, `...`, a split New button, expand; under the header a chip of the parent
-  type ("Projects"); the cards; a "+ New Object" row; a stepper through the type's collections ("1 / 3").
+  type ("Projects"); the cards; a "+ New object" row; a stepper through the type's collections ("1 / 3").
 - **Outline popover** (hover the dash column at the right edge, in a peek or full page): tabs "Outline" and
   "Stats" and a pin button. Outline lists headings indented by level with an active marker on the left; click
   scrolls. Stats: Words, Sentences, Paragraphs, Characters, Created At, Last Updated.
-- **Tab context menu** (right-click a type tab): Pin to Sidebar, Pin Tab, Object Type Settings, Import (Ctrl+I).
-- **Sidebar type context menu**: Open >, Create <Type>, New from Template >, New Collection, Pin to Sidebar,
-  Object Type Settings, Import.
+- **Tab context menu** (right-click a type tab): Pin to sidebar, Pin tab, Object type settings, Import (Ctrl+I).
+- **Sidebar type context menu**: Open >, Create <Type>, New from template >, New collection, Pin to sidebar,
+  Object type settings, Import.
 - **Editor content in real notes**: a strikethrough run of text, an "Icon" block (a small icon chip in front
   of a paragraph, made with `()` Space), tables with a header row, tags row with colored chips, inline code.
 - **Note**: opening an object and selecting text must not change its "Last Updated"; only a real edit does.
@@ -271,7 +271,7 @@ Each starter template pre-fills the new type's properties.
 - **Month view**: header "Nov 2026" at the left, the view switcher (Month, Week, Three days, Day) centered,
   "< Today >" at the right; below, a strip Jan to Dec with the current month highlighted; then one card per
   existing daily note of that month (type label, title, Reviewed checkbox, Tags row, then the note's content:
-  to-dos, bullets, code/time rows), and a "+ New Object" row. An empty month shows a short
+  to-dos, bullets, code/time rows), and a "+ New object" row. An empty month shows a short
   empty-state line saying the month has no daily notes yet. Clicking a month in the strip jumps there; the tab
   title becomes the month's first day.
 - **Week view**: a single column of days. Each day: the weekday name colored by weekday (Sunday red, Monday amber
