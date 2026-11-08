@@ -1,8 +1,9 @@
 // M23 Task 9: the Work page: the top bar, the brain-dump bar and the focus rail on every view, then
 // the view switcher and the selected view. Every view is computed from `useWorkData`; the page's
 // own state (energy, Just one thing, view, the focus line) is `useWorkUi`, browser storage only.
-import { useEffect, useMemo, useState, type JSX } from 'react'
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import type { WorkBoard, WorkBoardItem, WorkViewId } from '@/api/types'
+import { zonedParts } from '@/lib/zonedTime'
 import { useWorkKeys } from '../keys/useWorkKeys'
 import { DEFAULT_PARTS, useWorkData, useWorkEvents, type WorkDataState, type WorkPart } from '../state/useWorkData'
 import { useWorkUi } from '../state/useWorkUi'
@@ -21,6 +22,9 @@ export { clearWorkSearch }
 
 /** What the page loads on mount: the default parts plus the ones its counts need. */
 const PAGE_PARTS: readonly WorkPart[] = [...DEFAULT_PARTS, 'wins', 'general']
+
+/** What a new day reloads: everything stamped with the server's "today". */
+const DAY_PARTS: readonly WorkPart[] = ['board', 'focus', 'today', 'needsYou']
 
 /** The clock the views read, moved on once a minute. */
 function useNow(): Date {
@@ -65,6 +69,19 @@ export function WorkPage({ view }: { view?: WorkViewId }): JSX.Element {
   useEffect(() => {
     void useWorkData.getState().load(PAGE_PARTS)
   }, [])
+
+  // Left open overnight: once the wall-clock day in the board's zone passes the board's "today", the
+  // day's parts are loaded again, once per stale day (the server's answer moves `today` on).
+  const boardToday = data.board?.today ?? null
+  const boardZone = data.board?.timeZone ?? null
+  const rolledFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!boardToday) return
+    if (zonedParts(now, boardZone).date === boardToday) return
+    if (rolledFor.current === boardToday) return
+    rolledFor.current = boardToday
+    void useWorkData.getState().load(DAY_PARTS)
+  }, [now, boardToday, boardZone])
 
   // A `{kind: 'work', view}` target opens that view.
   useEffect(() => {
