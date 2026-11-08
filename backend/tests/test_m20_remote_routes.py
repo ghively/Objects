@@ -311,6 +311,74 @@ def test_url_change_drops_the_secret(api, fake: FakeA2A) -> None:
     assert all(r["headers"].get("Authorization") is None for r in other.requests)
 
 
+def test_endpoint_refusal_rules() -> None:
+    """Audit 6: an endpoint on this computer only from a card on this computer; never Object."""
+    refuse = api_remote_agents.endpoint_refusal
+    own = "http://127.0.0.1:8765/"
+    far = "https://agents.example.com/.well-known/agent-card.json"
+    assert refuse(far, "https://agents.example.com/a2a", own) is None
+    assert refuse(far, "https://other.example.com/a2a", own) is None
+    for ep in ("http://127.0.0.1:9000/a2a", "http://127.8.9.10/a2a", "http://localhost:9000/a2a",
+               "http://[::1]:9000/a2a", "http://LOCALHOST/a2a"):
+        message = refuse(far, ep, own)
+        assert message is not None and "on this computer" in message, ep
+    local = "http://127.0.0.1:9000/.well-known/agent-card.json"
+    assert refuse(local, "http://127.0.0.1:9000/a2a", own) is None
+    assert refuse(local, "http://localhost:9001/a2a", own) is None
+    for ep in ("http://127.0.0.1:8765/api/ai/chats", "http://localhost:8765/api", "http://[::1]:8765/x"):
+        assert refuse(local, ep, own) == api_remote_agents.OWN_ENDPOINT.format(endpoint=_host_port(ep)), ep
+        assert refuse(far, ep, own) is not None, ep
+
+
+def _host_port(url: str) -> str:
+    from objectapp.agents import endpoint_host
+
+    return endpoint_host(url)
+
+
+def test_loopback_endpoint_refused_on_preview_add_and_refresh(api, fake: FakeA2A, monkeypatch) -> None:
+    """Audit 6: a card from another host that points its endpoint at this computer, or a card that
+    points at Object's own API, is refused (422) by preview, add and refresh; nothing is stored."""
+    from objectapp import a2a
+
+    client = api["client"]
+    agent = _add(client, fake.base_url)
+    before = _snapshot(state_dir())
+    real = a2a.fetch_card
+
+    async def far_card(card_url: str, auth, **kw):  # the card as if it came from another host
+        return await real(fake.base_url + "/.well-known/agent-card.json", auth, **kw)
+
+    monkeypatch.setattr(a2a, "fetch_card", far_card)
+    fake.card_override = _moved_card(fake, fake.base_url + "/a2a")  # 127.0.0.1, the fake's port
+    far = "https://agents.example.com"
+    for route, body in (("/api/remote-agents/preview", {"url": far, "auth": _bearer()}),
+                        ("/api/remote-agents", {"url": far, "auth": _bearer(), "name": "Far"})):
+        res = client.post(route, json=body)
+        assert res.status_code == 422, res.text
+        assert "on this computer" in res.json()["detail"]
+    monkeypatch.setattr(a2a, "fetch_card", real)
+
+    # A card on this computer pointing at Object itself (the test client's base: testserver:80).
+    fake.card_override = _moved_card(fake, "http://testserver/api/ai/chats")
+    res = client.post("/api/remote-agents/preview", json={"url": fake.base_url, "auth": _bearer()})
+    assert (res.status_code, res.json()["detail"]) == (422, api_remote_agents.OWN_ENDPOINT.format(endpoint="testserver"))
+    res = client.post(f"/api/remote-agents/{agent['id']}/refresh", json={})
+    assert (res.status_code, res.json()["detail"]) == (422, api_remote_agents.OWN_ENDPOINT.format(endpoint="testserver"))
+    assert _snapshot(state_dir()) == before  # nothing stored, the old endpoint and secret kept
+
+
+def test_add_and_refresh_carry_the_warnings(api, fake: FakeA2A) -> None:
+    client = api["client"]
+    agent = _add(client, fake.base_url)
+    assert agent["warnings"] == []
+    port = fake.base_url.rsplit(":", 1)[1]
+    fake.card_override = _moved_card(fake, f"http://localhost:{port}/a2a")
+    res = client.post(f"/api/remote-agents/{agent['id']}/refresh", json={})
+    assert res.status_code == 200, res.text
+    assert res.json()["warnings"] == ["This agent's card sends messages to localhost, not 127.0.0.1."]
+
+
 def test_refresh_errors(api, fake: FakeA2A) -> None:
     client = api["client"]
     agent = _add(client, fake.base_url)
