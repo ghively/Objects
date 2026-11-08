@@ -265,3 +265,57 @@ def test_work_item_fields_leave_out_a_hidden_project(tmp_path: Path, monkeypatch
         r = c.get("/api/work/item", params={"path": "Tasks/Order toner.md"})  # the app's own
         if r.status_code == 200:
             assert "Scanner rollout" in repr(r.json())
+
+
+# -- review: the activity log of every server instance on one file -------------------------------
+
+
+def _activity_record():
+    from objectapp.tokens import TokenRecord
+
+    return TokenRecord(id="t", name="n", scope="read-write", space="s", hash="h", createdAt="x")
+
+
+def test_activity_logs_on_one_file_take_turns(tmp_path: Path):
+    """Two ActivityLogs (the v1 router's and a guard's) on one file: one's append-and-trim finishes
+    before the other's starts, so a trim can't drop a line written meanwhile."""
+    from objectapp.tokens import ActivityLog
+
+    (tmp_path / "space").mkdir()
+    a, b = ActivityLog(tmp_path / "space", tmp_path), ActivityLog(tmp_path / "space", tmp_path)
+    in_trim, release = threading.Event(), threading.Event()
+    trim = a._trim
+
+    def slow_trim() -> None:
+        in_trim.set()
+        release.wait(5)
+        trim()
+
+    a._trim = slow_trim  # type: ignore[method-assign]
+    ta = threading.Thread(target=a.add, args=(_activity_record(), "edit", "A.md"))
+    ta.start()
+    assert in_trim.wait(5)
+    tb = threading.Thread(target=b.add, args=(_activity_record(), "edit", "B.md"))
+    tb.start()
+    time.sleep(0.3)
+    waited = tb.is_alive()
+    release.set()
+    ta.join(5)
+    tb.join(5)
+    assert waited, "the second log wrote while the first was in its trim"
+    assert [e["path"] for e in a.since(None)] == ["A.md", "B.md"]
+
+
+def test_activity_trim_needs_no_fixed_temp_name(tmp_path: Path, monkeypatch):
+    """The trim wrote a fixed ``api-activity.jsonl.tmp``: two at once shared it, and a stray one
+    (here a folder) stopped every trim. It writes through a temp file of its own."""
+    from objectapp import tokens
+    from objectapp.tokens import ActivityLog
+
+    monkeypatch.setattr(tokens, "ACTIVITY_KEEP", 3)
+    (tmp_path / "space").mkdir()
+    (tmp_path / "api-activity.jsonl.tmp").mkdir()
+    log = ActivityLog(tmp_path / "space", tmp_path)
+    for i in range(7):
+        log.add(_activity_record(), "edit", f"{i}.md")
+    assert [e["path"] for e in log.since(None)] == ["4.md", "5.md", "6.md"]
