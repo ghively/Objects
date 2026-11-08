@@ -552,21 +552,48 @@ export function isResync(e: ChangeEvent, kind: ChangeKind): boolean {
   return e.kind === kind && e.path === RESYNC_PATH
 }
 
-function ensureSource() {
+/** `EventSource.CLOSED`: the browser gave up on the stream and will not reconnect it by itself. */
+const STREAM_CLOSED = 2
+/** The first wait before the stream is made again after the browser closed it, doubled up to the max. */
+const STREAM_RETRY_MS = 1_000
+const STREAM_RETRY_MAX_MS = 30_000
+let retryMs = STREAM_RETRY_MS
+let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+function ensureSource(resyncOnOpen = false) {
   if (source || typeof EventSource === 'undefined') return
-  source = new EventSource(`${BASE}/events`)
+  if (retryTimer) {
+    // A new subscription while a closed stream waits to be made again: make it now, still a resync.
+    clearTimeout(retryTimer)
+    retryTimer = null
+    resyncOnOpen = true
+  }
+  const es = new EventSource(`${BASE}/events`)
+  source = es
   // The browser reconnects an `EventSource` by itself after a drop (server restart, sleep), but
   // the events published in between are gone: `open` after an `error` resyncs every consumer.
-  let dropped = false
-  source.onerror = () => {
+  let dropped = resyncOnOpen
+  es.onerror = () => {
     dropped = true
+    // Audit 2026-11-07 #39: some drops (an HTTP error answer, a refused connection) close the
+    // stream for good; it is made again after a growing wait, and its `open` resyncs.
+    if (es.readyState !== STREAM_CLOSED || source !== es) return
+    es.close()
+    source = null
+    const wait = retryMs
+    retryMs = Math.min(retryMs * 2, STREAM_RETRY_MAX_MS)
+    retryTimer = setTimeout(() => {
+      retryTimer = null
+      if (listeners.size > 0) ensureSource(true)
+    }, wait)
   }
-  source.onopen = () => {
+  es.onopen = () => {
+    retryMs = STREAM_RETRY_MS
     if (!dropped) return
     dropped = false
     for (const e of RESYNC_EVENTS) emit({ ...e })
   }
-  source.addEventListener('change', (msg) => {
+  es.addEventListener('change', (msg) => {
     let e: ChangeEvent
     try {
       e = JSON.parse((msg as MessageEvent<string>).data) as ChangeEvent
@@ -2143,6 +2170,10 @@ export const api = {
       if (listeners.size === 0 && source) {
         source.close()
         source = null
+      }
+      if (listeners.size === 0 && retryTimer) {
+        clearTimeout(retryTimer)
+        retryTimer = null
       }
     }
   },

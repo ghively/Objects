@@ -12,7 +12,8 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
-import { RANGE_RELOAD_MS, useCalendarRange } from './useCalendarRange'
+import { useSettings } from '@/settings/useSettings'
+import { concernsRange, RANGE_RELOAD_MS, useCalendarRange } from './useCalendarRange'
 
 const mocked = vi.mocked(api)
 let listeners: ((e: ChangeEvent) => void)[] = []
@@ -114,6 +115,21 @@ describe('useCalendarRange on a changed event', () => {
     await settle()
     expect(mocked.calendar).toHaveBeenCalledTimes(2)
     expect(mocked.rows).not.toHaveBeenCalled()
+  })
+
+  // Audit 2026-11-07 #16: a timed value's day is its day in the shown time zone, not its UTC day.
+  test('a timed date late in the zone day counts for that day, not the next UTC day', async () => {
+    const before = useSettings.getState().settings
+    useSettings.setState({ settings: { ...before, timeZone: 'America/New_York' } })
+    try {
+      // 2026-10-07 23:30 in New York is 2026-10-08T03:30Z
+      const values = { date: { start: '2026-10-08T03:30:00.000Z', resolution: 'time' } }
+      mocked.rows.mockResolvedValue([row({ path: 'Tasks/Late.md', values })])
+      expect(await concernsRange('Tasks/Late.md', '2026-10-07', '2026-10-07')).toBe(true)
+      expect(await concernsRange('Tasks/Late.md', '2026-10-08', '2026-10-08')).toBe(false)
+    } finally {
+      useSettings.setState({ settings: before })
+    }
   })
 
   test('created, deleted, renamed and types always reload', async () => {

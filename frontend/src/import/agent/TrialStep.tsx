@@ -22,9 +22,16 @@ export function TrialStep({ batch, onDone }: { batch: string; onDone: (status: F
   const [error, setError] = useState<string | null>(null)
   const finished = useRef(false)
 
+  const loaded = useRef(false)
+
   const refresh = useCallback(async () => {
     try {
       const s = await api.filingStatus(batch)
+      if (!loaded.current) {
+        // The first answer after failed tries: their error no longer stands.
+        loaded.current = true
+        setError(null)
+      }
       setStatus(s)
       setVerdicts((v) => ({
         ...Object.fromEntries(s.trial.items.filter((i) => i.verdict).map((i) => [i.path, i.verdict as FilingVerdict])),
@@ -50,6 +57,13 @@ export function TrialStep({ batch, onDone }: { batch: string; onDone: (status: F
     const t = setInterval(() => void refresh(), agentTiming.pollMs)
     return () => clearInterval(t)
   }, [state, continuing, refresh])
+  // Audit 2026-11-07 #42: a failed first load is tried again (else no Start button ever comes).
+  const firstLoadFailed = status === null && error !== null
+  useEffect(() => {
+    if (!firstLoadFailed) return
+    const t = setInterval(() => void refresh(), agentTiming.pollMs)
+    return () => clearInterval(t)
+  }, [firstLoadFailed, refresh])
 
   const start = async () => {
     setBusy(true)

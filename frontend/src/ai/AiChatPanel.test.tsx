@@ -397,6 +397,30 @@ describe('AiChatPanel', () => {
     expect(mocked.saveAiChat.mock.calls[2][0].messages).toHaveLength(4)
   })
 
+  // Audit 2026-11-07 #40: a save queued behind one in flight writes what the chat held when it was
+  // queued, into that chat's object, even after New chat; no empty AI Chat object is made.
+  test('test a queued save after New chat saves the old chat, never an empty one', async () => {
+    let finishFirst: (r: { path: string; version: string }) => void = () => undefined
+    mocked.saveAiChat
+      .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)))
+      .mockResolvedValueOnce({ path: 'AI Chats/C.md', version: 'v2' })
+    const { user } = setup()
+    await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
+    await user.type(input(), 'One{Enter}')
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(1))
+    await user.type(input(), 'Two{Enter}')
+    await waitFor(() => expect(mocked.aiChat).toHaveBeenCalledTimes(2))
+    await user.click(screen.getByRole('button', { name: T.newChat }))
+    await act(async () => finishFirst({ path: 'AI Chats/C.md', version: 'v1' }))
+    await waitFor(() => expect(mocked.saveAiChat).toHaveBeenCalledTimes(2))
+    const second = mocked.saveAiChat.mock.calls[1][0]
+    expect(second).toMatchObject({ path: 'AI Chats/C.md', baseVersion: 'v1' })
+    expect(second.messages).toHaveLength(4)
+    expect(second.title).toBeUndefined()
+    // The new chat shown is untouched: its entry names no saved chat.
+    expect(aiEntry()?.target).toEqual({ kind: 'aiChat' })
+  })
+
   test('test a block goes with its page; a rephrased answer goes without one', async () => {
     mocked.aiChat.mockImplementation(answer(done('Answer one')))
     const { user } = setup()

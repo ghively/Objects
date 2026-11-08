@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { Collection, DashboardSectionKey, Query, TypeDef, Views } from '@/api/types'
 import { saveCollectionEdit } from '@/collections/useCollections'
+import { showToast } from '@/editor/media/upload'
 import { appendSection, buildSections } from '@/types/dashboardSections'
 import { reloadDefinitions, useDefinitions, useDefs } from '@/types/useDefinitions'
 
@@ -57,6 +58,9 @@ export function saveQueryEdit(id: string, edit: (q: Query) => Query): Promise<Qu
   })
 }
 
+/** The toast after a query's save failed ("Could not save …" form, as the graph's and the sidebar's). */
+export const QUERY_SAVE_FAILED = 'Could not save the query'
+
 type QueryEdit = (q: Query) => Query
 const pending = new Map<string, QueryEdit[]>()
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -71,6 +75,8 @@ async function flush(id: string): Promise<void> {
     await saveQueryEdit(id, (q) => edits.reduce((x, e) => e(x), q))
   } catch (e) {
     console.warn('Could not save the query:', e)
+    // Audit 2026-11-07 #43: told, not only logged.
+    showToast(QUERY_SAVE_FAILED)
   }
 }
 

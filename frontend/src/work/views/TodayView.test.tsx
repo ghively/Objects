@@ -1,6 +1,6 @@
 // M23 Task 12: Today: the 07:00-17:30 timeline with the brief, meetings, focus lines in the gaps,
 // the wrap-up, a now-line and the deadline countdowns.
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import type { MeetingSlot, WorkBoard } from '@/api/types'
@@ -116,5 +116,28 @@ describe('TodayView', () => {
   test('test the day name shows', () => {
     show()
     expect(screen.getByText('Thursday, November 5')).toBeInTheDocument()
+  })
+})
+
+// Audit 2026-11-07 #14: the now-line follows the page's clock alone (it used to add the time since
+// the view showed on top of `now`, which already moves, so it ran at twice real speed).
+describe('TodayView now-line follows the page clock', () => {
+  test('test ten minutes later, with the page clock at 10:10, the line shows 10:10', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(NOW)
+      useWorkData.setState({ board: BOARD, today: { day: '2026-11-05', now: NOW.toISOString(), nowLocal: '10:00', meetings: [] } })
+      const data = useWorkData.getState()
+      const { rerender } = render(<TodayView data={data} now={NOW} />)
+      const line = () => (document.querySelector('[data-work-now-line]') as HTMLElement).getAttribute('data-time')
+      expect(line()).toBe('10:00')
+      act(() => {
+        vi.advanceTimersByTime(10 * 60_000)
+      })
+      rerender(<TodayView data={data} now={new Date(NOW.getTime() + 10 * 60_000)} />)
+      expect(line()).toBe('10:10')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
