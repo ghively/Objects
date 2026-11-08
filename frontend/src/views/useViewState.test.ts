@@ -5,7 +5,7 @@ import type { ViewState } from '@/api/types'
 import { useViewState } from './useViewState'
 
 const base = (): ViewState =>
-  ({ layout: 'table', filterGroup: null, sorts: [], groupBy: null, viewDefinition: {} }) as unknown as ViewState
+  ({ filterGroup: null, sorts: [], groupBy: null, viewDefinition: { dataViewLayout: 'table' } }) as unknown as ViewState
 
 const settle = async () => {
   for (let i = 0; i < 4; i++) await Promise.resolve()
@@ -27,7 +27,7 @@ describe('useViewState', () => {
         saved.push(s)
         return Promise.resolve()
       })
-      const fresh = { ...base(), layout: 'list' } as ViewState
+      const fresh = { ...base(), viewDefinition: { dataViewLayout: 'list' } } as ViewState
       const refetch = vi.fn(async () => fresh)
       const { result } = renderHook(() => useViewState(base(), save, refetch))
 
@@ -47,10 +47,10 @@ describe('useViewState', () => {
 
       // Save 1 answers 409: the state is rebuilt from the fresh copy plus every pending patch.
       await act(async () => {
-        failFirst!(new ConflictError('409', 'conflict'))
+        failFirst!(new ConflictError('v2'))
         await settle()
       })
-      expect(result.current[0].layout).toBe('list')
+      expect(result.current[0].viewDefinition.dataViewLayout).toBe('list')
       expect(result.current[0].sorts).toHaveLength(1)
       expect(result.current[0].groupBy).not.toBeNull()
       expect(saved[saved.length - 1]?.groupBy).not.toBeNull()
@@ -63,7 +63,7 @@ describe('useViewState', () => {
       const last = saved[saved.length - 1]
       expect(last.groupBy).not.toBeNull()
       expect(last.sorts).toHaveLength(1)
-      expect(last.layout).toBe('list')
+      expect(last.viewDefinition.dataViewLayout).toBe('list')
     } finally {
       vi.useRealTimers()
     }
