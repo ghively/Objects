@@ -7,7 +7,6 @@ from pathlib import Path
 
 from .model import TABLE_MAX_COLS, TABLE_MAX_ROWS
 
-
 MAX_OFFICE_UNPACKED_BYTES = 100 * 1024 * 1024
 """The most a .docx, .pptx or .xlsx may unpack to (all its parts) before it is parsed; a larger one
 (a small file can inflate to hundreds of MB) is kept as Original only."""
