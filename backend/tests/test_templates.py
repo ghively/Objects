@@ -161,7 +161,7 @@ def test_bad_date_format_422(space_dir: Path):
         "/api/objects", json={"typeId": "page", "templateId": "01TEMPLATEBAD0000000000000"}
     )
     assert res.status_code == 422
-    assert res.json()["detail"] == "The template couldn't be applied"
+    assert res.json()["detail"] == "The template couldn't be applied."
 
 
 def test_date_variable_week_range():

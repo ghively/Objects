@@ -172,7 +172,7 @@ def main(argv: list[str] | None = None) -> None:
     if space_root is None:
         parser.error("Pass --space PATH the first time.")
     if not space_root.is_dir():
-        parser.error(f"{space_root} is not a folder.")
+        parser.error(f'"{space_root}" is not a folder.')
 
     host = SpaceHost(args.port, DEFAULT_STATIC_DIR)
     thread = threading.Thread(

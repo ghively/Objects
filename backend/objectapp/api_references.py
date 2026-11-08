@@ -71,7 +71,7 @@ def router(ctx: ApiContext) -> APIRouter:
         try:
             data = references(space, ctx.search, rel, related_limit=relatedLimit)
         except KeyError:
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
         return _safe_json(data)
 
     @r.post("/references/link")
@@ -99,7 +99,7 @@ def router(ctx: ApiContext) -> APIRouter:
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         if version != req.baseVersion:
             rel = PurePosixPath(req.path.replace("\\", "/")).as_posix()
             ctx.announce(ChangeEvent("changed", rel, version, origin=req.clientId))

@@ -117,7 +117,7 @@ def router(ctx: ApiContext, service: WorkService) -> APIRouter:
         except (IllegalMove, UnreadableList, InvalidValue) as exc:
             return _error(422, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
         except ValueError as exc:  # a path outside the space
             return _error(400, str(exc))
         rel = result["item"]["path"]
@@ -141,7 +141,7 @@ def router(ctx: ApiContext, service: WorkService) -> APIRouter:
         except NotWorkItem as exc:
             return _error(422, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
         except ValueError as exc:
             return _error(400, str(exc))
 
@@ -187,7 +187,7 @@ def router(ctx: ApiContext, service: WorkService) -> APIRouter:
     def add_work_fields(type_id: str, req: WorkFieldsTypeRequest):
         t, revision = space.refresh_type(type_id)
         if t is None:
-            return _error(404, f"No object type {type_id!r}")
+            return _error(404, f'There is no object type "{type_id}".')
         if t.basic:
             return _error(422, BASIC_LOCKED)
         if t.readOnlyReason:
@@ -210,7 +210,7 @@ def router(ctx: ApiContext, service: WorkService) -> APIRouter:
         except InvalidValue as exc:
             return _error(422, str(exc))
         except KeyError:
-            return _error(404, f"No object type {type_id!r}")
+            return _error(404, f'There is no object type "{type_id}".')
         ctx.announce(ChangeEvent("types", type_id, result.revision, origin=req.clientId))
         ctx.announce(ChangeEvent("queries", TICKETS_ID, None, origin=req.clientId))
         for path in result.rewritten:

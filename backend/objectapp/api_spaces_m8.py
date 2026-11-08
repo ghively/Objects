@@ -55,16 +55,16 @@ def router(ctx: ApiContext) -> APIRouter:
         except TrashUnavailable as exc:
             return JSONResponse(
                 {
-                    "detail": f"The trash is not available: {exc}",
+                    "detail": f"The Trash is not available: {str(exc).rstrip('.')}.",
                     "affected": 0,
                     "folder": exc.folder,
                 },
                 status_code=428,
             )
         except FileNotFoundError:
-            return _error(404, f"Not a space folder: {req.path}")
+            return _error(404, f'"{req.path}" is not a space folder.')
         except OSError as exc:  # 503 like the app's other file-system failures, never a bare 500
-            return _error(503, f"The folder could not be deleted: {exc.strerror or exc}")
+            return _error(503, f"The folder could not be deleted: {exc.strerror or exc}.")
         return {"trashed": trashed}
 
     return r

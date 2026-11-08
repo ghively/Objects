@@ -610,13 +610,13 @@ def link_mention(
     try:
         trg = space._rel(target)
     except ValueError as exc:
-        raise InvalidValue(f"No object at {target!r}") from exc
+        raise InvalidValue(f'There is no object at "{target}".') from exc
     with space._lock:
         if rel not in space._summaries:
             raise KeyError(rel)
         tsum = space._summaries.get(trg)
     if tsum is None or tsum.template is not None:
-        raise InvalidValue(f"No object at {target!r}")
+        raise InvalidValue(f'There is no object at "{target}".')
     if trg == rel:
         raise InvalidValue(NOT_A_MENTION)
     if not isinstance(start, int) or not isinstance(end, int) or not 0 <= start < end:

@@ -390,7 +390,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         except ValueError as exc:
             raise _Hide(400, str(exc)) from exc
         except KeyError as exc:
-            raise _Hide(404, f"No object at {path!r}") from exc
+            raise _Hide(404, f'There is no object at "{path}".') from exc
 
     def resolve_type_id(name_or_id: str) -> str | None:
         t = space.type_by_id(name_or_id) or space.type_by_id(space._type_id(name_or_id))
@@ -435,7 +435,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         tid = resolve_type_id(type_id)
         found = next(((t, rev) for t, rev in space.types_with_revisions() if t.id == tid), None)
         if found is None:
-            return error(404, f"No object type {type_id!r}")
+            return error(404, f'There is no object type "{type_id}".')
         t, rev = found
         return SafeJSONResponse(_jsonable(t.to_api(rev)))
 
@@ -451,7 +451,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         auth(request)
         found = find_collection(collection_id)
         if found is None:
-            return error(404, f"No collection {collection_id!r}")
+            return error(404, f'There is no collection "{collection_id}".')
         c, rev = found
         return SafeJSONResponse(_jsonable(c.to_api(rev)))
 
@@ -467,7 +467,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         auth(request)
         q = find_query(query_id)
         if q is None:
-            return error(404, f"No query {query_id!r}")
+            return error(404, f'There is no query "{query_id}".')
         return SafeJSONResponse(_jsonable(q.to_api(space.query_revision(q.id))))
 
     @r.get("/v1/whiteboard")
@@ -492,7 +492,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         try:
             return SafeJSONResponse(_jsonable(history.content(rel, id)))
         except VersionNotFound:
-            return error(404, f"No version {id!r} of {path!r}")
+            return error(404, f'There is no version "{id}" of "{path}".')
         except ValueError as exc:
             return error(400, str(exc))
 
@@ -691,7 +691,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
     def write_body(req: BodyRequest, request: Request):
         token = auth(request, write=True)
         if len(req.body) > MAX_BODY:
-            return error(422, "body is too long.")
+            return error(422, "The body is too long.")
         rel = visible(req.path)
         status, body = app(
             request, "PUT", "/api/object/body",
@@ -735,7 +735,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         rel = visible(req.path)
         tid = resolve_type_id(req.type)
         if tid is None:
-            return error(404, f"No object type {req.type!r}")
+            return error(404, f'There is no object type "{req.type}".')
         mapping = req.mapping
         if mapping is None:
             status, body = app(request, "GET", "/api/object/change-type", path=rel, typeId=tid)
@@ -812,7 +812,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         token = auth(request, write=True)
         tid = resolve_type_id(type_id)
         if tid is None:
-            return error(404, f"No object type {type_id!r}")
+            return error(404, f'There is no object type "{type_id}".')
         status, body = app(
             request, "PUT", "/api/types/{type_id}",
             {"type": req.type, "baseRevision": req.revision, "confirm": req.confirm,
@@ -878,7 +878,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         token = auth(request, write=True)
         tid = resolve_type_id(type_id)
         if tid is None:
-            return error(404, f"No object type {type_id!r}")
+            return error(404, f'There is no object type "{type_id}".')
         status, body = app(
             request, "POST", "/api/types/{type_id}/properties/{pid}/change-kind",
             {"toType": req.toKind, "baseRevision": req.revision, "clientId": origin(token)},
@@ -900,7 +900,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         token = auth(request, write=True)
         tid = resolve_type_id(type_id)
         if tid is None:
-            return error(404, f"No object type {type_id!r}")
+            return error(404, f'There is no object type "{type_id}".')
         status, body = app(
             request, "DELETE", "/api/types/{type_id}",
             type_id=tid, confirm=bool(confirm), clientId=origin(token),
@@ -941,7 +941,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         token = auth(request, write=True)
         found = find_collection(collection_id)
         if found is None:
-            return error(404, f"No collection {collection_id!r}")
+            return error(404, f'There is no collection "{collection_id}".')
         cid = found[0].id
         status, body = app(
             request, "PUT", "/api/collections/{collection_id}",
@@ -961,7 +961,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         token = auth(request, write=True)
         found = find_collection(collection_id)
         if found is None:
-            return error(404, f"No collection {collection_id!r}")
+            return error(404, f'There is no collection "{collection_id}".')
         cid = found[0].id
         members = collection_members(cid) if not confirm else []
         status, body = app(
@@ -999,7 +999,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         token = auth(request, write=True)
         q = find_query(query_id)
         if q is None:
-            return error(404, f"No query {query_id!r}")
+            return error(404, f'There is no query "{query_id}".')
         status, body = app(
             request, "PUT", "/api/queries/{query_id}",
             {"query": req.query, "baseRevision": req.revision, "clientId": origin(token)},
@@ -1015,7 +1015,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         token = auth(request, write=True)
         q = find_query(query_id)
         if q is None:
-            return error(404, f"No query {query_id!r}")
+            return error(404, f'There is no query "{query_id}".')
         status, body = app(request, "DELETE", "/api/queries/{query_id}", query_id=q.id, clientId=origin(token))
         if status < 400:
             guard.log(token, "delete-query", q.id, trashId=body.get("trashId"))
@@ -1135,7 +1135,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         token = auth(request, write=True)
         item = next((i for i in space.list_trash() if i.id == trash_id), None)
         if item is None or guard.trash_entry_hidden(item):
-            return error(404, f"No trash entry {trash_id!r}")
+            return error(404, f'There is no Trash entry "{trash_id}".')
         status, body = app(request, "POST", "/api/trash/{trash_id}/restore", trash_id=trash_id, clientId=origin(token))
         if status < 400:
             guard.log(token, "restore", item.originalPath, trashId=trash_id)

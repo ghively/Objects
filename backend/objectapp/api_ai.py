@@ -444,10 +444,10 @@ def router(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No AI chat at {path!r}")
+            return _error(404, f'There is no AI chat at "{path}".')
         t = find_chat_type(space)
         if t is None or summary.type != t.id:
-            return _error(404, f"No AI chat at {path!r}")
+            return _error(404, f'There is no AI chat at "{path}".')
         ctx_key, ses_key = chat_keys(t)
         links = space.links_of(rel, fm) if ctx_key else {}
         context = [p for p in links.get(ctx_key, []) if p] if ctx_key else []
@@ -560,9 +560,9 @@ def router(
             rel = space._rel(req.path)
             summary = space.get(rel)
             if summary.type != t.id:
-                return _error(404, f"No AI chat at {req.path!r}")
+                return _error(404, f'There is no AI chat at "{req.path}".')
             if not req.baseVersion:
-                return _error(422, "baseVersion is needed to update a chat.")
+                return _error(422, "A base version is needed to update a chat.")
             _of, _fm, current = space.read(rel)
             if current != req.baseVersion:
                 raise Conflict(current)
@@ -594,6 +594,6 @@ def router(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No AI chat at {req.path!r}")
+            return _error(404, f'There is no AI chat at "{req.path}".')
 
     return r

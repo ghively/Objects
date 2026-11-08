@@ -350,7 +350,7 @@ def _move_to_trash(path: Path) -> None:
     fake = os.environ.get(FAKE_TRASH_ENV)
     if fake:
         if fake == "unavailable":
-            raise TrashUnavailable("The trash is not available.")
+            raise TrashUnavailable("The Trash is not available.")
         bin_dir = state_dir() / "fake-trash"
         bin_dir.mkdir(parents=True, exist_ok=True)
         dest, n = bin_dir / path.name, 2
@@ -366,12 +366,12 @@ def _move_to_trash(path: Path) -> None:
     try:
         send2trash(str(path))
     except TrashPermissionError as exc:
-        raise TrashUnavailable(str(exc) or "The trash is not available.") from exc
+        raise TrashUnavailable(str(exc) or "The Trash is not available.") from exc
     except FileNotFoundError:
         raise
     except OSError as exc:
         if path.exists():  # nothing (or only part) was moved: the trash can't take it
-            raise TrashUnavailable(str(exc) or "The trash is not available.") from exc
+            raise TrashUnavailable(str(exc) or "The Trash is not available.") from exc
         raise
 
 

@@ -209,9 +209,9 @@ def router(ctx: ApiContext) -> APIRouter:
             try:
                 location = normalize(req.target.location)
             except (ValueError, OSError):
-                return _error(404, "Not a folder.")
+                return _error(404, "This path is not a folder.")
             if not location.is_dir():
-                return _error(404, f"Not a folder: {location}")
+                return _error(404, f'"{location}" is not a folder.')
             target_path = location / safe_filename(name)
             if target_path.exists():
                 return _error(409, "A file or folder with this name already exists there.")
