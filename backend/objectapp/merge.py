@@ -131,7 +131,13 @@ def _merged_updates(
             continue
         traw = tfm.get(key)
         try:
-            if _is_list(pdef):
+            if pdef.type == "entity_collections":
+                value, left_out = _collections_union(space, t, traw, sraw)
+                if left_out:
+                    dropped.append(key)  # one the target can't join, or no such collection
+                if value is not None:
+                    updates[key] = value
+            elif _is_list(pdef):
                 value = _union(space, pdef, source, target, sfm, tfm)
                 if value is not None:
                     updates[key] = value
@@ -159,6 +165,33 @@ def _entity_refs(space: Space, pdef: PropertyDefinition, raw: Any, at: str) -> l
     return out
 
 
+def _collections_union(
+    space: Space, t: TypeDefinition | None, traw: Any, sraw: Any
+) -> tuple[list[str] | None, bool]:
+    """The target's collections plus the source's it may join, and whether any were left out.
+
+    A source collection is kept when the target already has it, or when a collection by that
+    name exists and lists the target's type (what `Space._apply_values` accepts); the rest
+    would make the merge fail, so they are dropped instead (sweep 2026-11-08).
+    """
+    mine = _str_items(traw)
+    had = {_fold(x) for x in mine}
+    seen = set(had)
+    added: list[str] = []
+    left_out = False
+    for name in _str_items(sraw):
+        c = space.collection_by_name(name)
+        if _fold(name) not in had and not (c is not None and t is not None and t.id in c.typeIds):
+            left_out = True
+            continue
+        key = _fold(c.name if c is not None else name)
+        if key in seen:
+            continue
+        seen.add(key)
+        added.append(c.name if c is not None else name)
+    return ([*mine, *added] if added else None), left_out
+
+
 def _union(
     space: Space, pdef: PropertyDefinition, source: str, target: str, sfm: dict, tfm: dict
 ) -> Any:
@@ -184,9 +217,7 @@ def _union(
     if pdef.type == "label":
         mine = decode_value(pdef, tfm.get(key))
         theirs = [x for x in decode_value(pdef, sfm.get(key)) if label_lookup(pdef, x)]
-    elif pdef.type == "entity_collections":
-        mine, theirs = _str_items(tfm.get(key)), _str_items(sfm.get(key))
-    else:  # tags, aliases
+    else:  # tags, aliases (collections go through `_collections_union`)
         mine = decode_value(pdef, tfm.get(key))
         theirs = decode_value(pdef, sfm.get(key))
     seen = {_fold(x) for x in mine}
