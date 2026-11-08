@@ -136,7 +136,8 @@ def iter_object_paths(root: Path) -> Iterator[str]:
     """Every ``*.md`` object file under `root`, as sorted space-relative POSIX paths.
 
     The suffix matches in any case (``Note.MD``), as `Space._rel` and the watcher accept
-    it on every system; dot-folders are not entered.
+    it on every system; dot-folders and symlinked folders are not entered, and symlinked
+    files are skipped.
     """
     root = Path(root)
     found = []
@@ -146,7 +147,10 @@ def iter_object_paths(root: Path) -> Iterator[str]:
         for name in files:
             if name.startswith(".") or not name.lower().endswith(".md"):
                 continue
-            if not os.path.isfile(os.path.join(folder, name)):
+            full = os.path.join(folder, name)
+            # A symlinked file is skipped: its target may lie outside the space (where
+            # every per-object call refuses it) and its text must not be listed or searched.
+            if os.path.islink(full) or not os.path.isfile(full):
                 continue
             rel = base / name
             if is_ignored(rel):
