@@ -50,7 +50,7 @@ export interface SidebarProps {
   onNew?: () => void
   /** The `+` beside "Object Types": create a type. */
   onCreateType?: () => void
-  /** A type row's context menu › "Object Type Settings". */
+  /** A type row's context menu › "Object type settings". */
   onOpenTypeSettings?: (type: TypeDef) => void
   /** A type row's context menu › "Delete object type" (non-basic types only). */
   onDeleteType?: (type: TypeDef) => void
@@ -243,7 +243,7 @@ function SortableTypeEntry({ id, children }: { id: string; children: (drag: Drag
   )
 }
 
-/** The Object Types header `...`: Sort Manually | Sort Alphabetically, the current one checked. */
+/** The Object Types header `...`: Sort manually | Sort alphabetically, the current one checked. */
 function ObjectTypesMenu({ sort, onManual, onAlphabetical }: { sort: TypeSort; onManual(): void; onAlphabetical(): void }) {
   return (
     <DropdownMenu>
@@ -297,7 +297,7 @@ export function Sidebar({
   // A type's collections sit under its row in the object types block.
   const { collections } = useCollections()
   const [collapsed, toggleCollapsed] = useCollapsedTypes()
-  // The type menu's "New Collection" and "Import" open their dialogs here.
+  // The type menu's "New collection" and "Import" open their dialogs here.
   const [collectionFor, setCollectionFor] = useState<TypeDef | null>(null)
   const [importFor, setImportFor] = useState<TypeDef | null>(null)
   const byType = useMemo(() => {

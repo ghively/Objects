@@ -492,13 +492,17 @@ export function TypePage({ type }: { type: TypeDef }) {
               <Icon name={COLLECTION_ICON} size={14} />
               {SECTION_TEXT.createCollection}
             </DropdownMenuItem>
+            <PinMenuItems pin={{ kind: 'type', id: type.id }} />
+            <DropdownMenuItem data-type-setting="" onClick={() => useTabs.getState().open({ kind: 'typeSettings', typeId: type.id })}>
+              <Icon name="ph-gear" size={14} />
+              Object type settings
+            </DropdownMenuItem>
             {canImport && (
               <DropdownMenuItem onSelect={() => setImportOpen(true)}>
                 <Icon name="ph-file-csv" size={14} />
                 {IMPORT_CSV_TEXT.menu}
               </DropdownMenuItem>
             )}
-            <PinMenuItems pin={{ kind: 'type', id: type.id }} />
             {tab === 'all' && (
               <DropdownMenuItem
                 onClick={() => void saveAsQuery().catch((e: unknown) => console.warn('Could not save the query:', e))}
@@ -507,10 +511,6 @@ export function TypePage({ type }: { type: TypeDef }) {
                 Save as query
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem data-type-setting="" onClick={() => useTabs.getState().open({ kind: 'typeSettings', typeId: type.id })}>
-              <Icon name="ph-gear" size={14} />
-              Object Type Settings
-            </DropdownMenuItem>
             {!type.basic && (
               <DropdownMenuItem onClick={() => setDeleteOpen(true)}>
                 <Icon name="ph-trash" size={14} />

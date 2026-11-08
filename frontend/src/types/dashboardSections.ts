@@ -32,7 +32,7 @@ export const SECTION_TEXT = {
   collections: 'Collections',
   collectionsEmptyTitle: 'No collections',
   collectionsEmptyBody: 'Create a collection to see it here.',
-  createCollection: 'New Collection',
+  createCollection: 'New collection',
   queries: 'Queries',
   queriesEmptyTitle: 'No queries',
   queriesEmptyBody: 'Queries you save show up here.',

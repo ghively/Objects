@@ -4,8 +4,8 @@
 import type { UiState } from '@/api/types'
 import { saveSidebarUi } from './SidebarSections'
 
-export const SORT_MANUALLY = 'Sort Manually'
-export const SORT_ALPHABETICALLY = 'Sort Alphabetically'
+export const SORT_MANUALLY = 'Sort manually'
+export const SORT_ALPHABETICALLY = 'Sort alphabetically'
 /** Our string: the header `...` button's name. */
 export const TYPES_MENU_LABEL = 'Object Types options'
 

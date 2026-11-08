@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { invalidateLinkIndex } from '@/links/linkIndex'
 
 export const COLLECTION_DIALOG_TEXT = {
-  createTitle: 'New Collection',
+  createTitle: 'New collection',
   createTooltip: 'Sort objects of this type into collections; an object can sit in more than one.',
   defaultName: 'New Collection',
   deleteTitle: 'Delete this collection?',

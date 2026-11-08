@@ -53,7 +53,7 @@ describe('CollectionPage row menu (Task 17)', () => {
       'Change type',
       'Copy object reference',
       'Duplicate',
-      'Delete Object',
+      'Delete object',
       'Pin to collection',
       'Remove from collection',
     ])

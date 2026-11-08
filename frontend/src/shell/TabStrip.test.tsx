@@ -54,7 +54,7 @@ describe('TabStrip', () => {
     expect(within(tabs()[1]).getByRole('button', { name: 'Close tab' })).toBeInTheDocument()
 
     fireEvent.contextMenu(tabs()[1])
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Pin Tab' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pin tab' }))
     expect(tabs()[0]).toHaveTextContent('b')
     expect(tabs()[0]).toHaveAttribute('data-pinned')
     expect(within(tabs()[0]).queryByRole('button', { name: 'Close tab' })).toBeNull()
@@ -63,12 +63,12 @@ describe('TabStrip', () => {
     expect(s().tabs).toHaveLength(2)
     // Nor does the context menu: it has no "Close tab" for a pinned tab (on every path).
     fireEvent.contextMenu(tabs()[0])
-    expect(screen.getByRole('menuitem', { name: 'Unpin Tab' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Unpin tab' })).toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'Close tab' })).toBeNull()
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
 
     fireEvent.contextMenu(tabs()[0])
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Unpin Tab' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Unpin tab' }))
     expect(s().tabs[0].pinned).toBe(false)
     expect(within(tabs()[0]).getByRole('button', { name: 'Close tab' })).toBeInTheDocument()
 
@@ -78,7 +78,7 @@ describe('TabStrip', () => {
     expect(s().tabs).toHaveLength(1)
   })
 
-  test("a type tab's menu: Pin to sidebar, Pin Tab, Object Type Settings, Import (Ctrl I), Close tab", async () => {
+  test("a type tab's menu: Pin to sidebar, Pin tab, Object type settings, Import (Ctrl I), Close tab", async () => {
     const PAGES = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', revision: 'r1' })
     vi.mocked(api).ui.mockResolvedValue({ ui: { pinned: [], sections: [], allNotesLayout: 'list' }, revision: 'u0' })
     vi.mocked(api).onChange.mockReturnValue(() => undefined)
@@ -88,11 +88,11 @@ describe('TabStrip', () => {
     render(<TabStrip space={null} />)
     fireEvent.contextMenu(tabs()[0])
     const items = screen.getAllByRole('menuitem').map((i) => i.textContent)
-    expect(items).toEqual(['Pin to sidebar', 'Pin Tab', 'Object Type Settings', 'ImportCtrl I', 'Close tab'])
+    expect(items).toEqual(['Pin to sidebar', 'Pin tab', 'Object type settings', 'ImportCtrl I', 'Close tab'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Pin to sidebar' }))
     await waitFor(() => expect(vi.mocked(api).patchUi).toHaveBeenCalledWith({ pinned: [{ kind: 'type', id: 'page' }] }, expect.anything()))
     fireEvent.contextMenu(tabs()[0])
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Object Type Settings' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Object type settings' }))
     expect(currentTarget(s())).toEqual({ kind: 'typeSettings', typeId: 'page' })
   })
 
@@ -100,7 +100,7 @@ describe('TabStrip', () => {
     s().open({ kind: 'calendar' })
     render(<TabStrip space={null} />)
     fireEvent.contextMenu(tabs()[0])
-    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Pin Tab', 'Close tab'])
+    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Pin tab', 'Close tab'])
   })
 
   test('test tabs are 60 to 200 px wide with a 5 px gap', () => {

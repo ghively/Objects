@@ -34,7 +34,7 @@ describe('Sidebar type context menu', () => {
     render(<Sidebar types={[MEETING]} />)
     await openMenu(user, /Meetings/)
     const items = (await screen.findAllByRole('menuitem')).map((i) => i.textContent)
-    expect(items).toEqual(['Open', 'Create Meeting', 'New from Template', 'New Collection', 'Pin to sidebar', 'Object Type Settings', 'Import CSV', 'Delete object type'])
+    expect(items).toEqual(['Open', 'Create Meeting', 'New from template', 'New collection', 'Pin to sidebar', 'Object type settings', 'Import CSV', 'Delete object type'])
   })
 
   it('Pin to sidebar pins the type', async () => {
@@ -56,11 +56,11 @@ describe('Sidebar type context menu', () => {
     expect(createAndOpen).toHaveBeenCalledWith('meeting')
   })
 
-  it('New from Template lists the type\'s templates and creates from one', async () => {
+  it('New from template lists the type\'s templates and creates from one', async () => {
     const user = userEvent.setup()
     render(<Sidebar types={[MEETING]} />)
     await openMenu(user, /Meetings/)
-    await user.click(await screen.findByRole('menuitem', { name: 'New from Template' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'New from template' }))
     // Radix submenus ignore a pointer that jumps straight in (jsdom); the click itself is what selects.
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Standup' }))
     expect(mocked.templates).toHaveBeenCalledWith('meeting')
@@ -77,11 +77,11 @@ describe('Sidebar type context menu', () => {
     expect(onOpenTarget).toHaveBeenCalledWith({ kind: 'type', typeId: 'meeting' }, { newTab: true })
   })
 
-  it('New Collection opens the create dialog for the type', async () => {
+  it('New collection opens the create dialog for the type', async () => {
     const user = userEvent.setup()
     render(<Sidebar types={[MEETING]} />)
     await openMenu(user, /Meetings/)
-    await user.click(await screen.findByRole('menuitem', { name: 'New Collection' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'New collection' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { hidden: true })).toBeInTheDocument()
   })
@@ -99,6 +99,6 @@ describe('Sidebar type context menu', () => {
     render(<Sidebar types={[DAILY]} />)
     await openMenu(user, /DailyNotes/)
     const items = (await screen.findAllByRole('menuitem')).map((i) => i.textContent)
-    expect(items).toEqual(['Open', 'New Collection', 'Pin to sidebar', 'Object Type Settings'])
+    expect(items).toEqual(['Open', 'New collection', 'Pin to sidebar', 'Object type settings'])
   })
 })
