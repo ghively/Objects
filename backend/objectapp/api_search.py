@@ -33,7 +33,10 @@ def _error(message: str) -> JSONResponse:
 
 def router(ctx: ApiContext) -> APIRouter:
     """The search routes, mounted on the app's `/api` router (so no prefix here)."""
-    r = APIRouter()
+    from .server import SafeJSONResponse  # lazy: server.py imports this module
+
+    # A file name that is not UTF-8 holds surrogate escapes (audit 2026-11-07 #4).
+    r = APIRouter(default_response_class=SafeJSONResponse)
 
     @r.get("/search")
     def search(
