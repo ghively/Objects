@@ -882,7 +882,7 @@ def _report(planned: Planned, space: Space, state: WriteState) -> None:
             return f"[[{summary.title}]]"
         return f"[[{rel[:-3]}]]"
 
-    when = datetime.now(UTC).astimezone().strftime("%Y-%m-%d %H:%M")
+    when = space.clock().astimezone(space.tz).strftime("%Y-%m-%d %H:%M")  # the space's zone, as every stamp
     # Planned renames, and files that got another name because theirs was taken meanwhile.
     renamed = [
         (po.title, rel)
