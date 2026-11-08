@@ -8,6 +8,8 @@ original kept by the importer.
 
 from __future__ import annotations
 
+import os
+import stat
 from pathlib import Path
 
 from . import docx, media, pdf, pptx, sheets, textfiles
@@ -45,6 +47,12 @@ def read_file(path: Path) -> ReadResult:
     """Read one file into a page. Unknown or broken files come back ``original_only``, never raise on content."""
     path = Path(path)
     reader = _READERS.get(path.suffix.lower(), media.read_binary)
+    try:
+        regular = stat.S_ISREG(os.stat(path).st_mode)
+    except OSError:
+        regular = True  # the reader reports a missing or unreadable file as before
+    if not regular:  # a FIFO, socket or device: opening it can block forever
+        return ReadResult(title=path.stem, notes=["Not a regular file", "Original only"], original_only=True)
     try:
         result = reader(path)
     except Exception as e:  # a damaged document must not stop an import

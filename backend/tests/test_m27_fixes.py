@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -476,3 +478,40 @@ def test_take_source_keeps_the_files_crlf_and_bom(client, tmp_path):
     out = (root / page).read_bytes()
     assert b"version two" in out
     assert out.startswith(b"\xef\xbb\xbf") and b"\r\n" in out and b"\n" not in out.replace(b"\r\n", b"")
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="no FIFOs on this platform")
+def test_a_fifo_in_the_source_is_not_opened(tmp_path):
+    """Audit 11: a FIFO (or any non-regular file) in an import source made the scan block forever."""
+    import threading
+
+    from objectapp import readers
+    from objectapp.importscan import scan_file
+
+    src = tmp_path / "S"
+    src.mkdir()
+    (src / "ok.md").write_text(f"# ok\n\nkey {AWS}\n", encoding="utf-8")
+    os.mkfifo(src / "pipe.md")
+    os.mkfifo(src / "pipe.docx")
+    os.mkfifo(tmp_path / "lone.zip")
+    got: dict = {}
+
+    def work() -> None:
+        got["tree"] = scan_tree(src)
+        got["file"] = scan_file(src / "pipe.md")
+        got["zip"] = scan_tree(tmp_path / "lone.zip")
+        got["read"] = [readers.read_file(src / n) for n in ("pipe.md", "pipe.docx")]
+
+    t = threading.Thread(target=work, daemon=True)
+    t.start()
+    t.join(15)
+    if t.is_alive():  # unblock the stuck open so the thread can end
+        for n in ("pipe.md", "pipe.docx"):
+            with contextlib.suppress(OSError):
+                fd = os.open(src / n, os.O_WRONLY | os.O_NONBLOCK)
+                os.close(fd)
+        pytest.fail("the scan opened a FIFO and blocked")
+    assert list(got["tree"].findings) == ["ok.md"] and got["tree"].scanned == 1
+    assert got["file"] == []
+    assert got["zip"].scanned == 0
+    assert all(r.original_only and r.markdown == "" for r in got["read"])
