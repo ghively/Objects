@@ -238,6 +238,7 @@ def contributors() -> list[tuple[int, str, Contributor]]:
 
 
 SECRET_LOOKUP: Callable[[str], str | None] = lambda name: None  # noqa: E731 - M19 replaces it
+"""A ``${VAR}``'s value for a folder ``.mcp.json`` server, or None (M19 supplies secrets)."""
 
 _REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 
@@ -261,7 +262,6 @@ def fill_refs(value: Any, values: dict[str, str]) -> Any:
     if isinstance(value, dict):
         return {k: fill_refs(v, values) for k, v in value.items()}
     return value
-"""A ``${VAR}``'s value for a folder ``.mcp.json`` server, or None (M19 supplies secrets)."""
 
 
 # -- paths and the fence -----------------------------------------------------------------------
