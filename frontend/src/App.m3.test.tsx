@@ -67,13 +67,13 @@ describe('navigation wiring', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Pages', level: 1 })
     await user.click(screen.getByRole('button', { name: 'More' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Pin to Sidebar' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Pin to sidebar' }))
     await waitFor(() => expect(stored.pinned).toEqual([{ kind: 'type', id: 'page' }]))
 
     useTabs.getState().open({ kind: 'collection', id: 'reading' })
     await screen.findByRole('textbox', { name: 'Collection name' })
     await user.click(screen.getByRole('button', { name: 'More' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Pin to Sidebar' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Pin to sidebar' }))
     await waitFor(() =>
       expect(stored.pinned).toEqual([
         { kind: 'type', id: 'page' },

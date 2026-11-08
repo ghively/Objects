@@ -77,7 +77,7 @@ export interface TypeContextMenuProps {
   onImport?: (type: TypeDef) => void
 }
 
-/** "Pin to Sidebar" / "Unpin from space" for the type itself (the live menu has it after New Collection). */
+/** "Pin to sidebar" / "Unpin from space" for the type itself (the live menu has it after New Collection). */
 export function PinTypeItem({ type }: { type: TypeDef }) {
   const { isPinned, pin, unpin } = usePinned()
   const ref = { kind: 'type' as const, id: type.id }

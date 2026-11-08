@@ -69,7 +69,7 @@ describe('Sidebar', () => {
       'Create Server',
       'New from Template',
       'New Collection',
-      'Pin to Sidebar',
+      'Pin to sidebar',
       'Object Type Settings',
       'Import CSV',
       'Delete object type',

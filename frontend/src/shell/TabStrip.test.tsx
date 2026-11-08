@@ -78,7 +78,7 @@ describe('TabStrip', () => {
     expect(s().tabs).toHaveLength(1)
   })
 
-  test("a type tab's menu: Pin to Sidebar, Pin Tab, Object Type Settings, Import (Ctrl I), Close tab", async () => {
+  test("a type tab's menu: Pin to sidebar, Pin Tab, Object Type Settings, Import (Ctrl I), Close tab", async () => {
     const PAGES = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', revision: 'r1' })
     vi.mocked(api).ui.mockResolvedValue({ ui: { pinned: [], sections: [], allNotesLayout: 'list' }, revision: 'u0' })
     vi.mocked(api).onChange.mockReturnValue(() => undefined)
@@ -88,8 +88,8 @@ describe('TabStrip', () => {
     render(<TabStrip space={null} />)
     fireEvent.contextMenu(tabs()[0])
     const items = screen.getAllByRole('menuitem').map((i) => i.textContent)
-    expect(items).toEqual(['Pin to Sidebar', 'Pin Tab', 'Object Type Settings', 'ImportCtrl I', 'Close tab'])
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Pin to Sidebar' }))
+    expect(items).toEqual(['Pin to sidebar', 'Pin Tab', 'Object Type Settings', 'ImportCtrl I', 'Close tab'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pin to sidebar' }))
     await waitFor(() => expect(vi.mocked(api).patchUi).toHaveBeenCalledWith({ pinned: [{ kind: 'type', id: 'page' }] }, expect.anything()))
     fireEvent.contextMenu(tabs()[0])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Object Type Settings' }))

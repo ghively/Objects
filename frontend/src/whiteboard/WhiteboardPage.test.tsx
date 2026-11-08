@@ -269,7 +269,7 @@ describe('WhiteboardPage', () => {
     expect(screen.queryByText('Delete this object?')).toBeNull()
     act(() => useDeleteRequest.getState().requestDelete(PATH, 'page'))
     expect(await screen.findByText('Delete this object?')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Object' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete object' }))
     await waitFor(() => expect(api.deleteObject).toHaveBeenCalledWith(PATH, { baseVersion: 'v1' }))
     expect(await screen.findByText('Deleted content')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Undo Delete' }))

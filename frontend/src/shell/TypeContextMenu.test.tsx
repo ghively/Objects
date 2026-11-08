@@ -34,14 +34,14 @@ describe('Sidebar type context menu', () => {
     render(<Sidebar types={[MEETING]} />)
     await openMenu(user, /Meetings/)
     const items = (await screen.findAllByRole('menuitem')).map((i) => i.textContent)
-    expect(items).toEqual(['Open', 'Create Meeting', 'New from Template', 'New Collection', 'Pin to Sidebar', 'Object Type Settings', 'Import CSV', 'Delete object type'])
+    expect(items).toEqual(['Open', 'Create Meeting', 'New from Template', 'New Collection', 'Pin to sidebar', 'Object Type Settings', 'Import CSV', 'Delete object type'])
   })
 
-  it('Pin to Sidebar pins the type', async () => {
+  it('Pin to sidebar pins the type', async () => {
     const user = userEvent.setup()
     render(<Sidebar types={[MEETING]} />)
     await openMenu(user, /Meetings/)
-    await user.click(await screen.findByRole('menuitem', { name: 'Pin to Sidebar' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Pin to sidebar' }))
     await waitFor(() => expect(mocked.patchUi).toHaveBeenCalled())
     const sent = JSON.stringify(mocked.patchUi.mock.calls[0][0])
     expect(sent).toContain('"kind":"type"')
@@ -99,6 +99,6 @@ describe('Sidebar type context menu', () => {
     render(<Sidebar types={[DAILY]} />)
     await openMenu(user, /DailyNotes/)
     const items = (await screen.findAllByRole('menuitem')).map((i) => i.textContent)
-    expect(items).toEqual(['Open', 'New Collection', 'Pin to Sidebar', 'Object Type Settings'])
+    expect(items).toEqual(['Open', 'New Collection', 'Pin to sidebar', 'Object Type Settings'])
   })
 })

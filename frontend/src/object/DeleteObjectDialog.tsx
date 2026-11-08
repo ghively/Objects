@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button'
 export const DELETE_OBJECT_TEXT = {
   title: 'Delete this object?',
   description: 'Moves it to the Trash.',
-  action: 'Delete Object',
+  action: 'Delete object',
 }
 
 interface DeleteRequestState {
