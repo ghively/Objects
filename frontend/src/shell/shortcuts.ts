@@ -5,8 +5,13 @@
  * binds them with `useTabShortcuts()` and `usePanelShortcuts()`. Back/forward (Ctrl+←/→, Ctrl+[/])
  * and the panel keys (Ctrl+Shift+←/→) stay out of text fields and editors, where those keys move
  * and select by word.
+ *
+ * The General keys of the 2026-11-08 sweep (`useGeneralShortcuts()`: Create new task) ride along
+ * with the tab shortcuts, so `App` binds them with the same call.
  */
 import { toggleCalendarSidebar } from '@/calendar/calendarUi'
+import { createAndOpen } from '@/create/createAndOpen'
+import { useLinkIndex } from '@/links/linkIndex'
 import { M7_SHORTCUTS, registerShortcuts, useGlobalShortcut } from '@/lib/shortcuts'
 import { useTabs } from '@/nav/tabs'
 import { useTabMenu } from '@/shell/TabMenu'
@@ -33,7 +38,26 @@ export function cycleTabs(): void {
   s.activate(s.tabs[(i + 1) % s.tabs.length].id)
 }
 
+/** The basic Task type of this space (by flag and name, as the server infers it), or none. */
+export function taskTypeId(): string | undefined {
+  const types = useLinkIndex.getState().types
+  return (types.find((t) => t.basic && t.name.toLowerCase() === 'task') ?? types.find((t) => t.id === 'task'))?.id
+}
+
+/** "Create new task" (Ctrl+Shift+T): the New menu's flow for the Task type, outside editable targets. */
+export function createNewTask(): void {
+  const id = taskTypeId()
+  if (!id) return
+  void createAndOpen(id).catch((err: unknown) => console.warn('Could not create a task:', err))
+}
+
+/** The General keys of the 2026-11-08 sweep. Inside the editor Ctrl+Shift+T stays "Make this block a task". */
+export function useGeneralShortcuts(): void {
+  useGlobalShortcut('createNewTask', createNewTask)
+}
+
 export function useTabShortcuts(): void {
+  useGeneralShortcuts()
   useGlobalShortcut('closeTab', closeActiveTab)
   useGlobalShortcut('openNewTab', () => useTabs.getState().newTab())
   useGlobalShortcut('navigateTabs', cycleTabs, { allowInEditable: true })

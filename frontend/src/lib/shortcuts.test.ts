@@ -184,3 +184,39 @@ describe('letter shortcuts and keyboard layouts', () => {
     expect(matches(key({ key: 'я', code: 'KeyZ', ctrlKey: true }), ['Mod-z'])).toBe(true)
   })
 })
+
+// The 2026-11-08 sweep: the easy catalogued keys Gene asked to bind ("bind the easy ones").
+describe('sweep 2026-11-08: catalogued keys', () => {
+  const byId = () => new Map(allShortcuts().map((d) => [d.id, d]))
+
+  test('Ctrl+Shift+T creates a new task outside the editor and keeps making a block a task inside it', () => {
+    const d = byId().get('createNewTask')
+    expect(d).toBeTruthy()
+    expect(d?.category).toBe('global')
+    expect(d?.scope).toBe('global')
+    expect(d?.name).toBe('Create new task')
+    expect(d?.provisional).toBe(false)
+    expect(d?.bound).toBe(true)
+    expect(keysFor('createNewTask')).toEqual(['Mod-Shift-t'])
+    // The editor keeps its own meaning of the key (the registry knows the pair shares it).
+    expect(keysFor('turnBlockIntoTaskObject')).toEqual(['Mod-Shift-t'])
+    expect(byId().get('turnBlockIntoTaskObject')?.scope).toBe('editor')
+    expect(sharesKeyByDesign('createNewTask', 'turnBlockIntoTaskObject')).toBe(true)
+  })
+
+  test('no two registered ids in one scope share a key, except the declared pairs', () => {
+    for (const mac of [false, true]) {
+      const seen = new Map<string, string>()
+      for (const d of allShortcuts()) {
+        for (const k of d.keys) {
+          const c = parseKeys(k, mac)
+          const sig = isSequence(k) ? `${d.scope}|seq|${k.toLowerCase()}` : `${d.scope}|${c.ctrl}|${c.meta}|${c.alt}|${c.shift}|${c.key.toLowerCase()}`
+          const other = seen.get(sig)
+          if (other && sharesKeyByDesign(other, d.id)) continue
+          expect(other, `${d.id} (${k}) collides with ${other} in scope ${d.scope}`).toBeUndefined()
+          seen.set(sig, d.id)
+        }
+      }
+    }
+  })
+})

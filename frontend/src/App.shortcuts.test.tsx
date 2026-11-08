@@ -18,6 +18,7 @@ const mocked = vi.mocked(api)
 
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true, revision: 'r1' })
 const PROJECT = typeDef({ id: 'project', name: 'Project', pluralName: 'Projects', revision: 'r1' })
+const TASK = typeDef({ id: 'task', name: 'Task', pluralName: 'Tasks', basic: true, revision: 'r1' })
 const PATH = 'Projects/Notes.md'
 const NOTES = objectSummary({ path: PATH, type: 'project', title: 'Notes' })
 
@@ -27,7 +28,7 @@ beforeEach(() => {
   usePeek.getState().close()
   resetLinkIndex()
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockClear()
-  mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE, PROJECT] } satisfies SpaceInfo)
+  mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE, PROJECT, TASK] } satisfies SpaceInfo)
   mocked.objects.mockResolvedValue([NOTES])
   mocked.object.mockImplementation(async () =>
     objectDetail({ summary: NOTES, frontmatter: { type: 'Project', title: 'Notes' }, body: 'Some text.\n', version: 'v1' }),
@@ -90,5 +91,23 @@ describe('app shortcuts', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
     expect(mocked.deleteObject).not.toHaveBeenCalled()
+  })
+
+  // The 2026-11-08 sweep: Ctrl+Shift+T is "Create new task" outside the editor (catalog, General).
+  test('Ctrl+Shift+T outside the editor creates a new task, as the New menu does for the Task type', async () => {
+    await openObjectPage()
+    const notPrevented = fireEvent.keyDown(document.body, { key: 'T', ctrlKey: true, shiftKey: true })
+    expect(notPrevented).toBe(false)
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', {}))
+    // A task opens in the peek (the New menu's rule for the Task type).
+    await waitFor(() => expect(usePeek.getState().path).toBe('task/Untitled.md'))
+  })
+
+  test('Ctrl+Shift+T inside the editor keeps meaning "Make this block a task": no new task is created', async () => {
+    const { container } = await openObjectPage()
+    const editor = container.querySelector('.ProseMirror')!
+    fireEvent.keyDown(editor, { key: 'T', ctrlKey: true, shiftKey: true })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(mocked.createObject).not.toHaveBeenCalled()
   })
 })
