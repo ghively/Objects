@@ -383,3 +383,36 @@ def test_trashed_md_without_sidecar_and_unparseable_frontmatter(tmp_path, src):
     assert [s.path for s in space.list()] == ["Good.md"]
     meta = space.trash.object_meta(tid)
     assert meta is not None and meta["title"] == tid
+
+
+# -- bug audit 2026-11-07, finding 19: a `...` document-end line stays last -------------
+
+
+def test_document_end_line_stays_after_every_key():
+    src = "title: T\nstatus: open\n... # end\n"
+    stamp = "2026-11-07T00:00:00.000Z"
+    assert set_keys(src, {"lastUpdated": stamp}, insert_first={"id": "01ABC"}) == (
+        f"id: 01ABC\ntitle: T\nstatus: open\nlastUpdated: {stamp}\n... # end\n"
+    )
+    assert set_keys(src, {"status": "done"}) == "title: T\nstatus: done\n... # end\n"
+    assert set_keys(src, {"status": ["a", "b"]}) == (
+        "title: T\nstatus:\n  - a\n  - b\n... # end\n"
+    )
+    assert delete_keys(src, ["status"]) == "title: T\n... # end\n"
+    assert rename_key(src, "status", "state") == "title: T\nstate: open\n... # end\n"
+
+
+def test_property_edit_of_a_file_with_document_end_line(tmp_path):
+    from objectapp.space import Space, version_of
+
+    path = tmp_path / "Doc end.md"
+    path.write_bytes(b"---\ntitle: Doc end\nstatus: open\n...\n---\nbody\n")
+    space = Space(tmp_path)
+    space.update_properties("Doc end.md", {"note": "first"}, version_of(path.read_bytes()))
+    text = path.read_text(encoding="utf-8")
+    fm = text.split("---\n")[1]
+    assert fm.endswith("...\n") and "note: first\n" in fm and "lastUpdated: " in fm
+    summary = space.get("Doc end.md")
+    assert not summary.readOnly
+    space.update_properties("Doc end.md", {"note": "second"}, version_of(path.read_bytes()))
+    assert "note: second\n" in path.read_text(encoding="utf-8")
