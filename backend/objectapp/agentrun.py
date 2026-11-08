@@ -52,7 +52,10 @@ if TYPE_CHECKING:  # agents (T2) imports toolcatalog; this module only needs the
 
 __all__ = [
     "CLI_FLAGS",
+    "NESTED_AGENT",
+    "NESTED_AGENTS_DIR",
     "NESTED_MESSAGE",
+    "NESTED_TRASH",
     "OBJECT_GUIDANCE",
     "PROPOSAL_GUIDANCE",
     "RUN_ENV_DROP",
@@ -110,6 +113,9 @@ RUN_ENV_DROP: tuple[str, ...] = (
 """Names or name prefixes dropped from a run's environment (spike)."""
 
 NESTED_MESSAGE = "An agent folder can't be inside a space folder or hold one."
+NESTED_AGENT = "An agent folder can't be inside another agent's folder or hold one."  # our string
+NESTED_TRASH = "An agent folder can't be inside the agent trash."  # our string
+NESTED_AGENTS_DIR = "An agent folder can't be the folder that holds Object's agents."  # our string
 
 OBJECT_GUIDANCE = (
     "You are {agent}, an agent inside Object, the user's local Markdown notes app. "
@@ -302,14 +308,28 @@ def fence_rules(folders: list[Path], own: Path, state: Path, home: Path) -> list
     return out
 
 
-def nesting_problem(own: Path, folders: list[Path]) -> str | None:
-    """`NESTED_MESSAGE` when `own` is inside, or holds, one of `folders`; else None."""
+def nesting_problem(own: Path, folders: list[Path], message: str = NESTED_MESSAGE) -> str | None:
+    """`message` (by default `NESTED_MESSAGE`, the space folders') when `own` is inside, or holds,
+    one of `folders`; else None."""
     mine = Path(own).resolve()
     for f in folders:
         other = Path(f).resolve()
         if _within(mine, other) or _within(other, mine):
-            return NESTED_MESSAGE
+            return message
     return None
+
+
+def _nesting(scope: RunScope, spaces: list[Path], agents: list[Path]) -> str | None:
+    """What the run's own folder is nested in or holds, named (audit 13): a space folder, the
+    agents folder itself, the agent trash, or another agent's folder; else None."""
+    own = Path(scope.agent.folder).resolve()
+    agents_dir = (Path(scope.state) / AGENTS_DIR).resolve()
+    others = [p for p in agents if _key(Path(p).resolve()) != _key(own)]
+    problem = nesting_problem(own, [*spaces, scope.space_root])
+    if problem is None and _within(agents_dir, own):
+        problem = NESTED_AGENTS_DIR
+    return (problem or nesting_problem(own, [agents_dir / TRASH_DIR], NESTED_TRASH)
+            or nesting_problem(own, others, NESTED_AGENT))
 
 
 def claude_md_excludes(own: Path, home: Path) -> list[str]:
@@ -429,11 +449,10 @@ def _space_folders(state: Path, current: Path) -> list[Path]:
 
 
 def _fence(scope: RunScope, parts: RunParts) -> None:
-    folders = fence_folders(
-        scope, _space_folders(scope.state, scope.space_root), _local_agent_folders(scope.state)
-    )
+    spaces, agents = _space_folders(scope.state, scope.space_root), _local_agent_folders(scope.state)
+    folders = fence_folders(scope, spaces, agents)
     own = Path(scope.agent.folder)
-    problem = nesting_problem(own, folders)
+    problem = _nesting(scope, spaces, agents)
     if problem:
         raise RunRefused(problem)
     cache = os.environ.get("OBJECT_CACHE_DIR")

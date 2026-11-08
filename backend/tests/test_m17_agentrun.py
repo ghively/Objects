@@ -490,6 +490,24 @@ def test_nested_agent_and_space_refuse_to_run(env) -> None:
         assert nesting_problem(Path(str(inside).upper()), [space]) == NESTED_MESSAGE
 
 
+def test_nested_agent_names_what_it_hit(env) -> None:
+    """Audit 13: an agent inside another agent's folder, inside the agent trash, or that is the
+    agents folder itself, is refused with a message that says which."""
+    from objectapp.agentrun import NESTED_AGENT, NESTED_AGENTS_DIR, NESTED_TRASH
+
+    outer = env["state"] / "agents" / "Outer"
+    inner = outer / "Inner"
+    (inner / ".claude").mkdir(parents=True)
+    env["others"].extend([outer, inner])
+    for agent, message in ((inner, NESTED_AGENT), (outer, NESTED_AGENT),
+                           (env["state"] / "agents" / ".trash" / "Old", NESTED_TRASH),
+                           (env["state"] / "agents", NESTED_AGENTS_DIR)):
+        agent.mkdir(parents=True, exist_ok=True)
+        with pytest.raises(RunRefused) as e:
+            build_run(_scope(env, agent=_agent(agent)), claude="claude", model=None, resume=None)
+        assert e.value.message == message, agent
+
+
 # -- tool switches ------------------------------------------------------------------------------
 
 
